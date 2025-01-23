@@ -64,18 +64,33 @@ function updateDisplay() {
   document.getElementById("current-number").textContent = currentNumber;
   document.getElementById("target-number").textContent = targetNumber;
 
+  // Check if the current number matches the target
   if (currentNumber === targetNumber) {
-    document.getElementById("message").textContent = `Nice! ${targetNumber} in binary is ${binaryDigits.join("")}.`;
-    revealRandomTile(); // Reveal a tile
+    document.getElementById("message").textContent = `Congratulations, you got ${binaryDigits.join("")} binary number correct!`;
+    document.getElementById("reset-button").style.display = "block"; // Show the reset button
 
-    setTimeout(() => {
-      targetNumber = generateTarget(); // Generate a new target
-      binaryDigits.fill(0); // Reset binary digits
-      updateBinaryButtons();
-      updateDisplay();
-      document.getElementById("message").textContent = "";
-    }, 3000);
+    // Disable further interaction with binary buttons
+    document.querySelectorAll(".binary-button").forEach((button) => {
+      button.disabled = true;
+    });
   }
+}
+
+function resetGame() {
+  targetNumber = generateTarget(); // Generate a new target
+  binaryDigits.fill(0); // Reset binary digits
+
+  // Hide the reset button
+  document.getElementById("reset-button").style.display = "none";
+
+  // Clear messages
+  document.getElementById("message").textContent = "";
+
+  // Reset the cat game
+  resetCatGame();
+
+  // Reinitialize the binary game
+  initGame();
 }
 
 // Convert binary to decimal
