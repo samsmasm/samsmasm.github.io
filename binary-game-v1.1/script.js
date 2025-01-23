@@ -1,16 +1,32 @@
-// Binary game logic
 let binaryDigits = Array(8).fill(0); // Initialize an 8-bit binary number
 let revealedTiles = []; // Keep track of revealed tiles
 let targetNumber = generateTarget(); // Target number
 const totalTiles = 16;
 const totalImages = 10; // Number of available images
 let currentImage = ""; // Path to the current random image
+let isGameComplete = false; // Tracks whether all tiles are revealed
 
 // Rainbow colors for tiles
 const rainbowColors = [
   "red", "orange", "yellow", "green", "blue", "indigo", "violet",
   "pink", "teal", "brown", "lightblue", "gold", "lime", "purple", "silver", "coral",
 ];
+
+// Generate a random target number
+function generateTarget() {
+  return Math.floor(Math.random() * 256); // Random number between 0-255
+}
+
+// Convert binary digits to decimal
+function binaryToDecimal(binaryArray) {
+  return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
+}
+
+// Select a random image
+function selectRandomImage() {
+  const randomIndex = Math.floor(Math.random() * totalImages) + 1; // Random number from 1 to totalImages
+  return `images/${randomIndex}.jpg`;
+}
 
 // Initialize binary buttons
 function updateBinaryButtons() {
@@ -42,43 +58,63 @@ function updateBinaryButtons() {
 
 // Toggle a binary digit
 function toggleDigit(index) {
+  if (isGameComplete) return; // Prevent interaction if the game is complete
   binaryDigits[index] = binaryDigits[index] === 0 ? 1 : 0;
   updateBinaryButtons();
   updateDisplay();
 }
 
-// Generate a random target number
-function generateTarget() {
-  return Math.floor(Math.random() * 256); // Random number between 0-255
-}
-
-// Initialize the binary game
-function initGame() {
-  updateBinaryButtons();
-  updateDisplay();
-}
-
-// Update the display
+// Update the display (Partial Match Logic)
 function updateDisplay() {
   const currentNumber = binaryToDecimal(binaryDigits);
   document.getElementById("current-number").textContent = currentNumber;
   document.getElementById("target-number").textContent = targetNumber;
 
-  // Check if the current number matches the target
-  if (currentNumber === targetNumber) {
-    document.getElementById("message").textContent = `Congratulations, you got ${binaryDigits.join("")} binary number correct!`;
-    document.getElementById("reset-button").style.display = "block"; // Show the reset button
+  if (currentNumber === targetNumber && !isGameComplete) {
+    document.getElementById("message").textContent = `Nice! ${currentNumber} in binary is ${binaryDigits.join("")}.`;
+    revealRandomTile(); // Reveal a tile
 
-    // Disable further interaction with binary buttons
-    document.querySelectorAll(".binary-button").forEach((button) => {
-      button.disabled = true;
-    });
+    // After 3 seconds, reset the target and message
+    setTimeout(() => {
+      if (!isGameComplete) {
+        targetNumber = generateTarget(); // Generate a new target
+        binaryDigits.fill(0); // Reset binary digits
+        updateBinaryButtons();
+        updateDisplay();
+        document.getElementById("message").textContent = "";
+      }
+    }, 3000);
   }
 }
 
+// Reveal a random tile (Handles Complete Match)
+function revealRandomTile() {
+  const tiles = document.querySelectorAll(".cat-tile");
+  const availableTiles = Array.from(tiles).filter(
+    (tile) => !revealedTiles.includes(parseInt(tile.dataset.index))
+  );
+
+  if (availableTiles.length > 0) {
+    const randomTile =
+      availableTiles[Math.floor(Math.random() * availableTiles.length)];
+    randomTile.classList.add("flipped");
+    revealedTiles.push(parseInt(randomTile.dataset.index));
+  }
+
+  // Check if all tiles are revealed
+  if (revealedTiles.length === totalTiles) {
+    isGameComplete = true; // Mark the game as complete
+    document.getElementById("message").textContent = `Congratulations, you got ${binaryDigits.join("")} binary number correct!`;
+    document.getElementById("reset-button").style.display = "block"; // Show the reset button
+  }
+}
+
+// Reset the game
 function resetGame() {
+  isGameComplete = false; // Reset game completion state
   targetNumber = generateTarget(); // Generate a new target
   binaryDigits.fill(0); // Reset binary digits
+  revealedTiles = []; // Reset revealed tiles
 
   // Hide the reset button
   document.getElementById("reset-button").style.display = "none";
@@ -86,22 +122,15 @@ function resetGame() {
   // Clear messages
   document.getElementById("message").textContent = "";
 
-  // Reset the cat game
-  resetCatGame();
-
-  // Reinitialize the binary game
+  // Reinitialize the game
   initGame();
+  initCatGame();
 }
 
-// Convert binary to decimal
-function binaryToDecimal(binaryArray) {
-  return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
-}
-
-// Select a random image
-function selectRandomImage() {
-  const randomIndex = Math.floor(Math.random() * totalImages) + 1; // Random number from 1 to totalImages
-  return `images/${randomIndex}.jpg`;
+// Initialize the binary game
+function initGame() {
+  updateBinaryButtons();
+  updateDisplay();
 }
 
 // Initialize cat tiles
@@ -134,33 +163,6 @@ function initCatGame() {
 
     catContainer.appendChild(tile);
   }
-}
-
-// Reveal a random tile
-function revealRandomTile() {
-  const tiles = document.querySelectorAll(".cat-tile");
-  const availableTiles = Array.from(tiles).filter(
-    (tile) => !revealedTiles.includes(parseInt(tile.dataset.index))
-  );
-
-  if (availableTiles.length > 0) {
-    const randomTile =
-      availableTiles[Math.floor(Math.random() * availableTiles.length)];
-    randomTile.classList.add("flipped");
-    revealedTiles.push(parseInt(randomTile.dataset.index));
-  }
-
-  if (revealedTiles.length === totalTiles) {
-    document.getElementById("cat-message").textContent = "Congratulations! You've won a cat!";
-    setTimeout(resetCatGame, 3000);
-  }
-}
-
-// Reset the cat game
-function resetCatGame() {
-  revealedTiles = [];
-  document.getElementById("cat-message").textContent = "";
-  initCatGame();
 }
 
 // Initialize everything
