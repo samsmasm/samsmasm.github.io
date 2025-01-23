@@ -31,6 +31,12 @@ function toggleDigit(index) {
   updateDisplay();
 }
 
+// Define initGame
+function initGame() {
+  updateBinaryButtons(); // Call updateBinaryButtons here
+  updateDisplay();
+}
+
 // Initialize cat tiles
 function initCatGame() {
   const catContainer = document.getElementById("cat-container");
