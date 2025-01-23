@@ -45,19 +45,31 @@ function toggleDigit(index) {
 function updateBinaryButtons() {
   const container = document.getElementById("binary-boxes");
   container.innerHTML = ""; // Clear existing buttons
+
   binaryDigits.forEach((bit, index) => {
+    // Create a container for the button and number
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "flex";
+    wrapper.style.flexDirection = "column";
+    wrapper.style.alignItems = "center";
+    wrapper.style.margin = "5px";
+
+    // Create the binary toggle button
     const button = document.createElement("button");
     button.className = `binary-button ${bit === 1 ? "active" : ""}`;
     button.textContent = bit;
     button.addEventListener("click", () => toggleDigit(index));
-    container.appendChild(button);
+    wrapper.appendChild(button);
 
     // Add the base-10 value below the button
     const base10Value = document.createElement("div");
-    base10Value.textContent = Math.pow(2, 7 - index); // 128, 64, 32, ...
+    base10Value.textContent = Math.pow(2, 7 - index); // 128, 64, 32, ..., 1
     base10Value.style.fontSize = "14px";
     base10Value.style.marginTop = "5px";
-    container.appendChild(base10Value);
+    wrapper.appendChild(base10Value);
+
+    // Append the wrapper to the container
+    container.appendChild(wrapper);
   });
 }
 
