@@ -27,7 +27,7 @@ function updateDisplay() {
     clearTimeout(messageTimeout);
     messageTimeout = setTimeout(() => {
       targetNumber = generateTarget();
-      binaryDigits.fill(0);
+      binaryDigits.fill(0); // Reset all boxes to 0
       updateDisplay();
       document.getElementById("message").textContent = "";
     }, 3000);
@@ -51,6 +51,13 @@ function updateBinaryButtons() {
     button.textContent = bit;
     button.addEventListener("click", () => toggleDigit(index));
     container.appendChild(button);
+
+    // Add the base-10 value below the button
+    const base10Value = document.createElement("div");
+    base10Value.textContent = Math.pow(2, 7 - index); // 128, 64, 32, ...
+    base10Value.style.fontSize = "14px";
+    base10Value.style.marginTop = "5px";
+    container.appendChild(base10Value);
   });
 }
 
