@@ -1,7 +1,10 @@
+// Binary game logic
 let binaryDigits = Array(8).fill(0); // Initialize an 8-bit binary number
 let revealedTiles = []; // Keep track of revealed tiles
 let targetNumber = generateTarget(); // Target number
 const totalTiles = 16;
+const totalImages = 10; // Number of available images
+let currentImage = ""; // Path to the current random image
 
 // Rainbow colors for tiles
 const rainbowColors = [
@@ -80,10 +83,17 @@ function binaryToDecimal(binaryArray) {
   return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
 }
 
+// Select a random image
+function selectRandomImage() {
+  const randomIndex = Math.floor(Math.random() * totalImages) + 1; // Random number from 1 to totalImages
+  return `images/${randomIndex}.jpg`;
+}
+
 // Initialize cat tiles
 function initCatGame() {
+  currentImage = selectRandomImage(); // Select a new random image
   const catContainer = document.getElementById("cat-container");
-  catContainer.innerHTML = ""; // Clear existing tiles
+  catContainer.innerHTML = ""; // Clear any existing tiles
 
   for (let i = 0; i < totalTiles; i++) {
     const tile = document.createElement("div");
@@ -99,6 +109,8 @@ function initCatGame() {
 
     const tileBack = document.createElement("div");
     tileBack.className = "cat-tile-back";
+    tileBack.style.backgroundImage = `url(${currentImage})`; // Use the selected image
+    tileBack.style.backgroundSize = "200px 200px";
     tileBack.style.backgroundPosition = `${(i % 4) * -50}px ${Math.floor(i / 4) * -50}px`;
 
     tileInner.appendChild(tileFront);
