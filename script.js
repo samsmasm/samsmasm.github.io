@@ -10,6 +10,12 @@ const rainbowColors = [
 ];
 
 // Initialize cat tiles
+
+function initGame() {
+  updateBinaryButtons();
+  updateDisplay();
+}
+
 function initCatGame() {
   const catContainer = document.getElementById("cat-container");
   catContainer.innerHTML = ""; // Clear any existing tiles
