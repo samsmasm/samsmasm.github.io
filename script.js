@@ -1,19 +1,73 @@
-// Binary digits and target number
-let binaryDigits = Array(8).fill(0);
-let targetNumber = generateTarget();
-let messageTimeout = null;
+// Existing binary game code...
 
-// Generate a random target number (0-255)
-function generateTarget() {
-  return Math.floor(Math.random() * 256);
+let revealedTiles = []; // Keep track of revealed tiles
+const totalTiles = 16;
+
+// Rainbow colors for tiles
+const rainbowColors = [
+  "red", "orange", "yellow", "green", "blue", "indigo", "violet",
+  "pink", "teal", "brown", "lightblue", "gold", "lime", "purple", "silver", "coral",
+];
+
+// Initialize cat tiles
+function initCatGame() {
+  const catContainer = document.getElementById("cat-container");
+  catContainer.innerHTML = ""; // Clear any existing tiles
+
+  for (let i = 0; i < totalTiles; i++) {
+    const tile = document.createElement("div");
+    tile.className = "cat-tile";
+    tile.dataset.index = i;
+
+    const tileInner = document.createElement("div");
+    tileInner.className = "cat-tile-inner";
+
+    const tileFront = document.createElement("div");
+    tileFront.className = "cat-tile-front";
+    tileFront.style.background = rainbowColors[i];
+
+    const tileBack = document.createElement("div");
+    tileBack.className = "cat-tile-back";
+    tileBack.style.backgroundPosition = `${(i % 4) * -50}px ${Math.floor(i / 4) * -50}px`;
+
+    tileInner.appendChild(tileFront);
+    tileInner.appendChild(tileBack);
+    tile.appendChild(tileInner);
+
+    catContainer.appendChild(tile);
+  }
 }
 
-// Convert binary array to decimal
-function binaryToDecimal(binaryArray) {
-  return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
+// Reveal a random tile
+function revealRandomTile() {
+  const tiles = document.querySelectorAll(".cat-tile");
+  const availableTiles = Array.from(tiles).filter(
+    (tile) => !revealedTiles.includes(parseInt(tile.dataset.index))
+  );
+
+  if (availableTiles.length > 0) {
+    const randomTile =
+      availableTiles[Math.floor(Math.random() * availableTiles.length)];
+    randomTile.classList.add("flipped");
+    revealedTiles.push(parseInt(randomTile.dataset.index));
+  }
+
+  // Check if all tiles are revealed
+  if (revealedTiles.length === totalTiles) {
+    document.getElementById("cat-message").textContent =
+      "Congratulations! You've won a cat!";
+    setTimeout(resetCatGame, 3000); // Reset after 3 seconds
+  }
 }
 
-// Update the display
+// Reset the cat game
+function resetCatGame() {
+  revealedTiles = [];
+  document.getElementById("cat-message").textContent = "";
+  initCatGame();
+}
+
+// Hook into binary game logic
 function updateDisplay() {
   const currentNumber = binaryToDecimal(binaryDigits);
   document.getElementById("current-number").textContent = currentNumber;
@@ -22,6 +76,7 @@ function updateDisplay() {
   // Check if the current number matches the target
   if (currentNumber === targetNumber) {
     document.getElementById("message").textContent = `Nice! ${targetNumber} in binary is ${binaryDigits.join("")}.`;
+    revealRandomTile(); // Reveal a tile
 
     // Reset after 3 seconds
     clearTimeout(messageTimeout);
@@ -34,50 +89,6 @@ function updateDisplay() {
   }
 }
 
-// Toggle a binary digit
-function toggleDigit(index) {
-  binaryDigits[index] = binaryDigits[index] === 0 ? 1 : 0;
-  updateBinaryButtons();
-  updateDisplay();
-}
-
-// Update binary buttons
-function updateBinaryButtons() {
-  const container = document.getElementById("binary-boxes");
-  container.innerHTML = ""; // Clear existing buttons
-
-  binaryDigits.forEach((bit, index) => {
-    // Create a container for the button and number
-    const wrapper = document.createElement("div");
-    wrapper.style.display = "flex";
-    wrapper.style.flexDirection = "column";
-    wrapper.style.alignItems = "center";
-    wrapper.style.margin = "5px";
-
-    // Create the binary toggle button
-    const button = document.createElement("button");
-    button.className = `binary-button ${bit === 1 ? "active" : ""}`;
-    button.textContent = bit;
-    button.addEventListener("click", () => toggleDigit(index));
-    wrapper.appendChild(button);
-
-    // Add the base-10 value below the button
-    const base10Value = document.createElement("div");
-    base10Value.textContent = Math.pow(2, 7 - index); // 128, 64, 32, ..., 1
-    base10Value.style.fontSize = "14px";
-    base10Value.style.marginTop = "5px";
-    wrapper.appendChild(base10Value);
-
-    // Append the wrapper to the container
-    container.appendChild(wrapper);
-  });
-}
-
-// Initialize game
-function initGame() {
-  updateBinaryButtons();
-  updateDisplay();
-}
-
-// Start the game
+// Initialize everything
 initGame();
+initCatGame();
