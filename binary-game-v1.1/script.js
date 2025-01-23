@@ -1,7 +1,7 @@
 let binaryDigits = Array(8).fill(0); // Initialize an 8-bit binary number
 let revealedTiles = []; // Keep track of revealed tiles
 let targetNumber = generateTarget(); // Target number
-const totalTiles = 16;
+const totalTiles = 9;
 const totalImages = 10; // Number of available images
 let currentImage = ""; // Path to the current random image
 let isGameComplete = false; // Tracks whether all tiles are revealed
@@ -87,7 +87,6 @@ function updateDisplay() {
   }
 }
 
-// Reveal a random tile (Handles Complete Match)
 function revealRandomTile() {
   const tiles = document.querySelectorAll(".cat-tile");
   const availableTiles = Array.from(tiles).filter(
@@ -104,7 +103,7 @@ function revealRandomTile() {
   // Check if all tiles are revealed
   if (revealedTiles.length === totalTiles) {
     isGameComplete = true; // Mark the game as complete
-    document.getElementById("message").textContent = `Congratulations, you got ${binaryDigits.join("")} binary number correct!`;
+    document.getElementById("message").textContent = "Congratulations, you got 1001 binary numbers correct!";
     document.getElementById("reset-button").style.display = "block"; // Show the reset button
   }
 }
@@ -149,13 +148,13 @@ function initCatGame() {
 
     const tileFront = document.createElement("div");
     tileFront.className = "cat-tile-front";
-    tileFront.style.background = rainbowColors[i];
+    tileFront.style.background = rainbowColors[i % rainbowColors.length];
 
     const tileBack = document.createElement("div");
     tileBack.className = "cat-tile-back";
     tileBack.style.backgroundImage = `url(${currentImage})`; // Use the selected image
-    tileBack.style.backgroundSize = "200px 200px";
-    tileBack.style.backgroundPosition = `${(i % 4) * -50}px ${Math.floor(i / 4) * -50}px`;
+    tileBack.style.backgroundSize = "150px 150px"; // Adjust size for 3x3 grid
+    tileBack.style.backgroundPosition = `${(i % 3) * -50}px ${Math.floor(i / 3) * -50}px`;
 
     tileInner.appendChild(tileFront);
     tileInner.appendChild(tileBack);
