@@ -1,7 +1,6 @@
-// Binary game logic
-
 let binaryDigits = Array(8).fill(0); // Initialize an 8-bit binary number
 let revealedTiles = []; // Keep track of revealed tiles
+let targetNumber = generateTarget(); // Target number
 const totalTiles = 16;
 
 // Rainbow colors for tiles
@@ -16,11 +15,25 @@ function updateBinaryButtons() {
   container.innerHTML = ""; // Clear existing buttons
 
   binaryDigits.forEach((bit, index) => {
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "flex";
+    wrapper.style.flexDirection = "column";
+    wrapper.style.alignItems = "center";
+    wrapper.style.margin = "5px";
+
     const button = document.createElement("button");
     button.className = `binary-button ${bit === 1 ? "active" : ""}`;
     button.textContent = bit;
     button.addEventListener("click", () => toggleDigit(index));
-    container.appendChild(button);
+    wrapper.appendChild(button);
+
+    const base10Value = document.createElement("div");
+    base10Value.textContent = Math.pow(2, 7 - index); // 128, 64, ..., 1
+    base10Value.style.fontSize = "14px";
+    base10Value.style.marginTop = "5px";
+    wrapper.appendChild(base10Value);
+
+    container.appendChild(wrapper);
   });
 }
 
@@ -31,16 +44,46 @@ function toggleDigit(index) {
   updateDisplay();
 }
 
-// Define initGame
+// Generate a random target number
+function generateTarget() {
+  return Math.floor(Math.random() * 256); // Random number between 0-255
+}
+
+// Initialize the binary game
 function initGame() {
-  updateBinaryButtons(); // Call updateBinaryButtons here
+  updateBinaryButtons();
   updateDisplay();
+}
+
+// Update the display
+function updateDisplay() {
+  const currentNumber = binaryToDecimal(binaryDigits);
+  document.getElementById("current-number").textContent = currentNumber;
+  document.getElementById("target-number").textContent = targetNumber;
+
+  if (currentNumber === targetNumber) {
+    document.getElementById("message").textContent = `Nice! ${targetNumber} in binary is ${binaryDigits.join("")}.`;
+    revealRandomTile(); // Reveal a tile
+
+    setTimeout(() => {
+      targetNumber = generateTarget(); // Generate a new target
+      binaryDigits.fill(0); // Reset binary digits
+      updateBinaryButtons();
+      updateDisplay();
+      document.getElementById("message").textContent = "";
+    }, 3000);
+  }
+}
+
+// Convert binary to decimal
+function binaryToDecimal(binaryArray) {
+  return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
 }
 
 // Initialize cat tiles
 function initCatGame() {
   const catContainer = document.getElementById("cat-container");
-  catContainer.innerHTML = ""; // Clear any existing tiles
+  catContainer.innerHTML = ""; // Clear existing tiles
 
   for (let i = 0; i < totalTiles; i++) {
     const tile = document.createElement("div");
@@ -80,11 +123,9 @@ function revealRandomTile() {
     revealedTiles.push(parseInt(randomTile.dataset.index));
   }
 
-  // Check if all tiles are revealed
   if (revealedTiles.length === totalTiles) {
-    document.getElementById("cat-message").textContent =
-      "Congratulations! You've won a cat!";
-    setTimeout(resetCatGame, 3000); // Reset after 3 seconds
+    document.getElementById("cat-message").textContent = "Congratulations! You've won a cat!";
+    setTimeout(resetCatGame, 3000);
   }
 }
 
@@ -93,38 +134,6 @@ function resetCatGame() {
   revealedTiles = [];
   document.getElementById("cat-message").textContent = "";
   initCatGame();
-}
-
-// Update the display
-function updateDisplay() {
-  const currentNumber = binaryToDecimal(binaryDigits);
-  document.getElementById("current-number").textContent = currentNumber;
-  document.getElementById("target-number").textContent = targetNumber;
-
-  // Check if the current number matches the target
-  if (currentNumber === targetNumber) {
-    document.getElementById("message").textContent = `Nice! ${targetNumber} in binary is ${binaryDigits.join("")}.`;
-    revealRandomTile(); // Reveal a tile
-
-    // Reset after 3 seconds
-    clearTimeout(messageTimeout);
-    messageTimeout = setTimeout(() => {
-      targetNumber = generateTarget();
-      binaryDigits.fill(0); // Reset all boxes to 0
-      updateDisplay();
-      document.getElementById("message").textContent = "";
-    }, 3000);
-  }
-}
-
-// Convert binary digits to decimal
-function binaryToDecimal(binaryArray) {
-  return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
-}
-
-// Generate a random target number
-function generateTarget() {
-  return Math.floor(Math.random() * 256); // Random number between 0-255
 }
 
 // Initialize everything
