@@ -1,5 +1,6 @@
-// Existing binary game code...
+// Binary game logic
 
+let binaryDigits = Array(8).fill(0); // Initialize an 8-bit binary number
 let revealedTiles = []; // Keep track of revealed tiles
 const totalTiles = 16;
 
@@ -9,13 +10,28 @@ const rainbowColors = [
   "pink", "teal", "brown", "lightblue", "gold", "lime", "purple", "silver", "coral",
 ];
 
-// Initialize cat tiles
+// Initialize binary buttons
+function updateBinaryButtons() {
+  const container = document.getElementById("binary-boxes");
+  container.innerHTML = ""; // Clear existing buttons
 
-function initGame() {
+  binaryDigits.forEach((bit, index) => {
+    const button = document.createElement("button");
+    button.className = `binary-button ${bit === 1 ? "active" : ""}`;
+    button.textContent = bit;
+    button.addEventListener("click", () => toggleDigit(index));
+    container.appendChild(button);
+  });
+}
+
+// Toggle a binary digit
+function toggleDigit(index) {
+  binaryDigits[index] = binaryDigits[index] === 0 ? 1 : 0;
   updateBinaryButtons();
   updateDisplay();
 }
 
+// Initialize cat tiles
 function initCatGame() {
   const catContainer = document.getElementById("cat-container");
   catContainer.innerHTML = ""; // Clear any existing tiles
@@ -73,7 +89,7 @@ function resetCatGame() {
   initCatGame();
 }
 
-// Hook into binary game logic
+// Update the display
 function updateDisplay() {
   const currentNumber = binaryToDecimal(binaryDigits);
   document.getElementById("current-number").textContent = currentNumber;
@@ -93,6 +109,16 @@ function updateDisplay() {
       document.getElementById("message").textContent = "";
     }, 3000);
   }
+}
+
+// Convert binary digits to decimal
+function binaryToDecimal(binaryArray) {
+  return binaryArray.reduce((sum, bit, index) => sum + bit * Math.pow(2, 7 - index), 0);
+}
+
+// Generate a random target number
+function generateTarget() {
+  return Math.floor(Math.random() * 256); // Random number between 0-255
 }
 
 // Initialize everything
