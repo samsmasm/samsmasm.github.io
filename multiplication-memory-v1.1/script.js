@@ -2,6 +2,24 @@ let flippedTiles = [];
 let matchesFound = 0;
 let attempts = 0;
 
+function getRandomImage() {
+  const totalImages = 10; // Update this number if you add more images
+  const randomIndex = Math.floor(Math.random() * totalImages) + 1;
+  return `images/${randomIndex}.jpg`;
+}
+
+function assignTileBackgrounds(image) {
+  const gameBoard = document.getElementById("game-board");
+  const tiles = gameBoard.querySelectorAll(".tile");
+
+  tiles.forEach((tile, index) => {
+    const row = Math.floor(index / 4); // Row index (0-3)
+    const col = index % 4;            // Column index (0-3)
+    tile.dataset.bgPosition = `-${col * 100}px -${row * 100}px`;
+    tile.dataset.bgImage = image;
+  });
+}
+
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -20,12 +38,14 @@ function generateMultiplicationData(pairsCount) {
   console.log("Generated multiplication data:", data.slice(0, pairsCount)); // Debugging
   return data.slice(0, pairsCount); // Take the first `pairsCount` pairs
 }
-
 function initGame() {
   const gameBoard = document.getElementById("game-board");
   gameBoard.innerHTML = ""; // Clear the game board
   flippedTiles = [];
   matchesFound = 0;
+
+  // Select a random image for the game
+  const selectedImage = getRandomImage();
 
   // Generate multiplication problems and answers
   const multiplicationData = generateMultiplicationData(8); // 8 pairs for a 4x4 grid
@@ -41,14 +61,16 @@ function initGame() {
     tile.classList.add("tile");
     tile.dataset.content = data.content;
     tile.dataset.type = data.type; // Mark tile as "problem" or "answer"
-
-    console.log("Creating tile:", data.content, data.type); // Debugging
+    tile.dataset.index = index; // Keep track of index for image assignment
 
     // Add click handler
     tile.addEventListener("click", handleTileClick);
 
     gameBoard.appendChild(tile);
   });
+
+  // Assign image backgrounds to tiles
+  assignTileBackgrounds(selectedImage);
 
   document.getElementById("message").textContent = "";
 }
@@ -74,7 +96,7 @@ function checkMatch() {
   attempts++;
   document.getElementById("attempts-count").textContent = attempts; // Update attempts on the page
 
-  const [tile1, tile2] = flippedTiles;
+    const [tile1, tile2] = flippedTiles;
 
   let problemTile, answerTile;
 
@@ -105,15 +127,12 @@ function checkMatch() {
   if (problemResult === parseInt(answerTile.dataset.content)) {
     matchesFound++;
 
-    // Lock matched tiles
-    problemTile.classList.add("matched");
-    answerTile.classList.add("matched");
-    problemTile.style.backgroundColor = "pink";
-    answerTile.style.backgroundColor = "pink";
-
-    // Remove event listeners
-    problemTile.removeEventListener("click", handleTileClick);
-    answerTile.removeEventListener("click", handleTileClick);
+    // Lock matched tiles and reveal their part of the image
+    [problemTile, answerTile].forEach(tile => {
+      tile.classList.add("matched");
+      tile.style.backgroundImage = `url(${tile.dataset.bgImage})`;
+      tile.style.backgroundPosition = tile.dataset.bgPosition;
+    });
 
     // Clear flipped tiles array
     flippedTiles = [];
