@@ -6,8 +6,30 @@ let chart;
 // Define colors for points P1, P2, and P3
 const pointColors = ['red', 'blue', 'green'];
 
-// Custom plugin to display permanent coordinate labels
-// Now displays labels like "P1: (x,y)"
+/* 
+Helper function: count the number of decimals in a numeric string.
+If no decimal point is present, returns 0.
+*/
+function countDecimals(valueStr) {
+  if (valueStr.indexOf('.') >= 0) {
+    return valueStr.split('.')[1].length;
+  }
+  return 0;
+}
+
+/*
+Helper function: compares a student's numeric answer (as string) with the correct numeric value.
+Both are rounded to the number of decimals present in the student's answer.
+*/
+function compareNumeric(studentStr, correctNum) {
+  const decimals = countDecimals(studentStr);
+  return parseFloat(studentStr).toFixed(decimals) === Number(correctNum).toFixed(decimals);
+}
+
+/*
+Custom plugin to permanently display coordinate labels on the graph.
+Labels are drawn in the format "P1: (x,y)".
+*/
 const coordinateLabelsPlugin = {
   id: 'coordinateLabels',
   afterDatasetsDraw: (chartInstance) => {
@@ -29,7 +51,7 @@ const coordinateLabelsPlugin = {
   }
 };
 
-// Initialize when window loads
+// Initialize when the window loads
 window.onload = function () {
   generateProblem();
   document.getElementById('newProblem').addEventListener('click', generateProblem);
@@ -50,11 +72,63 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// Calculate midpoint (returns an object with raw numeric values)
+function calculateMidpoint(p1, p2) {
+  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
+
+// Calculate distance (raw numeric value)
+function calculateDistance(p1, p2) {
+  return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+}
+
+// Calculate equation of a line in y=mx+b format; if vertical, returns "x=constant"
+function calculateEquation(p1, p2) {
+  if (p2.x - p1.x === 0) {
+    return `x=${p1.x}`;
+  }
+  let m = (p2.y - p1.y) / (p2.x - p1.x);
+  let b = p1.y - m * p1.x;
+  m = parseFloat(m.toFixed(2));
+  b = parseFloat(b.toFixed(2));
+  return b >= 0 ? `y=${m}x+${b}` : `y=${m}x-${Math.abs(b)}`;
+}
+
+// Calculate the perpendicular gradient; if horizontal, returns "Undefined (Vertical Line)"
+function calculatePerpendicularGradient(p1, p2) {
+  if (p2.x - p1.x === 0) {
+    return `0`;
+  }
+  let m = (p2.y - p1.y) / (p2.x - p1.x);
+  if (m === 0) {
+    return `Undefined (Vertical Line)`;
+  }
+  let perpendicularM = -1 / m;
+  perpendicularM = parseFloat(perpendicularM.toFixed(2));
+  return perpendicularM;
+}
+
+// Calculate the equation of the perpendicular bisector in y=mx+b format; if vertical, returns "x=constant"
+function calculatePerpendicularBisector(p1, p2) {
+  const mid = calculateMidpoint(p1, p2);
+  if (p2.x - p1.x === 0) {
+    return `y=${mid.y.toFixed(2)}`;
+  }
+  let m = (p2.y - p1.y) / (p2.x - p1.x);
+  if (m === 0) {
+    return `x=${mid.x.toFixed(2)}`;
+  }
+  let perpendicularM = -1 / m;
+  let b = mid.y - perpendicularM * mid.x;
+  perpendicularM = parseFloat(perpendicularM.toFixed(2));
+  b = parseFloat(b.toFixed(2));
+  return b >= 0 ? `y=${perpendicularM}x+${b}` : `y=${perpendicularM}x-${Math.abs(b)}`;
+}
+
 // Plot the graph using Chart.js
 function plotGraph() {
   const ctx = document.getElementById('graph').getContext('2d');
 
-  // Prepare datasets for each point
   const datasets = points.map((point, index) => ({
     label: `P${index + 1}`,
     data: [{ x: point.x, y: point.y }],
@@ -63,7 +137,6 @@ function plotGraph() {
     pointStyle: 'circle'
   }));
 
-  // Destroy any previous chart
   if (chart) {
     chart.destroy();
   }
@@ -95,9 +168,10 @@ function plotGraph() {
           },
           grid: {
             display: true,
-            // Use a callback so that the tick at 0 is bold
-            color: (context) => context.tick.value === 0 ? '#000' : '#e0e0e0',
-            lineWidth: (context) => context.tick.value === 0 ? 3 : 1
+            color: (context) =>
+              context.tick.value === 0 ? '#000' : '#e0e0e0',
+            lineWidth: (context) =>
+              context.tick.value === 0 ? 3 : 1
           },
           title: {
             display: true,
@@ -115,8 +189,10 @@ function plotGraph() {
           },
           grid: {
             display: true,
-            color: (context) => context.tick.value === 0 ? '#000' : '#e0e0e0',
-            lineWidth: (context) => context.tick.value === 0 ? 3 : 1
+            color: (context) =>
+              context.tick.value === 0 ? '#000' : '#e0e0e0',
+            lineWidth: (context) =>
+              context.tick.value === 0 ? 3 : 1
           },
           title: {
             display: true,
@@ -136,11 +212,11 @@ function generateQuestions() {
   const tableBody = document.querySelector('#questionsTable tbody');
   tableBody.innerHTML = '';
 
-  // Define the three unique point pairs:
+  // Define three unique point pairs:
   const pairs = [
-    [0, 1], // Column 2 (P1 & P2)
-    [1, 2], // Column 3 (P2 & P3)
-    [0, 2]  // Column 4 (P1 & P3)
+    [0, 1], // Column 2: P1 & P2
+    [1, 2], // Column 3: P2 & P3
+    [0, 2]  // Column 4: P1 & P3
   ];
 
   // Define question types:
@@ -152,72 +228,72 @@ function generateQuestions() {
     'Perpendicular Bisector Equation'
   ];
 
-  // For each question type, create a row
+  // Create a row for each question type:
   questionTypes.forEach((type) => {
     const row = document.createElement('tr');
-
-    // First column: question type
     const questionCell = document.createElement('td');
     questionCell.textContent = type;
     row.appendChild(questionCell);
 
-    // For each pair, create an answer cell
     pairs.forEach((pair, index) => {
-      const answer = getAnswer(type, points[pair[0]], points[pair[1]]);
       const cell = document.createElement('td');
+      // Generate the input/button HTML for this cell:
+      let html = '';
       if (type === 'Midpoint') {
-        cell.innerHTML = `
+        html = `
           <input type="text" id="${type}_${index}" class="question-input" placeholder="(x,y)">
           <button class="check-button" onclick="checkAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Check</button>
           <button class="show-answer-button" onclick="showAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Show</button>
           <div id="${type}_${index}_feedback" class="feedback"></div>
         `;
       } else if (type === 'Distance') {
-        cell.innerHTML = `
+        html = `
           <input type="text" id="${type}_${index}" class="question-input" placeholder="Distance">
           <button class="check-button" onclick="checkAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Check</button>
           <button class="show-answer-button" onclick="showAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Show</button>
           <div id="${type}_${index}_feedback" class="feedback"></div>
         `;
       } else if (type === 'Equation of Line') {
-        cell.innerHTML = `
+        html = `
           <input type="text" id="${type}_${index}" class="question-input" placeholder="y=mx+b">
           <button class="check-button" onclick="checkAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Check</button>
           <button class="show-answer-button" onclick="showAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Show</button>
           <div id="${type}_${index}_feedback" class="feedback"></div>
         `;
       } else if (type === 'Perpendicular Gradient') {
-        cell.innerHTML = `
+        html = `
           <input type="text" id="${type}_${index}" class="question-input" placeholder="Gradient">
           <button class="check-button" onclick="checkAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Check</button>
           <button class="show-answer-button" onclick="showAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Show</button>
           <div id="${type}_${index}_feedback" class="feedback"></div>
         `;
       } else if (type === 'Perpendicular Bisector Equation') {
-        cell.innerHTML = `
+        html = `
           <input type="text" id="${type}_${index}" class="question-input" placeholder="y=mx+b">
           <button class="check-button" onclick="checkAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Check</button>
           <button class="show-answer-button" onclick="showAnswer('${type}_${index}', '${type}', ${pair[0]}, ${pair[1]})">Show</button>
           <div id="${type}_${index}_feedback" class="feedback"></div>
         `;
       }
-      // Set the text color for this cell to match the corresponding point pair:
-      // For the first pair ([P1,P2]) → red, second ([P2,P3]) → blue, third ([P1,P3]) → green.
+      cell.innerHTML = html;
+      // Set the cell text color to match the corresponding point pair:
+      // Pair 0: red, Pair 1: blue, Pair 2: green.
       cell.style.color = pointColors[index];
       row.appendChild(cell);
     });
-
     tableBody.appendChild(row);
   });
 }
 
-// Return the correct answer for a given question type and point pair
+// getAnswer returns the correct answer based on the question type and point pair.
+// For numeric answers, we return raw numbers; for equations, we return strings.
 function getAnswer(type, p1, p2) {
   if (type === 'Midpoint') {
-    const midpoint = calculateMidpoint(p1, p2);
-    return `(${midpoint.x},${midpoint.y})`;
+    const mid = calculateMidpoint(p1, p2);
+    // For display, show default as 2 decimals
+    return `(${mid.x.toFixed(2)},${mid.y.toFixed(2)})`;
   } else if (type === 'Distance') {
-    return calculateDistance(p1, p2).toFixed(2);
+    return calculateDistance(p1, p2);
   } else if (type === 'Equation of Line') {
     return calculateEquation(p1, p2);
   } else if (type === 'Perpendicular Gradient') {
@@ -227,123 +303,50 @@ function getAnswer(type, p1, p2) {
   }
 }
 
-// Create a new problem (generate points, plot graph, and generate table)
+// Generate a new problem: points, graph, and table
 function generateProblem() {
   generatePoints();
   plotGraph();
   generateQuestions();
 }
 
-// Calculate the midpoint of two points
-function calculateMidpoint(p1, p2) {
-  return {
-    x: ((p1.x + p2.x) / 2).toFixed(2),
-    y: ((p1.y + p2.y) / 2).toFixed(2)
-  };
-}
-
-// Calculate the distance between two points
-function calculateDistance(p1, p2) {
-  return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-}
-
-// Calculate the equation of the line through two points in y=mx+b format
-function calculateEquation(p1, p2) {
-  if (p2.x - p1.x === 0) {
-    return `x=${p1.x}`;
-  }
-  let m = (p2.y - p1.y) / (p2.x - p1.x);
-  let b = p1.y - m * p1.x;
-  m = parseFloat(m.toFixed(2));
-  b = parseFloat(b.toFixed(2));
-  return b >= 0 ? `y=${m}x+${b}` : `y=${m}x-${Math.abs(b)}`;
-}
-
-// Calculate the gradient of the line perpendicular to the line through two points
-function calculatePerpendicularGradient(p1, p2) {
-  if (p2.x - p1.x === 0) {
-    return `0`;
-  }
-  let m = (p2.y - p1.y) / (p2.x - p1.x);
-  if (m === 0) {
-    return `Undefined (Vertical Line)`;
-  }
-  let perpendicularM = -1 / m;
-  perpendicularM = parseFloat(perpendicularM.toFixed(2));
-  return `${perpendicularM}`;
-}
-
-// Calculate the equation of the perpendicular bisector of the segment joining two points
-function calculatePerpendicularBisector(p1, p2) {
-  const midpoint = calculateMidpoint(p1, p2);
-  if (p2.x - p1.x === 0) {
-    return `y=${midpoint.y}`;
-  }
-  let m = (p2.y - p1.y) / (p2.x - p1.x);
-  if (m === 0) {
-    return `x=${midpoint.x}`;
-  }
-  let perpendicularM = -1 / m;
-  let b = midpoint.y - perpendicularM * midpoint.x;
-  perpendicularM = parseFloat(perpendicularM.toFixed(2));
-  b = parseFloat(b.toFixed(2));
-  return b >= 0 ? `y=${perpendicularM}x+${b}` : `y=${perpendicularM}x-${Math.abs(b)}`;
-}
-
-// Check the user's answer with flexible precision
+// Check the student's answer using standard rounding based on the number of decimals entered.
 function checkAnswer(id, type, p1Index, p2Index) {
   const userInput = document.getElementById(id).value.trim();
   const feedback = document.getElementById(`${id}_feedback`);
   const correctAnswer = getAnswer(type, points[p1Index], points[p2Index]);
 
   if (type === 'Midpoint') {
+    // Expect format (x,y)
     const regex = /^\(-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\)$/;
     if (!regex.test(userInput)) {
       feedback.innerText = 'Format should be (x,y)';
       feedback.className = 'feedback incorrect';
       return;
     }
-    const userCoords = userInput.slice(1, -1).split(',').map(num => parseFloat(num.trim()));
-    const correctCoords = correctAnswer.slice(1, -1).split(',').map(num => parseFloat(num));
-    const isCorrect =
-      Math.abs(userCoords[0] - correctCoords[0]) < 0.1 &&
-      Math.abs(userCoords[1] - correctCoords[1]) < 0.1;
-    if (isCorrect) {
-      feedback.innerText = 'Correct!';
-      feedback.className = 'feedback correct';
-    } else {
-      feedback.innerText = `Incorrect. Correct Answer: ${correctAnswer}`;
-      feedback.className = 'feedback incorrect';
-    }
-  } else if (type === 'Distance') {
-    const userDistance = parseFloat(userInput);
-    if (isNaN(userDistance)) {
-      feedback.innerText = 'Please enter a numerical value.';
+    const parts = userInput.slice(1, -1).split(',');
+    if (parts.length !== 2) {
+      feedback.innerText = 'Please enter two numbers separated by a comma.';
       feedback.className = 'feedback incorrect';
       return;
     }
-    const correctDistance = parseFloat(correctAnswer);
-    const isCorrect = Math.abs(userDistance - correctDistance) < 0.1;
-    if (isCorrect) {
+    const studentXStr = parts[0].trim();
+    const studentYStr = parts[1].trim();
+    const mid = calculateMidpoint(points[p1Index], points[p2Index]); // raw numbers
+    const xCorrect = compareNumeric(studentXStr, mid.x);
+    const yCorrect = compareNumeric(studentYStr, mid.y);
+    if (xCorrect && yCorrect) {
       feedback.innerText = 'Correct!';
       feedback.className = 'feedback correct';
     } else {
-      feedback.innerText = `Incorrect. Correct Answer: ${correctAnswer}`;
+      // For display, use getAnswer (which rounds to 2 decimals by default)
+      feedback.innerText = `Incorrect. Correct Answer: ${getAnswer(type, points[p1Index], points[p2Index])}`;
       feedback.className = 'feedback incorrect';
     }
-  } else if (type === 'Equation of Line') {
-    const userEquation = normalizeEquation(userInput);
-    const correctEq = normalizeEquation(correctAnswer);
-    const isCorrect = userEquation === correctEq;
-    if (isCorrect) {
-      feedback.innerText = 'Correct!';
-      feedback.className = 'feedback correct';
-    } else {
-      feedback.innerText = `Incorrect. Correct Answer: ${correctAnswer}`;
-      feedback.className = 'feedback incorrect';
-    }
-  } else if (type === 'Perpendicular Gradient') {
-    if (correctAnswer === 'Undefined (Vertical Line)') {
+  } else if (type === 'Distance' || type === 'Perpendicular Gradient') {
+    // For numeric answers (except Midpoint), use our compareNumeric helper.
+    // First, check if the correct answer is "Undefined (Vertical Line)"
+    if (type === 'Perpendicular Gradient' && correctAnswer === 'Undefined (Vertical Line)') {
       if (
         userInput.toLowerCase() === 'undefined' ||
         userInput.toLowerCase() === 'infinite' ||
@@ -356,27 +359,20 @@ function checkAnswer(id, type, p1Index, p2Index) {
         feedback.className = 'feedback incorrect';
       }
     } else {
-      const userGradient = parseFloat(userInput);
-      if (isNaN(userGradient)) {
-        feedback.innerText = 'Please enter a numerical value.';
-        feedback.className = 'feedback incorrect';
-        return;
-      }
-      const correctGradient = parseFloat(correctAnswer);
-      const isCorrect = Math.abs(userGradient - correctGradient) < 0.1;
-      if (isCorrect) {
+      if (compareNumeric(userInput, correctAnswer)) {
         feedback.innerText = 'Correct!';
         feedback.className = 'feedback correct';
       } else {
-        feedback.innerText = `Incorrect. Correct Answer: ${correctAnswer}`;
+        // Display the correct answer rounded to 2 decimals by default
+        feedback.innerText = `Incorrect. Correct Answer: ${Number(correctAnswer).toFixed(2)}`;
         feedback.className = 'feedback incorrect';
       }
     }
-  } else if (type === 'Perpendicular Bisector Equation') {
-    const userEquation = normalizeEquation(userInput);
+  } else if (type === 'Equation of Line' || type === 'Perpendicular Bisector Equation') {
+    // For these, normalize (remove spaces, lowercase) and check equality.
+    const studentEq = normalizeEquation(userInput);
     const correctEq = normalizeEquation(correctAnswer);
-    const isCorrect = userEquation === correctEq;
-    if (isCorrect) {
+    if (studentEq === correctEq) {
       feedback.innerText = 'Correct!';
       feedback.className = 'feedback correct';
     } else {
@@ -386,15 +382,20 @@ function checkAnswer(id, type, p1Index, p2Index) {
   }
 }
 
-// Show the correct answer
+// Show the correct answer in the feedback
 function showAnswer(id, type, p1Index, p2Index) {
   const feedback = document.getElementById(`${id}_feedback`);
   const correctAnswer = getAnswer(type, points[p1Index], points[p2Index]);
-  feedback.innerText = `Answer: ${correctAnswer}`;
+  // For numeric answers, display using toFixed(2) by default.
+  if (type === 'Distance' || type === 'Perpendicular Gradient') {
+    feedback.innerText = `Answer: ${Number(correctAnswer).toFixed(2)}`;
+  } else {
+    feedback.innerText = `Answer: ${correctAnswer}`;
+  }
   feedback.className = 'feedback correct';
 }
 
-// Normalize equation strings for comparison
+// Normalize equation strings by removing spaces and converting to lowercase.
 function normalizeEquation(eq) {
   return eq.replace(/\s+/g, '').toLowerCase();
 }
