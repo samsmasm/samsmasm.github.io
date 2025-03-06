@@ -6,6 +6,9 @@ document.addEventListener("DOMContentLoaded", function() {
   const scaleToggle = document.getElementById("scaleToggle");
   const aMinInput = document.getElementById("aMin");
   const aMaxInput = document.getElementById("aMax");
+  // Expect a new input field for contour value in the HTML:
+  // <input type="number" id="contourValue" placeholder="Contour Value (optional)">
+  const contourInput = document.getElementById("contourValue");
   const valuesDiv = document.getElementById("values");
   const errorDiv = document.getElementById("error");
   const cellInfoDiv = document.getElementById("cellInfo");
@@ -165,8 +168,17 @@ document.addEventListener("DOMContentLoaded", function() {
     drawAxes(aMin, aMax, gridRows);
 
     valuesDiv.textContent = `Min (blue): ${minValue}   |   Max (red): ${maxValue}`;
+
+    // If a contour value is provided, draw contour lines.
+    if (contourInput) {
+      const contourVal = parseFloat(contourInput.value);
+      if (!isNaN(contourVal)) {
+        drawContours(contourVal, gridCols, gridRows, aMin);
+      }
+    }
   }
 
+  // Draw axes as before.
   function drawAxes(aMin, aMax, gridRows) {
     ctx.strokeStyle = "black";
     ctx.fillStyle = "black";
@@ -220,6 +232,113 @@ document.addEventListener("DOMContentLoaded", function() {
     ctx.fillText("b", marginLeft - 20, marginTop);
   }
 
+  // Helper: Linear interpolation between two points.
+  // p1 and p2 are objects {x, y}, v1 and v2 are values at those points.
+  function interpolatePoint(p1, p2, v1, v2, threshold) {
+    let t = (threshold - v1) / (v2 - v1);
+    return {
+      x: p1.x + t * (p2.x - p1.x),
+      y: p1.y + t * (p2.y - p1.y)
+    };
+  }
+
+  // Draw contour lines using a basic marching squares algorithm.
+  function drawContours(threshold, gridCols, gridRows, axisMin) {
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1.5;
+    
+    // Loop over each square (each square defined by 4 neighboring grid points)
+    for (let i = 0; i < gridCols - 1; i++) {
+      for (let j = 0; j < gridRows - 1; j++) {
+        // For each square, define vertices.
+        // We'll treat gridData indices as follows:
+        // v0: top-left, v1: top-right, v2: bottom-right, v3: bottom-left.
+        const v0 = gridData[i][j+1];
+        const v1 = gridData[i+1][j+1];
+        const v2 = gridData[i+1][j];
+        const v3 = gridData[i][j];
+
+        // Determine canvas coordinates for each vertex.
+        const p0 = { x: marginLeft + i * cellSize, y: marginTop + ((gridRows - 1 - (j+1)) * cellSize) };
+        const p1 = { x: marginLeft + (i+1) * cellSize, y: marginTop + ((gridRows - 1 - (j+1)) * cellSize) };
+        const p2 = { x: marginLeft + (i+1) * cellSize, y: marginTop + ((gridRows - 1 - j) * cellSize) };
+        const p3 = { x: marginLeft + i * cellSize, y: marginTop + ((gridRows - 1 - j) * cellSize) };
+
+        // Create a 4-bit index based on whether each vertex is above the threshold.
+        let squareIndex = 0;
+        if (v0 >= threshold) squareIndex |= 8;
+        if (v1 >= threshold) squareIndex |= 4;
+        if (v2 >= threshold) squareIndex |= 2;
+        if (v3 >= threshold) squareIndex |= 1;
+
+        // If square is completely inside or outside the contour, skip.
+        if (squareIndex === 0 || squareIndex === 15) continue;
+
+        // Compute edge intersection points.
+        const ptTop = interpolatePoint(p0, p1, v0, v1, threshold);
+        const ptRight = interpolatePoint(p1, p2, v1, v2, threshold);
+        const ptBottom = interpolatePoint(p3, p2, v3, v2, threshold);
+        const ptLeft = interpolatePoint(p0, p3, v0, v3, threshold);
+
+        // Determine line segments for this square.
+        switch (squareIndex) {
+          case 1: // 0001
+            drawLine(ptBottom, ptLeft);
+            break;
+          case 2: // 0010
+            drawLine(ptRight, ptBottom);
+            break;
+          case 3: // 0011
+            drawLine(ptRight, ptLeft);
+            break;
+          case 4: // 0100
+            drawLine(ptTop, ptRight);
+            break;
+          case 5: // 0101 (ambiguous)
+            drawLine(ptTop, ptLeft);
+            drawLine(ptBottom, ptRight);
+            break;
+          case 6: // 0110
+            drawLine(ptTop, ptBottom);
+            break;
+          case 7: // 0111
+            drawLine(ptTop, ptLeft);
+            break;
+          case 8: // 1000
+            drawLine(ptTop, ptLeft);
+            break;
+          case 9: // 1001
+            drawLine(ptTop, ptBottom);
+            break;
+          case 10: // 1010 (ambiguous)
+            drawLine(ptTop, ptRight);
+            drawLine(ptBottom, ptLeft);
+            break;
+          case 11: // 1011
+            drawLine(ptTop, ptRight);
+            break;
+          case 12: // 1100
+            drawLine(ptRight, ptLeft);
+            break;
+          case 13: // 1101
+            drawLine(ptRight, ptBottom);
+            break;
+          case 14: // 1110
+            drawLine(ptBottom, ptLeft);
+            break;
+        }
+      }
+    }
+  }
+
+  // Helper to draw a line between two points.
+  function drawLine(p1, p2) {
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+
   // Interactive: Show cell info on mouse hover.
   function handleMouseMove(event) {
     const rect = canvas.getBoundingClientRect();
@@ -244,3 +363,4 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 });
+   
