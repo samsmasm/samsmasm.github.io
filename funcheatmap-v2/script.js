@@ -23,6 +23,13 @@ document.addEventListener("DOMContentLoaded", function() {
   drawBtn.addEventListener("click", drawVisualization);
   canvas.addEventListener("mousemove", handleMouseMove);
 
+  // Preprocess the input to replace | ... | with abs(...)
+  function preprocessFormula(inputStr) {
+    // This regex replaces any text of the form | ... | with abs(...).
+    // Note: This simple regex assumes no nested absolute value bars.
+    return inputStr.replace(/\|([^|]+)\|/g, "abs($1)");
+  }
+
   function getAxisRanges() {
     const aMin = parseFloat(aMinInput.value);
     const aMax = parseFloat(aMaxInput.value);
@@ -37,12 +44,15 @@ document.addEventListener("DOMContentLoaded", function() {
     formulaInput.classList.remove("error");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const formulaStr = formulaInput.value.trim();
+    let formulaStr = formulaInput.value.trim();
     if (!formulaStr) {
       errorDiv.textContent = "Please enter a formula.";
       formulaInput.classList.add("error");
       return;
     }
+    
+    // Preprocess to support absolute value notation using |...|
+    formulaStr = preprocessFormula(formulaStr);
 
     let compiled;
     try {
@@ -78,6 +88,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let validValues = [];
 
     // Evaluate the formula for each grid point.
+    // Add the custom functions to the scope.
     for (let i = 0; i < gridCols; i++) {
       gridData[i] = [];
       const a = aMin + i;
@@ -85,7 +96,17 @@ document.addEventListener("DOMContentLoaded", function() {
         const b = aMin + j;  // Use the same range for b
         let result;
         try {
-          result = compiled.evaluate({ a, b, sin: Math.sin, cos: Math.cos, tan: Math.tan, log: Math.log, exp: Math.exp, sqrt: Math.sqrt });
+          result = compiled.evaluate({
+            a,
+            b,
+            sin: Math.sin,
+            cos: Math.cos,
+            tan: Math.tan,
+            log: Math.log,
+            exp: Math.exp,
+            sqrt: Math.sqrt,
+            abs: Math.abs
+          });
           if (typeof result !== "number" || !isFinite(result)) {
             result = NaN;
           }
