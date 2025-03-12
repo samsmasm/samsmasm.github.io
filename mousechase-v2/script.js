@@ -14,7 +14,7 @@ let hunterY;      // we'll set it in resetGame
 let hunterSpeed = 15;
 
 let preyEaten = 0;
-let preyArr = []; // array of prey objects: { x, y, speed, angle, element, interval }
+let preyArr = []; // array of prey objects: { x, y, speed, angle, element, interval, movementInterval, directionInterval }
 let gameTime = 0;
 let timerRunning = false;
 let gameOver = false;
@@ -98,7 +98,12 @@ function resetGame() {
 
   // Remove existing prey
   document.querySelectorAll(".mouse").forEach(el => el.remove());
-  preyArr.forEach(p => clearInterval(p.interval));
+  // Clear intervals for all prey
+  preyArr.forEach(p => {
+    if (p.interval) clearInterval(p.interval);
+    if (p.movementInterval) clearInterval(p.movementInterval);
+    if (p.directionInterval) clearInterval(p.directionInterval);
+  });
   preyArr = [];
 
   // Position hunter in middle-left
@@ -141,7 +146,16 @@ function spawnPrey() {
   let angle = Math.random() * Math.PI * 2;
   let speed = 2 + Math.random() * 2 + preySpeedBoost;
 
-  let preyObj = { x, y, angle, speed, element: preyEl };
+  let preyObj = { 
+    x, 
+    y, 
+    angle, 
+    speed, 
+    element: preyEl,
+    interval: null,
+    movementInterval: null,
+    directionInterval: null
+  };
 
   // Main update loop
   preyObj.interval = setInterval(() => {
@@ -151,7 +165,7 @@ function spawnPrey() {
     }
 
     // 1) If not in swarm mode & #prey < SWARM_THRESHOLD => random wandering
-    // 2) If #prey >= SWARM_THRESHOLD => set swarmMode = true => all chase
+    // 2) If #prey >= SWARM_THRESHOLD => set swarmMode = true => they chase
     if (!swarmMode && preyArr.length >= SWARM_THRESHOLD) {
       swarmMode = true;
     }
@@ -207,17 +221,7 @@ function spawnPrey() {
 // On each frame, check if prey is colliding with hunter
 function collisionCheck(preyObj) {
   if (gameOver) return;  
-  // If the swarm threshold is reached, no more eating
-  if (preyArr.length >= SWARM_THRESHOLD) {
-    // Instead check if we kill the hunter
-    let colliding = getPreyColliding();
-    if (colliding.length >= COLLISION_COUNT) {
-      killHunter(colliding);
-    }
-    return;
-  }
 
-  // If we haven't reached swarm threshold yet => normal eating logic
   let hx = hunterX + HUNTER_SIZE/2;
   let hy = hunterY + HUNTER_SIZE/2;
   let px = preyObj.x + PREY_SIZE/2;
@@ -229,11 +233,21 @@ function collisionCheck(preyObj) {
   let collisionDist = (HUNTER_SIZE + PREY_SIZE)/2 * 0.8;
 
   if (distance < collisionDist) {
-    eatPrey(preyObj);
+    // If the swarm threshold is reached or exceeded => no more eating
+    if (preyArr.length >= SWARM_THRESHOLD) {
+      // Instead check if we kill the hunter
+      let colliding = getPreyColliding();
+      if (colliding.length >= COLLISION_COUNT) {
+        killHunter(colliding);
+      }
+    } else {
+      // The hunter can eat this prey
+      eatPrey(preyObj);
+    }
   }
 }
 
-// Return an array of all prey currently colliding
+// Return all prey currently colliding
 function getPreyColliding() {
   let colliding = [];
   let hx = hunterX + HUNTER_SIZE/2;
@@ -271,8 +285,7 @@ function eatPrey(preyObj) {
   } else {
     // update HUNTER_SIZE
     hunterEl.style.fontSize = `${newSize}px`;
-    // Actually store
-    window.HUNTER_SIZE = newSize; // quick hack: or define a local let
+    window.HUNTER_SIZE = newSize; // store globally so it persists
   }
 }
 
@@ -331,11 +344,12 @@ function killHunter(collidingPrey) {
   hunterEl.textContent = "☠️";
   gameOverMsg.style.display = "block";
 
-  // Make the 10 colliding prey move in random directions every second
+  // For each of the 10 colliding prey => switch them to random-swarm logic
   for (let i=0; i<COLLISION_COUNT; i++) {
     if (collidingPrey[i]) {
-      // Clear old interval
+      // Clear old chase/wander interval
       clearInterval(collidingPrey[i].interval);
+      // Start random direction motion
       startSwarmMotion(collidingPrey[i]);
     }
   }
@@ -343,8 +357,39 @@ function killHunter(collidingPrey) {
 
 // The colliding prey move in random directions every second
 function startSwarmMotion(preyObj) {
-  preyObj.interval = setInterval(() => {
-    preyObj.angle = Math.random() * Math.PI*2;
+  // movementInterval => moves the prey each frame
+  preyObj.movementInterval = setInterval(() => {
+    let dx = preyObj.speed * Math.cos(preyObj.angle);
+    let dy = preyObj.speed * Math.sin(preyObj.angle);
+    preyObj.x += dx;
+    preyObj.y += dy;
+
+    // bounce
+    if (preyObj.x < 0) {
+      preyObj.x = 0;
+      preyObj.angle = Math.PI - preyObj.angle;
+    }
+    else if (preyObj.x > gameContainer.clientWidth - PREY_SIZE) {
+      preyObj.x = gameContainer.clientWidth - PREY_SIZE;
+      preyObj.angle = Math.PI - preyObj.angle;
+    }
+    if (preyObj.y < 0) {
+      preyObj.y = 0;
+      preyObj.angle = -preyObj.angle;
+    }
+    else if (preyObj.y > gameContainer.clientHeight - PREY_SIZE) {
+      preyObj.y = gameContainer.clientHeight - PREY_SIZE;
+      preyObj.angle = -preyObj.angle;
+    }
+
+    // update DOM
+    preyObj.element.style.left = `${preyObj.x}px`;
+    preyObj.element.style.top  = `${preyObj.y}px`;
+  }, 30);
+
+  // directionInterval => randomizes angle every second
+  preyObj.directionInterval = setInterval(() => {
+    preyObj.angle = Math.random() * Math.PI * 2;
   }, 1000);
 }
 
