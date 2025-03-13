@@ -1,58 +1,84 @@
 // List of animal emojis to choose from.
-const animalEmojis = ["🐶", "🐱", "🐰", "🐻", "🦊", "🐼", "🐨", "🐯"];
-
+const animalEmojis = [
+    "🐶", "🐱", "🐰", "🐻", "🦊", "🐼", "🐨", "🐯",
+    "🦁", "🐮", "🐷", "🐵", "🐸", "🐔", "🐧", "🐦",
+    "🐤", "🐣", "🐥", "🦆"
+  ];
+  
 // Container and other elements.
 const container = document.getElementById("tile-container");
 const yayMessage = document.getElementById("yay-message");
-const resetButton = document.getElementById("reset-button");
 const meowSound = document.getElementById("meow-sound");
 
-let tilesData = []; // Array to store tile elements.
+// Mode buttons.
+const btnEmoji = document.getElementById("mode-emoji");
+const btnMixed = document.getElementById("mode-mixed");
+const btnDigits = document.getElementById("mode-digits");
+
+// Slider controls.
+const tileCountSlider = document.getElementById("tile-count-slider");
+const tileCountDisplay = document.getElementById("tile-count-display");
+const startNumberSlider = document.getElementById("start-number-slider");
+const startNumberDisplay = document.getElementById("start-number-display");
+
+// Current mode; default is "mixed".
+let currentMode = "mixed";
+const dragThreshold = 5; // Minimal movement in pixels before dragging starts.
 
 function createTiles() {
   container.innerHTML = '';
-  tilesData = [];
 
-  // Decide which two tiles (by their numbers 1-5) will display as a digit.
-  // We'll randomly pick 2 distinct numbers between 1 and 5.
+  // Read values from sliders.
+  const tileCount = parseInt(tileCountSlider.value, 10);
+  const startNumber = parseInt(startNumberSlider.value, 10);
+
+  // For "mixed" mode, decide which two tile numbers (from the sequence) will display as a digit.
   let digitTiles = [];
-  while (digitTiles.length < 2) {
-    const candidate = Math.floor(Math.random() * 5) + 1;
-    if (!digitTiles.includes(candidate)) {
-      digitTiles.push(candidate);
+  if (currentMode === "mixed") {
+    while (digitTiles.length < Math.min(2, tileCount)) {
+      const candidate = startNumber + Math.floor(Math.random() * tileCount);
+      if (!digitTiles.includes(candidate)) {
+        digitTiles.push(candidate);
+      }
     }
   }
 
-  // Create tiles for numbers 1 to 5.
-  for (let i = 1; i <= 5; i++) {
+  // Create tiles for numbers starting from startNumber.
+  for (let i = 0; i < tileCount; i++) {
+    const numberValue = startNumber + i;
     const tile = document.createElement("div");
     tile.classList.add("tile");
-    tile.setAttribute("data-number", i);
+    tile.setAttribute("data-number", numberValue);
 
-    // If this tile's number is in the digitTiles array, display a big digit.
-    if (digitTiles.includes(i)) {
-      tile.textContent = i;
-      tile.style.fontSize = "3em";
-    } else {
-      // Otherwise, pick a random animal emoji and display it repeated i times.
+    if (currentMode === "emoji") {
+      // Emoji mode: all tiles display emojis.
       const emoji = animalEmojis[Math.floor(Math.random() * animalEmojis.length)];
-      tile.textContent = emoji.repeat(i);
+      tile.textContent = emoji.repeat(numberValue);
+    } else if (currentMode === "digits") {
+      // Only digits mode: all tiles display the digit.
+      tile.textContent = numberValue;
+      tile.style.fontSize = "3em";
+    } else if (currentMode === "mixed") {
+      // Mixed mode: two random tiles show as digits.
+      if (digitTiles.includes(numberValue)) {
+        tile.textContent = numberValue;
+        tile.style.fontSize = "3em";
+      } else {
+        const emoji = animalEmojis[Math.floor(Math.random() * animalEmojis.length)];
+        tile.textContent = emoji.repeat(numberValue);
+      }
     }
     
     container.appendChild(tile);
-    tilesData.push(tile);
-    
-    // Add pointer event listeners for drag and drop.
     addDragAndDrop(tile);
   }
   
-  // Shuffle the tile order in the container.
+  // Shuffle the tile order.
   shuffleTiles();
 }
 
 function shuffleTiles() {
   const tilesArray = Array.from(container.children);
-  // Fisher-Yates shuffle
   for (let i = tilesArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     container.insertBefore(tilesArray[i], tilesArray[j]);
@@ -62,22 +88,18 @@ function shuffleTiles() {
 function addDragAndDrop(tile) {
   let offsetX = 0, offsetY = 0;
   let startX = 0, startY = 0;
+  let draggingStarted = false;
   let initialIndex = null;
 
   const pointerDownHandler = (e) => {
     e.preventDefault();
-    tile.classList.add("dragging");
     startX = e.clientX || e.touches[0].clientX;
     startY = e.clientY || e.touches[0].clientY;
     const rect = tile.getBoundingClientRect();
     offsetX = startX - rect.left;
     offsetY = startY - rect.top;
     initialIndex = Array.from(container.children).indexOf(tile);
-    
-    // Fix tile size to prevent layout issues.
-    tile.style.width = rect.width + "px";
-    tile.style.height = rect.height + "px";
-    
+
     document.addEventListener("pointermove", pointerMoveHandler);
     document.addEventListener("pointerup", pointerUpHandler);
     document.addEventListener("touchmove", pointerMoveHandler, {passive: false});
@@ -88,10 +110,24 @@ function addDragAndDrop(tile) {
     e.preventDefault();
     const clientX = e.clientX || (e.touches && e.touches[0].clientX);
     const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    
+    // Only start dragging after exceeding the movement threshold.
+    if (!draggingStarted) {
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+      if (Math.hypot(dx, dy) < dragThreshold) {
+        return;
+      }
+      draggingStarted = true;
+      tile.classList.add("dragging");
+      const rect = tile.getBoundingClientRect();
+      tile.style.width = rect.width + "px";
+      tile.style.height = rect.height + "px";
+    }
+    
     tile.style.left = (clientX - offsetX - container.getBoundingClientRect().left) + "px";
     tile.style.top = (clientY - offsetY - container.getBoundingClientRect().top) + "px";
 
-    // Determine new potential index based on the center of the dragging tile.
     const draggingRect = tile.getBoundingClientRect();
     const centerX = draggingRect.left + draggingRect.width / 2;
     
@@ -117,12 +153,14 @@ function addDragAndDrop(tile) {
   };
 
   const pointerUpHandler = (e) => {
-    tile.classList.remove("dragging");
-    tile.style.left = "";
-    tile.style.top = "";
-    tile.style.width = "";
-    tile.style.height = "";
-    
+    if (draggingStarted) {
+      tile.classList.remove("dragging");
+      tile.style.left = "";
+      tile.style.top = "";
+      tile.style.width = "";
+      tile.style.height = "";
+    }
+    draggingStarted = false;
     document.removeEventListener("pointermove", pointerMoveHandler);
     document.removeEventListener("pointerup", pointerUpHandler);
     document.removeEventListener("touchmove", pointerMoveHandler);
@@ -157,8 +195,42 @@ function celebrate() {
   }, 1000);
 }
 
-resetButton.addEventListener("click", () => {
+// Reset the game when double-clicking (desktop) or double-tapping (touch).
+document.addEventListener("dblclick", () => {
+  createTiles();
+});
+let lastTouchTime = 0;
+document.addEventListener("touchend", () => {
+  let now = new Date().getTime();
+  if (now - lastTouchTime < 300) {
+    createTiles();
+  }
+  lastTouchTime = now;
+});
+
+// Mode button event listeners.
+btnEmoji.addEventListener("click", () => {
+  currentMode = "emoji";
+  createTiles();
+});
+btnMixed.addEventListener("click", () => {
+  currentMode = "mixed";
+  createTiles();
+});
+btnDigits.addEventListener("click", () => {
+  currentMode = "digits";
   createTiles();
 });
 
+// Update slider displays and recreate tiles when sliders change.
+tileCountSlider.addEventListener("input", () => {
+  tileCountDisplay.textContent = tileCountSlider.value;
+  createTiles();
+});
+startNumberSlider.addEventListener("input", () => {
+  startNumberDisplay.textContent = startNumberSlider.value;
+  createTiles();
+});
+
+// Initialize game on page load.
 createTiles();
