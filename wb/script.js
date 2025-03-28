@@ -1,30 +1,37 @@
-// Get references to the canvases and contexts
+/*******************************************************
+ * script.js - Using Pointer Events for unified input
+ * to fix the stylus "straight-line" bug
+ ******************************************************/
+
+// References to canvases and contexts
 const drawingCanvas = document.getElementById('drawingCanvas');
 const gridCanvas = document.getElementById('gridCanvas');
 const drawingCtx = drawingCanvas.getContext('2d');
 const gridCtx = gridCanvas.getContext('2d');
 
-// Control variables
+// Tool and drawing state variables
 let currentColor = "#000000";
 let currentThickness = 2;
 let currentTool = "pen"; // "pen", "eraser", or "eraseArea"
 let isDrawing = false;
+let hasMoved = false;
 let lastX = 0;
 let lastY = 0;
-let hasMoved = false;
 let gridOn = true;
 const undoStack = [];
 
-// Variables for erase area mode
+// Variables for Erase Area
 let eraseStartX = 0;
 let eraseStartY = 0;
 let selectionRect = null;
 
-// Maintain overall canvas size (which only grows)
+// Maintain a "maximum" canvas size that can grow but not shrink
 let canvasWidth = window.innerWidth;
 let canvasHeight = window.innerHeight;
 
-// Initialize canvas dimensions
+/*******************************************************
+ * Initialization and Resizing
+ *******************************************************/
 function initCanvas() {
   drawingCanvas.width = canvasWidth;
   drawingCanvas.height = canvasHeight;
@@ -34,33 +41,46 @@ function initCanvas() {
 }
 initCanvas();
 
-// Resize function that only increases canvas size, never shrinks it.
-// When the window becomes larger than the current canvas, extend the canvas.
-// The drawing remains at its original size and new space is added.
+/**
+ * Only grow the canvas if the window becomes larger.
+ * If the window is smaller, we keep the bigger canvas
+ * so the user can scroll to see the rest.
+ */
 function resizeCanvas() {
-  // Check if the window is larger than the current canvas size
-  canvasWidth = Math.max(canvasWidth, window.innerWidth);
-  canvasHeight = Math.max(canvasHeight, window.innerHeight);
+  // Check if window is larger than our current canvas size
+  const newWidth = window.innerWidth;
+  const newHeight = window.innerHeight;
   
-  // Save current drawing in a temporary canvas
-  const tempCanvas = document.createElement("canvas");
+  // If neither dimension is bigger, do nothing
+  if (newWidth <= canvasWidth && newHeight <= canvasHeight) return;
+  
+  // Save current drawing
+  const tempCanvas = document.createElement('canvas');
   tempCanvas.width = drawingCanvas.width;
   tempCanvas.height = drawingCanvas.height;
-  tempCanvas.getContext("2d").drawImage(drawingCanvas, 0, 0);
+  tempCanvas.getContext('2d').drawImage(drawingCanvas, 0, 0);
   
-  // Set new dimensions (the canvas only grows)
+  // Update our "maximum" width/height
+  canvasWidth = Math.max(canvasWidth, newWidth);
+  canvasHeight = Math.max(canvasHeight, newHeight);
+  
+  // Resize real canvases
   drawingCanvas.width = canvasWidth;
   drawingCanvas.height = canvasHeight;
   gridCanvas.width = canvasWidth;
   gridCanvas.height = canvasHeight;
   
-  // Redraw saved image at the same scale (anchored at top-left)
+  // Redraw the saved image at the top-left
   drawingCtx.drawImage(tempCanvas, 0, 0);
+  
+  // Redraw grid
   drawGrid();
 }
 window.addEventListener('resize', resizeCanvas);
 
-// Draw grid lines on the grid canvas (light blue)
+/*******************************************************
+ * Grid Drawing
+ *******************************************************/
 function drawGrid() {
   gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
   if (!gridOn) return;
@@ -85,7 +105,9 @@ function drawGrid() {
   }
 }
 
-// Save current drawing state for undo
+/*******************************************************
+ * Undo Stack
+ *******************************************************/
 function saveState() {
   undoStack.push(drawingCanvas.toDataURL());
   if (undoStack.length > 20) {
@@ -93,41 +115,43 @@ function saveState() {
   }
 }
 
-// Restore the previous drawing state
 function undo() {
   if (undoStack.length === 0) return;
-  let imgData = undoStack.pop();
-  let img = new Image();
+  const imgData = undoStack.pop();
+  const img = new Image();
   img.onload = function() {
     drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
     drawingCtx.drawImage(img, 0, 0);
-  }
+  };
   img.src = imgData;
 }
 
-// Get the correct coordinates for mouse/touch events
-function getCoords(e) {
+/*******************************************************
+ * Pointer Event Helpers
+ *******************************************************/
+function getPointerCoords(e) {
+  // Use clientX/Y for pointer events
   const rect = drawingCanvas.getBoundingClientRect();
-  if (e.touches) {
-    return {
-      x: e.touches[0].clientX - rect.left,
-      y: e.touches[0].clientY - rect.top
-    };
-  } else {
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-  }
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
 }
 
-// Begin drawing or starting an erase area selection
-function startDrawing(e) {
-  const coords = getCoords(e);
+/*******************************************************
+ * Pointer Event Handlers
+ *******************************************************/
+
+// 1) pointerdown
+function pointerDownHandler(e) {
+  e.preventDefault();
+  
   if (currentTool === "eraseArea") {
-    // Start erase area selection
+    // Begin erase-area selection
+    const coords = getPointerCoords(e);
     eraseStartX = coords.x;
     eraseStartY = coords.y;
+    
     selectionRect = document.createElement("div");
     selectionRect.id = "selectionRect";
     selectionRect.style.position = "absolute";
@@ -138,38 +162,46 @@ function startDrawing(e) {
     selectionRect.style.top = coords.y + "px";
     selectionRect.style.width = "0px";
     selectionRect.style.height = "0px";
+    
     document.getElementById("container").appendChild(selectionRect);
-    e.preventDefault();
     return;
   }
-  // Normal drawing mode
+  
+  // Normal pen/eraser logic
   isDrawing = true;
   hasMoved = false;
+  saveState();
+  
+  const coords = getPointerCoords(e);
   lastX = coords.x;
   lastY = coords.y;
-  saveState();
-  e.preventDefault();
 }
 
-// Draw a line segment or update the erase area selection rectangle
-function draw(e) {
-  const coords = getCoords(e);
-  if (currentTool === "eraseArea") {
-    if (!selectionRect) return;
+// 2) pointermove
+function pointerMoveHandler(e) {
+  e.preventDefault();
+  
+  // Erase area dragging
+  if (currentTool === "eraseArea" && selectionRect) {
+    const coords = getPointerCoords(e);
     const x = Math.min(eraseStartX, coords.x);
     const y = Math.min(eraseStartY, coords.y);
     const w = Math.abs(coords.x - eraseStartX);
     const h = Math.abs(coords.y - eraseStartY);
+    
     selectionRect.style.left = x + "px";
     selectionRect.style.top = y + "px";
     selectionRect.style.width = w + "px";
     selectionRect.style.height = h + "px";
-    e.preventDefault();
     return;
   }
+  
+  // If we're not actively drawing, exit
   if (!isDrawing) return;
-  // Mark that the user has moved from the initial point
+  
+  // Draw or erase
   hasMoved = true;
+  const coords = getPointerCoords(e);
   drawingCtx.beginPath();
   drawingCtx.moveTo(lastX, lastY);
   drawingCtx.lineTo(coords.x, coords.y);
@@ -178,55 +210,63 @@ function draw(e) {
   drawingCtx.lineCap = "round";
   drawingCtx.lineJoin = "round";
   drawingCtx.stroke();
+  
   lastX = coords.x;
   lastY = coords.y;
-  e.preventDefault();
 }
 
-// End drawing or finalize the erase area selection
-function stopDrawing(e) {
-  const coords = getCoords(e);
-  if (currentTool === "eraseArea") {
-    if (!selectionRect) return;
+// 3) pointerup / pointercancel / pointerout
+function pointerUpHandler(e) {
+  e.preventDefault();
+  
+  // Finalize erase-area
+  if (currentTool === "eraseArea" && selectionRect) {
+    const coords = getPointerCoords(e);
     const x = Math.min(eraseStartX, coords.x);
     const y = Math.min(eraseStartY, coords.y);
     const w = Math.abs(coords.x - eraseStartX);
     const h = Math.abs(coords.y - eraseStartY);
+    
     saveState();
     drawingCtx.clearRect(x, y, w, h);
+    
     selectionRect.parentNode.removeChild(selectionRect);
     selectionRect = null;
+    
     // Revert back to pen after erasing area
     currentTool = "pen";
-    e.preventDefault();
     return;
   }
+  
+  // If we weren't drawing, nothing to finalize
   if (!isDrawing) return;
-  // If no movement occurred, draw a dot
+  
+  // If the user never moved, draw a single dot
   if (!hasMoved) {
     drawingCtx.beginPath();
     drawingCtx.arc(lastX, lastY, currentThickness / 2, 0, Math.PI * 2);
     drawingCtx.fillStyle = (currentTool === "eraser") ? "#FFFFFF" : currentColor;
     drawingCtx.fill();
   }
+  
   isDrawing = false;
-  e.preventDefault();
 }
 
-// Mouse events
-drawingCanvas.addEventListener('mousedown', startDrawing);
-drawingCanvas.addEventListener('mousemove', draw);
-drawingCanvas.addEventListener('mouseup', stopDrawing);
-drawingCanvas.addEventListener('mouseout', stopDrawing);
+/*******************************************************
+ * Register Pointer Events
+ *******************************************************/
+drawingCanvas.addEventListener('pointerdown', pointerDownHandler);
+drawingCanvas.addEventListener('pointermove', pointerMoveHandler);
+// We treat pointerup, pointercancel, and pointerout the same
+drawingCanvas.addEventListener('pointerup', pointerUpHandler);
+drawingCanvas.addEventListener('pointercancel', pointerUpHandler);
+drawingCanvas.addEventListener('pointerout', pointerUpHandler);
 
-// Touch events
-drawingCanvas.addEventListener('touchstart', startDrawing);
-drawingCanvas.addEventListener('touchmove', draw);
-drawingCanvas.addEventListener('touchend', stopDrawing);
+/*******************************************************
+ * Button & UI Logic
+ *******************************************************/
 
-// Control button event listeners
-
-// Color selection: update color and revert to pen
+// Color selection
 document.querySelectorAll('.color-btn').forEach(button => {
   button.addEventListener('click', () => {
     currentColor = button.getAttribute('data-color');
@@ -245,51 +285,52 @@ document.querySelectorAll('.thickness-btn').forEach(button => {
 document.getElementById('penButton').addEventListener('click', () => {
   currentTool = "pen";
 });
-
 document.getElementById('eraserButton').addEventListener('click', () => {
   currentTool = "eraser";
 });
-
 document.getElementById('eraseAreaButton').addEventListener('click', () => {
   currentTool = "eraseArea";
 });
-
 document.getElementById('undoButton').addEventListener('click', () => {
   undo();
 });
-
 document.getElementById('clearButton').addEventListener('click', () => {
   saveState();
   drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 });
-
 document.getElementById('gridToggleButton').addEventListener('click', () => {
   gridOn = !gridOn;
   drawGrid();
 });
 
-// Save: composite the drawing on a white background (no grid)
+// Save button: composite with white background (no grid)
 document.getElementById('saveButton').addEventListener('click', () => {
   const composite = document.createElement('canvas');
   composite.width = drawingCanvas.width;
   composite.height = drawingCanvas.height;
   const compCtx = composite.getContext('2d');
+  
+  // Fill with white background
   compCtx.fillStyle = "#FFFFFF";
   compCtx.fillRect(0, 0, composite.width, composite.height);
+  // Draw the actual drawing
   compCtx.drawImage(drawingCanvas, 0, 0);
+  
+  // Download as PNG
   const link = document.createElement('a');
   link.download = 'whiteboard.png';
   link.href = composite.toDataURL('image/png');
   link.click();
 });
 
-// Print: composite the drawing (transparent background, no grid) without scaling
+// Print button: composite the drawing (transparent background) without grid
 document.getElementById('printButton').addEventListener('click', () => {
   const composite = document.createElement('canvas');
   composite.width = drawingCanvas.width;
   composite.height = drawingCanvas.height;
   const compCtx = composite.getContext('2d');
   compCtx.drawImage(drawingCanvas, 0, 0);
+  
   const dataUrl = composite.toDataURL('image/png');
   const printWindow = window.open('', '_blank', 'width=' + drawingCanvas.width + ',height=' + drawingCanvas.height);
   printWindow.document.open();
