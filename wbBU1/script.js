@@ -1,5 +1,6 @@
 /*******************************************************
  * script.js - Using Pointer Events for unified input
+ * to fix the stylus "straight-line" bug
  ******************************************************/
 
 // References to canvases and contexts
@@ -46,12 +47,14 @@ initCanvas();
  * so the user can scroll to see the rest.
  */
 function resizeCanvas() {
+  // Check if window is larger than our current canvas size
   const newWidth = window.innerWidth;
   const newHeight = window.innerHeight;
   
+  // If neither dimension is bigger, do nothing
   if (newWidth <= canvasWidth && newHeight <= canvasHeight) return;
   
-  // Save current drawing in a temporary canvas
+  // Save current drawing
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = drawingCanvas.width;
   tempCanvas.height = drawingCanvas.height;
@@ -61,7 +64,7 @@ function resizeCanvas() {
   canvasWidth = Math.max(canvasWidth, newWidth);
   canvasHeight = Math.max(canvasHeight, newHeight);
   
-  // Resize the real canvases
+  // Resize real canvases
   drawingCanvas.width = canvasWidth;
   drawingCanvas.height = canvasHeight;
   gridCanvas.width = canvasWidth;
@@ -70,6 +73,7 @@ function resizeCanvas() {
   // Redraw the saved image at the top-left
   drawingCtx.drawImage(tempCanvas, 0, 0);
   
+  // Redraw grid
   drawGrid();
 }
 window.addEventListener('resize', resizeCanvas);
@@ -83,7 +87,7 @@ function drawGrid() {
   
   gridCtx.strokeStyle = '#ADD8E6';
   gridCtx.lineWidth = 0.5;
-  const spacing = 50;
+  const spacing = 50; // spacing between grid lines
   
   // Vertical lines
   for (let x = spacing; x < gridCanvas.width; x += spacing) {
@@ -126,6 +130,7 @@ function undo() {
  * Pointer Event Helpers
  *******************************************************/
 function getPointerCoords(e) {
+  // Use clientX/Y for pointer events
   const rect = drawingCanvas.getBoundingClientRect();
   return {
     x: e.clientX - rect.left,
@@ -136,11 +141,13 @@ function getPointerCoords(e) {
 /*******************************************************
  * Pointer Event Handlers
  *******************************************************/
-// pointerdown
+
+// 1) pointerdown
 function pointerDownHandler(e) {
   e.preventDefault();
   
   if (currentTool === "eraseArea") {
+    // Begin erase-area selection
     const coords = getPointerCoords(e);
     eraseStartX = coords.x;
     eraseStartY = coords.y;
@@ -160,7 +167,7 @@ function pointerDownHandler(e) {
     return;
   }
   
-  // Normal drawing/erasing mode
+  // Normal pen/eraser logic
   isDrawing = true;
   hasMoved = false;
   saveState();
@@ -170,10 +177,11 @@ function pointerDownHandler(e) {
   lastY = coords.y;
 }
 
-// pointermove
+// 2) pointermove
 function pointerMoveHandler(e) {
   e.preventDefault();
   
+  // Erase area dragging
   if (currentTool === "eraseArea" && selectionRect) {
     const coords = getPointerCoords(e);
     const x = Math.min(eraseStartX, coords.x);
@@ -188,8 +196,10 @@ function pointerMoveHandler(e) {
     return;
   }
   
+  // If we're not actively drawing, exit
   if (!isDrawing) return;
   
+  // Draw or erase
   hasMoved = true;
   const coords = getPointerCoords(e);
   drawingCtx.beginPath();
@@ -205,10 +215,11 @@ function pointerMoveHandler(e) {
   lastY = coords.y;
 }
 
-// pointerup / pointercancel / pointerout
+// 3) pointerup / pointercancel / pointerout
 function pointerUpHandler(e) {
   e.preventDefault();
   
+  // Finalize erase-area
   if (currentTool === "eraseArea" && selectionRect) {
     const coords = getPointerCoords(e);
     const x = Math.min(eraseStartX, coords.x);
@@ -222,12 +233,15 @@ function pointerUpHandler(e) {
     selectionRect.parentNode.removeChild(selectionRect);
     selectionRect = null;
     
+    // Revert back to pen after erasing area
     currentTool = "pen";
     return;
   }
   
+  // If we weren't drawing, nothing to finalize
   if (!isDrawing) return;
   
+  // If the user never moved, draw a single dot
   if (!hasMoved) {
     drawingCtx.beginPath();
     drawingCtx.arc(lastX, lastY, currentThickness / 2, 0, Math.PI * 2);
@@ -243,6 +257,7 @@ function pointerUpHandler(e) {
  *******************************************************/
 drawingCanvas.addEventListener('pointerdown', pointerDownHandler);
 drawingCanvas.addEventListener('pointermove', pointerMoveHandler);
+// We treat pointerup, pointercancel, and pointerout the same
 drawingCanvas.addEventListener('pointerup', pointerUpHandler);
 drawingCanvas.addEventListener('pointercancel', pointerUpHandler);
 drawingCanvas.addEventListener('pointerout', pointerUpHandler);
@@ -251,20 +266,19 @@ drawingCanvas.addEventListener('pointerout', pointerUpHandler);
  * Button & UI Logic
  *******************************************************/
 
-// Color selection: update color and mark selected
+// Color selection
 document.querySelectorAll('.color-btn').forEach(button => {
   button.addEventListener('click', () => {
-    document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
-    button.classList.add('selected');
     currentColor = button.getAttribute('data-color');
     currentTool = "pen";
   });
 });
 
-// Thickness slider control
-const thicknessSlider = document.getElementById('thicknessSlider');
-thicknessSlider.addEventListener('input', (e) => {
-  currentThickness = parseInt(e.target.value);
+// Thickness selection
+document.querySelectorAll('.thickness-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    currentThickness = parseInt(button.getAttribute('data-size'));
+  });
 });
 
 // Tool buttons
@@ -289,24 +303,27 @@ document.getElementById('gridToggleButton').addEventListener('click', () => {
   drawGrid();
 });
 
-// Save: composite the drawing on a white background (no grid)
+// Save button: composite with white background (no grid)
 document.getElementById('saveButton').addEventListener('click', () => {
   const composite = document.createElement('canvas');
   composite.width = drawingCanvas.width;
   composite.height = drawingCanvas.height;
   const compCtx = composite.getContext('2d');
   
+  // Fill with white background
   compCtx.fillStyle = "#FFFFFF";
   compCtx.fillRect(0, 0, composite.width, composite.height);
+  // Draw the actual drawing
   compCtx.drawImage(drawingCanvas, 0, 0);
   
+  // Download as PNG
   const link = document.createElement('a');
   link.download = 'whiteboard.png';
   link.href = composite.toDataURL('image/png');
   link.click();
 });
 
-// Print: composite the drawing (transparent background) without grid
+// Print button: composite the drawing (transparent background) without grid
 document.getElementById('printButton').addEventListener('click', () => {
   const composite = document.createElement('canvas');
   composite.width = drawingCanvas.width;
