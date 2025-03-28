@@ -11,6 +11,7 @@ let currentTool = "pen"; // "pen", "eraser", or "eraseArea"
 let isDrawing = false;
 let lastX = 0;
 let lastY = 0;
+let hasMoved = false;
 let gridOn = true;
 const undoStack = [];
 
@@ -19,29 +20,45 @@ let eraseStartX = 0;
 let eraseStartY = 0;
 let selectionRect = null;
 
-// Resize the canvas without scaling the drawing.
-// Instead, extend the canvas and draw the saved image at original size.
+// Maintain overall canvas size (which only grows)
+let canvasWidth = window.innerWidth;
+let canvasHeight = window.innerHeight;
+
+// Initialize canvas dimensions
+function initCanvas() {
+  drawingCanvas.width = canvasWidth;
+  drawingCanvas.height = canvasHeight;
+  gridCanvas.width = canvasWidth;
+  gridCanvas.height = canvasHeight;
+  drawGrid();
+}
+initCanvas();
+
+// Resize function that only increases canvas size, never shrinks it.
+// When the window becomes larger than the current canvas, extend the canvas.
+// The drawing remains at its original size and new space is added.
 function resizeCanvas() {
+  // Check if the window is larger than the current canvas size
+  canvasWidth = Math.max(canvasWidth, window.innerWidth);
+  canvasHeight = Math.max(canvasHeight, window.innerHeight);
+  
   // Save current drawing in a temporary canvas
   const tempCanvas = document.createElement("canvas");
   tempCanvas.width = drawingCanvas.width;
   tempCanvas.height = drawingCanvas.height;
   tempCanvas.getContext("2d").drawImage(drawingCanvas, 0, 0);
   
-  // Set new dimensions (canvas fills the window)
-  drawingCanvas.width = window.innerWidth;
-  drawingCanvas.height = window.innerHeight;
-  gridCanvas.width = window.innerWidth;
-  gridCanvas.height = window.innerHeight;
+  // Set new dimensions (the canvas only grows)
+  drawingCanvas.width = canvasWidth;
+  drawingCanvas.height = canvasHeight;
+  gridCanvas.width = canvasWidth;
+  gridCanvas.height = canvasHeight;
   
-  // Redraw saved image at its original size (anchored at top-left)
+  // Redraw saved image at the same scale (anchored at top-left)
   drawingCtx.drawImage(tempCanvas, 0, 0);
-  
-  // Redraw grid on new grid canvas
   drawGrid();
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
 
 // Draw grid lines on the grid canvas (light blue)
 function drawGrid() {
@@ -127,6 +144,7 @@ function startDrawing(e) {
   }
   // Normal drawing mode
   isDrawing = true;
+  hasMoved = false;
   lastX = coords.x;
   lastY = coords.y;
   saveState();
@@ -150,6 +168,8 @@ function draw(e) {
     return;
   }
   if (!isDrawing) return;
+  // Mark that the user has moved from the initial point
+  hasMoved = true;
   drawingCtx.beginPath();
   drawingCtx.moveTo(lastX, lastY);
   drawingCtx.lineTo(coords.x, coords.y);
@@ -182,14 +202,13 @@ function stopDrawing(e) {
     return;
   }
   if (!isDrawing) return;
-  drawingCtx.beginPath();
-  drawingCtx.moveTo(lastX, lastY);
-  drawingCtx.lineTo(coords.x, coords.y);
-  drawingCtx.strokeStyle = (currentTool === "eraser") ? "#FFFFFF" : currentColor;
-  drawingCtx.lineWidth = currentThickness;
-  drawingCtx.lineCap = "round";
-  drawingCtx.lineJoin = "round";
-  drawingCtx.stroke();
+  // If no movement occurred, draw a dot
+  if (!hasMoved) {
+    drawingCtx.beginPath();
+    drawingCtx.arc(lastX, lastY, currentThickness / 2, 0, Math.PI * 2);
+    drawingCtx.fillStyle = (currentTool === "eraser") ? "#FFFFFF" : currentColor;
+    drawingCtx.fill();
+  }
   isDrawing = false;
   e.preventDefault();
 }
@@ -207,11 +226,11 @@ drawingCanvas.addEventListener('touchend', stopDrawing);
 
 // Control button event listeners
 
-// Color selection
+// Color selection: update color and revert to pen
 document.querySelectorAll('.color-btn').forEach(button => {
   button.addEventListener('click', () => {
     currentColor = button.getAttribute('data-color');
-    currentTool = "pen"; // switch back to pen when a color is selected
+    currentTool = "pen";
   });
 });
 
