@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Annotation Tool with Live Drawing & Save As</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: #eee;
+    }
+    /* Toolbar styling */
+    #toolbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #f4f4f4;
+      padding: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      z-index: 1000;
+      text-align: center;
+    }
+    /* Centered PDF container */
+    #pdfContainer {
+      margin: 70px auto 10px auto;
+      padding: 10px;
+      width: 90%;
+      text-align: center;
+    }
+    .pageContainer {
+      border: 1px solid #ccc;
+      margin: 10px auto;
+      position: relative;
+      display: inline-block;
+    }
+    .pdf-canvas {
+      display: block;
+    }
+    .annotationCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    /* Visual style for the area eraser selection rectangle */
+    .selection-rect {
+      position: absolute;
+      border: 2px dashed red;
+      background-color: rgba(255, 0, 0, 0.1);
+      pointer-events: none;
+    }
+  </style>
+  <!-- Include pdf-lib from CDN -->
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <!-- Include PDF.js library from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+</head>
+<body>
+  <!-- Toolbar with file input and controls -->
+  <div id="toolbar">
+    <input type="file" id="pdfInput" accept="application/pdf">
+    <button id="penBtn">Pen</button>
+    <button id="eraserBtn">Freehand Eraser</button>
+    <button id="areaEraserBtn">Area Eraser</button>
+    <input type="color" id="colorPicker" value="#000000">
+    <select id="thicknessSelector">
+      <option value="2">2px</option>
+      <option value="4">4px</option>
+      <option value="6">6px</option>
+    </select>
+    <button id="zoomInBtn">Zoom In</button>
+    <button id="zoomOutBtn">Zoom Out</button>
+    <button id="snapWidthBtn">Snap to Width</button>
+    <button id="saveBtn">Save As</button>
+  </div>
+
+  <!-- Container for rendered PDF pages -->
+  <div id="pdfContainer"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // -----------------------------
+      // Global drawing and PDF settings
+      // -----------------------------
+      // currentTool can be: 'pen', 'eraser' (freehand), or 'areaEraser'
+      let currentTool = 'pen';
+      let isDrawing = false;
+      let penColor = '#000000';
+      let penThickness = 2;
+      let currentScale = 1; // current zoom level
+      
+      let pdfDoc = null;     // PDF.js document
+      let pdfData = null;    // PDF data (for re-rendering)
+      
+      // For vector drawing, store strokes (per page, in base coordinates, scale = 1)
+      // Structure: { pageNum: [ { tool, color, thickness, points: [ {x, y}, ... ] }, ... ] }
+      const pageStrokes = {};
+
+      const pdfContainer = document.getElementById('pdfContainer');
+      const pdfInput = document.getElementById('pdfInput');
+
+      // -----------------------------
+      // PDF Loading
+      // -----------------------------
+      pdfInput.addEventListener('change', handleFileSelect);
+      function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function() {
+            const typedarray = new Uint8Array(this.result);
+            pdfData = typedarray;
+            loadPDF(typedarray);
+          }
+          reader.readAsArrayBuffer(file);
+        }
+      }
+      function loadPDF(data) {
+        pdfjsLib.getDocument({ data: data }).promise.then(function(pdf) {
+          pdfDoc = pdf;
+          renderAllPages();
+        });
+      }
+      
+      // Re-render all pages using the currentScale
+      function renderAllPages() {
+        pdfContainer.innerHTML = '';
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          renderPage(pageNum);
+        }
+      }
+      
+      // Render an individual page with PDF and its annotation layer.
+      function renderPage(pageNum) {
+        pdfDoc.getPage(pageNum).then(function(page) {
+          // Base viewport (scale = 1) for vector storage
+          const baseViewport = page.getViewport({ scale: 1 });
+          // Viewport for current display scale
+          const viewport = page.getViewport({ scale: currentScale });
+          
+          // Create container for the page.
+          const pageContainer = document.createElement('div');
+          pageContainer.className = 'pageContainer';
+          pageContainer.style.width = viewport.width + 'px';
+          pageContainer.style.height = viewport.height + 'px';
+          
+          // PDF canvas: render the PDF page.
+          const pdfCanvas = document.createElement('canvas');
+          pdfCanvas.width = viewport.width;
+          pdfCanvas.height = viewport.height;
+          pdfCanvas.className = 'pdf-canvas';
+          pageContainer.appendChild(pdfCanvas);
+          const pdfCtx = pdfCanvas.getContext('2d');
+          page.render({
+            canvasContext: pdfCtx,
+            viewport: viewport
+          });
+          
+          // Annotation canvas for vector drawings.
+          const annotationCanvas = document.createElement('canvas');
+          annotationCanvas.width = viewport.width;
+          annotationCanvas.height = viewport.height;
+          annotationCanvas.className = 'annotationCanvas';
+          pageContainer.appendChild(annotationCanvas);
+          
+          // Initialize strokes array for this page if needed.
+          if (!pageStrokes[pageNum]) {
+            pageStrokes[pageNum] = [];
+          }
+          
+          // Draw persistent strokes (if any) onto the annotation canvas.
+          redrawStrokesForCanvas(annotationCanvas.getContext('2d'), pageNum);
+          
+          // Attach vector drawing listeners to the annotation canvas.
+          addCanvasListeners(annotationCanvas, pageNum);
+          pdfContainer.appendChild(pageContainer);
+        });
+      }
+      
+      // -----------------------------
+      // Vector Drawing Functions
+      // -----------------------------
+      // Redraw all vector strokes for a given page onto its annotation canvas context.
+      function redrawStrokesForCanvas(ctx, pageNum) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        const strokes = pageStrokes[pageNum] || [];
+        strokes.forEach(stroke => {
+          drawStroke(ctx, stroke);
+        });
+      }
+      
+      // Draw a single stroke onto a canvas context.
+      function drawStroke(ctx, stroke) {
+        if (!stroke || stroke.points.length === 0) return;
+        ctx.beginPath();
+        const first = stroke.points[0];
+        ctx.moveTo(first.x * currentScale, first.y * currentScale);
+        for (let i = 1; i < stroke.points.length; i++) {
+          const pt = stroke.points[i];
+          ctx.lineTo(pt.x * currentScale, pt.y * currentScale);
+        }
+        ctx.lineWidth = stroke.thickness * currentScale;
+        ctx.lineCap = 'round';
+        if (stroke.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = stroke.color;
+        }
+        ctx.stroke();
+        ctx.closePath();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      
+      // Add pointer event listeners to an annotation canvas for vector drawing.
+      function addCanvasListeners(canvas, pageNum) {
+        const ctx = canvas.getContext('2d');
+        let currentStroke = null;
+        let areaStartX, areaStartY;
+        let selectionRect = null;
+        
+        canvas.addEventListener('pointerdown', function(e) {
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          if (currentTool === 'areaEraser') {
+            // Start area selection.
+            areaStartX = x;
+            areaStartY = y;
+            selectionRect = document.createElement('div');
+            selectionRect.className = 'selection-rect';
+            selectionRect.style.left = x + 'px';
+            selectionRect.style.top = y + 'px';
+            selectionRect.style.width = '0px';
+            selectionRect.style.height = '0px';
+            canvas.parentElement.appendChild(selectionRect);
+            e.preventDefault();
+            return;
+          } else if (currentTool === 'pen' || currentTool === 'eraser') {
+            isDrawing = true;
+            // Create a new stroke, storing coordinates in base space.
+            currentStroke = {
+              tool: currentTool,
+              color: penColor,
+              thickness: penThickness,
+              points: [{ x: x / currentScale, y: y / currentScale }]
+            };
+            e.preventDefault();
+          }
+        });
+        
+        canvas.addEventListener('pointermove', function(e) {
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          if (currentTool === 'areaEraser' && selectionRect) {
+            // Update selection rectangle.
+            let startX = areaStartX, startY = areaStartY;
+            let width = x - areaStartX;
+            let height = y - areaStartY;
+            if (width < 0) { startX = x; width = Math.abs(width); }
+            if (height < 0) { startY = y; height = Math.abs(height); }
+            selectionRect.style.left = startX + 'px';
+            selectionRect.style.top = startY + 'px';
+            selectionRect.style.width = width + 'px';
+            selectionRect.style.height = height + 'px';
+            e.preventDefault();
+            return;
+          } else if (isDrawing && (currentTool === 'pen' || currentTool === 'eraser')) {
+            // Add point to current stroke.
+            currentStroke.points.push({ x: x / currentScale, y: y / currentScale });
+            // Redraw persistent strokes.
+            redrawStrokesForCanvas(ctx, pageNum);
+            // Draw the current stroke live on top.
+            drawStroke(ctx, currentStroke);
+            e.preventDefault();
+          }
+        });
+        
+        canvas.addEventListener('pointerup', function(e) {
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          if (currentTool === 'areaEraser' && selectionRect) {
+            // Compute selection rectangle in base coordinates.
+            let startX = Math.min(areaStartX, x);
+            let startY = Math.min(areaStartY, y);
+            let width = Math.abs(x - areaStartX);
+            let height = Math.abs(y - areaStartY);
+            const baseRect = {
+              x: startX / currentScale,
+              y: startY / currentScale,
+              width: width / currentScale,
+              height: height / currentScale
+            };
+            // Remove strokes that have any point inside the selection.
+            pageStrokes[pageNum] = pageStrokes[pageNum].filter(stroke => {
+              return !stroke.points.some(pt => (
+                pt.x >= baseRect.x && pt.x <= baseRect.x + baseRect.width &&
+                pt.y >= baseRect.y && pt.y <= baseRect.y + baseRect.height
+              ));
+            });
+            selectionRect.remove();
+            selectionRect = null;
+            redrawStrokesForCanvas(ctx, pageNum);
+            e.preventDefault();
+            return;
+          } else if (isDrawing && (currentTool === 'pen' || currentTool === 'eraser')) {
+            // Finalize the stroke.
+            pageStrokes[pageNum].push(currentStroke);
+            currentStroke = null;
+            isDrawing = false;
+            redrawStrokesForCanvas(ctx, pageNum);
+            e.preventDefault();
+          }
+        });
+        
+        canvas.addEventListener('pointerleave', function(e) {
+          if (currentTool === 'areaEraser' && selectionRect) {
+            selectionRect.remove();
+            selectionRect = null;
+          }
+          if (isDrawing) {
+            pageStrokes[pageNum].push(currentStroke);
+            currentStroke = null;
+            isDrawing = false;
+            redrawStrokesForCanvas(ctx, pageNum);
+          }
+        });
+      }
+      
+      // -----------------------------
+      // Toolbar Button Wiring
+      // -----------------------------
+      document.getElementById('penBtn').addEventListener('click', () => {
+        currentTool = 'pen';
+      });
+      document.getElementById('eraserBtn').addEventListener('click', () => {
+        currentTool = 'eraser';
+      });
+      document.getElementById('areaEraserBtn').addEventListener('click', () => {
+        currentTool = 'areaEraser';
+      });
+      document.getElementById('colorPicker').addEventListener('change', (e) => {
+        penColor = e.target.value;
+      });
+      document.getElementById('thicknessSelector').addEventListener('change', (e) => {
+        penThickness = parseInt(e.target.value, 10);
+      });
+      document.getElementById('zoomInBtn').addEventListener('click', () => {
+        currentScale *= 1.1;
+        renderAllPages();
+      });
+      document.getElementById('zoomOutBtn').addEventListener('click', () => {
+        currentScale /= 1.1;
+        renderAllPages();
+      });
+      document.getElementById('snapWidthBtn').addEventListener('click', () => {
+        if (!pdfDoc) return;
+        pdfDoc.getPage(1).then(function(page) {
+          const baseViewport = page.getViewport({ scale: 1 });
+          const containerWidth = pdfContainer.clientWidth;
+          currentScale = containerWidth / baseViewport.width;
+          renderAllPages();
+        });
+      });
+      
+      // -----------------------------
+      // Save As Function using pdf-lib
+      // -----------------------------
+      document.getElementById('saveBtn').addEventListener('click', async () => {
+         const { PDFDocument } = PDFLib;
+         const pdfDocNew = await PDFDocument.create();
+         // For each page container, combine the PDF and annotation canvases.
+         const pageContainers = document.querySelectorAll('.pageContainer');
+         for (let container of pageContainers) {
+            const pdfCanvas = container.querySelector('.pdf-canvas');
+            const annotationCanvas = container.querySelector('.annotationCanvas');
+            // Create a temporary canvas to combine both layers.
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = pdfCanvas.width;
+            tempCanvas.height = pdfCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(pdfCanvas, 0, 0);
+            tempCtx.drawImage(annotationCanvas, 0, 0);
+            const imgData = tempCanvas.toDataURL('image/png');
+            const pageImage = await pdfDocNew.embedPng(imgData);
+            const newPage = pdfDocNew.addPage([pdfCanvas.width, pdfCanvas.height]);
+            newPage.drawImage(pageImage, {
+               x: 0,
+               y: 0,
+               width: pdfCanvas.width,
+               height: pdfCanvas.height
+            });
+         }
+         const pdfBytes = await pdfDocNew.save();
+         // Trigger download.
+         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+         const link = document.createElement('a');
+         link.href = URL.createObjectURL(blob);
+         link.download = 'annotated.pdf';
+         link.click();
+      });
+    });
+  </script>
+</body>
+</html>
