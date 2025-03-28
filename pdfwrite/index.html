@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PDF Annotation Tool with Dedicated Scrollbar</title>
+  <title>PDF Annotation Tool with Undo & Fine Thickness</title>
   <style>
     body {
       margin: 0;
@@ -22,9 +22,7 @@
       z-index: 1000;
       text-align: center;
     }
-    /* PDF container with dedicated scrollbar.
-       The max-height is set so that the container fits within the viewport
-       (toolbar height is assumed to be 70px here). */
+    /* PDF container with dedicated scrollbar */
     #pdfContainer {
       margin: 70px auto 10px auto;
       padding: 10px;
@@ -71,20 +69,19 @@
     <button id="penBtn">Pen</button>
     <button id="eraserBtn">Freehand Eraser</button>
     <button id="areaEraserBtn">Area Eraser</button>
-    <input type="color" id="colorPicker" value="#000000">
-    <select id="thicknessSelector">
-      <option value="2">2px</option>
-      <option value="4">4px</option>
-      <option value="6">6px</option>
-    </select>
+    <!-- Thickness slider: min 0.5px, max 6px, step 0.1 -->
+    <label for="thicknessSlider">Thickness: <span id="thicknessValue">1</span>px</label>
+    <input type="range" id="thicknessSlider" min="0.5" max="6" step="0.1" value="1">
+    <button id="undoBtn">Undo</button>
     <button id="zoomInBtn">Zoom In</button>
     <button id="zoomOutBtn">Zoom Out</button>
     <button id="snapWidthBtn">Snap to Width</button>
     <button id="saveBtn">Save As</button>
+    <input type="color" id="colorPicker" value="#000000">
   </div>
 
   <!-- Container for rendered PDF pages.
-       tabindex="0" makes this element focusable so that arrow keys can scroll it. -->
+       tabindex="0" makes this element focusable so arrow keys work -->
   <div id="pdfContainer" tabindex="0"></div>
 
   <script>
@@ -96,15 +93,19 @@
       let currentTool = 'pen';
       let isDrawing = false;
       let penColor = '#000000';
-      let penThickness = 2;
+      let penThickness = 1; // Default now from slider (can be thinner than 2px)
       let currentScale = 1; // current zoom level
       
       let pdfDoc = null;     // PDF.js document
       let pdfData = null;    // PDF data (for re-rendering)
       
-      // For vector drawing, store strokes (per page, in base coordinates, scale = 1)
+      // For vector drawing, store strokes per page in base coordinates (scale = 1)
       // Structure: { pageNum: [ { tool, color, thickness, points: [ {x, y}, ... ] }, ... ] }
       const pageStrokes = {};
+      // Global undo stack: each entry is { pageNum: number } indicating that the last stroke on that page was drawn.
+      const undoStack = [];
+      // Map page numbers to annotation canvas elements (to update them on undo)
+      const annotationCanvases = {};
 
       const pdfContainer = document.getElementById('pdfContainer');
       const pdfInput = document.getElementById('pdfInput');
@@ -135,6 +136,8 @@
       // Re-render all pages using the currentScale
       function renderAllPages() {
         pdfContainer.innerHTML = '';
+        // Reset annotation canvas mapping (strokes persist in pageStrokes)
+        Object.keys(annotationCanvases).forEach(key => delete annotationCanvases[key]);
         for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
           renderPage(pageNum);
         }
@@ -172,6 +175,8 @@
           annotationCanvas.height = viewport.height;
           annotationCanvas.className = 'annotationCanvas';
           pageContainer.appendChild(annotationCanvas);
+          // Store the annotation canvas for undo updates.
+          annotationCanvases[pageNum] = annotationCanvas;
           
           // Initialize strokes array for this page if needed.
           if (!pageStrokes[pageNum]) {
@@ -318,6 +323,8 @@
           } else if (isDrawing && (currentTool === 'pen' || currentTool === 'eraser')) {
             // Finalize the stroke.
             pageStrokes[pageNum].push(currentStroke);
+            // Also push onto global undo stack.
+            undoStack.push({ pageNum: pageNum });
             currentStroke = null;
             isDrawing = false;
             redrawStrokesForCanvas(ctx, pageNum);
@@ -332,6 +339,7 @@
           }
           if (isDrawing) {
             pageStrokes[pageNum].push(currentStroke);
+            undoStack.push({ pageNum: pageNum });
             currentStroke = null;
             isDrawing = false;
             redrawStrokesForCanvas(ctx, pageNum);
@@ -354,9 +362,15 @@
       document.getElementById('colorPicker').addEventListener('change', (e) => {
         penColor = e.target.value;
       });
-      document.getElementById('thicknessSelector').addEventListener('change', (e) => {
-        penThickness = parseInt(e.target.value, 10);
+      
+      // Thickness slider handling.
+      const thicknessSlider = document.getElementById('thicknessSlider');
+      const thicknessValue = document.getElementById('thicknessValue');
+      thicknessSlider.addEventListener('input', (e) => {
+        penThickness = parseFloat(e.target.value);
+        thicknessValue.textContent = penThickness;
       });
+      
       document.getElementById('zoomInBtn').addEventListener('click', () => {
         currentScale *= 1.1;
         renderAllPages();
@@ -375,9 +389,24 @@
         });
       });
       
-      // -----------------------------
-      // Save As Function using pdf-lib
-      // -----------------------------
+      // Undo button functionality.
+      document.getElementById('undoBtn').addEventListener('click', () => {
+        if (undoStack.length === 0) return;
+        const lastAction = undoStack.pop();
+        const pageNum = lastAction.pageNum;
+        if (pageStrokes[pageNum] && pageStrokes[pageNum].length > 0) {
+          // Remove the last stroke on that page.
+          pageStrokes[pageNum].pop();
+          // Redraw the annotation canvas for that page.
+          const canvas = annotationCanvases[pageNum];
+          if (canvas) {
+            const ctx = canvas.getContext('2d');
+            redrawStrokesForCanvas(ctx, pageNum);
+          }
+        }
+      });
+      
+      // Save As Function using pdf-lib.
       document.getElementById('saveBtn').addEventListener('click', async () => {
          const { PDFDocument } = PDFLib;
          const pdfDocNew = await PDFDocument.create();
