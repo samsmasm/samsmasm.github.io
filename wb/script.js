@@ -1,5 +1,5 @@
 /*******************************************************
- * script.js - Using Pointer Events for unified input
+ * script.js - Unified Pointer Events and UI Updates
  ******************************************************/
 
 // References to canvases and contexts
@@ -41,9 +41,8 @@ function initCanvas() {
 initCanvas();
 
 /**
- * Only grow the canvas if the window becomes larger.
- * If the window is smaller, we keep the bigger canvas
- * so the user can scroll to see the rest.
+ * Grow the canvas if the window becomes larger.
+ * (If the window is smaller, we keep the larger canvas and allow scrolling.)
  */
 function resizeCanvas() {
   const newWidth = window.innerWidth;
@@ -51,25 +50,21 @@ function resizeCanvas() {
   
   if (newWidth <= canvasWidth && newHeight <= canvasHeight) return;
   
-  // Save current drawing in a temporary canvas
+  // Save current drawing
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = drawingCanvas.width;
   tempCanvas.height = drawingCanvas.height;
   tempCanvas.getContext('2d').drawImage(drawingCanvas, 0, 0);
   
-  // Update our "maximum" width/height
   canvasWidth = Math.max(canvasWidth, newWidth);
   canvasHeight = Math.max(canvasHeight, newHeight);
   
-  // Resize the real canvases
   drawingCanvas.width = canvasWidth;
   drawingCanvas.height = canvasHeight;
   gridCanvas.width = canvasWidth;
   gridCanvas.height = canvasHeight;
   
-  // Redraw the saved image at the top-left
   drawingCtx.drawImage(tempCanvas, 0, 0);
-  
   drawGrid();
 }
 window.addEventListener('resize', resizeCanvas);
@@ -85,14 +80,12 @@ function drawGrid() {
   gridCtx.lineWidth = 0.5;
   const spacing = 50;
   
-  // Vertical lines
   for (let x = spacing; x < gridCanvas.width; x += spacing) {
     gridCtx.beginPath();
     gridCtx.moveTo(x, 0);
     gridCtx.lineTo(x, gridCanvas.height);
     gridCtx.stroke();
   }
-  // Horizontal lines
   for (let y = spacing; y < gridCanvas.height; y += spacing) {
     gridCtx.beginPath();
     gridCtx.moveTo(0, y);
@@ -134,9 +127,8 @@ function getPointerCoords(e) {
 }
 
 /*******************************************************
- * Pointer Event Handlers
+ * Pointer Event Handlers for Drawing
  *******************************************************/
-// pointerdown
 function pointerDownHandler(e) {
   e.preventDefault();
   
@@ -170,7 +162,6 @@ function pointerDownHandler(e) {
   lastY = coords.y;
 }
 
-// pointermove
 function pointerMoveHandler(e) {
   e.preventDefault();
   
@@ -205,7 +196,6 @@ function pointerMoveHandler(e) {
   lastY = coords.y;
 }
 
-// pointerup / pointercancel / pointerout
 function pointerUpHandler(e) {
   e.preventDefault();
   
@@ -239,7 +229,7 @@ function pointerUpHandler(e) {
 }
 
 /*******************************************************
- * Register Pointer Events
+ * Register Pointer Events on Canvas
  *******************************************************/
 drawingCanvas.addEventListener('pointerdown', pointerDownHandler);
 drawingCanvas.addEventListener('pointermove', pointerMoveHandler);
@@ -250,8 +240,7 @@ drawingCanvas.addEventListener('pointerout', pointerUpHandler);
 /*******************************************************
  * Button & UI Logic
  *******************************************************/
-
-// Color selection: update color and mark selected
+// Color selection: update color and highlight selected
 document.querySelectorAll('.color-btn').forEach(button => {
   button.addEventListener('click', () => {
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
@@ -288,8 +277,6 @@ document.getElementById('gridToggleButton').addEventListener('click', () => {
   gridOn = !gridOn;
   drawGrid();
 });
-
-// Save: composite the drawing on a white background (no grid)
 document.getElementById('saveButton').addEventListener('click', () => {
   const composite = document.createElement('canvas');
   composite.width = drawingCanvas.width;
@@ -305,8 +292,6 @@ document.getElementById('saveButton').addEventListener('click', () => {
   link.href = composite.toDataURL('image/png');
   link.click();
 });
-
-// Print: composite the drawing (transparent background) without grid
 document.getElementById('printButton').addEventListener('click', () => {
   const composite = document.createElement('canvas');
   composite.width = drawingCanvas.width;
@@ -340,4 +325,32 @@ document.getElementById('printButton').addEventListener('click', () => {
     </html>
   `);
   printWindow.document.close();
+});
+
+/*******************************************************
+ * Draggable Control Panel
+ *******************************************************/
+const controls = document.getElementById('controls');
+const dragHandle = document.getElementById('dragHandle');
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+dragHandle.addEventListener('pointerdown', (e) => {
+  isDragging = true;
+  const rect = controls.getBoundingClientRect();
+  dragOffsetX = e.clientX - rect.left;
+  dragOffsetY = e.clientY - rect.top;
+  // Prevent propagation so drawing canvas doesn't also receive the event
+  e.stopPropagation();
+});
+
+document.addEventListener('pointermove', (e) => {
+  if (!isDragging) return;
+  controls.style.left = (e.clientX - dragOffsetX) + 'px';
+  controls.style.top = (e.clientY - dragOffsetY) + 'px';
+});
+
+document.addEventListener('pointerup', () => {
+  isDragging = false;
 });
