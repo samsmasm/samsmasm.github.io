@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Circle Inversion Visualizer</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 5px;
+      max-width: 250px;
+    }
+    #equations {
+      margin-top: 10px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .eq {
+      margin: 5px 0;
+    }
+    button {
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button id="modeButton">Switch to Eraser Mode</button>
+    <button id="resetButton">Reset</button>
+    <div id="modeIndicator">Mode: Draw</div>
+    <div id="equations"><h3>Equations:</h3></div>
+  </div>
+  
+  <!-- p5.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+  <script>
+    // Global variables
+    let circles = [];         // Array of drawn circles
+    let pendingCenter = null; // Stores the first click (circle center)
+    let mode = "draw";        // "draw" or "erase"
+    let scaleFactor = 200;    // Pixels per unit (initial zoom level)
+    let gridSpacing = 0.2;    // Grid spacing in math units
+    let eqDiv;
+    const snapInterval = 0.05;  // Snap to nearest 0.05
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      // Set up UI buttons
+      let modeButton = select("#modeButton");
+      modeButton.mousePressed(toggleMode);
+      
+      let resetButton = select("#resetButton");
+      resetButton.mousePressed(resetCanvas);
+      
+      eqDiv = select("#equations");
+      textSize(14);
+    }
+    
+    function draw() {
+      background(240);
+      // Set up coordinate system: origin at center, positive y upward
+      push();
+      translate(width/2, height/2);
+      scale(scaleFactor, -scaleFactor); // scale and flip y
+      
+      drawGrid();
+      drawUnitCircle();
+      
+      // If waiting for the second click, draw a temporary line
+      if (pendingCenter && mode === "draw") {
+        let m = screenToWorld(mouseX, mouseY);
+        stroke(150);
+        strokeWeight(1/scaleFactor);
+        line(pendingCenter.x, pendingCenter.y, m.x, m.y);
+      }
+      
+      // Draw all circles and their inversion images
+      for (let c of circles) {
+        // Draw original circle
+        stroke(c.col);
+        strokeWeight(2/scaleFactor);
+        noFill();
+        circle(c.center.x, c.center.y, 2*c.r);
+        
+        // Draw inversion (circle or line)
+        if (c.inversion.type === "circle") {
+          stroke(c.col);
+          strokeWeight(2/scaleFactor);
+          noFill();
+          circle(c.inversion.center.x, c.inversion.center.y, 2*c.inversion.r);
+        } else if (c.inversion.type === "line") {
+          stroke(c.col);
+          strokeWeight(2/scaleFactor);
+          // For the inversion line: a*x + b*y = 0.5
+          let A = c.center.x;
+          let B = c.center.y;
+          let C = 0.5;
+          let x1, y1, x2, y2;
+          if (abs(B) > 1e-6) {
+            x1 = -3; x2 = 3;
+            y1 = (C - A*x1)/B;
+            y2 = (C - A*x2)/B;
+          } else {
+            x1 = C/A; x2 = C/A;
+            y1 = -3; y2 = 3;
+          }
+          line(x1, y1, x2, y2);
+        }
+      }
+      
+      pop();
+      
+      // Now draw grid numbers as an overlay in screen coordinates.
+      drawGridLabels();
+    }
+    
+    function mousePressed() {
+      // Convert mouse click to world coordinates and snap to nearest 0.05.
+      let worldPos = screenToWorld(mouseX, mouseY);
+      worldPos.x = snapValue(worldPos.x);
+      worldPos.y = snapValue(worldPos.y);
+      
+      if (mode === "draw") {
+        if (!pendingCenter) {
+          // First click: set circle center.
+          pendingCenter = { x: worldPos.x, y: worldPos.y };
+        } else {
+          // Second click: compute radius.
+          let dx = worldPos.x - pendingCenter.x;
+          let dy = worldPos.y - pendingCenter.y;
+          let r = sqrt(dx*dx + dy*dy);
+          if (r < 1e-6) {
+            pendingCenter = null;
+            return;
+          }
+          // Random color for this circle.
+          let col = color(random(50,255), random(50,255), random(50,255));
+          // Compute the inversion.
+          let inversion = computeInversion(pendingCenter, r);
+          let circleObj = {
+            center: pendingCenter,
+            r: r,
+            col: col,
+            inversion: inversion
+          };
+          circles.push(circleObj);
+          pendingCenter = null;
+          updateEquations();
+        }
+      } else if (mode === "erase") {
+        // In eraser mode, remove a circle if the click falls inside it.
+        for (let i = circles.length - 1; i >= 0; i--) {
+          let c = circles[i];
+          let d = dist(worldPos.x, worldPos.y, c.center.x, c.center.y);
+          if (d <= c.r) {
+            circles.splice(i, 1);
+            updateEquations();
+            break;
+          }
+        }
+      }
+    }
+    
+    function toggleMode() {
+      if (mode === "draw") {
+        mode = "erase";
+        select("#modeButton").html("Switch to Draw Mode");
+        select("#modeIndicator").html("Mode: Erase");
+      } else {
+        mode = "draw";
+        select("#modeButton").html("Switch to Eraser Mode");
+        select("#modeIndicator").html("Mode: Draw");
+      }
+    }
+    
+    function resetCanvas() {
+      circles = [];
+      pendingCenter = null;
+      updateEquations();
+    }
+    
+    // Draw a grid that aligns with the origin.
+    function drawGrid() {
+      stroke(200);
+      strokeWeight(1/scaleFactor);
+      let halfWidthUnits = width/(2*scaleFactor);
+      let halfHeightUnits = height/(2*scaleFactor);
+      // Vertical grid lines
+      for (let x = -halfWidthUnits; x <= halfWidthUnits; x += gridSpacing) {
+        line(x, -halfHeightUnits, x, halfHeightUnits);
+      }
+      // Horizontal grid lines
+      for (let y = -halfHeightUnits; y <= halfHeightUnits; y += gridSpacing) {
+        line(-halfWidthUnits, y, halfWidthUnits, y);
+      }
+      // Draw axes
+      stroke(150);
+      strokeWeight(2/scaleFactor);
+      line(-halfWidthUnits, 0, halfWidthUnits, 0);
+      line(0, -halfHeightUnits, 0, halfHeightUnits);
+    }
+    
+    // Draw the unit circle (centered at origin, radius 1)
+    function drawUnitCircle() {
+      stroke(0);
+      strokeWeight(2/scaleFactor);
+      noFill();
+      circle(0, 0, 2);
+    }
+    
+    // Draw grid labels (numbers) along the axes.
+    function drawGridLabels() {
+      let halfWidthUnits = width/(2*scaleFactor);
+      let halfHeightUnits = height/(2*scaleFactor);
+      fill(0);
+      noStroke();
+      textSize(12);
+      textAlign(CENTER, CENTER);
+      // X-axis labels (for each vertical grid line)
+      for (let x = -halfWidthUnits; x <= halfWidthUnits; x += gridSpacing) {
+        let screenX = width/2 + x * scaleFactor;
+        let screenY = height/2;
+        // Offset below the x-axis
+        text(nf(x, 1, 2), screenX, screenY + 15);
+      }
+      // Y-axis labels (for each horizontal grid line)
+      for (let y = -halfHeightUnits; y <= halfHeightUnits; y += gridSpacing) {
+        let screenX = width/2;
+        let screenY = height/2 - y * scaleFactor;
+        // Skip the origin (already labeled on x-axis)
+        if (abs(y) > 1e-6) {
+          text(nf(y, 1, 2), screenX + 20, screenY);
+        }
+      }
+    }
+    
+    // Convert screen coordinates to world (math) coordinates.
+    function screenToWorld(x, y) {
+      let wx = (x - width/2) / scaleFactor;
+      let wy = -(y - height/2) / scaleFactor;
+      return { x: wx, y: wy };
+    }
+    
+    // Snap a value to the nearest multiple of snapInterval.
+    function snapValue(val) {
+      return round(val / snapInterval) * snapInterval;
+    }
+    
+    // Compute inversion of a circle with center (a,b) and radius r relative to the unit circle.
+    function computeInversion(center, r) {
+      let a = center.x;
+      let b = center.y;
+      let d2 = a*a + b*b;
+      let epsilon = 1e-6;
+      if (abs(a) < epsilon && abs(b) < epsilon) {
+        return {
+          type: "circle",
+          center: { x: 0, y: 0 },
+          r: (r === 0 ? 0 : 1/r)
+        };
+      }
+      if (abs(d2 - r*r) < epsilon) {
+        // Circle touches the origin → inversion is a line.
+        return {
+          type: "line",
+          A: a,
+          B: b,
+          C: 0.5
+        };
+      } else {
+        let denom = d2 - r*r;
+        let invCenter = { x: a / denom, y: b / denom };
+        let invR = r / abs(denom);
+        return {
+          type: "circle",
+          center: invCenter,
+          r: invR
+        };
+      }
+    }
+    
+    // Update the equations shown in the side panel.
+    function updateEquations() {
+      let html = "<h3>Equations:</h3>";
+      circles.forEach((c, index) => {
+        let a = c.center.x;
+        let b = c.center.y;
+        let r = c.r;
+        let eq1 = "(x " + (a >= 0 ? "- " + a.toFixed(2) : "+ " + nf(abs(a),1,2)) + ")² + " +
+                  "(y " + (b >= 0 ? "- " + b.toFixed(2) : "+ " + nf(abs(b),1,2)) + ")² = " + (r*r).toFixed(2);
+        
+        let eq2 = "";
+        if (c.inversion.type === "circle") {
+          let ac = c.inversion.center.x;
+          let bc = c.inversion.center.y;
+          let rr = c.inversion.r;
+          eq2 = "(x " + (ac >= 0 ? "- " + ac.toFixed(2) : "+ " + nf(abs(ac),1,2)) + ")² + " +
+                "(y " + (bc >= 0 ? "- " + bc.toFixed(2) : "+ " + nf(abs(bc),1,2)) + ")² = " + (rr*rr).toFixed(2);
+        } else if (c.inversion.type === "line") {
+          eq2 = a.toFixed(2) + "x + " + b.toFixed(2) + "y = 0.50";
+        }
+        let colStr = "rgb(" + floor(red(c.col)) + "," + floor(green(c.col)) + "," + floor(blue(c.col)) + ")";
+        html += "<div class='eq' style='color:" + colStr + ";'>"
+              + "Circle " + (index+1) + ": " + eq1 + "<br>Inversion: " + eq2 + "</div>";
+      });
+      eqDiv.html(html);
+    }
+    
+    // Zoom in and out with the mouse wheel.
+    function mouseWheel(event) {
+      // event.deltaY: positive for zoom out, negative for zoom in.
+      let zoomFactor = 1.05;
+      if (event.deltaY < 0) {
+        scaleFactor *= zoomFactor;
+      } else {
+        scaleFactor /= zoomFactor;
+      }
+      // Prevent page scrolling when zooming.
+      return false;
+    }
+    
+    // Adjust canvas size when the window is resized.
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
