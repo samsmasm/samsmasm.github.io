@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess Who? Optimal Strategy Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .game-status {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 3px solid #e9ecef;
+        }
+
+        .question-section {
+            background: #e3f2fd;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 3px solid #bbdefb;
+        }
+
+        .question-text {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+
+        .answer-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .answer-btn {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 100px;
+        }
+
+        .yes-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .yes-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .no-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .no-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .animals-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .animals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 3px solid #e9ecef;
+        }
+
+        .animal-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .animal-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .animal-icon {
+            display: none;
+        }
+
+        .animal-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        .guess-section {
+            background: #fff3cd;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            border: 3px solid #ffeaa7;
+        }
+
+        .guess-text {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .reset-btn {
+            background: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 20px;
+            transition: background 0.3s ease;
+        }
+
+        .question-counts {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .final-animal-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .final-animal-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .final-animal-card.eliminated {
+            opacity: 0.4;
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-top: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        .delete-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            font-size: 1.1em;
+        }
+
+        .stat-item {
+            color: #666;
+        }
+
+        .stat-number {
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Guess Who? Optimal Strategy</h1>
+        
+        <div class="game-status">
+            <div class="stats">
+                <div class="stat-item">Animals remaining: <span class="stat-number" id="remainingCount">24</span></div>
+                <div class="stat-item">Questions asked: <span class="stat-number" id="questionsCount">0</span></div>
+            </div>
+        </div>
+
+        <div id="questionSection" class="question-section">
+            <div class="question-text" id="questionText">Loading optimal question...</div>
+            <div class="answer-buttons">
+                <button class="answer-btn yes-btn" onclick="answerQuestion(true)">YES</button>
+                <button class="answer-btn no-btn" onclick="answerQuestion(false)">NO</button>
+            </div>
+        </div>
+
+        <div id="guessSection" class="guess-section" style="display: none;">
+            <div class="guess-text">Time to guess! Pick one of these animals:</div>
+            <div id="finalAnimals"></div>
+            <button class="reset-btn" onclick="resetGame()">Start New Game</button>
+        </div>
+
+        <div class="animals-section">
+            <div class="section-title">Remaining Animals</div>
+            <div class="animals-grid" id="animalsGrid"></div>
+        </div>
+
+        <button class="reset-btn" onclick="resetGame()">Reset Game</button>
+    </div>
+
+    <script>
+        // Animal data from CSV
+        const animalData = {
+            "Harriet": {"Brown eyes": true, "Other": true, "Bow or hat": true, "Fluffy": true, "Has ears": true, "Ears pointing up": true, "Yellow": true},
+            "Louie": {"Brown eyes": true, "Other": true, "Has ears": true, "Ears pointing up": true, "Yellow": true, "Whiskers": true},
+            "Sunny": {"Brown eyes": true, "Cat": true, "Collar": true, "Has ears": true, "Ears pointy": true, "Yellow": true, "Whiskers": true},
+            "Flash": {"Brown eyes": true, "Lizard": true, "Yellow": true},
+            "Freddy": {"Brown eyes": true, "Other": true, "Yellow": true, "Brown": true},
+            "Iggy": {"Brown eyes": true, "Lizard": true, "Bow or hat": true, "Collar": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "Green": true},
+            "Mikey": {"Black only eyes": true, "Other": true, "Has ears": true, "Ears pointing up": true, "Black": true, "Whiskers": true},
+            "Ziggy": {"Brown eyes": true, "Lizard": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "Black": true},
+            "Boots": {"Green eyes": true, "Cat": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "White": true},
+            "Jasmine": {"Green eyes": true, "Cat": true, "Collar": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "White": true, "Tongue showing": true, "Whiskers": true},
+            "Cloud": {"Brown eyes": true, "Other": true, "Has ears": true, "Ears pointy": true, "Black": true},
+            "Rocko": {"Brown eyes": true, "Lizard": true, "Yellow": true},
+            "Dolly": {"Black only eyes": true, "Bird": true, "Ears pointy": true},
+            "Tommy": {"Black only eyes": true, "Bird": true, "Yellow": true},
+            "Babs": {"Green eyes": true, "Other": true, "Collar": true, "Has ears": true, "White": true},
+            "Arty": {"Brown eyes": true, "Dog": true, "Fluffy": true, "Has ears": true, "Ears pointy": true, "Black": true, "Tongue showing": true},
+            "Puddles": {"Brown eyes": true, "Dog": true, "Has ears": true, "Black": true},
+            "Misty": {"Green eyes": true, "Other": true, "Has ears": true, "Ears pointing up": true, "White": true},
+            "Lady": {"Brown eyes": true, "Dog": true, "Collar": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "White": true},
+            "Fluffy": {"Brown eyes": true, "Cat": true, "Bow or hat": true, "Fluffy": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "Brown": true},
+            "Scout": {"Brown eyes": true, "Dog": true, "Bow or hat": true, "Has ears": true, "Ears pointy": true, "White": true, "Tongue showing": true},
+            "Chief": {"Brown eyes": true, "Dog": true, "Collar": true, "Has ears": true, "Ears pointy": true, "White": true},
+            "Belle": {"Black only eyes": true, "Bird": true, "Ears pointy": true},
+            "Cleo": {"Green eyes": true, "Cat": true, "Collar": true, "Has ears": true, "Ears pointing up": true, "Ears pointy": true, "White": true, "Tongue showing": true}
+        };
+
+        // All possible characteristics
+        const allCharacteristics = [
+            "Brown eyes", "Green eyes", "Black only eyes", "Cat", "Bird", "Dog", "Pig", "Lizard", "Other",
+            "Bow or hat", "Collar", "Fluffy", "Has ears", "Ears pointing up", "Ears pointy", "Yellow",
+            "Green", "Black", "White", "Brown", "Tongue showing", "Whiskers"
+        ];
+
+        // Game state
+        let remainingAnimals = Object.keys(animalData);
+        let questionsAsked = 0;
+        let currentQuestion = "";
+        let eliminatedFromGuess = new Set();
+
+        // Animal icons for display
+        const animalIcons = {
+            "Harriet": "🐰", "Louie": "🦊", "Sunny": "🐱", "Flash": "🦎", "Freddy": "🐹",
+            "Iggy": "🦎", "Mikey": "🐭", "Ziggy": "🦎", "Boots": "🐱", "Jasmine": "🐱",
+            "Cloud": "🐰", "Rocko": "🦎", "Dolly": "🐦", "Tommy": "🐦", "Babs": "🐰",
+            "Arty": "🐕", "Puddles": "🐕", "Misty": "🐰", "Lady": "🐕", "Fluffy": "🐱",
+            "Scout": "🐕", "Chief": "🐕", "Belle": "🐦", "Cleo": "🐱"
+        };
+
+        // Question grammar improvements
+        const questionGrammar = {
+            "Brown eyes": "Do you have brown eyes?",
+            "Green eyes": "Do you have green eyes?",
+            "Black only eyes": "Do you have black eyes?",
+            "Cat": "Are you a cat?",
+            "Bird": "Are you a bird?",
+            "Dog": "Are you a dog?",
+            "Pig": "Are you a pig?",
+            "Lizard": "Are you a lizard?",
+            "Other": "Are you another type of animal?",
+            "Bow or hat": "Are you wearing a bow or hat?",
+            "Collar": "Are you wearing a collar?",
+            "Fluffy": "Are you fluffy?",
+            "Has ears": "Do you have ears?",
+            "Ears pointing up": "Are your ears pointing up?",
+            "Ears pointy": "Are your ears pointy?",
+            "Yellow": "Are you yellow?",
+            "Green": "Are you green?",
+            "Black": "Are you black?",
+            "White": "Are you white?",
+            "Brown": "Are you brown?",
+            "Tongue showing": "Is your tongue showing?",
+            "Whiskers": "Do you have whiskers?"
+        };
+
+        function findOptimalQuestion() {
+            if (remainingAnimals.length <= 3) {
+                return null; // Time to guess
+            }
+
+            let bestQuestion = "";
+            let bestScore = Infinity;
+
+            for (const characteristic of allCharacteristics) {
+                const yesAnimals = remainingAnimals.filter(animal => animalData[animal][characteristic]);
+                const noAnimals = remainingAnimals.filter(animal => !animalData[animal][characteristic]);
+                
+                // Skip if all animals have the same value for this characteristic
+                if (yesAnimals.length === 0 || noAnimals.length === 0) {
+                    continue;
+                }
+
+                // Calculate how close to 50/50 split this question gives us
+                const score = Math.abs(yesAnimals.length - noAnimals.length);
+                
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestQuestion = characteristic;
+                }
+            }
+
+            return bestQuestion;
+        }
+
+        function updateDisplay() {
+            document.getElementById('remainingCount').textContent = remainingAnimals.length;
+            document.getElementById('questionsCount').textContent = questionsAsked;
+            
+            // Update animals grid
+            const animalsGrid = document.getElementById('animalsGrid');
+            animalsGrid.innerHTML = '';
+            
+            remainingAnimals.forEach(animal => {
+                const animalCard = document.createElement('div');
+                animalCard.className = 'animal-card';
+                animalCard.innerHTML = `
+                    <div class="animal-name">${animal}</div>
+                `;
+                animalsGrid.appendChild(animalCard);
+            });
+        }
+
+        function showNextQuestion() {
+            if (remainingAnimals.length <= 3) {
+                // Time to guess
+                document.getElementById('questionSection').style.display = 'none';
+                document.getElementById('guessSection').style.display = 'block';
+                
+                const finalAnimals = document.getElementById('finalAnimals');
+                finalAnimals.innerHTML = '';
+                const finalGrid = document.createElement('div');
+                finalGrid.className = 'animals-grid';
+                finalGrid.style.marginTop = '20px';
+                
+                remainingAnimals.forEach(animal => {
+                    const animalCard = document.createElement('div');
+                    animalCard.className = eliminatedFromGuess.has(animal) ? 'final-animal-card eliminated' : 'final-animal-card';
+                    animalCard.innerHTML = `
+                        <div class="animal-name">${animal}</div>
+                        <button class="delete-btn" onclick="eliminateFromGuess('${animal}')" ${eliminatedFromGuess.has(animal) ? 'disabled' : ''}>
+                            ${eliminatedFromGuess.has(animal) ? 'Eliminated' : 'Not this one'}
+                        </button>
+                    `;
+                    finalGrid.appendChild(animalCard);
+                });
+                
+                finalAnimals.appendChild(finalGrid);
+                return;
+            }
+
+            const optimalQuestion = findOptimalQuestion();
+            if (optimalQuestion) {
+                currentQuestion = optimalQuestion;
+                
+                // Count animals with and without this characteristic
+                const yesCount = remainingAnimals.filter(animal => animalData[animal][optimalQuestion]).length;
+                const noCount = remainingAnimals.length - yesCount;
+                
+                // Create descriptive text for the counts
+                let countText = '';
+                if (optimalQuestion.includes('eyes')) {
+                    countText = `${yesCount} ${optimalQuestion.toLowerCase()}, ${noCount} other eye color`;
+                } else if (['Cat', 'Bird', 'Dog', 'Pig', 'Lizard', 'Other'].includes(optimalQuestion)) {
+                    countText = `${yesCount} ${optimalQuestion.toLowerCase()}${yesCount !== 1 ? 's' : ''}, ${noCount} other animal${noCount !== 1 ? 's' : ''}`;
+                } else if (['Yellow', 'Green', 'Black', 'White', 'Brown'].includes(optimalQuestion)) {
+                    countText = `${yesCount} ${optimalQuestion.toLowerCase()}, ${noCount} other color${noCount !== 1 ? 's' : ''}`;
+                } else if (['Bow or hat', 'Collar'].includes(optimalQuestion)) {
+                    countText = `${yesCount} with ${optimalQuestion.toLowerCase()}, ${noCount} without`;
+                } else if (optimalQuestion.includes('ears')) {
+                    countText = `${yesCount} ${optimalQuestion.toLowerCase()}, ${noCount} other ear${noCount !== 1 ? 's' : ''}`;
+                } else {
+                    // Default for other characteristics
+                    countText = `${yesCount} ${optimalQuestion.toLowerCase()}, ${noCount} not ${optimalQuestion.toLowerCase()}`;
+                }
+                
+                document.getElementById('questionText').innerHTML = `
+                    ${questionGrammar[optimalQuestion] || `Do you have: ${optimalQuestion}?`}
+                    <div class="question-counts">${countText}</div>
+                `;
+            }
+        }
+
+        function answerQuestion(answer) {
+            if (!currentQuestion) return;
+
+            questionsAsked++;
+            
+            if (answer) {
+                // Keep animals that have this characteristic
+                remainingAnimals = remainingAnimals.filter(animal => animalData[animal][currentQuestion]);
+            } else {
+                // Keep animals that don't have this characteristic
+                remainingAnimals = remainingAnimals.filter(animal => !animalData[animal][currentQuestion]);
+            }
+
+            updateDisplay();
+            showNextQuestion();
+        }
+
+        function eliminateFromGuess(animal) {
+            eliminatedFromGuess.add(animal);
+            showNextQuestion(); // Refresh the display
+        }
+
+        function resetGame() {
+            remainingAnimals = Object.keys(animalData);
+            questionsAsked = 0;
+            currentQuestion = "";
+            eliminatedFromGuess.clear();
+            
+            document.getElementById('questionSection').style.display = 'block';
+            document.getElementById('guessSection').style.display = 'none';
+            
+            updateDisplay();
+            showNextQuestion();
+        }
+
+        // Initialize game
+        updateDisplay();
+        showNextQuestion();
+    </script>
+</body>
+</html>
