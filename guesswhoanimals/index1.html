@@ -349,7 +349,7 @@
         };
 
         function findOptimalQuestion() {
-            if (remainingAnimals.length <= 2) {
+            if (remainingAnimals.length <= 3) {
                 return null; // Time to guess
             }
 
@@ -365,8 +365,8 @@
                     continue;
                 }
 
-                // Calculate expected questions needed using 3-level lookahead
-                const score = calculateLookaheadScore(characteristic, remainingAnimals, 3);
+                // Calculate how close to 50/50 split this question gives us
+                const score = Math.abs(yesAnimals.length - noAnimals.length);
                 
                 if (score < bestScore) {
                     bestScore = score;
@@ -375,56 +375,6 @@
             }
 
             return bestQuestion;
-        }
-
-        function calculateLookaheadScore(characteristic, animals, depth) {
-            const yesAnimals = animals.filter(animal => animalData[animal][characteristic]);
-            const noAnimals = animals.filter(animal => !animalData[animal][characteristic]);
-            
-            // Calculate expected questions for both branches
-            const yesExpectedQuestions = calculateExpectedQuestions(yesAnimals, depth - 1);
-            const noExpectedQuestions = calculateExpectedQuestions(noAnimals, depth - 1);
-            
-            // Weight by probability of each branch
-            const totalAnimals = animals.length;
-            const yesProb = yesAnimals.length / totalAnimals;
-            const noProb = noAnimals.length / totalAnimals;
-            
-            return 1 + (yesProb * yesExpectedQuestions) + (noProb * noExpectedQuestions);
-        }
-
-        function calculateExpectedQuestions(animals, depth) {
-            // Base cases
-            if (animals.length <= 2) {
-                return animals.length <= 1 ? 0 : 1; // 0 if we have 1 animal, 1 if we have 2
-            }
-            
-            if (depth <= 0) {
-                // If we've reached max depth, fall back to simple heuristic
-                return Math.log2(animals.length);
-            }
-
-            // Find best question for this subset
-            let bestScore = Infinity;
-            
-            for (const characteristic of allCharacteristics) {
-                const yesAnimals = animals.filter(animal => animalData[animal][characteristic]);
-                const noAnimals = animals.filter(animal => !animalData[animal][characteristic]);
-                
-                // Skip if all animals have the same value for this characteristic
-                if (yesAnimals.length === 0 || noAnimals.length === 0) {
-                    continue;
-                }
-
-                // Calculate expected questions for this characteristic
-                const score = calculateLookaheadScore(characteristic, animals, depth);
-                
-                if (score < bestScore) {
-                    bestScore = score;
-                }
-            }
-
-            return bestScore === Infinity ? Math.log2(animals.length) : bestScore;
         }
 
         function updateDisplay() {
@@ -446,7 +396,7 @@
         }
 
         function showNextQuestion() {
-            if (remainingAnimals.length <= 2) {
+            if (remainingAnimals.length <= 3) {
                 // Time to guess
                 document.getElementById('questionSection').style.display = 'none';
                 document.getElementById('guessSection').style.display = 'block';
