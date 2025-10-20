@@ -3,55 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stock / Random Walk Simulator</title>
+  <title>Random Walk / Stock Simulator</title>
   <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-    }
-
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-    }
-
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px 16px 28px; }
-
-    .toolbar {
-      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
-      background: var(--panel); padding: 10px 12px; border-radius: 14px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.25);
-    }
-
-    .group { display: flex; gap: 8px; align-items: center; }
-    .toolbar label { font-size: 12px; color: var(--muted); }
-    .toolbar select, .toolbar input[type="number"], .toolbar input[type="range"] {
-      background: #0b1022; color: var(--text); border: 1px solid #223; outline: none; border-radius: 10px; padding: 6px 8px;
-    }
-    .toolbar input[type="range"] { accent-color: var(--accent); height: 6px; }
-    .btn { cursor: pointer; border: 1px solid #2a3550; background: #0b1022; color: var(--text); padding: 7px 10px; border-radius: 10px; }
-    .btn:hover { border-color: #3e4f80; }
-
-    .canvas-card { margin-top: 14px; background: var(--panel); border-radius: 16px; box-shadow: 0 12px 28px rgba(0,0,0,.25); position: relative; }
-    canvas { display: block; width: 100%; height: 520px; }
-    .hint { position: absolute; right: 14px; bottom: 10px; font-size: 12px; color: var(--muted); }
-    .legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 8px; color: var(--muted); font-size: 13px; }
-    .badge { padding: 2px 6px; border-radius: 8px; background: #0b1022; border: 1px solid #223; }
+    :root { --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8; }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px 16px 28px}
+    .toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:var(--panel);padding:10px 12px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .group{display:flex;gap:8px;align-items:center}
+    .toolbar label{font-size:12px;color:var(--muted)}
+    .toolbar select,.toolbar input[type="number"],.toolbar input[type="range"]{background:#0b1022;color:var(--text);border:1px solid #223;outline:none;border-radius:10px;padding:6px 8px}
+    .toolbar input[type="range"]{accent-color:var(--accent);height:6px}
+    .btn{cursor:pointer;border:1px solid #2a3550;background:#0b1022;color:var(--text);padding:7px 10px;border-radius:10px}
+    .btn:hover{border-color:#3e4f80}
+    .canvas-card{margin-top:14px;background:var(--panel);border-radius:16px;box-shadow:0 12px 28px rgba(0,0,0,.25);position:relative}
+    canvas{display:block;width:100%;height:520px}
+    .hint{position:absolute;right:14px;bottom:10px;font-size:12px;color:var(--muted)}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px;color:var(--muted);font-size:13px}
+    .badge{padding:2px 6px;border-radius:8px;background:#0b1022;border:1px solid #223}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1 style="font-size:20px;margin:4px 0 12px">Stock / Random Walk Simulator</h1>
+    <h1 style="font-size:20px;margin:4px 0 12px">Random Walk / Stock Simulator</h1>
     <div class="toolbar">
       <div class="group">
         <button class="btn" id="playPauseBtn">Play</button>
         <button class="btn" id="regenBtn">Regenerate</button>
+      </div>
+
+      <div class="group">
+        <label for="modeSelect">Mode</label>
+        <select id="modeSelect">
+          <option value="log" selected>Log (centered axis)</option>
+          <option value="price">Price (S₀=1000, ≥0)</option>
+        </select>
+      </div>
+
+      <div class="group">
+        <label for="yScale">Y-axis</label>
+        <select id="yScale" title="Y axis scaling (price mode)">
+          <option value="linear" selected>Linear</option>
+          <option value="log">Log</option>
+        </select>
       </div>
 
       <div class="group" style="min-width:240px">
@@ -74,15 +67,39 @@
         <label for="picker">Pick interesting</label>
         <select id="picker" title="Select a criterion to auto-pick a line">
           <option value="" selected>— choose —</option>
-          <option value="straightest">Straightest trajectory (least SSE to best-fit line)</option>
+          <option value="straightest">Straightest trajectory (least SSE)</option>
           <option value="range">Greatest top-to-bottom range</option>
-          <option value="zero">Most zero-crossings</option>
+          <option value="zero">Most return zero-crossings</option>
           <option value="streak">Longest one-direction streak</option>
           <option value="drawdown">Largest max drawdown</option>
           <option value="earliest">Earliest to hit |y| threshold</option>
           <option value="area">Largest area under |y|</option>
         </select>
         <button class="btn" id="applyPick">Find</button>
+      </div>
+
+      <div class="group">
+        <label for="driftToggle">Drift</label>
+        <select id="driftToggle" title="Apply annual drift to ensemble">
+          <option value="off" selected>Off</option>
+          <option value="on">On</option>
+        </select>
+      </div>
+      <div class="group">
+        <label for="annualPct">Annual %</label>
+        <input id="annualPct" type="number" step="0.1" value="8" style="width:80px" />
+      </div>
+      <div class="group">
+        <label for="tradingDays">Days/yr</label>
+        <input id="tradingDays" type="number" min="200" max="366" value="252" style="width:80px" />
+      </div>
+      <div class="group">
+        <label for="showTarget">Target path</label>
+        <select id="showTarget">
+          <option value="off" selected>Off</option>
+          <option value="index">Index fund mode</option>
+          <option value="continuous">Continuous compounding</option>
+        </select>
       </div>
 
       <div class="group" style="flex:1 1 260px;min-width:260px">
@@ -105,7 +122,7 @@
 
     <div class="canvas-card">
       <canvas id="chart" width="1100" height="520"></canvas>
-      <div class="hint">Scroll to zoom • Drag to pan • 0 is the horizontal axis</div>
+      <div class="hint">Scroll to zoom • Drag to pan • Axis depends on mode</div>
     </div>
 
     <div class="legend" id="legend"></div>
@@ -114,28 +131,20 @@
   <script>
     // ---------- Utils ----------
     function colorFor(i, total) {
-      const hue = (i * 360 / Math.max(1, total)) % 360;
-      return `hsl(${hue} 85% 60%)`;
+      const hue = (i * 360 / Math.max(1, total)) % 360; return `hsl(${hue} 85% 60%)`;
     }
     function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
-    function randNormal() {
-      const u = Math.random() || 1e-12; const v = Math.random() || 1e-12;
-      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-    }
+    function randNormal(){ const u=Math.random()||1e-12, v=Math.random()||1e-12; return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
 
     // ---------- State ----------
     const state = {
-      lines: 100,
-      steps: 1000,
-      walks: [],         // each: [{x,y}, ...] with y = log-price
-      minY: 0,
-      maxY: 0,
-      curStep: 1000,     // default drawn to the end
-      playing: false,
-      selected: 0,
-      view: 'faint',
-      panX: 0, panY: 0,
-      scaleX: 1, scaleY: 1,
+      lines: 100, steps: 1000,
+      walks: [], minY: 0, maxY: 0,
+      curStep: 1000, playing: false, selected: 0,
+      view:'faint', mode:'log', yScale:'linear',
+      panX:0, panY:0, scaleX:1, scaleY:1,
+      driftOn:false, annualReturnPct:8, daysPerYear:252,
+      targetPath:null
     };
 
     // ---------- DOM ----------
@@ -143,10 +152,16 @@
     const ctx = canvas.getContext('2d');
     const playPauseBtn = document.getElementById('playPauseBtn');
     const regenBtn = document.getElementById('regenBtn');
+    const modeSelect = document.getElementById('modeSelect');
+    const yScaleSelect = document.getElementById('yScale');
     const lineSelect = document.getElementById('lineSelect');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const viewMode = document.getElementById('viewMode');
+    const driftToggle = document.getElementById('driftToggle');
+    const annualPct = document.getElementById('annualPct');
+    const tradingDays = document.getElementById('tradingDays');
+    const showTarget = document.getElementById('showTarget');
     const picker = document.getElementById('picker');
     const applyPick = document.getElementById('applyPick');
     const scrub = document.getElementById('scrub');
@@ -155,207 +170,193 @@
     const applyBtn = document.getElementById('applyBtn');
     const legend = document.getElementById('legend');
 
-    // ---------- Generation (GBM on log price) ----------
+    // ---------- Generation (two modes) ----------
     function generate(){
-      const {lines, steps} = state;
-      state.walks = []; state.minY = 0; state.maxY = 0;
+      const {lines, steps, mode} = state;
+      state.walks = []; state.targetPath=null;
+      // initialize bounds per mode
+      if(mode==='log'){ state.minY=0; state.maxY=0; } else { state.minY=Infinity; state.maxY=-Infinity; }
 
-      const mu = 0.00;     // drift per unit time
-      const sigma = 0.20;  // volatility
-      const dt = 1 / steps;
+      // drift config
+      const N = clamp(Number(tradingDays.value||252), 200, 366); state.daysPerYear = N;
+      const g = Number(annualPct.value||0)/100; state.annualReturnPct = g*100;
+      const L = Math.log(1+g); const driftOn = (driftToggle.value==='on');
+      const mu_dt = driftOn ? (L / N) : 0;
+      const sigma_annual = 0.20; const sigma_dt = sigma_annual / Math.sqrt(N);
 
-      for (let i = 0; i < lines; i++) {
-        let logP = 0; // start at logP=0 (price=1)
-        const arr = [{x:0, y:logP}];
-        for (let x = 1; x <= steps; x++) {
-          const eps = randNormal();
-          const r = mu * dt + sigma * Math.sqrt(dt) * eps; // log return
-          logP += r;
-          arr.push({x, y: logP});
-          if (logP < state.minY) state.minY = logP;
-          if (logP > state.maxY) state.maxY = logP;
+      for(let i=0;i<lines;i++){
+        if(mode==='log'){
+          let y=0; const arr=[{x:0,y}];
+          // include initial in bounds
+          state.minY=Math.min(state.minY,y); state.maxY=Math.max(state.maxY,y);
+          for(let x=1;x<=steps;x++){
+            const eps=randNormal(); y += mu_dt + sigma_dt*eps;
+            arr.push({x,y}); state.minY=Math.min(state.minY,y); state.maxY=Math.max(state.maxY,y);
+          }
+          state.walks.push(arr);
+        } else {
+          let logS=Math.log(1000); let S=Math.exp(logS);
+          const arr=[{x:0,y:S}]; state.minY=Math.min(state.minY,S); state.maxY=Math.max(state.maxY,S);
+          for(let x=1;x<=steps;x++){
+            const eps=randNormal(); logS += mu_dt + sigma_dt*eps; S=Math.exp(logS);
+            arr.push({x,y:S}); state.minY=Math.min(state.minY,S); state.maxY=Math.max(state.maxY,S);
+          }
+          state.walks.push(arr);
         }
-        state.walks.push(arr);
       }
-      // sync UI defaults
-      state.curStep = state.steps;
-      scrub.max = String(steps);
-      scrub.value = String(steps);
-      populateSelect();
-      buildLegend();
-      draw();
+
+      // Target path (index/continuous)
+      if(showTarget.value!=='off'){
+        const modeT = showTarget.value; const T=state.steps;
+        if(mode==='log'){
+          const arr=[{x:0,y:0}];
+          if(modeT==='continuous'){
+            for(let t=1;t<=T;t++){ const y=(L*(t/state.daysPerYear)); arr.push({x:t,y}); state.minY=Math.min(state.minY,y); state.maxY=Math.max(state.maxY,y);}  
+          }else{ // index (stochastic bridge)
+            let W=0; const Wv=[0]; for(let t=1;t<=T;t++){ W+=randNormal(); Wv.push(W);} const WT=Wv[T];
+            for(let t=1;t<=T;t++){ const bridge=Wv[t] - (t/T)*WT; const y=(L*(t/state.daysPerYear)) + sigma_dt*Math.sqrt(state.daysPerYear)*(bridge/Math.sqrt(T)); arr.push({x:t,y}); state.minY=Math.min(state.minY,y); state.maxY=Math.max(state.maxY,y);}  
+          }
+          state.targetPath=arr;
+        }else{
+          const arr=[{x:0,y:1000}];
+          if(modeT==='continuous'){
+            for(let t=1;t<=T;t++){ const S=1000*Math.exp(L*(t/state.daysPerYear)); arr.push({x:t,y:S}); state.minY=Math.min(state.minY,S); state.maxY=Math.max(state.maxY,S);}  
+          }else{
+            let W=0; const Wv=[0]; for(let t=1;t<=T;t++){ W+=randNormal(); Wv.push(W);} const WT=Wv[T];
+            for(let t=1;t<=T;t++){ const bridge=Wv[t] - (t/T)*WT; const logR=(L*(t/state.daysPerYear)) + sigma_dt*Math.sqrt(state.daysPerYear)*(bridge/Math.sqrt(T)); const S=1000*Math.exp(logR); arr.push({x:t,y:S}); state.minY=Math.min(state.minY,S); state.maxY=Math.max(state.maxY,S);}  
+          }
+          state.targetPath=arr;
+        }
+      }
+
+      // UI sync
+      state.curStep = state.steps; scrub.max=String(state.steps); scrub.value=String(state.steps);
+      populateSelect(); buildLegend(); draw();
     }
 
     function populateSelect(){
-      lineSelect.innerHTML = '';
-      for(let i=0;i<state.lines;i++){
-        const o=document.createElement('option');
-        o.value=String(i); o.textContent = `Line ${i+1}`;
-        lineSelect.appendChild(o);
-      }
-      lineSelect.value = String(state.selected);
+      lineSelect.innerHTML=''; for(let i=0;i<state.lines;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent=`Line ${i+1}`; lineSelect.appendChild(o);} lineSelect.value=String(state.selected);
     }
 
     function buildLegend(){
-      legend.innerHTML = '';
-      const a = document.createElement('span'); a.className='badge';
-      a.textContent = `View: ${viewMode.options[viewMode.selectedIndex].text}`;
-      legend.appendChild(a);
-      const b = document.createElement('span'); b.className='badge';
-      b.textContent = `Selected: ${Number(state.selected)+1}/${state.lines}`;
-      legend.appendChild(b);
-      const c = document.createElement('span'); c.className='badge';
-      c.textContent = `Step ${state.curStep}/${state.steps}`;
-      legend.appendChild(c);
+      legend.innerHTML='';
+      const add=(txt)=>{ const s=document.createElement('span'); s.className='badge'; s.textContent=txt; legend.appendChild(s); };
+      add(`Mode: ${state.mode==='log'?'Log (centered)':'Price (S₀=1000)'}`);
+      add(`View: ${viewMode.options[viewMode.selectedIndex].text}`);
+      add(`Selected: ${state.selected+1}/${state.lines}`);
+      add(`Step ${state.curStep}/${state.steps}`);
+      add(`Drift: ${driftToggle.value==='on'? (state.annualReturnPct.toFixed(1)+'% over '+state.daysPerYear+'d'):'off'}`);
+      const tp=showTarget.value; add(`Target: ${tp==='off'?'Off':(tp==='continuous'?'Continuous':'Index')}`);
+      if(window.__testsResult){ add(window.__testsResult); }
     }
 
-    // ---------- Coordinate transform & grid ----------
+    // ---------- Transform & grid ----------
     function getTransform(){
-      const pad=40; const w = canvas.width - pad*2; const h = canvas.height - pad*2;
-      const xMax = Math.max(1, state.steps);
-      const yAbs = Math.max(1, Math.max(Math.abs(state.minY), Math.abs(state.maxY)));
-      const sx = (w / xMax) * state.scaleX; const sy = (h / (2*yAbs)) * state.scaleY;
-      const originX = pad + state.panX; const originY = pad + h/2 + state.panY; // zero in middle
-      return {scaleX:sx, scaleY:sy, originX, originY, w, h};
+      const pad=48; const w=canvas.width - pad*2; const h=canvas.height - pad*2; const xMax=Math.max(1,state.steps);
+      if(state.mode==='log'){
+        const yAbs=Math.max(1,Math.max(Math.abs(state.minY),Math.abs(state.maxY)));
+        return {scaleX:(w/xMax)*state.scaleX, scaleY:(h/(2*yAbs))*state.scaleY, originX:pad+state.panX, originY:pad+h/2+state.panY, w, h, scaleKind:'logCentered'};
+      }else{
+        const yMinRaw=Math.max(1e-9,state.minY); const yMaxRaw=Math.max(yMinRaw*1.000001,state.maxY);
+        const base={scaleX:(w/xMax)*state.scaleX, originX:pad+state.panX, originY:pad+h+state.panY, w, h};
+        if(state.yScale==='log'){
+          const logMin=Math.log(yMinRaw), logMax=Math.log(yMaxRaw); const scaleY=(h/(logMax-logMin))*state.scaleY;
+          return {...base, scaleY, yMin:yMinRaw, yMax:yMaxRaw, logMin, logMax, scaleKind:'priceLog'};
+        }else{
+          const scaleY=(h/(yMaxRaw-yMinRaw))*state.scaleY; return {...base, scaleY, yMin:yMinRaw, yMax:yMaxRaw, scaleKind:'priceLinear'};
+        }
+      }
     }
 
     function drawGrid(t){
-      const {originX, originY, w, h, scaleX} = t;
-      ctx.save(); ctx.translate(originX, originY);
-      // verticals
-      ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.beginPath();
-      const step = Math.max(10, Math.round(state.steps/10));
-      for(let x=0; x<=state.steps; x+=step){ const px = x*scaleX; ctx.moveTo(px, -h/2); ctx.lineTo(px, h/2); }
-      ctx.stroke();
-      // axes
-      ctx.strokeStyle='rgba(148,163,184,.6)';
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(state.steps*scaleX, 0); ctx.stroke(); // y=0
-      ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(0, h/2); ctx.stroke(); // x=0
+      const {originX, originY, w, h, scaleX} = t; ctx.save(); ctx.translate(originX, originY);
+      // Year markers only
+      const N=Math.max(1,state.daysPerYear|0); const years=Math.floor(state.steps/N);
+      if(years>=1){ ctx.strokeStyle='rgba(56,189,248,.18)'; ctx.lineWidth=1; for(let k=1;k<=years;k++){ const px=k*N*scaleX; ctx.beginPath(); ctx.moveTo(px, state.mode==='log'?-h/2:-h); ctx.lineTo(px,0); ctx.stroke(); ctx.fillStyle='rgba(148,163,184,.7)'; ctx.font='12px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(`Year ${k}`, px, -2);} }
+      // Log mode horizontal axis
+      if(state.mode==='log'){ ctx.strokeStyle='rgba(148,163,184,.6)'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(state.steps*scaleX,0); ctx.stroke(); }
+      // Price mode left ticks
+      if(state.mode==='price'){
+        ctx.fillStyle='rgba(148,163,184,.8)'; ctx.strokeStyle='rgba(148,163,184,.35)'; ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.font='12px system-ui,sans-serif';
+        const drawTick=(py,label)=>{ ctx.beginPath(); ctx.moveTo(-4,py); ctx.lineTo(0,py); ctx.stroke(); ctx.fillText(label, -10, py); };
+        if(state.yScale==='log'){
+          const decade=(x)=>Math.log(x)/Math.LN10; const dMin=Math.ceil(decade(t.yMin)), dMax=Math.floor(decade(t.yMax));
+          for(let d=dMin; d<=dMax; d++){ const val=Math.pow(10,d); const py=-(Math.log(val)-t.logMin)*t.scaleY; drawTick(py, String(val.toFixed(0))); }
+        }else{
+          const range=t.yMax-t.yMin; const target=6; const rough=range/target; const pow10=Math.pow(10,Math.floor(Math.log10(rough))); const steps=[1,2,5,10]; let step=pow10; for(const s of steps){ if(rough<=s*pow10){ step=s*pow10; break; } }
+          const start=Math.ceil(t.yMin/step)*step; const end=Math.floor(t.yMax/step)*step; for(let v=start; v<=end; v+=step){ const py=-(v - t.yMin)*t.scaleY; drawTick(py, String(v.toFixed(0))); }
+        }
+      }
+      // x=0 line
+      ctx.strokeStyle='rgba(148,163,184,.6)'; ctx.beginPath(); ctx.moveTo(0, state.mode==='log'?-h/2:-h); ctx.lineTo(0,0); ctx.stroke();
       ctx.restore();
     }
 
     // ---------- Draw ----------
     function draw(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      if(!state.walks.length) return;
-      const t = getTransform(); drawGrid(t);
-      const stepLimit = Math.min(state.curStep, state.steps);
-
-      function drawOne(path, color, width, alpha){
-        if(!path || path.length===0) return;
-        const {scaleX, scaleY, originX, originY} = t;
-        ctx.save(); ctx.translate(originX, originY);
-        ctx.lineWidth = width; ctx.strokeStyle = color; ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        const maxI = Math.min(stepLimit, path.length-1);
-        for(let i=0;i<=maxI;i++){
-          const p = path[i]; const px = p.x*scaleX; const py = -p.y*scaleY;
-          if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-        }
-        ctx.stroke(); ctx.restore();
-      }
-
-      if(state.view==='faint'){
-        for(let i=0;i<state.walks.length;i++){ if(i===state.selected) continue; drawOne(state.walks[i], colorFor(i,state.walks.length), 1.1, 0.25); }
-        drawOne(state.walks[state.selected], colorFor(state.selected,state.walks.length), 2.2, 1);
-      } else if(state.view==='selected'){
-        drawOne(state.walks[state.selected], colorFor(state.selected,state.walks.length), 2.2, 1);
-      } else if(state.view==='equal'){
-        for(let i=0;i<state.walks.length;i++){ drawOne(state.walks[i], colorFor(i,state.walks.length), 1.5, 0.9); }
-      }
+      ctx.clearRect(0,0,canvas.width,canvas.height); if(!state.walks.length) return; const t=getTransform(); drawGrid(t);
+      const stepLimit=Math.min(state.curStep,state.steps);
+      function drawOne(path,color,width,alpha){ if(!path||path.length===0) return; const {scaleX,scaleY,originX,originY}=t; ctx.save(); ctx.translate(originX,originY); ctx.lineWidth=width; ctx.strokeStyle=color; ctx.globalAlpha=alpha; ctx.beginPath(); const maxI=Math.min(stepLimit,path.length-1); for(let i=0;i<=maxI;i++){ const p=path[i]; const px=p.x*scaleX; let py; if(state.mode==='log'){ py=-p.y*scaleY; } else { if(state.yScale==='log'){ py=-(Math.log(p.y)-t.logMin)*scaleY; } else { py=-(p.y - t.yMin)*scaleY; } } if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);} ctx.stroke(); ctx.restore(); }
+      if(state.view==='faint'){ for(let i=0;i<state.walks.length;i++){ if(i===state.selected) continue; drawOne(state.walks[i], colorFor(i,state.walks.length), 1.1, .25);} drawOne(state.walks[state.selected], colorFor(state.selected,state.walks.length), 2.2, 1); }
+      else if(state.view==='selected'){ drawOne(state.walks[state.selected], colorFor(state.selected,state.walks.length), 2.2, 1); }
+      else { for(let i=0;i<state.walks.length;i++){ drawOne(state.walks[i], colorFor(i,state.walks.length), 1.5, .9);} }
+      if(state.targetPath){ drawOne(state.targetPath, '#ffffff', 2.2, .95); }
       buildLegend();
     }
 
     // ---------- Interesting pickers ----------
-    function bestBy(fn, prefer='max'){
-      let bestIdx=0; let bestVal = prefer==='max' ? -Infinity : Infinity;
-      for(let i=0;i<state.walks.length;i++){
-        const v = fn(state.walks[i]);
-        if((prefer==='max' && v>bestVal) || (prefer==='min' && v<bestVal)) { bestVal=v; bestIdx=i; }
-      }
-      return bestIdx;
-    }
-    function sseToBestFit(path){
-      const n=path.length; if(n===0) return Infinity;
-      let sumx=0,sumy=0,sumxx=0,sumxy=0;
-      for(let i=0;i<n;i++){ const x=path[i].x, y=path[i].y; sumx+=x; sumy+=y; sumxx+=x*x; sumxy+=x*y; }
-      const denom = n*sumxx - sumx*sumx; const b = denom===0?0:(n*sumxy - sumx*sumy)/denom; const a=(sumy - b*sumx)/n;
-      let sse=0; for(let i=0;i<n;i++){ const x=path[i].x,y=path[i].y; const yhat=a+b*x; const e=y-yhat; sse+=e*e; }
-      return sse;
-    }
-    const rangeY = (path)=>{ let min=Infinity,max=-Infinity; for(const p of path){ if(p.y<min)min=p.y; if(p.y>max)max=p.y; } return max-min; };
-    const zeroCross = (path)=>{ let c=0; for(let i=1;i<path.length;i++){ const a=path[i-1].y, b=path[i].y; if(a*b<0 || a===0 || b===0) c++; } return c; };
-    const longestStreak = (path)=>{ let best=0, run=0, prev=0; for(let i=1;i<path.length;i++){ const d=path[i].y-path[i-1].y; const s = d===0?0:(d>0?1:-1); if(s!==0 && s===prev){ run++; } else { run = s===0?0:1; prev=s; } if(run>best) best=run; } return best; };
-    const maxDrawdown = (path)=>{ let peak=path[0].y, mdd=0; for(let i=1;i<path.length;i++){ if(path[i].y>peak) peak=path[i].y; const dd=peak-path[i].y; if(dd>mdd) mdd=dd; } return mdd; };
-    function earliestHit(path, T){ for(let i=0;i<path.length;i++){ if(Math.abs(path[i].y)>=T) return i; } return Infinity; }
-    const areaAbs = (path)=>{ let s=0; for(let i=0;i<path.length;i++){ s += Math.abs(path[i].y); } return s; };
+    function returnsFor(path){ const r=[]; for(let i=1;i<path.length;i++){ const y0=path[i-1].y, y1=path[i].y; r.push(state.mode==='price'? Math.log(y1/y0) : (y1-y0)); } return r; }
+    function bestBy(fn,prefer='max'){ let bestIdx=0,bestVal=prefer==='max'?-Infinity:Infinity; for(let i=0;i<state.walks.length;i++){ const v=fn(state.walks[i]); if((prefer==='max'&&v>bestVal)||(prefer==='min'&&v<bestVal)){ bestVal=v; bestIdx=i; } } return bestIdx; }
+    function sseToBestFit(path){ const n=path.length; if(n===0) return Infinity; let sumx=0,sumy=0,sumxx=0,sumxy=0; for(let i=0;i<n;i++){ const x=path[i].x,y=path[i].y; sumx+=x; sumy+=y; sumxx+=x*x; sumxy+=x*y; } const denom=n*sumxx - sumx*sumx; const b=denom===0?0:(n*sumxy - sumx*sumy)/denom; const a=(sumy - b*sumx)/n; let sse=0; for(let i=0;i<n;i++){ const x=path[i].x,y=path[i].y; const yhat=a+b*x; const e=y-yhat; sse+=e*e; } return sse; }
+    const rangeY=(path)=>{ let min=Infinity,max=-Infinity; for(const p of path){ if(p.y<min)min=p.y; if(p.y>max)max=p.y; } return max-min; };
+    const zeroCross=(path)=>{ const arr=returnsFor(path); let c=0; for(let i=1;i<arr.length;i++){ const a=arr[i-1],b=arr[i]; if(a*b<0 || a===0 || b===0) c++; } return c; };
+    const longestStreak=(path)=>{ let best=0,run=0,prev=0; for(let i=1;i<path.length;i++){ const d=(state.mode==='price')? Math.sign(Math.log(path[i].y/path[i-1].y)) : Math.sign(path[i].y-path[i-1].y); if(d!==0 && d===prev){ run++; } else { run=d===0?0:1; prev=d; } if(run>best) best=run; } return best; };
+    const maxDrawdown=(path)=>{ let peak=path[0].y,mdd=0; for(let i=1;i<path.length;i++){ if(path[i].y>peak) peak=path[i].y; const dd=peak-path[i].y; if(dd>mdd) mdd=dd; } return mdd; };
+    function earliestHit(path,T){ for(let i=0;i<path.length;i++){ if(Math.abs(path[i].y)>=T) return i; } return Infinity; }
+    const areaAbs=(path)=>{ let s=0; for(let i=0;i<path.length;i++){ s+=Math.abs(path[i].y); } return s; };
+    function pickInteresting(which){ if(!state.walks.length) return; let idx=0; if(which==='straightest') idx=bestBy(sseToBestFit,'min'); else if(which==='range') idx=bestBy(rangeY,'max'); else if(which==='zero') idx=bestBy(zeroCross,'max'); else if(which==='streak') idx=bestBy(longestStreak,'max'); else if(which==='drawdown') idx=bestBy(maxDrawdown,'max'); else if(which==='earliest'){ let g=1; for(const w of state.walks){ for(const p of w){ const a=Math.abs(p.y); if(a>g) g=a; } } const T=.75*g; idx=bestBy((w)=>earliestHit(w,T),'min'); } else if(which==='area') idx=bestBy(areaAbs,'max'); state.selected=clamp(idx,0,state.lines-1); lineSelect.value=String(state.selected); state.view='selected'; viewMode.value='selected'; draw(); }
 
-    function pickInteresting(which){
-      if(!state.walks.length) return; let idx=0;
-      if(which==='straightest') idx = bestBy(sseToBestFit,'min');
-      else if(which==='range') idx = bestBy(rangeY,'max');
-      else if(which==='zero') idx = bestBy(zeroCross,'max');
-      else if(which==='streak') idx = bestBy(longestStreak,'max');
-      else if(which==='drawdown') idx = bestBy(maxDrawdown,'max');
-      else if(which==='earliest'){
-        let g=1; for(const w of state.walks){ for(const p of w){ const a=Math.abs(p.y); if(a>g) g=a; } }
-        const T = 0.75*g; idx = bestBy((w)=>earliestHit(w,T),'min');
-      } else if(which==='area') idx = bestBy(areaAbs,'max');
-      state.selected = clamp(idx,0,state.lines-1); lineSelect.value=String(state.selected);
-      state.view='selected'; viewMode.value='selected'; draw();
+    // ---------- Tests ----------
+    function runTests(){
+      const results=[];
+      results.push({name:'shapes', ok:Array.isArray(state.walks)&&state.walks.length===state.lines&&state.walks[0]&&state.walks[0].length===state.steps+1});
+      const beforeSel=state.selected; state.selected=state.lines+5; state.selected=clamp(state.selected,0,state.lines-1); results.push({name:'sel clamp', ok:state.selected===state.lines-1}); state.selected=beforeSel;
+      const old=state.curStep; state.curStep=state.steps+5; try{ draw(); results.push({name:'draw cap', ok:true}); }catch(e){ results.push({name:'draw cap', ok:false}); } state.curStep=old;
+      const r=(state.walks[0]? returnsFor(state.walks[0]):[]); results.push({name:'returns len', ok:r.length===state.steps});
+      const passed=results.filter(t=>t.ok).length; if(passed!==results.length){ console.warn('Tests failed', results.filter(t=>!t.ok)); }
+      return `${passed}/${results.length} tests passed`;
     }
 
-    // ---------- Animation ----------
-    let raf; function loop(ts){
-      if(!state.playing){ raf=requestAnimationFrame(loop); return; }
-      state.curStep = Math.min(state.steps, state.curStep + 1);
-      scrub.value = String(state.curStep);
-      draw();
-      if(state.curStep>=state.steps){ state.playing=false; playPauseBtn.textContent='Play'; }
-      raf=requestAnimationFrame(loop);
-    }
+    // ---------- Animation & Events ----------
+    let raf; function loop(){ if(!state.playing){ raf=requestAnimationFrame(loop); return; } state.curStep=Math.min(state.steps,state.curStep+1); scrub.value=String(state.curStep); draw(); if(state.curStep>=state.steps){ state.playing=false; playPauseBtn.textContent='Play'; } raf=requestAnimationFrame(loop); }
 
-    // ---------- Events ----------
     function resize(){ const r=canvas.parentElement.getBoundingClientRect(); canvas.width=Math.floor(r.width); canvas.height=520; draw(); }
+
+    function init(){ resize(); generate(); window.__testsResult=runTests(); cancelAnimationFrame(raf); raf=requestAnimationFrame(loop); }
+
+    // UI events
     window.addEventListener('resize', resize);
-
-    playPauseBtn.onclick = ()=>{ state.playing=!state.playing; playPauseBtn.textContent = state.playing? 'Pause':'Play'; };
-    regenBtn.onclick = ()=>{ generate(); };
-
-    lineSelect.onchange = (e)=>{ state.selected = Number(e.target.value)||0; draw(); };
-    prevBtn.onclick = ()=>{ state.selected = (state.selected - 1 + state.lines) % state.lines; lineSelect.value=String(state.selected); draw(); };
-    nextBtn.onclick = ()=>{ state.selected = (state.selected + 1) % state.lines; lineSelect.value=String(state.selected); draw(); };
-
-    viewMode.onchange = (e)=>{ state.view=e.target.value; buildLegend(); draw(); };
-
-    scrub.oninput = (e)=>{ state.curStep = Number(e.target.value)||0; state.playing=false; playPauseBtn.textContent='Play'; draw(); };
-
-    applyBtn.onclick = ()=>{
-      const L = clamp(Number(linesInput.value||100),1,300);
-      const S = clamp(Number(stepsInput.value||1000),10,5000);
-      state.lines=L; state.steps=S; state.selected = clamp(state.selected,0,L-1);
-      generate();
-    };
-
-    applyPick.onclick = ()=>{ const which = picker.value; if(which) pickInteresting(which); };
+    modeSelect.addEventListener('change', ()=>{ state.mode=modeSelect.value; generate(); window.__testsResult=runTests(); });
+    yScaleSelect.addEventListener('change', ()=>{ state.yScale=yScaleSelect.value; draw(); });
+    playPauseBtn.addEventListener('click', ()=>{ state.playing=!state.playing; playPauseBtn.textContent=state.playing?'Pause':'Play'; });
+    regenBtn.addEventListener('click', ()=>{ generate(); window.__testsResult=runTests(); });
+    lineSelect.addEventListener('change', (e)=>{ state.selected=Number(e.target.value)||0; draw(); });
+    prevBtn.addEventListener('click', ()=>{ state.selected=(state.selected-1+state.lines)%state.lines; lineSelect.value=String(state.selected); draw(); });
+    nextBtn.addEventListener('click', ()=>{ state.selected=(state.selected+1)%state.lines; lineSelect.value=String(state.selected); draw(); });
+    viewMode.addEventListener('change', ()=>{ state.view=viewMode.value; buildLegend(); draw(); });
+    driftToggle.addEventListener('change', ()=>{ generate(); window.__testsResult=runTests(); });
+    annualPct.addEventListener('change', ()=>{ generate(); window.__testsResult=runTests(); });
+    tradingDays.addEventListener('change', ()=>{ generate(); window.__testsResult=runTests(); });
+    showTarget.addEventListener('change', ()=>{ generate(); window.__testsResult=runTests(); });
+    scrub.addEventListener('input', (e)=>{ state.curStep=Number(e.target.value)||0; state.playing=false; playPauseBtn.textContent='Play'; draw(); });
+    applyBtn.addEventListener('click', ()=>{ const L=clamp(Number(linesInput.value||100),1,300); const S=clamp(Number(stepsInput.value||1000),10,5000); state.lines=L; state.steps=S; state.selected=clamp(state.selected,0,L-1); generate(); window.__testsResult=runTests(); });
+    applyPick.addEventListener('click', ()=>{ const which=picker.value; if(which) pickInteresting(which); });
 
     // pan & zoom
-    let drag=false,lastX=0,lastY=0;
-    canvas.onmousedown = (e)=>{ drag=true; lastX=e.clientX; lastY=e.clientY; };
-    window.onmouseup = ()=>{ drag=false; };
-    window.onmousemove = (e)=>{ if(!drag) return; state.panX += e.clientX-lastX; state.panY += e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; draw(); };
-    canvas.onwheel = (e)=>{ e.preventDefault(); const z = e.deltaY<0?1.1:0.9; state.scaleX*=z; state.scaleY*=z; state.scaleX=clamp(state.scaleX,0.2,10); state.scaleY=clamp(state.scaleY,0.2,10); draw(); };
+    (function(){ let drag=false,lastX=0,lastY=0; canvas.addEventListener('mousedown',(e)=>{ drag=true; lastX=e.clientX; lastY=e.clientY; }); window.addEventListener('mouseup',()=>{ drag=false; }); window.addEventListener('mousemove',(e)=>{ if(!drag) return; state.panX+=e.clientX-lastX; state.panY+=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; draw(); }); canvas.addEventListener('wheel',(e)=>{ e.preventDefault(); const z=e.deltaY<0?1.1:0.9; state.scaleX*=z; state.scaleY*=z; state.scaleX=clamp(state.scaleX,0.2,10); state.scaleY=clamp(state.scaleY,0.2,10); draw(); }, {passive:false}); })();
 
-    // keyboard shortcuts
-    window.addEventListener('keydown', (e)=>{
-      if(e.key===' '){ e.preventDefault(); playPauseBtn.click(); }
-      if(e.key==='ArrowLeft'){ prevBtn.click(); }
-      if(e.key==='ArrowRight'){ nextBtn.click(); }
-      if(e.key==='g' || e.key==='G'){ regenBtn.click(); }
-    });
+    window.addEventListener('keydown',(e)=>{ if(e.key===' '){ e.preventDefault(); playPauseBtn.click(); } if(e.key==='ArrowLeft'){ prevBtn.click(); } if(e.key==='ArrowRight'){ nextBtn.click(); } if(e.key==='g'||e.key==='G'){ regenBtn.click(); } });
 
-    // ---------- Init ----------
-    function init(){ resize(); generate(); cancelAnimationFrame(raf); raf=requestAnimationFrame(loop); }
     init();
   </script>
 </body>
