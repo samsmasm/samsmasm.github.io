@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stock Simulator</title>
+  <title>Stock / Random Walk Simulator</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -21,125 +21,55 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
     }
 
-    .wrap {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 16px 16px 28px;
-    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px 16px 28px; }
 
     .toolbar {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      background: var(--panel);
-      padding: 10px 12px;
-      border-radius: 14px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+      background: var(--panel); padding: 10px 12px; border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
     }
 
-    .toolbar .group {
-      display: flex;
-      gap: 8px;
-      align-items: center;
+    .group { display: flex; gap: 8px; align-items: center; }
+    .toolbar label { font-size: 12px; color: var(--muted); }
+    .toolbar select, .toolbar input[type="number"], .toolbar input[type="range"] {
+      background: #0b1022; color: var(--text); border: 1px solid #223; outline: none; border-radius: 10px; padding: 6px 8px;
     }
+    .toolbar input[type="range"] { accent-color: var(--accent); height: 6px; }
+    .btn { cursor: pointer; border: 1px solid #2a3550; background: #0b1022; color: var(--text); padding: 7px 10px; border-radius: 10px; }
+    .btn:hover { border-color: #3e4f80; }
 
-    .toolbar label {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .toolbar select,
-    .toolbar input[type="number"],
-    .toolbar input[type="range"] {
-      background: #0b1022;
-      color: var(--text);
-      border: 1px solid #223;
-      outline: none;
-      border-radius: 10px;
-      padding: 6px 8px;
-    }
-
-    .toolbar input[type="range"] {
-      accent-color: var(--accent);
-      height: 6px;
-    }
-
-    .btn {
-      cursor: pointer;
-      border: 1px solid #2a3550;
-      background: #0b1022;
-      color: var(--text);
-      padding: 7px 10px;
-      border-radius: 10px;
-    }
-
-    .btn:hover {
-      border-color: #3e4f80;
-    }
-
-    .canvas-card {
-      margin-top: 14px;
-      background: var(--panel);
-      border-radius: 16px;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, .25);
-      position: relative;
-    }
-
-    canvas {
-      display: block;
-      width: 100%;
-      height: 520px;
-    }
-
-    .hint {
-      position: absolute;
-      right: 14px;
-      bottom: 10px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .legend {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .badge {
-      padding: 2px 6px;
-      border-radius: 8px;
-      background: #0b1022;
-      border: 1px solid #223;
-    }
+    .canvas-card { margin-top: 14px; background: var(--panel); border-radius: 16px; box-shadow: 0 12px 28px rgba(0,0,0,.25); position: relative; }
+    canvas { display: block; width: 100%; height: 520px; }
+    .hint { position: absolute; right: 14px; bottom: 10px; font-size: 12px; color: var(--muted); }
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .badge { padding: 2px 6px; border-radius: 8px; background: #0b1022; border: 1px solid #223; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1 style="font-size:20px;margin:4px 0 12px">Stock Simulator</h1>
+    <h1 style="font-size:20px;margin:4px 0 12px">Stock / Random Walk Simulator</h1>
     <div class="toolbar">
       <div class="group">
         <button class="btn" id="playPauseBtn">Play</button>
         <button class="btn" id="regenBtn">Regenerate</button>
       </div>
-      <div class="group" style="min-width:220px">
+
+      <div class="group" style="min-width:240px">
         <label for="lineSelect">Line</label>
         <select id="lineSelect"></select>
         <button class="btn" id="prevBtn">◀</button>
         <button class="btn" id="nextBtn">▶</button>
       </div>
+
       <div class="group">
         <label for="viewMode">View</label>
         <select id="viewMode">
           <option value="selected">Selected only</option>
-          <option value="faint">Selected + faint others</option>
+          <option value="faint" selected>Selected + faint others</option>
           <option value="equal">Highlight all equally</option>
         </select>
       </div>
+
       <div class="group">
         <label for="picker">Pick interesting</label>
         <select id="picker" title="Select a criterion to auto-pick a line">
@@ -154,292 +84,279 @@
         </select>
         <button class="btn" id="applyPick">Find</button>
       </div>
-      <div class="group" style="flex:1 1 220px;min-width:220px">
+
+      <div class="group" style="flex:1 1 260px;min-width:260px">
         <label for="scrub">Progress</label>
-        <input id="scrub" type="range" min="0" max="100" value="100" style="width:180px" />
+        <input id="scrub" type="range" min="0" max="1000" value="1000" style="width:200px" />
       </div>
+
       <div class="group">
         <label for="linesInput">Lines</label>
-        <input id="linesInput" type="number" min="1" max="200" value="50" style="width:70px" />
+        <input id="linesInput" type="number" min="1" max="300" value="100" style="width:80px" />
       </div>
       <div class="group">
         <label for="stepsInput">Steps</label>
-        <input id="stepsInput" type="number" min="10" max="1000" value="100" style="width:80px" />
+        <input id="stepsInput" type="number" min="10" max="5000" value="1000" style="width:90px" />
       </div>
       <div class="group">
         <button class="btn" id="applyBtn">Apply</button>
       </div>
     </div>
+
     <div class="canvas-card">
       <canvas id="chart" width="1100" height="520"></canvas>
-      <div class="hint">Scroll to zoom • Drag to pan</div>
+      <div class="hint">Scroll to zoom • Drag to pan • 0 is the horizontal axis</div>
     </div>
+
     <div class="legend" id="legend"></div>
   </div>
 
   <script>
+    // ---------- Utils ----------
     function colorFor(i, total) {
       const hue = (i * 360 / Math.max(1, total)) % 360;
       return `hsl(${hue} 85% 60%)`;
     }
-
-    function clamp(n, min, max) {
-      return Math.max(min, Math.min(max, n));
-    }
-
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
     function randNormal() {
-      const u = Math.random() || 1e-12;
-      const v = Math.random() || 1e-12;
+      const u = Math.random() || 1e-12; const v = Math.random() || 1e-12;
       return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
     }
 
+    // ---------- State ----------
     const state = {
-      lines: 50,
-      steps: 100,
-      walks: [],
+      lines: 100,
+      steps: 1000,
+      walks: [],         // each: [{x,y}, ...] with y = log-price
       minY: 0,
       maxY: 0,
-      curStep: 100,
+      curStep: 1000,     // default drawn to the end
       playing: false,
       selected: 0,
       view: 'faint',
-      panX: 0,
-      panY: 0,
-      scaleX: 1,
-      scaleY: 1
+      panX: 0, panY: 0,
+      scaleX: 1, scaleY: 1,
     };
 
+    // ---------- DOM ----------
     const canvas = document.getElementById('chart');
     const ctx = canvas.getContext('2d');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const regenBtn = document.getElementById('regenBtn');
     const lineSelect = document.getElementById('lineSelect');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const viewMode = document.getElementById('viewMode');
     const picker = document.getElementById('picker');
     const applyPick = document.getElementById('applyPick');
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    const regenBtn = document.getElementById('regenBtn');
     const scrub = document.getElementById('scrub');
     const linesInput = document.getElementById('linesInput');
     const stepsInput = document.getElementById('stepsInput');
     const applyBtn = document.getElementById('applyBtn');
     const legend = document.getElementById('legend');
 
-    function resize() {
-      const r = canvas.parentElement.getBoundingClientRect();
-      canvas.width = Math.floor(r.width);
-      canvas.height = Math.floor(r.height);
-      draw();
-    }
+    // ---------- Generation (GBM on log price) ----------
+    function generate(){
+      const {lines, steps} = state;
+      state.walks = []; state.minY = 0; state.maxY = 0;
 
-    window.addEventListener('resize', resize, { passive: true });
-
-    function populateSelect() {
-      lineSelect.innerHTML = '';
-      for (let i = 0; i < state.lines; i++) {
-        const o = document.createElement('option');
-        o.value = String(i);
-        o.textContent = `Line ${i + 1}`;
-        lineSelect.appendChild(o);
-      }
-      lineSelect.value = String(state.selected);
-    }
-
-    function buildLegend() {
-      legend.innerHTML = `View: ${viewMode.options[viewMode.selectedIndex].text} | Line ${Number(state.selected) + 1}/${state.lines}`;
-    }
-
-    function generate() {
-      const { lines, steps } = state;
-
-      state.selected = clamp(state.selected, 0, Math.max(0, lines - 1));
-      state.walks = [];
-      state.minY = 0;
-      state.maxY = 0;
-
-      const mu = 0.00;
-      const sigma = 0.20;
+      const mu = 0.00;     // drift per unit time
+      const sigma = 0.20;  // volatility
       const dt = 1 / steps;
 
       for (let i = 0; i < lines; i++) {
-        let logP = 0;
-        const arr = [{ x: 0, y: logP }];
-
+        let logP = 0; // start at logP=0 (price=1)
+        const arr = [{x:0, y:logP}];
         for (let x = 1; x <= steps; x++) {
           const eps = randNormal();
-          const r = mu * dt + sigma * Math.sqrt(dt) * eps;
+          const r = mu * dt + sigma * Math.sqrt(dt) * eps; // log return
           logP += r;
-          arr.push({ x, y: logP });
-          state.minY = Math.min(state.minY, logP);
-          state.maxY = Math.max(state.maxY, logP);
+          arr.push({x, y: logP});
+          if (logP < state.minY) state.minY = logP;
+          if (logP > state.maxY) state.maxY = logP;
         }
-
         state.walks.push(arr);
       }
-
+      // sync UI defaults
       state.curStep = state.steps;
       scrub.max = String(steps);
       scrub.value = String(steps);
-      state.panX = 0;
-      state.panY = 0;
-      state.scaleX = 1;
-      state.scaleY = 1;
       populateSelect();
       buildLegend();
       draw();
     }
 
-    function getTransform() {
-      const pad = 40;
-      const w = canvas.width - pad * 2;
-      const h = canvas.height - pad * 2;
-      const xMax = Math.max(1, state.steps);
-      const yAbsMax = Math.max(1, Math.max(Math.abs(state.minY), Math.abs(state.maxY)));
-      const sx = w / xMax;
-      const sy = h / (yAbsMax * 2);
-      return {
-        scaleX: sx * state.scaleX,
-        scaleY: sy * state.scaleY,
-        originX: pad + state.panX,
-        originY: pad + h / 2 + state.panY,
-        w,
-        h
-      };
+    function populateSelect(){
+      lineSelect.innerHTML = '';
+      for(let i=0;i<state.lines;i++){
+        const o=document.createElement('option');
+        o.value=String(i); o.textContent = `Line ${i+1}`;
+        lineSelect.appendChild(o);
+      }
+      lineSelect.value = String(state.selected);
     }
 
-    function drawGrid(t) {
-      const { originX, originY, w, h, scaleX } = t;
-      ctx.save();
-      ctx.translate(originX, originY);
-      ctx.strokeStyle = 'rgba(255,255,255,.05)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = 0; x <= state.steps; x += 10) {
-        const px = x * scaleX;
-        ctx.moveTo(px, -h / 2);
-        ctx.lineTo(px, h / 2);
-      }
+    function buildLegend(){
+      legend.innerHTML = '';
+      const a = document.createElement('span'); a.className='badge';
+      a.textContent = `View: ${viewMode.options[viewMode.selectedIndex].text}`;
+      legend.appendChild(a);
+      const b = document.createElement('span'); b.className='badge';
+      b.textContent = `Selected: ${Number(state.selected)+1}/${state.lines}`;
+      legend.appendChild(b);
+      const c = document.createElement('span'); c.className='badge';
+      c.textContent = `Step ${state.curStep}/${state.steps}`;
+      legend.appendChild(c);
+    }
+
+    // ---------- Coordinate transform & grid ----------
+    function getTransform(){
+      const pad=40; const w = canvas.width - pad*2; const h = canvas.height - pad*2;
+      const xMax = Math.max(1, state.steps);
+      const yAbs = Math.max(1, Math.max(Math.abs(state.minY), Math.abs(state.maxY)));
+      const sx = (w / xMax) * state.scaleX; const sy = (h / (2*yAbs)) * state.scaleY;
+      const originX = pad + state.panX; const originY = pad + h/2 + state.panY; // zero in middle
+      return {scaleX:sx, scaleY:sy, originX, originY, w, h};
+    }
+
+    function drawGrid(t){
+      const {originX, originY, w, h, scaleX} = t;
+      ctx.save(); ctx.translate(originX, originY);
+      // verticals
+      ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.beginPath();
+      const step = Math.max(10, Math.round(state.steps/10));
+      for(let x=0; x<=state.steps; x+=step){ const px = x*scaleX; ctx.moveTo(px, -h/2); ctx.lineTo(px, h/2); }
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(148,163,184,.6)';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(state.steps * scaleX, 0);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, -h / 2);
-      ctx.lineTo(0, h / 2);
-      ctx.stroke();
+      // axes
+      ctx.strokeStyle='rgba(148,163,184,.6)';
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(state.steps*scaleX, 0); ctx.stroke(); // y=0
+      ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(0, h/2); ctx.stroke(); // x=0
       ctx.restore();
     }
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (!state.walks || state.walks.length === 0) {
-        buildLegend();
-        return;
-      }
-
-      const t = getTransform();
-      drawGrid(t);
+    // ---------- Draw ----------
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(!state.walks.length) return;
+      const t = getTransform(); drawGrid(t);
       const stepLimit = Math.min(state.curStep, state.steps);
 
-      function drawOne(path, color, width, alpha) {
-        if (!path || path.length === 0) return;
-        const { scaleX, scaleY, originX, originY } = t;
-        ctx.save();
-        ctx.translate(originX, originY);
-        ctx.lineWidth = width;
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = alpha;
+      function drawOne(path, color, width, alpha){
+        if(!path || path.length===0) return;
+        const {scaleX, scaleY, originX, originY} = t;
+        ctx.save(); ctx.translate(originX, originY);
+        ctx.lineWidth = width; ctx.strokeStyle = color; ctx.globalAlpha = alpha;
         ctx.beginPath();
-        const maxI = Math.min(stepLimit, path.length - 1);
-        for (let i = 0; i <= maxI; i++) {
-          const pt = path[i];
-          const px = pt.x * scaleX;
-          const py = -pt.y * scaleY;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
+        const maxI = Math.min(stepLimit, path.length-1);
+        for(let i=0;i<=maxI;i++){
+          const p = path[i]; const px = p.x*scaleX; const py = -p.y*scaleY;
+          if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
         }
-        ctx.stroke();
-        ctx.restore();
+        ctx.stroke(); ctx.restore();
       }
 
-      if (state.view === 'faint') {
-        for (let i = 0; i < state.walks.length; i++) {
-          if (i === state.selected) continue;
-          drawOne(state.walks[i], colorFor(i, state.walks.length), 1.2, 0.25);
-        }
-        drawOne(state.walks[state.selected], colorFor(state.selected, state.walks.length), 2.4, 1);
-      } else if (state.view === 'selected') {
-        drawOne(state.walks[state.selected], colorFor(state.selected, state.walks.length), 2.4, 1);
-      } else if (state.view === 'equal') {
-        for (let i = 0; i < state.walks.length; i++) {
-          drawOne(state.walks[i], colorFor(i, state.walks.length), 1.5, 0.9);
-        }
+      if(state.view==='faint'){
+        for(let i=0;i<state.walks.length;i++){ if(i===state.selected) continue; drawOne(state.walks[i], colorFor(i,state.walks.length), 1.1, 0.25); }
+        drawOne(state.walks[state.selected], colorFor(state.selected,state.walks.length), 2.2, 1);
+      } else if(state.view==='selected'){
+        drawOne(state.walks[state.selected], colorFor(state.selected,state.walks.length), 2.2, 1);
+      } else if(state.view==='equal'){
+        for(let i=0;i<state.walks.length;i++){ drawOne(state.walks[i], colorFor(i,state.walks.length), 1.5, 0.9); }
       }
-
       buildLegend();
     }
 
-    let raf;
-
-    function loop(ts) {
-      if (!state.playing) {
-        raf = requestAnimationFrame(loop);
-        return;
+    // ---------- Interesting pickers ----------
+    function bestBy(fn, prefer='max'){
+      let bestIdx=0; let bestVal = prefer==='max' ? -Infinity : Infinity;
+      for(let i=0;i<state.walks.length;i++){
+        const v = fn(state.walks[i]);
+        if((prefer==='max' && v>bestVal) || (prefer==='min' && v<bestVal)) { bestVal=v; bestIdx=i; }
       }
+      return bestIdx;
+    }
+    function sseToBestFit(path){
+      const n=path.length; if(n===0) return Infinity;
+      let sumx=0,sumy=0,sumxx=0,sumxy=0;
+      for(let i=0;i<n;i++){ const x=path[i].x, y=path[i].y; sumx+=x; sumy+=y; sumxx+=x*x; sumxy+=x*y; }
+      const denom = n*sumxx - sumx*sumx; const b = denom===0?0:(n*sumxy - sumx*sumy)/denom; const a=(sumy - b*sumx)/n;
+      let sse=0; for(let i=0;i<n;i++){ const x=path[i].x,y=path[i].y; const yhat=a+b*x; const e=y-yhat; sse+=e*e; }
+      return sse;
+    }
+    const rangeY = (path)=>{ let min=Infinity,max=-Infinity; for(const p of path){ if(p.y<min)min=p.y; if(p.y>max)max=p.y; } return max-min; };
+    const zeroCross = (path)=>{ let c=0; for(let i=1;i<path.length;i++){ const a=path[i-1].y, b=path[i].y; if(a*b<0 || a===0 || b===0) c++; } return c; };
+    const longestStreak = (path)=>{ let best=0, run=0, prev=0; for(let i=1;i<path.length;i++){ const d=path[i].y-path[i-1].y; const s = d===0?0:(d>0?1:-1); if(s!==0 && s===prev){ run++; } else { run = s===0?0:1; prev=s; } if(run>best) best=run; } return best; };
+    const maxDrawdown = (path)=>{ let peak=path[0].y, mdd=0; for(let i=1;i<path.length;i++){ if(path[i].y>peak) peak=path[i].y; const dd=peak-path[i].y; if(dd>mdd) mdd=dd; } return mdd; };
+    function earliestHit(path, T){ for(let i=0;i<path.length;i++){ if(Math.abs(path[i].y)>=T) return i; } return Infinity; }
+    const areaAbs = (path)=>{ let s=0; for(let i=0;i<path.length;i++){ s += Math.abs(path[i].y); } return s; };
 
+    function pickInteresting(which){
+      if(!state.walks.length) return; let idx=0;
+      if(which==='straightest') idx = bestBy(sseToBestFit,'min');
+      else if(which==='range') idx = bestBy(rangeY,'max');
+      else if(which==='zero') idx = bestBy(zeroCross,'max');
+      else if(which==='streak') idx = bestBy(longestStreak,'max');
+      else if(which==='drawdown') idx = bestBy(maxDrawdown,'max');
+      else if(which==='earliest'){
+        let g=1; for(const w of state.walks){ for(const p of w){ const a=Math.abs(p.y); if(a>g) g=a; } }
+        const T = 0.75*g; idx = bestBy((w)=>earliestHit(w,T),'min');
+      } else if(which==='area') idx = bestBy(areaAbs,'max');
+      state.selected = clamp(idx,0,state.lines-1); lineSelect.value=String(state.selected);
+      state.view='selected'; viewMode.value='selected'; draw();
+    }
+
+    // ---------- Animation ----------
+    let raf; function loop(ts){
+      if(!state.playing){ raf=requestAnimationFrame(loop); return; }
       state.curStep = Math.min(state.steps, state.curStep + 1);
       scrub.value = String(state.curStep);
       draw();
-
-      if (state.curStep >= state.steps) {
-        state.playing = false;
-        playPauseBtn.textContent = 'Play';
-      }
-
-      raf = requestAnimationFrame(loop);
+      if(state.curStep>=state.steps){ state.playing=false; playPauseBtn.textContent='Play'; }
+      raf=requestAnimationFrame(loop);
     }
 
-    playPauseBtn.onclick = () => {
-      state.playing = !state.playing;
-      playPauseBtn.textContent = state.playing ? 'Pause' : 'Play';
+    // ---------- Events ----------
+    function resize(){ const r=canvas.parentElement.getBoundingClientRect(); canvas.width=Math.floor(r.width); canvas.height=520; draw(); }
+    window.addEventListener('resize', resize);
+
+    playPauseBtn.onclick = ()=>{ state.playing=!state.playing; playPauseBtn.textContent = state.playing? 'Pause':'Play'; };
+    regenBtn.onclick = ()=>{ generate(); };
+
+    lineSelect.onchange = (e)=>{ state.selected = Number(e.target.value)||0; draw(); };
+    prevBtn.onclick = ()=>{ state.selected = (state.selected - 1 + state.lines) % state.lines; lineSelect.value=String(state.selected); draw(); };
+    nextBtn.onclick = ()=>{ state.selected = (state.selected + 1) % state.lines; lineSelect.value=String(state.selected); draw(); };
+
+    viewMode.onchange = (e)=>{ state.view=e.target.value; buildLegend(); draw(); };
+
+    scrub.oninput = (e)=>{ state.curStep = Number(e.target.value)||0; state.playing=false; playPauseBtn.textContent='Play'; draw(); };
+
+    applyBtn.onclick = ()=>{
+      const L = clamp(Number(linesInput.value||100),1,300);
+      const S = clamp(Number(stepsInput.value||1000),10,5000);
+      state.lines=L; state.steps=S; state.selected = clamp(state.selected,0,L-1);
+      generate();
     };
 
-    regenBtn.onclick = () => generate();
+    applyPick.onclick = ()=>{ const which = picker.value; if(which) pickInteresting(which); };
 
-    lineSelect.onchange = e => {
-      state.selected = Number(e.target.value) || 0;
-      draw();
-    };
+    // pan & zoom
+    let drag=false,lastX=0,lastY=0;
+    canvas.onmousedown = (e)=>{ drag=true; lastX=e.clientX; lastY=e.clientY; };
+    window.onmouseup = ()=>{ drag=false; };
+    window.onmousemove = (e)=>{ if(!drag) return; state.panX += e.clientX-lastX; state.panY += e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; draw(); };
+    canvas.onwheel = (e)=>{ e.preventDefault(); const z = e.deltaY<0?1.1:0.9; state.scaleX*=z; state.scaleY*=z; state.scaleX=clamp(state.scaleX,0.2,10); state.scaleY=clamp(state.scaleY,0.2,10); draw(); };
 
-    prevBtn.onclick = () => {
-      state.selected = (state.selected - 1 + state.lines) % state.lines;
-      lineSelect.value = String(state.selected);
-      draw();
-    };
+    // keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if(e.key===' '){ e.preventDefault(); playPauseBtn.click(); }
+      if(e.key==='ArrowLeft'){ prevBtn.click(); }
+      if(e.key==='ArrowRight'){ nextBtn.click(); }
+      if(e.key==='g' || e.key==='G'){ regenBtn.click(); }
+    });
 
-    nextBtn.onclick = () => {
-      state.selected = (state.selected + 1) % state.lines;
-      lineSelect.value = String(state.selected);
-      draw();
-    };
-
-    viewMode.onchange = e => {
-      state.view = e.target.value;
-      buildLegend();
-      draw();
-    };
-
-    scrub.oninput = e => {
-      state.curStep = Number(e.target.value) || 0;
-      state.playing = false;
-      playPauseBtn.textContent = 'Play';
-      draw();
-    };
-
-    applyBtn.onclick = () => {
-      const L = clamp(Number(linesInput.value || 50), 1, 200);
-      const S = clamp(Number(stepsInput.value || 100), 10, 1000);
-      state.lines = L;
-      state.steps = S;
+    // ---------- Init ----------
+    function init(){ resize(); generate(); cancelAnimationFrame(raf); raf=requestAnimationFrame(loop); }
+    init();
+  </script>
+</body>
+</html>
