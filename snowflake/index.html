@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paper Snowflake Simulator (3-fold, surprise reveal)</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+    .app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
+    header, footer { color: #ddd; padding: .6rem 1rem; }
+    header { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #222; }
+    header .group { display: flex; gap: .5rem; align-items: center; }
+    header label { font-size: .9rem; color: #bbb; }
+    header button, header input[type="range"] { background: #111; color: #eee; border: 1px solid #333; border-radius: 8px; padding: .45rem .75rem; }
+    header button { cursor: pointer; }
+    header button:active { transform: translateY(1px); }
+    header button[disabled] { opacity: .5; cursor: not-allowed; }
+
+    #wrap { display: grid; place-items: center; padding: 1rem; }
+    canvas { background: #000; width: min(92vmin, 100%); height: min(92vmin, 100%); aspect-ratio: 1 / 1; border: 1px solid #222; touch-action: none; }
+
+    footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #222; font-size: .9rem; color: #888; }
+    .kbd { padding: 0 .35rem; border: 1px solid #444; border-bottom-width: 2px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; color: #ccc; background: #111; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="group">
+        <strong>3-fold (square → triangle) • cut while folded</strong>
+      </div>
+      <div class="group">
+        <label for="cutWidth">Cut width</label>
+        <input id="cutWidth" type="range" min="2" max="30" value="8" />
+        <span id="cutWidthVal" style="color:#aaa;">8 px</span>
+      </div>
+      <div class="group">
+        <label><input type="checkbox" id="showGuides" checked /> Guides</label>
+      </div>
+      <div class="group">
+        <button id="undo">Undo</button>
+        <button id="clear">Reset</button>
+        <button id="unfold">Unfold ✷</button>
+        <button id="save">Save PNG</button>
+        <button id="runtests" title="Run self-tests (see console)">Run tests</button>
+      </div>
+    </header>
+
+    <main id="wrap">
+      <canvas id="c" width="1200" height="1200" aria-label="paper snowflake canvas"></canvas>
+    </main>
+
+    <footer>
+      <div>Folded view only. Drag to cut straight lines inside the triangle wedge. Isolated islands are removed. Press <span class="kbd">Unfold</span> to reveal the full snowflake.</div>
+      <div><span class="kbd">Z</span>=Undo &nbsp; <span class="kbd">R</span>=Reset</div>
+    </footer>
+  </div>
+
+  <script>
+  (() => {
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    const cutWidthRange = document.getElementById('cutWidth');
+    const cutWidthVal = document.getElementById('cutWidthVal');
+    const showGuidesChk = document.getElementById('showGuides');
+    const undoBtn = document.getElementById('undo');
+    const clearBtn = document.getElementById('clear');
+    const saveBtn = document.getElementById('save');
+    const unfoldBtn = document.getElementById('unfold');
+    const runTestsBtn = document.getElementById('runtests');
+
+    let cuts = []; // { x1,y1,x2,y2,w }
+    let drawing = false;
+    let start = null;
+    let unfolded = false;
+
+    // Paper geometry (square centered)
+    const S = canvas.width;
+    const pad = 80;
+    const size = S - pad * 2;
+    const cx = S / 2, cy = S / 2;
+    const left = cx - size/2, top = cy - size/2, right = cx + size/2, bottom = cy + size/2;
+
+    // Correct folded wedge triangle: center → mid-right → top-right corner
+    const triA = { x: cx, y: cy };      // center
+    const triB = { x: right, y: cy };   // mid-right
+    const triC = { x: right, y: top };  // top-right corner (on the fold axis)
+
+    function clampToPaper(x, y) {
+      return [ Math.max(left, Math.min(right, x)), Math.max(top, Math.min(bottom, y)) ];
+    }
+
+    function pointInTriangle(p, a, b, c) {
+      function sign(p1, p2, p3) { return (p1.x - p3.x)*(p2.y - p3.y) - (p2.x - p3.x)*(p1.y - p3.y); }
+      const d1 = sign(p, a, b);
+      const d2 = sign(p, b, c);
+      const d3 = sign(p, c, a);
+      const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      return !(hasNeg && hasPos);
+    }
+
+    function pointInActiveRegion(x, y) {
+      return pointInTriangle({x,y}, triA, triB, triC);
+    }
+
+    // --- Geometry helpers for clipping a line segment to the folded triangle ---
+    function segmentIntersection(p0, p1, q0, q1) {
+      const x1=p0.x, y1=p0.y, x2=p1.x, y2=p1.y, x3=q0.x, y3=q0.y, x4=q1.x, y4=q1.y;
+      const denom = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+      if (Math.abs(denom) < 1e-9) return null; // parallel or coincident
+      const t = ((x1-x3)*(y3-y4) - (y1-y3)*(x3-x4)) / denom;
+      const u = ((x1-x3)*(y1-y2) - (y1-y3)*(x1-x2)) / denom;
+      if (t < -1e-6 || t > 1+1e-6 || u < -1e-6 || u > 1+1e-6) return null; // outside segment extents
+      const xi = x1 + t*(x2-x1);
+      const yi = y1 + t*(y2-y1);
+      return { t: Math.max(0, Math.min(1, t)), x: xi, y: yi };
+    }
+
+    function clipSegmentToTriangle(seg) {
+      const p0 = { x: seg.x1, y: seg.y1 };
+      const p1 = { x: seg.x2, y: seg.y2 };
+      const inside0 = pointInActiveRegion(p0.x, p0.y);
+      const inside1 = pointInActiveRegion(p1.x, p1.y);
+      const edges = [ [triA, triB], [triB, triC], [triC, triA] ];
+      const pts = [];
+      if (inside0) pts.push({ t: 0, x: p0.x, y: p0.y });
+      if (inside1) pts.push({ t: 1, x: p1.x, y: p1.y });
+      for (const [e0,e1] of edges) {
+        const inter = segmentIntersection(p0, p1, e0, e1);
+        if (inter) pts.push(inter);
+      }
+      if (pts.length < 2) return null;
+      pts.sort((a,b)=>a.t-b.t);
+      for (let i=0;i<pts.length-1;i++) {
+        const a=pts[i], b=pts[i+1];
+        const mx = a.x + 0.5*(b.x-a.x), my = a.y + 0.5*(b.y-a.y);
+        if (pointInActiveRegion(mx,my)) {
+          return { x1:a.x, y1:a.y, x2:b.x, y2:b.y, w: seg.w };
+        }
+      }
+      return null; // no portion inside the triangle
+    }
+
+    // Mirrors for unfolding (vertical, horizontal, and axis through center→top-right)
+    function reflectVertical(x, y) { return [ 2*cx - x, y ]; }
+    function reflectHorizontal(x, y) { return [ x, 2*cy - y ]; }
+    function reflectDiagYeqX(x, y) {
+      // Use the mathematical y = x reflection about the center.
+      const dx = x - cx, dy = y - cy;
+      return [ cx + dy, cy + dx ];
+    }
+
+    function mapSeg(s, fn) {
+      const [x1,y1] = fn(s.x1, s.y1);
+      const [x2,y2] = fn(s.x2, s.y2);
+      return { x1, y1, x2, y2, w: s.w };
+    }
+
+    function generateSymmetryVariants(seg) {
+      const base = [seg];
+      const v = base.map(s => mapSeg(s, reflectVertical));
+      const h = base.map(s => mapSeg(s, reflectHorizontal));
+      const hv = base.map(s => mapSeg(mapSeg(s, reflectVertical), reflectHorizontal));
+      const d = base.map(s => mapSeg(s, reflectDiagYeqX));
+      const dv = base.map(s => mapSeg(mapSeg(s, reflectVertical), reflectDiagYeqX));
+      const dh = base.map(s => mapSeg(mapSeg(s, reflectHorizontal), reflectDiagYeqX));
+      const dhv = base.map(s => mapSeg(mapSeg(mapSeg(s, reflectVertical), reflectHorizontal), reflectDiagYeqX));
+      const all = [ ...base, ...v, ...h, ...hv, ...d, ...dv, ...dh, ...dhv ];
+      return uniqueSegments(all.map(s => {
+        let [x1,y1] = clampToPaper(s.x1, s.y1);
+        let [x2,y2] = clampToPaper(s.x2, s.y2);
+        return { x1, y1, x2, y2, w: s.w };
+      }));
+    }
+
+    function uniqueSegments(list) {
+      const key = s => [s.x1, s.y1, s.x2, s.y2, s.w].map(v => Math.round(v)).join(',');
+      const seen = new Set();
+      const out = [];
+      for (const s of list) { const k = key(s); if (!seen.has(k)) { seen.add(k); out.push(s); } }
+      return out;
+    }
+
+    function drawFolded(previewSeg=null) {
+      ctx.clearRect(0,0,S,S);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(triA.x, triA.y);
+      ctx.lineTo(triB.x, triB.y);
+      ctx.lineTo(triC.x, triC.y);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(left, top, size, size);
+
+      const segs = [ ...(previewSeg ? [previewSeg] : []), ...cuts ];
+      applyCuts(segs);
+
+      removeIslandsInTriangle();
+
+      ctx.restore();
+
+      if (showGuidesChk.checked) drawGuidesTriangle();
+    }
+
+    function drawUnfolded() {
+      ctx.clearRect(0,0,S,S);
+      ctx.save();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(left, top, size, size);
+      let allSegs = [];
+      for (const seg of cuts) allSegs.push(...generateSymmetryVariants(seg));
+      applyCuts(allSegs);
+      removeIslandsInFullSheet();
+      ctx.restore();
+    }
+
+    function applyCuts(segments) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (const s of segments) {
+        if (!s) continue; // ignore null preview
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        ctx.lineWidth = s.w;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawGuidesTriangle() {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(triA.x, triA.y); ctx.lineTo(triB.x, triB.y);
+      ctx.moveTo(triA.x, triA.y); ctx.lineTo(triC.x, triC.y);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.2)';
+      ctx.strokeRect(left, top, size, size);
+      ctx.restore();
+    }
+
+    // Remove islands inside the folded triangle
+    function removeIslandsInTriangle() {
+      const img = ctx.getImageData(left|0, top|0, size|0, size|0);
+      const w = img.width, h = img.height, data = img.data;
+      const index = (x,y) => (y*w + x) << 2;
+      const alphaAt = (x,y) => data[index(x,y)+3];
+      const isWhite = (x,y) => x>=0 && y>=0 && x<w && y<h && alphaAt(x,y)>0;
+      const inTri = (x,y) => pointInTriangle({x:left+x+0.5, y:top+y+0.5}, triA, triB, triC);
+
+      const comp = new Int32Array(w*h); comp.fill(-1);
+      const sizes = []; const touchB = [];
+      const qx = new Int32Array(w*h), qy = new Int32Array(w*h);
+      let cid=0;
+      for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+        const f=y*w+x; if (!inTri(x,y) || !isWhite(x,y) || comp[f]!==-1) continue;
+        let head=0, tail=0; qx[tail]=x; qy[tail]=y; tail++; comp[f]=cid;
+        let size=0, tb=false;
+        while (head<tail) {
+          const x0=qx[head], y0=qy[head]; head++; size++;
+          const n4=[[1,0],[-1,0],[0,1],[0,-1]];
+          for (const [dx,dy] of n4) {
+            const nx=x0+dx, ny=y0+dy;
+            if (!inTri(nx,ny)) { tb=true; continue; }
+            if (nx<0||ny<0||nx>=w||ny>=h) continue;
+            const nf=ny*w+nx; if (comp[nf]!==-1 || !isWhite(nx,ny)) continue;
+            comp[nf]=cid; qx[tail]=nx; qy[tail]=ny; tail++;
+          }
+        }
+        sizes[cid]=size; touchB[cid]=tb; cid++;
+      }
+      let keep=-1, ksize=-1;
+      for (let i=0;i<cid;i++) if (touchB[i] && sizes[i]>ksize) { keep=i; ksize=sizes[i]; }
+      if (keep === -1 && cid > 0) {
+        // Fallback: keep largest component if boundary-touch not detected due to numeric issues
+        for (let i=0;i<cid;i++) if (sizes[i]>ksize) { keep=i; ksize=sizes[i]; }
+      }
+      for (let y=0;y<h;y++) for (let x=0;x<w;x++) { const f=y*w+x, c=comp[f]; if (c===-1) continue; if (c!==keep) { const o=index(x,y); data[o]=data[o+1]=data[o+2]=data[o+3]=0; } }
+      ctx.putImageData(img, left|0, top|0);
+    }
+
+    // Remove islands on the full sheet (after unfold)
+    function removeIslandsInFullSheet() {
+      const img = ctx.getImageData(left|0, top|0, size|0, size|0);
+      const w = img.width, h = img.height, data = img.data;
+      const index = (x,y) => (y*w + x) << 2;
+      const alphaAt = (x,y) => data[index(x,y)+3];
+      const isWhite = (x,y) => x>=0 && y>=0 && x<w && y<h && alphaAt(x,y)>0;
+
+      const comp = new Int32Array(w*h); comp.fill(-1);
+      const sizes = []; const touchB = [];
+      const qx = new Int32Array(w*h), qy = new Int32Array(w*h);
+      let cid=0;
+      for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+        const f=y*w+x; if (!isWhite(x,y) || comp[f]!==-1) continue;
+        let head=0, tail=0; qx[tail]=x; qy[tail]=y; tail++; comp[f]=cid;
+        let size=0, tb=false;
+        while (head<tail) {
+          const x0=qx[head], y0=qy[head]; head++; size++;
+          if (x0===0||y0===0||x0===w-1||y0===h-1) tb=true;
+          const n4=[[1,0],[-1,0],[0,1],[0,-1]];
+          for (const [dx,dy] of n4) {
+            const nx=x0+dx, ny=y0+dy; if (nx<0||ny<0||nx>=w||ny>=h) continue;
+            const nf=ny*w+nx; if (comp[nf]!==-1 || !isWhite(nx,ny)) continue;
+            comp[nf]=cid; qx[tail]=nx; qy[tail]=ny; tail++;
+          }
+        }
+        sizes[cid]=size; touchB[cid]=tb; cid++;
+      }
+      let keep=-1, ksize=-1;
+      for (let i=0;i<cid;i++) if (touchB[i] && sizes[i]>ksize) { keep=i; ksize=sizes[i]; }
+      if (keep === -1 && cid > 0) {
+        for (let i=0;i<cid;i++) if (sizes[i]>ksize) { keep=i; ksize=sizes[i]; }
+      }
+      for (let y=0;y<h;y++) for (let x=0;x<w;x++) { const f=y*w+x, c=comp[f]; if (c===-1) continue; if (c!==keep) { const o=index(x,y); data[o]=data[o+1]=data[o+2]=data[o+3]=0; } }
+      ctx.putImageData(img, left|0, top|0);
+    }
+
+    // Interaction
+    function getMousePos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return [ (evt.clientX - rect.left) * scaleX, (evt.clientY - rect.top) * scaleY ];
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (unfolded) return;
+      const [x,y] = getMousePos(e);
+      // Allow starting outside; just record the start (clamped to paper bounds)
+      drawing = true;
+      start = clampToPaper(x,y);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (unfolded) { drawUnfolded(); return; }
+      if (!drawing) { drawFolded(); return; }
+      const [x,y] = getMousePos(e);
+      const [x2,y2] = clampToPaper(x,y);
+      const seg = { x1:start[0], y1:start[1], x2, y2, w: +cutWidthRange.value };
+      const clipped = clipSegmentToTriangle(seg);
+      drawFolded(clipped);
+    });
+
+    function endStroke(e) {
+      if (!drawing) return;
+      drawing = false;
+      const [x,y] = getMousePos(e);
+      const [x2,y2] = clampToPaper(x,y);
+      const seg = { x1:start[0], y1:start[1], x2, y2, w: +cutWidthRange.value };
+      const clipped = clipSegmentToTriangle(seg);
+      if (clipped) { cuts.push(clipped); }
+      start = null;
+      drawFolded();
+    }
+
+    canvas.addEventListener('mouseup', endStroke);
+    canvas.addEventListener('mouseleave', endStroke);
+
+    // Touch
+    canvas.addEventListener('touchstart', (e) => {
+      if (unfolded) return;
+      const t = e.changedTouches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (t.clientX - rect.left) * scaleX;
+      const y = (t.clientY - rect.top) * scaleY;
+      // Allow starting outside triangle
+      drawing = true;
+      start = clampToPaper(x,y);
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!drawing) { unfolded ? drawUnfolded() : drawFolded(); return; }
+      const t = e.changedTouches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (t.clientX - rect.left) * scaleX;
+      const y = (t.clientY - rect.top) * scaleY;
+      const [x2,y2] = clampToPaper(x,y);
+      const seg = { x1:start[0], y1:start[1], x2, y2, w: +cutWidthRange.value };
+      const clipped = clipSegmentToTriangle(seg);
+      drawFolded(clipped);
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (t.clientX - rect.left) * scaleX;
+      const y = (t.clientY - rect.top) * scaleY;
+      if (!drawing) return;
+      const [x2,y2] = clampToPaper(x,y);
+      const seg = { x1:start[0], y1:start[1], x2, y2, w: +cutWidthRange.value };
+      const clipped = clipSegmentToTriangle(seg);
+      if (clipped) { cuts.push(clipped); }
+      start = null;
+      drawing = false;
+      drawFolded();
+      e.preventDefault();
+    }, { passive: false });
+
+    // Controls
+    showGuidesChk.addEventListener('change', () => (unfolded ? drawUnfolded() : drawFolded()));
+    cutWidthRange.addEventListener('input', () => { cutWidthVal.textContent = `${cutWidthRange.value} px`; unfolded ? drawUnfolded() : drawFolded(); });
+
+    undoBtn.addEventListener('click', () => { if (unfolded) return; cuts.pop(); drawFolded(); });
+    clearBtn.addEventListener('click', () => { cuts = []; unfolded = false; setButtons(); drawFolded(); });
+    saveBtn.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.download = unfolded ? 'snowflake.png' : 'folded.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    });
+    unfoldBtn.addEventListener('click', () => { unfolded = true; setButtons(); drawUnfolded(); });
+
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !unfolded) { cuts.pop(); drawFolded(); }
+      if (k === 'r') { cuts = []; unfolded = false; setButtons(); drawFolded(); }
+    });
+
+    function setButtons() { unfoldBtn.disabled = unfolded; }
+
+    // --- Self-tests (see console) ---
+    function runSelfTests() {
+      console.group("Snowflake tests");
+      try {
+        // Test 1: reflection across y=x should swap dx,dy
+        const p = [cx+10, cy+30];
+        const r = reflectDiagYeqX(...p);
+        console.assert(Math.abs(r[0] - (cx+30)) < 1e-6 && Math.abs(r[1] - (cy+10)) < 1e-6, "Diag reflect swap failed");
+
+        // Test 2: active region containment
+        console.assert(pointInActiveRegion(cx+size*0.25, cy-size*0.05) === true, "Inside triangle should be true");
+        console.assert(pointInActiveRegion(cx+size*0.05, cy-size*0.25) === false, "Outside triangle should be false");
+
+        // Test 3: clipping – outside-only stroke returns null
+        const outsideSeg = { x1: left-50, y1: bottom+50, x2: left-10, y2: bottom+10, w: 8 };
+        console.assert(clipSegmentToTriangle(outsideSeg) === null, "Clip should return null for outside-only stroke");
+
+        // Test 4: clipping – crossing stroke is trimmed to inside portion
+        const crossSeg = { x1: left-50, y1: cy, x2: right, y2: cy-50, w: 8 };
+        const clipped = clipSegmentToTriangle(crossSeg);
+        console.assert(clipped && pointInActiveRegion((clipped.x1+clipped.x2)/2, (clipped.y1+clipped.y2)/2), "Clipped crossing stroke should be inside");
+
+        // Test 5: folded island removal
+        drawFolded();
+        const wbx = 10; const bx = cx + size*0.2; const by = cy - size*0.1;
+        const s1 = { x1: bx, y1: by, x2: bx+wbx, y2: by, w: 6 };
+        const s2 = { x1: bx+wbx, y1: by, x2: bx+wbx, y2: by+wbx, w: 6 };
+        const s3 = { x1: bx+wbx, y1: by+wbx, x2: bx, y2: by+wbx, w: 6 };
+        const s4 = { x1: bx, y1: by+wbx, x2: bx, y2: by, w: 6 };
+        applyCuts([s1,s2,s3,s4]);
+        removeIslandsInTriangle();
+        let px = ctx.getImageData(Math.round(bx+wbx/2), Math.round(by+wbx/2), 1, 1).data;
+        console.assert(px[3] === 0, "Island not removed (folded)");
+
+        // Test 6: after unfold, islands stay removed
+        cuts = [s1,s2,s3,s4]; unfolded = true; drawUnfolded();
+        px = ctx.getImageData(Math.round(bx+wbx/2), Math.round(by+wbx/2), 1, 1).data;
+        console.assert(px[3] === 0, "Island reappeared after unfold");
+
+        console.log("All tests passed ✅");
+      } catch (err) {
+        console.error("Test error:", err);
+      } finally {
+        console.groupEnd();
+        unfolded = false; cuts = []; setButtons(); drawFolded();
+      }
+    }
+
+    runTestsBtn.addEventListener('click', runSelfTests);
+
+    // Initial paint
+    setButtons();
+    drawFolded();
+  })();
+  </script>
+</body>
+</html>
