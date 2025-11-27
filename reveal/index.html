@@ -1,0 +1,291 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, RefreshCw, Eye, EyeOff, Grid3X3, Download, Trash2, Image as ImageIcon } from 'lucide-react';
+
+export default function App() {
+  const [imageSrc, setImageSrc] = useState(null);
+  const [columns, setColumns] = useState(10);
+  const [tiles, setTiles] = useState([]);
+  const [isSetup, setIsSetup] = useState(false);
+  const [revealedCount, setRevealedCount] = useState(0);
+  const imageRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Constants
+  const MIN_COLUMNS = 2;
+  const MAX_COLUMNS = 50;
+
+  // Handle Image Upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImageSrc(event.target.result);
+        setIsSetup(false); // Reset setup when new image loads
+        setTiles([]);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Generate the Grid
+  const generateGrid = () => {
+    if (!imageRef.current) return;
+
+    const img = imageRef.current;
+    const aspectRatio = img.naturalHeight / img.naturalWidth;
+    
+    // We want square tiles. 
+    // Width of one tile = (1 / columns) * 100% of width.
+    // Height of one tile = Width of one tile (in pixels).
+    // To calculate rows: 
+    // tileWidthPx = imgWidth / columns
+    // rows = Math.ceil(imgHeight / tileWidthPx)
+    
+    // However, in CSS grid relative terms:
+    // If we have N columns, the row count is roughly N * aspect ratio
+    const rows = Math.ceil(columns * aspectRatio);
+    const totalTiles = columns * rows;
+
+    const newTiles = Array.from({ length: totalTiles }, (_, i) => ({
+      id: i,
+      isVisible: true,
+    }));
+
+    setTiles(newTiles);
+    setIsSetup(true);
+    setRevealedCount(0);
+  };
+
+  // Toggle a single tile
+  const handleTileClick = (index) => {
+    if (!tiles[index].isVisible) return; // Already revealed
+
+    const newTiles = [...tiles];
+    newTiles[index].isVisible = false;
+    setTiles(newTiles);
+    setRevealedCount(prev => prev + 1);
+  };
+
+  // Reveal All / Hide All
+  const toggleAll = (show) => {
+    const newTiles = tiles.map(t => ({ ...t, isVisible: show }));
+    setTiles(newTiles);
+    setRevealedCount(show ? 0 : tiles.length);
+  };
+
+  // Reset the grid logic when image loads to ensure dimensions are ready
+  const onImageLoad = () => {
+    // Optional: Auto-generate on load if preferred, or wait for user.
+    // We'll wait for user to click "Generate Grid" or update defaults if not setup.
+    if (!isSetup) {
+       // We can give a preview or just wait.
+    }
+  };
+
+  // Calculate grid styles dynamically
+  const getGridStyle = () => {
+    if (!imageRef.current) return {};
+    const img = imageRef.current;
+    const aspectRatio = img.naturalHeight / img.naturalWidth;
+    const rows = Math.ceil(columns * aspectRatio);
+    
+    return {
+      display: 'grid',
+      gridTemplateColumns: `repeat(${columns}, 1fr)`,
+      gridTemplateRows: `repeat(${rows}, 1fr)`, // This ensures we have enough rows
+      aspectRatio: `${img.naturalWidth} / ${img.naturalHeight}`,
+    };
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center p-4 md:p-8 font-sans">
+      
+      {/* Header */}
+      <header className="w-full max-w-4xl mb-8 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-700 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-400 to-blue-500 bg-clip-text text-transparent">
+            TileReveal
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">Upload an image, cover it, and click to reveal.</p>
+        </div>
+
+        {/* Global Controls */}
+        <div className="flex gap-2">
+          <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg cursor-pointer transition-colors shadow-lg shadow-blue-900/20 font-medium">
+            <Upload size={18} />
+            <span>Upload Image</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              className="hidden" 
+            />
+          </label>
+        </div>
+      </header>
+
+      {/* Main Workspace */}
+      <main className="w-full max-w-5xl flex flex-col gap-6">
+        
+        {/* Controls Bar */}
+        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4 backdrop-blur-sm">
+          
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Grid Density (Across)</label>
+              <div className="flex items-center gap-3">
+                <Grid3X3 size={18} className="text-slate-400" />
+                <input 
+                  type="range" 
+                  min={MIN_COLUMNS} 
+                  max={MAX_COLUMNS} 
+                  value={columns} 
+                  onChange={(e) => {
+                    setColumns(Number(e.target.value));
+                    setIsSetup(false); // Invalidate current grid
+                  }}
+                  className="w-32 accent-teal-500 cursor-pointer"
+                />
+                <span className="font-mono bg-slate-900 px-2 py-1 rounded text-sm min-w-[3rem] text-center border border-slate-700">
+                  {columns}
+                </span>
+              </div>
+            </div>
+
+            {/* Stats */}
+            {isSetup && (
+               <div className="flex flex-col gap-1 pl-6 border-l border-slate-700">
+                 <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Progress</span>
+                 <span className="font-mono text-sm text-teal-400">
+                   {revealedCount} / {tiles.length} Tiles
+                 </span>
+               </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isSetup ? (
+              <button 
+                onClick={generateGrid}
+                disabled={!imageSrc}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-all"
+              >
+                <RefreshCw size={18} />
+                Generate Grid
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={() => toggleAll(true)}
+                  className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors tooltip"
+                  title="Cover All"
+                >
+                  <EyeOff size={20} />
+                </button>
+                <button 
+                  onClick={() => toggleAll(false)}
+                  className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors tooltip"
+                  title="Reveal All"
+                >
+                  <Eye size={20} />
+                </button>
+                <button 
+                  onClick={() => {
+                     setIsSetup(false);
+                     setTiles([]);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors ml-2"
+                >
+                  <RefreshCw size={16} />
+                  Reset Grid
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Canvas Area */}
+        <div className="relative w-full min-h-[400px] bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden">
+          
+          {!imageSrc ? (
+            <div className="text-center p-8 text-slate-500 flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-2">
+                <ImageIcon size={32} className="opacity-50" />
+              </div>
+              <p>No image selected.</p>
+              <p className="text-sm">Upload an image to get started.</p>
+              <label className="mt-2 px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg cursor-pointer text-slate-300 transition-colors text-sm">
+                Choose File
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  className="hidden" 
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="relative max-w-full shadow-2xl rounded-lg overflow-hidden" ref={containerRef}>
+              {/* The Image */}
+              <img 
+                ref={imageRef}
+                src={imageSrc} 
+                alt="Uploaded base" 
+                className="max-h-[70vh] w-auto h-auto object-contain block"
+                onLoad={onImageLoad}
+              />
+
+              {/* The Grid Overlay */}
+              {isSetup && tiles.length > 0 && (
+                <div 
+                  className="absolute inset-0 z-10"
+                  style={getGridStyle()}
+                >
+                  {tiles.map((tile, idx) => (
+                    <div
+                      key={tile.id}
+                      onClick={() => handleTileClick(idx)}
+                      className={`
+                        border border-slate-900/10
+                        cursor-pointer transition-all duration-300 ease-out
+                        hover:bg-teal-500/20
+                        ${tile.isVisible 
+                          ? 'bg-slate-700 opacity-100 hover:scale-[0.98]' 
+                          : 'bg-transparent opacity-0 pointer-events-none'
+                        }
+                      `}
+                      // Inline style to ensure squareness if strictly needed, 
+                      // but grid layout handles it mostly.
+                    />
+                  ))}
+                </div>
+              )}
+              
+              {/* Setup Overlay Prompt */}
+              {!isSetup && (
+                 <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center backdrop-blur-[2px]">
+                   <button 
+                      onClick={generateGrid}
+                      className="bg-teal-500 hover:bg-teal-400 text-white font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all flex items-center gap-2"
+                   >
+                     <Grid3X3 size={20} />
+                     Generate {columns}× Tiles
+                   </button>
+                 </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* Instructions Footer */}
+        {isSetup && (
+          <div className="text-center text-slate-500 text-sm pb-8">
+            Click on tiles to reveal the image below.
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}
