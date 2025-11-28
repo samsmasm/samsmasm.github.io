@@ -46,7 +46,7 @@
             return label;
         };
 
-        // --- ICON COMPONENTS (Inlined for standalone usage) ---
+        // --- ICON COMPONENTS ---
         const Upload = ({ size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
         );
@@ -65,14 +65,30 @@
         const ImageIcon = ({ size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
         );
+        const Droplet = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>
+        );
+        const ToggleLeft = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="12" x="2" y="6" rx="6" ry="6"/><circle cx="8" cy="12" r="2"/></svg>
+        );
+        const ToggleRight = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="12" x="2" y="6" rx="6" ry="6"/><circle cx="16" cy="12" r="2"/></svg>
+        );
 
         // --- MAIN APP COMPONENT ---
         function App() {
             const [imageSrc, setImageSrc] = useState(null);
             const [columns, setColumns] = useState(10);
+            
+            // Tile State: 'covered' | 'blurred' | 'cleared'
             const [tiles, setTiles] = useState([]);
+            
             const [isSetup, setIsSetup] = useState(false);
             const [revealedCount, setRevealedCount] = useState(0);
+            
+            // New Feature: Blur Mode
+            const [isBlurMode, setIsBlurMode] = useState(false);
+
             const imageRef = useRef(null);
             const containerRef = useRef(null);
 
@@ -81,7 +97,7 @@
 
             // Constants
             const MIN_COLUMNS = 2;
-            const MAX_COLUMNS = 50;
+            const MAX_COLUMNS = 20;
 
             // Handle Image Upload
             const handleImageUpload = (e) => {
@@ -90,16 +106,14 @@
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         setImageSrc(event.target.result);
-                        setIsSetup(false); // Reset setup when new image loads
+                        setIsSetup(false);
                         setTiles([]);
                     };
                     reader.readAsDataURL(file);
                 }
             };
 
-            // Handle Preset Selection
             const handlePresetSelect = (filename) => {
-                // We use relative path. Ensure 1.png etc are in same folder as index.html
                 setImageSrc(filename);
                 setIsSetup(false);
                 setTiles([]);
@@ -108,22 +122,16 @@
             // Generate the Grid
             const generateGrid = () => {
                 if (!imageRef.current) return;
-
                 const img = imageRef.current;
-                // Avoid division by zero or empty images
                 if (img.naturalWidth === 0 || img.naturalHeight === 0) return;
 
                 const aspectRatio = img.naturalHeight / img.naturalWidth;
-                
-                // We want square tiles. 
-                // Width of one tile = (1 / columns) * 100% of width.
-                // Height of one tile = Width of one tile (in pixels).
                 const rows = Math.ceil(columns * aspectRatio);
                 const totalTiles = columns * rows;
 
                 const newTiles = Array.from({ length: totalTiles }, (_, i) => ({
                     id: i,
-                    isVisible: true,
+                    state: 'covered', // Initial state
                 }));
 
                 setTiles(newTiles);
@@ -131,24 +139,39 @@
                 setRevealedCount(0);
             };
 
-            // Toggle a single tile
+            // Toggle a single tile based on mode
             const handleTileClick = (index) => {
-                if (!tiles[index].isVisible) return; // Already revealed
+                const currentTile = tiles[index];
+                if (currentTile.state === 'cleared') return;
 
                 const newTiles = [...tiles];
-                newTiles[index].isVisible = false;
+                
+                if (isBlurMode) {
+                    if (currentTile.state === 'covered') {
+                        // Step 1: Reveal but blur
+                        newTiles[index].state = 'blurred';
+                    } else if (currentTile.state === 'blurred') {
+                        // Step 2: Clear completely
+                        newTiles[index].state = 'cleared';
+                        setRevealedCount(prev => prev + 1);
+                    }
+                } else {
+                    // Standard Mode: Go straight to cleared
+                    newTiles[index].state = 'cleared';
+                    setRevealedCount(prev => prev + 1);
+                }
+
                 setTiles(newTiles);
-                setRevealedCount(prev => prev + 1);
             };
 
-            // Reveal All / Hide All
-            const toggleAll = (show) => {
-                const newTiles = tiles.map(t => ({ ...t, isVisible: show }));
+            // Reveal Options
+            const setAllTiles = (targetState) => {
+                const newTiles = tiles.map(t => ({ ...t, state: targetState }));
                 setTiles(newTiles);
-                setRevealedCount(show ? 0 : tiles.length);
+                if (targetState === 'cleared') setRevealedCount(tiles.length);
+                else if (targetState === 'covered') setRevealedCount(0);
             };
 
-            // Calculate grid styles dynamically
             const getGridStyle = () => {
                 if (!imageRef.current) return {};
                 const img = imageRef.current;
@@ -163,12 +186,10 @@
                 };
             };
             
-            // Auto generate grid when image loads
             const onImageLoad = () => {
                  generateGrid();
             };
 
-            // Update grid if columns change while image is loaded
             useEffect(() => {
                 if (imageSrc && imageRef.current && isSetup) {
                     generateGrid();
@@ -187,10 +208,7 @@
                     <p className="text-slate-400 text-sm mt-1">Upload an image, cover it, and click to reveal.</p>
                     </div>
 
-                    {/* Global Controls */}
                     <div className="flex flex-col md:flex-row gap-2 items-end md:items-center">
-                        
-                        {/* Presets List */}
                         <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
                              {PRESET_IMAGES.map((imgName) => (
                                  <button
@@ -217,72 +235,98 @@
                     </div>
                 </header>
 
-                {/* Main Workspace */}
                 <main className="w-full max-w-5xl flex flex-col gap-6">
                     
                     {/* Controls Bar */}
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4 backdrop-blur-sm">
-                    
-                    <div className="flex items-center gap-6">
-                        <div className="flex flex-col gap-1">
-                        <label className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Grid Density (Across)</label>
-                        <div className="flex items-center gap-3">
-                            <Grid3X3 size={18} className="text-slate-400" />
-                            <input 
-                            type="range" 
-                            min={MIN_COLUMNS} 
-                            max={MAX_COLUMNS} 
-                            value={columns} 
-                            onChange={(e) => setColumns(Number(e.target.value))}
-                            className="w-32 accent-teal-500 cursor-pointer"
-                            />
-                            <span className="font-mono bg-slate-900 px-2 py-1 rounded text-sm min-w-[3rem] text-center border border-slate-700">
-                            {columns}
-                            </span>
-                        </div>
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-sm">
+                        
+                        {/* Left Side: Sliders & Modes */}
+                        <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto">
+                            
+                            {/* Columns Slider */}
+                            <div className="flex flex-col gap-1 w-full md:w-auto">
+                                <label className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Grid Density</label>
+                                <div className="flex items-center gap-3">
+                                    <Grid3X3 size={18} className="text-slate-400" />
+                                    <input 
+                                    type="range" 
+                                    min={MIN_COLUMNS} 
+                                    max={MAX_COLUMNS} 
+                                    value={columns} 
+                                    onChange={(e) => setColumns(Number(e.target.value))}
+                                    className="w-full md:w-32 accent-teal-500 cursor-pointer"
+                                    />
+                                    <span className="font-mono bg-slate-900 px-2 py-1 rounded text-sm min-w-[3rem] text-center border border-slate-700">
+                                    {columns}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Blur Mode Toggle */}
+                            <div className="flex flex-col gap-1 w-full md:w-auto cursor-pointer" onClick={() => setIsBlurMode(!isBlurMode)}>
+                                <label className="text-xs uppercase tracking-wider text-slate-500 font-semibold cursor-pointer">Blur Reveal Mode</label>
+                                <div className="flex items-center gap-2">
+                                    {isBlurMode 
+                                        ? <ToggleRight size={24} className="text-teal-400" />
+                                        : <ToggleLeft size={24} className="text-slate-600" />
+                                    }
+                                    <span className={`text-sm font-medium ${isBlurMode ? 'text-teal-400' : 'text-slate-400'}`}>
+                                        {isBlurMode ? "On (2-Step)" : "Off (Instant)"}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {isSetup && (
+                            <div className="hidden md:flex flex-col gap-1 pl-6 border-l border-slate-700">
+                                <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Progress</span>
+                                <span className="font-mono text-sm text-teal-400">
+                                {revealedCount} / {tiles.length}
+                                </span>
+                            </div>
+                            )}
                         </div>
 
-                        {/* Stats */}
-                        {isSetup && (
-                        <div className="flex flex-col gap-1 pl-6 border-l border-slate-700">
-                            <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Progress</span>
-                            <span className="font-mono text-sm text-teal-400">
-                            {revealedCount} / {tiles.length} Tiles
-                            </span>
-                        </div>
-                        )}
-                    </div>
+                        {/* Right Side: Action Buttons */}
+                        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                            <button 
+                                onClick={() => setAllTiles('covered')}
+                                className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors tooltip"
+                                title="Hide All (Cover)"
+                                disabled={!isSetup}
+                            >
+                                <EyeOff size={20} />
+                            </button>
+                            
+                            {/* New Button: Reveal Blurred */}
+                            <button 
+                                onClick={() => setAllTiles('blurred')}
+                                className="p-2 hover:bg-slate-700 rounded-lg text-blue-300 transition-colors tooltip"
+                                title="Reveal All Blurred"
+                                disabled={!isSetup}
+                            >
+                                <Droplet size={20} />
+                            </button>
 
-                    <div className="flex items-center gap-2">
-                        {/* Hidden logic - only show manual reset now that auto is on */}
-                        <button 
-                            onClick={() => toggleAll(true)}
-                            className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors tooltip"
-                            title="Cover All"
-                            disabled={!isSetup}
-                        >
-                            <EyeOff size={20} />
-                        </button>
-                        <button 
-                            onClick={() => toggleAll(false)}
-                            className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors tooltip"
-                            title="Reveal All"
-                            disabled={!isSetup}
-                        >
-                            <Eye size={20} />
-                        </button>
-                        <button 
-                            onClick={() => {
-                                // Manual re-generate button just in case
-                                generateGrid();
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors ml-2"
-                            disabled={!imageSrc}
-                        >
-                            <RefreshCw size={16} />
-                            Reset Grid
-                        </button>
-                    </div>
+                            <button 
+                                onClick={() => setAllTiles('cleared')}
+                                className="p-2 hover:bg-slate-700 rounded-lg text-teal-300 transition-colors tooltip"
+                                title="Reveal All Clear"
+                                disabled={!isSetup}
+                            >
+                                <Eye size={20} />
+                            </button>
+
+                            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+
+                            <button 
+                                onClick={() => generateGrid()}
+                                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
+                                disabled={!imageSrc}
+                            >
+                                <RefreshCw size={16} />
+                                <span className="hidden sm:inline">Reset</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Canvas Area */}
@@ -307,8 +351,6 @@
                         </div>
                     ) : (
                         <div className="relative max-w-full shadow-2xl rounded-lg overflow-hidden" ref={containerRef}>
-                        {/* The Image */}
-                        {/* We hide the image with opacity-0 until tiles are setup to avoid revealing the picture */}
                         <img 
                             ref={imageRef}
                             src={imageSrc} 
@@ -321,37 +363,42 @@
                             }}
                         />
 
-                        {/* The Grid Overlay */}
                         {isSetup && tiles.length > 0 && (
                             <div 
                             className="absolute inset-0 z-10"
                             style={getGridStyle()}
                             >
                             {tiles.map((tile, idx) => {
-                                // Calculate grid reference labels
                                 const colIndex = idx % columns;
                                 const rowIndex = Math.floor(idx / columns);
                                 const label = `${getColumnLabel(colIndex)}${rowIndex + 1}`;
                                 
+                                // Determine styling based on state
+                                let tileClass = "border border-slate-900/10 cursor-pointer transition-all duration-300 ease-out flex items-center justify-center overflow-hidden select-none ";
+                                
+                                if (tile.state === 'covered') {
+                                    tileClass += "bg-slate-700 opacity-100 hover:scale-[0.98] hover:bg-slate-600";
+                                } else if (tile.state === 'blurred') {
+                                    // Modified: backdrop-blur-sm (4px) instead of xl (24px) for better visibility
+                                    tileClass += "backdrop-blur-sm bg-white/5 hover:bg-white/10 border-white/10"; 
+                                } else {
+                                    // Cleared
+                                    tileClass += "bg-transparent opacity-0 pointer-events-none";
+                                }
+
                                 return (
                                     <div
                                     key={tile.id}
                                     onClick={() => handleTileClick(idx)}
-                                    className={`
-                                        border border-slate-900/10
-                                        cursor-pointer transition-all duration-300 ease-out
-                                        hover:bg-teal-500/20
-                                        flex items-center justify-center overflow-hidden select-none
-                                        ${tile.isVisible 
-                                        ? 'bg-slate-700 opacity-100 hover:scale-[0.98]' 
-                                        : 'bg-transparent opacity-0 pointer-events-none'
-                                        }
-                                    `}
+                                    className={tileClass}
                                     >
-                                        {tile.isVisible && (
+                                        {tile.state === 'covered' && (
                                             <span className="text-[10px] md:text-xs font-mono text-slate-400/50 pointer-events-none">
                                                 {label}
                                             </span>
+                                        )}
+                                        {tile.state === 'blurred' && (
+                                            <Droplet size={16} className="text-white/20 pointer-events-none" />
                                         )}
                                     </div>
                                 );
@@ -365,7 +412,9 @@
                     {/* Instructions Footer */}
                     {isSetup && (
                     <div className="text-center text-slate-500 text-sm pb-8">
-                        Click on tiles to reveal the image below.
+                        {isBlurMode 
+                            ? "Blur Mode On: Click once to blur, click again to reveal." 
+                            : "Click on tiles to reveal the image below."}
                     </div>
                     )}
 
