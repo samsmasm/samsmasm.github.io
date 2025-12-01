@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolutionary Car Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/planck-js@0.3.31/dist/planck.js" onerror="alert('Network Error: Failed to load planck.js. Please check your internet connection.')"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #f0f0f0; }
+        canvas { width: 100vw; height: 100vh; display: block; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        
+        /* Slider centering track */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            margin-top: -4px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #d1d5db;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Start Screen Overlay -->
+    <div id="startScreen" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-90">
+        <div class="bg-white p-8 rounded-lg shadow-2xl text-center max-w-md w-full">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Evolutionary Cars</h1>
+            <p class="text-gray-600 mb-6 text-sm">Design cars through natural selection.</p>
+            
+            <div class="space-y-4">
+                <button onclick="selectTrack('flat')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    🏁 Flat Sprint
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Fastest Time to 100m</div>
+                </button>
+                
+                <button onclick="selectTrack('hill')" class="w-full py-4 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    ⛰️ Hill Climb
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Furthest Distance (Infinite)</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Left UI: Controls & Live Info -->
+    <div class="absolute top-4 left-4 z-10 space-y-4 max-h-[95vh] flex flex-col">
+        <div class="bg-white p-4 rounded shadow-lg border border-gray-300 w-72 shrink-0">
+            <h1 class="font-bold text-lg mb-2 text-gray-800">Evolutionary Sim</h1>
+            
+            <!-- Live Stats -->
+            <div class="mb-2 text-sm border-b pb-2 space-y-1">
+                <div class="flex justify-between">
+                    <span>Gen:</span> 
+                    <span class="font-bold"><span id="dispGen">1</span></span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Car:</span> 
+                    <span><span id="dispIndex">1</span> / <span id="dispPop">20</span></span>
+                </div>
+                <div class="flex justify-between bg-gray-100 p-1 rounded">
+                    <span>Time / Dist:</span> 
+                    <span id="dispTime" class="font-mono font-bold">0.00s / 0.0m</span>
+                </div>
+                 <div class="flex justify-between text-xs text-gray-400">
+                    <span>Stuck Timer:</span> 
+                    <span id="dispStuck">0.0s</span>
+                </div>
+                <!-- Power Stats -->
+                <div class="flex justify-between text-xs text-blue-600 mt-1">
+                    <span>Body Power:</span> 
+                    <span id="dispPower">-</span>
+                </div>
+                <div class="flex justify-between text-xs text-blue-600">
+                    <span>Total Mass:</span> 
+                    <span id="dispMass">-</span>
+                </div>
+            </div>
+
+            <!-- Scrollable Log -->
+            <div id="status" class="text-xs font-mono bg-black text-green-400 p-2 rounded h-24 overflow-y-auto whitespace-pre-wrap">
+                Select Track...
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white p-3 rounded shadow border border-gray-300 w-72 space-y-3 overflow-y-auto shrink-0">
+            <div class="flex gap-2">
+                <button id="btnSpeed" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-2 rounded text-xs transition">
+                    Speed: Normal (4x)
+                </button>
+                <button id="btnMainMenu" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs transition">
+                    Main Menu
+                </button>
+            </div>
+            
+            <!-- Mutation Slider -->
+            <div class="border-t pt-2">
+                <label class="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                    <span>Mutation Rate</span>
+                    <span id="valMutation" class="text-blue-600">10%</span>
+                </label>
+                <input type="range" id="inputMutation" min="0" max="100" value="10" class="w-full">
+                <div class="text-[10px] text-gray-400 text-right mt-1">Decays 5% per Gen</div>
+            </div>
+
+            <!-- Config Sliders -->
+            <div class="border-t pt-2 space-y-3">
+                <h3 class="text-xs font-bold text-gray-700">Car Configuration</h3>
+                
+                <!-- Wheels Range -->
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                        <span>Wheels (Min/Max)</span>
+                        <span class="font-bold text-blue-600"><span id="txtMinWheels">2</span> - <span id="txtMaxWheels">8</span></span>
+                    </label>
+                    <div class="flex gap-1">
+                        <input type="range" id="inputMinWheels" min="0" max="8" step="1" value="2" class="w-1/2">
+                        <input type="range" id="inputMaxWheels" min="0" max="8" step="1" value="8" class="w-1/2">
+                    </div>
+                </div>
+
+                <!-- Body Points Range -->
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                        <span>Vertices (Min/Max)</span>
+                        <span class="font-bold text-blue-600"><span id="txtMinPoints">3</span> - <span id="txtMaxPoints">14</span></span>
+                    </label>
+                    <div class="flex gap-1">
+                        <input type="range" id="inputMinPoints" min="3" max="20" step="1" value="3" class="w-1/2">
+                        <input type="range" id="inputMaxPoints" min="3" max="20" step="1" value="14" class="w-1/2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nudge Sliders -->
+            <div class="border-t pt-2 space-y-2">
+                <h3 class="text-xs font-bold text-gray-700">Mutation Bias (Nudge)</h3>
+                
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-500">
+                        <span>Less Wheels</span>
+                        <span>More Wheels</span>
+                    </label>
+                    <input type="range" id="nudgeWheels" min="-1" max="1" step="0.1" value="0" class="w-full">
+                </div>
+
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-500">
+                        <span>Smaller Wheels</span>
+                        <span>Bigger Wheels</span>
+                    </label>
+                    <input type="range" id="nudgeWheelSize" min="-1" max="1" step="0.1" value="0" class="w-full">
+                </div>
+
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-500">
+                        <span>Smaller Body</span>
+                        <span>Bigger Body</span>
+                    </label>
+                    <input type="range" id="nudgeBodySize" min="-1" max="1" step="0.1" value="0" class="w-full">
+                </div>
+            </div>
+
+            <!-- Import / Export -->
+            <div class="border-t pt-2 space-y-2">
+                <h3 class="text-xs font-bold text-gray-700">Import / Export</h3>
+                <textarea id="ioTextarea" class="w-full h-12 text-[10px] border rounded p-1 font-mono text-gray-600 resize-none" placeholder="Paste car JSON here..."></textarea>
+                <div class="flex gap-2">
+                    <button id="btnCopyBest" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 py-1 px-2 rounded text-[10px] font-bold transition">
+                        Copy Best
+                    </button>
+                    <button id="btnLoad" class="flex-1 bg-green-100 hover:bg-green-200 text-green-800 py-1 px-2 rounded text-[10px] font-bold transition">
+                        Load
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right UI: Results Lists -->
+    <div class="absolute top-4 right-4 z-10 space-y-4 w-64 flex flex-col h-[calc(100vh-2rem)] pointer-events-none">
+        
+        <!-- Current Generation Results -->
+        <div class="bg-white/90 p-3 rounded shadow-lg border border-gray-300 flex flex-col max-h-[50%] pointer-events-auto">
+            <h2 class="font-bold text-sm text-gray-700 mb-2 border-b pb-1">Current Gen Results</h2>
+            <div id="listCurrentGen" class="flex-1 overflow-y-auto text-xs space-y-1">
+                <!-- Rows injected here -->
+            </div>
+        </div>
+
+        <!-- Hall of Fame (Gen Bests) -->
+        <div class="bg-white/90 p-3 rounded shadow-lg border border-gray-300 flex flex-col flex-1 pointer-events-auto">
+            <h2 class="font-bold text-sm text-gray-700 mb-2 border-b pb-1">Hall of Fame (Best per Gen)</h2>
+            <div id="listHistory" class="flex-1 overflow-y-auto text-xs space-y-1">
+                <!-- Rows injected here -->
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+    // --- UTILS ---
+    function log(msg) {
+        const el = document.getElementById('status');
+        if(!el) return;
+        el.innerText += '\n' + msg;
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // --- CONFIG ---
+    const CONFIG = {
+        POPULATION_SIZE: 20,
+        MUTATION_RATE: 0.1, // Dynamic
+        MUTATION_DECAY: 0.95, // 5% decay per gen
+        TRACK_LENGTH: 100, // meters (Flat Finish Line)
+        HILL_LENGTH: 2000, // meters (Hill max gen)
+        SCALE: 40,         // px per meter
+        MAX_TIME: 20,      // seconds hard limit (Flat only)
+        STUCK_TIME: 3,     // seconds allowed stationary before reset
+        GRAVITY: -10,
+        ELITISM: true,     // Keep best parent
+        
+        // Limits (Controlled by UI)
+        MIN_WHEELS: 2,
+        MAX_WHEELS: 8,
+        MIN_POINTS: 3,
+        MAX_POINTS: 14,
+        
+        // Tuning
+        POWER_DENSITY: 80.0, // Torque per unit of body area
+        
+        // Bias (-1.0 to 1.0)
+        NUDGE_WHEELS: 0,
+        NUDGE_WHEEL_SIZE: 0,
+        NUDGE_BODY_SIZE: 0,
+        
+        // Track
+        TRACK_TYPE: 'flat'
+    };
+
+    // Global helper for track selection from HTML
+    window.selectTrack = (type) => {
+        CONFIG.TRACK_TYPE = type;
+        document.getElementById('startScreen').classList.add('hidden');
+        resetSimulation();
+    };
+
+    // --- GENOME CLASS ---
+    class Genome {
+        constructor() {
+            this.points = []; // {angle, radius}
+            this.wheels = []; // {vertexIndex, radius}
+            this.hue = Math.floor(Math.random() * 360); // Car color theme
+            
+            // Results
+            this.fitness = 0;
+            this.finished = false;
+            this.time = 0;
+            this.distance = 0;
+        }
+
+        static random() {
+            const g = new Genome();
+            
+            // Resolve Min/Max logic (swap if user inverted sliders)
+            const minP = Math.min(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+            const maxP = Math.max(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+            
+            const numPoints = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+            
+            // 1. Generate random angles (slices)
+            let angles = [];
+            let total = 0;
+            for(let i=0; i<numPoints; i++) {
+                let r = Math.random() + 0.2; 
+                angles.push(r);
+                total += r;
+            }
+            
+            let currentAngle = 0;
+            for(let i=0; i<numPoints; i++) {
+                let slice = (angles[i] / total) * (Math.PI * 2);
+                currentAngle += slice;
+                g.points.push({
+                    angle: currentAngle,
+                    radius: 0.3 + Math.random() * 1.5 
+                });
+            }
+
+            // 2. Wheels
+            const minW = Math.min(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            const maxW = Math.max(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            
+            let targetWheels = Math.floor(Math.random() * (maxW - minW + 1)) + minW;
+            // Physical limit: Cannot have more wheels than points
+            if (targetWheels > numPoints) targetWheels = numPoints;
+            
+            const indices = [];
+            while(indices.length < targetWheels) {
+                let idx = Math.floor(Math.random() * numPoints);
+                if(!indices.includes(idx)) indices.push(idx);
+            }
+            
+            indices.forEach(idx => {
+                g.wheels.push({
+                    vertexIndex: idx,
+                    radius: 0.2 + Math.random() * 0.4 
+                });
+            });
+
+            return g;
+        }
+
+        static mutate(parent) {
+            const child = new Genome();
+            child.hue = parent.hue; 
+            child.points = parent.points.map(p => ({...p}));
+            child.wheels = parent.wheels.map(w => ({...w}));
+
+            // --- Mutate Body Vertices Count (Add/Remove) ---
+            const minP = Math.min(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+            const maxP = Math.max(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+
+            // 1. Force range compliance
+            if (child.points.length < minP) {
+                while(child.points.length < minP) {
+                    // Add random point
+                    child.points.push({ angle: Math.random() * Math.PI * 2, radius: 1.0 });
+                }
+            } else if (child.points.length > maxP) {
+                while(child.points.length > maxP) {
+                    child.points.pop(); // Simple removal from end
+                }
+            }
+            
+            // 2. Random Add/Remove based on mutation
+            else if (Math.random() < CONFIG.MUTATION_RATE * 0.5) {
+                if (Math.random() < 0.5 && child.points.length < maxP) {
+                    child.points.push({ angle: Math.random() * Math.PI * 2, radius: 1.0 });
+                } else if (child.points.length > minP) {
+                    child.points.pop();
+                }
+            }
+
+            // SAFETY: Re-sort angles after adding/removing
+            child.points.sort((a,b) => a.angle - b.angle);
+
+            // SAFETY: Clean up wheels attached to invalid indices (if points shrank)
+            // Or re-map them to valid indices
+            child.wheels.forEach(w => {
+                if (w.vertexIndex >= child.points.length) {
+                    w.vertexIndex = child.points.length - 1; // Clamp to last valid point
+                }
+            });
+
+            // --- Mutate Body Shape ---
+            child.points.forEach(p => {
+                if(Math.random() < CONFIG.MUTATION_RATE) {
+                    let shift = (Math.random() - 0.5) + (CONFIG.NUDGE_BODY_SIZE * 0.5); 
+                    p.radius += shift * CONFIG.MUTATION_RATE * 3;
+                    p.radius = Math.max(0.2, Math.min(3.5, p.radius));
+                }
+                if(Math.random() < CONFIG.MUTATION_RATE) {
+                    p.angle += (Math.random() - 0.5) * CONFIG.MUTATION_RATE;
+                }
+            });
+            child.points.sort((a,b) => a.angle - b.angle); // Ensure sorted again
+
+            // --- Mutate Wheel Size ---
+            child.wheels.forEach(w => {
+                if(Math.random() < CONFIG.MUTATION_RATE) {
+                    let shift = (Math.random() - 0.5) + (CONFIG.NUDGE_WHEEL_SIZE * 0.5);
+                    w.radius += shift * CONFIG.MUTATION_RATE;
+                    w.radius = Math.max(0.1, Math.min(1.2, w.radius));
+                }
+            });
+
+            // --- Mutate Wheel Count (Add/Remove) ---
+            const minW = Math.min(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            const maxW = Math.max(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+
+            // Force range compliance
+            if (child.wheels.length < minW) {
+                while(child.wheels.length < minW) {
+                    let idx = Math.floor(Math.random() * child.points.length);
+                    child.wheels.push({ vertexIndex: idx, radius: 0.3 });
+                }
+            } else if (child.wheels.length > maxW) {
+                while(child.wheels.length > maxW) {
+                    const removeIdx = Math.floor(Math.random() * child.wheels.length);
+                    child.wheels.splice(removeIdx, 1);
+                }
+            } 
+            // Random Mutation
+            else if (Math.random() < CONFIG.MUTATION_RATE * 0.5) {
+                let addProb = 0.5 + (CONFIG.NUDGE_WHEELS * 0.4); 
+                
+                if (Math.random() < addProb) {
+                    if (child.wheels.length < maxW && child.wheels.length < child.points.length) {
+                        let idx = Math.floor(Math.random() * child.points.length);
+                        child.wheels.push({ vertexIndex: idx, radius: 0.3 });
+                    }
+                } else {
+                    if (child.wheels.length > minW) {
+                        const removeIdx = Math.floor(Math.random() * child.wheels.length);
+                        child.wheels.splice(removeIdx, 1);
+                    }
+                }
+            }
+
+            // Rare: Change wheel attachment point
+            if(Math.random() < (CONFIG.MUTATION_RATE * 0.5) && child.wheels.length > 0) {
+                const w = child.wheels[Math.floor(Math.random() * child.wheels.length)];
+                w.vertexIndex = Math.floor(Math.random() * child.points.length);
+            }
+            
+            // Color drift
+            if(Math.random() < 0.1) {
+                child.hue = (child.hue + Math.floor((Math.random()-0.5)*20) + 360) % 360;
+            }
+
+            return child;
+        }
+    }
+
+    // --- GLOBALS ---
+    let world = null;
+    let carBody = null;
+    let canvas, ctx;
+    
+    // Sim State
+    let population = [];
+    let currentCarIndex = 0;
+    let generation = 1;
+    let allTimeBestTime = Infinity;
+    
+    // Run State
+    let simTime = 0; // Simulated time in seconds
+    let isRacing = false;
+    let simSpeed = 4; // DEFAULT "NORMAL" (4x calculations)
+    let stuckTimer = 0; 
+
+    // --- INIT ---
+    window.onload = function() {
+        if (typeof planck === 'undefined') {
+            if (typeof Planck !== 'undefined') window.planck = Planck;
+            else { alert("Physics Engine Failed to Load"); return; }
+        }
+        
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+        window.onresize();
+
+        // Bind Buttons
+        document.getElementById('btnMainMenu').onclick = showMainMenu;
+        document.getElementById('btnSpeed').onclick = toggleSpeed;
+        
+        // Import/Export Handlers
+        document.getElementById('btnCopyBest').onclick = copyBestGenome;
+        document.getElementById('btnLoad').onclick = loadGenome;
+
+        // Bind Sliders
+        const mutSlider = document.getElementById('inputMutation');
+        mutSlider.oninput = (e) => {
+            CONFIG.MUTATION_RATE = parseInt(e.target.value) / 100;
+            document.getElementById('valMutation').innerText = e.target.value + "%";
+        };
+
+        const bindNudge = (id, key) => {
+            document.getElementById(id).oninput = (e) => {
+                CONFIG[key] = parseFloat(e.target.value);
+            };
+        };
+        bindNudge('nudgeWheels', 'NUDGE_WHEELS');
+        bindNudge('nudgeWheelSize', 'NUDGE_WHEEL_SIZE');
+        bindNudge('nudgeBodySize', 'NUDGE_BODY_SIZE');
+        
+        // Config Sliders
+        const bindRange = (id, key, displayId) => {
+            document.getElementById(id).oninput = (e) => {
+                CONFIG[key] = parseInt(e.target.value);
+                const actualMin = Math.min(CONFIG[key.replace('MAX', 'MIN')], CONFIG[key.replace('MIN', 'MAX')]);
+                const actualMax = Math.max(CONFIG[key.replace('MAX', 'MIN')], CONFIG[key.replace('MIN', 'MAX')]);
+                // This updates label but config update happens via both sliders binding to respective keys
+                // We trust the loop to resolve min/max
+                document.getElementById(displayId).innerText = CONFIG[key];
+            };
+        };
+        
+        bindRange('inputMinWheels', 'MIN_WHEELS', 'txtMinWheels');
+        bindRange('inputMaxWheels', 'MAX_WHEELS', 'txtMaxWheels');
+        bindRange('inputMinPoints', 'MIN_POINTS', 'txtMinPoints');
+        bindRange('inputMaxPoints', 'MAX_POINTS', 'txtMaxPoints');
+
+        // Initialize reusable World
+        world = planck.World(planck.Vec2(0, CONFIG.GRAVITY));
+        
+        // Global Contact Listener (Add once)
+        world.on('begin-contact', (contact) => {
+            if (isRacing) return;
+            const bA = contact.getFixtureA().getBody();
+            const bB = contact.getFixtureB().getBody();
+            if (bA.getUserData() === 'ground' || bB.getUserData() === 'ground') {
+                isRacing = true;
+            }
+        });
+
+        // Don't auto start, wait for menu
+        // requestAnimationFrame(loop); starts in resetSimulation
+    };
+
+    function showMainMenu() {
+        document.getElementById('startScreen').classList.remove('hidden');
+        // Stop any running loop effectively by not calling resetSimulation yet
+        // Ideally we pause physics, but since we hide controls, user must click button
+    }
+
+    function toggleSpeed() {
+        // Cycle: Normal (4x) -> Fast (12x) -> Realtime (1x)
+        if(simSpeed === 4) {
+            simSpeed = 12;
+            document.getElementById('btnSpeed').innerText = `Speed: Fast (12x)`;
+        }
+        else if(simSpeed === 12) {
+            simSpeed = 1;
+            document.getElementById('btnSpeed').innerText = `Speed: Realtime (1x)`;
+        }
+        else {
+            simSpeed = 4;
+            document.getElementById('btnSpeed').innerText = `Speed: Normal (4x)`;
+        }
+    }
+
+    function clearWorld() {
+        let bodies = [];
+        for (let b = world.getBodyList(); b; b = b.getNext()) {
+            bodies.push(b);
+        }
+        bodies.forEach(b => world.destroyBody(b));
+    }
+
+    // Pass optional seed genome (for Import feature)
+    function resetSimulation(seedGenome = null) {
+        generation = 1;
+        currentCarIndex = 0;
+        allTimeBestTime = Infinity;
+        population = [];
+        
+        // Reset Config Defaults
+        CONFIG.MUTATION_RATE = 0.5; 
+        updateSlider();
+
+        // Clear UI Lists
+        document.getElementById('listCurrentGen').innerHTML = '';
+        document.getElementById('listHistory').innerHTML = '';
+
+        log("Creating Gen 1...");
+        
+        if (seedGenome) {
+            log("Loaded imported car!");
+            population.push(seedGenome);
+        }
+
+        while(population.length < CONFIG.POPULATION_SIZE) {
+            population.push(Genome.random());
+        }
+        
+        startCar(0);
+        updateUI();
+        
+        // Ensure loop is running
+        requestAnimationFrame(loop);
+    }
+    
+    function copyBestGenome() {
+        const sorted = [...population].sort((a, b) => {
+            if (a.finished && b.finished) return a.time - b.time;
+            if (a.finished) return -1;
+            if (b.finished) return 1;
+            return b.distance - a.distance;
+        });
+        
+        const best = sorted[0];
+        const clean = {
+            points: best.points,
+            wheels: best.wheels,
+            hue: best.hue
+        };
+        
+        const json = JSON.stringify(clean);
+        document.getElementById('ioTextarea').value = json;
+        navigator.clipboard.writeText(json).then(() => {
+            log("Best Genome copied to clipboard!");
+            alert("Best Car JSON copied to clipboard!");
+        });
+    }
+
+    function loadGenome() {
+        const text = document.getElementById('ioTextarea').value;
+        try {
+            const data = JSON.parse(text);
+            if (!data.points || !data.wheels) throw new Error("Invalid format");
+            
+            const g = new Genome();
+            g.points = data.points;
+            g.wheels = data.wheels;
+            g.hue = data.hue || 0;
+            
+            // Hide menu if open
+            document.getElementById('startScreen').classList.add('hidden');
+            resetSimulation(g);
+        } catch(e) {
+            alert("Error loading car: " + e.message);
+        }
+    }
+    
+    function updateSlider() {
+        const val = Math.round(CONFIG.MUTATION_RATE * 100);
+        document.getElementById('inputMutation').value = val;
+        document.getElementById('valMutation').innerText = val + "%";
+    }
+
+    function startCar(index) {
+        if(index >= population.length) {
+            evolve();
+            return;
+        }
+
+        clearWorld();
+
+        currentCarIndex = index;
+        simTime = 0; 
+        isRacing = false;
+        stuckTimer = 0; 
+        document.getElementById('dispTime').innerText = "0.00s / 0.0m";
+        document.getElementById('dispPower').innerText = "-";
+        document.getElementById('dispMass').innerText = "-";
+
+        createTrack();
+        createCar(population[index]);
+    }
+
+    function createTrack() {
+        const ground = world.createBody({ type: 'static' });
+        ground.setUserData('ground');
+
+        // Back Wall
+        ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), { friction: 0.0 });
+
+        if (CONFIG.TRACK_TYPE === 'flat') {
+            // Flat floor
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 0), planck.Vec2(CONFIG.TRACK_LENGTH + 50, 0)), { friction: 1.0 });
+        } else if (CONFIG.TRACK_TYPE === 'hill') {
+            // Procedural Hill
+            let x = -20;
+            let y = 0;
+            const segment = 5; 
+            const maxD = CONFIG.HILL_LENGTH; 
+            
+            while(x < maxD) {
+                const nextX = x + segment;
+                let nextY = 0;
+                
+                if (nextX > 0) {
+                    nextY = (nextX * nextX) / 1000;
+                }
+                
+                ground.createFixture(planck.Edge(planck.Vec2(x, y), planck.Vec2(nextX, nextY)), { friction: 1.0 });
+                x = nextX;
+                y = nextY;
+            }
+        }
+    }
+
+    function createCar(genome) {
+        const vertices = genome.points.map(p => {
+            return planck.Vec2(
+                p.radius * Math.cos(p.angle),
+                p.radius * Math.sin(p.angle)
+            );
+        });
+
+        carBody = world.createBody({
+            type: 'dynamic',
+            position: planck.Vec2(0, 4),
+            angularDamping: 0.5
+        });
+
+        let bodyArea = 0;
+        const center = planck.Vec2(0,0);
+        for(let i=0; i<vertices.length; i++) {
+            const p1 = vertices[i];
+            const p2 = vertices[(i + 1) % vertices.length];
+            
+            const sliceArea = 0.5 * Math.abs(p1.x * p2.y - p1.y * p2.x);
+            bodyArea += sliceArea;
+
+            const fixture = carBody.createFixture(planck.Polygon([center, p1, p2]), {
+                density: 2.0, 
+                friction: 2.5,
+                filterCategoryBits: 0x0002,
+                filterMaskBits: 0x0001
+            });
+            
+            const sliceHue = genome.hue;
+            const lightness = 50 + (i % 2) * 10;
+            fixture.setUserData({ color: `hsl(${sliceHue}, 70%, ${lightness}%)` });
+        }
+
+        // --- POWER LOGIC ---
+        const totalTorque = bodyArea * CONFIG.POWER_DENSITY;
+        const numWheels = Math.max(1, genome.wheels.length);
+        const torquePerWheel = totalTorque / numWheels;
+        
+        document.getElementById('dispPower').innerText = totalTorque.toFixed(1) + " Nm";
+
+        let totalWheelMass = 0;
+        genome.wheels.forEach(w => {
+            const localPos = vertices[w.vertexIndex]; 
+            const worldPos = carBody.getPosition().clone().add(localPos);
+
+            const wheelBody = world.createBody({
+                type: 'dynamic',
+                position: worldPos
+            });
+
+            const wheelFix = wheelBody.createFixture(planck.Circle(w.radius), {
+                density: 1.0, 
+                friction: 3.0, 
+                restitution: 0.1,
+                filterCategoryBits: 0x0002,
+                filterMaskBits: 0x0001
+            });
+            
+            // Calculate mass manually or use getMass() after step?
+            // Density 1.0 * Area (PI * r^2)
+            totalWheelMass += Math.PI * w.radius * w.radius * 1.0;
+
+            const joint = world.createJoint(planck.WheelJoint(
+                {
+                    motorSpeed: -15.0, 
+                    maxMotorTorque: torquePerWheel, 
+                    enableMotor: true,
+                    frequencyHz: 4,
+                    dampingRatio: 0.7
+                },
+                carBody,
+                wheelBody,
+                wheelBody.getPosition(),
+                planck.Vec2(0, 1)
+            ));
+        });
+        
+        // Approx Body Mass = Area * Density (2.0)
+        const totalMass = (bodyArea * 2.0) + totalWheelMass;
+        document.getElementById('dispMass').innerText = totalMass.toFixed(1) + " kg";
+    }
+
+    function addListRow(containerId, text, isHighlight) {
+        const div = document.createElement('div');
+        div.className = `flex justify-between px-2 py-1 rounded ${isHighlight ? 'bg-green-100 text-green-800 font-bold' : 'bg-gray-50 text-gray-600'}`;
+        div.innerText = text;
+        const cont = document.getElementById(containerId);
+        cont.prepend(div); 
+    }
+
+    function recordResult(carIdx, genome) {
+        let text = `Car ${carIdx+1}: `;
+        
+        if (CONFIG.TRACK_TYPE === 'flat') {
+            if(genome.finished) text += `${genome.time.toFixed(2)}s`;
+            else text += `${genome.distance.toFixed(1)}m`;
+        } else {
+            text += `${genome.distance.toFixed(1)}m`;
+        }
+        
+        addListRow('listCurrentGen', text, genome.finished);
+    }
+
+    function evolve() {
+        log(`--- Gen ${generation} Complete ---`);
+
+        CONFIG.MUTATION_RATE *= CONFIG.MUTATION_DECAY;
+        updateSlider();
+
+        if (CONFIG.TRACK_TYPE === 'flat') {
+            population.sort((a, b) => {
+                if (a.finished && !b.finished) return -1;
+                if (!a.finished && b.finished) return 1;
+                if (a.finished && b.finished) return a.time - b.time;
+                return b.distance - a.distance;
+            });
+        } else {
+            population.sort((a, b) => b.distance - a.distance);
+        }
+
+        const best = population[0];
+        let bestStr = "";
+        
+        if (CONFIG.TRACK_TYPE === 'flat') {
+            bestStr = best.finished ? `${best.time.toFixed(2)}s` : `${best.distance.toFixed(1)}m`;
+        } else {
+            bestStr = `${best.distance.toFixed(1)}m`;
+        }
+        
+        addListRow('listHistory', `Gen ${generation}: ${bestStr}`, best.finished);
+
+        const newPop = [];
+        if(CONFIG.ELITISM) {
+            const elite = new Genome();
+            elite.points = best.points.map(p=>({...p}));
+            elite.wheels = best.wheels.map(w=>({...w}));
+            elite.hue = best.hue;
+            newPop.push(elite);
+        }
+
+        while(newPop.length < CONFIG.POPULATION_SIZE) {
+            newPop.push(Genome.mutate(best));
+        }
+
+        population = newPop;
+        generation++;
+        
+        document.getElementById('listCurrentGen').innerHTML = '';
+        
+        updateUI();
+        startCar(0);
+    }
+
+    function updateUI() {
+        document.getElementById('dispGen').innerText = generation;
+        document.getElementById('dispPop').innerText = CONFIG.POPULATION_SIZE;
+    }
+
+    function loop() {
+        requestAnimationFrame(loop);
+        
+        // Pause if menu is up
+        if(!document.getElementById('startScreen').classList.contains('hidden')) return;
+        
+        if(!world || !carBody) return;
+
+        for(let s=0; s<simSpeed; s++) {
+            world.step(1/60);
+            
+            if(isRacing) {
+                simTime += (1/60);
+            }
+
+            const pos = carBody.getPosition();
+            const vel = carBody.getLinearVelocity();
+            const speed = vel.length();
+            
+            let frontX = -Infinity;
+            for (let b = world.getBodyList(); b; b = b.getNext()) {
+                if (b.getType() === 'dynamic') {
+                    for (let f = b.getFixtureList(); f; f = f.getNext()) {
+                        const shape = f.getShape();
+                        const xf = b.getTransform();
+                        if (shape.getType() === 'circle') {
+                             frontX = Math.max(frontX, planck.Transform.mul(xf, shape.m_p).x + shape.m_radius);
+                        } else if (shape.getType() === 'polygon') {
+                            shape.m_vertices.forEach(v => {
+                                frontX = Math.max(frontX, planck.Transform.mul(xf, v).x);
+                            });
+                        }
+                    }
+                }
+            }
+
+            const currentGenome = population[currentCarIndex];
+            currentGenome.distance = Math.max(currentGenome.distance, frontX);
+
+            if(isRacing && speed < 0.1) {
+                stuckTimer += (1/60);
+            } else {
+                stuckTimer = 0;
+            }
+
+            let done = false;
+
+            if(CONFIG.TRACK_TYPE === 'flat' && frontX >= CONFIG.TRACK_LENGTH) {
+                currentGenome.finished = true;
+                currentGenome.time = simTime;
+                log(`Car ${currentCarIndex+1}: Finished ${simTime.toFixed(2)}s`);
+                recordResult(currentCarIndex, currentGenome);
+                done = true;
+            }
+            
+            if (CONFIG.TRACK_TYPE === 'flat') {
+                if (simTime > CONFIG.MAX_TIME) {
+                    log(`Car ${currentCarIndex+1}: Timeout (${frontX.toFixed(1)}m)`);
+                    recordResult(currentCarIndex, currentGenome);
+                    done = true;
+                } else if (stuckTimer > CONFIG.STUCK_TIME) {
+                    log(`Car ${currentCarIndex+1}: Stuck (${frontX.toFixed(1)}m)`);
+                    recordResult(currentCarIndex, currentGenome);
+                    done = true;
+                }
+            } else if (CONFIG.TRACK_TYPE === 'hill') {
+                if (vel.x < -0.5 && isRacing) {
+                    log(`Car ${currentCarIndex+1}: Slid Backwards`);
+                    recordResult(currentCarIndex, currentGenome);
+                    done = true;
+                }
+                
+                if (frontX < 20.0 && isRacing) {
+                    if (speed < 0.8) {
+                        if (speed >= 0.1) stuckTimer += (1/60); 
+                    } else {
+                        stuckTimer = 0;
+                    }
+                    
+                    if (stuckTimer > 2.0) {
+                         log(`Car ${currentCarIndex+1}: Too Slow at Start (<20m)`);
+                         recordResult(currentCarIndex, currentGenome);
+                         done = true;
+                    }
+                } else {
+                    if (speed > 0.1) stuckTimer = 0;
+                    if (stuckTimer > CONFIG.STUCK_TIME) {
+                        log(`Car ${currentCarIndex+1}: Stuck on Hill (${frontX.toFixed(1)}m)`);
+                        recordResult(currentCarIndex, currentGenome);
+                        done = true;
+                    }
+                }
+            }
+            
+            if(pos.y < -10) {
+                 log(`Car ${currentCarIndex+1}: Fell off`);
+                 recordResult(currentCarIndex, currentGenome);
+                 done = true;
+            }
+
+            if(done) {
+                startCar(currentCarIndex + 1);
+                return; 
+            }
+        }
+
+        const carPos = carBody.getPosition();
+        const currentGenome = population[currentCarIndex];
+        const dist = Math.max(0, currentGenome.distance);
+        
+        document.getElementById('dispTime').innerText = `${simTime.toFixed(2)}s / ${dist.toFixed(1)}m`;
+        document.getElementById('dispIndex').innerText = currentCarIndex + 1;
+        document.getElementById('dispStuck').innerText = stuckTimer.toFixed(1) + "s";
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.translate(canvas.width/2 - carPos.x * CONFIG.SCALE, canvas.height/2 + carPos.y * CONFIG.SCALE);
+        ctx.scale(1, -1);
+
+        drawWorld();
+        drawOverlay();
+    }
+
+    function drawOverlay() {
+        ctx.save();
+        // ctx.scale(1, -1); REMOVE THIS GLOBAL SCALE, IT FLIPS THE CONTEXT BUT CAMERA PAN/ZOOM IS ALREADY SET
+        // Wait, loop sets transform:
+        // ctx.translate(center); ctx.scale(1, -1);
+        // So overlay is drawn in world coords (Y is UP)
+        // But we want to draw markers.
+        // We need to keep world X, but adjust drawing
+        
+        const interval = CONFIG.TRACK_LENGTH / 10;
+        // Dynamic range from loop is passed via closure? No. recalculate or draw fixed?
+        // Let's draw dynamic to match loop logic or just draw 0-max
+        // Just draw 0-2000 roughly or based on car
+        const currentX = carBody.getPosition().x;
+        const startM = Math.floor((currentX - 50) / 10) * 10; 
+        const endM = startM + 150; 
+        const drawStart = Math.max(0, startM);
+        const drawEnd = Math.max(100, endM); // Always draw at least to 100
+
+        for(let x = drawStart; x <= drawEnd; x+=10) {
+            let y = 0;
+            if (CONFIG.TRACK_TYPE === 'hill' && x > 0) {
+                y = (x * x) / 1000;
+            }
+            
+            const isFinish = (CONFIG.TRACK_TYPE === 'flat' && x === CONFIG.TRACK_LENGTH);
+            
+            ctx.fillStyle = isFinish ? 'red' : '#aaa';
+            
+            // Draw Post
+            // We are in world coords (Y UP).
+            // A post goes from ground (y) downwards? Or upwards?
+            // "In line vertically" - let's draw a post below the track
+            // Ground is at y. We draw from y down to y-something.
+            // Rect(x, y, w, h). If h is positive, it draws UP in world coords.
+            // So to draw down, we use negative height, or y - h.
+            // Let's draw a post downwards.
+            ctx.fillRect(x*CONFIG.SCALE - 2, y*CONFIG.SCALE, 4, -100); 
+            
+            // Text
+            ctx.fillStyle = '#666';
+            ctx.font = "12px sans-serif";
+            ctx.save();
+            // Position text slightly above track
+            ctx.translate(x*CONFIG.SCALE, y*CONFIG.SCALE + 25); 
+            ctx.scale(1, -1); // Flip text back to be upright
+            ctx.fillText(isFinish ? "FINISH" : `${x}m`, -10, 0); // Center align manually roughly
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    function drawWorld() {
+        for (let b = world.getBodyList(); b; b = b.getNext()) {
+            const pos = b.getPosition();
+            const angle = b.getAngle();
+            ctx.save();
+            ctx.translate(pos.x * CONFIG.SCALE, pos.y * CONFIG.SCALE);
+            ctx.rotate(angle);
+
+            for (let f = b.getFixtureList(); f; f = f.getNext()) {
+                const shape = f.getShape();
+                const userData = f.getUserData();
+                
+                if (shape.getType() === 'polygon') {
+                    if (userData && userData.color) {
+                        ctx.fillStyle = userData.color;
+                    } else {
+                        ctx.fillStyle = (b.getType() === 'dynamic') ? '#3b82f6' : '#999';
+                    }
+                    
+                    ctx.beginPath();
+                    shape.m_vertices.forEach((v, i) => {
+                        if(i===0) ctx.moveTo(v.x * CONFIG.SCALE, v.y * CONFIG.SCALE);
+                        else ctx.lineTo(v.x * CONFIG.SCALE, v.y * CONFIG.SCALE);
+                    });
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (shape.getType() === 'circle') {
+                    ctx.fillStyle = '#444';
+                    ctx.beginPath();
+                    const r = shape.m_radius * CONFIG.SCALE;
+                    const cx = shape.m_p.x * CONFIG.SCALE;
+                    const cy = shape.m_p.y * CONFIG.SCALE;
+                    ctx.arc(cx, cy, r, 0, 2*Math.PI);
+                    ctx.fill();
+                    
+                    // Spoke to see rotation (Inverted angle drawing)
+                    ctx.save();
+                    // We are already rotated by body angle.
+                    // Visual fix: If wheels look like they spin backwards, it's often an artifact of the update loop vs render loop or scale.
+                    // But if we want to "force" it to look right, we might need to draw the spokes differently.
+                    // Actually, let's just draw the line normally. If it looks wrong, it's usually stroboscopic.
+                    // But if the user says "visibly spinning wrong direction", let's try counter-rotating the spoke visual?
+                    // No, that detaches it from physics.
+                    // Let's try just drawing it standard first, maybe my previous line was weird.
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    // Draw line to edge.
+                    ctx.lineTo(cx + r, cy);
+                    ctx.strokeStyle = '#fff';
+                    ctx.stroke();
+                    ctx.restore();
+                    
+                    // To "Fix" the visual spin if it looks backwards due to coordinate flip:
+                    // We can't really "fix" it without breaking the physics viz. 
+                    // But let's try drawing a second line at 90 deg to make it clear it's rotating.
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(cx, cy + r);
+                    ctx.stroke();
+
+                } else if (shape.getType() === 'edge') {
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#555';
+                    ctx.beginPath();
+                    ctx.moveTo(shape.m_vertex1.x * CONFIG.SCALE, shape.m_vertex1.y * CONFIG.SCALE);
+                    ctx.lineTo(shape.m_vertex2.x * CONFIG.SCALE, shape.m_vertex2.y * CONFIG.SCALE);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+    }
+
+</script>
+</body>
+</html>
