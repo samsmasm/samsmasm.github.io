@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Designer - Evolutionary Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Using Planck just for Vec2 and Math helpers if needed, though we can do most math natively for the designer to keep it light -->
+    <script src="https://unpkg.com/planck-js@0.3.31/dist/planck.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #e5e7eb; font-family: 'Segoe UI', sans-serif; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        .slider-label {
+            font-size: 0.7rem;
+            width: 2.5rem; /* Adjusted for input box */
+            color: #4b5563;
+            flex-shrink: 0;
+        }
+        /* Number inputs styling */
+        input[type=number] {
+            width: 3.5rem;
+            font-size: 0.75rem;
+            padding: 2px 4px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            text-align: right;
+        }
+        /* Slider styling */
+        input[type=range] {
+            flex-grow: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: #d1d5db;
+            appearance: none;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden">
+
+    <!-- 1. LEFT: Guidance Panel -->
+    <div class="w-64 bg-gray-900 text-gray-300 flex flex-col border-r border-gray-700 z-30 shrink-0">
+        <div class="p-4 border-b border-gray-800 bg-gray-800">
+            <h2 class="font-bold text-sm text-white flex items-center gap-2">
+                📘 Design Handbook
+            </h2>
+        </div>
+        <div class="flex-grow overflow-y-auto p-4 space-y-6 text-xs leading-relaxed">
+            
+            <section>
+                <h3 class="font-bold text-blue-400 mb-1">Body Geometry (Vertices)</h3>
+                <p>The "Chassis" is the engine of your car. Its <strong>Area</strong> determines its power.</p>
+                <ul class="list-disc pl-4 mt-2 space-y-1 text-gray-400">
+                    <li><strong>Larger Area:</strong> Produces massive <strong>Torque</strong> (pushing power). Great for hills.</li>
+                    <li><strong>Smaller Area:</strong> Produces very little power, but is lightweight.</li>
+                    <li><strong>Trade-off:</strong> A massive body is heavy (Density 2.0). If it's too big, the engine spends all its power just moving itself!</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3 class="font-bold text-yellow-400 mb-1">Wheels</h3>
+                <p>Wheels transfer power to the ground. They are lighter (Density 1.0) than the body.</p>
+                <ul class="list-disc pl-4 mt-2 space-y-1 text-gray-400">
+                    <li><strong>Large Radius:</strong> Higher <strong>Top Speed</strong> and better ground clearance. Good for rough terrain.</li>
+                    <li><strong>Small Radius:</strong> Faster <strong>Acceleration</strong> but low top speed. Risk of chassis dragging.</li>
+                    <li><strong>Trade-off:</strong> Big wheels are heavy. A small body (weak engine) cannot spin giant wheels efficiently.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3 class="font-bold text-green-400 mb-1">Winning Strategies</h3>
+                <div class="space-y-2 mt-2">
+                    <p><strong class="text-white">🏁 Flat Sprint:</strong> Aim for high Power-to-Weight. Medium body, medium-small wheels for snap acceleration.</p>
+                    <p><strong class="text-white">⛰️ Hill Climb:</strong> Torque is king. You need a large body to generate power, and large wheels to grip the slope without flipping.</p>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- 2. MIDDLE: Canvas Visualizer -->
+    <div class="flex-grow relative bg-gray-50 flex flex-col min-w-0">
+        <div class="absolute top-4 left-4 z-10 bg-white/90 p-3 rounded shadow border border-gray-300 pointer-events-none">
+            <h1 class="font-bold text-gray-800">Car Visualizer</h1>
+            <p class="text-xs text-gray-500">Live preview</p>
+        </div>
+        
+        <!-- Dyno Stats -->
+        <div class="absolute bottom-4 left-4 z-10 bg-white/90 p-4 rounded shadow border border-gray-300 w-64 pointer-events-none">
+            <h2 class="font-bold text-gray-800 border-b pb-1 mb-2 text-sm">Dyno Stats</h2>
+            <div class="space-y-1 text-xs">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Body Area:</span>
+                    <span id="statArea" class="font-mono">0.00 m²</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Mass:</span>
+                    <span id="statMass" class="font-mono font-bold">0.00 kg</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Torque:</span>
+                    <span id="statTorque" class="font-mono text-blue-600 font-bold">0.0 Nm</span>
+                </div>
+                <div class="flex justify-between border-t pt-1 mt-1">
+                    <span class="text-gray-600">Est. Power/Weight:</span>
+                    <span id="statRatio" class="font-mono">0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="canvas" class="flex-grow w-full h-full"></canvas>
+    </div>
+
+    <!-- 3. RIGHT: Engineer's Panel -->
+    <div class="w-96 bg-white shadow-2xl border-l border-gray-300 flex flex-col z-20 shrink-0 h-full">
+        <div class="p-4 border-b bg-gray-100 flex justify-between items-center shrink-0">
+            <h2 class="font-bold text-lg text-gray-800">Engineer's Panel</h2>
+            <div class="flex gap-2">
+                <button id="btnExport" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded shadow transition">
+                    Copy JSON
+                </button>
+                <button id="btnImport" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded shadow transition">
+                    Paste JSON
+                </button>
+            </div>
+        </div>
+
+        <!-- Added h-full and overflow-y-auto here to ensure scrolling works -->
+        <div class="flex-grow overflow-y-auto p-4 space-y-6">
+            
+            <!-- Global Settings -->
+            <div class="space-y-2">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Chassis Color</h3>
+                <div class="flex items-center gap-2">
+                    <div id="colorPreview" class="w-6 h-6 rounded border border-gray-300"></div>
+                    <input type="range" id="inputHue" min="0" max="360" value="0" class="flex-grow">
+                </div>
+            </div>
+
+            <!-- Vertices Control -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Geometry Points</h3>
+                    <div class="flex gap-1">
+                        <button id="btnAddPoint" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">+</button>
+                        <button id="btnRemPoint" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">-</button>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="checkbox" id="checkAutoSort" checked class="w-4 h-4 text-blue-600 rounded">
+                    <label for="checkAutoSort" class="text-xs text-gray-600">Auto-sort angles (prevent twisting)</label>
+                </div>
+
+                <div id="pointsList" class="space-y-3">
+                    <!-- Point Controls injected here -->
+                </div>
+            </div>
+
+            <!-- Wheels Control -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Wheels</h3>
+                    <div class="flex gap-1">
+                        <button id="btnAddWheel" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">+</button>
+                        <button id="btnRemWheel" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">-</button>
+                    </div>
+                </div>
+                
+                <div id="wheelsList" class="space-y-3">
+                    <!-- Wheel Controls injected here -->
+                </div>
+            </div>
+
+            <!-- Bottom Spacer for easy scrolling -->
+            <div class="h-8"></div>
+
+        </div>
+    </div>
+
+<script>
+    // --- CONSTANTS (Must match Game) ---
+    const CONFIG = {
+        SCALE: 60, // Zoomed in for designer
+        POWER_DENSITY: 80.0,
+        BODY_DENSITY: 2.0,
+        WHEEL_DENSITY: 1.0
+    };
+
+    // --- STATE ---
+    // Matches the Genome structure from index.html
+    const genome = {
+        hue: 0,
+        points: [
+            { angle: 0, radius: 1.0 },
+            { angle: 2.0, radius: 1.0 },
+            { angle: 4.0, radius: 1.0 }
+        ],
+        wheels: [
+            { vertexIndex: 0, radius: 0.4 },
+            { vertexIndex: 1, radius: 0.4 }
+        ]
+    };
+
+    let canvas, ctx;
+
+    // --- INIT ---
+    window.onload = function() {
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        
+        // Resize Handler
+        const resize = () => {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            draw();
+        };
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Bind Global Inputs
+        document.getElementById('inputHue').addEventListener('input', (e) => {
+            genome.hue = parseInt(e.target.value);
+            updateUI();
+            draw();
+        });
+
+        document.getElementById('checkAutoSort').addEventListener('change', () => {
+            if(document.getElementById('checkAutoSort').checked) {
+                sortPoints();
+                renderPointsUI();
+                draw();
+            }
+        });
+
+        // Buttons
+        document.getElementById('btnAddPoint').onclick = addPoint;
+        document.getElementById('btnRemPoint').onclick = remPoint;
+        document.getElementById('btnAddWheel').onclick = addWheel;
+        document.getElementById('btnRemWheel').onclick = remWheel;
+        
+        document.getElementById('btnExport').onclick = exportJSON;
+        document.getElementById('btnImport').onclick = importJSON;
+
+        // Initial Render
+        renderPointsUI();
+        renderWheelsUI();
+        updateUI();
+        draw();
+        
+        // Animation Loop (just for spinning wheels visual)
+        requestAnimationFrame(animate);
+    };
+
+    // --- LOGIC ---
+
+    function sortPoints() {
+        // Sorts points by angle to ensure convex-ish polygon
+        genome.points.sort((a,b) => a.angle - b.angle);
+    }
+
+    function addPoint() {
+        if(genome.points.length >= 20) return;
+        // Add random point
+        genome.points.push({ 
+            angle: Math.random() * 6.28, 
+            radius: 1.0 
+        });
+        if(document.getElementById('checkAutoSort').checked) sortPoints();
+        renderPointsUI();
+        // Vital: Refresh wheels dropdown so new points appear in list
+        renderWheelsUI(); 
+        updateUI();
+        draw();
+    }
+
+    function remPoint() {
+        if(genome.points.length <= 3) return;
+        genome.points.pop();
+        // Clamp wheel indices
+        genome.wheels.forEach(w => {
+            if(w.vertexIndex >= genome.points.length) w.vertexIndex = genome.points.length - 1;
+        });
+        renderPointsUI();
+        renderWheelsUI(); 
+        updateUI();
+        draw();
+    }
+
+    function addWheel() {
+        if(genome.wheels.length >= 8) return;
+        genome.wheels.push({ vertexIndex: 0, radius: 0.4 });
+        renderWheelsUI();
+        updateUI();
+        draw();
+    }
+
+    function remWheel() {
+        if(genome.wheels.length <= 0) return;
+        genome.wheels.pop();
+        renderWheelsUI();
+        updateUI();
+        draw();
+    }
+
+    function calculateStats() {
+        // Calculate Area (Shoelace formula for triangles from center)
+        let area = 0;
+        const pts = genome.points.map(p => ({
+            x: p.radius * Math.cos(p.angle),
+            y: p.radius * Math.sin(p.angle)
+        }));
+        
+        for(let i=0; i<pts.length; i++) {
+            const p1 = pts[i];
+            const p2 = pts[(i+1)%pts.length];
+            // Triangle area with (0,0) is 0.5 * |x1y2 - y1x2|
+            area += 0.5 * Math.abs(p1.x * p2.y - p1.y * p2.x);
+        }
+
+        // Calculate Mass
+        const bodyMass = area * CONFIG.BODY_DENSITY;
+        let wheelMass = 0;
+        genome.wheels.forEach(w => {
+            wheelMass += Math.PI * w.radius * w.radius * CONFIG.WHEEL_DENSITY;
+        });
+        const totalMass = bodyMass + wheelMass;
+
+        // Calculate Torque
+        const torque = area * CONFIG.POWER_DENSITY;
+
+        return { area, totalMass, torque };
+    }
+
+    // --- UI RENDERING ---
+
+    function updateUI() {
+        // Color Preview
+        document.getElementById('colorPreview').style.backgroundColor = `hsl(${genome.hue}, 70%, 50%)`;
+        
+        // Stats
+        const stats = calculateStats();
+        document.getElementById('statArea').innerText = stats.area.toFixed(2) + " m²";
+        document.getElementById('statMass').innerText = stats.totalMass.toFixed(1) + " kg";
+        document.getElementById('statTorque').innerText = stats.torque.toFixed(1) + " Nm";
+        
+        const ratio = (stats.totalMass > 0) ? (stats.torque / stats.totalMass) : 0;
+        document.getElementById('statRatio').innerText = ratio.toFixed(2);
+    }
+
+    function renderPointsUI() {
+        const container = document.getElementById('pointsList');
+        container.innerHTML = '';
+
+        genome.points.forEach((p, idx) => {
+            const div = document.createElement('div');
+            div.className = "bg-gray-50 p-2 rounded border border-gray-200";
+            
+            const degrees = Math.round(p.angle * 57.2958);
+
+            div.innerHTML = `
+                <div class="flex justify-between mb-1 text-[10px] font-bold text-gray-500">
+                    <span>Vertex #${idx + 1}</span>
+                </div>
+                <div class="slider-group">
+                    <span class="slider-label">Len:</span>
+                    <input type="number" min="0.2" max="3.5" step="0.1" value="${p.radius.toFixed(2)}" data-idx="${idx}" class="input-radius-num">
+                    <input type="range" min="0.2" max="3.5" step="0.1" value="${p.radius}" data-idx="${idx}" class="input-radius-range">
+                </div>
+                <div class="slider-group">
+                    <span class="slider-label">Ang:</span>
+                    <input type="number" min="0" max="360" step="1" value="${degrees}" data-idx="${idx}" class="input-angle-num">
+                    <input type="range" min="0" max="6.28" step="0.05" value="${p.angle}" data-idx="${idx}" class="input-angle-range">
+                </div>
+            `;
+            container.appendChild(div);
+        });
+
+        // --- Bind Events for Radius ---
+        // Range Slider
+        document.querySelectorAll('.input-radius-range').forEach(el => {
+            el.addEventListener('input', (e) => {
+                const idx = e.target.dataset.idx;
+                const val = parseFloat(e.target.value);
+                genome.points[idx].radius = val;
+                // Sync number box
+                e.target.parentElement.querySelector('.input-radius-num').value = val.toFixed(2);
+                updateUI();
+                draw();
+            });
+        });
+        // Number Input
+        document.querySelectorAll('.input-radius-num').forEach(el => {
+            el.addEventListener('input', (e) => {
+                const idx = e.target.dataset.idx;
+                let val = parseFloat(e.target.value);
+                if(isNaN(val)) return;
+                // Clamp
+                if(val < 0.2) val = 0.2;
+                if(val > 3.5) val = 3.5;
+                genome.points[idx].radius = val;
+                // Sync slider
+                e.target.parentElement.querySelector('.input-radius-range').value = val;
+                updateUI();
+                draw();
+            });
+        });
+
+        // --- Bind Events for Angle ---
+        // Range Slider
+        document.querySelectorAll('.input-angle-range').forEach(el => {
+            const handleInput = (e) => {
+                const idx = e.target.dataset.idx;
+                genome.points[idx].angle = parseFloat(e.target.value);
+                // Sync number box (convert rad to deg)
+                const deg = Math.round(genome.points[idx].angle * 57.2958);
+                e.target.parentElement.querySelector('.input-angle-num').value = deg;
+                updateUI();
+                draw();
+            };
+            el.addEventListener('input', handleInput);
+            
+            // Auto-sort logic on release
+            el.addEventListener('change', () => {
+                if(document.getElementById('checkAutoSort').checked) {
+                    sortPoints();
+                    renderPointsUI();
+                    draw();
+                }
+            });
+        });
+        
+        // Number Input (Degrees)
+        document.querySelectorAll('.input-angle-num').forEach(el => {
+            const handleInput = (e) => {
+                const idx = e.target.dataset.idx;
+                let deg = parseFloat(e.target.value);
+                if(isNaN(deg)) return;
+                // Clamp 0-360
+                if(deg < 0) deg = 0; 
+                if(deg > 360) deg = 360;
+                
+                const rad = deg / 57.2958;
+                genome.points[idx].angle = rad;
+                
+                // Sync slider
+                e.target.parentElement.querySelector('.input-angle-range').value = rad;
+                updateUI();
+                draw();
+            };
+            el.addEventListener('input', handleInput);
+            
+            // Auto-sort on blur/enter? Or just change?
+            el.addEventListener('change', () => {
+                if(document.getElementById('checkAutoSort').checked) {
+                    sortPoints();
+                    renderPointsUI();
+                    draw();
+                }
+            });
+        });
+    }
+
+    function renderWheelsUI() {
+        const container = document.getElementById('wheelsList');
+        container.innerHTML = '';
+
+        genome.wheels.forEach((w, idx) => {
+            const div = document.createElement('div');
+            div.className = "bg-gray-50 p-2 rounded border border-gray-200";
+            
+            // Build options for Vertex Dropdown
+            let options = '';
+            genome.points.forEach((_, pIdx) => {
+                const sel = (pIdx === w.vertexIndex) ? 'selected' : '';
+                options += `<option value="${pIdx}" ${sel}>Vertex ${pIdx + 1}</option>`;
+            });
+
+            div.innerHTML = `
+                <div class="flex justify-between mb-1 text-[10px] font-bold text-gray-500">
+                    <span>Wheel #${idx + 1}</span>
+                </div>
+                <div class="slider-group">
+                    <span class="slider-label">Size:</span>
+                    <input type="number" min="0.1" max="1.5" step="0.05" value="${w.radius.toFixed(2)}" data-idx="${idx}" class="input-wheel-num">
+                    <input type="range" min="0.1" max="1.5" step="0.05" value="${w.radius}" data-idx="${idx}" class="input-wheel-range">
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="slider-label">Mount:</span>
+                    <select class="text-xs border rounded p-1 w-full input-wheel-idx" data-idx="${idx}">
+                        ${options}
+                    </select>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+
+        // Bind Range
+        document.querySelectorAll('.input-wheel-range').forEach(el => {
+            el.addEventListener('input', (e) => {
+                const idx = e.target.dataset.idx;
+                const val = parseFloat(e.target.value);
+                genome.wheels[idx].radius = val;
+                // Sync num
+                e.target.parentElement.querySelector('.input-wheel-num').value = val.toFixed(2);
+                updateUI();
+                draw();
+            });
+        });
+        
+        // Bind Number
+        document.querySelectorAll('.input-wheel-num').forEach(el => {
+            el.addEventListener('input', (e) => {
+                const idx = e.target.dataset.idx;
+                let val = parseFloat(e.target.value);
+                if(isNaN(val)) return;
+                if(val < 0.1) val = 0.1;
+                if(val > 1.5) val = 1.5;
+                genome.wheels[idx].radius = val;
+                // Sync slider
+                e.target.parentElement.querySelector('.input-wheel-range').value = val;
+                updateUI();
+                draw();
+            });
+        });
+
+        document.querySelectorAll('.input-wheel-idx').forEach(el => {
+            el.addEventListener('change', (e) => {
+                const idx = e.target.dataset.idx;
+                genome.wheels[idx].vertexIndex = parseInt(e.target.value);
+                updateUI();
+                draw();
+            });
+        });
+    }
+
+    function exportJSON() {
+        const json = JSON.stringify(genome);
+        navigator.clipboard.writeText(json).then(() => {
+            alert("Car Genome copied to clipboard!\nPaste it into the game's 'Import' box.");
+        });
+    }
+
+    function importJSON() {
+        const text = prompt("Paste car JSON here:");
+        if(!text) return;
+        try {
+            const data = JSON.parse(text);
+            if(!data.points || !data.wheels) throw new Error("Invalid Format");
+            
+            // Load
+            genome.hue = data.hue || 0;
+            genome.points = data.points;
+            genome.wheels = data.wheels;
+            
+            renderPointsUI();
+            renderWheelsUI();
+            updateUI();
+            draw();
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+    // --- CANVAS VISUALIZER ---
+    let spinAngle = 0;
+
+    function animate() {
+        spinAngle -= 0.05; // Rotate wheels slowly
+        draw();
+        requestAnimationFrame(animate);
+    }
+
+    function draw() {
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        // Center Coordinate System
+        ctx.save();
+        ctx.translate(w/2, h/2);
+        ctx.scale(1, -1); // Flip Y to match physics
+        
+        // Calculate Cartesian Points
+        const poly = genome.points.map(p => ({
+            x: p.radius * Math.cos(p.angle) * CONFIG.SCALE,
+            y: p.radius * Math.sin(p.angle) * CONFIG.SCALE
+        }));
+
+        // Draw Body (Pizza Slices)
+        for(let i=0; i<poly.length; i++) {
+            const p1 = poly[i];
+            const p2 = poly[(i+1)%poly.length];
+            
+            ctx.beginPath();
+            ctx.moveTo(0,0);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.closePath();
+            
+            // Color logic from game
+            const lightness = 50 + (i % 2) * 10;
+            ctx.fillStyle = `hsl(${genome.hue}, 70%, ${lightness}%)`;
+            ctx.fill();
+            ctx.strokeStyle = '#1f2937'; // Dark border
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Draw Center of Mass / Origin
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, 6.28);
+        ctx.fill();
+
+        // Draw Wheels
+        genome.wheels.forEach(wh => {
+            const mount = poly[wh.vertexIndex]; // Already scaled
+            const r = wh.radius * CONFIG.SCALE;
+            
+            ctx.save();
+            ctx.translate(mount.x, mount.y);
+            ctx.rotate(spinAngle); // Spin animation
+            
+            // Wheel Body
+            ctx.fillStyle = '#374151'; // Dark Gray
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, 6.28);
+            ctx.fill();
+            
+            // Spoke (Visual spin)
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(r, 0); // Spoke 1
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, r); // Spoke 2 (90 deg)
+            ctx.stroke();
+            
+            ctx.restore();
+        });
+
+        // Draw Ground Line
+        ctx.restore(); // Back to screen coords for simple line
+        ctx.beginPath();
+        const groundY = h/2 + 3.0 * CONFIG.SCALE; // 3m below center
+        ctx.moveTo(0, groundY);
+        ctx.lineTo(w, groundY);
+        ctx.strokeStyle = '#9ca3af';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+</script>
+</body>
+</html>
