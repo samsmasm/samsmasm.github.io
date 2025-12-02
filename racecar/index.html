@@ -51,13 +51,18 @@
                     ⛰️ Hill Climb
                     <div class="text-xs font-normal opacity-80 mt-1">Goal: Furthest Distance (Infinite)</div>
                 </button>
+
+                <button onclick="selectTrack('jump')" class="w-full py-4 px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    ⛷️ Ski Jump
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Max Distance (Air Time)</div>
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Left UI: Controls & Live Info -->
-    <div class="absolute top-4 left-4 z-10 space-y-4 max-h-[95vh] flex flex-col">
-        <div class="bg-white p-4 rounded shadow-lg border border-gray-300 w-72 shrink-0">
+    <div class="absolute top-4 left-4 z-10 space-y-4 max-h-[calc(100vh-2rem)] flex flex-col w-72">
+        <div class="bg-white p-4 rounded shadow-lg border border-gray-300 shrink-0">
             <h1 class="font-bold text-lg mb-2 text-gray-800">Evolutionary Sim</h1>
             
             <!-- Live Stats -->
@@ -73,6 +78,10 @@
                 <div class="flex justify-between bg-gray-100 p-1 rounded">
                     <span>Time / Dist:</span> 
                     <span id="dispTime" class="font-mono font-bold">0.00s / 0.0m</span>
+                </div>
+                <div class="flex justify-between text-xs text-purple-600 hidden" id="rowHeight">
+                    <span>Max Height:</span> 
+                    <span id="dispHeight">0.0m</span>
                 </div>
                  <div class="flex justify-between text-xs text-gray-400">
                     <span>Stuck Timer:</span> 
@@ -96,7 +105,13 @@
         </div>
 
         <!-- Controls -->
-        <div class="bg-white p-3 rounded shadow border border-gray-300 w-72 space-y-3 overflow-y-auto shrink-0">
+        <div class="bg-white p-3 rounded shadow border border-gray-300 space-y-3 overflow-y-auto flex-1 min-h-0">
+            
+            <!-- Designer Link -->
+            <a href="designer.html" target="_blank" class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-2 rounded text-xs text-center transition shadow">
+                Open Car Designer 🛠️
+            </a>
+
             <div class="flex gap-2">
                 <button id="btnSpeed" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-2 rounded text-xs transition">
                     Speed: Normal (4x)
@@ -106,29 +121,55 @@
                 </button>
             </div>
             
+            <!-- Manual Skip -->
+            <button id="btnSkip" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-2 rounded text-xs transition">
+                Skip Current Car (Next)
+            </button>
+            
             <!-- Mutation Slider -->
-            <div class="border-t pt-2">
-                <label class="flex justify-between text-xs font-bold text-gray-700 mb-1">
-                    <span>Mutation Rate</span>
-                    <span id="valMutation" class="text-blue-600">10%</span>
-                </label>
-                <input type="range" id="inputMutation" min="0" max="100" value="10" class="w-full">
-                <div class="text-[10px] text-gray-400 text-right mt-1">Decays 5% per Gen</div>
+            <div class="border-t pt-2 space-y-2">
+                <!-- Initial Rate -->
+                <div>
+                    <label class="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                        <span>Mutation Rate</span>
+                        <span id="valMutation" class="text-blue-600">50%</span>
+                    </label>
+                    <input type="range" id="inputMutation" min="0" max="100" value="50" class="w-full">
+                </div>
+                
+                <!-- Decay Rate -->
+                <div>
+                    <label class="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                        <span>Rate Decay</span>
+                        <span id="valDecay" class="text-blue-600">5%</span>
+                    </label>
+                    <input type="range" id="inputDecay" min="-5" max="20" value="5" class="w-full">
+                    <div class="text-[9px] text-gray-400 text-right">Negative = Rate Grows</div>
+                </div>
             </div>
 
             <!-- Config Sliders -->
             <div class="border-t pt-2 space-y-3">
                 <h3 class="text-xs font-bold text-gray-700">Car Configuration</h3>
                 
+                <!-- Max Time -->
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                        <span>Max Time Limit</span>
+                        <span id="txtMaxTime" class="font-bold text-blue-600">60s</span>
+                    </label>
+                    <input type="range" id="inputMaxTime" min="10" max="300" step="5" value="60" class="w-full">
+                </div>
+
                 <!-- Wheels Range -->
                 <div>
                     <label class="flex justify-between text-[10px] text-gray-600 mb-1">
                         <span>Wheels (Min/Max)</span>
-                        <span class="font-bold text-blue-600"><span id="txtMinWheels">2</span> - <span id="txtMaxWheels">8</span></span>
+                        <span class="font-bold text-blue-600"><span id="txtMinWheels">2</span> - <span id="txtMaxWheels">4</span></span>
                     </label>
                     <div class="flex gap-1">
                         <input type="range" id="inputMinWheels" min="0" max="8" step="1" value="2" class="w-1/2">
-                        <input type="range" id="inputMaxWheels" min="0" max="8" step="1" value="8" class="w-1/2">
+                        <input type="range" id="inputMaxWheels" min="0" max="8" step="1" value="4" class="w-1/2">
                     </div>
                 </div>
 
@@ -224,19 +265,19 @@
     // --- CONFIG ---
     const CONFIG = {
         POPULATION_SIZE: 20,
-        MUTATION_RATE: 0.1, // Dynamic
-        MUTATION_DECAY: 0.95, // 5% decay per gen
+        MUTATION_RATE: 0.5, // Start high (50%)
+        MUTATION_DECAY: 0.95, // 5% decay per gen default
         TRACK_LENGTH: 100, // meters (Flat Finish Line)
         HILL_LENGTH: 2000, // meters (Hill max gen)
         SCALE: 40,         // px per meter
-        MAX_TIME: 20,      // seconds hard limit (Flat only)
+        MAX_TIME: 60,      // seconds hard limit (Adjustable)
         STUCK_TIME: 3,     // seconds allowed stationary before reset
         GRAVITY: -10,
         ELITISM: true,     // Keep best parent
         
         // Limits (Controlled by UI)
         MIN_WHEELS: 2,
-        MAX_WHEELS: 8,
+        MAX_WHEELS: 4,
         MIN_POINTS: 3,
         MAX_POINTS: 14,
         
@@ -256,6 +297,10 @@
     window.selectTrack = (type) => {
         CONFIG.TRACK_TYPE = type;
         document.getElementById('startScreen').classList.add('hidden');
+        // Hide/Show Height display
+        if (type === 'jump') document.getElementById('rowHeight').classList.remove('hidden');
+        else document.getElementById('rowHeight').classList.add('hidden');
+        
         resetSimulation();
     };
 
@@ -452,7 +497,12 @@
     let simTime = 0; // Simulated time in seconds
     let isRacing = false;
     let simSpeed = 4; // DEFAULT "NORMAL" (4x calculations)
-    let stuckTimer = 0; 
+    let stuckTimer = 0;
+    
+    // Jump specific
+    let maxJumpHeight = 0;
+    let hasLanded = false;
+    let postRunTimer = 0;
 
     // --- INIT ---
     window.onload = function() {
@@ -469,6 +519,7 @@
         // Bind Buttons
         document.getElementById('btnMainMenu').onclick = showMainMenu;
         document.getElementById('btnSpeed').onclick = toggleSpeed;
+        document.getElementById('btnSkip').onclick = forceSkip;
         
         // Import/Export Handlers
         document.getElementById('btnCopyBest').onclick = copyBestGenome;
@@ -480,6 +531,15 @@
             CONFIG.MUTATION_RATE = parseInt(e.target.value) / 100;
             document.getElementById('valMutation').innerText = e.target.value + "%";
         };
+        
+        const decaySlider = document.getElementById('inputDecay');
+        decaySlider.oninput = (e) => {
+            const val = parseInt(e.target.value);
+            // Decay Logic: 1 - (val/100)
+            const factor = 1 - (val / 100);
+            CONFIG.MUTATION_DECAY = factor;
+            document.getElementById('valDecay').innerText = val + "%";
+        };
 
         const bindNudge = (id, key) => {
             document.getElementById(id).oninput = (e) => {
@@ -490,14 +550,10 @@
         bindNudge('nudgeWheelSize', 'NUDGE_WHEEL_SIZE');
         bindNudge('nudgeBodySize', 'NUDGE_BODY_SIZE');
         
-        // Config Sliders
+        // FIX: Manual binding to ensure both label and config update
         const bindRange = (id, key, displayId) => {
             document.getElementById(id).oninput = (e) => {
                 CONFIG[key] = parseInt(e.target.value);
-                const actualMin = Math.min(CONFIG[key.replace('MAX', 'MIN')], CONFIG[key.replace('MIN', 'MAX')]);
-                const actualMax = Math.max(CONFIG[key.replace('MAX', 'MIN')], CONFIG[key.replace('MIN', 'MAX')]);
-                // This updates label but config update happens via both sliders binding to respective keys
-                // We trust the loop to resolve min/max
                 document.getElementById(displayId).innerText = CONFIG[key];
             };
         };
@@ -506,12 +562,47 @@
         bindRange('inputMaxWheels', 'MAX_WHEELS', 'txtMaxWheels');
         bindRange('inputMinPoints', 'MIN_POINTS', 'txtMinPoints');
         bindRange('inputMaxPoints', 'MAX_POINTS', 'txtMaxPoints');
-
+        
+        // Max Time Slider
+        document.getElementById('inputMaxTime').oninput = (e) => {
+            CONFIG.MAX_TIME = parseInt(e.target.value);
+            document.getElementById('txtMaxTime').innerText = CONFIG.MAX_TIME + "s";
+        };
+        
+        // --- SYNC UI WITH CONFIG (Fix for slider positions) ---
+        // Force inputs to match default CONFIG values on load
+        document.getElementById('inputMaxTime').value = CONFIG.MAX_TIME;
+        document.getElementById('txtMaxTime').innerText = CONFIG.MAX_TIME + "s";
+        document.getElementById('inputMinWheels').value = CONFIG.MIN_WHEELS;
+        document.getElementById('inputMaxWheels').value = CONFIG.MAX_WHEELS;
+        
         // Initialize reusable World
         world = planck.World(planck.Vec2(0, CONFIG.GRAVITY));
         
         // Global Contact Listener (Add once)
         world.on('begin-contact', (contact) => {
+            // For Jump Track: Detect Landing
+            if (CONFIG.TRACK_TYPE === 'jump') {
+                const bA = contact.getFixtureA().getBody();
+                const bB = contact.getFixtureB().getBody();
+                
+                // Identify Car vs Ground
+                const isCarA = bA.getType() === 'dynamic';
+                const isGroundB = bB.getUserData() === 'ground';
+                const isCarB = bB.getType() === 'dynamic';
+                const isGroundA = bA.getUserData() === 'ground';
+                
+                if ((isCarA && isGroundB) || (isCarB && isGroundA)) {
+                    // Check if landed past the ramp
+                    // Ramp ends at X=60
+                    const carX = isCarA ? bA.getPosition().x : bB.getPosition().x;
+                    if (carX > 60 && !hasLanded) {
+                        hasLanded = true;
+                        log(`Landed at ${carX.toFixed(1)}m`);
+                    }
+                }
+            }
+            
             if (isRacing) return;
             const bA = contact.getFixtureA().getBody();
             const bB = contact.getFixtureB().getBody();
@@ -524,10 +615,42 @@
         // requestAnimationFrame(loop); starts in resetSimulation
     };
 
+    function forceSkip() {
+        if (!carBody) return;
+        
+        log(`Car ${currentCarIndex+1}: Skipped`);
+        
+        const pos = carBody.getPosition();
+        let frontX = getFrontX();
+        const currentGenome = population[currentCarIndex];
+        currentGenome.distance = Math.max(currentGenome.distance, frontX);
+        
+        recordResult(currentCarIndex, currentGenome);
+        startCar(currentCarIndex + 1);
+    }
+    
+    function getFrontX() {
+        let frontX = -Infinity;
+        for (let b = world.getBodyList(); b; b = b.getNext()) {
+            if (b.getType() === 'dynamic') {
+                for (let f = b.getFixtureList(); f; f = f.getNext()) {
+                    const shape = f.getShape();
+                    const xf = b.getTransform();
+                    if (shape.getType() === 'circle') {
+                         frontX = Math.max(frontX, planck.Transform.mul(xf, shape.m_p).x + shape.m_radius);
+                    } else if (shape.getType() === 'polygon') {
+                        shape.m_vertices.forEach(v => {
+                            frontX = Math.max(frontX, planck.Transform.mul(xf, v).x);
+                        });
+                    }
+                }
+            }
+        }
+        return frontX;
+    }
+
     function showMainMenu() {
         document.getElementById('startScreen').classList.remove('hidden');
-        // Stop any running loop effectively by not calling resetSimulation yet
-        // Ideally we pause physics, but since we hide controls, user must click button
     }
 
     function toggleSpeed() {
@@ -565,7 +688,6 @@
         CONFIG.MUTATION_RATE = 0.5; 
         updateSlider();
 
-        // Clear UI Lists
         document.getElementById('listCurrentGen').innerHTML = '';
         document.getElementById('listHistory').innerHTML = '';
 
@@ -583,7 +705,6 @@
         startCar(0);
         updateUI();
         
-        // Ensure loop is running
         requestAnimationFrame(loop);
     }
     
@@ -621,7 +742,6 @@
             g.wheels = data.wheels;
             g.hue = data.hue || 0;
             
-            // Hide menu if open
             document.getElementById('startScreen').classList.add('hidden');
             resetSimulation(g);
         } catch(e) {
@@ -647,9 +767,16 @@
         simTime = 0; 
         isRacing = false;
         stuckTimer = 0; 
+        
+        // Jump specific
+        maxJumpHeight = 0;
+        hasLanded = false;
+        postRunTimer = 0;
+        
         document.getElementById('dispTime').innerText = "0.00s / 0.0m";
         document.getElementById('dispPower').innerText = "-";
         document.getElementById('dispMass').innerText = "-";
+        document.getElementById('dispHeight').innerText = "0.0m";
 
         createTrack();
         createCar(population[index]);
@@ -659,13 +786,15 @@
         const ground = world.createBody({ type: 'static' });
         ground.setUserData('ground');
 
-        // Back Wall
-        ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), { friction: 0.0 });
-
         if (CONFIG.TRACK_TYPE === 'flat') {
+            // Back Wall
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), { friction: 2.0 });
             // Flat floor
-            ground.createFixture(planck.Edge(planck.Vec2(-20, 0), planck.Vec2(CONFIG.TRACK_LENGTH + 50, 0)), { friction: 1.0 });
-        } else if (CONFIG.TRACK_TYPE === 'hill') {
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 0), planck.Vec2(CONFIG.TRACK_LENGTH + 50, 0)), { friction: 2.0 });
+        } 
+        else if (CONFIG.TRACK_TYPE === 'hill') {
+            // Back Wall
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), { friction: 2.0 });
             // Procedural Hill
             let x = -20;
             let y = 0;
@@ -675,15 +804,33 @@
             while(x < maxD) {
                 const nextX = x + segment;
                 let nextY = 0;
-                
-                if (nextX > 0) {
-                    nextY = (nextX * nextX) / 1000;
-                }
-                
-                ground.createFixture(planck.Edge(planck.Vec2(x, y), planck.Vec2(nextX, nextY)), { friction: 1.0 });
+                if (nextX > 0) nextY = (nextX * nextX) / 1000;
+                ground.createFixture(planck.Edge(planck.Vec2(x, y), planck.Vec2(nextX, nextY)), { friction: 2.0 });
                 x = nextX;
                 y = nextY;
             }
+        }
+        else if (CONFIG.TRACK_TYPE === 'jump') {
+            // Start Platform (High up)
+            ground.createFixture(planck.Edge(planck.Vec2(-10, 30), planck.Vec2(0, 30)), { friction: 2.0 });
+            // Back Wall
+            ground.createFixture(planck.Edge(planck.Vec2(-10, 40), planck.Vec2(-10, 30)), { friction: 2.0 });
+            // Downhill Slope
+            ground.createFixture(planck.Edge(planck.Vec2(0, 30), planck.Vec2(30, 5)), { friction: 2.0 }); // Linear drop to (30,5)
+            // Kicker Ramp (Parabola)
+            let currX = 30;
+            let currY = 5;
+            const step = 2; // Smoothness
+            while (currX < 50) {
+                const nextX = currX + step;
+                // y = 0.035x^2 - 2.93x + 61.4
+                const nextY = 0.035 * (nextX*nextX) - 2.93 * nextX + 61.4;
+                ground.createFixture(planck.Edge(planck.Vec2(currX, currY), planck.Vec2(nextX, nextY)), { friction: 2.0 });
+                currX = nextX;
+                currY = nextY;
+            }
+            // Landing Zone (Far below)
+            ground.createFixture(planck.Edge(planck.Vec2(65, -15), planck.Vec2(500, -30)), { friction: 2.0 });
         }
     }
 
@@ -694,29 +841,31 @@
                 p.radius * Math.sin(p.angle)
             );
         });
+        
+        let startPos = planck.Vec2(0, 4);
+        if (CONFIG.TRACK_TYPE === 'jump') startPos = planck.Vec2(0, 34); // Start high for jump
 
         carBody = world.createBody({
             type: 'dynamic',
-            position: planck.Vec2(0, 4),
+            position: startPos,
             angularDamping: 0.5
         });
 
+        // --- Calculate Body Area for Power ---
         let bodyArea = 0;
         const center = planck.Vec2(0,0);
         for(let i=0; i<vertices.length; i++) {
             const p1 = vertices[i];
             const p2 = vertices[(i + 1) % vertices.length];
-            
             const sliceArea = 0.5 * Math.abs(p1.x * p2.y - p1.y * p2.x);
             bodyArea += sliceArea;
 
             const fixture = carBody.createFixture(planck.Polygon([center, p1, p2]), {
                 density: 2.0, 
-                friction: 2.5,
+                friction: 2.0,
                 filterCategoryBits: 0x0002,
                 filterMaskBits: 0x0001
             });
-            
             const sliceHue = genome.hue;
             const lightness = 50 + (i % 2) * 10;
             fixture.setUserData({ color: `hsl(${sliceHue}, 70%, ${lightness}%)` });
@@ -739,7 +888,7 @@
                 position: worldPos
             });
 
-            const wheelFix = wheelBody.createFixture(planck.Circle(w.radius), {
+            wheelBody.createFixture(planck.Circle(w.radius), {
                 density: 1.0, 
                 friction: 3.0, 
                 restitution: 0.1,
@@ -747,8 +896,6 @@
                 filterMaskBits: 0x0001
             });
             
-            // Calculate mass manually or use getMass() after step?
-            // Density 1.0 * Area (PI * r^2)
             totalWheelMass += Math.PI * w.radius * w.radius * 1.0;
 
             const joint = world.createJoint(planck.WheelJoint(
@@ -766,7 +913,6 @@
             ));
         });
         
-        // Approx Body Mass = Area * Density (2.0)
         const totalMass = (bodyArea * 2.0) + totalWheelMass;
         document.getElementById('dispMass').innerText = totalMass.toFixed(1) + " kg";
     }
@@ -866,26 +1012,21 @@
             const vel = carBody.getLinearVelocity();
             const speed = vel.length();
             
-            let frontX = -Infinity;
-            for (let b = world.getBodyList(); b; b = b.getNext()) {
-                if (b.getType() === 'dynamic') {
-                    for (let f = b.getFixtureList(); f; f = f.getNext()) {
-                        const shape = f.getShape();
-                        const xf = b.getTransform();
-                        if (shape.getType() === 'circle') {
-                             frontX = Math.max(frontX, planck.Transform.mul(xf, shape.m_p).x + shape.m_radius);
-                        } else if (shape.getType() === 'polygon') {
-                            shape.m_vertices.forEach(v => {
-                                frontX = Math.max(frontX, planck.Transform.mul(xf, v).x);
-                            });
-                        }
-                    }
-                }
-            }
+            let frontX = getFrontX();
 
             const currentGenome = population[currentCarIndex];
             currentGenome.distance = Math.max(currentGenome.distance, frontX);
 
+            // JUMP LOGIC
+            if (CONFIG.TRACK_TYPE === 'jump') {
+                if (pos.y > maxJumpHeight) maxJumpHeight = pos.y;
+                
+                if (hasLanded) {
+                    postRunTimer += (1/60);
+                }
+            }
+
+            // STUCK LOGIC (Generalized)
             if(isRacing && speed < 0.1) {
                 stuckTimer += (1/60);
             } else {
@@ -894,7 +1035,15 @@
 
             let done = false;
 
-            if(CONFIG.TRACK_TYPE === 'flat' && frontX >= CONFIG.TRACK_LENGTH) {
+            // Universal Max Time Limit
+            if (simTime > CONFIG.MAX_TIME) {
+                log(`Car ${currentCarIndex+1}: Time Limit`);
+                recordResult(currentCarIndex, currentGenome);
+                done = true;
+            }
+
+            // Finish Line (Flat only)
+            if(CONFIG.TRACK_TYPE === 'flat' && frontX >= CONFIG.TRACK_LENGTH && !done) {
                 currentGenome.finished = true;
                 currentGenome.time = simTime;
                 log(`Car ${currentCarIndex+1}: Finished ${simTime.toFixed(2)}s`);
@@ -902,46 +1051,72 @@
                 done = true;
             }
             
-            if (CONFIG.TRACK_TYPE === 'flat') {
-                if (simTime > CONFIG.MAX_TIME) {
-                    log(`Car ${currentCarIndex+1}: Timeout (${frontX.toFixed(1)}m)`);
-                    recordResult(currentCarIndex, currentGenome);
-                    done = true;
-                } else if (stuckTimer > CONFIG.STUCK_TIME) {
-                    log(`Car ${currentCarIndex+1}: Stuck (${frontX.toFixed(1)}m)`);
-                    recordResult(currentCarIndex, currentGenome);
-                    done = true;
-                }
-            } else if (CONFIG.TRACK_TYPE === 'hill') {
-                if (vel.x < -0.5 && isRacing) {
-                    log(`Car ${currentCarIndex+1}: Slid Backwards`);
-                    recordResult(currentCarIndex, currentGenome);
-                    done = true;
-                }
-                
-                if (frontX < 20.0 && isRacing) {
-                    if (speed < 0.8) {
-                        if (speed >= 0.1) stuckTimer += (1/60); 
-                    } else {
-                        stuckTimer = 0;
-                    }
-                    
-                    if (stuckTimer > 2.0) {
-                         log(`Car ${currentCarIndex+1}: Too Slow at Start (<20m)`);
-                         recordResult(currentCarIndex, currentGenome);
-                         done = true;
-                    }
-                } else {
-                    if (speed > 0.1) stuckTimer = 0;
+            if (!done) {
+                if (CONFIG.TRACK_TYPE === 'flat') {
                     if (stuckTimer > CONFIG.STUCK_TIME) {
-                        log(`Car ${currentCarIndex+1}: Stuck on Hill (${frontX.toFixed(1)}m)`);
+                        log(`Car ${currentCarIndex+1}: Stuck`);
                         recordResult(currentCarIndex, currentGenome);
                         done = true;
+                    }
+                } else if (CONFIG.TRACK_TYPE === 'hill') {
+                    // Hill specific
+                    if (vel.x < -0.5 && isRacing) {
+                        // Allow 3s of falling back to watch it
+                        
+                        // IF BACKWARDS:
+                        stuckTimer += (1/60); // Increment counter
+                        if (stuckTimer > 3.0) { // 3s of falling allowed
+                             log(`Car ${currentCarIndex+1}: Slid Backwards`);
+                             recordResult(currentCarIndex, currentGenome);
+                             done = true;
+                        }
+                    }
+                    
+                    // Slow Start
+                    if (frontX < 20.0 && isRacing) {
+                        if (speed < 0.8) { /* handled by general stuck logic mostly, but steeper req */ 
+                             // if already stuckTimer incrementing from speed<0.1, fine.
+                             // if 0.1 < speed < 0.8, we need to increment.
+                             if (speed >= 0.1) stuckTimer += (1/60);
+                             if (stuckTimer > 2.0) {
+                                 log(`Car ${currentCarIndex+1}: Too Slow at Start`);
+                                 recordResult(currentCarIndex, currentGenome);
+                                 done = true;
+                             }
+                        }
+                    } else {
+                        // Past 20m, just standard stuck logic (stationary)
+                        if (stuckTimer > CONFIG.STUCK_TIME && speed < 0.1) {
+                            log(`Car ${currentCarIndex+1}: Stuck on Hill`);
+                            recordResult(currentCarIndex, currentGenome);
+                            done = true;
+                        }
+                    }
+                } else if (CONFIG.TRACK_TYPE === 'jump') {
+                    // JUMP END CONDITION
+                    // 1. Stuck at start (didn't make it down slope)
+                    if (frontX < 50 && stuckTimer > 3.0) {
+                        log(`Car ${currentCarIndex+1}: Stuck at Start`);
+                        recordResult(currentCarIndex, currentGenome);
+                        done = true;
+                    }
+                    // 2. Landed and rolled for 3s
+                    if (hasLanded && postRunTimer > 3.0) {
+                        log(`Car ${currentCarIndex+1}: Jump Complete`);
+                        recordResult(currentCarIndex, currentGenome);
+                        done = true;
+                    }
+                    // 3. Stuck after landing (stopped rolling before 3s)
+                    if (hasLanded && speed < 0.1 && postRunTimer > 1.0) {
+                         // Short circuit if it stopped moving
+                         log(`Car ${currentCarIndex+1}: Stopped`);
+                         recordResult(currentCarIndex, currentGenome);
+                         done = true;
                     }
                 }
             }
             
-            if(pos.y < -10) {
+            if(pos.y < -50 && !done) { // Increased fall limit for jump
                  log(`Car ${currentCarIndex+1}: Fell off`);
                  recordResult(currentCarIndex, currentGenome);
                  done = true;
@@ -960,6 +1135,7 @@
         document.getElementById('dispTime').innerText = `${simTime.toFixed(2)}s / ${dist.toFixed(1)}m`;
         document.getElementById('dispIndex').innerText = currentCarIndex + 1;
         document.getElementById('dispStuck').innerText = stuckTimer.toFixed(1) + "s";
+        document.getElementById('dispHeight').innerText = maxJumpHeight.toFixed(1) + "m";
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -973,51 +1149,40 @@
 
     function drawOverlay() {
         ctx.save();
-        // ctx.scale(1, -1); REMOVE THIS GLOBAL SCALE, IT FLIPS THE CONTEXT BUT CAMERA PAN/ZOOM IS ALREADY SET
-        // Wait, loop sets transform:
-        // ctx.translate(center); ctx.scale(1, -1);
-        // So overlay is drawn in world coords (Y is UP)
-        // But we want to draw markers.
-        // We need to keep world X, but adjust drawing
-        
+        ctx.scale(1, -1); 
         const interval = CONFIG.TRACK_LENGTH / 10;
-        // Dynamic range from loop is passed via closure? No. recalculate or draw fixed?
-        // Let's draw dynamic to match loop logic or just draw 0-max
-        // Just draw 0-2000 roughly or based on car
+        
+        // Draw Bounds
         const currentX = carBody.getPosition().x;
         const startM = Math.floor((currentX - 50) / 10) * 10; 
         const endM = startM + 150; 
         const drawStart = Math.max(0, startM);
-        const drawEnd = Math.max(100, endM); // Always draw at least to 100
+        const drawEnd = Math.max(100, endM);
 
         for(let x = drawStart; x <= drawEnd; x+=10) {
             let y = 0;
             if (CONFIG.TRACK_TYPE === 'hill' && x > 0) {
                 y = (x * x) / 1000;
+            } else if (CONFIG.TRACK_TYPE === 'jump') {
+                // Approximate ground height for markers on jump track landing
+                if (x > 65) y = -15 - (x - 65) * 0.05; // -15 start, slight slope down
+                else if (x > 55) y = -100; // Gap
+                else if (x > 50) y = 0.035*(x*x) - 2.93*x + 61.4; // Parabola Curve
+                else if (x > 0) y = 30 - (x * 0.8333); // Linear Slope
+                else y = 30;
             }
             
             const isFinish = (CONFIG.TRACK_TYPE === 'flat' && x === CONFIG.TRACK_LENGTH);
             
             ctx.fillStyle = isFinish ? 'red' : '#aaa';
-            
-            // Draw Post
-            // We are in world coords (Y UP).
-            // A post goes from ground (y) downwards? Or upwards?
-            // "In line vertically" - let's draw a post below the track
-            // Ground is at y. We draw from y down to y-something.
-            // Rect(x, y, w, h). If h is positive, it draws UP in world coords.
-            // So to draw down, we use negative height, or y - h.
-            // Let's draw a post downwards.
             ctx.fillRect(x*CONFIG.SCALE - 2, y*CONFIG.SCALE, 4, -100); 
             
-            // Text
             ctx.fillStyle = '#666';
             ctx.font = "12px sans-serif";
             ctx.save();
-            // Position text slightly above track
-            ctx.translate(x*CONFIG.SCALE, y*CONFIG.SCALE + 25); 
-            ctx.scale(1, -1); // Flip text back to be upright
-            ctx.fillText(isFinish ? "FINISH" : `${x}m`, -10, 0); // Center align manually roughly
+            ctx.translate(x*CONFIG.SCALE, y*CONFIG.SCALE + 20); 
+            ctx.scale(1, -1); 
+            ctx.fillText(isFinish ? "FINISH" : `${x}m`, 0, 0);
             ctx.restore();
         }
         ctx.restore();
@@ -1059,26 +1224,15 @@
                     ctx.arc(cx, cy, r, 0, 2*Math.PI);
                     ctx.fill();
                     
-                    // Spoke to see rotation (Inverted angle drawing)
+                    // Spoke to see rotation
                     ctx.save();
-                    // We are already rotated by body angle.
-                    // Visual fix: If wheels look like they spin backwards, it's often an artifact of the update loop vs render loop or scale.
-                    // But if we want to "force" it to look right, we might need to draw the spokes differently.
-                    // Actually, let's just draw the line normally. If it looks wrong, it's usually stroboscopic.
-                    // But if the user says "visibly spinning wrong direction", let's try counter-rotating the spoke visual?
-                    // No, that detaches it from physics.
-                    // Let's try just drawing it standard first, maybe my previous line was weird.
                     ctx.beginPath();
                     ctx.moveTo(cx, cy);
-                    // Draw line to edge.
                     ctx.lineTo(cx + r, cy);
                     ctx.strokeStyle = '#fff';
                     ctx.stroke();
                     ctx.restore();
                     
-                    // To "Fix" the visual spin if it looks backwards due to coordinate flip:
-                    // We can't really "fix" it without breaking the physics viz. 
-                    // But let's try drawing a second line at 90 deg to make it clear it's rotating.
                     ctx.beginPath();
                     ctx.moveTo(cx, cy);
                     ctx.lineTo(cx, cy + r);
