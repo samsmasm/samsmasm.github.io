@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IB Continual Revision</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f7f7f7;
+    display: flex;
+    flex-direction: column;
+    --question-size: 2em;
+}
+
+.panel {
+    background: white;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+}
+
+.question {
+    font-size: var(--question-size, 2em);
+    background: white;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    position: relative;
+}
+
+.remove-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    cursor: pointer;
+    color: #bbb;          /* light grey */
+    font-weight: bold;
+}
+
+.remove-btn:hover {
+    color: #666;          /* darker on hover */
+}
+
+.controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.hidden {
+    display: none;
+}
+
+body.dark {
+    background: #121212;
+    color: #eaeaea;
+}
+
+body.dark .panel {
+    background: #1e1e1e;
+    color: #eaeaea;
+}
+
+body.dark .question {
+    background: #222;
+    color: #f0f0f0;
+}
+
+body.dark button {
+    background: #333;
+    color: #f0f0f0;
+    border: 1px solid #555;
+}
+
+.unit-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.unit-topics {
+    margin-left: 30px;
+}
+</style>
+</head>
+
+<body>
+<button id="controlsToggleBtn" onclick="toggleControls()"
+        style="position:fixed; bottom:20px; right:20px; z-index:1000;">
+    Hide controls
+</button>
+
+<div class="panel" id="questionsContainer"></div>
+
+<div id="controlsPanel" class="panel">
+    <h1>Review Review and Review those Qs</h1>
+
+
+    <hr>
+
+    <h2>Select topics</h2>
+    <div id="topicSelector"></div>
+
+    <hr>
+
+    <div class="controls">
+        <div>
+            <label>
+                Number of questions:
+                <span id="questionCountLabel">3</span>
+            </label><br>
+            <input type="range" id="questionCount" min="1" max="10" value="3">
+        </div>
+
+        <div>
+            <label>
+                Question size:
+                <span id="fontSizeLabel">2.0</span>
+            </label><br>
+            <input type="range" min="1.2" max="6" step="0.1" value="2.0"
+                   oninput="updateQuestionSize(this.value)">
+        </div>
+
+        <div>
+            <label>
+                <input type="checkbox" id="addMode"> Add questions instead of replace
+            </label>
+        </div>
+
+        <button onclick="generateQuestions()">Generate questions</button>
+        <button onclick="resetAll()">Start again</button>
+        <label>
+        <input type="checkbox" onchange="toggleDarkMode()"> Dark mode
+        </label>
+    </div>
+</div>
+
+<script>
+const questionData = {
+  "Business Management": {
+    "Unit 1: Introduction to Business Management": {
+      "1.1 What is a business?": [
+        "Define the term business and give one example.",
+        "Identify two key inputs and one output of a business.",
+        "Distinguish between for-profit and not-for-profit organizations, using examples.",
+        "Identify the primary, secondary, tertiary, and quaternary sectors of economic activity.",
+        "Distinguish between the primary, secondary, and tertiary sectors, using examples.",
+        "Identify one business activity operating in the quaternary sector.",
+        "Explain briefly why the tertiary sector is growing in many economies.",
+        "Define entrepreneurship and give one example of an entrepreneur.",
+        "Identify two characteristics commonly associated with entrepreneurs.",
+        "Explain briefly one role of entrepreneurs in an economy.",
+        "Identify two challenges faced by start-up businesses.",
+        "Identify two opportunities available to new businesses.",
+        "Explain briefly why access to finance is a major issue for start-ups."
+      ],
+
+      "1.2 Types of business entities": [
+        "Distinguish between the public sector and the private sector, using examples.",
+        "Identify one key objective of public sector organizations and one objective of private sector organizations.",
+        "Define sole trader and give one example.",
+        "Identify one advantage and one disadvantage of being a sole trader.",
+        "Explain briefly why sole traders have unlimited liability.",
+        "Define partnership and identify the typical number of owners.",
+        "Distinguish between a sole trader and a partnership.",
+        "Identify one advantage and one disadvantage of partnerships.",
+        "Define privately held company and identify two key features.",
+        "Distinguish between a privately held company and a partnership.",
+        "Identify one advantage and one disadvantage of a privately held company.",
+        "Define publicly held company and identify two key features.",
+        "Distinguish between privately held and publicly held companies.",
+        "Identify one advantage and one disadvantage of being publicly held.",
+        "Define social enterprise.",
+        "Distinguish between a for-profit social enterprise and a traditional private sector company.",
+        "Identify two key features of private sector for-profit social enterprises.",
+        "Identify two key features of public sector for-profit social enterprises.",
+        "Define cooperative and give one example.",
+        "Identify one advantage and one disadvantage of cooperatives.",
+        "Define non-governmental organization (NGO) and give one example.",
+        "Identify one objective of an NGO."
+      ],
+
+      "1.3 Business objectives": [
+        "Define a vision statement and a mission statement.",
+        "Distinguish between a vision statement and a mission statement, using examples.",
+        "Identify three common business objectives.",
+        "Distinguish between profit, growth, and ethical objectives.",
+        "Explain briefly what is meant by protecting shareholder value.",
+        "Define strategic objectives and tactical objectives.",
+        "Distinguish between strategic and tactical objectives, using examples.",
+        "Define corporate social responsibility (CSR).",
+        "Identify two examples of CSR activities.",
+        "Explain briefly one potential benefit and one potential cost of CSR."
+      ],
+
+      "1.4 Stakeholders": [
+        "Define the term stakeholder.",
+        "Distinguish between internal and external stakeholders, using examples.",
+        "Identify two objectives of shareholders.",
+        "Identify one possible conflict of interest between two stakeholder groups.",
+        "Explain briefly why stakeholder conflict may arise."
+      ],
+
+      "1.5 Growth and evolution": [
+        "Define economies of scale and diseconomies of scale.",
+        "Distinguish between internal and external economies of scale.",
+        "Identify one example of an internal economy of scale.",
+        "Identify one example of a diseconomy of scale.",
+        "Distinguish between internal growth and external growth.",
+        "Identify two reasons for businesses to grow.",
+        "Identify two reasons for businesses to stay small.",
+        "(HL only) Identify the four strategies in the Ansoff Matrix.",
+        "(HL only) Distinguish between market penetration and product development.",
+        "Define merger and acquisition.",
+        "Distinguish between mergers and takeovers.",
+        "Define joint venture and strategic alliance.",
+        "Define franchising.",
+        "Identify one advantage and one disadvantage of franchising."
+      ],
+
+      "1.6 Multinational companies (MNCs)": [
+        "Define multinational company (MNC).",
+        "Identify two features of multinational companies.",
+        "Explain briefly one positive impact of MNCs on host countries.",
+        "Explain briefly one negative impact of MNCs on host countries."
+      ]
+    },
+    "Unit 2: Human Resource Management": {
+  "2.1 Introduction to human resource management": [
+    "Define human resource management (HRM) and identify two key roles of HRM.",
+    "Explain briefly why effective HRM is important for organizational performance.",
+    "Distinguish between internal and external factors influencing human resource planning.",
+    "Identify two external factors that influence human resource planning, using examples such as demographic change, labour mobility, immigration, the gig economy, or flexible working.",
+    "Identify one internal factor that may affect human resource planning.",
+    "Identify two reasons why employees may resist change in the workplace.",
+    "Explain briefly how fear of job loss can lead to resistance to change.",
+    "Identify two human resource strategies used to reduce resistance to change.",
+    "Explain briefly how communication or employee participation can reduce resistance to change."
+  ],
+
+  "2.2 Organizational structure": [
+    "Define delegation and explain one advantage of effective delegation.",
+    "Define span of control and levels of hierarchy.",
+    "Define chain of command and bureaucracy.",
+    "Distinguish between centralization and decentralization.",
+    "Define delayering and identify one potential advantage.",
+    "Define matrix structure and identify one disadvantage.",
+    "Distinguish between flat (horizontal) and tall (vertical) organizational structures.",
+    "Identify one advantage and one disadvantage of a flat organizational structure.",
+    "Identify one advantage and one disadvantage of a tall organizational structure.",
+    "Distinguish between organization structures by product, by function, and by region.",
+    "Explain briefly why a change in external factors may require a change in organizational structure.",
+    "Identify one situation where decentralization may be more appropriate than centralization.",
+    "(HL only) Define project-based organization.",
+    "(HL only) Outline the main features of Charles Handy’s Shamrock Organization.",
+    "(HL only) Explain briefly why organizations may adopt more flexible organizational structures."
+  ],
+
+  "2.3 Leadership and management": [
+    "Distinguish between management and leadership.",
+    "Identify two roles of managers.",
+    "Define autocratic, paternalistic, democratic, laissez-faire, and situational leadership styles.",
+    "Identify one advantage and one disadvantage of autocratic leadership.",
+    "Explain briefly why situational leadership may be effective.",
+    "(HL only) Distinguish between scientific and intuitive management thinking."
+  ],
+
+  "2.4 Motivation and demotivation": [
+    "Outline one key assumption of Taylor’s theory of motivation.",
+    "Explain briefly one level of Maslow’s hierarchy of needs.",
+    "Distinguish between motivators and hygiene factors in Herzberg’s motivation–hygiene theory.",
+    "(HL only) Identify one key idea from McClelland’s acquired needs theory.",
+    "(HL only) Identify one principle of self-determination theory.",
+    "(HL only) Distinguish between equity theory and expectancy theory.",
+    "(HL only) Define labour turnover.",
+    "(HL only) Identify one cause and one consequence of high labour turnover.",
+    "(HL only) Distinguish between formative and summative appraisal.",
+    "(HL only) Identify one advantage of 360-degree feedback.",
+    "(HL only) Identify one advantage of self-appraisal.",
+    "(HL only) Identify two methods of recruitment.",
+    "(HL only) Distinguish between internal and external recruitment.",
+    "Distinguish between salary and wages.",
+    "Distinguish between time rate and piece rate wages.",
+    "Identify one advantage of commission-based pay.",
+    "Identify one advantage of performance-related pay.",
+    "Identify one benefit of profit-related pay or employee share ownership schemes.",
+    "Identify one example of a fringe payment.",
+    "Distinguish between job enrichment, job rotation, and job enlargement.",
+    "Define empowerment and identify one benefit.",
+    "Explain briefly how purpose or the opportunity to make a difference can motivate employees.",
+    "Identify one benefit of teamwork.",
+    "Distinguish between induction training, on-the-job training, and off-the-job training."
+  ],
+
+  "2.5 Organizational (corporate) culture": [
+    "(HL only) Define organizational culture.",
+    "(HL only) Identify two types of organizational culture using Charles Handy’s model.",
+    "(HL only) Explain briefly why cultural clashes may occur when organizations grow, merge, or change leadership style."
+  ],
+
+  "2.6 Communication": [
+    "Distinguish between formal and informal methods of communication, using examples.",
+    "Identify one situation where informal communication may be more effective than formal communication.",
+    "Identify two barriers to effective communication."
+  ],
+
+  "2.7 Industrial and employee relations": [
+    "(HL only) Identify two sources of conflict in the workplace.",
+    "(HL only) Distinguish between collective bargaining, work-to-rule, and strike action.",
+    "(HL only) Identify one employer response to industrial conflict.",
+    "(HL only) Distinguish between conciliation and arbitration.",
+    "(HL only) Explain briefly how employee participation or industrial democracy may reduce conflict.",
+    "(HL only) Define a no-strike agreement and a single-union agreement."
+  ]
+},
+"Unit 3: Finance and accounts": {
+  "3.1 Introduction to finance": [
+    "Define finance and identify two reasons why finance is important to businesses.",
+    "Distinguish between capital expenditure and revenue expenditure, using examples.",
+    "Identify one example of capital expenditure and one example of revenue expenditure."
+  ],
+
+  "3.2 Sources of finance": [
+    "Identify two internal sources of finance and state one advantage of each.",
+    "Distinguish between personal funds and retained profit.",
+    "Identify four external sources of finance, including share capital, loan capital, overdrafts, trade credit, crowdfunding, leasing, microfinance providers, or business angels.",
+    "Identify one advantage and one disadvantage of loan capital.",
+    "Identify one advantage and one disadvantage of share capital.",
+    "Distinguish between short-term and long-term sources of finance, using examples.",
+    "Explain briefly why an overdraft may be more appropriate than a loan in some situations."
+  ],
+
+  "3.3 Costs and revenues": [
+    "Define fixed costs, variable costs, direct costs, and indirect (overhead) costs, using examples.",
+    "Distinguish between fixed costs and variable costs.",
+    "Distinguish between direct costs and indirect costs.",
+    "Define total revenue and identify one example of a revenue stream.",
+    "Calculate total revenue when price is $25 and quantity sold is 400 units."
+  ],
+
+  "3.4 Final accounts": [
+    "Identify two reasons why final accounts are useful to stakeholders.",
+    "Identify two items of revenue and two items of expense found in a profit and loss account.",
+    "Calculate gross profit when revenue is $120 000 and cost of sales is $75 000.",
+    "Calculate profit for the year when gross profit is $60 000 and expenses are $38 000.",
+    "Distinguish between current assets and non-current assets, using examples.",
+    "Distinguish between current liabilities and non-current liabilities, using examples.",
+    "Calculate working capital when current assets are $90 000 and current liabilities are $65 000.",
+    "Define intangible assets and identify two examples.",
+    "(HL only) Distinguish between straight-line depreciation and units of production depreciation.",
+    "(HL only) Calculate depreciation using the straight-line method.",
+    "(HL only) Calculate depreciation using the units of production method.",
+    "(HL only) Identify one situation where each depreciation method may be appropriate."
+  ],
+
+  "3.5 Profitability and liquidity ratio analysis": [
+    "Define gross profit margin, profit margin, and return on capital employed (ROCE).",
+    "Calculate gross profit margin when gross profit is $40 000 and revenue is $160 000.",
+    "Calculate profit margin when profit for the year is $24 000 and revenue is $200 000.",
+    "Calculate ROCE when profit before interest and tax is $50 000 and capital employed is $250 000.",
+    "Identify one strategy a business could use to improve profitability ratios.",
+    "Define current ratio and acid-test (quick) ratio.",
+    "Calculate current ratio when current assets are $120 000 and current liabilities are $80 000.",
+    "Calculate acid-test ratio when current assets are $150 000, inventories are $40 000, and current liabilities are $110 000.",
+    "Identify one strategy a business could use to improve liquidity."
+  ],
+
+  "3.6 Efficiency ratio analysis": [
+    "(HL only) Define stock turnover.",
+    "(HL only) Calculate stock turnover when cost of sales is $300 000 and average inventory is $50 000.",
+    "(HL only) Define debtor days and creditor days.",
+    "(HL only) Calculate debtor days when trade debtors are $60 000 and annual revenue is $360 000.",
+    "(HL only) Calculate creditor days when trade creditors are $45 000 and cost of sales is $270 000.",
+    "(HL only) Define gearing ratio.",
+    "(HL only) Distinguish between insolvency and bankruptcy."
+  ],
+
+  "3.7 Cash flow": [
+    "Distinguish between profit and cash flow.",
+    "Define working capital and calculate working capital from given data.",
+    "Explain briefly what is meant by a business’s liquidity position.",
+    "Identify two reasons why a profitable business may experience cash flow problems.",
+    "Identify two strategies businesses can use to deal with cash flow problems."
+  ],
+
+  "3.8 Investment appraisal": [
+    "Define investment appraisal.",
+    "Calculate payback period for an investment costing $120 000 that generates $30 000 per year.",
+    "Calculate average rate of return (ARR) when average profit is $18 000 and initial investment is $90 000.",
+    "Identify one advantage and one disadvantage of using payback period.",
+    "Identify one advantage and one disadvantage of using ARR.",
+    "(HL only) Calculate net present value (NPV) using given discount rates."
+  ],
+
+  "3.9 Budgets": [
+    "(HL only) Distinguish between cost centres and profit centres.",
+    "(HL only) Identify one role of a cost centre and one role of a profit centre.",
+    "(HL only) Construct a simple budget using given data.",
+    "(HL only) Distinguish between favourable and adverse variances.",
+    "(HL only) Calculate a variance using budgeted and actual figures."
+  ]
+},
+"Unit 4: Marketing": {
+  "4.1 Introduction to marketing": [
+    "Distinguish between market orientation and product orientation.",
+    "Define market share and calculate market share when a firm sells 40 000 units in a market of 200 000 units.",
+    "Define market growth and calculate market growth given market size data for two consecutive years.",
+    "(HL only) Explain briefly why market share and market leadership are important for businesses."
+  ],
+
+  "4.2 Marketing planning": [
+    "Define marketing planning and identify one reason why marketing planning is important.",
+    "Distinguish between market segmentation, targeting, and positioning.",
+    "Identify one example of a target market for a specific product.",
+    "Distinguish between a niche market and a mass market.",
+    "Define a unique selling point (USP) and give one example.",
+    "Identify two ways organizations can differentiate their products from competitors."
+  ],
+
+  "4.3 Sales forecasting": [
+    "(HL only) Define sales forecasting.",
+    "(HL only) Identify one benefit and one limitation of sales forecasting."
+  ],
+
+  "4.4 Market research": [
+    "Explain briefly why organizations carry out market research.",
+    "Identify one situation where market research would be particularly important.",
+    "Distinguish between primary and secondary market research.",
+    "Identify one advantage and one disadvantage of surveys.",
+    "Identify one advantage and one disadvantage of interviews.",
+    "Identify one advantage and one disadvantage of focus groups.",
+    "Identify one advantage and one disadvantage of observations.",
+    "Identify two sources of secondary market research.",
+    "Identify one advantage and one disadvantage of using secondary data.",
+    "Distinguish between qualitative and quantitative research, using examples.",
+    "Distinguish between quota sampling, random sampling, and convenience sampling."
+  ],
+
+  "4.5 The seven Ps of the marketing mix": [
+    "Explain the relationship between the product life cycle and the marketing mix.",
+    "Distinguish between different stages of the product life cycle.",
+    "Identify one extension strategy used in the maturity stage of the product life cycle.",
+    "Explain briefly the relationship between the product life cycle, investment, profit, and cash flow.",
+    "Define brand awareness, brand development, brand loyalty, and brand value.",
+    "Explain briefly why branding is important for businesses.",
+    "Distinguish between cost-plus pricing and penetration pricing.",
+    "Identify one situation where loss leader pricing may be appropriate.",
+    "Identify one situation where predatory pricing may be used.",
+    "Identify one situation where premium pricing may be appropriate.",
+    "(HL only) Distinguish between dynamic pricing and competitive pricing.",
+    "(HL only) Define contribution pricing.",
+    "(HL only) Define price elasticity of demand.",
+    "Distinguish between above-the-line, below-the-line, and through-the-line promotion.",
+    "Identify one advantage of social media marketing as a promotional strategy.",
+    "Distinguish between direct and indirect distribution channels.",
+    "Explain briefly why distribution channel choice is important for a business.",
+    "Explain briefly why employee–customer relationships are important in marketing a service.",
+    "Identify one reason why cultural differences may affect these relationships.",
+    "Explain briefly why delivery processes are important in marketing a service.",
+    "Identify one example of how changes in processes can improve customer satisfaction.",
+    "Explain briefly why physical evidence is important when marketing a service.",
+    "Identify one example of physical evidence used by a service business.",
+    "Identify one reason why marketing mixes differ between products or businesses."
+  ],
+
+  "4.6 International marketing": [
+    "(HL only) Identify one opportunity and one threat posed by operating in international markets.",
+    "(HL only) Explain briefly why cultural differences may affect international marketing strategies."
+  ]
+},
+"Unit 5: Operations management": {
+  "5.1 Introduction to operations management": [
+    "Define operations management and identify two key roles of operations management.",
+    "Explain briefly how operations decisions can affect other business functions."
+  ],
+
+  "5.2 Operations methods": [
+    "Distinguish between job production, batch production, and mass/flow production, using examples.",
+    "Identify one advantage and one disadvantage of job production.",
+    "Identify one advantage and one disadvantage of batch production.",
+    "Identify one advantage and one disadvantage of mass/flow production.",
+    "Define mass customization and identify one product suitable for mass customization."
+  ],
+
+  "5.3 Lean production and quality management": [
+    "(HL only) Define lean production.",
+    "(HL only) Identify two features of lean production.",
+    "(HL only) Distinguish between continuous improvement (kaizen) and just-in-time (JIT).",
+    "(HL only) Identify two features of cradle to cradle design and manufacturing.",
+    "(HL only) Distinguish between quality control and quality assurance.",
+    "(HL only) Define quality circles, benchmarking, and total quality management (TQM).",
+    "(HL only) Explain briefly one impact of lean production or TQM on an organization.",
+    "(HL only) Identify one reason why national or international quality standards are important."
+  ],
+
+  "5.4 Location": [
+    "Identify two reasons why a business may choose a specific location for production.",
+    "Distinguish between outsourcing and offshoring.",
+    "Distinguish between insourcing and reshoring.",
+    "Identify one advantage and one disadvantage of outsourcing or offshoring."
+  ],
+
+  "5.5 Break-even analysis": [
+    "Distinguish between total contribution and contribution per unit.",
+    "Identify the break-even quantity on a break-even chart.",
+    "Identify the profit or loss at a given level of output using a break-even chart.",
+    "Define margin of safety and calculate margin of safety using given data.",
+    "Calculate target profit output when fixed costs, selling price, and variable costs are given.",
+    "Calculate target price needed to achieve a given level of profit.",
+    "Explain briefly how a change in price or cost affects break-even quantity or margin of safety.",
+    "Identify one limitation of break-even analysis as a decision-making tool."
+  ],
+
+  "5.6 Production planning": [
+    "(HL only) Outline the local and global supply chain process.",
+    "(HL only) Distinguish between just-in-time (JIT) and just-in-case (JIC).",
+    "(HL only) Define lead time, buffer stock, reorder level, and reorder quantity.",
+    "(HL only) Calculate reorder level using given data.",
+    "(HL only) Define capacity utilization rate and calculate it using given data.",
+    "(HL only) Define defect rate and calculate it using given data.",
+    "(HL only) Distinguish between labour productivity and capital productivity.",
+    "(HL only) Calculate productivity rate using given output and input data.",
+    "(HL only) Define operating leverage.",
+    "(HL only) Distinguish between cost to buy (CTB) and cost to make (CTM).",
+    "(HL only) Identify one situation where CTB may be preferable to CTM."
+  ],
+
+  "5.7 Crisis management and contingency planning": [
+    "(HL only) Distinguish between crisis management and contingency planning.",
+    "(HL only) Identify two factors that affect effective crisis management.",
+    "(HL only) Explain briefly one impact of contingency planning on cost, time, risk, or safety."
+  ],
+
+  "5.8 Research and development": [
+    "(HL only) Explain briefly why research and development is important for businesses.",
+    "(HL only) Identify one reason why developing products that meet unmet customer needs is important.",
+    "(HL only) Distinguish between patents, copyrights, and trademarks.",
+    "(HL only) Distinguish between incremental innovation and disruptive innovation."
+  ],
+
+  "5.9 Management information systems": [
+    "(HL only) Define data analytics and databases.",
+    "(HL only) Identify one risk associated with cybersecurity or cybercrime.",
+    "(HL only) Identify one example of critical infrastructure used in business decision-making.",
+    "(HL only) Identify one business use of virtual reality or the internet of things.",
+    "(HL only) Explain briefly how artificial intelligence can support business operations.",
+    "(HL only) Define big data.",
+    "(HL only) Identify one benefit of customer loyalty programmes.",
+    "(HL only) Explain briefly how data can be used to monitor employees.",
+    "(HL only) Identify one ethical issue associated with the use of management information systems."
+  ]
+}
+
+  }
+}
+
+;
+
+const selectorDiv = document.getElementById("topicSelector");
+const questionsContainer = document.getElementById("questionsContainer");
+const questionCountSlider = document.getElementById("questionCount");
+const questionCountLabel = document.getElementById("questionCountLabel");
+
+questionCountSlider.addEventListener("input", () => {
+    questionCountLabel.textContent = questionCountSlider.value;
+});
+
+function buildTopicSelector() {
+    selectorDiv.innerHTML = "";
+
+    Object.entries(questionData).forEach(([subject, units]) => {
+        const subjectDiv = document.createElement("div");
+
+        const subjectLabel = document.createElement("label");
+        subjectLabel.innerHTML = `<input type="checkbox" class="subject-checkbox"> <strong>${subject}</strong>`;
+        subjectDiv.appendChild(subjectLabel);
+
+        Object.entries(units).forEach(([unitName, topics]) => {
+            const unitHeader = document.createElement("div");
+            unitHeader.className = "unit-header";
+
+            const toggleBtn = document.createElement("button");
+            toggleBtn.className = "toggle-btn";
+            toggleBtn.textContent = "▸";
+
+            const unitLabel = document.createElement("label");
+            unitLabel.innerHTML = `<input type="checkbox" class="unit-checkbox"> ${unitName}`;
+
+            unitHeader.appendChild(toggleBtn);
+            unitHeader.appendChild(unitLabel);
+
+            const topicsDiv = document.createElement("div");
+            topicsDiv.className = "unit-topics hidden";
+
+            Object.keys(topics).forEach(topicKey => {
+                const topicLabel = document.createElement("label");
+                topicLabel.style.display = "block";
+                topicLabel.innerHTML = `<input type="checkbox" class="topic-checkbox" data-topic="${topicKey}"> ${topicKey}`;
+                topicsDiv.appendChild(topicLabel);
+            });
+
+            toggleBtn.addEventListener("click", () => {
+                const hidden = topicsDiv.classList.toggle("hidden");
+                toggleBtn.textContent = hidden ? "▸" : "▾";
+            });
+
+            subjectDiv.appendChild(unitHeader);
+            subjectDiv.appendChild(topicsDiv);
+        });
+
+        selectorDiv.appendChild(subjectDiv);
+    });
+
+    attachCheckboxLogic();
+}
+
+function attachCheckboxLogic() {
+
+    /* ---------- SUBJECT LEVEL ---------- */
+    document.querySelectorAll(".subject-checkbox").forEach(subjectCheckbox => {
+        subjectCheckbox.addEventListener("click", () => {
+            const subjectContainer = subjectCheckbox.closest("div");
+            const allCheckboxes = subjectContainer.querySelectorAll("input[type=checkbox]");
+
+            const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+
+            allCheckboxes.forEach(cb => {
+                cb.checked = !allChecked;
+                cb.indeterminate = false;
+            });
+
+            subjectCheckbox.checked = !allChecked;
+        });
+    });
+
+    /* ---------- UNIT LEVEL ---------- */
+    document.querySelectorAll(".unit-checkbox").forEach(unitCheckbox => {
+        unitCheckbox.addEventListener("click", () => {
+            const unitHeader = unitCheckbox.closest(".unit-header");
+            const topicsDiv = unitHeader.nextElementSibling;
+            const topicCheckboxes = topicsDiv.querySelectorAll(".topic-checkbox");
+
+            const allChecked = Array.from(topicCheckboxes).every(cb => cb.checked);
+
+            topicCheckboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+
+            unitCheckbox.checked = !allChecked;
+            unitCheckbox.indeterminate = false;
+        });
+    });
+
+    /* ---------- TOPIC LEVEL (sync up) ---------- */
+    document.querySelectorAll(".topic-checkbox").forEach(topicCheckbox => {
+        topicCheckbox.addEventListener("change", () => {
+            const topicsDiv = topicCheckbox.closest(".unit-topics");
+            const unitHeader = topicsDiv.previousElementSibling;
+            const unitCheckbox = unitHeader.querySelector(".unit-checkbox");
+
+            const topicCheckboxes = topicsDiv.querySelectorAll(".topic-checkbox");
+
+            const allChecked = Array.from(topicCheckboxes).every(cb => cb.checked);
+            const anyChecked = Array.from(topicCheckboxes).some(cb => cb.checked);
+
+            unitCheckbox.checked = allChecked;
+            unitCheckbox.indeterminate = !allChecked && anyChecked;
+        });
+    });
+}
+
+
+function getSelectedTopics() {
+    return Array.from(document.querySelectorAll(".topic-checkbox:checked")).map(cb => cb.dataset.topic);
+}
+
+function getQuestionsForTopics(topics) {
+    const questions = [];
+    Object.values(questionData).forEach(units => {
+        Object.values(units).forEach(topicObj => {
+            Object.entries(topicObj).forEach(([topic, qs]) => {
+                if (topics.includes(topic)) questions.push(...qs);
+            });
+        });
+    });
+    return questions;
+}
+
+function generateQuestions() {
+    const topics = getSelectedTopics();
+    if (!topics.length) return alert("Please select at least one topic.");
+
+    const allQuestions = getQuestionsForTopics(topics);
+    const count = Number(questionCountSlider.value);
+    const addMode = document.getElementById("addMode").checked;
+
+    if (!addMode) questionsContainer.innerHTML = "";
+
+    for (let i = 0; i < count; i++) {
+        const q = allQuestions[Math.floor(Math.random() * allQuestions.length)];
+        addQuestion(q, allQuestions);
+    }
+}
+
+function addQuestion(text, allQuestions) {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.textContent = text;
+
+    const remove = document.createElement("span");
+    remove.className = "remove-btn";
+    remove.textContent = "✕";
+    remove.onclick = () => {
+        div.remove();
+        const replacement = allQuestions[Math.floor(Math.random() * allQuestions.length)];
+        addQuestion(replacement, allQuestions);
+    };
+
+    div.appendChild(remove);
+    questionsContainer.appendChild(div);
+}
+
+function resetAll() {
+    document.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+    questionsContainer.innerHTML = "";
+}
+
+function toggleControls() {
+    const panel = document.getElementById("controlsPanel");
+    const btn = document.getElementById("controlsToggleBtn");
+    const hidden = panel.classList.toggle("hidden");
+    btn.textContent = hidden ? "Show controls" : "Hide controls";
+}
+
+function toggleDarkMode() {
+    document.body.classList.toggle("dark");
+}
+
+function updateQuestionSize(size) {
+    document.body.style.setProperty("--question-size", size + "em");
+    document.getElementById("fontSizeLabel").textContent = size;
+}
+
+buildTopicSelector();
+</script>
+</body>
+</html>
