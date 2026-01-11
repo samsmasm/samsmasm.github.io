@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PeeDeeEffer | Pro Assembly</title>
+    <title>PeeDeeEffer | Pro Suite</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; user-select: none; }
-        .workspace-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.03); }
         .page-card { transition: all 0.2s ease; cursor: pointer; border: 2px solid transparent; }
         .selected-page { border-color: #3b82f6 !important; background-color: #eff6ff; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); opacity: 1 !important; filter: none !important; }
         .excluded { opacity: 0.4; filter: grayscale(0.5); }
@@ -19,11 +18,23 @@
 </head>
 <body class="text-slate-800 antialiased">
 
+    <div id="modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <h3 class="text-xl font-bold mb-2">High Memory File</h3>
+            <p class="text-slate-500 mb-6 text-sm">This is a large file. "Smart Preview" only renders pages you interact with to save memory.</p>
+            <div class="space-y-3">
+                <button onclick="confirmLoad('full')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold">Standard (Slow)</button>
+                <button onclick="confirmLoad('smart')" class="w-full py-3 bg-blue-50 text-blue-700 rounded-xl font-semibold">Smart (Fast)</button>
+            </div>
+        </div>
+    </div>
+
     <div class="flex flex-col lg:flex-row h-screen overflow-hidden">
         <aside class="w-full lg:w-96 bg-white border-r border-slate-200 flex flex-col h-full z-20">
             <div class="p-6">
                 <h1 class="text-lg font-bold tracking-tight">PeeDeeEffer</h1>
-                <p class="text-[10px] uppercase tracking-widest text-slate-400 mt-1 font-semibold">Stability Version</p>
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 mt-1 font-semibold">Stability Locked</p>
             </div>
 
             <div class="flex p-1 mx-6 bg-slate-100 rounded-xl mb-6">
@@ -33,83 +44,72 @@
 
             <div class="px-6 flex-1 overflow-y-auto pb-6">
                 <div id="uploadArea" class="mb-8">
-                    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all group">
-                        <svg class="w-6 h-6 mb-2 text-slate-300 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        <span id="uploadLabel" class="text-xs font-medium text-slate-500">Add PDF Files</span>
+                    <label id="uploadLabelBox" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all group">
+                        <span class="text-xs font-medium text-slate-500">Upload PDF(s)</span>
                         <input type="file" id="pdfInput" class="hidden" accept="application/pdf" multiple />
                     </label>
+                    <div id="fileInfoBox" class="hidden p-4 bg-slate-900 text-white rounded-2xl flex justify-between items-center">
+                        <span id="fileNameDisplay" class="text-xs truncate italic pr-4">filename.pdf</span>
+                        <button onclick="resetState()" class="text-red-400 font-bold hover:text-red-200">RESET</button>
+                    </div>
                 </div>
 
                 <div id="controlsMerge" class="space-y-4">
-                    <div class="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
-                        <span>Queue</span>
-                        <button onclick="resetState()" class="text-red-500">Clear All</button>
-                    </div>
+                    <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Merge Queue</div>
                     <ul id="mergeList" class="space-y-2 text-xs"></ul>
-                    <div id="mergeExportArea" class="hidden pt-4 border-t border-slate-100 space-y-3">
-                        <input type="text" id="mergeName" placeholder="Merged Filename" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none">
-                        <button onclick="processExport('merge-all')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg">Merge & Download</button>
+                    <div id="mergeExportArea" class="hidden pt-4 border-t space-y-3">
+                        <input type="text" id="mergeManualName" placeholder="Rename merged file..." class="w-full px-4 py-3 bg-white border rounded-xl text-sm">
+                        <button onclick="processExport('merge-all')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg">Merge All</button>
                     </div>
                 </div>
 
                 <div id="controlsSplit" class="hidden space-y-6">
                     <div class="space-y-3">
-                        <div class="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
-                            <span>Ranges</span>
-                            <button onclick="clearSelection()" class="text-red-500">Clear</button>
-                        </div>
+                        <div class="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400 tracking-widest">Ranges</div>
                         <div id="rangeInputs" class="space-y-2">
-                            <input type="text" placeholder="e.g. 1-3" onfocus="activeBox = this" oninput="updateVisualSelect()" class="range-field w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none transition focus:bg-white">
+                            <input type="text" placeholder="e.g. 1-5" onfocus="activeBox = this" oninput="updateVisualSelect()" class="range-field w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:bg-white transition">
                         </div>
                         <button onclick="addRangeInput()" class="text-xs font-bold text-blue-600">+ ADD RANGE</button>
                     </div>
-                    <div id="splitExportArea" class="hidden pt-6 border-t border-slate-100 space-y-3">
-                        <button onclick="processExport('split-single')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold">Save as Single PDF</button>
-                        <button onclick="processExport('split-multiple')" class="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold">Download Separate PDFs</button>
+                    <div id="splitExportArea" class="hidden pt-6 border-t space-y-3">
+                        <input type="text" id="splitManualName" placeholder="Rename single file..." class="w-full px-4 py-3 bg-white border rounded-xl text-sm">
+                        <button onclick="processExport('split-single')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg">Save Selection (Single)</button>
+                        <button onclick="processExport('split-multiple')" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50">Download Separate Parts</button>
                     </div>
                 </div>
             </div>
 
-            <div class="p-6 bg-slate-50 border-t border-slate-200 text-[10px] font-bold text-slate-400 flex items-center">
+            <div class="p-6 bg-slate-50 border-t text-[10px] font-bold text-slate-400 flex items-center">
                 <span id="statusLed" class="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2"></span>
                 <span id="statusText">System Idle</span>
             </div>
         </aside>
 
         <main class="flex-1 bg-slate-50 p-6 lg:p-12 overflow-hidden flex flex-col relative">
-            <div id="workspace" class="flex-1 w-full rounded-[2rem] border bg-white workspace-shadow overflow-y-auto">
-                <div id="emptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Ready for upload...</div>
+            <div id="workspace" class="flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto">
+                <div id="emptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Upload a PDF to begin</div>
                 <div id="canvasGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 w-full p-10 max-w-7xl"></div>
             </div>
 
             <div id="actionBar" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-6 z-50">
-                <span id="selectCount" class="text-xs font-bold border-r border-slate-700 pr-6 uppercase">0 Pages</span>
-                <button onclick="rotateSelected(-90)" class="flex items-center space-x-2 hover:text-blue-400 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                    <span class="text-xs font-bold uppercase">Rotate</span>
-                </button>
-                <button onclick="clearSelection()" class="text-xs font-bold uppercase text-slate-400 hover:text-white">Deselect</button>
+                <span id="selectCount" class="text-xs font-bold border-r border-slate-700 pr-6 uppercase tracking-widest">0 Pages</span>
+                <button onclick="rotateSelected(-90)" class="text-xs font-bold uppercase hover:text-blue-400">Rotate</button>
+                <button onclick="clearSelection()" class="text-xs font-bold uppercase text-slate-400">Clear</button>
             </div>
         </main>
     </div>
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-        let mergeFiles = [];
-        let currentMode = 'merge';
-        let activeBox = null;
-        let globalRotations = {}; 
-        let lastClickedIdx = null; // Fix for Shift-Click
+        let mergeFiles = [], currentMode = 'merge', activeBox = null, globalRotations = {}, lastClickedIdx = null;
+        let pendingFiles = [], previewLimitMode = 'full';
 
         function handleTabSwitch(mode) {
-            currentMode = mode;
-            resetState();
-            document.getElementById('tabMerge').className = mode === 'merge' ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition' : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
-            document.getElementById('tabSplit').className = mode === 'split' ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition' : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+            currentMode = mode; resetState();
+            document.getElementById('tabMerge').className = mode === 'merge' ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm' : 'flex-1 py-2 text-sm font-medium text-slate-500';
+            document.getElementById('tabSplit').className = mode === 'split' ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm' : 'flex-1 py-2 text-sm font-medium text-slate-500';
             document.getElementById('controlsMerge').classList.toggle('hidden', mode !== 'merge');
             document.getElementById('controlsSplit').classList.toggle('hidden', mode !== 'split');
-            document.getElementById('uploadLabel').innerText = mode === 'merge' ? 'Add PDF Files' : 'Upload PDF to Split';
         }
 
         function resetState() {
@@ -117,97 +117,87 @@
             document.getElementById('canvasGrid').innerHTML = '';
             document.getElementById('mergeList').innerHTML = '';
             document.getElementById('emptyState').classList.remove('hidden');
+            document.getElementById('uploadLabelBox').classList.remove('hidden');
+            document.getElementById('fileInfoBox').classList.add('hidden');
             document.getElementById('mergeExportArea').classList.add('hidden');
             document.getElementById('splitExportArea').classList.add('hidden');
             document.getElementById('actionBar').classList.add('hidden');
             document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
-            setStatus('System Reset', 'slate');
+            setStatus('Reset', 'slate');
         }
 
-        document.getElementById('pdfInput').addEventListener('change', async (e) => {
+        document.getElementById('pdfInput').onchange = async (e) => {
             const files = Array.from(e.target.files);
             if (!files.length) return;
-            if (currentMode === 'split') resetState();
+            pendingFiles = files;
+            if (files.some(f => f.size > 50 * 1024 * 1024)) document.getElementById('modal').classList.remove('hidden');
+            else confirmLoad('full');
+        };
 
-            setStatus('Reading...', 'amber');
-            for (let f of files) {
+        async function confirmLoad(pMode) {
+            previewLimitMode = pMode;
+            document.getElementById('modal').classList.add('hidden');
+            if (currentMode === 'split') resetState();
+            
+            setStatus('Loading...', 'amber');
+            for (let f of pendingFiles) {
                 const data = await f.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({data: data.slice(0)}).promise;
-                mergeFiles.push({ id: Math.random().toString(36).substr(2, 9), name: f.name, data: data, numPages: pdf.numPages });
-                if (currentMode === 'merge' && mergeFiles.length === 1) document.getElementById('mergeName').value = f.name.replace('.pdf', '') + '_merged';
+                mergeFiles.push({ id: Math.random().toString(36).substr(2, 9), name: f.name, data: data });
+                if (currentMode === 'split') {
+                    document.getElementById('fileNameDisplay').innerText = f.name;
+                    document.getElementById('uploadLabelBox').classList.add('hidden');
+                    document.getElementById('fileInfoBox').classList.remove('hidden');
+                }
             }
-            renderGrid();
-            updateSidebarList();
-            e.target.value = '';
-        });
+            renderGrid(); updateSidebarList();
+        }
 
         async function renderGrid() {
-            const grid = document.getElementById('canvasGrid');
-            grid.innerHTML = '';
+            const grid = document.getElementById('canvasGrid'); grid.innerHTML = '';
             document.getElementById('emptyState').classList.add('hidden');
-            let absoluteIdx = 1;
+            let absIdx = 1;
             for (const file of mergeFiles) {
                 const pdf = await pdfjsLib.getDocument({data: file.data.slice(0)}).promise;
-                for (let i = 1; i <= file.numPages; i++) {
+                file.numPages = pdf.numPages;
+                for (let i = 1; i <= pdf.numPages; i++) {
                     const pageId = `${file.id}-${i}`;
                     const card = document.createElement('div');
-                    card.id = `card-${pageId}`;
-                    card.dataset.absIndex = absoluteIdx;
+                    card.id = `card-${pageId}`; card.dataset.absIndex = absIdx;
                     card.className = "page-card p-3 bg-white rounded-xl shadow-sm border-2 flex flex-col items-center";
-                    card.innerHTML = `<div class="mb-2 text-[8px] font-bold text-slate-300 uppercase">Page ${absoluteIdx}</div>
-                        <div class="canvas-container w-full h-full flex items-center justify-center overflow-hidden">
-                            <canvas id="canv-${pageId}" class="max-w-full"></canvas>
-                        </div>`;
+                    card.innerHTML = `<div class="mb-2 text-[8px] font-bold text-slate-300 uppercase">Page ${absIdx}</div><div class="canvas-container"><canvas id="canv-${pageId}" class="max-w-full"></canvas></div>`;
                     card.onclick = (e) => handlePageClick(pageId, parseInt(card.dataset.absIndex), e);
                     grid.appendChild(card);
-                    const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({scale: 0.3});
-                    const canvas = document.getElementById(`canv-${pageId}`);
-                    canvas.height = viewport.height; canvas.width = viewport.width;
-                    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+                    if (previewLimitMode === 'full') {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({scale: 0.3});
+                        const canvas = document.getElementById(`canv-${pageId}`);
+                        canvas.height = viewport.height; canvas.width = viewport.width;
+                        await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+                    }
                     if (globalRotations[pageId]) applyRotationVisual(pageId, globalRotations[pageId]);
-                    absoluteIdx++;
+                    absIdx++;
                 }
             }
             setStatus('Ready', 'slate');
         }
 
         function handlePageClick(pageId, absIdx, event) {
-            if (!activeBox && currentMode === 'split') activeBox = document.querySelector('.range-field');
-            
-            // Shift-Click Logic
             let targetIdxs = [absIdx];
             if (event.shiftKey && lastClickedIdx !== null) {
-                const start = Math.min(lastClickedIdx, absIdx);
-                const end = Math.max(lastClickedIdx, absIdx);
+                const start = Math.min(lastClickedIdx, absIdx), end = Math.max(lastClickedIdx, absIdx);
                 targetIdxs = Array.from({length: end - start + 1}, (_, i) => start + i);
             }
             lastClickedIdx = absIdx;
 
             if (currentMode === 'split') {
+                if (!activeBox) activeBox = document.querySelector('.range-field');
                 let set = parseRange(activeBox.value);
                 targetIdxs.forEach(idx => set.has(idx) ? set.delete(idx) : set.add(idx));
                 activeBox.value = setToString(set);
             } else {
-                targetIdxs.forEach(idx => {
-                    const card = document.querySelector(`.page-card[data-abs-index="${idx}"]`);
-                    if (card) card.classList.toggle('selected-page');
-                });
+                targetIdxs.forEach(idx => document.querySelector(`.page-card[data-abs-index="${idx}"]`)?.classList.toggle('selected-page'));
             }
             updateVisualSelect();
-        }
-
-        function rotateSelected(deg) {
-            document.querySelectorAll('.selected-page').forEach(card => {
-                const pageId = card.id.replace('card-', '');
-                globalRotations[pageId] = (globalRotations[pageId] || 0) + deg;
-                applyRotationVisual(pageId, globalRotations[pageId]);
-            });
-        }
-
-        function applyRotationVisual(pageId, deg) {
-            const container = document.querySelector(`#card-${pageId} .canvas-container`);
-            container.style.transform = `rotate(${deg}deg)`;
         }
 
         function updateVisualSelect() {
@@ -221,9 +211,7 @@
                     card.classList.toggle('selected-page', isSel);
                     card.classList.toggle('excluded', ranges.size > 0 && !isSel);
                     if (isSel) count++;
-                } else {
-                    if (card.classList.contains('selected-page')) count++;
-                }
+                } else if (card.classList.contains('selected-page')) count++;
             });
             document.getElementById('selectCount').innerText = `${count} Selected`;
             document.getElementById('actionBar').classList.toggle('hidden', count === 0);
@@ -231,108 +219,78 @@
 
         async function processExport(type) {
             setStatus('Exporting...', 'blue');
-            const masterDoc = await PDFLib.PDFDocument.create();
-            const baseName = mergeFiles[0]?.name.replace('.pdf', '') || 'pee-dee';
-
-            if (type === 'merge-all' || type === 'split-single') {
-                const targetPages = currentMode === 'split' ? parseAllRanges() : null;
-                await buildDocFromSelection(masterDoc, targetPages);
-                const outName = currentMode === 'split' ? `${baseName}_selection.pdf` : (document.getElementById('mergeName').value + '.pdf');
-                save(await masterDoc.save(), outName);
-            } else if (type === 'split-multiple') {
-                const rangeInputs = document.querySelectorAll('.range-field');
-                for (let input of rangeInputs) {
-                    const set = parseRange(input.value);
-                    if (!set.size) continue;
-                    const subDoc = await PDFLib.PDFDocument.create();
-                    await buildDocFromSelection(subDoc, set);
-                    const rangeLabel = input.value.replace(/[\s,]+/g, '_');
-                    save(await subDoc.save(), `${baseName}_Pages_${rangeLabel}.pdf`);
-                    await new Promise(r => setTimeout(r, 400));
+            const baseName = mergeFiles[0]?.name.replace('.pdf', '');
+            if (type === 'split-multiple') {
+                for (let input of document.querySelectorAll('.range-field')) {
+                    const set = parseRange(input.value); if (!set.size) continue;
+                    const doc = await PDFLib.PDFDocument.create();
+                    await buildDoc(doc, set);
+                    save(await doc.save(), `${baseName}_Pages_${input.value.replace(/\s/g,'')}.pdf`);
+                    await new Promise(r => setTimeout(r, 500));
                 }
+            } else {
+                const doc = await PDFLib.PDFDocument.create();
+                await buildDoc(doc, currentMode === 'split' ? parseAllRanges() : null);
+                let name = (currentMode === 'merge' ? document.getElementById('mergeManualName').value : document.getElementById('splitManualName').value) || baseName + '_processed';
+                save(await doc.save(), name + '.pdf');
             }
             setStatus('Done', 'green');
         }
 
-        async function buildDocFromSelection(targetDoc, pageSet) {
+        async function buildDoc(targetDoc, pageSet) {
             const cards = Array.from(document.querySelectorAll('.page-card'));
             for (let card of cards) {
                 const abs = parseInt(card.dataset.absIndex);
                 if (pageSet && !pageSet.has(abs)) continue;
-                const pageId = card.id.replace('card-', '');
-                const [fId, pIdx] = pageId.split('-');
+                const [fId, pIdx] = card.id.replace('card-', '').split('-');
                 const fileObj = mergeFiles.find(f => f.id === fId);
                 const srcDoc = await PDFLib.PDFDocument.load(fileObj.data);
                 const [copied] = await targetDoc.copyPages(srcDoc, [parseInt(pIdx)-1]);
-                copied.setRotation(PDFLib.degrees((globalRotations[pageId] || 0) % 360));
+                copied.setRotation(PDFLib.degrees((globalRotations[card.id.replace('card-','')] || 0) % 360));
                 targetDoc.addPage(copied);
             }
         }
 
+        function rotateSelected(deg) { document.querySelectorAll('.selected-page').forEach(card => {
+            const id = card.id.replace('card-',''); globalRotations[id] = (globalRotations[id] || 0) + deg;
+            applyRotationVisual(id, globalRotations[id]);
+        }); }
+        function applyRotationVisual(id, deg) { document.querySelector(`#card-${id} .canvas-container`).style.transform = `rotate(${deg}deg)`; }
         function updateSidebarList() {
             const list = document.getElementById('mergeList'); list.innerHTML = '';
             mergeFiles.forEach((f, i) => {
-                const li = document.createElement('li');
-                li.className = "p-2 bg-slate-50 rounded-lg flex justify-between";
+                const li = document.createElement('li'); li.className = "p-2 bg-slate-50 rounded-lg flex justify-between";
                 li.innerHTML = `<span>${f.name}</span><div class="space-x-2"><button onclick="moveFile(${i},-1)">▲</button><button onclick="moveFile(${i},1)">▼</button></div>`;
                 list.appendChild(li);
             });
             document.getElementById('mergeExportArea').classList.toggle('hidden', mergeFiles.length === 0);
             document.getElementById('splitExportArea').classList.toggle('hidden', mergeFiles.length === 0);
         }
-        function moveFile(i, d) {
-            const t = i + d;
-            if (t >= 0 && t < mergeFiles.length) { [mergeFiles[i], mergeFiles[t]] = [mergeFiles[t], mergeFiles[i]]; updateSidebarList(); renderGrid(); }
-        }
+        function moveFile(i, d) { const t = i + d; if (t >= 0 && t < mergeFiles.length) { [mergeFiles[i], mergeFiles[t]] = [mergeFiles[t], mergeFiles[i]]; updateSidebarList(); renderGrid(); } }
         function addRangeInput() {
-            const input = document.createElement('input');
-            input.className = "range-field w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none mt-2 transition focus:bg-white";
-            input.placeholder = "Next range...";
-            input.onfocus = () => activeBox = input;
-            input.oninput = updateVisualSelect;
-            document.getElementById('rangeInputs').appendChild(input);
-            input.focus();
+            const input = document.createElement('input'); input.className = "range-field w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:bg-white mt-2";
+            input.onfocus = () => activeBox = input; input.oninput = updateVisualSelect; document.getElementById('rangeInputs').appendChild(input); input.focus();
         }
         function parseRange(str) {
-            let s = new Set();
-            str.replace(/\s+/g, '').split(',').forEach(p => {
-                if (p.includes('-')) {
-                    const [st, en] = p.split('-').map(Number);
-                    if(st && en) for(let i=Math.min(st,en); i<=Math.max(st,en); i++) s.add(i);
-                } else { const n = Number(p); if(n) s.add(n); }
-            });
-            return s;
+            let s = new Set(); str.replace(/\s+/g, '').split(',').forEach(p => {
+                if (p.includes('-')) { const [st, en] = p.split('-').map(Number); if(st && en) for(let i=Math.min(st,en); i<=Math.max(st,en); i++) s.add(i); }
+                else { const n = Number(p); if(n) s.add(n); }
+            }); return s;
         }
         function setToString(s) {
-            const sorted = Array.from(s).sort((a,b) => a-b);
-            if (!sorted.length) return "";
+            const sorted = Array.from(s).sort((a,b) => a-b); if (!sorted.length) return "";
             let res = [], start = sorted[0], end = sorted[0];
             for (let i = 1; i <= sorted.length; i++) {
                 if (i < sorted.length && sorted[i] === end + 1) end = sorted[i];
                 else { res.push(start === end ? `${start}` : `${start}-${end}`); start = sorted[i]; end = sorted[i]; }
-            }
-            return res.join(', ');
+            } return res.join(', ');
         }
-        function parseAllRanges() {
-            let combined = new Set();
-            document.querySelectorAll('.range-field').forEach(input => parseRange(input.value).forEach(n => combined.add(n)));
-            return combined;
-        }
-        function setStatus(t, c) {
-            const colors = { slate: 'bg-slate-300', amber: 'bg-amber-400', blue: 'bg-blue-500', green: 'bg-emerald-500' };
-            document.getElementById('statusText').innerText = t;
-            document.getElementById('statusLed').className = `w-1.5 h-1.5 rounded-full mr-2 ${colors[c]}`;
-        }
-        function save(data, name) {
-            const blob = new Blob([data], { type: 'application/pdf' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
-        }
+        function parseAllRanges() { let c = new Set(); document.querySelectorAll('.range-field').forEach(i => parseRange(i.value).forEach(n => c.add(n))); return c; }
+        function setStatus(t, c) { document.getElementById('statusText').innerText = t; const l = document.getElementById('statusLed'); l.className = `w-1.5 h-1.5 rounded-full mr-2 bg-${c === 'slate' ? 'slate-300' : (c === 'amber' ? 'amber-400' : (c === 'blue' ? 'blue-500' : 'emerald-500'))}`; }
+        function save(data, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type:'application/pdf'})); a.download = name; a.click(); }
         function clearSelection() {
-            if (currentMode === 'split') {
-                document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
-            } else {
-                document.querySelectorAll('.selected-page').forEach(c => c.classList.remove('selected-page'));
-            }
+            if (currentMode === 'split') document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
+            else document.querySelectorAll('.selected-page').forEach(c => c.classList.remove('selected-page'));
             updateVisualSelect();
         }
     </script>
