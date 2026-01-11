@@ -12,8 +12,7 @@
         :root { --bg: #e2e8f0; --accent: #4f46e5; --postit: #fef08a; --title-font: 'Inter', sans-serif; }
         body { font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; background: var(--bg); margin: 0; overflow: hidden; }
         
-        /* MODERN TITLES */
-        h1, h2, .modern-font { font-family: var(--title-font); text-transform: uppercase; letter-spacing: -1px; }
+        h1, h2 { font-family: var(--title-font); text-transform: uppercase; letter-spacing: -1px; }
 
         /* LAUNCHPAD */
         #launch-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: white; z-index: 1000; position: relative; }
@@ -28,19 +27,40 @@
         /* TEACHER VIEW */
         #teacher-view { height: 100vh; width: 100vw; position: relative; }
         #question-header { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
-        #display-q-large, #display-url-large { font-family: var(--title-font); font-size: 3.5rem; margin: 0; color: #1e293b; text-shadow: 2px 2px 0px white; pointer-events: auto; cursor: pointer; }
+        #display-q-large { font-family: var(--title-font); font-size: 3.5rem; margin: 0; color: #1e293b; text-shadow: 2px 2px 0px white; pointer-events: auto; cursor: pointer; }
         
+        /* THE NEW BOTTOM URL DISPLAY */
+        #bottom-url-display { 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            font-family: var(--title-font); font-size: 1.5rem; color: #64748b; 
+            background: rgba(255,255,255,0.7); padding: 5px 20px; border-radius: 50px;
+            white-space: nowrap; z-index: 5;
+        }
+
         /* POST-IT TILES */
         .post-it { 
-            width: 180px; min-height: 180px; padding: 20px; background: var(--postit); 
+            width: 200px; min-height: 200px; padding: 25px; background: var(--postit); 
             box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: absolute; 
             display: flex; align-items: center; justify-content: center; text-align: center;
             font-size: 1.4rem; cursor: grab; border-bottom-right-radius: 40px 5px;
             transform: rotate(-2deg); touch-action: none; user-select: none;
         }
         .del-x { position: absolute; top: 5px; right: 8px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; }
+        
+        /* FONT CONTROLS (HOVER) */
+        .font-controls { 
+            position: absolute; bottom: 5px; right: 8px; display: flex; gap: 5px; 
+            opacity: 0; transition: opacity 0.2s; 
+        }
+        .post-it:hover .font-controls { opacity: 1; }
+        .font-btn { 
+            background: rgba(0,0,0,0.05); border: 1px solid #cbd5e1; border-radius: 4px; 
+            width: 24px; height: 24px; cursor: pointer; font-weight: bold; font-family: sans-serif;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .font-btn:hover { background: #fff; }
 
-        /* QR CODE OVERLAY - NOW MASSIVE */
+        /* QR OVERLAY */
         #qr-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255,255,255,0.95); display: flex; flex-direction: column;
@@ -54,7 +74,6 @@
         
         input, textarea { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid #cbd5e1; font-size: 1.2rem; box-sizing: border-box; }
         button { background: var(--accent); color: white; border: none; padding: 15px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
-        .room-tag { position: fixed; bottom: 10px; left: 10px; font-size: 0.8rem; color: #64748b; font-family: monospace; }
         .controls { position: fixed; bottom: 10px; right: 10px; display: flex; gap: 10px; z-index: 1600; }
         .btn-tiny { background: #94a3b8; width: auto; padding: 5px 10px; font-size: 0.7rem; }
         .hidden { display: none !important; }
@@ -94,21 +113,19 @@
 <div id="teacher-view" class="hidden">
     <div id="question-header">
         <h1 id="display-q-large" onclick="promptNewQ()">SET QUESTION</h1>
-        <h1 id="display-url-large" class="hidden">URL GOES HERE</h1>
     </div>
     
     <div id="board-canvas" style="width:100%; height:100%;"></div>
 
+    <div id="bottom-url-display">https://samsmasm.github.io/dowser#roomname</div>
+
     <div id="qr-overlay" class="hidden" onclick="toggleQR()">
         <h1 style="margin-bottom:20px;">SCAN TO JOIN</h1>
         <div id="qrcode"></div>
-        <p style="margin-top:20px; font-size: 1.5rem;">Click anywhere to close</p>
     </div>
 
-    <div class="room-tag" id="t-room-badge">#room</div>
     <div class="controls">
         <button class="btn-tiny" onclick="toggleQR()">QR CODE</button>
-        <button class="btn-tiny" onclick="toggleURL()">SHOW URL</button>
         <button class="btn-tiny" onclick="downloadCSV()">CSV</button>
         <button class="btn-tiny" onclick="clearAll()" style="background:#fca5a5">CLEAR</button>
     </div>
@@ -139,8 +156,6 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    
-    // 1. IMPROVED ROUTING LOGIC
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role');
     const room = window.location.hash.substring(1);
@@ -148,45 +163,23 @@
 
     window.launch = (mode) => {
         const r = document.getElementById('room-input').value.trim().toLowerCase();
-        if(!r) return alert("Please enter a room name first!");
-        
-        // Force the path to include index.html to prevent GitHub folder loops
+        if(!r) return alert("Enter room name");
         let path = window.location.pathname;
-        if (!path.endsWith('index.html')) {
-            path = path.endsWith('/') ? path + 'index.html' : path + '/index.html';
-        }
-
-        const destination = `${path}?role=${mode}#${r}`;
-        console.log("Launching to:", destination);
-        window.location.href = destination;
+        if (!path.endsWith('index.html')) path = path.endsWith('/') ? path + 'index.html' : path + '/index.html';
+        window.location.href = `${path}?role=${mode}#${r}`;
     };
 
-    // 2. VIEW INITIALIZATION
-    if (room && role) {
+    if (room) {
         document.getElementById('launch-screen').classList.add('hidden');
         if (role === 'teacher') setupTeacher(); else setupStudent();
-    } else if (room && !role) {
-        // Direct link access for students
-        document.getElementById('launch-screen').classList.add('hidden');
-        setupStudent();
     }
 
-    // 3. TEACHER LOGIC
     function setupTeacher() {
         document.getElementById('teacher-view').classList.remove('hidden');
-        document.getElementById('t-room-badge').innerText = "#" + room;
+        const simpleUrl = "https://samsmasm.github.io/dowser#" + room;
+        document.getElementById('bottom-url-display').innerText = simpleUrl;
         
-        const fullUrl = window.location.origin + window.location.pathname + "#" + room;
-        document.getElementById('display-url-large').innerText = fullUrl;
-        
-        // Clear and rebuild QR
-        document.getElementById("qrcode").innerHTML = "";
-        new QRCode(document.getElementById("qrcode"), { 
-            text: fullUrl, 
-            width: 500, 
-            height: 500,
-            correctLevel: QRCode.CorrectLevel.H
-        });
+        new QRCode(document.getElementById("qrcode"), { text: simpleUrl, width: 500, height: 500 });
 
         onValue(ref(db, `rooms/${room}/q`), (snap) => {
             document.getElementById('display-q-large').innerText = snap.val() || "CLICK TO SET QUESTION";
@@ -204,52 +197,50 @@
         div.id = id;
         div.className = 'post-it';
         div.style.zIndex = highestZ++;
-        div.innerHTML = `<span class="del-x" onclick="del('${id}')">×</span><div>${text}</div>`;
+        div.innerHTML = `
+            <span class="del-x" onclick="del('${id}')">×</span>
+            <div class="text-content">${text}</div>
+            <div class="font-controls">
+                <div class="font-btn" onclick="changeFont('${id}', -2)">-</div>
+                <div class="font-btn" onclick="changeFont('${id}', 2)">+</div>
+            </div>
+        `;
         
         const x = Math.random() * (window.innerWidth - 220);
-        const y = 150 + Math.random() * (window.innerHeight - 380);
-        div.style.left = x + 'px'; 
-        div.style.top = y + 'px';
+        const y = 150 + Math.random() * (window.innerHeight - 450);
+        div.style.left = x + 'px'; div.style.top = y + 'px';
         document.getElementById('board-canvas').appendChild(div);
         
-        div.addEventListener('mousedown', () => {
-            div.style.zIndex = highestZ++;
-        });
+        div.addEventListener('mousedown', () => div.style.zIndex = highestZ++);
     }
 
+    window.changeFont = (id, delta) => {
+        const content = document.querySelector(`#${id} .text-content`);
+        const currentSize = parseFloat(window.getComputedStyle(content).fontSize);
+        content.style.fontSize = (currentSize + delta) + "px";
+    };
+
     interact('.post-it').draggable({
-        listeners: { 
-            move (event) {
-                const t = event.target;
-                const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
-                const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
-                t.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
-                t.setAttribute('data-x', x); 
-                t.setAttribute('data-y', y);
-            }
-        }
+        listeners: { move (event) {
+            const t = event.target;
+            const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
+            const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
+            t.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
+            t.setAttribute('data-x', x); t.setAttribute('data-y', y);
+        }}
     });
 
-    // 4. STUDENT LOGIC
     async function setupStudent() {
         document.getElementById('student-view').classList.remove('hidden');
         const snap = await get(ref(db, `rooms/${room}/q`));
-        if (!snap.exists()) {
-            document.getElementById('invalid-room-msg').classList.remove('hidden');
-        }
+        if (!snap.exists()) document.getElementById('invalid-room-msg').classList.remove('hidden');
         onValue(ref(db, `rooms/${room}/q`), snap => {
-            document.getElementById('student-q').innerText = snap.val() || "Waiting for question...";
+            document.getElementById('student-q').innerText = snap.val() || "Waiting...";
         });
     }
 
-    // 5. WINDOW HELPERS
     window.toggleModal = (id) => document.getElementById('modal-'+id).classList.toggle('hidden');
-    
-    window.promptNewQ = () => { 
-        const n = prompt("Enter new question:"); 
-        if(n) set(ref(db, `rooms/${room}/q`), n); 
-    };
-
+    window.promptNewQ = () => { const n = prompt("New Question:"); if(n) set(ref(db, `rooms/${room}/q`), n); };
     window.submitAns = () => {
         const t = document.getElementById('ans-input').value;
         if(t) push(ref(db, `rooms/${room}/answers`), { text: t });
@@ -257,37 +248,14 @@
         document.getElementById('feedback').style.display = "block";
         setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
     };
-
-    window.del = (k) => { 
-        if(confirm("Delete this note?")) {
-            remove(ref(db, `rooms/${room}/answers/${k}`)); 
-            document.getElementById(k).remove(); 
-        }
-    };
-
-    window.clearAll = () => {
-        if(confirm("Clear the entire board?")) {
-            remove(ref(db, `rooms/${room}/answers`));
-            document.getElementById('board-canvas').innerHTML = "";
-        }
-    };
-
+    window.del = (k) => confirm("Delete?") && remove(ref(db, `rooms/${room}/answers/${k}`)) && document.getElementById(k).remove();
+    window.clearAll = () => confirm("Clear?") && remove(ref(db, `rooms/${room}/answers`)) && (document.getElementById('board-canvas').innerHTML="");
     window.toggleQR = () => document.getElementById('qr-overlay').classList.toggle('hidden');
-    
-    window.toggleURL = () => {
-        document.getElementById('display-q-large').classList.toggle('hidden');
-        document.getElementById('display-url-large').classList.toggle('hidden');
-    };
-
     window.downloadCSV = () => {
         let c = "Response\n";
-        document.querySelectorAll('.post-it div').forEach(n => {
-            if(n.innerText) c += `"${n.innerText.replace(/"/g, '""')}"\n`;
-        });
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(new Blob([c], {type:'text/csv'}));
-        a.download = `dowser-${room}.csv`; 
-        a.click();
+        document.querySelectorAll('.post-it .text-content').forEach(n => c += `"${n.innerText.replace(/"/g, '""')}"\n`);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c], {type:'text/csv'}));
+        a.download = `dowser-${room}.csv`; a.click();
     };
 </script>
 </body>
