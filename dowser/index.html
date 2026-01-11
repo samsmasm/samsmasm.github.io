@@ -3,159 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dowser | Live Class Board</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>Dowser | Live Board</title>
     <style>
-        :root { --bg: #f8fafc; --text: #1e293b; --accent: #2563eb; --card: #ffffff; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 700px; }
-        .card { background: var(--card); padding: 2rem; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 20px; transition: all 0.3s; }
+        :root { --bg: #f8fafc; --text: #1e293b; --accent: #4f46e5; --card: #ffffff; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 600px; }
+        .card { background: var(--card); padding: 2rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .hidden { display: none !important; }
-        h1 { margin-top: 0; color: var(--accent); font-weight: 800; }
-        .question-display { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
         
-        /* Inputs */
-        input, textarea { width: 100%; padding: 14px; margin: 10px 0; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; box-sizing: border-box; }
-        button { background: var(--accent); color: white; border: none; padding: 14px; border-radius: 10px; cursor: pointer; font-weight: 700; width: 100%; margin-top: 10px; font-size: 1rem; }
-        button.secondary { background: #64748b; margin-top: 20px; }
+        h1 { color: var(--accent); margin-top: 0; }
+        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+        button { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 700; width: 100%; font-size: 1rem; }
+        button.secondary { background: #64748b; margin-top: 10px; }
         
-        /* Responses */
-        .response-item { background: #fff; border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 12px; border-radius: 12px; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        .direct-link { background: #f1f5f9; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.9rem; color: #475569; word-break: break-all; margin: 10px 0; cursor: pointer; }
+        .response-item { background: #f1f5f9; padding: 12px; margin-bottom: 8px; border-radius: 8px; position: relative; border-left: 4px solid var(--accent); animation: slide 0.3s ease; }
+        @keyframes slide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .delete-x { position: absolute; right: 10px; top: 10px; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .room-badge { background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    
-    <div id="setup-screen" class="card">
-        <h1>Dowser Setup</h1>
-        <p>Prepare your board before students join.</p>
-        <input type="text" id="setup-room" placeholder="Room Name (e.g. History101)">
-        <textarea id="setup-question" rows="3" placeholder="What is your question for the class?"></textarea>
-        <button onclick="launchBoard()">Launch Board</button>
-        <p style="font-size: 0.8rem; text-align: center; color: #94a3b8;">Students can also join via URL hash later.</p>
-    </div>
-
-    <div id="board-screen" class="card hidden">
-        <div class="question-display" id="active-question"></div>
-        <div id="lobby-info">
-            <p>Students join at this link:</p>
-            <div class="direct-link" id="share-url" onclick="copyUrl()"></div>
-            <p class="status">Waiting for entries...</p>
+    <div id="teacher-view" class="card hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h1>Teacher Board</h1>
+            <span class="room-badge" id="teacher-room-id"></span>
         </div>
-        <div id="responses-list"></div>
-        <button onclick="exportData()" class="secondary">Download CSV Report</button>
+        <p>Set the question for your students:</p>
+        <input type="text" id="q-input" placeholder="Type your question here...">
+        <button onclick="updateQ()">Update Question</button>
+        
+        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+        
+        <h3>Student Responses</h3>
+        <div id="responses"></div>
+        
+        <div style="margin-top:20px; display:flex; gap:10px;">
+            <button onclick="downloadCSV()" class="secondary">Download CSV</button>
+            <button onclick="clearAll()" class="secondary" style="background:#ef4444;">Clear All</button>
+        </div>
     </div>
 
-    <div id="student-screen" class="card hidden">
-        <div class="question-display" id="student-question-view">Waiting for teacher...</div>
-        <textarea id="student-answer" rows="4" placeholder="Type your answer..."></textarea>
-        <button onclick="sendAnswer()">Submit Answer</button>
-        <p id="sent-feedback" style="color: #059669; font-weight: 600; text-align: center; opacity: 0;">✔ Sent to Teacher</p>
+    <div id="student-view" class="card hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h1 style="font-size: 1.2rem;">Student Input</h1>
+            <span class="room-badge" id="student-room-id"></span>
+        </div>
+        <h2 id="display-q" style="margin-bottom:20px;">Waiting for teacher...</h2>
+        <textarea id="ans-input" rows="5" placeholder="Type your answer here..."></textarea>
+        <button onclick="submitAns()">Submit to Teacher</button>
+        <p id="feedback" style="text-align:center; color:#059669; font-weight:bold; display:none; margin-top:10px;">✔ Sent!</p>
     </div>
 
+    <div id="error-view" class="card">
+        <h1>Welcome to Dowser</h1>
+        <p>To start, add a room name to the end of the URL, like this:</p>
+        <code id="example-url" style="background:#eee; padding:5px; display:block; margin:10px 0;">...</code>
+    </div>
 </div>
 
-<script>
-    let peer = null;
-    let conn = null;
-    let roomData = { question: '', name: '', responses: [] };
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // AUTO-LOAD: Check if student is joining via link
-    window.onload = () => {
-        if (window.location.hash) {
-            const roomName = window.location.hash.substring(1);
-            startStudentMode(roomName);
+    // Your specific Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
+      authDomain: "dowserboard.firebaseapp.com",
+      projectId: "dowserboard",
+      storageBucket: "dowserboard.firebasestorage.app",
+      messagingSenderId: "1032600748722",
+      appId: "1:1032600748722:web:1584c7508fbbca617cbfab",
+      measurementId: "G-Q749TWRV1Z"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Get Room and Role from URL
+    const room = window.location.hash.substring(1).toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const isTeacher = params.get('role') === 'teacher';
+
+    let allResponses = [];
+
+    // Setup Logic
+    if (!room) {
+        document.getElementById('example-url').innerText = window.location.href + "#Science101";
+    } else {
+        document.getElementById('error-view').classList.add('hidden');
+        
+        if (isTeacher) {
+            setupTeacher();
+        } else {
+            setupStudent();
+        }
+    }
+
+    function setupTeacher() {
+        document.getElementById('teacher-view').classList.remove('hidden');
+        document.getElementById('teacher-room-id').innerText = "#" + room;
+        
+        // Sync Responses
+        onValue(ref(db, `rooms/${room}/answers`), (snap) => {
+            const container = document.getElementById('responses');
+            container.innerHTML = "";
+            allResponses = [];
+            snap.forEach(child => {
+                const data = child.val();
+                allResponses.push(data.text);
+                const div = document.createElement('div');
+                div.className = 'response-item';
+                div.innerHTML = `${data.text} <span class="delete-x" onclick="del('${child.key}')">Delete</span>`;
+                container.prepend(div);
+            });
+        });
+    }
+
+    function setupStudent() {
+        document.getElementById('student-view').classList.remove('hidden');
+        document.getElementById('student-room-id').innerText = "#" + room;
+        
+        // Sync Question
+        onValue(ref(db, `rooms/${room}/q`), (snap) => {
+            document.getElementById('display-q').innerText = snap.val() || "The teacher hasn't set a question yet.";
+        });
+    }
+
+    // Global Functions for Buttons
+    window.updateQ = () => {
+        const val = document.getElementById('q-input').value;
+        if(val) set(ref(db, `rooms/${room}/q`), val);
+    };
+
+    window.submitAns = () => {
+        const text = document.getElementById('ans-input').value;
+        if(text) {
+            push(ref(db, `rooms/${room}/answers`), { text, ts: Date.now() });
+            document.getElementById('ans-input').value = "";
+            document.getElementById('feedback').style.display = "block";
+            setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
         }
     };
 
-    // --- TEACHER LOGIC ---
-    function launchBoard() {
-        roomData.name = document.getElementById('setup-room').value.trim().replace(/\s+/g, '-');
-        roomData.question = document.getElementById('setup-question').value.trim();
-        
-        if (!roomData.name || !roomData.question) return alert("Please fill in both fields.");
+    window.del = (key) => {
+        if(confirm("Remove this response?")) remove(ref(db, `rooms/${room}/answers/${key}`));
+    };
 
-        peer = new Peer("dw-" + roomData.name, {
-            config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
-        });
+    window.clearAll = () => {
+        if(confirm("Clear ALL responses?")) remove(ref(db, `rooms/${room}/answers`));
+    };
 
-        peer.on('open', () => {
-            document.getElementById('active-question').innerText = roomData.question;
-            const url = window.location.origin + window.location.pathname + "#" + roomData.name;
-            document.getElementById('share-url').innerText = url;
-            showScreen('board-screen');
-            window.onbeforeunload = () => "Close board? All responses will be lost.";
-        });
-
-        peer.on('connection', (c) => {
-            // When a student connects, immediately send them the question
-            c.on('open', () => {
-                c.send({ type: 'QUESTION', text: roomData.question });
-            });
-            c.on('data', (data) => {
-                if (data.type === 'ANSWER') addResponse(data.text);
-            });
-        });
-    }
-
-    function addResponse(text) {
-        roomData.responses.push({ time: new Date().toLocaleTimeString(), text: text });
-        const list = document.getElementById('responses-list');
-        const div = document.createElement('div');
-        div.className = 'response-item';
-        div.textContent = text;
-        div.onclick = function() { if(confirm('Delete?')) this.remove(); };
-        list.prepend(div);
-    }
-
-    // --- STUDENT LOGIC ---
-    function startStudentMode(roomName) {
-        showScreen('student-screen');
-        peer = new Peer(null, { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
-        
-        peer.on('open', () => {
-            conn = peer.connect("dw-" + roomName);
-            conn.on('data', (data) => {
-                if (data.type === 'QUESTION') {
-                    document.getElementById('student-question-view').innerText = data.text;
-                }
-            });
-            conn.on('error', () => { document.getElementById('student-question-view').innerText = "Room not found. Check link."; });
-        });
-    }
-
-    function sendAnswer() {
-        const val = document.getElementById('student-answer').value.trim();
-        if (!val || !conn) return;
-        conn.send({ type: 'ANSWER', text: val });
-        document.getElementById('student-answer').value = "";
-        const fb = document.getElementById('sent-feedback');
-        fb.style.opacity = 1; setTimeout(() => fb.style.opacity = 0, 2000);
-    }
-
-    // --- HELPERS ---
-    function showScreen(id) {
-        ['setup-screen', 'board-screen', 'student-screen'].forEach(s => document.getElementById(s).classList.add('hidden'));
-        document.getElementById(id).classList.remove('hidden');
-    }
-
-    function copyUrl() {
-        const text = document.getElementById('share-url').innerText;
-        navigator.clipboard.writeText(text);
-        alert("Link copied! Share this with your students.");
-    }
-
-    function exportData() {
-        let csv = "Time,Response\n" + roomData.responses.map(r => `${r.time},"${r.text}"`).join("\n");
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
+    window.downloadCSV = () => {
+        const content = "Response\n" + allResponses.map(r => `"${r.replace(/"/g, '""')}"`).join("\n");
+        const blob = new Blob([content], { type: 'text/csv' });
         const a = document.createElement('a');
-        a.href = url; a.download = `Dowser-${roomData.name}.csv`; a.click();
-    }
+        a.href = window.URL.createObjectURL(blob);
+        a.download = `dowser-${room}.csv`;
+        a.click();
+    };
 </script>
-
 </body>
 </html>
