@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple PDF Merger</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sortable-ghost { opacity: 0.4; background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center py-10 px-4">
+
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl">
+        <h1 class="text-2xl font-bold mb-4 text-center">PDF Merger</h1>
+        <p class="text-gray-600 mb-6 text-center text-sm">Upload PDFs, drag to reorder, then merge.</p>
+
+        <div class="mb-6">
+            <label class="block w-full border-2 border-dashed border-blue-400 rounded-lg p-8 text-center cursor-pointer hover:bg-blue-50 transition">
+                <input type="file" id="fileInput" multiple accept="application/pdf" class="hidden">
+                <span class="text-blue-600 font-medium">Click to select files</span> or drag them here
+            </label>
+        </div>
+
+        <ul id="fileList" class="space-y-2 mb-6">
+            </ul>
+
+        <button id="mergeBtn" disabled class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition">
+            Merge & Download PDF
+        </button>
+        
+        <p id="status" class="mt-4 text-center text-sm font-medium text-gray-500"></p>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const status = document.getElementById('status');
+
+        let filesArray = [];
+
+        // Initialize Drag and Drop Reordering
+        const sortable = new Sortable(fileList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost'
+        });
+
+        // Handle File Selection
+        fileInput.addEventListener('change', (e) => {
+            const selectedFiles = Array.from(e.target.files);
+            
+            selectedFiles.forEach(file => {
+                const fileId = Math.random().toString(36).substr(2, 9);
+                filesArray.push({ id: fileId, file: file });
+
+                const li = document.createElement('li');
+                li.dataset.id = fileId;
+                li.className = 'flex items-center justify-between p-3 bg-gray-50 border rounded cursor-move hover:border-blue-300';
+                li.innerHTML = `
+                    <div class="flex items-center truncate">
+                        <span class="mr-3 text-gray-400">☰</span>
+                        <span class="truncate text-sm font-medium">${file.name}</span>
+                    </div>
+                    <button class="text-red-500 text-xs font-bold px-2 hover:underline ml-4">Remove</button>
+                `;
+
+                // Remove file functionality
+                li.querySelector('button').onclick = () => {
+                    filesArray = filesArray.filter(f => f.id !== fileId);
+                    li.remove();
+                    updateButtonState();
+                };
+
+                fileList.appendChild(li);
+            });
+            
+            updateButtonState();
+            fileInput.value = ''; // Reset input
+        });
+
+        function updateButtonState() {
+            mergeBtn.disabled = filesArray.length < 2;
+        }
+
+        // The Merging Logic
+        mergeBtn.onclick = async () => {
+            try {
+                status.innerText = "Processing... please wait.";
+                mergeBtn.disabled = true;
+
+                const { PDFDocument } = PDFLib;
+                const mergedPdf = await PDFDocument.create();
+
+                // Get the current order from the UI
+                const currentOrder = sortable.toArray();
+
+                for (const id of currentOrder) {
+                    const fileObj = filesArray.find(f => f.id === id);
+                    const fileBuffer = await fileObj.file.arrayBuffer();
+                    const pdf = await PDFDocument.load(fileBuffer);
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                // Generate and Download
+                const pdfBytes = await mergedPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'merged_document.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                status.innerText = "Done! Your PDF has been downloaded.";
+            } catch (error) {
+                console.error(error);
+                status.innerText = "Error: Could not merge PDFs. (Are any files password protected?)";
+            } finally {
+                mergeBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
