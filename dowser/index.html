@@ -95,23 +95,32 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    
+    // This part handles the redirection
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role');
     const room = window.location.hash.substring(1);
 
-    // ROUTING LOGIC
-    if (room) {
-        document.getElementById('launch-screen').classList.add('hidden');
-        if (role === 'teacher') setupTeacher(); else setupStudent();
-    }
-
+    // FIX: Stay within the current folder
     window.launch = (mode) => {
         const r = document.getElementById('room-input').value.trim().toLowerCase();
         if(!r) return alert("Enter a room name");
-        window.location.href = `?role=${mode}#${r}`;
-        window.location.reload();
+        
+        // This keeps the /dowser/ part of your URL intact
+        const newUrl = window.location.pathname + `?role=${mode}#${r}`;
+        console.log("Redirecting to: " + newUrl);
+        window.location.href = newUrl;
     };
 
+    if (room && role) {
+        document.getElementById('launch-screen').classList.add('hidden');
+        if (role === 'teacher') setupTeacher(); 
+        else setupStudent();
+    } else if (room && !role) {
+        // If someone just types #roomname, assume they are a student
+        document.getElementById('launch-screen').classList.add('hidden');
+        setupStudent();
+    }
     // TEACHER LOGIC
     function setupTeacher() {
         document.body.style.overflow = "hidden";
