@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate PDF Tool</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .page-canvas { border: 1px solid #ddd; margin-bottom: 10px; transition: opacity 0.3s; }
+        .excluded { opacity: 0.2; filter: grayscale(1); }
+        .range-tag { background: #dbeafe; border: 1px solid #3b82f6; padding: 2px 8px; border-radius: 4px; margin: 2px; display: inline-block; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-4 md:p-8 font-sans">
+
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border">
+                <h2 class="text-xl font-bold mb-4">1. Upload PDF</h2>
+                <input type="file" id="pdfInput" accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <p id="sizeWarning" class="text-red-500 text-xs mt-2 hidden">Warning: This file is large (>50MB). Performance may be slow.</p>
+            </div>
+
+            <div id="editSection" class="bg-white p-6 rounded-xl shadow-sm border hidden">
+                <h2 class="text-xl font-bold mb-4">2. Define Ranges</h2>
+                <p class="text-xs text-gray-500 mb-2 italic">Format: 1-3, 5, 8-10</p>
+                
+                <div id="rangeContainer" class="space-y-3">
+                    <div class="flex gap-2">
+                        <input type="text" placeholder="e.g. 1-3" class="range-input border rounded px-3 py-2 w-full focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                
+                <button id="addRange" class="mt-3 text-sm text-blue-600 font-bold hover:underline">+ Add Another Range</button>
+
+                <hr class="my-6">
+
+                <h2 class="text-xl font-bold mb-4">3. Export Options</h2>
+                <div class="space-y-2">
+                    <button id="exportSingle" class="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition">Merge Ranges to 1 PDF</button>
+                    <button id="exportZip" class="w-full bg-indigo-600 text-white py-2 rounded font-medium hover:bg-indigo-700 transition">Slice to Separate PDFs (.zip)</button>
+                </div>
+                <p id="status" class="text-center text-xs mt-4 text-gray-600"></p>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2">
+            <div id="previewContainer" class="bg-white p-4 rounded-xl shadow-inner border h-[85vh] overflow-y-auto flex flex-col items-center relative">
+                <div id="placeholder" class="text-gray-300 mt-20 text-center">
+                    <p class="text-5xl mb-4">📄</p>
+                    <p>Upload a PDF to see preview</p>
+                </div>
+                <div id="canvasWrapper"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const pdfInput = document.getElementById('pdfInput');
+        const rangeContainer = document.getElementById('rangeContainer');
+        const addRangeBtn = document.getElementById('addRange');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const editSection = document.getElementById('editSection');
+        const status = document.getElementById('status');
+
+        let currentPdfDoc = null;
+        let pdfBytes = null;
+        let totalPages = 0;
+
+        // --- 1. FILE UPLOAD & PREVIEW ---
+        pdfInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 50 * 1024 * 1024) {
+                if (!confirm("This file is over 50MB. It might crash your browser tab. Continue?")) return;
+            }
+
+            status.innerText = "Loading preview...";
+            pdfBytes = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({data: pdfBytes});
+            currentPdfDoc = await loadingTask.promise;
+            totalPages = currentPdfDoc.numPages;
+
+            canvasWrapper.innerHTML = '';
+            document.getElementById('placeholder').classList.add('hidden');
+            editSection.classList.remove('hidden');
+
+            for (let i = 1; i <= totalPages; i++) {
+                const page = await currentPdfDoc.getPage(i);
+                const viewport = page.getViewport({scale: 0.5});
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                canvas.className = "page-canvas rounded shadow-sm relative";
+                canvas.dataset.pageNumber = i;
+
+                // Wrapper for page labeling
+                const div = document.createElement('div');
+                div.className = "relative inline-block";
+                div.innerHTML = `<span class="absolute top-2 left-2 bg-black/50 text-white text-[10px] px-1.5 rounded z-10">Pg ${i}</span>`;
+                div.appendChild(canvas);
+                canvasWrapper.appendChild(div);
+
+                await page.render({canvasContext: context, viewport: viewport}).promise;
+            }
+            status.innerText = "Ready.";
+            updateHighlights();
+        };
+
+        // --- 2. RANGE HANDLING ---
+        addRangeBtn.onclick = () => {
+            const input = document.createElement('input');
+            input.type = "text";
+            input.placeholder = "e.g. 5-10";
+            input.className = "range-input border rounded px-3 py-2 w-full focus:ring-2 focus:ring-blue-500 outline-none mt-2";
+            input.oninput = updateHighlights;
+            rangeContainer.appendChild(input);
+        };
+
+        document.addEventListener('input', (e) => {
+            if (e.target.classList.contains('range-input')) updateHighlights();
+        });
+
+        function getSelectedPages() {
+            const inputs = document.querySelectorAll('.range-input');
+            let selected = new Set();
+            let rangesArr = [];
+
+            inputs.forEach(input => {
+                const val = input.value.replace(/\s+/g, '');
+                if (!val) return;
+                
+                const parts = val.split(',');
+                parts.forEach(part => {
+                    if (part.includes('-')) {
+                        const [start, end] = part.split('-').map(Number);
+                        if (start && end) {
+                            rangesArr.push({start, end});
+                            for (let i = start; i <= end; i++) selected.add(i);
+                        }
+                    } else {
+                        const num = Number(part);
+                        if (num) {
+                            selected.add(num);
+                            rangesArr.push({start: num, end: num});
+                        }
+                    }
+                });
+            });
+            return { selected, rangesArr };
+        }
+
+        function updateHighlights() {
+            const { selected } = getSelectedPages();
+            const canvases = document.querySelectorAll('.page-canvas');
+            canvases.forEach(canvas => {
+                const pg = parseInt(canvas.dataset.pageNumber);
+                if (selected.size === 0 || selected.has(pg)) {
+                    canvas.classList.remove('excluded');
+                } else {
+                    canvas.classList.add('excluded');
+                }
+            });
+        }
+
+        // --- 3. EXPORT LOGIC ---
+        async function processPdf(mode) {
+            const { selected, rangesArr } = getSelectedPages();
+            if (rangesArr.length === 0) return alert("Please enter at least one page range.");
+
+            status.innerText = "Processing...";
+            const srcDoc = await PDFLib.PDFDocument.load(pdfBytes);
+            
+            if (mode === 'single') {
+                const newDoc = await PDFLib.PDFDocument.create();
+                for (const pg of Array.from(selected).sort((a,b) => a-b)) {
+                    if (pg > 0 && pg <= totalPages) {
+                        const [copiedPage] = await newDoc.copyPages(srcDoc, [pg - 1]);
+                        newDoc.addPage(copiedPage);
+                    }
+                }
+                download(await newDoc.save(), "merged_selection.pdf", "application/pdf");
+            } 
+            else if (mode === 'zip') {
+                const zip = new JSZip();
+                for (let i = 0; i < rangesArr.length; i++) {
+                    const range = rangesArr[i];
+                    const newDoc = await PDFLib.PDFDocument.create();
+                    const indices = [];
+                    for(let j = range.start; j <= range.end; j++) {
+                        if (j > 0 && j <= totalPages) indices.push(j - 1);
+                    }
+                    if (indices.length > 0) {
+                        const copiedPages = await newDoc.copyPages(srcDoc, indices);
+                        copiedPages.forEach(p => newDoc.addPage(p));
+                        const bytes = await newDoc.save();
+                        zip.file(`part_${i+1}_pages_${range.start}-${range.end}.pdf`, bytes);
+                    }
+                }
+                const zipBlob = await zip.generateAsync({type: "blob"});
+                download(zipBlob, "split_pdfs.zip", "application/zip");
+            }
+            status.innerText = "Done!";
+        }
+
+        function download(data, name, type) {
+            const blob = new Blob([data], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            a.click();
+        }
+
+        document.getElementById('exportSingle').onclick = () => processPdf('single');
+        document.getElementById('exportZip').onclick = () => processPdf('zip');
+
+    </script>
+</body>
+</html>
