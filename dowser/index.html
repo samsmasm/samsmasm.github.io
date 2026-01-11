@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dowser | Live Class Board</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --bg: #f8fafc; --text: #1e293b; --accent: #2563eb; --card: #ffffff; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 700px; }
+        .card { background: var(--card); padding: 2rem; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 20px; transition: all 0.3s; }
+        .hidden { display: none !important; }
+        h1 { margin-top: 0; color: var(--accent); font-weight: 800; }
+        .question-display { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        
+        /* Inputs */
+        input, textarea { width: 100%; padding: 14px; margin: 10px 0; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; box-sizing: border-box; }
+        button { background: var(--accent); color: white; border: none; padding: 14px; border-radius: 10px; cursor: pointer; font-weight: 700; width: 100%; margin-top: 10px; font-size: 1rem; }
+        button.secondary { background: #64748b; margin-top: 20px; }
+        
+        /* Responses */
+        .response-item { background: #fff; border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 12px; border-radius: 12px; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .direct-link { background: #f1f5f9; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.9rem; color: #475569; word-break: break-all; margin: 10px 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="setup-screen" class="card">
+        <h1>Dowser Setup</h1>
+        <p>Prepare your board before students join.</p>
+        <input type="text" id="setup-room" placeholder="Room Name (e.g. History101)">
+        <textarea id="setup-question" rows="3" placeholder="What is your question for the class?"></textarea>
+        <button onclick="launchBoard()">Launch Board</button>
+        <p style="font-size: 0.8rem; text-align: center; color: #94a3b8;">Students can also join via URL hash later.</p>
+    </div>
+
+    <div id="board-screen" class="card hidden">
+        <div class="question-display" id="active-question"></div>
+        <div id="lobby-info">
+            <p>Students join at this link:</p>
+            <div class="direct-link" id="share-url" onclick="copyUrl()"></div>
+            <p class="status">Waiting for entries...</p>
+        </div>
+        <div id="responses-list"></div>
+        <button onclick="exportData()" class="secondary">Download CSV Report</button>
+    </div>
+
+    <div id="student-screen" class="card hidden">
+        <div class="question-display" id="student-question-view">Waiting for teacher...</div>
+        <textarea id="student-answer" rows="4" placeholder="Type your answer..."></textarea>
+        <button onclick="sendAnswer()">Submit Answer</button>
+        <p id="sent-feedback" style="color: #059669; font-weight: 600; text-align: center; opacity: 0;">✔ Sent to Teacher</p>
+    </div>
+
+</div>
+
+<script>
+    let peer = null;
+    let conn = null;
+    let roomData = { question: '', name: '', responses: [] };
+
+    // AUTO-LOAD: Check if student is joining via link
+    window.onload = () => {
+        if (window.location.hash) {
+            const roomName = window.location.hash.substring(1);
+            startStudentMode(roomName);
+        }
+    };
+
+    // --- TEACHER LOGIC ---
+    function launchBoard() {
+        roomData.name = document.getElementById('setup-room').value.trim().replace(/\s+/g, '-');
+        roomData.question = document.getElementById('setup-question').value.trim();
+        
+        if (!roomData.name || !roomData.question) return alert("Please fill in both fields.");
+
+        peer = new Peer("dw-" + roomData.name, {
+            config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
+        });
+
+        peer.on('open', () => {
+            document.getElementById('active-question').innerText = roomData.question;
+            const url = window.location.origin + window.location.pathname + "#" + roomData.name;
+            document.getElementById('share-url').innerText = url;
+            showScreen('board-screen');
+            window.onbeforeunload = () => "Close board? All responses will be lost.";
+        });
+
+        peer.on('connection', (c) => {
+            // When a student connects, immediately send them the question
+            c.on('open', () => {
+                c.send({ type: 'QUESTION', text: roomData.question });
+            });
+            c.on('data', (data) => {
+                if (data.type === 'ANSWER') addResponse(data.text);
+            });
+        });
+    }
+
+    function addResponse(text) {
+        roomData.responses.push({ time: new Date().toLocaleTimeString(), text: text });
+        const list = document.getElementById('responses-list');
+        const div = document.createElement('div');
+        div.className = 'response-item';
+        div.textContent = text;
+        div.onclick = function() { if(confirm('Delete?')) this.remove(); };
+        list.prepend(div);
+    }
+
+    // --- STUDENT LOGIC ---
+    function startStudentMode(roomName) {
+        showScreen('student-screen');
+        peer = new Peer(null, { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
+        
+        peer.on('open', () => {
+            conn = peer.connect("dw-" + roomName);
+            conn.on('data', (data) => {
+                if (data.type === 'QUESTION') {
+                    document.getElementById('student-question-view').innerText = data.text;
+                }
+            });
+            conn.on('error', () => { document.getElementById('student-question-view').innerText = "Room not found. Check link."; });
+        });
+    }
+
+    function sendAnswer() {
+        const val = document.getElementById('student-answer').value.trim();
+        if (!val || !conn) return;
+        conn.send({ type: 'ANSWER', text: val });
+        document.getElementById('student-answer').value = "";
+        const fb = document.getElementById('sent-feedback');
+        fb.style.opacity = 1; setTimeout(() => fb.style.opacity = 0, 2000);
+    }
+
+    // --- HELPERS ---
+    function showScreen(id) {
+        ['setup-screen', 'board-screen', 'student-screen'].forEach(s => document.getElementById(s).classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    function copyUrl() {
+        const text = document.getElementById('share-url').innerText;
+        navigator.clipboard.writeText(text);
+        alert("Link copied! Share this with your students.");
+    }
+
+    function exportData() {
+        let csv = "Time,Response\n" + roomData.responses.map(r => `${r.time},"${r.text}"`).join("\n");
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `Dowser-${roomData.name}.csv`; a.click();
+    }
+</script>
+
+</body>
+</html>
