@@ -7,17 +7,28 @@
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        :root { --bg: #e2e8f0; --accent: #4f46e5; --postit: #fef08a; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
+        
+        :root { --bg: #e2e8f0; --accent: #4f46e5; --postit: #fef08a; --title-font: 'Inter', sans-serif; }
         body { font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; background: var(--bg); margin: 0; overflow: hidden; }
         
-        /* LAUNCHPAD STYLES */
+        /* MODERN TITLES */
+        h1, h2, .modern-font { font-family: var(--title-font); text-transform: uppercase; letter-spacing: -1px; }
+
+        /* LAUNCHPAD */
         #launch-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: white; z-index: 1000; position: relative; }
         .setup-box { background: #f8fafc; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
+        .info-links { margin-top: 15px; display: flex; gap: 20px; justify-content: center; }
+        .info-link { cursor: pointer; color: #64748b; font-size: 0.9rem; text-decoration: underline; }
+
+        /* MODALS */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-content { background: white; padding: 30px; border-radius: 20px; max-width: 500px; width: 90%; position: relative; }
 
         /* TEACHER VIEW */
         #teacher-view { height: 100vh; width: 100vw; position: relative; }
-        #question-header { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; }
-        #display-q-large { font-size: 3.5rem; font-weight: 800; margin: 0; color: #1e293b; text-shadow: 2px 2px 0px white; cursor: pointer; }
+        #question-header { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
+        #display-q-large, #display-url-large { font-family: var(--title-font); font-size: 3.5rem; margin: 0; color: #1e293b; text-shadow: 2px 2px 0px white; pointer-events: auto; cursor: pointer; }
         
         /* POST-IT TILES */
         .post-it { 
@@ -27,20 +38,25 @@
             font-size: 1.4rem; cursor: grab; border-bottom-right-radius: 40px 5px;
             transform: rotate(-2deg); touch-action: none; user-select: none;
         }
-        .post-it:active { cursor: grabbing; box-shadow: 10px 10px 25px rgba(0,0,0,0.2); }
-        .del-x { position: absolute; top: 5px; right: 8px; color: #94a3b8; cursor: pointer; font-size: 1rem; }
-        .del-x:hover { color: #ef4444; }
+        .del-x { position: absolute; top: 5px; right: 8px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; }
+
+        /* QR CODE OVERLAY - NOW MASSIVE */
+        #qr-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.95); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 1500; 
+        }
+        #qrcode img { height: 60vh !important; width: auto !important; }
 
         /* STUDENT VIEW */
-        #student-view { max-width: 500px; margin: 40px auto; padding: 20px; font-family: sans-serif; }
+        #student-view { max-width: 500px; margin: 40px auto; padding: 20px; font-family: sans-serif; text-align: center; }
+        .error-msg { color: #ef4444; background: #fee2e2; padding: 15px; border-radius: 12px; margin-bottom: 20px; }
         
-        /* UI ELEMENTS */
         input, textarea { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid #cbd5e1; font-size: 1.2rem; box-sizing: border-box; }
-        button { background: var(--accent); color: white; border: none; padding: 15px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 1.1rem; width: 100%; margin-top: 10px; }
+        button { background: var(--accent); color: white; border: none; padding: 15px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
         .room-tag { position: fixed; bottom: 10px; left: 10px; font-size: 0.8rem; color: #64748b; font-family: monospace; }
-        .controls { position: fixed; bottom: 10px; right: 10px; display: flex; gap: 10px; }
+        .controls { position: fixed; bottom: 10px; right: 10px; display: flex; gap: 10px; z-index: 1600; }
         .btn-tiny { background: #94a3b8; width: auto; padding: 5px 10px; font-size: 0.7rem; }
-        #qr-container { background: white; padding: 10px; border-radius: 8px; position: fixed; bottom: 50px; right: 10px; display: none; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -48,41 +64,69 @@
 
 <div id="launch-screen">
     <div class="setup-box">
-        <h1 style="margin-top:0;">Dowser</h1>
-        <input type="text" id="room-input" placeholder="Room Name (e.g. Bio101)">
-        <button onclick="launch('teacher')">I'm the Teacher</button>
-        <button onclick="launch('student')" style="background:#64748b">I'm a Student</button>
+        <h1 style="margin-top:0; font-size: 3rem;">DOWSER</h1>
+        <input type="text" id="room-input" placeholder="Room Name">
+        <button onclick="launch('teacher')">TEACHER VIEW</button>
+        <button onclick="launch('student')" style="background:#64748b">STUDENT VIEW</button>
+        <div class="info-links">
+            <span class="info-link" onclick="toggleModal('help')">Help!</span>
+            <span class="info-link" onclick="toggleModal('what')">What?!</span>
+        </div>
+    </div>
+</div>
+
+<div id="modal-help" class="modal hidden" onclick="toggleModal('help')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h2>HELP!</h2>
+        <p>PLACE HOLDER HELP</p>
+        <button onclick="toggleModal('help')">Close</button>
+    </div>
+</div>
+
+<div id="modal-what" class="modal hidden" onclick="toggleModal('what')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h2>WHAT?!</h2>
+        <p>PLACEHOLDER WHAT</p>
+        <button onclick="toggleModal('what')">Close</button>
     </div>
 </div>
 
 <div id="teacher-view" class="hidden">
     <div id="question-header">
-        <h1 id="display-q-large" onclick="promptNewQ()">Click to set question...</h1>
+        <h1 id="display-q-large" onclick="promptNewQ()">SET QUESTION</h1>
+        <h1 id="display-url-large" class="hidden">URL GOES HERE</h1>
     </div>
     
     <div id="board-canvas" style="width:100%; height:100%;"></div>
 
-    <div class="room-tag" id="t-room-badge">#room</div>
-    
-    <div id="qr-container"><div id="qrcode"></div></div>
+    <div id="qr-overlay" class="hidden" onclick="toggleQR()">
+        <h1 style="margin-bottom:20px;">SCAN TO JOIN</h1>
+        <div id="qrcode"></div>
+        <p style="margin-top:20px; font-size: 1.5rem;">Click anywhere to close</p>
+    </div>
 
+    <div class="room-tag" id="t-room-badge">#room</div>
     <div class="controls">
-        <button class="btn-tiny" onclick="toggleQR()">Show QR</button>
+        <button class="btn-tiny" onclick="toggleQR()">QR CODE</button>
+        <button class="btn-tiny" onclick="toggleURL()">SHOW URL</button>
         <button class="btn-tiny" onclick="downloadCSV()">CSV</button>
-        <button class="btn-tiny" onclick="clearAll()" style="background:#fca5a5">Clear</button>
+        <button class="btn-tiny" onclick="clearAll()" style="background:#fca5a5">CLEAR</button>
     </div>
 </div>
 
 <div id="student-view" class="hidden">
-    <h2 id="student-q" style="font-family: sans-serif;">Waiting...</h2>
+    <div id="invalid-room-msg" class="hidden error-msg">
+        Check your typing! You've come to an empty room.
+    </div>
+    <h2 id="student-q">...</h2>
     <textarea id="ans-input" rows="5" placeholder="Your answer..."></textarea>
-    <button onclick="submitAns()">Send to Board</button>
-    <p id="feedback" style="text-align:center; color:green; display:none;">Sent!</p>
+    <button onclick="submitAns()">SEND TO BOARD</button>
+    <p id="feedback" style="color:green; display:none; margin-top:10px;">✔ SENT!</p>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue, remove, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
@@ -95,55 +139,38 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    
-    // This part handles the redirection
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role');
     const room = window.location.hash.substring(1);
+    let highestZ = 100;
 
-    // FIX: Stay within the current folder
     window.launch = (mode) => {
         const r = document.getElementById('room-input').value.trim().toLowerCase();
         if(!r) return alert("Enter a room name");
-        
-        // This keeps the /dowser/ part of your URL intact
-        const newUrl = window.location.pathname + `?role=${mode}#${r}`;
-        console.log("Redirecting to: " + newUrl);
-        window.location.href = newUrl;
+        window.location.href = window.location.pathname + `?role=${mode}#${r}`;
+        window.location.reload();
     };
 
-    if (room && role) {
+    if (room) {
         document.getElementById('launch-screen').classList.add('hidden');
-        if (role === 'teacher') setupTeacher(); 
-        else setupStudent();
-    } else if (room && !role) {
-        // If someone just types #roomname, assume they are a student
-        document.getElementById('launch-screen').classList.add('hidden');
-        setupStudent();
+        if (role === 'teacher') setupTeacher(); else setupStudent();
     }
-    // TEACHER LOGIC
+
     function setupTeacher() {
-        document.body.style.overflow = "hidden";
         document.getElementById('teacher-view').classList.remove('hidden');
         document.getElementById('t-room-badge').innerText = "#" + room;
+        const fullUrl = window.location.origin + window.location.pathname + "#" + room;
+        document.getElementById('display-url-large').innerText = fullUrl;
         
-        // QR Code Generation
-        new QRCode(document.getElementById("qrcode"), {
-            text: window.location.origin + window.location.pathname + "#" + room,
-            width: 128, height: 128
-        });
+        new QRCode(document.getElementById("qrcode"), { text: fullUrl, width: 500, height: 500 });
 
         onValue(ref(db, `rooms/${room}/q`), (snap) => {
-            document.getElementById('display-q-large').innerText = snap.val() || "Click to set question";
+            document.getElementById('display-q-large').innerText = snap.val() || "CLICK TO SET QUESTION";
         });
 
         onValue(ref(db, `rooms/${room}/answers`), (snap) => {
-            const canvas = document.getElementById('board-canvas');
-            // Only add new items
             snap.forEach(child => {
-                if(!document.getElementById(child.key)) {
-                    createPostIt(child.key, child.val().text);
-                }
+                if(!document.getElementById(child.key)) createPostIt(child.key, child.val().text);
             });
         });
     }
@@ -152,84 +179,59 @@
         const div = document.createElement('div');
         div.id = id;
         div.className = 'post-it';
+        div.style.zIndex = highestZ++;
         div.innerHTML = `<span class="del-x" onclick="del('${id}')">×</span><div>${text}</div>`;
         
-        // Random placement
-        const x = Math.random() * (window.innerWidth - 200);
-        const y = 150 + Math.random() * (window.innerHeight - 350);
-        const rot = (Math.random() * 10) - 5;
-        
-        div.style.left = x + 'px';
-        div.style.top = y + 'px';
-        div.style.transform = `rotate(${rot}deg)`;
-        
+        const x = Math.random() * (window.innerWidth - 220);
+        const y = 150 + Math.random() * (window.innerHeight - 380);
+        div.style.left = x + 'px'; div.style.top = y + 'px';
         document.getElementById('board-canvas').appendChild(div);
+        
+        div.addEventListener('mousedown', () => div.style.zIndex = highestZ++);
     }
 
-    // INTERACT.JS FOR DRAGGING
     interact('.post-it').draggable({
-        listeners: {
-            move (event) {
-                const target = event.target;
-                const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
-                const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
-                target.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
-                target.setAttribute('data-x', x);
-                target.setAttribute('data-y', y);
-            }
-        }
+        listeners: { move (event) {
+            const t = event.target;
+            const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
+            const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
+            t.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
+            t.setAttribute('data-x', x); t.setAttribute('data-y', y);
+        }}
     });
 
-    // STUDENT LOGIC
-    function setupStudent() {
-        document.body.style.overflow = "auto";
-        document.body.style.background = "white";
+    async function setupStudent() {
         document.getElementById('student-view').classList.remove('hidden');
+        const snap = await get(ref(db, `rooms/${room}/q`));
+        if (!snap.exists()) {
+            document.getElementById('invalid-room-msg').classList.remove('hidden');
+        }
         onValue(ref(db, `rooms/${room}/q`), snap => {
             document.getElementById('student-q').innerText = snap.val() || "Waiting for question...";
         });
     }
 
-    // HELPERS
-    window.promptNewQ = () => {
-        const newQ = prompt("Enter the new question:");
-        if(newQ) set(ref(db, `rooms/${room}/q`), newQ);
-    };
-
+    window.toggleModal = (id) => document.getElementById('modal-'+id).classList.toggle('hidden');
+    window.promptNewQ = () => { const n = prompt("New Question:"); if(n) set(ref(db, `rooms/${room}/q`), n); };
     window.submitAns = () => {
-        const text = document.getElementById('ans-input').value;
-        if(text) push(ref(db, `rooms/${room}/answers`), { text });
+        const t = document.getElementById('ans-input').value;
+        if(t) push(ref(db, `rooms/${room}/answers`), { text: t });
         document.getElementById('ans-input').value = "";
         document.getElementById('feedback').style.display = "block";
         setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
     };
-
-    window.del = (key) => {
-        remove(ref(db, `rooms/${room}/answers/${key}`));
-        document.getElementById(key).remove();
+    window.del = (k) => { remove(ref(db, `rooms/${room}/answers/${k}`)); document.getElementById(k).remove(); };
+    window.clearAll = () => confirm("Clear board?") && remove(ref(db, `rooms/${room}/answers`)) && (document.getElementById('board-canvas').innerHTML="");
+    window.toggleQR = () => document.getElementById('qr-overlay').classList.toggle('hidden');
+    window.toggleURL = () => {
+        document.getElementById('display-q-large').classList.toggle('hidden');
+        document.getElementById('display-url-large').classList.toggle('hidden');
     };
-
-    window.clearAll = () => {
-        if(confirm("Clear board?")) {
-            remove(ref(db, `rooms/${room}/answers`));
-            document.getElementById('board-canvas').innerHTML = "";
-        }
-    };
-
-    window.toggleQR = () => {
-        const qr = document.getElementById('qr-container');
-        qr.style.display = qr.style.display === 'block' ? 'none' : 'block';
-    };
-
     window.downloadCSV = () => {
-        const notes = document.querySelectorAll('.post-it div');
-        let csv = "Response\n";
-        notes.forEach(n => csv += `"${n.innerText.replace(/"/g, '""')}"\n`);
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `dowser-${room}.csv`;
-        a.click();
+        let c = "Response\n";
+        document.querySelectorAll('.post-it div').forEach(n => c += `"${n.innerText.replace(/"/g, '""')}"\n`);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c], {type:'text/csv'}));
+        a.download = `dowser-${room}.csv`; a.click();
     };
 </script>
 </body>
