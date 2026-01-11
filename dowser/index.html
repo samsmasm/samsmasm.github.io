@@ -4,163 +4,221 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dowser | Live Board</title>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        :root { --bg: #f8fafc; --text: #1e293b; --accent: #4f46e5; --card: #ffffff; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 600px; }
-        .card { background: var(--card); padding: 2rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        :root { --bg: #e2e8f0; --accent: #4f46e5; --postit: #fef08a; }
+        body { font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; background: var(--bg); margin: 0; overflow: hidden; }
+        
+        /* LAUNCHPAD STYLES */
+        #launch-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: white; z-index: 1000; position: relative; }
+        .setup-box { background: #f8fafc; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
+
+        /* TEACHER VIEW */
+        #teacher-view { height: 100vh; width: 100vw; position: relative; }
+        #question-header { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; }
+        #display-q-large { font-size: 3.5rem; font-weight: 800; margin: 0; color: #1e293b; text-shadow: 2px 2px 0px white; cursor: pointer; }
+        
+        /* POST-IT TILES */
+        .post-it { 
+            width: 180px; min-height: 180px; padding: 20px; background: var(--postit); 
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: absolute; 
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            font-size: 1.4rem; cursor: grab; border-bottom-right-radius: 40px 5px;
+            transform: rotate(-2deg); touch-action: none; user-select: none;
+        }
+        .post-it:active { cursor: grabbing; box-shadow: 10px 10px 25px rgba(0,0,0,0.2); }
+        .del-x { position: absolute; top: 5px; right: 8px; color: #94a3b8; cursor: pointer; font-size: 1rem; }
+        .del-x:hover { color: #ef4444; }
+
+        /* STUDENT VIEW */
+        #student-view { max-width: 500px; margin: 40px auto; padding: 20px; font-family: sans-serif; }
+        
+        /* UI ELEMENTS */
+        input, textarea { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid #cbd5e1; font-size: 1.2rem; box-sizing: border-box; }
+        button { background: var(--accent); color: white; border: none; padding: 15px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 1.1rem; width: 100%; margin-top: 10px; }
+        .room-tag { position: fixed; bottom: 10px; left: 10px; font-size: 0.8rem; color: #64748b; font-family: monospace; }
+        .controls { position: fixed; bottom: 10px; right: 10px; display: flex; gap: 10px; }
+        .btn-tiny { background: #94a3b8; width: auto; padding: 5px 10px; font-size: 0.7rem; }
+        #qr-container { background: white; padding: 10px; border-radius: 8px; position: fixed; bottom: 50px; right: 10px; display: none; }
         .hidden { display: none !important; }
-        
-        h1 { color: var(--accent); margin-top: 0; }
-        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-        button { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 700; width: 100%; font-size: 1rem; }
-        button.secondary { background: #64748b; margin-top: 10px; }
-        
-        .response-item { background: #f1f5f9; padding: 12px; margin-bottom: 8px; border-radius: 8px; position: relative; border-left: 4px solid var(--accent); animation: slide 0.3s ease; }
-        @keyframes slide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .delete-x { position: absolute; right: 10px; top: 10px; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
-        .room-badge { background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div id="teacher-view" class="card hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1>Teacher Board</h1>
-            <span class="room-badge" id="teacher-room-id"></span>
-        </div>
-        <p>Set the question for your students:</p>
-        <input type="text" id="q-input" placeholder="Type your question here...">
-        <button onclick="updateQ()">Update Question</button>
-        
-        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
-        
-        <h3>Student Responses</h3>
-        <div id="responses"></div>
-        
-        <div style="margin-top:20px; display:flex; gap:10px;">
-            <button onclick="downloadCSV()" class="secondary">Download CSV</button>
-            <button onclick="clearAll()" class="secondary" style="background:#ef4444;">Clear All</button>
-        </div>
+<div id="launch-screen">
+    <div class="setup-box">
+        <h1 style="margin-top:0;">Dowser</h1>
+        <input type="text" id="room-input" placeholder="Room Name (e.g. Bio101)">
+        <button onclick="launch('teacher')">I'm the Teacher</button>
+        <button onclick="launch('student')" style="background:#64748b">I'm a Student</button>
     </div>
+</div>
 
-    <div id="student-view" class="card hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1 style="font-size: 1.2rem;">Student Input</h1>
-            <span class="room-badge" id="student-room-id"></span>
-        </div>
-        <h2 id="display-q" style="margin-bottom:20px;">Waiting for teacher...</h2>
-        <textarea id="ans-input" rows="5" placeholder="Type your answer here..."></textarea>
-        <button onclick="submitAns()">Submit to Teacher</button>
-        <p id="feedback" style="text-align:center; color:#059669; font-weight:bold; display:none; margin-top:10px;">✔ Sent!</p>
+<div id="teacher-view" class="hidden">
+    <div id="question-header">
+        <h1 id="display-q-large" onclick="promptNewQ()">Click to set question...</h1>
     </div>
+    
+    <div id="board-canvas" style="width:100%; height:100%;"></div>
 
-    <div id="error-view" class="card">
-        <h1>Welcome to Dowser</h1>
-        <p>To start, add a room name to the end of the URL, like this:</p>
-        <code id="example-url" style="background:#eee; padding:5px; display:block; margin:10px 0;">...</code>
+    <div class="room-tag" id="t-room-badge">#room</div>
+    
+    <div id="qr-container"><div id="qrcode"></div></div>
+
+    <div class="controls">
+        <button class="btn-tiny" onclick="toggleQR()">Show QR</button>
+        <button class="btn-tiny" onclick="downloadCSV()">CSV</button>
+        <button class="btn-tiny" onclick="clearAll()" style="background:#fca5a5">Clear</button>
     </div>
+</div>
+
+<div id="student-view" class="hidden">
+    <h2 id="student-q" style="font-family: sans-serif;">Waiting...</h2>
+    <textarea id="ans-input" rows="5" placeholder="Your answer..."></textarea>
+    <button onclick="submitAns()">Send to Board</button>
+    <p id="feedback" style="text-align:center; color:green; display:none;">Sent!</p>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // Your specific Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
       authDomain: "dowserboard.firebaseapp.com",
       projectId: "dowserboard",
       storageBucket: "dowserboard.firebasestorage.app",
       messagingSenderId: "1032600748722",
-      appId: "1:1032600748722:web:1584c7508fbbca617cbfab",
-      measurementId: "G-Q749TWRV1Z"
+      appId: "1:1032600748722:web:1584c7508fbbca617cbfab"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-
-    // Get Room and Role from URL
-    const room = window.location.hash.substring(1).toLowerCase();
     const params = new URLSearchParams(window.location.search);
-    const isTeacher = params.get('role') === 'teacher';
+    const role = params.get('role');
+    const room = window.location.hash.substring(1);
 
-    let allResponses = [];
-
-    // Setup Logic
-    if (!room) {
-        document.getElementById('example-url').innerText = window.location.href + "#Science101";
-    } else {
-        document.getElementById('error-view').classList.add('hidden');
-        
-        if (isTeacher) {
-            setupTeacher();
-        } else {
-            setupStudent();
-        }
+    // ROUTING LOGIC
+    if (room) {
+        document.getElementById('launch-screen').classList.add('hidden');
+        if (role === 'teacher') setupTeacher(); else setupStudent();
     }
 
+    window.launch = (mode) => {
+        const r = document.getElementById('room-input').value.trim().toLowerCase();
+        if(!r) return alert("Enter a room name");
+        window.location.href = `?role=${mode}#${r}`;
+        window.location.reload();
+    };
+
+    // TEACHER LOGIC
     function setupTeacher() {
+        document.body.style.overflow = "hidden";
         document.getElementById('teacher-view').classList.remove('hidden');
-        document.getElementById('teacher-room-id').innerText = "#" + room;
+        document.getElementById('t-room-badge').innerText = "#" + room;
         
-        // Sync Responses
+        // QR Code Generation
+        new QRCode(document.getElementById("qrcode"), {
+            text: window.location.origin + window.location.pathname + "#" + room,
+            width: 128, height: 128
+        });
+
+        onValue(ref(db, `rooms/${room}/q`), (snap) => {
+            document.getElementById('display-q-large').innerText = snap.val() || "Click to set question";
+        });
+
         onValue(ref(db, `rooms/${room}/answers`), (snap) => {
-            const container = document.getElementById('responses');
-            container.innerHTML = "";
-            allResponses = [];
+            const canvas = document.getElementById('board-canvas');
+            // Only add new items
             snap.forEach(child => {
-                const data = child.val();
-                allResponses.push(data.text);
-                const div = document.createElement('div');
-                div.className = 'response-item';
-                div.innerHTML = `${data.text} <span class="delete-x" onclick="del('${child.key}')">Delete</span>`;
-                container.prepend(div);
+                if(!document.getElementById(child.key)) {
+                    createPostIt(child.key, child.val().text);
+                }
             });
         });
     }
 
-    function setupStudent() {
-        document.getElementById('student-view').classList.remove('hidden');
-        document.getElementById('student-room-id').innerText = "#" + room;
+    function createPostIt(id, text) {
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'post-it';
+        div.innerHTML = `<span class="del-x" onclick="del('${id}')">×</span><div>${text}</div>`;
         
-        // Sync Question
-        onValue(ref(db, `rooms/${room}/q`), (snap) => {
-            document.getElementById('display-q').innerText = snap.val() || "The teacher hasn't set a question yet.";
+        // Random placement
+        const x = Math.random() * (window.innerWidth - 200);
+        const y = 150 + Math.random() * (window.innerHeight - 350);
+        const rot = (Math.random() * 10) - 5;
+        
+        div.style.left = x + 'px';
+        div.style.top = y + 'px';
+        div.style.transform = `rotate(${rot}deg)`;
+        
+        document.getElementById('board-canvas').appendChild(div);
+    }
+
+    // INTERACT.JS FOR DRAGGING
+    interact('.post-it').draggable({
+        listeners: {
+            move (event) {
+                const target = event.target;
+                const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                target.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
+                target.setAttribute('data-x', x);
+                target.setAttribute('data-y', y);
+            }
+        }
+    });
+
+    // STUDENT LOGIC
+    function setupStudent() {
+        document.body.style.overflow = "auto";
+        document.body.style.background = "white";
+        document.getElementById('student-view').classList.remove('hidden');
+        onValue(ref(db, `rooms/${room}/q`), snap => {
+            document.getElementById('student-q').innerText = snap.val() || "Waiting for question...";
         });
     }
 
-    // Global Functions for Buttons
-    window.updateQ = () => {
-        const val = document.getElementById('q-input').value;
-        if(val) set(ref(db, `rooms/${room}/q`), val);
+    // HELPERS
+    window.promptNewQ = () => {
+        const newQ = prompt("Enter the new question:");
+        if(newQ) set(ref(db, `rooms/${room}/q`), newQ);
     };
 
     window.submitAns = () => {
         const text = document.getElementById('ans-input').value;
-        if(text) {
-            push(ref(db, `rooms/${room}/answers`), { text, ts: Date.now() });
-            document.getElementById('ans-input').value = "";
-            document.getElementById('feedback').style.display = "block";
-            setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
-        }
+        if(text) push(ref(db, `rooms/${room}/answers`), { text });
+        document.getElementById('ans-input').value = "";
+        document.getElementById('feedback').style.display = "block";
+        setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
     };
 
     window.del = (key) => {
-        if(confirm("Remove this response?")) remove(ref(db, `rooms/${room}/answers/${key}`));
+        remove(ref(db, `rooms/${room}/answers/${key}`));
+        document.getElementById(key).remove();
     };
 
     window.clearAll = () => {
-        if(confirm("Clear ALL responses?")) remove(ref(db, `rooms/${room}/answers`));
+        if(confirm("Clear board?")) {
+            remove(ref(db, `rooms/${room}/answers`));
+            document.getElementById('board-canvas').innerHTML = "";
+        }
+    };
+
+    window.toggleQR = () => {
+        const qr = document.getElementById('qr-container');
+        qr.style.display = qr.style.display === 'block' ? 'none' : 'block';
     };
 
     window.downloadCSV = () => {
-        const content = "Response\n" + allResponses.map(r => `"${r.replace(/"/g, '""')}"`).join("\n");
-        const blob = new Blob([content], { type: 'text/csv' });
+        const notes = document.querySelectorAll('.post-it div');
+        let csv = "Response\n";
+        notes.forEach(n => csv += `"${n.innerText.replace(/"/g, '""')}"\n`);
+        const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
-        a.href = window.URL.createObjectURL(blob);
+        a.href = URL.createObjectURL(blob);
         a.download = `dowser-${room}.csv`;
         a.click();
     };
