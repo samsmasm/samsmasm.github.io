@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeeDeeEffer | Privately merge and split PDFs</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .workspace-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.03), 0 8px 10px -6px rgba(0, 0, 0, 0.03); }
+        .page-card { transition: all 0.2s ease; cursor: pointer; border: 2px solid transparent; }
+        .page-card:hover { transform: translateY(-2px); }
+        .excluded { opacity: 0.4; filter: grayscale(0.5); }
+        .selected-page { border-color: #3b82f6; background-color: #eff6ff; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .no-select { user-select: none; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased no-select">
+
+    <div id="modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+        <div class="relative bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <h3 class="text-xl font-semibold mb-2">High Memory File</h3>
+            <p class="text-slate-500 mb-6 text-sm">This file exceeds 100MB. How would you like to load the preview workspace?</p>
+            <div class="space-y-3">
+                <button onclick="loadSplitPreview('full')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition">Standard Preview</button>
+                <button onclick="loadSplitPreview('selective')" class="w-full py-3 bg-blue-50 text-blue-700 rounded-xl font-medium hover:bg-blue-100 transition">Smart Preview (RAM Save)</button>
+                <button onclick="resetSplitter()" class="w-full py-3 text-slate-400 font-medium hover:text-red-500 transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col lg:flex-row h-screen overflow-hidden">
+        <aside class="w-full lg:w-96 bg-white border-r border-slate-200 flex flex-col h-full z-20">
+            <div class="p-6">
+                <h1 class="text-lg font-bold tracking-tight">PeeDeeEffer</h1>
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 mt-1 font-semibold">Privately merge and split PDFs</p>
+            </div>
+
+            <div class="flex p-1 mx-6 bg-slate-100 rounded-xl mb-6">
+                <button onclick="switchTab('merge')" id="tabMerge" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Merge</button>
+                <button onclick="switchTab('split')" id="tabSplit" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Split</button>
+            </div>
+
+            <div class="px-6 flex-1 overflow-y-auto pb-6">
+                <div id="uploadContainer" class="mb-8">
+                    <label id="uploadBox" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group">
+                        <svg class="w-6 h-6 mb-2 text-slate-300 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        <span class="text-xs font-medium text-slate-500">Upload PDF</span>
+                        <input type="file" id="pdfInput" class="hidden" accept="application/pdf" multiple />
+                    </label>
+
+                    <div id="fileLoadedBadge" class="hidden flex items-center justify-between w-full p-4 bg-slate-900 text-white rounded-2xl">
+                        <div class="flex items-center truncate">
+                            <svg class="w-4 h-4 mr-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A1 1 0 0111 2.293l4.707 4.707a1 1 0 01.293.707V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path></svg>
+                            <span id="loadedFileName" class="text-xs font-medium truncate italic text-slate-100">Filename.pdf</span>
+                        </div>
+                        <button onclick="resetSplitter()" class="ml-2 p-1 hover:bg-white/10 rounded-full transition">✕</button>
+                    </div>
+                </div>
+
+                <div id="controlsSplit" class="hidden space-y-6">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Page Ranges</span>
+                            <button onclick="clearSelection()" class="text-[10px] font-bold text-red-500 uppercase">Clear All</button>
+                        </div>
+                        <div id="rangeInputs" class="space-y-2">
+                            <input type="text" id="mainRangeInput" placeholder="e.g. 1-5, 8" onkeydown="handleRangeKey(event)" class="range-field w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition">
+                        </div>
+                        <p class="text-[10px] text-slate-400">Tip: Click pages to select. Hold Shift for ranges.</p>
+                    </div>
+
+                    <div id="splitExportArea" class="hidden pt-6 border-t border-slate-100 space-y-6">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Manual Rename (Single PDF)</label>
+                            <input type="text" id="splitManualName" placeholder="Leave blank for auto-name" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <button onclick="processExport('single')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg hover:bg-slate-800 transition">Save as Single PDF</button>
+                            <button onclick="processExport('zip')" class="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold hover:bg-slate-50 transition">Split to ZIP</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="controlsMerge" class="space-y-4">
+                    <div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <span>Queue</span>
+                        <span id="totalQueueSize" class="text-slate-300">0 MB</span>
+                    </div>
+                    <ul id="mergeList" class="space-y-2"></ul>
+                    <div id="mergeExportArea" class="hidden pt-4 space-y-4">
+                        <input type="text" id="mergeName" placeholder="Merged Filename" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none">
+                        <button id="btnFinalMerge" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg">Merge All</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 bg-slate-50 border-t border-slate-200">
+                <div id="status" class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter flex items-center">
+                    <span id="statusLed" class="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2"></span>
+                    <span id="statusText">System Idle</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 relative bg-slate-50 p-6 lg:p-12 overflow-hidden">
+            <div id="workspace" class="h-full w-full rounded-[2rem] border border-slate-200 bg-white workspace-shadow overflow-y-auto flex flex-col items-center relative">
+                <div id="emptyState" class="m-auto text-center"><p class="text-sm font-medium text-slate-400">Ready for Document Input</p></div>
+                <div id="smartNotice" class="hidden m-auto text-center px-10">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-2 italic">Smart Mode Active</h2>
+                    <p class="text-sm text-slate-400 max-w-xs mx-auto">Click pages or type ranges to preview.</p>
+                </div>
+                <div id="canvasGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-10 w-full p-10 max-w-5xl"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        let splitFileData = null, originalFileName = "", pdfDocForPreview = null, mergeFiles = [], currentMode = 'merge';
+        let selectedPages = new Set(), lastClickedPage = null, smartPreviewMode = false;
+
+        function switchTab(mode) {
+            currentMode = mode;
+            document.getElementById('tabMerge').className = mode === 'merge' ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm' : 'flex-1 py-2 text-sm font-medium text-slate-500';
+            document.getElementById('tabSplit').className = mode === 'split' ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm' : 'flex-1 py-2 text-sm font-medium text-slate-500';
+            document.getElementById('controlsMerge').classList.toggle('hidden', mode !== 'merge');
+            document.getElementById('controlsSplit').classList.toggle('hidden', mode !== 'split');
+            updateWorkspace();
+        }
+
+        document.getElementById('pdfInput').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            if (currentMode === 'merge') {
+                for(let f of files) {
+                    const data = await f.arrayBuffer();
+                    mergeFiles.push({id: Math.random().toString(36).substr(2, 9), name: f.name, size: f.size, data: data});
+                }
+                updateMergeQueue();
+            } else {
+                const file = files[0];
+                originalFileName = file.name.replace('.pdf', '');
+                splitFileData = await file.arrayBuffer();
+                document.getElementById('loadedFileName').innerText = file.name;
+                if (file.size > 100 * 1024 * 1024) document.getElementById('modal').classList.remove('hidden');
+                else loadSplitPreview('full');
+                document.getElementById('uploadBox').classList.add('hidden');
+                document.getElementById('fileLoadedBadge').classList.remove('hidden');
+            }
+            e.target.value = '';
+        });
+
+        async function loadSplitPreview(mode) {
+            smartPreviewMode = (mode === 'selective');
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('splitExportArea').classList.remove('hidden');
+            setStatus('Loading Preview...', 'amber');
+            pdfDocForPreview = await pdfjsLib.getDocument({data: splitFileData.slice(0)}).promise;
+            if (!smartPreviewMode) await renderPages(Array.from({length: pdfDocForPreview.numPages}, (_, i) => i + 1));
+            else { document.getElementById('canvasGrid').innerHTML = ''; document.getElementById('smartNotice').classList.remove('hidden'); setStatus('Smart Mode', 'blue'); }
+        }
+
+        async function renderPages(pageNumbers) {
+            const grid = document.getElementById('canvasGrid');
+            if (smartPreviewMode) grid.innerHTML = '';
+            for (let num of pageNumbers) {
+                if (num > pdfDocForPreview.numPages || num < 1 || document.getElementById(`card-${num}`)) continue;
+                const card = document.createElement('div');
+                card.id = `card-${num}`;
+                card.className = "page-card p-3 bg-white rounded-xl shadow-sm border-2 flex flex-col items-center animate-in fade-in";
+                card.innerHTML = `<div class="mb-2 text-[9px] font-bold text-slate-300 uppercase">Page ${num}</div><canvas id="p-${num}" class="w-full h-auto rounded-sm"></canvas>`;
+                card.onclick = (e) => handlePageClick(num, e);
+                grid.appendChild(card);
+                const page = await pdfDocForPreview.getPage(num);
+                const viewport = page.getViewport({scale: 0.4});
+                const canvas = card.querySelector('canvas');
+                canvas.height = viewport.height; canvas.width = viewport.width;
+                await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+            }
+            updateVisualSelection();
+            setStatus('Ready', 'slate');
+        }
+
+        function handlePageClick(num, event) {
+            if (event.shiftKey && lastClickedPage !== null) {
+                const start = Math.min(lastClickedPage, num), end = Math.max(lastClickedPage, num);
+                for (let i = start; i <= end; i++) selectedPages.add(i);
+            } else if (event.metaKey || event.ctrlKey) {
+                selectedPages.has(num) ? selectedPages.delete(num) : selectedPages.add(num);
+            } else {
+                if (selectedPages.has(num) && selectedPages.size === 1) selectedPages.clear();
+                else { selectedPages.clear(); selectedPages.add(num); }
+            }
+            lastClickedPage = num;
+            syncSelectionToInput();
+        }
+
+        function syncSelectionToInput() {
+            const sorted = Array.from(selectedPages).sort((a,b) => a-b);
+            let ranges = [], start = sorted[0], end = sorted[0];
+            for (let i = 1; i <= sorted.length; i++) {
+                if (i < sorted.length && sorted[i] === end + 1) end = sorted[i];
+                else { ranges.push(start === end ? `${start}` : `${start}-${end}`); start = sorted[i]; end = sorted[i]; }
+            }
+            document.getElementById('mainRangeInput').value = ranges.join(', ');
+            updateVisualSelection();
+            if(smartPreviewMode) renderPages(sorted);
+        }
+
+        function updateVisualSelection() {
+            document.querySelectorAll('.page-card').forEach(card => {
+                const num = parseInt(card.id.replace('card-', ''));
+                const isSelected = selectedPages.has(num);
+                card.classList.toggle('selected-page', isSelected);
+                card.classList.toggle('excluded', selectedPages.size > 0 && !isSelected);
+            });
+        }
+
+        function clearSelection() {
+            selectedPages.clear(); lastClickedPage = null;
+            document.getElementById('mainRangeInput').value = '';
+            updateVisualSelection();
+            if (smartPreviewMode) document.getElementById('canvasGrid').innerHTML = '';
+        }
+
+        // Logic to sync from Input -> UI
+        document.getElementById('mainRangeInput').addEventListener('input', (e) => {
+            const val = e.target.value.replace(/\s+/g, '');
+            selectedPages.clear();
+            val.split(',').forEach(part => {
+                if (part.includes('-')) {
+                    const [s, e] = part.split('-').map(Number);
+                    if(s && e) for(let i=Math.min(s,e); i<=Math.max(s,e); i++) selectedPages.add(i);
+                } else { const n = Number(part); if(n) selectedPages.add(n); }
+            });
+            updateVisualSelection();
+            if(smartPreviewMode) {
+                clearTimeout(window.renderTimeout);
+                window.renderTimeout = setTimeout(() => renderPages(Array.from(selectedPages)), 600);
+            }
+        });
+
+        async function processExport(type) {
+            if (!selectedPages.size) return alert("Select pages first.");
+            const manualName = document.getElementById('splitManualName').value.trim();
+            const autoName = () => {
+                const sorted = Array.from(selectedPages).sort((a,b)=>a-b);
+                let rangeStrings = [];
+                let start = sorted[0], end = sorted[0];
+                for (let i = 1; i <= sorted.length; i++) {
+                    if (i < sorted.length && sorted[i] === end + 1) end = sorted[i];
+                    else { rangeStrings.push(start === end ? start : `${start}-${end}`); start = sorted[i]; end = sorted[i]; }
+                }
+                return `${originalFileName}_${rangeStrings.join('_')}`;
+            };
+            const fileNameBase = (type === 'single' && manualName) ? manualName : autoName();
+            setStatus('Exporting...', 'blue');
+            const src = await PDFLib.PDFDocument.load(splitFileData.slice(0));
+            if (type === 'single') {
+                const doc = await PDFLib.PDFDocument.create();
+                for(let n of Array.from(selectedPages).sort((a,b)=>a-b)) {
+                    if (n > 0 && n <= pdfDocForPreview.numPages) {
+                        const [p] = await doc.copyPages(src, [n-1]);
+                        doc.addPage(p);
+                    }
+                }
+                save(await doc.save(), `${fileNameBase}.pdf`);
+            } else {
+                const zip = new JSZip();
+                // For ZIP we use the actual text ranges to decide the split files
+                const rangeParts = document.getElementById('mainRangeInput').value.replace(/\s+/g, '').split(',');
+                for(let part of rangeParts) {
+                    const doc = await PDFLib.PDFDocument.create();
+                    let s, e;
+                    if(part.includes('-')) [s,e] = part.split('-').map(Number); else s = e = Number(part);
+                    const indices = [];
+                    for(let j=Math.min(s,e); j<=Math.max(s,e); j++) if(j>0 && j<=pdfDocForPreview.numPages) indices.push(j-1);
+                    if(!indices.length) continue;
+                    const pgs = await doc.copyPages(src, indices);
+                    pgs.forEach(p => doc.addPage(p));
+                    zip.file(`${originalFileName}_${part}.pdf`, await doc.save());
+                }
+                save(await zip.generateAsync({type: 'blob'}), `${originalFileName}_splits.zip`);
+            }
+            setStatus('Done', 'green');
+        }
+
+        // Merger UI
+        function updateMergeQueue() {
+            const list = document.getElementById('mergeList'); list.innerHTML = '';
+            mergeFiles.forEach((f, idx) => {
+                const li = document.createElement('li');
+                li.className = "flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs";
+                li.innerHTML = `<span>${f.name}</span><button onclick="removeMerge('${f.id}')">✕</button>`;
+                list.appendChild(li);
+            });
+            document.getElementById('mergeExportArea').classList.toggle('hidden', mergeFiles.length < 2);
+        }
+        function removeMerge(id) { mergeFiles = mergeFiles.filter(f => f.id !== id); updateMergeQueue(); }
+        document.getElementById('btnFinalMerge').onclick = async () => {
+            const doc = await PDFLib.PDFDocument.create();
+            for(let f of mergeFiles) {
+                const sub = await PDFLib.PDFDocument.load(f.data);
+                const pgs = await doc.copyPages(sub, sub.getPageIndices());
+                pgs.forEach(p => doc.addPage(p));
+            }
+            save(await doc.save(), (document.getElementById('mergeName').value || 'merged') + '.pdf');
+        };
+
+        function setStatus(text, color) {
+            const colors = { slate: 'bg-slate-300', amber: 'bg-amber-400', blue: 'bg-blue-500', green: 'bg-emerald-500' };
+            document.getElementById('statusText').innerText = text;
+            document.getElementById('statusLed').className = `w-1.5 h-1.5 rounded-full mr-2 ${colors[color]}`;
+        }
+        function save(data, name) {
+            const blob = new Blob([data], { type: name.endsWith('.pdf') ? 'application/pdf' : 'application/zip' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+        }
+        function resetSplitter() { location.reload(); }
+        function handleRangeKey(e) { if(e.key === 'Enter') processExport('single'); }
+        function updateWorkspace() {
+            if (currentMode === 'split' && splitFileData) document.getElementById('emptyState').classList.add('hidden');
+            else if (!mergeFiles.length) document.getElementById('emptyState').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
