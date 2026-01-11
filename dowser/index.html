@@ -139,6 +139,8 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    
+    // 1. IMPROVED ROUTING LOGIC
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role');
     const room = window.location.hash.substring(1);
@@ -146,23 +148,45 @@
 
     window.launch = (mode) => {
         const r = document.getElementById('room-input').value.trim().toLowerCase();
-        if(!r) return alert("Enter a room name");
-        window.location.href = window.location.pathname + `?role=${mode}#${r}`;
-        window.location.reload();
+        if(!r) return alert("Please enter a room name first!");
+        
+        // Force the path to include index.html to prevent GitHub folder loops
+        let path = window.location.pathname;
+        if (!path.endsWith('index.html')) {
+            path = path.endsWith('/') ? path + 'index.html' : path + '/index.html';
+        }
+
+        const destination = `${path}?role=${mode}#${r}`;
+        console.log("Launching to:", destination);
+        window.location.href = destination;
     };
 
-    if (room) {
+    // 2. VIEW INITIALIZATION
+    if (room && role) {
         document.getElementById('launch-screen').classList.add('hidden');
         if (role === 'teacher') setupTeacher(); else setupStudent();
+    } else if (room && !role) {
+        // Direct link access for students
+        document.getElementById('launch-screen').classList.add('hidden');
+        setupStudent();
     }
 
+    // 3. TEACHER LOGIC
     function setupTeacher() {
         document.getElementById('teacher-view').classList.remove('hidden');
         document.getElementById('t-room-badge').innerText = "#" + room;
+        
         const fullUrl = window.location.origin + window.location.pathname + "#" + room;
         document.getElementById('display-url-large').innerText = fullUrl;
         
-        new QRCode(document.getElementById("qrcode"), { text: fullUrl, width: 500, height: 500 });
+        // Clear and rebuild QR
+        document.getElementById("qrcode").innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), { 
+            text: fullUrl, 
+            width: 500, 
+            height: 500,
+            correctLevel: QRCode.CorrectLevel.H
+        });
 
         onValue(ref(db, `rooms/${room}/q`), (snap) => {
             document.getElementById('display-q-large').innerText = snap.val() || "CLICK TO SET QUESTION";
@@ -184,22 +208,29 @@
         
         const x = Math.random() * (window.innerWidth - 220);
         const y = 150 + Math.random() * (window.innerHeight - 380);
-        div.style.left = x + 'px'; div.style.top = y + 'px';
+        div.style.left = x + 'px'; 
+        div.style.top = y + 'px';
         document.getElementById('board-canvas').appendChild(div);
         
-        div.addEventListener('mousedown', () => div.style.zIndex = highestZ++);
+        div.addEventListener('mousedown', () => {
+            div.style.zIndex = highestZ++;
+        });
     }
 
     interact('.post-it').draggable({
-        listeners: { move (event) {
-            const t = event.target;
-            const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
-            const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
-            t.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
-            t.setAttribute('data-x', x); t.setAttribute('data-y', y);
-        }}
+        listeners: { 
+            move (event) {
+                const t = event.target;
+                const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
+                const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
+                t.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
+                t.setAttribute('data-x', x); 
+                t.setAttribute('data-y', y);
+            }
+        }
     });
 
+    // 4. STUDENT LOGIC
     async function setupStudent() {
         document.getElementById('student-view').classList.remove('hidden');
         const snap = await get(ref(db, `rooms/${room}/q`));
@@ -211,8 +242,14 @@
         });
     }
 
+    // 5. WINDOW HELPERS
     window.toggleModal = (id) => document.getElementById('modal-'+id).classList.toggle('hidden');
-    window.promptNewQ = () => { const n = prompt("New Question:"); if(n) set(ref(db, `rooms/${room}/q`), n); };
+    
+    window.promptNewQ = () => { 
+        const n = prompt("Enter new question:"); 
+        if(n) set(ref(db, `rooms/${room}/q`), n); 
+    };
+
     window.submitAns = () => {
         const t = document.getElementById('ans-input').value;
         if(t) push(ref(db, `rooms/${room}/answers`), { text: t });
@@ -220,18 +257,37 @@
         document.getElementById('feedback').style.display = "block";
         setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
     };
-    window.del = (k) => { remove(ref(db, `rooms/${room}/answers/${k}`)); document.getElementById(k).remove(); };
-    window.clearAll = () => confirm("Clear board?") && remove(ref(db, `rooms/${room}/answers`)) && (document.getElementById('board-canvas').innerHTML="");
+
+    window.del = (k) => { 
+        if(confirm("Delete this note?")) {
+            remove(ref(db, `rooms/${room}/answers/${k}`)); 
+            document.getElementById(k).remove(); 
+        }
+    };
+
+    window.clearAll = () => {
+        if(confirm("Clear the entire board?")) {
+            remove(ref(db, `rooms/${room}/answers`));
+            document.getElementById('board-canvas').innerHTML = "";
+        }
+    };
+
     window.toggleQR = () => document.getElementById('qr-overlay').classList.toggle('hidden');
+    
     window.toggleURL = () => {
         document.getElementById('display-q-large').classList.toggle('hidden');
         document.getElementById('display-url-large').classList.toggle('hidden');
     };
+
     window.downloadCSV = () => {
         let c = "Response\n";
-        document.querySelectorAll('.post-it div').forEach(n => c += `"${n.innerText.replace(/"/g, '""')}"\n`);
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c], {type:'text/csv'}));
-        a.download = `dowser-${room}.csv`; a.click();
+        document.querySelectorAll('.post-it div').forEach(n => {
+            if(n.innerText) c += `"${n.innerText.replace(/"/g, '""')}"\n`;
+        });
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(new Blob([c], {type:'text/csv'}));
+        a.download = `dowser-${room}.csv`; 
+        a.click();
     };
 </script>
 </body>
