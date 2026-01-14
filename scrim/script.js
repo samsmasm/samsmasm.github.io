@@ -182,11 +182,16 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC (FIXED) ---
+// --- 5. ARROWS LOGIC (FINAL FIXED) ---
 window.addArrow = (style, hasHead) => {
-    const c = getViewCenter();
+    // Math to find center screen without external helpers
+    const styleComp = window.getComputedStyle(canvas).transform;
+    const matrix = (styleComp === 'none') ? new DOMMatrix() : new DOMMatrix(styleComp);
+    const cx = ((window.innerWidth / 2) - matrix.e) / matrix.a;
+    const cy = ((window.innerHeight / 2) - matrix.f) / matrix.a;
+
     push(ref(db, `scrims/${room}/arrows`), {
-        x1: c.x - 50, y1: c.y, x2: c.x + 50, y2: c.y,
+        x1: cx - 50, y1: cy, x2: cx + 50, y2: cy,
         style: style, head: hasHead
     });
 };
@@ -197,7 +202,7 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
     
     // 1. Remove deleted arrows
     Array.from(container.children).forEach(el => {
-        if (el.tagName === 'defs') return; // Don't delete the marker definitions
+        if (el.tagName === 'defs') return; 
         if (!data[el.id]) el.remove();
     });
 
@@ -208,7 +213,6 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
             el = createArrow(id, data[id]); 
             container.appendChild(el); 
         } else if (!el.dataset.dragging) {
-            // Only update visuals if user isn't currently dragging it
             updateArrowVisuals(el, data[id]);
         }
     }
@@ -223,14 +227,13 @@ function createArrow(id, data) {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
     line.classList.add('arrow-line');
     
-    // Handles (Blue dots)
+    // Handles
     const h1 = createHandle(id, 'start');
     const h2 = createHandle(id, 'end');
 
-    // Delete Group (Red Button)
+    // Delete Group (Red X)
     const delG = document.createElementNS("http://www.w3.org/2000/svg", "g");
     delG.classList.add('arrow-del-group');
-    delG.style.cursor = "pointer";
     
     const delCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     delCircle.setAttribute("r", "10");
@@ -239,46 +242,51 @@ function createArrow(id, data) {
     const delText = document.createElementNS("http://www.w3.org/2000/svg", "text");
     delText.textContent = "×";
     delText.setAttribute("text-anchor", "middle");
-    delText.setAttribute("dy", "5"); // Center vertically
+    delText.setAttribute("dy", "5");
     delText.setAttribute("fill", "white");
     delText.setAttribute("font-weight", "bold");
     delText.style.userSelect = "none";
 
     delG.append(delCircle, delText);
+    
+    // Delete Event
     delG.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
+        e.stopPropagation(); // Stop Panzoom
+        // Small timeout ensures click registers before any drag logic interferes
+        setTimeout(() => {
+             if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
+        }, 10);
     });
 
     g.append(line, h1, h2, delG);
-    
-    // Initial Render
     updateArrowVisuals(g, data);
 
-    // --- INTERACTION: Drag Whole Arrow ---
+    // --- DRAG WHOLE ARROW ---
     line.addEventListener('mousedown', (e) => {
         e.stopPropagation();
-        g.dataset.dragging = "true"; // Lock updates
+        g.dataset.dragging = "true"; 
         
         const startX = e.clientX; 
         const startY = e.clientY;
-        // Read current coords directly from DOM attributes
-        const x1 = parseFloat(line.getAttribute("x1"));
-        const y1 = parseFloat(line.getAttribute("y1"));
-        const x2 = parseFloat(line.getAttribute("x2"));
-        const y2 = parseFloat(line.getAttribute("y2"));
-        
         const scale = pz.getScale();
-
-        let finalData = { x1, y1, x2, y2 };
+        
+        // Capture initial state
+        const init = {
+            x1: parseFloat(line.getAttribute("x1")),
+            y1: parseFloat(line.getAttribute("y1")),
+            x2: parseFloat(line.getAttribute("x2")),
+            y2: parseFloat(line.getAttribute("y2"))
+        };
+        let finalData = { ...init };
 
         const onMove = (ev) => {
             const dx = (ev.clientX - startX) / scale;
             const dy = (ev.clientY - startY) / scale;
-            
-            finalData = { x1: x1 + dx, y1: y1 + dy, x2: x2 + dx, y2: y2 + dy };
-            
-            // Visual update
+            finalData = { 
+                x1: init.x1 + dx, y1: init.y1 + dy, 
+                x2: init.x2 + dx, y2: init.y2 + dy 
+            };
+            // Merge generic data (style/head) with new coords for visual update
             updateArrowVisuals(g, { ...data, ...finalData });
         };
         
@@ -306,32 +314,29 @@ function createHandle(id, type) {
         g.dataset.dragging = "true";
         
         const line = g.querySelector('.arrow-line');
+        // CACHE MATRIX LOCALLY - No external helper needed
         const matrix = new DOMMatrix(window.getComputedStyle(canvas).transform);
         
-        // Capture static "anchor" point (the end of the arrow we are NOT moving)
         const anchorX = parseFloat(line.getAttribute(type === 'start' ? "x2" : "x1"));
         const anchorY = parseFloat(line.getAttribute(type === 'start' ? "y2" : "y1"));
         
-        let finalX = 0; 
-        let finalY = 0;
+        let finalX = 0; let finalY = 0;
 
         const onMove = (ev) => {
-            const coords = getCanvasCoordinates(ev.clientX, ev.clientY, matrix);
-            finalX = coords.x;
-            finalY = coords.y;
+            // Local Math
+            finalX = (ev.clientX - matrix.e) / matrix.a;
+            finalY = (ev.clientY - matrix.f) / matrix.a;
 
-            // Construct new data object for visual update
             const newData = {
-                // Keep existing style/head
-                style: line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid',
-                head: line.getAttribute("marker-end") ? true : false,
-                // Update coordinates
+                style: data.style, head: data.head, // fallback to outer scope data is risky, but visuals update uses specific attributes usually
                 x1: type === 'start' ? finalX : anchorX,
                 y1: type === 'start' ? finalY : anchorY,
                 x2: type === 'end' ? finalX : anchorX,
-                y2: type === 'end' ? finalY : anchorY
+                y2: type === 'end' ? finalY : anchorY,
+                // Pass current style props from DOM to ensure they don't vanish
+                style: line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid',
+                head: line.getAttribute("marker-end") ? true : false
             };
-            
             updateArrowVisuals(g, newData);
         };
 
@@ -340,41 +345,35 @@ function createHandle(id, type) {
             window.removeEventListener('mouseup', onUp);
             delete g.dataset.dragging;
             
-            const updatePayload = (type === 'start') 
-                ? { x1: finalX, y1: finalY }
-                : { x2: finalX, y2: finalY };
-                
-            update(ref(db, `scrims/${room}/arrows/${id}`), updatePayload);
+            const payload = (type === 'start') ? { x1: finalX, y1: finalY } : { x2: finalX, y2: finalY };
+            update(ref(db, `scrims/${room}/arrows/${id}`), payload);
         };
         
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     });
-
     return c;
 }
 
-// Helper to sync SVG attributes with Data object
 function updateArrowVisuals(g, data) {
     const line = g.querySelector('.arrow-line');
-    const handles = g.querySelectorAll('.arrow-handle'); // [0] is start, [1] is end
+    const handles = g.querySelectorAll('.arrow-handle');
     const delG = g.querySelector('.arrow-del-group');
     const delCircle = delG.querySelector('circle');
     const delText = delG.querySelector('text');
 
-    // 1. Line
     line.setAttribute("x1", data.x1); line.setAttribute("y1", data.y1);
     line.setAttribute("x2", data.x2); line.setAttribute("y2", data.y2);
+    
     if (data.style === 'dotted') line.setAttribute("stroke-dasharray", "5,5");
     else line.removeAttribute("stroke-dasharray");
+    
     if (data.head) line.setAttribute("marker-end", "url(#arrowhead)");
     else line.removeAttribute("marker-end");
 
-    // 2. Handles
     handles[0].setAttribute("cx", data.x1); handles[0].setAttribute("cy", data.y1);
     handles[1].setAttribute("cx", data.x2); handles[1].setAttribute("cy", data.y2);
 
-    // 3. Delete Button (Center)
     const midX = (data.x1 + data.x2) / 2;
     const midY = (data.y1 + data.y2) / 2;
     delCircle.setAttribute("cx", midX); delCircle.setAttribute("cy", midY - 15);
