@@ -22,28 +22,28 @@ while (!room) {
 document.getElementById('room-display').innerText = "#" + room;
 
 const canvas = document.getElementById('canvas');
+// Initialize Panzoom
 const pz = Panzoom(canvas, {
     maxScale: 3, minScale: 0.1, canvas: true,
-    excludeClass: 'note' 
+    excludeClass: 'note' // prevent dragging notes from panning the canvas
 });
 
+// Zoom Controls
 canvas.parentElement.addEventListener('wheel', pz.zoomWithWheel);
 document.getElementById('zoom-slider').addEventListener('input', (e) => pz.zoom(parseFloat(e.target.value)));
 canvas.addEventListener('panzoomzoom', (e) => document.getElementById('zoom-slider').value = e.detail.scale);
 
-// --- 2. MATH HELPERS (OPTIMIZED) ---
-
-// Converts screen pixels (mouse) to canvas coordinates (x,y)
-// We cache the matrix on mousedown to avoid recalc during drag
-function getCanvasCoordinates(clientX, clientY, cachedMatrix = null) {
-    const matrix = cachedMatrix || new DOMMatrix(window.getComputedStyle(canvas).transform);
+// --- 2. MATH HELPERS ---
+function getCanvasCoordinates(clientX, clientY) {
+    // Robustly handle the matrix, even if 'none'
+    const style = window.getComputedStyle(canvas).transform;
+    const matrix = (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
     return {
         x: (clientX - matrix.e) / matrix.a,
         y: (clientY - matrix.f) / matrix.a
     };
 }
 
-// Gets the center of the viewport in canvas coordinates (for dropping new items)
 function getViewCenter() {
     return getCanvasCoordinates(window.innerWidth / 2, window.innerHeight / 2);
 }
@@ -86,19 +86,16 @@ onValue(ref(db, `scrims/${room}/notes`), snap => {
     const container = document.getElementById('notes-container');
     const data = snap.val() || {};
     
-    // Cleanup deleted
     Array.from(container.children).forEach(n => { if(!data[n.id]) n.remove(); });
 
     for (let id in data) {
         let el = document.getElementById(id);
         if (!el) { el = createNote(id, data[id]); container.appendChild(el); }
         
-        // Only update if NOT currently being dragged by local user
         if (!el.dataset.dragging) {
             el.style.left = data[id].x + 'px';
             el.style.top = data[id].y + 'px';
             el.style.backgroundColor = data[id].color;
-            // Only update text if not focused to prevent cursor jumping
             if(document.activeElement !== el.querySelector('.note-text')) 
                 el.querySelector('.note-text').innerText = data[id].text;
         }
@@ -120,7 +117,6 @@ function createNote(id, data) {
     `;
     div.querySelector('.note-text').innerText = data.text;
     
-    // Delete & Color (Direct updates)
     div.querySelector('.del-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         if(confirm("Delete note?")) remove(ref(db, `scrims/${room}/notes/${id}`));
@@ -135,7 +131,7 @@ function createNote(id, data) {
     const textEl = div.querySelector('.note-text');
     textEl.addEventListener('blur', () => update(ref(db, `scrims/${room}/notes/${id}`), { text: textEl.innerText }));
 
-    // --- OPTIMIZED DRAG LOGIC ---
+    // Drag Logic
     div.addEventListener('mousedown', (e) => {
         if (e.target === textEl || e.target.classList.contains('del-btn') || e.target.classList.contains('color-dot')) return;
         e.stopPropagation();
@@ -143,24 +139,20 @@ function createNote(id, data) {
         div.dataset.dragging = "true";
         div.classList.add('selected');
         
-        // 1. Capture starting state
         const startX = e.clientX; 
         const startY = e.clientY;
         const startLeft = parseFloat(div.style.left);
         const startTop = parseFloat(div.style.top);
-        const scale = pz.getScale(); // Get scale ONCE
+        const scale = pz.getScale();
 
         let finalX = startLeft;
         let finalY = startTop;
 
         const onMove = (ev) => {
-            // 2. Calculate Delta (pure math, no DB calls)
             const dx = (ev.clientX - startX) / scale;
             const dy = (ev.clientY - startY) / scale;
             finalX = startLeft + dx;
             finalY = startTop + dy;
-            
-            // 3. Update DOM locally for smooth 60fps
             div.style.left = finalX + 'px';
             div.style.top = finalY + 'px';
         };
@@ -170,8 +162,6 @@ function createNote(id, data) {
             window.removeEventListener('mouseup', onUp);
             delete div.dataset.dragging;
             div.classList.remove('selected');
-            
-            // 4. Update Database ONCE at the end
             update(ref(db, `scrims/${room}/notes/${id}`), { x: finalX, y: finalY });
         };
 
@@ -182,16 +172,11 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC (FINAL FIXED) ---
+// --- 5. ARROWS LOGIC (FIXED & ROBUST) ---
 window.addArrow = (style, hasHead) => {
-    // Math to find center screen without external helpers
-    const styleComp = window.getComputedStyle(canvas).transform;
-    const matrix = (styleComp === 'none') ? new DOMMatrix() : new DOMMatrix(styleComp);
-    const cx = ((window.innerWidth / 2) - matrix.e) / matrix.a;
-    const cy = ((window.innerHeight / 2) - matrix.f) / matrix.a;
-
+    const c = getViewCenter();
     push(ref(db, `scrims/${room}/arrows`), {
-        x1: cx - 50, y1: cy, x2: cx + 50, y2: cy,
+        x1: c.x - 50, y1: c.y, x2: c.x + 50, y2: c.y,
         style: style, head: hasHead
     });
 };
@@ -200,13 +185,13 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
     const container = document.getElementById('svg-layer');
     const data = snap.val() || {};
     
-    // 1. Remove deleted arrows
+    // Cleanup
     Array.from(container.children).forEach(el => {
         if (el.tagName === 'defs') return; 
         if (!data[el.id]) el.remove();
     });
 
-    // 2. Create or Update arrows
+    // Update
     for (let id in data) {
         let el = document.getElementById(id);
         if (!el) {
@@ -231,7 +216,7 @@ function createArrow(id, data) {
     const h1 = createHandle(id, 'start');
     const h2 = createHandle(id, 'end');
 
-    // Delete Group (Red X)
+    // Delete Group
     const delG = document.createElementNS("http://www.w3.org/2000/svg", "g");
     delG.classList.add('arrow-del-group');
     
@@ -252,7 +237,6 @@ function createArrow(id, data) {
     // Delete Event
     delG.addEventListener('mousedown', (e) => {
         e.stopPropagation(); 
-        // Timeout ensures click registers separately from drag
         setTimeout(() => {
              if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
         }, 10);
@@ -270,7 +254,7 @@ function createArrow(id, data) {
         const startY = e.clientY;
         const scale = pz.getScale();
         
-        // Capture current state from DOM
+        // Capture existing DOM state to prevent style loss
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
         
@@ -321,11 +305,13 @@ function createHandle(id, type) {
         g.dataset.dragging = "true";
         
         const line = g.querySelector('.arrow-line');
-        // Capture current style so we don't lose it while dragging
+        // Capture Style
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
 
-        const matrix = new DOMMatrix(window.getComputedStyle(canvas).transform);
+        // SAFE MATRIX CALCULATION (Fixes the crash)
+        const style = window.getComputedStyle(canvas).transform;
+        const matrix = (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
         
         const anchorX = parseFloat(line.getAttribute(type === 'start' ? "x2" : "x1"));
         const anchorY = parseFloat(line.getAttribute(type === 'start' ? "y2" : "y1"));
