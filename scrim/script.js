@@ -17,10 +17,16 @@ window.location.hash = room;
 
 // Panzoom Setup
 const canvas = document.getElementById('canvas');
-const pz = Panzoom(canvas, { maxScale: 3, minScale: 0.1, canvas: true });
+const pz = Panzoom(canvas, { 
+    maxScale: 3, 
+    minScale: 0.1, 
+    canvas: true,
+    // This allows children (notes) to handle their own clicks
+    excludeChildren: true 
+});
 canvas.parentElement.addEventListener('wheel', pz.zoomWithWheel);
 
-// Create Note
+// Create Note Button
 document.getElementById('add-note-btn').addEventListener('click', () => {
     const scale = pz.getScale();
     const pan = pz.getPan();
@@ -28,7 +34,7 @@ document.getElementById('add-note-btn').addEventListener('click', () => {
     const y = (window.innerHeight / 2 - pan.y) / scale;
 
     push(ref(db, `scrims/${room}/notes`), {
-        text: "New Note...",
+        text: "Type here...",
         x: x,
         y: y,
         color: '#ffffff'
@@ -38,32 +44,20 @@ document.getElementById('add-note-btn').addEventListener('click', () => {
 // Sync Notes from Firebase
 onValue(ref(db, `scrims/${room}/notes`), (snapshot) => {
     const container = document.getElementById('notes-container');
-    const existingNotes = Array.from(container.children);
     const data = snapshot.val() || {};
 
-    // Remove deleted notes
-    existingNotes.forEach(noteEl => {
-        if (!data[noteEl.id]) noteEl.remove();
-    });
-
-    // Add or Update notes
+    // Update existing or add new
     for (let id in data) {
         let noteEl = document.getElementById(id);
         if (!noteEl) {
             noteEl = createNoteElement(id, data[id]);
             container.appendChild(noteEl);
-        } else {
-            // Only update position if we aren't currently dragging it
-            if (!noteEl.dataset.isDragging) {
-                noteEl.style.left = data[id].x + 'px';
-                noteEl.style.top = data[id].y + 'px';
-            }
-            // Update color and text (if not focused)
+        } else if (!noteEl.dataset.isDragging) {
+            noteEl.style.left = data[id].x + 'px';
+            noteEl.style.top = data[id].y + 'px';
             noteEl.style.backgroundColor = data[id].color;
             const textEl = noteEl.querySelector('.note-text');
-            if (document.activeElement !== textEl) {
-                textEl.innerText = data[id].text;
-            }
+            if (document.activeElement !== textEl) textEl.innerText = data[id].text;
         }
     }
 });
@@ -72,6 +66,9 @@ function createNoteElement(id, data) {
     const div = document.createElement('div');
     div.id = id;
     div.className = 'note';
+    div.style.left = data.x + 'px';
+    div.style.top = data.y + 'px';
+    div.style.backgroundColor = data.color;
     div.innerHTML = `
         <div class="note-text" contenteditable="true">${data.text}</div>
         <div class="note-tools">
@@ -82,39 +79,45 @@ function createNoteElement(id, data) {
         </div>
     `;
 
-    // Text Sync
-    div.querySelector('.note-text').addEventListener('input', (e) => {
-        update(ref(db, `scrims/${room}/notes/${id}`), { text: e.target.innerText });
+    const textEl = div.querySelector('.note-text');
+
+    // Prevent background pan when clicking/typing in a note
+    div.addEventListener('mousedown', (e) => e.stopPropagation());
+    div.addEventListener('wheel', (e) => e.stopPropagation());
+
+    // Sync Text
+    textEl.addEventListener('input', () => {
+        update(ref(db, `scrims/${room}/notes/${id}`), { text: textEl.innerText });
     });
 
-    // Color Sync
+    // Sync Color
     div.querySelectorAll('.color-dot').forEach(dot => {
-        dot.addEventListener('click', () => {
+        dot.addEventListener('click', (e) => {
+            e.stopPropagation();
             update(ref(db, `scrims/${room}/notes/${id}`), { color: dot.dataset.color });
         });
     });
 
-    // Dragging logic adjusted for Zoom
+    // DRAG LOGIC
     let isDown = false;
-    let offset = { x: 0, y: 0 };
+    let startPos = { x: 0, y: 0 };
 
     div.addEventListener('mousedown', (e) => {
-        if (e.target.contentEditable === "true") return; // Allow typing
+        if (e.target === textEl) return; // Let text be editable
         isDown = true;
         div.dataset.isDragging = "true";
         const scale = pz.getScale();
-        offset = {
+        startPos = {
             x: (e.clientX / scale) - parseFloat(div.style.left),
             y: (e.clientY / scale) - parseFloat(div.style.top)
         };
-        e.stopPropagation();
     });
 
     window.addEventListener('mousemove', (e) => {
         if (!isDown) return;
         const scale = pz.getScale();
-        const newX = (e.clientX / scale) - offset.x;
-        const newY = (e.clientY / scale) - offset.y;
+        const newX = (e.clientX / scale) - startPos.x;
+        const newY = (e.clientY / scale) - startPos.y;
         div.style.left = newX + 'px';
         div.style.top = newY + 'px';
         update(ref(db, `scrims/${room}/notes/${id}`), { x: newX, y: newY });
