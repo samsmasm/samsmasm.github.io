@@ -182,7 +182,7 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC (OPTIMIZED) ---
+// --- 5. ARROWS LOGIC (FIXED) ---
 window.addArrow = (style, hasHead) => {
     const c = getViewCenter();
     push(ref(db, `scrims/${room}/arrows`), {
@@ -195,122 +195,188 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
     const container = document.getElementById('svg-layer');
     const data = snap.val() || {};
     
-    // We recreate SVG content to handle Z-indexing simply, 
-    // but in a real app, we would update attributes like we do for Notes.
-    // For now, this is fine as arrows are lightweight.
-    let html = `<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#333"/></marker></defs>`;
-    
-    // Note: This approach redraws all arrows on every update. 
-    // Ideally, diffing should be used, but simplified here for readability.
-    container.innerHTML = html; 
-    for (let id in data) createArrow(id, data[id], container);
-});
-
-function createArrow(id, data, container) {
-    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    g.classList.add('arrow-group');
-
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", data.x1); line.setAttribute("y1", data.y1);
-    line.setAttribute("x2", data.x2); line.setAttribute("y2", data.y2);
-    line.classList.add('arrow-line');
-    if (data.style === 'dotted') line.setAttribute("stroke-dasharray", "5,5");
-    if (data.head) line.setAttribute("marker-end", "url(#arrowhead)");
-
-    // Handles
-    const h1 = createHandle(data.x1, data.y1, id, 'start', data);
-    const h2 = createHandle(data.x2, data.y2, id, 'end', data);
-
-    // Delete Button
-    const cx = (data.x1 + data.x2) / 2;
-    const cy = (data.y1 + data.y2) / 2;
-    const del = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    del.classList.add('arrow-del');
-    del.setAttribute("cx", cx); del.setAttribute("cy", cy - 15);
-    del.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        if(confirm("Delete arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
+    // 1. Remove deleted arrows
+    Array.from(container.children).forEach(el => {
+        if (el.tagName === 'defs') return; // Don't delete the marker definitions
+        if (!data[el.id]) el.remove();
     });
 
-    g.append(line, h1, h2, del);
-    container.appendChild(g);
+    // 2. Create or Update arrows
+    for (let id in data) {
+        let el = document.getElementById(id);
+        if (!el) {
+            el = createArrow(id, data[id]); 
+            container.appendChild(el); 
+        } else if (!el.dataset.dragging) {
+            // Only update visuals if user isn't currently dragging it
+            updateArrowVisuals(el, data[id]);
+        }
+    }
+});
 
-    // --- DRAG WHOLE ARROW ---
+function createArrow(id, data) {
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.id = id;
+    g.classList.add('arrow-group');
+
+    // Main Line
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.classList.add('arrow-line');
+    
+    // Handles (Blue dots)
+    const h1 = createHandle(id, 'start');
+    const h2 = createHandle(id, 'end');
+
+    // Delete Group (Red Button)
+    const delG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    delG.classList.add('arrow-del-group');
+    delG.style.cursor = "pointer";
+    
+    const delCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    delCircle.setAttribute("r", "10");
+    delCircle.setAttribute("fill", "#ef4444");
+    
+    const delText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    delText.textContent = "×";
+    delText.setAttribute("text-anchor", "middle");
+    delText.setAttribute("dy", "5"); // Center vertically
+    delText.setAttribute("fill", "white");
+    delText.setAttribute("font-weight", "bold");
+    delText.style.userSelect = "none";
+
+    delG.append(delCircle, delText);
+    delG.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
+    });
+
+    g.append(line, h1, h2, delG);
+    
+    // Initial Render
+    updateArrowVisuals(g, data);
+
+    // --- INTERACTION: Drag Whole Arrow ---
     line.addEventListener('mousedown', (e) => {
         e.stopPropagation();
+        g.dataset.dragging = "true"; // Lock updates
+        
         const startX = e.clientX; 
         const startY = e.clientY;
+        // Read current coords directly from DOM attributes
+        const x1 = parseFloat(line.getAttribute("x1"));
+        const y1 = parseFloat(line.getAttribute("y1"));
+        const x2 = parseFloat(line.getAttribute("x2"));
+        const y2 = parseFloat(line.getAttribute("y2"));
+        
         const scale = pz.getScale();
-        const init = { ...data };
-        let finalData = { ...init };
+
+        let finalData = { x1, y1, x2, y2 };
 
         const onMove = (ev) => {
             const dx = (ev.clientX - startX) / scale;
             const dy = (ev.clientY - startY) / scale;
             
-            // Visual Update Only
-            line.setAttribute("x1", init.x1 + dx); line.setAttribute("y1", init.y1 + dy);
-            line.setAttribute("x2", init.x2 + dx); line.setAttribute("y2", init.y2 + dy);
-            h1.setAttribute("cx", init.x1 + dx); h1.setAttribute("cy", init.y1 + dy);
-            h2.setAttribute("cx", init.x2 + dx); h2.setAttribute("cy", init.y2 + dy);
-            del.setAttribute("cx", (init.x1 + init.x2)/2 + dx); 
-            del.setAttribute("cy", (init.y1 + init.y2)/2 + dy - 15);
-
-            finalData = { 
-                x1: init.x1 + dx, y1: init.y1 + dy, 
-                x2: init.x2 + dx, y2: init.y2 + dy 
-            };
+            finalData = { x1: x1 + dx, y1: y1 + dy, x2: x2 + dx, y2: y2 + dy };
+            
+            // Visual update
+            updateArrowVisuals(g, { ...data, ...finalData });
         };
         
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
+            delete g.dataset.dragging;
             update(ref(db, `scrims/${room}/arrows/${id}`), finalData);
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     });
+
+    return g;
 }
 
-function createHandle(x, y, id, type, currentData) {
+function createHandle(id, type) {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", x); c.setAttribute("cy", y);
     c.classList.add('arrow-handle');
+    c.setAttribute("r", "6"); 
     
     c.addEventListener('mousedown', (e) => {
         e.stopPropagation();
+        const g = document.getElementById(id);
+        g.dataset.dragging = "true";
         
-        // CACHE MATRIX ONCE!
+        const line = g.querySelector('.arrow-line');
         const matrix = new DOMMatrix(window.getComputedStyle(canvas).transform);
-        let finalX = x;
-        let finalY = y;
+        
+        // Capture static "anchor" point (the end of the arrow we are NOT moving)
+        const anchorX = parseFloat(line.getAttribute(type === 'start' ? "x2" : "x1"));
+        const anchorY = parseFloat(line.getAttribute(type === 'start' ? "y2" : "y1"));
+        
+        let finalX = 0; 
+        let finalY = 0;
 
         const onMove = (ev) => {
-            // Use cached matrix for super-fast math
             const coords = getCanvasCoordinates(ev.clientX, ev.clientY, matrix);
             finalX = coords.x;
             finalY = coords.y;
 
-            // Visual update handled by re-rendering line? 
-            // In this simplified version, we just let the line "snap" on refresh
-            // OR we could visually update the line here for polish.
-            // For now, dragging the handle is invisible until mouseup to save complexity,
-            // or we update the handle position locally:
-            c.setAttribute("cx", finalX);
-            c.setAttribute("cy", finalY);
+            // Construct new data object for visual update
+            const newData = {
+                // Keep existing style/head
+                style: line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid',
+                head: line.getAttribute("marker-end") ? true : false,
+                // Update coordinates
+                x1: type === 'start' ? finalX : anchorX,
+                y1: type === 'start' ? finalY : anchorY,
+                x2: type === 'end' ? finalX : anchorX,
+                y2: type === 'end' ? finalY : anchorY
+            };
+            
+            updateArrowVisuals(g, newData);
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
+            delete g.dataset.dragging;
             
-            // DB Update
-            if (type === 'start') update(ref(db, `scrims/${room}/arrows/${id}`), { x1: finalX, y1: finalY });
-            else update(ref(db, `scrims/${room}/arrows/${id}`), { x2: finalX, y2: finalY });
+            const updatePayload = (type === 'start') 
+                ? { x1: finalX, y1: finalY }
+                : { x2: finalX, y2: finalY };
+                
+            update(ref(db, `scrims/${room}/arrows/${id}`), updatePayload);
         };
         
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     });
+
     return c;
+}
+
+// Helper to sync SVG attributes with Data object
+function updateArrowVisuals(g, data) {
+    const line = g.querySelector('.arrow-line');
+    const handles = g.querySelectorAll('.arrow-handle'); // [0] is start, [1] is end
+    const delG = g.querySelector('.arrow-del-group');
+    const delCircle = delG.querySelector('circle');
+    const delText = delG.querySelector('text');
+
+    // 1. Line
+    line.setAttribute("x1", data.x1); line.setAttribute("y1", data.y1);
+    line.setAttribute("x2", data.x2); line.setAttribute("y2", data.y2);
+    if (data.style === 'dotted') line.setAttribute("stroke-dasharray", "5,5");
+    else line.removeAttribute("stroke-dasharray");
+    if (data.head) line.setAttribute("marker-end", "url(#arrowhead)");
+    else line.removeAttribute("marker-end");
+
+    // 2. Handles
+    handles[0].setAttribute("cx", data.x1); handles[0].setAttribute("cy", data.y1);
+    handles[1].setAttribute("cx", data.x2); handles[1].setAttribute("cy", data.y2);
+
+    // 3. Delete Button (Center)
+    const midX = (data.x1 + data.x2) / 2;
+    const midY = (data.y1 + data.y2) / 2;
+    delCircle.setAttribute("cx", midX); delCircle.setAttribute("cy", midY - 15);
+    delText.setAttribute("x", midX); delText.setAttribute("y", midY - 15);
 }
