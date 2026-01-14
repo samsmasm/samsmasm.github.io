@@ -251,8 +251,8 @@ function createArrow(id, data) {
     
     // Delete Event
     delG.addEventListener('mousedown', (e) => {
-        e.stopPropagation(); // Stop Panzoom
-        // Small timeout ensures click registers before any drag logic interferes
+        e.stopPropagation(); 
+        // Timeout ensures click registers separately from drag
         setTimeout(() => {
              if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
         }, 10);
@@ -270,7 +270,10 @@ function createArrow(id, data) {
         const startY = e.clientY;
         const scale = pz.getScale();
         
-        // Capture initial state
+        // Capture current state from DOM
+        const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
+        const currentHead = line.getAttribute("marker-end") ? true : false;
+        
         const init = {
             x1: parseFloat(line.getAttribute("x1")),
             y1: parseFloat(line.getAttribute("y1")),
@@ -286,8 +289,12 @@ function createArrow(id, data) {
                 x1: init.x1 + dx, y1: init.y1 + dy, 
                 x2: init.x2 + dx, y2: init.y2 + dy 
             };
-            // Merge generic data (style/head) with new coords for visual update
-            updateArrowVisuals(g, { ...data, ...finalData });
+            
+            updateArrowVisuals(g, { 
+                ...finalData, 
+                style: currentStyle, 
+                head: currentHead 
+            });
         };
         
         const onUp = () => {
@@ -314,7 +321,10 @@ function createHandle(id, type) {
         g.dataset.dragging = "true";
         
         const line = g.querySelector('.arrow-line');
-        // CACHE MATRIX LOCALLY - No external helper needed
+        // Capture current style so we don't lose it while dragging
+        const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
+        const currentHead = line.getAttribute("marker-end") ? true : false;
+
         const matrix = new DOMMatrix(window.getComputedStyle(canvas).transform);
         
         const anchorX = parseFloat(line.getAttribute(type === 'start' ? "x2" : "x1"));
@@ -323,19 +333,16 @@ function createHandle(id, type) {
         let finalX = 0; let finalY = 0;
 
         const onMove = (ev) => {
-            // Local Math
             finalX = (ev.clientX - matrix.e) / matrix.a;
             finalY = (ev.clientY - matrix.f) / matrix.a;
 
             const newData = {
-                style: data.style, head: data.head, // fallback to outer scope data is risky, but visuals update uses specific attributes usually
                 x1: type === 'start' ? finalX : anchorX,
                 y1: type === 'start' ? finalY : anchorY,
                 x2: type === 'end' ? finalX : anchorX,
                 y2: type === 'end' ? finalY : anchorY,
-                // Pass current style props from DOM to ensure they don't vanish
-                style: line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid',
-                head: line.getAttribute("marker-end") ? true : false
+                style: currentStyle,
+                head: currentHead
             };
             updateArrowVisuals(g, newData);
         };
