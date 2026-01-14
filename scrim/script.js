@@ -13,6 +13,20 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// --- 0. FORCE STYLES (Fixes Clicks & Cursors) ---
+const styleTag = document.createElement('style');
+styleTag.innerHTML = `
+    .arrow-group { pointer-events: auto; }
+    .arrow-line { stroke: #333; stroke-width: 3; fill: none; transition: stroke 0.2s; cursor: grab; }
+    .arrow-group:hover .arrow-line { stroke: #4f46e5; }
+    .arrow-handle { fill: #4f46e5; r: 6; opacity: 0; cursor: crosshair; transition: opacity 0.2s; }
+    .arrow-group:hover .arrow-handle { opacity: 1; }
+    .arrow-del-group { opacity: 0; cursor: pointer; transition: opacity 0.2s; }
+    .arrow-group:hover .arrow-del-group { opacity: 1; }
+    #svg-layer { pointer-events: none; z-index: 99; } /* Ensures SVG sits on top but lets clicks pass */
+`;
+document.head.appendChild(styleTag);
+
 // --- 1. SETUP & ROOMS ---
 let room = window.location.hash.substring(1);
 while (!room) {
@@ -22,30 +36,25 @@ while (!room) {
 document.getElementById('room-display').innerText = "#" + room;
 
 const canvas = document.getElementById('canvas');
-// Initialize Panzoom
+
+// Initialize Panzoom with 'interactive' exclusion
 const pz = Panzoom(canvas, {
     maxScale: 3, minScale: 0.1, canvas: true,
-    excludeClass: 'note' // prevent dragging notes from panning the canvas
+    excludeClass: 'interactive' // <--- CRITICAL FIX: Ignores Notes AND Arrows
 });
 
-// Zoom Controls
 canvas.parentElement.addEventListener('wheel', pz.zoomWithWheel);
 document.getElementById('zoom-slider').addEventListener('input', (e) => pz.zoom(parseFloat(e.target.value)));
 canvas.addEventListener('panzoomzoom', (e) => document.getElementById('zoom-slider').value = e.detail.scale);
 
 // --- 2. MATH HELPERS ---
-function getCanvasCoordinates(clientX, clientY) {
-    // Robustly handle the matrix, even if 'none'
+function getViewCenter() {
     const style = window.getComputedStyle(canvas).transform;
     const matrix = (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
     return {
-        x: (clientX - matrix.e) / matrix.a,
-        y: (clientY - matrix.f) / matrix.a
+        x: ((window.innerWidth / 2) - matrix.e) / matrix.a,
+        y: ((window.innerHeight / 2) - matrix.f) / matrix.a
     };
-}
-
-function getViewCenter() {
-    return getCanvasCoordinates(window.innerWidth / 2, window.innerHeight / 2);
 }
 
 // --- 3. EXPORT FUNCTIONS ---
@@ -105,14 +114,14 @@ onValue(ref(db, `scrims/${room}/notes`), snap => {
 function createNote(id, data) {
     const div = document.createElement('div');
     div.id = id;
-    div.className = 'note';
+    div.className = 'note interactive'; // <--- Added 'interactive'
     const colors = ['#ffffff', '#ffd1dc', '#d1e9ff', '#d1ffda', '#fef3c7', '#e9d5ff', '#ffedd5'];
     
     div.innerHTML = `
-        <div class="del-btn">×</div>
-        <div class="note-text" contenteditable="true"></div>
-        <div class="note-tools">
-            ${colors.map(c => `<div class="color-dot" style="background:${c}" data-c="${c}"></div>`).join('')}
+        <div class="del-btn interactive">×</div>
+        <div class="note-text interactive" contenteditable="true"></div>
+        <div class="note-tools interactive">
+            ${colors.map(c => `<div class="color-dot interactive" style="background:${c}" data-c="${c}"></div>`).join('')}
         </div>
     `;
     div.querySelector('.note-text').innerText = data.text;
@@ -172,7 +181,7 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC (FIXED & ROBUST) ---
+// --- 5. ARROWS LOGIC ---
 window.addArrow = (style, hasHead) => {
     const c = getViewCenter();
     push(ref(db, `scrims/${room}/arrows`), {
@@ -185,13 +194,11 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
     const container = document.getElementById('svg-layer');
     const data = snap.val() || {};
     
-    // Cleanup
     Array.from(container.children).forEach(el => {
         if (el.tagName === 'defs') return; 
         if (!data[el.id]) el.remove();
     });
 
-    // Update
     for (let id in data) {
         let el = document.getElementById(id);
         if (!el) {
@@ -206,23 +213,24 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
 function createArrow(id, data) {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
     g.id = id;
-    g.classList.add('arrow-group');
+    g.classList.add('arrow-group', 'interactive'); // <--- Marked interactive
 
     // Main Line
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.classList.add('arrow-line');
+    line.classList.add('arrow-line', 'interactive'); // <--- Marked interactive
     
     // Handles
     const h1 = createHandle(id, 'start');
     const h2 = createHandle(id, 'end');
 
-    // Delete Group
+    // Delete Group (Red X)
     const delG = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    delG.classList.add('arrow-del-group');
+    delG.classList.add('arrow-del-group', 'interactive'); // <--- Marked interactive
     
     const delCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     delCircle.setAttribute("r", "10");
     delCircle.setAttribute("fill", "#ef4444");
+    delCircle.classList.add('interactive');
     
     const delText = document.createElementNS("http://www.w3.org/2000/svg", "text");
     delText.textContent = "×";
@@ -231,15 +239,14 @@ function createArrow(id, data) {
     delText.setAttribute("fill", "white");
     delText.setAttribute("font-weight", "bold");
     delText.style.userSelect = "none";
+    delText.classList.add('interactive');
 
     delG.append(delCircle, delText);
     
     // Delete Event
     delG.addEventListener('mousedown', (e) => {
-        e.stopPropagation(); 
-        setTimeout(() => {
-             if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
-        }, 10);
+        e.stopPropagation(); // Explicitly Stop Panzoom
+        if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
     });
 
     g.append(line, h1, h2, delG);
@@ -254,7 +261,6 @@ function createArrow(id, data) {
         const startY = e.clientY;
         const scale = pz.getScale();
         
-        // Capture existing DOM state to prevent style loss
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
         
@@ -273,12 +279,7 @@ function createArrow(id, data) {
                 x1: init.x1 + dx, y1: init.y1 + dy, 
                 x2: init.x2 + dx, y2: init.y2 + dy 
             };
-            
-            updateArrowVisuals(g, { 
-                ...finalData, 
-                style: currentStyle, 
-                head: currentHead 
-            });
+            updateArrowVisuals(g, { ...finalData, style: currentStyle, head: currentHead });
         };
         
         const onUp = () => {
@@ -296,20 +297,18 @@ function createArrow(id, data) {
 
 function createHandle(id, type) {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.classList.add('arrow-handle');
+    c.classList.add('arrow-handle', 'interactive'); // <--- Marked interactive
     c.setAttribute("r", "6"); 
     
     c.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
+        e.stopPropagation(); // Explicitly Stop Panzoom
         const g = document.getElementById(id);
         g.dataset.dragging = "true";
         
         const line = g.querySelector('.arrow-line');
-        // Capture Style
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
 
-        // SAFE MATRIX CALCULATION (Fixes the crash)
         const style = window.getComputedStyle(canvas).transform;
         const matrix = (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
         
