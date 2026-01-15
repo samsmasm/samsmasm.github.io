@@ -13,7 +13,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- 0. FORCE STYLES & SVG DEFS (Arrowheads Fix) ---
+// --- 0. FORCE STYLES & SVG DEFS ---
 const styleTag = document.createElement('style');
 styleTag.innerHTML = `
     .arrow-group { pointer-events: auto; }
@@ -24,12 +24,9 @@ styleTag.innerHTML = `
     .arrow-del-group { opacity: 0; cursor: pointer; transition: opacity 0.2s; }
     .arrow-group:hover .arrow-del-group { opacity: 1; }
     #svg-layer { pointer-events: none; z-index: 99; overflow: visible; }
-    /* Snap Guide Visual */
-    .snap-guide { position: absolute; width: 10px; height: 10px; background: red; border-radius: 50%; pointer-events: none; z-index: 1000; transform: translate(-50%, -50%); display: none; }
 `;
 document.head.appendChild(styleTag);
 
-// Inject Arrowhead Definition
 const svgLayer = document.getElementById('svg-layer');
 svgLayer.innerHTML = `
     <defs>
@@ -49,7 +46,6 @@ document.getElementById('room-display').innerText = "#" + room;
 
 const canvas = document.getElementById('canvas');
 
-// Initialize Panzoom
 const pz = Panzoom(canvas, {
     maxScale: 3, minScale: 0.1, canvas: true,
     excludeClass: 'interactive'
@@ -73,7 +69,17 @@ function getViewCenter() {
     };
 }
 
-// --- 3. EXPORT FUNCTIONS (High-Res & Auto-Crop) ---
+// Calculate the 4 anchor points of a note (Top, Right, Bottom, Left)
+function getNoteAnchors(x, y, w, h) {
+    return [
+        { x: x + w / 2, y: y },             // Top
+        { x: x + w,     y: y + h / 2 },     // Right
+        { x: x + w / 2, y: y + h },         // Bottom
+        { x: x,         y: y + h / 2 }      // Left
+    ];
+}
+
+// --- 3. EXPORT FUNCTIONS ---
 window.exportTXT = () => {
     let content = "SCRIM NOTES - Room: #" + room + "\n---------------------------\n\n";
     document.querySelectorAll('.note-text').forEach(n => {
@@ -88,38 +94,21 @@ window.exportTXT = () => {
 
 window.exportJPG = async () => {
     try {
-        // 1. Calculate Bounding Box of content
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         const elements = document.querySelectorAll('.note, .arrow-line');
-        
         if (elements.length === 0) return alert("Nothing to export!");
 
-        elements.forEach(el => {
-            const rect = el.getBoundingClientRect(); // Screen coords
-            // We need canvas relative coords, but getting screen bounds is easier for a snapshot crop
-            // Let's rely on Panzoom reset for simplicity and highest quality
-        });
-
-        // 2. Save current view state
         const originalTransform = canvas.style.transform;
-        
-        // 3. Reset View for clean export (Scale 1, centered-ish)
-        // We temporarily disable transitions to make this instant
         canvas.style.transition = 'none';
         pz.reset(); 
-        
-        // Wait briefly for DOM to settle
         await new Promise(r => setTimeout(r, 100));
 
-        // 4. Capture with Scale 3 (High Res)
         const c = await html2canvas(document.getElementById('canvas'), {
             backgroundColor: '#f0f2f5',
-            scale: 3, // <--- Triple Resolution
+            scale: 3,
             logging: false,
             ignoreElements: (el) => el.classList.contains('ui-layer')
         });
 
-        // 5. Restore User View
         canvas.style.transform = originalTransform;
         canvas.style.transition = '';
 
@@ -127,13 +116,10 @@ window.exportJPG = async () => {
         a.href = c.toDataURL("image/jpeg", 0.9);
         a.download = `scrim-${room}.jpg`;
         a.click();
-    } catch (e) { 
-        alert("Snapshot failed: " + e.message); 
-        console.error(e);
-    }
+    } catch (e) { alert("Snapshot failed: " + e.message); }
 };
 
-// --- 4. NOTES LOGIC ---
+// --- 4. NOTES LOGIC (Updated with Arrow Dragging) ---
 window.addNote = () => {
     const c = getViewCenter();
     push(ref(db, `scrims/${room}/notes`), {
@@ -176,10 +162,13 @@ function createNote(id, data) {
     `;
     div.querySelector('.note-text').innerText = data.text;
     
+    // Delete Note
     div.querySelector('.del-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         if(confirm("Delete note?")) remove(ref(db, `scrims/${room}/notes/${id}`));
     });
+
+    // Color Change
     div.querySelectorAll('.color-dot').forEach(d => {
         d.addEventListener('mousedown', (e) => {
             e.stopPropagation();
@@ -187,10 +176,11 @@ function createNote(id, data) {
         });
     });
     
+    // Text Update
     const textEl = div.querySelector('.note-text');
     textEl.addEventListener('blur', () => update(ref(db, `scrims/${room}/notes/${id}`), { text: textEl.innerText }));
 
-    // Drag Logic
+    // --- DRAG NOTE + ATTACHED ARROWS ---
     div.addEventListener('mousedown', (e) => {
         if (e.target === textEl || e.target.classList.contains('del-btn') || e.target.classList.contains('color-dot')) return;
         e.stopPropagation();
@@ -202,7 +192,44 @@ function createNote(id, data) {
         const startY = e.clientY;
         const startLeft = parseFloat(div.style.left);
         const startTop = parseFloat(div.style.top);
+        const w = div.offsetWidth;
+        const h = div.offsetHeight;
         const scale = pz.getScale();
+
+        // 1. Identify Attached Arrows
+        const attachedArrows = [];
+        const anchors = getNoteAnchors(startLeft, startTop, w, h);
+        
+        document.querySelectorAll('.arrow-group').forEach(arrowGroup => {
+            const line = arrowGroup.querySelector('line');
+            const ax1 = parseFloat(line.getAttribute('x1'));
+            const ay1 = parseFloat(line.getAttribute('y1'));
+            const ax2 = parseFloat(line.getAttribute('x2'));
+            const ay2 = parseFloat(line.getAttribute('y2'));
+
+            // Check if Start Point is snapped to this note
+            anchors.forEach(anchor => {
+                if (Math.abs(ax1 - anchor.x) < 5 && Math.abs(ay1 - anchor.y) < 5) {
+                    attachedArrows.push({ 
+                        id: arrowGroup.id, 
+                        type: 'start', 
+                        offsetX: ax1 - startLeft, // Distance from Note Left
+                        offsetY: ay1 - startTop,  // Distance from Note Top
+                        fixedX: ax2, fixedY: ay2 // The other end stays still
+                    });
+                }
+                // Check if End Point is snapped to this note
+                if (Math.abs(ax2 - anchor.x) < 5 && Math.abs(ay2 - anchor.y) < 5) {
+                    attachedArrows.push({ 
+                        id: arrowGroup.id, 
+                        type: 'end', 
+                        offsetX: ax2 - startLeft, 
+                        offsetY: ay2 - startTop,
+                        fixedX: ax1, fixedY: ay1 
+                    });
+                }
+            });
+        });
 
         let finalX = startLeft;
         let finalY = startTop;
@@ -212,8 +239,36 @@ function createNote(id, data) {
             const dy = (ev.clientY - startY) / scale;
             finalX = startLeft + dx;
             finalY = startTop + dy;
+            
+            // Move Note
             div.style.left = finalX + 'px';
             div.style.top = finalY + 'px';
+
+            // Move Attached Arrows
+            attachedArrows.forEach(att => {
+                const arrowEl = document.getElementById(att.id);
+                if (arrowEl) {
+                    const line = arrowEl.querySelector('.arrow-line');
+                    const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
+                    const currentHead = line.getAttribute("marker-end") ? true : false;
+                    
+                    const newX = finalX + att.offsetX;
+                    const newY = finalY + att.offsetY;
+                    
+                    const newData = {
+                        x1: att.type === 'start' ? newX : att.fixedX,
+                        y1: att.type === 'start' ? newY : att.fixedY,
+                        x2: att.type === 'end' ? newX : att.fixedX,
+                        y2: att.type === 'end' ? newY : att.fixedY,
+                        style: currentStyle,
+                        head: currentHead
+                    };
+                    updateArrowVisuals(arrowEl, newData);
+                    
+                    // Update temp data for drag end
+                    att.finalData = newData; 
+                }
+            });
         };
 
         const onUp = () => {
@@ -221,7 +276,16 @@ function createNote(id, data) {
             window.removeEventListener('mouseup', onUp);
             delete div.dataset.dragging;
             div.classList.remove('selected');
+            
+            // Save Note Position
             update(ref(db, `scrims/${room}/notes/${id}`), { x: finalX, y: finalY });
+
+            // Save Arrow Positions
+            attachedArrows.forEach(att => {
+                if (att.finalData) {
+                    update(ref(db, `scrims/${room}/arrows/${att.id}`), att.finalData);
+                }
+            });
         };
 
         window.addEventListener('mousemove', onMove);
@@ -231,14 +295,12 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC (With Snapping) ---
+// --- 5. ARROWS LOGIC (With Snapping & Updating) ---
 
-// Helper: Find nearest snap point
 function getNearestSnapPoint(x, y) {
     const SNAP_DIST = 30;
     let bestPoint = { x, y, dist: Infinity };
 
-    // Iterate all notes to find anchor points
     document.querySelectorAll('.note').forEach(note => {
         const rect = {
             x: parseFloat(note.style.left),
@@ -246,15 +308,8 @@ function getNearestSnapPoint(x, y) {
             w: note.offsetWidth,
             h: note.offsetHeight
         };
+        const anchors = getNoteAnchors(rect.x, rect.y, rect.w, rect.h);
         
-        // Define 4 Anchors: Top-Mid, Right-Mid, Bottom-Mid, Left-Mid
-        const anchors = [
-            { x: rect.x + rect.w / 2, y: rect.y },             // Top
-            { x: rect.x + rect.w,     y: rect.y + rect.h / 2 }, // Right
-            { x: rect.x + rect.w / 2, y: rect.y + rect.h },     // Bottom
-            { x: rect.x,              y: rect.y + rect.h / 2 }  // Left
-        ];
-
         anchors.forEach(p => {
             const d = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
             if (d < SNAP_DIST && d < bestPoint.dist) {
@@ -278,9 +333,8 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
     const container = document.getElementById('svg-layer');
     const data = snap.val() || {};
     
-    // Cleanup
     Array.from(container.children).forEach(el => {
-        if (el.tagName === 'defs') return; // Don't delete our arrowhead definition!
+        if (el.tagName === 'defs') return; 
         if (!data[el.id]) el.remove();
     });
 
@@ -398,11 +452,9 @@ function createHandle(id, type) {
         let finalX = 0; let finalY = 0;
 
         const onMove = (ev) => {
-            // 1. Raw Mouse Position
             const rawX = (ev.clientX - matrix.e) / matrix.a;
             const rawY = (ev.clientY - matrix.f) / matrix.a;
 
-            // 2. Snap Logic
             const snap = getNearestSnapPoint(rawX, rawY);
             finalX = snap.x;
             finalY = snap.y;
@@ -446,7 +498,6 @@ function updateArrowVisuals(g, data) {
     if (data.style === 'dotted') line.setAttribute("stroke-dasharray", "5,5");
     else line.removeAttribute("stroke-dasharray");
     
-    // Correctly reference the injected arrowhead
     if (data.head) line.setAttribute("marker-end", "url(#arrowhead)");
     else line.removeAttribute("marker-end");
 
