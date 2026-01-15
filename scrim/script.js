@@ -13,7 +13,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- 0. FORCE STYLES (Fixes Clicks & Cursors) ---
+// --- 0. FORCE STYLES & SVG DEFS (Arrowheads Fix) ---
 const styleTag = document.createElement('style');
 styleTag.innerHTML = `
     .arrow-group { pointer-events: auto; }
@@ -23,9 +23,21 @@ styleTag.innerHTML = `
     .arrow-group:hover .arrow-handle { opacity: 1; }
     .arrow-del-group { opacity: 0; cursor: pointer; transition: opacity 0.2s; }
     .arrow-group:hover .arrow-del-group { opacity: 1; }
-    #svg-layer { pointer-events: none; z-index: 99; } /* Ensures SVG sits on top but lets clicks pass */
+    #svg-layer { pointer-events: none; z-index: 99; overflow: visible; }
+    /* Snap Guide Visual */
+    .snap-guide { position: absolute; width: 10px; height: 10px; background: red; border-radius: 50%; pointer-events: none; z-index: 1000; transform: translate(-50%, -50%); display: none; }
 `;
 document.head.appendChild(styleTag);
+
+// Inject Arrowhead Definition
+const svgLayer = document.getElementById('svg-layer');
+svgLayer.innerHTML = `
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+        </marker>
+    </defs>
+`;
 
 // --- 1. SETUP & ROOMS ---
 let room = window.location.hash.substring(1);
@@ -37,10 +49,10 @@ document.getElementById('room-display').innerText = "#" + room;
 
 const canvas = document.getElementById('canvas');
 
-// Initialize Panzoom with 'interactive' exclusion
+// Initialize Panzoom
 const pz = Panzoom(canvas, {
     maxScale: 3, minScale: 0.1, canvas: true,
-    excludeClass: 'interactive' // <--- CRITICAL FIX: Ignores Notes AND Arrows
+    excludeClass: 'interactive'
 });
 
 canvas.parentElement.addEventListener('wheel', pz.zoomWithWheel);
@@ -48,16 +60,20 @@ document.getElementById('zoom-slider').addEventListener('input', (e) => pz.zoom(
 canvas.addEventListener('panzoomzoom', (e) => document.getElementById('zoom-slider').value = e.detail.scale);
 
 // --- 2. MATH HELPERS ---
-function getViewCenter() {
+function getCanvasMatrix() {
     const style = window.getComputedStyle(canvas).transform;
-    const matrix = (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
+    return (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
+}
+
+function getViewCenter() {
+    const matrix = getCanvasMatrix();
     return {
         x: ((window.innerWidth / 2) - matrix.e) / matrix.a,
         y: ((window.innerHeight / 2) - matrix.f) / matrix.a
     };
 }
 
-// --- 3. EXPORT FUNCTIONS ---
+// --- 3. EXPORT FUNCTIONS (High-Res & Auto-Crop) ---
 window.exportTXT = () => {
     let content = "SCRIM NOTES - Room: #" + room + "\n---------------------------\n\n";
     document.querySelectorAll('.note-text').forEach(n => {
@@ -72,15 +88,49 @@ window.exportTXT = () => {
 
 window.exportJPG = async () => {
     try {
+        // 1. Calculate Bounding Box of content
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const elements = document.querySelectorAll('.note, .arrow-line');
+        
+        if (elements.length === 0) return alert("Nothing to export!");
+
+        elements.forEach(el => {
+            const rect = el.getBoundingClientRect(); // Screen coords
+            // We need canvas relative coords, but getting screen bounds is easier for a snapshot crop
+            // Let's rely on Panzoom reset for simplicity and highest quality
+        });
+
+        // 2. Save current view state
+        const originalTransform = canvas.style.transform;
+        
+        // 3. Reset View for clean export (Scale 1, centered-ish)
+        // We temporarily disable transitions to make this instant
+        canvas.style.transition = 'none';
+        pz.reset(); 
+        
+        // Wait briefly for DOM to settle
+        await new Promise(r => setTimeout(r, 100));
+
+        // 4. Capture with Scale 3 (High Res)
         const c = await html2canvas(document.getElementById('canvas'), {
             backgroundColor: '#f0f2f5',
+            scale: 3, // <--- Triple Resolution
+            logging: false,
             ignoreElements: (el) => el.classList.contains('ui-layer')
         });
+
+        // 5. Restore User View
+        canvas.style.transform = originalTransform;
+        canvas.style.transition = '';
+
         const a = document.createElement('a');
-        a.href = c.toDataURL("image/jpeg");
+        a.href = c.toDataURL("image/jpeg", 0.9);
         a.download = `scrim-${room}.jpg`;
         a.click();
-    } catch (e) { alert("Snapshot failed: " + e.message); }
+    } catch (e) { 
+        alert("Snapshot failed: " + e.message); 
+        console.error(e);
+    }
 };
 
 // --- 4. NOTES LOGIC ---
@@ -114,7 +164,7 @@ onValue(ref(db, `scrims/${room}/notes`), snap => {
 function createNote(id, data) {
     const div = document.createElement('div');
     div.id = id;
-    div.className = 'note interactive'; // <--- Added 'interactive'
+    div.className = 'note interactive';
     const colors = ['#ffffff', '#ffd1dc', '#d1e9ff', '#d1ffda', '#fef3c7', '#e9d5ff', '#ffedd5'];
     
     div.innerHTML = `
@@ -181,7 +231,41 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC ---
+// --- 5. ARROWS LOGIC (With Snapping) ---
+
+// Helper: Find nearest snap point
+function getNearestSnapPoint(x, y) {
+    const SNAP_DIST = 30;
+    let bestPoint = { x, y, dist: Infinity };
+
+    // Iterate all notes to find anchor points
+    document.querySelectorAll('.note').forEach(note => {
+        const rect = {
+            x: parseFloat(note.style.left),
+            y: parseFloat(note.style.top),
+            w: note.offsetWidth,
+            h: note.offsetHeight
+        };
+        
+        // Define 4 Anchors: Top-Mid, Right-Mid, Bottom-Mid, Left-Mid
+        const anchors = [
+            { x: rect.x + rect.w / 2, y: rect.y },             // Top
+            { x: rect.x + rect.w,     y: rect.y + rect.h / 2 }, // Right
+            { x: rect.x + rect.w / 2, y: rect.y + rect.h },     // Bottom
+            { x: rect.x,              y: rect.y + rect.h / 2 }  // Left
+        ];
+
+        anchors.forEach(p => {
+            const d = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
+            if (d < SNAP_DIST && d < bestPoint.dist) {
+                bestPoint = { x: p.x, y: p.y, dist: d, snapped: true };
+            }
+        });
+    });
+
+    return bestPoint;
+}
+
 window.addArrow = (style, hasHead) => {
     const c = getViewCenter();
     push(ref(db, `scrims/${room}/arrows`), {
@@ -194,8 +278,9 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
     const container = document.getElementById('svg-layer');
     const data = snap.val() || {};
     
+    // Cleanup
     Array.from(container.children).forEach(el => {
-        if (el.tagName === 'defs') return; 
+        if (el.tagName === 'defs') return; // Don't delete our arrowhead definition!
         if (!data[el.id]) el.remove();
     });
 
@@ -213,19 +298,16 @@ onValue(ref(db, `scrims/${room}/arrows`), snap => {
 function createArrow(id, data) {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
     g.id = id;
-    g.classList.add('arrow-group', 'interactive'); // <--- Marked interactive
+    g.classList.add('arrow-group', 'interactive');
 
-    // Main Line
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.classList.add('arrow-line', 'interactive'); // <--- Marked interactive
+    line.classList.add('arrow-line', 'interactive');
     
-    // Handles
     const h1 = createHandle(id, 'start');
     const h2 = createHandle(id, 'end');
 
-    // Delete Group (Red X)
     const delG = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    delG.classList.add('arrow-del-group', 'interactive'); // <--- Marked interactive
+    delG.classList.add('arrow-del-group', 'interactive');
     
     const delCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     delCircle.setAttribute("r", "10");
@@ -243,16 +325,15 @@ function createArrow(id, data) {
 
     delG.append(delCircle, delText);
     
-    // Delete Event
     delG.addEventListener('mousedown', (e) => {
-        e.stopPropagation(); // Explicitly Stop Panzoom
+        e.stopPropagation(); 
         if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
     });
 
     g.append(line, h1, h2, delG);
     updateArrowVisuals(g, data);
 
-    // --- DRAG WHOLE ARROW ---
+    // Drag Whole Arrow
     line.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         g.dataset.dragging = "true"; 
@@ -297,11 +378,11 @@ function createArrow(id, data) {
 
 function createHandle(id, type) {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.classList.add('arrow-handle', 'interactive'); // <--- Marked interactive
+    c.classList.add('arrow-handle', 'interactive');
     c.setAttribute("r", "6"); 
     
     c.addEventListener('mousedown', (e) => {
-        e.stopPropagation(); // Explicitly Stop Panzoom
+        e.stopPropagation();
         const g = document.getElementById(id);
         g.dataset.dragging = "true";
         
@@ -309,8 +390,7 @@ function createHandle(id, type) {
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
 
-        const style = window.getComputedStyle(canvas).transform;
-        const matrix = (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
+        const matrix = getCanvasMatrix();
         
         const anchorX = parseFloat(line.getAttribute(type === 'start' ? "x2" : "x1"));
         const anchorY = parseFloat(line.getAttribute(type === 'start' ? "y2" : "y1"));
@@ -318,8 +398,14 @@ function createHandle(id, type) {
         let finalX = 0; let finalY = 0;
 
         const onMove = (ev) => {
-            finalX = (ev.clientX - matrix.e) / matrix.a;
-            finalY = (ev.clientY - matrix.f) / matrix.a;
+            // 1. Raw Mouse Position
+            const rawX = (ev.clientX - matrix.e) / matrix.a;
+            const rawY = (ev.clientY - matrix.f) / matrix.a;
+
+            // 2. Snap Logic
+            const snap = getNearestSnapPoint(rawX, rawY);
+            finalX = snap.x;
+            finalY = snap.y;
 
             const newData = {
                 x1: type === 'start' ? finalX : anchorX,
@@ -360,6 +446,7 @@ function updateArrowVisuals(g, data) {
     if (data.style === 'dotted') line.setAttribute("stroke-dasharray", "5,5");
     else line.removeAttribute("stroke-dasharray");
     
+    // Correctly reference the injected arrowhead
     if (data.head) line.setAttribute("marker-end", "url(#arrowhead)");
     else line.removeAttribute("marker-end");
 
