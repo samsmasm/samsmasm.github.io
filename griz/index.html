@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Trivia Board</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #0645ad; /* Jeopardy Blue */
+            --text-color: #ffffff;
+            --highlight-color: #f1c40f; /* Gold */
+            --modal-overlay: rgba(0, 0, 0, 0.9);
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevent scrolling on body, scroll inside board instead */
+        }
+
+        /* --- UTILITY & SETUP VIEW --- */
+        .hidden { display: none !important; }
+        .container {
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Setup Screen Styling */
+        #setup-view {
+            max-width: 800px;
+            margin: 0 auto;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+        }
+
+        h1 { margin-bottom: 20px; color: var(--highlight-color); text-transform: uppercase; letter-spacing: 2px; }
+        
+        .instructions {
+            margin-bottom: 15px;
+            color: #aaa;
+            line-height: 1.5;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            background: #2a2a2a;
+            color: #ddd;
+            border: 2px solid #444;
+            padding: 15px;
+            font-family: monospace;
+            border-radius: 8px;
+            resize: none;
+            margin-bottom: 20px;
+        }
+
+        textarea:focus { outline: none; border-color: var(--highlight-color); }
+
+        .btn-group { display: flex; gap: 10px; }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .btn-primary { background-color: var(--highlight-color); color: #000; }
+        .btn-secondary { background-color: #444; color: #fff; }
+        .btn-reset { position: absolute; top: 10px; right: 10px; background: #c0392b; color: white; font-size: 0.8rem; z-index: 100; }
+
+        #error-msg {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-weight: bold;
+            white-space: pre-wrap;
+        }
+
+        /* --- GAME BOARD VIEW --- */
+        #game-view {
+            height: 100%;
+            overflow: auto; /* Allow scrolling if board is huge */
+            position: relative;
+        }
+
+        /* The Board Grid */
+        #board {
+            display: flex; /* We use flex to create columns */
+            gap: 15px;
+            justify-content: center; /* Center the board */
+            min-height: 100%;
+            padding-top: 40px;
+        }
+
+        .category-column {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1; /* Distribute space evenly */
+            min-width: 150px;
+            max-width: 300px;
+        }
+
+        .cat-header {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 20px 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            border: 2px solid #fff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            /* Header stays fixed at top when scrolling long boards */
+            position: sticky; 
+            top: 0;
+            z-index: 10;
+        }
+
+        .tile {
+            background-color: var(--accent-color);
+            color: var(--highlight-color);
+            font-size: 2.5rem;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 16/9; /* Classic TV shape */
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s, background-color 0.2s;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .tile:hover {
+            border-color: var(--highlight-color);
+            transform: scale(1.02);
+            z-index: 5;
+        }
+
+        .tile.used {
+            background-color: #2c2c2c;
+            color: #2c2c2c; /* Hide the number visually but keep shape */
+            cursor: default;
+            border-color: #444;
+            pointer-events: none;
+        }
+
+        /* --- MODAL (Question View) --- */
+        #question-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: var(--modal-overlay);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        #question-modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: var(--accent-color);
+            border: 4px solid var(--highlight-color);
+            width: 90%;
+            max-width: 1000px;
+            max-height: 90vh;
+            padding: 40px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .q-text {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            line-height: 1.3;
+        }
+
+        .media-container {
+            margin-bottom: 20px;
+            max-width: 100%;
+        }
+        
+        .media-container img, 
+        .media-container video {
+            max-height: 400px;
+            max-width: 100%;
+            border: 2px solid white;
+            border-radius: 4px;
+        }
+
+        .answer-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            width: 100%;
+            font-size: 1.8rem;
+            color: var(--highlight-color);
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-controls {
+            margin-top: 30px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            color: rgba(255,255,255,0.5);
+            font-size: 2rem;
+            padding: 0;
+        }
+        .btn-close:hover { color: white; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .tile { font-size: 1.5rem; }
+            .q-text { font-size: 1.5rem; }
+            #board { flex-direction: column; } /* Stack categories on tiny screens */
+            .category-column { width: 100%; max-width: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup-view" class="container">
+        <h1>Trivia Board Builder</h1>
+        <div class="instructions">
+            Paste your CSV below. First row must be headers: <br>
+            <code>category, points, question, answer, type, media_url</code>
+        </div>
+        <textarea id="csv-input" placeholder="Paste CSV data here..."></textarea>
+        
+        <div class="btn-group">
+            <button class="btn-primary" onclick="processCSV()">Build Board</button>
+            <button class="btn-secondary" onclick="fillExample()">Load Example</button>
+        </div>
+        <div id="error-msg"></div>
+    </div>
+
+    <div id="game-view" class="container hidden">
+        <button class="btn-reset" onclick="resetGame()">Reset / Edit</button>
+        <div id="board">
+            </div>
+    </div>
+
+    <div id="question-modal">
+        <div class="modal-content">
+            <button class="btn-close" onclick="closeModal()">&times;</button>
+            
+            <div id="modal-media" class="media-container"></div>
+            <div id="modal-question" class="q-text"></div>
+            
+            <div id="modal-answer" class="answer-box hidden"></div>
+
+            <div class="modal-controls">
+                <button id="btn-reveal" class="btn-primary" onclick="revealAnswer()">Reveal Answer</button>
+                <button id="btn-close-modal" class="btn-secondary hidden" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STATE ---
+        let categories = {}; // Map: "Category Name" -> [Array of Question Objects]
+        let currentTile = null; // Ref to DOM element currently active
+
+        // --- DOM ELEMENTS ---
+        const setupView = document.getElementById('setup-view');
+        const gameView = document.getElementById('game-view');
+        const csvInput = document.getElementById('csv-input');
+        const errorMsg = document.getElementById('error-msg');
+        const boardDiv = document.getElementById('board');
+        
+        const modal = document.getElementById('question-modal');
+        const modalQ = document.getElementById('modal-question');
+        const modalA = document.getElementById('modal-answer');
+        const modalMedia = document.getElementById('modal-media');
+        const btnReveal = document.getElementById('btn-reveal');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+
+        // --- CSV PROCESSING ---
+        function processCSV() {
+            errorMsg.textContent = '';
+            let rawText = csvInput.value.trim();
+
+            if (!rawText) {
+                errorMsg.textContent = "Please paste some CSV data.";
+                return;
+            }
+
+            // 1. Sanitize Markdown (Remove ```csv ... ``` wrapper)
+            // This regex looks for code blocks and returns just the inner content
+            const markdownRegex = /^```(?:csv)?\s*([\s\S]*?)\s*```$/i;
+            const match = rawText.match(markdownRegex);
+            if (match) {
+                rawText = match[1].trim();
+            }
+
+            // 2. Parse using PapaParse
+            Papa.parse(rawText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        // Show first error
+                        errorMsg.textContent = `CSV Error: ${results.errors[0].message} (Row ${results.errors[0].row})`;
+                        return;
+                    }
+                    validateAndBuild(results.data);
+                }
+            });
+        }
+
+        function validateAndBuild(data) {
+            // Reset Data
+            categories = {};
+            const requiredHeaders = ['category', 'points', 'question'];
+            
+            // Check headers on first row (keys of first object)
+            if (data.length === 0) {
+                errorMsg.textContent = "CSV appears empty.";
+                return;
+            }
+            
+            const firstRowKeys = Object.keys(data[0]);
+            const missing = requiredHeaders.filter(h => !firstRowKeys.includes(h));
+            if (missing.length > 0) {
+                errorMsg.textContent = `Missing required columns: ${missing.join(', ')}`;
+                return;
+            }
+
+            // Grouping and Validation
+            try {
+                data.forEach((row, index) => {
+                    // Skip completely empty rows if any slipped through
+                    if (!row.category || !row.points || !row.question) return;
+
+                    const cat = row.category.trim();
+                    const pts = parseInt(row.points, 10);
+
+                    if (isNaN(pts)) throw new Error(`Row ${index + 2}: Points must be a number.`);
+
+                    if (!categories[cat]) {
+                        categories[cat] = [];
+                    }
+
+                    // Check for duplicates
+                    if (categories[cat].some(q => q.points === pts)) {
+                        throw new Error(`Duplicate point value ${pts} in category "${cat}".`);
+                    }
+
+                    categories[cat].push({
+                        points: pts,
+                        question: row.question,
+                        answer: row.answer || "No answer provided",
+                        type: (row.type || 'text').toLowerCase(),
+                        media_url: row.media_url || ''
+                    });
+                });
+            } catch (err) {
+                errorMsg.textContent = err.message;
+                return;
+            }
+
+            // Sort questions by points
+            for (let cat in categories) {
+                categories[cat].sort((a, b) => a.points - b.points);
+            }
+
+            renderBoard();
+        }
+
+        // --- RENDERING ---
+        function renderBoard() {
+            boardDiv.innerHTML = '';
+            
+            // Create a column for each category
+            Object.keys(categories).forEach(catName => {
+                const col = document.createElement('div');
+                col.className = 'category-column';
+
+                // Header
+                const header = document.createElement('div');
+                header.className = 'cat-header';
+                header.textContent = catName;
+                col.appendChild(header);
+
+                // Tiles
+                categories[catName].forEach(qObj => {
+                    const tile = document.createElement('button');
+                    tile.className = 'tile';
+                    tile.textContent = qObj.points;
+                    tile.onclick = () => openQuestion(tile, qObj);
+                    col.appendChild(tile);
+                });
+
+                boardDiv.appendChild(col);
+            });
+
+            // Switch Views
+            setupView.classList.add('hidden');
+            gameView.classList.remove('hidden');
+        }
+
+        // --- GAMEPLAY LOGIC ---
+        function openQuestion(tileElement, qObj) {
+            currentTile = tileElement;
+            
+            // Reset Modal State
+            modalQ.textContent = qObj.question;
+            modalA.textContent = qObj.answer;
+            modalA.classList.add('hidden');
+            btnReveal.classList.remove('hidden');
+            btnCloseModal.classList.add('hidden');
+            modalMedia.innerHTML = ''; // Clear old media
+
+            // Handle Media
+            if (qObj.type !== 'text' && qObj.media_url) {
+                let mediaEl;
+                if (qObj.type === 'image') {
+                    mediaEl = document.createElement('img');
+                    mediaEl.src = qObj.media_url;
+                } else if (qObj.type === 'video') {
+                    mediaEl = document.createElement('video');
+                    mediaEl.src = qObj.media_url;
+                    mediaEl.controls = true;
+                } else if (qObj.type === 'audio') {
+                    mediaEl = document.createElement('audio');
+                    mediaEl.src = qObj.media_url;
+                    mediaEl.controls = true;
+                }
+                
+                if (mediaEl) {
+                    modalMedia.appendChild(mediaEl);
+                    // For video/audio, optional auto-play could go here
+                }
+            }
+
+            modal.classList.add('active');
+        }
+
+        function revealAnswer() {
+            modalA.classList.remove('hidden');
+            btnReveal.classList.add('hidden');
+            btnCloseModal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+            
+            // Stop media playback
+            const video = modalMedia.querySelector('video');
+            const audio = modalMedia.querySelector('audio');
+            if (video) video.pause();
+            if (audio) audio.pause();
+
+            // Mark tile as used
+            if (currentTile) {
+                currentTile.classList.add('used');
+            }
+        }
+
+        function resetGame() {
+            if(confirm("Are you sure you want to go back to editing? This will reset the board.")) {
+                gameView.classList.add('hidden');
+                setupView.classList.remove('hidden');
+            }
+        }
+
+        // --- EXAMPLE DATA ---
+        function fillExample() {
+            csvInput.value = `category,points,question,answer,type,media_url
+History,100,First President of the US,George Washington,text,
+History,200,Year the Titanic sank,1912,text,
+Science,100,Chemical symbol for Gold,Au,text,
+Science,300,Fastest land animal,Cheetah,image,https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/TheCheethcat.jpg/320px-TheCheethcat.jpg
+Movies,100,Which movie features a T-Rex?,Jurassic Park,text,
+Movies,200,Director of "Pulp Fiction",Quentin Tarantino,text,`;
+        }
+    </script>
+</body>
+</html>
