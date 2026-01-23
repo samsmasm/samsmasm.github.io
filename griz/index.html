@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Trivia Board</title>
+    <title>Griz - Trivia Board</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         :root {
@@ -12,7 +12,8 @@
             --accent-color: #0645ad; /* Jeopardy Blue */
             --text-color: #ffffff;
             --highlight-color: #f1c40f; /* Gold */
-            --modal-overlay: rgba(0, 0, 0, 0.9);
+            --active-team-bg: #2ecc71;
+            --modal-overlay: rgba(0, 0, 0, 0.95);
             --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
@@ -29,40 +30,54 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Prevent scrolling on body, scroll inside board instead */
+            overflow: hidden;
         }
 
-        /* --- UTILITY & SETUP VIEW --- */
+        /* --- UTILITY --- */
         .hidden { display: none !important; }
         .container {
             width: 100%;
             height: 100%;
-            padding: 20px;
             display: flex;
             flex-direction: column;
+            padding: 10px;
         }
 
-        /* Setup Screen Styling */
+        /* --- SETUP VIEW --- */
         #setup-view {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             align-items: center;
             justify-content: center;
             height: 100%;
             width: 100%;
+            padding: 20px;
         }
 
-        h1 { margin-bottom: 20px; color: var(--highlight-color); text-transform: uppercase; letter-spacing: 2px; }
+        h1 { margin-bottom: 10px; color: var(--highlight-color); text-transform: uppercase; letter-spacing: 2px; font-size: 3rem; }
         
         .instructions {
             margin-bottom: 15px;
             color: #aaa;
-            line-height: 1.5;
+            text-align: center;
         }
+
+        .controls-row {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            margin-bottom: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .input-group label { margin-right: 10px; font-weight: bold; color: #ccc;}
+        select { padding: 10px; border-radius: 4px; border: none; font-size: 1rem; }
 
         textarea {
             width: 100%;
-            height: 300px;
+            flex: 1; /* Fill remaining height in setup */
+            min-height: 200px;
             background: #2a2a2a;
             color: #ddd;
             border: 2px solid #444;
@@ -75,7 +90,7 @@
 
         textarea:focus { outline: none; border-color: var(--highlight-color); }
 
-        .btn-group { display: flex; gap: 10px; }
+        .btn-group { display: flex; gap: 15px; width: 100%; justify-content: center; }
 
         button {
             padding: 12px 24px;
@@ -91,65 +106,102 @@
 
         .btn-primary { background-color: var(--highlight-color); color: #000; }
         .btn-secondary { background-color: #444; color: #fff; }
-        .btn-reset { position: absolute; top: 10px; right: 10px; background: #c0392b; color: white; font-size: 0.8rem; z-index: 100; }
+        .btn-gpt { background-color: #10a37f; color: white; text-decoration: none; display: inline-block; text-align: center;}
+        
+        .btn-reset { 
+            position: absolute; top: 10px; right: 10px; 
+            background: #c0392b; color: white; font-size: 0.8rem; z-index: 100; 
+            padding: 8px 12px;
+        }
 
         #error-msg {
             color: #e74c3c;
             margin-top: 10px;
             font-weight: bold;
             white-space: pre-wrap;
+            height: 20px;
         }
 
-        /* --- GAME BOARD VIEW --- */
+        /* --- SCOREBOARD --- */
+        #scoreboard {
+            display: flex;
+            gap: 10px;
+            padding: 10px 0;
+            background: #111;
+            margin-bottom: 10px;
+            justify-content: center;
+        }
+
+        .team-score {
+            background: #333;
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-align: center;
+            border: 2px solid transparent;
+            cursor: pointer;
+            min-width: 100px;
+            transition: all 0.3s ease;
+        }
+
+        .team-score.active {
+            background: #004d00;
+            border-color: var(--active-team-bg);
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+        }
+
+        .team-name { font-size: 0.8rem; color: #aaa; text-transform: uppercase; margin-bottom: 5px; }
+        .team-points { font-size: 1.5rem; font-weight: bold; color: white; }
+
+        /* --- BOARD VIEW --- */
         #game-view {
-            height: 100%;
-            overflow: auto; /* Allow scrolling if board is huge */
-            position: relative;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* The Board Grid */
         #board {
-            display: flex; /* We use flex to create columns */
-            gap: 15px;
-            justify-content: center; /* Center the board */
-            min-height: 100%;
-            padding-top: 40px;
+            display: flex;
+            gap: 10px;
+            flex: 1; /* Takes up all remaining space */
+            width: 100%;
+            overflow: hidden; /* Prevent body scroll */
         }
 
         .category-column {
             display: flex;
             flex-direction: column;
             gap: 10px;
-            flex: 1; /* Distribute space evenly */
-            min-width: 150px;
-            max-width: 300px;
+            flex: 1; /* Stretch to fill width */
+            height: 100%;
         }
 
         .cat-header {
             background-color: var(--accent-color);
             color: white;
-            padding: 20px 10px;
+            padding: 15px 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
             font-weight: bold;
-            font-size: 1.2rem;
+            font-size: clamp(0.8rem, 2vw, 1.5rem); /* Responsive font */
             text-transform: uppercase;
             border: 2px solid #fff;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            /* Header stays fixed at top when scrolling long boards */
-            position: sticky; 
-            top: 0;
-            z-index: 10;
+            height: auto;
+            min-height: 60px;
         }
 
         .tile {
             background-color: var(--accent-color);
             color: var(--highlight-color);
-            font-size: 2.5rem;
+            font-size: clamp(1.5rem, 4vw, 3rem);
             font-weight: 900;
             display: flex;
             align-items: center;
             justify-content: center;
-            aspect-ratio: 16/9; /* Classic TV shape */
+            flex: 1; /* Stretch to fill vertical space */
             cursor: pointer;
             border: 2px solid transparent;
             transition: transform 0.2s, background-color 0.2s;
@@ -158,19 +210,20 @@
 
         .tile:hover {
             border-color: var(--highlight-color);
-            transform: scale(1.02);
+            background-color: #0856d6;
             z-index: 5;
         }
 
         .tile.used {
-            background-color: #2c2c2c;
-            color: #2c2c2c; /* Hide the number visually but keep shape */
+            background-color: #1a1a1a;
+            color: transparent;
+            text-shadow: none;
             cursor: default;
-            border-color: #444;
+            border-color: #333;
             pointer-events: none;
         }
 
-        /* --- MODAL (Question View) --- */
+        /* --- MODAL --- */
         #question-modal {
             position: fixed;
             top: 0; left: 0;
@@ -185,17 +238,14 @@
             transition: opacity 0.3s ease;
         }
 
-        #question-modal.active {
-            opacity: 1;
-            pointer-events: all;
-        }
+        #question-modal.active { opacity: 1; pointer-events: all; }
 
         .modal-content {
             background: var(--accent-color);
             border: 4px solid var(--highlight-color);
-            width: 90%;
-            max-width: 1000px;
-            max-height: 90vh;
+            width: 95%;
+            max-width: 1100px;
+            max-height: 95vh;
             padding: 40px;
             text-align: center;
             display: flex;
@@ -207,8 +257,21 @@
             position: relative;
         }
 
+        .active-team-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.4);
+            color: var(--highlight-color);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border: 1px solid var(--highlight-color);
+        }
+
         .q-text {
-            font-size: 2.5rem;
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
             font-weight: bold;
             text-transform: uppercase;
             margin-bottom: 30px;
@@ -216,18 +279,8 @@
             line-height: 1.3;
         }
 
-        .media-container {
-            margin-bottom: 20px;
-            max-width: 100%;
-        }
-        
-        .media-container img, 
-        .media-container video {
-            max-height: 400px;
-            max-width: 100%;
-            border: 2px solid white;
-            border-radius: 4px;
-        }
+        .media-container { margin-bottom: 20px; width: 100%; display: flex; justify-content: center; }
+        .media-container img, .media-container video { max-height: 50vh; max-width: 100%; border: 2px solid white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
 
         .answer-box {
             margin-top: 20px;
@@ -235,7 +288,7 @@
             background: rgba(0,0,0,0.3);
             border-radius: 8px;
             width: 100%;
-            font-size: 1.8rem;
+            font-size: 2rem;
             color: var(--highlight-color);
             min-height: 80px;
             display: flex;
@@ -243,59 +296,80 @@
             justify-content: center;
         }
 
-        .modal-controls {
-            margin-top: 30px;
-            display: flex;
-            gap: 20px;
-        }
+        .modal-controls { margin-top: 30px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;}
 
         .btn-close {
             position: absolute;
-            top: 20px;
+            top: 15px;
             right: 20px;
             background: transparent;
             color: rgba(255,255,255,0.5);
-            font-size: 2rem;
+            font-size: 2.5rem;
             padding: 0;
+            line-height: 1;
         }
         .btn-close:hover { color: white; }
 
-        /* Mobile Adjustments */
-        @media (max-width: 768px) {
-            .tile { font-size: 1.5rem; }
-            .q-text { font-size: 1.5rem; }
-            #board { flex-direction: column; } /* Stack categories on tiny screens */
-            .category-column { width: 100%; max-width: none; }
-        }
+        .btn-award { background-color: var(--active-team-bg); color: white; border: 2px solid white; }
+        .btn-no-score { background-color: #7f8c8d; color: white; }
+
     </style>
 </head>
 <body>
 
     <div id="setup-view" class="container">
-        <h1>Trivia Board Builder</h1>
-        <div class="instructions">
-            Paste your CSV below. First row must be headers: <br>
-            <code>category, points, question, answer, type, media_url</code>
+        <h1>Griz</h1>
+        
+        <div class="controls-row">
+            <a href="https://chatgpt.com/" target="_blank" class="button btn-gpt" style="padding: 12px 24px; border-radius: 4px; font-weight: bold;">
+                Open Custom GPT
+            </a>
+            
+            <div class="input-group">
+                <label for="team-count">Players/Teams:</label>
+                <select id="team-count">
+                    <option value="1">1 Player</option>
+                    <option value="2" selected>2 Teams</option>
+                    <option value="3">3 Teams</option>
+                    <option value="4">4 Teams</option>
+                    <option value="5">5 Teams</option>
+                    <option value="6">6 Teams</option>
+                </select>
+            </div>
         </div>
+
+        <div class="instructions">
+            Paste your CSV below. First row headers required: <br>
+            <code>category,points,question,answer,type,media_url</code>
+        </div>
+        
         <textarea id="csv-input" placeholder="Paste CSV data here..."></textarea>
         
         <div class="btn-group">
-            <button class="btn-primary" onclick="processCSV()">Build Board</button>
+            <button class="btn-primary" onclick="processCSV()">Build Grid</button>
             <button class="btn-secondary" onclick="fillExample()">Load Example</button>
         </div>
         <div id="error-msg"></div>
     </div>
 
-    <div id="game-view" class="container hidden">
+    <div id="game-view" class="hidden">
         <button class="btn-reset" onclick="resetGame()">Reset / Edit</button>
-        <div id="board">
+        
+        <div id="scoreboard">
             </div>
+
+        <div class="container" style="flex: 1; padding: 10px;">
+            <div id="board">
+                </div>
+        </div>
     </div>
 
     <div id="question-modal">
         <div class="modal-content">
-            <button class="btn-close" onclick="closeModal()">&times;</button>
+            <button class="btn-close" onclick="closeModalWithoutScore()">&times;</button>
             
+            <div class="active-team-indicator" id="modal-team-indicator">Team 1 is answering</div>
+
             <div id="modal-media" class="media-container"></div>
             <div id="modal-question" class="q-text"></div>
             
@@ -303,31 +377,46 @@
 
             <div class="modal-controls">
                 <button id="btn-reveal" class="btn-primary" onclick="revealAnswer()">Reveal Answer</button>
-                <button id="btn-close-modal" class="btn-secondary hidden" onclick="closeModal()">Close</button>
+                
+                <div id="post-reveal-controls" class="hidden" style="display: flex; gap: 15px;">
+                    <button id="btn-award" class="btn-award" onclick="awardPoints()">Correct (+0)</button>
+                    <button class="btn-no-score" onclick="closeModalWithoutScore()">No Score / Wrong</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- DATA STATE ---
-        let categories = {}; // Map: "Category Name" -> [Array of Question Objects]
-        let currentTile = null; // Ref to DOM element currently active
+        // --- STATE ---
+        let categories = {}; 
+        let currentTile = null; 
+        let currentQuestionPoints = 0;
+        
+        // Team State
+        let scores = [];
+        let activeTeamIndex = 0;
+        let numberOfTeams = 2;
 
-        // --- DOM ELEMENTS ---
+        // --- DOM ---
         const setupView = document.getElementById('setup-view');
         const gameView = document.getElementById('game-view');
         const csvInput = document.getElementById('csv-input');
         const errorMsg = document.getElementById('error-msg');
         const boardDiv = document.getElementById('board');
-        
+        const scoreboardDiv = document.getElementById('scoreboard');
+        const teamSelect = document.getElementById('team-count');
+
         const modal = document.getElementById('question-modal');
         const modalQ = document.getElementById('modal-question');
         const modalA = document.getElementById('modal-answer');
         const modalMedia = document.getElementById('modal-media');
+        const modalTeamInd = document.getElementById('modal-team-indicator');
+        
         const btnReveal = document.getElementById('btn-reveal');
-        const btnCloseModal = document.getElementById('btn-close-modal');
+        const postRevealControls = document.getElementById('post-reveal-controls');
+        const btnAward = document.getElementById('btn-award');
 
-        // --- CSV PROCESSING ---
+        // --- SETUP ---
         function processCSV() {
             errorMsg.textContent = '';
             let rawText = csvInput.value.trim();
@@ -337,104 +426,106 @@
                 return;
             }
 
-            // 1. Sanitize Markdown (Remove ```csv ... ``` wrapper)
-            // This regex looks for code blocks and returns just the inner content
+            // Strip Markdown
             const markdownRegex = /^```(?:csv)?\s*([\s\S]*?)\s*```$/i;
             const match = rawText.match(markdownRegex);
-            if (match) {
-                rawText = match[1].trim();
-            }
+            if (match) rawText = match[1].trim();
 
-            // 2. Parse using PapaParse
             Papa.parse(rawText, {
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
                     if (results.errors.length > 0) {
-                        // Show first error
-                        errorMsg.textContent = `CSV Error: ${results.errors[0].message} (Row ${results.errors[0].row})`;
+                        errorMsg.textContent = `CSV Error: ${results.errors[0].message}`;
                         return;
                     }
-                    validateAndBuild(results.data);
+                    if(validateAndBuild(results.data)) {
+                        initGame();
+                    }
                 }
             });
         }
 
         function validateAndBuild(data) {
-            // Reset Data
             categories = {};
-            const requiredHeaders = ['category', 'points', 'question'];
+            const required = ['category', 'points', 'question'];
+            if (data.length === 0) return false;
             
-            // Check headers on first row (keys of first object)
-            if (data.length === 0) {
-                errorMsg.textContent = "CSV appears empty.";
-                return;
-            }
-            
-            const firstRowKeys = Object.keys(data[0]);
-            const missing = requiredHeaders.filter(h => !firstRowKeys.includes(h));
-            if (missing.length > 0) {
-                errorMsg.textContent = `Missing required columns: ${missing.join(', ')}`;
-                return;
+            const keys = Object.keys(data[0]);
+            if (!required.every(r => keys.includes(r))) {
+                errorMsg.textContent = "Missing headers. Check CSV format.";
+                return false;
             }
 
-            // Grouping and Validation
             try {
-                data.forEach((row, index) => {
-                    // Skip completely empty rows if any slipped through
+                data.forEach((row) => {
                     if (!row.category || !row.points || !row.question) return;
-
                     const cat = row.category.trim();
                     const pts = parseInt(row.points, 10);
+                    if (isNaN(pts)) return;
 
-                    if (isNaN(pts)) throw new Error(`Row ${index + 2}: Points must be a number.`);
-
-                    if (!categories[cat]) {
-                        categories[cat] = [];
-                    }
-
-                    // Check for duplicates
-                    if (categories[cat].some(q => q.points === pts)) {
-                        throw new Error(`Duplicate point value ${pts} in category "${cat}".`);
-                    }
-
+                    if (!categories[cat]) categories[cat] = [];
                     categories[cat].push({
                         points: pts,
                         question: row.question,
-                        answer: row.answer || "No answer provided",
+                        answer: row.answer || "No answer",
                         type: (row.type || 'text').toLowerCase(),
                         media_url: row.media_url || ''
                     });
                 });
             } catch (err) {
-                errorMsg.textContent = err.message;
-                return;
+                errorMsg.textContent = "Error parsing data.";
+                return false;
             }
 
-            // Sort questions by points
+            // Sort by points
             for (let cat in categories) {
                 categories[cat].sort((a, b) => a.points - b.points);
             }
-
-            renderBoard();
+            return true;
         }
 
-        // --- RENDERING ---
+        function initGame() {
+            // Setup Teams
+            numberOfTeams = parseInt(teamSelect.value);
+            scores = new Array(numberOfTeams).fill(0);
+            activeTeamIndex = 0;
+            renderScoreboard();
+            renderBoard();
+
+            setupView.classList.add('hidden');
+            gameView.classList.remove('hidden');
+        }
+
+        function renderScoreboard() {
+            scoreboardDiv.innerHTML = '';
+            scores.forEach((score, index) => {
+                const div = document.createElement('div');
+                div.className = `team-score ${index === activeTeamIndex ? 'active' : ''}`;
+                div.innerHTML = `
+                    <div class="team-name">Team ${index + 1}</div>
+                    <div class="team-points">${score}</div>
+                `;
+                // Manual Override Click
+                div.onclick = () => {
+                    activeTeamIndex = index;
+                    renderScoreboard();
+                };
+                scoreboardDiv.appendChild(div);
+            });
+        }
+
         function renderBoard() {
             boardDiv.innerHTML = '';
-            
-            // Create a column for each category
             Object.keys(categories).forEach(catName => {
                 const col = document.createElement('div');
                 col.className = 'category-column';
-
-                // Header
+                
                 const header = document.createElement('div');
                 header.className = 'cat-header';
                 header.textContent = catName;
                 col.appendChild(header);
 
-                // Tiles
                 categories[catName].forEach(qObj => {
                     const tile = document.createElement('button');
                     tile.className = 'tile';
@@ -442,47 +533,38 @@
                     tile.onclick = () => openQuestion(tile, qObj);
                     col.appendChild(tile);
                 });
-
                 boardDiv.appendChild(col);
             });
-
-            // Switch Views
-            setupView.classList.add('hidden');
-            gameView.classList.remove('hidden');
         }
 
-        // --- GAMEPLAY LOGIC ---
+        // --- GAMEPLAY ---
         function openQuestion(tileElement, qObj) {
             currentTile = tileElement;
+            currentQuestionPoints = qObj.points;
             
-            // Reset Modal State
+            // Setup Modal UI
             modalQ.textContent = qObj.question;
             modalA.textContent = qObj.answer;
             modalA.classList.add('hidden');
+            
+            // Buttons state
             btnReveal.classList.remove('hidden');
-            btnCloseModal.classList.add('hidden');
-            modalMedia.innerHTML = ''; // Clear old media
+            postRevealControls.classList.add('hidden'); // Hide score buttons until reveal
+            postRevealControls.style.display = 'none'; 
+
+            modalMedia.innerHTML = '';
+            
+            // Update Active Team Text
+            modalTeamInd.textContent = `Team ${activeTeamIndex + 1} is answering`;
+            modalTeamInd.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--active-team-bg');
 
             // Handle Media
             if (qObj.type !== 'text' && qObj.media_url) {
                 let mediaEl;
-                if (qObj.type === 'image') {
-                    mediaEl = document.createElement('img');
-                    mediaEl.src = qObj.media_url;
-                } else if (qObj.type === 'video') {
-                    mediaEl = document.createElement('video');
-                    mediaEl.src = qObj.media_url;
-                    mediaEl.controls = true;
-                } else if (qObj.type === 'audio') {
-                    mediaEl = document.createElement('audio');
-                    mediaEl.src = qObj.media_url;
-                    mediaEl.controls = true;
-                }
-                
-                if (mediaEl) {
-                    modalMedia.appendChild(mediaEl);
-                    // For video/audio, optional auto-play could go here
-                }
+                if (qObj.type === 'image') mediaEl = Object.assign(document.createElement('img'), {src: qObj.media_url});
+                else if (qObj.type === 'video') mediaEl = Object.assign(document.createElement('video'), {src: qObj.media_url, controls: true});
+                else if (qObj.type === 'audio') mediaEl = Object.assign(document.createElement('audio'), {src: qObj.media_url, controls: true});
+                if (mediaEl) modalMedia.appendChild(mediaEl);
             }
 
             modal.classList.add('active');
@@ -491,40 +573,65 @@
         function revealAnswer() {
             modalA.classList.remove('hidden');
             btnReveal.classList.add('hidden');
-            btnCloseModal.classList.remove('hidden');
+            
+            // Show score buttons
+            postRevealControls.classList.remove('hidden');
+            postRevealControls.style.display = 'flex';
+            btnAward.textContent = `Correct (+${currentQuestionPoints})`;
         }
 
-        function closeModal() {
-            modal.classList.remove('active');
-            
-            // Stop media playback
-            const video = modalMedia.querySelector('video');
-            const audio = modalMedia.querySelector('audio');
-            if (video) video.pause();
-            if (audio) audio.pause();
+        function awardPoints() {
+            scores[activeTeamIndex] += currentQuestionPoints;
+            nextTurn();
+            closeModalAndMarkUsed();
+        }
 
-            // Mark tile as used
-            if (currentTile) {
-                currentTile.classList.add('used');
-            }
+        function closeModalWithoutScore() {
+            // No points awarded, but do we rotate turn? Usually yes if wrong.
+            // Let's assume yes. If they just wanted to close without affecting game, they can use the top X.
+            // But to be safe, let's just close. User can manually click next team if needed.
+            closeModalAndMarkUsed();
+        }
+
+        function nextTurn() {
+            activeTeamIndex = (activeTeamIndex + 1) % numberOfTeams;
+            renderScoreboard();
+        }
+
+        function closeModalAndMarkUsed() {
+            modal.classList.remove('active');
+            // Stop media
+            const video = modalMedia.querySelector('video');
+            if (video) video.pause();
+            
+            if (currentTile) currentTile.classList.add('used');
+            renderScoreboard(); // Refresh UI
         }
 
         function resetGame() {
-            if(confirm("Are you sure you want to go back to editing? This will reset the board.")) {
+            if(confirm("Exit to main menu? Current scores will be lost.")) {
                 gameView.classList.add('hidden');
                 setupView.classList.remove('hidden');
             }
         }
 
-        // --- EXAMPLE DATA ---
         function fillExample() {
             csvInput.value = `category,points,question,answer,type,media_url
-History,100,First President of the US,George Washington,text,
-History,200,Year the Titanic sank,1912,text,
 Science,100,Chemical symbol for Gold,Au,text,
-Science,300,Fastest land animal,Cheetah,image,https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/TheCheethcat.jpg/320px-TheCheethcat.jpg
-Movies,100,Which movie features a T-Rex?,Jurassic Park,text,
-Movies,200,Director of "Pulp Fiction",Quentin Tarantino,text,`;
+Science,200,Hardest natural substance,Diamond,text,
+Science,300,Planet closest to the sun,Mercury,text,
+Science,400,Speed of light (approx km/s),300000,text,
+Science,500,Study of fungi,Mycology,text,
+History,100,First US President,Washington,text,
+History,200,Year WWII ended,1945,text,
+History,300,Ancient Egyptian writing,Hieroglyphics,text,
+History,400,Joan of Arc's country,France,text,
+History,500,Empire of Alexander the Great,Macedonian,text,
+Movies,100,Toy Story main cowboy,Woody,text,
+Movies,200,Wizard of Oz villain,Wicked Witch of the West,text,
+Movies,300,Titanic director,James Cameron,text,
+Movies,400,Highest grossing movie 2009,Avatar,text,
+Movies,500,First feature length animated film,Snow White,text,`;
         }
     </script>
 </body>
