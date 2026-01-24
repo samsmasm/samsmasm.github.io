@@ -266,7 +266,11 @@
     <script>
         let categories = [], teams = [], activeTeamIndex = 0, currentTile = null, usedTilesCount = 0, totalTiles = 0, selectedTables = [];
         let currentLivePoints = 0, decayRate = 1, timerInterval = null;
+        
+        // --- TURN TRACKING VARIABLES ---
         let gameMode = 'standard'; 
+        let questionStartTeam = 0; // Who picked the tile
+        let passesCount = 0;       // How many times passed in this question
 
         const qModal = document.getElementById('question-modal'), mathInput = document.getElementById('math-answer-input');
 
@@ -363,6 +367,10 @@
             currentTile = tile; 
             currentLivePoints = q.points;
             
+            // --- NEW TURN LOGIC: RECORD STARTING STATE ---
+            questionStartTeam = activeTeamIndex; // Remember who picked this card
+            passesCount = 0;                     // Reset pass counter
+            
             document.getElementById('live-reward-text').textContent = currentLivePoints;
             document.getElementById('modal-question').textContent = q.question;
             document.getElementById('modal-answer').textContent = q.answer;
@@ -417,16 +425,22 @@
         function updateTurnIndicator() {
             document.getElementById('modal-team-indicator').textContent = `${teams[activeTeamIndex].name}`;
             if(gameMode === 'pass') {
-                 // Update dynamic label on pass button if visible
                  document.getElementById('btn-pass').textContent = `Pass to ${teams[(activeTeamIndex + 1) % teams.length].name}`;
             }
             renderScoreboard(); 
         }
 
         function passToNextTeam() {
-            // Keep modal open, keep points same, just switch team
-            activeTeamIndex = (activeTeamIndex + 1) % teams.length;
-            updateTurnIndicator();
+            passesCount++; 
+            // Check if full loop is complete (passes >= total teams)
+            if (passesCount >= teams.length) {
+                // Everyone passed! Question dies.
+                finalizeTurn(); 
+            } else {
+                // Just move to the next person to try THIS question
+                activeTeamIndex = (activeTeamIndex + 1) % teams.length;
+                updateTurnIndicator();
+            }
         }
 
         mathInput.onkeydown = (e) => {
@@ -446,14 +460,8 @@
         function revealAnswer() { 
             clearInterval(timerInterval);
             document.getElementById('modal-answer').classList.remove('hidden'); 
-            
-            // Hide Pre-Reveal (Reveal/Pass)
             document.getElementById('pre-reveal-controls').classList.add('hidden');
-            
-            // Show Post-Reveal (Correct/Wrong)
             document.getElementById('post-reveal-controls').classList.remove('hidden');
-            
-            // Update labels based on mode
             document.getElementById('btn-award').textContent = `Correct (+${currentLivePoints})`;
             
             if(gameMode === 'pass') {
@@ -472,7 +480,6 @@
             if(gameMode === 'pass') {
                 teams[activeTeamIndex].score -= currentLivePoints;
             }
-            // In both modes, a "Wrong" after reveal kills the question
             finalizeTurn();
         }
         
@@ -489,8 +496,11 @@
                 usedTilesCount++;
             }
             
-            // Always move to next team after question ends
-            activeTeamIndex = (activeTeamIndex + 1) % teams.length;
+            // --- KEY CHANGE: RESET CONTROL TO NATURAL ORDER ---
+            // Irrespective of who answered, stole, or passed, the next 
+            // person to pick a tile is the one AFTER the person who started THIS tile.
+            activeTeamIndex = (questionStartTeam + 1) % teams.length;
+
             renderScoreboard();
             
             if(usedTilesCount >= totalTiles) {
@@ -504,6 +514,8 @@
             const s = document.getElementById('scoreboard');
             s.innerHTML = '';
             teams.forEach((t, i) => {
+                // If modal is active, highlight the current answering team.
+                // If board is active, highlight the team whose turn it is to pick.
                 s.innerHTML += `<div class="team-card ${i===activeTeamIndex?'active':''}" onclick="activeTeamIndex=${i};renderScoreboard();">
                     <div class="btn-manual-add" onclick="event.stopPropagation(); manualScore(${i})">+</div>
                     <div class="team-name">${t.name}</div><div class="team-points">${t.score}</div>
@@ -515,33 +527,34 @@
         function openMathModal() { document.getElementById('tt-modal').classList.add('active'); }
         function closeMathModal() { document.getElementById('tt-modal').classList.remove('active'); }
         function resetGame() { document.getElementById('game-view').classList.add('hidden'); document.getElementById('setup-view').classList.remove('hidden'); }
+        
         function fillExample() { 
         document.getElementById('csv-input').value = `category,points,question,answer,type,media_url
-Space,100,What planet do we live on,Earth,text,
-Space,200,What is the name of the star at the center of our solar system,The Sun,text,
-Space,300,Which planet is known as the Red Planet,Mars,text,
-Space,400,What do we call a rock that falls from space to Earth,A meteorite,text,
-Space,500,What do we call a person who travels into space,Astronaut,text,
-Animals,100,What animal is known as man's best friend,Dog,text,
-Animals,200,Which animal is the largest land animal,Elephant,text,
-Animals,300,What do you call a baby cat,Kitten,text,
-Animals,400,Which reptile is known for changing its color to blend in,Chameleon,text,
-Animals,500,What group of animals have feathers and lay eggs,Birds,text,
-Geography,100,What is the name of the country we live in,United Kingdom,text,
-Geography,200,What is the largest ocean on Earth,Pacific Ocean,text,
-Geography,300,What do we call land completely surrounded by water,Island,text,
-Geography,400,What is the capital city of France,Paris,text,
-Geography,500,What line goes around the middle of the Earth,Equator,text,
-History,100,Who were the rulers of ancient Egypt,Pharaohs,text,
-History,200,What did knights wear to protect themselves,Armor,text,
-History,300,What were castles mainly built for,Defense,text,
-History,400,Who was the first person to walk on the Moon,Neil Armstrong,text,
-History,500,What do we call a long time ago before written records,Prehistory,text,
-Science,100,What do we need to breathe to stay alive,Oxygen,text,
-Science,200,What state of matter is water when it freezes,Solid,text,
-Science,300,What force pulls objects down to the ground,Gravity,text,
-Science,400,What part of a plant makes food using sunlight,Leaf,text,
-Science,500,What gas do plants need from the air to make their food,Carbon dioxide,text,`; 
+Space,100,What planet do we live on?,Earth,text,
+Space,200,What is the name of the star at the center of our solar system?,The Sun,text,
+Space,300,Which planet is known as the Red Planet?,Mars,text,
+Space,400,What do we call a rock that falls from space to Earth?,A meteorite,text,
+Space,500,What do we call a person who travels into space?,Astronaut,text,
+Animals,100,What animal is known as man's best friend?,Dog,text,
+Animals,200,Which animal is the largest land animal?,Elephant,text,
+Animals,300,What do you call a baby cat?,Kitten,text,
+Animals,400,Which reptile is known for changing its color to blend in?,Chameleon,text,
+Animals,500,What group of animals have feathers and lay eggs?,Birds,text,
+Geography,100,What is the name of the country we live in?,United Kingdom,text,
+Geography,200,What is the largest ocean on Earth?,Pacific Ocean,text,
+Geography,300,What do we call land completely surrounded by water?,Island,text,
+Geography,400,What is the capital city of France?,Paris,text,
+Geography,500,What line goes around the middle of the Earth?,Equator,text,
+History,100,Who were the rulers of ancient Egypt?,Pharaohs,text,
+History,200,What did knights wear to protect themselves?,Armor,text,
+History,300,What were castles mainly built for?,Defense,text,
+History,400,Who was the first person to walk on the Moon?,Neil Armstrong,text,
+History,500,What do we call a long time ago before written records?,Prehistory,text,
+Science,100,What do we need to breathe to stay alive?,Oxygen,text,
+Science,200,What state of matter is water when it freezes?,Solid,text,
+Science,300,What force pulls objects down to the ground?,Gravity,text,
+Science,400,What part of a plant makes food using sunlight?,Leaf,text,
+Science,500,What gas do plants need from the air to make their food?,Carbon dioxide,text,`; 
     }
     </script>
 </body>
