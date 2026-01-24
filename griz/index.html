@@ -6,6 +6,7 @@
     <title>Griz - Trivia Board</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
+        /* --- CSS STYLES START HERE --- */
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
@@ -47,7 +48,7 @@
             align-items: center;
         }
 
-        h1 { margin-bottom: 10px; color: var(--highlight-color); text-transform: uppercase; font-size: 3rem; text-align: center; }
+        h1 { margin: 0; color: var(--highlight-color); text-transform: uppercase; font-size: 3rem; }
         
         .setup-controls {
             display: grid;
@@ -123,8 +124,20 @@
         #board-container { flex: 1; padding: 20px; overflow: hidden; }
         #board { display: grid; gap: 15px; height: 100%; width: 100%; }
 
+        /* Updated Category Header for Rainbow logic */
         .cat-header {
-            background-color: var(--accent-color); color: white; padding: 10px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold; text-transform: uppercase; border: 2px solid #fff; font-size: clamp(1rem, 2.5vh, 1.8rem); 
+            /* Background color is set via JS now */
+            color: white; 
+            padding: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            text-align: center; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            border: 2px solid #fff; 
+            font-size: clamp(1rem, 2.5vh, 1.8rem); 
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
         }
 
         .tile {
@@ -141,7 +154,7 @@
             background: var(--accent-color); border: 4px solid var(--highlight-color); width: 95%; max-width: 1100px; padding: 30px; text-align: center; display: flex; flex-direction: column; align-items: center; border-radius: 10px; position: relative;
         }
 
-        /* FIXED MODAL HEADER LAYOUT */
+        /* MODAL HEADER LAYOUT */
         .modal-header-nav {
             display: flex;
             justify-content: space-between;
@@ -161,6 +174,22 @@
 
         .live-reward-container {
             background: var(--timer-color); color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 0 10px rgba(0,0,0,0.5); min-width: 140px;
+        }
+        
+        /* New Category Label inside Modal */
+        #modal-category-label {
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding: 5px 15px;
+            border-radius: 4px;
+            background: #333; /* Fallback */
+            display: inline-block;
+            text-shadow: 1px 1px 2px black;
+            color: white;
+            border: 1px solid white;
         }
 
         .q-text { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: bold; text-transform: uppercase; margin: 20px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
@@ -193,13 +222,20 @@
             <a href="https://chatgpt.com/g/g-6973624af8988191af4fa3a6f78f968a-griz-csv-generator" 
                target="_blank" 
                style="color: var(--highlight-color); text-decoration: none; font-size: 1rem; font-weight: bold; opacity: 0.8; border-bottom: 1px dashed var(--highlight-color); padding-bottom: 2px; display: inline-block;">
-                Get formatted questions from this custom GPT
+                Get formated questions from this custom GPT
             </a>
         </div>
 
-    <div class="setup-controls">
+        <div class="setup-controls">
             <div>
                 <h3 style="margin-bottom:10px; color:#aaa;">Settings</h3>
+                <div class="setting-group">
+                    <label>Game Mode</label>
+                    <select id="game-mode-select">
+                        <option value="standard">Standard (Miss = Dead Question)</option>
+                        <option value="pass">Pass/Steal (Miss = Next Team Tries)</option>
+                    </select>
+                </div>
                 <div class="setting-group">
                     <label>Teams</label>
                     <select id="team-count" onchange="updateTeamInputs()">
@@ -256,6 +292,8 @@
                 <div class="live-reward-container">Value: <span id="live-reward-text">0</span></div>
             </div>
 
+            <div id="modal-category-label">CATEGORY</div>
+
             <div id="modal-media" class="media-container"></div>
             <div id="modal-question" class="q-text"></div>
             
@@ -289,6 +327,10 @@
         let categories = [], teams = [], activeTeamIndex = 0, currentTile = null, usedTilesCount = 0, totalTiles = 0, selectedTables = [];
         let currentLivePoints = 0, decayRate = 1, timerInterval = null;
         
+        // Game State
+        let gameMode = 'standard'; 
+        let questionStartTeam = 0; 
+
         const qModal = document.getElementById('question-modal'), mathInput = document.getElementById('math-answer-input');
 
         window.onload = () => { updateTeamInputs(); initMathGrid(); };
@@ -347,6 +389,10 @@
         function initGame() {
             teams = Array.from(document.querySelectorAll('#team-inputs input')).map(i => ({name: i.value, score: 0}));
             decayRate = parseInt(document.getElementById('decay-rate-input').value) || 0;
+            
+            // CAPTURE GAME MODE
+            gameMode = document.getElementById('game-mode-select').value;
+
             activeTeamIndex = 0; usedTilesCount = 0;
             totalTiles = categories.reduce((a,c) => a + c.questions.length, 0);
             renderScoreboard(); renderBoard();
@@ -358,51 +404,70 @@
             const b = document.getElementById('board');
             b.style.gridTemplateColumns = `repeat(${categories.length}, 1fr)`;
             b.innerHTML = '';
-            categories.forEach(c => b.innerHTML += `<div class="cat-header">${c.name}</div>`);
+            
+            // Render Headers with Rainbow Logic
+            categories.forEach((c, index) => {
+                const hue = index * (360 / categories.length);
+                const color = `hsl(${hue}, 80%, 45%)`;
+                b.innerHTML += `<div class="cat-header" style="background-color:${color};">${c.name}</div>`;
+            });
+
             const maxRows = Math.max(...categories.map(c=>c.questions.length));
             for(let i=0; i<maxRows; i++) {
-                categories.forEach(c => {
+                categories.forEach((c, index) => {
                     const q = c.questions[i];
                     if(q) {
                         const btn = document.createElement('button');
-                        btn.className = 'tile'; btn.textContent = q.points;
-                        btn.onclick = () => openQuestion(btn, q);
+                        btn.className = 'tile'; 
+                        btn.textContent = q.points;
+                        
+                        // Pass colors to question
+                        const hue = index * (360 / categories.length);
+                        const catColor = `hsl(${hue}, 80%, 45%)`;
+
+                        btn.onclick = () => openQuestion(btn, q, c.name, catColor);
                         b.appendChild(btn);
                     } else b.innerHTML += `<div></div>`;
                 });
             }
         }
 
-        function openQuestion(tile, q) {
+        function openQuestion(tile, q, catName, catColor) {
             currentTile = tile; 
             currentLivePoints = q.points;
             
+            // TRACK WHO STARTED THIS QUESTION
+            questionStartTeam = activeTeamIndex;
+
             // Text Setup
             document.getElementById('live-reward-text').textContent = currentLivePoints;
             document.getElementById('modal-question').textContent = q.question;
             document.getElementById('modal-answer').textContent = q.answer;
-            document.getElementById('modal-team-indicator').textContent = `${teams[activeTeamIndex].name}`;
             
-            // UI Toggle Logic - Explicit Reset
-            const isMath = !!q.isMath; // Force boolean
+            // Update Category Label
+            const catLabel = document.getElementById('modal-category-label');
+            catLabel.textContent = catName || 'General';
+            catLabel.style.backgroundColor = catColor || '#333';
+
+            updateTurnIndicator(); 
             
+            // UI Toggle Logic
+            const isMath = !!q.isMath; 
             const standardUI = document.getElementById('standard-logic-ui');
             const mathUI = document.getElementById('math-logic-ui');
 
             if (isMath) {
                 standardUI.classList.add('hidden');
                 mathUI.classList.remove('hidden');
-                
                 mathInput.value = '';
                 setTimeout(() => mathInput.focus(), 100);
             } else {
                 mathUI.classList.add('hidden');
                 standardUI.classList.remove('hidden');
-                
-                // RESET STANDARD CONTROLS
+                // Explicitly Reset Buttons
                 document.getElementById('modal-answer').classList.add('hidden');
                 document.getElementById('post-reveal-controls').classList.add('hidden');
-                document.getElementById('btn-reveal').classList.remove('hidden'); // Ensure Reveal button is visible
+                document.getElementById('btn-reveal').classList.remove('hidden');
             }
 
             // Start Timer
@@ -415,7 +480,11 @@
             qModal.classList.add('active');
         }
 
-        // Auto Checker for Math
+        function updateTurnIndicator() {
+            document.getElementById('modal-team-indicator').textContent = `${teams[activeTeamIndex].name}`;
+            renderScoreboard(); 
+        }
+
         mathInput.onkeydown = (e) => {
             if(e.key === 'Enter') {
                 const correctAns = document.getElementById('modal-answer').textContent;
@@ -425,7 +494,6 @@
                     setTimeout(() => { mathInput.classList.remove('correct-flash'); awardPoints(); }, 400);
                 } else {
                     mathInput.classList.add('wrong-flash');
-                    clearInterval(timerInterval);
                     setTimeout(() => { mathInput.classList.remove('wrong-flash'); handleWrongAnswer(); }, 400);
                 }
             }
@@ -441,24 +509,52 @@
 
         function awardPoints() { 
             teams[activeTeamIndex].score += currentLivePoints; 
-            finalizeTurn(); 
+            // In PASS mode, after a steal or win, return control to original starter
+            // so they can pick the next tile on the board.
+            activeTeamIndex = questionStartTeam; 
+            finalizeTurn(true); 
         }
 
         function handleWrongAnswer() { 
-            finalizeTurn(); 
+            if (gameMode === 'standard') {
+                // STANDARD: Question dies, Next team's turn
+                finalizeTurn(true); 
+            } else {
+                // PASS MODE logic
+                passToNextTeam();
+            }
         }
 
-        function finalizeTurn() {
+        function passToNextTeam() {
+            let nextIndex = (activeTeamIndex + 1) % teams.length;
+
+            if (nextIndex === questionStartTeam) {
+                // Loop Complete: Everyone missed. Question dies. Back to starter.
+                activeTeamIndex = questionStartTeam; 
+                finalizeTurn(false); // False = don't increment, we just reset manually
+            } else {
+                // Pass control to next team
+                activeTeamIndex = nextIndex;
+                updateTurnIndicator();
+                // Clear inputs if math
+                mathInput.value = '';
+                mathInput.focus();
+            }
+        }
+
+        function finalizeTurn(shouldIncrement) {
             clearInterval(timerInterval);
             qModal.classList.remove('active');
             
-            // Only mark used if points were awarded or it was skipped/wrong
             if(currentTile && !currentTile.classList.contains('used')) {
                 currentTile.classList.add('used');
                 usedTilesCount++;
             }
             
-            activeTeamIndex = (activeTeamIndex + 1) % teams.length;
+            if(shouldIncrement) {
+                activeTeamIndex = (activeTeamIndex + 1) % teams.length;
+            }
+
             renderScoreboard();
             
             if(usedTilesCount >= totalTiles) {
