@@ -207,7 +207,7 @@
 
     <div id="start-overlay">
         <h1>🐱 Rainbow Cat Maze</h1>
-        <p>Smoother Mobile Controls</p>
+        <p>Fixed Speed & Controls</p>
         <button id="start-button" onclick="startGame()">▶ START</button>
     </div>
 
@@ -288,6 +288,7 @@ let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: fal
 
 // Time Step Logic
 let lastTime = 0;
+let animationId = null; // KEY FIX: Store the Loop ID
 
 // Ghost Mode
 let ghostCharges = 1;
@@ -380,12 +381,17 @@ function resize() {
     
     player.size = TILE_SIZE * 0.7;
     
-    // SPEED CALIBRATION (Units per Second)
-    // TILE_SIZE * 8 means "Move 8 tiles per second"
-    player.speed = TILE_SIZE * 8.0; 
+    // ADJUSTED SPEED: Lowered from 8.0 to 6.0 for better control
+    player.speed = TILE_SIZE * 6.0; 
 }
 
 function resetGame() {
+    // FIX: Stop the previous loop if it exists!
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
     gameRunning = true;
     gameWon = false;
     document.getElementById('win-msg').style.display = 'none';
@@ -408,7 +414,9 @@ function resetGame() {
     player.y = midRow * TILE_SIZE + (TILE_SIZE - player.size)/2;
 
     lastTime = performance.now();
-    requestAnimationFrame(loop);
+    
+    // Start the new loop
+    animationId = requestAnimationFrame(loop);
 }
 
 function activateGhostMode() {
@@ -440,18 +448,14 @@ function update(dt) {
     if (gameWon) { updateConfetti(); return; }
     if (!gameRunning) return;
 
-    // Convert ms to seconds for simpler math
     const dtSeconds = dt / 1000;
 
-    // Movement Vector
     let vx = joystickInput.x;
     let vy = joystickInput.y;
 
-    // Deadzone to prevent twitching
     if (Math.abs(vx) < 0.1) vx = 0;
     if (Math.abs(vy) < 0.1) vy = 0;
 
-    // Keyboard Fallback
     if (vx === 0 && vy === 0) {
         if (keys.ArrowUp) vy = -1;
         if (keys.ArrowDown) vy = 1;
@@ -459,7 +463,6 @@ function update(dt) {
         if (keys.ArrowRight) vx = 1;
     }
 
-    // Apply Speed relative to Time (Delta Time)
     const moveX = vx * player.speed * dtSeconds;
     const moveY = vy * player.speed * dtSeconds;
 
@@ -476,15 +479,12 @@ function updateEnemies(dtSeconds) {
     const proximity = TILE_SIZE * 3; 
     let dogNearby = false;
 
-    // Dog Speed (Tiles per second)
-    const dogSpeed = player.speed * 0.45; 
+    // Dog Speed: Keep relative to player
+    const dogSpeed = player.speed * 0.5; 
 
     enemies.forEach(dog => {
-        // Change direction check
         if (dog.vx === 0 && dog.vy === 0 || checkWallCollision(dog.x + dog.vx * dtSeconds, dog.y + dog.vy * dtSeconds)) {
             const dirs = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
-            
-            // Check a bit further ahead to avoid getting stuck
             const checkDist = dogSpeed * 0.1; 
             const valid = dirs.filter(d => !checkWallCollision(dog.x + d.x * checkDist, dog.y + d.y * checkDist));
             
@@ -493,16 +493,13 @@ function updateEnemies(dtSeconds) {
                 dog.vx = pick.x * dogSpeed;
                 dog.vy = pick.y * dogSpeed;
             } else {
-                // If stuck, reverse
                 dog.vx = -dog.vx; dog.vy = -dog.vy;
             }
         }
 
-        // Apply Movement
         dog.x += dog.vx * dtSeconds;
         dog.y += dog.vy * dtSeconds;
 
-        // Collision with Player
         const dist = Math.hypot(player.x - dog.x, player.y - dog.y);
         if (!isGhost && dist < player.size * 0.8) caughtByDog();
         if (dist < proximity) dogNearby = true;
@@ -630,18 +627,15 @@ function draw() {
 
 function loop(timestamp) {
     if (!lastTime) lastTime = timestamp;
-    
-    // Calculate Delta Time (time since last frame)
     let deltaTime = timestamp - lastTime;
     lastTime = timestamp;
-
-    // CAP Delta Time: Prevents tunneling if the game lags or tab switches
-    // If we pause for 5 seconds, don't simulate 5 seconds of movement in one frame!
     if (deltaTime > 50) deltaTime = 50; 
 
     update(deltaTime); 
     draw(); 
-    requestAnimationFrame(loop); 
+    
+    // Store ID so we can cancel it later
+    animationId = requestAnimationFrame(loop); 
 }
 
 function winGame() {
