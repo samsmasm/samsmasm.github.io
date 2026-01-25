@@ -11,12 +11,15 @@
             overflow: hidden;
             background-color: #000;
             font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
-            touch-action: none; /* Prevents browser zooming/scrolling */
+            touch-action: none;
             user-select: none;
             display: flex;
             flex-direction: column;
-            height: 100vh;
             width: 100vw;
+            
+            /* KEY FIX: Use 'dvh' to account for mobile browser bottom bars */
+            height: 100vh; /* Fallback */
+            height: 100dvh; 
         }
 
         /* 1. BACKGROUND LAYER */
@@ -39,7 +42,7 @@
 
         /* 2. TOP HEADER (Compact) */
         #top-ui {
-            flex: 0 0 auto; /* Don't grow */
+            flex: 0 0 auto;
             background: rgba(255, 255, 255, 0.9);
             padding: 5px;
             display: flex;
@@ -75,7 +78,7 @@
 
         /* 3. GAME AREA (Flexible) */
         #game-area {
-            flex: 1 1 auto; /* Grow to fill space */
+            flex: 1 1 auto;
             position: relative;
             display: flex;
             align-items: center;
@@ -87,27 +90,29 @@
         canvas {
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            /* Maximize fit but keep aspect ratio */
             max-width: 100%;
             max-height: 100%; 
             object-fit: contain;
         }
 
-        /* 4. BOTTOM CONTROLS (Fixed Height) */
+        /* 4. BOTTOM CONTROLS (Fixed Height & Safe Areas) */
         #bottom-controls {
-            flex: 0 0 180px; /* Dedicated control height */
+            flex: 0 0 180px; /* Base height */
             position: relative;
             width: 100%;
             display: flex;
-            justify-content: space-between; /* Joystick Left, Button Right */
+            justify-content: space-between; 
             align-items: center;
-            padding: 0 20px;
+            padding: 0 30px; /* Side padding */
             box-sizing: border-box;
-            /* Optional: slight gradient to indicate control zone */
             background: linear-gradient(to top, rgba(0,0,0,0.1), transparent);
+            
+            /* SAFE AREA FIX: Pushes controls up if there's a home bar */
+            padding-bottom: env(safe-area-inset-bottom);
+            margin-bottom: 10px; /* Extra lift from bottom edge */
         }
 
-        /* JOYSTICK */
+        /* JOYSTICK (Now on Right) */
         #joystick-container {
             width: 120px;
             height: 120px;
@@ -127,10 +132,10 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            pointer-events: none; /* Let clicks pass to container */
+            pointer-events: none; 
         }
 
-        /* ACTION BUTTON */
+        /* ACTION BUTTON (Now on Left) */
         #ghost-action-btn {
             width: 100px;
             height: 100px;
@@ -228,14 +233,14 @@
     </div>
 
     <div id="bottom-controls">
-        <div id="joystick-container">
-            <div id="joystick-knob"></div>
-        </div>
-
         <button id="ghost-action-btn" onclick="activateGhostMode()">
             👻
             <span id="ghost-count-display">x1</span>
         </button>
+
+        <div id="joystick-container">
+            <div id="joystick-knob"></div>
+        </div>
     </div>
 
 <script>
@@ -282,7 +287,7 @@ document.getElementById('high-score-val').innerText = highScore;
 
 // Player & Movement
 let player = { x: 0, y: 0, size: 0, speed: 0 };
-let joystickInput = { x: 0, y: 0 }; // Values from -1.0 to 1.0
+let joystickInput = { x: 0, y: 0 }; 
 let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
 
 // Ghost Mode
@@ -301,7 +306,7 @@ const joyContainer = document.getElementById('joystick-container');
 const joyKnob = document.getElementById('joystick-knob');
 let joyActive = false;
 let joyCenter = { x: 0, y: 0 };
-const maxRadius = 35; // Maximum distance knob can move
+const maxRadius = 35; 
 
 joyContainer.addEventListener('touchstart', startJoystick, {passive: false});
 joyContainer.addEventListener('touchmove', moveJoystick, {passive: false});
@@ -321,7 +326,7 @@ function startJoystick(e) {
 
 function moveJoystick(e) {
     if (!joyActive) return;
-    if (e.type === 'touchmove') e.preventDefault(); // Prevent scroll
+    if (e.type === 'touchmove') e.preventDefault(); 
 
     let clientX, clientY;
     if (e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; } 
@@ -332,12 +337,12 @@ function moveJoystick(e) {
     const distance = Math.min(Math.hypot(dx, dy), maxRadius);
     const angle = Math.atan2(dy, dx);
 
-    // Visual: Move Knob
+    // Visual
     const knobX = Math.cos(angle) * distance;
     const knobY = Math.sin(angle) * distance;
     joyKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
 
-    // Logic: Normalize input (-1 to 1)
+    // Logic
     joystickInput.x = knobX / maxRadius;
     joystickInput.y = knobY / maxRadius;
 }
@@ -365,16 +370,13 @@ function setDifficulty(level) {
     resetGame();
 }
 
-// INTELLIGENT RESIZE
 function resize() {
-    // We calculate size based on the #game-area div, which flexbox has already sized for us
     const rect = gameArea.getBoundingClientRect();
     const availableW = rect.width;
     const availableH = rect.height;
     
-    // Determine the biggest square that fits
-    let size = Math.min(availableW, availableH) - 10; // -10 for padding
-    size = Math.floor(size / GRID_SIZE) * GRID_SIZE; // Snap to grid
+    let size = Math.min(availableW, availableH) - 10; 
+    size = Math.floor(size / GRID_SIZE) * GRID_SIZE; 
 
     canvas.width = size;
     canvas.height = size;
@@ -438,21 +440,17 @@ function update() {
     if (gameWon) { updateConfetti(); return; }
     if (!gameRunning) return;
 
-    // MERGE INPUTS (Joystick + Keyboard)
     let vx = joystickInput.x * player.speed;
     let vy = joystickInput.y * player.speed;
 
     if (Math.abs(vx) < 0.1 && Math.abs(vy) < 0.1) {
-        // Fallback to keyboard if joystick is idle
         if (keys.ArrowUp) vy = -player.speed;
         if (keys.ArrowDown) vy = player.speed;
         if (keys.ArrowLeft) vx = -player.speed;
         if (keys.ArrowRight) vx = player.speed;
     }
 
-    // Move X
     if (!checkWallCollision(player.x + vx, player.y)) player.x += vx;
-    // Move Y
     if (!checkWallCollision(player.x, player.y + vy)) player.y += vy;
 
     updateEnemies();
@@ -466,7 +464,6 @@ function updateEnemies() {
     let dogNearby = false;
 
     enemies.forEach(dog => {
-        // Simple random patrol logic
         if (dog.vx === 0 && dog.vy === 0 || checkWallCollision(dog.x + dog.vx, dog.y + dog.vy)) {
             const dirs = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
             const valid = dirs.filter(d => !checkWallCollision(dog.x + d.x*dog.speed, dog.y + d.y*dog.speed));
@@ -500,8 +497,7 @@ function caughtByDog() {
 }
 
 function checkWallCollision(x, y) {
-    // Check 4 corners of player box
-    const margin = 2; // slight forgiveness
+    const margin = 2; 
     const points = [
         {x: x+margin, y: y+margin}, 
         {x: x + player.size-margin, y: y+margin},
@@ -571,11 +567,9 @@ function spawnEntity(cb) {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // BACKGROUND
     ctx.fillStyle = isGhost ? 'rgba(20,20,20,0.85)' : 'rgba(255,255,255,0.4)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // WALLS
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             if (maze[r][c] === 1) {
@@ -585,12 +579,10 @@ function draw() {
         }
     }
 
-    // ITEMS
     ctx.font = `${TILE_SIZE * 0.6}px Arial`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     collectibles.forEach(i => { if (!i.collected) ctx.fillText(i.type, i.x, i.y); });
 
-    // ENEMIES
     ctx.save();
     if (isGhost) { ctx.shadowBlur = 30; ctx.shadowColor = '#ff0055'; }
     ctx.font = `${player.size}px Arial`;
@@ -603,7 +595,6 @@ function draw() {
     });
     ctx.restore();
 
-    // PLAYER
     ctx.save();
     if (isGhost) { ctx.filter = 'grayscale(100%) brightness(500%)'; ctx.shadowBlur = 40; ctx.shadowColor = '#fff'; }
     ctx.fillText('🐱', player.x + player.size/2, player.y + player.size/2);
@@ -623,7 +614,6 @@ function createConfetti() { for(let i=0;i<100;i++) confettiParticles.push({x:can
 function updateConfetti() { confettiParticles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;}); }
 function drawConfetti() { confettiParticles.forEach(p=>{ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,p.s,p.s)}); }
 
-// Keyboard Support
 window.addEventListener('keydown', e => { if(e.code==='Space') activateGhostMode(); if(keys.hasOwnProperty(e.code)) keys[e.code]=true; });
 window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.code)) keys[e.code]=false; });
 window.addEventListener('resize', () => { if(gameRunning) resize(); });
