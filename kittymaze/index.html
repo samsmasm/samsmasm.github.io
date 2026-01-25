@@ -16,8 +16,6 @@
             display: flex;
             flex-direction: column;
             width: 100vw;
-            
-            /* KEY FIX: Use 'dvh' to account for mobile browser bottom bars */
             height: 100vh; /* Fallback */
             height: 100dvh; 
         }
@@ -95,24 +93,22 @@
             object-fit: contain;
         }
 
-        /* 4. BOTTOM CONTROLS (Fixed Height & Safe Areas) */
+        /* 4. BOTTOM CONTROLS */
         #bottom-controls {
-            flex: 0 0 180px; /* Base height */
+            flex: 0 0 180px; 
             position: relative;
             width: 100%;
             display: flex;
             justify-content: space-between; 
             align-items: center;
-            padding: 0 30px; /* Side padding */
+            padding: 0 30px; 
             box-sizing: border-box;
             background: linear-gradient(to top, rgba(0,0,0,0.1), transparent);
-            
-            /* SAFE AREA FIX: Pushes controls up if there's a home bar */
             padding-bottom: env(safe-area-inset-bottom);
-            margin-bottom: 10px; /* Extra lift from bottom edge */
+            margin-bottom: 10px; 
         }
 
-        /* JOYSTICK (Now on Right) */
+        /* JOYSTICK (Right) */
         #joystick-container {
             width: 120px;
             height: 120px;
@@ -135,7 +131,7 @@
             pointer-events: none; 
         }
 
-        /* ACTION BUTTON (Now on Left) */
+        /* ACTION BUTTON (Left) */
         #ghost-action-btn {
             width: 100px;
             height: 100px;
@@ -171,7 +167,7 @@
             margin-top: 5px;
         }
 
-        /* OVERLAYS & EFFECTS */
+        /* OVERLAYS */
         #start-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -211,7 +207,7 @@
 
     <div id="start-overlay">
         <h1>🐱 Rainbow Cat Maze</h1>
-        <p>Pro Mobile Edition</p>
+        <p>Smoother Mobile Controls</p>
         <button id="start-button" onclick="startGame()">▶ START</button>
     </div>
 
@@ -290,6 +286,9 @@ let player = { x: 0, y: 0, size: 0, speed: 0 };
 let joystickInput = { x: 0, y: 0 }; 
 let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
 
+// Time Step Logic
+let lastTime = 0;
+
 // Ghost Mode
 let ghostCharges = 1;
 let isGhost = false;
@@ -311,7 +310,6 @@ const maxRadius = 35;
 joyContainer.addEventListener('touchstart', startJoystick, {passive: false});
 joyContainer.addEventListener('touchmove', moveJoystick, {passive: false});
 joyContainer.addEventListener('touchend', endJoystick, {passive: false});
-// Mouse support for testing on PC
 joyContainer.addEventListener('mousedown', startJoystick);
 window.addEventListener('mousemove', moveJoystick);
 window.addEventListener('mouseup', endJoystick);
@@ -337,12 +335,10 @@ function moveJoystick(e) {
     const distance = Math.min(Math.hypot(dx, dy), maxRadius);
     const angle = Math.atan2(dy, dx);
 
-    // Visual
     const knobX = Math.cos(angle) * distance;
     const knobY = Math.sin(angle) * distance;
     joyKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
 
-    // Logic
     joystickInput.x = knobX / maxRadius;
     joystickInput.y = knobY / maxRadius;
 }
@@ -383,7 +379,10 @@ function resize() {
     TILE_SIZE = size / GRID_SIZE;
     
     player.size = TILE_SIZE * 0.7;
-    player.speed = TILE_SIZE * 0.15;
+    
+    // SPEED CALIBRATION (Units per Second)
+    // TILE_SIZE * 8 means "Move 8 tiles per second"
+    player.speed = TILE_SIZE * 8.0; 
 }
 
 function resetGame() {
@@ -408,6 +407,7 @@ function resetGame() {
     player.x = 0; 
     player.y = midRow * TILE_SIZE + (TILE_SIZE - player.size)/2;
 
+    lastTime = performance.now();
     requestAnimationFrame(loop);
 }
 
@@ -435,49 +435,74 @@ function stopGhostMode() {
     if (ghostTimer) clearTimeout(ghostTimer);
 }
 
-/* ================= LOGIC & PHYSICS ================= */
-function update() {
+/* ================= LOGIC & PHYSICS (DELTA TIME) ================= */
+function update(dt) {
     if (gameWon) { updateConfetti(); return; }
     if (!gameRunning) return;
 
-    let vx = joystickInput.x * player.speed;
-    let vy = joystickInput.y * player.speed;
+    // Convert ms to seconds for simpler math
+    const dtSeconds = dt / 1000;
 
-    if (Math.abs(vx) < 0.1 && Math.abs(vy) < 0.1) {
-        if (keys.ArrowUp) vy = -player.speed;
-        if (keys.ArrowDown) vy = player.speed;
-        if (keys.ArrowLeft) vx = -player.speed;
-        if (keys.ArrowRight) vx = player.speed;
+    // Movement Vector
+    let vx = joystickInput.x;
+    let vy = joystickInput.y;
+
+    // Deadzone to prevent twitching
+    if (Math.abs(vx) < 0.1) vx = 0;
+    if (Math.abs(vy) < 0.1) vy = 0;
+
+    // Keyboard Fallback
+    if (vx === 0 && vy === 0) {
+        if (keys.ArrowUp) vy = -1;
+        if (keys.ArrowDown) vy = 1;
+        if (keys.ArrowLeft) vx = -1;
+        if (keys.ArrowRight) vx = 1;
     }
 
-    if (!checkWallCollision(player.x + vx, player.y)) player.x += vx;
-    if (!checkWallCollision(player.x, player.y + vy)) player.y += vy;
+    // Apply Speed relative to Time (Delta Time)
+    const moveX = vx * player.speed * dtSeconds;
+    const moveY = vy * player.speed * dtSeconds;
 
-    updateEnemies();
+    if (!checkWallCollision(player.x + moveX, player.y)) player.x += moveX;
+    if (!checkWallCollision(player.x, player.y + moveY)) player.y += moveY;
+
+    updateEnemies(dtSeconds);
     checkCollectibles();
 
     if (player.x > canvas.width - TILE_SIZE) winGame();
 }
 
-function updateEnemies() {
+function updateEnemies(dtSeconds) {
     const proximity = TILE_SIZE * 3; 
     let dogNearby = false;
 
+    // Dog Speed (Tiles per second)
+    const dogSpeed = player.speed * 0.45; 
+
     enemies.forEach(dog => {
-        if (dog.vx === 0 && dog.vy === 0 || checkWallCollision(dog.x + dog.vx, dog.y + dog.vy)) {
+        // Change direction check
+        if (dog.vx === 0 && dog.vy === 0 || checkWallCollision(dog.x + dog.vx * dtSeconds, dog.y + dog.vy * dtSeconds)) {
             const dirs = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
-            const valid = dirs.filter(d => !checkWallCollision(dog.x + d.x*dog.speed, dog.y + d.y*dog.speed));
+            
+            // Check a bit further ahead to avoid getting stuck
+            const checkDist = dogSpeed * 0.1; 
+            const valid = dirs.filter(d => !checkWallCollision(dog.x + d.x * checkDist, dog.y + d.y * checkDist));
+            
             if (valid.length > 0) {
                 const pick = valid[Math.floor(Math.random() * valid.length)];
-                dog.vx = pick.x * dog.speed;
-                dog.vy = pick.y * dog.speed;
+                dog.vx = pick.x * dogSpeed;
+                dog.vy = pick.y * dogSpeed;
             } else {
+                // If stuck, reverse
                 dog.vx = -dog.vx; dog.vy = -dog.vy;
             }
         }
-        dog.x += dog.vx;
-        dog.y += dog.vy;
 
+        // Apply Movement
+        dog.x += dog.vx * dtSeconds;
+        dog.y += dog.vy * dtSeconds;
+
+        // Collision with Player
         const dist = Math.hypot(player.x - dog.x, player.y - dog.y);
         if (!isGhost && dist < player.size * 0.8) caughtByDog();
         if (dist < proximity) dogNearby = true;
@@ -553,7 +578,7 @@ function spawnCollectibles() {
 function spawnEnemies() {
     let count = difficulty === 'hard' ? 12 : (difficulty === 'medium' ? 5 : 2);
     for(let i=0; i<count; i++) spawnEntity((c,r)=> {
-        if(c>4) enemies.push({x: c*TILE_SIZE+(TILE_SIZE-player.size)/2, y: r*TILE_SIZE+(TILE_SIZE-player.size)/2, vx:0, vy:0, speed: player.speed*0.4});
+        if(c>4) enemies.push({x: c*TILE_SIZE+(TILE_SIZE-player.size)/2, y: r*TILE_SIZE+(TILE_SIZE-player.size)/2, vx:0, vy:0});
     });
 }
 function spawnEntity(cb) {
@@ -603,7 +628,22 @@ function draw() {
     if (gameWon) drawConfetti();
 }
 
-function loop() { update(); draw(); requestAnimationFrame(loop); }
+function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    
+    // Calculate Delta Time (time since last frame)
+    let deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+
+    // CAP Delta Time: Prevents tunneling if the game lags or tab switches
+    // If we pause for 5 seconds, don't simulate 5 seconds of movement in one frame!
+    if (deltaTime > 50) deltaTime = 50; 
+
+    update(deltaTime); 
+    draw(); 
+    requestAnimationFrame(loop); 
+}
+
 function winGame() {
     gameWon = true; 
     document.getElementById('win-msg').style.display = 'block';
