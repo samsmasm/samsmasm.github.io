@@ -1,10 +1,9 @@
 // ==========================================
-// 1. FIREBASE CONFIGURATION (Must be at the top!)
+// 1. FIREBASE CONFIGURATION
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, push, onChildAdded, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, push, get, child, onChildAdded, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// Your Dowserboard Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
     authDomain: "dowserboard.firebaseapp.com",
@@ -14,20 +13,19 @@ const firebaseConfig = {
     appId: "1:1032600748722:web:1584c7508fbbca617cbfab"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // ==========================================
-// 2. STATE MANAGEMENT
+// 2. GLOBAL STATE
 // ==========================================
 let currentRoom = null;
 let isTeacher = false;
 let studentCooldownTimer = null;
-let recentSignals = []; // To track threshold
-let threshold = 1;
+let recentSignals = [];
+let threshold = 3; // Default threshold
 
-// DOM Elements
+// DOM Cache
 const views = {
     landing: document.getElementById('view-landing'),
     teacher: document.getElementById('view-teacher'),
@@ -35,170 +33,208 @@ const views = {
 };
 
 // ==========================================
-// 3. NAVIGATION & ROOM SETUP
+// 3. INITIALIZATION & NAVIGATION
 // ==========================================
 
-// Ensure DOM is loaded before attaching listeners
 window.addEventListener('DOMContentLoaded', () => {
-    
-    // Setup Button Listeners
-    const btnCreate = document.getElementById('btn-create-room');
-    const btnJoin = document.getElementById('btn-join-room');
-    const btnEnter = document.getElementById('btn-enter');
-    const btnLeave = document.getElementById('btn-leave');
-
-    if(btnCreate) btnCreate.onclick = () => showInput('teacher');
-    if(btnJoin) btnJoin.onclick = () => showInput('student');
-    
-    if(btnEnter) btnEnter.onclick = async () => {
-        const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
-        if (!roomCode) return alert("Please enter a room name");
-        
-        currentRoom = roomCode;
-        
-        // Unlock Audio Context immediately on interaction
-        unlockAudio();
-
-        if (isTeacher) {
-            initTeacherMode();
-        } else {
+    // 1. Check for URL Hash (Auto-Join)
+    if (window.location.hash) {
+        const roomFromHash = window.location.hash.substring(1).toUpperCase();
+        if (roomFromHash) {
+            currentRoom = roomFromHash;
+            unlockAudio(); // Browser requirement hack
             initStudentMode();
+            return; // Skip landing logic
         }
-    };
+    }
 
-    if(btnLeave) btnLeave.onclick = () => {
-        window.location.reload(); 
-    };
+    // 2. Setup Landing Buttons
+    document.getElementById('btn-create-room').onclick = () => showInput('teacher');
+    document.getElementById('btn-join-room').onclick = () => showInput('student');
+    document.getElementById('btn-back').onclick = resetLanding;
+    document.getElementById('btn-enter').onclick = handleEntry;
+
+    // 3. Setup Leave Buttons
+    document.getElementById('btn-leave-teacher').onclick = leaveRoom;
+    document.getElementById('btn-leave-student').onclick = leaveRoom;
 });
 
 function showInput(role) {
     isTeacher = (role === 'teacher');
-    const inputArea = document.getElementById('input-area');
-    const btnGroup = document.querySelector('.btn-group');
+    document.querySelector('.btn-group').classList.add('hidden');
+    document.getElementById('input-area').classList.remove('hidden');
+    
+    const pinContainer = document.getElementById('pin-container');
     const inputField = document.getElementById('room-code-input');
+    
+    if (isTeacher) {
+        pinContainer.classList.remove('hidden');
+    } else {
+        pinContainer.classList.add('hidden');
+    }
+    
+    inputField.focus();
+}
 
-    if(inputArea) inputArea.classList.remove('hidden');
-    if(btnGroup) btnGroup.classList.add('hidden');
-    if(inputField) inputField.focus();
+function resetLanding() {
+    document.querySelector('.btn-group').classList.remove('hidden');
+    document.getElementById('input-area').classList.add('hidden');
+    document.getElementById('room-code-input').value = '';
+    document.getElementById('teacher-pin-input').value = '';
+}
+
+async function handleEntry() {
+    const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+    if (!roomCode) return alert("Please enter a room name");
+
+    currentRoom = roomCode;
+    unlockAudio();
+
+    if (isTeacher) {
+        // Teacher Security Check
+        const pinInput = document.getElementById('teacher-pin-input').value.trim();
+        if (!pinInput || pinInput.length < 4) return alert("Please enter a 4-digit PIN");
+
+        await verifyTeacher(roomCode, pinInput);
+    } else {
+        // Student Entry
+        initStudentMode();
+    }
+}
+
+function leaveRoom() {
+    window.location.hash = "";
+    window.location.reload();
 }
 
 function switchView(viewName) {
-    Object.values(views).forEach(el => {
-        if(el) el.classList.remove('active');
-    });
-    if(views[viewName]) views[viewName].classList.add('active');
+    Object.values(views).forEach(el => el.classList.remove('active'));
+    views[viewName].classList.add('active');
 }
 
 // ==========================================
 // 4. TEACHER LOGIC
 // ==========================================
+
+async function verifyTeacher(room, pin) {
+    const roomConfigRef = child(ref(db), `rooms/${room}/config`);
+    
+    try {
+        const snapshot = await get(roomConfigRef);
+        
+        if (snapshot.exists()) {
+            // Room exists: Check PIN
+            const data = snapshot.val();
+            if (data.pin && data.pin === pin) {
+                initTeacherMode();
+            } else {
+                alert("Incorrect PIN for this room.");
+            }
+        } else {
+            // New Room: Create it with PIN
+            await set(ref(db, `rooms/${room}/config`), {
+                pin: pin,
+                btnText: "Slow down please",
+                cooldown: 30,
+                threshold: 3
+            });
+            initTeacherMode();
+        }
+    } catch (error) {
+        console.error("Auth Error:", error);
+        alert("Connection failed.");
+    }
+}
+
 function initTeacherMode() {
     switchView('teacher');
-    const display = document.getElementById('teacher-room-display');
-    if(display) display.textContent = currentRoom;
+    document.getElementById('teacher-room-display').textContent = currentRoom;
     
-    // Default Settings
-    updateConfig(); 
+    // Load config to fill inputs
+    const configRef = ref(db, `rooms/${currentRoom}/config`);
+    onValue(configRef, (snapshot) => {
+        const data = snapshot.val();
+        if(data) {
+            document.getElementById('threshold-input').value = data.threshold || 3;
+            document.getElementById('cooldown-input').value = data.cooldown || 30;
+            document.getElementById('btn-text-input').value = data.btnText || "Slow down please";
+            threshold = data.threshold || 3; // Sync local threshold
+        }
+    });
 
     // Listen for Pings
     const pingsRef = ref(db, `rooms/${currentRoom}/pings`);
-    
-    // When a new ping comes in
     onChildAdded(pingsRef, (snapshot) => {
-        const data = snapshot.val();
-        handleSignal(data);
+        handleSignal(snapshot.val());
     });
 
-    // Configuration Listeners
-    const btnUpdate = document.getElementById('btn-update-text');
-    const inputThresh = document.getElementById('threshold-input');
-    const inputCool = document.getElementById('cooldown-input');
-
-    if(btnUpdate) btnUpdate.onclick = updateConfig;
-    if(inputThresh) inputThresh.onchange = updateConfig;
-    if(inputCool) inputCool.onchange = updateConfig;
+    // UI Listeners
+    document.getElementById('btn-update-text').onclick = updateConfig;
+    document.getElementById('threshold-input').onchange = updateConfig;
+    document.getElementById('cooldown-input').onchange = updateConfig;
 }
 
 function updateConfig() {
-    const textEl = document.getElementById('btn-text-input');
-    const cdEl = document.getElementById('cooldown-input');
-    const thEl = document.getElementById('threshold-input');
+    const text = document.getElementById('btn-text-input').value;
+    const cd = parseInt(document.getElementById('cooldown-input').value);
+    const th = parseInt(document.getElementById('threshold-input').value);
 
-    if(!textEl || !cdEl || !thEl) return;
-
-    // Update local variables
-    threshold = parseInt(thEl.value);
-
-    // Sync to Firebase
-    set(ref(db, `rooms/${currentRoom}/config`), {
-        btnText: textEl.value,
-        cooldown: parseInt(cdEl.value)
+    // Maintain existing PIN while updating other settings
+    // We use update() via set with merge logic, but simple way is to read first or just assume PIN hasn't changed locally
+    // To be safe, we just update the specific fields without overwriting the whole node if possible, 
+    // but the simplest way here given the structure is to merge.
+    
+    // NOTE: set() overwrites. We need to be careful not to delete the PIN.
+    // Better strategy: Read current config, update fields, save back.
+    
+    get(ref(db, `rooms/${currentRoom}/config`)).then((snap) => {
+        const currentData = snap.val() || {};
+        set(ref(db, `rooms/${currentRoom}/config`), {
+            ...currentData, // Keep the PIN
+            btnText: text,
+            cooldown: cd,
+            threshold: th
+        });
     });
+    
+    threshold = th;
 }
 
 function handleSignal(data) {
     const now = Date.now();
-    
-    // 1. Add to History
     addHistoryItem(now);
 
-    // 2. Threshold Logic
-    recentSignals = recentSignals.filter(t => now - t < 5000);
+    // Threshold Logic
+    recentSignals = recentSignals.filter(t => now - t < 5000); // 5 sec rolling window
     recentSignals.push(now);
 
     if (recentSignals.length >= threshold) {
         playSound();
-        recentSignals = []; 
+        recentSignals = []; // Reset burst
     }
 }
 
 function addHistoryItem(timestamp) {
     const list = document.getElementById('history-list');
-    if(!list) return;
-
     const li = document.createElement('li');
-    const date = new Date(timestamp);
-    const timeStr = date.toLocaleTimeString();
-    
-    li.innerHTML = `Signal Received <span class="time">${timeStr}</span>`;
+    li.innerHTML = `Signal Received <span class="time">${new Date(timestamp).toLocaleTimeString()}</span>`;
     list.prepend(li);
-
-    // Update count
+    
     const countEl = document.getElementById('total-signals');
-    if(countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
+    countEl.textContent = parseInt(countEl.textContent) + 1;
 }
 
-// Audio Handling
 let isPlaying = false;
 function playSound() {
-    if (isPlaying) return; 
-
-    const select = document.getElementById('sound-select');
-    if(!select) return;
-
-    const soundType = select.value;
-    const audioEl = document.getElementById(`audio-${soundType}`);
-    
-    if (audioEl) {
+    if (isPlaying) return;
+    const type = document.getElementById('sound-select').value;
+    const audio = document.getElementById(`audio-${type}`);
+    if (audio) {
         isPlaying = true;
-        audioEl.currentTime = 0;
-        audioEl.play().catch(e => console.log("Audio blocked:", e));
-        setTimeout(() => { isPlaying = false; }, 2000);
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        setTimeout(() => isPlaying = false, 2000);
     }
-}
-
-function unlockAudio() {
-    ['siren', 'bells', 'meow'].forEach(id => {
-        const el = document.getElementById(`audio-${id}`);
-        if(el) {
-            el.muted = true;
-            el.play().then(() => {
-                el.pause();
-                el.currentTime = 0;
-                el.muted = false;
-            }).catch(() => {});
-        }
-    });
 }
 
 // ==========================================
@@ -208,52 +244,62 @@ let globalCooldown = 30;
 
 function initStudentMode() {
     switchView('student');
-    const display = document.getElementById('student-room-display');
-    if(display) display.textContent = currentRoom;
+    document.getElementById('student-room-display').textContent = currentRoom;
+    
+    // Update URL hash so they can share it
+    window.location.hash = currentRoom;
 
     const btn = document.getElementById('btn-signal');
     
-    // Listen for Config Changes
-    const configRef = ref(db, `rooms/${currentRoom}/config`);
-    onValue(configRef, (snapshot) => {
+    // Real-time Sync
+    onValue(ref(db, `rooms/${currentRoom}/config`), (snapshot) => {
         const data = snapshot.val();
         if (data) {
-            if(btn) btn.textContent = data.btnText || "Slow down please";
+            btn.textContent = data.btnText || "Slow down please";
             globalCooldown = data.cooldown !== undefined ? data.cooldown : 30;
         }
     });
 
-    // Handle Button Press
-    if(btn) {
-        btn.onclick = () => {
-            push(ref(db, `rooms/${currentRoom}/pings`), {
-                timestamp: Date.now()
-            });
-            startStudentCooldown();
-        };
-    }
+    btn.onclick = () => {
+        push(ref(db, `rooms/${currentRoom}/pings`), { timestamp: Date.now() });
+        startStudentCooldown();
+    };
 }
 
 function startStudentCooldown() {
+    if (globalCooldown <= 0) return;
+    
     const btn = document.getElementById('btn-signal');
     const msg = document.getElementById('cooldown-msg');
-    const timerSpan = document.getElementById('timer');
-
-    if (globalCooldown === 0) return;
-
-    if(btn) btn.disabled = true;
-    if(msg) msg.classList.remove('hidden');
+    const timer = document.getElementById('timer');
     
+    btn.disabled = true;
+    msg.classList.remove('hidden');
     let timeLeft = globalCooldown;
-    if(timerSpan) timerSpan.textContent = timeLeft;
-
+    timer.textContent = timeLeft;
+    
     studentCooldownTimer = setInterval(() => {
         timeLeft--;
-        if(timerSpan) timerSpan.textContent = timeLeft;
+        timer.textContent = timeLeft;
         if (timeLeft <= 0) {
             clearInterval(studentCooldownTimer);
-            if(btn) btn.disabled = false;
-            if(msg) msg.classList.add('hidden');
+            btn.disabled = false;
+            msg.classList.add('hidden');
         }
     }, 1000);
+}
+
+// Helper to unlock AudioContext on iOS/Chrome
+function unlockAudio() {
+    ['siren', 'bells', 'meow'].forEach(id => {
+        const el = document.getElementById(`audio-${id}`);
+        if(el) {
+            el.muted = true;
+            el.play().then(() => {
+                el.pause();
+                el.currentTime = 0;
+                el.muted = false;
+            }).catch(()=>{});
+        }
+    });
 }
