@@ -158,6 +158,7 @@ async function verifyTeacher(room, pin) {
         alert("Connection failed.");
     }
 }
+
 function initTeacherMode() {
     switchView('teacher');
     document.getElementById('teacher-room-display').textContent = currentRoom;
