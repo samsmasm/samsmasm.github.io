@@ -23,9 +23,9 @@ let currentRoom = null;
 let isTeacher = false;
 let studentCooldownTimer = null;
 let recentSignals = [];
-let threshold = 3; // Default threshold
+let threshold = 3; 
+let teacherJoinTime = 0; // NEW: Tracks when teacher entered
 
-// DOM Cache
 const views = {
     landing: document.getElementById('view-landing'),
     teacher: document.getElementById('view-teacher'),
@@ -37,24 +37,21 @@ const views = {
 // ==========================================
 
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. Check for URL Hash (Auto-Join)
+    // URL Hash Check
     if (window.location.hash) {
         const roomFromHash = window.location.hash.substring(1).toUpperCase();
         if (roomFromHash) {
             currentRoom = roomFromHash;
-            unlockAudio(); // Browser requirement hack
+            unlockAudio();
             initStudentMode();
-            return; // Skip landing logic
+            return;
         }
     }
 
-    // 2. Setup Landing Buttons
     document.getElementById('btn-create-room').onclick = () => showInput('teacher');
     document.getElementById('btn-join-room').onclick = () => showInput('student');
     document.getElementById('btn-back').onclick = resetLanding;
     document.getElementById('btn-enter').onclick = handleEntry;
-
-    // 3. Setup Leave Buttons
     document.getElementById('btn-leave-teacher').onclick = leaveRoom;
     document.getElementById('btn-leave-student').onclick = leaveRoom;
 });
@@ -67,11 +64,8 @@ function showInput(role) {
     const pinContainer = document.getElementById('pin-container');
     const inputField = document.getElementById('room-code-input');
     
-    if (isTeacher) {
-        pinContainer.classList.remove('hidden');
-    } else {
-        pinContainer.classList.add('hidden');
-    }
+    if (isTeacher) pinContainer.classList.remove('hidden');
+    else pinContainer.classList.add('hidden');
     
     inputField.focus();
 }
@@ -91,13 +85,10 @@ async function handleEntry() {
     unlockAudio();
 
     if (isTeacher) {
-        // Teacher Security Check
         const pinInput = document.getElementById('teacher-pin-input').value.trim();
         if (!pinInput || pinInput.length < 4) return alert("Please enter a 4-digit PIN");
-
         await verifyTeacher(roomCode, pinInput);
     } else {
-        // Student Entry
         initStudentMode();
     }
 }
@@ -124,27 +115,18 @@ async function verifyTeacher(room, pin) {
         
         if (snapshot.exists()) {
             const data = snapshot.val();
-
-            // CASE 1: Legacy Room (Exists, but has no PIN)
-            // We "claim" it by saving the PIN you just entered.
+            
+            // Legacy Room Handling
             if (!data.pin) {
-                await set(ref(db, `rooms/${room}/config`), {
-                    ...data, // Keep existing settings (threshold, cooldown)
-                    pin: pin
-                });
-                alert("Legacy room detected. PIN has been set to: " + pin);
+                await set(ref(db, `rooms/${room}/config`), { ...data, pin: pin });
+                alert("Legacy room detected. PIN set to: " + pin);
                 initTeacherMode();
                 return;
             }
 
-            // CASE 2: Modern Room (Check PIN)
-            if (data.pin === pin) {
-                initTeacherMode();
-            } else {
-                alert("Incorrect PIN for this room.");
-            }
+            if (data.pin === pin) initTeacherMode();
+            else alert("Incorrect PIN for this room.");
         } else {
-            // CASE 3: New Room (Create it)
             await set(ref(db, `rooms/${room}/config`), {
                 pin: pin,
                 btnText: "Slow down please",
@@ -163,7 +145,10 @@ function initTeacherMode() {
     switchView('teacher');
     document.getElementById('teacher-room-display').textContent = currentRoom;
     
-    // Load config to fill inputs
+    // NEW: Capture join time to filter old signals
+    teacherJoinTime = Date.now();
+    addHistoryItem('system', 'Click count reset (Session Start)');
+
     const configRef = ref(db, `rooms/${currentRoom}/config`);
     onValue(configRef, (snapshot) => {
         const data = snapshot.val();
@@ -171,70 +156,96 @@ function initTeacherMode() {
             document.getElementById('threshold-input').value = data.threshold || 3;
             document.getElementById('cooldown-input').value = data.cooldown || 30;
             document.getElementById('btn-text-input').value = data.btnText || "Slow down please";
-            threshold = data.threshold || 3; // Sync local threshold
+            threshold = data.threshold || 3;
         }
     });
 
-    // Listen for Pings
     const pingsRef = ref(db, `rooms/${currentRoom}/pings`);
     onChildAdded(pingsRef, (snapshot) => {
-        handleSignal(snapshot.val());
+        const data = snapshot.val();
+        handleSignal(data);
     });
 
-    // UI Listeners
     document.getElementById('btn-update-text').onclick = updateConfig;
     document.getElementById('threshold-input').onchange = updateConfig;
     document.getElementById('cooldown-input').onchange = updateConfig;
+    
+    // NEW: Reset Button Listener
+    document.getElementById('btn-reset-count').onclick = resetCounters;
+}
+
+// NEW: Reset Logic
+function resetCounters() {
+    recentSignals = []; // Clear the burst buffer
+    document.getElementById('total-signals').textContent = '0'; // Visually reset
+    addHistoryItem('system', 'Click count reset');
 }
 
 function updateConfig() {
     const text = document.getElementById('btn-text-input').value;
     const cd = parseInt(document.getElementById('cooldown-input').value);
     const th = parseInt(document.getElementById('threshold-input').value);
-
-    // Maintain existing PIN while updating other settings
-    // We use update() via set with merge logic, but simple way is to read first or just assume PIN hasn't changed locally
-    // To be safe, we just update the specific fields without overwriting the whole node if possible, 
-    // but the simplest way here given the structure is to merge.
-    
-    // NOTE: set() overwrites. We need to be careful not to delete the PIN.
-    // Better strategy: Read current config, update fields, save back.
     
     get(ref(db, `rooms/${currentRoom}/config`)).then((snap) => {
         const currentData = snap.val() || {};
         set(ref(db, `rooms/${currentRoom}/config`), {
-            ...currentData, // Keep the PIN
+            ...currentData,
             btnText: text,
             cooldown: cd,
             threshold: th
         });
     });
-    
     threshold = th;
 }
 
 function handleSignal(data) {
-    const now = Date.now();
-    addHistoryItem(now);
+    // 1. If signal is OLDER than when teacher joined, ignore it for sound/stats
+    if (data.timestamp < teacherJoinTime) {
+        return; 
+    }
 
-    // Threshold Logic
-    recentSignals = recentSignals.filter(t => now - t < 5000); // 5 sec rolling window
-    recentSignals.push(now);
+    addHistoryItem('signal', 'Signal Received', data.timestamp);
+    
+    // Update Total Count
+    const countEl = document.getElementById('total-signals');
+    countEl.textContent = parseInt(countEl.textContent) + 1;
+
+    // 2. Threshold Logic - use actual packet timestamp, not Date.now()
+    const signalTime = data.timestamp; 
+    
+    // Clean up buffer (keep only last 5 sec)
+    recentSignals = recentSignals.filter(t => signalTime - t < 5000);
+    recentSignals.push(signalTime);
 
     if (recentSignals.length >= threshold) {
         playSound();
+        addHistoryItem('alert', '⚠️ Sound Activated');
         recentSignals = []; // Reset burst
     }
 }
 
-function addHistoryItem(timestamp) {
+// Updated History Function
+function addHistoryItem(type, message, timestamp = null) {
     const list = document.getElementById('history-list');
     const li = document.createElement('li');
-    li.innerHTML = `Signal Received <span class="time">${new Date(timestamp).toLocaleTimeString()}</span>`;
-    list.prepend(li);
     
-    const countEl = document.getElementById('total-signals');
-    countEl.textContent = parseInt(countEl.textContent) + 1;
+    let timeStr = "";
+    if (timestamp) {
+        timeStr = new Date(timestamp).toLocaleTimeString();
+    }
+
+    if (type === 'signal') {
+        li.className = 'log-signal';
+        li.innerHTML = `${message} <span class="time">${timeStr}</span>`;
+    } else if (type === 'alert') {
+        li.className = 'log-alert';
+        li.innerHTML = message;
+    } else if (type === 'system') {
+        li.className = 'log-system';
+        li.textContent = message;
+    }
+
+    list.prepend(li);
 }
 
 let isPlaying = false;
@@ -258,13 +269,10 @@ let globalCooldown = 30;
 function initStudentMode() {
     switchView('student');
     document.getElementById('student-room-display').textContent = currentRoom;
-    
-    // Update URL hash so they can share it
     window.location.hash = currentRoom;
 
     const btn = document.getElementById('btn-signal');
     
-    // Real-time Sync
     onValue(ref(db, `rooms/${currentRoom}/config`), (snapshot) => {
         const data = snapshot.val();
         if (data) {
@@ -302,7 +310,6 @@ function startStudentCooldown() {
     }, 1000);
 }
 
-// Helper to unlock AudioContext on iOS/Chrome
 function unlockAudio() {
     ['siren', 'bells', 'meow'].forEach(id => {
         const el = document.getElementById(`audio-${id}`);
