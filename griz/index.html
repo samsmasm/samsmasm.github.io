@@ -81,6 +81,7 @@
         .btn-primary { background-color: var(--highlight-color); color: #000; }
         .btn-secondary { background-color: #444; color: #fff; }
         .btn-pass { background-color: #e67e22; color: #fff; }
+        .btn-wrong { background-color: var(--wrong-color); color: white; }
         .btn-math { background-color: #9b59b6; color: white; }
         
         /* --- GAME VIEW --- */
@@ -148,6 +149,8 @@
         }
         @keyframes rainbow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .winner-text { font-size: 4rem; font-weight: 900; }
+        
+        .modal-controls { margin-top: 20px; width: 100%; display: flex; justify-content: center; }
     </style>
 </head>
 <body>
@@ -158,7 +161,7 @@
             <a href="https://chatgpt.com/g/g-6973624af8988191af4fa3a6f78f968a-griz-csv-generator" 
                target="_blank" 
                style="color: var(--highlight-color); text-decoration: none; font-size: 1rem; font-weight: bold; opacity: 0.8; border-bottom: 1px dashed var(--highlight-color); padding-bottom: 2px; display: inline-block;">
-                Get formated questions from this custom GPT
+                Get formatted questions from this custom GPT
             </a>
         </div>
 
@@ -239,11 +242,12 @@
                     <div id="pre-reveal-controls" style="display:flex; gap:15px; justify-content:center;">
                         <button id="btn-reveal" class="btn-primary" onclick="revealAnswer()">Reveal Answer</button>
                         <button id="btn-pass" class="btn-pass hidden" onclick="passToNextTeam()">Pass</button>
+                        <button id="btn-steal-wrong" class="btn-wrong hidden" onclick="handleStealWrong()">Wrong (-Pts)</button>
                     </div>
 
                     <div id="post-reveal-controls" class="hidden" style="display:flex; gap:15px; justify-content:center;">
                         <button id="btn-award" style="background:var(--active-team-bg); color:white;" onclick="awardPoints()">Correct</button>
-                        <button id="btn-wrong" style="background:var(--wrong-color); color:white;" onclick="handleWrongAnswer()">Wrong</button>
+                        <button id="btn-final-wrong" class="btn-wrong" onclick="handleFinalWrong()">Wrong</button>
                     </div>
                 </div>
             </div>
@@ -270,7 +274,7 @@
         // --- TURN TRACKING VARIABLES ---
         let gameMode = 'standard'; 
         let questionStartTeam = 0; // Who picked the tile
-        let passesCount = 0;       // How many times passed in this question
+        let passesCount = 0;       // How many times passed/wrong in this question
 
         const qModal = document.getElementById('question-modal'), mathInput = document.getElementById('math-answer-input');
 
@@ -368,8 +372,8 @@
             currentLivePoints = q.points;
             
             // --- NEW TURN LOGIC: RECORD STARTING STATE ---
-            questionStartTeam = activeTeamIndex; // Remember who picked this card
-            passesCount = 0;                     // Reset pass counter
+            questionStartTeam = activeTeamIndex; 
+            passesCount = 0;                     
             
             document.getElementById('live-reward-text').textContent = currentLivePoints;
             document.getElementById('modal-question').textContent = q.question;
@@ -395,20 +399,26 @@
                 mathUI.classList.add('hidden');
                 standardUI.classList.remove('hidden');
                 
-                // Hide Answer & Post-Reveal Buttons
+                // --- CONFIGURE BUTTONS FOR MODE ---
                 document.getElementById('modal-answer').classList.add('hidden');
-                document.getElementById('post-reveal-controls').classList.add('hidden');
                 
-                // Show Pre-Reveal Buttons
+                // Show Pre-Reveal Panel, Hide Post-Reveal
                 document.getElementById('pre-reveal-controls').classList.remove('hidden');
-                
-                // Handle Pass Button Visibility based on Mode
+                document.getElementById('post-reveal-controls').classList.add('hidden');
+
                 const btnPass = document.getElementById('btn-pass');
+                const btnStealWrong = document.getElementById('btn-steal-wrong');
+
                 if (gameMode === 'pass') {
+                    // Pass Mode: Show Pass and Pre-Reveal Wrong (Steal)
                     btnPass.classList.remove('hidden');
-                    btnPass.textContent = `Pass to ${teams[(activeTeamIndex + 1) % teams.length].name}`;
+                    btnStealWrong.classList.remove('hidden');
+                    btnStealWrong.textContent = `Wrong (-${currentLivePoints})`;
+                    btnPass.textContent = "Pass";
                 } else {
+                    // Standard Mode: Just Reveal Answer
                     btnPass.classList.add('hidden');
+                    btnStealWrong.classList.add('hidden');
                 }
             }
 
@@ -417,6 +427,10 @@
             timerInterval = setInterval(() => {
                 currentLivePoints = Math.max(0, currentLivePoints - decayRate);
                 document.getElementById('live-reward-text').textContent = currentLivePoints;
+                // Update dynamic button text as points drop
+                if(gameMode === 'pass') {
+                    document.getElementById('btn-steal-wrong').textContent = `Wrong (-${currentLivePoints})`;
+                }
             }, 1000);
 
             qModal.classList.add('active');
@@ -424,25 +438,69 @@
 
         function updateTurnIndicator() {
             document.getElementById('modal-team-indicator').textContent = `${teams[activeTeamIndex].name}`;
-            if(gameMode === 'pass') {
-                 document.getElementById('btn-pass').textContent = `Pass to ${teams[(activeTeamIndex + 1) % teams.length].name}`;
-            }
             renderScoreboard(); 
         }
 
+        // --- BUTTON LOGIC: PASS (No points lost, Next Team) ---
         function passToNextTeam() {
             passesCount++; 
-            // Check if full loop is complete (passes >= total teams)
             if (passesCount >= teams.length) {
-                // Everyone passed! Question dies.
-                finalizeTurn(); 
+                finalizeTurn(); // Full loop, nobody knows.
             } else {
-                // Just move to the next person to try THIS question
                 activeTeamIndex = (activeTeamIndex + 1) % teams.length;
                 updateTurnIndicator();
             }
         }
 
+        // --- BUTTON LOGIC: WRONG/STEAL (Points Lost, Next Team) ---
+        function handleStealWrong() {
+            // Deduct points from CURRENT active team
+            teams[activeTeamIndex].score -= currentLivePoints;
+            
+            passesCount++;
+            if (passesCount >= teams.length) {
+                finalizeTurn(); // Everyone tried and failed.
+            } else {
+                // Move to next team to try
+                activeTeamIndex = (activeTeamIndex + 1) % teams.length;
+                updateTurnIndicator();
+            }
+        }
+
+        // --- BUTTON LOGIC: REVEAL (Locks Question, Moves to Final Phase) ---
+        function revealAnswer() { 
+            clearInterval(timerInterval); // Stop timer
+            document.getElementById('modal-answer').classList.remove('hidden'); 
+            
+            // Switch Button Groups
+            document.getElementById('pre-reveal-controls').classList.add('hidden');
+            document.getElementById('post-reveal-controls').classList.remove('hidden');
+            
+            // Set Text for Final Buttons
+            document.getElementById('btn-award').textContent = `Correct (+${currentLivePoints})`;
+            
+            if(gameMode === 'pass') {
+                document.getElementById('btn-final-wrong').textContent = `Wrong (-${currentLivePoints})`;
+            } else {
+                document.getElementById('btn-final-wrong').textContent = `Wrong (0)`;
+            }
+        }
+
+        // --- BUTTON LOGIC: CORRECT (Points Added, Close) ---
+        function awardPoints() { 
+            teams[activeTeamIndex].score += currentLivePoints; 
+            finalizeTurn(); 
+        }
+
+        // --- BUTTON LOGIC: FINAL WRONG (Points Lost, Close) ---
+        function handleFinalWrong() { 
+            if(gameMode === 'pass') {
+                teams[activeTeamIndex].score -= currentLivePoints;
+            }
+            finalizeTurn();
+        }
+        
+        // --- MATH INPUT LOGIC ---
         mathInput.onkeydown = (e) => {
             if(e.key === 'Enter') {
                 const correctAns = document.getElementById('modal-answer').textContent;
@@ -452,37 +510,11 @@
                     setTimeout(() => { mathInput.classList.remove('correct-flash'); awardPoints(); }, 400);
                 } else {
                     mathInput.classList.add('wrong-flash');
-                    setTimeout(() => { mathInput.classList.remove('wrong-flash'); handleWrongAnswer(); }, 400);
+                    setTimeout(() => { mathInput.classList.remove('wrong-flash'); handleFinalWrong(); }, 400);
                 }
             }
         };
 
-        function revealAnswer() { 
-            clearInterval(timerInterval);
-            document.getElementById('modal-answer').classList.remove('hidden'); 
-            document.getElementById('pre-reveal-controls').classList.add('hidden');
-            document.getElementById('post-reveal-controls').classList.remove('hidden');
-            document.getElementById('btn-award').textContent = `Correct (+${currentLivePoints})`;
-            
-            if(gameMode === 'pass') {
-                document.getElementById('btn-wrong').textContent = `Wrong (-${currentLivePoints})`;
-            } else {
-                document.getElementById('btn-wrong').textContent = `Wrong (0)`;
-            }
-        }
-
-        function awardPoints() { 
-            teams[activeTeamIndex].score += currentLivePoints; 
-            finalizeTurn(); 
-        }
-
-        function handleWrongAnswer() { 
-            if(gameMode === 'pass') {
-                teams[activeTeamIndex].score -= currentLivePoints;
-            }
-            finalizeTurn();
-        }
-        
         function skipQuestion() {
             finalizeTurn();
         }
@@ -496,9 +528,7 @@
                 usedTilesCount++;
             }
             
-            // --- KEY CHANGE: RESET CONTROL TO NATURAL ORDER ---
-            // Irrespective of who answered, stole, or passed, the next 
-            // person to pick a tile is the one AFTER the person who started THIS tile.
+            // Reset Board Control: Next person is the one after the original picker
             activeTeamIndex = (questionStartTeam + 1) % teams.length;
 
             renderScoreboard();
@@ -514,8 +544,6 @@
             const s = document.getElementById('scoreboard');
             s.innerHTML = '';
             teams.forEach((t, i) => {
-                // If modal is active, highlight the current answering team.
-                // If board is active, highlight the team whose turn it is to pick.
                 s.innerHTML += `<div class="team-card ${i===activeTeamIndex?'active':''}" onclick="activeTeamIndex=${i};renderScoreboard();">
                     <div class="btn-manual-add" onclick="event.stopPropagation(); manualScore(${i})">+</div>
                     <div class="team-name">${t.name}</div><div class="team-points">${t.score}</div>
