@@ -123,15 +123,28 @@ async function verifyTeacher(room, pin) {
         const snapshot = await get(roomConfigRef);
         
         if (snapshot.exists()) {
-            // Room exists: Check PIN
             const data = snapshot.val();
-            if (data.pin && data.pin === pin) {
+
+            // CASE 1: Legacy Room (Exists, but has no PIN)
+            // We "claim" it by saving the PIN you just entered.
+            if (!data.pin) {
+                await set(ref(db, `rooms/${room}/config`), {
+                    ...data, // Keep existing settings (threshold, cooldown)
+                    pin: pin
+                });
+                alert("Legacy room detected. PIN has been set to: " + pin);
+                initTeacherMode();
+                return;
+            }
+
+            // CASE 2: Modern Room (Check PIN)
+            if (data.pin === pin) {
                 initTeacherMode();
             } else {
                 alert("Incorrect PIN for this room.");
             }
         } else {
-            // New Room: Create it with PIN
+            // CASE 3: New Room (Create it)
             await set(ref(db, `rooms/${room}/config`), {
                 pin: pin,
                 btnText: "Slow down please",
@@ -145,7 +158,6 @@ async function verifyTeacher(room, pin) {
         alert("Connection failed.");
     }
 }
-
 function initTeacherMode() {
     switchView('teacher');
     document.getElementById('teacher-room-display').textContent = currentRoom;
