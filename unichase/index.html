@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Unicorn Magic Chase v7 (Joystick)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; 
+            background-color: #fff0f5;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+            touch-action: none; /* Critical for joystick */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- Top Bar & Layout --- */
+        #top-bar {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px;
+            background: #fff0f5;
+            z-index: 10;
+        }
+
+        #main-area {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            max-width: 950px;
+            height: 60vh; 
+        }
+
+        /* --- Level Buttons --- */
+        #level-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .lvl-btn {
+            width: 45px; height: 45px;
+            border-radius: 10px;
+            border: 3px solid #ccc;
+            background: white;
+            font-weight: bold; font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 3px rgba(0,0,0,0.1);
+        }
+        .lvl-btn[data-lvl="super_easy"] { border-color: #4CAF50; color: #4CAF50; }
+        .lvl-btn[data-lvl="easy"]       { border-color: #8BC34A; color: #8BC34A; }
+        .lvl-btn[data-lvl="okey_pokey"] { border-color: #FFC107; color: #FFC107; }
+        .lvl-btn[data-lvl="hard"]       { border-color: #FF9800; color: #FF9800; }
+        .lvl-btn[data-lvl="super_hard"] { border-color: #F44336; color: #F44336; }
+        
+        .lvl-btn.active {
+            background-color: #333; color: white !important;
+            transform: scale(1.1); border-color: #333 !important;
+        }
+
+        /* --- HUD --- */
+        #hud-row {
+            display: flex; width: 100%; max-width: 800px;
+            align-items: center; gap: 10px;
+        }
+        #magic-container {
+            flex-grow: 1; background: #fff;
+            border: 3px solid #ffb3d9; border-radius: 15px;
+            height: 20px; overflow: hidden;
+        }
+        #magic-bar {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, #ff99ff, #99ffff);
+            transition: width 0.3s;
+        }
+        #timer-display {
+            font-size: 24px; font-weight: bold; color: #ff4081;
+            width: 80px; text-align: right;
+        }
+
+        /* --- Game Canvas --- */
+        #canvas-wrapper {
+            flex-grow: 1; height: 100%; position: relative;
+            border: 6px solid #ffd1dc; border-radius: 20px;
+            background-color: #f0fff0; overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- Scoreboard --- */
+        #scoreboard {
+            width: 140px; height: 100%; margin-left: 10px;
+            background: white; border: 3px solid #ffb3d9;
+            border-radius: 15px; display: flex; flex-direction: column;
+            padding: 5px; box-sizing: border-box; font-size: 14px;
+        }
+        #score-header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 5px; }
+        #best-time-label { color: #ff4081; font-weight: bold; font-size: 12px; }
+        #best-time-val { font-size: 20px; font-weight: bold; color: #333; }
+        #score-list { flex-grow: 1; overflow-y: auto; text-align: left; }
+        .score-entry { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #eee; font-size: 13px; }
+        .score-lvl { font-size: 10px; color: #888; margin-left: 5px; }
+
+        /* --- Controls Area --- */
+        #controls {
+            width: 100%; max-width: 800px;
+            flex-grow: 1;
+            display: flex;
+            justify-content: space-between; /* Spread joystick and button */
+            align-items: center;
+            padding: 10px 40px; /* Padding from sides */
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* --- Joystick CSS --- */
+        #joystick-zone {
+            width: 140px;
+            height: 140px;
+            position: relative;
+        }
+
+        #joystick-base {
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.5);
+            border: 4px solid #ffb3d9;
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        #joystick-stick {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #ff80ab, #ff4081);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            pointer-events: none; /* Let clicks pass through to zone */
+        }
+
+        /* Magic Button */
+        #btn-magic {
+            width: 110px; height: 110px;
+            background: #ff4081; color: white;
+            border-radius: 50%; border: 5px solid #fff;
+            font-weight: bold;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            opacity: 0.3; pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        #btn-magic.ready { opacity: 1; pointer-events: auto; animation: pulse 1s infinite; cursor: pointer; }
+
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
+
+        #overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95); padding: 20px; border-radius: 20px;
+            text-align: center; display: none; border: 5px solid #ff80ab; z-index: 50;
+        }
+
+        @media (max-width: 600px) {
+            #main-area { flex-direction: column; height: 50vh; }
+            #scoreboard { width: 100%; height: auto; max-height: 80px; margin: 5px 0; flex-direction: row; align-items: center; }
+            #score-header { border-bottom: none; border-right: 2px solid #eee; padding-right: 10px; margin-right: 10px; margin-bottom: 0; min-width: 80px; }
+            #score-list { display: flex; overflow-x: auto; gap: 15px; overflow-y: hidden; align-items: center; }
+            .score-entry { flex-direction: column; border-bottom: none; text-align: center; min-width: 50px; }
+            #controls { padding: 10px 20px; }
+            #joystick-zone { width: 120px; height: 120px; }
+            #btn-magic { width: 90px; height: 90px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="top-bar">
+        <div id="level-container">
+            <button class="lvl-btn" data-lvl="super_easy" onclick="setLevel('super_easy')">1</button>
+            <button class="lvl-btn" data-lvl="easy" onclick="setLevel('easy')">2</button>
+            <button class="lvl-btn active" data-lvl="okey_pokey" onclick="setLevel('okey_pokey')">3</button>
+            <button class="lvl-btn" data-lvl="hard" onclick="setLevel('hard')">4</button>
+            <button class="lvl-btn" data-lvl="super_hard" onclick="setLevel('super_hard')">5</button>
+        </div>
+        <div id="hud-row">
+            <div style="font-size: 24px;">✨</div>
+            <div id="magic-container"><div id="magic-bar"></div></div>
+            <div id="timer-display">0:00</div>
+        </div>
+    </div>
+
+    <div id="main-area">
+        <div id="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+            <div id="overlay">
+                <h2 id="status-title" style="color: #ff4081; margin:0;">Oh No!</h2>
+                <p id="final-time-msg" style="font-size: 20px; font-weight: bold;">Time: 0:00</p>
+                <button class="btn" style="background:#fff; border:3px solid #ff4081; border-radius:10px; width: 150px; height: 50px; margin: 10px auto; font-size: 18px;" onclick="resetGame()">Play Again</button>
+            </div>
+        </div>
+        <div id="scoreboard">
+            <div id="score-header">
+                <div id="best-time-label">TOP TIME</div>
+                <div id="best-time-val">--:--</div>
+            </div>
+            <div id="score-list"></div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div id="joystick-zone">
+            <div id="joystick-base">
+                <div id="joystick-stick"></div>
+            </div>
+        </div>
+
+        <div id="btn-magic" onclick="activateMagic()">
+            <span style="font-size: 30px;">🦄</span>
+            <span>MAGIC</span>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const wrapper = document.getElementById('canvas-wrapper');
+
+    function resize() {
+        canvas.width = wrapper.clientWidth;
+        canvas.height = wrapper.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Configuration ---
+    const LEVELS = {
+        'super_easy': { pSpeed: 3, sSpeed: 0.6, spawnRate: 12000, label: "Lvl 1" },
+        'easy':       { pSpeed: 4, sSpeed: 1.0, spawnRate: 10000, label: "Lvl 2" },
+        'okey_pokey': { pSpeed: 5, sSpeed: 1.6, spawnRate: 8000,  label: "Lvl 3" },
+        'hard':       { pSpeed: 6, sSpeed: 2.5, spawnRate: 6000,  label: "Lvl 4" },
+        'super_hard': { pSpeed: 7, sSpeed: 3.5, spawnRate: 4000,  label: "Lvl 5" }
+    };
+    
+    let currentLevelKey = 'okey_pokey';
+    let currentSettings = LEVELS['okey_pokey'];
+
+    // --- Game State ---
+    let gameActive = true;
+    let magic = 0;
+    let startTime = Date.now();
+    let currentDuration = 0;
+    
+    let player = { x: 50, y: 50, size: 40, stuckUntil: 0, immuneUntil: 0 };
+    let snakes = [];
+    let items = [];
+    let puddles = [];
+    let keys = {};
+    let nextSnakeTime = 0;
+    let sessionScores = [];
+
+    // --- JOYSTICK STATE ---
+    let joystick = { active: false, x: 0, y: 0 }; 
+    // x and y are between -1 and 1
+
+    const EMOJIS = { 
+        hero: "🦄", snake: "🐍", tangled: "🥨", stuck: "😮", 
+        yarn: "🧶", cat: "🐱", dog: "🐶" 
+    };
+
+    function setLevel(lvlKey) {
+        currentLevelKey = lvlKey;
+        currentSettings = LEVELS[lvlKey];
+        document.querySelectorAll('.lvl-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if(btn.dataset.lvl === lvlKey) btn.classList.add('active');
+        });
+        resetGame();
+        document.activeElement.blur();
+    }
+
+    function init() {
+        snakes = [];
+        spawnSnake(); spawnSnake();
+        
+        puddles = [
+            {x: canvas.width/2, y: canvas.height/2, r: 40},
+            {x: 100, y: canvas.height - 100, r: 35},
+            {x: canvas.width - 100, y: 100, r: 35}
+        ];
+
+        items = [];
+        spawnItem(); spawnItem(); spawnItem();
+
+        nextSnakeTime = Date.now() + currentSettings.spawnRate;
+        startTime = Date.now(); 
+    }
+
+    function spawnSnake() {
+        let sx, sy, safe = false, tries = 0;
+        while (!safe && tries < 10) {
+            sx = Math.random() * (canvas.width - 40);
+            sy = Math.random() * (canvas.height - 40);
+            let dx = sx - player.x;
+            let dy = sy - player.y;
+            if (Math.sqrt(dx*dx + dy*dy) > 300) safe = true;
+            tries++;
+        }
+        if (!safe) {
+            sx = (player.x < canvas.width/2) ? canvas.width - 50 : 10;
+            sy = (player.y < canvas.height/2) ? canvas.height - 50 : 10;
+        }
+        snakes.push({ x: sx, y: sy, size: 40, state: 'chase', stuckUntil: 0, immuneUntil: 0, angle: 0 });
+    }
+
+    function spawnItem() {
+        const types = [EMOJIS.yarn, EMOJIS.cat, EMOJIS.dog];
+        items.push({
+            x: Math.random() * (canvas.width - 60) + 30,
+            y: Math.random() * (canvas.height - 60) + 30,
+            type: types[Math.floor(Math.random() * types.length)],
+            size: 35
+        });
+    }
+
+    function formatTime(ms) {
+        let seconds = Math.floor(ms / 1000);
+        let m = Math.floor(seconds / 60);
+        let s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function updateTimer() {
+        if(gameActive) {
+            currentDuration = Date.now() - startTime;
+            document.getElementById('timer-display').innerText = formatTime(currentDuration);
+        }
+    }
+
+    function updateScoreboard(finalTimeMs) {
+        const timeStr = formatTime(finalTimeMs);
+        const lvlLabel = LEVELS[currentLevelKey].label;
+        sessionScores.push({ ms: finalTimeMs, str: timeStr, lvl: lvlLabel });
+        sessionScores.sort((a, b) => b.ms - a.ms);
+        document.getElementById('best-time-val').innerText = sessionScores[0].str;
+
+        const listEl = document.getElementById('score-list');
+        listEl.innerHTML = '';
+        sessionScores.forEach(score => {
+            const div = document.createElement('div');
+            div.className = 'score-entry';
+            div.innerHTML = `<span>${score.str}</span><span class="score-lvl">${score.lvl}</span>`;
+            listEl.appendChild(div);
+        });
+    }
+
+    function handlePuddleLogic(entity, now) {
+        if (now < entity.stuckUntil) return true;
+        if (now < entity.immuneUntil) return false;
+        for (let p of puddles) {
+            let dx = (entity.x + entity.size/2) - p.x;
+            let dy = (entity.y + entity.size/2) - p.y;
+            if (Math.sqrt(dx*dx + dy*dy) < p.r) {
+                entity.stuckUntil = now + 2000; 
+                entity.immuneUntil = now + 4000;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function update() {
+        if(!gameActive) return;
+        updateTimer();
+        const now = Date.now();
+
+        if (now > nextSnakeTime && snakes.length < 15) {
+            spawnSnake();
+            nextSnakeTime = now + currentSettings.spawnRate;
+        }
+
+        // --- MOVEMENT LOGIC (Joystick + Keyboard) ---
+        const isPlayerStuck = handlePuddleLogic(player, now);
+        
+        if (!isPlayerStuck) {
+            let moveX = 0;
+            let moveY = 0;
+
+            // 1. Check Keyboard
+            if (keys.ArrowUp) moveY = -1;
+            if (keys.ArrowDown) moveY = 1;
+            if (keys.ArrowLeft) moveX = -1;
+            if (keys.ArrowRight) moveX = 1;
+
+            // 2. Check Joystick (Overwrites keyboard if active)
+            if (joystick.active) {
+                moveX = joystick.x;
+                moveY = joystick.y;
+            }
+
+            // 3. Apply Speed
+            const speed = currentSettings.pSpeed;
+            player.x += moveX * speed;
+            player.y += moveY * speed;
+        }
+        
+        player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+        player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+
+        // Items
+        for (let i = items.length - 1; i >= 0; i--) {
+            let it = items[i];
+            if (Math.abs(player.x - it.x) < 45 && Math.abs(player.y - it.y) < 45) {
+                items.splice(i, 1);
+                magic = Math.min(100, magic + 25);
+                spawnItem();
+                updateUI();
+            }
+        }
+
+        // Snakes
+        snakes.forEach((s, index) => {
+            if (s.state === 'tangled') { s.angle += 0.05; return; }
+            if (handlePuddleLogic(s, now)) return;
+
+            let pushX = 0, pushY = 0;
+            snakes.forEach((other, otherIndex) => {
+                if (index !== otherIndex) {
+                    let dx = s.x - other.x;
+                    let dy = s.y - other.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 60 && dist > 0) {
+                        pushX += (dx / dist) * 2.5; 
+                        pushY += (dy / dist) * 2.5;
+                    }
+                }
+            });
+
+            let dx = player.x - s.x;
+            let dy = player.y - s.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist > 0) {
+                const sSpeed = currentSettings.sSpeed;
+                s.x += (dx/dist) * sSpeed + pushX;
+                s.y += (dy/dist) * sSpeed + pushY;
+            }
+
+            if (dist < 30) {
+                gameActive = false;
+                document.getElementById('final-time-msg').innerText = "Time: " + formatTime(currentDuration);
+                updateScoreboard(currentDuration);
+                document.getElementById('overlay').style.display = "block";
+            }
+
+            snakes.forEach(other => {
+                if (other.state === 'tangled') {
+                    let rdx = s.x - other.x;
+                    let rdy = s.y - other.y;
+                    let rdist = Math.sqrt(rdx*rdx + rdy*rdy);
+                    if (rdist < 35) {
+                        other.state = 'chase';
+                        s.x += 20; other.x -= 20;
+                    }
+                }
+            });
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.save();
+        puddles.forEach(p => {
+            ctx.fillStyle = "rgba(180, 100, 255, 0.6)"; 
+            ctx.beginPath();
+            for (let a = 0; a < Math.PI * 2; a += 0.3) {
+                let r = p.r + Math.sin(a * 5) * 5; 
+                let x = p.x + Math.cos(a) * r;
+                let y = p.y + Math.sin(a) * r;
+                if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.fill();
+            ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+            ctx.beginPath(); ctx.arc(p.x - 10, p.y - 10, 6, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.restore();
+
+        const now = Date.now();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "40px Arial";
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = "#000"; 
+
+        items.forEach(it => ctx.fillText(it.type, it.x + it.size/2, it.y + it.size/2));
+
+        snakes.forEach(s => {
+            ctx.save();
+            ctx.translate(s.x + s.size/2, s.y + s.size/2);
+            if (s.state === 'tangled') {
+                ctx.rotate(s.angle);
+                ctx.fillText(EMOJIS.tangled, 0, 0);
+            } else if (now < s.stuckUntil) {
+                ctx.globalAlpha = 0.5;
+                ctx.fillText(EMOJIS.snake, 0, 0);
+            } else {
+                ctx.globalAlpha = 1.0; 
+                ctx.fillText(EMOJIS.snake, 0, 0);
+            }
+            ctx.restore();
+        });
+
+        let pEmoji = EMOJIS.hero;
+        let px = player.x + player.size/2;
+        let py = player.y + player.size/2;
+        ctx.globalAlpha = 1.0;
+        if (now < player.stuckUntil) {
+            pEmoji = EMOJIS.stuck;
+            ctx.globalAlpha = 0.6; 
+            px += (Math.random() * 4) - 2; 
+        } else if (now < player.immuneUntil) {
+            if (Math.floor(now / 100) % 2 === 0) ctx.globalAlpha = 0.5;
+        }
+        ctx.fillText(pEmoji, px, py);
+        ctx.globalAlpha = 1.0;
+    }
+
+    function updateUI() {
+        document.getElementById('magic-bar').style.width = magic + "%";
+        const btn = document.getElementById('btn-magic');
+        if (magic >= 100) btn.classList.add('ready');
+        else btn.classList.remove('ready');
+    }
+
+    function activateMagic() {
+        if (magic < 100) return;
+        let activeSnakes = snakes.filter(s => s.state === 'chase');
+        activeSnakes.sort((a,b) => {
+             let da = Math.hypot(a.x - player.x, a.y - player.y);
+             let db = Math.hypot(b.x - player.x, b.y - player.y);
+             return da - db;
+        });
+        if (activeSnakes.length > 0) activeSnakes[0].state = 'tangled';
+        magic = 0;
+        updateUI();
+    }
+
+    function resetGame() {
+        player.x = 100; player.y = 100; 
+        player.stuckUntil = 0; player.immuneUntil = 0;
+        magic = 0;
+        init();
+        updateUI();
+        document.getElementById('overlay').style.display = "none";
+        gameActive = true;
+    }
+
+    // --- INPUT HANDLING ---
+    
+    // Keyboard
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    window.addEventListener('keydown', e => { if (e.code === 'Space') activateMagic(); });
+
+    // Joystick Logic
+    const joyZone = document.getElementById('joystick-zone');
+    const joyStick = document.getElementById('joystick-stick');
+    const maxRadius = 40; // Max distance stick can move
+
+    function handleJoystick(e) {
+        e.preventDefault(); // Stop scroll
+        let clientX, clientY;
+        
+        if (e.touches) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const rect = joyZone.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let dx = clientX - centerX;
+        let dy = clientY - centerY;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        // Cap distance
+        if (dist > maxRadius) {
+            dx = (dx / dist) * maxRadius;
+            dy = (dy / dist) * maxRadius;
+        }
+
+        // Move visual stick
+        joyStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+        // Update Logic Data (-1 to 1)
+        joystick.active = true;
+        joystick.x = dx / maxRadius;
+        joystick.y = dy / maxRadius;
+    }
+
+    function resetJoystick() {
+        joystick.active = false;
+        joystick.x = 0;
+        joystick.y = 0;
+        joyStick.style.transform = `translate(-50%, -50%)`;
+    }
+
+    // Touch Events
+    joyZone.addEventListener('touchstart', handleJoystick);
+    joyZone.addEventListener('touchmove', handleJoystick);
+    joyZone.addEventListener('touchend', resetJoystick);
+
+    // Mouse Events (for desktop testing)
+    let mouseDown = false;
+    joyZone.addEventListener('mousedown', (e) => { mouseDown = true; handleJoystick(e); });
+    window.addEventListener('mousemove', (e) => { if(mouseDown) handleJoystick(e); });
+    window.addEventListener('mouseup', () => { mouseDown = false; resetJoystick(); });
+
+
+    resize();
+    init();
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    loop();
+
+</script>
+</body>
+</html>
