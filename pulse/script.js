@@ -51,6 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Landing actions
     document.getElementById('btn-start').addEventListener('click', startSession);
+    document.getElementById('btn-rejoin').addEventListener('click', rejoinSession);
     document.getElementById('btn-join').addEventListener('click', joinSession);
 
     // Teacher controls
@@ -81,7 +82,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (hash) {
         currentRoom = hash;
         if (role === 'teacher') {
-            document.getElementById('t-room-input').value = hash;
+            // Pre-fill the rejoin form — returning teachers use rejoin, not new room
+            document.getElementById('r-room-input').value = hash;
             showTab('teacher');
         } else {
             initStudentMode();
@@ -158,10 +160,10 @@ async function startSession() {
     if (!room) return alert("Please enter a room name.");
     if (!pin) return alert("Please enter a PIN.");
 
-    // If room exists, verify PIN matches
+    // Block if room already exists — teacher should use Rejoin instead
     const existing = await get(ref(db, `pulse/${room}/config`));
-    if (existing.exists() && existing.val().pin !== pin) {
-        return alert("A session with this room name already exists with a different PIN.");
+    if (existing.exists()) {
+        return alert("A room with this name already exists. Use 'Rejoin Room' to return to it, or choose a different name.");
     }
 
     const variables = [];
@@ -182,6 +184,21 @@ async function startSession() {
 
     currentRoom = room;
     await set(ref(db, `pulse/${room}/config`), config);
+    initTeacherMode();
+}
+
+async function rejoinSession() {
+    const room = document.getElementById('r-room-input').value.trim().toUpperCase();
+    const pin = document.getElementById('r-pin-input').value.trim();
+    if (!room) return alert("Please enter a room name.");
+    if (!pin) return alert("Please enter your PIN.");
+
+    const snap = await get(ref(db, `pulse/${room}/config`));
+    if (!snap.exists()) return alert("Room not found. Check the room name.");
+    if (snap.val().pin !== pin) return alert("Incorrect PIN.");
+
+    config = snap.val();
+    currentRoom = room;
     initTeacherMode();
 }
 
