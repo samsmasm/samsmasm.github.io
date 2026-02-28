@@ -109,6 +109,13 @@ function setVarCount(n) {
 }
 
 function renderVarConfigRows(n) {
+    // Save existing values before wiping
+    const saved = [0, 1, 2].map(i => ({
+        label: document.getElementById(`vl-${i}`)?.value ?? '',
+        min:   document.getElementById(`vmin-${i}`)?.value ?? '0',
+        max:   document.getElementById(`vmax-${i}`)?.value ?? '10',
+    }));
+
     const axisNames = ['X axis', 'Y axis', 'Colour'];
     const container = document.getElementById('var-config-rows');
     container.innerHTML = '';
@@ -134,6 +141,10 @@ function renderVarConfigRows(n) {
             </div>
         `;
         container.appendChild(div);
+        // Restore saved values
+        document.getElementById(`vl-${i}`).value   = saved[i].label;
+        document.getElementById(`vmin-${i}`).value = saved[i].min;
+        document.getElementById(`vmax-${i}`).value = saved[i].max;
     }
 }
 
@@ -367,8 +378,8 @@ function jitter(id) {
 // ==========================================
 
 function drawScatter(list, vars) {
-    const legendW = vars.length === 3 ? 110 : 0;
-    const pad = { top: 40, right: 20 + legendW, bottom: 64, left: 70 };
+    const legendW = vars.length === 3 ? 140 : 0;
+    const pad = { top: 40, right: 20 + legendW, bottom: 80, left: 90 };
     const pw = canvasW - pad.left - pad.right;
     const ph = canvasH - pad.top - pad.bottom;
     const v0 = vars[0], v1 = vars[1], v2 = vars[2] || null;
@@ -425,21 +436,21 @@ function drawScatterAxes(pad, pw, ph, v0, v1) {
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#64748b';
-    ctx.font = '12px Inter, sans-serif';
+    ctx.font = '18px Inter, sans-serif';
 
     for (let i = 0; i <= xTicks; i++) {
         const val = v0.min + Math.round(i / xTicks * xRange);
         const x = pad.left + (i / xTicks) * pw;
         ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ph); ctx.stroke();
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillText(val, x, pad.top + ph + 6);
+        ctx.fillText(val, x, pad.top + ph + 8);
     }
     for (let i = 0; i <= yTicks; i++) {
         const val = v1.min + Math.round(i / yTicks * yRange);
         const y = pad.top + ph - (i / yTicks) * ph;
         ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + pw, y); ctx.stroke();
         ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-        ctx.fillText(val, pad.left - 8, y);
+        ctx.fillText(val, pad.left - 10, y);
     }
 
     ctx.strokeStyle = '#94a3b8';
@@ -447,11 +458,11 @@ function drawScatterAxes(pad, pw, ph, v0, v1) {
     ctx.strokeRect(pad.left, pad.top, pw, ph);
 
     ctx.fillStyle = '#1e293b';
-    ctx.font = 'bold 13px Inter, sans-serif';
+    ctx.font = 'bold 20px Inter, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText(v0.label, pad.left + pw / 2, canvasH - 6);
     ctx.save();
-    ctx.translate(18, pad.top + ph / 2);
+    ctx.translate(22, pad.top + ph / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.textBaseline = 'top'; ctx.fillText(v1.label, 0, 0);
     ctx.restore();
@@ -464,10 +475,16 @@ function varToColor(val, v) {
 }
 
 function drawColorLegend(pad, ph, v2) {
-    const lx = canvasW - pad.right + 18;
-    const ly = pad.top;
-    const lw = 18;
-    const lh = ph;
+    const lx = canvasW - pad.right + 20;
+    const ly = pad.top + 24; // leave room for label above
+    const lw = 26;
+    const lh = ph - 24;
+
+    // Variable label above the bar
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(v2.label, lx + lw / 2, ly - 6, lw * 5);
 
     // Gradient: top = max (red), bottom = min (blue)
     const grad = ctx.createLinearGradient(0, ly, 0, ly + lh);
@@ -479,21 +496,13 @@ function drawColorLegend(pad, ph, v2) {
     ctx.lineWidth = 1;
     ctx.strokeRect(lx, ly, lw, lh);
 
+    // Min/max labels to the right
     ctx.fillStyle = '#1e293b';
-    ctx.font = '11px Inter, sans-serif';
+    ctx.font = '14px Inter, sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(v2.max, lx + lw + 4, ly);
+    ctx.fillText(v2.max, lx + lw + 6, ly);
     ctx.textBaseline = 'bottom';
-    ctx.fillText(v2.min, lx + lw + 4, ly + lh);
-
-    ctx.save();
-    ctx.translate(lx + lw / 2, ly + lh / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = '#64748b';
-    ctx.font = 'bold 11px Inter, sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(v2.label, 0, 0);
-    ctx.restore();
+    ctx.fillText(v2.min, lx + lw + 6, ly + lh);
 }
 
 // ==========================================
@@ -501,7 +510,7 @@ function drawColorLegend(pad, ph, v2) {
 // ==========================================
 
 function drawHistogram(list, v) {
-    const pad = { top: 40, right: 40, bottom: 64, left: 70 };
+    const pad = { top: 40, right: 40, bottom: 80, left: 90 };
     const pw = canvasW - pad.left - pad.right;
     const ph = canvasH - pad.top - pad.bottom;
     const range = v.max - v.min;
@@ -537,14 +546,14 @@ function drawHistogram(list, v) {
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#64748b';
-    ctx.font = '12px Inter, sans-serif';
+    ctx.font = '18px Inter, sans-serif';
     const yTicks = Math.min(maxCount, 6);
     for (let i = 0; i <= yTicks; i++) {
         const val = Math.round(i / yTicks * maxCount);
         const y = pad.top + ph - (val / maxCount) * ph;
         ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + pw, y); ctx.stroke();
         ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-        ctx.fillText(val, pad.left - 8, y);
+        ctx.fillText(val, pad.left - 10, y);
     }
 
     ctx.strokeStyle = '#94a3b8';
@@ -574,7 +583,7 @@ function drawHistogram(list, v) {
             ctx.beginPath(); ctx.moveTo(ax, pad.top); ctx.lineTo(ax, pad.top + ph); ctx.stroke();
             ctx.restore();
             ctx.fillStyle = '#f97316';
-            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.font = 'bold 18px Inter, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
             ctx.fillText(`avg: ${avg.toFixed(1)}`, ax, pad.top - 4);
         }
@@ -582,20 +591,20 @@ function drawHistogram(list, v) {
 
     // X axis labels
     ctx.fillStyle = '#64748b';
-    ctx.font = '11px Inter, sans-serif';
+    ctx.font = '16px Inter, sans-serif';
     buckets.forEach((b, i) => {
         const x = pad.left + (i + 0.5) * bw;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillText(b.label, x, pad.top + ph + 6);
+        ctx.fillText(b.label, x, pad.top + ph + 8);
     });
 
     // Axis labels
     ctx.fillStyle = '#1e293b';
-    ctx.font = 'bold 13px Inter, sans-serif';
+    ctx.font = 'bold 20px Inter, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText(v.label, pad.left + pw / 2, canvasH - 6);
     ctx.save();
-    ctx.translate(18, pad.top + ph / 2);
+    ctx.translate(22, pad.top + ph / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.textBaseline = 'top'; ctx.fillText('Count', 0, 0);
     ctx.restore();
