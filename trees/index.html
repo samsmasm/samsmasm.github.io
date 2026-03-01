@@ -57,6 +57,13 @@
       border-top: 1px solid rgba(126,200,80,0.15); padding-top: 6px;
     }
     .trait-key span { color: #aaa; }
+
+    #btn-reset {
+      width: 100%; margin-top: 10px; padding: 5px;
+      background: rgba(30, 80, 20, 0.6); border: 1px solid #3a6a2a;
+      border-radius: 5px; color: #7ec850; font-size: 11px; cursor: pointer;
+    }
+    #btn-reset:hover { background: rgba(50, 120, 30, 0.7); }
   </style>
 </head>
 <body>
@@ -75,6 +82,7 @@
   <div id="content">
     <div class="sec">World</div>
     <div class="stat">Trees: <span class="val" id="s-pop">0</span></div>
+    <div class="stat">Seeds: <span class="val" id="s-seeds">0</span></div>
     <div class="stat">Time:  <span class="val" id="s-time">0</span></div>
 
     <div class="sec">Avg Traits</div>
@@ -120,6 +128,8 @@
       <label>Speed <span class="val" id="d-speed">1×</span></label>
       <input type="range" id="sl-speed" min="1" max="20" step="1" value="1">
     </div>
+
+    <button id="btn-reset">↺ Reset</button>
   </div>
 </div>
 
@@ -128,48 +138,54 @@
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const CFG = {
-  slotW:      14,       // px per tree slot
-  groundFrac: 0.76,     // fraction of canvas height where ground sits
+  slotW:      14,
+  groundFrac: 0.76,
 
-  // Climate (modified by sliders)
   rainfall:   0.5,
   windStr:    0.2,
-  windDir:    0,        // -1 (left) to +1 (right), drifts over time
+  windDir:    0,        // -1..+1, drifts over time
   fireRate:   0.0,
 
-  // Evolution
   mutRate:    0.1,
   simSpeed:   1,
 
-  // Energy
-  photoBase:  1.0,      // energy/frame at full light + full rainfall
-  maintH:     0.20,     // energy cost × height fraction per frame
-  maintG:     0.05,     // energy cost × girth per frame
-  maintBase:  0.03,     // fixed baseline cost
+  photoBase:  1.0,
+  maintH:     0.20,
+  maintG:     0.05,
+  maintBase:  0.03,
   reproThr:   200,
   reproCost:  100,
   seedEnergy: 50,
   maxAge:     7000,
 
-  // Gene ranges
   hRange: [0.15, 1.0],
   gRange: [0.20, 1.0],
-  dRange: [1,    14],   // dispersal in slots
+  dRange: [1,    14],
 };
+
+const SEED_HALFLIFE  = 1200;   // frames until ~37% viability remains
+const SEED_MIN_VIA   = 0.004;  // remove seeds below this viability
+const MAX_SEED_BANK  = 2000;
 
 // ─── CANVAS & STATE ───────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 
-let numSlots = 0;
-let groundY  = 0;
-let maxTreeH = 0;
-let slots    = [];      // Tree | null, one per slot
-let stumps   = [];      // charred stump records
-let lightArr = [];      // Float32Array — light level per slot [0..1]
-let frameCount = 0;
-let history    = [];    // trait average snapshots for graph
-const MAX_HIST = 300;
+let numSlots = 0, groundY = 0, maxTreeH = 0;
+let slots       = [];   // Tree | null per slot
+let stumps      = [];   // charred/fallen stump records
+let lightArr    = [];   // Float32Array of light levels
+let frameCount  = 0;    // simulation frames
+let animFrame   = 0;    // render frames (for visual animations)
+let history     = [];
+const MAX_HIST  = 300;
+
+// New state
+let windParticles = [];
+let raindrops     = [];
+let fallingTrees  = [];
+let activeFires   = new Map();  // slot → {age, burnTime}
+let seedBank      = [];         // {slot, genes, seedSize, age}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
@@ -189,10 +205,11 @@ class Tree {
   constructor(slot, genes = null) {
     this.slot   = slot;
     this.x      = (slot + 0.5) * CFG.slotW;
-    this.curH   = 4;                   // current pixel height, grows toward target
+    this.curH   = 4;
     this.energy = CFG.seedEnergy;
     this.age    = 0;
     this.dead   = false;
+    this.windToppled = false;
 
     this.genes = genes ?? {
       h: rnd(...CFG.hRange),
@@ -201,7 +218,6 @@ class Tree {
       d: rnd(...CFG.dRange),
     };
 
-    // Pre-compute stable bump positions for deciduous canopy (avoids per-frame flicker)
     this.bumps = Array.from({length: 5}, () => ({
       dx:  (Math.random() - 0.5) * 1.5,
       dy: -(Math.random() * 0.85 + 0.1),
@@ -209,25 +225,16 @@ class Tree {
     }));
   }
 
-  // ── Derived properties ────────────────────────────────────────────────────
   get targetH()    { return this.genes.h * maxTreeH; }
   get shapeRatio() { return this.genes.h / (this.genes.g + 0.1); }
-
-  // Conifer: narrow trunk. Deciduous: wide trunk.
   get trunkHW() {
     return this.shapeRatio > 2.0
       ? Math.max(1.5, this.genes.g * 4)
       : Math.max(3,   this.genes.g * 11);
   }
-
-  // Horizontal canopy radius
   get canopyRX() { return this.genes.g * 26 + 10; }
-
-  // Vertical canopy radius — capped so tall trees don't go off-screen
   get canopyRY() { return Math.min(48, this.curH * 0.17 + 5); }
 
-  // Canopy colours driven by seed strategy
-  // s=0 → deep forest green; s=1 → bright spring green
   colors() {
     const s = this.genes.s;
     const r = Math.round(18  + s * 58);
@@ -240,40 +247,38 @@ class Tree {
     };
   }
 
-  // ── Simulation step ───────────────────────────────────────────────────────
   update(light) {
     this.age++;
     if (this.age > CFG.maxAge) { this.dead = true; return []; }
 
-    // Photosynthesis
     this.energy += light * CFG.rainfall * CFG.photoBase;
 
-    // Maintenance (taller + thicker = more expensive)
     const hFrac = this.curH / maxTreeH;
     this.energy -= hFrac * CFG.maintH + this.genes.g * CFG.maintG + CFG.maintBase;
     if (this.energy <= 0) { this.dead = true; return []; }
 
-    // Wind topple — tall thin trees most vulnerable
+    // Wind topple — tall thin trees most vulnerable; sets windToppled flag for animation
     const vuln = (this.curH / maxTreeH) / (this.genes.g + 0.2);
-    if (Math.random() < CFG.windStr * vuln * 0.0025) { this.dead = true; return []; }
+    if (Math.random() < CFG.windStr * vuln * 0.0025) {
+      this.dead = true;
+      this.windToppled = true;
+      return [];
+    }
 
-    // Grow toward genetic target height
     if (this.curH < this.targetH) {
       const grow = Math.min(0.9, this.energy * 0.06);
       this.curH   += grow;
       this.energy -= grow * 0.35;
     }
 
-    // Reproduce when energy is sufficient
     if (this.energy >= CFG.reproThr) return this.disperse();
     return [];
   }
 
-  // Scatter seeds; count and size trade off via seedStrategy gene
   disperse() {
     this.energy -= CFG.reproCost;
     const count    = Math.round(1 + this.genes.s * 9 + Math.random() * 2);
-    const seedSize = 1 - this.genes.s * 0.75; // big seeds (s≈0) survive shade better
+    const seedSize = 1 - this.genes.s * 0.75;
     const seeds    = [];
     for (let i = 0; i < count; i++) {
       const bias   = CFG.windDir * CFG.windStr * this.genes.d * 0.4;
@@ -283,54 +288,41 @@ class Tree {
     return seeds;
   }
 
-  // ── Rendering ─────────────────────────────────────────────────────────────
   draw() {
     const c = this.colors();
-    if (this.shapeRatio > 2.0) {
-      this._drawConifer(c);
-    } else {
-      this._drawDeciduous(c);
-    }
+    if (this.shapeRatio > 2.0) this._drawConifer(c);
+    else                        this._drawDeciduous(c);
   }
 
-  // Tall/thin: layered triangle silhouette (pine/spruce style)
   _drawConifer(c) {
     const x    = this.x;
     const topY = groundY - this.curH;
     const tw   = this.trunkHW;
 
-    // Trunk
     ctx.fillStyle = '#3e1e08';
     ctx.fillRect(x - tw, topY + this.curH * 0.10, tw * 2, this.curH * 0.90);
 
-    // Three overlapping triangular layers, top to bottom
-    const maxHW   = this.genes.g * 15 + 8;
-    const secH    = this.curH * 0.38;
-    const stepY   = this.curH * 0.28;
-    const cols    = [c.light, c.mid, c.dark];
-
+    const maxHW = this.genes.g * 15 + 8;
+    const secH  = this.curH * 0.38;
+    const stepY = this.curH * 0.28;
+    const cols  = [c.light, c.mid, c.dark];
     for (let i = 0; i < 3; i++) {
       const ly = topY + i * stepY;
       const hw = maxHW * ((i + 1) / 3);
       ctx.fillStyle = cols[i];
       ctx.beginPath();
-      ctx.moveTo(x,      ly);
-      ctx.lineTo(x + hw, ly + secH);
-      ctx.lineTo(x - hw, ly + secH);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(x, ly); ctx.lineTo(x + hw, ly + secH); ctx.lineTo(x - hw, ly + secH);
+      ctx.closePath(); ctx.fill();
     }
   }
 
-  // Short/wide: rounded dome with leaf-bump texture (oak/maple style)
   _drawDeciduous(c) {
     const x   = this.x;
     const crx = this.canopyRX;
     const cry = this.canopyRY;
-    const cy  = groundY - this.curH;      // canopy centre Y
+    const cy  = groundY - this.curH;
     const tw  = this.trunkHW;
 
-    // Trunk — from canopy centre down to ground
     const tGrad = ctx.createLinearGradient(x - tw, 0, x + tw, 0);
     const tMid  = `rgb(${68+Math.round(this.genes.g*28)},${40+Math.round(this.genes.g*14)},10)`;
     tGrad.addColorStop(0,   '#2a1406');
@@ -340,20 +332,18 @@ class Tree {
     ctx.fillStyle = tGrad;
     ctx.fillRect(x - tw, cy + cry * 0.5, tw * 2, groundY - cy - cry * 0.5);
 
-    // Main canopy ellipse with radial gradient
     const grad = ctx.createRadialGradient(
       x - crx * 0.2, cy - cry * 0.25, crx * 0.04,
       x,             cy + cry * 0.15, crx
     );
-    grad.addColorStop(0,   c.light);
+    grad.addColorStop(0,    c.light);
     grad.addColorStop(0.55, c.mid);
-    grad.addColorStop(1,   c.dark);
+    grad.addColorStop(1,    c.dark);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.ellipse(x, cy, crx, cry, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pre-computed bump clusters (stable, no flicker)
     for (const b of this.bumps) {
       ctx.fillStyle = b.dy < -0.5 ? c.light : c.mid;
       ctx.beginPath();
@@ -361,7 +351,6 @@ class Tree {
       ctx.fill();
     }
 
-    // Subtle specular highlight
     ctx.fillStyle = 'rgba(255,255,255,0.055)';
     ctx.beginPath();
     ctx.ellipse(x - crx * 0.18, cy - cry * 0.30, crx * 0.44, cry * 0.30, -0.2, 0, Math.PI * 2);
@@ -369,9 +358,97 @@ class Tree {
   }
 }
 
-// ─── LIGHT COMPUTATION ───────────────────────────────────────────────────────
-// Each tree casts a shadow onto adjacent slots proportional to its height.
-// The shadow system is made visible by darkening the ground beneath dense canopy.
+// ─── FALLING TREE (visual animation) ─────────────────────────────────────────
+class FallingTree {
+  constructor(tree) {
+    this.x    = tree.x;
+    this.gY   = groundY;
+    this.curH = tree.curH;
+    this.genes = { ...tree.genes };
+    this.bumps = tree.bumps;
+    this._c   = tree.colors();
+    this.sr   = tree.shapeRatio;
+    this.trW  = tree.trunkHW;
+    this.crx  = tree.canopyRX;
+    this.cry  = tree.canopyRY;
+    this.angle      = 0;
+    this.fallDir    = CFG.windDir >= 0 ? 1 : -1;
+    this.done       = false;
+    this._stumpMade = false;
+  }
+
+  update() {
+    this.angle += Math.PI / 2 / 40;  // 40 render frames to fall
+    if (this.angle >= Math.PI / 2) {
+      this.angle = Math.PI / 2;
+      if (!this._stumpMade) {
+        this._stumpMade = true;
+        stumps.push({
+          x:      this.x + this.fallDir * this.curH * 0.3,
+          w:      this.trW * 2 + 2,
+          h:      Math.min(this.curH * 0.12, 18),
+          age:    0,
+          maxAge: 2000 + Math.random() * 1000,
+        });
+      }
+      this.done = true;
+    }
+  }
+
+  draw() {
+    const c    = this._c;
+    const curH = this.curH;
+    ctx.save();
+    ctx.translate(this.x, this.gY);
+    ctx.rotate(this.fallDir * this.angle);
+
+    if (this.sr > 2.0) {
+      // Conifer in local space (base at 0,0, top at 0,-curH)
+      ctx.fillStyle = '#3e1e08';
+      ctx.fillRect(-this.trW, -curH * 0.9, this.trW * 2, curH * 0.9);
+      const maxHW = this.genes.g * 15 + 8;
+      const secH  = curH * 0.38;
+      const stepY = curH * 0.28;
+      const cols  = [c.light, c.mid, c.dark];
+      for (let i = 0; i < 3; i++) {
+        const ly = -curH + i * stepY;
+        const hw = maxHW * ((i + 1) / 3);
+        ctx.fillStyle = cols[i];
+        ctx.beginPath();
+        ctx.moveTo(0, ly); ctx.lineTo(hw, ly + secH); ctx.lineTo(-hw, ly + secH);
+        ctx.closePath(); ctx.fill();
+      }
+    } else {
+      // Deciduous in local space
+      const crx = this.crx, cry = this.cry, tw = this.trW;
+      ctx.fillStyle = '#3e1e08';
+      ctx.fillRect(-tw, -(curH - cry * 0.5), tw * 2, curH - cry * 0.5);
+
+      const grad = ctx.createRadialGradient(
+        -crx * 0.2, -curH - cry * 0.25, crx * 0.04,
+        0,          -curH + cry * 0.15, crx
+      );
+      grad.addColorStop(0,    c.light);
+      grad.addColorStop(0.55, c.mid);
+      grad.addColorStop(1,    c.dark);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(0, -curH, crx, cry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (const b of this.bumps) {
+        ctx.fillStyle = b.dy < -0.5 ? c.light : c.mid;
+        ctx.beginPath();
+        ctx.arc(b.dx * crx * 0.52, -curH + b.dy * cry, cry * b.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+// ─── LIGHT ───────────────────────────────────────────────────────────────────
 function computeLight() {
   const light = new Float32Array(numSlots).fill(1.0);
   for (let j = 0; j < numSlots; j++) {
@@ -391,35 +468,33 @@ function computeLight() {
 }
 
 // ─── FIRE ────────────────────────────────────────────────────────────────────
+function igniteSlot(slot) {
+  if (activeFires.has(slot)) return;
+  const t = slots[slot];
+  if (!t) return;
+  const survive = t.genes.g * t.genes.g * 0.35;  // thick bark resists
+  if (Math.random() < survive) return;
+  activeFires.set(slot, { age: 0, burnTime: 70 + t.genes.g * 80 + Math.random() * 40 });
+}
+
 function triggerFire() {
   const cx  = (Math.random() * numSlots) | 0;
-  const rad = 4 + ((Math.random() * 9) | 0);
+  const rad = 2 + ((Math.random() * 4) | 0);
   for (let i = cx - rad; i <= cx + rad; i++) {
-    if (i < 0 || i >= numSlots || !slots[i]) continue;
-    const t       = slots[i];
-    const survive = t.genes.g * t.genes.g * 0.35;  // thick bark resists fire
-    if (Math.random() > survive) {
-      stumps.push({
-        x:      t.x,
-        w:      t.trunkHW * 2 + 2,
-        h:      Math.min(t.curH * 0.22, 28),
-        age:    0,
-        maxAge: 2500 + Math.random() * 1200,
-      });
-      slots[i].dead = true;
-    }
+    if (i >= 0 && i < numSlots && slots[i]) igniteSlot(i);
   }
 }
 
 // ─── SEED PLANTING ───────────────────────────────────────────────────────────
 function plantSeed(slot, genes, seedSize) {
-  if (slot < 0 || slot >= numSlots || slots[slot]) return;
+  if (slot < 0 || slot >= numSlots || slots[slot]) return false;
   const light     = lightArr[slot] ?? 1.0;
-  // Large seeds (s≈0, seedSize≈1) can germinate in shade; small seeds need sun
   const shadeFact = light < 0.4 ? (seedSize * light / 0.4) : 1.0;
   if (Math.random() < 0.28 * shadeFact) {
     slots[slot] = new Tree(slot, genes);
+    return true;
   }
+  return false;
 }
 
 // ─── SIMULATE ────────────────────────────────────────────────────────────────
@@ -429,39 +504,198 @@ function simulate() {
 
   lightArr = computeLight();
 
-  // Fire events
+  // Random fire events
   if (CFG.fireRate > 0 && Math.random() < CFG.fireRate * 0.0015) triggerFire();
 
-  // Age stumps, remove old ones
+  // Process active fires: spread, age, and eventually kill trees
+  for (const [slot, fire] of activeFires) {
+    fire.age++;
+
+    // Spread to adjacent slots every 25 frames
+    if (fire.age % 25 === 0) {
+      for (const di of [-1, 1]) {
+        const ns = slot + di;
+        if (ns >= 0 && ns < numSlots && slots[ns] && !activeFires.has(ns)) {
+          if (Math.random() < 0.65) igniteSlot(ns);
+        }
+      }
+    }
+
+    // Kill tree when fully burned
+    if (fire.age >= fire.burnTime) {
+      const t = slots[slot];
+      if (t) {
+        stumps.push({
+          x: t.x, w: t.trunkHW * 2 + 2,
+          h: Math.min(t.curH * 0.22, 28),
+          age: 0, maxAge: 2500 + Math.random() * 1200,
+        });
+        slots[slot] = null;
+      }
+      activeFires.delete(slot);
+    }
+  }
+
+  // Age stumps
   for (let i = stumps.length - 1; i >= 0; i--) {
     stumps[i].age++;
     if (stumps[i].age > stumps[i].maxAge) stumps.splice(i, 1);
   }
 
-  // Update each tree
+  // Update trees (skip burning ones)
   const pending = [];
   for (let i = 0; i < numSlots; i++) {
-    if (!slots[i]) continue;
+    if (!slots[i] || activeFires.has(i)) continue;
     const seeds = slots[i].update(lightArr[i]);
-    if (slots[i].dead) { slots[i] = null; continue; }
+    if (slots[i].dead) {
+      if (slots[i].windToppled) {
+        fallingTrees.push(new FallingTree(slots[i]));
+      }
+      slots[i] = null;
+      continue;
+    }
     for (const s of seeds) pending.push(s);
   }
 
-  // Shuffle pending seeds to avoid positional bias
+  // Shuffle seeds to avoid positional bias
   for (let i = pending.length - 1; i > 0; i--) {
     const j = (Math.random() * (i + 1)) | 0;
     [pending[i], pending[j]] = [pending[j], pending[i]];
   }
 
-  for (const s of pending) plantSeed(s.slot, s.genes, s.seedSize);
+  // Add seeds to bank (not planted immediately — they decay over time)
+  for (const s of pending) {
+    if (s.slot >= 0 && s.slot < numSlots && seedBank.length < MAX_SEED_BANK) {
+      seedBank.push({ slot: s.slot, genes: s.genes, seedSize: s.seedSize, age: 0 });
+    }
+  }
+
+  // Process seed bank: age seeds, attempt germination, remove dead seeds
+  for (let i = seedBank.length - 1; i >= 0; i--) {
+    const seed = seedBank[i];
+    seed.age++;
+    const viability = Math.exp(-seed.age / SEED_HALFLIFE);
+    if (viability < SEED_MIN_VIA) { seedBank.splice(i, 1); continue; }
+    if (Math.random() < viability * 0.003) {
+      if (plantSeed(seed.slot, seed.genes, seed.seedSize)) {
+        seedBank.splice(i, 1);
+      }
+    }
+  }
 
   frameCount++;
 }
 
-// ─── DRAW ────────────────────────────────────────────────────────────────────
+// ─── VISUAL: WIND PARTICLES ──────────────────────────────────────────────────
+function initWindParticles() {
+  windParticles = Array.from({ length: 35 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * groundY * 0.80 + 10,
+  }));
+}
+
+function drawWindParticles() {
+  if (CFG.windStr < 0.05) return;
+  const absDir = Math.abs(CFG.windDir);
+  if (absDir < 0.05) return;
+
+  const W    = canvas.width;
+  const dir  = CFG.windDir > 0 ? 1 : -1;
+  const spd  = absDir * CFG.windStr * 4.5 + 0.4;
+  const size = 8 + CFG.windStr * 24;
+  const op   = (0.12 + CFG.windStr * 0.5).toFixed(2);
+  const lw   = 0.7 + CFG.windStr * 1.6;
+
+  ctx.strokeStyle = `rgba(210,235,255,${op})`;
+  ctx.lineWidth   = lw;
+
+  for (const p of windParticles) {
+    p.x += dir * spd;
+    if (p.x > W + 50) p.x = -50;
+    if (p.x < -50)    p.x = W + 50;
+
+    const x0 = p.x - dir * size * 0.5;
+    const x1 = p.x + dir * size * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x0, p.y);
+    ctx.lineTo(x1, p.y);
+    ctx.lineTo(x1 - dir * 7, p.y - 4);
+    ctx.moveTo(x1, p.y);
+    ctx.lineTo(x1 - dir * 7, p.y + 4);
+    ctx.stroke();
+  }
+}
+
+// ─── VISUAL: RAIN ────────────────────────────────────────────────────────────
+function drawRain(W, H) {
+  if (CFG.rainfall < 0.05) return;
+
+  const target = Math.floor(CFG.rainfall * 180);
+  while (raindrops.length < target)
+    raindrops.push({ x: Math.random() * W, y: Math.random() * H,
+                     len: 8 + Math.random() * 8, spd: 6 + Math.random() * 4 });
+  while (raindrops.length > target) raindrops.pop();
+
+  const drift = CFG.windDir * CFG.windStr * 0.45;
+  const alpha = (0.15 + CFG.rainfall * 0.25).toFixed(2);
+
+  ctx.strokeStyle = `rgba(180,215,255,${alpha})`;
+  ctx.lineWidth   = 0.8;
+  ctx.beginPath();
+  for (const d of raindrops) {
+    d.y += d.spd;
+    d.x += drift * d.spd * 0.5;
+    if (d.y > H) { d.y = -10; d.x = Math.random() * W; }
+    if (d.x > W + 10) d.x = -10;
+    if (d.x < -10)    d.x = W + 10;
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(d.x + drift * d.len, d.y + d.len);
+  }
+  ctx.stroke();
+}
+
+// ─── VISUAL: FLAMES ──────────────────────────────────────────────────────────
+function drawFlames(slot) {
+  const fire = activeFires.get(slot);
+  if (!fire) return;
+
+  const x = (slot + 0.5) * CFG.slotW;
+  const t = slots[slot];
+  const h = (t ? t.curH : 30) * 0.65;
+
+  const progress  = fire.age / fire.burnTime;
+  const intensity = Math.min(1, progress < 0.6 ? progress / 0.6 : (1 - progress) / 0.4);
+
+  for (let i = 0; i < 4; i++) {
+    const phase = animFrame * 0.11 + i * 1.5;
+    const offX  = Math.sin(phase) * 5;
+    const flH   = h * (0.35 + 0.2 * Math.sin(phase * 0.7)) * intensity;
+    if (flH < 2) continue;
+
+    const grad = ctx.createLinearGradient(x + offX, groundY, x + offX, groundY - flH);
+    grad.addColorStop(0,   'rgba(255,55,0,0.88)');
+    grad.addColorStop(0.4, 'rgba(255,155,0,0.65)');
+    grad.addColorStop(1,   'rgba(255,255,80,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x + offX - 5, groundY);
+    ctx.quadraticCurveTo(x + offX + 4, groundY - flH * 0.5, x + offX, groundY - flH);
+    ctx.quadraticCurveTo(x + offX - 4, groundY - flH * 0.5, x + offX + 5, groundY);
+    ctx.fill();
+  }
+
+  // Orange ambient glow
+  const gr = h * 0.8;
+  const glow = ctx.createRadialGradient(x, groundY - h * 0.25, 0, x, groundY - h * 0.25, gr);
+  glow.addColorStop(0, `rgba(255,110,0,${(0.14 * intensity).toFixed(2)})`);
+  glow.addColorStop(1, 'rgba(255,50,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - gr, groundY - h, gr * 2, h);
+}
+
+// ─── DRAW FRAME ──────────────────────────────────────────────────────────────
 function drawFrame() {
-  const W = canvas.width;
-  const H = canvas.height;
+  const W = canvas.width, H = canvas.height;
 
   // Sky gradient
   const sky = ctx.createLinearGradient(0, 0, 0, groundY);
@@ -471,20 +705,26 @@ function drawFrame() {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, groundY);
 
+  // Wind arrow particles (in sky, behind hills)
+  drawWindParticles();
+
   // Distant hills silhouette
   ctx.fillStyle = 'rgba(42, 88, 42, 0.38)';
   ctx.beginPath();
   ctx.moveTo(0, groundY);
   for (let x = 0; x <= W; x += 5) {
-    const h = 34 * Math.sin(x * 0.007) + 20 * Math.sin(x * 0.013 + 1.4)
-            + 16 * Math.sin(x * 0.004 + 2.9);
-    ctx.lineTo(x, groundY - 44 + h);
+    const hv = 34 * Math.sin(x * 0.007) + 20 * Math.sin(x * 0.013 + 1.4)
+             + 16 * Math.sin(x * 0.004 + 2.9);
+    ctx.lineTo(x, groundY - 44 + hv);
   }
   ctx.lineTo(W, groundY);
   ctx.closePath();
   ctx.fill();
 
-  // Shadow stripes on ground — makes the light system visible
+  // Rain (in front of hills)
+  drawRain(W, H);
+
+  // Shadow stripes on ground — light system visible
   for (let i = 0; i < numSlots; i++) {
     const shade = 1 - (lightArr[i] ?? 1);
     if (shade > 0.04) {
@@ -504,11 +744,10 @@ function drawFrame() {
 
   // Charred stumps
   for (const s of stumps) {
-    const op = (1 - s.age / s.maxAge);
-    ctx.fillStyle = `rgba(22, 10, 4, ${(op * 0.92).toFixed(3)})`;
+    const op = 1 - s.age / s.maxAge;
+    ctx.fillStyle = `rgba(22,10,4,${(op * 0.92).toFixed(3)})`;
     ctx.fillRect(s.x - s.w / 2, groundY - s.h, s.w, s.h);
-    // Charring texture lines
-    ctx.fillStyle = `rgba(0, 0, 0, ${(op * 0.45).toFixed(3)})`;
+    ctx.fillStyle = `rgba(0,0,0,${(op * 0.45).toFixed(3)})`;
     ctx.fillRect(s.x - s.w / 2 + 1, groundY - s.h + 2, 1, s.h - 2);
     ctx.fillRect(s.x + s.w / 2 - 2, groundY - s.h + 3, 1, s.h - 3);
   }
@@ -524,56 +763,41 @@ function drawFrame() {
     ctx.fill();
   }
 
-  // Trees
+  // Falling trees (visual animation)
+  for (let i = fallingTrees.length - 1; i >= 0; i--) {
+    fallingTrees[i].update();
+    fallingTrees[i].draw();
+    if (fallingTrees[i].done) fallingTrees.splice(i, 1);
+  }
+
+  // Standing trees
   for (let i = 0; i < numSlots; i++) {
     if (slots[i]) slots[i].draw();
   }
 
-  // Wind indicator
-  drawWind(W);
-}
-
-function drawWind(W) {
-  const x0 = W - 75, y0 = 26;
-  ctx.font         = '11px Segoe UI, sans-serif';
-  ctx.fillStyle    = 'rgba(220,240,220,0.55)';
-  ctx.textAlign    = 'right';
-  ctx.fillText('wind', x0 - 6, y0 + 4);
-  ctx.textAlign    = 'left';
-
-  const arrowLen = CFG.windStr * 38;
-  const dx       = CFG.windDir * arrowLen;
-  if (Math.abs(dx) < 2) {
-    ctx.fillStyle = 'rgba(220,240,220,0.4)';
-    ctx.fillText('calm', x0, y0 + 4);
-    return;
+  // Flames over burning trees
+  for (const slot of activeFires.keys()) {
+    drawFlames(slot);
   }
-  const ex  = x0 + dx;
-  const dir = dx > 0 ? 1 : -1;
-  ctx.strokeStyle = 'rgba(220,240,220,0.55)';
-  ctx.lineWidth   = 1.8;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0); ctx.lineTo(ex, y0);
-  ctx.lineTo(ex - dir * 8, y0 - 5);
-  ctx.moveTo(ex, y0);
-  ctx.lineTo(ex - dir * 8, y0 + 5);
-  ctx.stroke();
 }
 
 // ─── STATS ───────────────────────────────────────────────────────────────────
 function updateStats() {
   const live = slots.filter(Boolean);
-  if (!live.length) return;
-  const n = live.length;
+  const n    = live.length;
+
+  document.getElementById('s-pop').textContent   = n;
+  document.getElementById('s-seeds').textContent = seedBank.length;
+  document.getElementById('s-time').textContent  = frameCount;
+
+  if (!n) return;
   let sh = 0, sg = 0, ss = 0, sd = 0;
   for (const t of live) { sh += t.genes.h; sg += t.genes.g; ss += t.genes.s; sd += t.genes.d; }
 
-  document.getElementById('s-pop').textContent  = n;
-  document.getElementById('s-time').textContent = frameCount;
-  document.getElementById('s-h').textContent    = (sh/n).toFixed(2);
-  document.getElementById('s-g').textContent    = (sg/n).toFixed(2);
-  document.getElementById('s-s').textContent    = (ss/n).toFixed(2);
-  document.getElementById('s-d').textContent    = (sd/n).toFixed(1);
+  document.getElementById('s-h').textContent = (sh/n).toFixed(2);
+  document.getElementById('s-g').textContent = (sg/n).toFixed(2);
+  document.getElementById('s-s').textContent = (ss/n).toFixed(2);
+  document.getElementById('s-d').textContent = (sd/n).toFixed(1);
 
   history.push({
     pop: n / numSlots,
@@ -587,9 +811,9 @@ function updateStats() {
 }
 
 function drawGraph() {
-  const gc  = document.getElementById('graph');
-  const gx  = gc.getContext('2d');
-  const W   = gc.width, H = gc.height;
+  const gc = document.getElementById('graph');
+  const gx = gc.getContext('2d');
+  const W  = gc.width, H = gc.height;
   gx.clearRect(0, 0, W, H);
   gx.fillStyle = 'rgba(0,0,0,0.38)';
   gx.fillRect(0, 0, W, H);
@@ -597,11 +821,11 @@ function drawGraph() {
 
   const vis   = history.slice(-150);
   const lines = [
-    { key:'h',   max:1, color:'#6dbf4a', lw:1.5 },
-    { key:'g',   max:1, color:'#a07850', lw:1.5 },
-    { key:'s',   max:1, color:'#e8d060', lw:1.5 },
-    { key:'d',   max:1, color:'#80c8e0', lw:1   },
-    { key:'pop', max:1, color:'#ffffff', lw:1   },
+    { key:'h',   color:'#6dbf4a', lw:1.5 },
+    { key:'g',   color:'#a07850', lw:1.5 },
+    { key:'s',   color:'#e8d060', lw:1.5 },
+    { key:'d',   color:'#80c8e0', lw:1   },
+    { key:'pop', color:'#ffffff', lw:1   },
   ];
   for (const l of lines) {
     gx.strokeStyle = l.color;
@@ -609,7 +833,7 @@ function drawGraph() {
     gx.beginPath();
     for (let i = 0; i < vis.length; i++) {
       const x = (i / (vis.length - 1)) * W;
-      const y = H - (vis[i][l.key] / l.max) * H;
+      const y = H - vis[i][l.key] * H;
       i === 0 ? gx.moveTo(x, y) : gx.lineTo(x, y);
     }
     gx.stroke();
@@ -623,12 +847,12 @@ function loop() {
     if (frameCount % 60 === 0) updateStats();
   }
   drawFrame();
+  animFrame++;
   requestAnimationFrame(loop);
 }
 
-// ─── UI INIT ─────────────────────────────────────────────────────────────────
+// ─── UI ──────────────────────────────────────────────────────────────────────
 function initUI() {
-  // Collapsible panel
   const uiEl = document.getElementById('ui');
   document.getElementById('tog').addEventListener('click', () => {
     uiEl.classList.toggle('collapsed');
@@ -636,7 +860,6 @@ function initUI() {
       uiEl.classList.contains('collapsed') ? '▼' : '▲';
   });
 
-  // Bind a slider to a CFG key; fmt converts the string value
   const bind = (sliderId, cfgKey, dispId, fmt) => {
     document.getElementById(sliderId).addEventListener('input', e => {
       CFG[cfgKey] = fmt(e.target.value);
@@ -650,6 +873,8 @@ function initUI() {
   bind('sl-fire',  'fireRate', 'd-fire',  parseFloat);
   bind('sl-mut',   'mutRate',  'd-mut',   parseFloat);
   bind('sl-speed', 'simSpeed', 'd-speed', parseInt);
+
+  document.getElementById('btn-reset').addEventListener('click', resetSim);
 }
 
 // ─── RESIZE ──────────────────────────────────────────────────────────────────
@@ -661,6 +886,32 @@ function resize() {
   numSlots = Math.floor(canvas.width / CFG.slotW);
 }
 
+function initParticles() {
+  windParticles = Array.from({ length: 35 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * groundY * 0.80 + 10,
+  }));
+  raindrops = [];
+}
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+function resetSim() {
+  slots        = new Array(numSlots).fill(null);
+  lightArr     = new Float32Array(numSlots).fill(1.0);
+  stumps       = [];
+  fallingTrees = [];
+  activeFires  = new Map();
+  seedBank     = [];
+  history      = [];
+  frameCount   = 0;
+  animFrame    = 0;
+  initParticles();
+  for (let i = 0; i < 25; i++) {
+    const slot = (Math.random() * numSlots) | 0;
+    if (!slots[slot]) slots[slot] = new Tree(slot);
+  }
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
 function init() {
   resize();
@@ -668,18 +919,19 @@ function init() {
     resize();
     while (slots.length < numSlots) slots.push(null);
     slots.length = numSlots;
-    lightArr     = new Float32Array(numSlots).fill(1.0);
+    lightArr = new Float32Array(numSlots).fill(1.0);
+    initParticles();
   });
 
   slots    = new Array(numSlots).fill(null);
   lightArr = new Float32Array(numSlots).fill(1.0);
 
-  // Start sparse — watch the forest fill in and competition emerge
   for (let i = 0; i < 25; i++) {
     const slot = (Math.random() * numSlots) | 0;
     if (!slots[slot]) slots[slot] = new Tree(slot);
   }
 
+  initParticles();
   initUI();
   loop();
 }
