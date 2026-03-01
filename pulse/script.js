@@ -293,7 +293,7 @@ function initTeacherMode() {
     updateRevealBtn();
 
     if (!qrGenerated) {
-        const url = `https://samsmasm.github.io/pulse/#${currentRoom.toLowerCase()}`;
+        const url = `https://unisam.nz/pulse/#${currentRoom.toLowerCase()}`;
         document.getElementById('qr-url-text').textContent = url;
         new QRCode(document.getElementById('qrcode'), { text: url, width: 300, height: 300 });
         qrGenerated = true;
