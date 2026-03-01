@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forest Evolution</title>
+  <link rel="icon" type="image/png" href="/unisamicon2.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { overflow: hidden; background: #0a2010; font-family: 'Segoe UI', sans-serif; color: #ddd; }
+    canvas { display: block; }
+
+    #ui {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(5, 20, 5, 0.84);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(100, 200, 80, 0.25);
+      border-radius: 10px;
+      padding: 14px;
+      width: 288px;
+      max-height: 92vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #3a6a2a #0a2010;
+    }
+    #ui.collapsed { max-height: 44px; overflow: hidden; }
+    #ui::-webkit-scrollbar { width: 5px; }
+    #ui::-webkit-scrollbar-track { background: #0a2010; }
+    #ui::-webkit-scrollbar-thumb { background: #3a6a2a; border-radius: 3px; }
+
+    .row  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    h2    { font-size: 14px; font-weight: bold; color: #7ec850; }
+    .back { font-size: 11px; color: #7ec850; text-decoration: none; border: 1px solid #3a6a2a;
+            border-radius: 5px; padding: 2px 8px; margin-right: 6px; }
+    .back:hover { background: #1a4a1a; }
+    .tog  { background: none; border: 1px solid #3a6a2a; color: #aaa; border-radius: 4px;
+            cursor: pointer; padding: 2px 8px; font-size: 12px; }
+    .tog:hover { background: #1a4a1a; }
+
+    .sec  { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em;
+            color: #7ec850; border-bottom: 1px solid rgba(126,200,80,0.2);
+            padding-bottom: 3px; margin: 10px 0 6px; }
+    .stat { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
+    .val  { font-family: monospace; font-weight: bold; color: #b0e880; }
+
+    .ctrl       { margin: 7px 0; }
+    .ctrl label { font-size: 11px; color: #ccc; display: flex; justify-content: space-between; margin-bottom: 3px; }
+    input[type=range] { width: 100%; accent-color: #7ec850; cursor: pointer; }
+
+    #graph { border: 1px solid rgba(126,200,80,0.2); border-radius: 4px; margin-top: 8px; display: block; }
+    .legend { display: flex; flex-wrap: wrap; gap: 5px; font-size: 9px; margin-top: 4px; }
+    .leg  { display: flex; align-items: center; gap: 3px; }
+    .leg-line { width: 10px; height: 2px; border-radius: 1px; display: inline-block; }
+
+    .trait-key {
+      font-size: 9px; color: #888; margin-top: 8px; line-height: 1.6;
+      border-top: 1px solid rgba(126,200,80,0.15); padding-top: 6px;
+    }
+    .trait-key span { color: #aaa; }
+  </style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div class="row">
+    <div style="display:flex;align-items:center">
+      <a class="back" href="/">← Home</a>
+      <h2>🌲 Forest Evolution</h2>
+    </div>
+    <button class="tog" id="tog">▲</button>
+  </div>
+
+  <div id="content">
+    <div class="sec">World</div>
+    <div class="stat">Trees: <span class="val" id="s-pop">0</span></div>
+    <div class="stat">Time:  <span class="val" id="s-time">0</span></div>
+
+    <div class="sec">Avg Traits</div>
+    <div class="stat" style="color:#6dbf4a">Height:               <span class="val" id="s-h">—</span></div>
+    <div class="stat" style="color:#a07850">Girth:                <span class="val" id="s-g">—</span></div>
+    <div class="stat" style="color:#e8d060">Seed (0=big, 1=many): <span class="val" id="s-s">—</span></div>
+    <div class="stat" style="color:#80c8e0">Dispersal (slots):    <span class="val" id="s-d">—</span></div>
+
+    <canvas id="graph" width="260" height="90"></canvas>
+    <div class="legend">
+      <span class="leg"><span class="leg-line" style="background:#6dbf4a"></span>Height</span>
+      <span class="leg"><span class="leg-line" style="background:#a07850"></span>Girth</span>
+      <span class="leg"><span class="leg-line" style="background:#e8d060"></span>Seed</span>
+      <span class="leg"><span class="leg-line" style="background:#80c8e0"></span>Disp.</span>
+      <span class="leg"><span class="leg-line" style="background:#fff"></span>Pop</span>
+    </div>
+
+    <div class="trait-key">
+      <span>Shape:</span> tall+thin = conifer · short+wide = deciduous<br>
+      <span>Colour:</span> deep green = few big seeds · bright green = many small seeds
+    </div>
+
+    <div class="sec">Climate</div>
+    <div class="ctrl">
+      <label>Rainfall <span class="val" id="d-rain">0.50</span></label>
+      <input type="range" id="sl-rain" min="0" max="1" step="0.05" value="0.5">
+    </div>
+    <div class="ctrl">
+      <label>Wind <span class="val" id="d-wind">0.20</span></label>
+      <input type="range" id="sl-wind" min="0" max="1" step="0.05" value="0.2">
+    </div>
+    <div class="ctrl">
+      <label>Fire Rate <span class="val" id="d-fire">0.00</span></label>
+      <input type="range" id="sl-fire" min="0" max="1" step="0.05" value="0">
+    </div>
+
+    <div class="sec">Simulation</div>
+    <div class="ctrl">
+      <label>Mutation <span class="val" id="d-mut">0.10</span></label>
+      <input type="range" id="sl-mut" min="0" max="1" step="0.05" value="0.1">
+    </div>
+    <div class="ctrl">
+      <label>Speed <span class="val" id="d-speed">1×</span></label>
+      <input type="range" id="sl-speed" min="1" max="20" step="1" value="1">
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const CFG = {
+  slotW:      14,       // px per tree slot
+  groundFrac: 0.76,     // fraction of canvas height where ground sits
+
+  // Climate (modified by sliders)
+  rainfall:   0.5,
+  windStr:    0.2,
+  windDir:    0,        // -1 (left) to +1 (right), drifts over time
+  fireRate:   0.0,
+
+  // Evolution
+  mutRate:    0.1,
+  simSpeed:   1,
+
+  // Energy
+  photoBase:  1.0,      // energy/frame at full light + full rainfall
+  maintH:     0.20,     // energy cost × height fraction per frame
+  maintG:     0.05,     // energy cost × girth per frame
+  maintBase:  0.03,     // fixed baseline cost
+  reproThr:   200,
+  reproCost:  100,
+  seedEnergy: 50,
+  maxAge:     7000,
+
+  // Gene ranges
+  hRange: [0.15, 1.0],
+  gRange: [0.20, 1.0],
+  dRange: [1,    14],   // dispersal in slots
+};
+
+// ─── CANVAS & STATE ───────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+let numSlots = 0;
+let groundY  = 0;
+let maxTreeH = 0;
+let slots    = [];      // Tree | null, one per slot
+let stumps   = [];      // charred stump records
+let lightArr = [];      // Float32Array — light level per slot [0..1]
+let frameCount = 0;
+let history    = [];    // trait average snapshots for graph
+const MAX_HIST = 300;
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+const rnd   = (lo, hi)    => lo + Math.random() * (hi - lo);
+
+function mutate(g) {
+  return {
+    h: clamp(g.h + (Math.random()-0.5) * CFG.mutRate * 0.35, ...CFG.hRange),
+    g: clamp(g.g + (Math.random()-0.5) * CFG.mutRate * 0.35, ...CFG.gRange),
+    s: clamp(g.s + (Math.random()-0.5) * CFG.mutRate * 0.50, 0, 1),
+    d: clamp(g.d + (Math.random()-0.5) * CFG.mutRate * 5,    ...CFG.dRange),
+  };
+}
+
+// ─── TREE ────────────────────────────────────────────────────────────────────
+class Tree {
+  constructor(slot, genes = null) {
+    this.slot   = slot;
+    this.x      = (slot + 0.5) * CFG.slotW;
+    this.curH   = 4;                   // current pixel height, grows toward target
+    this.energy = CFG.seedEnergy;
+    this.age    = 0;
+    this.dead   = false;
+
+    this.genes = genes ?? {
+      h: rnd(...CFG.hRange),
+      g: rnd(...CFG.gRange),
+      s: Math.random(),
+      d: rnd(...CFG.dRange),
+    };
+
+    // Pre-compute stable bump positions for deciduous canopy (avoids per-frame flicker)
+    this.bumps = Array.from({length: 5}, () => ({
+      dx:  (Math.random() - 0.5) * 1.5,
+      dy: -(Math.random() * 0.85 + 0.1),
+      r:    0.22 + Math.random() * 0.16,
+    }));
+  }
+
+  // ── Derived properties ────────────────────────────────────────────────────
+  get targetH()    { return this.genes.h * maxTreeH; }
+  get shapeRatio() { return this.genes.h / (this.genes.g + 0.1); }
+
+  // Conifer: narrow trunk. Deciduous: wide trunk.
+  get trunkHW() {
+    return this.shapeRatio > 2.0
+      ? Math.max(1.5, this.genes.g * 4)
+      : Math.max(3,   this.genes.g * 11);
+  }
+
+  // Horizontal canopy radius
+  get canopyRX() { return this.genes.g * 26 + 10; }
+
+  // Vertical canopy radius — capped so tall trees don't go off-screen
+  get canopyRY() { return Math.min(48, this.curH * 0.17 + 5); }
+
+  // Canopy colours driven by seed strategy
+  // s=0 → deep forest green; s=1 → bright spring green
+  colors() {
+    const s = this.genes.s;
+    const r = Math.round(18  + s * 58);
+    const g = Math.round(80  + s * 80);
+    const b = Math.round(16  + s * 12);
+    return {
+      light: `rgb(${r+44},${g+44},${b+20})`,
+      mid:   `rgb(${r},${g},${b})`,
+      dark:  `rgb(${Math.round(r*0.42)},${Math.round(g*0.42)},${Math.round(b*0.42)})`,
+    };
+  }
+
+  // ── Simulation step ───────────────────────────────────────────────────────
+  update(light) {
+    this.age++;
+    if (this.age > CFG.maxAge) { this.dead = true; return []; }
+
+    // Photosynthesis
+    this.energy += light * CFG.rainfall * CFG.photoBase;
+
+    // Maintenance (taller + thicker = more expensive)
+    const hFrac = this.curH / maxTreeH;
+    this.energy -= hFrac * CFG.maintH + this.genes.g * CFG.maintG + CFG.maintBase;
+    if (this.energy <= 0) { this.dead = true; return []; }
+
+    // Wind topple — tall thin trees most vulnerable
+    const vuln = (this.curH / maxTreeH) / (this.genes.g + 0.2);
+    if (Math.random() < CFG.windStr * vuln * 0.0025) { this.dead = true; return []; }
+
+    // Grow toward genetic target height
+    if (this.curH < this.targetH) {
+      const grow = Math.min(0.9, this.energy * 0.06);
+      this.curH   += grow;
+      this.energy -= grow * 0.35;
+    }
+
+    // Reproduce when energy is sufficient
+    if (this.energy >= CFG.reproThr) return this.disperse();
+    return [];
+  }
+
+  // Scatter seeds; count and size trade off via seedStrategy gene
+  disperse() {
+    this.energy -= CFG.reproCost;
+    const count    = Math.round(1 + this.genes.s * 9 + Math.random() * 2);
+    const seedSize = 1 - this.genes.s * 0.75; // big seeds (s≈0) survive shade better
+    const seeds    = [];
+    for (let i = 0; i < count; i++) {
+      const bias   = CFG.windDir * CFG.windStr * this.genes.d * 0.4;
+      const offset = (Math.random() - 0.5) * 2 * this.genes.d + bias;
+      seeds.push({ slot: Math.round(this.slot + offset), genes: mutate(this.genes), seedSize });
+    }
+    return seeds;
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────
+  draw() {
+    const c = this.colors();
+    if (this.shapeRatio > 2.0) {
+      this._drawConifer(c);
+    } else {
+      this._drawDeciduous(c);
+    }
+  }
+
+  // Tall/thin: layered triangle silhouette (pine/spruce style)
+  _drawConifer(c) {
+    const x    = this.x;
+    const topY = groundY - this.curH;
+    const tw   = this.trunkHW;
+
+    // Trunk
+    ctx.fillStyle = '#3e1e08';
+    ctx.fillRect(x - tw, topY + this.curH * 0.10, tw * 2, this.curH * 0.90);
+
+    // Three overlapping triangular layers, top to bottom
+    const maxHW   = this.genes.g * 15 + 8;
+    const secH    = this.curH * 0.38;
+    const stepY   = this.curH * 0.28;
+    const cols    = [c.light, c.mid, c.dark];
+
+    for (let i = 0; i < 3; i++) {
+      const ly = topY + i * stepY;
+      const hw = maxHW * ((i + 1) / 3);
+      ctx.fillStyle = cols[i];
+      ctx.beginPath();
+      ctx.moveTo(x,      ly);
+      ctx.lineTo(x + hw, ly + secH);
+      ctx.lineTo(x - hw, ly + secH);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // Short/wide: rounded dome with leaf-bump texture (oak/maple style)
+  _drawDeciduous(c) {
+    const x   = this.x;
+    const crx = this.canopyRX;
+    const cry = this.canopyRY;
+    const cy  = groundY - this.curH;      // canopy centre Y
+    const tw  = this.trunkHW;
+
+    // Trunk — from canopy centre down to ground
+    const tGrad = ctx.createLinearGradient(x - tw, 0, x + tw, 0);
+    const tMid  = `rgb(${68+Math.round(this.genes.g*28)},${40+Math.round(this.genes.g*14)},10)`;
+    tGrad.addColorStop(0,   '#2a1406');
+    tGrad.addColorStop(0.4, tMid);
+    tGrad.addColorStop(0.6, tMid);
+    tGrad.addColorStop(1,   '#2a1406');
+    ctx.fillStyle = tGrad;
+    ctx.fillRect(x - tw, cy + cry * 0.5, tw * 2, groundY - cy - cry * 0.5);
+
+    // Main canopy ellipse with radial gradient
+    const grad = ctx.createRadialGradient(
+      x - crx * 0.2, cy - cry * 0.25, crx * 0.04,
+      x,             cy + cry * 0.15, crx
+    );
+    grad.addColorStop(0,   c.light);
+    grad.addColorStop(0.55, c.mid);
+    grad.addColorStop(1,   c.dark);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(x, cy, crx, cry, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pre-computed bump clusters (stable, no flicker)
+    for (const b of this.bumps) {
+      ctx.fillStyle = b.dy < -0.5 ? c.light : c.mid;
+      ctx.beginPath();
+      ctx.arc(x + b.dx * crx * 0.52, cy + b.dy * cry, cry * b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Subtle specular highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.055)';
+    ctx.beginPath();
+    ctx.ellipse(x - crx * 0.18, cy - cry * 0.30, crx * 0.44, cry * 0.30, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ─── LIGHT COMPUTATION ───────────────────────────────────────────────────────
+// Each tree casts a shadow onto adjacent slots proportional to its height.
+// The shadow system is made visible by darkening the ground beneath dense canopy.
+function computeLight() {
+  const light = new Float32Array(numSlots).fill(1.0);
+  for (let j = 0; j < numSlots; j++) {
+    const t = slots[j];
+    if (!t || t.curH < 6) continue;
+    const hFrac = t.curH / maxTreeH;
+    const reach = Math.ceil(t.canopyRX / CFG.slotW);
+    for (let di = -reach; di <= reach; di++) {
+      const i = j + di;
+      if (i < 0 || i >= numSlots || i === j) continue;
+      const distF  = Math.abs(di) / (reach + 0.5);
+      const shadow = hFrac * (1 - distF) * 0.88;
+      if (shadow > 1 - light[i]) light[i] = Math.max(0, 1 - shadow);
+    }
+  }
+  return light;
+}
+
+// ─── FIRE ────────────────────────────────────────────────────────────────────
+function triggerFire() {
+  const cx  = (Math.random() * numSlots) | 0;
+  const rad = 4 + ((Math.random() * 9) | 0);
+  for (let i = cx - rad; i <= cx + rad; i++) {
+    if (i < 0 || i >= numSlots || !slots[i]) continue;
+    const t       = slots[i];
+    const survive = t.genes.g * t.genes.g * 0.35;  // thick bark resists fire
+    if (Math.random() > survive) {
+      stumps.push({
+        x:      t.x,
+        w:      t.trunkHW * 2 + 2,
+        h:      Math.min(t.curH * 0.22, 28),
+        age:    0,
+        maxAge: 2500 + Math.random() * 1200,
+      });
+      slots[i].dead = true;
+    }
+  }
+}
+
+// ─── SEED PLANTING ───────────────────────────────────────────────────────────
+function plantSeed(slot, genes, seedSize) {
+  if (slot < 0 || slot >= numSlots || slots[slot]) return;
+  const light     = lightArr[slot] ?? 1.0;
+  // Large seeds (s≈0, seedSize≈1) can germinate in shade; small seeds need sun
+  const shadeFact = light < 0.4 ? (seedSize * light / 0.4) : 1.0;
+  if (Math.random() < 0.28 * shadeFact) {
+    slots[slot] = new Tree(slot, genes);
+  }
+}
+
+// ─── SIMULATE ────────────────────────────────────────────────────────────────
+function simulate() {
+  // Wind direction drifts slowly
+  CFG.windDir = clamp(CFG.windDir + (Math.random() - 0.5) * 0.025, -1, 1);
+
+  lightArr = computeLight();
+
+  // Fire events
+  if (CFG.fireRate > 0 && Math.random() < CFG.fireRate * 0.0015) triggerFire();
+
+  // Age stumps, remove old ones
+  for (let i = stumps.length - 1; i >= 0; i--) {
+    stumps[i].age++;
+    if (stumps[i].age > stumps[i].maxAge) stumps.splice(i, 1);
+  }
+
+  // Update each tree
+  const pending = [];
+  for (let i = 0; i < numSlots; i++) {
+    if (!slots[i]) continue;
+    const seeds = slots[i].update(lightArr[i]);
+    if (slots[i].dead) { slots[i] = null; continue; }
+    for (const s of seeds) pending.push(s);
+  }
+
+  // Shuffle pending seeds to avoid positional bias
+  for (let i = pending.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [pending[i], pending[j]] = [pending[j], pending[i]];
+  }
+
+  for (const s of pending) plantSeed(s.slot, s.genes, s.seedSize);
+
+  frameCount++;
+}
+
+// ─── DRAW ────────────────────────────────────────────────────────────────────
+function drawFrame() {
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+  sky.addColorStop(0,   '#2b65b0');
+  sky.addColorStop(0.5, '#68a8da');
+  sky.addColorStop(1,   '#bcdcee');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, groundY);
+
+  // Distant hills silhouette
+  ctx.fillStyle = 'rgba(42, 88, 42, 0.38)';
+  ctx.beginPath();
+  ctx.moveTo(0, groundY);
+  for (let x = 0; x <= W; x += 5) {
+    const h = 34 * Math.sin(x * 0.007) + 20 * Math.sin(x * 0.013 + 1.4)
+            + 16 * Math.sin(x * 0.004 + 2.9);
+    ctx.lineTo(x, groundY - 44 + h);
+  }
+  ctx.lineTo(W, groundY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Shadow stripes on ground — makes the light system visible
+  for (let i = 0; i < numSlots; i++) {
+    const shade = 1 - (lightArr[i] ?? 1);
+    if (shade > 0.04) {
+      ctx.fillStyle = `rgba(0,18,0,${(shade * 0.48).toFixed(3)})`;
+      ctx.fillRect(i * CFG.slotW, groundY - 4, CFG.slotW, 22);
+    }
+  }
+
+  // Ground
+  const gnd = ctx.createLinearGradient(0, groundY, 0, H);
+  gnd.addColorStop(0,    '#58982e');
+  gnd.addColorStop(0.12, '#488228');
+  gnd.addColorStop(0.4,  '#386a20');
+  gnd.addColorStop(1,    '#265018');
+  ctx.fillStyle = gnd;
+  ctx.fillRect(0, groundY, W, H - groundY);
+
+  // Charred stumps
+  for (const s of stumps) {
+    const op = (1 - s.age / s.maxAge);
+    ctx.fillStyle = `rgba(22, 10, 4, ${(op * 0.92).toFixed(3)})`;
+    ctx.fillRect(s.x - s.w / 2, groundY - s.h, s.w, s.h);
+    // Charring texture lines
+    ctx.fillStyle = `rgba(0, 0, 0, ${(op * 0.45).toFixed(3)})`;
+    ctx.fillRect(s.x - s.w / 2 + 1, groundY - s.h + 2, 1, s.h - 2);
+    ctx.fillRect(s.x + s.w / 2 - 2, groundY - s.h + 3, 1, s.h - 3);
+  }
+
+  // Ground shadow ellipses under canopies
+  for (let i = 0; i < numSlots; i++) {
+    const t = slots[i];
+    if (!t) continue;
+    const op = 0.16 * (t.curH / maxTreeH);
+    ctx.fillStyle = `rgba(0,22,0,${op.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(t.x, groundY + 5, t.canopyRX * 1.1, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Trees
+  for (let i = 0; i < numSlots; i++) {
+    if (slots[i]) slots[i].draw();
+  }
+
+  // Wind indicator
+  drawWind(W);
+}
+
+function drawWind(W) {
+  const x0 = W - 75, y0 = 26;
+  ctx.font         = '11px Segoe UI, sans-serif';
+  ctx.fillStyle    = 'rgba(220,240,220,0.55)';
+  ctx.textAlign    = 'right';
+  ctx.fillText('wind', x0 - 6, y0 + 4);
+  ctx.textAlign    = 'left';
+
+  const arrowLen = CFG.windStr * 38;
+  const dx       = CFG.windDir * arrowLen;
+  if (Math.abs(dx) < 2) {
+    ctx.fillStyle = 'rgba(220,240,220,0.4)';
+    ctx.fillText('calm', x0, y0 + 4);
+    return;
+  }
+  const ex  = x0 + dx;
+  const dir = dx > 0 ? 1 : -1;
+  ctx.strokeStyle = 'rgba(220,240,220,0.55)';
+  ctx.lineWidth   = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0); ctx.lineTo(ex, y0);
+  ctx.lineTo(ex - dir * 8, y0 - 5);
+  ctx.moveTo(ex, y0);
+  ctx.lineTo(ex - dir * 8, y0 + 5);
+  ctx.stroke();
+}
+
+// ─── STATS ───────────────────────────────────────────────────────────────────
+function updateStats() {
+  const live = slots.filter(Boolean);
+  if (!live.length) return;
+  const n = live.length;
+  let sh = 0, sg = 0, ss = 0, sd = 0;
+  for (const t of live) { sh += t.genes.h; sg += t.genes.g; ss += t.genes.s; sd += t.genes.d; }
+
+  document.getElementById('s-pop').textContent  = n;
+  document.getElementById('s-time').textContent = frameCount;
+  document.getElementById('s-h').textContent    = (sh/n).toFixed(2);
+  document.getElementById('s-g').textContent    = (sg/n).toFixed(2);
+  document.getElementById('s-s').textContent    = (ss/n).toFixed(2);
+  document.getElementById('s-d').textContent    = (sd/n).toFixed(1);
+
+  history.push({
+    pop: n / numSlots,
+    h:   sh / n,
+    g:   sg / n,
+    s:   ss / n,
+    d:   (sd / n) / CFG.dRange[1],
+  });
+  if (history.length > MAX_HIST) history.shift();
+  drawGraph();
+}
+
+function drawGraph() {
+  const gc  = document.getElementById('graph');
+  const gx  = gc.getContext('2d');
+  const W   = gc.width, H = gc.height;
+  gx.clearRect(0, 0, W, H);
+  gx.fillStyle = 'rgba(0,0,0,0.38)';
+  gx.fillRect(0, 0, W, H);
+  if (history.length < 2) return;
+
+  const vis   = history.slice(-150);
+  const lines = [
+    { key:'h',   max:1, color:'#6dbf4a', lw:1.5 },
+    { key:'g',   max:1, color:'#a07850', lw:1.5 },
+    { key:'s',   max:1, color:'#e8d060', lw:1.5 },
+    { key:'d',   max:1, color:'#80c8e0', lw:1   },
+    { key:'pop', max:1, color:'#ffffff', lw:1   },
+  ];
+  for (const l of lines) {
+    gx.strokeStyle = l.color;
+    gx.lineWidth   = l.lw;
+    gx.beginPath();
+    for (let i = 0; i < vis.length; i++) {
+      const x = (i / (vis.length - 1)) * W;
+      const y = H - (vis[i][l.key] / l.max) * H;
+      i === 0 ? gx.moveTo(x, y) : gx.lineTo(x, y);
+    }
+    gx.stroke();
+  }
+}
+
+// ─── GAME LOOP ────────────────────────────────────────────────────────────────
+function loop() {
+  for (let i = 0; i < CFG.simSpeed; i++) {
+    simulate();
+    if (frameCount % 60 === 0) updateStats();
+  }
+  drawFrame();
+  requestAnimationFrame(loop);
+}
+
+// ─── UI INIT ─────────────────────────────────────────────────────────────────
+function initUI() {
+  // Collapsible panel
+  const uiEl = document.getElementById('ui');
+  document.getElementById('tog').addEventListener('click', () => {
+    uiEl.classList.toggle('collapsed');
+    document.getElementById('tog').textContent =
+      uiEl.classList.contains('collapsed') ? '▼' : '▲';
+  });
+
+  // Bind a slider to a CFG key; fmt converts the string value
+  const bind = (sliderId, cfgKey, dispId, fmt) => {
+    document.getElementById(sliderId).addEventListener('input', e => {
+      CFG[cfgKey] = fmt(e.target.value);
+      document.getElementById(dispId).textContent =
+        cfgKey === 'simSpeed' ? CFG[cfgKey] + '×' : CFG[cfgKey].toFixed(2);
+    });
+  };
+
+  bind('sl-rain',  'rainfall', 'd-rain',  parseFloat);
+  bind('sl-wind',  'windStr',  'd-wind',  parseFloat);
+  bind('sl-fire',  'fireRate', 'd-fire',  parseFloat);
+  bind('sl-mut',   'mutRate',  'd-mut',   parseFloat);
+  bind('sl-speed', 'simSpeed', 'd-speed', parseInt);
+}
+
+// ─── RESIZE ──────────────────────────────────────────────────────────────────
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  groundY  = Math.floor(canvas.height * CFG.groundFrac);
+  maxTreeH = Math.floor(groundY * 0.86);
+  numSlots = Math.floor(canvas.width / CFG.slotW);
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+function init() {
+  resize();
+  window.addEventListener('resize', () => {
+    resize();
+    while (slots.length < numSlots) slots.push(null);
+    slots.length = numSlots;
+    lightArr     = new Float32Array(numSlots).fill(1.0);
+  });
+
+  slots    = new Array(numSlots).fill(null);
+  lightArr = new Float32Array(numSlots).fill(1.0);
+
+  // Start sparse — watch the forest fill in and competition emerge
+  for (let i = 0; i < 25; i++) {
+    const slot = (Math.random() * numSlots) | 0;
+    if (!slots[slot]) slots[slot] = new Tree(slot);
+  }
+
+  initUI();
+  loop();
+}
+
+init();
+</script>
+</body>
+</html>
