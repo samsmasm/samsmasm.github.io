@@ -271,7 +271,6 @@ class Tree {
     this.age    = 0;
     this.dead   = false;
     this.windToppled = false;
-    this.flashTimer  = 0;
 
     this.genes = genes ?? {
       h:  rnd(...CFG.hRange),
@@ -356,35 +355,35 @@ class Tree {
 
   disperse() {
     this.energy -= CFG.reproCost;
-    this.flashTimer = 18;   // trigger parent glow
     const count    = Math.round(1 + this.genes.s * 9 + Math.random() * 2);
     const seedSize = 1 - this.genes.s * 0.75;
     const seeds    = [];
     const topY     = groundY - this.curH;
-    // Seed colour: bright version of the tree's seed-strategy hue
-    const s  = this.genes.s;
-    const pr = Math.round(52  + s * 142);
-    const pg = Math.round(97  + s * 167);
-    const pb = Math.round(22  + s * 24);
+    let firstFreeSeed = null;
     for (let i = 0; i < count; i++) {
-      const bias   = CFG.windDir * CFG.windStr * this.genes.d * 0.4;
-      const offset = (Math.random() - 0.5) * 2 * this.genes.d + bias;
+      const bias     = CFG.windDir * CFG.windStr * this.genes.d * 0.4;
+      const offset   = (Math.random() - 0.5) * 2 * this.genes.d + bias;
       const destSlot = Math.round(this.slot + offset);
-      const seed   = { slot: destSlot, genes: mutate(this.genes), seedSize };
-      // Serotinous trees lock seeds in resin-sealed cones, released only by fire
+      const seed     = { slot: destSlot, genes: mutate(this.genes), seedSize };
       if (Math.random() < this.genes.sr && this.seedCache.length < 60) {
         this.seedCache.push(seed);
       } else {
         seeds.push(seed);
-        // Emit a seed particle for non-serotinous seeds
-        const tx = (destSlot + 0.5) * CFG.slotW;
-        seedParticles.push({
-          x: this.x, y: topY + this.curH * 0.3,
-          tx, ty: groundY,
-          age: 0, dur: 22 + Math.abs(offset) * 1.2,
-          r: pr, g: pg, b: pb,
-        });
+        if (!firstFreeSeed) firstFreeSeed = { destSlot, offset };
       }
+    }
+    // Emit a single quiet particle for the first non-serotinous seed
+    if (firstFreeSeed) {
+      const { destSlot, offset } = firstFreeSeed;
+      const s  = this.genes.s;
+      seedParticles.push({
+        x: this.x, y: topY + this.curH * 0.25,
+        tx: (destSlot + 0.5) * CFG.slotW, ty: groundY,
+        age: 0, dur: 28 + Math.abs(offset) * 1.5,
+        r: Math.round(52 + s * 142),
+        g: Math.round(97 + s * 167),
+        b: Math.round(22 + s * 24),
+      });
     }
     return seeds;
   }
@@ -392,24 +391,28 @@ class Tree {
   draw() {
     const c = this.colors();
     if (this.genes.r > 0.15) this._drawRoots();
-    if (this.shapeRatio > 2.0) this._drawConifer(c);
-    else                        this._drawDeciduous(c);
-    // Reproduction flash — bright halo that fades over flashTimer frames
-    if (this.flashTimer > 0) {
-      const alpha = this.flashTimer / 18;
+    // Anticipatory glow — builds as energy approaches reproduction threshold
+    const energyFrac = Math.min(1, this.energy / CFG.reproThr);
+    if (energyFrac > 0.55 && this.curH > 12) {
       const topY  = groundY - this.curH;
       const crx   = this.canopyRX;
-      const cry   = this.canopyRY;
-      const glow  = ctx.createRadialGradient(this.x, topY + this.curH * 0.3, 0, this.x, topY + this.curH * 0.3, crx * 1.4);
-      glow.addColorStop(0,   `rgba(255,255,160,${(alpha * 0.75).toFixed(2)})`);
-      glow.addColorStop(0.5, `rgba(255,240,80,${(alpha * 0.35).toFixed(2)})`);
-      glow.addColorStop(1,   'rgba(255,220,0,0)');
+      // Slow pulse: period ~120 render frames
+      const pulse = 0.5 + 0.5 * Math.sin(animFrame * 0.052);
+      // Alpha ramps from 0 at 55% energy to ~0.28 at 100%, modulated by pulse
+      const base  = (energyFrac - 0.55) / 0.45;
+      const alpha = base * pulse * 0.28;
+      const cy    = topY + this.curH * 0.3;
+      const glow  = ctx.createRadialGradient(this.x, cy, 0, this.x, cy, crx * 1.2);
+      glow.addColorStop(0,   `rgba(220,255,120,${alpha.toFixed(3)})`);
+      glow.addColorStop(0.6, `rgba(180,230,60,${(alpha * 0.4).toFixed(3)})`);
+      glow.addColorStop(1,   'rgba(140,200,0,0)');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.ellipse(this.x, topY + this.curH * 0.3, crx * 1.4, (cry + crx) * 0.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(this.x, cy, crx * 1.2, crx * 0.7, 0, 0, Math.PI * 2);
       ctx.fill();
-      this.flashTimer--;
     }
+    if (this.shapeRatio > 2.0) this._drawConifer(c);
+    else                        this._drawDeciduous(c);
   }
 
   // b=0: cream/sandy birch · b=1: near-black redwood
@@ -1168,10 +1171,10 @@ function drawFrame() {
     // Gentle arc: peak height halfway through travel
     const arc = Math.sin(t * Math.PI) * 18;
     const py  = p.y + (p.ty - p.y) * t - arc;
-    const alpha = (1 - t) * 0.85;
+    const alpha = (1 - t) * 0.55;
     ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha.toFixed(2)})`;
     ctx.beginPath();
-    ctx.arc(px, py, 2, 0, Math.PI * 2);
+    ctx.arc(px, py, 1.5, 0, Math.PI * 2);
     ctx.fill();
     if (t >= 1) seedParticles.splice(i, 1);
   }
