@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku — UniSam</title>
+    <link rel="icon" type="image/png" href="/unisamicon2.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --cell-size: 42px;
+            --border-thick: 2px solid rgba(109,40,217,0.55);
+            --border-thin: 1px solid rgba(109,40,217,0.18);
+            --color-selected: #fde68a;
+            --color-peer: rgba(233,221,255,0.6);
+            --color-same-num: rgba(196,232,255,0.7);
+            --color-error-bg: rgba(255,200,210,0.8);
+            --text-normal: #4c1d95;
+            --text-fixed: #2d1a3e;
+            --text-candidate: #7c3aed;
+            --glass: rgba(255,255,255,0.55);
+            --glass-border: rgba(255,255,255,0.75);
+            --glass-shadow: 0 8px 32px rgba(180,120,220,0.18);
+        }
+
+        html { height: 100%; }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px;
+            color: var(--text-fixed);
+            background: linear-gradient(135deg,
+                #fde8f0 0%, #fde8d8 12%, #fef9d0 25%,
+                #d8f5e8 40%, #d0eefe 55%, #e0d8fe 70%,
+                #f5d8fe 85%, #fde8f0 100%);
+            background-attachment: fixed;
+        }
+
+        /* ── Back link ── */
+        .back-link {
+            align-self: flex-start;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #7c3aed;
+            text-decoration: none;
+            margin-bottom: 10px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.5);
+            border: 1.5px solid var(--glass-border);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: background 0.15s;
+        }
+        .back-link:hover { background: rgba(255,255,255,0.75); }
+
+        /* ── Page title ── */
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(90deg, #f472b6, #fb923c, #facc15, #4ade80, #38bdf8, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 14px;
+        }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 390px;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+
+        /* ── Board ── */
+        .sudoku-board {
+            display: grid;
+            grid-template-columns: repeat(9, var(--cell-size));
+            grid-template-rows: repeat(9, var(--cell-size));
+            border: var(--border-thick);
+            background: rgba(255,255,255,0.7);
+            backdrop-filter: blur(12px) saturate(150%);
+            -webkit-backdrop-filter: blur(12px) saturate(150%);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--glass-shadow);
+            user-select: none;
+            outline: none;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            border: var(--border-thin);
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            color: var(--text-normal);
+            transition: background 0.1s;
+        }
+
+        .cell.fixed { font-weight: 700; color: var(--text-fixed); }
+        .cell:nth-child(3n) { border-right: var(--border-thick); }
+        .cell:nth-child(9n) { border-right: var(--border-thin); }
+        .cell-row-2, .cell-row-5 { border-bottom: var(--border-thick); }
+
+        .cell.peer      { background-color: var(--color-peer); }
+        .cell.same-num  { background-color: var(--color-same-num); }
+        .cell.selected  { background-color: var(--color-selected); }
+        .cell.error     { background-color: var(--color-error-bg); color: #dc2626; }
+
+        /* ── Controls ── */
+        .controls { margin-top: 12px; width: 100%; max-width: 390px; }
+        .mode-toggle { display: flex; gap: 8px; margin-bottom: 8px; }
+
+        button {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            transition: transform 0.1s ease, box-shadow 0.1s, background 0.15s;
+            cursor: pointer;
+        }
+
+        button:active {
+            transform: scale(0.93);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        /* Glass button base */
+        .sys-btn, .mode-btn {
+            background: var(--glass);
+            border: 1.5px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 10px;
+            color: #5b21b6;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+        }
+
+        .sys-btn { flex: 1; }
+        .mode-btn { flex: 1; padding: 10px; }
+
+        .mode-btn.active {
+            background: #6d28d9;
+            color: white;
+            border-color: #6d28d9;
+        }
+
+        .sys-btn:hover, .mode-btn:not(.active):hover {
+            background: rgba(255,255,255,0.8);
+        }
+
+        #level-select {
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1.5px solid var(--glass-border);
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: #5b21b6;
+            flex: 1;
+            cursor: pointer;
+        }
+
+        /* Number pad */
+        .number-pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+
+        .n-btn {
+            height: 50px;
+            font-size: 20px;
+            font-family: 'Inter', sans-serif;
+            background: var(--glass);
+            border: 1.5px solid var(--glass-border);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #5b21b6;
+        }
+
+        .n-btn:hover { background: rgba(255,255,255,0.8); }
+
+        .n-btn.completed {
+            background: rgba(240,240,240,0.4);
+            color: rgba(180,160,210,0.5);
+            border-color: rgba(255,255,255,0.4);
+            pointer-events: none;
+        }
+
+        body.candidate-active .n-btn:not(.completed) {
+            background: rgba(224,218,255,0.5);
+            color: #7c3aed;
+        }
+
+        /* ── Sparkle & Win ── */
+        .sparkle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        #win-message {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 42px;
+            font-weight: 800;
+            font-family: 'Inter', sans-serif;
+            text-align: center;
+            display: none;
+            z-index: 1001;
+            background: rgba(255,255,255,0.88);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 28px 36px;
+            border-radius: 24px;
+            border: 2px solid var(--glass-border);
+            box-shadow: 0 16px 60px rgba(168,85,247,0.3);
+            pointer-events: none;
+        }
+
+        .candidate-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            width: 100%; height: 100%;
+            font-size: 9px;
+            color: var(--text-candidate);
+            font-family: 'Inter', sans-serif;
+        }
+        .candidate-grid span { display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <a class="back-link" href="/">← Home</a>
+    <h1>Sudoku</h1>
+
+    <div id="win-message">
+        <div style="background: linear-gradient(to right, #f472b6, #fb923c, #facc15, #4ade80, #38bdf8, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+            PUZZLE SOLVED! 🌈✨
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <select id="level-select" data-prev="expert">
+            <option value="easy">Level 1</option>
+            <option value="medium">Level 2</option>
+            <option value="hard">Level 3</option>
+            <option value="expert" selected>Level 4</option>
+        </select>
+        <button id="btn-reset" class="sys-btn">New Game</button>
+    </div>
+
+    <div class="toolbar" style="margin-bottom: 14px;">
+        <button id="btn-save" class="sys-btn">Generate Save String</button>
+        <button id="btn-load" class="sys-btn">Load Game</button>
+    </div>
+
+    <div id="sudoku-board" class="sudoku-board" tabindex="0"></div>
+
+    <div class="controls">
+        <div class="mode-toggle">
+            <button id="mode-normal" class="mode-btn active">Normal</button>
+            <button id="mode-candidate" class="mode-btn">Notes</button>
+        </div>
+        <div class="number-pad" id="number-pad">
+            <button class="n-btn" data-num="1">1</button>
+            <button class="n-btn" data-num="2">2</button>
+            <button class="n-btn" data-num="3">3</button>
+            <button class="n-btn" data-num="4">4</button>
+            <button class="n-btn" data-num="5">5</button>
+            <button class="n-btn" data-num="6">6</button>
+            <button class="n-btn" data-num="7">7</button>
+            <button class="n-btn" data-num="8">8</button>
+            <button class="n-btn" data-num="9">9</button>
+            <button class="n-btn" id="btn-del">Del</button>
+        </div>
+    </div>
+
+    <script>
+        let solution = [];
+        let initialBoard = [];
+        let currentBoard = [];
+        let candidates = Array.from({length: 81}, () => []);
+        let selectedIdx = null;
+        let mode = 'normal';
+
+        // --- SOLVER & UNIQUE GENERATOR ---
+        function isSafe(grid, row, col, num) {
+            for (let x = 0; x < 9; x++) if (grid[row][x] === num || grid[x][col] === num) return false;
+            let startRow = row - row % 3, startCol = col - col % 3;
+            for (let i = 0; i < 3; i++)
+                for (let j = 0; j < 3; j++)
+                    if (grid[i + startRow][j + startCol] === num) return false;
+            return true;
+        }
+
+        function fillGrid(grid) {
+            for (let i = 0; i < 81; i++) {
+                let row = Math.floor(i / 9), col = i % 9;
+                if (grid[row][col] === 0) {
+                    let nums = [1,2,3,4,5,6,7,8,9].sort(() => Math.random() - 0.5);
+                    for (let num of nums) {
+                        if (isSafe(grid, row, col, num)) {
+                            grid[row][col] = num;
+                            if (fillGrid(grid)) return true;
+                            grid[row][col] = 0;
+                        }
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Checks if puzzle has multiple solutions
+        function countSolutions(grid, countObj) {
+            for (let i = 0; i < 81; i++) {
+                let row = Math.floor(i / 9), col = i % 9;
+                if (grid[row][col] === 0) {
+                    for (let num = 1; num <= 9; num++) {
+                        if (isSafe(grid, row, col, num)) {
+                            grid[row][col] = num;
+                            countSolutions(grid, countObj);
+                            grid[row][col] = 0;
+                            if (countObj.count > 1) return; // Stop early if >1 solution found
+                        }
+                    }
+                    return;
+                }
+            }
+            countObj.count++;
+        }
+
+        function generatePuzzle(forceInit = false) {
+            // UX Flow & Safety Check
+            if (!forceInit && initialBoard.length > 0) {
+                if (!confirm("Are you sure you want to start a new game? Current progress will be lost.")) {
+                    return false; // User cancelled
+                }
+            }
+
+            document.getElementById('win-message').style.display = 'none';
+            selectedIdx = null; // Clear selection
+
+            // 1. Generate full board
+            let grid = Array.from({length: 9}, () => Array(9).fill(0));
+            fillGrid(grid);
+            solution = grid.flat();
+            let puzzle = [...solution];
+
+            // 2. Determine target holes
+            let diff = document.getElementById('level-select').value;
+            let targetHoles = { 'easy': 35, 'medium': 45, 'hard': 52, 'expert': 58 }[diff];
+
+            // 3. Remove holes ensuring UNIQUE solution
+            let indices = Array.from({length: 81}, (_, i) => i).sort(() => Math.random() - 0.5);
+            let holes = 0;
+
+            for (let idx of indices) {
+                if (holes >= targetHoles) break;
+
+                let temp = puzzle[idx];
+                puzzle[idx] = 0;
+
+                // Convert 1D back to 2D for solver check
+                let testGrid = [];
+                for(let r=0; r<9; r++) testGrid.push(puzzle.slice(r*9, r*9+9));
+
+                let countObj = { count: 0 };
+                countSolutions(testGrid, countObj);
+
+                if (countObj.count !== 1) {
+                    puzzle[idx] = temp; // Put it back, removing this creates multiple paths
+                } else {
+                    holes++;
+                }
+            }
+
+            initialBoard = [...puzzle];
+            currentBoard = [...puzzle];
+            candidates = Array.from({length: 81}, () => []);
+            render();
+            return true; // Game successfully generated
+        }
+
+        // --- GAME LOGIC & UI ---
+
+        function hasConflict(idx, num) {
+            let r = Math.floor(idx / 9), c = idx % 9;
+            for(let i = 0; i < 81; i++) {
+                if (i !== idx && currentBoard[i] === num) {
+                    let r2 = Math.floor(i / 9), c2 = i % 9;
+                    if (r === r2 || c === c2 || (Math.floor(r/3) === Math.floor(r2/3) && Math.floor(c/3) === Math.floor(c2/3))) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function render() {
+            const boardDiv = document.getElementById('sudoku-board');
+            boardDiv.innerHTML = '';
+
+            // Count valid numbers for keypad muting
+            let counts = {};
+            for(let i = 0; i < 81; i++) {
+                let n = currentBoard[i];
+                if (n !== 0 && !hasConflict(i, n)) counts[n] = (counts[n] || 0) + 1;
+            }
+
+            for (let i = 0; i < 81; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                if (Math.floor(i / 9) === 2 || Math.floor(i / 9) === 5) cell.classList.add('cell-row-2');
+                if (initialBoard[i] !== 0) {
+                    cell.classList.add('fixed');
+                    cell.innerText = initialBoard[i];
+                } else if (currentBoard[i] !== 0) {
+                    cell.innerText = currentBoard[i];
+                } else if (candidates[i].length > 0) {
+                    cell.innerHTML = `<div class="candidate-grid">${[1,2,3,4,5,6,7,8,9].map(n => `<span>${candidates[i].includes(n) ? n : ''}</span>`).join('')}</div>`;
+                }
+                cell.onclick = () => { selectedIdx = i; updateHighlights(); };
+                boardDiv.appendChild(cell);
+            }
+
+            // Mute number buttons
+            document.querySelectorAll('.n-btn[data-num]').forEach(btn => {
+                const n = parseInt(btn.dataset.num);
+                if (counts[n] >= 9) btn.classList.add('completed');
+                else btn.classList.remove('completed');
+            });
+
+            updateHighlights();
+            checkWin();
+        }
+
+        function updateHighlights() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(c => c.classList.remove('selected', 'peer', 'same-num', 'error'));
+            if (selectedIdx === null) return;
+            let r = Math.floor(selectedIdx / 9), c = selectedIdx % 9;
+            cells.forEach((cell, i) => {
+                let row = Math.floor(i / 9), col = i % 9;
+                if (row === r || col === c || (Math.floor(row/3)===Math.floor(r/3) && Math.floor(col/3)===Math.floor(c/3))) cell.classList.add('peer');
+                if (currentBoard[i] !== 0 && currentBoard[i] === currentBoard[selectedIdx]) cell.classList.add('same-num');
+                if (currentBoard[i] !== 0 && i !== selectedIdx) {
+                   if ((row === r || col === c || (Math.floor(row/3)===Math.floor(r/3) && Math.floor(col/3)===Math.floor(c/3))) && currentBoard[i] === currentBoard[selectedIdx]) {
+                       cells[i].classList.add('error');
+                       cells[selectedIdx].classList.add('error');
+                   }
+                }
+            });
+            cells[selectedIdx].classList.add('selected');
+        }
+
+        function checkWin() {
+            const winMsg = document.getElementById('win-message');
+            if (currentBoard.includes(0)) {
+                winMsg.style.display = 'none';
+                return;
+            }
+            const hasErrors = document.querySelectorAll('.error').length > 0;
+            if (!hasErrors) {
+                celebrate();
+            } else {
+                winMsg.style.display = 'none';
+            }
+        }
+
+        function celebrate() {
+            document.getElementById('win-message').style.display = 'block';
+            for (let i = 0; i < 150; i++) setTimeout(createSparkle, i * 20);
+        }
+
+        function createSparkle() {
+            const colors = ['#f472b6', '#fb923c', '#facc15', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];
+            const s = document.createElement('div');
+            s.className = 'sparkle';
+            s.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            s.style.left = '50%';
+            s.style.top = '50%';
+            document.body.appendChild(s);
+
+            const destX = (Math.random() - 0.5) * window.innerWidth * 1.5;
+            const destY = (Math.random() - 0.5) * window.innerHeight * 1.5;
+
+            const animation = s.animate([
+                { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                { transform: `translate(${destX}px, ${destY}px) scale(0)`, opacity: 0 }
+            ], { duration: 2000 + Math.random() * 1000, easing: 'ease-out' });
+
+            animation.onfinish = () => s.remove();
+        }
+
+        function handleInput(num) {
+            document.getElementById('win-message').style.display = 'none';
+            if (selectedIdx === null || initialBoard[selectedIdx] !== 0) return;
+
+            if (num === 0) {
+                currentBoard[selectedIdx] = 0;
+                candidates[selectedIdx] = [];
+            }
+            else if (mode === 'normal') {
+                currentBoard[selectedIdx] = (currentBoard[selectedIdx] === num) ? 0 : num;
+                candidates[selectedIdx] = [];
+
+                // Auto-Cleanup Notes in peers
+                if (currentBoard[selectedIdx] === num) {
+                    let r = Math.floor(selectedIdx / 9), c = selectedIdx % 9;
+                    for (let i = 0; i < 81; i++) {
+                        let r2 = Math.floor(i / 9), c2 = i % 9;
+                        if (i !== selectedIdx && (r === r2 || c === c2 || (Math.floor(r/3)===Math.floor(r2/3) && Math.floor(c/3)===Math.floor(c2/3)))) {
+                            candidates[i] = candidates[i].filter(n => n !== num);
+                        }
+                    }
+                }
+            }
+            else {
+                let idx = candidates[selectedIdx].indexOf(num);
+                if (idx > -1) candidates[selectedIdx].splice(idx, 1);
+                else if (currentBoard[selectedIdx] === 0) candidates[selectedIdx].push(num);
+            }
+            render();
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            if (mode === 'candidate') {
+                document.body.classList.add('candidate-active');
+                document.getElementById('mode-candidate').classList.add('active');
+                document.getElementById('mode-normal').classList.remove('active');
+            } else {
+                document.body.classList.remove('candidate-active');
+                document.getElementById('mode-normal').classList.add('active');
+                document.getElementById('mode-candidate').classList.remove('active');
+            }
+        }
+
+        // --- STATE MANAGEMENT (Save/Load) ---
+        function generateSaveString() {
+            const state = {
+                i: initialBoard,
+                c: currentBoard,
+                n: candidates
+            };
+            const saveString = btoa(JSON.stringify(state));
+            prompt("Here is your Save String. Copy it and keep it safe:", saveString);
+        }
+
+        function loadGameString() {
+            const input = prompt("Paste your Save String here:");
+            if (!input) return; // User cancelled or left empty
+
+            try {
+                const state = JSON.parse(atob(input));
+                if (state.i && state.c && state.n && state.i.length === 81) {
+                    initialBoard = state.i;
+                    currentBoard = state.c;
+                    candidates = state.n;
+                    selectedIdx = null;
+                    document.getElementById('win-message').style.display = 'none';
+                    render();
+                    alert("Game loaded successfully!");
+                } else {
+                    alert("Invalid Save String data.");
+                }
+            } catch (error) {
+                alert("Failed to parse the Save String. Make sure you copied it correctly.");
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+
+        // Buttons
+        document.querySelectorAll('.n-btn').forEach(b => b.onclick = () => handleInput(b.innerText === 'Del' ? 0 : parseInt(b.innerText)));
+        document.getElementById('mode-normal').onclick = () => setMode('normal');
+        document.getElementById('mode-candidate').onclick = () => setMode('candidate');
+        document.getElementById('btn-reset').onclick = () => generatePuzzle(false);
+        document.getElementById('btn-save').onclick = () => generateSaveString();
+        document.getElementById('btn-load').onclick = () => loadGameString();
+
+        // Auto-Regen on Level Change
+        const levelSelect = document.getElementById('level-select');
+        levelSelect.addEventListener('change', (e) => {
+            const previousValue = e.target.dataset.prev;
+            if (!generatePuzzle(false)) {
+                // If user hits 'Cancel' on the prompt, revert the dropdown
+                e.target.value = previousValue;
+            } else {
+                // Update the tracked previous value
+                e.target.dataset.prev = e.target.value;
+            }
+        });
+
+        // Keyboard Navigation & Inputs
+        document.addEventListener('keydown', (e) => {
+            // Valid interactive keys
+            const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "1", "2", "3", "4", "5", "6", "7", "8", "9", "Backspace", "Delete", " "];
+
+            if (validKeys.includes(e.key)) {
+                // Prevent space/arrows from scrolling the page
+                if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                    e.preventDefault();
+                }
+
+                // Auto-select top-left cell if typing/moving with nothing selected
+                if (selectedIdx === null && e.key !== " ") {
+                    selectedIdx = 0;
+                    updateHighlights();
+                    if(e.key.startsWith("Arrow")) return;
+                }
+            } else {
+                return; // Ignore all other keys
+            }
+
+            if (selectedIdx === null) return;
+
+            if (e.key >= '1' && e.key <= '9') {
+                handleInput(parseInt(e.key));
+            } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                handleInput(0);
+            } else if (e.key === ' ') {
+                setMode(mode === 'normal' ? 'candidate' : 'normal');
+            } else if (e.key === 'ArrowUp') {
+                if (selectedIdx >= 9) selectedIdx -= 9;
+                updateHighlights();
+            } else if (e.key === 'ArrowDown') {
+                if (selectedIdx <= 71) selectedIdx += 9;
+                updateHighlights();
+            } else if (e.key === 'ArrowLeft') {
+                if (selectedIdx % 9 !== 0) selectedIdx -= 1;
+                updateHighlights();
+            } else if (e.key === 'ArrowRight') {
+                if (selectedIdx % 9 !== 8) selectedIdx += 1;
+                updateHighlights();
+            }
+        });
+
+        // Initialize first game without the confirm prompt
+        generatePuzzle(true);
+    </script>
+</body>
+</html>
