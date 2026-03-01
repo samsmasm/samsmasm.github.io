@@ -26,6 +26,14 @@ let canvas, ctx, canvasW, canvasH;
 let dotPositions = [];
 let qrGenerated = false;
 
+// Choose mode state
+let newRoomMode = 'plot';
+let maxVotes = 1;
+let blobPositions = {};
+let allOptions = {};
+let chooseResponses = {};
+let studentVotes = new Set();
+
 const views = {
     landing: document.getElementById('view-landing'),
     teacher: document.getElementById('view-teacher'),
@@ -40,14 +48,27 @@ window.addEventListener('DOMContentLoaded', () => {
     const hash = window.location.hash.substring(1).toUpperCase();
     const role = new URLSearchParams(window.location.search).get('role');
 
-    // Set up tab buttons
+    // Tab buttons
     document.getElementById('tab-teacher').addEventListener('click', () => showTab('teacher'));
     document.getElementById('tab-student').addEventListener('click', () => showTab('student'));
 
-    // Set up var count buttons
+    // Var count buttons (plot mode)
     document.querySelectorAll('.var-count-btn').forEach(btn => {
         btn.addEventListener('click', () => setVarCount(parseInt(btn.dataset.n)));
     });
+
+    // Mode selector (Plot / Choose)
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => setNewRoomMode(btn.dataset.mode));
+    });
+
+    // Vote count buttons (choose setup)
+    document.querySelectorAll('.vote-count-btn').forEach(btn => {
+        btn.addEventListener('click', () => setMaxVotes(parseInt(btn.dataset.v)));
+    });
+
+    // Add option row button (teacher choose setup)
+    document.getElementById('btn-add-option').addEventListener('click', () => addOptionRow(''));
 
     // Landing actions
     document.getElementById('btn-start').addEventListener('click', startSession);
@@ -61,8 +82,12 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-delete').addEventListener('click', deleteBoard);
     document.getElementById('btn-leave').addEventListener('click', leaveRoom);
 
-    // Student submit
+    // Student plot submit
     document.getElementById('btn-submit').addEventListener('click', submitResponse);
+
+    // Student choose submit + add option
+    document.getElementById('btn-submit-choose').addEventListener('click', submitChooseResponse);
+    document.getElementById('btn-add-student-opt').addEventListener('click', addStudentOption);
 
     // Canvas setup
     canvas = document.getElementById('chart');
@@ -71,14 +96,14 @@ window.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('mouseleave', () => document.getElementById('tip').classList.add('hidden'));
     window.addEventListener('resize', resizeCanvas);
 
-    // Initial variable config UI
+    // Initial UI state
     setVarCount(1);
+    initOptionRows();
 
     // Direct URL navigation
     if (hash) {
         currentRoom = hash;
         if (role === 'teacher') {
-            // Pre-fill the rejoin form — returning teachers use rejoin, not new room
             document.getElementById('r-room-input').value = hash;
             showTab('teacher');
         } else {
@@ -107,7 +132,6 @@ function setVarCount(n) {
 }
 
 function renderVarConfigRows(n) {
-    // Save existing values before wiping
     const saved = [0, 1, 2].map(i => ({
         label: document.getElementById(`vl-${i}`)?.value ?? '',
         min:   document.getElementById(`vmin-${i}`)?.value ?? '0',
@@ -139,11 +163,55 @@ function renderVarConfigRows(n) {
             </div>
         `;
         container.appendChild(div);
-        // Restore saved values
         document.getElementById(`vl-${i}`).value   = saved[i].label;
         document.getElementById(`vmin-${i}`).value = saved[i].min;
         document.getElementById(`vmax-${i}`).value = saved[i].max;
     }
+}
+
+function setNewRoomMode(mode) {
+    newRoomMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    document.getElementById('plot-setup').classList.toggle('hidden', mode !== 'plot');
+    document.getElementById('choose-setup').classList.toggle('hidden', mode !== 'choose');
+}
+
+// ==========================================
+// CHOOSE SETUP (teacher landing)
+// ==========================================
+
+function initOptionRows() {
+    document.getElementById('option-input-rows').innerHTML = '';
+    addOptionRow('');
+    addOptionRow('');
+}
+
+function addOptionRow(value) {
+    const rows = document.getElementById('option-input-rows');
+    if (rows.children.length >= 15) return;
+    const idx = rows.children.length + 1;
+    const row = document.createElement('div');
+    row.className = 'option-input-row';
+    row.innerHTML = `
+        <input type="text" class="option-text-input" placeholder="Option ${idx}">
+        <button class="btn-remove-opt" title="Remove">×</button>
+    `;
+    if (value) row.querySelector('.option-text-input').value = value;
+    row.querySelector('.btn-remove-opt').addEventListener('click', () => {
+        if (document.getElementById('option-input-rows').children.length > 1) {
+            row.remove();
+        }
+    });
+    rows.appendChild(row);
+}
+
+function setMaxVotes(v) {
+    maxVotes = v;
+    document.querySelectorAll('.vote-count-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.v) === v);
+    });
 }
 
 // ==========================================
@@ -156,27 +224,41 @@ async function startSession() {
     if (!room) return alert("Please enter a room name.");
     if (!pin) return alert("Please enter a PIN.");
 
-    // Block if room already exists — teacher should use Rejoin instead
     const existing = await get(ref(db, `pulse/${room}/config`));
     if (existing.exists()) {
         return alert("A room with this name already exists. Use 'Rejoin Room' to return to it, or choose a different name.");
     }
 
-    const variables = [];
-    for (let i = 0; i < varCount; i++) {
-        const label = document.getElementById(`vl-${i}`).value.trim() || `Variable ${i + 1}`;
-        const min = parseFloat(document.getElementById(`vmin-${i}`).value) || 0;
-        let max = parseFloat(document.getElementById(`vmax-${i}`).value) || 10;
-        if (max <= min) max = min + 1;
-        variables.push({ label, min, max });
-    }
-
     config = {
-        variables,
+        mode: newRoomMode,
         anonymity: document.getElementById('t-anonymity').value,
         reveal: document.getElementById('t-reveal').value,
         pin,
     };
+
+    if (newRoomMode === 'plot') {
+        const variables = [];
+        for (let i = 0; i < varCount; i++) {
+            const label = document.getElementById(`vl-${i}`).value.trim() || `Variable ${i + 1}`;
+            const min = parseFloat(document.getElementById(`vmin-${i}`).value) || 0;
+            let max = parseFloat(document.getElementById(`vmax-${i}`).value) || 10;
+            if (max <= min) max = min + 1;
+            variables.push({ label, min, max });
+        }
+        config.variables = variables;
+    } else {
+        const rows = document.getElementById('option-input-rows').children;
+        const options = {};
+        let idx = 0;
+        for (const row of rows) {
+            const label = row.querySelector('.option-text-input').value.trim();
+            if (label) options[`t_${idx++}`] = label;
+        }
+        if (!Object.keys(options).length) return alert("Please add at least one option.");
+        config.options = options;
+        config.maxVotes = maxVotes;
+        config.allowStudentOptions = document.getElementById('allow-student-options').checked;
+    }
 
     currentRoom = room;
     await set(ref(db, `pulse/${room}/config`), config);
@@ -210,7 +292,6 @@ function initTeacherMode() {
     isRevealed = config.reveal === 'live';
     updateRevealBtn();
 
-    // QR code (generate once)
     if (!qrGenerated) {
         const url = `https://samsmasm.github.io/pulse/#${currentRoom.toLowerCase()}`;
         document.getElementById('qr-url-text').textContent = url;
@@ -218,36 +299,49 @@ function initTeacherMode() {
         qrGenerated = true;
     }
 
-    // Live responses
-    onValue(ref(db, `pulse/${currentRoom}/responses`), (snap) => {
-        responses = snap.val() || {};
-        const n = Object.keys(responses).length;
-        document.getElementById('t-count').textContent = `${n} response${n !== 1 ? 's' : ''}`;
-        redraw();
-    });
-
-    // Canvas
-    resizeCanvas();
+    if (config.mode === 'choose') {
+        document.getElementById('plot-content').classList.add('hidden');
+        document.getElementById('choose-content').classList.remove('hidden');
+        initChooseTeacher();
+    } else {
+        document.getElementById('plot-content').classList.remove('hidden');
+        document.getElementById('choose-content').classList.add('hidden');
+        onValue(ref(db, `pulse/${currentRoom}/responses`), (snap) => {
+            responses = snap.val() || {};
+            const n = Object.keys(responses).length;
+            document.getElementById('t-count').textContent = `${n} response${n !== 1 ? 's' : ''}`;
+            redraw();
+        });
+        resizeCanvas();
+    }
 }
 
 function updateRevealBtn() {
     const btn = document.getElementById('btn-reveal');
-    btn.textContent = isRevealed ? 'Hide Dots' : 'Show Dots';
+    const isChoose = config && config.mode === 'choose';
+    btn.textContent = isRevealed
+        ? (isChoose ? 'Hide Counts' : 'Hide Dots')
+        : (isChoose ? 'Show Counts' : 'Show Dots');
     btn.classList.toggle('active', isRevealed);
 }
 
 function toggleReveal() {
     isRevealed = !isRevealed;
     updateRevealBtn();
-    redraw();
+    if (config && config.mode === 'choose') {
+        renderBlobs(document.getElementById('blob-canvas'));
+    } else {
+        redraw();
+    }
 }
 
 function toggleQR() {
     const panel = document.getElementById('qr-panel');
     panel.classList.toggle('hidden');
     document.getElementById('btn-qr').classList.toggle('active', !panel.classList.contains('hidden'));
-    // Let the DOM reflow before resizing the canvas
-    setTimeout(resizeCanvas, 10);
+    if (!config || config.mode !== 'choose') {
+        setTimeout(resizeCanvas, 10);
+    }
 }
 
 async function deleteBoard() {
@@ -261,6 +355,10 @@ function leaveRoom() {
 }
 
 function exportCSV() {
+    if (config && config.mode === 'choose') {
+        exportChooseCSV();
+        return;
+    }
     const rows = Object.values(responses);
     if (!rows.length) return alert("No responses yet.");
     const headers = config.variables.map(v => `"${v.label}"`);
@@ -275,6 +373,185 @@ function exportCSV() {
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     a.download = `pulse-${currentRoom}.csv`;
     a.click();
+}
+
+function exportChooseCSV() {
+    const rows = Object.entries(chooseResponses);
+    if (!rows.length) return alert("No responses yet.");
+    const optLabels = {};
+    Object.entries(allOptions).forEach(([k, o]) => { optLabels[k] = o.label; });
+    let csv = '"Votes"' + (config.anonymity !== 'anonymous' ? ',"Name"' : '') + '\n';
+    rows.forEach(([, r]) => {
+        const votes = (r.votes || []).map(k => optLabels[k] || k).join('; ');
+        let row = `"${votes}"`;
+        if (config.anonymity !== 'anonymous') row += `,"${(r.name || '').replace(/"/g, '""')}"`;
+        csv += row + '\n';
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `pulse-${currentRoom}-choose.csv`;
+    a.click();
+}
+
+// ==========================================
+// CHOOSE — TEACHER VIEW (BLOBS)
+// ==========================================
+
+function initChooseTeacher() {
+    const blobCanvas = document.getElementById('blob-canvas');
+    blobCanvas.innerHTML = '';
+    blobPositions = {};
+    allOptions = {};
+    chooseResponses = {};
+
+    // Build teacher-defined options (static, from config)
+    Object.entries(config.options || {}).forEach(([key, label]) => {
+        allOptions[key] = { label, studentAdded: false };
+    });
+
+    // Listen for student-added options (real-time)
+    onValue(ref(db, `pulse/${currentRoom}/studentOptions`), (snap) => {
+        const studentOpts = snap.val() || {};
+        // Remove deleted student options
+        Object.keys(allOptions).forEach(k => {
+            if (allOptions[k].studentAdded && !studentOpts[k]) delete allOptions[k];
+        });
+        // Add new student options
+        Object.entries(studentOpts).forEach(([key, opt]) => {
+            if (!allOptions[key]) allOptions[key] = { label: opt.label, studentAdded: true };
+        });
+        renderBlobs(blobCanvas);
+    });
+
+    // Listen for student responses (votes)
+    onValue(ref(db, `pulse/${currentRoom}/responses`), (snap) => {
+        chooseResponses = snap.val() || {};
+        const n = Object.keys(chooseResponses).length;
+        document.getElementById('t-count').textContent = `${n} response${n !== 1 ? 's' : ''}`;
+        renderBlobs(blobCanvas);
+    });
+}
+
+function renderBlobs(container) {
+    // Count votes per option
+    const counts = {};
+    Object.keys(allOptions).forEach(k => { counts[k] = 0; });
+    if (isRevealed) {
+        Object.values(chooseResponses).forEach(r => {
+            (r.votes || []).forEach(k => { if (k in counts) counts[k]++; });
+        });
+    }
+
+    // Track existing blob elements
+    const existingEls = {};
+    container.querySelectorAll('[data-blob-key]').forEach(el => {
+        existingEls[el.getAttribute('data-blob-key')] = el;
+    });
+
+    // Remove stale blobs
+    Object.keys(existingEls).forEach(k => {
+        if (!allOptions[k]) existingEls[k].remove();
+    });
+
+    // Create or update
+    Object.entries(allOptions).forEach(([key, opt], idx) => {
+        const count = counts[key] || 0;
+        const size = blobSize(count);
+        if (existingEls[key]) {
+            updateBlobElement(existingEls[key], count, size);
+        } else {
+            const el = createBlobElement(key, opt.label, opt.studentAdded, count, size, idx, container);
+            container.appendChild(el);
+        }
+    });
+}
+
+function blobSize(count) {
+    return Math.max(100, Math.min(220, 100 + count * 14));
+}
+
+function createBlobElement(key, label, studentAdded, count, size, idx, container) {
+    const wrap = document.createElement('div');
+    wrap.className = 'blob-wrap';
+    wrap.setAttribute('data-blob-key', key);
+
+    if (!blobPositions[key]) {
+        blobPositions[key] = defaultBlobPosition(idx, container);
+    }
+    wrap.style.left = blobPositions[key].left + 'px';
+    wrap.style.top = blobPositions[key].top + 'px';
+
+    const circle = document.createElement('div');
+    circle.className = 'blob' + (studentAdded ? ' student-added' : '');
+    circle.style.width = size + 'px';
+    circle.style.height = size + 'px';
+
+    const countEl = document.createElement('div');
+    countEl.className = 'blob-count';
+    countEl.textContent = isRevealed ? count : '–';
+    circle.appendChild(countEl);
+
+    wrap.appendChild(circle);
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'blob-label';
+    labelEl.textContent = label;
+    wrap.appendChild(labelEl);
+
+    if (studentAdded) {
+        const del = document.createElement('button');
+        del.className = 'blob-delete';
+        del.innerHTML = '✕';
+        del.title = 'Delete this option';
+        del.addEventListener('click', e => {
+            e.stopPropagation();
+            deleteStudentOption(key);
+        });
+        wrap.appendChild(del);
+    }
+
+    setupBlobDrag(wrap, key);
+    return wrap;
+}
+
+function updateBlobElement(el, count, size) {
+    const circle = el.querySelector('.blob');
+    const countEl = el.querySelector('.blob-count');
+    circle.style.width = size + 'px';
+    circle.style.height = size + 'px';
+    countEl.textContent = isRevealed ? count : '–';
+}
+
+function defaultBlobPosition(idx, container) {
+    const cols = 4;
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const rect = container.getBoundingClientRect();
+    const containerW = rect.width || 800;
+    const cellW = containerW / cols;
+    return {
+        left: col * cellW + cellW / 2 - 60,
+        top: 40 + row * 220,
+    };
+}
+
+function setupBlobDrag(el, key) {
+    interact(el).draggable({
+        listeners: {
+            move(event) {
+                const left = parseFloat(el.style.left) + event.dx;
+                const top = parseFloat(el.style.top) + event.dy;
+                el.style.left = left + 'px';
+                el.style.top = top + 'px';
+                blobPositions[key] = { left, top };
+            }
+        }
+    });
+}
+
+async function deleteStudentOption(key) {
+    if (!confirm("Delete this student-suggested option? All votes for it will be lost.")) return;
+    await remove(ref(db, `pulse/${currentRoom}/studentOptions/${key}`));
 }
 
 // ==========================================
@@ -301,7 +578,13 @@ async function initStudentMode() {
     }
 
     config = snap.val();
-    renderSliders(config);
+    if (config.mode === 'choose') {
+        document.getElementById('s-form').classList.add('hidden');
+        document.getElementById('s-choose-form').classList.remove('hidden');
+        initStudentChooseMode(config);
+    } else {
+        renderSliders(config);
+    }
 }
 
 function renderSliders(cfg) {
@@ -342,11 +625,146 @@ async function submitResponse() {
 }
 
 // ==========================================
+// CHOOSE — STUDENT VIEW
+// ==========================================
+
+function getSessionId() {
+    let id = localStorage.getItem('pulse_session_id');
+    if (!id) {
+        id = 'sess_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        localStorage.setItem('pulse_session_id', id);
+    }
+    return id;
+}
+
+function initStudentChooseMode(cfg) {
+    studentVotes = new Set();
+
+    if (cfg.anonymity !== 'anonymous') {
+        document.getElementById('s-choose-name-wrap').classList.remove('hidden');
+    }
+    if (cfg.allowStudentOptions) {
+        document.getElementById('s-add-option-wrap').classList.remove('hidden');
+    }
+
+    updateVoteHint();
+
+    // Pre-load this student's existing votes
+    const sessionId = getSessionId();
+    get(ref(db, `pulse/${currentRoom}/responses/${sessionId}`)).then(snap => {
+        if (snap.exists()) {
+            studentVotes = new Set(snap.val().votes || []);
+            updateVoteHint();
+            document.querySelectorAll('#s-options-list .option-btn').forEach(btn => {
+                btn.classList.toggle('selected', studentVotes.has(btn.dataset.key));
+            });
+        }
+    });
+
+    // Teacher options (static from config)
+    const teacherOptions = {};
+    Object.entries(cfg.options || {}).forEach(([k, label]) => { teacherOptions[k] = label; });
+    renderStudentOptions(teacherOptions, {});
+
+    // Listen for student-added options appearing in real-time
+    onValue(ref(db, `pulse/${currentRoom}/studentOptions`), snap => {
+        renderStudentOptions(teacherOptions, snap.val() || {});
+    });
+}
+
+function renderStudentOptions(teacherOptions, studentOptions) {
+    const container = document.getElementById('s-options-list');
+    const allOpts = { ...teacherOptions };
+    Object.entries(studentOptions).forEach(([k, v]) => { allOpts[k] = v.label; });
+
+    // Remove stale votes for options that no longer exist
+    studentVotes.forEach(k => { if (!allOpts[k]) studentVotes.delete(k); });
+
+    // Track existing buttons
+    const existingBtns = {};
+    container.querySelectorAll('.option-btn').forEach(btn => {
+        existingBtns[btn.dataset.key] = btn;
+    });
+
+    // Remove stale buttons
+    Object.keys(existingBtns).forEach(k => {
+        if (!allOpts[k]) existingBtns[k].remove();
+    });
+
+    // Create or update buttons
+    Object.entries(allOpts).forEach(([key, label]) => {
+        if (existingBtns[key]) {
+            existingBtns[key].classList.toggle('selected', studentVotes.has(key));
+        } else {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn' + (studentVotes.has(key) ? ' selected' : '');
+            btn.textContent = label;
+            btn.dataset.key = key;
+            btn.addEventListener('click', () => toggleVote(key));
+            container.appendChild(btn);
+        }
+    });
+
+    updateVoteHint();
+}
+
+function toggleVote(key) {
+    if (studentVotes.has(key)) {
+        studentVotes.delete(key);
+    } else {
+        if (studentVotes.size >= (config.maxVotes || 1)) {
+            // Remove the first (oldest) selected vote to make room
+            const first = studentVotes.values().next().value;
+            studentVotes.delete(first);
+        }
+        studentVotes.add(key);
+    }
+    document.querySelectorAll('#s-options-list .option-btn').forEach(btn => {
+        btn.classList.toggle('selected', studentVotes.has(btn.dataset.key));
+    });
+    updateVoteHint();
+}
+
+function updateVoteHint() {
+    const hint = document.getElementById('vote-hint');
+    if (!config || config.mode !== 'choose') return;
+    const max = config.maxVotes || 1;
+    const sel = studentVotes.size;
+    hint.textContent = max === 1
+        ? (sel ? 'One option selected' : 'Select an option')
+        : `${sel} of up to ${max} options selected`;
+}
+
+async function addStudentOption() {
+    const input = document.getElementById('s-new-option');
+    const label = input.value.trim();
+    if (!label) return;
+    await push(ref(db, `pulse/${currentRoom}/studentOptions`), {
+        label,
+        timestamp: Date.now(),
+    });
+    input.value = '';
+}
+
+async function submitChooseResponse() {
+    const sessionId = getSessionId();
+    const response = { votes: [...studentVotes], timestamp: Date.now() };
+    if (config.anonymity !== 'anonymous') {
+        response.name = document.getElementById('s-choose-name').value.trim() || 'Anonymous';
+    }
+    await set(ref(db, `pulse/${currentRoom}/responses/${sessionId}`), response);
+
+    const feedback = document.getElementById('s-choose-feedback');
+    feedback.classList.remove('hidden');
+    setTimeout(() => feedback.classList.add('hidden'), 2000);
+}
+
+// ==========================================
 // CANVAS
 // ==========================================
 
 function resizeCanvas() {
-    if (!canvas) return;
+    if (!canvas || (config && config.mode === 'choose')) return;
     const wrap = canvas.parentElement;
     const rect = wrap.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
@@ -362,7 +780,7 @@ function resizeCanvas() {
 }
 
 function redraw() {
-    if (!ctx || !config) return;
+    if (!ctx || !config || config.mode === 'choose') return;
     ctx.clearRect(0, 0, canvasW, canvasH);
     dotPositions = [];
     const list = Object.entries(responses).map(([id, r]) => ({ id, ...r }));
@@ -410,7 +828,6 @@ function drawScatter(list, vars) {
 
     if (!isRevealed) return;
 
-    // Dots
     list.forEach(r => {
         const j = jitter(r.id);
         const x = toX(r.values[0]) + j.x;
@@ -425,7 +842,6 @@ function drawScatter(list, vars) {
         dotPositions.push({ x, y, r, color });
     });
 
-    // Average dot
     if (list.length > 0) {
         const ax = toX(mean(list, 0));
         const ay = toY(mean(list, 1));
@@ -489,23 +905,21 @@ function drawScatterAxes(pad, pw, ph, v0, v1) {
 
 function varToColor(val, v) {
     const t = Math.max(0, Math.min(1, (val - v.min) / (v.max - v.min)));
-    const hue = Math.round(220 - t * 220); // 220=blue → 0=red
+    const hue = Math.round(220 - t * 220);
     return `hsl(${hue}, 75%, 50%)`;
 }
 
 function drawColorLegend(pad, ph, v2) {
     const lx = canvasW - pad.right + 20;
-    const ly = pad.top + 24; // leave room for label above
+    const ly = pad.top + 24;
     const lw = 26;
     const lh = ph - 24;
 
-    // Variable label above the bar
     ctx.fillStyle = '#1e293b';
     ctx.font = 'bold 16px Inter, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText(v2.label, lx + lw / 2, ly - 6, lw * 5);
 
-    // Gradient: top = max (red), bottom = min (blue)
     const grad = ctx.createLinearGradient(0, ly, 0, ly + lh);
     grad.addColorStop(0, 'hsl(0, 75%, 50%)');
     grad.addColorStop(1, 'hsl(220, 75%, 50%)');
@@ -515,7 +929,6 @@ function drawColorLegend(pad, ph, v2) {
     ctx.lineWidth = 1;
     ctx.strokeRect(lx, ly, lw, lh);
 
-    // Min/max labels to the right
     ctx.fillStyle = '#1e293b';
     ctx.font = '14px Inter, sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -534,7 +947,6 @@ function drawHistogram(list, v) {
     const ph = canvasH - pad.top - pad.bottom;
     const range = v.max - v.min;
 
-    // Build buckets
     let buckets;
     if (range <= 20) {
         buckets = [];
@@ -561,7 +973,6 @@ function drawHistogram(list, v) {
     const maxCount = Math.max(...buckets.map(b => b.count), 1);
     const bw = pw / buckets.length;
 
-    // Y gridlines + labels
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#64748b';
@@ -580,7 +991,6 @@ function drawHistogram(list, v) {
     ctx.strokeRect(pad.left, pad.top, pw, ph);
 
     if (isRevealed) {
-        // Bars
         buckets.forEach((b, i) => {
             if (!b.count) return;
             const x = pad.left + i * bw;
@@ -591,7 +1001,6 @@ function drawHistogram(list, v) {
             ctx.globalAlpha = 1;
         });
 
-        // Average line
         if (list.length > 0) {
             const avg = mean(list, 0);
             const ax = pad.left + (avg - v.min) / range * pw;
@@ -608,7 +1017,6 @@ function drawHistogram(list, v) {
         }
     }
 
-    // X axis labels
     ctx.fillStyle = '#64748b';
     ctx.font = '16px Inter, sans-serif';
     buckets.forEach((b, i) => {
@@ -617,7 +1025,6 @@ function drawHistogram(list, v) {
         ctx.fillText(b.label, x, pad.top + ph + 8);
     });
 
-    // Axis labels
     ctx.fillStyle = '#1e293b';
     ctx.font = 'bold 20px Inter, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';

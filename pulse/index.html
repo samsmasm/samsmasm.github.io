@@ -8,9 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 </head>
 <body>
 
+<!-- LANDING -->
 <div id="view-landing" class="view active">
     <div class="brand">PULSE</div>
     <div class="tabs">
@@ -18,11 +20,10 @@
         <button class="tab" id="tab-student">Student</button>
     </div>
 
-    <!-- Teacher panel: two columns -->
+    <!-- Teacher panel: New Room + Rejoin side by side -->
     <div class="panel teacher-panel" id="panel-teacher">
         <div class="teacher-cols">
 
-            <!-- New Room -->
             <div class="teacher-col">
                 <div class="col-heading new-heading">New Room</div>
                 <div class="card">
@@ -34,15 +35,50 @@
                         <label>PIN</label>
                         <input type="text" id="t-pin-input" placeholder="e.g. 1234" maxlength="8">
                     </div>
+
+                    <!-- Mode selector -->
                     <div class="field-group">
-                        <label>Number of variables</label>
-                        <div class="var-count-group">
-                            <button class="var-count-btn active" data-n="1">1</button>
-                            <button class="var-count-btn" data-n="2">2</button>
-                            <button class="var-count-btn" data-n="3">3</button>
+                        <label>Mode</label>
+                        <div class="mode-group">
+                            <button class="mode-btn active" data-mode="plot">Plot</button>
+                            <button class="mode-btn" data-mode="choose">Choose</button>
                         </div>
                     </div>
-                    <div id="var-config-rows"></div>
+
+                    <!-- Plot config -->
+                    <div id="plot-setup">
+                        <div class="field-group">
+                            <label>Number of variables</label>
+                            <div class="var-count-group">
+                                <button class="var-count-btn active" data-n="1">1</button>
+                                <button class="var-count-btn" data-n="2">2</button>
+                                <button class="var-count-btn" data-n="3">3</button>
+                            </div>
+                        </div>
+                        <div id="var-config-rows"></div>
+                    </div>
+
+                    <!-- Choose config -->
+                    <div id="choose-setup" class="hidden">
+                        <div class="field-group">
+                            <label>Options</label>
+                            <div id="option-input-rows"></div>
+                            <button class="btn-add-opt" id="btn-add-option">+ Add option</button>
+                        </div>
+                        <div class="field-group">
+                            <label>Max votes per student</label>
+                            <div class="vote-count-group">
+                                <button class="vote-count-btn active" data-v="1">1</button>
+                                <button class="vote-count-btn" data-v="2">2</button>
+                                <button class="vote-count-btn" data-v="3">3</button>
+                            </div>
+                        </div>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="allow-student-options">
+                            Allow students to add their own options
+                        </label>
+                    </div>
+
                     <div class="field-group">
                         <label>Anonymity</label>
                         <select id="t-anonymity">
@@ -54,7 +90,7 @@
                     <div class="field-group">
                         <label>Reveal mode</label>
                         <select id="t-reveal">
-                            <option value="live">Live — dots appear as students submit</option>
+                            <option value="live">Live — results appear as students submit</option>
                             <option value="hidden">Hidden — teacher reveals manually</option>
                         </select>
                     </div>
@@ -64,7 +100,6 @@
 
             <div class="col-divider"></div>
 
-            <!-- Rejoin Room -->
             <div class="teacher-col rejoin-col">
                 <div class="col-heading rejoin-heading">Rejoin Room</div>
                 <div class="card">
@@ -95,7 +130,7 @@
     </div>
 </div>
 
-<!-- Teacher view -->
+<!-- TEACHER VIEW -->
 <div id="view-teacher" class="view">
     <div class="teacher-bar">
         <div class="bar-left">
@@ -104,7 +139,7 @@
             <span class="count-tag" id="t-count">0 responses</span>
         </div>
         <div class="bar-right">
-            <button class="btn-ctrl" id="btn-reveal">Show Dots</button>
+            <button class="btn-ctrl" id="btn-reveal">Show Results</button>
             <button class="btn-ctrl" id="btn-qr">QR Code</button>
             <button class="btn-ctrl" id="btn-csv">CSV</button>
             <button class="btn-ctrl danger" id="btn-delete">Delete Board</button>
@@ -112,10 +147,18 @@
         </div>
     </div>
     <div class="teacher-content">
-        <div class="canvas-wrap">
-            <canvas id="chart"></canvas>
-            <div class="tip hidden" id="tip"></div>
+        <!-- Plot content -->
+        <div id="plot-content">
+            <div class="canvas-wrap">
+                <canvas id="chart"></canvas>
+                <div class="tip hidden" id="tip"></div>
+            </div>
         </div>
+        <!-- Choose content -->
+        <div id="choose-content" class="hidden">
+            <div id="blob-canvas"></div>
+        </div>
+        <!-- QR panel (shared) -->
         <div class="qr-panel hidden" id="qr-panel">
             <div id="qrcode"></div>
             <p id="qr-url-text"></p>
@@ -123,12 +166,14 @@
     </div>
 </div>
 
-<!-- Student view -->
+<!-- STUDENT VIEW -->
 <div id="view-student" class="view">
     <div class="student-inner">
         <div class="brand">PULSE</div>
         <div class="room-label" id="s-room-label"></div>
         <div class="error-msg hidden" id="s-error">Room not found. Check the room name and try again.</div>
+
+        <!-- Plot student form -->
         <div id="s-form">
             <div id="s-sliders"></div>
             <div class="hidden" id="s-name-wrap">
@@ -140,6 +185,24 @@
         <div class="done hidden" id="s-done">
             <div class="done-check">✓</div>
             <p>Response submitted!</p>
+        </div>
+
+        <!-- Choose student form -->
+        <div id="s-choose-form" class="hidden">
+            <div id="s-options-list"></div>
+            <div id="s-add-option-wrap" class="hidden">
+                <div class="add-opt-row">
+                    <input type="text" id="s-new-option" placeholder="Type your option...">
+                    <button class="btn-secondary" id="btn-add-student-opt">Add</button>
+                </div>
+            </div>
+            <p class="vote-hint" id="vote-hint"></p>
+            <div id="s-choose-name-wrap" class="hidden field-group">
+                <label>Your name</label>
+                <input type="text" id="s-choose-name" placeholder="Your name">
+            </div>
+            <button class="btn primary" id="btn-submit-choose">Submit</button>
+            <div class="done-inline hidden" id="s-choose-feedback">✓ Saved!</div>
         </div>
     </div>
 </div>
