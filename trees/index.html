@@ -104,24 +104,42 @@
     <div class="stat">Seeds: <span class="val" id="s-seeds">0</span></div>
     <div class="stat">Time:  <span class="val" id="s-time">0</span></div>
 
-    <div class="sec">Avg Traits</div>
-    <div class="stat" style="color:#6dbf4a">Height:               <span class="val" id="s-h">—</span></div>
-    <div class="stat" style="color:#a07850">Girth:                <span class="val" id="s-g">—</span></div>
+    <div class="sec">Physical Traits</div>
+    <div class="stat" style="color:#6dbf4a">Height:            <span class="val" id="s-h">—</span></div>
+    <div class="stat" style="color:#a07850">Girth:             <span class="val" id="s-g">—</span></div>
+    <div class="stat" style="color:#5bc8a0">Root depth:        <span class="val" id="s-r">—</span></div>
+    <div class="stat" style="color:#d08840">Bark thickness:    <span class="val" id="s-b">—</span></div>
+
+    <canvas id="graph-phys" width="260" height="70"></canvas>
+    <div class="legend">
+      <span class="leg"><span class="leg-line" style="background:#6dbf4a"></span>H</span>
+      <span class="leg"><span class="leg-line" style="background:#a07850"></span>G</span>
+      <span class="leg"><span class="leg-line" style="background:#5bc8a0"></span>Root</span>
+      <span class="leg"><span class="leg-line" style="background:#d08840"></span>Bark</span>
+      <span class="leg"><span class="leg-line" style="background:#fff"></span>Pop</span>
+    </div>
+
+    <div class="sec">Strategic Traits</div>
     <div class="stat" style="color:#e8d060">Seed (0=big, 1=many): <span class="val" id="s-s">—</span></div>
     <div class="stat" style="color:#80c8e0">Dispersal (slots):    <span class="val" id="s-d">—</span></div>
+    <div class="stat" style="color:#c8a030">Allelopathy:          <span class="val" id="s-a">—</span></div>
+    <div class="stat" style="color:#e07050">Serotiny:             <span class="val" id="s-sr">—</span></div>
 
-    <canvas id="graph" width="260" height="90"></canvas>
+    <canvas id="graph-strat" width="260" height="70"></canvas>
     <div class="legend">
-      <span class="leg"><span class="leg-line" style="background:#6dbf4a"></span>Height</span>
-      <span class="leg"><span class="leg-line" style="background:#a07850"></span>Girth</span>
       <span class="leg"><span class="leg-line" style="background:#e8d060"></span>Seed</span>
       <span class="leg"><span class="leg-line" style="background:#80c8e0"></span>Disp.</span>
+      <span class="leg"><span class="leg-line" style="background:#c8a030"></span>Allelo.</span>
+      <span class="leg"><span class="leg-line" style="background:#e07050"></span>Serotiny</span>
       <span class="leg"><span class="leg-line" style="background:#fff"></span>Pop</span>
     </div>
 
     <div class="trait-key">
       <span>Shape:</span> tall+thin = conifer · short+wide = deciduous<br>
-      <span>Colour:</span> deep green = few big seeds · bright green = many small seeds
+      <span>Trunk:</span> dark red = thick bark · pale = thin bark<br>
+      <span>Roots:</span> visible below ground if deep-rooted<br>
+      <span>Allelo.:</span> brown haze suppresses nearby seedlings<br>
+      <span>Serotiny:</span> seeds locked in cones, bulk-released by fire
     </div>
 
     <div class="sec">Climate</div>
@@ -180,6 +198,8 @@ const CFG = {
   hRange: [0.15, 1.0],
   gRange: [0.20, 1.0],
   dRange: [1,    14],
+  // New genes (all 0–1)
+  // r = root depth, b = bark thickness, a = allelopathy, sr = serotiny
 };
 
 const SEED_HALFLIFE  = 1200;   // frames until ~37% viability remains
@@ -211,11 +231,16 @@ const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 const rnd   = (lo, hi)    => lo + Math.random() * (hi - lo);
 
 function mutate(g) {
+  const m = CFG.mutRate;
   return {
-    h: clamp(g.h + (Math.random()-0.5) * CFG.mutRate * 0.35, ...CFG.hRange),
-    g: clamp(g.g + (Math.random()-0.5) * CFG.mutRate * 0.35, ...CFG.gRange),
-    s: clamp(g.s + (Math.random()-0.5) * CFG.mutRate * 0.50, 0, 1),
-    d: clamp(g.d + (Math.random()-0.5) * CFG.mutRate * 5,    ...CFG.dRange),
+    h:  clamp(g.h  + (Math.random()-0.5) * m * 0.35, ...CFG.hRange),
+    g:  clamp(g.g  + (Math.random()-0.5) * m * 0.35, ...CFG.gRange),
+    s:  clamp(g.s  + (Math.random()-0.5) * m * 0.50, 0, 1),
+    d:  clamp(g.d  + (Math.random()-0.5) * m * 5,    ...CFG.dRange),
+    r:  clamp(g.r  + (Math.random()-0.5) * m * 0.35, 0, 1),
+    b:  clamp(g.b  + (Math.random()-0.5) * m * 0.35, 0, 1),
+    a:  clamp(g.a  + (Math.random()-0.5) * m * 0.35, 0, 1),
+    sr: clamp(g.sr + (Math.random()-0.5) * m * 0.35, 0, 1),
   };
 }
 
@@ -231,11 +256,17 @@ class Tree {
     this.windToppled = false;
 
     this.genes = genes ?? {
-      h: rnd(...CFG.hRange),
-      g: rnd(...CFG.gRange),
-      s: Math.random(),
-      d: rnd(...CFG.dRange),
+      h:  rnd(...CFG.hRange),
+      g:  rnd(...CFG.gRange),
+      s:  Math.random(),
+      d:  rnd(...CFG.dRange),
+      r:  Math.random() * 0.3,   // start low — costly to maintain
+      b:  Math.random() * 0.3,
+      a:  Math.random() * 0.2,
+      sr: Math.random() * 0.2,
     };
+
+    this.seedCache = [];  // serotinous seed store, released on fire death
 
     this.bumps = Array.from({length: 5}, () => ({
       dx:  (Math.random() - 0.5) * 1.5,
@@ -270,10 +301,17 @@ class Tree {
     this.age++;
     if (this.age > CFG.maxAge) { this.dead = true; return []; }
 
-    this.energy += light * CFG.rainfall * CFG.photoBase;
+    // Root depth boosts water access in drought; deep roots cost more to maintain
+    const waterAccess = CFG.rainfall + (1 - CFG.rainfall) * this.genes.r * 0.55;
+    this.energy += light * waterAccess * CFG.photoBase;
 
     const hFrac = this.curH / maxTreeH;
-    this.energy -= hFrac * CFG.maintH + this.genes.g * CFG.maintG + CFG.maintBase;
+    this.energy -= hFrac * CFG.maintH
+                 + this.genes.g  * CFG.maintG
+                 + CFG.maintBase
+                 + this.genes.r  * 0.016   // root maintenance
+                 + this.genes.b  * 0.013   // bark production
+                 + this.genes.a  * 0.020;  // allelopathic compound synthesis
     if (this.energy <= 0) { this.dead = true; return []; }
 
     // Wind topple — tall thin trees most vulnerable; sets windToppled flag for animation
@@ -302,15 +340,49 @@ class Tree {
     for (let i = 0; i < count; i++) {
       const bias   = CFG.windDir * CFG.windStr * this.genes.d * 0.4;
       const offset = (Math.random() - 0.5) * 2 * this.genes.d + bias;
-      seeds.push({ slot: Math.round(this.slot + offset), genes: mutate(this.genes), seedSize });
+      const seed   = { slot: Math.round(this.slot + offset), genes: mutate(this.genes), seedSize };
+      // Serotinous trees lock seeds in resin-sealed cones, released only by fire
+      if (Math.random() < this.genes.sr && this.seedCache.length < 60) {
+        this.seedCache.push(seed);
+      } else {
+        seeds.push(seed);
+      }
     }
     return seeds;
   }
 
   draw() {
     const c = this.colors();
+    if (this.genes.r > 0.15) this._drawRoots();
     if (this.shapeRatio > 2.0) this._drawConifer(c);
     else                        this._drawDeciduous(c);
+  }
+
+  // Bark colour: thin bark = pale brown; thick bark = dark reddish-brown
+  _barkColor() {
+    const b = this.genes.b;
+    const rv = Math.round(38 + b * 30);
+    const gv = Math.round(18 - b * 4);
+    return `rgb(${rv},${gv},4)`;
+  }
+
+  // Root lines visible just below ground
+  _drawRoots() {
+    const depth    = this.genes.r * 22;
+    const numRoots = 2 + Math.round(this.genes.r * 2);
+    const tw       = this.trunkHW;
+    ctx.strokeStyle = `rgba(50,24,6,${(0.25 + this.genes.r * 0.45).toFixed(2)})`;
+    ctx.lineWidth   = 1;
+    for (let i = 0; i < numRoots; i++) {
+      // Spread roots left and right from trunk base
+      const spread = ((i / (numRoots - 1 || 1)) - 0.5) * 2;
+      const endX   = this.x + spread * (tw * 2 + this.genes.r * 14);
+      const endY   = groundY + depth;
+      ctx.beginPath();
+      ctx.moveTo(this.x + spread * tw, groundY);
+      ctx.quadraticCurveTo(this.x + spread * tw * 1.5, groundY + depth * 0.4, endX, endY);
+      ctx.stroke();
+    }
   }
 
   _drawConifer(c) {
@@ -318,8 +390,11 @@ class Tree {
     const topY = groundY - this.curH;
     const tw   = this.trunkHW;
 
-    ctx.fillStyle = '#3e1e08';
+    ctx.fillStyle = this._barkColor();
     ctx.fillRect(x - tw, topY + this.curH * 0.10, tw * 2, this.curH * 0.90);
+
+    // Serotiny: orange-tinted cone dots on foliage tips
+    const coneAlpha = this.genes.sr * 0.7;
 
     const maxHW = this.genes.g * 15 + 8;
     const secH  = this.curH * 0.38;
@@ -332,6 +407,15 @@ class Tree {
       ctx.beginPath();
       ctx.moveTo(x, ly); ctx.lineTo(x + hw, ly + secH); ctx.lineTo(x - hw, ly + secH);
       ctx.closePath(); ctx.fill();
+      // Serotiny: small orange cone dots at tips of each triangular layer
+      if (coneAlpha > 0.08) {
+        ctx.fillStyle = `rgba(220,120,20,${coneAlpha.toFixed(2)})`;
+        for (let di = -1; di <= 1; di++) {
+          ctx.beginPath();
+          ctx.arc(x + di * hw * 0.55, ly + secH * 0.85, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
   }
 
@@ -342,12 +426,13 @@ class Tree {
     const cy  = groundY - this.curH;
     const tw  = this.trunkHW;
 
+    // Bark thickness darkens the trunk
+    const bark  = this._barkColor();
     const tGrad = ctx.createLinearGradient(x - tw, 0, x + tw, 0);
-    const tMid  = `rgb(${68+Math.round(this.genes.g*28)},${40+Math.round(this.genes.g*14)},10)`;
-    tGrad.addColorStop(0,   '#2a1406');
-    tGrad.addColorStop(0.4, tMid);
-    tGrad.addColorStop(0.6, tMid);
-    tGrad.addColorStop(1,   '#2a1406');
+    tGrad.addColorStop(0,   '#1a0a02');
+    tGrad.addColorStop(0.4, bark);
+    tGrad.addColorStop(0.6, bark);
+    tGrad.addColorStop(1,   '#1a0a02');
     ctx.fillStyle = tGrad;
     ctx.fillRect(x - tw, cy + cry * 0.5, tw * 2, groundY - cy - cry * 0.5);
 
@@ -491,9 +576,12 @@ function igniteSlot(slot) {
   if (activeFires.has(slot)) return;
   const t = slots[slot];
   if (!t) return;
-  const survive = t.genes.g * t.genes.g * 0.35;  // thick bark resists
-  if (Math.random() < survive) return;
-  activeFires.set(slot, { age: 0, burnTime: 70 + t.genes.g * 80 + Math.random() * 40 });
+  // Bark thickness is the primary fire defence; girth adds a little
+  const fireResist = t.genes.b * t.genes.b * 0.65 + t.genes.g * t.genes.g * 0.10;
+  if (Math.random() < fireResist) return;
+  // Thicker bark also slows burning
+  const burnTime = 55 + t.genes.b * 120 + t.genes.g * 20 + Math.random() * 35;
+  activeFires.set(slot, { age: 0, burnTime });
 }
 
 function triggerFire() {
@@ -509,7 +597,18 @@ function plantSeed(slot, genes, seedSize) {
   if (slot < 0 || slot >= numSlots || slots[slot]) return false;
   const light     = lightArr[slot] ?? 1.0;
   const shadeFact = light < 0.4 ? (seedSize * light / 0.4) : 1.0;
-  if (Math.random() < 0.28 * shadeFact) {
+
+  // Allelopathy: nearby trees exude chemicals that suppress germination
+  let suppression = 0;
+  const reach = 3;
+  for (let di = -reach; di <= reach; di++) {
+    const ni = slot + di;
+    if (ni < 0 || ni >= numSlots || !slots[ni]) continue;
+    const distFrac = Math.abs(di) / (reach + 1);
+    suppression = Math.max(suppression, slots[ni].genes.a * (1 - distFrac) * 0.85);
+  }
+
+  if (Math.random() < 0.28 * shadeFact * (1 - suppression)) {
     slots[slot] = new Tree(slot, genes);
     return true;
   }
@@ -544,6 +643,11 @@ function simulate() {
     if (fire.age >= fire.burnTime) {
       const t = slots[slot];
       if (t) {
+        // Serotiny: heat opens cones — dump entire seed cache into bank
+        for (const s of t.seedCache) {
+          if (seedBank.length < MAX_SEED_BANK)
+            seedBank.push({ slot: s.slot, genes: s.genes, seedSize: s.seedSize, age: 0 });
+        }
         stumps.push({
           x: t.x, w: t.trunkHW * 2 + 2,
           h: Math.min(t.curH * 0.22, 28),
@@ -746,10 +850,13 @@ function drawAverageTree() {
   }
 
   // Compute averages
-  let sh = 0, sg = 0, ss = 0;
-  for (const t of live) { sh += t.genes.h; sg += t.genes.g; ss += t.genes.s; }
-  const n  = live.length;
-  const ah = sh / n, ag = sg / n, as_ = ss / n;
+  let sh = 0, sg = 0, ss = 0, sr_ = 0, sb = 0;
+  for (const t of live) {
+    sh += t.genes.h; sg += t.genes.g; ss += t.genes.s;
+    sr_ += t.genes.r; sb += t.genes.b;
+  }
+  const n   = live.length;
+  const ah  = sh / n, ag = sg / n, as_ = ss / n, ar = sr_ / n, ab = sb / n;
 
   // Derived sizing (same formulas as Tree class)
   const shapeRatio = ah / (ag + 0.1);
@@ -768,6 +875,27 @@ function drawAverageTree() {
   const cMid   = `rgb(${cr},${cg},${cb})`;
   const cDark  = `rgb(${Math.round(cr*0.42)},${Math.round(cg*0.42)},${Math.round(cb*0.42)})`;
 
+  // Average bark color for preview trunk
+  const barkR = Math.round(38 + ab * 30);
+  const barkG = Math.round(18 - ab * 4);
+  const barkCol = `rgb(${barkR},${barkG},4)`;
+
+  // Roots (visible below ground)
+  if (ar > 0.15) {
+    const rootDepth = ar * 22;
+    const numRoots  = 2 + Math.round(ar * 2);
+    px.strokeStyle  = `rgba(50,24,6,${(0.25 + ar * 0.45).toFixed(2)})`;
+    px.lineWidth    = 1;
+    for (let i = 0; i < numRoots; i++) {
+      const spread = ((i / (numRoots - 1 || 1)) - 0.5) * 2;
+      const endX   = tx + spread * (tw * 2 + ar * 14);
+      px.beginPath();
+      px.moveTo(tx + spread * tw, pgY);
+      px.quadraticCurveTo(tx + spread * tw * 1.5, pgY + rootDepth * 0.4, endX, pgY + rootDepth);
+      px.stroke();
+    }
+  }
+
   // Ground shadow ellipse
   px.fillStyle = `rgba(0,22,0,${(0.16 * ah).toFixed(3)})`;
   px.beginPath();
@@ -776,7 +904,7 @@ function drawAverageTree() {
 
   if (shapeRatio > 2.0) {
     // Conifer
-    px.fillStyle = '#3e1e08';
+    px.fillStyle = barkCol;
     px.fillRect(tx - tw, topY + curH * 0.10, tw * 2, curH * 0.90);
 
     const maxHW = ag * 15 + 8;
@@ -795,13 +923,12 @@ function drawAverageTree() {
     // Deciduous
     const cy = pgY - curH;
 
-    // Trunk
-    const tMid = `rgb(${68+Math.round(ag*28)},${40+Math.round(ag*14)},10)`;
+    // Trunk (bark color reflects avg bark thickness)
     const tg = px.createLinearGradient(tx - tw, 0, tx + tw, 0);
-    tg.addColorStop(0,   '#2a1406');
-    tg.addColorStop(0.4, tMid);
-    tg.addColorStop(0.6, tMid);
-    tg.addColorStop(1,   '#2a1406');
+    tg.addColorStop(0,   '#1a0a02');
+    tg.addColorStop(0.4, barkCol);
+    tg.addColorStop(0.6, barkCol);
+    tg.addColorStop(1,   '#1a0a02');
     px.fillStyle = tg;
     px.fillRect(tx - tw, cy + cry * 0.5, tw * 2, pgY - cy - cry * 0.5);
 
@@ -903,6 +1030,18 @@ function drawFrame() {
     if (fallingTrees[i].done) fallingTrees.splice(i, 1);
   }
 
+  // Allelopathy: brownish dead-zone haze on ground around high-a trees
+  for (let i = 0; i < numSlots; i++) {
+    const t = slots[i];
+    if (!t || t.genes.a < 0.15) continue;
+    const reach = t.genes.a * 3 * CFG.slotW;
+    const op    = t.genes.a * 0.13;
+    ctx.fillStyle = `rgba(110,80,15,${op.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(t.x, groundY + 3, reach, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Standing trees
   for (let i = 0; i < numSlots; i++) {
     if (slots[i]) slots[i].draw();
@@ -927,27 +1066,51 @@ function updateStats() {
   document.getElementById('s-time').textContent  = frameCount;
 
   if (!n) return;
-  let sh = 0, sg = 0, ss = 0, sd = 0;
-  for (const t of live) { sh += t.genes.h; sg += t.genes.g; ss += t.genes.s; sd += t.genes.d; }
+  let sh = 0, sg = 0, ss = 0, sd = 0, sr_ = 0, sb = 0, sa = 0, ssr = 0;
+  for (const t of live) {
+    sh += t.genes.h; sg += t.genes.g; ss += t.genes.s; sd  += t.genes.d;
+    sr_ += t.genes.r; sb += t.genes.b; sa += t.genes.a; ssr += t.genes.sr;
+  }
 
-  document.getElementById('s-h').textContent = (sh/n).toFixed(2);
-  document.getElementById('s-g').textContent = (sg/n).toFixed(2);
-  document.getElementById('s-s').textContent = (ss/n).toFixed(2);
-  document.getElementById('s-d').textContent = (sd/n).toFixed(1);
+  document.getElementById('s-h').textContent  = (sh /n).toFixed(2);
+  document.getElementById('s-g').textContent  = (sg /n).toFixed(2);
+  document.getElementById('s-r').textContent  = (sr_/n).toFixed(2);
+  document.getElementById('s-b').textContent  = (sb /n).toFixed(2);
+  document.getElementById('s-s').textContent  = (ss /n).toFixed(2);
+  document.getElementById('s-d').textContent  = (sd /n).toFixed(1);
+  document.getElementById('s-a').textContent  = (sa /n).toFixed(2);
+  document.getElementById('s-sr').textContent = (ssr/n).toFixed(2);
 
   history.push({
     pop: n / numSlots,
-    h:   sh / n,
-    g:   sg / n,
-    s:   ss / n,
+    h:   sh  / n,
+    g:   sg  / n,
+    r:   sr_ / n,
+    b:   sb  / n,
+    s:   ss  / n,
     d:   (sd / n) / CFG.dRange[1],
+    a:   sa  / n,
+    sr:  ssr / n,
   });
   if (history.length > MAX_HIST) history.shift();
-  drawGraph();
+  drawGraph('graph-phys',  [
+    { key:'h',   color:'#6dbf4a', lw:1.5 },
+    { key:'g',   color:'#a07850', lw:1.5 },
+    { key:'r',   color:'#5bc8a0', lw:1.5 },
+    { key:'b',   color:'#d08840', lw:1.5 },
+    { key:'pop', color:'#ffffff', lw:1   },
+  ]);
+  drawGraph('graph-strat', [
+    { key:'s',   color:'#e8d060', lw:1.5 },
+    { key:'d',   color:'#80c8e0', lw:1.5 },
+    { key:'a',   color:'#c8a030', lw:1.5 },
+    { key:'sr',  color:'#e07050', lw:1.5 },
+    { key:'pop', color:'#ffffff', lw:1   },
+  ]);
 }
 
-function drawGraph() {
-  const gc = document.getElementById('graph');
+function drawGraph(id, lines) {
+  const gc = document.getElementById(id);
   const gx = gc.getContext('2d');
   const W  = gc.width, H = gc.height;
   gx.clearRect(0, 0, W, H);
@@ -955,14 +1118,7 @@ function drawGraph() {
   gx.fillRect(0, 0, W, H);
   if (history.length < 2) return;
 
-  const vis   = history.slice(-150);
-  const lines = [
-    { key:'h',   color:'#6dbf4a', lw:1.5 },
-    { key:'g',   color:'#a07850', lw:1.5 },
-    { key:'s',   color:'#e8d060', lw:1.5 },
-    { key:'d',   color:'#80c8e0', lw:1   },
-    { key:'pop', color:'#ffffff', lw:1   },
-  ];
+  const vis = history.slice(-150);
   for (const l of lines) {
     gx.strokeStyle = l.color;
     gx.lineWidth   = l.lw;
