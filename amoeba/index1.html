@@ -222,6 +222,11 @@
                 <input type="range" id="mut-slider" min="0.0" max="1.0" step="0.1" value="0.1" style="width: 100%; cursor: pointer;">
             </div>
 
+            <div class="control-group">
+                <label>Sim Speed: <span id="speed-mult-disp" class="stat-value">1×</span></label>
+                <input type="range" id="speed-slider" min="1" max="20" step="1" value="1" style="width: 100%; cursor: pointer;">
+            </div>
+
             <div class="section-title">Stats by Growth Rate</div>
             <table id="stats-table">
                 <thead>
@@ -274,7 +279,10 @@
             radiusScale: 0.08,     
 
             // Mutation Config
-            mutationRate: 0.1 
+            mutationRate: 0.1,
+
+            // Speed Multiplier
+            simSpeed: 1
         };
 
         // --- GLOBAL VARIABLES ---
@@ -329,6 +337,8 @@
         const uiStatsBody = document.getElementById('stats-body');
         
         // Sliders
+        const uiSpeedSlider = document.getElementById('speed-slider');
+        const uiSpeedDisp = document.getElementById('speed-mult-disp');
         const uiSpawnSlider = document.getElementById('spawn-slider');
         const uiSpawnDisp = document.getElementById('spawn-rate-disp');
         const uiPoisonSlider = document.getElementById('poison-slider');
@@ -339,6 +349,12 @@
         const uiGraphTimeDisp = document.getElementById('graph-time-disp');
 
         // Slider Listeners
+        uiSpeedSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            CONFIG.simSpeed = val;
+            uiSpeedDisp.textContent = val + '×';
+        });
+
         uiSpawnSlider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             CONFIG.foodSpawnRate = val;
@@ -807,48 +823,45 @@
             drawLine('pop', 50, '#ffffff', 1);       // Population (White)
         }
 
-        function render() {
-            ctx.clearRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+        function simulate() {
+            spawnFood();
+            spawnPoison();
 
-            for (let food of foods) {
-                food.draw(ctx);
-            }
-            
-            for (let poison of poisons) {
-                poison.draw(ctx);
-            }
-
+            const offspring = [];
             for (let i = organisms.length - 1; i >= 0; i--) {
                 let org = organisms[i];
-                let offspring = org.update(foods, poisons);
-
+                let child = org.update(foods, poisons);
                 if (org.dead) {
                     organisms.splice(i, 1);
-                } else {
-                    org.draw(ctx);
-                    if (offspring) {
-                        organisms.push(offspring);
-                    }
+                } else if (child) {
+                    offspring.push(child);
                 }
             }
-            
+            organisms.push(...offspring);
+
             // Extinction safeguard
             if (organisms.length === 0 && frameCount > 100) {
                 organisms.push(new Organism(CONFIG.canvasWidth/2, CONFIG.canvasHeight/2, CONFIG.startEnergy));
             }
+
+            frameCount++;
+        }
+
+        function drawFrame() {
+            ctx.clearRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+            for (let food of foods) food.draw(ctx);
+            for (let poison of poisons) poison.draw(ctx);
+            for (let org of organisms) org.draw(ctx);
         }
 
         function gameLoop() {
-            spawnFood();
-            spawnPoison();
-            render();
-            
-            // Update stats every 60 frames (approx 1 sec) for meaningful time units
-            if (frameCount % 60 === 0) { 
-                calculateAndDrawStats();
+            for (let i = 0; i < CONFIG.simSpeed; i++) {
+                simulate();
+                if (frameCount % 60 === 0) {
+                    calculateAndDrawStats();
+                }
             }
-            
-            frameCount++;
+            drawFrame();
             animationId = requestAnimationFrame(gameLoop);
         }
 
