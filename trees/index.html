@@ -251,11 +251,12 @@ let history     = [];
 const MAX_HIST  = 300;
 
 // New state
-let windParticles = [];
-let raindrops     = [];
-let fallingTrees  = [];
-let activeFires   = new Map();  // slot → {age, burnTime}
-let seedBank      = [];         // {slot, genes, seedSize, age}
+let windParticles  = [];
+let raindrops      = [];
+let fallingTrees   = [];
+let activeFires    = new Map();  // slot → {age, burnTime}
+let seedBank       = [];         // {slot, genes, seedSize, age}
+let seedParticles  = [];         // {x, y, tx, ty, age, dur, col}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
@@ -286,6 +287,7 @@ class Tree {
     this.age    = 0;
     this.dead   = false;
     this.windToppled = false;
+    this.flashTimer  = 0;
 
     this.genes = genes ?? {
       h:  rnd(...CFG.hRange),
@@ -315,7 +317,7 @@ class Tree {
       ? Math.max(1.5, this.genes.g * 4)
       : Math.max(3,   this.genes.g * 11);
   }
-  get canopyRX() { return this.genes.cw * 54 + 8; }  // cw gene, not girth
+  get canopyRX() { return this.genes.cw * 120 + 5; }  // cw gene — range 5–125px
   get canopyRY() { return Math.min(48, this.curH * 0.17 + 5); }
 
   colors() {
@@ -370,18 +372,34 @@ class Tree {
 
   disperse() {
     this.energy -= CFG.reproCost;
+    this.flashTimer = 18;   // trigger parent glow
     const count    = Math.round(1 + this.genes.s * 9 + Math.random() * 2);
     const seedSize = 1 - this.genes.s * 0.75;
     const seeds    = [];
+    const topY     = groundY - this.curH;
+    // Seed colour: bright version of the tree's seed-strategy hue
+    const s  = this.genes.s;
+    const pr = Math.round(52  + s * 142);
+    const pg = Math.round(97  + s * 167);
+    const pb = Math.round(22  + s * 24);
     for (let i = 0; i < count; i++) {
       const bias   = CFG.windDir * CFG.windStr * this.genes.d * 0.4;
       const offset = (Math.random() - 0.5) * 2 * this.genes.d + bias;
-      const seed   = { slot: Math.round(this.slot + offset), genes: mutate(this.genes), seedSize };
+      const destSlot = Math.round(this.slot + offset);
+      const seed   = { slot: destSlot, genes: mutate(this.genes), seedSize };
       // Serotinous trees lock seeds in resin-sealed cones, released only by fire
       if (Math.random() < this.genes.sr && this.seedCache.length < 60) {
         this.seedCache.push(seed);
       } else {
         seeds.push(seed);
+        // Emit a seed particle for non-serotinous seeds
+        const tx = (destSlot + 0.5) * CFG.slotW;
+        seedParticles.push({
+          x: this.x, y: topY + this.curH * 0.3,
+          tx, ty: groundY,
+          age: 0, dur: 22 + Math.abs(offset) * 1.2,
+          r: pr, g: pg, b: pb,
+        });
       }
     }
     return seeds;
@@ -392,6 +410,22 @@ class Tree {
     if (this.genes.r > 0.15) this._drawRoots();
     if (this.shapeRatio > 2.0) this._drawConifer(c);
     else                        this._drawDeciduous(c);
+    // Reproduction flash — bright halo that fades over flashTimer frames
+    if (this.flashTimer > 0) {
+      const alpha = this.flashTimer / 18;
+      const topY  = groundY - this.curH;
+      const crx   = this.canopyRX;
+      const cry   = this.canopyRY;
+      const glow  = ctx.createRadialGradient(this.x, topY + this.curH * 0.3, 0, this.x, topY + this.curH * 0.3, crx * 1.4);
+      glow.addColorStop(0,   `rgba(255,255,160,${(alpha * 0.75).toFixed(2)})`);
+      glow.addColorStop(0.5, `rgba(255,240,80,${(alpha * 0.35).toFixed(2)})`);
+      glow.addColorStop(1,   'rgba(255,220,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.ellipse(this.x, topY + this.curH * 0.3, crx * 1.4, (cry + crx) * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      this.flashTimer--;
+    }
   }
 
   // b=0: cream/sandy birch · b=1: near-black redwood
@@ -619,13 +653,15 @@ function computeLight() {
   for (let j = 0; j < numSlots; j++) {
     const t = slots[j];
     if (!t || t.curH < 6) continue;
-    const hFrac = t.curH / maxTreeH;
-    const reach = Math.ceil(t.canopyRX / CFG.slotW);
+    const hFrac    = t.curH / maxTreeH;
+    const cwFrac   = t.genes.cw;             // 0–1, drives canopy density
+    const maxShade = 0.55 + cwFrac * 0.44;   // narrow=0.55, wide=0.99 (near-total shade)
+    const reach    = Math.ceil(t.canopyRX / CFG.slotW);
     for (let di = -reach; di <= reach; di++) {
       const i = j + di;
       if (i < 0 || i >= numSlots || i === j) continue;
       const distF  = Math.abs(di) / (reach + 0.5);
-      const shadow = hFrac * (1 - distF) * 0.88;
+      const shadow = hFrac * (1 - distF) * maxShade;
       if (shadow > 1 - light[i]) light[i] = Math.max(0, 1 - shadow);
     }
   }
@@ -925,7 +961,7 @@ function drawAverageTree() {
   const curH = ah * pmH;
   const topY = pgY - curH;
   const tw   = shapeRatio > 2.0 ? Math.max(1.5, ag * 4) : Math.max(3, ag * 11);
-  const crx  = Math.min(PW * 0.44, acw * 54 + 8);  // use cw gene
+  const crx  = Math.min(PW * 0.48, acw * 120 + 5);  // use cw gene, matches new formula
   const cry  = Math.min(48, curH * 0.17 + 5);
   const tx   = PW / 2;
 
@@ -1139,6 +1175,23 @@ function drawFrame() {
     if (slots[i]) slots[i].draw();
   }
 
+  // Seed particles — small dots travelling from parent canopy to destination
+  for (let i = seedParticles.length - 1; i >= 0; i--) {
+    const p = seedParticles[i];
+    p.age++;
+    const t = Math.min(1, p.age / p.dur);
+    const px = p.x + (p.tx - p.x) * t;
+    // Gentle arc: peak height halfway through travel
+    const arc = Math.sin(t * Math.PI) * 18;
+    const py  = p.y + (p.ty - p.y) * t - arc;
+    const alpha = (1 - t) * 0.85;
+    ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha.toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 2, 0, Math.PI * 2);
+    ctx.fill();
+    if (t >= 1) seedParticles.splice(i, 1);
+  }
+
   // Flames over burning trees
   for (const slot of activeFires.keys()) {
     drawFlames(slot);
@@ -1299,7 +1352,8 @@ function resetSim() {
   stumps       = [];
   fallingTrees = [];
   activeFires  = new Map();
-  seedBank     = [];
+  seedBank       = [];
+  seedParticles  = [];
   history      = [];
   frameCount   = 0;
   animFrame    = 0;
