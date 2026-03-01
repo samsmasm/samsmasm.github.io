@@ -119,6 +119,7 @@
     <div class="stat" style="color:#b088e0">Canopy width:      <span class="val" id="s-cw">—</span></div>
     <div class="stat" style="color:#5bc8a0">Root depth:        <span class="val" id="s-r">—</span></div>
     <div class="stat" style="color:#d08840">Bark thickness:    <span class="val" id="s-b">—</span></div>
+    <div class="stat" style="color:#f0a060">Light pref (0=shade, 1=sun): <span class="val" id="s-ls">—</span></div>
 
     <canvas id="graph-phys" width="260" height="70"></canvas>
     <div class="legend">
@@ -127,6 +128,7 @@
       <span class="leg"><span class="leg-line" style="background:#b088e0"></span>CW</span>
       <span class="leg"><span class="leg-line" style="background:#5bc8a0"></span>Root</span>
       <span class="leg"><span class="leg-line" style="background:#d08840"></span>Bark</span>
+      <span class="leg"><span class="leg-line" style="background:#f0a060"></span>Light</span>
       <span class="leg"><span class="leg-line" style="background:#fff"></span>Pop</span>
     </div>
 
@@ -135,6 +137,7 @@
     <div class="stat" style="color:#80c8e0">Dispersal (slots):    <span class="val" id="s-d">—</span></div>
     <div class="stat" style="color:#c8a030">Allelopathy:          <span class="val" id="s-a">—</span></div>
     <div class="stat" style="color:#e07050">Serotiny:             <span class="val" id="s-sr">—</span></div>
+    <div class="stat" style="color:#90d0b0">Dormancy:             <span class="val" id="s-dorm">—</span></div>
 
     <canvas id="graph-strat" width="260" height="70"></canvas>
     <div class="legend">
@@ -142,6 +145,7 @@
       <span class="leg"><span class="leg-line" style="background:#80c8e0"></span>Disp.</span>
       <span class="leg"><span class="leg-line" style="background:#c8a030"></span>Allelo.</span>
       <span class="leg"><span class="leg-line" style="background:#e07050"></span>Serotiny</span>
+      <span class="leg"><span class="leg-line" style="background:#90d0b0"></span>Dormancy</span>
       <span class="leg"><span class="leg-line" style="background:#fff"></span>Pop</span>
     </div>
 
@@ -182,6 +186,8 @@
       <div class="info-trait"><b>Dispersal (d)</b> How far seeds travel from the parent. Wind biases the direction. High dispersal finds empty slots; low dispersal clusters offspring nearby. <i>A thin blue arc on the ground shows each tree's seed-reach radius.</i></div>
       <div class="info-trait"><b>Allelopathy (a)</b> Trees produce chemicals that suppress germination in nearby slots. Costs energy; pays off when the forest is dense and slot competition is intense. <i>A sickly yellow-brown dead zone with withered grass marks spreads around the base of high-allelopathy trees.</i></div>
       <div class="info-trait"><b>Serotiny (sr)</b> Seeds are sealed in resin and released only by fire heat. Useless in fire-free forests; in fire-prone ones each burn floods clearings with stored seeds before competitors can arrive. <i>Orange-brown elongated cones hang from conifer branches; dark pod clusters appear on deciduous canopies.</i></div>
+      <div class="info-trait"><b>Light preference (ls)</b> 0 = shade-tolerant: photosynthesises efficiently in dim light, grows slowly, can establish under a closed canopy. 1 = sun-loving: highly productive in full light but starves in deep shade. Coevolves with height — short shade-tolerant understory trees and tall canopy trees tend to emerge as distinct strategies.</div>
+      <div class="info-trait"><b>Dormancy (dorm)</b> How long seeds remain viable in the soil. Low dormancy: seeds germinate quickly or die. High dormancy: seeds persist for a very long time, acting as a long-term genetic reservoir — strategies that disappear from the living forest can re-emerge decades later from buried seeds.</div>
     </details>
   </div>
 </div>
@@ -215,6 +221,8 @@ const CFG = {
   gRange:  [0.20, 1.0],
   dRange:  [1,    14],
   cwRange: [0.05, 1.0],  // canopy width gene
+  // ls: light sensitivity — 0=shade-tolerant, 1=sun-loving
+  // dorm: seed dormancy — 0=short-lived seeds, 1=very long-lived seeds
 };
 
 const SEED_HALFLIFE  = 1200;   // frames until ~37% viability remains
@@ -256,8 +264,10 @@ function mutate(g) {
     d:  clamp(g.d  + (Math.random()-0.5) * m * 5,    ...CFG.dRange),
     r:  clamp(g.r  + (Math.random()-0.5) * m * 0.35, 0, 1),
     b:  clamp(g.b  + (Math.random()-0.5) * m * 0.35, 0, 1),
-    a:  clamp(g.a  + (Math.random()-0.5) * m * 0.35, 0, 1),
-    sr: clamp(g.sr + (Math.random()-0.5) * m * 0.35, 0, 1),
+    a:    clamp(g.a    + (Math.random()-0.5) * m * 0.35, 0, 1),
+    sr:   clamp(g.sr   + (Math.random()-0.5) * m * 0.35, 0, 1),
+    ls:   clamp(g.ls   + (Math.random()-0.5) * m * 0.40, 0, 1),
+    dorm: clamp(g.dorm + (Math.random()-0.5) * m * 0.30, 0, 1),
   };
 }
 
@@ -280,8 +290,10 @@ class Tree {
       d:  rnd(...CFG.dRange),
       r:  Math.random() * 0.3,   // start low — costly to maintain
       b:  Math.random() * 0.3,
-      a:  Math.random() * 0.2,
-      sr: Math.random() * 0.2,
+      a:    Math.random() * 0.2,
+      sr:   Math.random() * 0.2,
+      ls:   Math.random(),          // start fully random — let it evolve
+      dorm: Math.random(),
     };
 
     this.seedCache = [];  // serotinous seed store, released on fire death
@@ -323,7 +335,12 @@ class Tree {
 
     // Root depth boosts water access in drought; deep roots cost more to maintain
     const waterAccess = CFG.rainfall + (1 - CFG.rainfall) * this.genes.r * 0.55;
-    this.energy += light * waterAccess * CFG.photoBase;
+    // Light sensitivity: shade-tolerant (ls≈0) saturates at low light but has lower max rate;
+    // sun-loving (ls≈1) needs bright light but earns much more in full sun.
+    const lightSat  = 0.12 + this.genes.ls * 0.88;  // saturation point
+    const photoMult = 0.50 + this.genes.ls * 0.65;  // max rate (shade=0.50, sun=1.15)
+    const photoEff  = Math.min(1, light / lightSat) * photoMult;
+    this.energy += photoEff * waterAccess * CFG.photoBase;
 
     const hFrac = this.curH / maxTreeH;
     this.energy -= hFrac * CFG.maintH
@@ -641,17 +658,21 @@ function computeLight() {
     const t = slots[j];
     if (!t || t.curH < 6) continue;
     const hFrac    = t.curH / maxTreeH;
-    const cwFrac   = t.genes.cw;             // 0–1, drives canopy density
-    const maxShade = 0.55 + cwFrac * 0.44;   // narrow=0.55, wide=0.99 (near-total shade)
+    const cwFrac   = t.genes.cw;
+    // Per-tree max shadow: wide canopy casts denser shade (up to 0.80 per tree)
+    const maxShade = 0.45 + cwFrac * 0.35;
     const reach    = Math.ceil(t.canopyRX / CFG.slotW);
     for (let di = -reach; di <= reach; di++) {
       const i = j + di;
       if (i < 0 || i >= numSlots || i === j) continue;
       const distF  = Math.abs(di) / (reach + 0.5);
+      // Multiplicative: each overlapping canopy compounds the shade
       const shadow = hFrac * (1 - distF) * maxShade;
-      if (shadow > 1 - light[i]) light[i] = Math.max(0, 1 - shadow);
+      light[i] *= (1 - shadow);
     }
   }
+  // Clamp: absolute minimum 1% light (even in densest old-growth)
+  for (let i = 0; i < numSlots; i++) light[i] = Math.max(0.01, light[i]);
   return light;
 }
 
@@ -729,8 +750,10 @@ function simulate() {
       if (t) {
         // Serotiny: heat opens cones — dump entire seed cache into bank
         for (const s of t.seedCache) {
-          if (seedBank.length < MAX_SEED_BANK)
-            seedBank.push({ slot: s.slot, genes: s.genes, seedSize: s.seedSize, age: 0 });
+          if (seedBank.length < MAX_SEED_BANK) {
+            const halfLife = Math.round(SEED_HALFLIFE * (1 + s.genes.dorm * 49));
+            seedBank.push({ slot: s.slot, genes: s.genes, seedSize: s.seedSize, age: 0, halfLife });
+          }
         }
         stumps.push({
           x: t.x, w: t.trunkHW * 2 + 2,
@@ -773,7 +796,9 @@ function simulate() {
   // Add seeds to bank (not planted immediately — they decay over time)
   for (const s of pending) {
     if (s.slot >= 0 && s.slot < numSlots && seedBank.length < MAX_SEED_BANK) {
-      seedBank.push({ slot: s.slot, genes: s.genes, seedSize: s.seedSize, age: 0 });
+      // Dormancy gene sets how long seeds stay viable: 1× to 50× normal half-life
+      const halfLife = Math.round(SEED_HALFLIFE * (1 + s.genes.dorm * 49));
+      seedBank.push({ slot: s.slot, genes: s.genes, seedSize: s.seedSize, age: 0, halfLife });
     }
   }
 
@@ -781,7 +806,7 @@ function simulate() {
   for (let i = seedBank.length - 1; i >= 0; i--) {
     const seed = seedBank[i];
     seed.age++;
-    const viability = Math.exp(-seed.age / SEED_HALFLIFE);
+    const viability = Math.exp(-seed.age / (seed.halfLife ?? SEED_HALFLIFE));
     if (viability < SEED_MIN_VIA) { seedBank.splice(i, 1); continue; }
     if (Math.random() < viability * 0.003) {
       if (plantSeed(seed.slot, seed.genes, seed.seedSize)) {
@@ -1198,34 +1223,39 @@ function updateStats() {
   document.getElementById('s-time').textContent  = frameCount;
 
   if (!n) return;
-  let sh = 0, sg = 0, scw = 0, ss = 0, sd = 0, sr_ = 0, sb = 0, sa = 0, ssr = 0;
+  let sh = 0, sg = 0, scw = 0, ss = 0, sd = 0, sr_ = 0, sb = 0, sa = 0, ssr = 0, sls = 0, sdorm = 0;
   for (const t of live) {
     sh += t.genes.h; sg += t.genes.g; scw += t.genes.cw;
     ss += t.genes.s; sd += t.genes.d;
     sr_ += t.genes.r; sb += t.genes.b; sa += t.genes.a; ssr += t.genes.sr;
+    sls += t.genes.ls; sdorm += t.genes.dorm;
   }
 
-  document.getElementById('s-h').textContent  = (sh  /n).toFixed(2);
-  document.getElementById('s-g').textContent  = (sg  /n).toFixed(2);
-  document.getElementById('s-cw').textContent = (scw /n).toFixed(2);
-  document.getElementById('s-r').textContent  = (sr_ /n).toFixed(2);
-  document.getElementById('s-b').textContent  = (sb  /n).toFixed(2);
-  document.getElementById('s-s').textContent  = (ss  /n).toFixed(2);
-  document.getElementById('s-d').textContent  = (sd  /n).toFixed(1);
-  document.getElementById('s-a').textContent  = (sa  /n).toFixed(2);
-  document.getElementById('s-sr').textContent = (ssr /n).toFixed(2);
+  document.getElementById('s-h').textContent    = (sh   /n).toFixed(2);
+  document.getElementById('s-g').textContent    = (sg   /n).toFixed(2);
+  document.getElementById('s-cw').textContent   = (scw  /n).toFixed(2);
+  document.getElementById('s-r').textContent    = (sr_  /n).toFixed(2);
+  document.getElementById('s-b').textContent    = (sb   /n).toFixed(2);
+  document.getElementById('s-ls').textContent   = (sls  /n).toFixed(2);
+  document.getElementById('s-s').textContent    = (ss   /n).toFixed(2);
+  document.getElementById('s-d').textContent    = (sd   /n).toFixed(1);
+  document.getElementById('s-a').textContent    = (sa   /n).toFixed(2);
+  document.getElementById('s-sr').textContent   = (ssr  /n).toFixed(2);
+  document.getElementById('s-dorm').textContent = (sdorm/n).toFixed(2);
 
   history.push({
-    pop: n / numSlots,
-    h:   sh  / n,
-    g:   sg  / n,
-    cw:  scw / n,
-    r:   sr_ / n,
-    b:   sb  / n,
-    s:   ss  / n,
-    d:   (sd / n) / CFG.dRange[1],
-    a:   sa  / n,
-    sr:  ssr / n,
+    pop:  n / numSlots,
+    h:    sh    / n,
+    g:    sg    / n,
+    cw:   scw   / n,
+    r:    sr_   / n,
+    b:    sb    / n,
+    ls:   sls   / n,
+    s:    ss    / n,
+    d:    (sd / n) / CFG.dRange[1],
+    a:    sa    / n,
+    sr:   ssr   / n,
+    dorm: sdorm / n,
   });
   if (history.length > MAX_HIST) history.shift();
   drawGraph('graph-phys',  [
@@ -1234,14 +1264,16 @@ function updateStats() {
     { key:'cw',  color:'#b088e0', lw:1.5 },
     { key:'r',   color:'#5bc8a0', lw:1   },
     { key:'b',   color:'#d08840', lw:1   },
+    { key:'ls',  color:'#f0a060', lw:1.5 },
     { key:'pop', color:'#ffffff', lw:1   },
   ]);
   drawGraph('graph-strat', [
-    { key:'s',   color:'#e8d060', lw:1.5 },
-    { key:'d',   color:'#80c8e0', lw:1.5 },
-    { key:'a',   color:'#c8a030', lw:1.5 },
-    { key:'sr',  color:'#e07050', lw:1.5 },
-    { key:'pop', color:'#ffffff', lw:1   },
+    { key:'s',    color:'#e8d060', lw:1.5 },
+    { key:'d',    color:'#80c8e0', lw:1.5 },
+    { key:'a',    color:'#c8a030', lw:1.5 },
+    { key:'sr',   color:'#e07050', lw:1.5 },
+    { key:'dorm', color:'#90d0b0', lw:1.5 },
+    { key:'pop',  color:'#ffffff', lw:1   },
   ]);
 }
 
