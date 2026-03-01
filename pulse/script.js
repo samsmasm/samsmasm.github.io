@@ -58,12 +58,8 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-reveal').addEventListener('click', toggleReveal);
     document.getElementById('btn-qr').addEventListener('click', toggleQR);
     document.getElementById('btn-csv').addEventListener('click', exportCSV);
-    document.getElementById('btn-clear').addEventListener('click', clearResponses);
+    document.getElementById('btn-delete').addEventListener('click', deleteBoard);
     document.getElementById('btn-leave').addEventListener('click', leaveRoom);
-    document.getElementById('btn-close-qr').addEventListener('click', toggleQR);
-    document.getElementById('qr-overlay').addEventListener('click', (e) => {
-        if (e.target === document.getElementById('qr-overlay')) toggleQR();
-    });
 
     // Student submit
     document.getElementById('btn-submit').addEventListener('click', submitResponse);
@@ -209,16 +205,16 @@ async function rejoinSession() {
 function initTeacherMode() {
     switchView('teacher');
     document.getElementById('t-room-label').textContent = currentRoom;
-    window.history.replaceState(null, '', `?role=teacher#${currentRoom}`);
+    window.history.replaceState(null, '', `?role=teacher#${currentRoom.toLowerCase()}`);
 
     isRevealed = config.reveal === 'live';
     updateRevealBtn();
 
     // QR code (generate once)
     if (!qrGenerated) {
-        const url = `https://samsmasm.github.io/pulse/index.html#${currentRoom}`;
+        const url = `https://samsmasm.github.io/pulse/#${currentRoom.toLowerCase()}`;
         document.getElementById('qr-url-text').textContent = url;
-        new QRCode(document.getElementById('qrcode'), { text: url, width: 280, height: 280 });
+        new QRCode(document.getElementById('qrcode'), { text: url, width: 300, height: 300 });
         qrGenerated = true;
     }
 
@@ -247,11 +243,17 @@ function toggleReveal() {
 }
 
 function toggleQR() {
-    document.getElementById('qr-overlay').classList.toggle('hidden');
+    const panel = document.getElementById('qr-panel');
+    panel.classList.toggle('hidden');
+    document.getElementById('btn-qr').classList.toggle('active', !panel.classList.contains('hidden'));
+    // Let the DOM reflow before resizing the canvas
+    setTimeout(resizeCanvas, 10);
 }
 
-function clearResponses() {
-    if (confirm("Clear all responses?")) remove(ref(db, `pulse/${currentRoom}/responses`));
+async function deleteBoard() {
+    if (!confirm("Delete this board? This will remove all responses and config and cannot be undone.")) return;
+    await remove(ref(db, `pulse/${currentRoom}`));
+    leaveRoom();
 }
 
 function leaveRoom() {
@@ -289,7 +291,7 @@ async function joinSession() {
 async function initStudentMode() {
     switchView('student');
     document.getElementById('s-room-label').textContent = currentRoom;
-    window.history.replaceState(null, '', `#${currentRoom}`);
+    window.history.replaceState(null, '', `#${currentRoom.toLowerCase()}`);
 
     const snap = await get(ref(db, `pulse/${currentRoom}/config`));
     if (!snap.exists()) {
