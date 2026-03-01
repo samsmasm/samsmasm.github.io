@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolution Simulation - Stage 7 (Divergence)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            overflow: hidden; /* Prevent scrollbars */
+            height: 100vh;
+            width: 100vw;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #eee;
+        }
+
+        canvas {
+            background-color: #0d1117; /* Dark water color */
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 220px;
+        }
+
+        .stat-line {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        /* Re-enable pointer events for inputs */
+        input {
+            pointer-events: auto;
+        }
+        
+        .control-group {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #555;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="simCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div class="stat-line">Stage: 7 (Behavioral Divergence)</div>
+        <div class="stat-line">Food Count: <span id="food-count">0</span></div>
+        <div class="stat-line">Organisms: <span id="org-count">0</span></div>
+        <div class="stat-line">Avg Speed: <span id="avg-speed">0</span></div>
+        <div class="stat-line">Avg Sense: <span id="avg-sense">0</span></div>
+        
+        <div class="control-group">
+            <label>Algae Growth: <span id="spawn-rate-disp">0.10</span></label>
+            <input type="range" id="spawn-slider" min="0.0" max="0.5" step="0.01" value="0.1" style="width: 100%; cursor: pointer;">
+        </div>
+        
+        <div class="control-group">
+            <label>Mutation Rate: <span id="mut-rate-disp">0.10</span></label>
+            <input type="range" id="mut-slider" min="0.0" max="1.0" step="0.01" value="0.1" style="width: 100%; cursor: pointer;">
+        </div>
+
+        <div class="control-group">
+            <label>Food Nutrition: <span id="nut-disp">1.0</span></label>
+            <input type="range" id="nut-slider" min="0.1" max="5.0" step="0.1" value="1.0" style="width: 100%; cursor: pointer;">
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            canvasWidth: window.innerWidth,
+            canvasHeight: window.innerHeight,
+            // Food Config
+            foodSpawnRate: 0.1,    
+            foodBaseSize: 2,       
+            foodSizeVariance: 4,
+            foodNutritionMulti: 1.0, // New master slider for food quality
+            
+            // Life Cycle Config
+            startEnergy: 100,      
+            reproThreshold: 250,   // Increased threshold to force more eating
+            reproCost: 120,        
+            
+            // --- THE BALANCING ACT ---
+            
+            // 1. Existing is cheap
+            baseMetabolism: 0.05, 
+
+            // 2. Moving fast is expensive (Exponential)
+            // Speed 1 = 0.05 energy
+            // Speed 5 = 1.25 energy (25x more expensive)
+            speedCostFactor: 0.05, 
+
+            // 3. Being big is moderately expensive
+            sizeCostFactor: 0.05,
+            
+            // 4. Jittering is expensive
+            jitterCostFactor: 0.5, 
+            
+            // 5. Seeing is expensive (Linear but high)
+            // Range 50 = 0.1 energy
+            // Range 200 = 0.4 energy
+            senseCostFactor: 0.002, 
+            
+            infantMetabolicMultiplier: 1.5, 
+            infantDuration: 300,   
+            
+            // Visual Config
+            baseRadius: 5,         
+            radiusScale: 0.08,     
+
+            // Mutation Config
+            mutationRate: 0.1 
+        };
+
+        // --- GLOBAL VARIABLES ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const uiFoodCount = document.getElementById('food-count');
+        const uiOrgCount = document.getElementById('org-count');
+        const uiAvgSpeed = document.getElementById('avg-speed');
+        const uiAvgSense = document.getElementById('avg-sense');
+        
+        // Sliders
+        const uiSpawnSlider = document.getElementById('spawn-slider');
+        const uiSpawnDisp = document.getElementById('spawn-rate-disp');
+        const uiMutSlider = document.getElementById('mut-slider');
+        const uiMutDisp = document.getElementById('mut-rate-disp');
+        const uiNutSlider = document.getElementById('nut-slider');
+        const uiNutDisp = document.getElementById('nut-disp');
+
+        // Slider Listeners
+        uiSpawnSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            CONFIG.foodSpawnRate = val;
+            uiSpawnDisp.textContent = val.toFixed(2);
+        });
+
+        uiMutSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            CONFIG.mutationRate = val;
+            uiMutDisp.textContent = val.toFixed(2);
+        });
+
+        uiNutSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            CONFIG.foodNutritionMulti = val;
+            uiNutDisp.textContent = val.toFixed(1);
+        });
+
+        let foods = [];
+        let organisms = []; 
+        let frameCount = 0;
+        let animationId;
+
+        // --- RESIZE HANDLER ---
+        function handleResize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            CONFIG.canvasWidth = canvas.width;
+            CONFIG.canvasHeight = canvas.height;
+        }
+        window.addEventListener('resize', handleResize);
+        handleResize(); 
+
+        // --- CLASSES ---
+
+        class Food {
+            constructor() {
+                this.x = Math.random() * CONFIG.canvasWidth;
+                this.y = Math.random() * CONFIG.canvasHeight;
+                this.nutrition = Math.random(); 
+                const greenVal = Math.floor(50 + (this.nutrition * 205)); 
+                this.color = `rgb(0, ${greenVal}, 50)`;
+                this.size = CONFIG.foodBaseSize + (this.nutrition * CONFIG.foodSizeVariance);
+            }
+
+            draw(context) {
+                context.fillStyle = this.color;
+                context.beginPath();
+                context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                context.fill();
+            }
+        }
+
+        class Organism {
+            constructor(x, y, initialEnergy, genes = null) {
+                this.x = x;
+                this.y = y;
+                this.energy = initialEnergy;
+                this.age = 0;
+                this.dead = false;
+                
+                // --- GENETICS ---
+                if (genes) {
+                    this.genes = genes;
+                } else {
+                    this.genes = {
+                        speed: 0.5 + Math.random() * 5.0,  
+                        size: 0.8 + (Math.random() * 0.4), 
+                        jitter: Math.random() * 0.8,
+                        senseRange: Math.random() * 250 
+                    };
+                }
+
+                // Initial Velocity
+                const angle = Math.random() * Math.PI * 2;
+                this.vx = Math.cos(angle) * this.genes.speed;
+                this.vy = Math.sin(angle) * this.genes.speed;
+
+                // --- VISUALS ---
+                this.updateColors();
+            }
+
+            updateColors() {
+                // Body = Speed (Purple -> Red)
+                let speedNorm = (this.genes.speed - 0.5) / 5.0;
+                if(speedNorm < 0) speedNorm = 0;
+                if(speedNorm > 1) speedNorm = 1;
+                const bodyHue = 280 - (speedNorm * 280); 
+                this.bodyColor = `hsl(${bodyHue}, 100%, 50%)`;
+
+                // Outline = Jitter (Purple -> Red)
+                let jitterNorm = this.genes.jitter / 0.8;
+                if(jitterNorm < 0) jitterNorm = 0;
+                if(jitterNorm > 1) jitterNorm = 1;
+                const outlineHue = 280 - (jitterNorm * 280);
+                this.outlineColor = `hsl(${outlineHue}, 100%, 50%)`;
+            }
+
+            update(foods) {
+                this.age++;
+
+                // --- METABOLISM ---
+                
+                // 1. Quadratic Speed Cost (Speed^2)
+                // This punishes high speed severely
+                const speedCost = (this.genes.speed * this.genes.speed) * CONFIG.speedCostFactor;
+                
+                // 2. Linear Size Cost
+                const sizeCost = this.genes.size * CONFIG.sizeCostFactor;
+                
+                // 3. Quadratic Jitter Cost
+                const jitterCost = (this.genes.jitter * this.genes.jitter) * CONFIG.jitterCostFactor;
+                
+                // 4. Linear Sense Cost (Cost per pixel of radius)
+                const senseCost = this.genes.senseRange * CONFIG.senseCostFactor;
+
+                let metabolicLoss = CONFIG.baseMetabolism + speedCost + sizeCost + jitterCost + senseCost;
+
+                if (this.age < CONFIG.infantDuration) {
+                    metabolicLoss *= CONFIG.infantMetabolicMultiplier;
+                }
+                
+                this.energy -= metabolicLoss;
+
+                // Death Check
+                if (this.energy <= 0) {
+                    this.dead = true;
+                    return null;
+                }
+
+                // --- BEHAVIOR ---
+                let targetX = null;
+                let targetY = null;
+
+                // Sensing
+                if (this.genes.senseRange > 0) {
+                    let closestDist = this.genes.senseRange;
+                    let closestFood = null;
+
+                    for (let food of foods) {
+                        const dx = food.x - this.x;
+                        const dy = food.y - this.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestFood = food;
+                        }
+                    }
+
+                    if (closestFood) {
+                        targetX = closestFood.x;
+                        targetY = closestFood.y;
+                    }
+                }
+
+                if (targetX !== null) {
+                    // Hunt
+                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
+                    this.vx = Math.cos(angle) * this.genes.speed;
+                    this.vy = Math.sin(angle) * this.genes.speed;
+                } else {
+                    // Graze / Wander
+                    let currentAngle = Math.atan2(this.vy, this.vx);
+                    currentAngle += (Math.random() - 0.5) * this.genes.jitter;
+                    this.vx = Math.cos(currentAngle) * this.genes.speed;
+                    this.vy = Math.sin(currentAngle) * this.genes.speed;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Physics update
+                const geneRadius = CONFIG.baseRadius * this.genes.size;
+                const energyRadius = this.energy * CONFIG.radiusScale;
+                this.radius = geneRadius + energyRadius;
+
+                // Bounce
+                if (this.x + this.radius > CONFIG.canvasWidth) {
+                    this.x = CONFIG.canvasWidth - this.radius;
+                    this.vx *= -1;
+                }
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -1;
+                }
+                if (this.y + this.radius > CONFIG.canvasHeight) {
+                    this.y = CONFIG.canvasHeight - this.radius;
+                    this.vy *= -1;
+                }
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -1;
+                }
+
+                // Eating
+                for (let i = foods.length - 1; i >= 0; i--) {
+                    const food = foods[i];
+                    const dx = this.x - food.x;
+                    const dy = this.y - food.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < this.radius + food.size) {
+                        // Nutrition is multiplied by the Global Slider
+                        // Low nutrition = requires high efficiency
+                        const gainedEnergy = (15 + (food.nutrition * 40)) * CONFIG.foodNutritionMulti;
+                        this.energy += gainedEnergy;
+                        foods.splice(i, 1);
+                    }
+                }
+
+                // Reproduction
+                if (this.energy >= CONFIG.reproThreshold) {
+                    return this.reproduce();
+                }
+
+                return null;
+            }
+
+            reproduce() {
+                this.energy -= CONFIG.reproCost;
+                
+                let offsetX = (Math.random() - 0.5) * 10;
+                let offsetY = (Math.random() - 0.5) * 10;
+
+                const newGenes = { ...this.genes };
+                const magnitude = CONFIG.mutationRate * 2.0; 
+
+                // Mutate Speed
+                if (Math.random() < 0.5) {
+                    newGenes.speed += (Math.random() - 0.5) * magnitude;
+                    if (newGenes.speed < 0.5) newGenes.speed = 0.5; 
+                }
+                
+                // Mutate Size
+                if (Math.random() < 0.5) {
+                    newGenes.size += (Math.random() - 0.5) * magnitude;
+                    if (newGenes.size < 0.5) newGenes.size = 0.5;
+                }
+
+                // Mutate Jitter
+                if (Math.random() < 0.5) {
+                    newGenes.jitter += (Math.random() - 0.5) * (magnitude / 2);
+                    if (newGenes.jitter < 0) newGenes.jitter = 0;
+                }
+
+                // Mutate Sense
+                if (Math.random() < 0.5) {
+                    newGenes.senseRange += (Math.random() - 0.5) * (magnitude * 50); 
+                    if (newGenes.senseRange < 0) newGenes.senseRange = 0;
+                }
+
+                return new Organism(this.x + offsetX, this.y + offsetY, CONFIG.reproCost, newGenes);
+            }
+
+            draw(context) {
+                // Sense Range
+                if (this.genes.senseRange > 5) {
+                    context.beginPath();
+                    context.arc(this.x, this.y, this.genes.senseRange, 0, Math.PI * 2);
+                    context.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                    context.lineWidth = 1;
+                    context.stroke();
+                }
+
+                // Body
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.bodyColor; 
+                context.fill();
+                
+                // Outline
+                context.strokeStyle = this.outlineColor;
+                context.lineWidth = 6; 
+                context.stroke();
+            }
+        }
+
+        // --- SYSTEMS ---
+
+        function spawnFood() {
+            if (foods.length < 3000) { 
+                // Allow spawning multiple per frame if slider is high
+                let spawns = 1;
+                if (CONFIG.foodSpawnRate > 0.1) spawns = Math.ceil(CONFIG.foodSpawnRate * 10);
+                
+                for(let k=0; k<spawns; k++) {
+                    if (Math.random() < CONFIG.foodSpawnRate) {
+                        foods.push(new Food());
+                    }
+                }
+            }
+        }
+
+        function updateUI() {
+            if (frameCount % 10 === 0) {
+                uiFoodCount.textContent = foods.length;
+                uiOrgCount.textContent = organisms.length;
+                
+                // Calculate Averages
+                if (organisms.length > 0) {
+                    let totalSpeed = 0;
+                    let totalSense = 0;
+                    for(let o of organisms) {
+                        totalSpeed += o.genes.speed;
+                        totalSense += o.genes.senseRange;
+                    }
+                    uiAvgSpeed.textContent = (totalSpeed / organisms.length).toFixed(2);
+                    uiAvgSense.textContent = (totalSense / organisms.length).toFixed(0);
+                } else {
+                    uiAvgSpeed.textContent = "0";
+                    uiAvgSense.textContent = "0";
+                }
+                
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+
+            for (let food of foods) {
+                food.draw(ctx);
+            }
+
+            for (let i = organisms.length - 1; i >= 0; i--) {
+                let org = organisms[i];
+                let offspring = org.update(foods);
+
+                if (org.dead) {
+                    organisms.splice(i, 1);
+                } else {
+                    org.draw(ctx);
+                    if (offspring) {
+                        organisms.push(offspring);
+                    }
+                }
+            }
+            
+            if (organisms.length === 0 && frameCount > 100) {
+                organisms.push(new Organism(CONFIG.canvasWidth/2, CONFIG.canvasHeight/2, CONFIG.startEnergy));
+            }
+        }
+
+        function gameLoop() {
+            spawnFood();
+            render();
+            updateUI();
+            
+            frameCount++;
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function init() {
+            for(let i=0; i<100; i++) {
+                foods.push(new Food());
+            }
+
+            for(let i=0; i<15; i++) {
+                let rx = Math.random() * CONFIG.canvasWidth;
+                let ry = Math.random() * CONFIG.canvasHeight;
+                organisms.push(new Organism(rx, ry, CONFIG.startEnergy));
+            }
+
+            gameLoop();
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

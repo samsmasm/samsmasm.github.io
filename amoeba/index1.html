@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolution Simulation - Stage 7 (Age & Poison)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            overflow: hidden; /* Prevent scrollbars */
+            height: 100vh;
+            width: 100vw;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #eee;
+        }
+
+        canvas {
+            display: block;
+        }
+        
+        #simCanvas {
+            background-color: #0d1117; /* Dark water color */
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: auto; /* Allow scrolling */
+            background-color: rgba(0, 0, 0, 0.85); /* Darker for contrast */
+            padding: 15px;
+            border-radius: 8px;
+            width: 340px; /* Widened for extra table data */
+            max-height: 90vh; /* Limit height */
+            overflow-y: auto; /* Enable scrolling */
+            backdrop-filter: blur(4px);
+            border: 1px solid #444;
+            scrollbar-width: thin;
+            scrollbar-color: #555 #222;
+            transition: height 0.3s ease, max-height 0.3s ease, padding 0.3s ease;
+        }
+        
+        #ui-layer.collapsed {
+            max-height: 50px; /* Only show header */
+            overflow: hidden;
+            padding-bottom: 0;
+        }
+
+        /* Scrollbar styling for Webkit */
+        #ui-layer::-webkit-scrollbar {
+            width: 6px;
+        }
+        #ui-layer::-webkit-scrollbar-track {
+            background: #222;
+        }
+        #ui-layer::-webkit-scrollbar-thumb {
+            background-color: #555;
+            border-radius: 3px;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .toggle-btn {
+            background: none;
+            border: 1px solid #555;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+        .toggle-btn:hover {
+            background: #444;
+            color: #fff;
+        }
+
+        .stat-line {
+            margin: 4px 0;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .stat-value {
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+        }
+
+        input {
+            pointer-events: auto;
+        }
+        
+        .control-group {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #555;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            color: #aaa;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            margin-top: 10px;
+        }
+
+        #graph-container {
+            margin-top: 15px;
+            border-top: 1px solid #555;
+            padding-top: 10px;
+        }
+        
+        #graphCanvas {
+            background-color: rgba(0,0,0,0.3);
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        
+        .legend {
+            display: flex;
+            font-size: 10px;
+            justify-content: space-between;
+            margin-top: 2px;
+            flex-wrap: wrap;
+        }
+        .legend span { margin-right: 5px; }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 10px;
+            color: #ccc;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 4px 2px;
+            text-align: center;
+        }
+        th { background-color: rgba(255,255,255,0.1); }
+        .current-row { 
+            background-color: rgba(0, 255, 0, 0.15); /* Greenish highlight for growth focus */
+            color: #fff;
+            font-weight: bold;
+        }
+        /* Format for Avg (SD) */
+        .dual-val {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+        .sd-val {
+            font-size: 8px;
+            color: #888;
+        }
+        .current-row .sd-val {
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="simCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div class="header-row">
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">Evolution Sim</div>
+            <button id="toggle-ui" class="toggle-btn">▲</button>
+        </div>
+        
+        <div id="ui-content">
+            <div class="section-title">World Stats</div>
+            <div class="stat-line">Food Count: <span id="food-count" class="stat-value">0</span></div>
+            <div class="stat-line" style="color:#ff6666">Poison Count: <span id="poison-count" class="stat-value">0</span></div>
+            <div class="stat-line">Organisms: <span id="org-count" class="stat-value">0</span></div>
+            <div class="stat-line">Time: <span id="sim-time" class="stat-value">0</span></div>
+            
+            <div class="section-title">Population Averages</div>
+            <div class="stat-line" style="color:#ff8888">Avg Speed: <span id="avg-speed" class="stat-value">0</span></div>
+            <div class="stat-line" style="color:#ff88ff">Avg Jitter: <span id="avg-jitter" class="stat-value">0</span></div>
+            <div class="stat-line" style="color:#88ffff">Avg Sense: <span id="avg-sense" class="stat-value">0</span></div>
+            <div class="stat-line">Avg Energy: <span id="avg-energy" class="stat-value">0</span></div>
+
+            <div id="graph-container">
+                <canvas id="graphCanvas" width="300" height="120"></canvas>
+                <div class="legend">
+                    <span style="color: #ff4444">Speed</span>
+                    <span style="color: #ff00ff">Jitter</span>
+                    <span style="color: #00ffff">Sense</span>
+                    <span style="color: #00ff00">Growth</span>
+                    <span style="color: #ffffff">Pop</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Graph Time: <span id="graph-time-disp" class="stat-value">2 min</span></label>
+                <!-- 10 seconds to 600 seconds (10m) -->
+                <input type="range" id="graph-time-slider" min="10" max="600" step="10" value="120" style="width: 100%; cursor: pointer;">
+            </div>
+            
+            <div class="control-group">
+                <label>Algae Growth: <span id="spawn-rate-disp" class="stat-value">0.10</span></label>
+                <input type="range" id="spawn-slider" min="0.0" max="1.0" step="0.025" value="0.1" style="width: 100%; cursor: pointer;">
+            </div>
+
+            <div class="control-group" style="border-top: 1px dashed #554444;">
+                <label style="color: #ff8888">Poison Growth: <span id="poison-rate-disp" class="stat-value">0.00</span></label>
+                <input type="range" id="poison-slider" min="0.0" max="0.2" step="0.005" value="0.0" style="width: 100%; cursor: pointer;">
+            </div>
+            
+            <div class="control-group">
+                <label>Mutation Rate: <span id="mut-rate-disp" class="stat-value">0.1</span></label>
+                <input type="range" id="mut-slider" min="0.0" max="1.0" step="0.1" value="0.1" style="width: 100%; cursor: pointer;">
+            </div>
+
+            <div class="section-title">Stats by Growth Rate</div>
+            <table id="stats-table">
+                <thead>
+                    <tr>
+                        <th>Growth</th>
+                        <th>Pop</th>
+                        <th>Speed</th>
+                        <th>Jitter</th>
+                        <th>Sense</th>
+                    </tr>
+                </thead>
+                <tbody id="stats-body">
+                    <!-- Rows generated by JS -->
+                </tbody>
+            </table>
+            <div style="font-size: 9px; color: #777; margin-top: 5px; text-align: center;">Values shown as: Average <span style="color:#888">(±StdDev)</span></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            canvasWidth: window.innerWidth,
+            canvasHeight: window.innerHeight,
+            // Food Config
+            foodSpawnRate: 0.1,    
+            poisonSpawnRate: 0.0,  // New Poison Rate
+            foodBaseSize: 2,       
+            foodSizeVariance: 4,
+            
+            // Life Cycle Config
+            startEnergy: 100,      
+            reproThreshold: 200,   
+            reproCost: 100,        
+            maxAge: 2000,          // Senescence: Max frames before natural death (approx 33 secs at 60fps)
+            
+            // Metabolic Factors (High Pressure)
+            baseMetabolism: 0.05,  
+            speedCostFactor: 0.03, // Squared Law
+            sizeCostFactor: 0.05,
+            jitterCostFactor: 0.5, 
+            senseCostFactor: 0.00005, // Squared Law
+            poisonDamage: 40,      // Energy lost hitting poison
+            
+            infantMetabolicMultiplier: 2.0, 
+            infantDuration: 300,   
+            
+            // Visual Config
+            baseRadius: 5,         
+            radiusScale: 0.08,     
+
+            // Mutation Config
+            mutationRate: 0.1 
+        };
+
+        // --- GLOBAL VARIABLES ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Toggling
+        const uiLayer = document.getElementById('ui-layer');
+        const toggleBtn = document.getElementById('toggle-ui');
+        let isCollapsed = false;
+
+        toggleBtn.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            if (isCollapsed) {
+                uiLayer.classList.add('collapsed');
+                toggleBtn.textContent = '▼';
+            } else {
+                uiLayer.classList.remove('collapsed');
+                toggleBtn.textContent = '▲';
+            }
+        });
+
+        // Graph Canvas
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+        let statsHistory = [];
+        let visibleHistoryCount = 120; // Default 2 minutes (120 secs)
+        const maxBuffer = 600; 
+
+        // Long Term Stats Storage
+        const longTermStats = {};
+        for(let i=0; i<=10; i++) {
+            let key = (i/10).toFixed(1);
+            longTermStats[key] = {
+                sumSpeed: 0, sumSpeedSD: 0,
+                sumJitter: 0, sumJitterSD: 0,
+                sumSense: 0, sumSenseSD: 0,
+                sumPop: 0, 
+                count: 0
+            };
+        }
+
+        // UI Elements
+        const uiFoodCount = document.getElementById('food-count');
+        const uiPoisonCount = document.getElementById('poison-count');
+        const uiOrgCount = document.getElementById('org-count');
+        const uiAvgEnergy = document.getElementById('avg-energy');
+        const uiAvgSpeed = document.getElementById('avg-speed');
+        const uiAvgJitter = document.getElementById('avg-jitter');
+        const uiAvgSense = document.getElementById('avg-sense');
+        const uiSimTime = document.getElementById('sim-time');
+        const uiStatsBody = document.getElementById('stats-body');
+        
+        // Sliders
+        const uiSpawnSlider = document.getElementById('spawn-slider');
+        const uiSpawnDisp = document.getElementById('spawn-rate-disp');
+        const uiPoisonSlider = document.getElementById('poison-slider');
+        const uiPoisonDisp = document.getElementById('poison-rate-disp');
+        const uiMutSlider = document.getElementById('mut-slider');
+        const uiMutDisp = document.getElementById('mut-rate-disp');
+        const uiGraphTimeSlider = document.getElementById('graph-time-slider');
+        const uiGraphTimeDisp = document.getElementById('graph-time-disp');
+
+        // Slider Listeners
+        uiSpawnSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            CONFIG.foodSpawnRate = val;
+            uiSpawnDisp.textContent = val.toFixed(2);
+        });
+
+        uiPoisonSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            CONFIG.poisonSpawnRate = val;
+            uiPoisonDisp.textContent = val.toFixed(3);
+        });
+
+        uiMutSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            CONFIG.mutationRate = val;
+            uiMutDisp.textContent = val.toFixed(1);
+        });
+
+        uiGraphTimeSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            visibleHistoryCount = val;
+            const mins = Math.floor(val / 60);
+            const secs = val % 60;
+            uiGraphTimeDisp.textContent = `${mins}m ${secs > 0 ? secs + 's' : ''}`;
+        });
+
+        let foods = [];
+        let poisons = []; // New Poison Array
+        let organisms = []; 
+        let frameCount = 0;
+        let animationId;
+
+        // --- RESIZE HANDLER ---
+        function handleResize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            CONFIG.canvasWidth = canvas.width;
+            CONFIG.canvasHeight = canvas.height;
+        }
+        window.addEventListener('resize', handleResize);
+        handleResize(); 
+
+        // --- CLASSES ---
+
+        class Food {
+            constructor() {
+                this.x = Math.random() * CONFIG.canvasWidth;
+                this.y = Math.random() * CONFIG.canvasHeight;
+                this.nutrition = Math.random(); 
+                const greenVal = Math.floor(50 + (this.nutrition * 205)); 
+                this.color = `rgb(0, ${greenVal}, 50)`;
+                this.size = CONFIG.foodBaseSize + (this.nutrition * CONFIG.foodSizeVariance);
+            }
+
+            draw(context) {
+                context.fillStyle = this.color;
+                context.beginPath();
+                context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                context.fill();
+            }
+        }
+
+        class Poison {
+            constructor() {
+                this.x = Math.random() * CONFIG.canvasWidth;
+                this.y = Math.random() * CONFIG.canvasHeight;
+                this.color = '#aa0000'; // Red
+                this.size = CONFIG.foodBaseSize + Math.random() * 2;
+            }
+
+            draw(context) {
+                context.fillStyle = this.color;
+                context.beginPath();
+                context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                context.fill();
+            }
+        }
+
+        class Organism {
+            constructor(x, y, initialEnergy, genes = null) {
+                this.x = x;
+                this.y = y;
+                this.energy = initialEnergy;
+                this.age = 0;
+                this.dead = false;
+                
+                // --- GENETICS ---
+                if (genes) {
+                    this.genes = genes;
+                } else {
+                    this.genes = {
+                        speed: 0.5 + Math.random() * 5.0,  
+                        size: 0.8 + (Math.random() * 0.4), 
+                        jitter: Math.random() * 0.8,
+                        senseRange: Math.random() * 250
+                    };
+                }
+
+                // Initial Velocity
+                const angle = Math.random() * Math.PI * 2;
+                this.vx = Math.cos(angle) * this.genes.speed;
+                this.vy = Math.sin(angle) * this.genes.speed;
+
+                // --- VISUAL COLORS (HSL) ---
+                let speedNorm = (this.genes.speed - 0.5) / 5.0;
+                if(speedNorm < 0) speedNorm = 0;
+                if(speedNorm > 1) speedNorm = 1;
+                const bodyHue = 280 - (speedNorm * 280); 
+                this.bodyColor = `hsl(${bodyHue}, 100%, 50%)`;
+
+                let jitterNorm = this.genes.jitter / 0.8;
+                if(jitterNorm < 0) jitterNorm = 0;
+                if(jitterNorm > 1) jitterNorm = 1;
+                const outlineHue = 280 - (jitterNorm * 280);
+                this.outlineColor = `hsl(${outlineHue}, 100%, 50%)`;
+            }
+
+            update(foods, poisons) {
+                this.age++;
+
+                // 1. Old Age Death
+                if (this.age > CONFIG.maxAge) {
+                    this.dead = true;
+                    return null;
+                }
+
+                // 2. Metabolism
+                const speedCost = Math.pow(this.genes.speed, 3.0) * CONFIG.speedCostFactor;
+                const sizeCost = this.genes.size * CONFIG.sizeCostFactor;
+                const jitterCost = (this.genes.jitter * this.genes.jitter) * CONFIG.jitterCostFactor;
+                const senseCost = (this.genes.senseRange * this.genes.senseRange) * CONFIG.senseCostFactor;
+
+                let metabolicLoss = CONFIG.baseMetabolism + speedCost + sizeCost + jitterCost + senseCost;
+
+                if (this.age < CONFIG.infantDuration) {
+                    metabolicLoss *= CONFIG.infantMetabolicMultiplier;
+                }
+                
+                this.energy -= metabolicLoss;
+
+                // 3. Energy Death Check
+                if (this.energy <= 0) {
+                    this.dead = true;
+                    return null;
+                }
+
+                // 4. Sensing & Movement
+                let targetX = null;
+                let targetY = null;
+
+                // Sight Logic: Only target FOOD (Green), ignore POISON (Red)
+                if (this.genes.senseRange > 0) {
+                    let closestDist = this.genes.senseRange;
+                    let closestFood = null;
+
+                    for (let food of foods) {
+                        const dx = food.x - this.x;
+                        const dy = food.y - this.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestFood = food;
+                        }
+                    }
+
+                    if (closestFood) {
+                        targetX = closestFood.x;
+                        targetY = closestFood.y;
+                    }
+                }
+
+                if (targetX !== null) {
+                    // HUNTER MODE
+                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
+                    this.vx = Math.cos(angle) * this.genes.speed;
+                    this.vy = Math.sin(angle) * this.genes.speed;
+                } else {
+                    // GRAZER MODE
+                    let currentAngle = Math.atan2(this.vy, this.vx);
+                    currentAngle += (Math.random() - 0.5) * this.genes.jitter;
+                    this.vx = Math.cos(currentAngle) * this.genes.speed;
+                    this.vy = Math.sin(currentAngle) * this.genes.speed;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off walls
+                if (this.x + this.radius > CONFIG.canvasWidth) {
+                    this.x = CONFIG.canvasWidth - this.radius;
+                    this.vx *= -1;
+                }
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -1;
+                }
+                if (this.y + this.radius > CONFIG.canvasHeight) {
+                    this.y = CONFIG.canvasHeight - this.radius;
+                    this.vy *= -1;
+                }
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -1;
+                }
+
+                // Update physical radius
+                const geneRadius = CONFIG.baseRadius * this.genes.size;
+                const energyRadius = this.energy * CONFIG.radiusScale;
+                this.radius = geneRadius + energyRadius;
+
+                // 5. Eating Food
+                for (let i = foods.length - 1; i >= 0; i--) {
+                    const food = foods[i];
+                    const dx = this.x - food.x;
+                    const dy = this.y - food.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < this.radius + food.size) {
+                        this.energy += 20 + (food.nutrition * 50); 
+                        foods.splice(i, 1);
+                    }
+                }
+
+                // 6. Eating Poison (Collision)
+                for (let i = poisons.length - 1; i >= 0; i--) {
+                    const poison = poisons[i];
+                    const dx = this.x - poison.x;
+                    const dy = this.y - poison.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < this.radius + poison.size) {
+                        this.energy -= CONFIG.poisonDamage; // Take Damage
+                        poisons.splice(i, 1);
+                    }
+                }
+
+                // 7. Reproduction
+                if (this.energy >= CONFIG.reproThreshold) {
+                    return this.reproduce();
+                }
+
+                return null;
+            }
+
+            reproduce() {
+                this.energy -= CONFIG.reproCost;
+                
+                let offsetX = (Math.random() - 0.5) * 10;
+                let offsetY = (Math.random() - 0.5) * 10;
+
+                const newGenes = { ...this.genes };
+                const magnitude = CONFIG.mutationRate * 2.0; 
+
+                if (Math.random() < 0.5) {
+                    newGenes.speed += (Math.random() - 0.5) * magnitude;
+                    if (newGenes.speed < 0.5) newGenes.speed = 0.5; 
+                }
+                if (Math.random() < 0.5) {
+                    newGenes.size += (Math.random() - 0.5) * magnitude;
+                    if (newGenes.size < 0.5) newGenes.size = 0.5;
+                }
+                if (Math.random() < 0.5) {
+                    newGenes.jitter += (Math.random() - 0.5) * (magnitude / 2);
+                    if (newGenes.jitter < 0) newGenes.jitter = 0;
+                }
+                if (Math.random() < 0.5) {
+                    newGenes.senseRange += (Math.random() - 0.5) * (magnitude * 50); 
+                    if (newGenes.senseRange < 0) newGenes.senseRange = 0;
+                }
+
+                return new Organism(this.x + offsetX, this.y + offsetY, CONFIG.reproCost, newGenes);
+            }
+
+            draw(context) {
+                if (this.genes.senseRange > 5) { 
+                    context.beginPath();
+                    context.arc(this.x, this.y, this.genes.senseRange, 0, Math.PI * 2);
+                    context.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    context.lineWidth = 1;
+                    context.stroke();
+                }
+
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.bodyColor; 
+                context.fill();
+                context.strokeStyle = this.outlineColor;
+                context.lineWidth = 6; 
+                context.stroke();
+            }
+        }
+
+        // --- SYSTEMS ---
+
+        function spawnFood() {
+            if (foods.length < 5000) { 
+                if (Math.random() < CONFIG.foodSpawnRate) {
+                    foods.push(new Food());
+                }
+            }
+        }
+
+        function spawnPoison() {
+            if (poisons.length < 1000) { 
+                if (Math.random() < CONFIG.poisonSpawnRate) {
+                    poisons.push(new Poison());
+                }
+            }
+        }
+
+        function updateStatsTable(currentBucketKey) {
+            let html = '';
+            for(let i=0; i<=10; i++) {
+                let key = (i/10).toFixed(1);
+                let data = longTermStats[key];
+                
+                // Helper to format: Avg (SD)
+                const fmt = (sum, sumSD, count, fixed) => {
+                    if (count === 0) return '-';
+                    const avg = (sum / count).toFixed(fixed);
+                    const sd = (sumSD / count).toFixed(fixed);
+                    return `<div class="dual-val"><span>${avg}</span><span class="sd-val">±${sd}</span></div>`;
+                };
+
+                const avgPop = data.count > 0 ? Math.floor(data.sumPop / data.count) : '-';
+                
+                let rowClass = (key === currentBucketKey) ? 'current-row' : '';
+                
+                html += `
+                    <tr class="${rowClass}">
+                        <td>${key}</td>
+                        <td>${avgPop}</td>
+                        <td>${fmt(data.sumSpeed, data.sumSpeedSD, data.count, 1)}</td>
+                        <td>${fmt(data.sumJitter, data.sumJitterSD, data.count, 2)}</td>
+                        <td>${fmt(data.sumSense, data.sumSenseSD, data.count, 0)}</td>
+                    </tr>
+                `;
+            }
+            uiStatsBody.innerHTML = html;
+        }
+
+        function calculateAndDrawStats() {
+            // 1. Calculate Frame Stats
+            let totalEnergy = 0;
+            let sumSpeed = 0, sumSpeedSq = 0;
+            let sumJitter = 0, sumJitterSq = 0;
+            let sumSense = 0, sumSenseSq = 0;
+            const count = organisms.length;
+
+            let avgSpeed = 0, avgJitter = 0, avgSense = 0, avgEnergy = 0;
+
+            if (count > 0) {
+                for (let org of organisms) {
+                    totalEnergy += org.energy;
+                    
+                    let s = org.genes.speed;
+                    sumSpeed += s;
+                    sumSpeedSq += s*s;
+
+                    let j = org.genes.jitter;
+                    sumJitter += j;
+                    sumJitterSq += j*j;
+
+                    let sn = org.genes.senseRange;
+                    sumSense += sn;
+                    sumSenseSq += sn*sn;
+                }
+                
+                avgEnergy = totalEnergy / count;
+                avgSpeed = sumSpeed / count;
+                avgJitter = sumJitter / count;
+                avgSense = sumSense / count;
+
+                // Standard Deviation Calculation
+                let varSpeed = (sumSpeedSq / count) - (avgSpeed * avgSpeed);
+                let sdSpeed = varSpeed > 0 ? Math.sqrt(varSpeed) : 0;
+
+                let varJitter = (sumJitterSq / count) - (avgJitter * avgJitter);
+                let sdJitter = varJitter > 0 ? Math.sqrt(varJitter) : 0;
+
+                let varSense = (sumSenseSq / count) - (avgSense * avgSense);
+                let sdSense = varSense > 0 ? Math.sqrt(varSense) : 0;
+
+                // Update Text UI
+                uiFoodCount.textContent = foods.length;
+                uiPoisonCount.textContent = poisons.length;
+                uiOrgCount.textContent = count;
+                uiSimTime.textContent = frameCount;
+                uiAvgEnergy.textContent = Math.floor(avgEnergy);
+                uiAvgSpeed.textContent = avgSpeed.toFixed(2);
+                uiAvgJitter.textContent = avgJitter.toFixed(2);
+                uiAvgSense.textContent = Math.floor(avgSense);
+
+                // --- LONG TERM STATS UPDATE ---
+                // Key is now GROWTH RATE
+                const currentBucketKey = (Math.round(CONFIG.foodSpawnRate * 10) / 10).toFixed(1);
+                const bucket = longTermStats[currentBucketKey];
+                
+                if (bucket) {
+                    bucket.sumPop += count; 
+                    bucket.sumSpeed += avgSpeed;
+                    bucket.sumSpeedSD += sdSpeed; 
+                    bucket.sumJitter += avgJitter;
+                    bucket.sumJitterSD += sdJitter;
+                    bucket.sumSense += avgSense;
+                    bucket.sumSenseSD += sdSense;
+                    bucket.count++;
+                    updateStatsTable(currentBucketKey);
+                }
+
+                // Add to History
+                statsHistory.push({
+                    speed: avgSpeed,
+                    jitter: avgJitter,
+                    sense: avgSense,
+                    growthRate: CONFIG.foodSpawnRate,
+                    pop: count
+                });
+                
+                // Truncate based on Max Buffer
+                if (statsHistory.length > maxBuffer) {
+                    statsHistory.shift();
+                }
+            }
+
+            // 2. Draw Graph
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            graphCtx.clearRect(0, 0, w, h);
+            
+            // Draw grid lines
+            graphCtx.strokeStyle = '#444';
+            graphCtx.lineWidth = 1;
+            graphCtx.beginPath();
+            graphCtx.moveTo(0, h/2); graphCtx.lineTo(w, h/2);
+            graphCtx.stroke();
+
+            // Slicing for Zoom/Speed
+            const visibleStats = statsHistory.slice(-visibleHistoryCount);
+            if (visibleStats.length < 2) return;
+
+            const mapY = (val, max) => {
+                let norm = val / max;
+                if(norm > 1) norm = 1;
+                return h - (norm * h);
+            };
+
+            const drawLine = (prop, maxVal, color, width=1) => {
+                graphCtx.strokeStyle = color;
+                graphCtx.lineWidth = width;
+                graphCtx.beginPath();
+                for(let i=0; i<visibleStats.length; i++) {
+                    const x = (i / (visibleStats.length - 1)) * w;
+                    const val = visibleStats[i][prop];
+                    const y = mapY(val, maxVal);
+                    if (i===0) graphCtx.moveTo(x, y); else graphCtx.lineTo(x, y);
+                }
+                graphCtx.stroke();
+            };
+
+            // Draw Lines
+            drawLine('speed', 6.0, '#ff4444', 2);    // Speed
+            drawLine('jitter', 1.0, '#ff00ff', 1);   // Jitter
+            drawLine('sense', 250, '#00ffff', 1);    // Sense
+            drawLine('growthRate', 1.0, '#00ff00', 1); // Growth
+            drawLine('pop', 50, '#ffffff', 1);       // Population (White)
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+
+            for (let food of foods) {
+                food.draw(ctx);
+            }
+            
+            for (let poison of poisons) {
+                poison.draw(ctx);
+            }
+
+            for (let i = organisms.length - 1; i >= 0; i--) {
+                let org = organisms[i];
+                let offspring = org.update(foods, poisons);
+
+                if (org.dead) {
+                    organisms.splice(i, 1);
+                } else {
+                    org.draw(ctx);
+                    if (offspring) {
+                        organisms.push(offspring);
+                    }
+                }
+            }
+            
+            // Extinction safeguard
+            if (organisms.length === 0 && frameCount > 100) {
+                organisms.push(new Organism(CONFIG.canvasWidth/2, CONFIG.canvasHeight/2, CONFIG.startEnergy));
+            }
+        }
+
+        function gameLoop() {
+            spawnFood();
+            spawnPoison();
+            render();
+            
+            // Update stats every 60 frames (approx 1 sec) for meaningful time units
+            if (frameCount % 60 === 0) { 
+                calculateAndDrawStats();
+            }
+            
+            frameCount++;
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- INITIALIZATION ---
+        
+        function init() {
+            for(let i=0; i<100; i++) {
+                foods.push(new Food());
+            }
+
+            for(let i=0; i<10; i++) {
+                let rx = Math.random() * CONFIG.canvasWidth;
+                let ry = Math.random() * CONFIG.canvasHeight;
+                organisms.push(new Organism(rx, ry, CONFIG.startEnergy));
+            }
+
+            gameLoop();
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
