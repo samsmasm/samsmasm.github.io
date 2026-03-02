@@ -7,7 +7,6 @@
     <title>PeeDeeEffer</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -71,42 +70,13 @@
                 </div>
 
                 <div id="controlsSplit" class="hidden space-y-6">
-
-                    <!-- Split sub-mode toggle -->
-                    <div class="flex p-1 bg-slate-100 rounded-xl">
-                        <button onclick="setSplitMode('manual')" id="tabSplitManual" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Manual</button>
-                        <button onclick="setSplitMode('bysize')" id="tabSplitBySize" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">By Size</button>
-                    </div>
-
-                    <!-- Manual mode -->
-                    <div id="splitModeManual" class="space-y-3">
+                    <div class="space-y-3">
                         <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Ranges</div>
                         <div id="rangeInputs" class="space-y-2">
                             <input type="text" placeholder="e.g. 1-5" onfocus="activeBox = this" oninput="updateVisualSelect()" class="range-field w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:bg-white outline-none">
                         </div>
                         <button onclick="addRangeInput()" class="text-xs font-bold text-blue-600">+ ADD RANGE</button>
                     </div>
-
-                    <!-- By Size mode -->
-                    <div id="splitModeBySize" class="hidden space-y-4">
-                        <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Max Chunk Size</div>
-                        <div class="flex gap-2">
-                            <input type="number" id="chunkSizeInput" min="0.1" step="0.1" value="10" class="flex-1 px-4 py-3 bg-slate-50 border rounded-xl text-sm outline-none focus:bg-white">
-                            <select id="chunkSizeUnit" class="px-3 py-3 bg-slate-50 border rounded-xl text-sm outline-none">
-                                <option value="mb">MB</option>
-                                <option value="kb">KB</option>
-                            </select>
-                        </div>
-                        <button onclick="calculateChunks()" class="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold text-sm">Calculate Chunks</button>
-                        <div id="chunkResults" class="hidden space-y-2">
-                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Calculated Chunks</div>
-                            <ul id="chunkList" class="space-y-1 text-xs text-slate-700"></ul>
-                            <p id="chunkWarning" class="hidden text-[10px] text-amber-600 font-semibold pt-1">Note: Chunk sizes may exceed the limit if a single page embeds large shared resources (fonts, images).</p>
-                            <button onclick="downloadChunksAsZip()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold mt-2">Download All Chunks (ZIP)</button>
-                            <button onclick="downloadChunksIndividually()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50">Download Individually</button>
-                        </div>
-                    </div>
-
                     <div id="splitExportArea" class="hidden pt-6 border-t space-y-3">
                         <input type="text" id="splitManualName" placeholder="Custom name for single PDF" class="w-full px-4 py-3 bg-white border rounded-xl text-sm outline-none">
                         <button onclick="processExport('split-single')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold">Save Selection (Single PDF)</button>
@@ -139,7 +109,6 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         
         let mergeFiles = [], currentMode = 'merge', activeBox = null, globalRotations = {}, lastClickedIdx = null, pendingFiles = [], previewLimitMode = 'full';
-        let currentSplitMode = 'manual', calculatedChunks = [];
         
         // RENDER GUARD ID - The key to stopping zombie renders
         let currentRenderTask = 0;
@@ -156,10 +125,9 @@
 
         function resetState() {
             // KILL SWITCH: Increment ID so any running render loops stop immediately
-            currentRenderTask++;
-
+            currentRenderTask++; 
+            
             mergeFiles = []; globalRotations = {}; activeBox = null; lastClickedIdx = null;
-            calculatedChunks = [];
             document.getElementById('canvasGrid').innerHTML = '';
             document.getElementById('mergeList').innerHTML = '';
             document.getElementById('emptyState').classList.remove('hidden');
@@ -167,7 +135,6 @@
             document.getElementById('splitFileInfo').classList.add('hidden');
             document.getElementById('mergeExportArea').classList.add('hidden');
             document.getElementById('splitExportArea').classList.add('hidden');
-            document.getElementById('chunkResults').classList.add('hidden');
             document.getElementById('actionBar').classList.add('hidden');
             document.getElementById('mergeManualName').value = '';
             document.getElementById('splitManualName').value = '';
@@ -361,7 +328,7 @@
                 list.appendChild(li);
             });
             document.getElementById('mergeExportArea').classList.toggle('hidden', mergeFiles.length === 0);
-            document.getElementById('splitExportArea').classList.toggle('hidden', mergeFiles.length === 0 || currentSplitMode === 'bysize');
+            document.getElementById('splitExportArea').classList.toggle('hidden', mergeFiles.length === 0);
         }
 
         function deleteFile(i) {
@@ -410,149 +377,6 @@
         function clearSelection() {
             if (currentMode === 'split') document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
             updateVisualSelect();
-        }
-
-        // --- Split by Size ---
-        function setSplitMode(mode) {
-            currentSplitMode = mode;
-            document.getElementById('splitModeManual').classList.toggle('hidden', mode !== 'manual');
-            document.getElementById('splitModeBySize').classList.toggle('hidden', mode !== 'bysize');
-            document.getElementById('tabSplitManual').className = mode === 'manual'
-                ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
-                : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
-            document.getElementById('tabSplitBySize').className = mode === 'bysize'
-                ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
-                : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
-            document.getElementById('splitExportArea').classList.toggle('hidden', mode !== 'manual');
-            if (mode === 'bysize') {
-                document.getElementById('chunkResults').classList.add('hidden');
-                calculatedChunks = [];
-            }
-        }
-
-        async function buildPageBytes(pageIndices) {
-            // pageIndices: 0-based indices into the full page list across all files
-            const doc = await PDFLib.PDFDocument.create();
-            const cards = Array.from(document.querySelectorAll('.page-card'));
-            for (const idx of pageIndices) {
-                const card = cards[idx];
-                const pageId = card.id.replace('card-', '');
-                const [fId, pIdx] = pageId.split('-');
-                const fileObj = mergeFiles.find(f => f.id === fId);
-                const srcDoc = await PDFLib.PDFDocument.load(fileObj.data);
-                const [copied] = await doc.copyPages(srcDoc, [parseInt(pIdx) - 1]);
-                copied.setRotation(PDFLib.degrees((globalRotations[pageId] || 0) % 360));
-                doc.addPage(copied);
-            }
-            return await doc.save();
-        }
-
-        async function calculateChunks() {
-            if (!mergeFiles.length) { setStatus('No file loaded', 'amber'); return; }
-
-            const unit = document.getElementById('chunkSizeUnit').value;
-            const limitBytes = parseFloat(document.getElementById('chunkSizeInput').value) * (unit === 'mb' ? 1024 * 1024 : 1024);
-            if (!limitBytes || limitBytes <= 0) { setStatus('Invalid size', 'amber'); return; }
-
-            const cards = Array.from(document.querySelectorAll('.page-card'));
-            const totalPages = cards.length;
-            calculatedChunks = [];
-            let anyOverflow = false;
-            let chunkStart = 0;
-
-            document.getElementById('chunkResults').classList.add('hidden');
-            setStatus('Calculating chunks…', 'blue');
-
-            while (chunkStart < totalPages) {
-                // Binary search: find the largest count of pages starting at chunkStart that fits
-                let lo = 1, hi = totalPages - chunkStart, bestCount = -1, bestBytes = null;
-
-                // First check if even 1 page fits
-                const onePageBytes = await buildPageBytes([chunkStart]);
-                if (onePageBytes.byteLength > limitBytes) {
-                    // Single page overflows — include it anyway as its own chunk with a warning
-                    anyOverflow = true;
-                    calculatedChunks.push({ start: chunkStart, end: chunkStart, bytes: onePageBytes.byteLength, overflow: true });
-                    chunkStart++;
-                    continue;
-                }
-
-                bestCount = 1;
-                bestBytes = onePageBytes.byteLength;
-
-                while (lo <= hi) {
-                    const mid = Math.floor((lo + hi) / 2);
-                    const indices = Array.from({ length: mid }, (_, i) => chunkStart + i);
-                    const bytes = (await buildPageBytes(indices)).byteLength;
-                    if (bytes <= limitBytes) {
-                        bestCount = mid;
-                        bestBytes = bytes;
-                        lo = mid + 1;
-                    } else {
-                        hi = mid - 1;
-                    }
-                }
-
-                const chunkEnd = chunkStart + bestCount - 1;
-                calculatedChunks.push({ start: chunkStart, end: chunkEnd, bytes: bestBytes, overflow: false });
-                setStatus(`Calculating… chunk ${calculatedChunks.length} (pages ${chunkStart + 1}–${chunkEnd + 1})`, 'blue');
-                chunkStart += bestCount;
-            }
-
-            // Render results
-            const list = document.getElementById('chunkList');
-            list.innerHTML = '';
-            calculatedChunks.forEach((chunk, i) => {
-                const pageLabel = chunk.start === chunk.end
-                    ? `Page ${chunk.start + 1}`
-                    : `Pages ${chunk.start + 1}–${chunk.end + 1}`;
-                const sizeLabel = chunk.bytes >= 1024 * 1024
-                    ? (chunk.bytes / (1024 * 1024)).toFixed(2) + ' MB'
-                    : (chunk.bytes / 1024).toFixed(1) + ' KB';
-                const li = document.createElement('li');
-                li.className = 'p-2 bg-slate-50 rounded-lg flex justify-between items-center';
-                li.innerHTML = `<span class="font-semibold">Chunk ${i + 1}</span><span class="text-slate-500">${pageLabel} &mdash; ${sizeLabel}${chunk.overflow ? ' ⚠️' : ''}</span>`;
-                list.appendChild(li);
-            });
-
-            document.getElementById('chunkWarning').classList.toggle('hidden', !anyOverflow);
-            document.getElementById('chunkResults').classList.remove('hidden');
-            setStatus(`Done — ${calculatedChunks.length} chunk${calculatedChunks.length !== 1 ? 's' : ''}`, 'green');
-        }
-
-        async function buildChunkDoc(chunk) {
-            const indices = Array.from({ length: chunk.end - chunk.start + 1 }, (_, i) => chunk.start + i);
-            return await buildPageBytes(indices);
-        }
-
-        async function downloadChunksIndividually() {
-            if (!calculatedChunks.length) return;
-            const baseName = mergeFiles[0]?.name.replace('.pdf', '') || 'export';
-            setStatus('Exporting chunks…', 'blue');
-            for (let i = 0; i < calculatedChunks.length; i++) {
-                const bytes = await buildChunkDoc(calculatedChunks[i]);
-                save(bytes, `${baseName}_chunk${i + 1}.pdf`);
-                await new Promise(r => setTimeout(r, 800));
-            }
-            setStatus('Done', 'green');
-        }
-
-        async function downloadChunksAsZip() {
-            if (!calculatedChunks.length) return;
-            const baseName = mergeFiles[0]?.name.replace('.pdf', '') || 'export';
-            setStatus('Building ZIP…', 'blue');
-            const zip = new JSZip();
-            for (let i = 0; i < calculatedChunks.length; i++) {
-                setStatus(`Building chunk ${i + 1} of ${calculatedChunks.length}…`, 'blue');
-                const bytes = await buildChunkDoc(calculatedChunks[i]);
-                zip.file(`${baseName}_chunk${i + 1}.pdf`, bytes);
-            }
-            const blob = await zip.generateAsync({ type: 'blob' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${baseName}_chunks.zip`;
-            a.click();
-            setStatus('Done', 'green');
         }
     </script>
 </body>
