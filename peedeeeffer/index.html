@@ -157,7 +157,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         
         let mergeFiles = [], currentMode = 'merge', activeBox = null, globalRotations = {}, lastClickedIdx = null, pendingFiles = [], previewLimitMode = 'full';
-        let currentSplitMode = 'manual', calculatedChunks = [];
+        let currentSplitMode = 'manual', calculatedChunks = [], pdfLibDocCache = {};
         
         // RENDER GUARD ID - The key to stopping zombie renders
         let currentRenderTask = 0;
@@ -182,7 +182,7 @@
             currentRenderTask++;
 
             mergeFiles = []; globalRotations = {}; activeBox = null; lastClickedIdx = null;
-            calculatedChunks = []; extractedText = '';
+            calculatedChunks = []; extractedText = ''; pdfLibDocCache = {};
             document.getElementById('canvasGrid').innerHTML = '';
             document.getElementById('canvasGrid').classList.remove('hidden');
             document.getElementById('mergeList').innerHTML = '';
@@ -664,7 +664,8 @@
                 const pageId = card.id.replace('card-', '');
                 const [fId, pIdx] = pageId.split('-');
                 const fileObj = mergeFiles.find(f => f.id === fId);
-                const srcDoc = await PDFLib.PDFDocument.load(fileObj.data);
+                if (!pdfLibDocCache[fId]) pdfLibDocCache[fId] = await PDFLib.PDFDocument.load(fileObj.data);
+                const srcDoc = pdfLibDocCache[fId];
                 const [copied] = await doc.copyPages(srcDoc, [parseInt(pIdx) - 1]);
                 copied.setRotation(PDFLib.degrees((globalRotations[pageId] || 0) % 360));
                 doc.addPage(copied);
