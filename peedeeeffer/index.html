@@ -157,7 +157,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         
         let mergeFiles = [], currentMode = 'merge', activeBox = null, globalRotations = {}, lastClickedIdx = null, pendingFiles = [], previewLimitMode = 'full';
-        let currentSplitMode = 'manual', calculatedChunks = [];
+        let currentSplitMode = 'manual', calculatedChunks = [], pdfLibDocCache = {};
         
         // RENDER GUARD ID - The key to stopping zombie renders
         let currentRenderTask = 0;
@@ -182,7 +182,7 @@
             currentRenderTask++;
 
             mergeFiles = []; globalRotations = {}; activeBox = null; lastClickedIdx = null;
-            calculatedChunks = []; extractedText = '';
+            calculatedChunks = []; extractedText = ''; pdfLibDocCache = {};
             document.getElementById('canvasGrid').innerHTML = '';
             document.getElementById('canvasGrid').classList.remove('hidden');
             document.getElementById('mergeList').innerHTML = '';
@@ -482,9 +482,9 @@
                     const page = await pdf.getPage(p);
                     const content = await page.getTextContent();
                     for (const item of content.items) {
-                        if (!item.str || !item.str.trim()) continue;
+                        if (!item.str) continue;
                         const sz = Math.abs(item.transform[3]);
-                        if (sz <= 0) continue;
+                        if (sz <= 0 && item.str.trim()) continue; // allow zero-size whitespace items
                         rawItems.push({
                             str: item.str,
                             sz,
@@ -501,6 +501,7 @@
                 // --- Determine body font size by character-weighted frequency ---
                 const sizeCounts = {};
                 for (const it of rawItems) {
+                    if (!it.str.trim()) continue; // whitespace items don't count toward size frequency
                     const sz = Math.round(it.sz * 2) / 2;
                     sizeCounts[sz] = (sizeCounts[sz] || 0) + it.str.length;
                 }
@@ -526,7 +527,8 @@
                 const lines = [];
                 let curLine = null;
                 for (const item of rawItems) {
-                    const threshold = item.sz * 0.45;
+                    const effectiveSz = item.sz > 0 ? item.sz : (curLine ? curLine.sz : 1);
+                    const threshold = effectiveSz * 0.45;
                     if (!curLine || curLine.page !== item.page || Math.abs(curLine.y - item.y) > threshold) {
                         if (curLine) lines.push(curLine);
                         curLine = { page: item.page, y: item.y, sz: item.sz, bold: item.bold, items: [item] };
@@ -551,7 +553,20 @@
                 };
 
                 for (const line of lines) {
-                    const text = line.items.map(it => it.str).join('').trim();
+                    let text = '';
+                    for (let i = 0; i < line.items.length; i++) {
+                        const it = line.items[i];
+                        if (i > 0) {
+                            const prev = line.items[i - 1];
+                            const gap = it.x - (prev.x + prev.w);
+                            // Insert a space if there's a meaningful positional gap and neither side already has one
+                            if (gap > prev.sz * 0.15 && !text.endsWith(' ') && !it.str.startsWith(' ')) {
+                                text += ' ';
+                            }
+                        }
+                        text += it.str;
+                    }
+                    text = text.trim();
                     if (!text) continue;
 
                     const roundedSz = Math.round(line.sz * 2) / 2;
@@ -649,7 +664,8 @@
                 const pageId = card.id.replace('card-', '');
                 const [fId, pIdx] = pageId.split('-');
                 const fileObj = mergeFiles.find(f => f.id === fId);
-                const srcDoc = await PDFLib.PDFDocument.load(fileObj.data);
+                if (!pdfLibDocCache[fId]) pdfLibDocCache[fId] = await PDFLib.PDFDocument.load(fileObj.data);
+                const srcDoc = pdfLibDocCache[fId];
                 const [copied] = await doc.copyPages(srcDoc, [parseInt(pIdx) - 1]);
                 copied.setRotation(PDFLib.degrees((globalRotations[pageId] || 0) % 360));
                 doc.addPage(copied);
