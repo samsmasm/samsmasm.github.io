@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Creature Evolution Sim</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #e8f4ff; color: #222; font-family: monospace; display: flex; flex-direction: column; height: 100vh; }
+  #controls { display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #f0f0f0; border-bottom: 1px solid #ccc; flex-wrap: wrap; }
+  #controls label { font-size: 12px; color: #555; }
+  #controls input[type=number] { background: #fff; border: 1px solid #bbb; color: #222; padding: 4px 8px; border-radius: 4px; width: 70px; font-family: monospace; }
+  #controls input[type=range] { width: 80px; vertical-align: middle; }
+  #controls button { background: #4466cc; border: none; color: #fff; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-family: monospace; font-size: 13px; transition: opacity 0.15s; }
+  #controls button:hover:not(:disabled) { background: #3355bb; }
+  #controls button:disabled { opacity: 0.35; cursor: default; }
+  #controls button.danger { background: #cc4444; }
+  #controls button.danger:hover:not(:disabled) { background: #bb3333; }
+  #controls button.toggle { background: #117755; }
+  #controls button.toggle:hover { background: #0e6648; }
+  #stats { display: flex; gap: 20px; padding: 6px 16px; background: #f8f8f8; font-size: 12px; color: #777; border-bottom: 1px solid #ddd; flex-wrap: wrap; }
+  #stats span { color: #2244aa; font-weight: bold; }
+  #canvasWrap { flex: 1; min-height: 0; position: relative; }
+  canvas { position: absolute; top: 0; left: 0; }
+  #log { height: 72px; overflow-y: auto; background: #fff; padding: 4px 12px; font-size: 11px; color: #999; border-top: 1px solid #ddd; }
+  #log div { line-height: 1.6; }
+  .best { color: #cc7700; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <div><label>Pop size</label><br><input id="popSize" type="number" value="20" min="2" max="200"></div>
+  <div><label>Sim speed (x)</label><br><input id="simSpeed" type="number" value="5" min="1" max="1000"></div>
+  <div><label>Stall (s)</label><br><input id="stallTime" type="number" value="5" min="1" max="30"></div>
+  <div><label>Min progress (u)</label><br><input id="stallDist" type="number" value="1" min="0.1" max="20" step="0.1"></div>
+  <div><label>Mutation: <span id="mutLabel">50</span></label><br><input id="mutRate" type="range" min="0" max="100" value="50"></div>
+  <button id="btnStart">&#9654; Start</button>
+  <button id="btnPause" disabled>&#9646;&#9646; Pause</button>
+  <button id="btnReset" class="danger">&#8634; Reset</button>
+  <button id="btnRepro" class="toggle">&#9672; Sexual</button>
+</div>
+
+<div id="stats">
+  Generation: <span id="sGen">0</span> &nbsp;
+  Creature: <span id="sCreature">-</span> &nbsp;
+  Best dist: <span id="sBest">0.00</span> &nbsp;
+  Current: <span id="sCurrent">0.00</span> &nbsp;
+  Best time: <span id="sBestTime">-</span> &nbsp;
+  Last finish: <span id="sLastTime">-</span> &nbsp;
+  Speed: <span id="sMode">-</span>
+</div>
+
+<div id="canvasWrap"><canvas id="canvas"></canvas></div>
+<div id="log"></div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const WORLD_WIDTH    = 115;
+const TRACK_START    = 3;
+const TRACK_FINISH   = 103;
+const GRAVITY        = 40;
+const GROUND_Y       = 0;
+const DT_BASE        = 1/60;
+const ITERS          = 10;
+const FRICTION       = 0.88;
+const GND_FRICTION   = 0.40;
+const MAX_CONN_LEN   = 5;      // max rest length at creation
+const MUSCLE_BREAK   = 8;      // muscle snaps if stretched past this
+const TIME_CAP       = 120;    // max sim-seconds per creature
+const SPEED_BONUS    = 10;     // extra fitness units awarded to finishers for speed
+const HEADLESS_AT    = 100;    // skip main render at or above this speed
+const BOX_W          = 230;
+const BOX_H          = 188;
+const BOX_MARGIN     = 10;
+
+function getScale() { return canvas.width / WORLD_WIDTH; }
+
+// ─── GLOBALS ─────────────────────────────────────────────────────────────────
+let popSize = 20, stallTime = 5, stallDist = 1;
+let generation = 0, currentIdx = 0;
+let population = [], champion = null, championGenome = null;
+let running = false, paused = false;
+let animFrame = null, lastTime = null;
+let creatureTime = 0, stallCheckTime = 0, stallCheckX = 0;
+let currentCreature = null;
+let bestFinishTime = null;   // fastest recorded finish (sim-seconds)
+let lastFinishTime = null;   // most recent finish time
+let bestDist = 0;            // furthest distance reached by any non-finisher (0–100)
+let champCreature = null, champTime = 0, champStallX = 0, champStallT = 0;
+let champSpeed = 1.0;   // preview playback speed (0.1–2.0)
+let reproMode = 'sexual'; // 'sexual' | 'asexual'
+let champZoom  = 16;    // world units visible in preview (smaller = zoomed in)
+let champTimeAccum = 0; // sub-frame accumulator for fixed-dt stepping
+const champBtns = [];   // clickable regions, rebuilt each frame
+
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  const wrap = document.getElementById('canvasWrap');
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function rand(a, b)    { return a + Math.random() * (b - a); }
+function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+
+function clampedDist(nodes, a, b) {
+  const dx = nodes[a].x - nodes[b].x, dy = nodes[a].y - nodes[b].y;
+  return Math.min(Math.max(Math.sqrt(dx*dx + dy*dy), 0.3), MAX_CONN_LEN);
+}
+
+// ─── GENOME ──────────────────────────────────────────────────────────────────
+function makeBone(nodes, a, b) {
+  return { type: 'bone', a, b, restLen: clampedDist(nodes, a, b) };
+}
+
+function makeMuscle(nodes, a, b) {
+  return {
+    type: 'muscle', a, b,
+    restLen:           clampedDist(nodes, a, b),
+    contractionFactor: rand(0.4, 0.8),
+    frequency:         rand(0.5, 3.0),
+    phase:             rand(0, Math.PI * 2)
+  };
+}
+
+function makeConn(nodes, a, b) {
+  return Math.random() < 0.5 ? makeBone(nodes, a, b) : makeMuscle(nodes, a, b);
+}
+
+// Creates a bone from a→b with 0–2 intermediate attachment nodes.
+// Populates the groups array with { a, b, attachPts } for collinearity enforcement.
+function makeBoneWithAttachments(nodes, a, b, groups) {
+  const numAP = randInt(0, 2);
+  if (numAP === 0) {
+    return { boneConns: [makeBone(nodes, a, b)], attachPts: [] };
+  }
+  const ts = Array.from({ length: numAP }, () => rand(0.2, 0.8));
+  ts.sort((x, y) => x - y);
+
+  const ax = nodes[a].x, ay = nodes[a].y;
+  const bx = nodes[b].x, by = nodes[b].y;
+
+  const attachPts = [];
+  for (const t of ts) {
+    nodes.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t, attach: true });
+    attachPts.push(nodes.length - 1);
+  }
+
+  const chain = [a, ...attachPts, b];
+  const boneConns = [];
+  for (let i = 0; i < chain.length - 1; i++) {
+    boneConns.push(makeBone(nodes, chain[i], chain[i + 1]));
+  }
+
+  if (groups) groups.push({ a, b, attachPts: [...attachPts] });
+  return { boneConns, attachPts };
+}
+
+function randomGenome() {
+  const n = randInt(3, 8);
+  const nodes = Array.from({ length: n }, () => ({ x: rand(0, 5), y: rand(0, 3) }));
+  const conns = [];
+  const groups = [];
+  const connected = new Set([0]);
+  const remaining = new Set(Array.from({ length: n - 1 }, (_, i) => i + 1));
+
+  while (remaining.size > 0) {
+    const a = [...connected][randInt(0, connected.size - 1)];
+    const b = [...remaining][0];
+    remaining.delete(b); connected.add(b);
+    if (Math.random() < 0.5) {
+      const { boneConns, attachPts } = makeBoneWithAttachments(nodes, a, b, groups);
+      conns.push(...boneConns);
+      for (const ap of attachPts) connected.add(ap);
+    } else {
+      conns.push(makeMuscle(nodes, a, b));
+    }
+  }
+
+  const totalNodes = nodes.length;
+  const extras = randInt(1, totalNodes);
+  for (let i = 0; i < extras; i++) {
+    const a = randInt(0, totalNodes - 1);
+    let b = randInt(0, totalNodes - 1);
+    if (b === a) b = (b + 1) % totalNodes;
+    if (!conns.some(c => (c.a===a&&c.b===b)||(c.a===b&&c.b===a)))
+      conns.push(makeConn(nodes, a, b));
+  }
+  return { nodes, conns, groups };
+}
+
+// ─── CROSSOVER & MUTATION ────────────────────────────────────────────────────
+function crossover(g1, g2) {
+  const base = g1.nodes.length >= g2.nodes.length ? g1 : g2;
+  const other = base === g1 ? g2 : g1;
+  const nodes = base.nodes.map(n => ({ ...n }));
+  const conns = base.conns.map((c, i) => {
+    const oc = other.conns[i % other.conns.length];
+    if (c.type === 'muscle' && oc.type === 'muscle' && Math.random() < 0.4)
+      return { ...c, contractionFactor: oc.contractionFactor, frequency: oc.frequency, phase: oc.phase };
+    return { ...c };
+  });
+  const groups = (base.groups || []).map(gr => ({ ...gr, attachPts: [...gr.attachPts] }));
+  return { nodes, conns, groups };
+}
+
+function mutate(genome, mutRate) {
+  const g = JSON.parse(JSON.stringify(genome));
+  if (!g.groups) g.groups = [];
+  const s = mutRate / 50;
+
+  if (Math.random() < 0.15 * s && g.nodes.length < 10) {
+    g.nodes.push({ x: rand(0, 5), y: rand(0, 3) });
+    const ni = g.nodes.length - 1;
+    g.conns.push(makeConn(g.nodes, ni, randInt(0, ni - 1)));
+  }
+  if (Math.random() < 0.05 * s && g.nodes.length > 2) {
+    const ri = randInt(1, g.nodes.length - 1);
+    g.nodes.splice(ri, 1);
+    g.conns = g.conns
+      .filter(c => c.a !== ri && c.b !== ri)
+      .map(c => ({ ...c, a: c.a > ri ? c.a - 1 : c.a, b: c.b > ri ? c.b - 1 : c.b }));
+    // Remove groups that referenced the deleted node, remap the rest
+    g.groups = g.groups
+      .filter(gr => gr.a !== ri && gr.b !== ri && !gr.attachPts.includes(ri))
+      .map(gr => ({
+        a: gr.a > ri ? gr.a - 1 : gr.a,
+        b: gr.b > ri ? gr.b - 1 : gr.b,
+        attachPts: gr.attachPts.map(ap => ap > ri ? ap - 1 : ap)
+      }));
+    if (!g.conns.length && g.nodes.length >= 2) g.conns.push(makeConn(g.nodes, 0, 1));
+  }
+
+  g.conns.forEach(c => {
+    // Don't flip structural bone segments (those touching an attachment point)
+    const aIsAttach = g.nodes[c.a] && g.nodes[c.a].attach;
+    const bIsAttach = g.nodes[c.b] && g.nodes[c.b].attach;
+    if (Math.random() < 0.08 * s) {
+      if (c.type === 'bone' && !aIsAttach && !bIsAttach) {
+        Object.assign(c, { type: 'muscle', contractionFactor: rand(0.4,0.8), frequency: rand(0.5,3), phase: rand(0,Math.PI*2) });
+      } else if (c.type === 'muscle') {
+        c.type = 'bone';
+        delete c.contractionFactor; delete c.frequency; delete c.phase;
+      }
+    }
+    if (Math.random() < 0.1 * s)
+      c.restLen = Math.max(0.3, Math.min(MAX_CONN_LEN, c.restLen * rand(0.85, 1.15)));
+    if (c.type === 'muscle') {
+      if (Math.random() < 0.3 * s) c.contractionFactor = Math.max(0.3, Math.min(0.9, c.contractionFactor + rand(-0.1, 0.1)));
+      if (Math.random() < 0.3 * s) c.frequency = Math.max(0.2, Math.min(5, c.frequency * rand(0.8, 1.25)));
+      if (Math.random() < 0.3 * s) c.phase = (c.phase + rand(-0.5, 0.5)) % (Math.PI * 2);
+    }
+  });
+
+  g.nodes.forEach(n => {
+    if (Math.random() < 0.2 * s) n.x += rand(-0.3, 0.3);
+    if (Math.random() < 0.2 * s) n.y = Math.max(0, n.y + rand(-0.2, 0.2));
+  });
+
+  return g;
+}
+
+// ─── PHYSICS ─────────────────────────────────────────────────────────────────
+function buildCreature(genome, startX) {
+  const minY = Math.min(...genome.nodes.map(n => n.y));
+  const positions = genome.nodes.map(n => {
+    const x = n.x + startX, y = n.y - minY + 0.2;
+    return { x, y, px: x, py: y };
+  });
+  return {
+    genome, positions,
+    conns:  genome.conns.map(c => ({ ...c })),
+    groups: (genome.groups || []).map(gr => ({ ...gr, attachPts: [...gr.attachPts] })),
+    time: 0, fitness: 0
+  };
+}
+
+function stepCreature(creature, dt) {
+  const pos = creature.positions;
+  creature.time += dt;
+  const t = creature.time;
+
+  for (const p of pos) {
+    const vx = (p.x - p.px) * FRICTION, vy = p.y - p.py;
+    p.px = p.x; p.py = p.y;
+    p.x += vx;
+    p.y += vy - GRAVITY * dt * dt;
+  }
+
+  for (let iter = 0; iter < ITERS; iter++) {
+    for (const c of creature.conns) {
+      const pa = pos[c.a], pb = pos[c.b];
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+      if (c.type === 'bone') {
+        const diff = (dist - c.restLen) / dist * 0.5;
+        pa.x += dx*diff; pa.y += dy*diff;
+        pb.x -= dx*diff; pb.y -= dy*diff;
+      } else {
+        const t0 = 0.5 + 0.5 * Math.sin(t * c.frequency * Math.PI * 2 + c.phase);
+        const tgt = c.restLen * (c.contractionFactor + (1 - c.contractionFactor) * t0);
+        if (dist > tgt) {
+          const diff = (dist - tgt) / dist * 0.5;
+          pa.x += dx*diff; pa.y += dy*diff;
+          pb.x -= dx*diff; pb.y -= dy*diff;
+        }
+      }
+    }
+    for (const p of pos) {
+      if (p.y <= GROUND_Y + 0.08) {
+        const vx = (p.x - p.px) * GND_FRICTION;
+        p.py = p.y; p.y = GROUND_Y + 0.05; p.px = p.x - vx;
+      }
+    }
+  }
+
+  // Keep attachment points collinear with their bone endpoints
+  for (const gr of creature.groups) {
+    const pa = pos[gr.a], pb = pos[gr.b];
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    const len2 = dx*dx + dy*dy;
+    if (len2 < 1e-6) continue;
+    for (const api of gr.attachPts) {
+      const p = pos[api];
+      const t = ((p.x - pa.x)*dx + (p.y - pa.y)*dy) / len2;
+      p.x = pa.x + t * dx;
+      p.y = pa.y + t * dy;
+    }
+  }
+
+  // Snap overstretched muscles
+  creature.conns = creature.conns.filter(c => {
+    if (c.type !== 'muscle') return true;
+    const pa = pos[c.a], pb = pos[c.b];
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    return Math.sqrt(dx*dx + dy*dy) <= MUSCLE_BREAK;
+  });
+
+  let cx = 0;
+  for (const p of pos) cx += p.x;
+  creature.fitness = cx / pos.length;
+}
+
+function centroid(creature) {
+  let cx = 0, cy = 0;
+  for (const p of creature.positions) { cx += p.x; cy += p.y; }
+  return { x: cx / creature.positions.length, y: cy / creature.positions.length };
+}
+
+// ─── EVOLUTION ───────────────────────────────────────────────────────────────
+function initPopulation() {
+  population = Array.from({ length: popSize }, () => ({ genome: randomGenome(), fitness: 0 }));
+  generation = 0; currentIdx = 0; champion = null; championGenome = null;
+  champCreature = null; bestFinishTime = null; lastFinishTime = null; bestDist = 0;
+}
+
+function evolveNextGeneration() {
+  population.sort((a, b) => b.fitness - a.fitness);
+  const best = population[0];
+  const bestDesc = best.fitness > 100
+    ? `finished in ${(TIME_CAP - (best.fitness - 100)).toFixed(2)}s`
+    : `${best.fitness.toFixed(2)} units`;
+  addLog(`Gen ${generation} — best: ${bestDesc}`);
+  champion = best;
+  championGenome = JSON.parse(JSON.stringify(best.genome));
+  generation++;
+  restartChampPreview();
+
+  const mutRate = parseInt(document.getElementById('mutRate').value) || 50;
+  const newPop = [{ genome: JSON.parse(JSON.stringify(championGenome)), fitness: 0 }];
+  if (reproMode === 'asexual') {
+    while (newPop.length < popSize)
+      newPop.push({ genome: mutate(JSON.parse(JSON.stringify(championGenome)), mutRate), fitness: 0 });
+  } else {
+    const survivors = population.slice(0, Math.max(2, Math.floor(population.length / 2)));
+    while (newPop.length < popSize) {
+      const p1 = survivors[randInt(0, survivors.length - 1)];
+      const p2 = survivors[randInt(0, survivors.length - 1)];
+      newPop.push({ genome: mutate(crossover(p1.genome, p2.genome), mutRate), fitness: 0 });
+    }
+  }
+  population = newPop;
+  currentIdx = 0;
+}
+
+// ─── CHAMPION PREVIEW ────────────────────────────────────────────────────────
+function restartChampPreview() {
+  if (!championGenome) return;
+  champCreature = buildCreature(championGenome, TRACK_START - 0.5);
+  champTime = 0; champStallX = TRACK_START - 0.5; champStallT = 0; champTimeAccum = 0;
+}
+
+function stepChampPreview(wallDt) {
+  if (!champCreature) return;
+  champTimeAccum += wallDt * champSpeed;
+  while (champTimeAccum >= DT_BASE) {
+    champTimeAccum -= DT_BASE;
+    stepCreature(champCreature, DT_BASE);
+    champTime   += DT_BASE;
+    champStallT += DT_BASE;
+    const cx = centroid(champCreature).x;
+    if (champStallT >= 4) {
+      if (cx - champStallX < 0.5) { restartChampPreview(); return; }
+      champStallT = 0; champStallX = cx;
+    }
+    if (cx >= TRACK_FINISH || champTime > 40) { restartChampPreview(); return; }
+  }
+}
+
+// ─── DRAWING ─────────────────────────────────────────────────────────────────
+function drawCreatureOnCtx(creature, toX, toY) {
+  // toX/toY: functions mapping world coords to screen px
+  const pos = creature.positions;
+  for (const c of creature.conns) {
+    const sa = { x: toX(pos[c.a].x), y: toY(pos[c.a].y) };
+    const sb = { x: toX(pos[c.b].x), y: toY(pos[c.b].y) };
+    if (c.type === 'bone') {
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 3;
+    } else {
+      ctx.strokeStyle = '#ff69b4'; ctx.lineWidth = 2;
+    }
+    ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y); ctx.stroke();
+  }
+  for (let i = 0; i < pos.length; i++) {
+    const p = pos[i];
+    const isAttach = creature.genome.nodes[i] && creature.genome.nodes[i].attach;
+    ctx.beginPath(); ctx.arc(toX(p.x), toY(p.y), isAttach ? 2.5 : 4, 0, Math.PI * 2);
+    if (isAttach) {
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 1; ctx.stroke();
+    } else {
+      ctx.fillStyle = '#222'; ctx.fill();
+    }
+  }
+}
+
+function drawMainScene(creature) {
+  const sc = getScale();
+  const gnd = canvas.height - 60;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Sky
+  const sky = ctx.createLinearGradient(0, 0, 0, gnd);
+  sky.addColorStop(0, '#87ceeb'); sky.addColorStop(1, '#d8eeff');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, gnd);
+
+  // Grid
+  ctx.lineWidth = 1;
+  for (let t = -5; t <= 105; t += 5) {
+    const wx = TRACK_START + t;
+    if (wx < 0 || wx > WORLD_WIDTH) continue;
+    const sx = wx * sc;
+    ctx.strokeStyle = (t === 0 || t === 100) ? '#aaa' : '#cde';
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, gnd); ctx.stroke();
+    if (t >= 0 && t <= 100) {
+      ctx.fillStyle = '#aaa'; ctx.font = '9px monospace';
+      ctx.fillText(t, sx + 2, gnd - 4);
+    }
+  }
+
+  // Ground
+  const gg = ctx.createLinearGradient(0, gnd, 0, canvas.height);
+  gg.addColorStop(0, '#8B7355'); gg.addColorStop(1, '#5a4428');
+  ctx.fillStyle = gg; ctx.fillRect(0, gnd, canvas.width, canvas.height - gnd);
+  ctx.strokeStyle = '#6b5535'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, gnd); ctx.lineTo(canvas.width, gnd); ctx.stroke();
+
+  // Start line
+  ctx.strokeStyle = '#22aa44'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(TRACK_START*sc, 0); ctx.lineTo(TRACK_START*sc, gnd); ctx.stroke();
+  ctx.setLineDash([]); ctx.fillStyle = '#22aa44'; ctx.font = 'bold 11px monospace';
+  ctx.fillText('0', TRACK_START*sc + 4, 16);
+
+  // Finish line
+  ctx.strokeStyle = '#cc8800'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(TRACK_FINISH*sc, 0); ctx.lineTo(TRACK_FINISH*sc, gnd); ctx.stroke();
+  ctx.setLineDash([]); ctx.fillStyle = '#cc8800'; ctx.font = 'bold 11px monospace';
+  ctx.fillText('100', TRACK_FINISH*sc + 4, 16);
+
+  if (creature)
+    drawCreatureOnCtx(creature, wx => wx * sc, wy => gnd - wy * sc);
+
+  // Progress bar
+  if (creature) {
+    const prog = Math.max(0, Math.min(1, (centroid(creature).x - TRACK_START) / (TRACK_FINISH - TRACK_START)));
+    const bw = canvas.width - 32;
+    ctx.fillStyle = '#dde8f8'; ctx.fillRect(16, canvas.height - 22, bw, 10);
+    ctx.fillStyle = '#4466cc'; ctx.fillRect(16, canvas.height - 22, bw * prog, 10);
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1; ctx.strokeRect(16, canvas.height - 22, bw, 10);
+  }
+}
+
+function drawHeadlessOverlay() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, '#c8e8f8'); sky.addColorStop(1, '#e8f4ff');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#7799bb'; ctx.font = '13px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`Headless — Gen ${generation}, creature ${currentIdx+1}/${popSize}`, canvas.width/2, canvas.height/2);
+  ctx.textAlign = 'left';
+}
+
+function drawChampionBox() {
+  champBtns.length = 0;
+  const bx = canvas.width - BOX_W - BOX_MARGIN;
+  const by = BOX_MARGIN;
+  const ctrlH  = 44;                      // height reserved for controls at bottom
+  const innerTop = by + 20;
+  const innerBot = by + BOX_H - ctrlH - 4;
+  const innerH   = innerBot - innerTop;
+
+  // Panel
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.strokeStyle = '#aabbcc'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(bx, by, BOX_W, BOX_H, 5);
+  ctx.fill(); ctx.stroke();
+
+  // Title
+  ctx.fillStyle = '#335577'; ctx.font = 'bold 10px monospace';
+  ctx.fillText('CHAMPION', bx + 8, by + 13);
+
+  if (!champCreature) {
+    ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('Waiting for first generation…', bx + BOX_W/2, by + BOX_H/2 - 10);
+    ctx.textAlign = 'left';
+  } else {
+    const pad = 4;
+    const innerL = bx + pad, innerW = BOX_W - pad * 2;
+    const gndY   = innerBot;
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(innerL, innerTop, innerW, innerH); ctx.clip();
+
+    const ms = ctx.createLinearGradient(0, innerTop, 0, gndY);
+    ms.addColorStop(0, '#87ceeb'); ms.addColorStop(1, '#d8eeff');
+    ctx.fillStyle = ms; ctx.fillRect(innerL, innerTop, innerW, innerH);
+
+    ctx.fillStyle = '#8B7355';
+    ctx.fillRect(innerL, gndY - 4, innerW, innerH - (gndY - 4 - innerTop) + ctrlH + 4);
+    ctx.strokeStyle = '#6b5535'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(innerL, gndY); ctx.lineTo(innerL + innerW, gndY); ctx.stroke();
+
+    const cc   = centroid(champCreature);
+    const camX = cc.x - champZoom / 2;
+    const msc  = innerW / champZoom;
+    const toX  = wx => innerL + (wx - camX) * msc;
+    const toY  = wy => gndY - wy * msc;
+
+    ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.strokeStyle = '#22aa44';
+    ctx.beginPath(); ctx.moveTo(toX(TRACK_START), innerTop); ctx.lineTo(toX(TRACK_START), gndY); ctx.stroke();
+    ctx.strokeStyle = '#cc8800';
+    ctx.beginPath(); ctx.moveTo(toX(TRACK_FINISH), innerTop); ctx.lineTo(toX(TRACK_FINISH), gndY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const pos = champCreature.positions;
+    for (const c of champCreature.conns) {
+      if (c.type === 'bone') {
+        ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = '#ff69b4'; ctx.lineWidth = 1.5;
+      }
+      ctx.beginPath();
+      ctx.moveTo(toX(pos[c.a].x), toY(pos[c.a].y));
+      ctx.lineTo(toX(pos[c.b].x), toY(pos[c.b].y));
+      ctx.stroke();
+    }
+    for (const p of pos) {
+      ctx.beginPath(); ctx.arc(toX(p.x), toY(p.y), 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#222'; ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Distance label
+    const cc2 = centroid(champCreature);
+    ctx.fillStyle = '#335577'; ctx.font = '9px monospace';
+    ctx.fillText(`dist: ${(cc2.x - TRACK_START).toFixed(1)}`, bx + 8, innerBot + 12);
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  const ctrlTop = by + BOX_H - ctrlH + 4;
+  ctx.strokeStyle = '#dde'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(bx + 6, ctrlTop - 2); ctx.lineTo(bx + BOX_W - 6, ctrlTop - 2); ctx.stroke();
+
+  function drawRow(label, value, rowY, onMinus, onPlus) {
+    ctx.fillStyle = '#446688'; ctx.font = '9px monospace';
+    ctx.fillText(label, bx + 8, rowY + 10);
+
+    const btnW = 16, btnH = 14;
+    const valX = bx + 70, minusX = valX - btnW - 3, plusX = valX + 32;
+
+    // minus button
+    const mHover = false;
+    ctx.fillStyle = '#dde8f8'; ctx.strokeStyle = '#aabbcc'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(minusX, rowY, btnW, btnH, 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#335577'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('−', minusX + btnW/2, rowY + 10);
+
+    // value
+    ctx.fillStyle = '#223355'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(value, valX + 16, rowY + 10);
+
+    // plus button
+    ctx.fillStyle = '#dde8f8'; ctx.strokeStyle = '#aabbcc'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(plusX, rowY, btnW, btnH, 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#335577'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('+', plusX + btnW/2, rowY + 10);
+
+    ctx.textAlign = 'left';
+
+    champBtns.push({ x: minusX, y: rowY, w: btnW, h: btnH, action: onMinus });
+    champBtns.push({ x: plusX,  y: rowY, w: btnW, h: btnH, action: onPlus  });
+  }
+
+  drawRow(
+    'speed:',
+    champSpeed.toFixed(1) + 'x',
+    ctrlTop + 2,
+    () => { champSpeed = Math.max(0.1, parseFloat((champSpeed - 0.1).toFixed(1))); },
+    () => { champSpeed = Math.min(2.0, parseFloat((champSpeed + 0.1).toFixed(1))); }
+  );
+
+  drawRow(
+    'zoom:',
+    champZoom + 'u',
+    ctrlTop + 20,
+    () => { champZoom = Math.min(40, champZoom + 2); },
+    () => { champZoom = Math.max(4,  champZoom - 2); }
+  );
+}
+
+// ─── MAIN LOOP ───────────────────────────────────────────────────────────────
+function startCurrentCreature() {
+  currentCreature = buildCreature(population[currentIdx].genome, TRACK_START - 0.5);
+  creatureTime = 0; stallCheckTime = 0; stallCheckX = TRACK_START - 0.5;
+  updateStats();
+}
+
+function updateStats() {
+  const speed = parseFloat(document.getElementById('simSpeed').value) || 5;
+  document.getElementById('sGen').textContent      = generation;
+  document.getElementById('sCreature').textContent = `${currentIdx + 1}/${popSize}`;
+  document.getElementById('sBest').textContent     = bestFinishTime !== null ? `100 ✓` : bestDist.toFixed(2);
+  document.getElementById('sCurrent').textContent  = currentCreature ? Math.min(centroid(currentCreature).x - TRACK_START, 100).toFixed(2) : '0.00';
+  document.getElementById('sBestTime').textContent = bestFinishTime !== null ? bestFinishTime.toFixed(2) + 's' : '-';
+  document.getElementById('sLastTime').textContent = lastFinishTime !== null ? lastFinishTime.toFixed(2) + 's' : '-';
+  document.getElementById('sMode').textContent     = speed >= HEADLESS_AT ? `${speed}x (headless)` : `${speed}x`;
+}
+
+function updateButtons() {
+  document.getElementById('btnStart').disabled = running;
+  document.getElementById('btnPause').disabled = !running;
+  document.getElementById('btnPause').textContent = paused ? '\u25b6 Resume' : '\u23f8 Pause';
+}
+
+function addLog(msg) {
+  const div = document.createElement('div');
+  div.textContent = `[Gen ${generation}] ${msg}`;
+  div.className = 'best';
+  const el = document.getElementById('log');
+  el.appendChild(div); el.scrollTop = el.scrollHeight;
+}
+
+function tick(timestamp) {
+  if (!running || paused) { animFrame = requestAnimationFrame(tick); return; }
+  if (lastTime === null) lastTime = timestamp;
+  const wallDt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  const speed     = parseFloat(document.getElementById('simSpeed').value) || 5;
+  stallTime       = parseFloat(document.getElementById('stallTime').value) || 5;
+  stallDist       = parseFloat(document.getElementById('stallDist').value) || 1;
+  const headless  = speed >= HEADLESS_AT;
+
+  // Champion preview always runs at 1x wall time
+  stepChampPreview(wallDt);
+
+  // Current creature at sim speed
+  const simDt  = wallDt * speed;
+  const steps  = Math.ceil(simDt / DT_BASE);
+  const stepDt = simDt / steps;
+
+  for (let s = 0; s < steps; s++) {
+    stepCreature(currentCreature, stepDt);
+    creatureTime   += stepDt;
+    stallCheckTime += stepDt;
+    const cx = centroid(currentCreature).x;
+    if (stallCheckTime >= stallTime) {
+      if (cx - stallCheckX < stallDist) { finishCreature(cx, false); return; }
+      stallCheckTime = 0; stallCheckX = cx;
+    }
+    if (cx >= TRACK_FINISH) { finishCreature(cx, true); return; }
+    if (creatureTime > TIME_CAP) { finishCreature(cx, false); return; }
+  }
+
+  if (headless) drawHeadlessOverlay(); else drawMainScene(currentCreature);
+  drawChampionBox();
+  updateStats();
+  animFrame = requestAnimationFrame(tick);
+}
+
+function finishCreature(dist, finished) {
+  const trackDist = Math.min(dist - TRACK_START, 100);
+  if (finished) {
+    lastFinishTime = creatureTime;
+    if (bestFinishTime === null || creatureTime < bestFinishTime) bestFinishTime = creatureTime;
+    // Finishers: fitness > 100, ranked purely by speed (faster = higher)
+    population[currentIdx].fitness = 100 + (TIME_CAP - creatureTime);
+  } else {
+    // Non-finishers: fitness = distance (0–<100)
+    const d = Math.max(0, trackDist);
+    if (d > bestDist) bestDist = d;
+    population[currentIdx].fitness = d;
+  }
+  currentIdx++;
+  if (currentIdx >= popSize) evolveNextGeneration();
+  startCurrentCreature();
+  lastTime = null;
+  animFrame = requestAnimationFrame(tick);
+}
+
+// ─── CHAMPION BOX INTERACTION ────────────────────────────────────────────────
+canvas.addEventListener('click', function(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  for (const btn of champBtns) {
+    if (mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h) {
+      btn.action();
+      break;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', function(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  const overBtn = champBtns.some(btn => mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h);
+  canvas.style.cursor = overBtn ? 'pointer' : 'default';
+});
+
+// ─── CONTROLS ────────────────────────────────────────────────────────────────
+document.getElementById('mutRate').addEventListener('input', function() {
+  document.getElementById('mutLabel').textContent = this.value;
+});
+
+document.getElementById('btnRepro').addEventListener('click', () => {
+  reproMode = reproMode === 'sexual' ? 'asexual' : 'sexual';
+  const btn = document.getElementById('btnRepro');
+  btn.textContent = reproMode === 'sexual' ? '\u25b2 Sexual' : '\u25b3 Asexual';
+});
+
+document.getElementById('btnStart').addEventListener('click', () => {
+  popSize = parseInt(document.getElementById('popSize').value) || 20;
+  running = true; paused = false;
+  initPopulation(); startCurrentCreature();
+  lastTime = null;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = requestAnimationFrame(tick);
+  updateButtons();
+});
+
+document.getElementById('btnPause').addEventListener('click', () => {
+  paused = !paused; updateButtons();
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  running = false; paused = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = null; lastTime = null;
+  currentCreature = null; champCreature = null;
+  population = []; generation = 0; currentIdx = 0; champion = null; championGenome = null;
+  document.getElementById('log').innerHTML = '';
+  ['sGen','sCreature','sBest','sCurrent','sMode'].forEach(id => {
+    document.getElementById(id).textContent = id === 'sGen' ? '0' : '-';
+  });
+  document.getElementById('sBest').textContent     = '0.00';
+  document.getElementById('sCurrent').textContent  = '0.00';
+  document.getElementById('sBestTime').textContent = '-';
+  document.getElementById('sLastTime').textContent = '-';
+  bestFinishTime = null; lastFinishTime = null; bestDist = 0;
+  updateButtons(); drawMainScene(null);
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+updateButtons();
+drawMainScene(null);
+</script>
+</body>
+</html>

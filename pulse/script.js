@@ -93,7 +93,8 @@ window.addEventListener('DOMContentLoaded', () => {
     canvas = document.getElementById('chart');
     ctx = canvas.getContext('2d');
     canvas.addEventListener('mousemove', handleHover);
-    canvas.addEventListener('mouseleave', () => document.getElementById('tip').classList.add('hidden'));
+    canvas.addEventListener('mouseleave', () => { document.getElementById('tip').classList.add('hidden'); canvas.style.cursor = 'default'; });
+    canvas.addEventListener('dblclick', handleDblClick);
     window.addEventListener('resize', resizeCanvas);
 
     // Initial UI state
@@ -1046,9 +1047,11 @@ function handleHover(e) {
     const my = e.clientY - rect.top;
     const tip = document.getElementById('tip');
     const hit = dotPositions.find(d => Math.hypot(d.x - mx, d.y - my) < 12);
+    canvas.style.cursor = hit ? 'pointer' : 'default';
     if (hit) {
         const lines = config.variables.map((v, i) => `${v.label}: ${hit.r.values[i]}`);
         if (hit.r.name && config.anonymity !== 'anonymous') lines.push(hit.r.name);
+        lines.push('<span style="opacity:0.5;font-size:0.85em">double-click to delete</span>');
         tip.innerHTML = lines.join('<br>');
         const tipX = Math.min(mx + 14, canvasW - 160);
         tip.style.left = tipX + 'px';
@@ -1056,6 +1059,17 @@ function handleHover(e) {
         tip.classList.remove('hidden');
     } else {
         tip.classList.add('hidden');
+    }
+}
+
+function handleDblClick(e) {
+    if (!isRevealed) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const hit = dotPositions.find(d => Math.hypot(d.x - mx, d.y - my) < 12);
+    if (hit) {
+        remove(ref(db, `pulse/${currentRoom}/responses/${hit.r.id}`));
     }
 }
 
