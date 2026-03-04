@@ -78,7 +78,8 @@ window.addEventListener('DOMContentLoaded', () => {
     // Teacher controls
     document.getElementById('btn-reveal').addEventListener('click', toggleReveal);
     document.getElementById('btn-qr').addEventListener('click', toggleQR);
-    document.getElementById('btn-csv').addEventListener('click', exportCSV);
+    document.getElementById('btn-table').addEventListener('click', toggleTable);
+    document.getElementById('btn-download-csv').addEventListener('click', exportCSV);
     document.getElementById('btn-delete').addEventListener('click', deleteBoard);
     document.getElementById('btn-leave').addEventListener('click', leaveRoom);
 
@@ -312,6 +313,7 @@ function initTeacherMode() {
             const n = Object.keys(responses).length;
             document.getElementById('t-count').textContent = `${n} response${n !== 1 ? 's' : ''}`;
             redraw();
+            renderTable();
         });
         resizeCanvas();
     }
@@ -342,6 +344,61 @@ function toggleQR() {
     document.getElementById('btn-qr').classList.toggle('active', !panel.classList.contains('hidden'));
     if (!config || config.mode !== 'choose') {
         setTimeout(resizeCanvas, 10);
+    }
+}
+
+function toggleTable() {
+    const panel = document.getElementById('table-panel');
+    panel.classList.toggle('hidden');
+    document.getElementById('btn-table').classList.toggle('active', !panel.classList.contains('hidden'));
+    if (!panel.classList.contains('hidden')) {
+        renderTable();
+    }
+    if (!config || config.mode !== 'choose') {
+        setTimeout(resizeCanvas, 10);
+    }
+}
+
+function renderTable() {
+    const panel = document.getElementById('table-panel');
+    if (panel.classList.contains('hidden')) return;
+
+    const head = document.getElementById('response-table-head');
+    const body = document.getElementById('response-table-body');
+
+    if (config.mode === 'choose') {
+        const showNames = config.anonymity !== 'anonymous';
+        const optLabels = {};
+        Object.entries(allOptions).forEach(([k, o]) => { optLabels[k] = o.label; });
+        const headers = showNames ? ['Name', 'Votes'] : ['Votes'];
+        head.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        const rows = Object.values(chooseResponses);
+        if (!rows.length) {
+            body.innerHTML = `<tr><td colspan="${headers.length}" class="table-empty">No responses yet</td></tr>`;
+        } else {
+            body.innerHTML = rows.map(r => {
+                const votes = (r.votes || []).map(k => optLabels[k] || k).join(', ');
+                let cells = showNames ? `<td>${r.name || '—'}</td>` : '';
+                cells += `<td>${votes}</td>`;
+                return `<tr>${cells}</tr>`;
+            }).join('');
+        }
+    } else {
+        const showNames = config.anonymity !== 'anonymous';
+        const headers = [];
+        if (showNames) headers.push('Name');
+        config.variables.forEach(v => headers.push(v.label));
+        head.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        const rows = Object.values(responses);
+        if (!rows.length) {
+            body.innerHTML = `<tr><td colspan="${headers.length}" class="table-empty">No responses yet</td></tr>`;
+        } else {
+            body.innerHTML = rows.map(r => {
+                let cells = showNames ? `<td>${r.name || '—'}</td>` : '';
+                r.values.forEach(val => { cells += `<td>${val}</td>`; });
+                return `<tr>${cells}</tr>`;
+            }).join('');
+        }
     }
 }
 
@@ -430,6 +487,7 @@ function initChooseTeacher() {
         const n = Object.keys(chooseResponses).length;
         document.getElementById('t-count').textContent = `${n} response${n !== 1 ? 's' : ''}`;
         renderBlobs(blobCanvas);
+        renderTable();
     });
 }
 
