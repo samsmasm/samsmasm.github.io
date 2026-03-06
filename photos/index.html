@@ -102,6 +102,18 @@
     .sort-sep { color: var(--grey-light); font-size: 0.8rem; }
     .results-count { margin-left: auto; font-size: 0.7rem; letter-spacing: 0.06em; color: var(--grey-mid); }
 
+    /* YEAR SLIDER */
+    .year-slider-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0 0.75rem; border-top: 1px solid var(--grey-light); margin-top: 0.25rem; }
+    .year-slider-wrap { position: relative; flex: 1; height: 20px; }
+    .year-track { position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--grey-light); transform: translateY(-50%); }
+    .year-track-fill { position: absolute; top: 0; height: 100%; background: var(--ink); }
+    .year-slider-wrap input[type=range] { position: absolute; width: 100%; top: 0; left: 0; height: 100%; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none; }
+    .year-slider-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); cursor: pointer; }
+    .year-slider-wrap input[type=range]::-moz-range-thumb { pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); cursor: pointer; border: none; }
+    .year-slider-wrap input[type=range]::-webkit-slider-runnable-track { background: transparent; }
+    .year-slider-wrap input[type=range]::-moz-range-track { background: transparent; }
+    .year-value { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--ink); min-width: 2.5rem; text-align: center; }
+
     /* MASONRY */
     .grid-container { padding: 2rem 2rem; }
     .masonry { columns: 4; column-gap: 12px; }
@@ -178,11 +190,10 @@
     <ul class="nav-links">
       <li><a href="/photos" class="active">Photos</a></li>
       <li><a href="/about">About</a></li>
-      <li><a href="/experiments">Experiments</a></li>
     </ul>
     <button id="admin-toggle" title="Admin">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        <path id="lock-icon-path" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
       </svg>
     </button>
   </div>
@@ -214,7 +225,6 @@
       <button class="pill active" data-filter="camera" data-value="all">All</button>
       <button class="pill" data-filter="camera" data-value="pinhole"><span class="dot"></span>Pinhole</button>
       <button class="pill" data-filter="camera" data-value="35mm"><span class="dot"></span>35mm</button>
-      <button class="pill" data-filter="camera" data-value="120"><span class="dot"></span>120 / Medium Format</button>
     </div>
   </div>
   <div class="filter-row" id="country-filter-row">
@@ -230,6 +240,16 @@
         <span class="dot"></span><span id="new-pill-label">Untagged</span>
       </button>
     </div>
+  </div>
+  <div class="year-slider-row" id="year-slider-row" style="display:none">
+    <span class="filter-label">Years</span>
+    <span class="year-value" id="year-min-label"></span>
+    <div class="year-slider-wrap">
+      <div class="year-track"><div class="year-track-fill" id="year-track-fill"></div></div>
+      <input type="range" id="year-slider-min">
+      <input type="range" id="year-slider-max">
+    </div>
+    <span class="year-value" id="year-max-label"></span>
   </div>
   <div class="sort-row">
     <span class="sort-label">Sort</span>
@@ -335,6 +355,10 @@
       <input type="text" id="f-names" placeholder="Names of people in the photo">
     </div>
     <div class="form-row">
+      <label>Note / story</label>
+      <textarea id="f-note" rows="4" placeholder="Any story or context behind the photo…" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-row">
       <label>Rating (1 = best)</label>
       <select id="f-order">
         <option value="">— unrated —</option>
@@ -365,7 +389,7 @@ async function waitForFirebase(timeout = 6000) {
 
 const state = {
   allPhotos: [], manifest: [], metadata: {}, newPaths: [],
-  filter: { camera: 'all', country: 'all', show: null },
+  filter: { camera: 'all', country: 'all', show: null, yearMin: null, yearMax: null },
   sort: 'custom', lightboxIndex: 0, visiblePhotos: [],
   adminMode: false, editingPath: null,
 };
@@ -410,6 +434,7 @@ async function loadAll() {
       camera:      meta.camera      || '',
       film:        meta.film        || '',
       names:       meta.names       || '',
+      note:        meta.note        || '',
       categories:  meta.categories  || [],
       order:       meta.order ?? 9999,
       isNew:       !fsMeta[key],
@@ -427,6 +452,7 @@ async function loadAll() {
   }
 
   buildCountryPills();
+  initYearSlider();
   showLoading(false);
   renderGrid();
 }
@@ -436,7 +462,9 @@ function getVisible() {
     if (state.filter.show === 'new') return p.isNew;
     const c = state.filter.camera  === 'all' || p.categories.includes(state.filter.camera);
     const k = state.filter.country === 'all' || p.countryKey === state.filter.country;
-    return c && k;
+    const y = !p.year || state.filter.yearMin === null ||
+              (p.year >= state.filter.yearMin && p.year <= state.filter.yearMax);
+    return c && k && y;
   });
   if      (state.sort === 'year-desc') r.sort((a,b) => b.year - a.year);
   else if (state.sort === 'year-asc')  r.sort((a,b) => a.year - b.year);
@@ -526,6 +554,46 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') lbNav(1);
 });
 
+// Year slider
+function initYearSlider() {
+  const years = state.allPhotos.map(p => p.year).filter(y => y > 0);
+  if (years.length === 0) return;
+  const minY = Math.min(...years), maxY = Math.max(...years);
+  if (minY === maxY) return;
+  const sMin = document.getElementById('year-slider-min');
+  const sMax = document.getElementById('year-slider-max');
+  sMin.min = sMax.min = minY; sMin.max = sMax.max = maxY;
+  sMin.value = minY; sMax.value = maxY;
+  state.filter.yearMin = minY; state.filter.yearMax = maxY;
+  document.getElementById('year-min-label').textContent = minY;
+  document.getElementById('year-max-label').textContent = maxY;
+  document.getElementById('year-slider-row').style.display = 'flex';
+  updateYearTrack();
+}
+function updateYearTrack() {
+  const sMin = document.getElementById('year-slider-min');
+  const sMax = document.getElementById('year-slider-max');
+  const min = parseInt(sMin.min), max = parseInt(sMax.max);
+  const l = (parseInt(sMin.value) - min) / (max - min) * 100;
+  const r = (parseInt(sMax.value) - min) / (max - min) * 100;
+  const fill = document.getElementById('year-track-fill');
+  fill.style.left = l + '%'; fill.style.width = (r - l) + '%';
+}
+document.getElementById('year-slider-min').addEventListener('input', function() {
+  if (parseInt(this.value) > parseInt(document.getElementById('year-slider-max').value))
+    this.value = document.getElementById('year-slider-max').value;
+  state.filter.yearMin = parseInt(this.value);
+  document.getElementById('year-min-label').textContent = this.value;
+  updateYearTrack(); renderGrid();
+});
+document.getElementById('year-slider-max').addEventListener('input', function() {
+  if (parseInt(this.value) < parseInt(document.getElementById('year-slider-min').value))
+    this.value = document.getElementById('year-slider-min').value;
+  state.filter.yearMax = parseInt(this.value);
+  document.getElementById('year-max-label').textContent = this.value;
+  updateYearTrack(); renderGrid();
+});
+
 // Filter pills (event delegation so dynamically added country pills work)
 document.querySelector('.filter-section').addEventListener('click', e => {
   const pill = e.target.closest('.pill');
@@ -556,12 +624,15 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 // Admin toggle
 const adminToggle = document.getElementById('admin-toggle');
 const authPanel   = document.getElementById('auth-panel');
+const LOCK_LOCKED   = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z';
+const LOCK_UNLOCKED = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM8 11V7a4 4 0 118 0';
 adminToggle.addEventListener('click', e => {
   e.stopPropagation();
   if (window._adminUser) {
     state.adminMode = !state.adminMode;
     document.body.classList.toggle('admin-mode', state.adminMode);
     adminToggle.classList.toggle('active', state.adminMode);
+    document.getElementById('lock-icon-path').setAttribute('d', state.adminMode ? LOCK_UNLOCKED : LOCK_LOCKED);
   } else {
     authPanel.classList.toggle('open');
   }
@@ -585,6 +656,7 @@ document.getElementById('auth-signout-btn').addEventListener('click', async () =
   state.adminMode = false;
   document.body.classList.remove('admin-mode');
   adminToggle.classList.remove('active');
+  document.getElementById('lock-icon-path').setAttribute('d', LOCK_LOCKED);
   authPanel.classList.remove('open');
 });
 document.addEventListener('authchange', e => {
@@ -647,6 +719,7 @@ function openEditor(relativePath) {
   document.getElementById('f-camera').value      = p.camera     || '';
   document.getElementById('f-film').value        = p.film       || '';
   document.getElementById('f-names').value       = p.names      || '';
+  document.getElementById('f-note').value        = p.note       || '';
   document.getElementById('f-order').value       = (p.order >= 1 && p.order <= 5) ? p.order : '';
   document.getElementById('save-status').textContent = '';
   document.getElementById('meta-editor').classList.add('open');
@@ -697,6 +770,7 @@ document.getElementById('editor-save').addEventListener('click', async () => {
     camera:     camera,
     film:       film,
     names:      document.getElementById('f-names').value.trim(),
+    note:       document.getElementById('f-note').value.trim(),
     categories: cats,
     order:      (orderVal >= 1 && orderVal <= 5) ? orderVal : 9999,
     updatedAt:  new Date().toISOString(),
@@ -739,7 +813,7 @@ document.getElementById('editor-delete').addEventListener('click', async () => {
     if (photo) {
       photo.caption=''; photo.country=''; photo.countryKey=''; photo.place='';
       photo.date=''; photo.year=0; photo.cameraType=''; photo.camera='';
-      photo.film=''; photo.names=''; photo.categories=[]; photo.order=9999; photo.isNew=true;
+      photo.film=''; photo.names=''; photo.note=''; photo.categories=[]; photo.order=9999; photo.isNew=true;
     }
     buildCountryPills();
     renderGrid();
