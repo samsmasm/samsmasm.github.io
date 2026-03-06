@@ -25,6 +25,7 @@ let varCount = 1;
 let canvas, ctx, canvasW, canvasH;
 let dotPositions = [];
 let qrGenerated = false;
+let pendingDeleteId = null;
 
 // Choose mode state
 let newRoomMode = 'plot';
@@ -95,7 +96,9 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx = canvas.getContext('2d');
     canvas.addEventListener('mousemove', handleHover);
     canvas.addEventListener('mouseleave', () => { document.getElementById('tip').classList.add('hidden'); canvas.style.cursor = 'default'; });
+    canvas.addEventListener('click', handleClick);
     canvas.addEventListener('dblclick', handleDblClick);
+    document.addEventListener('click', handleDocClick);
     window.addEventListener('resize', resizeCanvas);
 
     // Initial UI state
@@ -892,12 +895,35 @@ function drawScatter(list, vars) {
         const x = toX(r.values[0]) + j.x;
         const y = toY(r.values[1]) + j.y;
         const color = v2 ? varToColor(r.values[2], v2) : '#3b82f6';
-        ctx.beginPath();
-        ctx.arc(x, y, 7, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.78;
-        ctx.fill();
-        ctx.globalAlpha = 1;
+        if (r.id === pendingDeleteId) {
+            const s = 9;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, s + 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444';
+            ctx.globalAlpha = 0.18;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x - s, y - s);
+            ctx.lineTo(x + s, y + s);
+            ctx.moveTo(x + s, y - s);
+            ctx.lineTo(x - s, y + s);
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+        } else {
+            ctx.beginPath();
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.78;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
         dotPositions.push({ x, y, r, color });
     });
 
@@ -1109,7 +1135,7 @@ function handleHover(e) {
     if (hit) {
         const lines = config.variables.map((v, i) => `${v.label}: ${hit.r.values[i]}`);
         if (hit.r.name && config.anonymity !== 'anonymous') lines.push(hit.r.name);
-        lines.push('<span style="opacity:0.5;font-size:0.85em">double-click to delete</span>');
+        lines.push('<span style="opacity:0.5;font-size:0.85em">double-click to remove</span>');
         tip.innerHTML = lines.join('<br>');
         const tipX = Math.min(mx + 14, canvasW - 160);
         tip.style.left = tipX + 'px';
@@ -1120,6 +1146,26 @@ function handleHover(e) {
     }
 }
 
+function handleClick(e) {
+    if (!pendingDeleteId) return;
+    e.stopPropagation();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const hit = dotPositions.find(d => d.r.id === pendingDeleteId && Math.hypot(d.x - mx, d.y - my) < 16);
+    if (hit) {
+        remove(ref(db, `pulse/${currentRoom}/responses/${hit.r.id}`));
+    }
+    pendingDeleteId = null;
+    redraw();
+}
+
+function handleDocClick() {
+    if (!pendingDeleteId) return;
+    pendingDeleteId = null;
+    redraw();
+}
+
 function handleDblClick(e) {
     if (!isRevealed) return;
     const rect = canvas.getBoundingClientRect();
@@ -1127,7 +1173,8 @@ function handleDblClick(e) {
     const my = e.clientY - rect.top;
     const hit = dotPositions.find(d => Math.hypot(d.x - mx, d.y - my) < 12);
     if (hit) {
-        remove(ref(db, `pulse/${currentRoom}/responses/${hit.r.id}`));
+        pendingDeleteId = hit.r.id;
+        redraw();
     }
 }
 
