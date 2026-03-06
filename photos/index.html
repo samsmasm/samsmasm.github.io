@@ -113,6 +113,11 @@
     .year-slider-wrap input[type=range]::-webkit-slider-runnable-track { background: transparent; }
     .year-slider-wrap input[type=range]::-moz-range-track { background: transparent; }
     .year-value { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--ink); min-width: 2.5rem; text-align: center; }
+    .untagged-count { font-size: 0.68rem; letter-spacing: 0.08em; color: var(--grey-mid); cursor: pointer; margin-left: 1rem; transition: color var(--transition); }
+    .untagged-count:hover { color: var(--ink); }
+    .lb-note-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(250,249,247,0.1); }
+    .lb-note-text { font-size: 0.78rem; font-style: italic; color: rgba(250,249,247,0.65); line-height: 1.6; white-space: pre-wrap; margin-top: 0.25rem; font-weight: 300; }
+    .overlay-note { font-size: 0.6rem; color: rgba(250,249,247,0.55); margin-top: 0.2rem; font-style: italic; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
     /* MASONRY */
     .grid-container { padding: 2rem 2rem; }
@@ -215,7 +220,6 @@
 
 <div class="page-header">
   <h1>photographs</h1>
-  <p>film & pinhole — Vietnam, New Zealand & beyond</p>
 </div>
 
 <div class="filter-section">
@@ -260,7 +264,10 @@
     <button class="sort-btn" data-sort="year-asc">Oldest first</button>
     <span class="sort-sep">·</span>
     <button class="sort-btn" data-sort="added">Recently added</button>
+    <span class="sort-sep">·</span>
+    <button class="sort-btn" data-sort="shuffle">Shuffle</button>
     <span class="results-count" id="results-count">— photos</span>
+    <span class="untagged-count" id="untagged-count" style="display:none"></span>
   </div>
 </div>
 
@@ -290,6 +297,10 @@
       <div class="lb-meta-row"><div class="lb-meta-label">Camera</div><div class="lb-meta-value" id="lb-camera"></div></div>
       <div class="lb-meta-row"><div class="lb-meta-label">Film</div><div class="lb-meta-value" id="lb-film"></div></div>
       <div class="lb-meta-row"><div class="lb-meta-label">People</div><div class="lb-meta-value" id="lb-names"></div></div>
+      <div class="lb-note-row" id="lb-note-row" style="display:none">
+        <div class="lb-meta-label">Note</div>
+        <div class="lb-note-text" id="lb-note"></div>
+      </div>
       <div class="lb-tags" id="lb-tags"></div>
     </div>
   </div>
@@ -302,6 +313,9 @@
       <button class="editor-close" id="editor-close">×</button>
     </div>
     <img id="editor-preview" src="" alt="">
+    <div id="copy-last-row" style="display:none; text-align:right; margin-bottom:0.75rem">
+      <button class="btn-xs" id="btn-copy-last">↩ Fill from last saved</button>
+    </div>
     <div class="form-row">
       <label>Caption</label>
       <input type="text" id="f-caption" placeholder="Describe the photo">
@@ -391,7 +405,7 @@ const state = {
   allPhotos: [], manifest: [], metadata: {}, newPaths: [],
   filter: { camera: 'all', country: 'all', show: null, yearMin: null, yearMax: null },
   sort: 'custom', lightboxIndex: 0, visiblePhotos: [],
-  adminMode: false, editingPath: null,
+  adminMode: false, editingPath: null, lastSaved: null,
 };
 
 async function loadAll() {
@@ -453,6 +467,7 @@ async function loadAll() {
 
   buildCountryPills();
   initYearSlider();
+  updateUntaggedCount();
   showLoading(false);
   renderGrid();
 }
@@ -469,6 +484,7 @@ function getVisible() {
   if      (state.sort === 'year-desc') r.sort((a,b) => b.year - a.year);
   else if (state.sort === 'year-asc')  r.sort((a,b) => a.year - b.year);
   else if (state.sort === 'added')     r.sort((a,b) => new Date(b.addedAt) - new Date(a.addedAt));
+  else if (state.sort === 'shuffle') r.sort(() => Math.random() - 0.5);
   else r.sort((a,b) => a.order !== b.order ? a.order - b.order : a._rand - b._rand);
   return r;
 }
@@ -492,12 +508,14 @@ function renderGrid() {
     el.className = 'photo-item';
     const cap  = p.caption || p.relativePath.split('/').pop();
     const meta = [p.country, p.place, p.date].filter(Boolean).join(' · ') || 'untagged';
+    const noteSnippet = p.note ? `<div class="overlay-note">${p.note.slice(0, 80)}${p.note.length > 80 ? '…' : ''}</div>` : '';
     el.innerHTML = `
       ${p.isNew ? '<span class="new-badge">New</span>' : ''}
       <img src="${p.src}" alt="${cap}" loading="lazy">
       <div class="photo-overlay">
         <div class="overlay-caption">${cap}</div>
         <div class="overlay-meta">${meta}</div>
+        ${noteSnippet}
       </div>
       <div class="admin-edit-hint">Edit metadata</div>
     `;
@@ -505,6 +523,14 @@ function renderGrid() {
       state.adminMode ? openEditor(p.relativePath) : openLightbox(i));
     grid.appendChild(el);
   });
+}
+
+function updateUntaggedCount() {
+  const n = state.allPhotos.filter(p => p.isNew).length;
+  const el = document.getElementById('untagged-count');
+  el.style.display = '';
+  el.textContent = `${n} untagged`;
+  el.style.opacity = n > 0 ? '1' : '0.35';
 }
 
 function showLoading(yes) {
@@ -531,6 +557,13 @@ function updateLightbox() {
   document.getElementById('lb-camera').textContent  = p.camera  || '—';
   document.getElementById('lb-film').textContent    = p.film    || '—';
   document.getElementById('lb-names').textContent   = p.names   || '—';
+  const noteRow = document.getElementById('lb-note-row');
+  if (p.note) {
+    document.getElementById('lb-note').textContent = p.note;
+    noteRow.style.display = 'block';
+  } else {
+    noteRow.style.display = 'none';
+  }
   const tags = document.getElementById('lb-tags');
   tags.innerHTML = p.categories.length
     ? p.categories.map(c => `<span class="lb-tag">${c}</span>`).join('')
@@ -697,6 +730,7 @@ function openEditor(relativePath) {
   const p = state.allPhotos.find(x => x.relativePath === relativePath);
   if (!p) return;
   populateDatalists();
+  document.getElementById('copy-last-row').style.display = state.lastSaved ? 'block' : 'none';
   document.getElementById('editor-filename').textContent = relativePath;
   document.getElementById('editor-preview').src          = p.src;
   document.getElementById('f-caption').value    = p.caption    || '';
@@ -789,7 +823,9 @@ document.getElementById('editor-save').addEventListener('click', async () => {
     } else {
       document.getElementById('new-filter-row').style.display = 'none';
     }
+    state.lastSaved = { ...meta };
     buildCountryPills();
+    updateUntaggedCount();
     renderGrid();
     statusEl.textContent = '✓ Saved';
     setTimeout(() => {
@@ -816,9 +852,42 @@ document.getElementById('editor-delete').addEventListener('click', async () => {
       photo.film=''; photo.names=''; photo.note=''; photo.categories=[]; photo.order=9999; photo.isNew=true;
     }
     buildCountryPills();
+    updateUntaggedCount();
     renderGrid();
     document.getElementById('meta-editor').classList.remove('open');
   } catch(e) { console.error(e); }
+});
+
+// Untagged count click — activate untagged filter
+document.getElementById('untagged-count').addEventListener('click', () => {
+  const n = state.allPhotos.filter(p => p.isNew).length;
+  if (n === 0) return;
+  state.filter.show = 'new';
+  document.getElementById('new-filter-row').style.display = 'flex';
+  document.querySelectorAll('.pill[data-filter="show"]').forEach(p => p.classList.add('active'));
+  renderGrid();
+});
+
+// Copy from last saved
+document.getElementById('btn-copy-last').addEventListener('click', () => {
+  const m = state.lastSaved;
+  if (!m) return;
+  const presetKeys = ['new-zealand', 'vietnam', 'hong-kong'];
+  const presetEl = document.getElementById('f-country-preset');
+  const otherEl  = document.getElementById('f-country-other');
+  if (!m.countryKey) {
+    presetEl.value = ''; otherEl.style.display = 'none'; otherEl.value = '';
+  } else if (presetKeys.includes(m.countryKey)) {
+    presetEl.value = m.countryKey; otherEl.style.display = 'none'; otherEl.value = '';
+  } else {
+    presetEl.value = 'other'; otherEl.style.display = 'block'; otherEl.value = m.country || '';
+  }
+  document.getElementById('f-place').value       = m.place      || '';
+  document.getElementById('f-date').value        = m.date       || '';
+  document.getElementById('f-year').value        = m.year       || '';
+  document.getElementById('f-camera-type').value = m.cameraType || '';
+  document.getElementById('f-camera').value      = m.camera     || '';
+  document.getElementById('f-film').value        = m.film       || '';
 });
 
 loadAll();
