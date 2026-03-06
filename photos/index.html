@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>unisam — photos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp }                          from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, doc,
+             getDocs, setDoc, deleteDoc }             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup,
+             signOut, onAuthStateChanged }            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAfiicxKIBLHx4wmMnd-Tc-EFGmlDmMxp4",
+      authDomain:        "unisam-photos.firebaseapp.com",
+      projectId:         "unisam-photos",
+      storageBucket:     "unisam-photos.firebasestorage.app",
+      messagingSenderId: "720936201474",
+      appId:             "1:720936201474:web:10e401c73a42696f6a261b",
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    window._firebase = { db, auth, collection, doc, getDocs, setDoc, deleteDoc,
+                         GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged };
+
+    onAuthStateChanged(auth, user => {
+      window._adminUser = user;
+      document.dispatchEvent(new CustomEvent('authchange', { detail: { user } }));
+    });
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #faf9f7; --warm-white: #f5f3ef; --grey-light: #e8e5e0;
+      --grey-mid: #b8b3ab; --grey-dark: #6b6560; --ink: #1a1917;
+      --accent: #8b7355; --danger: #c0392b; --new-badge: #4a7c59;
+      --transition: 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Jost', sans-serif; background: var(--cream); color: var(--ink); font-weight: 300; min-height: 100vh; }
+
+    /* NAV */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(250,249,247,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--grey-light); padding: 0 2.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 300; letter-spacing: 0.15em; text-decoration: none; color: var(--ink); }
+    .nav-right { display: flex; align-items: center; gap: 2rem; }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-dark); transition: color var(--transition); }
+    .nav-links a:hover, .nav-links a.active { color: var(--ink); }
+    #admin-toggle { background: none; border: none; cursor: pointer; padding: 4px; color: var(--grey-mid); transition: color var(--transition); display: flex; align-items: center; }
+    #admin-toggle:hover { color: var(--ink); }
+    #admin-toggle.active { color: var(--accent); }
+    #admin-toggle svg { width: 16px; height: 16px; }
+
+    /* AUTH PANEL */
+    #auth-panel { position: fixed; top: 64px; right: 2.5rem; z-index: 200; background: white; border: 1px solid var(--grey-light); padding: 1.25rem 1.5rem; width: 260px; box-shadow: 0 8px 32px rgba(26,25,23,0.1); display: none; }
+    #auth-panel.open { display: block; }
+    #auth-panel h3 { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1rem; font-weight: 300; margin-bottom: 1rem; color: var(--ink); }
+    .auth-field { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; border: 1px solid var(--grey-light); background: var(--cream); font-family: 'Jost', sans-serif; font-size: 0.8rem; font-weight: 300; color: var(--ink); outline: none; }
+    .auth-field:focus { border-color: var(--grey-mid); }
+    .auth-btn { width: 100%; padding: 0.5rem; background: var(--ink); color: var(--cream); border: none; cursor: pointer; font-family: 'Jost', sans-serif; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; transition: background var(--transition); }
+    .auth-btn:hover { background: var(--accent); }
+    .auth-status { font-size: 0.7rem; color: var(--grey-mid); margin-top: 0.75rem; text-align: center; }
+    .auth-error { color: var(--danger); }
+    .signout-btn { background: none; border: none; cursor: pointer; font-family: 'Jost', sans-serif; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-dark); text-decoration: underline; text-underline-offset: 3px; }
+
+    /* ADMIN BANNER */
+    #admin-banner { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 90; background: var(--ink); color: var(--cream); padding: 0.6rem 2.5rem; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; }
+    body.admin-mode #admin-banner { display: block; }
+    body.admin-mode .photo-item { cursor: crosshair; }
+    .new-badge { position: absolute; top: 8px; left: 8px; z-index: 10; background: var(--new-badge); color: white; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.2rem 0.45rem; border-radius: 2px; }
+
+    /* PAGE HEADER */
+    .page-header { padding: 96px 2.5rem 2rem; }
+    .page-header h1 { font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; font-weight: 300; font-style: italic; letter-spacing: 0.02em; color: var(--ink); margin-bottom: 0.25rem; }
+    .page-header p { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-mid); }
+
+    /* FILTER BAR */
+    .filter-section { padding: 1rem 2.5rem 0; border-bottom: 1px solid var(--grey-light); }
+    .filter-row { display: flex; align-items: center; flex-wrap: wrap; }
+    .filter-label { font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--grey-mid); min-width: 68px; padding: 0.6rem 0; }
+    .filter-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 0 0.5rem 0.5rem; }
+    .pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.85rem; border: 1px solid var(--grey-light); background: transparent; border-radius: 2px; font-family: 'Jost', sans-serif; font-size: 0.7rem; font-weight: 300; letter-spacing: 0.08em; cursor: pointer; color: var(--grey-dark); transition: all var(--transition); white-space: nowrap; }
+    .pill:hover { border-color: var(--grey-mid); color: var(--ink); }
+    .pill.active { background: var(--ink); border-color: var(--ink); color: var(--cream); }
+    .pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+    .pill.new-pill { border-color: var(--new-badge); color: var(--new-badge); }
+    .pill.new-pill.active { background: var(--new-badge); color: white; }
+    .sort-row { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0 0.75rem; border-top: 1px solid var(--grey-light); margin-top: 0.25rem; }
+    .sort-label { font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--grey-mid); }
+    .sort-btn { font-family: 'Jost', sans-serif; font-size: 0.7rem; font-weight: 300; letter-spacing: 0.08em; background: none; border: none; cursor: pointer; color: var(--grey-dark); padding: 0; transition: color var(--transition); }
+    .sort-btn.active { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+    .sort-btn:hover { color: var(--ink); }
+    .sort-sep { color: var(--grey-light); font-size: 0.8rem; }
+    .results-count { margin-left: auto; font-size: 0.7rem; letter-spacing: 0.06em; color: var(--grey-mid); }
+
+    /* MASONRY */
+    .grid-container { padding: 2rem 2rem; }
+    .masonry { columns: 4; column-gap: 12px; }
+    @media (max-width: 1200px) { .masonry { columns: 3; } }
+    @media (max-width: 800px)  { .masonry { columns: 2; } }
+    @media (max-width: 480px)  { .masonry { columns: 1; } }
+    .photo-item { break-inside: avoid; margin-bottom: 12px; cursor: pointer; position: relative; overflow: hidden; background: var(--grey-light); }
+    .photo-item img { display: block; width: 100%; height: auto; transition: transform 0.6s cubic-bezier(0.4,0,0.2,1); }
+    .photo-item:hover img { transform: scale(1.02); }
+    .photo-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(26,25,23,0.72) 0%, transparent 55%); opacity: 0; transition: opacity var(--transition); display: flex; flex-direction: column; justify-content: flex-end; padding: 1.1rem; }
+    .photo-item:hover .photo-overlay { opacity: 1; }
+    .overlay-caption { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 0.95rem; color: rgba(250,249,247,0.95); margin-bottom: 0.25rem; line-height: 1.3; }
+    .overlay-meta { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(250,249,247,0.6); }
+    body.admin-mode .photo-item:hover .photo-overlay { background: linear-gradient(to top, rgba(139,115,85,0.85) 0%, rgba(139,115,85,0.2) 100%); }
+    .admin-edit-hint { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: white; pointer-events: none; }
+    body.admin-mode .photo-item:hover .admin-edit-hint { display: flex; }
+
+    /* STATUS */
+    .status-msg { text-align: center; padding: 5rem 2rem; }
+    .status-msg p { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.2rem; color: var(--grey-mid); }
+
+    /* LIGHTBOX */
+    .lightbox { position: fixed; inset: 0; z-index: 300; background: rgba(26,25,23,0.96); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+    .lightbox.open { opacity: 1; pointer-events: all; }
+    .lightbox-inner { display: flex; align-items: flex-start; gap: 3rem; max-width: 90vw; max-height: 90vh; }
+    .lightbox-img-wrap { max-width: 66vw; max-height: 88vh; display: flex; align-items: center; }
+    .lightbox-img-wrap img { max-width: 100%; max-height: 88vh; object-fit: contain; display: block; }
+    .lightbox-info { min-width: 200px; max-width: 240px; padding-top: 0.5rem; }
+    .lb-caption { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.35rem; font-weight: 300; color: var(--cream); line-height: 1.35; margin-bottom: 1.5rem; }
+    .lb-meta-row { margin-bottom: 0.6rem; }
+    .lb-meta-label { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(250,249,247,0.4); margin-bottom: 0.15rem; }
+    .lb-meta-value { font-size: 0.78rem; letter-spacing: 0.04em; color: rgba(250,249,247,0.8); font-weight: 300; }
+    .lb-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 1.25rem; }
+    .lb-tag { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.2rem 0.5rem; border: 1px solid rgba(250,249,247,0.15); color: rgba(250,249,247,0.45); border-radius: 2px; }
+    .lb-untagged { font-style: italic; font-size: 0.75rem; color: rgba(250,249,247,0.3); }
+    .lb-close { position: fixed; top: 1.25rem; right: 1.5rem; background: none; border: none; color: rgba(250,249,247,0.5); font-size: 1.5rem; cursor: pointer; transition: color var(--transition); z-index: 301; line-height: 1; font-weight: 300; }
+    .lb-close:hover { color: var(--cream); }
+    .lb-nav { position: fixed; top: 50%; transform: translateY(-50%); background: none; border: none; color: rgba(250,249,247,0.3); font-size: 2rem; cursor: pointer; transition: color var(--transition); z-index: 301; padding: 1rem; font-weight: 300; }
+    .lb-nav:hover { color: var(--cream); }
+    .lb-prev { left: 0.5rem; } .lb-next { right: 0.5rem; }
+
+    /* METADATA EDITOR */
+    #meta-editor { position: fixed; inset: 0; z-index: 400; background: rgba(26,25,23,0.85); display: none; align-items: center; justify-content: center; }
+    #meta-editor.open { display: flex; }
+    .editor-panel { background: var(--cream); width: 540px; max-width: 94vw; max-height: 90vh; overflow-y: auto; padding: 2rem; }
+    .editor-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+    .editor-header h2 { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.1rem; font-weight: 300; color: var(--ink); line-height: 1.3; max-width: 420px; word-break: break-all; }
+    .editor-close { background: none; border: none; cursor: pointer; font-size: 1.4rem; color: var(--grey-mid); transition: color var(--transition); line-height: 1; }
+    .editor-close:hover { color: var(--ink); }
+    .editor-preview { width: 100%; max-height: 180px; object-fit: cover; margin-bottom: 1.5rem; display: block; }
+    .form-row { margin-bottom: 1rem; }
+    .form-row label { display: block; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-dark); margin-bottom: 0.35rem; }
+    .form-row input, .form-row textarea, .form-row select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--grey-light); background: white; font-family: 'Jost', sans-serif; font-size: 0.82rem; font-weight: 300; color: var(--ink); outline: none; }
+    .form-row input:focus, .form-row textarea:focus { border-color: var(--grey-mid); }
+    .form-hint { font-size: 0.65rem; color: var(--grey-mid); margin-top: 0.3rem; }
+    .form-row-half { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+    .editor-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+    .btn-save { flex: 1; padding: 0.6rem; background: var(--ink); color: var(--cream); border: none; cursor: pointer; font-family: 'Jost', sans-serif; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; transition: background var(--transition); }
+    .btn-save:hover { background: var(--accent); }
+    .btn-delete { padding: 0.6rem 1rem; background: none; color: var(--danger); border: 1px solid var(--danger); cursor: pointer; font-family: 'Jost', sans-serif; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; transition: all var(--transition); }
+    .btn-delete:hover { background: var(--danger); color: white; }
+    .save-status { font-size: 0.7rem; color: var(--accent); margin-top: 0.5rem; text-align: center; }
+
+    /* FOOTER */
+    footer { margin-top: 4rem; padding: 1.5rem 2.5rem; border-top: 1px solid var(--grey-light); display: flex; justify-content: space-between; align-items: center; }
+    footer span { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-mid); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">unisam</a>
+  <div class="nav-right">
+    <ul class="nav-links">
+      <li><a href="/photos" class="active">Photos</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/experiments">Experiments</a></li>
+    </ul>
+    <button id="admin-toggle" title="Admin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<div id="auth-panel">
+  <h3>Admin access</h3>
+  <div id="auth-signed-out">
+    <button class="auth-btn" id="auth-signin-btn">Sign in with Google</button>
+    <div class="auth-status auth-error" id="auth-error"></div>
+  </div>
+  <div id="auth-signed-in" style="display:none">
+    <div class="auth-status">Signed in as admin</div>
+    <div style="text-align:center;margin-top:0.75rem">
+      <button class="signout-btn" id="auth-signout-btn">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>photographs</h1>
+  <p>film & pinhole — Vietnam, New Zealand & beyond</p>
+</div>
+
+<div class="filter-section">
+  <div class="filter-row">
+    <span class="filter-label">Camera</span>
+    <div class="filter-pills">
+      <button class="pill active" data-filter="camera" data-value="all">All</button>
+      <button class="pill" data-filter="camera" data-value="pinhole"><span class="dot"></span>Pinhole</button>
+      <button class="pill" data-filter="camera" data-value="35mm"><span class="dot"></span>35mm</button>
+      <button class="pill" data-filter="camera" data-value="120"><span class="dot"></span>120 / Medium Format</button>
+    </div>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">Place</span>
+    <div class="filter-pills">
+      <button class="pill active" data-filter="place" data-value="all">All</button>
+      <button class="pill" data-filter="place" data-value="saigon"><span class="dot"></span>Saigon</button>
+      <button class="pill" data-filter="place" data-value="new-zealand"><span class="dot"></span>New Zealand</button>
+      <button class="pill" data-filter="place" data-value="elsewhere"><span class="dot"></span>Elsewhere</button>
+    </div>
+  </div>
+  <div class="filter-row" id="new-filter-row" style="display:none">
+    <span class="filter-label">Show</span>
+    <div class="filter-pills">
+      <button class="pill new-pill" data-filter="show" data-value="new" id="new-pill">
+        <span class="dot"></span><span id="new-pill-label">Untagged</span>
+      </button>
+    </div>
+  </div>
+  <div class="sort-row">
+    <span class="sort-label">Sort</span>
+    <button class="sort-btn active" data-sort="custom">My order</button>
+    <span class="sort-sep">·</span>
+    <button class="sort-btn" data-sort="year-desc">Newest first</button>
+    <span class="sort-sep">·</span>
+    <button class="sort-btn" data-sort="year-asc">Oldest first</button>
+    <span class="sort-sep">·</span>
+    <button class="sort-btn" data-sort="added">Recently added</button>
+    <span class="results-count" id="results-count">— photos</span>
+  </div>
+</div>
+
+<div class="grid-container">
+  <div class="masonry" id="masonry-grid"></div>
+  <div class="status-msg" id="loading-msg"><p>Loading photographs…</p></div>
+  <div class="status-msg" id="empty-state" style="display:none"><p>No photographs match this selection.</p></div>
+</div>
+
+<footer>
+  <span>unisam.nz/photos</span>
+  <span id="footer-count"></span>
+</footer>
+
+<div id="admin-banner">Admin mode — click any photo to edit its metadata</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lb-close">×</button>
+  <button class="lb-nav lb-prev" id="lb-prev">‹</button>
+  <button class="lb-nav lb-next" id="lb-next">›</button>
+  <div class="lightbox-inner">
+    <div class="lightbox-img-wrap"><img id="lb-img" src="" alt=""></div>
+    <div class="lightbox-info">
+      <div class="lb-caption" id="lb-caption"></div>
+      <div class="lb-meta-row"><div class="lb-meta-label">Place</div><div class="lb-meta-value" id="lb-place"></div></div>
+      <div class="lb-meta-row"><div class="lb-meta-label">Date</div><div class="lb-meta-value" id="lb-date"></div></div>
+      <div class="lb-meta-row"><div class="lb-meta-label">Camera</div><div class="lb-meta-value" id="lb-camera"></div></div>
+      <div class="lb-meta-row"><div class="lb-meta-label">Film</div><div class="lb-meta-value" id="lb-film"></div></div>
+      <div class="lb-meta-row"><div class="lb-meta-label">People</div><div class="lb-meta-value" id="lb-names"></div></div>
+      <div class="lb-tags" id="lb-tags"></div>
+    </div>
+  </div>
+</div>
+
+<div id="meta-editor">
+  <div class="editor-panel">
+    <div class="editor-header">
+      <h2 id="editor-filename"></h2>
+      <button class="editor-close" id="editor-close">×</button>
+    </div>
+    <img id="editor-preview" src="" alt="">
+    <div class="form-row">
+      <label>Caption</label>
+      <input type="text" id="f-caption" placeholder="e.g. Afternoon light on Bùi Viện">
+    </div>
+    <div class="form-row-half">
+      <div class="form-row" style="margin:0">
+        <label>Place (display)</label>
+        <input type="text" id="f-place" placeholder="e.g. Saigon">
+      </div>
+      <div class="form-row" style="margin:0">
+        <label>Place filter</label>
+        <select id="f-place-key">
+          <option value="">— none —</option>
+          <option value="saigon">Saigon</option>
+          <option value="new-zealand">New Zealand</option>
+          <option value="elsewhere">Elsewhere</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-half">
+      <div class="form-row" style="margin:0">
+        <label>Date (display)</label>
+        <input type="text" id="f-date" placeholder="e.g. March 2024">
+      </div>
+      <div class="form-row" style="margin:0">
+        <label>Year (for sorting)</label>
+        <input type="number" id="f-year" placeholder="2024" min="1900" max="2100">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Camera body</label>
+      <input type="text" id="f-camera" placeholder="e.g. Zero Image 2000 Pinhole">
+    </div>
+    <div class="form-row">
+      <label>Film stock</label>
+      <input type="text" id="f-film" placeholder="e.g. Kodak Portra 120 (expired)">
+    </div>
+    <div class="form-row">
+      <label>People / names</label>
+      <input type="text" id="f-names" placeholder="e.g. Thuy, Sam">
+    </div>
+    <div class="form-row">
+      <label>Camera categories (comma-separated)</label>
+      <input type="text" id="f-categories" placeholder="e.g. pinhole, 120, saigon">
+      <div class="form-hint">Options: pinhole · 35mm · 120 · saigon · new-zealand · elsewhere</div>
+    </div>
+    <div class="form-row">
+      <label>Sort order (lower number = shown earlier)</label>
+      <input type="number" id="f-order" placeholder="1" min="0">
+    </div>
+    <div class="editor-actions">
+      <button class="btn-save" id="editor-save">Save metadata</button>
+      <button class="btn-delete" id="editor-delete">Remove</button>
+    </div>
+    <div class="save-status" id="save-status"></div>
+  </div>
+</div>
+
+<script>
+async function waitForFirebase(timeout = 6000) {
+  const t = Date.now();
+  while (!window._firebase) {
+    if (Date.now() - t > timeout) throw new Error('Firebase timeout');
+    await new Promise(r => setTimeout(r, 60));
+  }
+  return window._firebase;
+}
+
+const state = {
+  allPhotos: [], manifest: [], metadata: {}, newPaths: [],
+  filter: { camera: 'all', place: 'all', show: null },
+  sort: 'custom', lightboxIndex: 0, visiblePhotos: [],
+  adminMode: false, editingPath: null,
+};
+
+async function loadAll() {
+  showLoading(true);
+
+  // 1. Manifest
+  let manifest = [];
+  try {
+    const res = await fetch('/photos/manifest.json');
+    if (res.ok) { const d = await res.json(); manifest = d.images || []; }
+  } catch(e) { console.warn('No manifest.json', e); }
+  state.manifest = manifest;
+
+  // 2. Firestore
+  let fsMeta = {};
+  try {
+    const fb = await waitForFirebase();
+    const snap = await fb.getDocs(fb.collection(fb.db, 'photo_metadata'));
+    snap.forEach(s => { fsMeta[s.id] = s.data(); });
+  } catch(e) { console.warn('Firestore unavailable', e); }
+  state.metadata = fsMeta;
+
+  // 3. Merge — use sanitised path as Firestore key (same transform as save)
+  state.allPhotos = manifest.map(img => {
+    const key  = img.relativePath.replace(/[\/\.]/g, '_');
+    const meta = fsMeta[key] || {};
+    return {
+      relativePath: img.relativePath,
+      src:     `/photos/${img.relativePath}`,
+      folder:   img.folder,
+      addedAt:  img.addedAt,
+      caption:   meta.caption    || '',
+      place:     meta.place      || '',
+      placeKey:  meta.placeKey   || '',
+      date:      meta.date       || '',
+      year:      meta.year       || 0,
+      camera:    meta.camera     || '',
+      film:      meta.film       || '',
+      names:     meta.names      || '',
+      categories: meta.categories || [],
+      order:     meta.order ?? 9999,
+      isNew:     !fsMeta[key],
+    };
+  });
+
+  state.newPaths = state.allPhotos.filter(p => p.isNew).map(p => p.relativePath);
+
+  const newRow = document.getElementById('new-filter-row');
+  if (state.newPaths.length > 0) {
+    newRow.style.display = 'flex';
+    document.getElementById('new-pill-label').textContent = `${state.newPaths.length} untagged`;
+  } else {
+    newRow.style.display = 'none';
+  }
+
+  showLoading(false);
+  renderGrid();
+}
+
+function getVisible() {
+  let r = state.allPhotos.filter(p => {
+    if (state.filter.show === 'new') return p.isNew;
+    const c = state.filter.camera === 'all' || p.categories.includes(state.filter.camera);
+    const l = state.filter.place  === 'all' || p.categories.includes(state.filter.place);
+    return c && l;
+  });
+  if      (state.sort === 'year-desc') r.sort((a,b) => b.year - a.year);
+  else if (state.sort === 'year-asc')  r.sort((a,b) => a.year - b.year);
+  else if (state.sort === 'added')     r.sort((a,b) => new Date(b.addedAt) - new Date(a.addedAt));
+  else                                 r.sort((a,b) => a.order - b.order);
+  return r;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('masonry-grid');
+  const empty = document.getElementById('empty-state');
+  state.visiblePhotos = getVisible();
+  grid.innerHTML = '';
+
+  document.getElementById('results-count').textContent =
+    `${state.visiblePhotos.length} photo${state.visiblePhotos.length !== 1 ? 's' : ''}`;
+  document.getElementById('footer-count').textContent =
+    `${state.allPhotos.length} photographs`;
+
+  if (!state.visiblePhotos.length) { empty.style.display='block'; return; }
+  empty.style.display = 'none';
+
+  state.visiblePhotos.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'photo-item';
+    const cap  = p.caption || p.relativePath.split('/').pop();
+    const meta = [p.place, p.date].filter(Boolean).join(' · ') || 'untagged';
+    el.innerHTML = `
+      ${p.isNew ? '<span class="new-badge">New</span>' : ''}
+      <img src="${p.src}" alt="${cap}" loading="lazy">
+      <div class="photo-overlay">
+        <div class="overlay-caption">${cap}</div>
+        <div class="overlay-meta">${meta}</div>
+      </div>
+      <div class="admin-edit-hint">Edit metadata</div>
+    `;
+    el.addEventListener('click', () =>
+      state.adminMode ? openEditor(p.relativePath) : openLightbox(i));
+    grid.appendChild(el);
+  });
+}
+
+function showLoading(yes) {
+  document.getElementById('loading-msg').style.display = yes ? 'block' : 'none';
+  document.getElementById('masonry-grid').style.display = yes ? 'none' : '';
+}
+
+// Lightbox
+function openLightbox(i) {
+  state.lightboxIndex = i; updateLightbox();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function updateLightbox() {
+  const p = state.visiblePhotos[state.lightboxIndex];
+  document.getElementById('lb-img').src = p.src;
+  document.getElementById('lb-caption').textContent = p.caption || '(untagged)';
+  document.getElementById('lb-place').textContent   = p.place   || '—';
+  document.getElementById('lb-date').textContent    = p.date    || '—';
+  document.getElementById('lb-camera').textContent  = p.camera  || '—';
+  document.getElementById('lb-film').textContent    = p.film    || '—';
+  document.getElementById('lb-names').textContent   = p.names   || '—';
+  const tags = document.getElementById('lb-tags');
+  tags.innerHTML = p.categories.length
+    ? p.categories.map(c => `<span class="lb-tag">${c}</span>`).join('')
+    : '<span class="lb-untagged">no categories yet</span>';
+}
+function lbNav(d) {
+  const n = state.visiblePhotos.length;
+  state.lightboxIndex = (state.lightboxIndex + d + n) % n;
+  updateLightbox();
+}
+document.getElementById('lb-close').addEventListener('click', closeLightbox);
+document.getElementById('lb-prev').addEventListener('click', () => lbNav(-1));
+document.getElementById('lb-next').addEventListener('click', () => lbNav(1));
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+});
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lbNav(-1);
+  if (e.key === 'ArrowRight') lbNav(1);
+});
+
+// Filter pills
+document.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    const f = pill.dataset.filter, v = pill.dataset.value;
+    if (f === 'show') {
+      if (state.filter.show === v) { state.filter.show = null; pill.classList.remove('active'); }
+      else { state.filter.show = v; pill.classList.add('active'); }
+    } else {
+      state.filter[f] = v; state.filter.show = null;
+      document.getElementById('new-pill')?.classList.remove('active');
+      document.querySelectorAll(`.pill[data-filter="${f}"]`).forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    }
+    renderGrid();
+  });
+});
+
+// Sort
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.sort = btn.dataset.sort;
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderGrid();
+  });
+});
+
+// Admin toggle
+const adminToggle = document.getElementById('admin-toggle');
+const authPanel   = document.getElementById('auth-panel');
+adminToggle.addEventListener('click', e => {
+  e.stopPropagation();
+  if (window._adminUser) {
+    state.adminMode = !state.adminMode;
+    document.body.classList.toggle('admin-mode', state.adminMode);
+    adminToggle.classList.toggle('active', state.adminMode);
+  } else {
+    authPanel.classList.toggle('open');
+  }
+});
+document.addEventListener('click', e => {
+  if (!authPanel.contains(e.target) && e.target !== adminToggle) authPanel.classList.remove('open');
+});
+document.getElementById('auth-signin-btn').addEventListener('click', async () => {
+  const fb = await waitForFirebase();
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+  try {
+    const provider = new fb.GoogleAuthProvider();
+    await fb.signInWithPopup(fb.auth, provider);
+    authPanel.classList.remove('open');
+  } catch(e) { errEl.textContent = 'Sign-in failed.'; }
+});
+document.getElementById('auth-signout-btn').addEventListener('click', async () => {
+  const fb = await waitForFirebase();
+  await fb.signOut(fb.auth);
+  state.adminMode = false;
+  document.body.classList.remove('admin-mode');
+  adminToggle.classList.remove('active');
+  authPanel.classList.remove('open');
+});
+document.addEventListener('authchange', e => {
+  const user = e.detail.user;
+  document.getElementById('auth-signed-out').style.display = user ? 'none'  : 'block';
+  document.getElementById('auth-signed-in').style.display  = user ? 'block' : 'none';
+});
+
+// Editor
+function openEditor(relativePath) {
+  state.editingPath = relativePath;
+  const p = state.allPhotos.find(x => x.relativePath === relativePath);
+  if (!p) return;
+  document.getElementById('editor-filename').textContent  = relativePath;
+  document.getElementById('editor-preview').src           = p.src;
+  document.getElementById('f-caption').value    = p.caption    || '';
+  document.getElementById('f-place').value      = p.place      || '';
+  document.getElementById('f-place-key').value  = p.placeKey   || '';
+  document.getElementById('f-date').value       = p.date       || '';
+  document.getElementById('f-year').value       = p.year       || '';
+  document.getElementById('f-camera').value     = p.camera     || '';
+  document.getElementById('f-film').value       = p.film       || '';
+  document.getElementById('f-names').value      = p.names      || '';
+  document.getElementById('f-categories').value = (p.categories || []).join(', ');
+  document.getElementById('f-order').value      = p.order !== 9999 ? p.order : '';
+  document.getElementById('save-status').textContent = '';
+  document.getElementById('meta-editor').classList.add('open');
+}
+document.getElementById('editor-close').addEventListener('click', () => {
+  document.getElementById('meta-editor').classList.remove('open');
+});
+document.getElementById('editor-save').addEventListener('click', async () => {
+  if (!state.editingPath) return;
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = 'Saving…';
+  const cats = document.getElementById('f-categories').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const meta = {
+    caption:    document.getElementById('f-caption').value.trim(),
+    place:      document.getElementById('f-place').value.trim(),
+    placeKey:   document.getElementById('f-place-key').value,
+    date:       document.getElementById('f-date').value.trim(),
+    year:       parseInt(document.getElementById('f-year').value) || 0,
+    camera:     document.getElementById('f-camera').value.trim(),
+    film:       document.getElementById('f-film').value.trim(),
+    names:      document.getElementById('f-names').value.trim(),
+    categories: cats,
+    order:      parseInt(document.getElementById('f-order').value) || 9999,
+    updatedAt:  new Date().toISOString(),
+  };
+  try {
+    const fb    = await waitForFirebase();
+    const docId = state.editingPath.replace(/[\/\.]/g, '_');
+    await fb.setDoc(fb.doc(fb.db, 'photo_metadata', docId), meta);
+    state.metadata[docId] = meta;
+    const photo = state.allPhotos.find(p => p.relativePath === state.editingPath);
+    if (photo) Object.assign(photo, meta, { isNew: false });
+    state.newPaths = state.allPhotos.filter(p => p.isNew).map(p => p.relativePath);
+    if (state.newPaths.length > 0) {
+      document.getElementById('new-pill-label').textContent = `${state.newPaths.length} untagged`;
+      document.getElementById('new-filter-row').style.display = 'flex';
+    } else {
+      document.getElementById('new-filter-row').style.display = 'none';
+    }
+    renderGrid();
+    statusEl.textContent = '✓ Saved';
+    setTimeout(() => {
+      statusEl.textContent = '';
+      document.getElementById('meta-editor').classList.remove('open');
+    }, 1000);
+  } catch(e) {
+    statusEl.textContent = 'Error — check Firebase config';
+    console.error(e);
+  }
+});
+document.getElementById('editor-delete').addEventListener('click', async () => {
+  if (!state.editingPath) return;
+  if (!confirm('Remove metadata for this photo?')) return;
+  try {
+    const fb    = await waitForFirebase();
+    const docId = state.editingPath.replace(/[\/\.]/g, '_');
+    await fb.deleteDoc(fb.doc(fb.db, 'photo_metadata', docId));
+    delete state.metadata[docId];
+    const photo = state.allPhotos.find(p => p.relativePath === state.editingPath);
+    if (photo) {
+      photo.caption=''; photo.place=''; photo.placeKey=''; photo.date='';
+      photo.camera=''; photo.film=''; photo.names=''; photo.categories=[];
+      photo.order=9999; photo.isNew=true;
+    }
+    renderGrid();
+    document.getElementById('meta-editor').classList.remove('open');
+  } catch(e) { console.error(e); }
+});
+
+loadAll();
+</script>
+</body>
+</html>
