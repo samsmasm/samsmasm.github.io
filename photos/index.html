@@ -115,6 +115,17 @@
     .year-value { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--ink); min-width: 2.5rem; text-align: center; }
     .untagged-count { font-size: 0.68rem; letter-spacing: 0.08em; color: var(--grey-mid); cursor: pointer; margin-left: 1rem; transition: color var(--transition); }
     .untagged-count:hover { color: var(--ink); }
+
+    /* TAGS DROPDOWN FILTER */
+    .tags-dropdown { position: relative; }
+    .tags-dropdown-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.85rem; border: 1px solid var(--grey-light); background: transparent; border-radius: 2px; font-family: 'Jost', sans-serif; font-size: 0.7rem; font-weight: 300; letter-spacing: 0.08em; cursor: pointer; color: var(--grey-dark); transition: all var(--transition); white-space: nowrap; }
+    .tags-dropdown-btn:hover { border-color: var(--grey-mid); color: var(--ink); }
+    .tags-dropdown-btn.active { background: var(--ink); border-color: var(--ink); color: var(--cream); }
+    .tags-dropdown-panel { position: absolute; top: calc(100% + 4px); left: 0; background: white; border: 1px solid var(--grey-light); min-width: 180px; z-index: 50; box-shadow: 0 4px 16px rgba(26,25,23,0.1); display: none; max-height: 260px; overflow-y: auto; }
+    .tags-dropdown-panel.open { display: block; }
+    .tags-dropdown-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; cursor: pointer; font-size: 0.72rem; font-weight: 300; letter-spacing: 0.06em; color: var(--ink); transition: background 0.15s; user-select: none; }
+    .tags-dropdown-item:hover { background: var(--warm-white); }
+    .tags-dropdown-item input[type=checkbox] { margin: 0; cursor: pointer; accent-color: var(--ink); flex-shrink: 0; }
     .lb-note-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(250,249,247,0.1); }
     .lb-note-text { font-size: 0.78rem; font-style: italic; color: rgba(250,249,247,0.65); line-height: 1.6; white-space: pre-wrap; margin-top: 0.25rem; font-weight: 300; }
     .overlay-note { font-size: 0.6rem; color: rgba(250,249,247,0.55); margin-top: 0.2rem; font-style: italic; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -259,6 +270,15 @@
       <button class="pill active" data-filter="country" data-value="all">All</button>
     </div>
   </div>
+  <div class="filter-row" id="tags-filter-row" style="display:none">
+    <span class="filter-label">Tags</span>
+    <div class="filter-pills">
+      <div class="tags-dropdown" id="tags-dropdown">
+        <button class="tags-dropdown-btn" id="tags-dropdown-btn">All tags</button>
+        <div class="tags-dropdown-panel" id="tags-dropdown-panel"></div>
+      </div>
+    </div>
+  </div>
   <div class="filter-row" id="new-filter-row" style="display:none">
     <span class="filter-label">Show</span>
     <div class="filter-pills">
@@ -395,6 +415,11 @@
       <textarea id="f-note" rows="4" placeholder="Any story or context behind the photo…" style="resize:vertical"></textarea>
     </div>
     <div class="form-row">
+      <label>Tags</label>
+      <input type="text" id="f-tags" placeholder="portrait, landscape, street, …">
+      <div class="form-hint">Separate tags with commas</div>
+    </div>
+    <div class="form-row">
       <label>Rating (1 = best)</label>
       <select id="f-order">
         <option value="">— unrated —</option>
@@ -485,7 +510,7 @@ async function waitForFirebase(timeout = 6000) {
 
 const state = {
   allPhotos: [], manifest: [], metadata: {}, newPaths: [],
-  filter: { camera: 'all', country: 'all', show: null, yearMin: null, yearMax: null },
+  filter: { camera: 'all', country: 'all', show: null, yearMin: null, yearMax: null, tags: [] },
   sort: 'custom', lightboxIndex: 0, visiblePhotos: [],
   adminMode: false, editingPath: null, lastSaved: null,
 };
@@ -532,6 +557,7 @@ async function loadAll() {
       names:       meta.names       || '',
       note:        meta.note        || '',
       categories:  meta.categories  || [],
+      tags:        meta.tags        || [],
       order:       meta.order ?? 9999,
       isNew:       !fsMeta[key],
     };
@@ -548,6 +574,7 @@ async function loadAll() {
   }
 
   buildCountryPills();
+  buildTagsDropdown();
   initYearSlider();
   updateUntaggedCount();
   showLoading(false);
@@ -569,7 +596,9 @@ function getVisible() {
     const k = state.filter.country === 'all' || p.countryKey === state.filter.country;
     const y = !p.year || state.filter.yearMin === null ||
               (p.year >= state.filter.yearMin && p.year <= state.filter.yearMax);
-    return c && k && y;
+    const t = state.filter.tags.length === 0 ||
+              state.filter.tags.some(tag => p.tags.includes(tag));
+    return c && k && y && t;
   });
   if      (state.sort === 'year-desc') r.sort((a,b) => b.year - a.year);
   else if (state.sort === 'year-asc')  r.sort((a,b) => a.year - b.year);
@@ -659,10 +688,11 @@ function updateLightbox() {
   } else {
     noteRow.style.display = 'none';
   }
-  const tags = document.getElementById('lb-tags');
-  tags.innerHTML = p.categories.length
-    ? p.categories.map(c => `<span class="lb-tag">${c}</span>`).join('')
-    : '<span class="lb-untagged">no categories yet</span>';
+  const allDisplayTags = [...p.categories, ...(p.tags || [])];
+  const tagsEl = document.getElementById('lb-tags');
+  tagsEl.innerHTML = allDisplayTags.length
+    ? allDisplayTags.map(c => `<span class="lb-tag">${c}</span>`).join('')
+    : '<span class="lb-untagged">no tags yet</span>';
 }
 function lbNav(d) {
   const n = state.visiblePhotos.length;
@@ -827,6 +857,50 @@ function buildCountryPills() {
   });
 }
 
+// Tags dropdown filter
+function buildTagsDropdown() {
+  const allTags = new Set();
+  state.allPhotos.forEach(p => p.tags.forEach(t => allTags.add(t)));
+  const row = document.getElementById('tags-filter-row');
+  const panel = document.getElementById('tags-dropdown-panel');
+  if (allTags.size === 0) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  panel.innerHTML = '';
+  [...allTags].sort().forEach(tag => {
+    const item = document.createElement('label');
+    item.className = 'tags-dropdown-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = tag;
+    cb.checked = state.filter.tags.includes(tag);
+    cb.addEventListener('change', () => {
+      if (cb.checked) state.filter.tags.push(tag);
+      else state.filter.tags = state.filter.tags.filter(t => t !== tag);
+      updateTagsDropdownBtn();
+      renderGrid();
+    });
+    item.appendChild(cb);
+    item.appendChild(document.createTextNode(tag));
+    panel.appendChild(item);
+  });
+  updateTagsDropdownBtn();
+}
+function updateTagsDropdownBtn() {
+  const btn = document.getElementById('tags-dropdown-btn');
+  const n = state.filter.tags.length;
+  btn.textContent = n === 0 ? 'All tags' : `${n} tag${n > 1 ? 's' : ''} selected`;
+  btn.classList.toggle('active', n > 0);
+}
+document.getElementById('tags-dropdown-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('tags-dropdown-panel').classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('tags-dropdown');
+  if (!dropdown.contains(e.target))
+    document.getElementById('tags-dropdown-panel').classList.remove('open');
+});
+
 // Editor
 function openEditor(relativePath) {
   state.editingPath = relativePath;
@@ -857,6 +931,7 @@ function openEditor(relativePath) {
   document.getElementById('f-film').value        = p.film       || '';
   document.getElementById('f-names').value       = p.names      || '';
   document.getElementById('f-note').value        = p.note       || '';
+  document.getElementById('f-tags').value        = (p.tags || []).join(', ');
   document.getElementById('f-order').value       = (p.order >= 1 && p.order <= 5) ? p.order : '';
   document.getElementById('save-status').textContent = '';
   document.getElementById('meta-editor').classList.add('open');
@@ -894,6 +969,8 @@ document.getElementById('editor-save').addEventListener('click', async () => {
   saveToList('unisam_films', film);
 
   const cats = cameraType ? [cameraType] : [];
+  const tagsRaw = document.getElementById('f-tags').value;
+  const tags = tagsRaw.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
   const orderVal = parseInt(document.getElementById('f-order').value);
 
   const meta = {
@@ -909,6 +986,7 @@ document.getElementById('editor-save').addEventListener('click', async () => {
     names:      document.getElementById('f-names').value.trim(),
     note:       document.getElementById('f-note').value.trim(),
     categories: cats,
+    tags:       tags,
     order:      (orderVal >= 1 && orderVal <= 5) ? orderVal : 9999,
     updatedAt:  new Date().toISOString(),
   };
@@ -928,6 +1006,7 @@ document.getElementById('editor-save').addEventListener('click', async () => {
     }
     state.lastSaved = { ...meta };
     buildCountryPills();
+    buildTagsDropdown();
     updateUntaggedCount();
     renderGrid();
     statusEl.textContent = '✓ Saved';
@@ -952,9 +1031,10 @@ document.getElementById('editor-delete').addEventListener('click', async () => {
     if (photo) {
       photo.caption=''; photo.country=''; photo.countryKey=''; photo.place='';
       photo.date=''; photo.year=0; photo.cameraType=''; photo.camera='';
-      photo.film=''; photo.names=''; photo.note=''; photo.categories=[]; photo.order=9999; photo.isNew=true;
+      photo.film=''; photo.names=''; photo.note=''; photo.categories=[]; photo.tags=[]; photo.order=9999; photo.isNew=true;
     }
     buildCountryPills();
+    buildTagsDropdown();
     updateUntaggedCount();
     renderGrid();
     document.getElementById('meta-editor').classList.remove('open');
