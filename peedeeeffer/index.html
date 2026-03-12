@@ -18,6 +18,7 @@
         .canvas-container { transition: transform 0.3s ease; }
         .merge-view .page-card { cursor: default; pointer-events: none; }
         .split-view .page-card { cursor: pointer; }
+        #extractTextContent { user-select: text; }
     </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -42,8 +43,8 @@
             </div>
 
             <div class="flex p-1 mx-6 bg-slate-100 rounded-xl mb-6">
-                <button onclick="handleTabSwitch('merge')" id="tabMerge" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Merge</button>
-                <button onclick="handleTabSwitch('split')" id="tabSplit" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Split</button>
+                <button onclick="handleTabSwitch('split')" id="tabSplit" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Split</button>
+                <button onclick="handleTabSwitch('merge')" id="tabMerge" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Merge</button>
                 <button onclick="handleTabSwitch('extract')" id="tabExtract" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Extract</button>
             </div>
 
@@ -59,27 +60,12 @@
                     </div>
                 </div>
 
-                <div id="controlsMerge" class="space-y-4">
-                    <div class="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
-                        <span>Queue</span>
-                        <button onclick="resetState()" class="text-red-500 underline">Clear All</button>
-                    </div>
-                    <ul id="mergeList" class="space-y-2 text-xs"></ul>
-                    <div id="mergeExportArea" class="hidden pt-4 border-t space-y-3">
-                        <input type="text" id="mergeManualName" placeholder="Custom name for merged PDF" class="w-full px-4 py-3 bg-white border rounded-xl text-sm outline-none focus:ring-2 ring-blue-500">
-                        <button onclick="processExport('merge-all')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg">Merge All</button>
-                    </div>
-                </div>
-
-                <div id="controlsSplit" class="hidden space-y-6">
-
-                    <!-- Split sub-mode toggle -->
+                <div id="controlsSplit" class="space-y-6">
                     <div class="flex p-1 bg-slate-100 rounded-xl">
                         <button onclick="setSplitMode('manual')" id="tabSplitManual" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Manual</button>
                         <button onclick="setSplitMode('bysize')" id="tabSplitBySize" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">By Size</button>
                     </div>
 
-                    <!-- Manual mode -->
                     <div id="splitModeManual" class="space-y-3">
                         <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Ranges</div>
                         <div id="rangeInputs" class="space-y-2">
@@ -88,7 +74,6 @@
                         <button onclick="addRangeInput()" class="text-xs font-bold text-blue-600">+ ADD RANGE</button>
                     </div>
 
-                    <!-- By Size mode -->
                     <div id="splitModeBySize" class="hidden space-y-4">
                         <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Max Chunk Size</div>
                         <div class="flex gap-2">
@@ -115,17 +100,28 @@
                     </div>
                 </div>
 
+                <div id="controlsMerge" class="hidden space-y-4">
+                    <div class="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
+                        <span>Queue</span>
+                        <button onclick="resetState()" class="text-red-500 underline">Clear All</button>
+                    </div>
+                    <ul id="mergeList" class="space-y-2 text-xs"></ul>
+                    <div id="mergeExportArea" class="hidden pt-4 border-t space-y-3">
+                        <input type="text" id="mergeManualName" placeholder="Custom name for merged PDF" class="w-full px-4 py-3 bg-white border rounded-xl text-sm outline-none focus:ring-2 ring-blue-500">
+                        <button onclick="processExport('merge-all')" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold shadow-lg">Merge All</button>
+                    </div>
+                </div>
+
                 <div id="controlsExtract" class="hidden space-y-5">
                     <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Output Format</div>
                     <div class="flex p-1 bg-slate-100 rounded-xl">
                         <button onclick="setExtractFormat('markdown')" id="tabExtractMd" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Markdown</button>
                         <button onclick="setExtractFormat('plain')" id="tabExtractPlain" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Plain Text</button>
                     </div>
-                    <button onclick="runExtract()" id="extractBtn" class="hidden w-full py-3 bg-slate-900 text-white rounded-xl font-semibold text-sm">Extract Text</button>
                     <div id="extractExportArea" class="hidden pt-4 border-t space-y-3">
                         <p id="extractCharCount" class="text-[10px] text-slate-400 font-semibold"></p>
                         <button onclick="copyExtractedText()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Copy to Clipboard</button>
-                        <button onclick="downloadExtractedText()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download File</button>
+                        <button onclick="downloadExtractedText()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download .txt</button>
                     </div>
                 </div>
             </div>
@@ -137,11 +133,27 @@
         </aside>
 
         <main class="flex-1 bg-slate-50 p-6 lg:p-12 overflow-hidden flex flex-col relative">
-            <div id="workspace" class="flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto relative">
+            <!-- Standard workspace: split & merge modes -->
+            <div id="workspace" class="flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto relative split-view">
                 <div id="emptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Upload PDF files to view workspace</div>
                 <div id="canvasGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 w-full p-10 max-w-7xl"></div>
-                <div id="extractView" class="hidden w-full h-full p-10">
-                    <pre id="extractTextContent" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed" style="font-family: 'Inter', sans-serif;"></pre>
+            </div>
+
+            <!-- Extract workspace: 75% preview / 25% text -->
+            <div id="extractWorkspace" class="hidden flex-1 w-full rounded-[2rem] border bg-white overflow-hidden flex flex-col">
+                <!-- Top 75%: PDF thumbnails -->
+                <div style="flex:3;min-height:0;" class="overflow-y-auto relative">
+                    <div id="extractEmptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Upload a PDF to preview</div>
+                    <div id="extractCanvasGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 w-full p-10 max-w-7xl"></div>
+                </div>
+                <!-- Control bar: page range + extract button -->
+                <div class="flex-none border-t border-b bg-slate-50 px-4 py-3 flex items-center gap-3">
+                    <input id="extractPageRange" type="text" placeholder="Pages: e.g. 1-5, 7, 10-13 (blank = all)" class="flex-1 px-4 py-2.5 bg-white border rounded-xl text-sm outline-none focus:ring-2 ring-blue-500" style="user-select:text;">
+                    <button onclick="runExtract()" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm whitespace-nowrap">Extract Text</button>
+                </div>
+                <!-- Bottom 25%: extracted text output -->
+                <div style="flex:1;min-height:0;" class="overflow-y-auto bg-white">
+                    <pre id="extractTextContent" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed p-6" style="font-family:'Inter',sans-serif;"></pre>
                 </div>
             </div>
 
@@ -155,17 +167,49 @@
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        
-        let mergeFiles = [], currentMode = 'merge', activeBox = null, globalRotations = {}, lastClickedIdx = null, pendingFiles = [], previewLimitMode = 'full';
-        let currentSplitMode = 'manual', calculatedChunks = [], pdfLibDocCache = {};
-        
-        // RENDER GUARD ID - The key to stopping zombie renders
-        let currentRenderTask = 0;
 
+        let mergeFiles = [], currentMode = 'split', activeBox = null, globalRotations = {}, lastClickedIdx = null, pendingFiles = [], previewLimitMode = 'full';
+        let currentSplitMode = 'manual', calculatedChunks = [], pdfLibDocCache = {};
+        let currentRenderTask = 0;
+        let sourceFileHandle = null;
+
+        // --- File upload via File System Access API (with <input> fallback) ---
+        document.getElementById('uploadLabelBox').addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (window.showOpenFilePicker) {
+                try {
+                    const handles = await window.showOpenFilePicker({
+                        types: [{ description: 'PDF Files', accept: { 'application/pdf': ['.pdf'] } }],
+                        multiple: currentMode === 'merge'
+                    });
+                    sourceFileHandle = handles[0];
+                    pendingFiles = await Promise.all(handles.map(h => h.getFile()));
+                    if (currentMode !== 'extract' && pendingFiles.some(f => f.size > 50 * 1024 * 1024))
+                        document.getElementById('modal').classList.remove('hidden');
+                    else confirmLoad('full');
+                } catch (err) {
+                    if (err.name !== 'AbortError') document.getElementById('pdfInput').click();
+                }
+            } else {
+                document.getElementById('pdfInput').click();
+            }
+        });
+
+        document.getElementById('pdfInput').onchange = (e) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            sourceFileHandle = null;
+            pendingFiles = files;
+            if (currentMode !== 'extract' && files.some(f => f.size > 50 * 1024 * 1024))
+                document.getElementById('modal').classList.remove('hidden');
+            else confirmLoad('full');
+            e.target.value = '';
+        };
+
+        // --- Tab switching (no resetState) ---
         function handleTabSwitch(mode) {
             currentMode = mode;
-            resetState();
-            ['merge', 'split', 'extract'].forEach(m => {
+            ['split', 'merge', 'extract'].forEach(m => {
                 const active = m === mode;
                 document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1)).className =
                     active ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
@@ -174,105 +218,119 @@
             document.getElementById('controlsMerge').classList.toggle('hidden', mode !== 'merge');
             document.getElementById('controlsSplit').classList.toggle('hidden', mode !== 'split');
             document.getElementById('controlsExtract').classList.toggle('hidden', mode !== 'extract');
-            document.getElementById('workspace').className = `flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto relative ${mode}-view`;
+
+            const isExtract = mode === 'extract';
+            document.getElementById('workspace').classList.toggle('hidden', isExtract);
+            document.getElementById('extractWorkspace').classList.toggle('hidden', !isExtract);
+            if (!isExtract) {
+                document.getElementById('workspace').className =
+                    `flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto relative ${mode}-view`;
+            }
+
+            updateUploadUI();
+
+            if (mergeFiles.length > 0) {
+                if (isExtract) {
+                    renderExtractPreview();
+                } else {
+                    renderGrid();
+                    if (mode === 'merge') updateSidebarList();
+                }
+            }
+        }
+
+        function updateUploadUI() {
+            const hasFiles = mergeFiles.length > 0;
+            if (currentMode === 'split' || currentMode === 'extract') {
+                document.getElementById('uploadLabelBox').classList.toggle('hidden', hasFiles);
+                document.getElementById('splitFileInfo').classList.toggle('hidden', !hasFiles);
+                if (hasFiles) document.getElementById('splitNameDisplay').innerText = mergeFiles[0].name;
+            } else {
+                document.getElementById('uploadLabelBox').classList.remove('hidden');
+                document.getElementById('splitFileInfo').classList.add('hidden');
+            }
         }
 
         function resetState() {
-            // KILL SWITCH: Increment ID so any running render loops stop immediately
             currentRenderTask++;
-
             mergeFiles = []; globalRotations = {}; activeBox = null; lastClickedIdx = null;
-            calculatedChunks = []; extractedText = ''; pdfLibDocCache = {};
+            calculatedChunks = []; extractedText = ''; pdfLibDocCache = {}; sourceFileHandle = null;
             document.getElementById('canvasGrid').innerHTML = '';
-            document.getElementById('canvasGrid').classList.remove('hidden');
+            document.getElementById('extractCanvasGrid').innerHTML = '';
             document.getElementById('mergeList').innerHTML = '';
             document.getElementById('emptyState').classList.remove('hidden');
-            document.getElementById('uploadLabelBox').classList.remove('hidden');
-            document.getElementById('splitFileInfo').classList.add('hidden');
+            document.getElementById('extractEmptyState').classList.remove('hidden');
             document.getElementById('mergeExportArea').classList.add('hidden');
             document.getElementById('splitExportArea').classList.add('hidden');
             document.getElementById('chunkResults').classList.add('hidden');
             document.getElementById('actionBar').classList.add('hidden');
-            document.getElementById('extractView').classList.add('hidden');
             document.getElementById('extractTextContent').textContent = '';
             document.getElementById('extractExportArea').classList.add('hidden');
-            document.getElementById('extractBtn').classList.add('hidden');
             document.getElementById('mergeManualName').value = '';
             document.getElementById('splitManualName').value = '';
+            document.getElementById('extractPageRange').value = '';
             document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
+            updateUploadUI();
             setStatus('System Ready', 'slate');
         }
-
-        document.getElementById('pdfInput').onchange = (e) => {
-            const files = Array.from(e.target.files);
-            if (!files.length) return;
-            pendingFiles = files;
-            if (currentMode !== 'extract' && files.some(f => f.size > 50 * 1024 * 1024))
-                document.getElementById('modal').classList.remove('hidden');
-            else confirmLoad('full');
-            e.target.value = '';
-        };
 
         async function confirmLoad(pMode) {
             previewLimitMode = pMode;
             document.getElementById('modal').classList.add('hidden');
-            if (currentMode === 'split' || currentMode === 'extract') resetState();
-
             setStatus('Loading PDF…', 'amber');
+
+            if (currentMode === 'split' || currentMode === 'extract') {
+                currentRenderTask++;
+                mergeFiles = []; globalRotations = {}; pdfLibDocCache = {};
+                document.getElementById('canvasGrid').innerHTML = '';
+                document.getElementById('extractCanvasGrid').innerHTML = '';
+                document.getElementById('extractTextContent').textContent = '';
+                document.getElementById('extractExportArea').classList.add('hidden');
+                pendingFiles = pendingFiles.slice(0, 1); // single file for split/extract
+            }
+
             for (let f of pendingFiles) {
                 const data = await f.arrayBuffer();
                 mergeFiles.push({ id: Math.random().toString(36).substr(2, 9), name: f.name, data });
-                if (currentMode === 'split' || currentMode === 'extract') {
-                    document.getElementById('splitNameDisplay').innerText = f.name;
-                    document.getElementById('uploadLabelBox').classList.add('hidden');
-                    document.getElementById('splitFileInfo').classList.remove('hidden');
-                }
             }
+
+            updateUploadUI();
+
             if (currentMode === 'extract') {
-                document.getElementById('extractBtn').classList.remove('hidden');
-                setStatus('Ready — click Extract Text', 'slate');
+                renderExtractPreview();
+                setStatus('Ready — specify pages and click Extract', 'slate');
                 return;
             }
-            renderGrid(); updateSidebarList();
+            renderGrid();
+            updateSidebarList();
         }
 
         async function renderGrid() {
-            // START NEW RENDER TASK
             const thisTaskID = ++currentRenderTask;
-
-            const grid = document.getElementById('canvasGrid'); 
-            grid.innerHTML = ''; // Immediate clear
-            
+            const grid = document.getElementById('canvasGrid');
+            grid.innerHTML = '';
             document.getElementById('emptyState').classList.add('hidden');
             let absIdx = 1;
 
             for (const file of mergeFiles) {
-                // CHECKPOINT 1: Before loading doc
                 if (currentRenderTask !== thisTaskID) return;
-
                 const pdf = await pdfjsLib.getDocument({data: file.data.slice(0)}).promise;
                 file.numPages = pdf.numPages;
-                
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    // CHECKPOINT 2: Before creating element
-                    if (currentRenderTask !== thisTaskID) return;
 
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    if (currentRenderTask !== thisTaskID) return;
                     const pageId = `${file.id}-${i}`;
                     const card = document.createElement('div');
                     card.id = `card-${pageId}`; card.dataset.absIndex = absIdx;
                     card.className = "page-card p-3 bg-white rounded-xl shadow-sm border-2 flex flex-col items-center";
                     card.innerHTML = `<div class="mb-2 text-[8px] font-bold text-slate-300 uppercase">Page ${absIdx}</div><div class="canvas-container"><canvas id="canv-${pageId}" class="max-w-full"></canvas></div>`;
-                    
-                    if(currentMode === 'split') {
+                    if (currentMode === 'split') {
                         card.onclick = (e) => handlePageClick(pageId, parseInt(card.dataset.absIndex), e);
                     }
-                    
-                    grid.appendChild(card); // Only append if task is still valid
+                    grid.appendChild(card);
 
                     if (previewLimitMode === 'full') {
-                        // CHECKPOINT 3: Before heavy rendering
                         if (currentRenderTask !== thisTaskID) return;
-
                         const page = await pdf.getPage(i);
                         const viewport = page.getViewport({scale: 0.3});
                         const canvas = document.getElementById(`canv-${pageId}`);
@@ -285,8 +343,37 @@
                     absIdx++;
                 }
             }
-            // CHECKPOINT 4: Finish
             if (currentRenderTask === thisTaskID) setStatus('Loaded', 'slate');
+        }
+
+        async function renderExtractPreview() {
+            const thisTaskID = ++currentRenderTask;
+            const grid = document.getElementById('extractCanvasGrid');
+            grid.innerHTML = '';
+            document.getElementById('extractEmptyState').classList.add('hidden');
+            if (!mergeFiles.length) return;
+
+            const fileObj = mergeFiles[0];
+            const pdf = await pdfjsLib.getDocument({data: fileObj.data.slice(0)}).promise;
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                if (currentRenderTask !== thisTaskID) return;
+                const pageId = `${fileObj.id}-${i}`;
+                const card = document.createElement('div');
+                card.className = "page-card p-3 bg-white rounded-xl shadow-sm border-2 flex flex-col items-center";
+                card.innerHTML = `<div class="mb-2 text-[8px] font-bold text-slate-300 uppercase">Page ${i}</div><div class="canvas-container"><canvas id="ecanv-${pageId}" class="max-w-full"></canvas></div>`;
+                grid.appendChild(card);
+
+                if (currentRenderTask !== thisTaskID) return;
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({scale: 0.3});
+                const canvas = document.getElementById(`ecanv-${pageId}`);
+                if (canvas) {
+                    canvas.height = viewport.height; canvas.width = viewport.width;
+                    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+                }
+            }
+            if (currentRenderTask === thisTaskID) setStatus('Loaded — specify pages and click Extract', 'slate');
         }
 
         function handlePageClick(pageId, absIdx, event) {
@@ -331,35 +418,30 @@
             if (type === 'merge-all') {
                 const doc = await PDFLib.PDFDocument.create();
                 await buildDoc(doc, null);
-                save(await doc.save(), (document.getElementById('mergeManualName').value || baseName + '_merged') + '.pdf');
-            } 
+                await save(await doc.save(), (document.getElementById('mergeManualName').value || baseName + '_merged') + '.pdf');
+            }
             else if (type === 'split-single') {
                 const doc = await PDFLib.PDFDocument.create();
                 const pages = parseAllRanges();
                 await buildDoc(doc, pages);
                 const userInp = document.getElementById('splitManualName').value;
-                const rangesStr = setToString(pages).replace(/, /g, '_'); 
+                const rangesStr = setToString(pages).replace(/, /g, '_');
                 const finalName = userInp ? userInp : `${baseName}_${rangesStr}`;
-                save(await doc.save(), finalName + '.pdf');
-            } 
+                await save(await doc.save(), finalName + '.pdf');
+            }
             else if (type === 'split-multiple') {
-                // FIXED LOGIC: Gather all comma segments from all boxes first
                 let rawSegments = [];
                 document.querySelectorAll('.range-field').forEach(input => {
-                   if(input.value.trim()) rawSegments.push(...input.value.split(','));
+                    if (input.value.trim()) rawSegments.push(...input.value.split(','));
                 });
-
                 for (let seg of rawSegments) {
                     const cleanSeg = seg.trim();
                     const set = parseRange(cleanSeg);
                     if (!set.size) continue;
-                    
                     const docPart = await PDFLib.PDFDocument.create();
                     await buildDoc(docPart, set);
-                    
-                    // Separate naming per comma segment
                     const segLabel = cleanSeg.replace(/\s/g, '');
-                    save(await docPart.save(), `${baseName}_${segLabel}.pdf`);
+                    await save(await docPart.save(), `${baseName}_${segLabel}.pdf`);
                     await new Promise(r => setTimeout(r, 800));
                 }
             }
@@ -406,9 +488,9 @@
 
         function moveFile(i, d) {
             const t = i + d;
-            if (t >= 0 && t < mergeFiles.length) { 
-                [mergeFiles[i], mergeFiles[t]] = [mergeFiles[t], mergeFiles[i]]; 
-                updateSidebarList(); renderGrid(); 
+            if (t >= 0 && t < mergeFiles.length) {
+                [mergeFiles[i], mergeFiles[t]] = [mergeFiles[t], mergeFiles[i]];
+                updateSidebarList(); renderGrid();
             }
         }
 
@@ -416,9 +498,9 @@
             const id = card.id.replace('card-',''); globalRotations[id] = (globalRotations[id] || 0) + deg;
             applyRotationVisual(id, globalRotations[id]);
         }); }
-        function applyRotationVisual(id, deg) { 
+        function applyRotationVisual(id, deg) {
             const canvasContainer = document.querySelector(`#card-${id} .canvas-container`);
-            if (canvasContainer) canvasContainer.style.transform = `rotate(${deg}deg)`; 
+            if (canvasContainer) canvasContainer.style.transform = `rotate(${deg}deg)`;
         }
         function addRangeInput() {
             const input = document.createElement('input'); input.className = "range-field w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:bg-white mt-2 outline-none";
@@ -440,7 +522,46 @@
         }
         function parseAllRanges() { let c = new Set(); document.querySelectorAll('.range-field').forEach(i => parseRange(i.value).forEach(n => c.add(n))); return c; }
         function setStatus(t, c) { document.getElementById('statusText').innerText = t; const l = document.getElementById('statusLed'); l.className = `w-1.5 h-1.5 rounded-full mr-2 bg-${c === 'slate' ? 'slate-300' : (c === 'amber' ? 'amber-400' : (c === 'blue' ? 'blue-500' : 'emerald-500'))}`; }
-        function save(data, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type:'application/pdf'})); a.download = name; a.click(); }
+
+        async function save(data, name) {
+            if (sourceFileHandle && window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: name,
+                        startIn: sourceFileHandle,
+                        types: [{ description: 'PDF File', accept: { 'application/pdf': ['.pdf'] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(new Blob([data], { type: 'application/pdf' }));
+                    await writable.close();
+                    return;
+                } catch (e) { if (e.name === 'AbortError') return; }
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([data], {type:'application/pdf'}));
+            a.download = name; a.click();
+        }
+
+        async function saveText(text, name) {
+            if (sourceFileHandle && window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: name,
+                        startIn: sourceFileHandle,
+                        types: [{ description: 'Text File', accept: { 'text/plain': ['.txt'] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(text);
+                    await writable.close();
+                    return;
+                } catch (e) { if (e.name === 'AbortError') return; }
+            }
+            const blob = new Blob([text], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name; a.click();
+        }
+
         function clearSelection() {
             if (currentMode === 'split') document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
             updateVisualSelect();
@@ -463,10 +584,10 @@
         async function runExtract() {
             if (!mergeFiles.length) { setStatus('No file loaded', 'amber'); return; }
 
+            const rangeInput = document.getElementById('extractPageRange').value.trim();
+            const pageFilter = rangeInput ? parseRange(rangeInput) : null;
+
             setStatus('Extracting…', 'blue');
-            document.getElementById('extractView').classList.remove('hidden');
-            document.getElementById('canvasGrid').classList.add('hidden');
-            document.getElementById('emptyState').classList.add('hidden');
             document.getElementById('extractTextContent').textContent = 'Working…';
             document.getElementById('extractExportArea').classList.add('hidden');
 
@@ -475,16 +596,16 @@
             for (const fileObj of mergeFiles) {
                 const pdf = await pdfjsLib.getDocument({ data: fileObj.data.slice(0) }).promise;
 
-                // --- Pass 1: collect every text item with font metadata ---
                 const rawItems = [];
                 for (let p = 1; p <= pdf.numPages; p++) {
+                    if (pageFilter && !pageFilter.has(p)) continue;
                     setStatus(`Page ${p} / ${pdf.numPages}…`, 'blue');
                     const page = await pdf.getPage(p);
                     const content = await page.getTextContent();
                     for (const item of content.items) {
                         if (!item.str) continue;
                         const sz = Math.abs(item.transform[3]);
-                        if (sz <= 0 && item.str.trim()) continue; // allow zero-size whitespace items
+                        if (sz <= 0 && item.str.trim()) continue;
                         rawItems.push({
                             str: item.str,
                             sz,
@@ -498,10 +619,9 @@
                 }
                 if (!rawItems.length) continue;
 
-                // --- Determine body font size by character-weighted frequency ---
                 const sizeCounts = {};
                 for (const it of rawItems) {
-                    if (!it.str.trim()) continue; // whitespace items don't count toward size frequency
+                    if (!it.str.trim()) continue;
                     const sz = Math.round(it.sz * 2) / 2;
                     sizeCounts[sz] = (sizeCounts[sz] || 0) + it.str.length;
                 }
@@ -509,21 +629,18 @@
                     Object.entries(sizeCounts).sort((a, b) => b[1] - a[1])[0][0]
                 );
 
-                // --- Heading sizes: noticeably larger than body, sorted H1→H6 ---
                 const headingSizes = [...new Set(
                     rawItems.map(i => Math.round(i.sz * 2) / 2).filter(sz => sz > bodySize * 1.08)
                 )].sort((a, b) => b - a);
                 const headingLevelMap = {};
                 headingSizes.slice(0, 6).forEach((sz, i) => headingLevelMap[sz] = i + 1);
 
-                // --- Sort: page asc, Y desc (top of page first), X asc ---
                 rawItems.sort((a, b) => {
                     if (a.page !== b.page) return a.page - b.page;
                     if (Math.abs(a.y - b.y) > 2) return b.y - a.y;
                     return a.x - b.x;
                 });
 
-                // --- Group items into lines ---
                 const lines = [];
                 let curLine = null;
                 for (const item of rawItems) {
@@ -539,11 +656,10 @@
                 }
                 if (curLine) lines.push(curLine);
 
-                // --- Build output ---
                 let prevPage = -1;
                 let prevY = null;
                 let prevSz = bodySize;
-                let pendingBody = []; // accumulate body text into paragraphs
+                let pendingBody = [];
 
                 const flushBody = () => {
                     if (pendingBody.length) {
@@ -559,7 +675,6 @@
                         if (i > 0) {
                             const prev = line.items[i - 1];
                             const gap = it.x - (prev.x + prev.w);
-                            // Insert a space if there's a meaningful positional gap and neither side already has one
                             if (gap > prev.sz * 0.15 && !text.endsWith(' ') && !it.str.startsWith(' ')) {
                                 text += ' ';
                             }
@@ -572,13 +687,11 @@
                     const roundedSz = Math.round(line.sz * 2) / 2;
                     let level = headingLevelMap[roundedSz] !== undefined ? headingLevelMap[roundedSz] : 0;
 
-                    // Bold body-sized short lines count as a minor heading
                     if (level === 0 && line.bold && text.length < 120 && line.sz >= bodySize * 0.95) {
                         const minorLevel = headingSizes.length + 1;
                         if (minorLevel <= 6) level = minorLevel;
                     }
 
-                    // Detect paragraph break (large vertical gap or page change)
                     const newPage = line.page !== prevPage;
                     const gapBreak = !newPage && prevY !== null && (prevY - line.y) > prevSz * 1.9;
 
@@ -588,7 +701,6 @@
                         if (extractFormat === 'markdown') {
                             outputParts.push('#'.repeat(level) + ' ' + text);
                         } else {
-                            // Plain text: underline H1/H2, caps+blank line for others
                             if (level === 1) {
                                 outputParts.push(text.toUpperCase());
                                 outputParts.push('='.repeat(Math.min(text.length, 72)));
@@ -628,13 +740,8 @@
 
         function downloadExtractedText() {
             if (!extractedText) return;
-            const ext = extractFormat === 'markdown' ? '.md' : '.txt';
             const baseName = mergeFiles[0]?.name.replace('.pdf', '') || 'extract';
-            const blob = new Blob([extractedText], { type: 'text/plain' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = baseName + ext;
-            a.click();
+            saveText(extractedText, baseName + '.txt');
         }
 
         // --- Split by Size ---
@@ -656,7 +763,6 @@
         }
 
         async function buildPageBytes(pageIndices) {
-            // pageIndices: 0-based indices into the full page list across all files
             const doc = await PDFLib.PDFDocument.create();
             const cards = Array.from(document.querySelectorAll('.page-card'));
             for (const idx of pageIndices) {
@@ -690,13 +796,10 @@
             setStatus('Calculating chunks…', 'blue');
 
             while (chunkStart < totalPages) {
-                // Binary search: find the largest count of pages starting at chunkStart that fits
                 let lo = 1, hi = totalPages - chunkStart, bestCount = -1, bestBytes = null;
 
-                // First check if even 1 page fits
                 const onePageBytes = await buildPageBytes([chunkStart]);
                 if (onePageBytes.byteLength > limitBytes) {
-                    // Single page overflows — include it anyway as its own chunk with a warning
                     anyOverflow = true;
                     calculatedChunks.push({ start: chunkStart, end: chunkStart, bytes: onePageBytes.byteLength, overflow: true });
                     chunkStart++;
@@ -725,7 +828,6 @@
                 chunkStart += bestCount;
             }
 
-            // Render results
             const list = document.getElementById('chunkList');
             list.innerHTML = '';
             calculatedChunks.forEach((chunk, i) => {
@@ -757,7 +859,7 @@
             setStatus('Exporting chunks…', 'blue');
             for (let i = 0; i < calculatedChunks.length; i++) {
                 const bytes = await buildChunkDoc(calculatedChunks[i]);
-                save(bytes, `${baseName}_chunk${i + 1}.pdf`);
+                await save(bytes, `${baseName}_chunk${i + 1}.pdf`);
                 await new Promise(r => setTimeout(r, 800));
             }
             setStatus('Done', 'green');
@@ -774,6 +876,20 @@
                 zip.file(`${baseName}_chunk${i + 1}.pdf`, bytes);
             }
             const blob = await zip.generateAsync({ type: 'blob' });
+            if (sourceFileHandle && window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: `${baseName}_chunks.zip`,
+                        startIn: sourceFileHandle,
+                        types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    setStatus('Done', 'green');
+                    return;
+                } catch (e) { if (e.name === 'AbortError') { setStatus('Cancelled', 'slate'); return; } }
+            }
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = `${baseName}_chunks.zip`;
