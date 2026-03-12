@@ -175,23 +175,20 @@
 
         // --- File upload via File System Access API (with <input> fallback) ---
         document.getElementById('uploadLabelBox').addEventListener('click', async (e) => {
+            if (!window.showOpenFilePicker) return; // let label trigger input natively
             e.preventDefault();
-            if (window.showOpenFilePicker) {
-                try {
-                    const handles = await window.showOpenFilePicker({
-                        types: [{ description: 'PDF Files', accept: { 'application/pdf': ['.pdf'] } }],
-                        multiple: currentMode === 'merge'
-                    });
-                    sourceFileHandle = handles[0];
-                    pendingFiles = await Promise.all(handles.map(h => h.getFile()));
-                    if (currentMode !== 'extract' && pendingFiles.some(f => f.size > 50 * 1024 * 1024))
-                        document.getElementById('modal').classList.remove('hidden');
-                    else confirmLoad('full');
-                } catch (err) {
-                    if (err.name !== 'AbortError') document.getElementById('pdfInput').click();
-                }
-            } else {
-                document.getElementById('pdfInput').click();
+            try {
+                const handles = await window.showOpenFilePicker({
+                    types: [{ description: 'PDF Files', accept: { 'application/pdf': ['.pdf'] } }],
+                    multiple: currentMode === 'merge'
+                });
+                sourceFileHandle = handles[0];
+                pendingFiles = await Promise.all(handles.map(h => h.getFile()));
+                if (currentMode !== 'extract' && pendingFiles.some(f => f.size > 50 * 1024 * 1024))
+                    document.getElementById('modal').classList.remove('hidden');
+                else confirmLoad('full');
+            } catch (err) {
+                // AbortError = user cancelled, anything else: silently fail
             }
         });
 
