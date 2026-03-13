@@ -576,14 +576,6 @@ window.doSave = async () => {
         return;
     }
 
-    // Check if room already exists
-    const existing = await get(ref(db, `scrims/${roomName}`));
-    if (existing.exists()) {
-        errEl.innerText = 'Room name already taken. Choose another.';
-        errEl.style.display = 'block';
-        return;
-    }
-
     // Write password hash if provided
     if (pw) {
         const hash = await sha256(pw);
