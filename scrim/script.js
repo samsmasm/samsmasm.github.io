@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, onValue, update, remove, get, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
@@ -36,13 +36,12 @@ svgLayer.innerHTML = `
     </defs>
 `;
 
-// --- 1. SETUP & ROOMS ---
-let room = window.location.hash.substring(1);
-while (!room) {
-    room = prompt("Room Name:")?.replace(/[^a-zA-Z0-9-_]/g, '');
-    if(room) window.location.hash = room;
-}
-document.getElementById('room-display').innerText = "#" + room;
+// --- 1. STATE ---
+let room = null;
+let memNotes = {};
+let memArrows = {};
+let tempIdCounter = 0;
+let storedPwHash = null;
 
 const canvas = document.getElementById('canvas');
 
@@ -55,7 +54,95 @@ canvas.parentElement.addEventListener('wheel', pz.zoomWithWheel);
 document.getElementById('zoom-slider').addEventListener('input', (e) => pz.zoom(parseFloat(e.target.value)));
 canvas.addEventListener('panzoomzoom', (e) => document.getElementById('zoom-slider').value = e.detail.scale);
 
-// --- 2. MATH HELPERS ---
+// --- 2. LOCAL/FIREBASE HELPERS ---
+
+function dbUpdate(type, id, data) {
+    if (room) {
+        update(ref(db, `scrims/${room}/${type}/${id}`), data);
+    } else {
+        const store = type === 'notes' ? memNotes : memArrows;
+        if (store[id]) Object.assign(store[id], data);
+    }
+}
+
+function dbRemove(type, id) {
+    if (room) {
+        remove(ref(db, `scrims/${room}/${type}/${id}`));
+    } else {
+        const store = type === 'notes' ? memNotes : memArrows;
+        delete store[id];
+        document.getElementById(id)?.remove();
+    }
+}
+
+async function sha256(msg) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function attachListeners() {
+    document.getElementById('btn-save').style.display = 'none';
+    document.getElementById('room-display').innerText = '#' + room;
+
+    onValue(ref(db, `scrims/${room}/notes`), snap => {
+        const container = document.getElementById('notes-container');
+        const data = snap.val() || {};
+
+        Array.from(container.children).forEach(n => { if (!data[n.id]) n.remove(); });
+
+        for (let id in data) {
+            let el = document.getElementById(id);
+            if (!el) { el = createNote(id, data[id]); container.appendChild(el); }
+
+            if (!el.dataset.dragging) {
+                el.style.left = data[id].x + 'px';
+                el.style.top = data[id].y + 'px';
+                el.style.backgroundColor = data[id].color;
+                if (document.activeElement !== el.querySelector('.note-text'))
+                    el.querySelector('.note-text').innerText = data[id].text;
+            }
+        }
+    });
+
+    onValue(ref(db, `scrims/${room}/arrows`), snap => {
+        const container = document.getElementById('svg-layer');
+        const data = snap.val() || {};
+
+        Array.from(container.children).forEach(el => {
+            if (el.tagName === 'defs') return;
+            if (!data[el.id]) el.remove();
+        });
+
+        for (let id in data) {
+            let el = document.getElementById(id);
+            if (!el) {
+                el = createArrow(id, data[id]);
+                container.appendChild(el);
+            } else if (!el.dataset.dragging) {
+                updateArrowVisuals(el, data[id]);
+            }
+        }
+    });
+}
+
+// --- 3. ON LOAD: check for room in URL hash ---
+(async () => {
+    const hashRoom = window.location.hash.substring(1);
+    if (!hashRoom) return; // No hash — stay in temporary mode
+
+    room = hashRoom;
+    const pwSnap = await get(ref(db, `scrims/${room}/password`));
+    if (pwSnap.exists()) {
+        storedPwHash = pwSnap.val();
+        document.getElementById('pw-room-name').innerText = room;
+        document.getElementById('pw-modal').classList.add('active');
+        document.getElementById('pw-input').focus();
+    } else {
+        attachListeners();
+    }
+})();
+
+// --- 4. MATH HELPERS ---
 function getCanvasMatrix() {
     const style = window.getComputedStyle(canvas).transform;
     return (style === 'none') ? new DOMMatrix() : new DOMMatrix(style);
@@ -69,26 +156,26 @@ function getViewCenter() {
     };
 }
 
-// Calculate the 4 anchor points of a note (Top, Right, Bottom, Left)
 function getNoteAnchors(x, y, w, h) {
     return [
-        { x: x + w / 2, y: y },             // Top
-        { x: x + w,     y: y + h / 2 },     // Right
-        { x: x + w / 2, y: y + h },         // Bottom
-        { x: x,         y: y + h / 2 }      // Left
+        { x: x + w / 2, y: y },
+        { x: x + w,     y: y + h / 2 },
+        { x: x + w / 2, y: y + h },
+        { x: x,         y: y + h / 2 }
     ];
 }
 
-// --- 3. EXPORT FUNCTIONS ---
+// --- 5. EXPORT FUNCTIONS ---
 window.exportTXT = () => {
-    let content = "SCRIM NOTES - Room: #" + room + "\n---------------------------\n\n";
+    const label = room || 'temp';
+    let content = "SCRIM NOTES - Room: #" + label + "\n---------------------------\n\n";
     document.querySelectorAll('.note-text').forEach(n => {
-        if(n.innerText.trim()) content += "• " + n.innerText.trim() + "\n\n";
+        if (n.innerText.trim()) content += "• " + n.innerText.trim() + "\n\n";
     });
     const blob = new Blob([content], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `scrim-${room}.txt`;
+    a.download = `scrim-${label}.txt`;
     a.click();
 };
 
@@ -99,7 +186,7 @@ window.exportJPG = async () => {
 
         const originalTransform = canvas.style.transform;
         canvas.style.transition = 'none';
-        pz.reset(); 
+        pz.reset();
         await new Promise(r => setTimeout(r, 100));
 
         const c = await html2canvas(document.getElementById('canvas'), {
@@ -112,47 +199,33 @@ window.exportJPG = async () => {
         canvas.style.transform = originalTransform;
         canvas.style.transition = '';
 
+        const label = room || 'temp';
         const a = document.createElement('a');
         a.href = c.toDataURL("image/jpeg", 0.9);
-        a.download = `scrim-${room}.jpg`;
+        a.download = `scrim-${label}.jpg`;
         a.click();
     } catch (e) { alert("Snapshot failed: " + e.message); }
 };
 
-// --- 4. NOTES LOGIC (Updated with Arrow Dragging) ---
+// --- 6. NOTES LOGIC ---
 window.addNote = () => {
     const c = getViewCenter();
-    push(ref(db, `scrims/${room}/notes`), {
-        text: "", x: c.x - 100, y: c.y - 70, color: '#ffffff'
-    });
-};
-
-onValue(ref(db, `scrims/${room}/notes`), snap => {
-    const container = document.getElementById('notes-container');
-    const data = snap.val() || {};
-    
-    Array.from(container.children).forEach(n => { if(!data[n.id]) n.remove(); });
-
-    for (let id in data) {
-        let el = document.getElementById(id);
-        if (!el) { el = createNote(id, data[id]); container.appendChild(el); }
-        
-        if (!el.dataset.dragging) {
-            el.style.left = data[id].x + 'px';
-            el.style.top = data[id].y + 'px';
-            el.style.backgroundColor = data[id].color;
-            if(document.activeElement !== el.querySelector('.note-text')) 
-                el.querySelector('.note-text').innerText = data[id].text;
-        }
+    const data = { text: "", x: c.x - 100, y: c.y - 70, color: '#ffffff' };
+    if (room) {
+        push(ref(db, `scrims/${room}/notes`), data);
+    } else {
+        const id = 'tmp-' + (++tempIdCounter);
+        memNotes[id] = data;
+        document.getElementById('notes-container').appendChild(createNote(id, data));
     }
-});
+};
 
 function createNote(id, data) {
     const div = document.createElement('div');
     div.id = id;
     div.className = 'note interactive';
     const colors = ['#ffffff', '#ffd1dc', '#d1e9ff', '#d1ffda', '#fef3c7', '#e9d5ff', '#ffedd5'];
-    
+
     div.innerHTML = `
         <div class="del-btn interactive">×</div>
         <div class="note-text interactive" contenteditable="true"></div>
@@ -161,34 +234,31 @@ function createNote(id, data) {
         </div>
     `;
     div.querySelector('.note-text').innerText = data.text;
-    
-    // Delete Note
+
     div.querySelector('.del-btn').addEventListener('click', (e) => {
         e.stopPropagation();
-        if(confirm("Delete note?")) remove(ref(db, `scrims/${room}/notes/${id}`));
+        if (confirm("Delete note?")) dbRemove('notes', id);
     });
 
-    // Color Change
     div.querySelectorAll('.color-dot').forEach(d => {
         d.addEventListener('mousedown', (e) => {
             e.stopPropagation();
-            update(ref(db, `scrims/${room}/notes/${id}`), { color: d.dataset.c });
+            dbUpdate('notes', id, { color: d.dataset.c });
+            div.style.backgroundColor = d.dataset.c;
         });
     });
-    
-    // Text Update
-    const textEl = div.querySelector('.note-text');
-    textEl.addEventListener('blur', () => update(ref(db, `scrims/${room}/notes/${id}`), { text: textEl.innerText }));
 
-    // --- DRAG NOTE + ATTACHED ARROWS ---
+    const textEl = div.querySelector('.note-text');
+    textEl.addEventListener('blur', () => dbUpdate('notes', id, { text: textEl.innerText }));
+
     div.addEventListener('mousedown', (e) => {
         if (e.target === textEl || e.target.classList.contains('del-btn') || e.target.classList.contains('color-dot')) return;
         e.stopPropagation();
-        
+
         div.dataset.dragging = "true";
         div.classList.add('selected');
-        
-        const startX = e.clientX; 
+
+        const startX = e.clientX;
         const startY = e.clientY;
         const startLeft = parseFloat(div.style.left);
         const startTop = parseFloat(div.style.top);
@@ -196,10 +266,9 @@ function createNote(id, data) {
         const h = div.offsetHeight;
         const scale = pz.getScale();
 
-        // 1. Identify Attached Arrows
         const attachedArrows = [];
         const anchors = getNoteAnchors(startLeft, startTop, w, h);
-        
+
         document.querySelectorAll('.arrow-group').forEach(arrowGroup => {
             const line = arrowGroup.querySelector('line');
             const ax1 = parseFloat(line.getAttribute('x1'));
@@ -207,25 +276,19 @@ function createNote(id, data) {
             const ax2 = parseFloat(line.getAttribute('x2'));
             const ay2 = parseFloat(line.getAttribute('y2'));
 
-            // Check if Start Point is snapped to this note
             anchors.forEach(anchor => {
                 if (Math.abs(ax1 - anchor.x) < 5 && Math.abs(ay1 - anchor.y) < 5) {
-                    attachedArrows.push({ 
-                        id: arrowGroup.id, 
-                        type: 'start', 
-                        offsetX: ax1 - startLeft, // Distance from Note Left
-                        offsetY: ay1 - startTop,  // Distance from Note Top
-                        fixedX: ax2, fixedY: ay2 // The other end stays still
+                    attachedArrows.push({
+                        id: arrowGroup.id, type: 'start',
+                        offsetX: ax1 - startLeft, offsetY: ay1 - startTop,
+                        fixedX: ax2, fixedY: ay2
                     });
                 }
-                // Check if End Point is snapped to this note
                 if (Math.abs(ax2 - anchor.x) < 5 && Math.abs(ay2 - anchor.y) < 5) {
-                    attachedArrows.push({ 
-                        id: arrowGroup.id, 
-                        type: 'end', 
-                        offsetX: ax2 - startLeft, 
-                        offsetY: ay2 - startTop,
-                        fixedX: ax1, fixedY: ay1 
+                    attachedArrows.push({
+                        id: arrowGroup.id, type: 'end',
+                        offsetX: ax2 - startLeft, offsetY: ay2 - startTop,
+                        fixedX: ax1, fixedY: ay1
                     });
                 }
             });
@@ -239,34 +302,29 @@ function createNote(id, data) {
             const dy = (ev.clientY - startY) / scale;
             finalX = startLeft + dx;
             finalY = startTop + dy;
-            
-            // Move Note
+
             div.style.left = finalX + 'px';
             div.style.top = finalY + 'px';
 
-            // Move Attached Arrows
             attachedArrows.forEach(att => {
                 const arrowEl = document.getElementById(att.id);
                 if (arrowEl) {
                     const line = arrowEl.querySelector('.arrow-line');
                     const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
                     const currentHead = line.getAttribute("marker-end") ? true : false;
-                    
+
                     const newX = finalX + att.offsetX;
                     const newY = finalY + att.offsetY;
-                    
+
                     const newData = {
                         x1: att.type === 'start' ? newX : att.fixedX,
                         y1: att.type === 'start' ? newY : att.fixedY,
                         x2: att.type === 'end' ? newX : att.fixedX,
                         y2: att.type === 'end' ? newY : att.fixedY,
-                        style: currentStyle,
-                        head: currentHead
+                        style: currentStyle, head: currentHead
                     };
                     updateArrowVisuals(arrowEl, newData);
-                    
-                    // Update temp data for drag end
-                    att.finalData = newData; 
+                    att.finalData = newData;
                 }
             });
         };
@@ -276,15 +334,10 @@ function createNote(id, data) {
             window.removeEventListener('mouseup', onUp);
             delete div.dataset.dragging;
             div.classList.remove('selected');
-            
-            // Save Note Position
-            update(ref(db, `scrims/${room}/notes/${id}`), { x: finalX, y: finalY });
 
-            // Save Arrow Positions
+            dbUpdate('notes', id, { x: finalX, y: finalY });
             attachedArrows.forEach(att => {
-                if (att.finalData) {
-                    update(ref(db, `scrims/${room}/arrows/${att.id}`), att.finalData);
-                }
+                if (att.finalData) dbUpdate('arrows', att.id, att.finalData);
             });
         };
 
@@ -295,8 +348,7 @@ function createNote(id, data) {
     return div;
 }
 
-// --- 5. ARROWS LOGIC (With Snapping & Updating) ---
-
+// --- 7. ARROWS LOGIC ---
 function getNearestSnapPoint(x, y) {
     const SNAP_DIST = 30;
     let bestPoint = { x, y, dist: Infinity };
@@ -309,7 +361,7 @@ function getNearestSnapPoint(x, y) {
             h: note.offsetHeight
         };
         const anchors = getNoteAnchors(rect.x, rect.y, rect.w, rect.h);
-        
+
         anchors.forEach(p => {
             const d = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
             if (d < SNAP_DIST && d < bestPoint.dist) {
@@ -323,31 +375,15 @@ function getNearestSnapPoint(x, y) {
 
 window.addArrow = (style, hasHead) => {
     const c = getViewCenter();
-    push(ref(db, `scrims/${room}/arrows`), {
-        x1: c.x - 50, y1: c.y, x2: c.x + 50, y2: c.y,
-        style: style, head: hasHead
-    });
-};
-
-onValue(ref(db, `scrims/${room}/arrows`), snap => {
-    const container = document.getElementById('svg-layer');
-    const data = snap.val() || {};
-    
-    Array.from(container.children).forEach(el => {
-        if (el.tagName === 'defs') return; 
-        if (!data[el.id]) el.remove();
-    });
-
-    for (let id in data) {
-        let el = document.getElementById(id);
-        if (!el) {
-            el = createArrow(id, data[id]); 
-            container.appendChild(el); 
-        } else if (!el.dataset.dragging) {
-            updateArrowVisuals(el, data[id]);
-        }
+    const data = { x1: c.x - 50, y1: c.y, x2: c.x + 50, y2: c.y, style, head: hasHead };
+    if (room) {
+        push(ref(db, `scrims/${room}/arrows`), data);
+    } else {
+        const id = 'tmp-arr-' + (++tempIdCounter);
+        memArrows[id] = data;
+        document.getElementById('svg-layer').appendChild(createArrow(id, data));
     }
-});
+};
 
 function createArrow(id, data) {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -356,18 +392,18 @@ function createArrow(id, data) {
 
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
     line.classList.add('arrow-line', 'interactive');
-    
+
     const h1 = createHandle(id, 'start');
     const h2 = createHandle(id, 'end');
 
     const delG = document.createElementNS("http://www.w3.org/2000/svg", "g");
     delG.classList.add('arrow-del-group', 'interactive');
-    
+
     const delCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     delCircle.setAttribute("r", "10");
     delCircle.setAttribute("fill", "#ef4444");
     delCircle.classList.add('interactive');
-    
+
     const delText = document.createElementNS("http://www.w3.org/2000/svg", "text");
     delText.textContent = "×";
     delText.setAttribute("text-anchor", "middle");
@@ -378,27 +414,26 @@ function createArrow(id, data) {
     delText.classList.add('interactive');
 
     delG.append(delCircle, delText);
-    
+
     delG.addEventListener('mousedown', (e) => {
-        e.stopPropagation(); 
-        if(confirm("Delete this arrow?")) remove(ref(db, `scrims/${room}/arrows/${id}`));
+        e.stopPropagation();
+        if (confirm("Delete this arrow?")) dbRemove('arrows', id);
     });
 
     g.append(line, h1, h2, delG);
     updateArrowVisuals(g, data);
 
-    // Drag Whole Arrow
     line.addEventListener('mousedown', (e) => {
         e.stopPropagation();
-        g.dataset.dragging = "true"; 
-        
-        const startX = e.clientX; 
+        g.dataset.dragging = "true";
+
+        const startX = e.clientX;
         const startY = e.clientY;
         const scale = pz.getScale();
-        
+
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
-        
+
         const init = {
             x1: parseFloat(line.getAttribute("x1")),
             y1: parseFloat(line.getAttribute("y1")),
@@ -410,18 +445,18 @@ function createArrow(id, data) {
         const onMove = (ev) => {
             const dx = (ev.clientX - startX) / scale;
             const dy = (ev.clientY - startY) / scale;
-            finalData = { 
-                x1: init.x1 + dx, y1: init.y1 + dy, 
-                x2: init.x2 + dx, y2: init.y2 + dy 
+            finalData = {
+                x1: init.x1 + dx, y1: init.y1 + dy,
+                x2: init.x2 + dx, y2: init.y2 + dy
             };
             updateArrowVisuals(g, { ...finalData, style: currentStyle, head: currentHead });
         };
-        
+
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
             delete g.dataset.dragging;
-            update(ref(db, `scrims/${room}/arrows/${id}`), finalData);
+            dbUpdate('arrows', id, finalData);
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
@@ -433,22 +468,22 @@ function createArrow(id, data) {
 function createHandle(id, type) {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     c.classList.add('arrow-handle', 'interactive');
-    c.setAttribute("r", "6"); 
-    
+    c.setAttribute("r", "6");
+
     c.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         const g = document.getElementById(id);
         g.dataset.dragging = "true";
-        
+
         const line = g.querySelector('.arrow-line');
         const currentStyle = line.getAttribute("stroke-dasharray") ? 'dotted' : 'solid';
         const currentHead = line.getAttribute("marker-end") ? true : false;
 
         const matrix = getCanvasMatrix();
-        
+
         const anchorX = parseFloat(line.getAttribute(type === 'start' ? "x2" : "x1"));
         const anchorY = parseFloat(line.getAttribute(type === 'start' ? "y2" : "y1"));
-        
+
         let finalX = 0; let finalY = 0;
 
         const onMove = (ev) => {
@@ -464,8 +499,7 @@ function createHandle(id, type) {
                 y1: type === 'start' ? finalY : anchorY,
                 x2: type === 'end' ? finalX : anchorX,
                 y2: type === 'end' ? finalY : anchorY,
-                style: currentStyle,
-                head: currentHead
+                style: currentStyle, head: currentHead
             };
             updateArrowVisuals(g, newData);
         };
@@ -474,11 +508,11 @@ function createHandle(id, type) {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
             delete g.dataset.dragging;
-            
+
             const payload = (type === 'start') ? { x1: finalX, y1: finalY } : { x2: finalX, y2: finalY };
-            update(ref(db, `scrims/${room}/arrows/${id}`), payload);
+            dbUpdate('arrows', id, payload);
         };
-        
+
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     });
@@ -494,10 +528,10 @@ function updateArrowVisuals(g, data) {
 
     line.setAttribute("x1", data.x1); line.setAttribute("y1", data.y1);
     line.setAttribute("x2", data.x2); line.setAttribute("y2", data.y2);
-    
+
     if (data.style === 'dotted') line.setAttribute("stroke-dasharray", "5,5");
     else line.removeAttribute("stroke-dasharray");
-    
+
     if (data.head) line.setAttribute("marker-end", "url(#arrowhead)");
     else line.removeAttribute("marker-end");
 
@@ -509,3 +543,95 @@ function updateArrowVisuals(g, data) {
     delCircle.setAttribute("cx", midX); delCircle.setAttribute("cy", midY - 15);
     delText.setAttribute("x", midX); delText.setAttribute("y", midY - 15);
 }
+
+// --- 8. SAVE MODAL ---
+window.openSaveModal = () => {
+    document.getElementById('save-room-input').value = '';
+    document.getElementById('save-pw-input').value = '';
+    document.getElementById('save-pw-confirm').value = '';
+    document.getElementById('save-error').style.display = 'none';
+    document.getElementById('save-modal').classList.add('active');
+    document.getElementById('save-room-input').focus();
+};
+
+window.closeSaveModal = () => {
+    document.getElementById('save-modal').classList.remove('active');
+};
+
+window.doSave = async () => {
+    const nameRaw = document.getElementById('save-room-input').value.trim();
+    const roomName = nameRaw.replace(/[^a-zA-Z0-9-_]/g, '');
+    const pw = document.getElementById('save-pw-input').value;
+    const pwConfirm = document.getElementById('save-pw-confirm').value;
+    const errEl = document.getElementById('save-error');
+
+    if (!roomName) {
+        errEl.innerText = 'Please enter a room name.';
+        errEl.style.display = 'block';
+        return;
+    }
+    if (pw !== pwConfirm) {
+        errEl.innerText = 'Passwords do not match.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // Check if room already exists
+    const existing = await get(ref(db, `scrims/${roomName}`));
+    if (existing.exists()) {
+        errEl.innerText = 'Room name already taken. Choose another.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // Write password hash if provided
+    if (pw) {
+        const hash = await sha256(pw);
+        await set(ref(db, `scrims/${roomName}/password`), hash);
+    }
+
+    // Flush in-memory notes and arrows to Firebase
+    const notePromises = Object.values(memNotes).map(n => push(ref(db, `scrims/${roomName}/notes`), n));
+    const arrowPromises = Object.values(memArrows).map(a => push(ref(db, `scrims/${roomName}/arrows`), a));
+    await Promise.all([...notePromises, ...arrowPromises]);
+
+    // Clear temp DOM — the onValue listeners will re-render from Firebase
+    document.getElementById('notes-container').innerHTML = '';
+    document.querySelectorAll('.arrow-group').forEach(el => el.remove());
+    memNotes = {};
+    memArrows = {};
+
+    room = roomName;
+    window.location.hash = room;
+    document.getElementById('save-modal').classList.remove('active');
+    attachListeners();
+};
+
+// --- 9. PASSWORD JOIN ---
+window.doJoin = async () => {
+    const entered = document.getElementById('pw-input').value;
+    const hash = await sha256(entered);
+    const errEl = document.getElementById('pw-error');
+
+    if (hash === storedPwHash) {
+        document.getElementById('pw-modal').classList.remove('active');
+        attachListeners();
+    } else {
+        errEl.style.display = 'block';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+    }
+};
+
+window.cancelJoin = () => {
+    // Drop back to temp mode with no room
+    room = null;
+    storedPwHash = null;
+    window.location.hash = '';
+    document.getElementById('pw-modal').classList.remove('active');
+};
+
+// Allow Enter key in modals
+document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') window.doJoin(); });
+document.getElementById('save-room-input').addEventListener('keydown', e => { if (e.key === 'Enter') window.doSave(); });
+document.getElementById('save-pw-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') window.doSave(); });
