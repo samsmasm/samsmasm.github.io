@@ -159,10 +159,14 @@ function getViewCenter() {
 
 function getNoteAnchors(x, y, w, h) {
     return [
-        { x: x + w / 2, y: y },
-        { x: x + w,     y: y + h / 2 },
-        { x: x + w / 2, y: y + h },
-        { x: x,         y: y + h / 2 }
+        { x: x + w / 2, y: y },          // top mid
+        { x: x + w,     y: y + h / 2 },  // right mid
+        { x: x + w / 2, y: y + h },      // bottom mid
+        { x: x,         y: y + h / 2 },  // left mid
+        { x: x,         y: y },          // top-left
+        { x: x + w,     y: y },          // top-right
+        { x: x + w,     y: y + h },      // bottom-right
+        { x: x,         y: y + h },      // bottom-left
     ];
 }
 
@@ -217,7 +221,11 @@ window.addNote = () => {
     } else {
         const id = 'tmp-' + (++tempIdCounter);
         memNotes[id] = data;
-        document.getElementById('notes-container').appendChild(createNote(id, data));
+        const el = createNote(id, data);
+        el.style.left = data.x + 'px';
+        el.style.top = data.y + 'px';
+        el.style.backgroundColor = data.color;
+        document.getElementById('notes-container').appendChild(el);
     }
 };
 
@@ -253,7 +261,8 @@ function createNote(id, data) {
     textEl.addEventListener('blur', () => dbUpdate('notes', id, { text: textEl.innerText }));
 
     div.addEventListener('mousedown', (e) => {
-        if (e.target === textEl || e.target.classList.contains('del-btn') || e.target.classList.contains('color-dot')) return;
+        if (e.target.classList.contains('del-btn') || e.target.classList.contains('color-dot')) return;
+        if (e.target === textEl && document.activeElement === textEl) return;
         e.stopPropagation();
 
         div.dataset.dragging = "true";
