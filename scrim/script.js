@@ -83,6 +83,7 @@ async function sha256(msg) {
 function attachListeners() {
     document.getElementById('btn-save').style.display = 'none';
     document.getElementById('btn-load').style.display = 'none';
+    document.getElementById('btn-delete').style.display = '';
     document.getElementById('room-display').innerText = '#' + room;
 
     onValue(ref(db, `scrims/${room}/notes`), snap => {
@@ -662,6 +663,19 @@ function cancelJoin() {
 // --- 11. WIRE UP BUTTONS & ENTER KEYS ---
 document.getElementById('btn-save').addEventListener('click', openSaveModal);
 document.getElementById('btn-load').addEventListener('click', openLoadModal);
+document.getElementById('btn-delete').addEventListener('click', async () => {
+    if (!room) return;
+    if (!confirm(`Delete room #${room} and all its contents? This cannot be undone.`)) return;
+    await remove(ref(db, `scrims/${room}`));
+    room = null;
+    window.location.hash = '';
+    document.getElementById('room-display').innerText = '#...';
+    document.getElementById('notes-container').innerHTML = '';
+    document.querySelectorAll('.arrow-group').forEach(el => el.remove());
+    document.getElementById('btn-save').style.display = '';
+    document.getElementById('btn-load').style.display = '';
+    document.getElementById('btn-delete').style.display = 'none';
+});
 document.getElementById('room-display').addEventListener('click', () => { if (!room) openLoadModal(); });
 
 document.getElementById('btn-do-save').addEventListener('click', doSave);
