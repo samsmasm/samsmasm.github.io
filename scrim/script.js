@@ -82,6 +82,7 @@ async function sha256(msg) {
 
 function attachListeners() {
     document.getElementById('btn-save').style.display = 'none';
+    document.getElementById('btn-load').style.display = 'none';
     document.getElementById('room-display').innerText = '#' + room;
 
     onValue(ref(db, `scrims/${room}/notes`), snap => {
@@ -623,7 +624,53 @@ window.cancelJoin = () => {
     document.getElementById('pw-modal').classList.remove('active');
 };
 
+// --- 10. LOAD MODAL ---
+window.openLoadModal = () => {
+    document.getElementById('load-room-input').value = '';
+    document.getElementById('load-error').style.display = 'none';
+    document.getElementById('load-modal').classList.add('active');
+    document.getElementById('load-room-input').focus();
+};
+
+window.closeLoadModal = () => {
+    document.getElementById('load-modal').classList.remove('active');
+};
+
+window.doLoad = async () => {
+    const nameRaw = document.getElementById('load-room-input').value.trim();
+    const roomName = nameRaw.replace(/[^a-zA-Z0-9-_]/g, '');
+    const errEl = document.getElementById('load-error');
+
+    if (!roomName) {
+        errEl.innerText = 'Please enter a room name.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    const snap = await get(ref(db, `scrims/${roomName}`));
+    if (!snap.exists()) {
+        errEl.innerText = 'Room not found.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    document.getElementById('load-modal').classList.remove('active');
+    room = roomName;
+    window.location.hash = room;
+
+    const pwHash = snap.child('password').val();
+    if (pwHash) {
+        storedPwHash = pwHash;
+        document.getElementById('pw-room-name').innerText = room;
+        document.getElementById('pw-modal').classList.add('active');
+        document.getElementById('pw-input').focus();
+    } else {
+        attachListeners();
+    }
+};
+
 // Allow Enter key in modals
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') window.doJoin(); });
 document.getElementById('save-room-input').addEventListener('keydown', e => { if (e.key === 'Enter') window.doSave(); });
 document.getElementById('save-pw-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') window.doSave(); });
+document.getElementById('load-room-input').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLoad(); });
