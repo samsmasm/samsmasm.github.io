@@ -535,13 +535,8 @@ function buildStatementCard(statement, scaleMin, scaleMax) {
     const color = getCategoryColor(cats[0]);
     const { minLabel = '', maxLabel = '' } = currentConfig;
 
-    const catBadges = cats.map(c =>
-        `<span class="cat-pill" style="background:${getCategoryColor(c)}">${escapeHtml(c)}</span>`
-    ).join('');
-
     card.innerHTML = `
         <div class="statement-text">${escapeHtml(statement.text)}</div>
-        <div class="cat-pills">${catBadges}</div>
         <div class="spectrum-container">
             <div class="spectrum-bar-inner">
                 <div class="spectrum-track"></div>
@@ -863,6 +858,17 @@ window.addEventListener('DOMContentLoaded', () => {
         window.location.href = '?role=teacher';
     });
 
+    // Help modal
+    document.getElementById('btn-show-help').addEventListener('click', () => {
+        document.getElementById('help-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-help').addEventListener('click', () => {
+        document.getElementById('help-modal').classList.add('hidden');
+    });
+    document.getElementById('help-modal-backdrop').addEventListener('click', () => {
+        document.getElementById('help-modal').classList.add('hidden');
+    });
+
     // QR modal toggle
     document.getElementById('btn-toggle-qr').addEventListener('click', () => {
         document.getElementById('qr-modal').classList.remove('hidden');
@@ -874,7 +880,10 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('qr-modal').classList.add('hidden');
     });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') document.getElementById('qr-modal').classList.add('hidden');
+        if (e.key === 'Escape') {
+            document.getElementById('qr-modal').classList.add('hidden');
+            document.getElementById('help-modal').classList.add('hidden');
+        }
     });
 
     // Context box toggle
