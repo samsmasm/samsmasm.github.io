@@ -216,7 +216,8 @@ async function createSession() {
     const statementOrder = shuffle ? shuffleArray(indices) : indices;
     const pinHash = await hashPin(pin);
 
-    const config = { pin: pinHash, scaleMin, scaleMax, shuffle, statementOrder, statements, requireName };
+    const context = document.getElementById('context-input').value.trim();
+    const config = { pin: pinHash, scaleMin, scaleMax, shuffle, statementOrder, statements, requireName, context };
 
     const btn = document.getElementById('btn-start-session');
     btn.textContent = 'Creating…';
@@ -290,22 +291,29 @@ function initTeacherDashboard(roomName) {
     document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
     document.querySelector('.btn-mode[data-mode="random"]').classList.add('active');
 
-    // QR code — clear container first to avoid doubling
+    // QR code modal — clear and regenerate
+    const joinUrl = `https://samsmasm.github.io/spectra/#${roomName.toLowerCase()}`;
     const qrContainer = document.getElementById('qrcode');
     qrContainer.innerHTML = '';
-    const joinUrl = `https://samsmasm.github.io/spectra/#${roomName.toLowerCase()}`;
-    new QRCode(qrContainer, { text: joinUrl, width: 280, height: 280 });
-
+    new QRCode(qrContainer, { text: joinUrl, width: 400, height: 400 });
     document.getElementById('join-link-text').textContent =
         `samsmasm.github.io/spectra/#${roomName.toLowerCase()}`;
 
-    const storedPin = sessionStorage.getItem(`spectra_pin_${roomName}`);
-    document.getElementById('pin-display-val').textContent = storedPin || '(set during creation)';
+    // Context box
+    document.getElementById('context-box').classList.add('hidden');
 
-    // Load config
+    // Load config (also populates context box text)
     get(ref(db, `spectra/${roomName}/config`)).then(snap => {
         if (snap.exists()) {
             currentConfig = snap.val();
+            const ctx = currentConfig.context || '';
+            const ctxEl = document.getElementById('context-text');
+            if (ctx) {
+                ctxEl.textContent = ctx;
+                document.getElementById('btn-toggle-context').classList.add('has-context');
+            } else {
+                document.getElementById('btn-toggle-context').disabled = true;
+            }
             renderResults();
         } else {
             document.getElementById('results-panel').innerHTML =
@@ -323,9 +331,7 @@ function initTeacherDashboard(roomName) {
 
 function updateResponseCount() {
     const count = Object.keys(responses).length;
-    const label = `${count} response${count !== 1 ? 's' : ''}`;
-    document.getElementById('t-count').textContent = label;
-    document.getElementById('access-count').textContent = label;
+    document.getElementById('t-count').textContent = `${count} response${count !== 1 ? 's' : ''}`;
 }
 
 // ==========================================
@@ -736,6 +742,30 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-t-leave').addEventListener('click', () => {
         if (responsesUnsubscribe) responsesUnsubscribe();
         window.location.href = '?role=teacher';
+    });
+
+    // QR modal toggle
+    document.getElementById('btn-toggle-qr').addEventListener('click', () => {
+        document.getElementById('qr-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-qr').addEventListener('click', () => {
+        document.getElementById('qr-modal').classList.add('hidden');
+    });
+    document.getElementById('qr-modal-backdrop').addEventListener('click', () => {
+        document.getElementById('qr-modal').classList.add('hidden');
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') document.getElementById('qr-modal').classList.add('hidden');
+    });
+
+    // Context box toggle
+    document.getElementById('btn-toggle-context').addEventListener('click', () => {
+        document.getElementById('context-box').classList.toggle('hidden');
+    });
+
+    // Font size slider
+    document.getElementById('font-size-slider').addEventListener('input', e => {
+        document.getElementById('results-panel').style.setProperty('--q-font-size', e.target.value + 'px');
     });
 
     // Event delegation for dot interactions on results panel
