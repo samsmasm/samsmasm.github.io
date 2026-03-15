@@ -72,9 +72,22 @@ function parseStatements(raw) {
         .map((block, i) => {
             const match = block.match(/^([\s\S]+?)\s*\[([^\]]+)\]\s*$/);
             if (!match) return null;
-            return { id: i, text: match[1].trim(), category: match[2].trim() };
+            const categories = match[2].split(',').map(c => c.trim()).filter(Boolean);
+            return { id: i, text: match[1].trim(), categories };
         })
         .filter(Boolean);
+}
+
+// Backward-compat: old rooms stored category (string), new ones store categories (array)
+function getCategories(statement) {
+    if (Array.isArray(statement.categories) && statement.categories.length) return statement.categories;
+    if (statement.category) return [statement.category];
+    return ['Uncategorised'];
+}
+
+// Format a scale-end label: "Never (0)" or just "0"
+function scaleLabelHtml(val, label) {
+    return label ? `${escapeHtml(label)} <small>(${val})</small>` : String(val);
 }
 
 function shuffleArray(arr) {
@@ -217,7 +230,9 @@ async function createSession() {
     const pinHash = await hashPin(pin);
 
     const context = document.getElementById('context-input').value.trim();
-    const config = { pin: pinHash, scaleMin, scaleMax, shuffle, statementOrder, statements, requireName, context };
+    const minLabel = document.getElementById('scale-min-label-input').value.trim();
+    const maxLabel = document.getElementById('scale-max-label-input').value.trim();
+    const config = { pin: pinHash, scaleMin, scaleMax, minLabel, maxLabel, shuffle, statementOrder, statements, requireName, context };
 
     const btn = document.getElementById('btn-start-session');
     btn.textContent = 'Creating…';
@@ -360,11 +375,13 @@ function renderResults() {
 }
 
 function renderGrouped(container, statements, scaleMin, scaleMax, mode) {
-    // Group by category
+    // Group by each category (a statement with [A, B] appears under both A and B)
     const groups = {};
     statements.forEach(s => {
-        if (!groups[s.category]) groups[s.category] = [];
-        groups[s.category].push(s);
+        getCategories(s).forEach(cat => {
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(s);
+        });
     });
 
     const sortedCats = Object.keys(groups).sort();
@@ -372,6 +389,11 @@ function renderGrouped(container, statements, scaleMin, scaleMax, mode) {
     sortedCats.forEach(cat => {
         const color = getCategoryColor(cat);
         const isExpanded = expandedCategories.has(cat);
+        const catStatements = groups[cat];
+
+        // Compute category average for title display
+        const catAvg = computeCategoryAverage(catStatements);
+        const avgSuffix = catAvg !== null ? ` — avg ${catAvg.toFixed(1)}` : '';
 
         // Category title
         const titleEl = document.createElement('div');
@@ -381,7 +403,8 @@ function renderGrouped(container, statements, scaleMin, scaleMax, mode) {
             titleEl.classList.add('reveal-title');
             titleEl.innerHTML = `
                 <span class="cat-dot" style="background:${color}"></span>
-                <span>${escapeHtml(cat)}</span>
+                <span class="cat-title-name">${escapeHtml(cat)}</span>
+                <span class="cat-title-avg">${avgSuffix}</span>
                 <span class="expand-icon">${isExpanded ? '▾' : '▸'}</span>
             `;
             titleEl.addEventListener('click', () => {
@@ -390,20 +413,100 @@ function renderGrouped(container, statements, scaleMin, scaleMax, mode) {
                 renderResults();
             });
         } else {
-            // organise: title shown, all spectra visible, no click needed
             titleEl.innerHTML = `
                 <span class="cat-dot" style="background:${color}"></span>
-                <span>${escapeHtml(cat)}</span>
+                <span class="cat-title-name">${escapeHtml(cat)}</span>
+                <span class="cat-title-avg">${avgSuffix}</span>
             `;
         }
 
         container.appendChild(titleEl);
 
-        // Show statements: always in organise, only if expanded in reveal
+        // Show statements + category average bar: always in organise, only if expanded in reveal
         if (mode === 'organise' || isExpanded) {
-            groups[cat].forEach(s => container.appendChild(buildStatementCard(s, scaleMin, scaleMax)));
+            catStatements.forEach(s => container.appendChild(buildStatementCard(s, scaleMin, scaleMax)));
+            container.appendChild(buildCategoryAverageCard(catStatements, cat, color, scaleMin, scaleMax));
         }
     });
+}
+
+function computeCategoryAverage(catStatements) {
+    let sum = 0, count = 0;
+    catStatements.forEach(s => {
+        Object.values(responses).forEach(sr => {
+            const v = sr[String(s.id)];
+            if (v !== undefined && v !== null) { sum += Number(v); count++; }
+        });
+    });
+    return count > 0 ? sum / count : null;
+}
+
+function buildCategoryAverageCard(catStatements, catName, color, scaleMin, scaleMax) {
+    const card = document.createElement('div');
+    card.className = 'cat-avg-card';
+
+    // Collect all dot data across all statements in this category
+    const allDots = [];
+    catStatements.forEach(s => {
+        Object.entries(responses).forEach(([studentId, sr]) => {
+            const v = sr[String(s.id)];
+            if (v !== undefined && v !== null) {
+                allDots.push({ studentId, score: Number(v), statementId: String(s.id) });
+            }
+        });
+    });
+
+    const avg = allDots.length > 0
+        ? allDots.reduce((sum, d) => sum + d.score, 0) / allDots.length
+        : null;
+
+    const { minLabel = '', maxLabel = '' } = currentConfig;
+
+    card.innerHTML = `
+        <div class="cat-avg-title">
+            <span class="cat-dot" style="background:${color}"></span>
+            Average across all <em>${escapeHtml(catName)}</em> statements
+            ${avg !== null ? `<span class="cat-avg-val">${avg.toFixed(1)}</span>` : ''}
+        </div>
+        <div class="spectrum-container">
+            <div class="spectrum-bar-inner cat-avg-bar">
+                <div class="spectrum-track"></div>
+            </div>
+            <div class="spectrum-labels">
+                <span>${scaleLabelHtml(scaleMin, minLabel)}</span>
+                <span>${scaleLabelHtml(scaleMax, maxLabel)}</span>
+            </div>
+        </div>
+    `;
+
+    // Build dots
+    const barInner = card.querySelector('.spectrum-bar-inner');
+    const range = scaleMax - scaleMin;
+    if (range > 0 && allDots.length > 0) {
+        const posCount = {};
+        allDots.forEach(({ score }) => {
+            const pct = Math.max(0, Math.min(100, (score - scaleMin) / range * 100));
+            const key = pct.toFixed(0);
+            posCount[key] = (posCount[key] || 0) + 1;
+            const topOffset = (posCount[key] - 1) * 4;
+            const dot = document.createElement('span');
+            dot.className = 'spectrum-dot cat-avg-dot';
+            dot.style.left = pct.toFixed(2) + '%';
+            dot.style.top = (50 + topOffset) + '%';
+            dot.style.background = color;
+            barInner.appendChild(dot);
+        });
+
+        if (avg !== null) {
+            const avgPct = Math.max(0, Math.min(100, (avg - scaleMin) / range * 100));
+            const avgEl = document.createElement('span');
+            avgEl.className = 'spectrum-avg';
+            avgEl.style.left = avgPct.toFixed(2) + '%';
+            barInner.appendChild(avgEl);
+        }
+    }
+
+    return card;
 }
 
 function buildStatementCard(statement, scaleMin, scaleMax) {
@@ -428,15 +531,24 @@ function buildStatementCard(statement, scaleMin, scaleMax) {
         ? `${dotData.length} response${dotData.length !== 1 ? 's' : ''} · avg ${avg.toFixed(1)}`
         : 'No responses yet';
 
+    const cats = getCategories(statement);
+    const color = getCategoryColor(cats[0]);
+    const { minLabel = '', maxLabel = '' } = currentConfig;
+
+    const catBadges = cats.map(c =>
+        `<span class="cat-pill" style="background:${getCategoryColor(c)}">${escapeHtml(c)}</span>`
+    ).join('');
+
     card.innerHTML = `
         <div class="statement-text">${escapeHtml(statement.text)}</div>
+        <div class="cat-pills">${catBadges}</div>
         <div class="spectrum-container">
             <div class="spectrum-bar-inner">
                 <div class="spectrum-track"></div>
             </div>
             <div class="spectrum-labels">
-                <span>${scaleMin}</span>
-                <span>${scaleMax}</span>
+                <span>${scaleLabelHtml(scaleMin, minLabel)}</span>
+                <span>${scaleLabelHtml(scaleMax, maxLabel)}</span>
             </div>
         </div>
         <div class="response-meta">${meta}</div>
@@ -445,7 +557,6 @@ function buildStatementCard(statement, scaleMin, scaleMax) {
     // Build dots via DOM so we can attach data-* attributes for event delegation
     const barInner = card.querySelector('.spectrum-bar-inner');
     const range = scaleMax - scaleMin;
-    const color = getCategoryColor(statement.category);
 
     if (range > 0) {
         const posCount = {};
@@ -634,7 +745,8 @@ async function initStudentFlow(roomName) {
 // ==========================================
 
 function initStudentSliders() {
-    const { statements, statementOrder, scaleMin, scaleMax, requireName } = studentConfig;
+    const { statements, statementOrder, scaleMin, scaleMax, requireName,
+            minLabel = '', maxLabel = '' } = studentConfig;
     const ordered = statementOrder.map(i => statements[i]);
     const mid = Math.round((scaleMin + scaleMax) / 2);
 
@@ -645,6 +757,13 @@ function initStudentSliders() {
     const prevValues = { ...studentSliderValues };
     studentSliderValues = {};
 
+    const minLabelHtml = minLabel
+        ? `<span class="slider-min">${escapeHtml(minLabel)}<br><small>${scaleMin}</small></span>`
+        : `<span class="slider-min">${scaleMin}</span>`;
+    const maxLabelHtml = maxLabel
+        ? `<span class="slider-max">${escapeHtml(maxLabel)}<br><small>${scaleMax}</small></span>`
+        : `<span class="slider-max">${scaleMax}</span>`;
+
     ordered.forEach(statement => {
         const savedVal = prevValues[statement.id] ?? mid;
         const item = document.createElement('div');
@@ -652,11 +771,11 @@ function initStudentSliders() {
         item.innerHTML = `
             <div class="slider-statement-text">${escapeHtml(statement.text)}</div>
             <div class="slider-row">
-                <span class="slider-min">${scaleMin}</span>
+                ${minLabelHtml}
                 <input type="range" class="spectrum-slider"
                     min="${scaleMin}" max="${scaleMax}"
                     value="${savedVal}">
-                <span class="slider-max">${scaleMax}</span>
+                ${maxLabelHtml}
                 <span class="slider-value">${savedVal}</span>
             </div>
         `;
