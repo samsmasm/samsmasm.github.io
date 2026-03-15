@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
@@ -21,16 +21,16 @@ let currentRoom = null;
 let currentConfig = null;
 let responses = {};
 let displayMode = 'random';
-let revealFilter = null;
+let expandedCategories = new Set(); // for reveal mode collapse/expand
 let responsesUnsubscribe = null;
-let qrGenerated = false;
 
 let studentConfig = null;
 let studentRoom = null;
 let studentSliderValues = {};
-let studentSubmitted = false;
 
-// Category colour palette
+let tooltipTimer = null;
+const singleClickTimers = new Map();
+
 const CAT_COLORS = [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
@@ -118,7 +118,6 @@ function showView(name) {
 // ==========================================
 
 function router() {
-    // Unsubscribe any existing listener when navigating
     if (responsesUnsubscribe) {
         responsesUnsubscribe();
         responsesUnsubscribe = null;
@@ -135,8 +134,8 @@ function router() {
         showView('teacher-dashboard');
         initTeacherDashboard(hash);
     } else if (hash && !role) {
-        showView('student-pin');
-        initStudentPin(hash);
+        showView('student-sliders');
+        initStudentFlow(hash);
     }
 }
 
@@ -201,6 +200,7 @@ async function createSession() {
     const scaleMin = parseInt(document.getElementById('scale-min-input').value) || 0;
     const scaleMax = parseInt(document.getElementById('scale-max-input').value) || 100;
     const shuffle = document.getElementById('shuffle-toggle').checked;
+    const requireName = document.getElementById('require-name-toggle').checked;
 
     if (!roomName) return showError('create-error', 'Please enter a room name.');
     if (!pin) return showError('create-error', 'Please enter a PIN.');
@@ -216,7 +216,7 @@ async function createSession() {
     const statementOrder = shuffle ? shuffleArray(indices) : indices;
     const pinHash = await hashPin(pin);
 
-    const config = { pin: pinHash, scaleMin, scaleMax, shuffle, statementOrder, statements };
+    const config = { pin: pinHash, scaleMin, scaleMax, shuffle, statementOrder, statements, requireName };
 
     const btn = document.getElementById('btn-start-session');
     btn.textContent = 'Creating…';
@@ -277,59 +277,43 @@ async function rejoinSession() {
 
 function initTeacherDashboard(roomName) {
     currentRoom = roomName;
-    qrGenerated = false;
     responses = {};
     displayMode = 'random';
-    revealFilter = null;
+    expandedCategories = new Set();
+    Object.keys(categoryColorMap).forEach(k => delete categoryColorMap[k]);
+    categoryColorIndex = 0;
+    currentConfig = null;
 
     document.getElementById('t-room-label').textContent = roomName;
 
-    // Mode buttons
-    document.querySelectorAll('.btn-mode').forEach(btn => {
-        btn.addEventListener('click', () => {
-            displayMode = btn.dataset.mode;
-            revealFilter = null;
-            document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderResults();
-        });
-    });
+    // Reset mode buttons
+    document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
+    document.querySelector('.btn-mode[data-mode="random"]').classList.add('active');
 
-    document.getElementById('btn-t-leave').addEventListener('click', () => {
-        if (responsesUnsubscribe) responsesUnsubscribe();
-        window.location.href = '?role=teacher';
-    });
-
-    // Access panel
+    // QR code — clear container first to avoid doubling
+    const qrContainer = document.getElementById('qrcode');
+    qrContainer.innerHTML = '';
     const joinUrl = `https://samsmasm.github.io/spectra/#${roomName.toLowerCase()}`;
-    document.getElementById('join-link-text').textContent = `samsmasm.github.io/spectra/#${roomName.toLowerCase()}`;
+    new QRCode(qrContainer, { text: joinUrl, width: 280, height: 280 });
 
-    if (!qrGenerated) {
-        new QRCode(document.getElementById('qrcode'), {
-            text: joinUrl,
-            width: 280,
-            height: 280
-        });
-        qrGenerated = true;
-    }
+    document.getElementById('join-link-text').textContent =
+        `samsmasm.github.io/spectra/#${roomName.toLowerCase()}`;
 
     const storedPin = sessionStorage.getItem(`spectra_pin_${roomName}`);
     document.getElementById('pin-display-val').textContent = storedPin || '(set during creation)';
 
-    // Load config then subscribe to responses
+    // Load config
     get(ref(db, `spectra/${roomName}/config`)).then(snap => {
         if (snap.exists()) {
             currentConfig = snap.val();
-            // Rebuild category color map in consistent order
-            Object.keys(categoryColorMap).forEach(k => delete categoryColorMap[k]);
-            categoryColorIndex = 0;
             renderResults();
         } else {
             document.getElementById('results-panel').innerHTML =
-                '<div class="empty-state">Room config not found. Has this room been created?</div>';
+                '<div class="empty-state">Room config not found.</div>';
         }
     });
 
+    // Subscribe to responses
     responsesUnsubscribe = onValue(ref(db, `spectra/${roomName}/responses`), snap => {
         responses = snap.exists() ? snap.val() : {};
         updateResponseCount();
@@ -344,25 +328,32 @@ function updateResponseCount() {
     document.getElementById('access-count').textContent = label;
 }
 
+// ==========================================
+// RESULTS RENDERING
+// ==========================================
+
 function renderResults() {
     if (!currentConfig) return;
 
     const { statements, statementOrder, scaleMin, scaleMax } = currentConfig;
     const panel = document.getElementById('results-panel');
-
-    // Build ordered list
     const ordered = statementOrder.map(i => statements[i]);
 
     panel.innerHTML = '';
 
+    if (displayMode === 'table') {
+        renderTable(panel, ordered);
+        return;
+    }
+
     if (displayMode === 'random') {
-        ordered.forEach(s => panel.appendChild(buildStatementCard(s, scaleMin, scaleMax, false)));
+        ordered.forEach(s => panel.appendChild(buildStatementCard(s, scaleMin, scaleMax)));
     } else {
-        renderGrouped(panel, ordered, scaleMin, scaleMax, displayMode === 'reveal');
+        renderGrouped(panel, ordered, scaleMin, scaleMax, displayMode);
     }
 }
 
-function renderGrouped(container, statements, scaleMin, scaleMax, showLabels) {
+function renderGrouped(container, statements, scaleMin, scaleMax, mode) {
     // Group by category
     const groups = {};
     statements.forEach(s => {
@@ -373,62 +364,69 @@ function renderGrouped(container, statements, scaleMin, scaleMax, showLabels) {
     const sortedCats = Object.keys(groups).sort();
 
     sortedCats.forEach(cat => {
-        if (showLabels && revealFilter && cat !== revealFilter) return;
+        const color = getCategoryColor(cat);
+        const isExpanded = expandedCategories.has(cat);
 
-        if (showLabels) {
-            const label = document.createElement('div');
-            const color = getCategoryColor(cat);
-            const isActive = revealFilter === cat;
-            label.className = 'category-group-label' + (isActive ? ' active' : '');
-            label.innerHTML = `
+        // Category title
+        const titleEl = document.createElement('div');
+        titleEl.className = 'category-group-label';
+
+        if (mode === 'reveal') {
+            titleEl.classList.add('reveal-title');
+            titleEl.innerHTML = `
                 <span class="cat-dot" style="background:${color}"></span>
                 <span>${escapeHtml(cat)}</span>
-                <span class="filter-hint">${isActive ? '— click to show all' : '— click to filter'}</span>
+                <span class="expand-icon">${isExpanded ? '▾' : '▸'}</span>
             `;
-            label.style.setProperty('--cat-color', color);
-            label.addEventListener('click', () => {
-                revealFilter = isActive ? null : cat;
+            titleEl.addEventListener('click', () => {
+                if (expandedCategories.has(cat)) expandedCategories.delete(cat);
+                else expandedCategories.add(cat);
                 renderResults();
             });
-            container.appendChild(label);
+        } else {
+            // organise: title shown, all spectra visible, no click needed
+            titleEl.innerHTML = `
+                <span class="cat-dot" style="background:${color}"></span>
+                <span>${escapeHtml(cat)}</span>
+            `;
         }
 
-        groups[cat].forEach(s => container.appendChild(buildStatementCard(s, scaleMin, scaleMax, showLabels)));
+        container.appendChild(titleEl);
+
+        // Show statements: always in organise, only if expanded in reveal
+        if (mode === 'organise' || isExpanded) {
+            groups[cat].forEach(s => container.appendChild(buildStatementCard(s, scaleMin, scaleMax)));
+        }
     });
 }
 
-function buildStatementCard(statement, scaleMin, scaleMax, showCategory) {
+function buildStatementCard(statement, scaleMin, scaleMax) {
     const card = document.createElement('div');
     card.className = 'statement-card';
 
-    // Collect scores for this statement
-    const scores = [];
-    Object.values(responses).forEach(sr => {
-        const v = sr[statement.id] ?? sr[String(statement.id)];
-        if (v !== undefined && v !== null) scores.push(Number(v));
+    // Collect dot data: {studentId, score, name}
+    const dotData = [];
+    Object.entries(responses).forEach(([studentId, sr]) => {
+        const v = sr[String(statement.id)];
+        if (v !== undefined && v !== null) {
+            const name = sr._name || '';
+            dotData.push({ studentId, score: Number(v), name });
+        }
     });
 
-    const avg = scores.length > 0
-        ? scores.reduce((a, b) => a + b, 0) / scores.length
+    const avg = dotData.length > 0
+        ? dotData.reduce((sum, d) => sum + d.score, 0) / dotData.length
         : null;
 
-    const color = getCategoryColor(statement.category);
-
-    const catBadge = showCategory
-        ? `<span class="statement-category" style="background:${color}">${escapeHtml(statement.category)}</span>`
-        : '';
-
-    const meta = scores.length > 0
-        ? `${scores.length} response${scores.length !== 1 ? 's' : ''}${avg !== null ? ` · avg ${avg.toFixed(1)}` : ''}`
+    const meta = dotData.length > 0
+        ? `${dotData.length} response${dotData.length !== 1 ? 's' : ''} · avg ${avg.toFixed(1)}`
         : 'No responses yet';
 
     card.innerHTML = `
         <div class="statement-text">${escapeHtml(statement.text)}</div>
-        ${catBadge}
         <div class="spectrum-container">
             <div class="spectrum-bar-inner">
                 <div class="spectrum-track"></div>
-                ${buildDots(scores, avg, scaleMin, scaleMax, color)}
             </div>
             <div class="spectrum-labels">
                 <span>${scaleMin}</span>
@@ -438,87 +436,190 @@ function buildStatementCard(statement, scaleMin, scaleMax, showCategory) {
         <div class="response-meta">${meta}</div>
     `;
 
+    // Build dots via DOM so we can attach data-* attributes for event delegation
+    const barInner = card.querySelector('.spectrum-bar-inner');
+    const range = scaleMax - scaleMin;
+    const color = getCategoryColor(statement.category);
+
+    if (range > 0) {
+        const posCount = {};
+
+        dotData.forEach(({ studentId, score, name }) => {
+            const pct = Math.max(0, Math.min(100, (score - scaleMin) / range * 100));
+            const key = pct.toFixed(0);
+            posCount[key] = (posCount[key] || 0) + 1;
+            const topOffset = (posCount[key] - 1) * 4;
+
+            const dot = document.createElement('span');
+            dot.className = 'spectrum-dot';
+            dot.style.left = pct.toFixed(2) + '%';
+            dot.style.top = (50 + topOffset) + '%';
+            dot.style.background = color;
+            dot.dataset.studentId = studentId;
+            dot.dataset.statementId = String(statement.id);
+            if (name) dot.dataset.name = name;
+            barInner.appendChild(dot);
+        });
+
+        if (avg !== null) {
+            const avgPct = Math.max(0, Math.min(100, (avg - scaleMin) / range * 100));
+            const avgEl = document.createElement('span');
+            avgEl.className = 'spectrum-avg';
+            avgEl.style.left = avgPct.toFixed(2) + '%';
+            barInner.appendChild(avgEl);
+        }
+    }
+
     return card;
 }
 
-function buildDots(scores, avg, scaleMin, scaleMax, color) {
-    const range = scaleMax - scaleMin;
-    if (range === 0) return '';
-
-    // Group dots by position to stack them slightly
-    const posCount = {};
-
-    const dots = scores.map(score => {
-        const pct = Math.max(0, Math.min(100, (score - scaleMin) / range * 100));
-        const key = pct.toFixed(0);
-        posCount[key] = (posCount[key] || 0) + 1;
-        const offset = (posCount[key] - 1) * 3; // small vertical stagger for overlaps
-        const topPct = 50 + offset;
-        return `<span class="spectrum-dot" style="left:${pct.toFixed(2)}%;top:${topPct}%;background:${color}"></span>`;
-    }).join('');
-
-    const avgLine = avg !== null
-        ? (() => {
-            const pct = Math.max(0, Math.min(100, (avg - scaleMin) / range * 100));
-            return `<span class="spectrum-avg" style="left:${pct.toFixed(2)}%"></span>`;
-        })()
-        : '';
-
-    return dots + avgLine;
-}
-
 // ==========================================
-// STUDENT PIN ENTRY
+// TABLE VIEW
 // ==========================================
 
-function initStudentPin(roomName) {
-    studentRoom = roomName;
-    document.getElementById('s-room-label').textContent = roomName;
+function renderTable(panel, ordered) {
+    if (Object.keys(responses).length === 0) {
+        panel.innerHTML = '<div class="empty-state">No responses yet.</div>';
+        return;
+    }
 
-    document.getElementById('btn-pin-join').addEventListener('click', verifyStudentPin);
-    document.getElementById('s-pin-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') verifyStudentPin();
+    const wrap = document.createElement('div');
+    wrap.className = 'table-scroll';
+
+    const table = document.createElement('table');
+    table.className = 'response-table';
+
+    // Header
+    const thead = table.createTHead();
+    const hr = thead.insertRow();
+    const th0 = document.createElement('th');
+    th0.textContent = 'Student';
+    hr.appendChild(th0);
+    ordered.forEach(s => {
+        const th = document.createElement('th');
+        th.title = s.text;
+        th.textContent = s.text.length > 22 ? s.text.slice(0, 22) + '…' : s.text;
+        hr.appendChild(th);
     });
+
+    // Body
+    const tbody = table.createTBody();
+    Object.entries(responses).forEach(([studentId, sr]) => {
+        const row = tbody.insertRow();
+        row.dataset.studentId = studentId;
+
+        const name = sr._name || '';
+        const nameCell = row.insertCell();
+        nameCell.className = 'student-cell';
+        if (name) {
+            nameCell.textContent = name;
+            nameCell.title = studentId;
+        } else {
+            nameCell.innerHTML = `<span class="anon-id">${escapeHtml(studentId.slice(0, 12))}</span>`;
+        }
+
+        ordered.forEach(s => {
+            const v = sr[String(s.id)];
+            const td = row.insertCell();
+            td.className = 'score-cell' + (v === undefined || v === null ? ' empty' : '');
+            td.textContent = (v !== undefined && v !== null) ? v : '—';
+            if (v !== undefined && v !== null) {
+                td.dataset.statementId = String(s.id);
+                td.dataset.studentId = studentId;
+            }
+        });
+    });
+
+    // Double-click a row → mark for deletion; click marked row → delete
+    table.addEventListener('dblclick', e => {
+        const row = e.target.closest('tbody tr');
+        if (!row || row.classList.contains('row-pending-delete')) return;
+        row.classList.add('row-pending-delete');
+        row.cells[0].innerHTML = '<span class="delete-x">✕ Delete</span>';
+    });
+
+    table.addEventListener('click', e => {
+        const row = e.target.closest('tbody tr.row-pending-delete');
+        if (!row) return;
+        remove(ref(db, `spectra/${currentRoom}/responses/${row.dataset.studentId}`));
+    });
+
+    wrap.appendChild(table);
+    panel.appendChild(wrap);
 }
 
-async function verifyStudentPin() {
-    const pin = document.getElementById('s-pin-input').value.trim();
-    if (!pin) return;
+// ==========================================
+// DOT INTERACTIONS (event delegation on results panel)
+// ==========================================
 
-    hideError('pin-error');
-    const btn = document.getElementById('btn-pin-join');
-    btn.textContent = 'Checking…';
-    btn.disabled = true;
+function handleResultsClick(e) {
+    const dot = e.target.closest('.spectrum-dot[data-student-id]');
+    if (!dot) return;
+
+    if (dot.classList.contains('marked-delete')) {
+        // Confirm: remove that specific response
+        remove(ref(db, `spectra/${currentRoom}/responses/${dot.dataset.studentId}/${dot.dataset.statementId}`));
+        return;
+    }
+
+    // Single-click: show name tooltip (cancel if dblclick fires)
+    clearTimeout(singleClickTimers.get(dot));
+    singleClickTimers.set(dot, setTimeout(() => {
+        singleClickTimers.delete(dot);
+        const name = dot.dataset.name;
+        if (name) showDotTooltip(e, name);
+    }, 220));
+}
+
+function handleResultsDblClick(e) {
+    const dot = e.target.closest('.spectrum-dot[data-student-id]');
+    if (!dot) return;
+
+    // Cancel pending single-click
+    clearTimeout(singleClickTimers.get(dot));
+    singleClickTimers.delete(dot);
+
+    dot.classList.add('marked-delete');
+    dot.textContent = '✕';
+}
+
+function showDotTooltip(e, name) {
+    const tooltip = document.getElementById('dot-tooltip');
+    tooltip.textContent = name;
+    tooltip.style.left = (e.clientX + 12) + 'px';
+    tooltip.style.top = (e.clientY - 40) + 'px';
+    tooltip.classList.remove('hidden');
+    clearTimeout(tooltipTimer);
+    tooltipTimer = setTimeout(hideDotTooltip, 3000);
+}
+
+function hideDotTooltip() {
+    document.getElementById('dot-tooltip').classList.add('hidden');
+    clearTimeout(tooltipTimer);
+}
+
+// ==========================================
+// STUDENT FLOW (no PIN — open to anyone with the link)
+// ==========================================
+
+async function initStudentFlow(roomName) {
+    studentRoom = roomName;
+    document.getElementById('s-sliders-room-label').textContent = roomName;
+    document.getElementById('sliders-container').innerHTML = '';
+    document.getElementById('submit-bar').classList.add('hidden');
+    document.getElementById('done-message').classList.add('hidden');
+    document.getElementById('student-load-error').classList.add('hidden');
 
     try {
-        const snap = await get(ref(db, `spectra/${studentRoom}/config`));
-
+        const snap = await get(ref(db, `spectra/${roomName}/config`));
         if (!snap.exists()) {
-            document.getElementById('pin-error').textContent = 'Room not found.';
-            document.getElementById('pin-error').classList.remove('hidden');
-            btn.textContent = 'Join'; btn.disabled = false;
+            showError('student-load-error', 'Room not found. Check the link and try again.');
             return;
         }
-
-        const config = snap.val();
-        const pinHash = await hashPin(pin);
-
-        if (config.pin !== pinHash) {
-            document.getElementById('pin-error').classList.remove('hidden');
-            btn.textContent = 'Join'; btn.disabled = false;
-            document.getElementById('s-pin-input').value = '';
-            document.getElementById('s-pin-input').focus();
-            return;
-        }
-
-        // Verified
-        studentConfig = config;
-        showView('student-sliders');
+        studentConfig = snap.val();
         initStudentSliders();
     } catch (err) {
-        document.getElementById('pin-error').textContent = 'Connection error. Try again.';
-        document.getElementById('pin-error').classList.remove('hidden');
-        btn.textContent = 'Join'; btn.disabled = false;
+        showError('student-load-error', 'Connection error. Please refresh and try again.');
     }
 }
 
@@ -527,18 +628,19 @@ async function verifyStudentPin() {
 // ==========================================
 
 function initStudentSliders() {
-    document.getElementById('s-sliders-room-label').textContent = studentRoom;
-
-    const { statements, statementOrder, scaleMin, scaleMax } = studentConfig;
+    const { statements, statementOrder, scaleMin, scaleMax, requireName } = studentConfig;
     const ordered = statementOrder.map(i => statements[i]);
     const mid = Math.round((scaleMin + scaleMax) / 2);
 
     const container = document.getElementById('sliders-container');
     container.innerHTML = '';
+
+    // Preserve any existing values (for "change responses" flow)
+    const prevValues = { ...studentSliderValues };
     studentSliderValues = {};
 
     ordered.forEach(statement => {
-        const savedVal = studentSliderValues[statement.id] ?? mid;
+        const savedVal = prevValues[statement.id] ?? mid;
         const item = document.createElement('div');
         item.className = 'slider-item';
         item.innerHTML = `
@@ -546,12 +648,10 @@ function initStudentSliders() {
             <div class="slider-row">
                 <span class="slider-min">${scaleMin}</span>
                 <input type="range" class="spectrum-slider"
-                    id="slider-${statement.id}"
                     min="${scaleMin}" max="${scaleMax}"
-                    value="${savedVal}"
-                    data-id="${statement.id}">
+                    value="${savedVal}">
                 <span class="slider-max">${scaleMax}</span>
-                <span class="slider-value" id="val-${statement.id}">${savedVal}</span>
+                <span class="slider-value">${savedVal}</span>
             </div>
         `;
         container.appendChild(item);
@@ -567,14 +667,22 @@ function initStudentSliders() {
         });
     });
 
+    // Name input
+    const nameWrap = document.getElementById('name-input-wrap');
+    if (requireName) {
+        nameWrap.classList.remove('hidden');
+    } else {
+        nameWrap.classList.add('hidden');
+    }
+
     document.getElementById('submit-bar').classList.remove('hidden');
     document.getElementById('done-message').classList.add('hidden');
 
-    // Only add submit listener if not already there
+    // Re-wire submit/change buttons to avoid duplicate listeners
     const submitBtn = document.getElementById('btn-submit-responses');
-    const newBtn = submitBtn.cloneNode(true);
-    submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-    newBtn.addEventListener('click', submitStudentResponses);
+    const newSubmit = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmit, submitBtn);
+    newSubmit.addEventListener('click', submitStudentResponses);
 
     const changeBtn = document.getElementById('btn-change-responses');
     const newChange = changeBtn.cloneNode(true);
@@ -591,9 +699,12 @@ async function submitStudentResponses() {
     btn.textContent = 'Submitting…';
     btn.disabled = true;
 
-    try {
-        await set(ref(db, `spectra/${studentRoom}/responses/${studentId}`), studentSliderValues);
+    const data = { ...studentSliderValues };
+    const name = document.getElementById('student-name-input').value.trim();
+    if (name) data._name = name;
 
+    try {
+        await set(ref(db, `spectra/${studentRoom}/responses/${studentId}`), data);
         document.getElementById('submit-bar').classList.add('hidden');
         document.getElementById('done-message').classList.remove('hidden');
     } catch (err) {
@@ -610,6 +721,35 @@ async function submitStudentResponses() {
 window.addEventListener('DOMContentLoaded', () => {
     initLanding();
     initTeacherSetup();
+
+    // Mode buttons (attached once; work across all dashboard visits)
+    document.querySelectorAll('.btn-mode').forEach(btn => {
+        btn.addEventListener('click', () => {
+            displayMode = btn.dataset.mode;
+            if (displayMode !== 'reveal') expandedCategories = new Set();
+            document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderResults();
+        });
+    });
+
+    document.getElementById('btn-t-leave').addEventListener('click', () => {
+        if (responsesUnsubscribe) responsesUnsubscribe();
+        window.location.href = '?role=teacher';
+    });
+
+    // Event delegation for dot interactions on results panel
+    const resultsPanel = document.getElementById('results-panel');
+    resultsPanel.addEventListener('click', handleResultsClick);
+    resultsPanel.addEventListener('dblclick', handleResultsDblClick);
+
+    // Hide tooltip on any outside click
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.spectrum-dot') && !e.target.closest('#dot-tooltip')) {
+            hideDotTooltip();
+        }
+    });
+
     router();
 });
 
