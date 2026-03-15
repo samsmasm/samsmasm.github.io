@@ -4,10 +4,10 @@
   <link rel="icon" type="image/jpeg" href="/unisamicon.jpg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EconNews — UniSam</title>
+  <title>Econ News — UniSam</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,47 +17,90 @@
     <a class="back-link" href="/">← UniSam</a>
 
     <div class="masthead">
-      <div class="masthead-icon-ring">
-        <img src="/unisamicon.jpg" alt="UniSam">
+      <div class="masthead-inner">
+        <img src="/unisamicon.jpg" alt="UniSam" class="masthead-seal">
+        <h1>Econ News</h1>
       </div>
-      <div class="masthead-text">
-        <h1>EconNews</h1>
-        <p class="tagline">Economics &amp; business for IB students &nbsp;·&nbsp; Mon / Wed / Fri</p>
-      </div>
+      <div class="tagline-bar">Economics for IB Econ Students &nbsp;·&nbsp; Mon / Wed / Fri</div>
     </div>
-
-    <div class="rainbow-line"></div>
 
     <div id="content">
       <p class="empty-state">Loading…</p>
     </div>
 
     <footer>
-      Curated by Claude Haiku &nbsp;·&nbsp; unisam.nz
+      unisam.nz
     </footer>
 
   </div>
 
   <script>
-    function formatDate(str) {
-      const [y, m, d] = str.split('-').map(Number);
-      return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+    // Get today's date in YYYY-MM-DD using local timezone
+    const d = new Date();
+    const TODAY = d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+
+    function formatDateLong(str) {
+      const [y, m, day] = str.split('-').map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString('en-GB', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+    }
+
+    function formatDateShort(str) {
+      const [y, m, day] = str.split('-').map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString('en-GB', {
         day: 'numeric', month: 'short', year: 'numeric'
       });
     }
 
-    async function fetchArticleTitles(filename) {
+    async function fetchArticles(filename) {
       try {
-        const res = await fetch(`posts/${filename}`);
+        const res = await fetch('posts/' + filename);
+        if (!res.ok) return [];
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return Array.from(doc.querySelectorAll('.article-card')).map(card => {
+          const a    = card.querySelector('h2 a');
+          const src  = card.querySelector('.article-source');
+          const sum  = card.querySelector('p');
+          const qs   = Array.from(card.querySelectorAll('.questions-list li'));
+          return {
+            title:     a?.textContent.trim()       || '',
+            url:       a?.getAttribute('href')     || '#',
+            source:    src?.textContent.trim()     || '',
+            summary:   sum?.textContent.trim()     || '',
+            questions: qs.map(q => q.textContent.trim())
+          };
+        });
+      } catch (e) { return []; }
+    }
+
+    async function fetchTitles(filename) {
+      try {
+        const res = await fetch('posts/' + filename);
         if (!res.ok) return [];
         const html = await res.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
         return Array.from(doc.querySelectorAll('.article-card h2 a'))
-          .map(a => a.textContent.trim())
-          .filter(Boolean);
-      } catch (e) {
-        return [];
-      }
+          .map(a => a.textContent.trim()).filter(Boolean);
+      } catch (e) { return []; }
+    }
+
+    function storyCardHTML(article) {
+      const qHTML = article.questions.length
+        ? '<ul class="story-questions">'
+            + article.questions.map(q => '<li>' + q + '</li>').join('')
+            + '</ul>'
+        : '';
+      return '<div class="story-cell">'
+        + '<h2 class="story-headline"><a href="' + article.url + '" target="_blank" rel="noopener">'
+        + article.title + '</a></h2>'
+        + '<span class="story-source">' + article.source + '</span>'
+        + '<p class="story-summary">' + article.summary + '</p>'
+        + qHTML
+        + '</div>';
     }
 
     async function render() {
@@ -68,67 +111,79 @@
         const posts = await res.json();
 
         if (!Array.isArray(posts) || posts.length === 0) {
-          content.innerHTML = '<p class="empty-state">No posts yet — check back on Monday.</p>';
+          content.innerHTML = '<p class="empty-state">No posts yet — check back Monday.</p>';
           return;
         }
 
-        const latest  = posts[0];
-        const recent  = posts.slice(1, 5);   // up to 4 older issues
-        const archive = posts.slice(5);       // everything beyond
+        const latest    = posts[0];
+        const isToday   = latest.date === TODAY;
+        const prevPosts = posts.slice(1, 5);   // up to 4 older issues
+        const hasMore   = posts.length > 5;    // anything beyond those 4
 
-        // Fetch article titles for the hero card
-        const titles = await fetchArticleTitles(latest.filename);
-        const titlesHTML = titles.length
-          ? titles.map(t => `<li>${t}</li>`).join('')
-          : `<li style="font-style:italic;color:var(--text-light)">Read this issue</li>`;
+        let html = '';
 
-        function olderCard(post) {
-          return `
-            <a class="older-card" href="posts/${post.filename}">
-              <span class="older-date">${formatDate(post.date)}</span>
-              <span class="older-title">${post.title}</span>
-              <span class="older-arrow">›</span>
-            </a>`;
+        if (isToday) {
+          // Show inline story grid for today's issue
+          html += '<div class="issue-dateline">'
+            + '<span>' + formatDateLong(latest.date) + '</span>'
+            + '<a class="issue-link" href="posts/' + latest.filename + '">Full issue →</a>'
+            + '</div>';
+
+          const articles = await fetchArticles(latest.filename);
+          if (articles.length) {
+            html += '<p class="section-heading">Today\'s stories</p>'
+              + '<div class="story-grid">'
+              + articles.map(storyCardHTML).join('')
+              + '</div>';
+          } else {
+            html += '<a class="featured-issue" href="posts/' + latest.filename + '">'
+              + '<span class="featured-issue-date">' + formatDateLong(latest.date) + '</span>'
+              + '<span class="featured-issue-cta">View this issue →</span>'
+              + '</a>';
+          }
+        } else {
+          // Latest issue is not today — show as a featured link
+          html += '<p class="section-heading">Latest issue</p>'
+            + '<a class="featured-issue" href="posts/' + latest.filename + '">'
+            + '<span class="featured-issue-date">' + formatDateLong(latest.date) + '</span>'
+            + '<span class="featured-issue-cta">View this issue →</span>'
+            + '</a>';
         }
 
-        let html = `
-          <div class="hero-card">
-            <div class="hero-card-meta">
-              <span class="hero-label">Latest issue</span>
-              <span class="hero-date">${formatDate(latest.date)}</span>
-            </div>
-            <hr class="hero-rule">
-            <ul class="hero-titles">${titlesHTML}</ul>
-            <a class="hero-read-link" href="posts/${latest.filename}">Read this issue →</a>
-          </div>`;
+        // Previous issues (up to 4) — fetch titles in parallel
+        if (prevPosts.length) {
+          const allTitles = await Promise.all(prevPosts.map(p => fetchTitles(p.filename)));
+          html += '<p class="section-heading section-heading-spaced">Previous issues</p>'
+            + '<div class="prev-issues-list">';
 
-        if (recent.length) {
-          html += `<p class="section-label">Previous issues</p>
-                   <div class="older-list">
-                     ${recent.map(olderCard).join('')}
-                   </div>`;
+          prevPosts.forEach((post, i) => {
+            const titles = allTitles[i];
+            const tHTML  = titles.length
+              ? '<ul class="prev-issue-titles">'
+                  + titles.map(t => '<li>' + t + '</li>').join('')
+                  + '</ul>'
+              : '';
+            html += '<div class="prev-issue">'
+              + '<div class="prev-issue-header">'
+              + '<span class="prev-issue-date">' + formatDateShort(post.date) + '</span>'
+              + '<a class="prev-issue-link" href="posts/' + post.filename + '">View this issue →</a>'
+              + '</div>'
+              + tHTML
+              + '</div>';
+          });
+
+          html += '</div>';
         }
 
-        if (archive.length) {
-          html += `
-            <button class="archive-toggle" id="archive-btn"
-                    onclick="toggleArchive()">Older issues ▾</button>
-            <div class="archive-list older-list" id="archive-list">
-              ${archive.map(olderCard).join('')}
-            </div>`;
+        // Archives link if there are more than 4 older issues
+        if (hasMore) {
+          html += '<a class="archives-link" href="archives.html">View the archives →</a>';
         }
 
         content.innerHTML = html;
       } catch (e) {
         content.innerHTML = '<p class="empty-state">Could not load posts.</p>';
       }
-    }
-
-    function toggleArchive() {
-      const list = document.getElementById('archive-list');
-      const btn  = document.getElementById('archive-btn');
-      const open = list.classList.toggle('open');
-      btn.textContent = open ? 'Older issues ▴' : 'Older issues ▾';
     }
 
     render();
