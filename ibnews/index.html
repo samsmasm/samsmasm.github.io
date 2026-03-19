@@ -667,76 +667,13 @@ function hideStatus() {
   document.getElementById('statusText').className = 'status-text';
 }
 
-// ── BUILD SYSTEM PROMPT ──
-function buildSystemPrompt(subject, topicLabel, conceptLabel, paper, recency, focus) {
-  const subjectNames = {
-    economics: 'IB Economics',
-    business: 'IB Business Management',
-    geography: 'IB Human Geography'
-  };
-  const subjectName = subjectNames[subject] || 'IB';
+// ── SUBJECT NAME MAP ──
+const SUBJECT_NAMES = {
+  economics: 'IB Economics',
+  business: 'IB Business Management',
+  geography: 'IB Human Geography',
+};
 
-  return `You are a research assistant helping an IB teacher find news articles for classroom use. Find 2–3 real, recent news articles that are (a) clearly relevant to the IB curriculum topic and (b) genuinely interesting and accessible to 16–18 year old students.
-
-SEARCH CRITERIA:
-- Subject: ${subjectName}
-- Topic: ${topicLabel || 'any topic in the curriculum'}
-- Key Concept: ${conceptLabel || 'any'}
-- Paper/Assessment context: ${paper || 'any'}
-- Recency: published within ${recency}
-- Additional focus: ${focus || 'none'}
-
-ARTICLE SELECTION — prioritise articles that are:
-1. Directly relevant to the IB syllabus topic (non-negotiable)
-2. About real events teenagers would find compelling — controversies, surprising outcomes, things that affect young people's lives, stories with a clear human angle
-3. From quality sources: BBC News, Reuters, FT, NYT, The Economist, AP, Bloomberg, Guardian, WSJ, Nikkei Asia, SCMP, Straits Times, Channel News Asia, IMF/World Bank/OECD reports
-4. Opinion pieces only from FT, The Economist, or Guardian — label clearly
-
-Do NOT use: tabloids, blogs, SEO content farms, Wikipedia, social media. Prefer fewer excellent articles over padding with weak matches.
-
-Return a JSON object with this exact structure — no preamble, no markdown fences, just raw JSON:
-
-{
-  "searchContext": {
-    "subject": "${subjectName}",
-    "topic": "${topicLabel || 'General'}",
-    "concept": "${conceptLabel || ''}",
-    "recency": "${recency}"
-  },
-  "articles": [
-    {
-      "headline": "exact or close to exact article headline",
-      "publication": "publication name",
-      "date": "publication date",
-      "url": "direct URL if available, otherwise null",
-      "isOpinion": false,
-      "summary": "2 short paragraphs in plain, student-friendly language. What happened, who is involved, why it matters. Include key numbers or facts. Each paragraph separated by \\n. Write as if explaining to a smart 17-year-old who hasn't studied this subject yet — no jargon.",
-      "syllabusPoints": [
-        "Specific IB syllabus point, e.g. '2.3 Macroeconomic Objectives — Unemployment'",
-        "Secondary syllabus point if applicable"
-      ],
-      "curriculumConnections": "2 sentences max. Name the specific concept, model, or theory from the syllabus this illustrates and explain the direct link concisely.",
-      "crossTopicLinks": "1 sentence naming 1–2 other syllabus areas this connects to.",
-      "iaRelevance": null,
-      "questions": {
-        "ib": [
-          "IB command-term question using evaluate / examine / discuss / to what extent — with reference to the article",
-          "A second IB-style question"
-        ],
-        "discussion": [
-          "A punchy, conversational question a teacher could throw out to start discussion — no subject knowledge assumed",
-          "A second discussion question"
-        ],
-        "hl": null
-      }
-    }
-  ]
-}
-
-For iaRelevance: if the article could realistically anchor an IB ${subjectName} Internal Assessment, give one specific sentence explaining how. Otherwise null.
-
-Return ONLY the JSON. No text before or after it.`;
-}
 
 // ── RENDER ARTICLES ──
 let lastMarkdown = '';
@@ -900,52 +837,35 @@ async function runSearch() {
   document.getElementById('resultsHeader').className = 'results-header';
   setStatus('<span class="dots">Searching for relevant articles</span>');
 
-  const systemPrompt = buildSystemPrompt(subject, topicLabel, conceptLabel, paper, recency, focus);
-
-  const conceptPart = conceptLabel && conceptLabel !== '— any concept —' ? `, concept: ${conceptLabel}` : '';
-  const userMessage = `Find ${recency === 'any time' ? '' : recency + ' '}news articles relevant to: ${topicLabel || subject}${conceptPart}${focus ? ', focusing on: ' + focus : ''}. Use web search to find real, specific articles. Return the JSON as instructed.`;
-
   try {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4000,
-        system: systemPrompt,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: userMessage }]
+        subject,
+        subjectName: SUBJECT_NAMES[subject] || subject,
+        topicLabel,
+        conceptLabel,
+        paper,
+        recency,
+        focus,
       })
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!res.ok || data?.error) {
+      throw new Error(data?.error?.message || `HTTP ${res.status}`);
     }
 
-    const data = await res.json();
-    console.log('API response:', JSON.stringify(data, null, 2));
-
-    // Find the last text block — earlier ones may be preamble before tool use
-    const textBlocks = data.content?.filter(b => b.type === 'text');
-    const textBlock = textBlocks?.[textBlocks.length - 1];
-    if (!textBlock?.text) throw new Error('No text response received — blocks: ' + JSON.stringify(data.content?.map(b => b.type)));
-
-    const raw = textBlock.text;
-    console.log('Text block:', raw.slice(0, 500));
-    // Find the outermost JSON object, even if surrounded by text or fences
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No JSON object found in response');
-    const parsed = JSON.parse(match[0]);
     hideStatus();
-    renderResults(parsed);
+    renderResults(data);
 
   } catch (err) {
     console.error(err);
     let msg = err.message || 'Unknown error';
     if (msg.includes('401') || msg.includes('403')) msg = 'Authentication error — check Worker setup.';
     if (msg.includes('529') || msg.includes('overloaded')) msg = 'Anthropic API overloaded — try again shortly.';
-    if (msg.includes('JSON')) msg = 'Unexpected response format — try again.';
     setStatus('Error: ' + msg, true);
   } finally {
     document.getElementById('searchBtn').disabled = false;
