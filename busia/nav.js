@@ -1,8 +1,8 @@
 const STAGES = [
   { slug: '',          label: 'Overview',          num: 1  },
   { slug: 'rq',        label: 'Find Your RQ',      num: 2  },
-  { slug: 'docs',      label: 'Supporting Docs',   num: 3  },
-  { slug: 'concept',   label: 'Key Concept',       num: 4  },
+  { slug: 'concept',   label: 'Key Concept',       num: 3  },
+  { slug: 'docs',      label: 'Supporting Docs',   num: 4  },
   { slug: 'structure', label: 'Structure',          num: 5  },
   { slug: 'analysis',  label: 'Analysis & Writing', num: 6  },
   { slug: 'conclusion',label: 'Conclusion',         num: 7  },
