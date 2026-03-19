@@ -933,12 +933,11 @@ async function runSearch() {
     const textBlock = data.content?.find(b => b.type === 'text');
     if (!textBlock?.text) throw new Error('No text response received');
 
-    const cleaned = textBlock.text
-      .replace(/^```json\s*/i, '')
-      .replace(/```\s*$/, '')
-      .trim();
-
-    const parsed = JSON.parse(cleaned);
+    const raw = textBlock.text;
+    // Find the outermost JSON object, even if surrounded by text or fences
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON object found in response');
+    const parsed = JSON.parse(match[0]);
     hideStatus();
     renderResults(parsed);
 
