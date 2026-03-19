@@ -42,7 +42,7 @@ function saveAsText(title, storageKey) {
     const heading  = item.closest('.checklist-section')?.querySelector('.checklist-section-title')?.textContent?.trim() || '';
     const strong   = item.querySelector('.checklist-item-text strong')?.textContent?.trim() || '';
     const note     = item.querySelector('.checklist-item-text .note')?.textContent?.trim() || '';
-    const text     = note ? `${strong} — ${note}` : strong;
+    const text     = note ? `${strong}: ${note}` : strong;
 
     if (saved[id]) {
       doneItems.push({ heading, text });
