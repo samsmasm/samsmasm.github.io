@@ -5,6 +5,60 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IB Econ IA — Example IA</title>
   <link rel="stylesheet" href="../style.css">
+  <style>
+    .gate {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+    .gate-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    .gate-box h2 { margin-bottom: 0.5rem; font-size: 1.3rem; }
+    .gate-box p  { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .gate-input {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .gate-input:focus { border-color: var(--accent); }
+    .gate-input.error { border-color: #dc2626; }
+    .gate-submit {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .gate-submit:hover { background: #1d4ed8; }
+    .gate-error {
+      color: #dc2626;
+      font-size: 0.82rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+  </style>
 </head>
 <body>
 <div class="layout">
@@ -14,8 +68,8 @@
     <nav id="main-nav"></nav>
   </aside>
 
-  <main class="main">
-    <div class="stage-tag">Stage 9</div>
+  <main class="main" id="page-content">
+    <div class="stage-tag">Example</div>
     <h1>A strong commentary</h1>
     <p class="subtitle">KZ Micro — an example of what a well-structured, well-executed IA looks like.</p>
 
@@ -25,19 +79,64 @@
       <strong>This is a model, not a template.</strong> Don't copy the structure of the argument — copy the standard of the technique.
     </div>
 
-    <div class="pdf-pages">
-      <img src="img/page-1.png" alt="KZ Micro — page 1">
-      <img src="img/page-2.png" alt="KZ Micro — page 2">
-      <img src="img/page-3.png" alt="KZ Micro — page 3">
-      <img src="img/page-4.png" alt="KZ Micro — page 4">
-      <img src="img/page-5.png" alt="KZ Micro — page 5">
-      <img src="img/page-6.png" alt="KZ Micro — page 6">
-      <img src="img/page-7.png" alt="KZ Micro — page 7">
-      <img src="img/page-8.png" alt="KZ Micro — page 8">
-    </div>
-
+    <div class="pdf-pages" id="pdf-pages"></div>
   </main>
 </div>
+
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h2>One quick question</h2>
+    <p>What's our animal?</p>
+    <input class="gate-input" id="gate-input" type="text" placeholder="Type your answer…" autocomplete="off">
+    <button class="gate-submit" id="gate-submit">Let me in</button>
+    <div class="gate-error" id="gate-error">That's not it — try again.</div>
+  </div>
+</div>
+
 <script src="../nav.js"></script>
+<script>
+(function () {
+  const H = 'a9c43be948c5cabd56ef2bacffb77cdaa5eec49dd5eb0cc4129cf3eda5f0e74c';
+  const SK = 'econia-example-ok';
+  const IMGS = Array.from({length: 8}, (_, i) => `img/page-${i + 1}.png`);
+
+  function reveal() {
+    document.getElementById('gate').remove();
+    const wrap = document.getElementById('pdf-pages');
+    IMGS.forEach((src, i) => {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = `KZ Micro — page ${i + 1}`;
+      wrap.appendChild(img);
+    });
+  }
+
+  async function check(val) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val.toLowerCase().trim()));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('') === H;
+  }
+
+  if (sessionStorage.getItem(SK) === '1') { reveal(); return; }
+
+  document.getElementById('gate-submit').addEventListener('click', async () => {
+    const val = document.getElementById('gate-input').value;
+    const ok  = await check(val);
+    if (ok) {
+      sessionStorage.setItem(SK, '1');
+      reveal();
+    } else {
+      const inp = document.getElementById('gate-input');
+      const err = document.getElementById('gate-error');
+      inp.classList.add('error');
+      err.style.display = 'block';
+      setTimeout(() => { inp.classList.remove('error'); err.style.display = 'none'; }, 2000);
+    }
+  });
+
+  document.getElementById('gate-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('gate-submit').click();
+  });
+})();
+</script>
 </body>
 </html>

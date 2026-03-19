@@ -1,13 +1,15 @@
 const STAGES = [
-  { slug: '',            label: 'Overview',    num: 1 },
-  { slug: 'article',    label: 'Article',      num: 2 },
-  { slug: 'plan',       label: 'Plan',         num: 3 },
-  { slug: 'structure',  label: 'Structure',    num: 4 },
-  { slug: 'diagrams',   label: 'Diagrams',     num: 5 },
-  { slug: 'concept',    label: 'Key Concept',  num: 6 },
-  { slug: 'intro',      label: 'Intro',        num: 7 },
-  { slug: 'evaluation', label: 'Evaluation',   num: 8 },
-  { slug: 'example',    label: 'Example',      num: 9 },
+  { slug: '',            label: 'Overview',            num: 1  },
+  { slug: 'article',    label: 'Article',              num: 2  },
+  { slug: 'plan',       label: 'Plan',                 num: 3  },
+  { slug: 'structure',  label: 'Structure',            num: 4  },
+  { slug: 'diagrams',   label: 'Diagrams & Analysis',  num: 5  },
+  { slug: 'concept',    label: 'Key Concept',          num: 6  },
+  { slug: 'intro',      label: 'Intro',                num: 7  },
+  { slug: 'evaluation', label: 'Evaluation',           num: 8  },
+  { slug: 'weaving',    label: 'Weaving & Checklist',  num: 9  },
+  { slug: 'submit',     label: 'Submitting It',        num: 10 },
+  { slug: 'example',    label: 'Example',              num: 'e'},
 ];
 
 function getCurrentSlug() {
