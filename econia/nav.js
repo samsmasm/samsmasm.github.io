@@ -38,6 +38,11 @@ function renderNav() {
 
   const base = getBase();
 
+  const label = document.createElement('div');
+  label.className = 'sidebar-order-label';
+  label.textContent = 'Follow this order:';
+  nav.appendChild(label);
+
   const ul = document.createElement('ul');
   STAGES.forEach(stage => {
     const isActive  = stage.slug === current;
