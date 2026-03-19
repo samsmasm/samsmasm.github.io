@@ -51,7 +51,6 @@ export default {
           'Content-Type': 'application/json',
           'x-api-key': env.ANTHROPIC_API_KEY,
           'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'web-search-20250305',
         },
         body: JSON.stringify(body),
       });
