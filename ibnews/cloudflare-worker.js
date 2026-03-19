@@ -19,15 +19,13 @@ export default {
 
     // ── Origin check ──
     const origin = request.headers.get('Origin') || '';
-    const allowed = env.ALLOWED_ORIGIN || 'https://unisam.nz';
     const isAllowed =
-      origin === allowed ||
-      origin === allowed.replace('https://', 'https://www.') ||
+      origin.includes('unisam.nz') ||
       origin.startsWith('http://localhost') ||
       origin.startsWith('http://127.0.0.1');
 
     if (!isAllowed) {
-      return corsResponse({ error: 'Forbidden' }, 403, env);
+      return corsResponse({ error: { message: `Forbidden — origin: ${origin}` } }, 403, env);
     }
 
     if (request.method !== 'POST') {
@@ -49,16 +47,28 @@ export default {
       const fromDate = getFromDate(recency);
 
       // ── Fetch from all three news APIs in parallel ──
-      const [guardianArticles, nytArticles, newsApiArticles] = await Promise.all([
+      const [guardianResult, nytResult, newsApiResult] = await Promise.allSettled([
         fetchGuardian(query, fromDate, env.GUARDIAN_API_KEY),
         fetchNYT(query, fromDate, env.NYT_API_KEY),
         fetchNewsAPI(query, fromDate, env.NEWSAPI_KEY),
       ]);
 
+      const guardianArticles = guardianResult.status === 'fulfilled' ? guardianResult.value : [];
+      const nytArticles = nytResult.status === 'fulfilled' ? nytResult.value : [];
+      const newsApiArticles = newsApiResult.status === 'fulfilled' ? newsApiResult.value : [];
+
+      const debugInfo = {
+        query,
+        fromDate,
+        guardian: guardianResult.status === 'rejected' ? guardianResult.reason?.message : `${guardianArticles.length} articles`,
+        nyt: nytResult.status === 'rejected' ? nytResult.reason?.message : `${nytArticles.length} articles`,
+        newsapi: newsApiResult.status === 'rejected' ? newsApiResult.reason?.message : `${newsApiArticles.length} articles`,
+      };
+
       const articles = mergeArticles(guardianArticles, nytArticles, newsApiArticles);
 
       if (articles.length === 0) {
-        return corsResponse({ error: { message: 'No articles found for this topic — try broadening your search.' } }, 200, env);
+        return corsResponse({ error: { message: 'No articles found. Debug: ' + JSON.stringify(debugInfo) } }, 200, env);
       }
 
       // ── Call Claude for analysis only (no web search) ──
@@ -101,7 +111,7 @@ export default {
       return corsResponse(parsed, 200, env);
 
     } catch (err) {
-      return corsResponse({ error: { message: err.message || 'Upstream error' } }, 502, env);
+      return corsResponse({ error: { message: err.message || 'Upstream error', stack: err.stack } }, 502, env);
     }
   }
 };
