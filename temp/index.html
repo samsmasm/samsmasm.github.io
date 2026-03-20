@@ -343,10 +343,10 @@
 
 <!-- Firebase SDKs (CDN) -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
+    getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   // ── Firebase config ──────────────────────────────────────────────────
   const firebaseConfig = {
@@ -491,19 +491,23 @@
 
     try {
       if (activeId) {
-        // Update existing — delete old, add new (simple approach)
-        await deleteDoc(doc(db, "notes", activeId));
+        // Update existing note in place
+        await setDoc(doc(db, "notes", activeId), { content, createdAt: serverTimestamp() });
+        notes = notes.map(n => n.id === activeId ? { ...n, content } : n);
+        renderList();
+        selectNote(activeId);
+      } else {
+        // New note
+        const docRef = await addDoc(collection(db, "notes"), {
+          content,
+          createdAt: serverTimestamp()
+        });
+        const newNote = { id: docRef.id, content, createdAt: Date.now() };
+        notes.unshift(newNote);
+        activeId = docRef.id;
+        renderList();
+        selectNote(docRef.id);
       }
-      const docRef = await addDoc(collection(db, "notes"), {
-        content,
-        createdAt: serverTimestamp()
-      });
-      // Optimistic local update
-      notes = notes.filter(n => n.id !== activeId);
-      notes.unshift({ id: docRef.id, content, createdAt: Date.now() });
-      activeId = docRef.id;
-      renderList();
-      selectNote(docRef.id);
     } catch (err) {
       alert("Failed to save: " + err.message);
     } finally {
@@ -552,8 +556,7 @@
   // ── Load from Firestore ──
   async function loadNotes() {
     try {
-      const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
+      const snap = await getDocs(collection(db, "notes"));
       const now = Date.now();
       const toDelete = [];
 
@@ -567,6 +570,9 @@
           notes.push({ id: d.id, content: data.content, createdAt });
         }
       });
+
+      // Sort newest first client-side
+      notes.sort((a, b) => b.createdAt - a.createdAt);
 
       // Clean up expired notes quietly
       toDelete.forEach(id => deleteDoc(doc(db, "notes", id)).catch(() => {}));
