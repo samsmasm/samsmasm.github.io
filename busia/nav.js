@@ -8,6 +8,7 @@ const STAGES = [
   { slug: 'conclusion',label: 'Conclusion',         num: 7  },
   { slug: 'submit',    label: 'Submitting It',      num: 8  },
   { slug: 'sample',    label: 'Sample IA',          num: 's'},
+  { slug: 'faq',      label: 'FAQ',                num: '?'},
 ];
 
 function getCurrentSlug() {
