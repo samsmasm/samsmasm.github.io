@@ -345,13 +345,14 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    getDatabase, ref, push, get, set, remove, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
   // ── Firebase config ──────────────────────────────────────────────────
   const firebaseConfig = {
     apiKey:            "AIzaSyCOSkL0C9_P8VeqpefXJbGCeOfXYwMMegE",
     authDomain:        "notes-ff975.firebaseapp.com",
+    databaseURL:       "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId:         "notes-ff975",
     storageBucket:     "notes-ff975.firebasestorage.app",
     messagingSenderId: "977644569179",
@@ -363,7 +364,7 @@
   const EXPIRY_MS = 96 * 60 * 60 * 1000; // 96 hours
 
   const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+  const db  = getDatabase(app);
 
   // ── State ──
   let notes = [];         // [{id, content, createdAt}]
@@ -492,21 +493,18 @@
     try {
       if (activeId) {
         // Update existing note in place
-        await setDoc(doc(db, "notes", activeId), { content, createdAt: serverTimestamp() });
+        await set(ref(db, "notes/" + activeId), { content, createdAt: serverTimestamp() });
         notes = notes.map(n => n.id === activeId ? { ...n, content } : n);
         renderList();
         selectNote(activeId);
       } else {
         // New note
-        const docRef = await addDoc(collection(db, "notes"), {
-          content,
-          createdAt: serverTimestamp()
-        });
-        const newNote = { id: docRef.id, content, createdAt: Date.now() };
+        const newRef = await push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
+        const newNote = { id: newRef.key, content, createdAt: Date.now() };
         notes.unshift(newNote);
-        activeId = docRef.id;
+        activeId = newRef.key;
         renderList();
-        selectNote(docRef.id);
+        selectNote(newRef.key);
       }
     } catch (err) {
       alert("Failed to save: " + err.message);
@@ -533,7 +531,7 @@
   async function deleteNote(id) {
     if (!confirm("Delete this note?")) return;
     try {
-      await deleteDoc(doc(db, "notes", id));
+      await remove(ref(db, "notes/" + id));
       notes = notes.filter(n => n.id !== id);
       if (activeId === id) {
         activeId = null;
@@ -553,29 +551,31 @@
     }
   }
 
-  // ── Load from Firestore ──
+  // ── Load from Realtime Database ──
   async function loadNotes() {
     try {
-      const snap = await getDocs(collection(db, "notes"));
+      const snap = await get(ref(db, "notes"));
       const now = Date.now();
       const toDelete = [];
 
       notes = [];
-      snap.forEach(d => {
-        const data = d.data();
-        const createdAt = data.createdAt?.toMillis?.() ?? now;
-        if (now - createdAt > EXPIRY_MS) {
-          toDelete.push(d.id); // expired — queue for cleanup
-        } else {
-          notes.push({ id: d.id, content: data.content, createdAt });
-        }
-      });
+      if (snap.exists()) {
+        snap.forEach(child => {
+          const data = child.val();
+          const createdAt = data.createdAt ?? now;
+          if (now - createdAt > EXPIRY_MS) {
+            toDelete.push(child.key);
+          } else {
+            notes.push({ id: child.key, content: data.content, createdAt });
+          }
+        });
+      }
 
-      // Sort newest first client-side
+      // Sort newest first
       notes.sort((a, b) => b.createdAt - a.createdAt);
 
       // Clean up expired notes quietly
-      toDelete.forEach(id => deleteDoc(doc(db, "notes", id)).catch(() => {}));
+      toDelete.forEach(id => remove(ref(db, "notes/" + id)).catch(() => {}));
 
       renderList();
       if (notes.length > 0) {
