@@ -319,6 +319,7 @@
     <button id="hamburger" aria-label="Toggle menu">&#9776;</button>
     <div id="note-title-display">Select a note</div>
     <span id="expires-label"></span>
+    <button class="btn btn-ghost" id="renew-btn" style="display:none" title="Reset expiry to 96 hours">&#8635; Renew</button>
   </div>
 
   <div id="note-area">
@@ -381,6 +382,7 @@
   const noteTextarea   = document.getElementById("note-textarea");
   const titleDisplay   = document.getElementById("note-title-display");
   const expiresLabel   = document.getElementById("expires-label");
+  const renewBtn       = document.getElementById("renew-btn");
   const sidebar        = document.getElementById("sidebar");
   const overlay        = document.getElementById("sidebar-overlay");
 
@@ -389,6 +391,12 @@
   function preview(content) {
     const words = content.trim().split(/\s+/).slice(0, 8).join(" ");
     return words.length < content.trim().length ? words + "…" : words;
+  }
+
+  function expiryColor(createdAt) {
+    const ratio = Math.max(0, Math.min(1, (Date.now() - createdAt) / EXPIRY_MS));
+    const hue = Math.round(120 * (1 - ratio));
+    return `hsl(${hue}, 70%, 42%)`;
   }
 
   function formatExpiry(createdAt) {
@@ -405,6 +413,7 @@
     emptyState.style.display = "none";
     noteView.style.display   = "none";
     noteEditor.style.display = "none";
+    if (panel !== noteView) renewBtn.style.display = "none";
     if (panel) panel.style.display = "flex";
     if (panel === noteView) noteView.style.display = "block";
   }
@@ -424,6 +433,7 @@
       const item = document.createElement("div");
       item.className = "note-item" + (note.id === activeId ? " active" : "");
       item.dataset.id = note.id;
+      item.style.borderLeftColor = expiryColor(note.createdAt);
 
       const prev = document.createElement("span");
       prev.className = "preview";
@@ -454,6 +464,7 @@
     noteView.textContent = note.content;
     titleDisplay.textContent = preview(note.content) || "(empty)";
     expiresLabel.textContent = formatExpiry(note.createdAt);
+    renewBtn.style.display = "inline-flex";
     showPanel(noteView);
 
     // Double-click to edit on desktop
@@ -524,6 +535,21 @@
       titleDisplay.textContent = "Select a note";
       expiresLabel.textContent = "";
       showPanel(emptyState);
+    }
+  }
+
+  // ── Renew ──
+  async function renewNote() {
+    if (!activeId) return;
+    try {
+      await set(ref(db, "notes/" + activeId + "/createdAt"), serverTimestamp());
+      const now = Date.now();
+      notes = notes.map(n => n.id === activeId ? { ...n, createdAt: now } : n);
+      const note = notes.find(n => n.id === activeId);
+      expiresLabel.textContent = formatExpiry(now);
+      renderList();
+    } catch (err) {
+      alert("Failed to renew: " + err.message);
     }
   }
 
@@ -605,7 +631,25 @@
   document.getElementById("save-btn").addEventListener("click", saveNote);
   document.getElementById("cancel-btn").addEventListener("click", cancelEdit);
   document.getElementById("hamburger").addEventListener("click", openSidebar);
+  renewBtn.addEventListener("click", renewNote);
   overlay.addEventListener("click", closeSidebar);
+
+  // Global keyboard shortcuts (not while typing in textarea)
+  document.addEventListener("keydown", e => {
+    if (isEditing) return;
+    if (e.target === noteTextarea) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      startNewNote();
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      if (notes.length === 0) return;
+      const idx = notes.findIndex(n => n.id === activeId);
+      let next = e.key === "ArrowUp" ? idx - 1 : idx + 1;
+      next = Math.max(0, Math.min(notes.length - 1, next));
+      if (next !== idx) selectNote(notes[next].id);
+    }
+  });
 
   // Ctrl+Enter / Cmd+Enter to save
   noteTextarea.addEventListener("keydown", e => {
