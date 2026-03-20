@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tote</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-width: 240px;
+      --bg: #f5f5f0;
+      --sidebar-bg: #1e1e1e;
+      --sidebar-text: #ccc;
+      --sidebar-hover: #2e2e2e;
+      --sidebar-active: #3a3a3a;
+      --accent: #e8a838;
+      --text: #222;
+      --border: #ddd;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: var(--sidebar-width);
+      background: var(--sidebar-bg);
+      color: var(--sidebar-text);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      height: 100dvh;
+      z-index: 10;
+    }
+
+    #sidebar-header {
+      padding: 16px 12px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #333;
+    }
+
+    #sidebar-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    #new-note-btn {
+      background: var(--accent);
+      border: none;
+      color: #000;
+      font-size: 20px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-weight: bold;
+    }
+
+    #new-note-btn:hover { opacity: 0.85; }
+
+    #note-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .note-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--sidebar-text);
+      border-left: 3px solid transparent;
+      transition: background 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .note-item:hover { background: var(--sidebar-hover); }
+    .note-item.active { background: var(--sidebar-active); border-left-color: var(--accent); color: #fff; }
+
+    .note-item .preview { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .note-item .delete-btn {
+      opacity: 0;
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .note-item:hover .delete-btn { opacity: 1; }
+    .note-item .delete-btn:hover { color: #e55; }
+
+    #empty-list {
+      padding: 20px 14px;
+      font-size: 12px;
+      color: #555;
+      font-style: italic;
+    }
+
+    #sidebar-footer {
+      padding: 8px 14px;
+      font-size: 11px;
+      color: #444;
+      border-top: 1px solid #2a2a2a;
+    }
+
+    /* ── Main area ── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    #toolbar {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #hamburger {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #555;
+    }
+
+    #hamburger:hover { background: #f0f0f0; }
+
+    #note-title-display {
+      font-size: 15px;
+      font-weight: 600;
+      color: #555;
+      flex: 1;
+    }
+
+    #expires-label {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    #note-area {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* view mode */
+    #note-view {
+      flex: 1;
+      padding: 28px 32px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 15px;
+      line-height: 1.7;
+      display: none;
+    }
+
+    /* edit mode */
+    #note-editor {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #note-textarea {
+      flex: 1;
+      width: 100%;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 28px 32px;
+      font-size: 15px;
+      line-height: 1.7;
+      font-family: inherit;
+      background: var(--bg);
+    }
+
+    #editor-actions {
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      background: #fff;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-ghost { background: #eee; color: #555; }
+    .btn-ghost:hover { background: #e0e0e0; }
+
+    /* empty state */
+    #empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      gap: 8px;
+    }
+
+    #empty-state p { font-size: 14px; }
+
+    /* ── Mobile overlay ── */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9;
+    }
+
+    /* ── Mobile styles ── */
+    @media (max-width: 600px) {
+      #sidebar {
+        position: fixed;
+        left: 0; top: 0; bottom: 0;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+
+      #sidebar.open {
+        transform: translateX(0);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+      }
+
+      #sidebar-overlay.visible { display: block; }
+
+      #hamburger { display: flex; align-items: center; }
+
+      #note-view { padding: 20px 16px; }
+      #note-textarea { padding: 20px 16px; }
+    }
+
+    /* ── Loading spinner ── */
+    #loading {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid #ddd;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar overlay for mobile -->
+<div id="sidebar-overlay"></div>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <h2>Tote</h2>
+    <button id="new-note-btn" title="New note">+</button>
+  </div>
+  <div id="note-list">
+    <div id="empty-list">No notes yet.</div>
+  </div>
+  <div id="sidebar-footer">Notes expire after 96 hours</div>
+</nav>
+
+<!-- Main -->
+<div id="main">
+  <div id="toolbar">
+    <button id="hamburger" aria-label="Toggle menu">&#9776;</button>
+    <div id="note-title-display">Select a note</div>
+    <span id="expires-label"></span>
+    <button class="btn btn-ghost" id="renew-btn" style="display:none" title="Reset expiry to 96 hours">&#8635; Renew</button>
+  </div>
+
+  <div id="note-area">
+    <div id="loading"><div class="spinner"></div> Loading…</div>
+
+    <div id="empty-state" style="display:none">
+      <p>No note selected.</p>
+      <button class="btn btn-primary" id="empty-new-btn">+ New Note</button>
+    </div>
+
+    <div id="note-view"></div>
+
+    <div id="note-editor" style="display:none">
+      <textarea id="note-textarea" placeholder="Write your note…"></textarea>
+      <div id="editor-actions">
+        <button class="btn btn-ghost" id="cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs (CDN) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getDatabase, ref, push, get, set, remove, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
+  // ── Firebase config ──────────────────────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "AIzaSyCOSkL0C9_P8VeqpefXJbGCeOfXYwMMegE",
+    authDomain:        "notes-ff975.firebaseapp.com",
+    databaseURL:       "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "notes-ff975",
+    storageBucket:     "notes-ff975.firebasestorage.app",
+    messagingSenderId: "977644569179",
+    appId:             "1:977644569179:web:5c23a086bb411bd1dfb57e",
+    measurementId:     "G-XN70GR5GNW"
+  };
+  // ────────────────────────────────────────────────────────────────────
+
+  const EXPIRY_MS = 96 * 60 * 60 * 1000; // 96 hours
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // ── State ──
+  let notes = [];         // [{id, content, createdAt}]
+  let activeId = null;
+  let isEditing = false;
+
+  // ── DOM refs ──
+  const noteList       = document.getElementById("note-list");
+  const emptyList      = document.getElementById("empty-list");
+  const loading        = document.getElementById("loading");
+  const emptyState     = document.getElementById("empty-state");
+  const noteView       = document.getElementById("note-view");
+  const noteEditor     = document.getElementById("note-editor");
+  const noteTextarea   = document.getElementById("note-textarea");
+  const titleDisplay   = document.getElementById("note-title-display");
+  const expiresLabel   = document.getElementById("expires-label");
+  const renewBtn       = document.getElementById("renew-btn");
+  const sidebar        = document.getElementById("sidebar");
+  const overlay        = document.getElementById("sidebar-overlay");
+
+  // ── Helpers ──
+
+  function preview(content) {
+    const words = content.trim().split(/\s+/).slice(0, 8).join(" ");
+    return words.length < content.trim().length ? words + "…" : words;
+  }
+
+  function expiryColor(createdAt) {
+    const ratio = Math.max(0, Math.min(1, (Date.now() - createdAt) / EXPIRY_MS));
+    const hue = Math.round(120 * (1 - ratio));
+    return `hsl(${hue}, 70%, 42%)`;
+  }
+
+  function formatExpiry(createdAt) {
+    const expiresAt = new Date(createdAt + EXPIRY_MS);
+    const diff = expiresAt - Date.now();
+    if (diff <= 0) return "expired";
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return `Expires in ${h}h ${m}m`;
+  }
+
+  function showPanel(panel) {
+    loading.style.display    = "none";
+    emptyState.style.display = "none";
+    noteView.style.display   = "none";
+    noteEditor.style.display = "none";
+    if (panel !== noteView) renewBtn.style.display = "none";
+    if (panel) panel.style.display = "flex";
+    if (panel === noteView) noteView.style.display = "block";
+  }
+
+  // ── Render sidebar ──
+  function renderList() {
+    // Remove old items (keep emptyList)
+    [...noteList.querySelectorAll(".note-item")].forEach(el => el.remove());
+
+    if (notes.length === 0) {
+      emptyList.style.display = "block";
+      return;
+    }
+    emptyList.style.display = "none";
+
+    notes.forEach(note => {
+      const item = document.createElement("div");
+      item.className = "note-item" + (note.id === activeId ? " active" : "");
+      item.dataset.id = note.id;
+      item.style.borderLeftColor = expiryColor(note.createdAt);
+
+      const prev = document.createElement("span");
+      prev.className = "preview";
+      prev.textContent = preview(note.content) || "(empty)";
+
+      const del = document.createElement("button");
+      del.className = "delete-btn";
+      del.title = "Delete note";
+      del.textContent = "✕";
+      del.addEventListener("click", e => { e.stopPropagation(); deleteNote(note.id); });
+
+      item.appendChild(prev);
+      item.appendChild(del);
+      item.addEventListener("click", () => { selectNote(note.id); closeSidebar(); });
+      noteList.appendChild(item);
+    });
+  }
+
+  // ── Select note ──
+  function selectNote(id) {
+    activeId = id;
+    isEditing = false;
+    renderList();
+
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+
+    noteView.textContent = note.content;
+    titleDisplay.textContent = preview(note.content) || "(empty)";
+    expiresLabel.textContent = formatExpiry(note.createdAt);
+    renewBtn.style.display = "inline-flex";
+    showPanel(noteView);
+
+    // Double-click to edit on desktop
+    noteView.ondblclick = () => startEdit(note);
+    // Tap-and-hold (or single tap) on mobile shows an edit button — handled via toolbar
+  }
+
+  // ── Edit ──
+  function startEdit(note) {
+    isEditing = true;
+    noteTextarea.value = note ? note.content : "";
+    showPanel(noteEditor);
+    noteTextarea.focus();
+  }
+
+  function startNewNote() {
+    activeId = null;
+    isEditing = true;
+    noteTextarea.value = "";
+    titleDisplay.textContent = "New note";
+    expiresLabel.textContent = "";
+    renderList();
+    showPanel(noteEditor);
+    noteTextarea.focus();
+    closeSidebar();
+  }
+
+  // ── Save ──
+  async function saveNote() {
+    const content = noteTextarea.value.trim();
+    if (!content) { cancelEdit(); return; }
+
+    const saveBtn = document.getElementById("save-btn");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+
+    try {
+      if (activeId) {
+        // Update existing note in place
+        await set(ref(db, "notes/" + activeId), { content, createdAt: serverTimestamp() });
+        notes = notes.map(n => n.id === activeId ? { ...n, content } : n);
+        renderList();
+        selectNote(activeId);
+      } else {
+        // New note
+        const newRef = await push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
+        const newNote = { id: newRef.key, content, createdAt: Date.now() };
+        notes.unshift(newNote);
+        activeId = newRef.key;
+        renderList();
+        selectNote(newRef.key);
+      }
+    } catch (err) {
+      alert("Failed to save: " + err.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
+  }
+
+  function cancelEdit() {
+    isEditing = false;
+    if (activeId) {
+      selectNote(activeId);
+    } else if (notes.length > 0) {
+      selectNote(notes[0].id);
+    } else {
+      titleDisplay.textContent = "Select a note";
+      expiresLabel.textContent = "";
+      showPanel(emptyState);
+    }
+  }
+
+  // ── Renew ──
+  async function renewNote() {
+    if (!activeId) return;
+    try {
+      await set(ref(db, "notes/" + activeId + "/createdAt"), serverTimestamp());
+      const now = Date.now();
+      notes = notes.map(n => n.id === activeId ? { ...n, createdAt: now } : n);
+      const note = notes.find(n => n.id === activeId);
+      expiresLabel.textContent = formatExpiry(now);
+      renderList();
+    } catch (err) {
+      alert("Failed to renew: " + err.message);
+    }
+  }
+
+  // ── Delete ──
+  async function deleteNote(id) {
+    if (!confirm("Delete this note?")) return;
+    try {
+      await remove(ref(db, "notes/" + id));
+      notes = notes.filter(n => n.id !== id);
+      if (activeId === id) {
+        activeId = null;
+        titleDisplay.textContent = "Select a note";
+        expiresLabel.textContent = "";
+      }
+      renderList();
+      if (activeId) {
+        selectNote(activeId);
+      } else if (notes.length > 0) {
+        selectNote(notes[0].id);
+      } else {
+        showPanel(emptyState);
+      }
+    } catch (err) {
+      alert("Failed to delete: " + err.message);
+    }
+  }
+
+  // ── Load from Realtime Database ──
+  async function loadNotes() {
+    try {
+      const snap = await get(ref(db, "notes"));
+      const now = Date.now();
+      const toDelete = [];
+
+      notes = [];
+      if (snap.exists()) {
+        snap.forEach(child => {
+          const data = child.val();
+          const createdAt = data.createdAt ?? now;
+          if (now - createdAt > EXPIRY_MS) {
+            toDelete.push(child.key);
+          } else {
+            notes.push({ id: child.key, content: data.content, createdAt });
+          }
+        });
+      }
+
+      // Sort newest first
+      notes.sort((a, b) => b.createdAt - a.createdAt);
+
+      // Clean up expired notes quietly
+      toDelete.forEach(id => remove(ref(db, "notes/" + id)).catch(() => {}));
+
+      renderList();
+      if (notes.length > 0) {
+        selectNote(notes[0].id);
+      } else {
+        showPanel(emptyState);
+      }
+    } catch (err) {
+      loading.innerHTML = `<span style="color:#e55">Error loading notes: ${err.message}</span>`;
+    }
+  }
+
+  // ── Mobile sidebar ──
+  function openSidebar() {
+    sidebar.classList.add("open");
+    overlay.classList.add("visible");
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("visible");
+  }
+
+  // ── Event listeners ──
+  document.getElementById("new-note-btn").addEventListener("click", startNewNote);
+  document.getElementById("empty-new-btn").addEventListener("click", startNewNote);
+  document.getElementById("save-btn").addEventListener("click", saveNote);
+  document.getElementById("cancel-btn").addEventListener("click", cancelEdit);
+  document.getElementById("hamburger").addEventListener("click", openSidebar);
+  renewBtn.addEventListener("click", renewNote);
+  overlay.addEventListener("click", closeSidebar);
+
+  // Global keyboard shortcuts (not while typing in textarea)
+  document.addEventListener("keydown", e => {
+    if (isEditing) return;
+    if (e.target === noteTextarea) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      startNewNote();
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      if (notes.length === 0) return;
+      const idx = notes.findIndex(n => n.id === activeId);
+      let next = e.key === "ArrowUp" ? idx - 1 : idx + 1;
+      next = Math.max(0, Math.min(notes.length - 1, next));
+      if (next !== idx) selectNote(notes[next].id);
+    }
+  });
+
+  // Ctrl+Enter / Cmd+Enter to save
+  noteTextarea.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") saveNote();
+    if (e.key === "Escape") cancelEdit();
+  });
+
+  // Edit button in toolbar when viewing a note
+  titleDisplay.style.cursor = "pointer";
+  titleDisplay.title = "Click to edit";
+  titleDisplay.addEventListener("click", () => {
+    if (activeId && !isEditing) {
+      const note = notes.find(n => n.id === activeId);
+      if (note) startEdit(note);
+    }
+  });
+
+  // ── Init ──
+  loadNotes();
+</script>
+</body>
+</html>
