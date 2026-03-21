@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IB Economics Graph Drawer</title>
+<title>Economics Graph Drawer</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
@@ -361,8 +361,8 @@
 <body>
 
 <header>
-  <h1>IB Economics Graph Drawer</h1>
-  <span class="tag">v1.4</span>
+  <h1>Economics Graph Drawer</h1>
+  <span class="tag">v1.5</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG()">⬇ Download JPG</button>
 </header>
@@ -377,8 +377,12 @@
       <span class="sub">Micro market equilibrium</span>
     </button>
     <button class="template-btn" onclick="loadTemplate('adas')">
-      AD / AS
+      New Classical AD/AS
       <span class="sub">Macroeconomic equilibrium</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('keyn')">
+      Keynesian AD/AS
+      <span class="sub">Horizontal AS with Keynesian range</span>
     </button>
     <button class="template-btn" onclick="loadTemplate('ext_neg')">
       Negative Externality
@@ -710,6 +714,30 @@ const TEMPLATES = {
       mkLine(0.52, 0.48, 0.52, 1.0, '#aaa', 1.5, '5,4', ''),
       mkText(0.52, 1.02, 'Yfe'),
       mkText(-0.07, 0.48, 'PL*'),
+    ]
+  },
+  keyn: {
+    title: '',
+    yLabel: 'Price level', xLabel: 'Real GDP',
+    curves: [
+      { name: 'AD', color: COLORS[0] },
+      { name: 'AS', color: COLORS[2] },
+    ],
+    elements: [
+      // AD: downward sloping
+      mkLine(0.05, 0.80, 0.80, 0.30, COLORS[0], 2.5, '', 'AD'),
+      // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
+      mkCurve([
+        {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
+        {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
+      ], COLORS[2], 2.5, '', 'AS'),
+      // YFE vertical line
+      mkLine(0.71, 0, 0.71, 1.0, COLORS[1], 1.5, '5,4', 'YFE'),
+      // Equilibrium: AD intersects flat part of AS at ~(0.20, 0.70)
+      mkLine(0, 0.70, 0.20, 0.70, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.20, 0.70, 0.20, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.20, 1.02, 'Y₁'),
+      mkText(-0.07, 0.70, 'P₁'),
     ]
   },
   ext_neg: {
@@ -1558,16 +1586,19 @@ function onMouseDown(e) {
         origDx: state[axisHit + 'Dx'], origDy: state[axisHit + 'Dy'] };
       return;
     }
-    // Priority 2: label drag/edit on already-selected element
-    if (state.selectedId) {
-      const selEl = state.elements.find(e => e.id === state.selectedId);
-      const hasLabel = selEl && selEl.type !== 'dot' && selEl.type !== 'text' &&
-                       (selEl.label || selEl.label === '');
-      if (hasLabel && selEl.label) {
-        const lpos = getFullLabelPos(selEl);
-        if (Math.abs(cx - lpos.x) < 36 && Math.abs(cy - lpos.y) < 14) {
-          labelDrag = { elId: selEl.id, startCx: cx, startCy: cy,
-            origDx: selEl.labelDx || 0, origDy: selEl.labelDy || 0, moved: false };
+    // Priority 2: label drag — check ALL elements with labels (allows single-click select+drag)
+    {
+      ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+      for (const el of state.elements) {
+        if (el.type === 'dot' || el.type === 'text') continue;
+        if (!el.label) continue;
+        const lpos = getFullLabelPos(el);
+        const hw = Math.max(22, ctx.measureText(el.label).width / 2 + 8);
+        if (Math.abs(cx - lpos.x) < hw && Math.abs(cy - lpos.y) < 14) {
+          state.selectedId = el.id;
+          renderProps();
+          labelDrag = { elId: el.id, startCx: cx, startCy: cy,
+            origDx: el.labelDx || 0, origDy: el.labelDy || 0, moved: false };
           return;
         }
       }
@@ -1862,7 +1893,9 @@ function onDblClick(e) {
     const el = mkRegion([...curvePoints], state.drawColor, 'solid');
     state.elements.push(el); state.selectedId = el.id;
     curvePoints = []; drawing = false;
-    renderProps(); redraw(); return;
+    renderProps(); redraw();
+    setTimeout(() => showInlineLabelEdit(el), 80);
+    return;
   }
 
   if (state.tool === 'select') {
@@ -2282,48 +2315,64 @@ function downloadJPG() {
   state.selectedId = null;
   const sv = viewScale, sox = viewOffsetX, soy = viewOffsetY;
   viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
+
+  // Collect legend items: named curves + labelled regions
+  const legendItems = [
+    ...state.curves.map(c => ({ name: c.name, color: c.color, type: 'line' })),
+    ...state.elements.filter(e => e.type === 'region' && e.label)
+      .map(e => ({ name: e.label, color: e.fillColor || COLORS[0], type: 'region', pattern: e.pattern })),
+  ];
+
+  // Calculate legend height
+  const itemW = 140, swatchW = 28, pad = 16, rowH = 24;
+  const cols = Math.max(1, Math.floor((W - pad * 2) / itemW));
+  const rows = legendItems.length > 0 ? Math.ceil(legendItems.length / cols) : 0;
+  const legendH = rows > 0 ? rows * rowH + pad * 2 + 8 : 0; // 8 for divider gap
+
+  // Temporarily expand canvas for legend
+  const origH = canvas.height;
+  canvas.height = origH + legendH;
+
   redraw();
-  if (state.curves.length > 0) drawLegend();
+
+  if (legendItems.length > 0) {
+    ctx.save();
+    ctx.font = '500 12px "IBM Plex Sans", sans-serif';
+    // Divider line
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(MARGIN.left, origH + 6); ctx.lineTo(W - MARGIN.right, origH + 6); ctx.stroke();
+
+    legendItems.forEach((item, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = pad + col * itemW;
+      const y = origH + pad + 8 + row * rowH + rowH / 2;
+
+      if (item.type === 'line') {
+        ctx.strokeStyle = item.color; ctx.lineWidth = 2; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + swatchW, y); ctx.stroke();
+      } else {
+        // Filled square swatch for region
+        ctx.fillStyle = hexToRgba(item.color, 0.5);
+        ctx.fillRect(x, y - 7, swatchW, 14);
+        ctx.strokeStyle = item.color; ctx.lineWidth = 1;
+        ctx.strokeRect(x, y - 7, swatchW, 14);
+      }
+      ctx.fillStyle = '#1a1918'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(item.name, x + swatchW + 6, y);
+    });
+    ctx.restore();
+  }
+
   const link = document.createElement('a');
-  const title = (state.title || 'ib-economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const title = (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
   link.download = title + '.jpg';
   link.href = canvas.toDataURL('image/jpeg', 0.97);
   link.click();
+
+  canvas.height = origH;
   viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
   redraw();
-}
-
-function drawLegend() {
-  const pad = 12, lineLen = 22, lineH = 20;
-  const totalH = state.curves.length * lineH + pad * 2;
-  const maxW = Math.max(...state.curves.map(c => ctx.measureText(c.name).width + lineLen + 14)) + pad * 2;
-  const lx = W - MARGIN.right - maxW - 8;
-  const ly = MARGIN.top + 8;
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = 0.8;
-  roundRect(ctx, lx, ly, maxW, totalH, 4);
-  ctx.fill();
-  ctx.stroke();
-
-  state.curves.forEach((c, i) => {
-    const y = ly + pad + i * lineH + lineH / 2;
-    ctx.strokeStyle = c.color;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(lx + pad, y);
-    ctx.lineTo(lx + pad + lineLen, y);
-    ctx.stroke();
-    ctx.font = '500 12px "IBM Plex Sans", sans-serif';
-    ctx.fillStyle = '#1a1918';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(c.name, lx + pad + lineLen + 6, y);
-  });
-  ctx.restore();
 }
 
 function roundRect(ctx, x, y, w, h, r) {
