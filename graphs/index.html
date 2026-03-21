@@ -361,9 +361,10 @@
 
 <header>
   <h1>Economics Graph Drawer</h1>
-  <span class="tag">v1.7</span>
+  <span class="tag">v1.8</span>
   <div class="spacer"></div>
-  <button onclick="downloadJPG()">⬇ Download JPG</button>
+  <button onclick="downloadJPG(1)">⬇ Standard JPG</button>
+  <button onclick="downloadJPG(2)">⬇ High-res JPG</button>
 </header>
 
 <div class="app">
@@ -494,8 +495,10 @@
 
     <div class="section-head" style="margin-top:4px">Export</div>
     <div class="props-form">
-      <button class="action-btn primary" onclick="downloadJPG()">Download JPG</button>
-      <div style="font-size:12px;color:var(--text);font-family:var(--sans);line-height:1.5">680×560px · white background · ready for submission</div>
+      <button class="action-btn primary" onclick="downloadJPG(1)">Download JPG (standard)</button>
+      <div style="font-size:11px;color:var(--text);font-family:var(--sans);line-height:1.4;margin-bottom:6px">680×560px</div>
+      <button class="action-btn primary" onclick="downloadJPG(2)">Download JPG (high-res)</button>
+      <div style="font-size:11px;color:var(--text);font-family:var(--sans);line-height:1.4">1360×1120px</div>
     </div>
   </div>
 </div>
@@ -557,7 +560,7 @@ const COLORS = [
 ];
 const MARGIN = { top: 50, right: 60, bottom: 60, left: 70 };
 const W = 680, H = 560;
-const SCALE = 2; // render scale — canvas pixels = W*SCALE × H*SCALE, logical coords stay W×H
+let SCALE = 2; // render scale — canvas pixels = W*SCALE × H*SCALE, logical coords stay W×H
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;
 
@@ -626,15 +629,33 @@ function redo() {
 const canvas = document.getElementById('graph-canvas');
 canvas.width = W * SCALE;
 canvas.height = H * SCALE;
-canvas.style.width = W + 'px';
-canvas.style.height = H + 'px';
 const ctx = canvas.getContext('2d');
+
+// Fit canvas to available space while preserving aspect ratio
+const canvasWrap = document.querySelector('.canvas-wrap');
+function fitCanvas() {
+  const ww = canvasWrap.clientWidth;
+  const wh = canvasWrap.clientHeight;
+  const aspect = W / H;
+  let cw, ch;
+  if (ww / wh > aspect) {
+    ch = wh;
+    cw = ch * aspect;
+  } else {
+    cw = ww;
+    ch = cw / aspect;
+  }
+  canvas.style.width = Math.floor(cw) + 'px';
+  canvas.style.height = Math.floor(ch) + 'px';
+}
+new ResizeObserver(fitCanvas).observe(canvasWrap);
 
 // ─── INIT ────────────────────────────────────────────────────
 function init() {
   buildColorRow();
   buildModalColors();
   loadTemplate('blank');
+  fitCanvas();
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mouseup', onMouseUp);
@@ -2321,10 +2342,13 @@ function loadFromSaveModal() {
   }
 }
 
-function downloadJPG() {
+function downloadJPG(exportScale) {
+  exportScale = exportScale || SCALE;
   state.selectedId = null;
   const sv = viewScale, sox = viewOffsetX, soy = viewOffsetY;
+  const origScale = SCALE;
   viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
+  SCALE = exportScale;
 
   // Collect legend items: named curves + labelled regions
   const legendItems = [
@@ -2333,22 +2357,22 @@ function downloadJPG() {
       .map(e => ({ name: e.label, color: e.fillColor || COLORS[0], type: 'region', pattern: e.pattern })),
   ];
 
-  // Calculate legend height
+  // Calculate legend height (in logical coords)
   const itemW = 140, swatchW = 28, pad = 16, rowH = 24;
   const cols = Math.max(1, Math.floor((W - pad * 2) / itemW));
   const rows = legendItems.length > 0 ? Math.ceil(legendItems.length / cols) : 0;
-  const legendH = rows > 0 ? rows * rowH + pad * 2 + 8 : 0; // 8 for divider gap
+  const legendH = rows > 0 ? rows * rowH + pad * 2 + 8 : 0;
 
-  // Temporarily expand canvas for legend (in scaled pixels)
-  const origH = canvas.height;
-  canvas.height = (H + legendH) * SCALE;
+  // Resize canvas for export
+  const origW = canvas.width, origHh = canvas.height;
+  canvas.width = W * exportScale;
+  canvas.height = (H + legendH) * exportScale;
 
   redraw();
 
-  // Legend is drawn in logical coords with base scale
-  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  // Draw legend at export scale
+  ctx.setTransform(exportScale, 0, 0, exportScale, 0, 0);
 
-  // Fill legend area with white (redraw() only fills the graph area)
   if (legendH > 0) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, H, W, legendH);
@@ -2357,7 +2381,6 @@ function downloadJPG() {
   if (legendItems.length > 0) {
     ctx.save();
     ctx.font = '500 12px "IBM Plex Sans", sans-serif';
-    // Divider line
     ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(MARGIN.left, H + 6); ctx.lineTo(W - MARGIN.right, H + 6); ctx.stroke();
 
@@ -2371,7 +2394,6 @@ function downloadJPG() {
         ctx.strokeStyle = item.color; ctx.lineWidth = 2; ctx.setLineDash([]);
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + swatchW, y); ctx.stroke();
       } else {
-        // Filled square swatch for region
         ctx.fillStyle = hexToRgba(item.color, 0.5);
         ctx.fillRect(x, y - 7, swatchW, 14);
         ctx.strokeStyle = item.color; ctx.lineWidth = 1;
@@ -2383,13 +2405,18 @@ function downloadJPG() {
     ctx.restore();
   }
 
+  // Export
   const link = document.createElement('a');
   const title = (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
-  link.download = title + '.jpg';
+  const suffix = exportScale > 1 ? '-hires' : '';
+  link.download = title + suffix + '.jpg';
   link.href = canvas.toDataURL('image/jpeg', 0.97);
   link.click();
 
-  canvas.height = H * SCALE;
+  // Restore canvas and state
+  SCALE = origScale;
+  canvas.width = origW;
+  canvas.height = origHh;
   viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
   redraw();
 }
