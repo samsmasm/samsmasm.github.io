@@ -362,7 +362,7 @@
 
 <header>
   <h1>IB Economics Graph Drawer</h1>
-  <span class="tag">v1.3</span>
+  <span class="tag">v1.4</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG()">⬇ Download JPG</button>
 </header>
@@ -458,6 +458,11 @@
       <div class="sep"></div>
       <button class="tb-toggle" id="snap-btn" onclick="toggleSnap()">Snap: off</button>
       <button class="tb-toggle" id="bw-btn" onclick="toggleBW()">Colour</button>
+      <div class="sep"></div>
+      <button class="tb-toggle" onclick="zoomOut()" title="Zoom out" style="padding:4px 8px;min-width:28px">−</button>
+      <span id="zoom-label" style="font-size:11px;font-family:var(--mono);color:var(--muted);min-width:38px;text-align:center;user-select:none">100%</span>
+      <button class="tb-toggle" onclick="zoomIn()" title="Zoom in" style="padding:4px 8px;min-width:28px">+</button>
+      <button class="tb-toggle" onclick="resetView()" title="Reset zoom and pan" style="font-size:10px">Reset view</button>
       <span class="hint" id="hint-text">Select a template or pick a tool to draw</span>
     </div>
     <div class="canvas-wrap">
@@ -580,6 +585,12 @@ let snapEnabled = false;
 let snapHoverActive = false;
 let bwMode = false;
 
+let viewScale = 1.0;
+let viewOffsetX = 0, viewOffsetY = 0;
+let isPanning = false;
+let panStartRaw = null, panStartOffset = null;
+let spaceHeld = false;
+
 // ─── UNDO / REDO ─────────────────────────────────────────────
 let undoStack = [];
 let redoStack = [];
@@ -621,6 +632,8 @@ function init() {
   canvas.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('dblclick', onDblClick);
   document.addEventListener('keydown', onKeyDown);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  document.addEventListener('keyup', onKeyUp);
 }
 
 function buildColorRow() {
@@ -904,6 +917,32 @@ function toggleBW() {
   redraw();
 }
 
+function applyViewXform() {
+  ctx.setTransform(viewScale, 0, 0, viewScale, viewOffsetX, viewOffsetY);
+}
+
+function resetView() {
+  viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
+  updateZoomLabel(); redraw();
+}
+
+function zoomIn()  { changeZoom(1.2, W / 2, H / 2); }
+function zoomOut() { changeZoom(1 / 1.2, W / 2, H / 2); }
+
+function changeZoom(factor, rawCx, rawCy) {
+  const newScale = Math.max(0.25, Math.min(8, viewScale * factor));
+  const f = newScale / viewScale;
+  viewOffsetX = rawCx - (rawCx - viewOffsetX) * f;
+  viewOffsetY = rawCy - (rawCy - viewOffsetY) * f;
+  viewScale = newScale;
+  updateZoomLabel(); redraw();
+}
+
+function updateZoomLabel() {
+  const el = document.getElementById('zoom-label');
+  if (el) el.textContent = Math.round(viewScale * 100) + '%';
+}
+
 function segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
   const rx = bx-ax, ry = by-ay, sx = dx-cx, sy = dy-cy;
   const denom = rx*sy - ry*sx;
@@ -1011,6 +1050,7 @@ function getSnapCandidate(cx, cy, includeOnSeg = false) {
 
 function drawSnapIndicator(x, y) {
   ctx.save();
+  applyViewXform();
   ctx.strokeStyle = '#1a4a8a'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
   ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x-10, y); ctx.lineTo(x+10, y); ctx.stroke();
@@ -1210,11 +1250,18 @@ function redraw() {
   state.title = document.getElementById('graph-title').value;
   state.yLabel = document.getElementById('y-label').value;
   state.xLabel = document.getElementById('x-label').value;
-  ctx.clearRect(0, 0, W, H);
+  // Clear entire canvas with bg colour (no transform)
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#f5f4f0';
+  ctx.fillRect(0, 0, W, H);
+  // Apply view transform for all diagram drawing
+  applyViewXform();
   drawBackground();
   drawAxes();
   drawElements();
   drawSelectionHandles();
+  // Reset transform after drawing
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 function drawBackground() {
@@ -1487,9 +1534,21 @@ function onMouseDown(e) {
   const r = canvas.getBoundingClientRect();
   const scaleX = canvas.width / r.width;
   const scaleY = canvas.height / r.height;
-  const cx = (e.clientX - r.left) * scaleX;
-  const cy = (e.clientY - r.top) * scaleY;
+  const rawCx = (e.clientX - r.left) * scaleX;
+  const rawCy = (e.clientY - r.top) * scaleY;
+  const cx = (rawCx - viewOffsetX) / viewScale;
+  const cy = (rawCy - viewOffsetY) / viewScale;
   const n = fromCanvas(cx, cy);
+
+  // Pan: space+drag or middle mouse button
+  if (spaceHeld || e.button === 1) {
+    e.preventDefault();
+    isPanning = true;
+    panStartRaw = { x: rawCx, y: rawCy };
+    panStartOffset = { x: viewOffsetX, y: viewOffsetY };
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
 
   if (state.tool === 'select') {
     // Priority 1: axis label drag
@@ -1545,7 +1604,9 @@ function onMouseDown(e) {
     }
     redraw();
     // preview
+    ctx.save(); applyViewXform();
     drawCurvePreview();
+    ctx.restore();
   } else if (state.tool === 'text') {
     const txt = prompt('Enter label text:');
     if (txt && txt.trim()) {
@@ -1566,7 +1627,9 @@ function onMouseDown(e) {
     curvePoints.push({ xn: finalN.xn, yn: finalN.yn });
     if (curvePoints.length === 1) drawing = true;
     redraw();
+    ctx.save(); applyViewXform();
     drawRegionPreview();
+    ctx.restore();
   } else if (state.tool === 'equil') {
     const pLbl = prompt('P* label (leave blank to skip):', 'P*');
     if (pLbl === null) return;
@@ -1585,9 +1648,17 @@ function onMouseMove(e) {
   const r = canvas.getBoundingClientRect();
   const scaleX = canvas.width / r.width;
   const scaleY = canvas.height / r.height;
-  const cx = (e.clientX - r.left) * scaleX;
-  const cy = (e.clientY - r.top) * scaleY;
+  const rawCx = (e.clientX - r.left) * scaleX;
+  const rawCy = (e.clientY - r.top) * scaleY;
+  const cx = (rawCx - viewOffsetX) / viewScale;
+  const cy = (rawCy - viewOffsetY) / viewScale;
   const n = fromCanvas(cx, cy);
+
+  if (isPanning) {
+    viewOffsetX = panStartOffset.x + (rawCx - panStartRaw.x);
+    viewOffsetY = panStartOffset.y + (rawCy - panStartRaw.y);
+    redraw(); return;
+  }
 
   // Node drag
   if (nodeDrag) {
@@ -1625,6 +1696,7 @@ function onMouseMove(e) {
     const a = toCanvas(drawStart.xn, drawStart.yn);
     const b = geoSnap ? { x: geoSnap.x, y: geoSnap.y } : toCanvas(endN.xn, endN.yn);
     ctx.save();
+    applyViewXform();
     ctx.strokeStyle = state.drawColor;
     ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
     const dash = document.getElementById('stroke-dash').value;
@@ -1636,7 +1708,9 @@ function onMouseMove(e) {
     if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'curve' && drawing && curvePoints.length > 0) {
     redraw();
+    ctx.save(); applyViewXform();
     drawCurvePreview(n);
+    ctx.restore();
   } else if (state.tool === 'region' && drawing && curvePoints.length > 0) {
     const geoSnap = getSnapCandidate(cx, cy, true);
     let previewN;
@@ -1648,7 +1722,9 @@ function onMouseMove(e) {
       previewN = n;
     }
     redraw();
+    ctx.save(); applyViewXform();
     drawRegionPreview(previewN);
+    ctx.restore();
     if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'select' && drawing && drawStart) {
     // drag to move
@@ -1707,9 +1783,17 @@ function onMouseUp(e) {
   const r = canvas.getBoundingClientRect();
   const scaleX = canvas.width / r.width;
   const scaleY = canvas.height / r.height;
-  const cx = (e.clientX - r.left) * scaleX;
-  const cy = (e.clientY - r.top) * scaleY;
+  const rawCx = (e.clientX - r.left) * scaleX;
+  const rawCy = (e.clientY - r.top) * scaleY;
+  const cx = (rawCx - viewOffsetX) / viewScale;
+  const cy = (rawCy - viewOffsetY) / viewScale;
   const n = fromCanvas(cx, cy);
+
+  if (isPanning) {
+    isPanning = false;
+    canvas.style.cursor = spaceHeld ? 'grab' : (state.tool === 'select' ? 'default' : 'crosshair');
+    return;
+  }
 
   if (nodeDrag) { nodeDrag = null; redraw(); return; }
 
@@ -1758,8 +1842,10 @@ function onDblClick(e) {
   const r = canvas.getBoundingClientRect();
   const scaleX = canvas.width / r.width;
   const scaleY = canvas.height / r.height;
-  const cx = (e.clientX - r.left) * scaleX;
-  const cy = (e.clientY - r.top) * scaleY;
+  const rawCx = (e.clientX - r.left) * scaleX;
+  const rawCy = (e.clientY - r.top) * scaleY;
+  const cx = (rawCx - viewOffsetX) / viewScale;
+  const cy = (rawCy - viewOffsetY) / viewScale;
 
   if (state.tool === 'curve' && drawing && curvePoints.length >= 2) {
     saveUndo();
@@ -1785,7 +1871,29 @@ function onDblClick(e) {
   }
 }
 
+function onWheel(e) {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const rawCx = (e.clientX - r.left) * (canvas.width / r.width);
+  const rawCy = (e.clientY - r.top) * (canvas.height / r.height);
+  changeZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, rawCx, rawCy);
+}
+
+function onKeyUp(e) {
+  if (e.key === ' ') {
+    spaceHeld = false;
+    if (!isPanning) canvas.style.cursor = state.tool === 'select' ? 'default' : 'crosshair';
+  }
+}
+
 function onKeyDown(e) {
+  if (e.key === ' ') {
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+    if (!spaceHeld) { spaceHeld = true; canvas.style.cursor = 'grab'; }
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
@@ -2172,15 +2280,17 @@ function loadFromSaveModal() {
 
 function downloadJPG() {
   state.selectedId = null;
+  const sv = viewScale, sox = viewOffsetX, soy = viewOffsetY;
+  viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
   redraw();
-  // Draw legend if curves exist
   if (state.curves.length > 0) drawLegend();
   const link = document.createElement('a');
   const title = (state.title || 'ib-economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
   link.download = title + '.jpg';
   link.href = canvas.toDataURL('image/jpeg', 0.97);
   link.click();
-  redraw(); // restore without legend overlay
+  viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
+  redraw();
 }
 
 function drawLegend() {
