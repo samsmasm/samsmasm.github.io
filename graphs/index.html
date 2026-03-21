@@ -2190,6 +2190,7 @@ function renderProps() {
   if (el.type === 'line' || el.type === 'arrow') {
     html += `<button class="action-btn secondary" style="margin-top:4px" onclick="makeLineOrthogonal()">Make horizontal / vertical</button>`;
   }
+  html += `<button class="action-btn secondary" style="margin-top:4px" onclick="duplicateSelected()">Duplicate</button>`;
   html += `<button class="action-btn danger" style="margin-top:4px" onclick="deleteSelected()">Delete element</button>`;
   form.innerHTML = html;
 }
@@ -2217,6 +2218,34 @@ function colorSwatchHTML(currentColor, propKey) {
     `<div style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;box-sizing:border-box;border:3px solid ${c===currentColor?'#1a1918':'transparent'}"
       onclick="setPropColor('${propKey}','${c}')"></div>`
   ).join('')}</div>`;
+}
+
+function duplicateSelected() {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  saveUndo();
+  // Append '1' to original label
+  const origLabel = el.type === 'text' ? 'text' : (el.label || '');
+  if (el.type !== 'text' && origLabel !== '') el.label = origLabel + '1';
+  // Deep-copy as duplicate with new id, offset slightly, label + '2'
+  const dup = JSON.parse(JSON.stringify(el));
+  dup.id = nextId++;
+  const off = 0.03;
+  if (dup.type === 'line' || dup.type === 'arrow') {
+    dup.x1n += off; dup.y1n += off; dup.x2n += off; dup.y2n += off;
+  } else if (dup.type === 'curve') {
+    dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
+  } else if (dup.type === 'region') {
+    dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
+  } else if (dup.type === 'text' || dup.type === 'dot') {
+    dup.xn += off; dup.yn += off;
+  }
+  if (dup.type !== 'text') dup.label = origLabel + '2';
+  state.elements.push(dup);
+  state.selectedId = dup.id;
+  renderCurveList();
+  renderProps();
+  redraw();
 }
 
 function deleteSelected() {
