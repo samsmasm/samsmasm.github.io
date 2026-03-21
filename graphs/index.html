@@ -363,6 +363,7 @@
   <h1>ShiftWork</h1>
   <span style="font-family:var(--sans);font-size:13px;color:var(--text);opacity:0.7;margin-left:2px;margin-right:8px">economics graph maker</span>
   <span class="tag">v1.8</span>
+  <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG(1)">⬇ Standard JPG</button>
   <button onclick="downloadJPG(2)">⬇ High-res JPG</button>
@@ -997,6 +998,8 @@ function changeZoom(factor, rawCx, rawCy) {
 function updateZoomLabel() {
   const el = document.getElementById('zoom-label');
   if (el) el.textContent = Math.round(viewScale * 100) + '%';
+  const hint = document.getElementById('pan-hint');
+  if (hint) hint.style.display = (viewScale > 1 && state.tool === 'select') ? '' : 'none';
 }
 
 function segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
@@ -1560,6 +1563,7 @@ function setTool(t) {
   document.getElementById('tool-' + t)?.classList.add('active');
   canvas.style.cursor = t === 'select' ? 'default' : 'crosshair';
   updateHint(t);
+  updateZoomLabel();
   curvePoints = [];
   drawing = false;
 }
@@ -1587,15 +1591,6 @@ function onMouseDown(e) {
   const cy = (rawCy - viewOffsetY) / viewScale;
   const n = fromCanvas(cx, cy);
 
-  // Pan: space+drag or middle mouse button — select mode only
-  if (state.tool === 'select' && (spaceHeld || e.button === 1)) {
-    e.preventDefault();
-    isPanning = true;
-    panStartRaw = { x: rawCx, y: rawCy };
-    panStartOffset = { x: viewOffsetX, y: viewOffsetY };
-    canvas.style.cursor = 'grabbing';
-    return;
-  }
 
   if (state.tool === 'select') {
     // Priority 1: axis label drag
@@ -1641,8 +1636,8 @@ function onMouseDown(e) {
       saveUndo();
       drawing = true;
       drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)) };
-    } else {
-      // Empty area — pan the view
+    } else if (e.shiftKey || spaceHeld || e.button === 1) {
+      // Empty area + shift (or space/middle) — pan the view
       isPanning = true;
       panStartRaw = { x: rawCx, y: rawCy };
       panStartOffset = { x: viewOffsetX, y: viewOffsetY };
