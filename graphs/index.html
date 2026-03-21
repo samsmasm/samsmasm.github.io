@@ -262,15 +262,16 @@
 
   .canvas-wrap {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    overflow: auto;
+    position: relative;
+    overflow: hidden;
     background: var(--bg);
   }
 
   #graph-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     background: #ffffff;
     box-shadow: 0 2px 16px rgba(0,0,0,0.10);
     border-radius: 4px;
@@ -362,7 +363,7 @@
 
 <header>
   <h1>Economics Graph Drawer</h1>
-  <span class="tag">v1.5</span>
+  <span class="tag">v1.6</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG()">⬇ Download JPG</button>
 </header>
@@ -372,6 +373,10 @@
   <!-- LEFT SIDEBAR -->
   <div class="sidebar">
     <div class="section-head">Templates</div>
+    <button class="template-btn" onclick="loadTemplate('blank')">
+      Blank axes
+      <span class="sub">Start from scratch</span>
+    </button>
     <button class="template-btn" onclick="loadTemplate('sd')">
       Supply &amp; Demand
       <span class="sub">Micro market equilibrium</span>
@@ -391,10 +396,6 @@
     <button class="template-btn" onclick="loadTemplate('ext_pos')">
       Positive Externality
       <span class="sub">Market failure (underproduction)</span>
-    </button>
-    <button class="template-btn" onclick="loadTemplate('blank')">
-      Blank axes
-      <span class="sub">Start from scratch</span>
     </button>
 
     <div class="section-head" style="margin-top:4px">Drawing tool</div>
@@ -630,7 +631,7 @@ const ctx = canvas.getContext('2d');
 function init() {
   buildColorRow();
   buildModalColors();
-  loadTemplate('sd');
+  loadTemplate('blank');
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mouseup', onMouseUp);
@@ -724,15 +725,16 @@ const TEMPLATES = {
       { name: 'AS', color: COLORS[2] },
     ],
     elements: [
-      // AD: downward sloping
-      mkLine(0.05, 0.80, 0.80, 0.30, COLORS[0], 2.5, '', 'AD'),
+      // AD: downward sloping (high price at low GDP → low price at high GDP)
+      mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD'),
       // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
       mkCurve([
         {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
         {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
       ], COLORS[2], 2.5, '', 'AS'),
-      // YFE vertical line
-      mkLine(0.71, 0, 0.71, 1.0, COLORS[1], 1.5, '5,4', 'YFE'),
+      // YFE vertical line (label placed below x-axis via mkText)
+      mkLine(0.71, 0, 0.71, 1.0, COLORS[1], 1.5, '5,4', ''),
+      mkText(0.71, 1.05, 'YFE'),
       // Equilibrium: AD intersects flat part of AS at ~(0.20, 0.70)
       mkLine(0, 0.70, 0.20, 0.70, '#aaa', 1.5, '5,4', ''),
       mkLine(0.20, 0.70, 0.20, 1.0, '#aaa', 1.5, '5,4', ''),
@@ -914,6 +916,7 @@ function showInlineLabelEdit(el) {
     saveUndo();
     if (el.type === 'text') el.text = val; else el.label = val;
     if (inp.parentNode) inp.parentNode.removeChild(inp);
+    if (el.type === 'region') renderCurveList();
     renderProps(); redraw();
   };
   const cancel = () => {
@@ -1214,15 +1217,6 @@ function drawRegionEl(el) {
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     drawLabelAt(el.label, cx + (el.labelDx || 0), cy + (el.labelDy || 0), color);
-    if (el.id === state.selectedId) {
-      ctx.save();
-      ctx.font = '500 13px "IBM Plex Sans", sans-serif';
-      const lw = ctx.measureText(el.label).width;
-      const lx = cx + (el.labelDx || 0), ly = cy + (el.labelDy || 0);
-      ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
-      ctx.beginPath(); ctx.moveTo(lx - lw/2, ly + 8); ctx.lineTo(lx + lw/2, ly + 8); ctx.stroke();
-      ctx.restore();
-    }
   }
 }
 
@@ -2027,6 +2021,17 @@ function renderCurveList() {
     `;
     list.appendChild(div);
   });
+  // Also show labeled regions
+  state.elements.filter(e => e.type === 'region' && e.label).forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'curve-item';
+    const col = e.fillColor || COLORS[0];
+    div.innerHTML = `
+      <div class="curve-swatch" style="background:${hexToRgba(col, 0.5)};border:1px solid ${col}"></div>
+      <span class="curve-name">${e.label}</span>
+    `;
+    list.appendChild(div);
+  });
 }
 
 let modalColorSelected = COLORS[0];
@@ -2168,6 +2173,7 @@ function updateProp(key, value) {
   if (!el) return;
   saveUndo();
   el[key] = value;
+  if (key === 'label' || key === 'fillColor') renderCurveList();
   redraw();
 }
 
@@ -2191,6 +2197,7 @@ function deleteSelected() {
   saveUndo();
   state.elements = state.elements.filter(e => e.id !== state.selectedId);
   state.selectedId = null;
+  renderCurveList();
   renderProps();
   redraw();
 }
@@ -2334,6 +2341,12 @@ function downloadJPG() {
   canvas.height = origH + legendH;
 
   redraw();
+
+  // Fill legend area with white (redraw() only fills the graph area)
+  if (legendH > 0) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, origH, W, legendH);
+  }
 
   if (legendItems.length > 0) {
     ctx.save();
