@@ -248,7 +248,7 @@
   }
   .canvas-toolbar input[type=text]:focus { outline: 2px solid var(--accent); border-color: transparent; }
   .canvas-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
-  .hint { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-left: auto; }
+  .hint { font-size: 13px; color: var(--text); font-family: var(--mono); font-weight: 500; margin-left: auto; }
   .tb-toggle {
     font-family: var(--mono); font-size: 10px; font-weight: 500;
     background: var(--tag-bg); border: 1.5px solid var(--border);
@@ -362,7 +362,7 @@
 
 <header>
   <h1>IB Economics Graph Drawer</h1>
-  <span class="tag">v1.2</span>
+  <span class="tag">v1.3</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG()">⬇ Download JPG</button>
 </header>
@@ -469,7 +469,7 @@
   <div class="right-panel">
     <div class="section-head">Selected object</div>
     <div class="props-form" id="props-form">
-      <div style="font-size:11px;color:var(--muted);padding:4px 0;font-family:var(--mono)">Nothing selected.<br><br>Click an element to edit its label, color, or position.</div>
+      <div style="font-size:13px;color:var(--text);padding:4px 0;font-family:var(--sans);line-height:1.5">Nothing selected.<br><br>Click any line, curve, or region to edit its label, colour, or style.</div>
     </div>
 
     <div class="section-head" style="margin-top:4px">Canvas</div>
@@ -478,10 +478,16 @@
       <button class="action-btn danger" onclick="clearAll()">Reset everything</button>
     </div>
 
+    <div class="section-head" style="margin-top:4px">Save / Load</div>
+    <div class="props-form">
+      <button class="action-btn secondary" onclick="openSaveModal()">Save / Load diagram</button>
+      <div style="font-size:12px;color:var(--text);font-family:var(--sans);line-height:1.5">Copy a code to save your diagram, paste it back to restore it later.</div>
+    </div>
+
     <div class="section-head" style="margin-top:4px">Export</div>
     <div class="props-form">
       <button class="action-btn primary" onclick="downloadJPG()">Download JPG</button>
-      <div style="font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.5">680×560px · white background · ready for submission</div>
+      <div style="font-size:12px;color:var(--text);font-family:var(--sans);line-height:1.5">680×560px · white background · ready for submission</div>
     </div>
   </div>
 </div>
@@ -501,6 +507,21 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-confirm" onclick="confirmAddCurve()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVE / LOAD MODAL -->
+<div class="modal-overlay" id="save-modal">
+  <div class="modal">
+    <h2>Save / Load diagram</h2>
+    <div class="field">
+      <label>Copy this code to save · paste it back to restore</label>
+      <textarea id="save-code" rows="5" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;background:var(--tag-bg);border:1px solid var(--border);border-radius:4px;padding:8px;color:var(--text);margin-top:4px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('save-modal').classList.remove('open')">Close</button>
+      <button class="btn-confirm" onclick="loadFromSaveModal()">Load from code</button>
     </div>
   </div>
 </div>
@@ -822,11 +843,11 @@ function hitTestAxisLabel(cx, cy) {
   const xly = MARGIN.top + PLOT_H + 8 + state.xLabelDy;
   const xw = ctx.measureText(state.xLabel).width;
   if (cx >= xlx - xw - 4 && cx <= xlx + 4 && Math.abs(cy - xly - 6) < 14) return 'xLabel';
-  // Y label: rotated, centered along left side of y-axis
+  // Y label: rotated, top-left of y-axis; right-aligned so text ends at top
   const ylx = MARGIN.left / 2 + state.yLabelDx;
-  const yly = MARGIN.top + PLOT_H / 2 + state.yLabelDy;
+  const yly = MARGIN.top + state.yLabelDy;
   const yw = ctx.measureText(state.yLabel).width;
-  if (Math.abs(cx - ylx) < 12 && Math.abs(cy - yly) < yw / 2 + 4) return 'yLabel';
+  if (Math.abs(cx - ylx) < 12 && cy >= yly - 4 && cy <= yly + yw + 4) return 'yLabel';
   return null;
 }
 
@@ -1229,11 +1250,11 @@ function drawAxes() {
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, MARGIN.top + PLOT_H + 8 + state.xLabelDy);
-  // Y label — rotated 90° CCW, centered along left side of y-axis
+  // Y label — rotated 90° CCW, top-left of y-axis
   ctx.save();
-  ctx.translate(MARGIN.left / 2 + state.yLabelDx, MARGIN.top + PLOT_H / 2 + state.yLabelDy);
+  ctx.translate(MARGIN.left / 2 + state.yLabelDx, MARGIN.top + state.yLabelDy);
   ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.fillText(state.yLabel, 0, 0);
   ctx.restore();
@@ -1901,7 +1922,7 @@ function renderProps() {
   const form = document.getElementById('props-form');
   const el = state.elements.find(e => e.id === state.selectedId);
   if (!el) {
-    form.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0;font-family:var(--mono)">Nothing selected.<br><br>Click an element to edit.</div>';
+    form.innerHTML = '<div style="font-size:13px;color:var(--text);padding:4px 0;font-family:var(--sans);line-height:1.5">Nothing selected.<br><br>Click any line, curve, or region to edit its label, colour, or style.</div>';
     return;
   }
   let html = '';
@@ -1936,9 +1957,7 @@ function renderProps() {
     </div>
     <div class="prop-row">
       <label>Color</label>
-      <select onchange="updateProp('fillColor',this.value)">
-        ${COLORS.map(c=>`<option value="${c}" ${el.fillColor===c?'selected':''}>${c}</option>`).join('')}
-      </select>
+      ${colorSwatchHTML(el.fillColor || COLORS[0], 'fillColor')}
     </div>`;
     if (el.pattern === 'solid') {
       html += `<div class="prop-row">
@@ -1962,9 +1981,7 @@ function renderProps() {
     </div>
     <div class="prop-row">
       <label>Color</label>
-      <select onchange="updateProp('color',this.value)">
-        ${COLORS.map(c=>`<option value="${c}" ${el.color===c?'selected':''}>${c}</option>`).join('')}
-      </select>
+      ${colorSwatchHTML(el.color || COLORS[0], 'color')}
     </div>`;
   } else if (el.type !== 'text') {
     html += `<div class="prop-row">
@@ -1973,9 +1990,7 @@ function renderProps() {
     </div>
     <div class="prop-row">
       <label>Color</label>
-      <select onchange="updateProp('color', this.value)">
-        ${COLORS.map(c => `<option value="${c}" ${el.color===c?'selected':''}>${c}</option>`).join('')}
-      </select>
+      ${colorSwatchHTML(el.color || COLORS[0], 'color')}
     </div>
     <div class="prop-row">
       <label>Weight</label>
@@ -2000,7 +2015,10 @@ function renderProps() {
     </div>`;
   }
 
-  html += `<button class="action-btn danger" style="margin-top:6px" onclick="deleteSelected()">Delete element</button>`;
+  if (el.type === 'line' || el.type === 'arrow') {
+    html += `<button class="action-btn secondary" style="margin-top:4px" onclick="makeLineOrthogonal()">Make horizontal / vertical</button>`;
+  }
+  html += `<button class="action-btn danger" style="margin-top:4px" onclick="deleteSelected()">Delete element</button>`;
   form.innerHTML = html;
 }
 
@@ -2012,11 +2030,53 @@ function updateProp(key, value) {
   redraw();
 }
 
+function setPropColor(key, value) {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  saveUndo();
+  el[key] = value;
+  renderProps();
+  redraw();
+}
+
+function colorSwatchHTML(currentColor, propKey) {
+  return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${COLORS.map(c =>
+    `<div style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;box-sizing:border-box;border:3px solid ${c===currentColor?'#1a1918':'transparent'}"
+      onclick="setPropColor('${propKey}','${c}')"></div>`
+  ).join('')}</div>`;
+}
+
 function deleteSelected() {
   saveUndo();
   state.elements = state.elements.filter(e => e.id !== state.selectedId);
   state.selectedId = null;
   renderProps();
+  redraw();
+}
+
+function makeLineOrthogonal() {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el || (el.type !== 'line' && el.type !== 'arrow')) return;
+  const a = toCanvas(el.x1n, el.y1n);
+  const b = toCanvas(el.x2n, el.y2n);
+  const SNAP_R = 14;
+  // Check if each endpoint is touching any other element's segment
+  const others = state.elements.filter(e => e.id !== el.id && (e.type === 'line' || e.type === 'arrow' || e.type === 'curve'));
+  let p1Anchored = false, p2Anchored = false;
+  for (const other of others) {
+    for (const [ax,ay,bx,by] of getElSegments(other)) {
+      if (distToSegment(a.x, a.y, ax, ay, bx, by) < SNAP_R) p1Anchored = true;
+      if (distToSegment(b.x, b.y, ax, ay, bx, by) < SNAP_R) p2Anchored = true;
+    }
+  }
+  const dx = Math.abs(el.x2n - el.x1n), dy = Math.abs(el.y2n - el.y1n);
+  const makeHoriz = dx >= dy;
+  saveUndo();
+  if (p2Anchored && !p1Anchored) {
+    if (makeHoriz) el.y1n = el.y2n; else el.x1n = el.x2n;
+  } else {
+    if (makeHoriz) el.y2n = el.y1n; else el.x2n = el.x1n;
+  }
   redraw();
 }
 
@@ -2074,6 +2134,42 @@ function clearAll() {
 }
 
 // ─── DOWNLOAD ────────────────────────────────────────────────
+function openSaveModal() {
+  const data = {
+    title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
+    curves: state.curves, elements: state.elements,
+    xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
+    yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
+  };
+  document.getElementById('save-code').value = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  document.getElementById('save-modal').classList.add('open');
+  setTimeout(() => { document.getElementById('save-code').select(); }, 50);
+}
+
+function loadFromSaveModal() {
+  const str = document.getElementById('save-code').value.trim();
+  try {
+    const data = JSON.parse(decodeURIComponent(escape(atob(str))));
+    state.elements = data.elements || [];
+    state.curves = data.curves || [];
+    state.title = data.title || '';
+    state.yLabel = data.yLabel || 'Price ($/unit)';
+    state.xLabel = data.xLabel || 'Quantity (units/week)';
+    state.xLabelDx = data.xLabelDx || 0; state.xLabelDy = data.xLabelDy || 0;
+    state.yLabelDx = data.yLabelDx || 0; state.yLabelDy = data.yLabelDy || 0;
+    const maxId = state.elements.reduce((m, e) => Math.max(m, e.id || 0), 0);
+    nextId = maxId + 1;
+    document.getElementById('graph-title').value = state.title;
+    document.getElementById('y-label').value = state.yLabel;
+    document.getElementById('x-label').value = state.xLabel;
+    state.selectedId = null;
+    renderCurveList(); renderProps(); redraw();
+    document.getElementById('save-modal').classList.remove('open');
+  } catch(e) {
+    alert('Could not load: please paste the complete save code without any changes.');
+  }
+}
+
 function downloadJPG() {
   state.selectedId = null;
   redraw();
