@@ -1,0 +1,2028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IB Economics Graph Drawer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --panel: #ffffff;
+    --border: #d8d6cf;
+    --border2: #e8e6e0;
+    --text: #1a1918;
+    --muted: #6b6860;
+    --accent: #1a4a8a;
+    --accent2: #c8380a;
+    --accent3: #1a7a4a;
+    --accent4: #8a1a6a;
+    --accent5: #8a6a1a;
+    --tag-bg: #eceae3;
+    --radius: 6px;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--text);
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  header .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: rgba(255,255,255,0.15);
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  header .spacer { flex: 1; }
+  header button {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    background: #fff;
+    color: var(--text);
+    border: none;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  header button:hover { background: #e8e6e0; }
+
+  .app { display: flex; flex: 1; overflow: hidden; }
+
+  /* LEFT PANEL */
+  .sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .section-head {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 14px 14px 6px;
+    border-bottom: 1px solid var(--border2);
+  }
+
+  .template-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border2);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .template-btn:hover { background: var(--tag-bg); }
+  .template-btn .sub { font-weight: 400; font-size: 11px; color: var(--muted); display: block; margin-top: 1px; }
+
+  .tool-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px 14px;
+  }
+  .tool-btn {
+    padding: 8px 6px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--tag-bg);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text);
+    text-align: center;
+    transition: all 0.1s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .tool-btn .icon { font-size: 16px; line-height: 1; }
+  .tool-btn:hover { border-color: var(--accent); }
+  .tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .curve-list { padding: 6px 14px 10px; }
+  .curve-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.1s;
+    position: relative;
+  }
+  .curve-item:hover { background: var(--tag-bg); }
+  .curve-item.selected { background: #e8f0fa; }
+  .curve-swatch {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .curve-name { flex: 1; font-weight: 500; font-family: var(--mono); font-size: 11px; }
+  .curve-del {
+    opacity: 0;
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+    width: 18px;
+    text-align: center;
+    line-height: 1;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  .curve-item:hover .curve-del { opacity: 1; }
+  .curve-del:hover { color: var(--accent2); }
+
+  .add-curve-row { padding: 0 14px 10px; }
+  .add-curve-btn {
+    width: 100%;
+    padding: 7px;
+    font-size: 11px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .add-curve-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Color picker row */
+  .color-row { padding: 6px 14px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .color-dot {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.1s;
+  }
+  .color-dot.active { border-color: var(--text); }
+
+  .stroke-row { padding: 0 14px 10px; display: flex; align-items: center; gap: 8px; }
+  .stroke-row label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .stroke-row select {
+    font-size: 11px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .canvas-toolbar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .canvas-toolbar label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .canvas-toolbar input[type=text] {
+    font-size: 12px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--text);
+    width: 180px;
+  }
+  .canvas-toolbar input[type=text]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .canvas-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .hint { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-left: auto; }
+  .tb-toggle {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    background: var(--tag-bg); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 4px 10px;
+    cursor: pointer; color: var(--muted); letter-spacing: 0.05em;
+    text-transform: uppercase; white-space: nowrap;
+    transition: all 0.1s;
+  }
+  .tb-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .tb-toggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: auto;
+    background: var(--bg);
+  }
+
+  #graph-canvas {
+    background: #ffffff;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+    border-radius: 4px;
+    cursor: crosshair;
+    display: block;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    width: 210px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .props-form { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .prop-row { display: flex; flex-direction: column; gap: 3px; }
+  .prop-row label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .prop-row input[type=text], .prop-row select {
+    font-size: 12px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: var(--text);
+  }
+  .prop-row input:focus, .prop-row select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+  .action-btn {
+    width: 100%;
+    padding: 8px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .action-btn.primary { background: var(--accent); color: #fff; }
+  .action-btn.primary:hover { background: #143d72; }
+  .action-btn.danger { background: var(--tag-bg); color: var(--accent2); border: 1px solid var(--border); }
+  .action-btn.danger:hover { background: #fde8e3; }
+  .action-btn.secondary { background: var(--tag-bg); color: var(--text); border: 1px solid var(--border); }
+  .action-btn.secondary:hover { background: var(--border2); }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 24px;
+    width: 340px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  }
+  .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+  .modal .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .modal .field label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .modal .field input {
+    font-size: 13px; font-family: var(--sans);
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 7px 10px; color: var(--text);
+  }
+  .modal .field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .modal-colors { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .modal-col { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; }
+  .modal-col.active { border-color: var(--text); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions button { flex: 1; padding: 8px; font-family: var(--sans); font-size: 12px; font-weight: 600; border-radius: var(--radius); border: none; cursor: pointer; }
+  .btn-confirm { background: var(--accent); color: #fff; }
+  .btn-confirm:hover { background: #143d72; }
+  .btn-cancel { background: var(--tag-bg); color: var(--text); border: 1px solid var(--border); }
+  .btn-cancel:hover { background: var(--border2); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>IB Economics Graph Drawer</h1>
+  <span class="tag">v1.1</span>
+  <div class="spacer"></div>
+  <button onclick="downloadJPG()">⬇ Download JPG</button>
+</header>
+
+<div class="app">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+    <div class="section-head">Templates</div>
+    <button class="template-btn" onclick="loadTemplate('sd')">
+      Supply &amp; Demand
+      <span class="sub">Micro market equilibrium</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('adas')">
+      AD / AS
+      <span class="sub">Macroeconomic equilibrium</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('ext_neg')">
+      Negative Externality
+      <span class="sub">Market failure (overproduction)</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('ext_pos')">
+      Positive Externality
+      <span class="sub">Market failure (underproduction)</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('blank')">
+      Blank axes
+      <span class="sub">Start from scratch</span>
+    </button>
+
+    <div class="section-head" style="margin-top:4px">Drawing tool</div>
+    <div class="tool-grid">
+      <button class="tool-btn active" id="tool-select" onclick="setTool('select')">
+        <span class="icon">↖</span>Select
+      </button>
+      <button class="tool-btn" id="tool-line" onclick="setTool('line')">
+        <span class="icon">╱</span>Straight line
+      </button>
+      <button class="tool-btn" id="tool-curve" onclick="setTool('curve')">
+        <span class="icon">∿</span>Curve (drag)
+      </button>
+      <button class="tool-btn" id="tool-text" onclick="setTool('text')">
+        <span class="icon">T</span>Label
+      </button>
+      <button class="tool-btn" id="tool-region" onclick="setTool('region')">
+        <span class="icon">▨</span>Fill region
+      </button>
+      <button class="tool-btn" id="tool-equil" onclick="setTool('equil')" style="grid-column:span 2">
+        <span class="icon">⊕</span>Equilibrium point
+      </button>
+    </div>
+
+    <div class="section-head" style="margin-top:2px">Line color</div>
+    <div class="color-row" id="color-row"></div>
+
+    <div class="section-head" style="margin-top:2px">Line style</div>
+    <div class="stroke-row">
+      <label>Weight</label>
+      <select id="stroke-weight">
+        <option value="1.5">Thin</option>
+        <option value="2.5" selected>Normal</option>
+        <option value="4">Bold</option>
+      </select>
+      <label>Dash</label>
+      <select id="stroke-dash">
+        <option value="">Solid</option>
+        <option value="6,4">Dashed</option>
+        <option value="2,3">Dotted</option>
+      </select>
+    </div>
+
+    <div class="section-head" style="margin-top:2px">Legend <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:9px;opacity:0.7">(JPG export)</span></div>
+    <div class="curve-list" id="curve-list"></div>
+    <div class="add-curve-row">
+      <button class="add-curve-btn" onclick="openAddCurve()">+ Add / rename curve</button>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area">
+    <div class="canvas-toolbar">
+      <label>Title</label>
+      <input type="text" id="graph-title" placeholder="e.g. Market for coffee" onchange="redraw()">
+      <div class="sep"></div>
+      <label>Y-axis</label>
+      <input type="text" id="y-label" placeholder="Price ($/unit)" style="width:130px" onchange="redraw()">
+      <div class="sep"></div>
+      <label>X-axis</label>
+      <input type="text" id="x-label" placeholder="Quantity (units/wk)" style="width:150px" onchange="redraw()">
+      <div class="sep"></div>
+      <button class="tb-toggle" id="snap-btn" onclick="toggleSnap()">Snap: off</button>
+      <span class="hint" id="hint-text">Select a template or pick a tool to draw</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="graph-canvas" width="680" height="560"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="section-head">Selected object</div>
+    <div class="props-form" id="props-form">
+      <div style="font-size:11px;color:var(--muted);padding:4px 0;font-family:var(--mono)">Nothing selected.<br><br>Click an element to edit its label, color, or position.</div>
+    </div>
+
+    <div class="section-head" style="margin-top:4px">Canvas</div>
+    <div class="props-form">
+      <button class="action-btn secondary" onclick="clearCanvas()">Clear canvas</button>
+      <button class="action-btn danger" onclick="clearAll()">Reset everything</button>
+    </div>
+
+    <div class="section-head" style="margin-top:4px">Export</div>
+    <div class="props-form">
+      <button class="action-btn primary" onclick="downloadJPG()">Download JPG</button>
+      <div style="font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.5">680×560px · white background · ready for submission</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CURVE MODAL -->
+<div class="modal-overlay" id="curve-modal">
+  <div class="modal">
+    <h2>Add curve to legend</h2>
+    <div class="field">
+      <label>Curve name</label>
+      <input type="text" id="modal-name" placeholder="e.g. S₁" maxlength="12">
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="modal-colors" id="modal-colors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm" onclick="confirmAddCurve()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ELEMENT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h2 id="edit-modal-title">Edit label</h2>
+    <div class="field">
+      <label>Label text</label>
+      <input type="text" id="edit-label-input" maxlength="20">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+      <button class="btn-confirm" onclick="confirmEditLabel()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ───────────────────────────────────────────────
+const COLORS = [
+  '#1a4a8a','#c8380a','#1a7a4a','#8a1a6a','#8a6a1a',
+  '#2a8ab8','#888','#1a1918'
+];
+const MARGIN = { top: 50, right: 60, bottom: 60, left: 70 };
+const W = 680, H = 560;
+const PLOT_W = W - MARGIN.left - MARGIN.right;
+const PLOT_H = H - MARGIN.top - MARGIN.bottom;
+
+// ─── STATE ───────────────────────────────────────────────────
+let state = {
+  title: '',
+  yLabel: 'Price ($/unit)',
+  xLabel: 'Quantity (units/week)',
+  elements: [],   // {type, ...}
+  curves: [],     // legend entries {name, color}
+  selectedId: null,
+  tool: 'select',
+  drawColor: COLORS[0],
+  strokeWeight: 2.5,
+  strokeDash: '',
+  xLabelDx: 0, xLabelDy: 0,
+  yLabelDx: 0, yLabelDy: 0,
+};
+
+let nextId = 1;
+let drawing = false;
+let drawStart = null;
+let curvePoints = [];
+let hoverHitId = null;
+let axisLabelDrag = null;
+let labelDrag = null;
+let nodeDrag = null;
+let snapEnabled = false;
+let snapHoverActive = false;
+
+// ─── UNDO / REDO ─────────────────────────────────────────────
+let undoStack = [];
+let redoStack = [];
+
+function saveUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(state.elements)));
+  if (undoStack.length > 60) undoStack.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.parse(JSON.stringify(state.elements)));
+  state.elements = undoStack.pop();
+  if (state.selectedId && !state.elements.find(e => e.id === state.selectedId)) state.selectedId = null;
+  renderProps();
+  redraw();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.parse(JSON.stringify(state.elements)));
+  state.elements = redoStack.pop();
+  if (state.selectedId && !state.elements.find(e => e.id === state.selectedId)) state.selectedId = null;
+  renderProps();
+  redraw();
+}
+
+const canvas = document.getElementById('graph-canvas');
+const ctx = canvas.getContext('2d');
+
+// ─── INIT ────────────────────────────────────────────────────
+function init() {
+  buildColorRow();
+  buildModalColors();
+  loadTemplate('sd');
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('dblclick', onDblClick);
+  document.addEventListener('keydown', onKeyDown);
+}
+
+function buildColorRow() {
+  const row = document.getElementById('color-row');
+  row.innerHTML = '';
+  COLORS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'color-dot' + (c === state.drawColor ? ' active' : '');
+    d.style.background = c;
+    d.onclick = () => { state.drawColor = c; buildColorRow(); };
+    row.appendChild(d);
+  });
+}
+
+function buildModalColors() {
+  const row = document.getElementById('modal-colors');
+  row.innerHTML = '';
+  COLORS.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'modal-col' + (i === 0 ? ' active' : '');
+    d.style.background = c;
+    d.dataset.color = c;
+    d.onclick = () => {
+      row.querySelectorAll('.modal-col').forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+    };
+    row.appendChild(d);
+  });
+}
+
+// ─── TEMPLATES ───────────────────────────────────────────────
+const TEMPLATES = {
+  blank: {
+    title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [], elements: []
+  },
+  sd: {
+    title: '',
+    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [
+      { name: 'D', color: COLORS[0] },
+      { name: 'S', color: COLORS[2] },
+    ],
+    elements: [
+      // Demand: top-left to bottom-right
+      mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D'),
+      // Supply: bottom-left to top-right
+      mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S'),
+      // Equilibrium dotted lines ~intersection at (0.48, 0.46)
+      mkLine(0, 0.47, 0.49, 0.47, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.49, 0.47, 0.49, 1.0, '#aaa', 1.5, '5,4', ''),
+      // P* and Q* axis labels
+      mkText(0.49, 1.02, 'Q*'),
+      mkText(-0.07, 0.47, 'P*'),
+    ]
+  },
+  adas: {
+    title: '',
+    yLabel: 'Price level', xLabel: 'Real GDP',
+    curves: [
+      { name: 'AD', color: COLORS[0] },
+      { name: 'SRAS', color: COLORS[2] },
+      { name: 'LRAS', color: COLORS[1] },
+    ],
+    elements: [
+      // AD: downward sloping
+      mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD'),
+      // SRAS: upward sloping
+      mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS'),
+      // LRAS: vertical at ~0.52
+      mkLine(0.52, 0.0, 0.52, 1.0, COLORS[1], 2.5, '', 'LRAS'),
+      // Dotted to axes from equilibrium ~(0.52, 0.47)
+      mkLine(0, 0.48, 0.52, 0.48, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.52, 0.48, 0.52, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.52, 1.02, 'Yfe'),
+      mkText(-0.07, 0.48, 'PL*'),
+    ]
+  },
+  ext_neg: {
+    title: '',
+    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [
+      { name: 'MPB=D', color: COLORS[0] },
+      { name: 'MPC=S', color: COLORS[2] },
+      { name: 'MSC', color: COLORS[1] },
+    ],
+    elements: [
+      // MPB = D downward
+      mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
+      // MPC = S upward
+      mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
+      // MSC above MPC (parallel, shifted up)
+      mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC'),
+      // Market eq ~(0.5, 0.48)
+      mkLine(0, 0.48, 0.50, 0.48, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.50, 0.48, 0.50, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Social optimum ~(0.38, 0.38)
+      mkLine(0, 0.39, 0.38, 0.39, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.38, 0.39, 0.38, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.50, 1.02, 'Qm'),
+      mkText(0.38, 1.02, 'Qs'),
+      mkText(-0.07, 0.48, 'Pm'),
+      mkText(-0.07, 0.39, 'Ps'),
+    ]
+  },
+  ext_pos: {
+    title: '',
+    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [
+      { name: 'MPC=S', color: COLORS[2] },
+      { name: 'MPB=D', color: COLORS[0] },
+      { name: 'MSB', color: COLORS[3] },
+    ],
+    elements: [
+      mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
+      mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
+      // MSB shifted right of MPB
+      mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB'),
+      // Market eq ~(0.5, 0.48)
+      mkLine(0, 0.48, 0.50, 0.48, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.50, 0.48, 0.50, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Social opt ~(0.63, 0.37)
+      mkLine(0, 0.38, 0.62, 0.38, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.62, 0.38, 0.62, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.50, 1.02, 'Qm'),
+      mkText(0.62, 1.02, 'Qs'),
+      mkText(-0.07, 0.48, 'Pm'),
+      mkText(-0.07, 0.38, 'Ps'),
+    ]
+  }
+};
+
+function mkLine(x1n, y1n, x2n, y2n, color, weight, dash, label) {
+  return { id: nextId++, type: 'line', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkCurve(points, color, weight, dash, label) {
+  return { id: nextId++, type: 'curve', points, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkText(xn, yn, text) {
+  return { id: nextId++, type: 'text', xn, yn, text, color: '#333', size: 13 };
+}
+function mkDot(xn, yn, color, pLabel, qLabel) {
+  return { id: nextId++, type: 'dot', xn, yn, color, pLabel, qLabel };
+}
+function mkRegion(points, fillColor, pattern) {
+  return { id: nextId++, type: 'region', points, fillColor: fillColor || COLORS[0],
+           pattern: pattern || 'solid', fillOpacity: 0.25, label: '', labelDx: 0, labelDy: 0 };
+}
+
+function loadTemplate(name) {
+  const t = TEMPLATES[name];
+  state.elements = t.elements.map(e => ({ ...e, id: nextId++ }));
+  state.curves = [...t.curves];
+  state.title = t.title;
+  state.yLabel = t.yLabel;
+  state.xLabel = t.xLabel;
+  state.selectedId = null;
+  state.xLabelDx = 0; state.xLabelDy = 0;
+  state.yLabelDx = 0; state.yLabelDy = 0;
+  document.getElementById('graph-title').value = t.title;
+  document.getElementById('y-label').value = t.yLabel;
+  document.getElementById('x-label').value = t.xLabel;
+  renderCurveList();
+  renderProps();
+  redraw();
+}
+
+// ─── COORDINATE HELPERS ──────────────────────────────────────
+// Normalized coords: (0,0) = top-left of plot area, (1,1) = bottom-right
+function toCanvas(xn, yn) {
+  return {
+    x: MARGIN.left + xn * PLOT_W,
+    y: MARGIN.top + yn * PLOT_H
+  };
+}
+function fromCanvas(cx, cy) {
+  return {
+    xn: (cx - MARGIN.left) / PLOT_W,
+    yn: (cy - MARGIN.top) / PLOT_H
+  };
+}
+
+function getLabelBasePos(el) {
+  if (el.type === 'line') {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (Math.abs(dy) > Math.abs(dx)) {
+      const top = a.y <= b.y ? a : b;  // smallest y = highest on canvas
+      return { x: top.x + 9, y: top.y - 6 };
+    } else {
+      const right = a.x >= b.x ? a : b;
+      return { x: right.x + 8, y: right.y };
+    }
+  } else if (el.type === 'curve') {
+    if (!el.points || !el.points.length) return { x: 0, y: 0 };
+    const last = toCanvas(el.points[el.points.length - 1].xn, el.points[el.points.length - 1].yn);
+    return { x: last.x + 8, y: last.y };
+  } else if (el.type === 'region') {
+    if (!el.points || !el.points.length) return { x: 0, y: 0 };
+    const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    return { x: pts.reduce((s,p) => s+p.x, 0)/pts.length, y: pts.reduce((s,p) => s+p.y, 0)/pts.length };
+  }
+  return { x: 0, y: 0 };
+}
+
+function getFullLabelPos(el) {
+  const base = getLabelBasePos(el);
+  return { x: base.x + (el.labelDx || 0), y: base.y + (el.labelDy || 0) };
+}
+
+function hitTestAxisLabel(cx, cy) {
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  // X label: right-aligned to MARGIN.left+PLOT_W, below axis
+  const xlx = MARGIN.left + PLOT_W + state.xLabelDx;
+  const xly = MARGIN.top + PLOT_H + 8 + state.xLabelDy;
+  const xw = ctx.measureText(state.xLabel).width;
+  if (cx >= xlx - xw - 4 && cx <= xlx + 4 && Math.abs(cy - xly - 6) < 14) return 'xLabel';
+  // Y label: left-aligned from MARGIN.left+4, above top of axis
+  const ylx = MARGIN.left + 4 + state.yLabelDx;
+  const yly = MARGIN.top - 4 + state.yLabelDy;
+  const yw = ctx.measureText(state.yLabel).width;
+  if (cx >= ylx - 4 && cx <= ylx + yw + 4 && Math.abs(cy - yly + 6) < 14) return 'yLabel';
+  return null;
+}
+
+function showInlineLabelEdit(el) {
+  const pos = getFullLabelPos(el);
+  const rect = canvas.getBoundingClientRect();
+  const sx = rect.left + pos.x * (rect.width / canvas.width);
+  const sy = rect.top  + pos.y * (rect.height / canvas.height);
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = el.type === 'text' ? (el.text || '') : (el.label || '');
+  inp.style.cssText = `position:fixed;left:${sx-36}px;top:${sy-13}px;width:84px;
+    font:500 13px 'IBM Plex Sans',sans-serif;text-align:center;
+    background:#fff;border:1.5px solid #1a4a8a;border-radius:3px;
+    padding:2px 6px;z-index:200;outline:none;
+    box-shadow:0 2px 8px rgba(0,0,0,0.15);`;
+  document.body.appendChild(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = () => {
+    if (done) return; done = true;
+    const val = inp.value.trim();
+    saveUndo();
+    if (el.type === 'text') el.text = val; else el.label = val;
+    if (inp.parentNode) inp.parentNode.removeChild(inp);
+    renderProps(); redraw();
+  };
+  const cancel = () => {
+    if (done) return; done = true;
+    if (inp.parentNode) inp.parentNode.removeChild(inp);
+  };
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') commit();
+    if (ev.key === 'Escape') cancel();
+    ev.stopPropagation();
+  });
+  inp.addEventListener('blur', commit);
+}
+
+// ─── SNAP ─────────────────────────────────────────────────────
+function toggleSnap() {
+  snapEnabled = !snapEnabled;
+  const btn = document.getElementById('snap-btn');
+  btn.textContent = snapEnabled ? 'Snap: on' : 'Snap: off';
+  btn.classList.toggle('active', snapEnabled);
+}
+
+function segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+  const rx = bx-ax, ry = by-ay, sx = dx-cx, sy = dy-cy;
+  const denom = rx*sy - ry*sx;
+  if (Math.abs(denom) < 0.001) return null;
+  const t = ((cx-ax)*sy - (cy-ay)*sx) / denom;
+  const u = ((cx-ax)*ry - (cy-ay)*rx) / denom;
+  if (t >= -0.01 && t <= 1.01 && u >= -0.01 && u <= 1.01)
+    return { x: ax + t*rx, y: ay + t*ry };
+  return null;
+}
+
+function closestPtOnSeg(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay, lenSq = dx*dx+dy*dy;
+  if (lenSq === 0) return { x: ax, y: ay };
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/lenSq));
+  return { x: ax+t*dx, y: ay+t*dy };
+}
+
+function getElSegments(el) {
+  if (el.type === 'line') {
+    const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+    return [[a.x, a.y, b.x, b.y]];
+  }
+  if (el.type === 'curve' && el.points.length >= 2) {
+    // Sample the smooth bezier curve (matching drawSmoothCurve) for accurate snap
+    const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    const sampled = [pts[0]];
+    const STEPS = 8;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i].x + pts[i+1].x) / 2;
+      const my = (pts[i].y + pts[i+1].y) / 2;
+      const prev = sampled[sampled.length - 1];
+      for (let s = 1; s <= STEPS; s++) {
+        const t = s / STEPS;
+        const u = 1 - t;
+        sampled.push({ x: u*u*prev.x + 2*u*t*pts[i].x + t*t*mx,
+                        y: u*u*prev.y + 2*u*t*pts[i].y + t*t*my });
+      }
+    }
+    // Final straight segment to last point (matching drawSmoothCurve's lineTo)
+    const lastPt = pts[pts.length - 1];
+    if (sampled[sampled.length-1].x !== lastPt.x || sampled[sampled.length-1].y !== lastPt.y)
+      sampled.push(lastPt);
+    const segs = [];
+    for (let i = 0; i < sampled.length - 1; i++)
+      segs.push([sampled[i].x, sampled[i].y, sampled[i+1].x, sampled[i+1].y]);
+    return segs;
+  }
+  return [];
+}
+
+function getSnapCandidate(cx, cy) {
+  if (!snapEnabled) return null;
+  const SNAP_R = 14;
+  const candidates = [];
+  const drawables = state.elements.filter(e => e.type === 'line' || e.type === 'curve');
+  const allSegs = drawables.flatMap(getElSegments);
+
+  // Endpoints
+  drawables.forEach(el => {
+    if (el.type === 'line') {
+      candidates.push(toCanvas(el.x1n, el.y1n));
+      candidates.push(toCanvas(el.x2n, el.y2n));
+    } else if (el.type === 'curve' && el.points.length) {
+      candidates.push(toCanvas(el.points[0].xn, el.points[0].yn));
+      candidates.push(toCanvas(el.points[el.points.length-1].xn, el.points[el.points.length-1].yn));
+    }
+  });
+
+  // Segment-segment intersections
+  for (let i = 0; i < allSegs.length; i++) {
+    for (let j = i+1; j < allSegs.length; j++) {
+      const [ax,ay,bx,by] = allSegs[i], [cx2,cy2,dx,dy] = allSegs[j];
+      const pt = segSegIntersect(ax,ay,bx,by,cx2,cy2,dx,dy);
+      if (pt && pt.x >= MARGIN.left-5 && pt.x <= MARGIN.left+PLOT_W+5
+              && pt.y >= MARGIN.top-5 && pt.y <= MARGIN.top+PLOT_H+5)
+        candidates.push(pt);
+    }
+  }
+
+  // Axis corners
+  candidates.push({ x: MARGIN.left, y: MARGIN.top+PLOT_H });
+  candidates.push({ x: MARGIN.left, y: MARGIN.top });
+  candidates.push({ x: MARGIN.left+PLOT_W, y: MARGIN.top+PLOT_H });
+
+  // Find nearest candidate
+  let best = null, bestDist = SNAP_R;
+  candidates.forEach(p => {
+    const d = Math.hypot(cx-p.x, cy-p.y);
+    if (d < bestDist) { bestDist = d; best = p; }
+  });
+
+  return best;
+}
+
+function drawSnapIndicator(x, y) {
+  ctx.save();
+  ctx.strokeStyle = '#1a4a8a'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x-10, y); ctx.lineTo(x+10, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y-10); ctx.lineTo(x, y+10); ctx.stroke();
+  ctx.restore();
+}
+
+// ─── NODE EDITING ─────────────────────────────────────────────
+function hitTestNode(cx, cy, el) {
+  if (!el) return null;
+  const R = 10;
+  if (el.type === 'line') {
+    const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+    if (Math.hypot(cx-a.x, cy-a.y) < R) return 'p1';
+    if (Math.hypot(cx-b.x, cy-b.y) < R) return 'p2';
+  } else if (el.type === 'curve' && el.points.length) {
+    const first = toCanvas(el.points[0].xn, el.points[0].yn);
+    const last  = toCanvas(el.points[el.points.length-1].xn, el.points[el.points.length-1].yn);
+    if (Math.hypot(cx-first.x, cy-first.y) < R) return 'first';
+    if (Math.hypot(cx-last.x,  cy-last.y)  < R) return 'last';
+  } else if (el.type === 'region' && el.points) {
+    for (let i = 0; i < el.points.length; i++) {
+      const p = toCanvas(el.points[i].xn, el.points[i].yn);
+      if (Math.hypot(cx-p.x, cy-p.y) < R) return i;
+    }
+  }
+  return null;
+}
+
+function applyNodeMove(el, node, cx, cy) {
+  const snap = getSnapCandidate(cx, cy);
+  const n = snap ? fromCanvas(snap.x, snap.y) : fromCanvas(cx, cy);
+  if (el.type === 'line') {
+    if (node === 'p1') { el.x1n = n.xn; el.y1n = n.yn; }
+    else               { el.x2n = n.xn; el.y2n = n.yn; }
+  } else if (el.type === 'curve') {
+    if (node === 'first') el.points[0] = { xn: n.xn, yn: n.yn };
+    else el.points[el.points.length-1] = { xn: n.xn, yn: n.yn };
+  } else if (el.type === 'region' && typeof node === 'number') {
+    el.points[node] = { xn: n.xn, yn: n.yn };
+  }
+  return snap;
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function pointInPolygon(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function drawPattern(pattern, color) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]);
+  const sp = 10;
+  if (pattern === 'hatch' || pattern === 'crosshatch') {
+    for (let d = -(H + W); d < W + H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d + H, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'crosshatch') {
+    for (let d = -(H + W); d < W + H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d + H, 0); ctx.lineTo(d, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'dots') {
+    const sp2 = 12;
+    for (let x = 0; x <= W; x += sp2) for (let y = 0; y <= H; y += sp2) {
+      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+function drawRegionEl(el) {
+  if (!el.points || el.points.length < 3) return;
+  const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+  const color = el.fillColor || COLORS[0];
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  if (el.pattern === 'solid') {
+    ctx.fillStyle = hexToRgba(color, el.fillOpacity ?? 0.25);
+    ctx.fill();
+  } else {
+    ctx.save(); ctx.clip();
+    drawPattern(el.pattern, color);
+    ctx.restore();
+  }
+  // Dashed outline
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.restore();
+  // Label at centroid + offset
+  if (el.label) {
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    drawLabelAt(el.label, cx + (el.labelDx || 0), cy + (el.labelDy || 0), color);
+    if (el.id === state.selectedId) {
+      ctx.save();
+      ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+      const lw = ctx.measureText(el.label).width;
+      const lx = cx + (el.labelDx || 0), ly = cy + (el.labelDy || 0);
+      ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+      ctx.beginPath(); ctx.moveTo(lx - lw/2, ly + 8); ctx.lineTo(lx + lw/2, ly + 8); ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function drawRegionPreview(mouseN) {
+  const allPts = mouseN ? [...curvePoints, mouseN] : curvePoints;
+  if (allPts.length < 2) return;
+  const pts = allPts.map(p => toCanvas(p.xn, p.yn));
+  ctx.save();
+  ctx.strokeStyle = state.drawColor; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+  if (allPts.length >= 3) { ctx.lineTo(pts[0].x, pts[0].y); } // close preview
+  ctx.stroke();
+  if (allPts.length >= 3) {
+    ctx.fillStyle = hexToRgba(state.drawColor, 0.10); ctx.fill();
+  }
+  curvePoints.forEach(p => {
+    const c = toCanvas(p.xn, p.yn);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = state.drawColor; ctx.setLineDash([]); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function getSnappedEnd(start, end, shift) {
+  if (!shift) return end;
+  const dxn = end.xn - start.xn, dyn = end.yn - start.yn;
+  const adx = Math.abs(dxn), ady = Math.abs(dyn);
+  const T = 0.4142; // tan(22.5°)
+  if (adx < ady * T) return { xn: start.xn, yn: end.yn };          // vertical
+  if (ady < adx * T) return { xn: end.xn,   yn: start.yn };         // horizontal
+  const m = Math.min(adx, ady);
+  return { xn: start.xn + Math.sign(dxn) * m, yn: start.yn + Math.sign(dyn) * m }; // 45°
+}
+
+// ─── DRAWING ─────────────────────────────────────────────────
+function redraw() {
+  state.title = document.getElementById('graph-title').value;
+  state.yLabel = document.getElementById('y-label').value;
+  state.xLabel = document.getElementById('x-label').value;
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawAxes();
+  drawElements();
+  drawSelectionHandles();
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawAxes() {
+  ctx.save();
+  ctx.strokeStyle = '#1a1918';
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+
+  // Y axis
+  ctx.beginPath();
+  ctx.moveTo(MARGIN.left, MARGIN.top + PLOT_H);
+  ctx.lineTo(MARGIN.left, MARGIN.top);
+  ctx.stroke();
+
+  // X axis
+  ctx.beginPath();
+  ctx.moveTo(MARGIN.left, MARGIN.top + PLOT_H);
+  ctx.lineTo(MARGIN.left + PLOT_W, MARGIN.top + PLOT_H);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Axis labels at ends of axes
+  ctx.save();
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.fillStyle = '#1a1918';
+  // X label — below and right-aligned to the right end of x-axis
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, MARGIN.top + PLOT_H + 8 + state.xLabelDy);
+  // Y label — left-aligned just above top of y-axis
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(state.yLabel, MARGIN.left + 4 + state.yLabelDx, MARGIN.top - 4 + state.yLabelDy);
+
+  // Title
+  ctx.font = '600 15px "IBM Plex Sans", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(state.title, W / 2, 26);
+
+  ctx.restore();
+}
+
+function drawElements() {
+  // Regions first so lines/curves draw on top
+  state.elements.forEach(el => {
+    if (el.type !== 'region' || el.id === state.selectedId) return;
+    drawElement(el);
+  });
+  state.elements.forEach(el => {
+    if (el.type === 'region' || el.id === state.selectedId) return;
+    drawElement(el);
+  });
+  if (state.selectedId) {
+    const el = state.elements.find(e => e.id === state.selectedId);
+    if (el) drawElement(el);
+  }
+}
+
+function drawElement(el) {
+  ctx.save();
+  ctx.strokeStyle = el.color || '#1a1918';
+  ctx.lineWidth = el.weight || 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (el.dash) ctx.setLineDash(el.dash.split(',').map(Number));
+  else ctx.setLineDash([]);
+
+  if (el.type === 'line') {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    if (el.label) drawLineLabel(el);
+  } else if (el.type === 'curve') {
+    if (el.points.length < 2) { ctx.restore(); return; }
+    const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    drawSmoothCurve(pts);
+    if (el.label) {
+      const pos = getFullLabelPos(el);
+      drawLabelAt(el.label, pos.x, pos.y, el.color);
+    }
+  } else if (el.type === 'region') {
+    ctx.restore();
+    drawRegionEl(el);
+    return;
+  } else if (el.type === 'dot') {
+    ctx.restore();
+    drawDotEl(el);
+    return;
+  } else if (el.type === 'text') {
+    ctx.restore();
+    drawTextEl(el);
+    return;
+  }
+  ctx.restore();
+}
+
+function drawSmoothCurve(pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2;
+    const my = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  const last = pts[pts.length - 1];
+  ctx.lineTo(last.x, last.y);
+  ctx.stroke();
+}
+
+function drawLineLabel(el) {
+  const pos = getFullLabelPos(el);
+  drawLabelAt(el.label, pos.x, pos.y, el.color);
+  // Dotted underline when selected to hint it's editable/draggable
+  if (el.id === state.selectedId) {
+    ctx.save();
+    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    const w = ctx.measureText(el.label).width;
+    ctx.strokeStyle = el.color || '#1a1918';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(pos.x - w / 2, pos.y + 8);
+    ctx.lineTo(pos.x + w / 2, pos.y + 8);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawLabelAt(text, x, y, color) {
+  ctx.save();
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.fillStyle = color || '#1a1918';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawTextEl(el) {
+  const p = toCanvas(el.xn, el.yn);
+  ctx.save();
+  ctx.font = `500 ${el.size || 13}px "IBM Plex Sans", sans-serif`;
+  ctx.fillStyle = el.color || '#333';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(el.text, p.x, p.y);
+  ctx.restore();
+}
+
+function drawDotEl(el) {
+  const p = toCanvas(el.xn, el.yn);
+  const axisL = toCanvas(0, el.yn);
+  const axisB = toCanvas(el.xn, 1.0);
+  ctx.save();
+  ctx.strokeStyle = el.color || '#1a1918';
+  ctx.lineWidth = 1.4;
+  ctx.setLineDash([4, 3]);
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = el.color || '#1a1918';
+  ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  if (el.pLabel) {
+    ctx.save();
+    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    ctx.fillStyle = '#1a1918'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(el.pLabel, axisL.x - 6, axisL.y);
+    ctx.restore();
+  }
+  if (el.qLabel) {
+    ctx.save();
+    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    ctx.fillStyle = '#1a1918'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(el.qLabel, axisB.x, axisB.y + 4);
+    ctx.restore();
+  }
+}
+
+function drawSelectionHandles() {
+  if (!state.selectedId) return;
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  ctx.save();
+  ctx.strokeStyle = '#1a4a8a';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  if (el.type === 'line') {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    drawHandle(a.x, a.y);
+    drawHandle(b.x, b.y);
+  } else if (el.type === 'curve' && el.points.length > 0) {
+    const first = toCanvas(el.points[0].xn, el.points[0].yn);
+    const last = toCanvas(el.points[el.points.length - 1].xn, el.points[el.points.length - 1].yn);
+    drawHandle(first.x, first.y);
+    drawHandle(last.x, last.y);
+  } else if (el.type === 'region') {
+    if (el.points && el.points.length >= 3) {
+      const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+      pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath();
+      ctx.strokeStyle = '#1a4a8a'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]); ctx.stroke();
+      pts.forEach(p => drawHandle(p.x, p.y));
+    }
+  } else if (el.type === 'dot') {
+    const p = toCanvas(el.xn, el.yn);
+    drawHandle(p.x, p.y);
+  } else if (el.type === 'text') {
+    const p = toCanvas(el.xn, el.yn);
+    drawHandle(p.x, p.y);
+  }
+  ctx.restore();
+}
+
+function drawHandle(x, y) {
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.strokeStyle = '#1a4a8a';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(26,74,138,0.15)';
+  ctx.fill();
+}
+
+// ─── TOOLS ───────────────────────────────────────────────────
+function setTool(t) {
+  state.tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tool-' + t)?.classList.add('active');
+  canvas.style.cursor = t === 'select' ? 'default' : 'crosshair';
+  updateHint(t);
+  curvePoints = [];
+  drawing = false;
+}
+
+function updateHint(t) {
+  const hints = {
+    select: 'Click to select · double-click to edit label',
+    line: 'Click and drag · hold Shift to snap to H / V / 45°',
+    curve: 'Click to add points · double-click to finish curve',
+    text: 'Click anywhere on the graph to add a label',
+    equil: 'Click to place equilibrium point with dotted drop lines',
+    region: 'Click vertices · double-click to close and fill region',
+  };
+  document.getElementById('hint-text').textContent = hints[t] || '';
+}
+
+function onMouseDown(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  const cx = (e.clientX - r.left) * scaleX;
+  const cy = (e.clientY - r.top) * scaleY;
+  const n = fromCanvas(cx, cy);
+
+  if (state.tool === 'select') {
+    // Priority 1: axis label drag
+    const axisHit = hitTestAxisLabel(cx, cy);
+    if (axisHit) {
+      axisLabelDrag = { type: axisHit, startCx: cx, startCy: cy,
+        origDx: state[axisHit + 'Dx'], origDy: state[axisHit + 'Dy'] };
+      return;
+    }
+    // Priority 2: label drag/edit on already-selected element
+    if (state.selectedId) {
+      const selEl = state.elements.find(e => e.id === state.selectedId);
+      const hasLabel = selEl && selEl.type !== 'dot' && selEl.type !== 'text' &&
+                       (selEl.label || selEl.label === '');
+      if (hasLabel && selEl.label) {
+        const lpos = getFullLabelPos(selEl);
+        if (Math.abs(cx - lpos.x) < 36 && Math.abs(cy - lpos.y) < 14) {
+          labelDrag = { elId: selEl.id, startCx: cx, startCy: cy,
+            origDx: selEl.labelDx || 0, origDy: selEl.labelDy || 0, moved: false };
+          return;
+        }
+      }
+    }
+    // Priority 3: node drag on selected element
+    if (state.selectedId) {
+      const selEl = state.elements.find(e => e.id === state.selectedId);
+      const nodeHit = hitTestNode(cx, cy, selEl);
+      if (nodeHit !== null) {
+        saveUndo();
+        nodeDrag = { elId: selEl.id, node: nodeHit };
+        return;
+      }
+    }
+    // Priority 4: regular element select / drag
+    const hit = hitTest(cx, cy);
+    state.selectedId = hit ? hit.id : null;
+    renderProps();
+    redraw();
+    if (hit) {
+      saveUndo();
+      drawing = true;
+      drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)) };
+    }
+  } else if (state.tool === 'line') {
+    const snapStart = getSnapCandidate(cx, cy);
+    const startN = snapStart ? fromCanvas(snapStart.x, snapStart.y) : n;
+    drawing = true;
+    drawStart = { xn: startN.xn, yn: startN.yn };
+  } else if (state.tool === 'curve') {
+    curvePoints.push({ xn: n.xn, yn: n.yn });
+    if (curvePoints.length === 1) {
+      drawing = true;
+    }
+    redraw();
+    // preview
+    drawCurvePreview();
+  } else if (state.tool === 'text') {
+    const txt = prompt('Enter label text:');
+    if (txt && txt.trim()) {
+      saveUndo();
+      state.elements.push(mkText(n.xn, n.yn, txt.trim()));
+      redraw();
+    }
+  } else if (state.tool === 'region') {
+    curvePoints.push({ xn: n.xn, yn: n.yn });
+    if (curvePoints.length === 1) drawing = true;
+    redraw();
+    drawRegionPreview();
+  } else if (state.tool === 'equil') {
+    const pLbl = prompt('P* label (leave blank to skip):', 'P*');
+    if (pLbl === null) return;
+    const qLbl = prompt('Q* label (leave blank to skip):', 'Q*');
+    if (qLbl === null) return;
+    saveUndo();
+    const el = mkDot(n.xn, n.yn, state.drawColor, pLbl.trim(), qLbl.trim());
+    state.elements.push(el);
+    state.selectedId = el.id;
+    renderProps();
+    redraw();
+  }
+}
+
+function onMouseMove(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  const cx = (e.clientX - r.left) * scaleX;
+  const cy = (e.clientY - r.top) * scaleY;
+  const n = fromCanvas(cx, cy);
+
+  // Node drag
+  if (nodeDrag) {
+    const el = state.elements.find(e => e.id === nodeDrag.elId);
+    if (el) {
+      const snap = applyNodeMove(el, nodeDrag.node, cx, cy);
+      redraw();
+      if (snap) drawSnapIndicator(snap.x, snap.y);
+    }
+    return;
+  }
+
+  // Handle special drags before tool logic
+  if (labelDrag) {
+    const el = state.elements.find(e => e.id === labelDrag.elId);
+    if (el) {
+      const dx = cx - labelDrag.startCx, dy = cy - labelDrag.startCy;
+      if (Math.hypot(dx, dy) > 4 && !labelDrag.moved) { saveUndo(); labelDrag.moved = true; }
+      if (labelDrag.moved) { el.labelDx = labelDrag.origDx + dx; el.labelDy = labelDrag.origDy + dy; redraw(); }
+    }
+    return;
+  }
+  if (axisLabelDrag) {
+    const dx = cx - axisLabelDrag.startCx, dy = cy - axisLabelDrag.startCy;
+    state[axisLabelDrag.type + 'Dx'] = axisLabelDrag.origDx + dx;
+    state[axisLabelDrag.type + 'Dy'] = axisLabelDrag.origDy + dy;
+    redraw(); return;
+  }
+
+  if (state.tool === 'line' && drawing && drawStart) {
+    const geoSnap = getSnapCandidate(cx, cy);
+    const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
+                         : getSnappedEnd(drawStart, n, e.shiftKey);
+    redraw();
+    const a = toCanvas(drawStart.xn, drawStart.yn);
+    const b = geoSnap ? { x: geoSnap.x, y: geoSnap.y } : toCanvas(endN.xn, endN.yn);
+    ctx.save();
+    ctx.strokeStyle = state.drawColor;
+    ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
+    const dash = document.getElementById('stroke-dash').value;
+    if (dash) ctx.setLineDash(dash.split(',').map(Number));
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.restore();
+    if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
+  } else if (state.tool === 'curve' && drawing && curvePoints.length > 0) {
+    redraw();
+    drawCurvePreview(n);
+  } else if (state.tool === 'region' && drawing && curvePoints.length > 0) {
+    redraw();
+    drawRegionPreview(n);
+  } else if (state.tool === 'select' && drawing && drawStart) {
+    // drag to move
+    const dx = cx - drawStart.cx;
+    const dy = cy - drawStart.cy;
+    const dxn = dx / PLOT_W;
+    const dyn = dy / PLOT_H;
+    const orig = drawStart.el;
+    const el = state.elements.find(e => e.id === state.selectedId);
+    if (!el) return;
+    if (el.type === 'line') {
+      el.x1n = orig.x1n + dxn;
+      el.y1n = orig.y1n + dyn;
+      el.x2n = orig.x2n + dxn;
+      el.y2n = orig.y2n + dyn;
+    } else if (el.type === 'curve') {
+      el.points = orig.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
+    } else if (el.type === 'region') {
+      el.points = orig.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
+    } else if (el.type === 'dot') {
+      el.xn = orig.xn + dxn;
+      el.yn = orig.yn + dyn;
+    } else if (el.type === 'text') {
+      el.xn = orig.xn + dxn;
+      el.yn = orig.yn + dyn;
+    }
+    redraw();
+  }
+
+  // hover cursor
+  if (state.tool === 'select') {
+    const selEl = state.selectedId ? state.elements.find(e => e.id === state.selectedId) : null;
+    const nodeHit = selEl ? hitTestNode(cx, cy, selEl) : null;
+    if (nodeHit !== null) {
+      canvas.style.cursor = 'crosshair'; // node resize
+    } else {
+      const hit = hitTest(cx, cy);
+      const axisHit = hitTestAxisLabel(cx, cy);
+      let labelHit = false;
+      if (selEl && selEl.label && selEl.type !== 'dot') {
+        const lpos = getFullLabelPos(selEl);
+        if (Math.abs(cx - lpos.x) < 36 && Math.abs(cy - lpos.y) < 14) labelHit = true;
+      }
+      canvas.style.cursor = (hit || axisHit || labelHit) ? 'move' : 'default';
+    }
+  }
+  // Show snap indicator while hovering with drawing tools
+  if ((state.tool === 'line' || state.tool === 'curve' || state.tool === 'region') && !drawing) {
+    const snap = getSnapCandidate(cx, cy);
+    if (snap) { redraw(); drawSnapIndicator(snap.x, snap.y); snapHoverActive = true; }
+    else if (snapHoverActive) { redraw(); snapHoverActive = false; }
+  }
+}
+
+function onMouseUp(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  const cx = (e.clientX - r.left) * scaleX;
+  const cy = (e.clientY - r.top) * scaleY;
+  const n = fromCanvas(cx, cy);
+
+  if (nodeDrag) { nodeDrag = null; redraw(); return; }
+
+  if (labelDrag) {
+    if (!labelDrag.moved) {
+      const el = state.elements.find(e => e.id === labelDrag.elId);
+      if (el) showInlineLabelEdit(el);
+    }
+    labelDrag = null; redraw(); return;
+  }
+  if (axisLabelDrag) { axisLabelDrag = null; return; }
+
+  if (state.tool === 'line' && drawing && drawStart) {
+    const geoSnap = getSnapCandidate(cx, cy);
+    const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
+                         : getSnappedEnd(drawStart, n, e.shiftKey);
+    const dist = Math.hypot(endN.xn - drawStart.xn, endN.yn - drawStart.yn);
+    if (dist > 0.02) {
+      saveUndo();
+      const label = '';
+      const el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn,
+        state.drawColor,
+        parseFloat(document.getElementById('stroke-weight').value),
+        document.getElementById('stroke-dash').value,
+        label
+      );
+      state.elements.push(el);
+      state.selectedId = el.id;
+      renderProps();
+    }
+    drawing = false;
+    drawStart = null;
+    redraw();
+  } else if (state.tool === 'select') {
+    drawing = false;
+    drawStart = null;
+  }
+}
+
+function onDblClick(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  const cx = (e.clientX - r.left) * scaleX;
+  const cy = (e.clientY - r.top) * scaleY;
+
+  if (state.tool === 'curve' && drawing && curvePoints.length >= 2) {
+    saveUndo();
+    const el = mkCurve([...curvePoints], state.drawColor,
+      parseFloat(document.getElementById('stroke-weight').value),
+      document.getElementById('stroke-dash').value, '');
+    state.elements.push(el); state.selectedId = el.id;
+    curvePoints = []; drawing = false;
+    renderProps(); redraw(); return;
+  }
+
+  if (state.tool === 'region' && drawing && curvePoints.length >= 3) {
+    saveUndo();
+    const el = mkRegion([...curvePoints], state.drawColor, 'solid');
+    state.elements.push(el); state.selectedId = el.id;
+    curvePoints = []; drawing = false;
+    renderProps(); redraw(); return;
+  }
+
+  if (state.tool === 'select') {
+    const hit = hitTest(cx, cy);
+    if (hit) openEditModal(hit);
+  }
+}
+
+function onKeyDown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
+    deleteSelected();
+  }
+  if (e.key === 'Escape') {
+    if ((state.tool === 'curve' || state.tool === 'region') && drawing) {
+      curvePoints = [];
+      drawing = false;
+      redraw();
+    }
+    state.selectedId = null;
+    renderProps();
+    redraw();
+  }
+}
+
+function drawCurvePreview(mouseN) {
+  const allPts = mouseN ? [...curvePoints, mouseN] : curvePoints;
+  if (allPts.length < 2) return;
+  const pts = allPts.map(p => toCanvas(p.xn, p.yn));
+  ctx.save();
+  ctx.strokeStyle = state.drawColor;
+  ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
+  const dash = document.getElementById('stroke-dash').value;
+  if (dash) ctx.setLineDash(dash.split(',').map(Number));
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  drawSmoothCurve(pts);
+  // draw control points
+  curvePoints.forEach(p => {
+    const c = toCanvas(p.xn, p.yn);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = state.drawColor;
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+// ─── HIT TESTING ─────────────────────────────────────────────
+function hitTest(cx, cy) {
+  // Non-region elements first (they render on top)
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type === 'region') continue;
+    if (el.type === 'line') {
+      const a = toCanvas(el.x1n, el.y1n);
+      const b = toCanvas(el.x2n, el.y2n);
+      if (distToSegment(cx, cy, a.x, a.y, b.x, b.y) < 8) return el;
+    } else if (el.type === 'curve') {
+      const segs = getElSegments(el);
+      for (let j = 0; j < segs.length; j++) {
+        if (distToSegment(cx, cy, segs[j][0], segs[j][1], segs[j][2], segs[j][3]) < 8) return el;
+      }
+    } else if (el.type === 'dot') {
+      const p = toCanvas(el.xn, el.yn);
+      if (Math.hypot(cx - p.x, cy - p.y) < 12) return el;
+    } else if (el.type === 'text') {
+      const p = toCanvas(el.xn, el.yn);
+      if (Math.abs(cx - p.x) < 30 && Math.abs(cy - p.y) < 14) return el;
+    }
+  }
+  // Region elements last
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type !== 'region') continue;
+    if (el.points && el.points.length >= 3) {
+      const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+      if (pointInPolygon(cx, cy, pts)) return el;
+    }
+  }
+  return null;
+}
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// ─── CURVE LIST ──────────────────────────────────────────────
+function renderCurveList() {
+  const list = document.getElementById('curve-list');
+  list.innerHTML = '';
+  state.curves.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'curve-item';
+    div.innerHTML = `
+      <div class="curve-swatch" style="background:${c.color}"></div>
+      <span class="curve-name">${c.name}</span>
+      <button class="curve-del" title="Remove" onclick="removeCurve(${i})">×</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+let modalColorSelected = COLORS[0];
+
+function openAddCurve() {
+  modalColorSelected = COLORS[0];
+  document.getElementById('modal-name').value = '';
+  buildModalColors();
+  document.getElementById('curve-modal').classList.add('open');
+  setTimeout(() => document.getElementById('modal-name').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('curve-modal').classList.remove('open');
+}
+
+function confirmAddCurve() {
+  const name = document.getElementById('modal-name').value.trim();
+  if (!name) return;
+  const colorEl = document.querySelector('#modal-colors .modal-col.active');
+  const color = colorEl ? colorEl.dataset.color : COLORS[0];
+  state.curves.push({ name, color });
+  renderCurveList();
+  closeModal();
+}
+
+function removeCurve(i) {
+  state.curves.splice(i, 1);
+  renderCurveList();
+}
+
+// ─── PROPS PANEL ─────────────────────────────────────────────
+function renderProps() {
+  const form = document.getElementById('props-form');
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) {
+    form.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0;font-family:var(--mono)">Nothing selected.<br><br>Click an element to edit.</div>';
+    return;
+  }
+  let html = '';
+
+  if (el.type === 'region') {
+    html += `<div class="prop-row">
+      <label>Label</label>
+      <input type="text" value="${el.label||''}" maxlength="20" placeholder="e.g. Consumer surplus"
+        onchange="updateProp('label',this.value)">
+    </div>
+    <div class="prop-row">
+      <label>Fill</label>
+      <select onchange="updateProp('pattern',this.value)">
+        <option value="solid" ${el.pattern==='solid'?'selected':''}>Solid colour</option>
+        <option value="hatch" ${el.pattern==='hatch'?'selected':''}>Hatch (45°)</option>
+        <option value="crosshatch" ${el.pattern==='crosshatch'?'selected':''}>Cross-hatch</option>
+        <option value="dots" ${el.pattern==='dots'?'selected':''}>Dots</option>
+      </select>
+    </div>
+    <div class="prop-row">
+      <label>Color</label>
+      <select onchange="updateProp('fillColor',this.value)">
+        ${COLORS.map(c=>`<option value="${c}" ${el.fillColor===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>`;
+    if (el.pattern === 'solid') {
+      html += `<div class="prop-row">
+        <label>Opacity</label>
+        <select onchange="updateProp('fillOpacity',parseFloat(this.value))">
+          <option value="0.10" ${el.fillOpacity==0.10?'selected':''}>10%</option>
+          <option value="0.20" ${el.fillOpacity==0.20?'selected':''}>20%</option>
+          <option value="0.30" ${(el.fillOpacity??0.25)==0.30?'selected':''}>30%</option>
+          <option value="0.45" ${el.fillOpacity==0.45?'selected':''}>45%</option>
+        </select>
+      </div>`;
+    }
+  } else if (el.type === 'dot') {
+    html += `<div class="prop-row">
+      <label>P* label</label>
+      <input type="text" value="${el.pLabel||''}" maxlength="10" onchange="updateProp('pLabel',this.value)">
+    </div>
+    <div class="prop-row">
+      <label>Q* label</label>
+      <input type="text" value="${el.qLabel||''}" maxlength="10" onchange="updateProp('qLabel',this.value)">
+    </div>
+    <div class="prop-row">
+      <label>Color</label>
+      <select onchange="updateProp('color',this.value)">
+        ${COLORS.map(c=>`<option value="${c}" ${el.color===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>`;
+  } else if (el.type !== 'text') {
+    html += `<div class="prop-row">
+      <label>Label</label>
+      <input type="text" value="${el.label || ''}" maxlength="16" onchange="updateProp('label', this.value)">
+    </div>
+    <div class="prop-row">
+      <label>Color</label>
+      <select onchange="updateProp('color', this.value)">
+        ${COLORS.map(c => `<option value="${c}" ${el.color===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="prop-row">
+      <label>Weight</label>
+      <select onchange="updateProp('weight', parseFloat(this.value))">
+        <option value="1.5" ${el.weight==1.5?'selected':''}>Thin</option>
+        <option value="2.5" ${el.weight==2.5?'selected':''}>Normal</option>
+        <option value="4" ${el.weight==4?'selected':''}>Bold</option>
+      </select>
+    </div>
+    <div class="prop-row">
+      <label>Dash</label>
+      <select onchange="updateProp('dash', this.value)">
+        <option value="" ${!el.dash?'selected':''}>Solid</option>
+        <option value="6,4" ${el.dash=='6,4'?'selected':''}>Dashed</option>
+        <option value="2,3" ${el.dash=='2,3'?'selected':''}>Dotted</option>
+      </select>
+    </div>`;
+  } else {
+    html += `<div class="prop-row">
+      <label>Text</label>
+      <input type="text" value="${el.text || ''}" maxlength="20" onchange="updateProp('text', this.value)">
+    </div>`;
+  }
+
+  html += `<button class="action-btn danger" style="margin-top:6px" onclick="deleteSelected()">Delete element</button>`;
+  form.innerHTML = html;
+}
+
+function updateProp(key, value) {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  saveUndo();
+  el[key] = value;
+  redraw();
+}
+
+function deleteSelected() {
+  saveUndo();
+  state.elements = state.elements.filter(e => e.id !== state.selectedId);
+  state.selectedId = null;
+  renderProps();
+  redraw();
+}
+
+// ─── EDIT MODAL ──────────────────────────────────────────────
+let editTargetId = null;
+function openEditModal(el) {
+  editTargetId = el.id;
+  const isText = el.type === 'text';
+  document.getElementById('edit-modal-title').textContent = isText ? 'Edit label' : 'Edit curve label';
+  document.getElementById('edit-label-input').value = isText ? (el.text || '') : (el.label || '');
+  document.getElementById('edit-modal').classList.add('open');
+  setTimeout(() => document.getElementById('edit-label-input').select(), 50);
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editTargetId = null;
+}
+function confirmEditLabel() {
+  const val = document.getElementById('edit-label-input').value.trim();
+  const el = state.elements.find(e => e.id === editTargetId);
+  if (el) {
+    saveUndo();
+    if (el.type === 'text') el.text = val;
+    else el.label = val;
+  }
+  closeEditModal();
+  renderProps();
+  redraw();
+}
+document.getElementById('edit-label-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') confirmEditLabel();
+});
+
+// ─── CANVAS ACTIONS ──────────────────────────────────────────
+function clearCanvas() {
+  saveUndo();
+  state.elements = [];
+  state.selectedId = null;
+  renderProps();
+  redraw();
+}
+
+function clearAll() {
+  if (!confirm('Reset everything including curves list?')) return;
+  state.elements = [];
+  state.curves = [];
+  state.selectedId = null;
+  state.title = '';
+  document.getElementById('graph-title').value = '';
+  document.getElementById('y-label').value = 'Price ($/unit)';
+  document.getElementById('x-label').value = 'Quantity (units/week)';
+  renderCurveList();
+  renderProps();
+  redraw();
+}
+
+// ─── DOWNLOAD ────────────────────────────────────────────────
+function downloadJPG() {
+  state.selectedId = null;
+  redraw();
+  // Draw legend if curves exist
+  if (state.curves.length > 0) drawLegend();
+  const link = document.createElement('a');
+  const title = (state.title || 'ib-economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  link.download = title + '.jpg';
+  link.href = canvas.toDataURL('image/jpeg', 0.97);
+  link.click();
+  redraw(); // restore without legend overlay
+}
+
+function drawLegend() {
+  const pad = 12, lineLen = 22, lineH = 20;
+  const totalH = state.curves.length * lineH + pad * 2;
+  const maxW = Math.max(...state.curves.map(c => ctx.measureText(c.name).width + lineLen + 14)) + pad * 2;
+  const lx = W - MARGIN.right - maxW - 8;
+  const ly = MARGIN.top + 8;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 0.8;
+  roundRect(ctx, lx, ly, maxW, totalH, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  state.curves.forEach((c, i) => {
+    const y = ly + pad + i * lineH + lineH / 2;
+    ctx.strokeStyle = c.color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(lx + pad, y);
+    ctx.lineTo(lx + pad + lineLen, y);
+    ctx.stroke();
+    ctx.font = '500 12px "IBM Plex Sans", sans-serif';
+    ctx.fillStyle = '#1a1918';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(c.name, lx + pad + lineLen + 6, y);
+  });
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ─── STROKE CONTROLS LIVE UPDATE ─────────────────────────────
+document.getElementById('stroke-weight').addEventListener('change', () => {});
+document.getElementById('stroke-dash').addEventListener('change', () => {});
+
+// ─── START ───────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
