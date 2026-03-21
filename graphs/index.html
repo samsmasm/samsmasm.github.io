@@ -362,7 +362,7 @@
 
 <header>
   <h1>IB Economics Graph Drawer</h1>
-  <span class="tag">v1.1</span>
+  <span class="tag">v1.2</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG()">⬇ Download JPG</button>
 </header>
@@ -400,6 +400,9 @@
       </button>
       <button class="tool-btn" id="tool-line" onclick="setTool('line')">
         <span class="icon">╱</span>Straight line
+      </button>
+      <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')">
+        <span class="icon">→</span>Arrow
       </button>
       <button class="tool-btn" id="tool-curve" onclick="setTool('curve')">
         <span class="icon">∿</span>Curve (drag)
@@ -454,6 +457,7 @@
       <input type="text" id="x-label" placeholder="Quantity (units/wk)" style="width:150px" onchange="redraw()">
       <div class="sep"></div>
       <button class="tb-toggle" id="snap-btn" onclick="toggleSnap()">Snap: off</button>
+      <button class="tb-toggle" id="bw-btn" onclick="toggleBW()">Colour</button>
       <span class="hint" id="hint-text">Select a template or pick a tool to draw</span>
     </div>
     <div class="canvas-wrap">
@@ -553,6 +557,7 @@ let labelDrag = null;
 let nodeDrag = null;
 let snapEnabled = false;
 let snapHoverActive = false;
+let bwMode = false;
 
 // ─── UNDO / REDO ─────────────────────────────────────────────
 let undoStack = [];
@@ -741,7 +746,11 @@ function mkDot(xn, yn, color, pLabel, qLabel) {
 }
 function mkRegion(points, fillColor, pattern) {
   return { id: nextId++, type: 'region', points, fillColor: fillColor || COLORS[0],
-           pattern: pattern || 'solid', fillOpacity: 0.25, label: '', labelDx: 0, labelDy: 0 };
+           pattern: pattern || 'solid', fillOpacity: 0.25, label: '', labelDx: 0, labelDy: 0,
+           bwPattern: 'bw-hatch45' };
+}
+function mkArrow(x1n, y1n, x2n, y2n, color, weight, dash, label) {
+  return { id: nextId++, type: 'arrow', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
 }
 
 function loadTemplate(name) {
@@ -778,7 +787,7 @@ function fromCanvas(cx, cy) {
 }
 
 function getLabelBasePos(el) {
-  if (el.type === 'line') {
+  if (el.type === 'line' || el.type === 'arrow') {
     const a = toCanvas(el.x1n, el.y1n);
     const b = toCanvas(el.x2n, el.y2n);
     const dx = b.x - a.x, dy = b.y - a.y;
@@ -813,11 +822,11 @@ function hitTestAxisLabel(cx, cy) {
   const xly = MARGIN.top + PLOT_H + 8 + state.xLabelDy;
   const xw = ctx.measureText(state.xLabel).width;
   if (cx >= xlx - xw - 4 && cx <= xlx + 4 && Math.abs(cy - xly - 6) < 14) return 'xLabel';
-  // Y label: left-aligned from MARGIN.left+4, above top of axis
-  const ylx = MARGIN.left + 4 + state.yLabelDx;
-  const yly = MARGIN.top - 4 + state.yLabelDy;
+  // Y label: rotated, centered along left side of y-axis
+  const ylx = MARGIN.left / 2 + state.yLabelDx;
+  const yly = MARGIN.top + PLOT_H / 2 + state.yLabelDy;
   const yw = ctx.measureText(state.yLabel).width;
-  if (cx >= ylx - 4 && cx <= ylx + yw + 4 && Math.abs(cy - yly + 6) < 14) return 'yLabel';
+  if (Math.abs(cx - ylx) < 12 && Math.abs(cy - yly) < yw / 2 + 4) return 'yLabel';
   return null;
 }
 
@@ -865,6 +874,15 @@ function toggleSnap() {
   btn.classList.toggle('active', snapEnabled);
 }
 
+function toggleBW() {
+  bwMode = !bwMode;
+  const btn = document.getElementById('bw-btn');
+  btn.textContent = bwMode ? 'B/W' : 'Colour';
+  btn.classList.toggle('active', bwMode);
+  renderProps();
+  redraw();
+}
+
 function segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
   const rx = bx-ax, ry = by-ay, sx = dx-cx, sy = dy-cy;
   const denom = rx*sy - ry*sx;
@@ -884,7 +902,7 @@ function closestPtOnSeg(px, py, ax, ay, bx, by) {
 }
 
 function getElSegments(el) {
-  if (el.type === 'line') {
+  if (el.type === 'line' || el.type === 'arrow') {
     const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
     return [[a.x, a.y, b.x, b.y]];
   }
@@ -916,7 +934,7 @@ function getElSegments(el) {
   return [];
 }
 
-function getSnapCandidate(cx, cy) {
+function getSnapCandidate(cx, cy, includeOnSeg = false) {
   if (!snapEnabled) return null;
   const SNAP_R = 14;
   const candidates = [];
@@ -957,6 +975,16 @@ function getSnapCandidate(cx, cy) {
     if (d < bestDist) { bestDist = d; best = p; }
   });
 
+  // Fallback: closest point on any segment (only when requested, e.g. for region drawing)
+  if (!best && includeOnSeg) {
+    const SEG_SNAP_R = 10;
+    allSegs.forEach(([ax,ay,bx,by]) => {
+      const p = closestPtOnSeg(cx, cy, ax, ay, bx, by);
+      const d = Math.hypot(cx-p.x, cy-p.y);
+      if (d < SEG_SNAP_R) { if (d < bestDist) { bestDist = d; best = p; } }
+    });
+  }
+
   return best;
 }
 
@@ -973,7 +1001,7 @@ function drawSnapIndicator(x, y) {
 function hitTestNode(cx, cy, el) {
   if (!el) return null;
   const R = 10;
-  if (el.type === 'line') {
+  if (el.type === 'line' || el.type === 'arrow') {
     const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
     if (Math.hypot(cx-a.x, cy-a.y) < R) return 'p1';
     if (Math.hypot(cx-b.x, cy-b.y) < R) return 'p2';
@@ -994,7 +1022,7 @@ function hitTestNode(cx, cy, el) {
 function applyNodeMove(el, node, cx, cy) {
   const snap = getSnapCandidate(cx, cy);
   const n = snap ? fromCanvas(snap.x, snap.y) : fromCanvas(cx, cy);
-  if (el.type === 'line') {
+  if (el.type === 'line' || el.type === 'arrow') {
     if (node === 'p1') { el.x1n = n.xn; el.y1n = n.yn; }
     else               { el.x2n = n.xn; el.y2n = n.yn; }
   } else if (el.type === 'curve') {
@@ -1039,30 +1067,58 @@ function drawPattern(pattern, color) {
       ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
     }
   }
+  if (pattern === 'bw-hatch45') {
+    for (let d = -(H+W); d < W+H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d+H, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-hatch135') {
+    for (let d = -(H+W); d < W+H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d+H, 0); ctx.lineTo(d, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-crosshatch') {
+    for (let d = -(H+W); d < W+H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d+H, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(d+H, 0); ctx.lineTo(d, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-dots') {
+    const sp2 = 12;
+    for (let x = 0; x <= W; x += sp2) for (let y = 0; y <= H; y += sp2) {
+      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  if (pattern === 'bw-vertical') {
+    for (let x = 0; x <= W; x += sp) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-horizontal') {
+    for (let y = 0; y <= H; y += sp) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
 }
 
 function drawRegionEl(el) {
   if (!el.points || el.points.length < 3) return;
   const pts = el.points.map(p => toCanvas(p.xn, p.yn));
-  const color = el.fillColor || COLORS[0];
+  const color = bwMode ? '#1a1918' : (el.fillColor || COLORS[0]);
+  const pat = bwMode ? (el.bwPattern || 'bw-hatch45') : el.pattern;
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
   ctx.closePath();
-  if (el.pattern === 'solid') {
+  if (pat === 'solid') {
     ctx.fillStyle = hexToRgba(color, el.fillOpacity ?? 0.25);
     ctx.fill();
   } else {
     ctx.save(); ctx.clip();
-    drawPattern(el.pattern, color);
+    drawPattern(pat, color);
     ctx.restore();
   }
-  // Dashed outline
-  ctx.setLineDash([4, 3]);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
   ctx.restore();
   // Label at centroid + offset
   if (el.label) {
@@ -1113,6 +1169,21 @@ function getSnappedEnd(start, end, shift) {
   return { xn: start.xn + Math.sign(dxn) * m, yn: start.yn + Math.sign(dyn) * m }; // 45°
 }
 
+function drawArrowhead(x1, y1, x2, y2, weight) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const size = 7 + weight * 1.5;
+  const spread = Math.PI / 6;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle - spread), y2 - size * Math.sin(angle - spread));
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle + spread), y2 - size * Math.sin(angle + spread));
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ─── DRAWING ─────────────────────────────────────────────────
 function redraw() {
   state.title = document.getElementById('graph-title').value;
@@ -1158,10 +1229,14 @@ function drawAxes() {
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, MARGIN.top + PLOT_H + 8 + state.xLabelDy);
-  // Y label — left-aligned just above top of y-axis
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(state.yLabel, MARGIN.left + 4 + state.yLabelDx, MARGIN.top - 4 + state.yLabelDy);
+  // Y label — rotated 90° CCW, centered along left side of y-axis
+  ctx.save();
+  ctx.translate(MARGIN.left / 2 + state.yLabelDx, MARGIN.top + PLOT_H / 2 + state.yLabelDy);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(state.yLabel, 0, 0);
+  ctx.restore();
 
   // Title
   ctx.font = '600 15px "IBM Plex Sans", sans-serif';
@@ -1190,20 +1265,22 @@ function drawElements() {
 
 function drawElement(el) {
   ctx.save();
-  ctx.strokeStyle = el.color || '#1a1918';
+  const col = bwMode ? '#1a1918' : (el.color || '#1a1918');
+  ctx.strokeStyle = col;
   ctx.lineWidth = el.weight || 2.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   if (el.dash) ctx.setLineDash(el.dash.split(',').map(Number));
   else ctx.setLineDash([]);
 
-  if (el.type === 'line') {
+  if (el.type === 'line' || el.type === 'arrow') {
     const a = toCanvas(el.x1n, el.y1n);
     const b = toCanvas(el.x2n, el.y2n);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
+    if (el.type === 'arrow') drawArrowhead(a.x, a.y, b.x, b.y, el.weight || 2.5);
     if (el.label) drawLineLabel(el);
   } else if (el.type === 'curve') {
     if (el.points.length < 2) { ctx.restore(); return; }
@@ -1211,7 +1288,7 @@ function drawElement(el) {
     drawSmoothCurve(pts);
     if (el.label) {
       const pos = getFullLabelPos(el);
-      drawLabelAt(el.label, pos.x, pos.y, el.color);
+      drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
     }
   } else if (el.type === 'region') {
     ctx.restore();
@@ -1244,7 +1321,7 @@ function drawSmoothCurve(pts) {
 
 function drawLineLabel(el) {
   const pos = getFullLabelPos(el);
-  drawLabelAt(el.label, pos.x, pos.y, el.color);
+  drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
   // Dotted underline when selected to hint it's editable/draggable
   if (el.id === state.selectedId) {
     ctx.save();
@@ -1275,7 +1352,7 @@ function drawTextEl(el) {
   const p = toCanvas(el.xn, el.yn);
   ctx.save();
   ctx.font = `500 ${el.size || 13}px "IBM Plex Sans", sans-serif`;
-  ctx.fillStyle = el.color || '#333';
+  ctx.fillStyle = bwMode ? '#1a1918' : (el.color || '#333');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(el.text, p.x, p.y);
@@ -1286,15 +1363,16 @@ function drawDotEl(el) {
   const p = toCanvas(el.xn, el.yn);
   const axisL = toCanvas(0, el.yn);
   const axisB = toCanvas(el.xn, 1.0);
+  const dotCol = bwMode ? '#1a1918' : (el.color || '#1a1918');
   ctx.save();
-  ctx.strokeStyle = el.color || '#1a1918';
+  ctx.strokeStyle = dotCol;
   ctx.lineWidth = 1.4;
   ctx.setLineDash([4, 3]);
   ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = el.color || '#1a1918';
+  ctx.fillStyle = dotCol;
   ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
   if (el.pLabel) {
@@ -1321,7 +1399,7 @@ function drawSelectionHandles() {
   ctx.strokeStyle = '#1a4a8a';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
-  if (el.type === 'line') {
+  if (el.type === 'line' || el.type === 'arrow') {
     const a = toCanvas(el.x1n, el.y1n);
     const b = toCanvas(el.x2n, el.y2n);
     drawHandle(a.x, a.y);
@@ -1375,6 +1453,7 @@ function updateHint(t) {
   const hints = {
     select: 'Click to select · double-click to edit label',
     line: 'Click and drag · hold Shift to snap to H / V / 45°',
+    arrow: 'Click and drag to draw an arrow',
     curve: 'Click to add points · double-click to finish curve',
     text: 'Click anywhere on the graph to add a label',
     equil: 'Click to place equilibrium point with dotted drop lines',
@@ -1433,7 +1512,7 @@ function onMouseDown(e) {
       drawing = true;
       drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)) };
     }
-  } else if (state.tool === 'line') {
+  } else if (state.tool === 'line' || state.tool === 'arrow') {
     const snapStart = getSnapCandidate(cx, cy);
     const startN = snapStart ? fromCanvas(snapStart.x, snapStart.y) : n;
     drawing = true;
@@ -1454,7 +1533,16 @@ function onMouseDown(e) {
       redraw();
     }
   } else if (state.tool === 'region') {
-    curvePoints.push({ xn: n.xn, yn: n.yn });
+    const geoSnap = getSnapCandidate(cx, cy, true);
+    let finalN;
+    if (geoSnap) {
+      finalN = fromCanvas(geoSnap.x, geoSnap.y);
+    } else if (e.shiftKey && curvePoints.length > 0) {
+      finalN = getSnappedEnd(curvePoints[curvePoints.length - 1], n, true);
+    } else {
+      finalN = n;
+    }
+    curvePoints.push({ xn: finalN.xn, yn: finalN.yn });
     if (curvePoints.length === 1) drawing = true;
     redraw();
     drawRegionPreview();
@@ -1508,7 +1596,7 @@ function onMouseMove(e) {
     redraw(); return;
   }
 
-  if (state.tool === 'line' && drawing && drawStart) {
+  if ((state.tool === 'line' || state.tool === 'arrow') && drawing && drawStart) {
     const geoSnap = getSnapCandidate(cx, cy);
     const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
                          : getSnappedEnd(drawStart, n, e.shiftKey);
@@ -1523,13 +1611,24 @@ function onMouseMove(e) {
     ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     ctx.restore();
+    if (state.tool === 'arrow') drawArrowhead(a.x, a.y, b.x, b.y, parseFloat(document.getElementById('stroke-weight').value));
     if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'curve' && drawing && curvePoints.length > 0) {
     redraw();
     drawCurvePreview(n);
   } else if (state.tool === 'region' && drawing && curvePoints.length > 0) {
+    const geoSnap = getSnapCandidate(cx, cy, true);
+    let previewN;
+    if (geoSnap) {
+      previewN = fromCanvas(geoSnap.x, geoSnap.y);
+    } else if (e.shiftKey && curvePoints.length > 0) {
+      previewN = getSnappedEnd(curvePoints[curvePoints.length - 1], n, true);
+    } else {
+      previewN = n;
+    }
     redraw();
-    drawRegionPreview(n);
+    drawRegionPreview(previewN);
+    if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'select' && drawing && drawStart) {
     // drag to move
     const dx = cx - drawStart.cx;
@@ -1576,7 +1675,7 @@ function onMouseMove(e) {
     }
   }
   // Show snap indicator while hovering with drawing tools
-  if ((state.tool === 'line' || state.tool === 'curve' || state.tool === 'region') && !drawing) {
+  if ((state.tool === 'line' || state.tool === 'arrow' || state.tool === 'curve' || state.tool === 'region') && !drawing) {
     const snap = getSnapCandidate(cx, cy);
     if (snap) { redraw(); drawSnapIndicator(snap.x, snap.y); snapHoverActive = true; }
     else if (snapHoverActive) { redraw(); snapHoverActive = false; }
@@ -1602,7 +1701,7 @@ function onMouseUp(e) {
   }
   if (axisLabelDrag) { axisLabelDrag = null; return; }
 
-  if (state.tool === 'line' && drawing && drawStart) {
+  if ((state.tool === 'line' || state.tool === 'arrow') && drawing && drawStart) {
     const geoSnap = getSnapCandidate(cx, cy);
     const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
                          : getSnappedEnd(drawStart, n, e.shiftKey);
@@ -1610,12 +1709,17 @@ function onMouseUp(e) {
     if (dist > 0.02) {
       saveUndo();
       const label = '';
-      const el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn,
-        state.drawColor,
-        parseFloat(document.getElementById('stroke-weight').value),
-        document.getElementById('stroke-dash').value,
-        label
-      );
+      const el = state.tool === 'arrow'
+        ? mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn,
+            state.drawColor,
+            parseFloat(document.getElementById('stroke-weight').value),
+            document.getElementById('stroke-dash').value,
+            label)
+        : mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn,
+            state.drawColor,
+            parseFloat(document.getElementById('stroke-weight').value),
+            document.getElementById('stroke-dash').value,
+            label);
       state.elements.push(el);
       state.selectedId = el.id;
       renderProps();
@@ -1709,7 +1813,7 @@ function hitTest(cx, cy) {
   for (let i = state.elements.length - 1; i >= 0; i--) {
     const el = state.elements[i];
     if (el.type === 'region') continue;
-    if (el.type === 'line') {
+    if (el.type === 'line' || el.type === 'arrow') {
       const a = toCanvas(el.x1n, el.y1n);
       const b = toCanvas(el.x2n, el.y2n);
       if (distToSegment(cx, cy, a.x, a.y, b.x, b.y) < 8) return el;
@@ -1807,8 +1911,21 @@ function renderProps() {
       <label>Label</label>
       <input type="text" value="${el.label||''}" maxlength="20" placeholder="e.g. Consumer surplus"
         onchange="updateProp('label',this.value)">
-    </div>
-    <div class="prop-row">
+    </div>`;
+    if (bwMode) {
+      html += `<div class="prop-row">
+        <label>B/W Texture</label>
+        <select onchange="updateProp('bwPattern',this.value)">
+          <option value="bw-hatch45" ${(el.bwPattern||'bw-hatch45')==='bw-hatch45'?'selected':''}>45° hatch</option>
+          <option value="bw-hatch135" ${el.bwPattern==='bw-hatch135'?'selected':''}>135° hatch</option>
+          <option value="bw-crosshatch" ${el.bwPattern==='bw-crosshatch'?'selected':''}>Crosshatch</option>
+          <option value="bw-dots" ${el.bwPattern==='bw-dots'?'selected':''}>Dots</option>
+          <option value="bw-vertical" ${el.bwPattern==='bw-vertical'?'selected':''}>Vertical lines</option>
+          <option value="bw-horizontal" ${el.bwPattern==='bw-horizontal'?'selected':''}>Horizontal lines</option>
+        </select>
+      </div>`;
+    }
+    html += `<div class="prop-row">
       <label>Fill</label>
       <select onchange="updateProp('pattern',this.value)">
         <option value="solid" ${el.pattern==='solid'?'selected':''}>Solid colour</option>
