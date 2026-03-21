@@ -262,16 +262,14 @@
 
   .canvas-wrap {
     flex: 1;
-    position: relative;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
     background: var(--bg);
   }
 
   #graph-canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
     background: #ffffff;
     box-shadow: 0 2px 16px rgba(0,0,0,0.10);
     border-radius: 4px;
@@ -363,7 +361,7 @@
 
 <header>
   <h1>Economics Graph Drawer</h1>
-  <span class="tag">v1.6</span>
+  <span class="tag">v1.7</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG()">⬇ Download JPG</button>
 </header>
@@ -471,7 +469,7 @@
       <span class="hint" id="hint-text">Select a template or pick a tool to draw</span>
     </div>
     <div class="canvas-wrap">
-      <canvas id="graph-canvas" width="680" height="560"></canvas>
+      <canvas id="graph-canvas"></canvas>
     </div>
   </div>
 
@@ -559,6 +557,7 @@ const COLORS = [
 ];
 const MARGIN = { top: 50, right: 60, bottom: 60, left: 70 };
 const W = 680, H = 560;
+const SCALE = 2; // render scale — canvas pixels = W*SCALE × H*SCALE, logical coords stay W×H
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;
 
@@ -625,6 +624,10 @@ function redo() {
 }
 
 const canvas = document.getElementById('graph-canvas');
+canvas.width = W * SCALE;
+canvas.height = H * SCALE;
+canvas.style.width = W + 'px';
+canvas.style.height = H + 'px';
 const ctx = canvas.getContext('2d');
 
 // ─── INIT ────────────────────────────────────────────────────
@@ -897,8 +900,8 @@ function hitTestAxisLabel(cx, cy) {
 function showInlineLabelEdit(el) {
   const pos = getFullLabelPos(el);
   const rect = canvas.getBoundingClientRect();
-  const sx = rect.left + pos.x * (rect.width / canvas.width);
-  const sy = rect.top  + pos.y * (rect.height / canvas.height);
+  const sx = rect.left + pos.x * (rect.width / W);
+  const sy = rect.top  + pos.y * (rect.height / H);
   const inp = document.createElement('input');
   inp.type = 'text';
   inp.value = el.type === 'text' ? (el.text || '') : (el.label || '');
@@ -949,7 +952,7 @@ function toggleBW() {
 }
 
 function applyViewXform() {
-  ctx.setTransform(viewScale, 0, 0, viewScale, viewOffsetX, viewOffsetY);
+  ctx.setTransform(SCALE * viewScale, 0, 0, SCALE * viewScale, SCALE * viewOffsetX, SCALE * viewOffsetY);
 }
 
 function resetView() {
@@ -1275,15 +1278,15 @@ function redraw() {
   // Clear entire canvas with bg colour (no transform)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#f5f4f0';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   // Apply view transform for all diagram drawing
   applyViewXform();
   drawBackground();
   drawAxes();
   drawElements();
   drawSelectionHandles();
-  // Reset transform after drawing
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // Reset transform to base scale after drawing
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
 }
 
 function drawBackground() {
@@ -1554,8 +1557,8 @@ function updateHint(t) {
 
 function onMouseDown(e) {
   const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
+  const scaleX = W / r.width;
+  const scaleY = H / r.height;
   const rawCx = (e.clientX - r.left) * scaleX;
   const rawCy = (e.clientY - r.top) * scaleY;
   const cx = (rawCx - viewOffsetX) / viewScale;
@@ -1671,8 +1674,8 @@ function onMouseDown(e) {
 
 function onMouseMove(e) {
   const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
+  const scaleX = W / r.width;
+  const scaleY = H / r.height;
   const rawCx = (e.clientX - r.left) * scaleX;
   const rawCy = (e.clientY - r.top) * scaleY;
   const cx = (rawCx - viewOffsetX) / viewScale;
@@ -1806,8 +1809,8 @@ function onMouseMove(e) {
 
 function onMouseUp(e) {
   const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
+  const scaleX = W / r.width;
+  const scaleY = H / r.height;
   const rawCx = (e.clientX - r.left) * scaleX;
   const rawCy = (e.clientY - r.top) * scaleY;
   const cx = (rawCx - viewOffsetX) / viewScale;
@@ -1865,8 +1868,8 @@ function onMouseUp(e) {
 
 function onDblClick(e) {
   const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
+  const scaleX = W / r.width;
+  const scaleY = H / r.height;
   const rawCx = (e.clientX - r.left) * scaleX;
   const rawCy = (e.clientY - r.top) * scaleY;
   const cx = (rawCx - viewOffsetX) / viewScale;
@@ -1901,8 +1904,8 @@ function onDblClick(e) {
 function onWheel(e) {
   e.preventDefault();
   const r = canvas.getBoundingClientRect();
-  const rawCx = (e.clientX - r.left) * (canvas.width / r.width);
-  const rawCy = (e.clientY - r.top) * (canvas.height / r.height);
+  const rawCx = (e.clientX - r.left) * (W / r.width);
+  const rawCy = (e.clientY - r.top) * (H / r.height);
   changeZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, rawCx, rawCy);
 }
 
@@ -2336,16 +2339,19 @@ function downloadJPG() {
   const rows = legendItems.length > 0 ? Math.ceil(legendItems.length / cols) : 0;
   const legendH = rows > 0 ? rows * rowH + pad * 2 + 8 : 0; // 8 for divider gap
 
-  // Temporarily expand canvas for legend
+  // Temporarily expand canvas for legend (in scaled pixels)
   const origH = canvas.height;
-  canvas.height = origH + legendH;
+  canvas.height = (H + legendH) * SCALE;
 
   redraw();
+
+  // Legend is drawn in logical coords with base scale
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
 
   // Fill legend area with white (redraw() only fills the graph area)
   if (legendH > 0) {
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, origH, W, legendH);
+    ctx.fillRect(0, H, W, legendH);
   }
 
   if (legendItems.length > 0) {
@@ -2353,13 +2359,13 @@ function downloadJPG() {
     ctx.font = '500 12px "IBM Plex Sans", sans-serif';
     // Divider line
     ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(MARGIN.left, origH + 6); ctx.lineTo(W - MARGIN.right, origH + 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(MARGIN.left, H + 6); ctx.lineTo(W - MARGIN.right, H + 6); ctx.stroke();
 
     legendItems.forEach((item, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = pad + col * itemW;
-      const y = origH + pad + 8 + row * rowH + rowH / 2;
+      const y = H + pad + 8 + row * rowH + rowH / 2;
 
       if (item.type === 'line') {
         ctx.strokeStyle = item.color; ctx.lineWidth = 2; ctx.setLineDash([]);
@@ -2383,7 +2389,7 @@ function downloadJPG() {
   link.href = canvas.toDataURL('image/jpeg', 0.97);
   link.click();
 
-  canvas.height = origH;
+  canvas.height = H * SCALE;
   viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
   redraw();
 }

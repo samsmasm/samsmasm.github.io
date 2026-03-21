@@ -3,7 +3,7 @@
 ## What this is
 A single self-contained HTML/CSS/JS file (`index.html`) that lets IB Economics students draw diagrams and export them as JPG. No build step, no dependencies, no separate CSS or JS files. Everything lives in `index.html`. Keep it that way.
 
-Current version: **v1.6** (tag shown in the header UI, line ~365).
+Current version: **v1.7** (tag shown in the header UI, line ~365).
 
 ## File structure
 ```
@@ -16,14 +16,17 @@ graphs/
 
 ## Canvas & coordinate system
 
-**Canvas element** has fixed attributes `width="680" height="560"` — this is the internal resolution and must not change. CSS makes it fill the available space visually; mouse coordinate mapping accounts for this via `getBoundingClientRect()` + `scaleX = canvas.width / r.width`.
+**Logical dimensions** are W=680, H=560. **Render scale** (`SCALE = 2`) means the actual canvas pixel buffer is 1360×1120, displayed at 680×560 CSS pixels (centred on screen). All drawing code, coordinates, font sizes, and thresholds work in logical space — `ctx.setTransform` applies SCALE automatically via `applyViewXform()`.
 
 ```js
 const W = 680, H = 560;
+const SCALE = 2; // canvas pixels = W*SCALE × H*SCALE
 const MARGIN = { top: 50, right: 60, bottom: 60, left: 70 };
 const PLOT_W = W - MARGIN.left - MARGIN.right;  // 550
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;  // 450
 ```
+
+Mouse coordinate mapping uses `W / r.width` (not `canvas.width / r.width`) to get logical coords. Never use `canvas.width`/`canvas.height` where you mean `W`/`H`.
 
 **Normalised coordinates** `(xn, yn)` where `(0,0)` = top-left of the plot area (high price / high value on y-axis) and `(1,1)` = bottom-right (low price / high quantity on x-axis). This means:
 - **yn = 0** → top of plot → **HIGH price**
@@ -136,15 +139,17 @@ Each region element stores `bwPattern` (which pattern to use in B/W) and `patter
 
 Three-column flex layout: left sidebar → `.canvas-wrap` → right panel.
 
-`.canvas-wrap` is `position:relative; overflow:hidden; flex:1` — fills all space between the sidebars. `#graph-canvas` is `position:absolute; inset:0; width:100%; height:100%` — fills the wrapper. The canvas `width/height` *attributes* stay 680×560 for the coordinate system; CSS scaling is handled automatically.
+`.canvas-wrap` is `flex:1; display:flex; align-items:center; justify-content:center; overflow:auto` — centres the canvas between the sidebars. `#graph-canvas` displays at its CSS size (680×560px) set in JS via `canvas.style.width/height`. The canvas pixel buffer is 1360×1120 (W×SCALE, H×SCALE) for crisp 2× rendering and larger JPG exports.
 
 ---
 
 ## Common pitfalls
 
 - **Normalised y-axis is inverted**: yn=0 is HIGH price. AD curves must go from small-yn (high price) at small-xn to large-yn (low price) at large-xn. Getting this backwards makes AD slope upward.
-- **After `redraw()`, view transform is reset**: if you need to draw additional overlays (e.g. in `downloadJPG`), you don't need `applyViewXform()` because export always uses `viewScale=1`.
-- **Legend export black background**: `redraw()` only fills 680×560. The expanded legend area below must be explicitly filled white.
+- **After `redraw()`, transform is set to base SCALE**: if you need to draw additional overlays (e.g. in `downloadJPG`), call `ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0)` to draw in logical coords without view transform.
+- **Legend export black background**: `redraw()` only fills W×H logical area. The expanded legend area below must be explicitly filled white.
+- **SCALE must be incorporated in `applyViewXform`**: the function applies `SCALE * viewScale` and `SCALE * viewOffset`. Any new transform code must account for this.
+- **Mouse coords use `W / r.width`, not `canvas.width / r.width`**: using canvas.width would give pixel coords (0–1360), but all code expects logical coords (0–680).
 - **`renderCurveList()` is not called automatically**: you must call it whenever regions are mutated or their labels change.
 - **Line label positions**: vertical lines get labels at the top by default. The exception is YFE-style labels — use `mkText(xn, 1.05, label)` to place below the x-axis instead.
 - **`saveUndo()` before every mutation**: undo/redo depends on this being called before `state.elements` or `state.curves` is changed.
