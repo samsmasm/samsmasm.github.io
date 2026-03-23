@@ -109,9 +109,17 @@
 <script src="../nav.js"></script>
 <script>
 (function () {
-  const H = 'a9c43be948c5cabd56ef2bacffb77cdaa5eec49dd5eb0cc4129cf3eda5f0e74c';
   const SK = 'econia-example-ok';
   const IMGS = Array.from({length: 8}, (_, i) => `img/page-${i + 1}.png`);
+
+  function syncCheck(val) {
+    const s = val.toLowerCase().trim();
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) {
+      h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
+    }
+    return h === 1131826964;
+  }
 
   function reveal() {
     document.getElementById('gate').remove();
@@ -124,17 +132,11 @@
     });
   }
 
-  async function check(val) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val.toLowerCase().trim()));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('') === H;
-  }
-
   if (sessionStorage.getItem(SK) === '1') { reveal(); return; }
 
-  document.getElementById('gate-submit').addEventListener('click', async () => {
+  function attempt() {
     const val = document.getElementById('gate-input').value;
-    const ok  = await check(val);
-    if (ok) {
+    if (syncCheck(val)) {
       sessionStorage.setItem(SK, '1');
       reveal();
     } else {
@@ -142,12 +144,13 @@
       const err = document.getElementById('gate-error');
       inp.classList.add('error');
       err.style.display = 'block';
-      setTimeout(() => { inp.classList.remove('error'); err.style.display = 'none'; }, 2000);
+      setTimeout(function () { inp.classList.remove('error'); err.style.display = 'none'; }, 2000);
     }
-  });
+  }
 
-  document.getElementById('gate-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('gate-submit').click();
+  document.getElementById('gate-submit').addEventListener('click', attempt);
+  document.getElementById('gate-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') attempt();
   });
 
   document.getElementById('gate-cancel').addEventListener('click', function () {
