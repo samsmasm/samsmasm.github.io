@@ -410,6 +410,12 @@
       <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')">
         <span class="icon">→</span>Arrow
       </button>
+      <button class="tool-btn" id="tool-dbarrow" onclick="setTool('dbarrow')">
+        <span class="icon">↔</span>Double arrow
+      </button>
+      <button class="tool-btn" id="tool-brace" onclick="setTool('brace')">
+        <span class="icon">⌒</span>Brace
+      </button>
       <button class="tool-btn" id="tool-curve" onclick="setTool('curve')">
         <span class="icon">∿</span>Curve (drag)
       </button>
@@ -843,6 +849,12 @@ function mkRegion(points, fillColor, pattern) {
 function mkArrow(x1n, y1n, x2n, y2n, color, weight, dash, label) {
   return { id: nextId++, type: 'arrow', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
 }
+function mkDArrow(x1n, y1n, x2n, y2n, color, weight, dash, label) {
+  return { id: nextId++, type: 'dbarrow', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkBrace(x1n, y1n, x2n, y2n, color, weight, label, flip) {
+  return { id: nextId++, type: 'brace', x1n, y1n, x2n, y2n, color, weight, label, labelDx: 0, labelDy: 0, flip: !!flip };
+}
 
 function loadTemplate(name) {
   const t = TEMPLATES[name];
@@ -878,7 +890,7 @@ function fromCanvas(cx, cy) {
 }
 
 function getLabelBasePos(el) {
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow' || el.type === 'brace') {
     const a = toCanvas(el.x1n, el.y1n);
     const b = toCanvas(el.x2n, el.y2n);
     const dx = b.x - a.x, dy = b.y - a.y;
@@ -1022,7 +1034,7 @@ function closestPtOnSeg(px, py, ax, ay, bx, by) {
 }
 
 function getElSegments(el) {
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow' || el.type === 'brace') {
     const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
     return [[a.x, a.y, b.x, b.y]];
   }
@@ -1122,7 +1134,7 @@ function drawSnapIndicator(x, y) {
 function hitTestNode(cx, cy, el) {
   if (!el) return null;
   const R = 10;
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow' || el.type === 'brace') {
     const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
     if (Math.hypot(cx-a.x, cy-a.y) < R) return 'p1';
     if (Math.hypot(cx-b.x, cy-b.y) < R) return 'p2';
@@ -1143,7 +1155,7 @@ function hitTestNode(cx, cy, el) {
 function applyNodeMove(el, node, cx, cy) {
   const snap = getSnapCandidate(cx, cy);
   const n = snap ? fromCanvas(snap.x, snap.y) : fromCanvas(cx, cy);
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow' || el.type === 'brace') {
     if (node === 'p1') { el.x1n = n.xn; el.y1n = n.yn; }
     else               { el.x2n = n.xn; el.y2n = n.yn; }
   } else if (el.type === 'curve') {
@@ -1296,6 +1308,34 @@ function drawArrowhead(x1, y1, x2, y2, weight) {
   ctx.restore();
 }
 
+function drawBraceShape(ax, ay, bx, by, flip, color, weight) {
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len < 2) return;
+  // Perpendicular unit vector, flipped as needed
+  const f = flip ? 1 : -1;
+  const nx = (-dy / len) * f;
+  const ny = (dx / len) * f;
+  const h = Math.min(Math.max(10, len * 0.1), 35);
+  const mx = (ax + bx) / 2, my = (ay + by) / 2;
+  // Tip extends h*2 out from midpoint
+  const tx = mx + nx * h * 2, ty = my + ny * h * 2;
+  // Inner rail control points at h from baseline
+  const cx1 = ax + nx * h, cy1 = ay + ny * h;
+  const cx2 = bx + nx * h, cy2 = by + ny * h;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = weight; ctx.setLineDash([]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.quadraticCurveTo(cx1, cy1, mx + nx * h - dx * 0.02, my + ny * h - dy * 0.02);
+  ctx.quadraticCurveTo(tx, ty, mx + nx * h + dx * 0.02, my + ny * h + dy * 0.02);
+  ctx.quadraticCurveTo(cx2, cy2, bx, by);
+  ctx.stroke();
+  ctx.restore();
+  // Return tip position for label
+  return { x: tx, y: ty };
+}
+
 // ─── DRAWING ─────────────────────────────────────────────────
 function redraw() {
   state.title = document.getElementById('graph-title').value;
@@ -1392,15 +1432,23 @@ function drawElement(el) {
   if (el.dash) ctx.setLineDash(el.dash.split(',').map(Number));
   else ctx.setLineDash([]);
 
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
     const a = toCanvas(el.x1n, el.y1n);
     const b = toCanvas(el.x2n, el.y2n);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
-    if (el.type === 'arrow') drawArrowhead(a.x, a.y, b.x, b.y, el.weight || 2.5);
+    if (el.type === 'arrow' || el.type === 'dbarrow') drawArrowhead(a.x, a.y, b.x, b.y, el.weight || 2.5);
+    if (el.type === 'dbarrow') drawArrowhead(b.x, b.y, a.x, a.y, el.weight || 2.5);
     if (el.label) drawLineLabel(el);
+  } else if (el.type === 'brace') {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    const tip = drawBraceShape(a.x, a.y, b.x, b.y, el.flip, col, el.weight || 1.5);
+    if (el.label && tip) {
+      drawLabelAt(el.label, tip.x + (el.labelDx || 0), tip.y + (el.labelDy || 0), col);
+    }
   } else if (el.type === 'curve') {
     if (el.points.length < 2) { ctx.restore(); return; }
     const pts = el.points.map(p => toCanvas(p.xn, p.yn));
@@ -1518,7 +1566,7 @@ function drawSelectionHandles() {
   ctx.strokeStyle = '#1a4a8a';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow' || el.type === 'brace') {
     const a = toCanvas(el.x1n, el.y1n);
     const b = toCanvas(el.x2n, el.y2n);
     drawHandle(a.x, a.y);
@@ -1574,6 +1622,8 @@ function updateHint(t) {
     select: 'Click to select · double-click to edit label',
     line: 'Click and drag · hold Shift to snap to H / V / 45°',
     arrow: 'Click and drag to draw an arrow',
+    dbarrow: 'Click and drag to draw a double-headed arrow',
+    brace: 'Click and drag to draw a curly brace · Flip direction in properties',
     curve: 'Click to add points · double-click to finish curve',
     text: 'Click anywhere on the graph to add a label',
     equil: 'Click to place equilibrium point with dotted drop lines',
@@ -1644,7 +1694,7 @@ function onMouseDown(e) {
       panStartOffset = { x: viewOffsetX, y: viewOffsetY };
       canvas.style.cursor = 'grabbing';
     }
-  } else if (state.tool === 'line' || state.tool === 'arrow') {
+  } else if (state.tool === 'line' || state.tool === 'arrow' || state.tool === 'dbarrow' || state.tool === 'brace') {
     const snapStart = getSnapCandidate(cx, cy);
     const startN = snapStart ? fromCanvas(snapStart.x, snapStart.y) : n;
     drawing = true;
@@ -1740,23 +1790,27 @@ function onMouseMove(e) {
     redraw(); return;
   }
 
-  if ((state.tool === 'line' || state.tool === 'arrow') && drawing && drawStart) {
+  if ((state.tool === 'line' || state.tool === 'arrow' || state.tool === 'dbarrow' || state.tool === 'brace') && drawing && drawStart) {
     const geoSnap = getSnapCandidate(cx, cy);
     const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
                          : getSnappedEnd(drawStart, n, e.shiftKey);
     redraw();
     const a = toCanvas(drawStart.xn, drawStart.yn);
     const b = geoSnap ? { x: geoSnap.x, y: geoSnap.y } : toCanvas(endN.xn, endN.yn);
-    ctx.save();
-    applyViewXform();
-    ctx.strokeStyle = state.drawColor;
-    ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
-    const dash = document.getElementById('stroke-dash').value;
-    if (dash) ctx.setLineDash(dash.split(',').map(Number));
-    ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    const w = parseFloat(document.getElementById('stroke-weight').value);
+    ctx.save(); applyViewXform();
+    if (state.tool === 'brace') {
+      drawBraceShape(a.x, a.y, b.x, b.y, false, state.drawColor, w);
+    } else {
+      ctx.strokeStyle = state.drawColor; ctx.lineWidth = w;
+      const dash = document.getElementById('stroke-dash').value;
+      if (dash) ctx.setLineDash(dash.split(',').map(Number));
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
     ctx.restore();
-    if (state.tool === 'arrow') drawArrowhead(a.x, a.y, b.x, b.y, parseFloat(document.getElementById('stroke-weight').value));
+    if (state.tool === 'arrow' || state.tool === 'dbarrow') drawArrowhead(a.x, a.y, b.x, b.y, w);
+    if (state.tool === 'dbarrow') drawArrowhead(b.x, b.y, a.x, a.y, w);
     if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'curve' && drawing && curvePoints.length > 0) {
     redraw();
@@ -1824,7 +1878,7 @@ function onMouseMove(e) {
     }
   }
   // Show snap indicator while hovering with drawing tools
-  if ((state.tool === 'line' || state.tool === 'arrow' || state.tool === 'curve' || state.tool === 'region') && !drawing) {
+  if ((state.tool === 'line' || state.tool === 'arrow' || state.tool === 'dbarrow' || state.tool === 'brace' || state.tool === 'curve' || state.tool === 'region') && !drawing) {
     const snap = getSnapCandidate(cx, cy);
     if (snap) { redraw(); drawSnapIndicator(snap.x, snap.y); snapHoverActive = true; }
     else if (snapHoverActive) { redraw(); snapHoverActive = false; }
@@ -1858,25 +1912,20 @@ function onMouseUp(e) {
   }
   if (axisLabelDrag) { axisLabelDrag = null; return; }
 
-  if ((state.tool === 'line' || state.tool === 'arrow') && drawing && drawStart) {
+  if ((state.tool === 'line' || state.tool === 'arrow' || state.tool === 'dbarrow' || state.tool === 'brace') && drawing && drawStart) {
     const geoSnap = getSnapCandidate(cx, cy);
     const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
                          : getSnappedEnd(drawStart, n, e.shiftKey);
     const dist = Math.hypot(endN.xn - drawStart.xn, endN.yn - drawStart.yn);
     if (dist > 0.02) {
       saveUndo();
-      const label = '';
-      const el = state.tool === 'arrow'
-        ? mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn,
-            state.drawColor,
-            parseFloat(document.getElementById('stroke-weight').value),
-            document.getElementById('stroke-dash').value,
-            label)
-        : mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn,
-            state.drawColor,
-            parseFloat(document.getElementById('stroke-weight').value),
-            document.getElementById('stroke-dash').value,
-            label);
+      const w = parseFloat(document.getElementById('stroke-weight').value);
+      const dash = document.getElementById('stroke-dash').value;
+      let el;
+      if (state.tool === 'arrow')        el = mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      else if (state.tool === 'dbarrow') el = mkDArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      else if (state.tool === 'brace')   el = mkBrace(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, '');
+      else                               el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
       state.elements.push(el);
       state.selectedId = el.id;
       renderProps();
@@ -1996,7 +2045,7 @@ function hitTest(cx, cy) {
   for (let i = state.elements.length - 1; i >= 0; i--) {
     const el = state.elements[i];
     if (el.type === 'region') continue;
-    if (el.type === 'line' || el.type === 'arrow') {
+    if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow' || el.type === 'brace') {
       const a = toCanvas(el.x1n, el.y1n);
       const b = toCanvas(el.x2n, el.y2n);
       if (distToSegment(cx, cy, a.x, a.y, b.x, b.y) < 8) return el;
@@ -2188,8 +2237,11 @@ function renderProps() {
     </div>`;
   }
 
-  if (el.type === 'line' || el.type === 'arrow') {
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
     html += `<button class="action-btn secondary" style="margin-top:4px" onclick="makeLineOrthogonal()">Make horizontal / vertical</button>`;
+  }
+  if (el.type === 'brace') {
+    html += `<button class="action-btn secondary" style="margin-top:4px" onclick="updateProp('flip', !${el.flip})">Flip direction</button>`;
   }
   html += `<button class="action-btn secondary" style="margin-top:4px" onclick="duplicateSelected()">Duplicate</button>`;
   html += `<button class="action-btn danger" style="margin-top:4px" onclick="deleteSelected()">Delete element</button>`;
@@ -2232,7 +2284,7 @@ function duplicateSelected() {
   const dup = JSON.parse(JSON.stringify(el));
   dup.id = nextId++;
   const off = 0.03;
-  if (dup.type === 'line' || dup.type === 'arrow') {
+  if (dup.type === 'line' || dup.type === 'arrow' || dup.type === 'dbarrow' || dup.type === 'brace') {
     dup.x1n += off; dup.y1n += off; dup.x2n += off; dup.y2n += off;
   } else if (dup.type === 'curve') {
     dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
