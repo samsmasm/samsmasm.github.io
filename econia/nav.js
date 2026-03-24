@@ -11,7 +11,6 @@ const STAGES = [
   { slug: 'submit',     label: 'Submitting It',        num: 10 },
   { slug: 'example',    label: 'Example',              num: 'e'},
   { slug: 'grading',   label: 'Check Your Commentary', num: '✓'},
-  { slug: 'grading2',  label: 'Understanding Grading', num: 'g'},
 ];
 
 function getCurrentSlug() {
