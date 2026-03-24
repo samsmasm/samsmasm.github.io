@@ -1,14 +1,16 @@
 const STAGES = [
-  { slug: '',          label: 'Overview',          num: 1  },
-  { slug: 'rq',        label: 'Find Your RQ',      num: 2  },
-  { slug: 'concept',   label: 'Key Concept',       num: 3  },
-  { slug: 'docs',      label: 'Supporting Docs',   num: 4  },
-  { slug: 'structure', label: 'Structure',          num: 5  },
-  { slug: 'analysis',  label: 'Analysis & Writing', num: 6  },
-  { slug: 'conclusion',label: 'Conclusion',         num: 7  },
-  { slug: 'submit',    label: 'Submitting It',      num: 8  },
-  { slug: 'sample',    label: 'Sample IA',          num: 's'},
-  { slug: 'faq',      label: 'FAQ',                num: '?'},
+  { slug: '',           label: 'Overview',          num: 'O' },
+  { slug: 'start',      label: 'Getting Started',   num: 'G' },
+  { slug: 'rq',         label: 'Find Your RQ',      num: 'F' },
+  { slug: 'concept',    label: 'Key Concept',       num: 'K' },
+  { slug: 'docs',       label: 'Supporting Docs',   num: 'D' },
+  { slug: 'structure',  label: 'Structure',          num: 'S' },
+  { slug: 'analysis',   label: 'Analysis & Writing', num: 'A' },
+  { slug: 'conclusion', label: 'Conclusion',         num: 'C' },
+  { slug: 'submit',     label: 'Submitting It',      num: 'B' },
+  { slug: 'check',      label: 'Check Your Draft',  num: '✓' },
+  { slug: 'sample',     label: 'Sample IA',         num: 'S' },
+  { slug: 'faq',        label: 'FAQ',               num: '?' },
 ];
 
 function getCurrentSlug() {
