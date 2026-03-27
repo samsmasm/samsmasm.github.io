@@ -7,7 +7,7 @@ const STAGES = [
   { slug: 'concept',    label: 'Key Concept',          num: 6  },
   { slug: 'intro',      label: 'Intro',                num: 7  },
   { slug: 'evaluation', label: 'Evaluation',           num: 8  },
-  { slug: 'weaving',    label: 'Weaving & Checklist',  num: 9  },
+  { slug: 'weaving',    label: 'Check Your Commentary', num: 9  },
   { slug: 'submit',     label: 'Submitting It',        num: 10 },
   { slug: 'example',    label: 'Example',              num: 'e'},
   { slug: 'grading',   label: 'Check Your Commentary', num: '✓'},
