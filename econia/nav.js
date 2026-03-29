@@ -10,7 +10,7 @@ const STAGES = [
   { slug: 'weaving',    label: 'Check Your Commentary', num: 9  },
   { slug: 'submit',     label: 'Submitting It',        num: 10 },
   { slug: 'example',    label: 'Example',              num: 'e'},
-  { slug: 'grading',   label: 'Check Your Commentary', num: '✓'},
+
 ];
 
 function getCurrentSlug() {
