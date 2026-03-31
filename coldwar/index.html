@@ -307,9 +307,9 @@ textarea.field-input { resize: vertical; min-height: 100px; }
   <div class="login-box">
     <div class="classified-tag">&#9632; TOP SECRET &#9632;</div>
     <div class="login-title">Shadow Protocol</div>
-    <div class="login-sub">SELECT YOUR CLASS &amp; ENTER ACCESS CODE</div>
+    <div class="login-sub">ENTER ACCESS CODE</div>
     <select id="class-select">
-      <option value="">&#9632; SELECT CLASS &#9632;</option>
+      <option value="">&#9632; CLASS (TEACHER ONLY) &#9632;</option>
       <option value="class1">Class 1</option>
       <option value="class2">Class 2</option>
       <option value="class3">Class 3</option>
@@ -318,6 +318,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
       <option value="class6">Class 6</option>
       <option value="class7">Class 7</option>
     </select>
+    <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;margin:-6px 0 12px;text-align:left">Students: ignore the dropdown above &mdash; your password determines your class automatically.</div>
     <input type="password" id="pw-input" placeholder="ENTER ACCESS CODE" autocomplete="off"/>
     <button class="btn-gold" onclick="doLogin()">AUTHENTICATE</button>
     <div class="login-err" id="login-err">ACCESS DENIED &mdash; INVALID CREDENTIALS</div>
@@ -492,19 +493,60 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ================================================================
-//  AUTH — SHA-256 hashed passwords (plaintext never stored)
-//  Passwords: pinkdaisy / bluetoad / orangeeagle / purplepig / shadowmaster
+//  AUTH — SHA-256 hashed passwords
+//  Student passwords encode their class. Teacher uses dropdown.
+//
+//  Class 1:  redfox / bluewolf / greenbear / goldhawk
+//  Class 2:  purplelion / orangetiger / pinkowl / silverdeer
+//  Class 3:  blackmoose / whitecrane / cyantiger / tealraven
+//  Class 4:  ambersnake / crimsonbat / navylynx / jadecrow
+//  Class 5:  ivorybear / bronzefox / maroondeer / violetfalcon
+//  Class 6:  scarletwolf / emeraldhawk / rubylion / coralcrane
+//  Class 7:  goldenfox / midnightbear / slatebat / rustcrow
+//  Teacher:  shadowmaster  (select class from dropdown)
 // ================================================================
 const HASHED_PASSWORDS = {
-  '9faae7a5bda7dd03528a82ee163980a78167d485e8aae1cc90151a23033730aa': 'nation1',
-  'b62c8c46bbab5a70b1e56813cf2ee4582109b95acf1747c97488ffb4fa003ec5': 'nation2',
-  '3fd488b2c4fd4e14c6f51b0489d9389391179ccbf2307810de1f40c85e9c8c4e': 'nation3',
-  '45f086ffb78f54fa843bf6c666a97734a69e287a9f46ff9abd2c56af9992d4fd': 'nation4',
-  '259efa596f8477ecb994f49a692f49adea9538bc6e6044b5cb776934ff768413': 'teacher'
+  // Class 1
+  '87059bb5dd92b899013cbd41df01c73807738a8436b4f0b30d4593f4dc86fe44': { classId:'class1', role:'nation1' },
+  '228b2a10901caeb6033c1258f56841b86ef48d7a3c0dc1810ff46d40098024c0': { classId:'class1', role:'nation2' },
+  'c635faa724e8c705e4b61ddcc8970fa282c97a61302543e29f57a247f27d82a5': { classId:'class1', role:'nation3' },
+  'ff4427ac54575c964bb8cc13f05174f94fb13fda6d870b89bf024a408458f6d7': { classId:'class1', role:'nation4' },
+  // Class 2
+  'a37f3792d303ee32f825ec91eadca9e898760a8853219f38c79fb868b54634df': { classId:'class2', role:'nation1' },
+  '3a28bd581f2c6b43273835e23bc836ebfbffdf4eb43a7693b6f804d0a6deb993': { classId:'class2', role:'nation2' },
+  '33d4fd55b6d1debbf62f6cf7f3df0f4e42e9e49e554875ee766070051457ad36': { classId:'class2', role:'nation3' },
+  '9eebdc455680c3253f56db8b2e67ac8752a189b2b4aa445aeb066ff08ab43f02': { classId:'class2', role:'nation4' },
+  // Class 3
+  '5b60103cab490c878fecd5ae9f5dde23f5043cfa45c7d3d596ff395d651f9146': { classId:'class3', role:'nation1' },
+  '04e4a054d00d823f8fca7ddfbbfb9f32f962eba98844d46d60032caf42196486': { classId:'class3', role:'nation2' },
+  'bf405d6aeff965dad9bbc69fcc13c20604787a06eccdf64b19939e52bf5bc4d9': { classId:'class3', role:'nation3' },
+  '8a0c551eed8c692c51f281d2304550e6007f34270ac94be5c72872809356e536': { classId:'class3', role:'nation4' },
+  // Class 4
+  '5e32be1c7fb117a98df76d44d3c2267a2633d45b325381640a7d9cc68cde0f75': { classId:'class4', role:'nation1' },
+  '7ddabbfa6b6fbef6e32f84d7c45330c2c0697b3f867fc384593c9cc224771856': { classId:'class4', role:'nation2' },
+  'ee0c8dbfdfe512e607825ceddaa24d0146e09cb4fe5a99d80409c72c245397f6': { classId:'class4', role:'nation3' },
+  'df006bb70d861bbf6a3c9ddd3a83f0374ca57480c77527f385f09c0da6c6cb7b': { classId:'class4', role:'nation4' },
+  // Class 5
+  'cef018515afb17220e8e0f98cc1c9aedaf504b817b0826889cbf1dbfdb4ee0a5': { classId:'class5', role:'nation1' },
+  'b0f06856aabb3f8c5056ac2673ba455a3a106b9ad5656c0b6d6f0bfc9b267c61': { classId:'class5', role:'nation2' },
+  '12e7559c904bd242812f076b37ca577f93ae22afd75fa16359b9d97803db8aae': { classId:'class5', role:'nation3' },
+  'ffb9c9d34ed2e137c84037f3ebefc0170c94617a06924d49f14ca58e9c04adfc': { classId:'class5', role:'nation4' },
+  // Class 6
+  '0cb40bf485785edd026830621d7c9d2df468b76f2a9131950ac2f5764ba0390b': { classId:'class6', role:'nation1' },
+  '271c2427781fda4ee6b1f3c97fefe88274f91b7c6bdd0a32403a8172ea6066e5': { classId:'class6', role:'nation2' },
+  '49e3f1616f999b43f76fd518e3d583a8a30790f1c91abd1a0ca45d96ef279ec6': { classId:'class6', role:'nation3' },
+  '7b5a57433ac48edc45cee2fcbf882240665513697fe6222a93ea22f43822072a': { classId:'class6', role:'nation4' },
+  // Class 7
+  '38041a118d4699dd2adbe4f95a6761f190f916d37e63a27c30be0f5a4c0fddf0': { classId:'class7', role:'nation1' },
+  '1c447233a48f796ec3f41744ba5eaa128cde1049131e1d1ee21ed257b74fd7e0': { classId:'class7', role:'nation2' },
+  '5757fc789529f124f3fd30fe968946d4c6ab15072b3e7cbb354801b979a22966': { classId:'class7', role:'nation3' },
+  'fd87147dc9fa94d4f8214539b9b3c3737f5d9ea36b9f82e5d8507a758f7216d4': { classId:'class7', role:'nation4' },
+  // Teacher — class determined by dropdown
+  '259efa596f8477ecb994f49a692f49adea9538bc6e6044b5cb776934ff768413': { classId:null, role:'teacher' },
 };
 
 async function sha256(str) {
-  const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
@@ -583,27 +625,49 @@ function basePath() { return '/classes/' + currentClass; }
 //  AUTH
 // ================================================================
 async function doLogin() {
-  const classVal = document.getElementById('class-select').value;
-  if (!classVal) {
-    document.getElementById('login-err').textContent = 'PLEASE SELECT A CLASS FIRST';
-    document.getElementById('login-err').style.display = 'block';
+  const pw = document.getElementById('pw-input').value.trim();
+  if (!pw) return;
+
+  let hash;
+  try {
+    hash = await sha256(pw);
+  } catch(e) {
+    showLoginErr('AUTHENTICATION ERROR \u2014 MUST BE ACCESSED VIA HTTPS');
     return;
   }
-  const pw   = document.getElementById('pw-input').value.trim();
-  const hash = await sha256(pw);
-  const role = HASHED_PASSWORDS[hash];
-  if (!role) {
-    document.getElementById('login-err').textContent = 'ACCESS DENIED \u2014 INVALID CREDENTIALS';
-    document.getElementById('login-err').style.display = 'block';
+
+  const entry = HASHED_PASSWORDS[hash];
+  if (!entry) {
+    showLoginErr('ACCESS DENIED \u2014 INVALID CREDENTIALS');
     return;
   }
-  currentClass  = classVal;
-  currentUser   = role === 'teacher' ? 'teacher' : role;
-  currentNation = role === 'teacher' ? null : role;
+
+  if (entry.role === 'teacher') {
+    const classVal = document.getElementById('class-select').value;
+    if (!classVal) {
+      showLoginErr('SELECT A CLASS FROM THE DROPDOWN FIRST');
+      return;
+    }
+    currentClass  = classVal;
+    currentUser   = 'teacher';
+    currentNation = null;
+  } else {
+    // Student password encodes the class — ignore dropdown
+    currentClass  = entry.classId;
+    currentUser   = entry.role;
+    currentNation = entry.role;
+  }
+
   sessionStorage.setItem('sp_user',   currentUser);
   sessionStorage.setItem('sp_nation', currentNation || '');
   sessionStorage.setItem('sp_class',  currentClass);
   initApp();
+}
+
+function showLoginErr(msg) {
+  const el = document.getElementById('login-err');
+  el.textContent = msg;
+  el.style.display = 'block';
 }
 
 function doLogout() {
