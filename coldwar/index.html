@@ -240,6 +240,44 @@ textarea.field-input { resize: vertical; min-height: 100px; }
 }
 .btn-hacked:hover { background: #3a0000; border-color: var(--red-bright); color: #ff8888; }
 
+/* ---- MODAL ---- */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.82); z-index: 1000;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg2); border: 1px solid var(--gold-dim);
+  border-top: 3px solid var(--gold); padding: 32px 28px; max-width: 400px; width: 92%;
+}
+.modal-box h3 { color: var(--gold); font-size: 12px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 14px; }
+.modal-nation-btn {
+  display: block; width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); padding: 13px 16px; font-family: inherit; font-size: 14px;
+  letter-spacing: 2px; text-transform: uppercase; cursor: pointer; margin-bottom: 9px;
+  text-align: left; transition: all 0.15s;
+}
+.modal-nation-btn:hover { border-color: var(--gold); color: var(--gold); }
+.modal-cancel {
+  display: block; width: 100%; background: none; border: 1px solid var(--border);
+  color: var(--text-dim); padding: 10px 16px; font-family: inherit; font-size: 11px;
+  letter-spacing: 2px; text-transform: uppercase; cursor: pointer; margin-top: 14px;
+  transition: all 0.15s;
+}
+.modal-cancel:hover { border-color: var(--text-dim); color: var(--text); }
+
+/* ---- SPY REGISTRY ---- */
+.spy-tag-bar { margin-top: 10px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.spy-tag-bar select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; font-family: inherit; font-size: 13px; outline: none; cursor: pointer; }
+.spy-tag-bar select:focus { border-color: var(--gold); }
+.spy-row-tagged { background: #1a0c00 !important; }
+.spy-badge { font-size: 10px; letter-spacing: 1px; color: #e07000; background: #2a1500; border: 1px solid #5a2a00; padding: 2px 7px; margin-left: 6px; vertical-align: middle; }
+.class-switch-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.class-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 7px 14px; font-family: inherit; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+.class-btn:hover { border-color: var(--gold); color: var(--gold); }
+.class-btn.active { border-color: var(--gold); color: var(--gold); background: #1a1200; }
+
 /* ---- NEWS ARCHIVE ---- */
 .news-item { background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--gold-dim); padding: 16px 20px; margin-bottom: 12px; }
 .news-date { font-size: 10px; letter-spacing: 3px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 9px; }
@@ -338,6 +376,16 @@ textarea.field-input { resize: vertical; min-height: 100px; }
 
   <div id="hacked-banner">&#9888;&nbsp; SYSTEM COMPROMISED &mdash; SECURITY BREACH DETECTED &nbsp;&#9888;</div>
 
+  <!-- HACK MODAL -->
+  <div class="modal-overlay" id="hack-modal">
+    <div class="modal-box">
+      <h3>&#9888; System Breach Confirmed</h3>
+      <p style="font-size:14px;color:var(--text-dim);margin-bottom:20px;line-height:1.6">Which nation performed this hack? They will receive 20 points.</p>
+      <div id="hack-modal-btns"></div>
+      <button class="modal-cancel" onclick="closeHackModal()">CANCEL</button>
+    </div>
+  </div>
+
   <div class="nav-tabs">
     <button class="nav-tab active" id="tab-btn-home"    onclick="showTab('home')">Intel Brief</button>
     <button class="nav-tab"        id="tab-btn-nation"  onclick="showTab('nation')">Our Nation</button>
@@ -367,7 +415,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
         </li>
         <li>
           <strong>Steal the Manifesto &mdash; 25 Points.</strong>
-          Your nation has planted an elite spy inside a rival team. That spy&rsquo;s job is to get a copy of the rival team&rsquo;s National Manifesto and secretly deliver it to your home nation. The spy must write it out by hand and pass it without the host team noticing.
+          Your nation has planted an elite spy inside a rival team. That spy&rsquo;s job is to get a copy of the rival team&rsquo;s National Manifesto and secretly deliver it to your home nation. The spy can read the manifesto on the rival nation&rsquo;s page &mdash; the challenge is writing it out by hand and passing it home without the host team noticing.
         </li>
         <li>
           <strong>Protect the Vault &mdash; 30 Points.</strong>
@@ -410,6 +458,11 @@ textarea.field-input { resize: vertical; min-height: 100px; }
   <!-- TEACHER PANEL -->
   <div class="tab-content" id="tab-teacher">
 
+    <div class="sec-title">&#9632; Class</div>
+    <div class="teacher-block">
+      <div class="class-switch-bar" id="class-switch-bar"></div>
+    </div>
+
     <div class="sec-title">&#9632; Broadcast &mdash; Today&rsquo;s Update</div>
     <div class="teacher-block">
       <textarea class="update-ta" id="teacher-update-ta" placeholder="Type today's intel briefing for all operatives..."></textarea>
@@ -431,6 +484,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
 
               <th>Icons Stolen<br/><span style="color:var(--text-dim);font-size:9px">&times;10</span></th>
               <th>Trial Bonus<br/><span style="color:var(--text-dim);font-size:9px">&times;10</span></th>
+              <th>Wrongful Conv.<br/><span style="color:var(--text-dim);font-size:9px">&minus;5 each</span></th>
               <th>Public Notes</th>
             </tr>
           </thead>
@@ -461,9 +515,16 @@ textarea.field-input { resize: vertical; min-height: 100px; }
       </div>
     </div>
 
-    <div class="sec-title">&#9632; Nation Rosters</div>
+    <div class="sec-title">&#9632; Spy Registry &amp; Nation Rosters</div>
     <div class="teacher-block">
-      <div id="roster-display"></div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">Tag which student in each nation is the embedded spy and where they came from. This is used to generate printable briefing sheets.</p>
+      <div id="spy-registry-display"></div>
+    </div>
+
+    <div class="sec-title">&#9632; Briefing Sheets</div>
+    <div class="teacher-block">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:14px;line-height:1.6">Generates a printable card for each student with their role and personal mission. Spies will see their secret allegiance. Fill in student names and tag spies first.</p>
+      <button class="btn-inline" onclick="printBriefingSheets()">&#9113; PRINT BRIEFING SHEETS</button>
     </div>
 
   </div>
@@ -561,38 +622,40 @@ const GOALS = [
 ];
 
 // Targets: Nation 1→3, Nation 2→4, Nation 3→1, Nation 4→2
+const SPY_CHIEF_MISSION = 'Identify the spy embedded in your nation AND correctly name which nation sent them. Submit a private written accusation to the Global Overseer — separately from any formal Trial.';
+const SCOUT_SUFFIX = ' Evidence: the target must explicitly agree, and you must report the conversation immediately to the Global Overseer.';
 const NATION_ROLES = {
   nation1: [
-    { key: 'president',      role: 'President',       mission: 'Get the signature of the Nation 2 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 1.' },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 3 Spy Chief's folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',     mission: 'Get a member of Nation 2 to say your nation's Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',  mission: 'Convince a member of Nation 3 that you are also a spy working for them.' },
-    { key: 'ghost',          role: 'Citizen (Ghost)',  mission: "Obtain Nation 3's access code, log in as them, and click the hacked button." },
+    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 2 President.' },
+    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
+    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 3 Spy Chief’s folder." },
+    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 2 to say your nation’s Trigger Word aloud without realising why.' },
+    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 3 that you are also a spy working for them.' + SCOUT_SUFFIX },
+    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 3’s access code, log in as them, and click the hacked button." },
   ],
   nation2: [
-    { key: 'president',      role: 'President',       mission: 'Get the signature of the Nation 3 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 2.' },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 4 Spy Chief's folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',     mission: 'Get a member of Nation 3 to say your nation's Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',  mission: 'Convince a member of Nation 4 that you are also a spy working for them.' },
-    { key: 'ghost',          role: 'Citizen (Ghost)',  mission: "Obtain Nation 4's access code, log in as them, and click the hacked button." },
+    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 3 President.' },
+    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
+    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 4 Spy Chief’s folder." },
+    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 3 to say your nation’s Trigger Word aloud without realising why.' },
+    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 4 that you are also a spy working for them.' + SCOUT_SUFFIX },
+    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 4’s access code, log in as them, and click the hacked button." },
   ],
   nation3: [
-    { key: 'president',      role: 'President',       mission: 'Get the signature of the Nation 4 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 3.' },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 1 Spy Chief's folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',     mission: 'Get a member of Nation 4 to say your nation's Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',  mission: 'Convince a member of Nation 1 that you are also a spy working for them.' },
-    { key: 'ghost',          role: 'Citizen (Ghost)',  mission: "Obtain Nation 1's access code, log in as them, and click the hacked button." },
+    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 4 President.' },
+    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
+    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 1 Spy Chief’s folder." },
+    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 4 to say your nation’s Trigger Word aloud without realising why.' },
+    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 1 that you are also a spy working for them.' + SCOUT_SUFFIX },
+    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 1’s access code, log in as them, and click the hacked button." },
   ],
   nation4: [
-    { key: 'president',      role: 'President',       mission: 'Get the signature of the Nation 1 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 4.' },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 2 Spy Chief's folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',     mission: 'Get a member of Nation 1 to say your nation's Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',  mission: 'Convince a member of Nation 2 that you are also a spy working for them.' },
-    { key: 'ghost',          role: 'Citizen (Ghost)',  mission: "Obtain Nation 2's access code, log in as them, and click the hacked button." },
+    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 1 President.' },
+    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
+    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 2 Spy Chief’s folder." },
+    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 1 to say your nation’s Trigger Word aloud without realising why.' },
+    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 2 that you are also a spy working for them.' + SCOUT_SUFFIX },
+    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 2’s access code, log in as them, and click the hacked button." },
   ],
 };
 
@@ -608,11 +671,12 @@ const PERSONAL_KEYS = [
 // ================================================================
 //  STATE
 // ================================================================
-let currentUser   = null;
-let currentNation = null;
-let currentClass  = null;  // 'class1' … 'class7'
-let scoresCache   = {};
-let nationsCache  = {};
+let currentUser        = null;
+let currentNation      = null;
+let currentClass       = null;  // 'class1' … 'class7'
+let scoresCache        = {};
+let nationsCache       = {};
+let spyRegistryCache   = {};
 
 // Firebase base path for current class
 function basePath() { return '/classes/' + currentClass; }
@@ -727,7 +791,12 @@ function setupListeners() {
     nationsCache = snap.val() || {};
     renderScoreboard();
     if (currentNation) renderNationFields();
-    if (currentUser === 'teacher') renderRosterTable();
+    if (currentUser === 'teacher') { renderSpyRegistry(); renderClassSwitcher(); }
+  });
+
+  db.ref(basePath() + '/game/spyRegistry').on('value', snap => {
+    spyRegistryCache = snap.val() || {};
+    if (currentUser === 'teacher') renderSpyRegistry();
   });
 
   db.ref(basePath() + '/news').on('value', snap => {
@@ -751,7 +820,27 @@ function applyHackedState(isHacked) {
 
 function triggerHack() {
   if (!currentNation) return;
+  const btns = document.getElementById('hack-modal-btns');
+  btns.innerHTML = NATIONS
+    .filter(n => n !== currentNation)
+    .map(n => {
+      const name = (nationsCache[n] && nationsCache[n].name) ? nationsCache[n].name : NATION_DISPLAY[n];
+      return '<button class="modal-nation-btn" onclick="confirmHack(\'' + n + '\')">' + esc(name) + '</button>';
+    }).join('');
+  document.getElementById('hack-modal').classList.add('open');
+}
+
+function closeHackModal() {
+  document.getElementById('hack-modal').classList.remove('open');
+}
+
+function confirmHack(rewardNation) {
+  // Mark current session's nation as hacked
   db.ref(basePath() + '/game/nations/' + currentNation + '/hacked').set(true);
+  // Award hack_performed count to the nation that did the hacking
+  const cur = parseInt((scoresCache[rewardNation] || {}).hack_performed) || 0;
+  db.ref(basePath() + '/game/scores/' + rewardNation + '/hack_performed').set(cur + 1);
+  closeHackModal();
 }
 
 function resetHack(nation) {
@@ -770,6 +859,8 @@ function calcScore(n) {
   if (s.asset_protection)      t += 15;
   t += (parseInt(s.icon_stolen_bonus) || 0) * 10;
   t += (parseInt(s.trial_bonus)       || 0) * 10;
+  t -= (parseInt(s.trial_penalty)     || 0) * 5;
+  t += (parseInt(s.hack_performed)    || 0) * 20;
   PERSONAL_KEYS.forEach(p => { if (s[p.key]) t += 10; });
   t += parseInt(s.discretionary) || 0;
   return t;
@@ -786,6 +877,10 @@ function breakdownHtml(n) {
   if (ib > 0) lines.push('<span class="ticked">&#10003; Icon Bonus +' + (ib*10) + '</span>');
   const tb = parseInt(s.trial_bonus) || 0;
   if (tb > 0) lines.push('<span class="ticked">&#10003; Trial Bonus +' + (tb*10) + '</span>');
+  const tp = parseInt(s.trial_penalty) || 0;
+  if (tp > 0) lines.push('<span style="color:var(--red-bright)">&#9888; Wrongful Conviction &minus;' + (tp*5) + '</span>');
+  const hp = parseInt(s.hack_performed) || 0;
+  if (hp > 0) lines.push('<span class="ticked">&#10003; Hack Bonus +' + (hp*20) + '</span>');
   const pc = PERSONAL_KEYS.filter(p => s[p.key]).length;
   if (pc > 0) lines.push('<span class="ticked">&#10003; Personal Missions +' + (pc*10) + '</span>');
   const disc = parseInt(s.discretionary) || 0;
@@ -886,7 +981,7 @@ function renderNationTab() {
     + '<hr class="divider"/>'
     + '<div class="sec-title">&#9632; System Security</div>'
     + '<div style="padding:18px 0;">'
-    + '<button class="btn-hacked" onclick="triggerHack()">&#9888; Click this if you\'ve hacked this page &mdash; 20 points to your team</button>'
+    + '<button class="btn-hacked" onclick="triggerHack()">&#9888; Click this if you\'ve been hacked &mdash; this will award 20 points to the hacking nation</button>'
     + '</div>';
 
   updateWordCount();
@@ -1010,6 +1105,7 @@ function renderScoreTable() {
       + '<td><input type="checkbox"' + (s.asset_protection?'checked':'')     + ' onchange="sc(\'' + n + '\',\'asset_protection\',this.checked)"/></td>'
       + '<td><input type="number" min="0" value="' + (parseInt(s.icon_stolen_bonus)||0) + '" onchange="sc(\'' + n + '\',\'icon_stolen_bonus\',parseInt(this.value)||0)"/></td>'
       + '<td><input type="number" min="0" value="' + (parseInt(s.trial_bonus)||0)       + '" onchange="sc(\'' + n + '\',\'trial_bonus\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + (parseInt(s.trial_penalty)||0)     + '" onchange="sc(\'' + n + '\',\'trial_penalty\',parseInt(this.value)||0)"/></td>'
       + '<td><textarea onchange="sc(\'' + n + '\',\'notes\',this.value)">' + esc(s.notes||'') + '</textarea></td>'
       + '</tr>';
   }).join('');
@@ -1038,24 +1134,57 @@ function renderPersonalTable() {
 }
 
 // ================================================================
-//  TEACHER: ROSTER TABLE
+//  TEACHER: SPY REGISTRY
 // ================================================================
-function renderRosterTable() {
-  const el = document.getElementById('roster-display');
+function renderSpyRegistry() {
+  const el = document.getElementById('spy-registry-display');
   if (!el) return;
   el.innerHTML = NATIONS.map(n => {
-    const nd   = nationsCache[n] || {};
-    const name = nd.name || NATION_DISPLAY[n];
-    const roles = NATION_ROLES[n] || [];
-    return '<div style="margin-bottom:24px">'
+    const nd        = nationsCache[n] || {};
+    const name      = nd.name || NATION_DISPLAY[n];
+    const roles     = NATION_ROLES[n] || [];
+    const spyEntry  = spyRegistryCache[n] || {};
+
+    const rosterRows = roles.map(r => {
+      const student = nd['rn_'+r.key] || '';
+      const isSpy   = spyEntry.spyRole === r.key;
+      return '<tr' + (isSpy ? ' class="spy-row-tagged"' : '') + '>'
+        + '<td>' + esc(r.role) + (isSpy ? ' <span class="spy-badge">SPY</span>' : '') + '</td>'
+        + '<td>' + (student ? esc(student) : '<span style="color:var(--text-dim);font-style:italic">not filled in</span>') + '</td>'
+        + '<td style="font-size:12px;color:#e07000">' + (isSpy && spyEntry.homeNation ? 'from ' + esc(NATION_DISPLAY[spyEntry.homeNation]) : '') + '</td>'
+        + '</tr>';
+    }).join('');
+
+    const roleOptions = '<option value="">-- role --</option>'
+      + roles.map(r => '<option value="' + r.key + '"' + (spyEntry.spyRole===r.key ? ' selected' : '') + '>' + esc(r.role) + '</option>').join('');
+    const nationOptions = '<option value="">-- home nation --</option>'
+      + NATIONS.filter(x => x !== n).map(x => '<option value="' + x + '"' + (spyEntry.homeNation===x ? ' selected' : '') + '>' + esc(NATION_DISPLAY[x]) + '</option>').join('');
+
+    return '<div style="margin-bottom:28px">'
       + '<div style="color:var(--gold);font-size:12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">' + esc(name) + '</div>'
-      + '<table class="roster-tbl"><thead><tr><th>Role</th><th>Student Name</th></tr></thead><tbody>'
-      + roles.map(r => {
-          const student = nd['rn_'+r.key] || '';
-          return '<tr><td>' + esc(r.role) + '</td><td>' + (student ? esc(student) : '<span style="color:var(--text-dim);font-style:italic">not filled in</span>') + '</td></tr>';
-        }).join('')
-      + '</tbody></table></div>';
+      + '<table class="roster-tbl"><thead><tr><th>Role</th><th>Student</th><th>Spy Origin</th></tr></thead><tbody>' + rosterRows + '</tbody></table>'
+      + '<div class="spy-tag-bar">'
+      + '<span style="font-size:10px;color:var(--gold);letter-spacing:2px">TAG SPY:</span>'
+      + '<select id="spy-role-' + n + '">' + roleOptions + '</select>'
+      + '<select id="spy-home-' + n + '">' + nationOptions + '</select>'
+      + '<button class="save-btn" onclick="saveSpyTag(\'' + n + '\')">Tag</button>'
+      + (spyEntry.spyRole ? ' <button class="btn-danger" onclick="clearSpyTag(\'' + n + '\')">Clear</button>' : '')
+      + '</div></div>';
   }).join('');
+}
+
+function saveSpyTag(hostNation) {
+  const roleEl = document.getElementById('spy-role-' + hostNation);
+  const homeEl = document.getElementById('spy-home-' + hostNation);
+  if (!roleEl || !homeEl || !roleEl.value || !homeEl.value) {
+    alert('Select both a role and a home nation first.');
+    return;
+  }
+  db.ref(basePath() + '/game/spyRegistry/' + hostNation).set({ spyRole: roleEl.value, homeNation: homeEl.value });
+}
+
+function clearSpyTag(hostNation) {
+  db.ref(basePath() + '/game/spyRegistry/' + hostNation).remove();
 }
 
 function sc(nation, field, value) {
@@ -1093,7 +1222,7 @@ function showTab(tab) {
   if (c) c.classList.add('active');
   if (b) b.classList.add('active');
   if (tab === 'nation') renderNationTab();
-  if (tab === 'teacher' && currentUser === 'teacher') { renderScoreTable(); renderPersonalTable(); renderRosterTable(); }
+  if (tab === 'teacher' && currentUser === 'teacher') { renderClassSwitcher(); renderScoreTable(); renderPersonalTable(); renderSpyRegistry(); }
 }
 
 // ================================================================
@@ -1102,6 +1231,98 @@ function showTab(tab) {
 function esc(str) {
   if (str == null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ================================================================
+//  TEACHER: CLASS SWITCHER
+// ================================================================
+function renderClassSwitcher() {
+  const bar = document.getElementById('class-switch-bar');
+  if (!bar) return;
+  bar.innerHTML = ['class1','class2','class3','class4','class5','class6','class7'].map(c => {
+    const label = c.replace('class','Class ');
+    return '<button class="class-btn' + (c === currentClass ? ' active' : '') + '" onclick="switchClass(\'' + c + '\')">' + label + '</button>';
+  }).join('');
+}
+
+function detachListeners() {
+  const base = basePath();
+  db.ref(base + '/game/settings/today_update').off();
+  db.ref(base + '/game/scores').off();
+  db.ref(base + '/game/nations').off();
+  db.ref(base + '/game/spyRegistry').off();
+  db.ref(base + '/news').off();
+  if (currentNation) db.ref(base + '/game/nations/' + currentNation + '/hacked').off();
+}
+
+function switchClass(newClass) {
+  if (newClass === currentClass) return;
+  detachListeners();
+  currentClass = newClass;
+  scoresCache = {};
+  nationsCache = {};
+  spyRegistryCache = {};
+  sessionStorage.setItem('sp_class', currentClass);
+  const classLabel = currentClass.replace('class', 'Class ');
+  document.getElementById('user-badge').textContent = '[SHADOWMASTER \u2014 ' + classLabel + ']';
+  setupListeners();
+  showTab('teacher');
+}
+
+// ================================================================
+//  TEACHER: PRINT BRIEFING SHEETS
+// ================================================================
+function printBriefingSheets() {
+  const w = window.open('', '_blank');
+  if (!w) { alert('Please allow popups to print briefing sheets.'); return; }
+
+  function eh(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const cards = NATIONS.flatMap(n => {
+    const nd       = nationsCache[n] || {};
+    const name     = nd.name || NATION_DISPLAY[n];
+    const roles    = NATION_ROLES[n] || [];
+    const spyEntry = spyRegistryCache[n] || {};
+    return roles.map(r => {
+      const student    = nd['rn_'+r.key] || '[Name not entered]';
+      const isSpy      = spyEntry.spyRole === r.key;
+      const homeNation = isSpy && spyEntry.homeNation ? (nationsCache[spyEntry.homeNation] && nationsCache[spyEntry.homeNation].name ? nationsCache[spyEntry.homeNation].name : NATION_DISPLAY[spyEntry.homeNation]) : null;
+      const missionText = typeof r.mission === 'string' ? r.mission : SPY_CHIEF_MISSION;
+      return '<div class="card">'
+        + '<div class="card-op">OPERATION: SHADOW PROTOCOL</div>'
+        + '<div class="card-classified">TOP SECRET // PERSONAL BRIEFING</div>'
+        + '<div class="card-nation">' + eh(name) + '</div>'
+        + '<div class="card-role">' + eh(r.role) + '</div>'
+        + '<div class="card-student">' + eh(student) + '</div>'
+        + (isSpy && homeNation ? '<div class="spy-box"><div class="spy-lbl">&#9888; SECRET ALLEGIANCE</div><div class="spy-txt">You are a spy planted from ' + eh(homeNation) + '. Your true loyalty is to ' + eh(homeNation) + '. Maintain your cover at all costs. Only the Global Overseer knows.</div></div>' : '')
+        + '<div class="mission-lbl">YOUR PERSONAL MISSION</div>'
+        + '<div class="mission-txt">' + eh(missionText) + '</div>'
+        + '<div class="card-footer">Destroy after reading. Do not share this briefing.</div>'
+        + '</div>';
+    });
+  }).join('');
+
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Shadow Protocol \u2014 Briefing Sheets</title><style>'
+    + '* { box-sizing:border-box; margin:0; padding:0; }'
+    + 'body { font-family: "Courier New",monospace; background:#fff; color:#000; }'
+    + '.card { width:148mm; min-height:100mm; border:2px solid #000; padding:16px; margin:8px auto; page-break-after:always; display:flex; flex-direction:column; gap:7px; }'
+    + '.card:last-child { page-break-after:auto; }'
+    + '.card-op { font-size:8px; letter-spacing:4px; text-align:center; opacity:0.4; }'
+    + '.card-classified { font-size:9px; letter-spacing:3px; text-align:center; font-weight:bold; border:1px solid #000; padding:3px; }'
+    + '.card-nation { font-size:20px; font-weight:bold; letter-spacing:3px; text-transform:uppercase; text-align:center; margin-top:2px; }'
+    + '.card-role { font-size:12px; letter-spacing:2px; text-transform:uppercase; text-align:center; opacity:0.6; }'
+    + '.card-student { font-size:16px; text-align:center; border-bottom:1px solid #ccc; padding-bottom:7px; }'
+    + '.mission-lbl { font-size:8px; letter-spacing:3px; text-transform:uppercase; opacity:0.5; margin-top:4px; }'
+    + '.mission-txt { font-size:12px; line-height:1.6; }'
+    + '.spy-box { background:#fff8e1; border:2px solid #c00; padding:9px; }'
+    + '.spy-lbl { font-size:9px; letter-spacing:2px; font-weight:bold; color:#c00; margin-bottom:3px; }'
+    + '.spy-txt { font-size:12px; line-height:1.5; }'
+    + '.card-footer { font-size:8px; opacity:0.3; text-align:center; margin-top:auto; padding-top:6px; }'
+    + '@media print { body{margin:0} .card{margin:0 auto; break-after:page} }'
+    + '</style></head><body>' + cards
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>');
+  w.document.close();
 }
 
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
