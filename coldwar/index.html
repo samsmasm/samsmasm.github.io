@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operation: Shadow Protocol</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #080c18;
+  --bg2:        #0d1220;
+  --bg3:        #111827;
+  --border:     #1e2d50;
+  --text:       #d4c5a9;
+  --text-dim:   #7a8ba6;
+  --gold:       #c9a227;
+  --gold-dim:   #7a5f12;
+  --red:        #8b1a1a;
+  --red-bright: #c0392b;
+  --green-bright: #27ae60;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', Courier, monospace;
+  min-height: 100vh;
+}
+
+/* ---- LOGIN ---- */
+#login-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(ellipse at center, #0d1a35 0%, var(--bg) 70%);
+}
+
+.login-box {
+  background: var(--bg2);
+  border: 1px solid var(--gold-dim);
+  border-top: 3px solid var(--gold);
+  padding: 40px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.classified-tag {
+  font-size: 10px;
+  letter-spacing: 5px;
+  color: var(--red-bright);
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.login-title {
+  font-size: 26px;
+  color: var(--gold);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.login-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 3px;
+  margin-bottom: 36px;
+}
+
+.login-box input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 13px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 4px;
+  text-align: center;
+  margin-bottom: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.login-box input:focus { border-color: var(--gold); }
+
+.btn-gold {
+  background: var(--gold);
+  color: #000;
+  border: none;
+  padding: 12px 32px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s;
+}
+.btn-gold:hover { background: #e0b82c; }
+
+.login-err {
+  color: var(--red-bright);
+  font-size: 11px;
+  margin-top: 14px;
+  letter-spacing: 1px;
+  display: none;
+}
+
+/* ---- APP LAYOUT ---- */
+#app-screen {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 11px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.app-header-title {
+  color: var(--gold);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.user-badge {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+/* ---- NAV ---- */
+.nav-tabs {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.nav-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-dim);
+  padding: 14px 18px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ---- TABS ---- */
+.tab-content {
+  display: none;
+  padding: 22px 20px;
+  max-width: 920px;
+  margin: 0 auto;
+  width: 100%;
+}
+.tab-content.active { display: block; }
+
+/* ---- UPDATE BANNER ---- */
+.update-banner {
+  background: linear-gradient(135deg, #140f00 0%, #201600 100%);
+  border: 1px solid var(--gold-dim);
+  border-left: 4px solid var(--gold);
+  padding: 16px 20px;
+  margin-bottom: 28px;
+}
+.update-label {
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.update-label::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.update-text { font-size: 14px; line-height: 1.7; }
+
+/* ---- SECTION TITLE ---- */
+.sec-title {
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- SCOREBOARD ---- */
+.scoreboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 34px;
+}
+
+.score-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 18px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.score-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--gold-dim);
+}
+
+.score-card-rank {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.score-card-name {
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+.score-total {
+  font-size: 38px;
+  font-weight: bold;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.score-total span { font-size: 14px; color: var(--text-dim); margin-left: 3px; }
+.score-breakdown { font-size: 11px; color: var(--text-dim); line-height: 2; }
+.score-breakdown .ticked { color: var(--green-bright); }
+
+/* ---- BRIEFING ---- */
+.briefing-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 26px;
+  margin-bottom: 28px;
+}
+.briefing-block h2 {
+  color: var(--gold);
+  font-size: 15px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.briefing-block h3 {
+  color: var(--gold);
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin: 22px 0 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.briefing-block ol, .briefing-block ul {
+  padding-left: 22px;
+}
+.briefing-block li {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.briefing-block p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+/* ---- NATION TAB ---- */
+.nation-header {
+  background: linear-gradient(135deg, var(--bg2) 0%, #0d1a30 100%);
+  border: 1px solid var(--gold-dim);
+  border-top: 3px solid var(--gold);
+  padding: 22px 26px;
+  margin-bottom: 26px;
+}
+.nation-header h2 {
+  color: var(--gold);
+  font-size: 22px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.nation-header p { color: var(--text-dim); font-size: 12px; letter-spacing: 1px; }
+
+.field-group { margin-bottom: 20px; }
+
+.field-label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.field-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field-input:focus { border-color: var(--gold); }
+textarea.field-input { resize: vertical; min-height: 80px; }
+
+.save-btn {
+  background: none;
+  border: 1px solid var(--gold-dim);
+  color: var(--gold);
+  padding: 7px 18px;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 7px;
+  transition: all 0.15s;
+}
+.save-btn:hover { background: var(--gold); color: #000; border-color: var(--gold); }
+
+.save-ok {
+  font-size: 10px;
+  color: var(--green-bright);
+  margin-left: 10px;
+  letter-spacing: 1px;
+  display: none;
+}
+
+/* ---- CHECKLIST ---- */
+.check-item {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  transition: border-color 0.2s;
+}
+.check-item.done { border-color: #2a6040; }
+.check-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.check-label { font-size: 13px; line-height: 1.6; }
+.check-pts { color: var(--gold); font-size: 11px; }
+.check-note { color: var(--text-dim); font-size: 11px; font-style: italic; margin-top: 5px; }
+
+/* ---- ROLES TABLE ---- */
+.roles-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.roles-tbl th {
+  text-align: left;
+  color: var(--gold);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.roles-tbl td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  line-height: 1.6;
+  vertical-align: top;
+}
+.roles-tbl tr:last-child td { border-bottom: none; }
+.role-name { color: var(--gold); white-space: nowrap; }
+
+/* ---- NEWS ARCHIVE ---- */
+.news-item {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-dim);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.news-date {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 9px;
+}
+.news-text { font-size: 13px; line-height: 1.7; }
+
+/* ---- TEACHER PANEL ---- */
+.teacher-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+.update-ta {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  outline: none;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+.update-ta:focus { border-color: var(--gold); }
+
+.btn-inline {
+  background: var(--gold);
+  color: #000;
+  border: none;
+  padding: 10px 24px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-inline:hover { background: #e0b82c; }
+
+.pub-ok {
+  font-size: 11px;
+  color: var(--green-bright);
+  margin-left: 12px;
+  letter-spacing: 1px;
+  display: none;
+}
+
+/* ---- SCORE TABLE (teacher) ---- */
+.score-tbl-wrap { overflow-x: auto; }
+.score-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.score-tbl th {
+  text-align: center;
+  color: var(--gold);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.score-tbl th:first-child { text-align: left; }
+.score-tbl td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+}
+.score-tbl td:first-child {
+  text-align: left;
+  color: var(--gold);
+  letter-spacing: 1px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.score-tbl input[type="checkbox"] {
+  width: 18px; height: 18px;
+  cursor: pointer;
+  accent-color: var(--gold);
+}
+.score-tbl input[type="number"] {
+  width: 56px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 6px;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+.score-tbl input[type="number"]:focus { border-color: var(--gold); }
+.score-tbl textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 7px;
+  font-family: inherit;
+  font-size: 11px;
+  resize: vertical;
+  min-height: 52px;
+  min-width: 140px;
+  width: 100%;
+  outline: none;
+}
+.score-tbl textarea:focus { border-color: var(--gold); }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 26px 0; }
+
+.empty-note { color: var(--text-dim); font-size: 12px; font-style: italic; padding: 10px 0; }
+
+@media (max-width: 600px) {
+  .tab-content { padding: 14px 12px; }
+  .login-box { padding: 28px 18px; }
+  .login-title { font-size: 20px; }
+  .score-total { font-size: 30px; }
+  .nation-header h2 { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================= LOGIN ============================= -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="classified-tag">&#9632; TOP SECRET &#9632;</div>
+    <div class="login-title">Shadow Protocol</div>
+    <div class="login-sub">OPERATIVE AUTHENTICATION REQUIRED</div>
+    <input type="password" id="pw-input" placeholder="ENTER ACCESS CODE" autocomplete="off"/>
+    <button class="btn-gold" onclick="doLogin()">AUTHENTICATE</button>
+    <div class="login-err" id="login-err">ACCESS DENIED &mdash; INVALID CREDENTIALS</div>
+  </div>
+</div>
+
+<!-- ============================= APP ============================= -->
+<div id="app-screen">
+
+  <div class="app-header">
+    <span class="app-header-title">&#9632; Operation Shadow Protocol</span>
+    <span class="user-badge" id="user-badge"></span>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-btn-home"    onclick="showTab('home')">Intel Brief</button>
+    <button class="nav-tab"        id="tab-btn-nation"  onclick="showTab('nation')">Our Nation</button>
+    <button class="nav-tab"        id="tab-btn-news"    onclick="showTab('news')">News Archive</button>
+    <button class="nav-tab"        id="tab-btn-teacher" onclick="showTab('teacher')" style="display:none">Teacher Panel</button>
+  </div>
+
+  <!-- ======= HOME ======= -->
+  <div class="tab-content active" id="tab-home">
+
+    <div class="update-banner">
+      <div class="update-label">Transmission Received</div>
+      <div class="update-text" id="today-update-text">Loading...</div>
+    </div>
+
+    <div class="sec-title">&#9632; Field Intelligence &mdash; Scoreboard</div>
+    <div class="scoreboard" id="scoreboard"></div>
+
+    <div class="sec-title">&#9632; Operation Briefing</div>
+    <div class="briefing-block">
+      <h2>OPERATION: SHADOW PROTOCOL</h2>
+
+      <h3>The Four Global Goals (Team Scoring)</h3>
+      <ol>
+        <li><strong>Counter-Intelligence: &ldquo;Expose the Rats&rdquo; &mdash; 20 Points.</strong> There is one Spy hiding in every team. You must correctly identify the Spies embedded in the other three nations. Observe rival behaviour. Who is whispering to other groups?</li>
+        <li><strong>The Courier: &ldquo;The Infiltrator&rsquo;s Memo&rdquo; &mdash; 25 Points.</strong> Your nation has an elite Spy working inside a rival team. That Spy must obtain a copy of the rival team&rsquo;s Manifesto and deliver it to their true home nation contact. The Spy must create a handwritten copy and pass it without the host team noticing.</li>
+        <li><strong>Information Security: &ldquo;The Vault&rdquo; &mdash; 30 Points.</strong> Your President will write a State Secret on a slip of paper and hide it within your team&rsquo;s territory. Keep it hidden for the duration of the game. Use Decoy Secrets to mislead rivals.</li>
+        <li><strong>Asset Protection: &ldquo;The State Icon&rdquo; &mdash; 15 Points.</strong> Your team sculpts a State Icon from clay. Protect it until the end of the game. Earn 10 bonus points for stealing a rival&rsquo;s Icon.</li>
+      </ol>
+
+      <h3>Individual Missions (Personal Scoring)</h3>
+      <p>Each operative has one personal mission worth 5 Personal Points. Evidence must be provided to the Teacher.</p>
+
+      <h3>Rules of Engagement</h3>
+      <ol>
+        <li><strong>The Shadow Rule:</strong> This game runs until the class before the Cold War assessment.</li>
+        <li><strong>Obey School Rules:</strong> No stealing by force. Use stealth, distraction, and social engineering. Do not go into others&rsquo; bags or laptops.</li>
+        <li><strong>The Teacher is the Oversight:</strong> All Intel Reports and Accusations must be whispered to the teacher or submitted in writing.</li>
+        <li><strong>Deniability:</strong> If accused of being a Spy, you must maintain your cover. Only the Teacher knows the truth.</li>
+        <li><strong>Counter-Sign Claims:</strong> If you trick a rival into saying your Counter-Sign, report it immediately by whispering to the teacher.</li>
+        <li><strong>The Double Agent&rsquo;s Dilemma:</strong> If a Spy reaches the end of the game unidentified, they may choose which nation to share victory with &mdash; their official home nation or their true loyalty.</li>
+        <li><strong>The Trial:</strong> A nation may accuse one of their own of being a Spy. Report to the Teacher first. The class becomes Citizens of the Court &mdash; the accusing nation presents evidence, the accused defends themselves, the class acts as Jury, the Teacher is Judge. Correct guilty verdict: +10 points to accusing nation, convicted Spy is banished to the nation they were spying for. Wrongful conviction: &minus;5 points. Maximum one Trial per nation.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ======= OUR NATION ======= -->
+  <div class="tab-content" id="tab-nation">
+    <div id="nation-tab-inner"></div>
+  </div>
+
+  <!-- ======= NEWS ARCHIVE ======= -->
+  <div class="tab-content" id="tab-news">
+    <div class="sec-title">&#9632; Intelligence Archive</div>
+    <div id="news-list"></div>
+  </div>
+
+  <!-- ======= TEACHER PANEL ======= -->
+  <div class="tab-content" id="tab-teacher">
+    <div class="sec-title">&#9632; Broadcast &mdash; Today&rsquo;s Update</div>
+    <div class="teacher-block">
+      <textarea class="update-ta" id="teacher-update-ta" placeholder="Type today's intel briefing for all operatives..."></textarea>
+      <button class="btn-inline" onclick="publishUpdate()">TRANSMIT</button>
+      <span class="pub-ok" id="pub-ok">&#10003; TRANSMITTED</span>
+    </div>
+
+    <div class="sec-title">&#9632; Field Scoring &mdash; All Nations</div>
+    <div class="teacher-block">
+      <div class="score-tbl-wrap">
+        <table class="score-tbl">
+          <thead>
+            <tr>
+              <th>Nation</th>
+              <th>Counter-Intel<br/><span style="color:var(--text-dim);font-size:9px">+20 pts</span></th>
+              <th>Courier<br/><span style="color:var(--text-dim);font-size:9px">+25 pts</span></th>
+              <th>Vault<br/><span style="color:var(--text-dim);font-size:9px">+30 pts</span></th>
+              <th>Asset Prot.<br/><span style="color:var(--text-dim);font-size:9px">+15 pts</span></th>
+              <th>Icons Stolen<br/><span style="color:var(--text-dim);font-size:9px">&times;10 pts</span></th>
+              <th>Trial Bonus<br/><span style="color:var(--text-dim);font-size:9px">&times;10 pts</span></th>
+              <th>Public Notes</th>
+            </tr>
+          </thead>
+          <tbody id="score-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#app-screen -->
+
+<script>
+// ================================================================
+//  FIREBASE CONFIG — replace with your project's config object
+// ================================================================
+const firebaseConfig = {
+  apiKey:            "AIzaSyDMlxhx94WHh-nVOyLPDEfEIY-ohGX7KRY",
+  authDomain:        "coldwar-d8109.firebaseapp.com",
+  databaseURL:       "https://coldwar-d8109-default-rtdb.firebaseio.com",
+  projectId:         "coldwar-d8109",
+  storageBucket:     "coldwar-d8109.firebasestorage.app",
+  messagingSenderId: "329049097500",
+  appId:             "1:329049097500:web:fd7184fb4c0ba011db66d9",
+  measurementId:     "G-8NBE44TW5Y"
+};
+// ================================================================
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ================================================================
+//  AUTH — passwords are the keys; values are role identifiers
+// ================================================================
+const PASSWORDS = {
+  'nation1':    'nation1',
+  'nation2':    'nation2',
+  'nation3':    'nation3',
+  'nation4':    'nation4',
+  'shadowmaster': 'teacher'
+};
+
+// ================================================================
+//  STATIC CONTENT
+// ================================================================
+const NATION_DISPLAY = {
+  nation1: 'NATION 1',
+  nation2: 'NATION 2',
+  nation3: 'NATION 3',
+  nation4: 'NATION 4',
+};
+
+const NATIONS = ['nation1', 'nation2', 'nation3', 'nation4'];
+
+const GOALS = [
+  { key: 'counter_intelligence', label: 'Counter-Intelligence', desc: 'Expose the Rats',         pts: 20 },
+  { key: 'courier',              label: 'The Courier',          desc: "The Infiltrator's Memo",  pts: 25 },
+  { key: 'vault',                label: 'Information Security', desc: 'The Vault',               pts: 30 },
+  { key: 'asset_protection',     label: 'Asset Protection',     desc: 'The State Icon',          pts: 15 },
+];
+
+const NATION_ROLES = {
+  nation1: [
+    { role: 'President',        mission: 'Get the signature of the Nation 2 President.' },
+    { role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 1.' },
+    { role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 3 Spy Chief's folder." },
+    { role: 'Gov Worker B',     mission: 'Trick a member of Nation 2 into saying your Counter-Sign.' },
+    { role: 'Citizen (Scout)',  mission: "Identify the shape and colour of Nation 2's Clay Icon." },
+    { role: 'Citizen (Ghost)',  mission: "Identify the shape and colour of Nation 3's Clay Icon." },
+  ],
+  nation2: [
+    { role: 'President',        mission: 'Get the signature of the Nation 3 President.' },
+    { role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 2.' },
+    { role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 4 Spy Chief's folder." },
+    { role: 'Gov Worker B',     mission: 'Trick a member of Nation 3 into saying your Counter-Sign.' },
+    { role: 'Citizen (Scout)',  mission: "Identify the shape and colour of Nation 3's Clay Icon." },
+    { role: 'Citizen (Ghost)',  mission: "Identify the shape and colour of Nation 4's Clay Icon." },
+  ],
+  nation3: [
+    { role: 'President',        mission: 'Get the signature of the Nation 4 President.' },
+    { role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 3.' },
+    { role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 1 Spy Chief's folder." },
+    { role: 'Gov Worker B',     mission: 'Trick a member of Nation 4 into saying your Counter-Sign.' },
+    { role: 'Citizen (Scout)',  mission: "Identify the shape and colour of Nation 4's Clay Icon." },
+    { role: 'Citizen (Ghost)',  mission: "Identify the shape and colour of Nation 1's Clay Icon." },
+  ],
+  nation4: [
+    { role: 'President',        mission: 'Get the signature of the Nation 1 President.' },
+    { role: 'Spy Chief',        mission: 'Correctly identify the Spy hidden inside Nation 4.' },
+    { role: 'Gov Worker A',     mission: "Place an Ink Blot on the Nation 2 Spy Chief's folder." },
+    { role: 'Gov Worker B',     mission: 'Trick a member of Nation 1 into saying your Counter-Sign.' },
+    { role: 'Citizen (Scout)',  mission: "Identify the shape and colour of Nation 1's Clay Icon." },
+    { role: 'Citizen (Ghost)',  mission: "Identify the shape and colour of Nation 2's Clay Icon." },
+  ],
+};
+
+// ================================================================
+//  STATE
+// ================================================================
+let currentUser   = null;  // 'nation1'...'nation4' or 'teacher'
+let currentNation = null;  // 'nation1'...'nation4' or null
+let scoresCache   = {};
+let nationsCache  = {};
+
+// ================================================================
+//  AUTH
+// ================================================================
+function doLogin() {
+  const pw   = document.getElementById('pw-input').value.trim();
+  const role = PASSWORDS[pw];
+  if (!role) {
+    document.getElementById('login-err').style.display = 'block';
+    return;
+  }
+  currentUser   = role === 'teacher' ? 'teacher' : pw;
+  currentNation = role === 'teacher' ? null : pw;
+  sessionStorage.setItem('sp_user',   currentUser);
+  sessionStorage.setItem('sp_nation', currentNation || '');
+  initApp();
+}
+
+function checkSession() {
+  const u = sessionStorage.getItem('sp_user');
+  if (!u) return;
+  currentUser   = u;
+  currentNation = sessionStorage.getItem('sp_nation') || null;
+  if (!currentNation) currentNation = null;
+  initApp();
+}
+
+// ================================================================
+//  APP INIT
+// ================================================================
+function initApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  const app = document.getElementById('app-screen');
+  app.style.display = 'flex';
+
+  document.getElementById('user-badge').textContent =
+    currentUser === 'teacher'
+      ? '[OVERSIGHT: SHADOWMASTER]'
+      : '[OPERATIVE: ' + currentUser.toUpperCase() + ']';
+
+  if (currentUser === 'teacher') {
+    document.getElementById('tab-btn-teacher').style.display = 'inline-block';
+  }
+
+  setupListeners();
+  showTab('home');
+}
+
+// ================================================================
+//  FIREBASE LISTENERS
+// ================================================================
+function setupListeners() {
+  // Today's update
+  db.ref('/game/settings/today_update').on('value', snap => {
+    const val = snap.val() || '\u2014 No active transmission \u2014';
+    document.getElementById('today-update-text').textContent = val;
+    const ta = document.getElementById('teacher-update-ta');
+    if (ta && currentUser === 'teacher') {
+      ta.value = (val === '\u2014 No active transmission \u2014') ? '' : val;
+    }
+  });
+
+  // Scores
+  db.ref('/game/scores').on('value', snap => {
+    scoresCache = snap.val() || {};
+    renderScoreboard();
+    if (currentUser === 'teacher') renderScoreTable();
+    if (currentNation) renderChecklist();
+  });
+
+  // Nations
+  db.ref('/game/nations').on('value', snap => {
+    nationsCache = snap.val() || {};
+    renderScoreboard();
+    if (currentNation) renderNationFields();
+  });
+
+  // News
+  db.ref('/news').on('value', snap => {
+    renderNews(snap.val() || {});
+  });
+}
+
+// ================================================================
+//  SCORING
+// ================================================================
+function calcScore(n) {
+  const s = scoresCache[n] || {};
+  let t = 0;
+  if (s.counter_intelligence) t += 20;
+  if (s.courier)               t += 25;
+  if (s.vault)                 t += 30;
+  if (s.asset_protection)      t += 15;
+  t += (parseInt(s.icon_stolen_bonus) || 0) * 10;
+  t += (parseInt(s.trial_bonus)       || 0) * 10;
+  return t;
+}
+
+function breakdownHtml(n) {
+  const s = scoresCache[n] || {};
+  const lines = [];
+  if (s.counter_intelligence) lines.push('<span class="ticked">&#10003; Counter-Intel +20</span>');
+  if (s.courier)               lines.push('<span class="ticked">&#10003; Courier +25</span>');
+  if (s.vault)                 lines.push('<span class="ticked">&#10003; Vault +30</span>');
+  if (s.asset_protection)      lines.push('<span class="ticked">&#10003; Asset Prot. +15</span>');
+  const ib = parseInt(s.icon_stolen_bonus) || 0;
+  if (ib > 0) lines.push('<span class="ticked">&#10003; Icon Bonus +' + (ib * 10) + '</span>');
+  const tb = parseInt(s.trial_bonus) || 0;
+  if (tb > 0) lines.push('<span class="ticked">&#10003; Trial Bonus +' + (tb * 10) + '</span>');
+  return lines.join('<br>') || '<span style="color:var(--text-dim)">No points scored yet</span>';
+}
+
+// ================================================================
+//  RENDER SCOREBOARD
+// ================================================================
+function renderScoreboard() {
+  const el = document.getElementById('scoreboard');
+  if (!el) return;
+  const sorted = [...NATIONS].sort((a, b) => calcScore(b) - calcScore(a));
+  const medals = ['&#9650;', '&#9651;', '&#9651;', '&#9651;'];
+  el.innerHTML = sorted.map((n, i) => {
+    const name  = (nationsCache[n] && nationsCache[n].name) ? nationsCache[n].name : NATION_DISPLAY[n];
+    const score = calcScore(n);
+    const bd    = breakdownHtml(n);
+    const rankLabel = i === 0 ? 'LEADING' : ('RANK ' + (i + 1));
+    return '<div class="score-card">'
+      + '<div class="score-card-rank">' + rankLabel + '</div>'
+      + '<div class="score-card-name">' + esc(name) + '</div>'
+      + '<div class="score-total">' + score + '<span>pts</span></div>'
+      + '<div class="score-breakdown">' + bd + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ================================================================
+//  RENDER NEWS
+// ================================================================
+function renderNews(news) {
+  const el = document.getElementById('news-list');
+  if (!el) return;
+  const entries = Object.entries(news).sort((a, b) => Number(b[0]) - Number(a[0]));
+  if (!entries.length) {
+    el.innerHTML = '<p class="empty-note">No transmissions archived yet.</p>';
+    return;
+  }
+  el.innerHTML = entries.map(([ts, item]) => {
+    const d = item.date || new Date(Number(ts)).toLocaleDateString('en-NZ', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    return '<div class="news-item">'
+      + '<div class="news-date">&#9658; ' + esc(d) + '</div>'
+      + '<div class="news-text">'  + esc(item.text || '') + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ================================================================
+//  RENDER NATION TAB
+// ================================================================
+function renderNationTab() {
+  const el = document.getElementById('nation-tab-inner');
+  if (!el) return;
+
+  if (!currentNation) {
+    el.innerHTML = '<p class="empty-note" style="margin-top:20px">Log in as a nation operative to view this tab.</p>';
+    return;
+  }
+
+  const d    = nationsCache[currentNation] || {};
+  const name = d.name || NATION_DISPLAY[currentNation];
+  const motto = d.motto || '';
+
+  el.innerHTML =
+    '<div class="nation-header">'
+    + '<h2 id="nh-name">' + esc(name) + '</h2>'
+    + '<p id="nh-motto">' + (motto ? '&ldquo;' + esc(motto) + '&rdquo;' : '') + '</p>'
+    + '</div>'
+
+    + '<div class="sec-title">&#9632; Nation Profile</div>'
+    + makeField('Nation Name',                   'name',             d.name || '',             'text',     'Enter nation name...')
+    + makeField('Motto',                         'motto',            d.motto || '',            'text',     'Enter motto...')
+    + makeField('Counter-Sign',                  'counter_sign',     d.counter_sign || '',     'text',     'Enter counter-sign...')
+    + makeField('Icon Description',              'icon_description', d.icon_description || '', 'text',     'Describe your clay icon...')
+    + makeField('Citizens (names list)',         'citizens',         d.citizens || '',         'textarea', 'Enter citizen names...')
+
+    + '<hr class="divider"/>'
+    + '<div class="sec-title">&#9632; Mission Status &mdash; Global Goals</div>'
+    + '<div id="checklist-inner"></div>'
+    + '<div id="nation-notes-display"></div>'
+
+    + '<hr class="divider"/>'
+    + '<div class="sec-title">&#9632; Operative Assignments</div>'
+    + '<table class="roles-tbl">'
+    + '<thead><tr><th>Role</th><th>Personal Mission</th></tr></thead>'
+    + '<tbody>'
+    + (NATION_ROLES[currentNation] || []).map(r =>
+        '<tr><td class="role-name">' + esc(r.role) + '</td><td>' + esc(r.mission) + '</td></tr>'
+      ).join('')
+    + '</tbody></table>';
+
+  renderChecklist();
+}
+
+function makeField(label, key, val, type, ph) {
+  const inputEl = type === 'textarea'
+    ? '<textarea class="field-input" id="fi-' + key + '" placeholder="' + esc(ph) + '">' + esc(val) + '</textarea>'
+    : '<input class="field-input" id="fi-' + key + '" type="text" value="' + esc(val) + '" placeholder="' + esc(ph) + '"/>';
+  return '<div class="field-group">'
+    + '<label class="field-label">' + esc(label) + '</label>'
+    + inputEl
+    + '<br/><button class="save-btn" onclick="saveField(\'' + key + '\')">Save</button>'
+    + '<span class="save-ok" id="sok-' + key + '">&#10003; Saved</span>'
+    + '</div>';
+}
+
+function renderNationFields() {
+  if (!currentNation) return;
+  const d = nationsCache[currentNation] || {};
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
+  setVal('fi-name',             d.name);
+  setVal('fi-motto',            d.motto);
+  setVal('fi-counter_sign',     d.counter_sign);
+  setVal('fi-icon_description', d.icon_description);
+  setVal('fi-citizens',         d.citizens);
+
+  const hn = document.getElementById('nh-name');
+  const hm = document.getElementById('nh-motto');
+  if (hn) hn.textContent = d.name || NATION_DISPLAY[currentNation];
+  if (hm) hm.innerHTML   = d.motto ? '\u201c' + esc(d.motto) + '\u201d' : '';
+}
+
+// ================================================================
+//  SAVE NATION FIELD
+// ================================================================
+function saveField(key) {
+  if (!currentNation) return;
+  const el = document.getElementById('fi-' + key);
+  if (!el) return;
+  db.ref('/game/nations/' + currentNation + '/' + key).set(el.value).then(() => {
+    const ok = document.getElementById('sok-' + key);
+    if (ok) { ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none'; }, 2000); }
+    if (key === 'name') {
+      const hn = document.getElementById('nh-name');
+      if (hn) hn.textContent = el.value || NATION_DISPLAY[currentNation];
+    }
+    if (key === 'motto') {
+      const hm = document.getElementById('nh-motto');
+      if (hm) hm.innerHTML = el.value ? '\u201c' + esc(el.value) + '\u201d' : '';
+    }
+  });
+}
+
+// ================================================================
+//  RENDER CHECKLIST
+// ================================================================
+function renderChecklist() {
+  const el = document.getElementById('checklist-inner');
+  const ne = document.getElementById('nation-notes-display');
+  if (!el || !currentNation) return;
+
+  const s = scoresCache[currentNation] || {};
+  el.innerHTML = GOALS.map(g => {
+    const done = !!s[g.key];
+    return '<div class="check-item' + (done ? ' done' : '') + '">'
+      + '<span class="check-icon">' + (done ? '&#9989;' : '&#11036;') + '</span>'
+      + '<div>'
+      + '<div class="check-label"><strong>' + esc(g.label) + ': &ldquo;' + esc(g.desc) + '&rdquo;</strong>'
+      + '<span class="check-pts"> &mdash; ' + g.pts + ' pts</span></div>'
+      + '</div></div>';
+  }).join('');
+
+  if (ne) {
+    const notes = s.notes ? s.notes.trim() : '';
+    ne.innerHTML = notes
+      ? '<div style="margin-top:12px;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--gold-dim);font-size:12px;color:var(--text-dim)"><span style="color:var(--gold);letter-spacing:2px;font-size:9px">TEACHER NOTE</span><br/>' + esc(notes) + '</div>'
+      : '';
+  }
+}
+
+// ================================================================
+//  TEACHER: SCORE TABLE
+// ================================================================
+function renderScoreTable() {
+  const tbody = document.getElementById('score-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = NATIONS.map(n => {
+    const s    = scoresCache[n] || {};
+    const name = (nationsCache[n] && nationsCache[n].name) ? nationsCache[n].name : NATION_DISPLAY[n];
+    return '<tr>'
+      + '<td>' + esc(name) + '</td>'
+      + '<td><input type="checkbox"' + (s.counter_intelligence ? ' checked' : '') + ' onchange="sc(\'' + n + '\',\'counter_intelligence\',this.checked)"/></td>'
+      + '<td><input type="checkbox"' + (s.courier              ? ' checked' : '') + ' onchange="sc(\'' + n + '\',\'courier\',this.checked)"/></td>'
+      + '<td><input type="checkbox"' + (s.vault                ? ' checked' : '') + ' onchange="sc(\'' + n + '\',\'vault\',this.checked)"/></td>'
+      + '<td><input type="checkbox"' + (s.asset_protection     ? ' checked' : '') + ' onchange="sc(\'' + n + '\',\'asset_protection\',this.checked)"/></td>'
+      + '<td><input type="number" min="0" value="' + (parseInt(s.icon_stolen_bonus)||0) + '" onchange="sc(\'' + n + '\',\'icon_stolen_bonus\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + (parseInt(s.trial_bonus)      ||0) + '" onchange="sc(\'' + n + '\',\'trial_bonus\',parseInt(this.value)||0)"/></td>'
+      + '<td><textarea onchange="sc(\'' + n + '\',\'notes\',this.value)">' + esc(s.notes||'') + '</textarea></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function sc(nation, field, value) {
+  db.ref('/game/scores/' + nation + '/' + field).set(value);
+}
+
+// ================================================================
+//  TEACHER: PUBLISH UPDATE
+// ================================================================
+function publishUpdate() {
+  const ta  = document.getElementById('teacher-update-ta');
+  const text = ta ? ta.value.trim() : '';
+  if (!text) return;
+
+  const now     = Date.now();
+  const dateStr = new Date().toLocaleDateString('en-NZ', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  db.ref('/game/settings/today_update').set(text);
+  db.ref('/news/' + now).set({ text, date: dateStr });
+
+  const ok = document.getElementById('pub-ok');
+  if (ok) {
+    ok.style.display = 'inline';
+    setTimeout(() => { ok.style.display = 'none'; }, 3000);
+  }
+}
+
+// ================================================================
+//  TAB NAVIGATION
+// ================================================================
+function showTab(tab) {
+  ['home', 'nation', 'news', 'teacher'].forEach(t => {
+    const c = document.getElementById('tab-' + t);
+    const b = document.getElementById('tab-btn-' + t);
+    if (c) c.classList.remove('active');
+    if (b) b.classList.remove('active');
+  });
+  const c = document.getElementById('tab-' + tab);
+  const b = document.getElementById('tab-btn-' + tab);
+  if (c) c.classList.add('active');
+  if (b) b.classList.add('active');
+
+  if (tab === 'nation') renderNationTab();
+  if (tab === 'teacher' && currentUser === 'teacher') renderScoreTable();
+}
+
+// ================================================================
+//  UTIL
+// ================================================================
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ================================================================
+//  ENTER KEY ON LOGIN
+// ================================================================
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ================================================================
+//  BOOT
+// ================================================================
+checkSession();
+</script>
+</body>
+</html>
