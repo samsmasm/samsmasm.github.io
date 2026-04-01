@@ -623,41 +623,65 @@ const GOALS = [
 
 // Targets: Nation 1→3, Nation 2→4, Nation 3→1, Nation 4→2
 const SPY_CHIEF_MISSION = 'Identify the spy embedded in your nation AND correctly name which nation sent them. Submit a private written accusation to the Global Overseer — separately from any formal Trial.';
-const SCOUT_SUFFIX = ' Evidence: the target must explicitly agree, and you must report the conversation immediately to the Global Overseer.';
-const NATION_ROLES = {
-  nation1: [
-    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 2 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 3 Spy Chief’s folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 2 to say your nation’s Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 3 that you are also a spy working for them.' + SCOUT_SUFFIX },
-    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 3’s access code, log in as them, and click the hacked button." },
+
+// Deterministic shuffle — same result every time for a given seed
+function seededShuffle(arr, seed) {
+  const a = [...arr];
+  let s = seed >>> 0;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    const j = s % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Lower missions per nation in canonical order: [inkBlot, triggerWord, convinceSpy, hackPage]
+// Each nation gets them shuffled by a unique seed so other teams can't predict who has which task.
+const LOWER_MISSIONS = [
+  /* nation1 */ [
+    "Place an Ink Blot on the Nation 3 Spy Chief’s folder.",
+    "Get a member of Nation 2 to say your nation’s Trigger Word aloud without realising why.",
+    "Convince a member of Nation 3 that you are also a spy working for them. Evidence: the target must explicitly agree, and you must report the conversation immediately to the Global Overseer.",
+    "Obtain Nation 3’s access code, log in as them, and click the hacked button."
   ],
-  nation2: [
-    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 3 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 4 Spy Chief’s folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 3 to say your nation’s Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 4 that you are also a spy working for them.' + SCOUT_SUFFIX },
-    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 4’s access code, log in as them, and click the hacked button." },
+  /* nation2 */ [
+    "Place an Ink Blot on the Nation 4 Spy Chief’s folder.",
+    "Get a member of Nation 3 to say your nation’s Trigger Word aloud without realising why.",
+    "Convince a member of Nation 4 that you are also a spy working for them. Evidence: the target must explicitly agree, and you must report the conversation immediately to the Global Overseer.",
+    "Obtain Nation 4’s access code, log in as them, and click the hacked button."
   ],
-  nation3: [
-    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 4 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 1 Spy Chief’s folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 4 to say your nation’s Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 1 that you are also a spy working for them.' + SCOUT_SUFFIX },
-    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 1’s access code, log in as them, and click the hacked button." },
+  /* nation3 */ [
+    "Place an Ink Blot on the Nation 1 Spy Chief’s folder.",
+    "Get a member of Nation 4 to say your nation’s Trigger Word aloud without realising why.",
+    "Convince a member of Nation 1 that you are also a spy working for them. Evidence: the target must explicitly agree, and you must report the conversation immediately to the Global Overseer.",
+    "Obtain Nation 1’s access code, log in as them, and click the hacked button."
   ],
-  nation4: [
-    { key: 'president',      role: 'President',           mission: 'Get the signature of the Nation 1 President.' },
-    { key: 'spy_chief',      role: 'Spy Chief',            mission: SPY_CHIEF_MISSION },
-    { key: 'gov_worker_a',   role: 'Gov Worker A',         mission: "Place an Ink Blot on the Nation 2 Spy Chief’s folder." },
-    { key: 'gov_worker_b',   role: 'Gov Worker B',         mission: 'Get a member of Nation 1 to say your nation’s Trigger Word aloud without realising why.' },
-    { key: 'scout',          role: 'Citizen (Scout)',      mission: 'Convince a member of Nation 2 that you are also a spy working for them.' + SCOUT_SUFFIX },
-    { key: 'ghost',          role: 'Citizen (Ghost)',      mission: "Obtain Nation 2’s access code, log in as them, and click the hacked button." },
+  /* nation4 */ [
+    "Place an Ink Blot on the Nation 2 Spy Chief’s folder.",
+    "Get a member of Nation 1 to say your nation’s Trigger Word aloud without realising why.",
+    "Convince a member of Nation 2 that you are also a spy working for them. Evidence: the target must explicitly agree, and you must report the conversation immediately to the Global Overseer.",
+    "Obtain Nation 2’s access code, log in as them, and click the hacked button."
   ],
-};
+];
+const LOWER_SEEDS  = [17, 42, 99, 137];
+const LOWER_KEYS   = ['gov_worker_a', 'gov_worker_b', 'scout',           'ghost'];
+const LOWER_LABELS = ['Gov Worker A', 'Gov Worker B', 'Citizen (Scout)', 'Citizen (Ghost)'];
+
+const NATION_ROLES = (function() {
+  const nk = ['nation1','nation2','nation3','nation4'];
+  const presTargets = [2,3,4,1];
+  const result = {};
+  nk.forEach((n, i) => {
+    const shuffled = seededShuffle(LOWER_MISSIONS[i], LOWER_SEEDS[i]);
+    result[n] = [
+      { key: 'president', role: 'President', mission: 'Get the signature of the Nation ' + presTargets[i] + ' President.' },
+      { key: 'spy_chief', role: 'Spy Chief', mission: SPY_CHIEF_MISSION },
+      ...LOWER_KEYS.map((key, ri) => ({ key, role: LOWER_LABELS[ri], mission: shuffled[ri] }))
+    ];
+  });
+  return result;
+})();
 
 const PERSONAL_KEYS = [
   { key: 'personal_president',    label: 'President'    },
@@ -981,7 +1005,7 @@ function renderNationTab() {
     + '<hr class="divider"/>'
     + '<div class="sec-title">&#9632; System Security</div>'
     + '<div style="padding:18px 0;">'
-    + '<button class="btn-hacked" onclick="triggerHack()">&#9888; Click this if you\'ve been hacked &mdash; this will award 20 points to the hacking nation</button>'
+    + '<button class="btn-hacked" onclick="triggerHack()">&#9888; CLICK THIS IF YOU HAVE HACKED THIS PAGE &mdash; THIS WILL AWARD 20 POINTS TO YOUR TEAM</button>'
     + '</div>';
 
   updateWordCount();
@@ -1278,48 +1302,85 @@ function printBriefingSheets() {
 
   function eh(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  const cards = NATIONS.flatMap(n => {
-    const nd       = nationsCache[n] || {};
-    const name     = nd.name || NATION_DISPLAY[n];
-    const roles    = NATION_ROLES[n] || [];
-    const spyEntry = spyRegistryCache[n] || {};
+  // Regular briefing cards (one per student, no spy info on these)
+  const regularCards = NATIONS.flatMap(n => {
+    const nd   = nationsCache[n] || {};
+    const name = nd.name || NATION_DISPLAY[n];
+    const roles = NATION_ROLES[n] || [];
     return roles.map(r => {
-      const student    = nd['rn_'+r.key] || '[Name not entered]';
-      const isSpy      = spyEntry.spyRole === r.key;
-      const homeNation = isSpy && spyEntry.homeNation ? (nationsCache[spyEntry.homeNation] && nationsCache[spyEntry.homeNation].name ? nationsCache[spyEntry.homeNation].name : NATION_DISPLAY[spyEntry.homeNation]) : null;
-      const missionText = typeof r.mission === 'string' ? r.mission : SPY_CHIEF_MISSION;
+      const student = nd['rn_'+r.key] || '[Name not entered]';
       return '<div class="card">'
         + '<div class="card-op">OPERATION: SHADOW PROTOCOL</div>'
-        + '<div class="card-classified">TOP SECRET // PERSONAL BRIEFING</div>'
+        + '<div class="card-cls">TOP SECRET // PERSONAL BRIEFING</div>'
         + '<div class="card-nation">' + eh(name) + '</div>'
         + '<div class="card-role">' + eh(r.role) + '</div>'
         + '<div class="card-student">' + eh(student) + '</div>'
-        + (isSpy && homeNation ? '<div class="spy-box"><div class="spy-lbl">&#9888; SECRET ALLEGIANCE</div><div class="spy-txt">You are a spy planted from ' + eh(homeNation) + '. Your true loyalty is to ' + eh(homeNation) + '. Maintain your cover at all costs. Only the Global Overseer knows.</div></div>' : '')
         + '<div class="mission-lbl">YOUR PERSONAL MISSION</div>'
-        + '<div class="mission-txt">' + eh(missionText) + '</div>'
+        + '<div class="mission-txt">' + eh(r.mission) + '</div>'
         + '<div class="card-footer">Destroy after reading. Do not share this briefing.</div>'
         + '</div>';
     });
-  }).join('');
+  });
 
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Shadow Protocol \u2014 Briefing Sheets</title><style>'
-    + '* { box-sizing:border-box; margin:0; padding:0; }'
-    + 'body { font-family: "Courier New",monospace; background:#fff; color:#000; }'
-    + '.card { width:148mm; min-height:100mm; border:2px solid #000; padding:16px; margin:8px auto; page-break-after:always; display:flex; flex-direction:column; gap:7px; }'
-    + '.card:last-child { page-break-after:auto; }'
-    + '.card-op { font-size:8px; letter-spacing:4px; text-align:center; opacity:0.4; }'
-    + '.card-classified { font-size:9px; letter-spacing:3px; text-align:center; font-weight:bold; border:1px solid #000; padding:3px; }'
-    + '.card-nation { font-size:20px; font-weight:bold; letter-spacing:3px; text-transform:uppercase; text-align:center; margin-top:2px; }'
-    + '.card-role { font-size:12px; letter-spacing:2px; text-transform:uppercase; text-align:center; opacity:0.6; }'
-    + '.card-student { font-size:16px; text-align:center; border-bottom:1px solid #ccc; padding-bottom:7px; }'
-    + '.mission-lbl { font-size:8px; letter-spacing:3px; text-transform:uppercase; opacity:0.5; margin-top:4px; }'
-    + '.mission-txt { font-size:12px; line-height:1.6; }'
-    + '.spy-box { background:#fff8e1; border:2px solid #c00; padding:9px; }'
-    + '.spy-lbl { font-size:9px; letter-spacing:2px; font-weight:bold; color:#c00; margin-bottom:3px; }'
-    + '.spy-txt { font-size:12px; line-height:1.5; }'
-    + '.card-footer { font-size:8px; opacity:0.3; text-align:center; margin-top:auto; padding-top:6px; }'
-    + '@media print { body{margin:0} .card{margin:0 auto; break-after:page} }'
-    + '</style></head><body>' + cards
+  // Spy cards \u2014 separate, highly classified, one per tagged spy
+  const spyCards = NATIONS.flatMap(n => {
+    const spy = spyRegistryCache[n] || {};
+    if (!spy.spyRole || !spy.homeNation) return [];
+    const nd       = nationsCache[n] || {};
+    const hnd      = nationsCache[spy.homeNation] || {};
+    const hostName = nd.name  || NATION_DISPLAY[n];
+    const homeName = hnd.name || NATION_DISPLAY[spy.homeNation];
+    const student  = nd['rn_'+spy.spyRole] || '[Name not entered]';
+    const roleObj  = (NATION_ROLES[n]||[]).find(r => r.key === spy.spyRole);
+    const roleStr  = roleObj ? roleObj.role : spy.spyRole;
+    return ['<div class="card spy-card">'
+      + '<div class="card-op">OPERATION: SHADOW PROTOCOL // EYES ONLY // NO COPIES</div>'
+      + '<div class="card-cls-spy">&#9888;&#9888; SPY BRIEFING // DESTROY AFTER READING &#9888;&#9888;</div>'
+      + '<div class="spy-cover">COVER: ' + eh(hostName) + ' &mdash; ' + eh(roleStr) + '</div>'
+      + '<div class="card-student">' + eh(student) + '</div>'
+      + '<div class="spy-true">TRUE ALLEGIANCE: ' + eh(homeName) + '</div>'
+      + '<div class="mission-lbl" style="margin-top:6px">YOUR MISSION</div>'
+      + '<div class="mission-txt">You are a deep-cover operative embedded inside ' + eh(hostName) + '. Your true loyalty is to ' + eh(homeName) + '. You have access to ' + eh(hostName) + "'s secrets &mdash; their manifesto, icon, vault. Feed this intelligence to " + eh(homeName) + '. Maintain your cover: appear to be a committed member of ' + eh(hostName) + ' or suspicion will expose you. If identified and put on Trial, deny everything.</div>'
+      + '<div class="mission-lbl" style="margin-top:6px">TRADECRAFT</div>'
+      + '<div class="mission-txt">The greatest operatives maintained cover for decades. Kim Philby ran British intelligence while serving the KGB for 30 years. Aldrich Ames sold CIA agent identities while collecting his Agency salary. Robert Hanssen spied for the Soviets from inside the FBI for 22 years. Double and triple agents are not just permitted &mdash; they are the highest form of tradecraft. You may serve both nations, feed disinformation to your host, or switch allegiances entirely if it serves your interests.</div>'
+      + '<div class="spy-dilemma">THE DOUBLE AGENT\'S DILEMMA &mdash; If you survive undetected to the end, you choose: share victory with ' + eh(hostName) + ' or ' + eh(homeName) + '. Choose wisely.</div>'
+      + '<div class="card-footer">&#9632;&#9632;&#9632; BURN THIS BRIEFING &#9632;&#9632;&#9632;</div>'
+      + '</div>'];
+  });
+
+  // Group all cards into pairs \u2014 2 per A4 page
+  const all = [...regularCards, ...spyCards];
+  const pages = [];
+  for (let i = 0; i < all.length; i += 2) {
+    pages.push('<div class="page">' + all.slice(i, i+2).join('') + '</div>');
+  }
+
+  const css = [
+    '* { box-sizing:border-box; margin:0; padding:0; }',
+    'body { font-family:"Courier New",monospace; background:#fff; color:#000; }',
+    '.page { display:flex; flex-direction:column; height:283mm; padding:4mm 6mm; gap:3mm; page-break-after:always; }',
+    '.page:last-child { page-break-after:auto; }',
+    '.card { flex:1; border:2px solid #000; padding:10px 12px; display:flex; flex-direction:column; gap:4px; overflow:hidden; }',
+    '.spy-card { border:3px solid #c00; }',
+    '.card-op { font-size:6px; letter-spacing:3px; text-align:center; opacity:0.35; }',
+    '.card-cls { font-size:8px; letter-spacing:2px; text-align:center; font-weight:bold; border:1px solid #000; padding:2px 4px; }',
+    '.card-cls-spy { font-size:8px; letter-spacing:1px; text-align:center; font-weight:bold; border:2px solid #c00; padding:2px 4px; color:#c00; }',
+    '.card-nation { font-size:17px; font-weight:bold; letter-spacing:3px; text-transform:uppercase; text-align:center; }',
+    '.spy-cover { font-size:12px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; text-align:center; }',
+    '.spy-true { font-size:12px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; text-align:center; color:#c00; background:#fff0f0; padding:3px; }',
+    '.card-role { font-size:10px; letter-spacing:2px; text-transform:uppercase; text-align:center; opacity:0.55; }',
+    '.card-student { font-size:14px; text-align:center; border-bottom:1px solid #bbb; padding-bottom:4px; }',
+    '.mission-lbl { font-size:7px; letter-spacing:3px; text-transform:uppercase; opacity:0.45; }',
+    '.mission-txt { font-size:10.5px; line-height:1.5; }',
+    '.spy-dilemma { font-size:9px; font-weight:bold; line-height:1.4; border-top:1px solid #c00; padding-top:4px; margin-top:auto; }',
+    '.card-footer { font-size:7px; opacity:0.3; text-align:center; margin-top:auto; }',
+    '@media print { body{margin:0} .page{break-after:page} }',
+  ].join('');
+
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<title>Shadow Protocol \u2014 Briefing Sheets</title>'
+    + '<style>' + css + '</style></head><body>'
+    + pages.join('')
     + '<script>window.onload=function(){window.print();}<\/script>'
     + '</body></html>');
   w.document.close();
