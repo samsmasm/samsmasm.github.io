@@ -407,7 +407,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
     <div class="briefing-block">
       <h2>OPERATION: SHADOW PROTOCOL</h2>
 
-      <h3>The Five Global Goals (Team Scoring)</h3>
+      <h3>The Four Global Goals (Team Scoring)</h3>
       <ol>
         <li>
           <strong>Find Your Spy &mdash; 20 Points.</strong>
@@ -419,7 +419,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
         </li>
         <li>
           <strong>Protect the Vault &mdash; 30 Points.</strong>
-          Your President writes your nation&rsquo;s State Secret on a piece of paper and hides it somewhere in your team&rsquo;s territory. Keep it hidden for the entire game. Use decoy secrets to throw rivals off the scent. If no rival finds it by the end of the game, you score full points.
+          Your President has been assigned a State Secret (visible in the Our Nation tab). They must write it on paper and hide it somewhere in your team&rsquo;s territory. Keep it hidden for the entire game &mdash; use decoy secrets to throw rivals off the scent. If no rival finds it by the end of the game, you score full points. Warning: the President must still be able to produce the paper at the end of the game, or your nation loses 10 points.
         </li>
         <li>
           <strong>Protect the State Icon &mdash; 15 Points.</strong>
@@ -428,8 +428,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
       </ol>
 
       <h3>Individual Missions (Personal Scoring &mdash; 10 Points Each)</h3>
-      <p>Each operative has one personal mission worth 10 points. These are secret &mdash; known only to you and the Global Overseer. Evidence must be presented to the teacher to claim your points.</p>
-      <p><strong>Gov Worker B &mdash; The Trigger Word:</strong> Your nation has chosen a secret word (something absurd, like &ldquo;keyboard&rdquo; or &ldquo;dragonfruit&rdquo;). Your mission is to socially engineer a member of your target nation into saying that word out loud &mdash; in natural conversation, without them realising why you wanted them to say it. When they say it, it is a national embarrassment for their team. Report the success immediately &mdash; whisper it to the Global Overseer. <span class="individual-goal-tag">Individual</span></p>
+      <p>Each operative has one personal mission worth 10 points. These are secret &mdash; known only to you and the Global Overseer. Evidence must be presented to the teacher to claim your points. Check your briefing card or the Our Nation tab for your mission.</p>
 
       <h3>Rules of Engagement</h3>
       <ol>
@@ -519,6 +518,12 @@ textarea.field-input { resize: vertical; min-height: 100px; }
     <div class="teacher-block">
       <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">Tag which student in each nation is the embedded spy and where they came from. This is used to generate printable briefing sheets.</p>
       <div id="spy-registry-display"></div>
+    </div>
+
+    <div class="sec-title">&#9632; Presidential State Secrets</div>
+    <div class="teacher-block">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">Each nation's President must write their secret on paper and carry it. Deduct 10 discretionary points at the end if they can't produce it.</p>
+      <div id="teacher-secrets-display"></div>
     </div>
 
     <div class="sec-title">&#9632; Briefing Sheets</div>
@@ -612,6 +617,46 @@ async function sha256(str) {
 // ================================================================
 const NATION_DISPLAY = { nation1:'NATION 1', nation2:'NATION 2', nation3:'NATION 3', nation4:'NATION 4' };
 const NATIONS = ['nation1','nation2','nation3','nation4'];
+
+// Absurd state secrets — one is assigned per nation per class, deterministically
+const STATE_SECRETS = [
+  'Our weapons can be defused with the sound of a recorder playing out of tune.',
+  'Our nation\'s founders never actually existed. They were invented by a bored cartographer.',
+  'The national anthem was written by a dog. We have never told anyone.',
+  'Our entire military is made of cardboard. It has worked so far.',
+  'We have been accidentally at war with Luxembourg for 200 years. Nobody has noticed.',
+  'The President is legally required to wear socks on their hands during all official meetings.',
+  'Our nuclear codes are the word "password". We feel fine about this.',
+  'The palace is haunted. The ghost does our taxes. We have not told the treasury.',
+  'Our national cheese has been classified a weapon of mass destruction since 1987.',
+  'The Prime Minister is actually three children in a trenchcoat. We are very proud of them.',
+  'We have been sending the wrong ambassador to the UN since 1971. His name is Gerald.',
+  'Our most advanced fighter jet runs on instant coffee and national pride.',
+  'The entire spy network is operated by one retired geography teacher named Brenda.',
+  'Our national bird is not real. It was made up to win a bet.',
+  'We once accidentally declared war on ourselves. We lost, but also won.',
+  'The crown jewels are made of painted pasta. The real ones were eaten at a state dinner in 1953.',
+  'Our defence budget was spent on a very large trampoline. It is in the basement of parliament.',
+  'We have seventeen treaties with a country that does not exist.',
+  'The entire government communicates exclusively through interpretive dance.',
+  'Our state-of-the-art submarine is a repainted rubber duck. It has sunk twice.',
+  'The national flag was designed by a child who was told to draw something "patriotic" and drew their dog.',
+  'We are technically still a colony of Belgium. We have not told Belgium.',
+  'Our generals are trained to fight by watching competitive cooking shows.',
+  'The head of intelligence has never left the country. He has very strong opinions about it.',
+  'We once accidentally signed a peace treaty in the wrong language. We are still not sure what we agreed to.',
+  'Our entire air force is a single hot air balloon painted to look like several jets.',
+  'The President\'s official title is longer than the national constitution.',
+  'We discovered oil in 1987 and immediately lost the paperwork.',
+];
+
+function getStateSecret(classId, nationId) {
+  const CLASS_IDX  = { class1:0,class2:1,class3:2,class4:3,class5:4,class6:5,class7:6 };
+  const NATION_IDX = { nation1:0,nation2:1,nation3:2,nation4:3 };
+  const ci = CLASS_IDX[classId]  || 0;
+  const ni = NATION_IDX[nationId] || 0;
+  return STATE_SECRETS[(ci * 4 + ni) % STATE_SECRETS.length];
+}
 
 const GOALS = [
   { key: 'counter_intelligence', label: 'Find Your Spy',             pts: 20 },
@@ -822,7 +867,7 @@ function setupListeners() {
     nationsCache = snap.val() || {};
     renderScoreboard();
     if (currentNation) renderNationFields();
-    if (currentUser === 'teacher') { renderSpyRegistry(); renderClassSwitcher(); }
+    if (currentUser === 'teacher') { renderSpyRegistry(); renderClassSwitcher(); renderTeacherSecrets(); }
   });
 
   db.ref(basePath() + '/game/spyRegistry').on('value', snap => {
@@ -985,6 +1030,12 @@ function renderNationTab() {
 
     + makeField('Trigger Word <span style="font-size:11px;color:var(--text-dim)">(secret &mdash; choose something absurd)</span>', 'counter_sign', d.counter_sign||'', 'text', "e.g. 'keyboard' or 'dragonfruit'...")
     + makeField('Icon Description',    'icon_description', d.icon_description||'', 'text', 'Describe your clay icon...')
+
+    + '<div style="background:#0a1a0a;border:1px solid #2a5a2a;border-left:4px solid #27ae60;padding:18px 20px;margin-bottom:20px">'
+    + '<div style="font-size:10px;letter-spacing:4px;color:#27ae60;text-transform:uppercase;margin-bottom:10px">&#9632; Presidential State Secret</div>'
+    + '<div style="font-size:17px;line-height:1.7;color:var(--text);margin-bottom:14px"><em>' + esc(getStateSecret(currentClass, currentNation)) + '</em></div>'
+    + '<div style="font-size:13px;color:var(--text-dim);line-height:1.7"><strong style="color:#a0c878">MANDATORY:</strong> The President must write this secret on a piece of paper or in their notebook and carry it for the entire game. At the end of the game, if your nation cannot show this paper to the Global Overseer, your nation loses 10 discretionary points. Use decoy secrets to mislead rival nations who may try to find it.</div>'
+    + '</div>'
 
     + '<hr class="divider"/>'
     + '<div class="sec-title">&#9632; Mission Status &mdash; Global Goals</div>'
@@ -1276,7 +1327,7 @@ function showTab(tab) {
   if (c) c.classList.add('active');
   if (b) b.classList.add('active');
   if (tab === 'nation') renderNationTab();
-  if (tab === 'teacher' && currentUser === 'teacher') { renderClassSwitcher(); renderScoreTable(); renderPersonalTable(); renderSpyRegistry(); }
+  if (tab === 'teacher' && currentUser === 'teacher') { renderClassSwitcher(); renderScoreTable(); renderPersonalTable(); renderSpyRegistry(); renderTeacherSecrets(); }
 }
 
 // ================================================================
@@ -1296,6 +1347,20 @@ function renderClassSwitcher() {
   bar.innerHTML = ['class1','class2','class3','class4','class5','class6','class7'].map(c => {
     const label = c.replace('class','Class ');
     return '<button class="class-btn' + (c === currentClass ? ' active' : '') + '" onclick="switchClass(\'' + c + '\')">' + label + '</button>';
+  }).join('');
+}
+
+function renderTeacherSecrets() {
+  const el = document.getElementById('teacher-secrets-display');
+  if (!el) return;
+  el.innerHTML = NATIONS.map(n => {
+    const nd   = nationsCache[n] || {};
+    const name = nd.name || NATION_DISPLAY[n];
+    const secret = getStateSecret(currentClass, n);
+    return '<div style="display:flex;gap:16px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">'
+      + '<div style="min-width:120px;color:var(--gold);font-size:12px;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;margin-top:2px">' + esc(name) + '</div>'
+      + '<div style="font-size:14px;color:var(--text);line-height:1.6;font-style:italic">' + esc(secret) + '</div>'
+      + '</div>';
   }).join('');
 }
 
