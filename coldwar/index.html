@@ -701,6 +701,13 @@ let currentClass       = null;  // 'class1' … 'class7'
 let scoresCache        = {};
 let nationsCache       = {};
 let spyRegistryCache   = {};
+const dirtyFields      = new Set(); // tracks which input IDs have unsaved local changes
+
+function markDirty(inputId) {
+  dirtyFields.add(inputId);
+  const btn = document.getElementById('sav-' + inputId);
+  if (btn) btn.textContent = 'Save';
+}
 
 // Firebase base path for current class
 function basePath() { return '/classes/' + currentClass; }
@@ -958,6 +965,7 @@ function renderNationTab() {
   const d    = nationsCache[currentNation] || {};
   const name = d.name || NATION_DISPLAY[currentNation];
   const roles = NATION_ROLES[currentNation] || [];
+  dirtyFields.clear(); // DOM is being rebuilt with fresh Firebase values
 
   el.innerHTML =
     '<div class="nation-header"><h2 id="nh-name">' + esc(name) + '</h2>'
@@ -968,10 +976,10 @@ function renderNationTab() {
 
     + '<div class="field-group">'
     + '<label class="field-label">National Manifesto <span style="color:var(--text-dim);font-size:10px">(minimum 40 words)</span></label>'
-    + '<textarea class="field-input" id="fi-manifesto" placeholder="Write your nation\'s manifesto here..." oninput="updateWordCount()">'
+    + '<textarea class="field-input" id="fi-manifesto" placeholder="Write your nation\'s manifesto here..." oninput="markDirty(\'fi-manifesto\'); updateWordCount()">'
     + esc(d.manifesto||'') + '</textarea>'
     + '<div class="word-count" id="wc-display">0 words</div>'
-    + '<br/><button class="save-btn" onclick="saveManifesto()">Save</button>'
+    + '<br/><button class="save-btn" id="sav-fi-manifesto" onclick="saveManifesto()">' + (d.manifesto ? 'Change' : 'Save') + '</button>'
     + '<span class="save-ok" id="sok-manifesto">&#10003; Saved</span>'
     + '</div>'
 
@@ -987,13 +995,14 @@ function renderNationTab() {
     + '<div class="sec-title">&#9632; Operative Roster &mdash; Enter Your Names</div>'
     + '<p style="font-size:14px;color:var(--text-dim);margin-bottom:16px">Enter the name of the person in each role. One person can take multiple roles.</p>'
     + '<div id="role-name-rows">'
-    + roles.map(r =>
-        '<div class="role-row">'
-        + '<span class="role-row-label">' + esc(r.role) + '</span>'
-        + '<input class="role-row-input" id="rn-' + r.key + '" type="text" value="' + esc(d['rn_'+r.key]||'') + '" placeholder="Student name..." />'
-        + '<button class="save-btn" onclick="saveRoleName(\'' + r.key + '\')">Save</button>'
-        + '</div>'
-      ).join('')
+    + roles.map(r => {
+        const rv = d['rn_'+r.key] || '';
+        return '<div class="role-row">'
+          + '<span class="role-row-label">' + esc(r.role) + '</span>'
+          + '<input class="role-row-input" id="rn-' + r.key + '" type="text" value="' + esc(rv) + '" placeholder="Student name..." oninput="markDirty(\'rn-' + r.key + '\')"/>'
+          + '<button class="save-btn" id="sav-rn-' + r.key + '" onclick="saveRoleName(\'' + r.key + '\')">' + (rv ? 'Change' : 'Save') + '</button>'
+          + '</div>';
+      }).join('')
     + '</div>'
 
     + '<hr class="divider"/>'
@@ -1022,19 +1031,29 @@ function updateWordCount() {
 }
 
 function makeField(label, key, val, type, ph) {
+  const fid = 'fi-' + key;
   const inputEl = type === 'textarea'
-    ? '<textarea class="field-input" id="fi-' + key + '" placeholder="' + esc(ph) + '">' + esc(val) + '</textarea>'
-    : '<input class="field-input" id="fi-' + key + '" type="text" value="' + esc(val) + '" placeholder="' + esc(ph) + '"/>';
-  return '<div class="field-group"><label class="field-label">' + esc(label) + '</label>'
+    ? '<textarea class="field-input" id="' + fid + '" placeholder="' + esc(ph) + '" oninput="markDirty(\'' + fid + '\')">' + esc(val) + '</textarea>'
+    : '<input class="field-input" id="' + fid + '" type="text" value="' + esc(val) + '" placeholder="' + esc(ph) + '" oninput="markDirty(\'' + fid + '\')"/>';
+  // label is programmer-supplied so rendered as raw HTML (allows inline spans)
+  return '<div class="field-group"><label class="field-label">' + label + '</label>'
     + inputEl
-    + '<br/><button class="save-btn" onclick="saveField(\'' + key + '\')">Save</button>'
+    + '<br/><button class="save-btn" id="sav-' + fid + '" onclick="saveField(\'' + key + '\')">' + (val ? 'Change' : 'Save') + '</button>'
     + '<span class="save-ok" id="sok-' + key + '">&#10003; Saved</span></div>';
 }
 
 function renderNationFields() {
   if (!currentNation) return;
   const d = nationsCache[currentNation] || {};
-  const setVal = (id, v) => { const e = document.getElementById(id); if (e && document.activeElement !== e) e.value = v||''; };
+  const setVal = (id, v) => {
+    if (dirtyFields.has(id)) return; // preserve unsaved local edits
+    const e = document.getElementById(id);
+    if (e && document.activeElement !== e) {
+      e.value = v || '';
+      const btn = document.getElementById('sav-' + id);
+      if (btn) btn.textContent = v ? 'Change' : 'Save';
+    }
+  };
   setVal('fi-name',             d.name);
   setVal('fi-manifesto',        d.manifesto);
   setVal('fi-counter_sign',     d.counter_sign);
@@ -1051,9 +1070,13 @@ function renderNationFields() {
 // ================================================================
 function saveField(key) {
   if (!currentNation) return;
-  const el = document.getElementById('fi-' + key);
+  const fid = 'fi-' + key;
+  const el = document.getElementById(fid);
   if (!el) return;
   db.ref(basePath() + '/game/nations/' + currentNation + '/' + key).set(el.value).then(() => {
+    dirtyFields.delete(fid);
+    const btn = document.getElementById('sav-' + fid);
+    if (btn) btn.textContent = 'Change';
     flashOk('sok-' + key);
     if (key === 'name') { const h = document.getElementById('nh-name'); if (h) h.textContent = el.value || NATION_DISPLAY[currentNation]; }
   });
@@ -1069,6 +1092,9 @@ function saveManifesto() {
     return;
   }
   db.ref(basePath() + '/game/nations/' + currentNation + '/manifesto').set(el.value).then(() => {
+    dirtyFields.delete('fi-manifesto');
+    const btn = document.getElementById('sav-fi-manifesto');
+    if (btn) btn.textContent = 'Change';
     flashOk('sok-manifesto');
   });
 }
@@ -1077,7 +1103,11 @@ function saveRoleName(roleKey) {
   if (!currentNation) return;
   const el = document.getElementById('rn-' + roleKey);
   if (!el) return;
-  db.ref(basePath() + '/game/nations/' + currentNation + '/rn_' + roleKey).set(el.value);
+  db.ref(basePath() + '/game/nations/' + currentNation + '/rn_' + roleKey).set(el.value).then(() => {
+    dirtyFields.delete('rn-' + roleKey);
+    const btn = document.getElementById('sav-rn-' + roleKey);
+    if (btn) btn.textContent = 'Change';
+  });
 }
 
 function flashOk(id) {
