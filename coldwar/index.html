@@ -346,17 +346,6 @@ textarea.field-input { resize: vertical; min-height: 100px; }
     <div class="classified-tag">&#9632; TOP SECRET &#9632;</div>
     <div class="login-title">Shadow Protocol</div>
     <div class="login-sub">ENTER ACCESS CODE</div>
-    <select id="class-select">
-      <option value="">&#9632; CLASS (TEACHER ONLY) &#9632;</option>
-      <option value="class1">Class 1</option>
-      <option value="class2">Class 2</option>
-      <option value="class3">Class 3</option>
-      <option value="class4">Class 4</option>
-      <option value="class5">Class 5</option>
-      <option value="class6">Class 6</option>
-      <option value="class7">Class 7</option>
-    </select>
-    <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;margin:-6px 0 12px;text-align:left">Students: ignore the dropdown above &mdash; your password determines your class automatically.</div>
     <input type="password" id="pw-input" placeholder="ENTER ACCESS CODE" autocomplete="off"/>
     <button class="btn-gold" onclick="doLogin()">AUTHENTICATE</button>
     <div class="login-err" id="login-err">ACCESS DENIED &mdash; INVALID CREDENTIALS</div>
@@ -419,7 +408,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
         </li>
         <li>
           <strong>Protect the Vault &mdash; 30 Points.</strong>
-          Your President has been assigned a State Secret (visible in the Our Nation tab). They must write it on paper and hide it somewhere in your team&rsquo;s territory. Keep it hidden for the entire game &mdash; use decoy secrets to throw rivals off the scent. If no rival finds it by the end of the game, you score full points. Warning: the President must still be able to produce the paper at the end of the game, or your nation loses 10 points.
+          Your President has been assigned a secret State Secret, revealed only on their personal briefing card. They must write it on paper and hide it somewhere in your team&rsquo;s territory. Keep it hidden for the entire game &mdash; use decoy secrets to throw rivals off the scent. If no rival finds it by the end of the game, you score full points. Warning: the President must still be able to produce the paper at the end of the game, or your nation loses 10 points.
         </li>
         <li>
           <strong>Protect the State Icon &mdash; 15 Points.</strong>
@@ -779,12 +768,7 @@ async function doLogin() {
   }
 
   if (entry.role === 'teacher') {
-    const classVal = document.getElementById('class-select').value;
-    if (!classVal) {
-      showLoginErr('SELECT A CLASS FROM THE DROPDOWN FIRST');
-      return;
-    }
-    currentClass  = classVal;
+    currentClass  = 'class1'; // teacher switches class from the dashboard
     currentUser   = 'teacher';
     currentNation = null;
   } else {
@@ -1030,12 +1014,6 @@ function renderNationTab() {
 
     + makeField('Trigger Word <span style="font-size:11px;color:var(--text-dim)">(secret &mdash; choose something absurd)</span>', 'counter_sign', d.counter_sign||'', 'text', "e.g. 'keyboard' or 'dragonfruit'...")
     + makeField('Icon Description',    'icon_description', d.icon_description||'', 'text', 'Describe your clay icon...')
-
-    + '<div style="background:#0a1a0a;border:1px solid #2a5a2a;border-left:4px solid #27ae60;padding:18px 20px;margin-bottom:20px">'
-    + '<div style="font-size:10px;letter-spacing:4px;color:#27ae60;text-transform:uppercase;margin-bottom:10px">&#9632; Presidential State Secret</div>'
-    + '<div style="font-size:17px;line-height:1.7;color:var(--text);margin-bottom:14px"><em>' + esc(getStateSecret(currentClass, currentNation)) + '</em></div>'
-    + '<div style="font-size:13px;color:var(--text-dim);line-height:1.7"><strong style="color:#a0c878">MANDATORY:</strong> The President must write this secret on a piece of paper or in their notebook and carry it for the entire game. At the end of the game, if your nation cannot show this paper to the Global Overseer, your nation loses 10 discretionary points. Use decoy secrets to mislead rival nations who may try to find it.</div>'
-    + '</div>'
 
     + '<hr class="divider"/>'
     + '<div class="sec-title">&#9632; Mission Status &mdash; Global Goals</div>'
@@ -1399,11 +1377,13 @@ function printBriefingSheets() {
 
   // Regular briefing cards (one per student, no spy info on these)
   const regularCards = NATIONS.flatMap(n => {
-    const nd   = nationsCache[n] || {};
-    const name = nd.name || NATION_DISPLAY[n];
-    const roles = NATION_ROLES[n] || [];
+    const nd     = nationsCache[n] || {};
+    const name   = nd.name || NATION_DISPLAY[n];
+    const roles  = NATION_ROLES[n] || [];
+    const secret = getStateSecret(currentClass, n);
     return roles.map(r => {
-      const student = nd['rn_'+r.key] || '[Name not entered]';
+      const student    = nd['rn_'+r.key] || '[Name not entered]';
+      const isPresident = r.key === 'president';
       return '<div class="card">'
         + '<div class="card-op">OPERATION: SHADOW PROTOCOL</div>'
         + '<div class="card-cls">TOP SECRET // PERSONAL BRIEFING</div>'
@@ -1412,6 +1392,13 @@ function printBriefingSheets() {
         + '<div class="card-student">' + eh(student) + '</div>'
         + '<div class="mission-lbl">YOUR PERSONAL MISSION</div>'
         + '<div class="mission-txt">' + eh(r.mission) + '</div>'
+        + (isPresident
+            ? '<div class="secret-box">'
+              + '<div class="secret-lbl">&#9632; PRESIDENTIAL STATE SECRET</div>'
+              + '<div class="secret-txt">' + eh(secret) + '</div>'
+              + '<div class="secret-note">You MUST write this on a piece of paper and carry it for the entire game. At the end, if you cannot produce it, your nation loses 10 points. Keep it hidden &mdash; use decoy secrets to mislead rivals.</div>'
+              + '</div>'
+            : '')
         + '<div class="card-footer">Destroy after reading. Do not share this briefing.</div>'
         + '</div>';
     });
@@ -1468,6 +1455,10 @@ function printBriefingSheets() {
     '.mission-lbl { font-size:7px; letter-spacing:3px; text-transform:uppercase; opacity:0.45; }',
     '.mission-txt { font-size:10.5px; line-height:1.5; }',
     '.spy-dilemma { font-size:9px; font-weight:bold; line-height:1.4; border-top:1px solid #c00; padding-top:4px; margin-top:auto; }',
+    '.secret-box { background:#f0f8e8; border:2px solid #2a6a00; padding:8px 10px; }',
+    '.secret-lbl { font-size:7px; letter-spacing:3px; font-weight:bold; color:#2a6a00; margin-bottom:3px; }',
+    '.secret-txt { font-size:12px; font-style:italic; line-height:1.4; font-weight:bold; margin-bottom:4px; }',
+    '.secret-note { font-size:9px; line-height:1.4; color:#333; }',
     '.card-footer { font-size:7px; opacity:0.3; text-align:center; margin-top:auto; }',
     '@media print { body{margin:0} .page{break-after:page} }',
   ].join('');
