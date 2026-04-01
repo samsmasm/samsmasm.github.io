@@ -55,7 +55,7 @@ function renderNav() {
     if (isActive)  a.classList.add('active');
     if (isVisited) a.classList.add('visited');
 
-    a.innerHTML = `<span class="nav-num">${stage.num}</span><span class="nav-label">${stage.label}</span>`;
+    a.innerHTML = `<span class="nav-num"></span><span class="nav-label">${stage.label}</span>`;
     li.appendChild(a);
     ul.appendChild(li);
   });
