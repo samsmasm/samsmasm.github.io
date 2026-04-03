@@ -472,6 +472,7 @@ textarea.field-input { resize: vertical; min-height: 100px; }
               <th>Icon Bonus<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
               <th>Trial Bonus<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
               <th>Trial Penalty<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
+              <th>Hack Bonus<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
               <th>Public Notes</th>
             </tr>
           </thead>
@@ -903,8 +904,8 @@ function closeHackModal() {
 function confirmHack(rewardNation) {
   if (nationsCache[currentNation] && nationsCache[currentNation].hacked) { closeHackModal(); return; }
   db.ref(basePath() + '/game/nations/' + currentNation + '/hacked').set(true);
-  // Award 20pts to the hacking nation (store as direct point value, capped at one hack)
-  db.ref(basePath() + '/game/scores/' + rewardNation + '/hack_performed').set(1);
+  // Award 20pts directly (teacher can adjust this value in the scoring table)
+  db.ref(basePath() + '/game/scores/' + rewardNation + '/hack_performed').set(20);
   closeHackModal();
 }
 
@@ -932,7 +933,7 @@ function calcScore(n) {
   t += coerce(s.icon_stolen_bonus,     0);  // direct pts
   t += coerce(s.trial_bonus,           0);  // direct pts
   t -= coerce(s.trial_penalty,         0);  // direct pts (deducted)
-  t += (parseInt(s.hack_performed) || 0) * 20; // 0 or 1 hack × 20pts
+  t += coerce(s.hack_performed, 0);  // direct pts
   PERSONAL_KEYS.forEach(p => { if (s[p.key]) t += 10; });
   t += parseInt(s.discretionary) || 0;
   return t;
@@ -948,7 +949,7 @@ function breakdownHtml(n) {
   const ib = coerce(s.icon_stolen_bonus,     0); if (ib) lines.push('<span class="ticked">&#10003; Icon Bonus +' + ib + '</span>');
   const tb = coerce(s.trial_bonus,           0); if (tb) lines.push('<span class="ticked">&#10003; Trial Bonus +' + tb + '</span>');
   const tp = coerce(s.trial_penalty,         0); if (tp) lines.push('<span style="color:var(--red-bright)">&#9888; Trial Penalty &minus;' + tp + '</span>');
-  const hp = parseInt(s.hack_performed) || 0;    if (hp) lines.push('<span class="ticked">&#10003; Hack Bonus +' + (hp*20) + '</span>');
+  const hp = coerce(s.hack_performed, 0);         if (hp) lines.push('<span class="ticked">&#10003; Hack Bonus +' + hp + '</span>');
   const pc = PERSONAL_KEYS.filter(p => s[p.key]).length;
   if (pc > 0) lines.push('<span class="ticked">&#10003; Personal Missions +' + (pc*10) + '</span>');
   const disc = parseInt(s.discretionary) || 0;
@@ -1198,6 +1199,7 @@ function renderScoreTable() {
       + '<td><input type="number" min="0" value="' + coerce(s.icon_stolen_bonus,     0) + '" onchange="sc(\'' + n + '\',\'icon_stolen_bonus\',parseInt(this.value)||0)"/></td>'
       + '<td><input type="number" min="0" value="' + coerce(s.trial_bonus,           0) + '" onchange="sc(\'' + n + '\',\'trial_bonus\',parseInt(this.value)||0)"/></td>'
       + '<td><input type="number" min="0" value="' + coerce(s.trial_penalty,         0) + '" onchange="sc(\'' + n + '\',\'trial_penalty\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + coerce(s.hack_performed,        0) + '" onchange="sc(\'' + n + '\',\'hack_performed\',parseInt(this.value)||0)"/></td>'
       + '<td><textarea onchange="sc(\'' + n + '\',\'notes\',this.value)">' + esc(s.notes||'') + '</textarea></td>'
       + '</tr>';
   }).join('');
