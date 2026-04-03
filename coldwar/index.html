@@ -458,48 +458,10 @@ textarea.field-input { resize: vertical; min-height: 100px; }
       <span class="pub-ok" id="pub-ok">&#10003; TRANSMITTED</span>
     </div>
 
-    <div class="sec-title">&#9632; Team Scoring</div>
+    <div class="sec-title">&#9632; Scoring</div>
     <div class="teacher-block">
       <div class="score-tbl-wrap">
-        <table class="score-tbl">
-          <thead>
-            <tr>
-              <th>Nation</th>
-              <th>Find Spy<br/><span style="color:var(--text-dim);font-size:9px">×20 pts</span></th>
-              <th>Steal Manifesto<br/><span style="color:var(--text-dim);font-size:9px">×25 pts</span></th>
-              <th>Protect Vault<br/><span style="color:var(--text-dim);font-size:9px">×30 pts</span></th>
-              <th>Protect Icon<br/><span style="color:var(--text-dim);font-size:9px">×15 pts</span></th>
-              <th>Icon Bonus<br/><span style="color:var(--text-dim);font-size:9px">×10 pts</span></th>
-              <th>Trial Bonus<br/><span style="color:var(--text-dim);font-size:9px">×10 pts</span></th>
-              <th>Trial Penalty<br/><span style="color:var(--text-dim);font-size:9px">×5 pts</span></th>
-              <th>Hack Bonus<br/><span style="color:var(--text-dim);font-size:9px">×20 pts</span></th>
-              <th>Public Notes</th>
-            </tr>
-          </thead>
-          <tbody id="score-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="sec-title">&#9632; Personal Mission Scores &amp; Discretionary</div>
-    <div class="teacher-block">
-      <div class="score-tbl-wrap">
-        <table class="score-tbl">
-          <thead>
-            <tr>
-              <th>Nation</th>
-              <th>President<br/><span style="color:var(--text-dim);font-size:9px">10 pts</span></th>
-              <th>Spy Chief<br/><span style="color:var(--text-dim);font-size:9px">10 pts</span></th>
-              <th>Gov Wkr A<br/><span style="color:var(--text-dim);font-size:9px">10 pts</span></th>
-              <th>Gov Wkr B<br/><span style="color:var(--text-dim);font-size:9px">10 pts</span></th>
-              <th>Scout<br/><span style="color:var(--text-dim);font-size:9px">10 pts</span></th>
-              <th>Ghost<br/><span style="color:var(--text-dim);font-size:9px">10 pts</span></th>
-              <th>Discretionary</th>
-              <th>Hacked?</th>
-            </tr>
-          </thead>
-          <tbody id="personal-tbody"></tbody>
-        </table>
+        <div id="combined-tbl-wrap"></div>
       </div>
     </div>
 
@@ -718,12 +680,12 @@ const NATION_ROLES = (function() {
 })();
 
 const PERSONAL_KEYS = [
-  { key: 'personal_president',    label: 'President'    },
-  { key: 'personal_spy_chief',    label: 'Spy Chief'    },
-  { key: 'personal_gov_worker_a', label: 'Gov Worker A' },
-  { key: 'personal_gov_worker_b', label: 'Gov Worker B' },
-  { key: 'personal_scout',        label: 'Scout'        },
-  { key: 'personal_ghost',        label: 'Ghost'        },
+  { key: 'personal_president',    label: 'President',  mission: 'Get Signature'  },
+  { key: 'personal_spy_chief',    label: 'Spy Chief',  mission: 'Identify Spy'   },
+  { key: 'personal_gov_worker_a', label: 'Gov Wkr A',  mission: 'Ink Blot'       },
+  { key: 'personal_gov_worker_b', label: 'Gov Wkr B',  mission: 'Trigger Word'   },
+  { key: 'personal_scout',        label: 'Scout',      mission: 'Convince Spy'   },
+  { key: 'personal_ghost',        label: 'Ghost',      mission: 'Hack Page'      },
 ];
 
 // ================================================================
@@ -941,7 +903,7 @@ function calcScore(n) {
   t += cnt(s.trial_bonus)          * 10;
   t -= cnt(s.trial_penalty)        *  5;
   t += cnt(s.hack_performed)       * 20;
-  PERSONAL_KEYS.forEach(p => { if (s[p.key]) t += 10; });
+  PERSONAL_KEYS.forEach(p => { t += cnt(s[p.key]) * 10; });
   t += parseInt(s.discretionary) || 0;
   return t;
 }
@@ -957,7 +919,7 @@ function breakdownHtml(n) {
   const tb = cnt(s.trial_bonus);          if (tb) lines.push('<span class="ticked">&#10003; Trial Bonus +' + (tb*10) + '</span>');
   const tp = cnt(s.trial_penalty);        if (tp) lines.push('<span style="color:var(--red-bright)">&#9888; Trial Penalty &minus;' + (tp*5) + '</span>');
   const hp = cnt(s.hack_performed);       if (hp) lines.push('<span class="ticked">&#10003; Hack Bonus +' + (hp*20) + '</span>');
-  const pc = PERSONAL_KEYS.filter(p => s[p.key]).length;
+  const pc = PERSONAL_KEYS.reduce((sum, p) => sum + cnt(s[p.key]), 0);
   if (pc > 0) lines.push('<span class="ticked">&#10003; Personal Missions +' + (pc*10) + '</span>');
   const disc = parseInt(s.discretionary) || 0;
   if (disc !== 0) lines.push('<span class="ticked">&#10003; Discretionary ' + (disc>=0?'+':'') + disc + '</span>');
@@ -1189,49 +1151,81 @@ function renderChecklist() {
 }
 
 // ================================================================
-//  TEACHER: TEAM SCORE TABLE
+//  TEACHER: COMBINED SCORING TABLE (challenges as rows, nations as cols)
 // ================================================================
-function renderScoreTable() {
-  const tbody = document.getElementById('score-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = NATIONS.map(n => {
-    const s    = scoresCache[n] || {};
-    const name = (nationsCache[n] && nationsCache[n].name) ? nationsCache[n].name : NATION_DISPLAY[n];
-    return '<tr>'
-      + '<td>' + esc(name) + '</td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.counter_intelligence) + '" onchange="sc(\'' + n + '\',\'counter_intelligence\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.courier)              + '" onchange="sc(\'' + n + '\',\'courier\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.vault)                + '" onchange="sc(\'' + n + '\',\'vault\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.asset_protection)     + '" onchange="sc(\'' + n + '\',\'asset_protection\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.icon_stolen_bonus)    + '" onchange="sc(\'' + n + '\',\'icon_stolen_bonus\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.trial_bonus)          + '" onchange="sc(\'' + n + '\',\'trial_bonus\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.trial_penalty)        + '" onchange="sc(\'' + n + '\',\'trial_penalty\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + cnt(s.hack_performed)       + '" onchange="sc(\'' + n + '\',\'hack_performed\',parseInt(this.value)||0)"/></td>'
-      + '<td><textarea onchange="sc(\'' + n + '\',\'notes\',this.value)">' + esc(s.notes||'') + '</textarea></td>'
-      + '</tr>';
-  }).join('');
-}
+function renderScoreTable()    { renderCombinedTable(); }  // legacy alias
+function renderPersonalTable() { renderCombinedTable(); }  // legacy alias
 
-// ================================================================
-//  TEACHER: PERSONAL SCORE TABLE
-// ================================================================
-function renderPersonalTable() {
-  const tbody = document.getElementById('personal-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = NATIONS.map(n => {
-    const s      = scoresCache[n] || {};
-    const nd     = nationsCache[n] || {};
-    const name   = nd.name || NATION_DISPLAY[n];
-    const hacked = !!nd.hacked;
-    return '<tr>'
-      + '<td>' + esc(name) + '</td>'
-      + PERSONAL_KEYS.map(p => '<td><input type="checkbox"' + (s[p.key]?' checked':'') + ' onchange="sc(\'' + n + '\',\'' + p.key + '\',this.checked)"/></td>').join('')
-      + '<td><input type="number" value="' + (parseInt(s.discretionary)||0) + '" onchange="sc(\'' + n + '\',\'discretionary\',parseInt(this.value)||0)"/></td>'
-      + '<td>' + (hacked
-          ? '<span style="color:#cc2222;font-size:12px;letter-spacing:1px">HACKED</span> <button class="btn-danger" onclick="resetHack(\'' + n + '\')">Reset</button>'
-          : '<span style="color:var(--text-dim);font-size:12px">Clear</span>')
-      + '</td></tr>';
+function renderCombinedTable() {
+  const wrap = document.getElementById('combined-tbl-wrap');
+  if (!wrap) return;
+
+  const nationNames = NATIONS.map(n => (nationsCache[n] && nationsCache[n].name) ? nationsCache[n].name : NATION_DISPLAY[n]);
+
+  const teamRows = [
+    { key: 'counter_intelligence', label: 'Find Spy',        mult: 20, deduct: false },
+    { key: 'courier',              label: 'Steal Manifesto', mult: 25, deduct: false },
+    { key: 'vault',                label: 'Protect Vault',   mult: 30, deduct: false },
+    { key: 'asset_protection',     label: 'Protect Icon',    mult: 15, deduct: false },
+    { key: 'icon_stolen_bonus',    label: 'Icon Bonus',      mult: 10, deduct: false },
+    { key: 'trial_bonus',          label: 'Trial Bonus',     mult: 10, deduct: false },
+    { key: 'trial_penalty',        label: 'Trial Penalty',   mult:  5, deduct: true  },
+    { key: 'hack_performed',       label: 'Hack Bonus',      mult: 20, deduct: false },
+  ];
+
+  function sectionRow(label) {
+    return '<tr><td colspan="' + (NATIONS.length + 1) + '" style="background:rgba(255,255,255,0.04);color:var(--text-dim);font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 10px">' + label + '</td></tr>';
+  }
+
+  const nationCols = nationNames.map(name => '<th>' + esc(name) + '</th>').join('');
+
+  const teamHtml = teamRows.map(r => {
+    const cells = NATIONS.map(n => {
+      const s = scoresCache[n] || {};
+      return '<td><input type="number" min="0" value="' + cnt(s[r.key]) + '" onchange="sc(\'' + n + '\',\'' + r.key + '\',parseInt(this.value)||0)"/></td>';
+    }).join('');
+    const sub = (r.deduct ? '&minus;' : '&times;') + r.mult + ' pts';
+    return '<tr><td><strong>' + r.label + '</strong><br/><span style="color:var(--text-dim);font-size:9px">' + sub + '</span></td>' + cells + '</tr>';
   }).join('');
+
+  const personalHtml = PERSONAL_KEYS.map(p => {
+    const cells = NATIONS.map(n => {
+      const s = scoresCache[n] || {};
+      return '<td><input type="number" min="0" value="' + cnt(s[p.key]) + '" onchange="sc(\'' + n + '\',\'' + p.key + '\',parseInt(this.value)||0)"/></td>';
+    }).join('');
+    return '<tr><td><strong>' + p.mission + '</strong><br/><span style="color:var(--text-dim);font-size:9px">(' + p.label + ') &times;10 pts</span></td>' + cells + '</tr>';
+  }).join('');
+
+  const discHtml = '<tr><td><strong>Discretionary</strong></td>'
+    + NATIONS.map(n => {
+        const s = scoresCache[n] || {};
+        return '<td><input type="number" value="' + (parseInt(s.discretionary)||0) + '" onchange="sc(\'' + n + '\',\'discretionary\',parseInt(this.value)||0)"/></td>';
+      }).join('') + '</tr>';
+
+  const hackedHtml = '<tr><td><strong>Hacked?</strong></td>'
+    + NATIONS.map(n => {
+        const nd = nationsCache[n] || {};
+        return '<td>' + (nd.hacked
+          ? '<span style="color:#cc2222;font-size:12px;letter-spacing:1px">HACKED</span> <button class="btn-danger" onclick="resetHack(\'' + n + '\')">Reset</button>'
+          : '<span style="color:var(--text-dim);font-size:12px">Clear</span>') + '</td>';
+      }).join('') + '</tr>';
+
+  const notesHtml = '<tr><td><strong>Public Notes</strong></td>'
+    + NATIONS.map(n => {
+        const s = scoresCache[n] || {};
+        return '<td><textarea onchange="sc(\'' + n + '\',\'notes\',this.value)">' + esc(s.notes||'') + '</textarea></td>';
+      }).join('') + '</tr>';
+
+  wrap.innerHTML = '<table class="score-tbl"><thead><tr><th>Challenge</th>' + nationCols + '</tr></thead><tbody>'
+    + sectionRow('Team Challenges')
+    + teamHtml
+    + sectionRow('Individual Challenges')
+    + personalHtml
+    + sectionRow('Other')
+    + discHtml
+    + hackedHtml
+    + notesHtml
+    + '</tbody></table>';
 }
 
 // ================================================================
