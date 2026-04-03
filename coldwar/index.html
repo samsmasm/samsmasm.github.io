@@ -465,14 +465,14 @@ textarea.field-input { resize: vertical; min-height: 100px; }
           <thead>
             <tr>
               <th>Nation</th>
-              <th>Find Spy<br/><span style="color:var(--text-dim);font-size:9px">std 20</span></th>
-              <th>Steal Manifesto<br/><span style="color:var(--text-dim);font-size:9px">std 25</span></th>
-              <th>Protect Vault<br/><span style="color:var(--text-dim);font-size:9px">std 30</span></th>
-              <th>Protect Icon<br/><span style="color:var(--text-dim);font-size:9px">std 15</span></th>
-              <th>Icon Bonus<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
-              <th>Trial Bonus<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
-              <th>Trial Penalty<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
-              <th>Hack Bonus<br/><span style="color:var(--text-dim);font-size:9px">pts</span></th>
+              <th>Find Spy<br/><span style="color:var(--text-dim);font-size:9px">×20 pts</span></th>
+              <th>Steal Manifesto<br/><span style="color:var(--text-dim);font-size:9px">×25 pts</span></th>
+              <th>Protect Vault<br/><span style="color:var(--text-dim);font-size:9px">×30 pts</span></th>
+              <th>Protect Icon<br/><span style="color:var(--text-dim);font-size:9px">×15 pts</span></th>
+              <th>Icon Bonus<br/><span style="color:var(--text-dim);font-size:9px">×10 pts</span></th>
+              <th>Trial Bonus<br/><span style="color:var(--text-dim);font-size:9px">×10 pts</span></th>
+              <th>Trial Penalty<br/><span style="color:var(--text-dim);font-size:9px">×5 pts</span></th>
+              <th>Hack Bonus<br/><span style="color:var(--text-dim);font-size:9px">×20 pts</span></th>
               <th>Public Notes</th>
             </tr>
           </thead>
@@ -905,7 +905,7 @@ function confirmHack(rewardNation) {
   if (nationsCache[currentNation] && nationsCache[currentNation].hacked) { closeHackModal(); return; }
   db.ref(basePath() + '/game/nations/' + currentNation + '/hacked').set(true);
   // Award 20pts directly (teacher can adjust this value in the scoring table)
-  db.ref(basePath() + '/game/scores/' + rewardNation + '/hack_performed').set(20);
+  db.ref(basePath() + '/game/scores/' + rewardNation + '/hack_performed').set(1);
   closeHackModal();
 }
 
@@ -923,17 +923,24 @@ function coerce(v, stdPts) {
   return parseInt(v) || 0;
 }
 
+// cnt: returns count (boolean true → 1, falsy → 0, else parseInt)
+function cnt(v) {
+  if (v === true) return 1;
+  if (!v) return 0;
+  return parseInt(v) || 0;
+}
+
 function calcScore(n) {
   const s = scoresCache[n] || {};
   let t = 0;
-  t += coerce(s.counter_intelligence, 20);
-  t += coerce(s.courier,              25);
-  t += coerce(s.vault,                30);
-  t += coerce(s.asset_protection,     15);
-  t += coerce(s.icon_stolen_bonus,     0);  // direct pts
-  t += coerce(s.trial_bonus,           0);  // direct pts
-  t -= coerce(s.trial_penalty,         0);  // direct pts (deducted)
-  t += coerce(s.hack_performed, 0);  // direct pts
+  t += cnt(s.counter_intelligence) * 20;
+  t += cnt(s.courier)              * 25;
+  t += cnt(s.vault)                * 30;
+  t += cnt(s.asset_protection)     * 15;
+  t += cnt(s.icon_stolen_bonus)    * 10;
+  t += cnt(s.trial_bonus)          * 10;
+  t -= cnt(s.trial_penalty)        *  5;
+  t += cnt(s.hack_performed)       * 20;
   PERSONAL_KEYS.forEach(p => { if (s[p.key]) t += 10; });
   t += parseInt(s.discretionary) || 0;
   return t;
@@ -942,14 +949,14 @@ function calcScore(n) {
 function breakdownHtml(n) {
   const s = scoresCache[n] || {};
   const lines = [];
-  const ci = coerce(s.counter_intelligence, 20); if (ci) lines.push('<span class="ticked">&#10003; Find Spy +' + ci + '</span>');
-  const co = coerce(s.courier,              25); if (co) lines.push('<span class="ticked">&#10003; Steal Manifesto +' + co + '</span>');
-  const va = coerce(s.vault,                30); if (va) lines.push('<span class="ticked">&#10003; Protect Vault +' + va + '</span>');
-  const ap = coerce(s.asset_protection,     15); if (ap) lines.push('<span class="ticked">&#10003; Protect Icon +' + ap + '</span>');
-  const ib = coerce(s.icon_stolen_bonus,     0); if (ib) lines.push('<span class="ticked">&#10003; Icon Bonus +' + ib + '</span>');
-  const tb = coerce(s.trial_bonus,           0); if (tb) lines.push('<span class="ticked">&#10003; Trial Bonus +' + tb + '</span>');
-  const tp = coerce(s.trial_penalty,         0); if (tp) lines.push('<span style="color:var(--red-bright)">&#9888; Trial Penalty &minus;' + tp + '</span>');
-  const hp = coerce(s.hack_performed, 0);         if (hp) lines.push('<span class="ticked">&#10003; Hack Bonus +' + hp + '</span>');
+  const ci = cnt(s.counter_intelligence); if (ci) lines.push('<span class="ticked">&#10003; Find Spy +' + (ci*20) + '</span>');
+  const co = cnt(s.courier);              if (co) lines.push('<span class="ticked">&#10003; Steal Manifesto +' + (co*25) + '</span>');
+  const va = cnt(s.vault);                if (va) lines.push('<span class="ticked">&#10003; Protect Vault +' + (va*30) + '</span>');
+  const ap = cnt(s.asset_protection);     if (ap) lines.push('<span class="ticked">&#10003; Protect Icon +' + (ap*15) + '</span>');
+  const ib = cnt(s.icon_stolen_bonus);    if (ib) lines.push('<span class="ticked">&#10003; Icon Bonus +' + (ib*10) + '</span>');
+  const tb = cnt(s.trial_bonus);          if (tb) lines.push('<span class="ticked">&#10003; Trial Bonus +' + (tb*10) + '</span>');
+  const tp = cnt(s.trial_penalty);        if (tp) lines.push('<span style="color:var(--red-bright)">&#9888; Trial Penalty &minus;' + (tp*5) + '</span>');
+  const hp = cnt(s.hack_performed);       if (hp) lines.push('<span class="ticked">&#10003; Hack Bonus +' + (hp*20) + '</span>');
   const pc = PERSONAL_KEYS.filter(p => s[p.key]).length;
   if (pc > 0) lines.push('<span class="ticked">&#10003; Personal Missions +' + (pc*10) + '</span>');
   const disc = parseInt(s.discretionary) || 0;
@@ -1192,14 +1199,14 @@ function renderScoreTable() {
     const name = (nationsCache[n] && nationsCache[n].name) ? nationsCache[n].name : NATION_DISPLAY[n];
     return '<tr>'
       + '<td>' + esc(name) + '</td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.counter_intelligence, 20) + '" onchange="sc(\'' + n + '\',\'counter_intelligence\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.courier,              25) + '" onchange="sc(\'' + n + '\',\'courier\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.vault,                30) + '" onchange="sc(\'' + n + '\',\'vault\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.asset_protection,     15) + '" onchange="sc(\'' + n + '\',\'asset_protection\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.icon_stolen_bonus,     0) + '" onchange="sc(\'' + n + '\',\'icon_stolen_bonus\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.trial_bonus,           0) + '" onchange="sc(\'' + n + '\',\'trial_bonus\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.trial_penalty,         0) + '" onchange="sc(\'' + n + '\',\'trial_penalty\',parseInt(this.value)||0)"/></td>'
-      + '<td><input type="number" min="0" value="' + coerce(s.hack_performed,        0) + '" onchange="sc(\'' + n + '\',\'hack_performed\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.counter_intelligence) + '" onchange="sc(\'' + n + '\',\'counter_intelligence\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.courier)              + '" onchange="sc(\'' + n + '\',\'courier\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.vault)                + '" onchange="sc(\'' + n + '\',\'vault\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.asset_protection)     + '" onchange="sc(\'' + n + '\',\'asset_protection\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.icon_stolen_bonus)    + '" onchange="sc(\'' + n + '\',\'icon_stolen_bonus\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.trial_bonus)          + '" onchange="sc(\'' + n + '\',\'trial_bonus\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.trial_penalty)        + '" onchange="sc(\'' + n + '\',\'trial_penalty\',parseInt(this.value)||0)"/></td>'
+      + '<td><input type="number" min="0" value="' + cnt(s.hack_performed)       + '" onchange="sc(\'' + n + '\',\'hack_performed\',parseInt(this.value)||0)"/></td>'
       + '<td><textarea onchange="sc(\'' + n + '\',\'notes\',this.value)">' + esc(s.notes||'') + '</textarea></td>'
       + '</tr>';
   }).join('');
