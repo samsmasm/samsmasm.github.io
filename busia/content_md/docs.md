@@ -57,16 +57,34 @@ You can rely on primary, secondary, or both. All-secondary IAs are perfectly acc
 
 **Forgetting to label them.** Each document must be labelled clearly in the appendix (Document 1, Document 2...) and referenced by that label in the commentary.
 
-## How to plan your document set
+## Document Treasure Hunt
 
-Before you collect anything, fill in this planning table. It forces you to think about what each document will actually give you.
+You are not finalising your document set here. The goal is to build a provisional list of candidates so you have more than enough to choose from later. Aim to find at least one document for each target below. Write the source, date, and a one-sentence note on what it contains.
 
-| # | Type (primary/secondary) | What it will provide | Got it? |
-|---|--------------------------|---------------------|---------|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
+*Your provisional research question:* ___________________________________________
+
+**Target 1: A news article**
+A report from a reputable outlet covering something that has happened to or around your business recently.
+
+**Target 2: Company-produced document (not financial statements)**
+Something directly from the business: annual report narrative, sustainability report, investor presentation, or press release.
+
+**Target 3: Financial statements**
+Income statement, balance sheet, or cash flow statement. Listed companies publish these publicly. For private companies, look for reported figures in databases or news coverage.
+
+**Target 4: Numbers someone else has given about this company**
+External figures from an analyst report, market research data, consumer survey results, or a ranking that includes your company.
+
+**Target 5: Industry or market-level source**
+A market research report, trade association data, industry overview, or competitor analysis that gives context for the company's position and decisions.
+
+**Target 6: Two documents that show things in a different light**
+These should complicate the picture. Find sources that raise concerns, challenges, or perspectives that contradict or sit in tension with your other evidence.
+
+**Target 7: A source from outside your country**
+A source from a different country or market, to test whether your research question is locally specific or part of a wider pattern.
+
+**Target 8: Other documents that do not fit the above**
+Government regulations, NGO reports, academic studies, court documents, staff review platforms, or interview/podcast transcripts. Anything that gives your IA an angle others will not have.
 
 > **The documents are your evidence, not your IA.** They go in the appendix. Your job in the commentary is to use them - reference specific data, quote key statements, and build analysis from what they show.
