@@ -17,49 +17,117 @@
   </div>
 
   <div class="login-form-container">
-    <form class="login-form" id="login-form" onsubmit="handleLogin(event)">
+    <div class="login-form">
       <div class="login-form-title">Welcome back</div>
       <div class="login-form-sub" id="login-form-sub">Sign in to continue your revision.</div>
 
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" placeholder="Enter your username" autocomplete="username" required>
+      <!-- Username/password form -->
+      <div id="username-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Enter your username" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
+        </div>
+        <button class="btn-primary" onclick="handleUsernameLogin()">Log in</button>
       </div>
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
-      </div>
+      <div class="login-divider">or</div>
 
-      <button type="submit" class="btn-primary">Log in</button>
+      <button class="btn-google" id="google-btn" onclick="handleGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+        Sign in with Google
+      </button>
+
       <div class="login-error" id="login-error"></div>
-    </form>
+    </div>
   </div>
 </div>
 
-<script src="js/app.js"></script>
-<script>
+<script type="module">
+  import { loginWithUsername, loginWithGoogle, onAuthChange, getDisplayName } from './js/firebase.js';
+  import { initTheme } from './js/app.js';
+
   initTheme();
 
-  // If already logged in, show a continue link rather than auto-redirecting
-  const existingUser = getCurrentUser();
-  if (existingUser) {
-    const sub = document.getElementById('login-form-sub');
-    sub.innerHTML = `Already signed in as <strong>${existingUser.username}</strong>. <a href="dashboard.html" style="color:var(--primary);font-weight:800;">Go to dashboard →</a>`;
-  }
+  // If already signed in, go straight to dashboard
+  onAuthChange(user => {
+    if (user) window.location.replace('dashboard.html');
+  });
 
-  function handleLogin(e) {
-    e.preventDefault();
+  window.handleUsernameLogin = async function() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
     const errorEl = document.getElementById('login-error');
-
-    if (login(username, password)) {
-      window.location.href = 'dashboard.html';
-    } else {
+    errorEl.textContent = '';
+    if (!username || !password) { errorEl.textContent = 'Please enter your username and password.'; return; }
+    try {
+      await loginWithUsername(username, password);
+      // onAuthChange will redirect
+    } catch(e) {
       errorEl.textContent = 'Incorrect username or password.';
     }
-  }
+  };
+
+  window.handleGoogleLogin = async function() {
+    const errorEl = document.getElementById('login-error');
+    errorEl.textContent = '';
+    try {
+      await loginWithGoogle();
+      // onAuthChange will redirect
+    } catch(e) {
+      errorEl.textContent = 'Google sign-in failed. Please try again.';
+    }
+  };
+
+  // Allow Enter key on password field
+  document.getElementById('password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.handleUsernameLogin();
+  });
 </script>
+
+<style>
+  .login-divider {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin: 16px 0;
+    position: relative;
+  }
+  .login-divider::before, .login-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 42%;
+    height: 1px;
+    background: var(--border);
+  }
+  .login-divider::before { left: 0; }
+  .login-divider::after { right: 0; }
+
+  .btn-google {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .btn-google:hover {
+    border-color: #4285F4;
+    background: rgba(66,133,244,0.05);
+  }
+</style>
 </body>
 </html>

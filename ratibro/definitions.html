@@ -99,16 +99,30 @@
 
 <script src="js/app.js"></script>
 <script src="js/data.js"></script>
-<script>
+<script type="module">
+  import { onAuthChange, logoutUser, getDisplayName, isTeacher, getProgress, recordAttempt } from './js/firebase.js';
+
   initTheme();
-  const user = initSidebar('definitions');
+
+  let currentUser = null;
+  let progressCache = {};
+
+  onAuthChange(async user => {
+    if (!user) { window.location.replace('index.html'); return; }
+    currentUser = user;
+    document.getElementById('sidebar-container').innerHTML =
+      buildSidebar('definitions', getDisplayName(user), isTeacher(user));
+    updateThemeToggle();
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+    progressCache = await getProgress(user.uid);
+  });
 
   let selectedCount = 10;
   let sessionSkills = [];
   let currentIndex = 0;
   let sessionResults = []; // { skillId, rating }
 
-  function selectCount(n) {
+  window.selectCount = function(n) {
     selectedCount = n;
     document.querySelectorAll('.count-btn').forEach(btn => {
       btn.classList.toggle('selected', parseInt(btn.textContent) === n);
@@ -117,7 +131,7 @@
 
   // Pick skills: prioritise untested, then lowest rated, then random
   function pickSkills(count) {
-    const progress = getProgress(user.username);
+    const progress = progressCache;
 
     const scored = ALL_SKILLS
       .filter(s => s.definition && s.definition !== '[PLACEHOLDER]')
@@ -133,7 +147,7 @@
     return scored.slice(0, count).map(x => x.skill);
   }
 
-  function startSession() {
+  window.startSession = function() {
     sessionSkills = pickSkills(selectedCount);
     if (sessionSkills.length === 0) {
       alert('No definitions available yet — placeholders need to be filled in first!');
@@ -166,7 +180,7 @@
     document.querySelector('.main-content').scrollTop = 0;
   }
 
-  function revealAnswer() {
+  window.revealAnswer = function() {
     const skill = sessionSkills[currentIndex];
     document.getElementById('def-answer-text').textContent = skill.definition;
     document.getElementById('def-answer').classList.add('visible');
@@ -175,7 +189,7 @@
     document.getElementById('rating-panel').classList.add('visible');
   }
 
-  function skipQuestion() {
+  window.skipQuestion = function() {
     // Record as unrated (no rating saved) and advance
     currentIndex++;
     if (currentIndex >= sessionSkills.length) {
@@ -185,9 +199,9 @@
     }
   }
 
-  function submitRating(rating) {
+  window.submitRating = async function(rating) {
     const skill = sessionSkills[currentIndex];
-    recordAttempt(user.username, skill.id, rating);
+    if (currentUser) await recordAttempt(currentUser.uid, skill.id, rating);
     sessionResults.push({ skillId: skill.id, rating });
 
     currentIndex++;
@@ -227,11 +241,11 @@
     }).join('');
   }
 
-  function goToDashboard() {
+  window.goToDashboard = function() {
     window.location.href = 'dashboard.html';
   }
 
-  function restartSetup() {
+  window.restartSetup = function() {
     document.getElementById('summary-screen').classList.add('hidden');
     document.getElementById('setup-screen').classList.remove('hidden');
   }

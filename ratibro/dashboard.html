@@ -16,41 +16,57 @@
       <div class="page-title" id="greeting">Skills Dashboard</div>
       <div class="page-subtitle">Rate yourself on each topic. Your history is tracked over time.</div>
     </div>
-
     <div class="stats-row" id="stats-row"></div>
-
     <div id="units-container"></div>
   </main>
 </div>
 
 <script src="js/app.js"></script>
 <script src="js/data.js"></script>
-<script>
+<script type="module">
+  import { onAuthChange, logoutUser, getDisplayName, isTeacher, getProgress, recordAttempt } from './js/firebase.js';
+
   initTheme();
-  const user = initSidebar('dashboard');
-  if (!user) { /* requireAuth already redirected — stop here */ }
-  else {
 
-  // Greeting
-  const hour = new Date().getHours();
-  const tod = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
-  document.getElementById('greeting').textContent = `Good ${tod}, ${user.username}`;
+  let currentUser = null;
+  let progressCache = {};
 
-  // Compute stats
-  function computeStats() {
-    const progress = getProgress(user.username);
-    const total = ALL_SKILLS.length;
-    let rated = 0, totalAttempts = 0;
-    ALL_SKILLS.forEach(s => {
-      const p = progress[s.id];
-      if (p && p.ratings.length) { rated++; totalAttempts += p.attempts; }
-    });
-    const greens = ALL_SKILLS.filter(s => getLatestRating(user.username, s.id) === 4).length;
-    return { total, rated, totalAttempts, greens };
+  onAuthChange(async user => {
+    if (!user) { window.location.replace('index.html'); return; }
+    currentUser = user;
+
+    // Build sidebar
+    document.getElementById('sidebar-container').innerHTML =
+      buildSidebar('dashboard', getDisplayName(user), isTeacher(user));
+    updateThemeToggle();
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+
+    // Greeting
+    const hour = new Date().getHours();
+    const tod = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+    document.getElementById('greeting').textContent = `Good ${tod}, ${getDisplayName(user)}`;
+
+    // Load progress then render
+    progressCache = await getProgress(user.uid);
+    renderStats();
+    renderUnits();
+  });
+
+  function getLocal(skillId) {
+    return progressCache[skillId] || { ratings: [], attempts: 0 };
   }
 
   function renderStats() {
-    const { total, rated, totalAttempts, greens } = computeStats();
+    const total = ALL_SKILLS.length;
+    let rated = 0, totalAttempts = 0, greens = 0;
+    ALL_SKILLS.forEach(s => {
+      const p = getLocal(s.id);
+      if (p.ratings.length) {
+        rated++;
+        totalAttempts += p.attempts;
+        if (p.ratings[p.ratings.length - 1].rating === 4) greens++;
+      }
+    });
     document.getElementById('stats-row').innerHTML = `
       <div class="stat-card">
         <div class="stat-value">${rated}/${total}</div>
@@ -68,36 +84,31 @@
   }
 
   function renderUnits() {
-    const container = document.getElementById('units-container');
-    container.innerHTML = TOPICS.map(unit => {
+    document.getElementById('units-container').innerHTML = TOPICS.map(unit => {
       const topicRows = unit.skills.map(skill => {
-        const p = getSkillProgress(user.username, skill.id);
+        const p = getLocal(skill.id);
         const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
         const recentDots = p.ratings.slice(-8);
 
-        const ratingBtns = [1, 2, 3, 4].map(r => `
-          <button class="rating-btn${latest === r ? ' selected' : ''}"
-            data-r="${r}"
+        const ratingBtns = [1,2,3,4].map(r => `
+          <button class="rating-btn${latest === r ? ' selected' : ''}" data-r="${r}"
             title="${RATING_MEANINGS[r]}"
             onclick="rateSkill('${skill.id}', ${r}, this)">
-          </button>
-        `).join('');
+          </button>`).join('');
 
-        const historyDots = recentDots.map(e =>
-          `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}"></span>`
-        ).join('');
+        const historyDots = recentDots.length
+          ? recentDots.map(e => `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}"></span>`).join('')
+          : '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>';
 
         return `
           <div class="topic-row" id="row-${skill.id}">
             <div class="topic-name">
-              ${skill.name}
-              ${skill.hl ? '<span class="hl-tag">HL</span>' : ''}
+              ${skill.name}${skill.hl ? '<span class="hl-tag">HL</span>' : ''}
             </div>
-            <div class="history-dots">${historyDots || '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>'}</div>
+            <div class="history-dots">${historyDots}</div>
             <div class="rating-btns">${ratingBtns}</div>
             <div class="attempt-count">${p.attempts > 0 ? p.attempts + '×' : '—'}</div>
-          </div>
-        `;
+          </div>`;
       }).join('');
 
       return `
@@ -109,53 +120,45 @@
             <span class="unit-chevron">▼</span>
           </div>
           <div class="unit-topics">${topicRows}</div>
-        </div>
-      `;
+        </div>`;
     }).join('');
   }
 
-  function toggleUnit(unitId) {
-    const el = document.getElementById('unit-' + unitId.replace('.', '-'));
-    el.classList.toggle('collapsed');
-  }
+  window.toggleUnit = function(unitId) {
+    document.getElementById('unit-' + unitId.replace('.', '-')).classList.toggle('collapsed');
+  };
 
-  function rateSkill(skillId, rating, btn) {
-    recordAttempt(user.username, skillId, rating);
+  window.rateSkill = async function(skillId, rating, btn) {
+    if (!currentUser) return;
 
-    // Update all rating buttons in this row
+    // Update local cache immediately for snappy UI
+    if (!progressCache[skillId]) progressCache[skillId] = { ratings: [], attempts: 0 };
+    progressCache[skillId].ratings.push({ rating, timestamp: Date.now() });
+    progressCache[skillId].attempts++;
+
+    // Update UI
     const row = btn.closest('.topic-row');
-    row.querySelectorAll('.rating-btn').forEach(b => {
-      b.classList.toggle('selected', parseInt(b.dataset.r) === rating);
-    });
+    row.querySelectorAll('.rating-btn').forEach(b =>
+      b.classList.toggle('selected', parseInt(b.dataset.r) === rating));
 
-    // Append a new history dot
     const dotsContainer = row.querySelector('.history-dots');
     const placeholder = dotsContainer.querySelector('span[style]');
     if (placeholder) placeholder.remove();
-
+    const existingDots = dotsContainer.querySelectorAll('.history-dot');
+    if (existingDots.length >= 8) existingDots[0].remove();
     const dot = document.createElement('span');
     dot.className = 'history-dot';
     dot.dataset.r = rating;
     dot.title = RATING_MEANINGS[rating];
-    // Keep only last 8 dots visible
-    const existingDots = dotsContainer.querySelectorAll('.history-dot');
-    if (existingDots.length >= 8) existingDots[0].remove();
     dotsContainer.appendChild(dot);
 
-    // Update attempt count
-    const p = getSkillProgress(user.username, skillId);
-    row.querySelector('.attempt-count').textContent = p.attempts + '×';
-
-    // Update stats
+    row.querySelector('.attempt-count').textContent = progressCache[skillId].attempts + '×';
     renderStats();
-
     showToast(`Rated: ${RATING_MEANINGS[rating]}`);
-  }
 
-  renderStats();
-  renderUnits();
-
-  } // end if (user)
+    // Save to Firestore in background
+    await recordAttempt(currentUser.uid, skillId, rating);
+  };
 </script>
 </body>
 </html>

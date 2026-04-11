@@ -70,84 +70,75 @@
 
 <script src="js/app.js"></script>
 <script src="js/data.js"></script>
-<script>
+<script type="module">
+  import { onAuthChange, logoutUser, getDisplayName, isTeacher, getAllUsers, setRealName } from './js/firebase.js';
+
   initTheme();
-  const user = initSidebar('teacher');
 
-  if (!user || !user.isTeacher) {
-    document.getElementById('access-denied').classList.remove('hidden');
-  } else {
-    document.getElementById('teacher-content').classList.remove('hidden');
-    loadStudents();
-  }
+  onAuthChange(async user => {
+    if (!user) { window.location.replace('index.html'); return; }
+    document.getElementById('sidebar-container').innerHTML =
+      buildSidebar('teacher', getDisplayName(user), isTeacher(user));
+    updateThemeToggle();
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
 
-  function switchTab(tab, btn) {
+    if (!isTeacher(user)) {
+      document.getElementById('access-denied').classList.remove('hidden');
+    } else {
+      document.getElementById('teacher-content').classList.remove('hidden');
+      await loadStudents();
+    }
+  });
+
+  window.switchTab = function(tab, btn) {
     document.querySelectorAll('.teacher-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-students').classList.add('hidden');
-    document.getElementById('tab-class').classList.add('hidden');
-    document.getElementById('tab-accounts').classList.add('hidden');
+    ['students','class','accounts'].forEach(t =>
+      document.getElementById('tab-' + t).classList.add('hidden'));
     document.getElementById('tab-' + tab).classList.remove('hidden');
-  }
+  };
 
-  function loadStudents() {
-    // Find all student progress records in localStorage
-    const students = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith('ratibro_progress_')) {
-        const username = key.replace('ratibro_progress_', '');
-        const progress = getProgress(username);
-        const realName = localStorage.getItem(`ratibro_realname_${username}`) || '';
-
-        let rated = 0, greens = 0, attempts = 0;
-        ALL_SKILLS.forEach(s => {
-          const p = progress[s.id];
-          if (p && p.ratings.length) {
-            rated++;
-            attempts += p.attempts;
-            if (p.ratings[p.ratings.length - 1].rating === 4) greens++;
-          }
-        });
-
-        students.push({ username, realName, rated, greens, attempts });
-      }
-    }
-
+  async function loadStudents() {
+    const users = await getAllUsers();
     const tbody = document.getElementById('students-tbody');
-    if (students.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No student data yet.</td></tr>`;
+
+    if (users.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No student data yet.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = students.map(s => `
-      <tr>
-        <td><strong>${s.username}</strong></td>
-        <td>
-          <input type="text" value="${s.realName}"
-            placeholder="Add real name..."
-            style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface-2);color:var(--text);font-size:0.8rem;font-weight:600;width:140px;outline:none;"
-            onchange="saveRealName('${s.username}', this.value)">
-        </td>
-        <td>${s.rated} / ${ALL_SKILLS.length}</td>
-        <td style="color:var(--rate-green);font-weight:800;">${s.greens}</td>
-        <td>${s.attempts}</td>
-        <td>
-          <button class="btn-secondary" style="padding:4px 10px;font-size:0.8rem;"
-            onclick="viewStudent('${s.username}')">View</button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = users.map(u => {
+      const progress = u.progress || {};
+      let rated = 0, greens = 0, attempts = 0;
+      ALL_SKILLS.forEach(s => {
+        const p = progress[s.id];
+        if (p && p.ratings && p.ratings.length) {
+          rated++;
+          attempts += p.attempts || 0;
+          if (p.ratings[p.ratings.length - 1].rating === 4) greens++;
+        }
+      });
+      const name = u.realName || u.displayName || u.email || u.uid;
+      return `
+        <tr>
+          <td><strong>${name}</strong></td>
+          <td>
+            <input type="text" value="${u.realName || ''}"
+              placeholder="Add real name..."
+              style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface-2);color:var(--text);font-size:0.8rem;font-weight:600;width:160px;outline:none;"
+              onchange="saveRealName('${u.uid}', this.value)">
+          </td>
+          <td>${rated} / ${ALL_SKILLS.length}</td>
+          <td style="color:var(--rate-green);font-weight:800;">${greens}</td>
+          <td>${attempts}</td>
+        </tr>`;
+    }).join('');
   }
 
-  function saveRealName(username, name) {
-    localStorage.setItem(`ratibro_realname_${username}`, name);
+  window.saveRealName = async function(uid, name) {
+    await setRealName(uid, name);
     showToast('Name saved');
-  }
-
-  function viewStudent(username) {
-    showToast(`Viewing ${username} — individual student view coming soon`);
-  }
+  };
 </script>
 </body>
 </html>

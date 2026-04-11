@@ -1,93 +1,12 @@
-// RatIBro — shared app logic: auth, sidebar, theme, storage
-
-// === Mock Auth (localStorage-based for prototype) ===
-// In production this will be replaced with Firebase Auth
-
-const TEACHER_USERNAME = 'teacher';
-const TEACHER_PASSWORD = 'teacher123';
-const STUDENT_PASSWORD = 'student123'; // all students share this for prototype
-
-function login(username, password) {
-  const isTeacher = username === TEACHER_USERNAME && password === TEACHER_PASSWORD;
-  const isStudent = username !== TEACHER_USERNAME && password === STUDENT_PASSWORD;
-  if (!isTeacher && !isStudent) return false;
-  const user = { username, isTeacher };
-  const userJson = JSON.stringify(user);
-  try { localStorage.setItem('ratibro_user', userJson); } catch(e) {}
-  window.name = userJson; // fallback for file:// protocol (persists across tab navigation)
-  return true;
-}
-
-function logout() {
-  try { localStorage.removeItem('ratibro_user'); } catch(e) {}
-  window.name = '';
-  window.location.replace('index.html');
-}
-
-function getCurrentUser() {
-  try {
-    const raw = localStorage.getItem('ratibro_user') || window.name;
-    if (!raw) return null;
-    const user = JSON.parse(raw);
-    if (user && user.username) {
-      // Keep localStorage in sync
-      try { localStorage.setItem('ratibro_user', JSON.stringify(user)); } catch(e) {}
-      return user;
-    }
-    return null;
-  } catch(e) {
-    return null;
-  }
-}
-
-function requireAuth(redirect = 'index.html') {
-  const user = getCurrentUser();
-  if (!user) { window.location.replace(redirect); return null; }
-  return user;
-}
-
-// === Progress Storage ===
-// Stored as: ratibro_progress_{username} = { skillId: { ratings: [1,2,3], attempts: 5 } }
-
-function getProgress(username) {
-  try {
-    const raw = localStorage.getItem(`ratibro_progress_${username}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch(e) { return {}; }
-}
-
-function saveProgress(username, progress) {
-  try {
-    localStorage.setItem(`ratibro_progress_${username}`, JSON.stringify(progress));
-  } catch(e) {}
-}
-
-function recordAttempt(username, skillId, rating) {
-  const progress = getProgress(username);
-  if (!progress[skillId]) progress[skillId] = { ratings: [], attempts: 0 };
-  progress[skillId].ratings.push({ rating, timestamp: Date.now() });
-  progress[skillId].attempts++;
-  saveProgress(username, progress);
-}
-
-function getSkillProgress(username, skillId) {
-  const progress = getProgress(username);
-  return progress[skillId] || { ratings: [], attempts: 0 };
-}
-
-function getLatestRating(username, skillId) {
-  const p = getSkillProgress(username, skillId);
-  if (!p.ratings.length) return null;
-  return p.ratings[p.ratings.length - 1].rating;
-}
+// RatIBro — shared app logic: theme, sidebar, toast, SVG icons
 
 // === Theme ===
 function getTheme() {
-  return localStorage.getItem('ratibro_theme') || 'light';
+  try { return localStorage.getItem('ratibro_theme') || 'light'; } catch(e) { return 'light'; }
 }
 
 function setTheme(theme) {
-  localStorage.setItem('ratibro_theme', theme);
+  try { localStorage.setItem('ratibro_theme', theme); } catch(e) {}
   document.documentElement.setAttribute('data-theme', theme);
 }
 
@@ -109,13 +28,12 @@ function updateThemeToggle() {
 }
 
 // === Sidebar ===
-function buildSidebar(activePage, user) {
-  const isTeacher = user?.isTeacher;
+function buildSidebar(activePage, displayName, isTeacher) {
   const nav = [
-    { id: 'dashboard', label: 'Dashboard', href: 'dashboard.html', icon: svgGrid() },
-    { id: 'definitions', label: 'Definitions', href: 'definitions.html', icon: svgBook() },
+    { id: 'dashboard',    label: 'Dashboard',    href: 'dashboard.html',    icon: svgGrid() },
+    { id: 'definitions',  label: 'Definitions',  href: 'definitions.html',  icon: svgBook() },
     { id: 'calculations', label: 'Calculations', href: 'calculations.html', icon: svgCalc() },
-    { id: 'statements', label: 'Statements', href: 'statements.html', icon: svgDoc() },
+    { id: 'statements',   label: 'Statements',   href: 'statements.html',   icon: svgDoc() },
   ];
   if (isTeacher) {
     nav.push({ id: 'teacher', label: 'Teacher panel', href: 'teacher.html', icon: svgTeacher() });
@@ -123,8 +41,7 @@ function buildSidebar(activePage, user) {
 
   const navHtml = nav.map(item => `
     <a href="${item.href}" class="nav-item${activePage === item.id ? ' active' : ''}">
-      ${item.icon}
-      <span>${item.label}</span>
+      ${item.icon}<span>${item.label}</span>
     </a>
   `).join('');
 
@@ -141,26 +58,14 @@ function buildSidebar(activePage, user) {
           <span class="theme-label">Dark mode</span>
         </button>
         <div class="sidebar-user">
-          <span class="sidebar-username">${user?.username || ''}</span>
-          <button class="nav-item logout-btn" onclick="logout()">
-            ${svgLogout()}
-            <span>Log out</span>
+          <span class="sidebar-username">${displayName}</span>
+          <button class="nav-item logout-btn" id="logout-btn">
+            ${svgLogout()}<span>Log out</span>
           </button>
         </div>
       </div>
     </aside>
   `;
-}
-
-function initSidebar(activePage) {
-  const user = requireAuth();
-  if (!user) return null;
-  const container = document.getElementById('sidebar-container');
-  if (container) {
-    container.innerHTML = buildSidebar(activePage, user);
-    updateThemeToggle();
-  }
-  return user;
 }
 
 // === Toast ===
@@ -174,8 +79,7 @@ function showToast(message) {
   setTimeout(() => toast.remove(), 2700);
 }
 
-// === Rating colour helpers ===
-const RATING_LABELS = { 1: 'Red', 2: 'Amber', 3: 'Yellow', 4: 'Green' };
+// === Rating helpers ===
 const RATING_MEANINGS = { 1: "Don't know it", 2: 'Shaky', 3: 'Getting there', 4: 'Got it' };
 
 // === SVG Icons ===

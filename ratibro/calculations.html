@@ -101,9 +101,21 @@
 
 <script src="js/app.js"></script>
 <script src="js/data.js"></script>
-<script>
+<script type="module">
+  import { onAuthChange, logoutUser, getDisplayName, isTeacher, recordAttempt } from './js/firebase.js';
+
   initTheme();
-  const user = initSidebar('calculations');
+
+  let currentUser = null;
+
+  onAuthChange(user => {
+    if (!user) { window.location.replace('index.html'); return; }
+    currentUser = user;
+    document.getElementById('sidebar-container').innerHTML =
+      buildSidebar('calculations', getDisplayName(user), isTeacher(user));
+    updateThemeToggle();
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+  });
 
   let selectedCount = 10;
   let sessionQuestions = [];
@@ -112,7 +124,7 @@
 
   const FORMULA_KEYS = Object.keys(FORMULAS);
 
-  function selectCount(n) {
+  window.selectCount = function(n) {
     selectedCount = n;
     document.querySelectorAll('.count-btn').forEach(btn => {
       btn.classList.toggle('selected', parseInt(btn.textContent) === n);
@@ -128,7 +140,7 @@
     return questions;
   }
 
-  function startSession() {
+  window.startSession = function() {
     sessionQuestions = pickQuestions(selectedCount);
     currentIndex = 0;
     sessionResults = [];
@@ -173,7 +185,7 @@
     });
   }
 
-  function revealCalcAnswer() {
+  window.revealCalcAnswer = function() {
     const q = sessionQuestions[currentIndex];
     const answer = q.answer;
     const unit = q.formula.unit;
@@ -194,15 +206,14 @@
     document.getElementById('rating-panel').classList.add('visible');
   }
 
-  function skipCalc() {
+  window.skipCalc = function() {
     currentIndex++;
     if (currentIndex >= sessionQuestions.length) showSummary();
     else loadQuestion();
   }
 
-  function submitRating(rating) {
+  window.submitRating = async function(rating) {
     const q = sessionQuestions[currentIndex];
-    // Find the skill id that matches this formula
     const skillMap = {
       'gross-profit-margin': 'gross-profit-margin',
       'profit-margin': 'profit-margin',
@@ -217,7 +228,7 @@
       'gearing': 'gearing-ratio',
     };
     const skillId = skillMap[q.formulaKey];
-    if (skillId) recordAttempt(user.username, skillId, rating);
+    if (skillId && currentUser) await recordAttempt(currentUser.uid, skillId, rating);
     sessionResults.push({ skillId, rating });
 
     currentIndex++;
@@ -252,7 +263,7 @@
     }).join('');
   }
 
-  function restartSetup() {
+  window.restartSetup = function() {
     document.getElementById('summary-screen').classList.add('hidden');
     document.getElementById('setup-screen').classList.remove('hidden');
   }
