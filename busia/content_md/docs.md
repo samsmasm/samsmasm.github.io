@@ -88,3 +88,5 @@ A source from a different country or market, to test whether your research quest
 Government regulations, NGO reports, academic studies, court documents, staff review platforms, or interview/podcast transcripts. Anything that gives your IA an angle others will not have.
 
 > **The documents are your evidence, not your IA.** They go in the appendix. Your job in the commentary is to use them - reference specific data, quote key statements, and build analysis from what they show.
+
+Next: [Sketching Ideas](../sketching/)

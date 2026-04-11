@@ -4,6 +4,7 @@ const STAGES = [
   { slug: 'rq',         label: 'Find Your RQ',      num: 'F' },
   { slug: 'concept',    label: 'Key Concept',       num: 'K' },
   { slug: 'docs',       label: 'Supporting Docs',   num: 'D' },
+  { slug: 'sketching',  label: 'Sketching Ideas',    num: 'I' },
   { slug: 'structure',  label: 'Structure',          num: 'S' },
   { slug: 'analysis',   label: 'Analysis & Writing', num: 'A' },
   { slug: 'conclusion', label: 'Conclusion',         num: 'C' },
