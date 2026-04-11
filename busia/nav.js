@@ -12,6 +12,7 @@ const STAGES = [
   { slug: 'check',      label: 'Check Your Draft',  num: '✓' },
   { slug: 'sample',     label: 'Sample IA',         num: 'S' },
   { slug: 'faq',        label: 'FAQ',               num: '?' },
+  { slug: 'team',       label: 'Team Work',         num: 'T' },
 ];
 
 function getCurrentSlug() {
