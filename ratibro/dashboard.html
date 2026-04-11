@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — RatIBro</title>
+  <link rel="icon" type="image/png" href="ratibrosm.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div class="page-title" id="greeting">Skills Dashboard</div>
+      <div class="page-subtitle">Rate yourself on each topic. Your history is tracked over time.</div>
+    </div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div id="units-container"></div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/data.js"></script>
+<script>
+  initTheme();
+  const user = initSidebar('dashboard');
+  if (!user) { /* requireAuth already redirected — stop here */ }
+  else {
+
+  // Greeting
+  const hour = new Date().getHours();
+  const tod = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+  document.getElementById('greeting').textContent = `Good ${tod}, ${user.username}`;
+
+  // Compute stats
+  function computeStats() {
+    const progress = getProgress(user.username);
+    const total = ALL_SKILLS.length;
+    let rated = 0, totalAttempts = 0;
+    ALL_SKILLS.forEach(s => {
+      const p = progress[s.id];
+      if (p && p.ratings.length) { rated++; totalAttempts += p.attempts; }
+    });
+    const greens = ALL_SKILLS.filter(s => getLatestRating(user.username, s.id) === 4).length;
+    return { total, rated, totalAttempts, greens };
+  }
+
+  function renderStats() {
+    const { total, rated, totalAttempts, greens } = computeStats();
+    document.getElementById('stats-row').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-value">${rated}/${total}</div>
+        <div class="stat-label">Topics rated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${totalAttempts}</div>
+        <div class="stat-label">Practice attempts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--rate-green)">${greens}</div>
+        <div class="stat-label">Topics in the green</div>
+      </div>
+    `;
+  }
+
+  function renderUnits() {
+    const container = document.getElementById('units-container');
+    container.innerHTML = TOPICS.map(unit => {
+      const topicRows = unit.skills.map(skill => {
+        const p = getSkillProgress(user.username, skill.id);
+        const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
+        const recentDots = p.ratings.slice(-8);
+
+        const ratingBtns = [1, 2, 3, 4].map(r => `
+          <button class="rating-btn${latest === r ? ' selected' : ''}"
+            data-r="${r}"
+            title="${RATING_MEANINGS[r]}"
+            onclick="rateSkill('${skill.id}', ${r}, this)">
+          </button>
+        `).join('');
+
+        const historyDots = recentDots.map(e =>
+          `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}"></span>`
+        ).join('');
+
+        return `
+          <div class="topic-row" id="row-${skill.id}">
+            <div class="topic-name">
+              ${skill.name}
+              ${skill.hl ? '<span class="hl-tag">HL</span>' : ''}
+            </div>
+            <div class="history-dots">${historyDots || '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>'}</div>
+            <div class="rating-btns">${ratingBtns}</div>
+            <div class="attempt-count">${p.attempts > 0 ? p.attempts + '×' : '—'}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="unit-section" id="unit-${unit.unit.replace('.', '-')}">
+          <div class="unit-header" onclick="toggleUnit('${unit.unit}')">
+            <span class="unit-badge">${unit.unit}</span>
+            <span class="unit-name">${unit.unitName}</span>
+            <span class="unit-count">${unit.skills.length} topics</span>
+            <span class="unit-chevron">▼</span>
+          </div>
+          <div class="unit-topics">${topicRows}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function toggleUnit(unitId) {
+    const el = document.getElementById('unit-' + unitId.replace('.', '-'));
+    el.classList.toggle('collapsed');
+  }
+
+  function rateSkill(skillId, rating, btn) {
+    recordAttempt(user.username, skillId, rating);
+
+    // Update all rating buttons in this row
+    const row = btn.closest('.topic-row');
+    row.querySelectorAll('.rating-btn').forEach(b => {
+      b.classList.toggle('selected', parseInt(b.dataset.r) === rating);
+    });
+
+    // Append a new history dot
+    const dotsContainer = row.querySelector('.history-dots');
+    const placeholder = dotsContainer.querySelector('span[style]');
+    if (placeholder) placeholder.remove();
+
+    const dot = document.createElement('span');
+    dot.className = 'history-dot';
+    dot.dataset.r = rating;
+    dot.title = RATING_MEANINGS[rating];
+    // Keep only last 8 dots visible
+    const existingDots = dotsContainer.querySelectorAll('.history-dot');
+    if (existingDots.length >= 8) existingDots[0].remove();
+    dotsContainer.appendChild(dot);
+
+    // Update attempt count
+    const p = getSkillProgress(user.username, skillId);
+    row.querySelector('.attempt-count').textContent = p.attempts + '×';
+
+    // Update stats
+    renderStats();
+
+    showToast(`Rated: ${RATING_MEANINGS[rating]}`);
+  }
+
+  renderStats();
+  renderUnits();
+
+  } // end if (user)
+</script>
+</body>
+</html>

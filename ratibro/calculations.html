@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculations — RatIBro</title>
+  <link rel="icon" type="image/png" href="ratibrosm.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <!-- Setup screen -->
+    <div id="setup-screen" class="practice-setup">
+      <div class="page-title">Calculations</div>
+      <div class="practice-desc">
+        You'll be given a set of figures. Work out the answer by hand, then reveal and self-rate.
+      </div>
+      <div class="count-picker">
+        <button class="count-btn" onclick="selectCount(3)">3</button>
+        <button class="count-btn" onclick="selectCount(5)">5</button>
+        <button class="count-btn selected" onclick="selectCount(10)">10</button>
+      </div>
+      <button class="btn-primary" onclick="startSession()">Start session</button>
+    </div>
+
+    <!-- Session screen -->
+    <div id="session-screen" class="hidden">
+      <div class="def-session">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+
+        <div class="calc-question-card" id="calc-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div>
+              <div class="calc-formula-name" id="calc-name"></div>
+              <div class="calc-formula-str" id="calc-formula"></div>
+            </div>
+            <span class="text-muted" style="font-size:0.8rem;font-weight:700;" id="calc-counter"></span>
+          </div>
+
+          <div class="calc-inputs" id="calc-inputs"></div>
+
+          <div class="calc-answer-input-wrap">
+            <span class="calc-answer-label">Your answer:</span>
+            <input type="number" class="calc-answer-input" id="calc-answer-input" step="any" placeholder="e.g. 42.5">
+          </div>
+
+          <div class="def-actions">
+            <button class="btn-secondary" onclick="skipCalc()">Skip</button>
+            <button class="btn-secondary btn-reveal" id="calc-reveal-btn" onclick="revealCalcAnswer()">Reveal answer</button>
+          </div>
+
+          <div class="calc-correct-answer" id="calc-correct-answer">
+            <div class="calc-correct-label">Correct answer</div>
+            <div class="calc-correct-value" id="calc-correct-value"></div>
+          </div>
+        </div>
+
+        <div class="rating-panel" id="rating-panel">
+          <div class="rating-panel-q">How did you do?</div>
+          <div class="rating-options">
+            <button class="rating-option" data-r="1" onclick="submitRating(1)">
+              <span class="rating-emoji">😬</span>
+              Don't know it
+            </button>
+            <button class="rating-option" data-r="2" onclick="submitRating(2)">
+              <span class="rating-emoji">🤔</span>
+              Shaky
+            </button>
+            <button class="rating-option" data-r="3" onclick="submitRating(3)">
+              <span class="rating-emoji">😊</span>
+              Getting there
+            </button>
+            <button class="rating-option" data-r="4" onclick="submitRating(4)">
+              <span class="rating-emoji">🎉</span>
+              Got it
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary screen -->
+    <div id="summary-screen" class="hidden">
+      <div class="session-summary">
+        <div class="summary-title">Session complete!</div>
+        <div class="summary-sub" id="summary-sub"></div>
+        <div class="summary-bars" id="summary-bars"></div>
+        <div class="summary-actions">
+          <button class="btn-outline" onclick="window.location.href='dashboard.html'">View dashboard</button>
+          <button class="btn-primary" style="padding:11px 24px;width:auto;" onclick="restartSetup()">Go again</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/data.js"></script>
+<script>
+  initTheme();
+  const user = initSidebar('calculations');
+
+  let selectedCount = 10;
+  let sessionQuestions = [];
+  let currentIndex = 0;
+  let sessionResults = [];
+
+  const FORMULA_KEYS = Object.keys(FORMULAS);
+
+  function selectCount(n) {
+    selectedCount = n;
+    document.querySelectorAll('.count-btn').forEach(btn => {
+      btn.classList.toggle('selected', parseInt(btn.textContent) === n);
+    });
+  }
+
+  function pickQuestions(count) {
+    const questions = [];
+    for (let i = 0; i < count; i++) {
+      const key = FORMULA_KEYS[Math.floor(Math.random() * FORMULA_KEYS.length)];
+      questions.push(generateCalcQuestion(key));
+    }
+    return questions;
+  }
+
+  function startSession() {
+    sessionQuestions = pickQuestions(selectedCount);
+    currentIndex = 0;
+    sessionResults = [];
+    document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('session-screen').classList.remove('hidden');
+    loadQuestion();
+  }
+
+  function fmt(n) {
+    // Format as integer if whole, else 2dp
+    return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function loadQuestion() {
+    const q = sessionQuestions[currentIndex];
+    const total = sessionQuestions.length;
+
+    document.getElementById('progress-fill').style.width = (currentIndex / total * 100) + '%';
+    document.getElementById('calc-counter').textContent = `${currentIndex + 1} / ${total}`;
+    document.getElementById('calc-name').textContent = q.formula.name;
+    document.getElementById('calc-formula').textContent = q.formula.formula;
+    document.getElementById('calc-answer-input').value = '';
+    document.getElementById('calc-answer-input').disabled = false;
+    document.getElementById('calc-correct-answer').classList.remove('visible');
+    document.getElementById('rating-panel').classList.remove('visible');
+    document.getElementById('calc-reveal-btn').disabled = false;
+
+    const inputsHtml = q.formula.inputs.map(key => `
+      <div class="calc-input-row">
+        <div class="calc-input-label">${INPUT_LABELS[key]}</div>
+        <div class="calc-input-value">$${fmt(q.values[key])}${key === 'yearsOfUse' ? ' years' : ''}</div>
+      </div>
+    `).join('');
+    document.getElementById('calc-inputs').innerHTML = inputsHtml.replace(/\$(\d)* years/, '$1 years');
+
+    // Fix the year display (no $ prefix)
+    document.getElementById('calc-inputs').querySelectorAll('.calc-input-row').forEach((row, i) => {
+      const key = q.formula.inputs[i];
+      if (key === 'yearsOfUse') {
+        row.querySelector('.calc-input-value').textContent = fmt(q.values[key]) + ' years';
+      }
+    });
+  }
+
+  function revealCalcAnswer() {
+    const q = sessionQuestions[currentIndex];
+    const answer = q.answer;
+    const unit = q.formula.unit;
+
+    let display;
+    if (unit === ':1') {
+      display = answer.toFixed(2) + ':1';
+    } else if (unit === '%') {
+      display = answer.toFixed(1) + '%';
+    } else {
+      display = answer.toFixed(1) + unit;
+    }
+
+    document.getElementById('calc-correct-value').textContent = display;
+    document.getElementById('calc-correct-answer').classList.add('visible');
+    document.getElementById('calc-answer-input').disabled = true;
+    document.getElementById('calc-reveal-btn').disabled = true;
+    document.getElementById('rating-panel').classList.add('visible');
+  }
+
+  function skipCalc() {
+    currentIndex++;
+    if (currentIndex >= sessionQuestions.length) showSummary();
+    else loadQuestion();
+  }
+
+  function submitRating(rating) {
+    const q = sessionQuestions[currentIndex];
+    // Find the skill id that matches this formula
+    const skillMap = {
+      'gross-profit-margin': 'gross-profit-margin',
+      'profit-margin': 'profit-margin',
+      'roce': 'roce',
+      'current-ratio': 'current-ratio',
+      'acid-test': 'acid-test-ratio',
+      'arr': 'arr',
+      'stock-turnover-times': 'stock-turnover',
+      'stock-turnover-days': 'stock-turnover',
+      'debtor-days': 'debtor-days',
+      'creditor-days': 'creditor-days',
+      'gearing': 'gearing-ratio',
+    };
+    const skillId = skillMap[q.formulaKey];
+    if (skillId) recordAttempt(user.username, skillId, rating);
+    sessionResults.push({ skillId, rating });
+
+    currentIndex++;
+    document.getElementById('progress-fill').style.width = (currentIndex / sessionQuestions.length * 100) + '%';
+    if (currentIndex >= sessionQuestions.length) showSummary();
+    else loadQuestion();
+  }
+
+  function showSummary() {
+    document.getElementById('session-screen').classList.add('hidden');
+    document.getElementById('summary-screen').classList.remove('hidden');
+
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    sessionResults.forEach(r => counts[r.rating]++);
+    const total = sessionResults.length;
+    document.getElementById('summary-sub').textContent =
+      `You worked through ${total} calculation${total !== 1 ? 's' : ''}.`;
+
+    const maxCount = Math.max(...Object.values(counts), 1);
+    const labels = { 1: "Don't know", 2: 'Shaky', 3: 'Getting there', 4: 'Got it' };
+    const emojis = { 1: '😬', 2: '🤔', 3: '😊', 4: '🎉' };
+
+    document.getElementById('summary-bars').innerHTML = [1, 2, 3, 4].map(r => {
+      const h = Math.max((counts[r] / maxCount) * 100, counts[r] > 0 ? 12 : 4);
+      return `
+        <div class="summary-bar-col">
+          <div class="summary-bar-fill" data-r="${r}" style="height:${h}px"></div>
+          <div class="summary-bar-count">${emojis[r]} ${counts[r]}</div>
+          <div class="summary-bar-label" data-r="${r}">${labels[r]}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function restartSetup() {
+    document.getElementById('summary-screen').classList.add('hidden');
+    document.getElementById('setup-screen').classList.remove('hidden');
+  }
+</script>
+</body>
+</html>

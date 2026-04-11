@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Definitions — RatIBro</title>
+  <link rel="icon" type="image/png" href="ratibrosm.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <!-- Setup screen -->
+    <div id="setup-screen" class="practice-setup">
+      <div class="page-title">Definitions</div>
+      <div class="practice-desc">
+        Write your definition, then reveal the answer and rate yourself.<br>
+        Topics you haven't tried — or rated yourself low on — come up first.
+      </div>
+      <div class="count-picker">
+        <button class="count-btn" onclick="selectCount(3)">3</button>
+        <button class="count-btn" onclick="selectCount(5)">5</button>
+        <button class="count-btn selected" onclick="selectCount(10)">10</button>
+        <button class="count-btn" onclick="selectCount(15)">15</button>
+      </div>
+      <button class="btn-primary" id="start-btn" onclick="startSession()">Start session</button>
+    </div>
+
+    <!-- Session screen -->
+    <div id="session-screen" class="hidden">
+      <div class="def-session">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+
+        <div id="question-area">
+          <div class="def-card" id="def-card">
+            <div class="def-card-meta">
+              <span class="def-card-unit" id="def-unit"></span>
+              <span id="def-counter" class="text-muted" style="font-size:0.8rem;font-weight:700;"></span>
+            </div>
+            <div class="def-term" id="def-term"></div>
+            <textarea class="def-input" id="def-input" placeholder="Write your definition here..."></textarea>
+
+            <div class="def-actions">
+              <button class="btn-secondary" onclick="skipQuestion()">Skip</button>
+              <button class="btn-secondary btn-reveal" id="reveal-btn" onclick="revealAnswer()">Reveal answer</button>
+            </div>
+
+            <div class="def-answer" id="def-answer">
+              <div class="def-answer-label">Definition</div>
+              <div class="def-answer-text" id="def-answer-text"></div>
+            </div>
+          </div>
+
+          <div class="rating-panel" id="rating-panel">
+            <div class="rating-panel-q">How well did you know it?</div>
+            <div class="rating-options">
+              <button class="rating-option" data-r="1" onclick="submitRating(1)">
+                <span class="rating-emoji">😬</span>
+                Don't know it
+              </button>
+              <button class="rating-option" data-r="2" onclick="submitRating(2)">
+                <span class="rating-emoji">🤔</span>
+                Shaky
+              </button>
+              <button class="rating-option" data-r="3" onclick="submitRating(3)">
+                <span class="rating-emoji">😊</span>
+                Getting there
+              </button>
+              <button class="rating-option" data-r="4" onclick="submitRating(4)">
+                <span class="rating-emoji">🎉</span>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary screen -->
+    <div id="summary-screen" class="hidden">
+      <div class="session-summary">
+        <div class="summary-title">Session complete!</div>
+        <div class="summary-sub" id="summary-sub"></div>
+
+        <div class="summary-bars" id="summary-bars"></div>
+
+        <div class="summary-actions">
+          <button class="btn-outline" onclick="goToDashboard()">View dashboard</button>
+          <button class="btn-primary" style="padding:11px 24px;width:auto;" onclick="restartSetup()">Go again</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/data.js"></script>
+<script>
+  initTheme();
+  const user = initSidebar('definitions');
+
+  let selectedCount = 10;
+  let sessionSkills = [];
+  let currentIndex = 0;
+  let sessionResults = []; // { skillId, rating }
+
+  function selectCount(n) {
+    selectedCount = n;
+    document.querySelectorAll('.count-btn').forEach(btn => {
+      btn.classList.toggle('selected', parseInt(btn.textContent) === n);
+    });
+  }
+
+  // Pick skills: prioritise untested, then lowest rated, then random
+  function pickSkills(count) {
+    const progress = getProgress(user.username);
+
+    const scored = ALL_SKILLS
+      .filter(s => s.definition && s.definition !== '[PLACEHOLDER]')
+      .map(s => {
+        const p = progress[s.id] || { ratings: [], attempts: 0 };
+        const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : 0;
+        // Score: untested = priority 0, then by rating ascending, with jitter
+        const score = latest === 0 ? -Math.random() * 10 : (latest - 1) + Math.random();
+        return { skill: s, score };
+      })
+      .sort((a, b) => a.score - b.score);
+
+    return scored.slice(0, count).map(x => x.skill);
+  }
+
+  function startSession() {
+    sessionSkills = pickSkills(selectedCount);
+    if (sessionSkills.length === 0) {
+      alert('No definitions available yet — placeholders need to be filled in first!');
+      return;
+    }
+    currentIndex = 0;
+    sessionResults = [];
+
+    document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('session-screen').classList.remove('hidden');
+    loadQuestion();
+  }
+
+  function loadQuestion() {
+    const skill = sessionSkills[currentIndex];
+    const total = sessionSkills.length;
+
+    document.getElementById('progress-fill').style.width = (currentIndex / total * 100) + '%';
+    document.getElementById('def-counter').textContent = `${currentIndex + 1} / ${total}`;
+    document.getElementById('def-unit').textContent = skill.unit + ' ' + skill.unitName;
+    document.getElementById('def-term').textContent = skill.name;
+    document.getElementById('def-input').value = '';
+    document.getElementById('def-input').disabled = false;
+    document.getElementById('def-answer').classList.remove('visible');
+    document.getElementById('rating-panel').classList.remove('visible');
+    document.getElementById('reveal-btn').disabled = false;
+    document.getElementById('reveal-btn').textContent = 'Reveal answer';
+
+    // Scroll to top
+    document.querySelector('.main-content').scrollTop = 0;
+  }
+
+  function revealAnswer() {
+    const skill = sessionSkills[currentIndex];
+    document.getElementById('def-answer-text').textContent = skill.definition;
+    document.getElementById('def-answer').classList.add('visible');
+    document.getElementById('def-input').disabled = true;
+    document.getElementById('reveal-btn').disabled = true;
+    document.getElementById('rating-panel').classList.add('visible');
+  }
+
+  function skipQuestion() {
+    // Record as unrated (no rating saved) and advance
+    currentIndex++;
+    if (currentIndex >= sessionSkills.length) {
+      showSummary();
+    } else {
+      loadQuestion();
+    }
+  }
+
+  function submitRating(rating) {
+    const skill = sessionSkills[currentIndex];
+    recordAttempt(user.username, skill.id, rating);
+    sessionResults.push({ skillId: skill.id, rating });
+
+    currentIndex++;
+    document.getElementById('progress-fill').style.width = (currentIndex / sessionSkills.length * 100) + '%';
+
+    if (currentIndex >= sessionSkills.length) {
+      showSummary();
+    } else {
+      loadQuestion();
+    }
+  }
+
+  function showSummary() {
+    document.getElementById('session-screen').classList.add('hidden');
+    document.getElementById('summary-screen').classList.remove('hidden');
+
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    sessionResults.forEach(r => counts[r.rating]++);
+
+    const total = sessionResults.length;
+    document.getElementById('summary-sub').textContent =
+      `You rated ${total} term${total !== 1 ? 's' : ''} — great work!`;
+
+    const maxCount = Math.max(...Object.values(counts), 1);
+    const labels = { 1: "Don't know", 2: 'Shaky', 3: 'Getting there', 4: 'Got it' };
+    const emojis = { 1: '😬', 2: '🤔', 3: '😊', 4: '🎉' };
+
+    document.getElementById('summary-bars').innerHTML = [1, 2, 3, 4].map(r => {
+      const h = Math.max((counts[r] / maxCount) * 100, counts[r] > 0 ? 12 : 4);
+      return `
+        <div class="summary-bar-col">
+          <div class="summary-bar-fill" data-r="${r}" style="height:${h}px"></div>
+          <div class="summary-bar-count">${emojis[r]} ${counts[r]}</div>
+          <div class="summary-bar-label" data-r="${r}">${labels[r]}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function goToDashboard() {
+    window.location.href = 'dashboard.html';
+  }
+
+  function restartSetup() {
+    document.getElementById('summary-screen').classList.add('hidden');
+    document.getElementById('setup-screen').classList.remove('hidden');
+  }
+</script>
+</body>
+</html>

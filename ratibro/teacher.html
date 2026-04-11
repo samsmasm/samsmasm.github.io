@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Panel — RatIBro</title>
+  <link rel="icon" type="image/png" href="ratibrosm.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div class="page-title">Teacher Panel</div>
+      <div class="page-subtitle">View student progress, manage accounts, and export data.</div>
+    </div>
+
+    <div id="access-denied" class="coming-soon hidden">
+      <div class="coming-soon-emoji">🔒</div>
+      <h2>Teacher access only</h2>
+      <p>You need to be logged in as the teacher to view this page.</p>
+    </div>
+
+    <div id="teacher-content" class="hidden">
+      <div class="teacher-tabs">
+        <button class="teacher-tab active" onclick="switchTab('students', this)">Students</button>
+        <button class="teacher-tab" onclick="switchTab('class', this)">Class overview</button>
+        <button class="teacher-tab" onclick="switchTab('accounts', this)">Manage accounts</button>
+      </div>
+
+      <!-- Students tab -->
+      <div id="tab-students">
+        <table class="data-table" id="students-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Real name</th>
+              <th>Topics rated</th>
+              <th>In the green</th>
+              <th>Total attempts</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="students-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Class overview tab -->
+      <div id="tab-class" class="hidden">
+        <div class="coming-soon">
+          <div class="coming-soon-emoji">🗂️</div>
+          <h2>Class heatmap</h2>
+          <p>A topic-by-topic view of how the whole class is rating themselves — coming soon.</p>
+        </div>
+      </div>
+
+      <!-- Manage accounts tab -->
+      <div id="tab-accounts" class="hidden">
+        <div class="coming-soon">
+          <div class="coming-soon-emoji">⚙️</div>
+          <h2>Account management</h2>
+          <p>Create student accounts, reset passwords, and label usernames — coming soon.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/data.js"></script>
+<script>
+  initTheme();
+  const user = initSidebar('teacher');
+
+  if (!user || !user.isTeacher) {
+    document.getElementById('access-denied').classList.remove('hidden');
+  } else {
+    document.getElementById('teacher-content').classList.remove('hidden');
+    loadStudents();
+  }
+
+  function switchTab(tab, btn) {
+    document.querySelectorAll('.teacher-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-students').classList.add('hidden');
+    document.getElementById('tab-class').classList.add('hidden');
+    document.getElementById('tab-accounts').classList.add('hidden');
+    document.getElementById('tab-' + tab).classList.remove('hidden');
+  }
+
+  function loadStudents() {
+    // Find all student progress records in localStorage
+    const students = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith('ratibro_progress_')) {
+        const username = key.replace('ratibro_progress_', '');
+        const progress = getProgress(username);
+        const realName = localStorage.getItem(`ratibro_realname_${username}`) || '';
+
+        let rated = 0, greens = 0, attempts = 0;
+        ALL_SKILLS.forEach(s => {
+          const p = progress[s.id];
+          if (p && p.ratings.length) {
+            rated++;
+            attempts += p.attempts;
+            if (p.ratings[p.ratings.length - 1].rating === 4) greens++;
+          }
+        });
+
+        students.push({ username, realName, rated, greens, attempts });
+      }
+    }
+
+    const tbody = document.getElementById('students-tbody');
+    if (students.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No student data yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = students.map(s => `
+      <tr>
+        <td><strong>${s.username}</strong></td>
+        <td>
+          <input type="text" value="${s.realName}"
+            placeholder="Add real name..."
+            style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface-2);color:var(--text);font-size:0.8rem;font-weight:600;width:140px;outline:none;"
+            onchange="saveRealName('${s.username}', this.value)">
+        </td>
+        <td>${s.rated} / ${ALL_SKILLS.length}</td>
+        <td style="color:var(--rate-green);font-weight:800;">${s.greens}</td>
+        <td>${s.attempts}</td>
+        <td>
+          <button class="btn-secondary" style="padding:4px 10px;font-size:0.8rem;"
+            onclick="viewStudent('${s.username}')">View</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function saveRealName(username, name) {
+    localStorage.setItem(`ratibro_realname_${username}`, name);
+    showToast('Name saved');
+  }
+
+  function viewStudent(username) {
+    showToast(`Viewing ${username} — individual student view coming soon`);
+  }
+</script>
+</body>
+</html>
