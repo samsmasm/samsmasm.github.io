@@ -39,7 +39,8 @@
           <div class="def-card" id="def-card">
             <div class="def-card-meta">
               <span class="def-card-unit" id="def-unit"></span>
-              <span id="def-counter" class="text-muted" style="font-size:0.8rem;font-weight:700;"></span>
+              <span id="def-vocab-badge" class="hl-tag" style="display:none;background:var(--surface-2);color:var(--text-muted);">vocab</span>
+              <span id="def-counter" class="text-muted" style="font-size:0.8rem;font-weight:700;margin-left:auto;"></span>
             </div>
             <div class="def-term" id="def-term"></div>
             <textarea class="def-input" id="def-input" placeholder="Write your definition here..."></textarea>
@@ -120,7 +121,7 @@
   let selectedCount = 10;
   let sessionSkills = [];
   let currentIndex = 0;
-  let sessionResults = []; // { skillId, rating }
+  let sessionResults = []; // { skillId, rating, isVocab }
 
   window.selectCount = function(n) {
     selectedCount = n;
@@ -129,16 +130,18 @@
     });
   }
 
-  // Pick skills: prioritise untested, then lowest rated, then random
+  // Pick from ALL_DEFN_ITEMS (skills + vocab):
+  // Skills: untested first, then lowest-rated, with jitter
+  // Vocab: no progress tracked, treated as untested with slight lower priority than unrated skills
   function pickSkills(count) {
-    const progress = progressCache;
-
-    const scored = ALL_SKILLS
-      .filter(s => s.definition && s.definition !== '[PLACEHOLDER]')
+    const scored = ALL_DEFN_ITEMS
+      .filter(s => s.definition)
       .map(s => {
-        const p = progress[s.id] || { ratings: [], attempts: 0 };
+        if (s.isVocab) {
+          return { skill: s, score: -Math.random() * 5 };
+        }
+        const p = progressCache[s.id] || { ratings: [], attempts: 0 };
         const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : 0;
-        // Score: untested = priority 0, then by rating ascending, with jitter
         const score = latest === 0 ? -Math.random() * 10 : (latest - 1) + Math.random();
         return { skill: s, score };
       })
@@ -150,7 +153,7 @@
   window.startSession = function() {
     sessionSkills = pickSkills(selectedCount);
     if (sessionSkills.length === 0) {
-      alert('No definitions available yet — placeholders need to be filled in first!');
+      alert('No definitions available yet.');
       return;
     }
     currentIndex = 0;
@@ -168,6 +171,8 @@
     document.getElementById('progress-fill').style.width = (currentIndex / total * 100) + '%';
     document.getElementById('def-counter').textContent = `${currentIndex + 1} / ${total}`;
     document.getElementById('def-unit').textContent = skill.unit + ' ' + skill.unitName;
+    const vocabBadge = document.getElementById('def-vocab-badge');
+    if (vocabBadge) vocabBadge.style.display = skill.isVocab ? 'inline' : 'none';
     document.getElementById('def-term').textContent = skill.name;
     document.getElementById('def-input').value = '';
     document.getElementById('def-input').disabled = false;
@@ -201,8 +206,9 @@
 
   window.submitRating = async function(rating) {
     const skill = sessionSkills[currentIndex];
-    if (currentUser) await recordAttempt(currentUser.uid, skill.id, rating);
-    sessionResults.push({ skillId: skill.id, rating });
+    // Only track progress for skills, not vocab terms
+    if (currentUser && !skill.isVocab) await recordAttempt(currentUser.uid, skill.id, rating);
+    sessionResults.push({ skillId: skill.id, rating, isVocab: skill.isVocab });
 
     currentIndex++;
     document.getElementById('progress-fill').style.width = (currentIndex / sessionSkills.length * 100) + '%';

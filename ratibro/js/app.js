@@ -46,7 +46,8 @@ function buildSidebar(activePage, displayName, isTeacher) {
   `).join('');
 
   return `
-    <aside class="sidebar">
+    <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle menu">☰</button>
+    <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-logo">
         <img src="ratibrosm.png" alt="RatIBro mascot">
         <span class="logo-text">Rat<span class="logo-ib">IB</span>ro</span>
@@ -66,6 +67,23 @@ function buildSidebar(activePage, displayName, isTeacher) {
       </div>
     </aside>
   `;
+}
+
+function toggleMobileMenu() {
+  document.body.classList.toggle('sidebar-open');
+  // Close when clicking the overlay
+  if (document.body.classList.contains('sidebar-open')) {
+    document.addEventListener('click', closeMobileMenuOnOutsideClick, { once: false });
+  }
+}
+
+function closeMobileMenuOnOutsideClick(e) {
+  const sidebar = document.getElementById('app-sidebar');
+  const menuBtn = document.querySelector('.mobile-menu-btn');
+  if (sidebar && !sidebar.contains(e.target) && menuBtn && !menuBtn.contains(e.target)) {
+    document.body.classList.remove('sidebar-open');
+    document.removeEventListener('click', closeMobileMenuOnOutsideClick);
+  }
 }
 
 // === Toast ===

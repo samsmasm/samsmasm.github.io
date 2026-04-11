@@ -1,4 +1,4 @@
-# Project Brief: RatIBro -- IB Business Management Finance Revision Site
+# Project Brief: RatIBro — IB Business Management Finance Revision Site
 
 ## Overview
 
@@ -9,18 +9,19 @@ A standalone web application for IB Business Management students (approx. 40 stu
 ## Branding
 
 - **Name**: RatIBro (plays on ratio / IB / bro)
-- **Mascot**: A wise rat money scholar with an ornate academic/Victorian hat, round spectacles, smart waistcoat. Duolingo-style character. Asset: `ratibrosm.png` (tab icon for now; smaller version to come).
+- **Mascot**: A wise rat money scholar with an ornate academic/Victorian hat, round spectacles, smart waistcoat. Duolingo-style character.
+- **Favicon**: `feathersm.png` (feather — simpler shape for browser tab)
 - **"IB" in the logo name is styled distinctively** to make the easter egg visible.
 
 ---
 
 ## Aesthetic Direction
 
-- **Vibe**: Energetic and app-like -- feels like something students want to open (Duolingo-inspired)
-- **Theme**: Light/dark toggle available to students
+- **Vibe**: Energetic and app-like — feels like something students want to open (Duolingo-inspired)
+- **Fonts**: Fraunces (display/headings) + Nunito (body)
+- **Theme**: Light/dark toggle; light default
 - **Navigation**: Left sidebar (persistent)
-- **Dashboard tiles**: Compact but not cluttered
-- **Animations**: Subtle transitions only -- no sound
+- **Animations**: Subtle transitions only — no sound
 - **Rating colours**: Red / Amber / Yellow / Green (4-point scale)
 - **Palette**: Neutral overall so rating colours read clearly as signal
 
@@ -28,121 +29,101 @@ A standalone web application for IB Business Management students (approx. 40 stu
 
 ## Architecture
 
-- **Frontend**: Multi-page site
-- **Auth**: Firebase Authentication -- name + password only (no email)
-- **Database**: Firebase Realtime Database or Firestore for student progress, self-ratings, saved answers
-- **Hosting**: GitHub Pages or Firebase Hosting (TBD)
-- **AI**: None -- all content generation is procedural
+- **Frontend**: Multi-page HTML site, no build tools, no framework
+- **Auth**: Firebase Authentication — Google sign-in only (any Google account)
+- **Database**: Firestore (Singapore region) for student progress
+- **Hosting**: GitHub Pages at samsmasm.github.io, custom domain unisam.nz via Cloudflare
+- **AI**: None — all content generation is procedural
 
 ### Auth notes
-- ~40 students + one teacher admin account
-- Students choose their own username on first login
-- Teacher can label usernames with real student names from the teacher panel
-- Teacher can reset student passwords from the teacher panel
-- Simple name/password auth is sufficient; no sensitive data stored
+- ~40 students + one teacher
+- Google-only auth: students sign in with their own Google account
+- Teacher identified by email: `samgetsstuffdone@gmail.com`
+- `isTeacher(user)` in firebase.js checks email match
+
+---
+
+## Data Structure (js/data.js)
+
+### Two-tier content model
+
+**Tier 1 — Skills** (self-rated, tracked in Firestore):
+- ~47 skills organized as: `TOPICS → units → clusters[] → skills[]`
+- Each skill: `{ id, name, hl, definition, unit, unitName, clusterId, clusterName }`
+- `ALL_SKILLS` is a flat array derived from the nested structure
+- Progress stored per skill id in Firestore: `{ ratings: [{rating, timestamp}], attempts }`
+
+**Tier 2 — Vocab terms** (definitions practice only, not tracked):
+- ~48 vocab terms in `VOCAB_TERMS` array
+- Same shape as skills but no progress tracking in Firestore
+- `ALL_DEFN_ITEMS = ALL_SKILLS + VOCAB_TERMS` — used by definitions practice
+- Vocab terms have `isVocab: true` flag
+
+### Cluster structure
+The dashboard organises skills into concept clusters (2–5 skills each) within units:
+- ~20 clusters across 10 units
+- Each cluster row shows mini status dots (one per skill, coloured by latest rating)
+- Clicking a cluster expands to show individual skill sub-rows with rating buttons
+- Clusters start collapsed; units start expanded
+
+### SL/HL
+Every skill and vocab term has an `hl: boolean` flag. SL/HL toggle deferred — filter will be applied to clusters/skills/vocab when built.
 
 ---
 
 ## Pages and Features
 
-### 1. Home Page -- Skills & Topics Dashboard
+### 1. Skills Dashboard (dashboard.html)
+- Unit sections → cluster rows → expandable skill sub-rows
+- Cluster header shows: name + mini status dots per skill
+- Skill sub-row: name, history dots (last 8 ratings), 4 rating buttons, attempt count
+- Stats bar: topics rated, total attempts, topics in the green
+- Rating updates Firestore in background; UI updates immediately (optimistic)
 
-A grid of topic tiles (one per individual IB Finance skill/term -- potentially 50+ rows). For each tile:
+### 2. Definitions Practice (definitions.html)
+- Student selects count (3/5/10/15), session begins
+- Pulls from ALL_DEFN_ITEMS (~95 total: skills + vocab)
+- Priority: unrated skills first, then lowest-rated skills, then vocab (treated as untested)
+- Student writes definition → reveals answer → self-rates
+- Progress recorded to Firestore for skills only (not vocab terms)
 
-- **Topic/skill name**
-- **Self-rating** (4-colour traffic light: red / amber / yellow / green): editable by student, persists over time
-- **Rating history**: small inline chart -- dots plotted over time, each dot coloured by its rating
-- **Review count**: number of practice attempts logged for that topic
+### 3. Calculations Practice (calculations.html)
+- Procedurally generated figures, student works by hand, self-rates
+- Formulas in FORMULAS object with `calculate()` functions
+- skillMap maps formula keys to skill IDs for progress recording
 
-Each practice activity (definitions, calculations, statements) logs an attempt and adds a dot to the relevant topic tile. Selection algorithms across practice pages prioritise untested or lowest-rated topics, with an element of randomness.
+### 4. Statements Practice (statements.html)
+- Currently a "coming soon" placeholder
 
-Teacher view shows all students' data in aggregate or individually.
-
----
-
-### 2. Financial Statements Practice Page
-
-Procedurally generated statements. Student does working by hand, submits, sees correct answer, self-rates on 4-colour scale. No automated marking.
-
-Three statement types (exact IB format from finstform.md):
-
-- **Statement of Profit or Loss** (profit-making and non-profit variants)
-- **Statement of Financial Position** (profit-making and non-profit variants)
-- **Cash Flow Forecast** (summary rows for now; individual inflow/outflow line items to be added later)
-
-Two practice modes:
-- **Fill in entries**: row labels/structure given; student fills in the figures
-- **Build from scratch**: student constructs the whole statement
-
-Self-rating feeds into the skills dashboard for the relevant topic(s).
+### 5. Teacher Panel (teacher.html)
+- Lists all users from Firestore
+- Shows: topics rated, greens, total attempts per student
+- Teacher can label real names (setRealName)
+- Class overview and account management tabs: "coming soon"
 
 ---
 
-### 3. Definition Checker Page
+## Deferred / Stretch Goals
 
-- Student selects how many definitions they want (e.g. 3, 5, 10)
-- App selects terms prioritising: untested first, then lowest-rated, with randomness
-- Student writes their definition in a text box
-- Submits; correct definition revealed for self-comparison
-- Student self-rates on 4-colour scale
-- Rating adds a dot to that topic's tile on the skills dashboard
-- Previous attempts are recorded and visible
-
-No automated marking.
-
----
-
-### 4. Calculations Practice Page
-
-- Student selects how many questions they want (e.g. 5, 10)
-- App generates questions procedurally with randomised figures
-- Student does working by hand, inputs answer, submits
-- Correct answer and working revealed for self-comparison
-- Student self-rates on 4-colour scale
-- Same model as definitions and statements
-
-Calculations to include (all from finstform.md formulae):
-
-**SL/HL:** Gross profit margin, Profit margin, ROCE, Current ratio, Acid test ratio, ARR, Payback period
-
-**HL only:** Stock turnover (times and days), Debtor days, Creditor days, Gearing ratio, NPV (with discount table), Capacity utilisation rate, Productivity rate
-
----
-
-### 5. Teacher Dashboard
-
-- View any individual student's skills dashboard
-- Class-wide overview: heatmap/table of self-ratings by topic
-- See each student's saved definition attempts
-- Reset student passwords
-- Label student usernames with real names
-- Basic CSV export of progress data
-
-Used occasionally (mainly pre-assessment).
+- **SL/HL toggle** — filter out HL content; save preference per user
+- **Spaced repetition for vocab** — definitions practice schedules vocab terms based on self-ratings (soon = rated low, deferred = rated high). Needs per-term timestamp tracking.
+- **Statements practice** — fill-in and build-from-scratch modes for P&L, SFP, Cash Flow Forecast
+- **Class heatmap** — teacher view of all students × all topics
+- **Cash flow line items** — individual inflow/outflow rows
+- **CSV export** — teacher data export
+- **Streak tracking**
+- **Mascot animations**
 
 ---
 
 ## Financial Statement Formats
 
-Exact IB formats defined in `/refdocs/finstform.md`. All three statement types, plus budget format, plus all formulae and NPV discount tables are documented there.
+Exact IB formats in `/refdocs/finstform.md`. All three statement types, budget format, all formulae, and NPV discount tables.
 
 ---
 
-## Deferred / Stretch Goals (do not build yet)
+## Content Notes
 
-- Cash flow statement individual inflow/outflow line items
-- "Give me 10 minutes" session mode
-- Difficulty levels
-- Longer-form / past paper questions
-- Recommendations engine
-- Streak tracking
-- Mascot animations
-
----
-
-## Content Still Needed from Teacher
-
-1. **Full glossary** -- every key term with definition in exact wording for students
-2. **Parameter ranges** -- realistic min/max values for procedural generation (statements and calculations)
-3. **Student roster** -- for account creation, or confirm students self-register
-4. **Smaller mascot image** -- optimised favicon to replace ratibrosm.png
+- Glossary source: `/refdocs/glossary.md` — full IB BM glossary, cleaned and reorganised by Gemini, with finance-relevant terms extracted and grouped by unit at the end of the file
+- All skill definitions are populated (no more [PLACEHOLDER] entries)
+- Wording can be adjusted by teacher — edit `definition` fields in data.js

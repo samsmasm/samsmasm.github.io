@@ -85,29 +85,52 @@
 
   function renderUnits() {
     document.getElementById('units-container').innerHTML = TOPICS.map(unit => {
-      const topicRows = unit.skills.map(skill => {
-        const p = getLocal(skill.id);
-        const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
-        const recentDots = p.ratings.slice(-8);
+      const totalSkills = unit.clusters.reduce((n, c) => n + c.skills.length, 0);
 
-        const ratingBtns = [1,2,3,4].map(r => `
-          <button class="rating-btn${latest === r ? ' selected' : ''}" data-r="${r}"
-            title="${RATING_MEANINGS[r]}"
-            onclick="rateSkill('${skill.id}', ${r}, this)">
-          </button>`).join('');
+      const clusterHTML = unit.clusters.map(cluster => {
+        // Mini status dots — one per skill, coloured by latest rating
+        const dots = cluster.skills.map(skill => {
+          const p = getLocal(skill.id);
+          const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
+          const attr = latest ? `data-r="${latest}"` : '';
+          return `<span class="cluster-dot" data-skill-id="${skill.id}" ${attr}></span>`;
+        }).join('');
 
-        const historyDots = recentDots.length
-          ? recentDots.map(e => `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}"></span>`).join('')
-          : '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>';
+        // Skill sub-rows
+        const skillRows = cluster.skills.map(skill => {
+          const p = getLocal(skill.id);
+          const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
+          const recentDots = p.ratings.slice(-8);
+
+          const ratingBtns = [1,2,3,4].map(r => `
+            <button class="rating-btn${latest === r ? ' selected' : ''}" data-r="${r}"
+              title="${RATING_MEANINGS[r]}"
+              onclick="rateSkill('${skill.id}', ${r}, this)">
+            </button>`).join('');
+
+          const historyDots = recentDots.length
+            ? recentDots.map(e => `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}"></span>`).join('')
+            : '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>';
+
+          return `
+            <div class="skill-subrow" id="row-${skill.id}">
+              <div class="topic-name">
+                ${skill.name}${skill.hl ? '<span class="hl-tag">HL</span>' : ''}
+              </div>
+              <div class="history-dots">${historyDots}</div>
+              <div class="rating-btns">${ratingBtns}</div>
+              <div class="attempt-count">${p.attempts > 0 ? p.attempts + '×' : '—'}</div>
+            </div>`;
+        }).join('');
 
         return `
-          <div class="topic-row" id="row-${skill.id}">
-            <div class="topic-name">
-              ${skill.name}${skill.hl ? '<span class="hl-tag">HL</span>' : ''}
+          <div class="cluster-section collapsed" id="cluster-${cluster.id}">
+            <div class="cluster-row" onclick="toggleCluster('${cluster.id}')">
+              <span class="cluster-name">${cluster.name}</span>
+              <span class="cluster-indicators">${dots}</span>
+              <span class="cluster-chevron">▼</span>
             </div>
-            <div class="history-dots">${historyDots}</div>
-            <div class="rating-btns">${ratingBtns}</div>
-            <div class="attempt-count">${p.attempts > 0 ? p.attempts + '×' : '—'}</div>
+            <div class="cluster-skills">${skillRows}</div>
           </div>`;
       }).join('');
 
@@ -116,10 +139,10 @@
           <div class="unit-header" onclick="toggleUnit('${unit.unit}')">
             <span class="unit-badge">${unit.unit}</span>
             <span class="unit-name">${unit.unitName}</span>
-            <span class="unit-count">${unit.skills.length} topics</span>
+            <span class="unit-count">${totalSkills} topics</span>
             <span class="unit-chevron">▼</span>
           </div>
-          <div class="unit-topics">${topicRows}</div>
+          <div class="unit-topics">${clusterHTML}</div>
         </div>`;
     }).join('');
   }
@@ -128,19 +151,24 @@
     document.getElementById('unit-' + unitId.replace('.', '-')).classList.toggle('collapsed');
   };
 
+  window.toggleCluster = function(clusterId) {
+    document.getElementById('cluster-' + clusterId).classList.toggle('collapsed');
+  };
+
   window.rateSkill = async function(skillId, rating, btn) {
     if (!currentUser) return;
 
-    // Update local cache immediately for snappy UI
+    // Update local cache immediately
     if (!progressCache[skillId]) progressCache[skillId] = { ratings: [], attempts: 0 };
     progressCache[skillId].ratings.push({ rating, timestamp: Date.now() });
     progressCache[skillId].attempts++;
 
-    // Update UI
-    const row = btn.closest('.topic-row');
+    // Update rating buttons in skill row
+    const row = btn.closest('.skill-subrow');
     row.querySelectorAll('.rating-btn').forEach(b =>
       b.classList.toggle('selected', parseInt(b.dataset.r) === rating));
 
+    // Update history dots in skill row
     const dotsContainer = row.querySelector('.history-dots');
     const placeholder = dotsContainer.querySelector('span[style]');
     if (placeholder) placeholder.remove();
@@ -153,6 +181,13 @@
     dotsContainer.appendChild(dot);
 
     row.querySelector('.attempt-count').textContent = progressCache[skillId].attempts + '×';
+
+    // Update the cluster header dot for this skill
+    const clusterDot = document.querySelector(`.cluster-dot[data-skill-id="${skillId}"]`);
+    if (clusterDot) {
+      clusterDot.dataset.r = rating;
+    }
+
     renderStats();
     showToast(`Rated: ${RATING_MEANINGS[rating]}`);
 
