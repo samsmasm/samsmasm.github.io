@@ -1,7 +1,7 @@
 // RatIBro — Firebase configuration and initialisation
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -18,26 +18,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Restrict Google sign-in to school domain (optional — remove the line below to allow any Google account)
-googleProvider.setCustomParameters({ hd: '' }); // set to e.g. 'yourschool.edu' to restrict domain
-
 // === Auth ===
 
-const TEACHER_EMAIL = 'teacher@ratibro.local';
-
-function usernameToEmail(username) {
-  return `${username.trim().toLowerCase()}@ratibro.local`;
-}
-
-async function loginWithUsername(username, password) {
-  const email = usernameToEmail(username);
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  return cred.user;
-}
+const TEACHER_EMAIL = 'samgetsstuffdone@gmail.com';
 
 async function loginWithGoogle() {
   const cred = await signInWithPopup(auth, googleProvider);
-  // Create a user doc if this is their first Google sign-in
   await ensureUserDoc(cred.user);
   return cred.user;
 }
@@ -58,9 +44,7 @@ function isTeacher(user) {
 
 function getDisplayName(user) {
   if (!user) return '';
-  if (user.displayName) return user.displayName;
-  // Strip @ratibro.local suffix for username-based accounts
-  return user.email.replace('@ratibro.local', '');
+  return user.displayName || user.email;
 }
 
 // === Firestore: User docs ===
@@ -71,7 +55,7 @@ async function ensureUserDoc(user) {
   if (!snap.exists()) {
     await setDoc(ref, {
       email: user.email,
-      displayName: user.displayName || getDisplayName(user),
+      displayName: user.displayName || user.email,
       createdAt: Date.now(),
       progress: {}
     });
@@ -103,11 +87,6 @@ async function recordAttempt(uid, skillId, rating) {
   await updateDoc(ref, { progress });
 }
 
-async function getSkillProgress(uid, skillId) {
-  const progress = await getProgress(uid);
-  return progress[skillId] || { ratings: [], attempts: 0 };
-}
-
 // === Firestore: Teacher ===
 
 async function getAllUsers() {
@@ -122,10 +101,10 @@ async function setRealName(uid, realName) {
 
 export {
   auth, db,
-  loginWithUsername, loginWithGoogle, logoutUser, onAuthChange,
+  loginWithGoogle, logoutUser, onAuthChange,
   isTeacher, getDisplayName,
   ensureUserDoc, getUserDoc,
-  getProgress, recordAttempt, getSkillProgress,
+  getProgress, recordAttempt,
   getAllUsers, setRealName,
   TEACHER_EMAIL
 };
