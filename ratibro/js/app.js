@@ -49,7 +49,7 @@ function buildSidebar(activePage, displayName, isTeacher) {
     <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle menu">☰</button>
     <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-logo">
-        <img src="ratibroicon2sm.png" alt="RatIBro mascot">
+        <img src="ratibromed.png" alt="RatIBro mascot">
         <span class="logo-text">Rat<span class="logo-ib">IB</span>ro</span>
       </div>
       <nav class="sidebar-nav">${navHtml}</nav>
