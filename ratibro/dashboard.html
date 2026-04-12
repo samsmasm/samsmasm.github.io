@@ -32,8 +32,20 @@
         <span class="pm-badge" id="pm-badge">Definitions</span>
         <h3 id="pm-cluster-title"></h3>
       </div>
-      <div class="count-label">Ask me this many:</div>
-      <div class="count-picker" id="pm-count-picker"></div>
+      <!-- Defs/calc count picker -->
+      <div id="pm-count-section">
+        <div class="count-label">Ask me this many:</div>
+        <div class="count-picker" id="pm-count-picker"></div>
+      </div>
+      <!-- Stmt mode picker -->
+      <div id="pm-stmt-section" class="hidden">
+        <div class="count-label">Choose mode:</div>
+        <div class="pm-mode-btns">
+          <button class="pm-mode-btn selected" id="pm-mode-fill" onclick="pmSetStmtMode('fill')">Fill in blanks</button>
+          <button class="pm-mode-btn" id="pm-mode-figures" onclick="pmSetStmtMode('figures')">Just the numbers</button>
+          <button class="pm-mode-btn" id="pm-mode-hunt" onclick="pmSetStmtMode('hunt')">Make me hunt</button>
+        </div>
+      </div>
       <button class="btn-primary" onclick="startPMSession()">Start</button>
     </div>
 
@@ -182,7 +194,7 @@
         const practiceBtns = `<div class="cluster-practice-row" onclick="event.stopPropagation()">
           <button class="cpb2 cpb2-defs" data-cid="${cluster.id}" data-cname="${cname}" data-ptype="defs" onclick="openPracticeModalBtn(this)">▸ Practise Definitions</button>
           ${clusterCalcKeys.length ? `<button class="cpb2 cpb2-calc" data-cid="${cluster.id}" data-cname="${cname}" data-ptype="calc" onclick="openPracticeModalBtn(this)">▸ Practise Calculations</button>` : ''}
-          ${clusterStmtType ? `<button class="cpb2 cpb2-stmt" onclick="openStatementsFor('${clusterStmtType}')">▸ Practise Statements</button>` : ''}
+          ${clusterStmtType ? `<button class="cpb2 cpb2-stmt" onclick="openStatementsFor('${clusterStmtType}', '${cname}')">▸ Practise Statements</button>` : ''}
         </div>`;
 
         return `
@@ -221,10 +233,9 @@
   window.rateSkill = async function(skillId, rating, btn) {
     if (!currentUser) return;
 
-    // Update local cache immediately
+    // Self-report: push rating but do NOT increment attempts count
     if (!progressCache[skillId]) progressCache[skillId] = { ratings: [], attempts: 0 };
-    progressCache[skillId].ratings.push({ rating, timestamp: Date.now() });
-    progressCache[skillId].attempts++;
+    progressCache[skillId].ratings.push({ rating, timestamp: Date.now(), selfReport: true });
 
     // Update rating buttons in skill row
     const row = btn.closest('.skill-subrow');
@@ -243,22 +254,65 @@
     dot.title = RATING_MEANINGS[rating];
     dotsContainer.appendChild(dot);
 
-    row.querySelector('.attempt-count').textContent = progressCache[skillId].attempts + '×';
+    // Show remove-self-report button (replace old one if present)
+    const existing = row.querySelector('.self-report-remove');
+    if (existing) existing.remove();
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'self-report-remove';
+    removeBtn.textContent = '× self report';
+    removeBtn.onclick = () => removeSelfReport(skillId, row, removeBtn);
+    row.appendChild(removeBtn);
 
     // Update the cluster header dot for this skill
     const clusterDot = document.querySelector(`.cluster-dot[data-skill-id="${skillId}"]`);
-    if (clusterDot) {
-      clusterDot.dataset.r = rating;
-    }
+    if (clusterDot) clusterDot.dataset.r = rating;
 
     renderStats();
     showToast(`Rated: ${RATING_MEANINGS[rating]}`);
 
     try {
-      await recordAttempt(currentUser.uid, skillId, rating);
+      await recordAttempt(currentUser.uid, skillId, rating, { selfReport: true });
     } catch(e) {
       console.error('recordAttempt failed:', e);
     }
+  };
+
+  window.removeSelfReport = async function(skillId, row, removeBtn) {
+    const p = progressCache[skillId];
+    if (!p) return;
+    // Remove the last self-report entry
+    const idx = [...p.ratings].map((r,i) => r.selfReport ? i : -1).filter(i => i >= 0).pop();
+    if (idx !== undefined) p.ratings.splice(idx, 1);
+
+    removeBtn.remove();
+
+    // Reset rating buttons to previous rating (if any)
+    const prev = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
+    row.querySelectorAll('.rating-btn').forEach(b =>
+      b.classList.toggle('selected', prev !== null && parseInt(b.dataset.r) === prev));
+
+    // Remove the last history dot
+    const dots = row.querySelectorAll('.history-dot');
+    if (dots.length) dots[dots.length - 1].remove();
+    if (!row.querySelectorAll('.history-dot').length) {
+      row.querySelector('.history-dots').innerHTML =
+        '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>';
+    }
+
+    // Update cluster dot
+    const clusterDot = document.querySelector(`.cluster-dot[data-skill-id="${skillId}"]`);
+    if (clusterDot) {
+      if (prev) clusterDot.dataset.r = prev;
+      else delete clusterDot.dataset.r;
+    }
+
+    renderStats();
+    showToast('Self report removed');
+
+    try {
+      // Record a removal marker in Firestore - use rating 0 as sentinel
+      await recordAttempt(currentUser.uid, skillId, 0, { removeSelfReport: true });
+    } catch(e) { console.warn(e); }
   };
 
   // ── Cluster practice config ──
@@ -284,37 +338,50 @@
   };
 
   // ── Modal state ──
-  let pmType     = 'defs';
+  let pmType      = 'defs';
   let pmClusterId = '';
-  let pmItems    = [];   // skill objects (defs) or question objects (calc)
-  let pmIndex    = 0;
-  let pmCount    = 5;
-  let pmResults  = [];
+  let pmStmtType  = '';   // for stmt type: 'pl','sfp','cashflow','budget'
+  let pmStmtMode  = 'fill'; // 'fill' or 'figures'
+  let pmItems     = [];   // skill objects (defs) or question objects (calc)
+  let pmIndex     = 0;
+  let pmCount     = 5;
+  let pmResults   = [];
 
   window.openPracticeModalBtn = function(btn) {
     openPracticeModal(btn.dataset.cid, btn.dataset.cname, btn.dataset.ptype);
   };
 
-  function openPracticeModal(clusterId, clusterName, type) {
+  function openPracticeModal(clusterId, clusterName, type, stmtType) {
     pmType      = type;
     pmClusterId = clusterId;
-    const available = type === 'defs'
-      ? ALL_SKILLS.filter(s => s.clusterId === clusterId)
-      : (CLUSTER_CALCS[clusterId] || []);
-    if (!available.length) return;
 
     document.getElementById('pm-cluster-title').textContent = clusterName;
-    document.getElementById('pm-badge').textContent = type === 'defs' ? 'Definitions' : 'Calculations';
+
+    const isStmt = type === 'stmt';
+    document.getElementById('pm-count-section').classList.toggle('hidden', isStmt);
+    document.getElementById('pm-stmt-section').classList.toggle('hidden', !isStmt);
+    document.getElementById('pm-badge').textContent = isStmt ? 'Statements' : (type === 'defs' ? 'Definitions' : 'Calculations');
     document.getElementById('pm-badge').className = 'pm-badge pm-badge-' + type;
 
-    // Build count picker
-    const total = available.length;
-    const opts = [3, 5, 10].filter(n => n < total);
-    if (!opts.length || opts[opts.length - 1] !== total) opts.push(total);
-    pmCount = opts[0] <= 5 ? (opts.find(n => n <= 5) || opts[0]) : opts[0];
-    document.getElementById('pm-count-picker').innerHTML = opts.map(n =>
-      `<button class="count-btn${n === pmCount ? ' selected' : ''}" onclick="pmSelectCount(${n},this)">${n}</button>`
-    ).join('');
+    if (isStmt) {
+      pmStmtType = stmtType || '';
+      pmStmtMode = 'fill';
+      ['fill','figures','hunt'].forEach(m => {
+        document.getElementById('pm-mode-' + m).classList.toggle('selected', m === 'fill');
+      });
+    } else {
+      const available = type === 'defs'
+        ? ALL_SKILLS.filter(s => s.clusterId === clusterId)
+        : (CLUSTER_CALCS[clusterId] || []);
+      if (!available.length) return;
+      const total = available.length;
+      const opts = [3, 5, 10].filter(n => n < total);
+      if (!opts.length || opts[opts.length - 1] !== total) opts.push(total);
+      pmCount = opts[0] <= 5 ? (opts.find(n => n <= 5) || opts[0]) : opts[0];
+      document.getElementById('pm-count-picker').innerHTML = opts.map(n =>
+        `<button class="count-btn${n === pmCount ? ' selected' : ''}" onclick="pmSelectCount(${n},this)">${n}</button>`
+      ).join('');
+    }
 
     // Show setup
     document.getElementById('pm-setup').classList.remove('hidden');
@@ -323,6 +390,13 @@
     document.getElementById('pm-overlay').classList.remove('hidden');
   }
 
+  window.pmSetStmtMode = function(mode) {
+    pmStmtMode = mode;
+    ['fill','figures','hunt'].forEach(m => {
+      document.getElementById('pm-mode-' + m).classList.toggle('selected', m === mode);
+    });
+  };
+
   window.pmSelectCount = function(n, btn) {
     pmCount = n;
     document.querySelectorAll('#pm-count-picker .count-btn').forEach(b => b.classList.remove('selected'));
@@ -330,6 +404,11 @@
   };
 
   window.startPMSession = function() {
+    if (pmType === 'stmt') {
+      const modeParam = pmStmtMode === 'hunt' ? 'figures&hunt=1' : pmStmtMode;
+      window.location.href = `statements.html?type=${pmStmtType}&mode=${modeParam}`;
+      return;
+    }
     pmIndex = 0; pmResults = [];
     if (pmType === 'defs') {
       const skills = ALL_SKILLS.filter(s => s.clusterId === pmClusterId);
@@ -394,7 +473,7 @@
   window.pmReveal = function() {
     document.getElementById('pm-reveal-btn').disabled = true;
     if (pmType === 'defs') {
-      document.getElementById('pm-def-answer').classList.remove('hidden');
+      document.getElementById('pm-def-answer').classList.add('visible');
     } else {
       const q = pmItems[pmIndex];
       const raw = (document.getElementById('pm-calc-input')?.value || '').trim();
@@ -475,8 +554,8 @@
     document.getElementById('pm-overlay').classList.add('hidden');
   };
 
-  window.openStatementsFor = function(stmtType) {
-    window.location.href = `statements.html?type=${stmtType}`;
+  window.openStatementsFor = function(stmtType, clusterName) {
+    openPracticeModal('', clusterName || 'Statements', 'stmt', stmtType);
   };
 
   window.showDotDetail = function(skillId, idx) {
