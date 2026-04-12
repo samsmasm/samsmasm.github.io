@@ -12,29 +12,467 @@
   <div id="sidebar-container"></div>
 
   <main class="main-content">
-    <div class="coming-soon">
-      <div class="coming-soon-emoji">📊</div>
-      <h2>Statements Practice</h2>
-      <p>
-        Procedurally generated financial statements — Statement of Profit or Loss,
-        Statement of Financial Position, and Cash Flow Forecast — coming soon.<br><br>
-        Two modes: fill in figures given the structure, or build from scratch.
-      </p>
+
+    <!-- ── Setup screen ── -->
+    <div id="setup-screen" class="practice-setup">
+      <div class="page-title">Statements</div>
+      <div class="practice-desc">
+        Practise constructing financial statements from real IB-format data.
+      </div>
+
+      <div class="setup-label">Statement type</div>
+      <div class="stmt-type-picker">
+        <button class="stmt-type-btn selected" data-t="pl"       onclick="selectType(this)">P&amp;L</button>
+        <button class="stmt-type-btn"           data-t="sfp"      onclick="selectType(this)">SFP</button>
+        <button class="stmt-type-btn"           data-t="cashflow" onclick="selectType(this)">Cash Flow</button>
+        <button class="stmt-type-btn"           data-t="surprise" onclick="selectType(this)">Surprise me</button>
+        <button class="stmt-type-btn wide"      data-t="all"      onclick="selectType(this)">All statements</button>
+      </div>
+
+      <div class="setup-label">Mode</div>
+      <div class="mode-picker">
+        <button class="mode-btn selected" id="mode-fill"    onclick="selectMode('fill')">Fill in blanks</button>
+        <button class="mode-btn"          id="mode-figures" onclick="selectMode('figures')">Work from figures</button>
+      </div>
+
+      <div class="setup-label">Data</div>
+      <div class="mode-picker">
+        <button class="mode-btn selected" id="diff-just" onclick="selectDiff('just')">Just the numbers</button>
+        <button class="mode-btn"          id="diff-hunt" onclick="selectDiff('hunt')">Make me hunt</button>
+      </div>
+
+      <button class="btn-primary" onclick="startSession()">Start</button>
     </div>
+
+    <!-- ── Session screen ── -->
+    <div id="session-screen" class="hidden">
+      <div class="def-session">
+
+        <!-- Progress bar (all-statements mode only) -->
+        <div class="progress-bar-track" id="all-progress-track" style="display:none">
+          <div class="progress-bar-fill" id="all-progress-fill" style="width:0%"></div>
+        </div>
+
+        <div id="stmt-card" class="stmt-card"></div>
+
+        <div class="def-actions" id="stmt-actions">
+          <button class="btn-secondary" onclick="skipStatement()">Skip</button>
+          <button class="btn-secondary btn-reveal" id="stmt-reveal-btn" onclick="revealStatement()">Reveal answer</button>
+        </div>
+
+        <div class="rating-panel" id="rating-panel">
+          <div class="rating-panel-q">How well did you do?</div>
+          <div class="rating-options">
+            <button class="rating-option" data-r="1" onclick="submitRating(1)"><span class="rating-emoji">😬</span>Don't know it</button>
+            <button class="rating-option" data-r="2" onclick="submitRating(2)"><span class="rating-emoji">🤔</span>Shaky</button>
+            <button class="rating-option" data-r="3" onclick="submitRating(3)"><span class="rating-emoji">😊</span>Getting there</button>
+            <button class="rating-option" data-r="4" onclick="submitRating(4)"><span class="rating-emoji">🎉</span>Got it</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Done screen ── -->
+    <div id="done-screen" class="hidden">
+      <div class="session-summary">
+        <div class="summary-title">Done!</div>
+        <div class="summary-sub" id="done-sub"></div>
+        <div class="summary-actions">
+          <button class="btn-outline" onclick="window.location.href='dashboard.html'">View dashboard</button>
+          <button class="btn-primary" style="padding:11px 24px;width:auto;" onclick="restartSetup()">Go again</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
 <script src="js/app.js"></script>
+<script src="js/data.js"></script>
 <script type="module">
-  import { onAuthChange, logoutUser, getDisplayName, isTeacher } from './js/firebase.js';
-  initTheme();
-  onAuthChange(user => {
-    if (!user) { window.location.replace('index.html'); return; }
-    document.getElementById('sidebar-container').innerHTML =
-      buildSidebar('statements', getDisplayName(user), isTeacher(user));
-    updateThemeToggle();
-    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+import { onAuthChange, logoutUser, getDisplayName, isTeacher, ensureUserDoc, recordAttempt } from './js/firebase.js';
+
+initTheme();
+
+let currentUser = null;
+onAuthChange(async user => {
+  if (!user) { window.location.replace('index.html'); return; }
+  currentUser = user;
+  await ensureUserDoc(user);
+  document.getElementById('sidebar-container').innerHTML =
+    buildSidebar('statements', getDisplayName(user), isTeacher(user));
+  updateThemeToggle();
+  document.getElementById('logout-btn').addEventListener('click', logoutUser);
+});
+
+// ── State ──
+let stmtType  = 'pl';
+let stmtMode  = 'fill';
+let huntMode  = false;
+let allQueue  = [];   // for 'all' mode: array of statement objects
+let current   = null; // current statement object
+
+// ── Setup selections ──
+window.selectType = function(btn) {
+  document.querySelectorAll('.stmt-type-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  stmtType = btn.dataset.t;
+};
+
+window.selectMode = function(mode) {
+  stmtMode = mode;
+  document.getElementById('mode-fill').classList.toggle('selected', mode === 'fill');
+  document.getElementById('mode-figures').classList.toggle('selected', mode === 'figures');
+};
+
+window.selectDiff = function(diff) {
+  huntMode = diff === 'hunt';
+  document.getElementById('diff-just').classList.toggle('selected', !huntMode);
+  document.getElementById('diff-hunt').classList.toggle('selected',  huntMode);
+};
+
+// ── Session start ──
+window.startSession = function() {
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('session-screen').classList.remove('hidden');
+  document.getElementById('done-screen').classList.add('hidden');
+
+  if (stmtType === 'all') {
+    allQueue = generateAllStatements(huntMode);
+    const track = document.getElementById('all-progress-track');
+    track.style.display = 'block';
+    loadNext();
+  } else {
+    allQueue = [];
+    document.getElementById('all-progress-track').style.display = 'none';
+    current = generateStatement(stmtType, huntMode);
+    renderCard(current);
+  }
+};
+
+function loadNext() {
+  if (allQueue.length === 0) { showDone(); return; }
+  current = allQueue.shift();
+  const done = 3 - allQueue.length;
+  document.getElementById('all-progress-fill').style.width = ((done - 1) / 3 * 100) + '%';
+  renderCard(current);
+}
+
+// ── Render dispatcher ──
+function renderCard(stmt) {
+  document.getElementById('rating-panel').classList.remove('visible');
+  document.getElementById('stmt-reveal-btn').disabled = false;
+  document.getElementById('stmt-reveal-btn').textContent = 'Reveal answer';
+  document.getElementById('stmt-actions').style.display = '';
+
+  const card = document.getElementById('stmt-card');
+  if (stmt.type === 'pl')       card.innerHTML = stmtMode === 'fill' ? renderPLFill(stmt)    : renderPLFigures(stmt);
+  if (stmt.type === 'sfp')      card.innerHTML = stmtMode === 'fill' ? renderSFPFill(stmt)   : renderSFPFigures(stmt);
+  if (stmt.type === 'cashflow') card.innerHTML = stmtMode === 'fill' ? renderCFFill(stmt)    : renderCFFigures(stmt);
+}
+
+// ── Formatting helpers ──
+function fv(n) {
+  // IB format: positive = "1,500", negative = "(1,500)"
+  const abs = Math.abs(Math.round(n));
+  const s = abs.toLocaleString();
+  return n < 0 ? `(${s})` : s;
+}
+
+function stmtHeader(stmt, subtitle) {
+  return `<div class="stmt-meta">
+    <div class="stmt-company">${stmt.company}</div>
+    <div class="stmt-subtitle">${subtitle}</div>
+    <div class="stmt-unit">Figures in $000</div>
+  </div>`;
+}
+
+function decoyBlock(decoys) {
+  if (!decoys.length) return '';
+  const items = decoys.map(d => `<span class="decoy-item"><span class="decoy-label">${d.label}</span><span class="decoy-val">${fv(d.value)}</span></span>`).join('');
+  return `<div class="decoy-block"><span class="decoy-heading">Additional information provided:</span>${items}</div>`;
+}
+
+// ── P&L ──
+function renderPLFill(stmt) {
+  const rows = stmt.rows.map(r => {
+    const label = r.bold ? `<strong>${r.label}</strong>` : r.label;
+    const display = r.neg ? fv(-r.value) : fv(r.value);
+    if (r.given) {
+      return `<tr class="stmt-row-given"><td>${label}</td><td class="stmt-val">${display}</td></tr>`;
+    } else {
+      return `<tr class="stmt-row-calc"><td>${label}</td>
+        <td><input class="stmt-input" type="text" data-answer="${r.value}" placeholder="?" autocomplete="off"></td></tr>`;
+    }
+  }).join('');
+
+  return stmtHeader(stmt, 'Statement of Profit or Loss — for the year ended 31 December 20XX')
+    + decoyBlock(stmt.decoys)
+    + `<table class="stmt-table">
+        <thead><tr><th>Category</th><th class="stmt-val-col">$000</th></tr></thead>
+        <tbody>${rows}</tbody>
+       </table>`;
+}
+
+function renderPLFigures(stmt) {
+  const givenItems = stmt.rows.filter(r => r.given);
+  const allItems = huntMode
+    ? [...givenItems, ...stmt.decoys.map(d => ({ label: d.label, value: d.value, given: true }))].sort(() => Math.random() - 0.5)
+    : givenItems;
+
+  const list = allItems.map(r =>
+    `<div class="fig-row"><span class="fig-label">${r.label}</span><span class="fig-val">${fv(r.value)}</span></div>`
+  ).join('');
+
+  return stmtHeader(stmt, 'Statement of Profit or Loss — for the year ended 31 December 20XX')
+    + `<div class="figures-list"><div class="figures-heading">Figures provided ($000)</div>${list}</div>`;
+}
+
+// ── SFP ──
+function renderSFPFill(stmt) {
+  const rows = stmt.rows.map(r => {
+    if (r.type === 'header') return `<tr class="stmt-section-hdr"><td colspan="3"><strong>${r.label}</strong></td></tr>`;
+    if (r.type === 'spacer') return `<tr class="stmt-spacer"><td colspan="3"></td></tr>`;
+    const label = r.bold ? `<strong>${r.label}</strong>` : r.label;
+    const hasDetail = r.detail != null;
+    const hasTotal  = r.total  != null;
+    const detailStr = hasDetail ? fv(r.detail) : '';
+    const totalStr  = hasTotal  ? fv(r.total)  : '';
+
+    if (!r.given) {
+      // Total column is blank
+      return `<tr class="stmt-row-calc">
+        <td>${label}</td><td class="stmt-detail"></td>
+        <td class="stmt-total"><input class="stmt-input" type="text" data-answer="${hasTotal ? r.total : r.detail}" placeholder="?"></td>
+      </tr>`;
+    }
+    return `<tr class="stmt-row-given">
+      <td>${label}</td>
+      <td class="stmt-detail">${detailStr}</td>
+      <td class="stmt-total">${totalStr}</td>
+    </tr>`;
+  }).join('');
+
+  return stmtHeader(stmt, 'Statement of Financial Position — as at 31 December 20XX')
+    + decoyBlock(stmt.decoys)
+    + `<table class="stmt-table stmt-two-col">
+        <thead><tr><th>Category</th><th class="stmt-detail-col">$000</th><th class="stmt-val-col">$000</th></tr></thead>
+        <tbody>${rows}</tbody>
+       </table>`;
+}
+
+function renderSFPFigures(stmt) {
+  const givenRows = stmt.rows.filter(r => r.given && !r.type);
+  const allItems = huntMode
+    ? [...givenRows, ...stmt.decoys.map(d => ({ label: d.label, detail: d.value, given: true }))].sort(() => Math.random() - 0.5)
+    : givenRows;
+
+  const list = allItems.map(r => {
+    const val = r.detail != null ? r.detail : (r.total != null ? r.total : r.value);
+    return `<div class="fig-row"><span class="fig-label">${r.label}</span><span class="fig-val">${fv(val)}</span></div>`;
+  }).join('');
+
+  return stmtHeader(stmt, 'Statement of Financial Position — as at 31 December 20XX')
+    + `<div class="figures-list"><div class="figures-heading">Figures provided ($000)</div>${list}</div>`;
+}
+
+// ── Cash Flow ──
+function renderCFFill(stmt) {
+  const { months } = stmt;
+  const heads = months.map(m => `<th class="stmt-val-col">${m.name}</th>`).join('');
+
+  function inputCell(val, idx) {
+    return `<td class="stmt-val"><input class="stmt-input stmt-input-sm" type="text" data-answer="${val}" data-col="${idx}" placeholder="?"></td>`;
+  }
+  function givenCell(val) {
+    return `<td class="stmt-val">${fv(val)}</td>`;
+  }
+
+  let html = `<thead><tr><th></th>${heads}</tr></thead><tbody>`;
+
+  // Opening balance — month 1 given, months 2&3 blank
+  html += `<tr class="stmt-row-calc"><td><strong>Opening balance</strong></td>
+    ${givenCell(months[0].openingBal)}
+    ${inputCell(months[1].openingBal, 1)}
+    ${inputCell(months[2].openingBal, 2)}
+  </tr>`;
+
+  // Inflow section header
+  html += `<tr class="stmt-section-hdr"><td colspan="4"><strong>Cash inflows</strong></td></tr>`;
+  // Inflow line items — all given
+  const inflowKeys = months[0].inflows.map(f => f.label);
+  inflowKeys.forEach((label, li) => {
+    const cells = months.map(m => givenCell(m.inflows[li].value)).join('');
+    html += `<tr class="stmt-row-given"><td>${label}</td>${cells}</tr>`;
   });
+  // Total inflows — blank
+  html += `<tr class="stmt-row-calc"><td><strong>Total cash inflows</strong></td>
+    ${months.map((m, i) => inputCell(m.totalInflows, i)).join('')}</tr>`;
+
+  // Outflow section header
+  html += `<tr class="stmt-section-hdr"><td colspan="4"><strong>Cash outflows</strong></td></tr>`;
+  const outflowKeys = months[0].outflows.map(f => f.label);
+  outflowKeys.forEach((label, li) => {
+    const cells = months.map(m => givenCell(m.outflows[li].value)).join('');
+    html += `<tr class="stmt-row-given"><td>${label}</td>${cells}</tr>`;
+  });
+  // Total outflows — blank
+  html += `<tr class="stmt-row-calc"><td><strong>Total cash outflows</strong></td>
+    ${months.map((m, i) => inputCell(m.totalOutflows, i)).join('')}</tr>`;
+
+  // Net cash flow — blank
+  html += `<tr class="stmt-row-calc"><td><strong>Net cash flow</strong></td>
+    ${months.map((m, i) => inputCell(m.netCF, i)).join('')}</tr>`;
+
+  // Closing balance — blank
+  html += `<tr class="stmt-row-calc"><td><strong>Closing balance</strong></td>
+    ${months.map((m, i) => inputCell(m.closingBal, i)).join('')}</tr>`;
+
+  html += '</tbody>';
+
+  return stmtHeader(stmt, 'Cash Flow Forecast — for the first three months of 20XX')
+    + decoyBlock(stmt.decoys)
+    + `<div class="stmt-cf-scroll"><table class="stmt-table stmt-cf">${html}</table></div>`;
+}
+
+function renderCFFigures(stmt) {
+  const { months } = stmt;
+  const allFigures = [];
+  months.forEach(m => {
+    allFigures.push({ label: `${m.name} — Opening balance`, value: m.openingBal });
+    m.inflows.forEach(f  => allFigures.push({ label: `${m.name} — ${f.label}`,       value: f.value }));
+    m.outflows.forEach(f => allFigures.push({ label: `${m.name} — ${f.label}`,       value: f.value }));
+  });
+
+  let items = huntMode
+    ? [...allFigures, ...stmt.decoys.map(d => ({ label: d.label, value: d.value }))].sort(() => Math.random() - 0.5)
+    : allFigures;
+
+  const list = items.map(r =>
+    `<div class="fig-row"><span class="fig-label">${r.label}</span><span class="fig-val">${fv(r.value)}</span></div>`
+  ).join('');
+
+  return stmtHeader(stmt, 'Cash Flow Forecast — for the first three months of 20XX')
+    + `<div class="figures-list"><div class="figures-heading">Figures provided ($000)</div>${list}</div>`;
+}
+
+// ── Reveal ──
+window.revealStatement = function() {
+  const c = current;
+  document.getElementById('stmt-reveal-btn').disabled = true;
+
+  if (stmtMode === 'fill') {
+    // Check and annotate each input
+    document.querySelectorAll('#stmt-card .stmt-input').forEach(input => {
+      const answer = parseFloat(input.dataset.answer);
+      const raw    = input.value.replace(/[,\(\)\s]/g, '');
+      const student = parseFloat(raw);
+      const correct = !isNaN(student) && Math.round(student) === Math.round(answer);
+      const badge   = document.createElement('span');
+      badge.className = 'stmt-check ' + (correct ? 'stmt-check-ok' : 'stmt-check-bad');
+      badge.textContent = correct ? '✓' : fv(answer);
+      input.replaceWith(badge);
+    });
+  } else {
+    // Figures mode — replace the figures list with the complete table
+    const card = document.getElementById('stmt-card');
+    if (c.type === 'pl')       card.innerHTML = renderPLComplete(c);
+    if (c.type === 'sfp')      card.innerHTML = renderSFPComplete(c);
+    if (c.type === 'cashflow') card.innerHTML = renderCFComplete(c);
+  }
+
+  document.getElementById('stmt-actions').style.display = 'none';
+  document.getElementById('rating-panel').classList.add('visible');
+};
+
+// ── Complete-table renderers (used after reveal in figures mode) ──
+function renderPLComplete(stmt) {
+  const rows = stmt.rows.map(r => {
+    const label   = r.bold ? `<strong>${r.label}</strong>` : r.label;
+    const display = r.neg ? fv(-r.value) : fv(r.value);
+    const cls     = r.given ? 'stmt-row-given' : 'stmt-row-calc';
+    return `<tr class="${cls}"><td>${label}</td><td class="stmt-val">${display}</td></tr>`;
+  }).join('');
+  return stmtHeader(stmt, 'Statement of Profit or Loss — for the year ended 31 December 20XX')
+    + `<table class="stmt-table"><thead><tr><th>Category</th><th class="stmt-val-col">$000</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderSFPComplete(stmt) {
+  const rows = stmt.rows.map(r => {
+    if (r.type === 'header') return `<tr class="stmt-section-hdr"><td colspan="3"><strong>${r.label}</strong></td></tr>`;
+    if (r.type === 'spacer') return `<tr class="stmt-spacer"><td colspan="3"></td></tr>`;
+    const label = r.bold ? `<strong>${r.label}</strong>` : r.label;
+    const cls   = r.given ? 'stmt-row-given' : 'stmt-row-calc';
+    return `<tr class="${cls}">
+      <td>${label}</td>
+      <td class="stmt-detail">${r.detail != null ? fv(r.detail) : ''}</td>
+      <td class="stmt-total">${r.total  != null ? fv(r.total)  : ''}</td>
+    </tr>`;
+  }).join('');
+  return stmtHeader(stmt, 'Statement of Financial Position — as at 31 December 20XX')
+    + `<table class="stmt-table stmt-two-col"><thead><tr><th>Category</th><th class="stmt-detail-col">$000</th><th class="stmt-val-col">$000</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderCFComplete(stmt) {
+  const { months } = stmt;
+  const heads = months.map(m => `<th class="stmt-val-col">${m.name}</th>`).join('');
+  function gCell(val) { return `<td class="stmt-val">${fv(val)}</td>`; }
+  let html = `<thead><tr><th></th>${heads}</tr></thead><tbody>`;
+  html += `<tr class="stmt-row-calc"><td><strong>Opening balance</strong></td>${months.map(m => gCell(m.openingBal)).join('')}</tr>`;
+  html += `<tr class="stmt-section-hdr"><td colspan="4"><strong>Cash inflows</strong></td></tr>`;
+  months[0].inflows.forEach((_, li) => {
+    html += `<tr class="stmt-row-given"><td>${months[0].inflows[li].label}</td>${months.map(m => gCell(m.inflows[li].value)).join('')}</tr>`;
+  });
+  html += `<tr class="stmt-row-calc"><td><strong>Total cash inflows</strong></td>${months.map(m => gCell(m.totalInflows)).join('')}</tr>`;
+  html += `<tr class="stmt-section-hdr"><td colspan="4"><strong>Cash outflows</strong></td></tr>`;
+  months[0].outflows.forEach((_, li) => {
+    html += `<tr class="stmt-row-given"><td>${months[0].outflows[li].label}</td>${months.map(m => gCell(m.outflows[li].value)).join('')}</tr>`;
+  });
+  html += `<tr class="stmt-row-calc"><td><strong>Total cash outflows</strong></td>${months.map(m => gCell(m.totalOutflows)).join('')}</tr>`;
+  html += `<tr class="stmt-row-calc"><td><strong>Net cash flow</strong></td>${months.map(m => gCell(m.netCF)).join('')}</tr>`;
+  html += `<tr class="stmt-row-calc"><td><strong>Closing balance</strong></td>${months.map(m => gCell(m.closingBal)).join('')}</tr>`;
+  html += '</tbody>';
+  return stmtHeader(stmt, 'Cash Flow Forecast — for the first three months of 20XX')
+    + `<div class="stmt-cf-scroll"><table class="stmt-table stmt-cf">${html}</table></div>`;
+}
+
+// ── Rating & progression ──
+window.submitRating = async function(rating) {
+  document.getElementById('rating-panel').classList.remove('visible');
+  try {
+    if (currentUser) await recordAttempt(currentUser.uid, current.skillId, rating);
+  } catch(e) { console.warn('recordAttempt failed:', e); }
+
+  if (stmtType === 'all' && allQueue.length > 0) {
+    loadNext();
+  } else {
+    showDone();
+  }
+};
+
+window.skipStatement = function() {
+  if (stmtType === 'all' && allQueue.length > 0) {
+    loadNext();
+  } else {
+    showDone();
+  }
+};
+
+function showDone() {
+  document.getElementById('session-screen').classList.add('hidden');
+  document.getElementById('done-screen').classList.remove('hidden');
+  const typeNames = { pl: 'Statement of Profit or Loss', sfp: 'Statement of Financial Position', cashflow: 'Cash Flow Forecast', surprise: 'statement', all: 'all three statements' };
+  document.getElementById('done-sub').textContent = stmtType === 'all'
+    ? 'You worked through all three statements.'
+    : `You completed a ${typeNames[stmtType] || 'statement'}.`;
+}
+
+window.restartSetup = function() {
+  document.getElementById('done-screen').classList.add('hidden');
+  document.getElementById('setup-screen').classList.remove('hidden');
+};
+
+window.goToDashboard = function() { window.location.href = 'dashboard.html'; };
 </script>
 </body>
 </html>

@@ -506,3 +506,192 @@ function generateCalcQuestion(formulaKey) {
   const answer = f.calculate(values);
   return { formulaKey, formula: f, values, answer };
 }
+
+// ============================================================
+// Financial Statements — data generators
+// ============================================================
+
+const STMT_COMPANIES = [
+  'Apex Manufacturing', 'BlueSky Retail', 'Cresta Foods',
+  'Delta Services', 'Evergreen Supplies', 'Fortis Engineering',
+  'Glacier Media', 'Horizon Hotels', 'Indigo Logistics', 'Juniper Tech',
+];
+
+function stmtCompany() {
+  return STMT_COMPANIES[Math.floor(Math.random() * STMT_COMPANIES.length)];
+}
+
+// Round to nearest 25 for clean figures
+function r25(n) { return Math.round(n / 25) * 25; }
+
+function generatePLStatement(hunt) {
+  const salesRevenue   = randBetween(500, 3000, 50);
+  const costOfSales    = r25(salesRevenue * randBetween(25, 60, 5) / 100);
+  const grossProfit    = salesRevenue - costOfSales;
+  const expenses       = r25(grossProfit  * randBetween(20, 50, 5) / 100);
+  const pbit           = grossProfit - expenses;
+  const interest       = r25(pbit * randBetween(5, 20, 5) / 100);
+  const profitBT       = pbit - interest;
+  const tax            = r25(profitBT * randBetween(20, 30, 5) / 100);
+  const profitFP       = profitBT - tax;
+  const dividends      = r25(profitFP * randBetween(20, 50, 5) / 100);
+  const retainedProfit = profitFP - dividends;
+
+  const rows = [
+    { label: 'Sales revenue',                  value: salesRevenue,   given: true,  bold: false },
+    { label: 'Cost of sales',                  value: costOfSales,    given: true,  bold: false, neg: true },
+    { label: 'Gross profit',                   value: grossProfit,    given: false, bold: true  },
+    { label: 'Expenses',                       value: expenses,       given: true,  bold: false, neg: true },
+    { label: 'Profit before interest and tax', value: pbit,           given: false, bold: true  },
+    { label: 'Interest',                       value: interest,       given: true,  bold: false, neg: true },
+    { label: 'Profit before tax',              value: profitBT,       given: false, bold: true  },
+    { label: 'Tax',                            value: tax,            given: true,  bold: false, neg: true },
+    { label: 'Profit for period',              value: profitFP,       given: false, bold: true  },
+    { label: 'Dividends',                      value: dividends,      given: true,  bold: false, neg: true },
+    { label: 'Retained profit',                value: retainedProfit, given: false, bold: true  },
+  ];
+
+  const decoys = hunt ? [
+    { label: 'Depreciation',  value: r25(expenses * 0.35) },
+    { label: 'Opening stock', value: r25(costOfSales * 0.2) },
+    { label: 'Closing stock', value: r25(costOfSales * 0.15) },
+  ] : [];
+
+  return { type: 'pl', company: stmtCompany(), rows, decoys,
+    skillId: 'statement-profit-loss',
+    data: { salesRevenue, costOfSales, grossProfit, expenses, pbit, interest, profitBT, tax, profitFP, dividends, retainedProfit } };
+}
+
+function generateSFPStatement(hunt, retainedFromPL) {
+  const ppe       = randBetween(400, 2000, 100);
+  const accumDep  = r25(ppe * randBetween(10, 40, 5) / 100);
+  const totalNCA  = ppe - accumDep;
+
+  const cash      = randBetween(50, 500, 25);
+  const debtors   = randBetween(50, 400, 25);
+  const stock     = randBetween(25, 250, 25);
+  const totalCA   = cash + debtors + stock;
+  const totalAssets = totalNCA + totalCA;
+
+  const bankOD    = randBetween(0, 150, 25);
+  const tradeCred = randBetween(50, 250, 25);
+  const stLoans   = randBetween(0, 150, 25);
+  const totalCL   = bankOD + tradeCred + stLoans;
+
+  const ltBorrow  = randBetween(100, 500, 50);
+  const totalNCL  = ltBorrow;
+  const totalLiab = totalCL + totalNCL;
+  const netAssets = totalAssets - totalLiab;
+
+  const retainedEarnings = retainedFromPL != null
+    ? retainedFromPL
+    : r25(netAssets * randBetween(60, 90, 5) / 100);
+  const shareCapital = netAssets - retainedEarnings;
+  const totalEquity  = netAssets;
+
+  const rows = [
+    { type: 'header', label: 'Non-current assets' },
+    { label: 'Property, plant and equipment', detail:  ppe,       given: true,  bold: false },
+    { label: 'Accumulated depreciation',      detail: -accumDep,  given: true,  bold: false },
+    { label: 'Total non-current assets',      total:   totalNCA,  given: false, bold: true  },
+    { type: 'spacer' },
+    { type: 'header', label: 'Current assets' },
+    { label: 'Cash',                          detail:  cash,      given: true,  bold: false },
+    { label: 'Debtors',                       detail:  debtors,   given: true,  bold: false },
+    { label: 'Stock',                         detail:  stock,     given: true,  bold: false },
+    { label: 'Total current assets',          total:   totalCA,   given: false, bold: true  },
+    { label: 'Total assets',                  total:   totalAssets, given: false, bold: true },
+    { type: 'spacer' },
+    { type: 'header', label: 'Current liabilities' },
+    { label: 'Bank overdraft',                detail:  bankOD,    given: true,  bold: false },
+    { label: 'Trade creditors',               detail:  tradeCred, given: true,  bold: false },
+    { label: 'Other short-term loans',        detail:  stLoans,   given: true,  bold: false },
+    { label: 'Total current liabilities',     total:  -totalCL,   given: false, bold: true  },
+    { type: 'spacer' },
+    { type: 'header', label: 'Non-current liabilities' },
+    { label: 'Borrowings — long term',        detail:  ltBorrow,  given: true,  bold: false },
+    { label: 'Total non-current liabilities', total:  -totalNCL,  given: false, bold: true  },
+    { label: 'Total liabilities',             total:  -totalLiab, given: false, bold: true  },
+    { label: 'Net assets',                    total:   netAssets, given: false, bold: true  },
+    { type: 'spacer' },
+    { type: 'header', label: 'Equity' },
+    { label: 'Share capital',                 detail:  shareCapital,     given: true,  bold: false },
+    { label: 'Retained earnings',             detail:  retainedEarnings, given: true,  bold: false },
+    { label: 'Total equity',                  total:   totalEquity,      given: false, bold: true  },
+  ];
+
+  const decoys = hunt ? [
+    { label: 'Capital employed', value: totalNCL + totalEquity },
+    { label: 'Working capital',  value: totalCA - totalCL },
+    { label: 'Goodwill',         value: r25(totalNCA * 0.15) },
+  ] : [];
+
+  return { type: 'sfp', company: stmtCompany(), rows, decoys,
+    skillId: 'statement-financial-position',
+    data: { totalNCA, totalCA, totalAssets, totalCL, totalNCL, totalLiab, netAssets, totalEquity } };
+}
+
+function generateCashFlowStatement(hunt, annualSalesRef) {
+  const MONTH_NAMES = ['January', 'February', 'March'];
+  let openingBal = randBetween(5, 50, 5);
+  const months = [];
+
+  for (let i = 0; i < 3; i++) {
+    const salesReceipts = r25(randBetween(150, 700, 25));
+    const otherInflows  = r25(randBetween(10,  80,  10));
+    const totalInflows  = salesReceipts + otherInflows;
+
+    const wages     = r25(randBetween(60,  300, 25));
+    const rent      = r25(randBetween(20,  80,  10));
+    const materials = r25(randBetween(40,  250, 25));
+    const utilities = r25(randBetween(5,   30,   5));
+    const totalOutflows = wages + rent + materials + utilities;
+
+    const netCF = totalInflows - totalOutflows;
+    const closingBal = openingBal + netCF;
+
+    months.push({
+      name: MONTH_NAMES[i],
+      openingBal,
+      inflows:  [{ label: 'Sales receipts', value: salesReceipts },
+                 { label: 'Other income',   value: otherInflows  }],
+      totalInflows,
+      outflows: [{ label: 'Wages and salaries', value: wages     },
+                 { label: 'Rent',               value: rent      },
+                 { label: 'Materials',          value: materials },
+                 { label: 'Utilities',          value: utilities }],
+      totalOutflows,
+      netCF,
+      closingBal,
+    });
+    openingBal = closingBal;
+  }
+
+  const decoys = hunt ? [
+    { label: 'Annual sales revenue', value: annualSalesRef || randBetween(800, 2500, 50) },
+    { label: 'Net profit (annual)',   value: r25((annualSalesRef || 1200) * 0.12)         },
+    { label: 'Accounts receivable',  value: r25(months[0].salesReceipts * 0.3)            },
+  ] : [];
+
+  return { type: 'cashflow', company: stmtCompany(), months, decoys,
+    skillId: 'cash-flow-forecasts' };
+}
+
+function generateAllStatements(hunt) {
+  const pl  = generatePLStatement(hunt);
+  const sfp = generateSFPStatement(hunt, pl.data.retainedProfit);
+  sfp.company = pl.company;
+  const cf  = generateCashFlowStatement(hunt, pl.data.salesRevenue);
+  cf.company = pl.company;
+  return [pl, sfp, cf];
+}
+
+function generateStatement(type, hunt) {
+  if (type === 'surprise') {
+    const t = ['pl','sfp','cashflow'];
+    return generateStatement(t[Math.floor(Math.random() * 3)], hunt);
+  }
+  if (type === 'pl')       return generatePLStatement(hunt);
+  if (type === 'sfp')      return generateSFPStatement(hunt);
+  if (type === 'cashflow') return generateCashFlowStatement(hunt);
+}
