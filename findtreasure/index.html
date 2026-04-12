@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smallest Enclosing Circle Map</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            min-width: 250px;
+        }
+        canvas {
+            background-color: #e0f7fa; /* Light blue for water */
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <label for="countrySelect"><strong>Select a Country:</strong></label>
+        <select id="countrySelect">
+            <option value="">Loading countries...</option>
+        </select>
+    </div>
+
+    <canvas id="mapCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const select = document.getElementById('countrySelect');
+        let geojsonFeatures = [];
+
+        // --- 1. Load Data ---
+        fetch('countries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                geojsonFeatures = data.features;
+                
+                // Sort countries alphabetically by name
+                geojsonFeatures.sort((a, b) => {
+                    const nameA = a.properties.ADMIN || a.properties.name || "";
+                    const nameB = b.properties.ADMIN || b.properties.name || "";
+                    return nameA.localeCompare(nameB);
+                });
+
+                select.innerHTML = '<option value="">-- Choose a Country --</option>';
+                geojsonFeatures.forEach((feature, index) => {
+                    const name = feature.properties.ADMIN || feature.properties.name || 'Unknown';
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+            })
+            .catch(err => {
+                console.error("Error loading GeoJSON:", err);
+                select.innerHTML = '<option value="">Error loading file. Are you running a local server?</option>';
+            });
+
+        // --- 2. Handle Selection ---
+        select.addEventListener('change', (e) => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (e.target.value === "") return;
+            
+            const feature = geojsonFeatures[e.target.value];
+            drawCountryAndCircle(feature);
+        });
+
+        function drawCountryAndCircle(feature) {
+            // Flatten all coordinates from Polygon or MultiPolygon
+            const rawPoints = [];
+            const polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+            
+            polygons.forEach(polygon => {
+                polygon.forEach(ring => {
+                    ring.forEach(coord => {
+                        rawPoints.push({ lon: coord[0], lat: coord[1] });
+                    });
+                });
+            });
+
+            // Calculate Bounding Box to scale the country to fit the canvas
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            rawPoints.forEach(p => {
+                if(p.lon < minX) minX = p.lon;
+                if(p.lon > maxX) maxX = p.lon;
+                if(p.lat < minY) minY = p.lat;
+                if(p.lat > maxY) maxY = p.lat;
+            });
+
+            const padding = 50;
+            const canvasW = canvas.width - padding * 2;
+            const canvasH = canvas.height - padding * 2;
+            
+            // Calculate scale while maintaining aspect ratio
+            const scaleX = canvasW / (maxX - minX);
+            const scaleY = canvasH / (maxY - minY);
+            const scale = Math.min(scaleX, scaleY);
+            
+            const offsetX = (canvas.width - (maxX - minX) * scale) / 2;
+            const offsetY = (canvas.height - (maxY - minY) * scale) / 2;
+
+            // Projection function (Convert GPS to Canvas Pixels)
+            function project(lon, lat) {
+                return {
+                    x: (lon - minX) * scale + offsetX,
+                    y: canvas.height - ((lat - minY) * scale + offsetY) // Invert Y because canvas Y goes down
+                };
+            }
+
+            // Project all points into pixel coordinates
+            const pixelPoints = rawPoints.map(p => project(p.lon, p.lat));
+
+            // Draw the Country
+            ctx.fillStyle = "#a8e6cf";
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath();
+            polygons.forEach(polygon => {
+                polygon.forEach(ring => {
+                    ring.forEach((coord, i) => {
+                        const pt = project(coord[0], coord[1]);
+                        if (i === 0) ctx.moveTo(pt.x, pt.y);
+                        else ctx.lineTo(pt.x, pt.y);
+                    });
+                });
+            });
+            ctx.fill();
+            ctx.stroke();
+
+            // Calculate and Draw Smallest Enclosing Circle
+            const hullPoints = convexHull(pixelPoints);
+            const circle = getSmallestEnclosingCircle(hullPoints);
+            
+            if (circle) {
+                ctx.beginPath();
+                ctx.arc(circle.center.x, circle.center.y, circle.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.fillStyle = "rgba(255, 0, 0, 0.1)";
+                ctx.fill();
+
+                // Highlight the anchor points that the circle is locking onto
+                ctx.fillStyle = "red";
+                circle.boundary.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        // --- 3. Convex Hull (Andrew's Monotone Chain) ---
+        function convexHull(points) {
+            if (points.length <= 3) return points;
+            const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+            const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+            const lower = [], upper = [];
+            for (const p of pts) {
+                while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+                lower.push(p);
+            }
+            for (let i = pts.length - 1; i >= 0; i--) {
+                const p = pts[i];
+                while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+                upper.push(p);
+            }
+            upper.pop(); lower.pop();
+            return lower.concat(upper);
+        }
+
+        // --- 4. Welzl's Algorithm Math Helpers ---
+        function circleFrom2Points(p1, p2) {
+            const center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+            const radius = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2) / 2;
+            return { center, radius, boundary: [p1, p2] };
+        }
+
+        function circleFrom3Points(p1, p2, p3) {
+            const x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y, x3 = p3.x, y3 = p3.y;
+            const d = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+            if (d === 0) return null;
+            const ux = ((x1**2 + y1**2) * (y2 - y3) + (x2**2 + y2**2) * (y3 - y1) + (x3**2 + y3**2) * (y1 - y2)) / d;
+            const uy = ((x1**2 + y1**2) * (x3 - x2) + (x2**2 + y2**2) * (x1 - x3) + (x3**2 + y3**2) * (x2 - x1)) / d;
+            const center = { x: ux, y: uy };
+            const radius = Math.sqrt((ux - x1)**2 + (uy - y1)**2);
+            return { center, radius, boundary: [p1, p2, p3] };
+        }
+
+        function isInside(circle, p) {
+            if (!circle) return false;
+            const dist = Math.sqrt((circle.center.x - p.x)**2 + (circle.center.y - p.y)**2);
+            return dist <= circle.radius + 1e-7;
+        }
+
+        // --- 5. The Main Welzl Function ---
+        function getSmallestEnclosingCircle(points) {
+            // Shuffle to guarantee O(n) average time complexity
+            let shuffled = [...points];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            function welzl(P, R, n) {
+                if (n === 0 || R.length === 3) {
+                    if (R.length === 0) return { center: { x: 0, y: 0 }, radius: 0, boundary: [] };
+                    if (R.length === 1) return { center: R[0], radius: 0, boundary: [R[0]] };
+                    if (R.length === 2) return circleFrom2Points(R[0], R[1]);
+                    return circleFrom3Points(R[0], R[1], R[2]);
+                }
+
+                const p = P[n - 1];
+                const D = welzl(P, R, n - 1);
+
+                if (isInside(D, p)) return D;
+
+                return welzl(P, [...R, p], n - 1);
+            }
+
+            return welzl(shuffled, [], shuffled.length);
+        }
+    </script>
+</body>
+</html>
