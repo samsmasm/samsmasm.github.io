@@ -35,19 +35,26 @@
 
         <div class="calc-question-card" id="calc-card">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-            <div>
+            <div style="flex:1;min-width:0;">
               <div class="calc-formula-name" id="calc-name"></div>
-              <div class="calc-formula-str" id="calc-formula"></div>
+              <div class="formula-peek-wrap" id="formula-peek-wrap">
+                <div class="calc-formula-str" id="calc-formula"></div>
+                <div class="formula-peek-cover" id="formula-peek-cover">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Hold to peek
+                </div>
+              </div>
             </div>
-            <span class="text-muted" style="font-size:0.8rem;font-weight:700;" id="calc-counter"></span>
+            <span class="text-muted" style="font-size:0.8rem;font-weight:700;margin-left:12px;flex-shrink:0;" id="calc-counter"></span>
           </div>
 
           <div class="calc-inputs" id="calc-inputs"></div>
 
           <div class="calc-answer-input-wrap">
             <span class="calc-answer-label">Your answer:</span>
-            <input type="number" class="calc-answer-input" id="calc-answer-input" step="any" placeholder="e.g. 42.5">
+            <input type="text" class="calc-answer-input" id="calc-answer-input" placeholder="e.g. 42.50%" autocomplete="off" inputmode="decimal">
           </div>
+          <div class="calc-check-result hidden" id="calc-check-result"></div>
 
           <div class="def-actions">
             <button class="btn-secondary" onclick="skipCalc()">Skip</button>
@@ -124,6 +131,18 @@
 
   const FORMULA_KEYS = Object.keys(FORMULAS);
 
+  // Formula peek interaction — set up once, works for all questions
+  (function setupPeek() {
+    const wrap = document.getElementById('formula-peek-wrap');
+    const cover = document.getElementById('formula-peek-cover');
+    function startPeek(e) { e.preventDefault(); wrap.classList.add('peeking'); }
+    function endPeek() { wrap.classList.remove('peeking'); }
+    cover.addEventListener('mousedown', startPeek);
+    cover.addEventListener('touchstart', startPeek, { passive: false });
+    document.addEventListener('mouseup', endPeek);
+    document.addEventListener('touchend', endPeek);
+  })();
+
   window.selectCount = function(n) {
     selectedCount = n;
     document.querySelectorAll('.count-btn').forEach(btn => {
@@ -154,6 +173,8 @@
     return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
 
+  const UNIT_PLACEHOLDERS = { '%': 'e.g. 42.50%', ':1': 'e.g. 1.25:1', ' days': 'e.g. 42.50 days', ' times': 'e.g. 2.50 times' };
+
   function loadQuestion() {
     const q = sessionQuestions[currentIndex];
     const total = sessionQuestions.length;
@@ -162,27 +183,83 @@
     document.getElementById('calc-counter').textContent = `${currentIndex + 1} / ${total}`;
     document.getElementById('calc-name').textContent = q.formula.name;
     document.getElementById('calc-formula').textContent = q.formula.formula;
-    document.getElementById('calc-answer-input').value = '';
-    document.getElementById('calc-answer-input').disabled = false;
+    const answerInput = document.getElementById('calc-answer-input');
+    answerInput.value = '';
+    answerInput.disabled = false;
+    answerInput.placeholder = UNIT_PLACEHOLDERS[q.formula.unit] || 'e.g. 42.50';
     document.getElementById('calc-correct-answer').classList.remove('visible');
     document.getElementById('rating-panel').classList.remove('visible');
     document.getElementById('calc-reveal-btn').disabled = false;
+    const checkEl = document.getElementById('calc-check-result');
+    checkEl.className = 'calc-check-result hidden';
+    checkEl.innerHTML = '';
+    document.getElementById('formula-peek-wrap').classList.remove('peeking');
 
-    const inputsHtml = q.formula.inputs.map(key => `
-      <div class="calc-input-row">
+    document.getElementById('calc-inputs').innerHTML = q.formula.inputs.map(key => {
+      const val = key === 'yearsOfUse'
+        ? fmt(q.values[key]) + ' years'
+        : '$' + fmt(q.values[key]);
+      return `<div class="calc-input-row">
         <div class="calc-input-label">${INPUT_LABELS[key]}</div>
-        <div class="calc-input-value">$${fmt(q.values[key])}${key === 'yearsOfUse' ? ' years' : ''}</div>
-      </div>
-    `).join('');
-    document.getElementById('calc-inputs').innerHTML = inputsHtml.replace(/\$(\d)* years/, '$1 years');
+        <div class="calc-input-value">${val}</div>
+      </div>`;
+    }).join('');
+  }
 
-    // Fix the year display (no $ prefix)
-    document.getElementById('calc-inputs').querySelectorAll('.calc-input-row').forEach((row, i) => {
-      const key = q.formula.inputs[i];
-      if (key === 'yearsOfUse') {
-        row.querySelector('.calc-input-value').textContent = fmt(q.values[key]) + ' years';
-      }
-    });
+  function checkStudentAnswer(q) {
+    const raw = document.getElementById('calc-answer-input').value.trim();
+    if (!raw) return { status: 'empty' };
+
+    const unit = q.formula.unit;
+    const lower = raw.toLowerCase().replace(/\s+/g, '');
+
+    let hasUnit = false;
+    let numStr = raw;
+
+    if (unit === '%') {
+      hasUnit = lower.endsWith('%');
+      numStr = raw.replace(/%/g, '').trim();
+    } else if (unit === ':1') {
+      hasUnit = lower.includes(':1');
+      numStr = raw.replace(/:1/gi, '').trim();
+    } else if (unit === ' days') {
+      hasUnit = lower.endsWith('days');
+      numStr = raw.toLowerCase().replace('days', '').trim();
+    } else if (unit === ' times') {
+      hasUnit = lower.endsWith('times');
+      numStr = raw.toLowerCase().replace('times', '').trim();
+    }
+
+    if (!hasUnit) return { status: 'no-unit' };
+
+    const studentNum = parseFloat(numStr);
+    if (isNaN(studentNum)) return { status: 'invalid' };
+
+    const correct2dp = Math.round(q.answer * 100) / 100;
+    const student2dp = Math.round(studentNum * 100) / 100;
+    return student2dp === correct2dp ? { status: 'correct' } : { status: 'wrong' };
+  }
+
+  function displayCheckResult(q) {
+    const result = checkStudentAnswer(q);
+    const el = document.getElementById('calc-check-result');
+    const unitExamples = { '%': '%', ':1': ':1', ' days': 'days', ' times': 'times' };
+    const unitExample = unitExamples[q.formula.unit] || '';
+
+    el.classList.remove('hidden');
+    if (result.status === 'empty') {
+      el.className = 'calc-check-result hidden';
+      el.innerHTML = '';
+    } else if (result.status === 'correct') {
+      el.className = 'calc-check-result check-correct';
+      el.innerHTML = '✓ Correct!';
+    } else if (result.status === 'no-unit') {
+      el.className = 'calc-check-result check-no-unit';
+      el.innerHTML = `Include the unit — e.g. <strong>${unitExample}</strong>`;
+    } else {
+      el.className = 'calc-check-result check-wrong';
+      el.innerHTML = '✗ Not quite — see correct answer below';
+    }
   }
 
   window.revealCalcAnswer = function() {
@@ -190,19 +267,14 @@
     const answer = q.answer;
     const unit = q.formula.unit;
 
-    let display;
-    if (unit === ':1') {
-      display = answer.toFixed(2) + ':1';
-    } else if (unit === '%') {
-      display = answer.toFixed(1) + '%';
-    } else {
-      display = answer.toFixed(1) + unit;
-    }
+    const display = unit === ':1' ? answer.toFixed(2) + ':1' : answer.toFixed(2) + unit;
 
+    displayCheckResult(q);
     document.getElementById('calc-correct-value').textContent = display;
     document.getElementById('calc-correct-answer').classList.add('visible');
     document.getElementById('calc-answer-input').disabled = true;
     document.getElementById('calc-reveal-btn').disabled = true;
+    document.getElementById('formula-peek-wrap').classList.add('peeking');
     document.getElementById('rating-panel').classList.add('visible');
   }
 
@@ -228,7 +300,11 @@
       'gearing': 'gearing-ratio',
     };
     const skillId = skillMap[q.formulaKey];
-    if (skillId && currentUser) await recordAttempt(currentUser.uid, skillId, rating);
+    try {
+      if (skillId && currentUser) await recordAttempt(currentUser.uid, skillId, rating);
+    } catch(e) {
+      console.warn('recordAttempt failed:', e);
+    }
     sessionResults.push({ skillId, rating });
 
     currentIndex++;
