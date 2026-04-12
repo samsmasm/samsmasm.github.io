@@ -25,6 +25,7 @@
         <button class="stmt-type-btn selected" data-t="pl"       onclick="selectType(this)">P&amp;L</button>
         <button class="stmt-type-btn"           data-t="sfp"      onclick="selectType(this)">SFP</button>
         <button class="stmt-type-btn"           data-t="cashflow" onclick="selectType(this)">Cash Flow</button>
+        <button class="stmt-type-btn"           data-t="budget"   onclick="selectType(this)">Budget</button>
         <button class="stmt-type-btn"           data-t="surprise" onclick="selectType(this)">Surprise me</button>
         <button class="stmt-type-btn wide"      data-t="all"      onclick="selectType(this)">All statements</button>
       </div>
@@ -153,8 +154,9 @@ window.startSession = function() {
 function loadNext() {
   if (allQueue.length === 0) { showDone(); return; }
   current = allQueue.shift();
-  const done = 3 - allQueue.length;
-  document.getElementById('all-progress-fill').style.width = ((done - 1) / 3 * 100) + '%';
+  const total = stmtType === 'all' ? 4 : 3;
+  const done  = total - allQueue.length;
+  document.getElementById('all-progress-fill').style.width = ((done - 1) / total * 100) + '%';
   renderCard(current);
 }
 
@@ -166,9 +168,10 @@ function renderCard(stmt) {
   document.getElementById('stmt-actions').style.display = '';
 
   const card = document.getElementById('stmt-card');
-  if (stmt.type === 'pl')       card.innerHTML = stmtMode === 'fill' ? renderPLFill(stmt)    : renderPLFigures(stmt);
-  if (stmt.type === 'sfp')      card.innerHTML = stmtMode === 'fill' ? renderSFPFill(stmt)   : renderSFPFigures(stmt);
-  if (stmt.type === 'cashflow') card.innerHTML = stmtMode === 'fill' ? renderCFFill(stmt)    : renderCFFigures(stmt);
+  if (stmt.type === 'pl')       card.innerHTML = stmtMode === 'fill' ? renderPLFill(stmt)      : renderPLFigures(stmt);
+  if (stmt.type === 'sfp')      card.innerHTML = stmtMode === 'fill' ? renderSFPFill(stmt)     : renderSFPFigures(stmt);
+  if (stmt.type === 'cashflow') card.innerHTML = stmtMode === 'fill' ? renderCFFill(stmt)      : renderCFFigures(stmt);
+  if (stmt.type === 'budget')   card.innerHTML = stmtMode === 'fill' ? renderBudgetFill(stmt)  : renderBudgetFigures(stmt);
 }
 
 // ── Formatting helpers ──
@@ -362,16 +365,41 @@ window.revealStatement = function() {
   document.getElementById('stmt-reveal-btn').disabled = true;
 
   if (stmtMode === 'fill') {
-    // Check and annotate each input
     document.querySelectorAll('#stmt-card .stmt-input').forEach(input => {
-      const answer = parseFloat(input.dataset.answer);
-      const raw    = input.value.replace(/[,\(\)\s]/g, '');
-      const student = parseFloat(raw);
-      const correct = !isNaN(student) && Math.round(student) === Math.round(answer);
-      const badge   = document.createElement('span');
+      const answer  = parseFloat(input.dataset.answer);
+      const fa      = input.dataset.fa; // set on variance cells only
+      const raw     = input.value.replace(/,/g, '').trim();
+
+      let correct;
+      let displayText;
+
+      if (fa) {
+        // Variance cell — check number AND F/A
+        const numStr  = raw.replace(/[FfAa\[\]\s]/g, '');
+        const faStr   = (raw.match(/[FfAa]/)||[''])[0].toUpperCase();
+        const student = parseFloat(numStr);
+        const numOk   = !isNaN(student) && Math.round(student) === Math.round(answer);
+        const faOk    = faStr === fa;
+        correct       = numOk && faOk;
+        displayText   = correct ? '✓' : `${fv(answer)} ${fa}`;
+      } else {
+        const student = parseFloat(raw.replace(/[\(\)]/g, ''));
+        correct       = !isNaN(student) && Math.round(student) === Math.round(answer);
+        displayText   = correct ? '✓' : fv(answer);
+      }
+
+      const badge = document.createElement('span');
       badge.className = 'stmt-check ' + (correct ? 'stmt-check-ok' : 'stmt-check-bad');
-      badge.textContent = correct ? '✓' : fv(answer);
-      input.replaceWith(badge);
+      badge.textContent = displayText;
+      if (fa && !correct) {
+        const faSpan = document.createElement('span');
+        faSpan.className = 'fa-tag ' + (fa === 'F' ? 'fa-f' : 'fa-a');
+        faSpan.textContent = fa;
+        input.replaceWith(badge);
+        badge.after(faSpan);
+      } else {
+        input.replaceWith(badge);
+      }
     });
   } else {
     // Figures mode — replace the figures list with the complete table
@@ -379,6 +407,7 @@ window.revealStatement = function() {
     if (c.type === 'pl')       card.innerHTML = renderPLComplete(c);
     if (c.type === 'sfp')      card.innerHTML = renderSFPComplete(c);
     if (c.type === 'cashflow') card.innerHTML = renderCFComplete(c);
+    if (c.type === 'budget')   card.innerHTML = renderBudgetComplete(c);
   }
 
   document.getElementById('stmt-actions').style.display = 'none';
@@ -434,6 +463,63 @@ function renderCFComplete(stmt) {
   html += '</tbody>';
   return stmtHeader(stmt, 'Cash Flow Forecast — for the first three months of 20XX')
     + `<div class="stmt-cf-scroll"><table class="stmt-table stmt-cf">${html}</table></div>`;
+}
+
+// ── Budget ──
+function budgetTableHead() {
+  return `<thead><tr><th></th><th class="stmt-val-col">Budgeted<br>$000</th><th class="stmt-val-col">Actual<br>$000</th><th class="stmt-val-col">Variance<br>$000</th></tr></thead>`;
+}
+
+function faTag(fa, revealed) {
+  if (!revealed) return '';
+  const cls = fa === 'F' ? 'fa-tag fa-f' : 'fa-tag fa-a';
+  return ` <span class="${cls}">${fa}</span>`;
+}
+
+function renderBudgetFill(stmt) {
+  // Blank: variance column for all rows, and budgeted+actual for excess row
+  const rows = stmt.rows.map(r => {
+    const label = r.bold ? `<strong>${r.label}</strong>` : r.label;
+    const cls   = r.bold ? 'stmt-row-calc' : 'stmt-row-given';
+    const bCell = r.givenBudgeted
+      ? `<td class="stmt-val">${fv(r.budgeted)}</td>`
+      : `<td class="stmt-val"><input class="stmt-input" type="text" data-answer="${r.budgeted}" data-col="b" placeholder="?"></td>`;
+    const aCell = r.givenActual
+      ? `<td class="stmt-val">${fv(r.actual)}</td>`
+      : `<td class="stmt-val"><input class="stmt-input" type="text" data-answer="${r.actual}" data-col="a" placeholder="?"></td>`;
+    const vCell = `<td class="stmt-val"><input class="stmt-input stmt-input-var" type="text" data-answer="${r.variance}" data-fa="${r.fa}" data-col="v" placeholder="e.g. 15 F"></td>`;
+    return `<tr class="${cls}"><td>${label}</td>${bCell}${aCell}${vCell}</tr>`;
+  }).join('');
+  return stmtHeader(stmt, 'Budget — for the period ended 31 December 20XX')
+    + decoyBlock(stmt.decoys)
+    + `<table class="stmt-table">${budgetTableHead()}<tbody>${rows}</tbody></table>`;
+}
+
+function renderBudgetFigures(stmt) {
+  const items = stmt.rows.filter(r => r.givenBudgeted).map(r =>
+    `<div class="fig-row"><span class="fig-label">${r.label} — Budgeted</span><span class="fig-val">${fv(r.budgeted)}</span></div>
+     <div class="fig-row"><span class="fig-label">${r.label} — Actual</span><span class="fig-val">${fv(r.actual)}</span></div>`
+  ).join('');
+  const extra = huntMode
+    ? stmt.decoys.map(d => `<div class="fig-row"><span class="fig-label">${d.label}</span><span class="fig-val">${fv(d.value)}</span></div>`).join('')
+    : '';
+  return stmtHeader(stmt, 'Budget — for the period ended 31 December 20XX')
+    + `<div class="figures-list"><div class="figures-heading">Figures provided ($000)</div>${items}${extra}</div>`;
+}
+
+function renderBudgetComplete(stmt) {
+  const rows = stmt.rows.map(r => {
+    const label = r.bold ? `<strong>${r.label}</strong>` : r.label;
+    const cls   = r.bold ? 'stmt-row-calc' : 'stmt-row-given';
+    return `<tr class="${cls}">
+      <td>${label}</td>
+      <td class="stmt-val">${fv(r.budgeted)}</td>
+      <td class="stmt-val">${fv(r.actual)}</td>
+      <td class="stmt-val">${fv(r.variance)}${faTag(r.fa, true)}</td>
+    </tr>`;
+  }).join('');
+  return stmtHeader(stmt, 'Budget — for the period ended 31 December 20XX')
+    + `<table class="stmt-table">${budgetTableHead()}<tbody>${rows}</tbody></table>`;
 }
 
 // ── Rating & progression ──

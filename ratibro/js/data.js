@@ -677,21 +677,58 @@ function generateCashFlowStatement(hunt, annualSalesRef) {
     skillId: 'cash-flow-forecasts' };
 }
 
+function generateBudgetStatement(hunt) {
+  const budgetedRevenue = randBetween(300, 2000, 50);
+  const revDiffPct      = randBetween(-15, 15, 5);
+  const actualRevenue   = r25(budgetedRevenue * (1 + revDiffPct / 100));
+  const revenueVar      = Math.abs(actualRevenue - budgetedRevenue);
+  const revenueFA       = actualRevenue >= budgetedRevenue ? 'F' : 'A';
+
+  const budgetedCosts   = r25(budgetedRevenue * randBetween(40, 75, 5) / 100);
+  const costDiffPct     = randBetween(-15, 15, 5);
+  const actualCosts     = r25(budgetedCosts * (1 + costDiffPct / 100));
+  const costsVar        = Math.abs(actualCosts - budgetedCosts);
+  const costsFA         = actualCosts <= budgetedCosts ? 'F' : 'A';
+
+  const budgetedExcess  = budgetedRevenue - budgetedCosts;
+  const actualExcess    = actualRevenue   - actualCosts;
+  const excessVar       = Math.abs(actualExcess - budgetedExcess);
+  const excessFA        = actualExcess >= budgetedExcess ? 'F' : 'A';
+
+  // rows: givenBudgeted / givenActual flags drive fill-in-blanks
+  const rows = [
+    { label: 'Total revenues',              budgeted: budgetedRevenue, actual: actualRevenue, variance: revenueVar, fa: revenueFA, givenBudgeted: true,  givenActual: true,  givenExcess: false, bold: false },
+    { label: 'Total costs',                 budgeted: budgetedCosts,   actual: actualCosts,   variance: costsVar,   fa: costsFA,   givenBudgeted: true,  givenActual: true,  givenExcess: false, bold: false },
+    { label: 'Excess of revenues over costs', budgeted: budgetedExcess, actual: actualExcess, variance: excessVar, fa: excessFA, givenBudgeted: false, givenActual: false, givenExcess: false, bold: true  },
+  ];
+
+  const decoys = hunt ? [
+    { label: 'Capital expenditure (budgeted)', value: r25(budgetedCosts * 0.2) },
+    { label: 'Last year\'s total revenue',     value: r25(budgetedRevenue * randBetween(85, 115, 5) / 100) },
+    { label: 'Marketing budget',               value: r25(budgetedCosts * 0.15) },
+  ] : [];
+
+  return { type: 'budget', company: stmtCompany(), rows, decoys, skillId: 'variances' };
+}
+
 function generateAllStatements(hunt) {
-  const pl  = generatePLStatement(hunt);
-  const sfp = generateSFPStatement(hunt, pl.data.retainedProfit);
-  sfp.company = pl.company;
-  const cf  = generateCashFlowStatement(hunt, pl.data.salesRevenue);
-  cf.company = pl.company;
-  return [pl, sfp, cf];
+  const pl     = generatePLStatement(hunt);
+  const sfp    = generateSFPStatement(hunt, pl.data.retainedProfit);
+  sfp.company  = pl.company;
+  const cf     = generateCashFlowStatement(hunt, pl.data.salesRevenue);
+  cf.company   = pl.company;
+  const budget = generateBudgetStatement(hunt);
+  budget.company = pl.company;
+  return [pl, sfp, cf, budget];
 }
 
 function generateStatement(type, hunt) {
   if (type === 'surprise') {
-    const t = ['pl','sfp','cashflow'];
-    return generateStatement(t[Math.floor(Math.random() * 3)], hunt);
+    const t = ['pl','sfp','cashflow','budget'];
+    return generateStatement(t[Math.floor(Math.random() * t.length)], hunt);
   }
   if (type === 'pl')       return generatePLStatement(hunt);
   if (type === 'sfp')      return generateSFPStatement(hunt);
   if (type === 'cashflow') return generateCashFlowStatement(hunt);
+  if (type === 'budget')   return generateBudgetStatement(hunt);
 }
