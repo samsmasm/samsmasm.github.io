@@ -83,16 +83,16 @@
 <body>
 
     <div class="controls">
-        <label for="countrySelect"><strong>Country:</strong>
-            <select id="countrySelect">
-                <option value="">Loading...</option>
+        <label for="mainSelect"><strong>Select:</strong>
+            <select id="mainSelect">
+                <option value="">-- Choose --</option>
             </select>
         </label>
         <button id="regenerateBtn" disabled>Regenerate</button>
         <div class="threshold-group">
             <label for="threshold">Win radius:</label>
             <input id="threshold" type="number" value="1" min="0.1" max="50" step="0.1">
-            <span>% of country width</span>
+            <span>% of shape width</span>
         </div>
     </div>
 
@@ -107,7 +107,7 @@
     <script>
         const canvas = document.getElementById('mapCanvas');
         const ctx = canvas.getContext('2d');
-        const select = document.getElementById('countrySelect');
+        const select = document.getElementById('mainSelect');
         const regenerateBtn = document.getElementById('regenerateBtn');
         const thresholdInput = document.getElementById('threshold');
         const statusDiv = document.getElementById('status');
@@ -115,15 +115,15 @@
         const clickCountDiv = document.getElementById('clickCount');
 
         // --- Game State ---
-        let geojsonFeatures = [];
+        let allFeatures = [];      // shapes first, then countries
         let currentFeature = null;
-        let treasure = null;       // {x, y} in canvas pixel coords
-        let clickCircles = [];     // [{x, y, radius, colorIndex}]
+        let treasure = null;
+        let clickCircles = [];
         let clickCount = 0;
         let won = false;
-        let projectFn = null;      // (lon, lat) => {x, y}
-        let pixelRings = [];       // all rings as [{x,y}] arrays, for hit-testing
-        let countryPixelWidth = 0; // pixel width of country bounding box
+        let projectFn = null;
+        let pixelRings = [];
+        let countryPixelWidth = 0;
 
         const SPECTRUM = [
             '#e74c3c', // red
@@ -135,31 +135,140 @@
             '#9b59b6', // violet
         ];
 
-        // --- Load Data ---
+        // --- Shape definitions ---
+        // Coordinates are arbitrary (treated like lon/lat); projection scales to fit canvas.
+        // Y increases upward (like latitude). All rings closed (first = last point).
+        const SHAPE_DEFS = [
+            {
+                name: 'Equilateral Triangle',
+                coords: [[0,0],[10,0],[5,8.66],[0,0]]
+            },
+            {
+                name: 'Square',
+                coords: [[0,0],[10,0],[10,10],[0,10],[0,0]]
+            },
+            {
+                name: 'Wide Rectangle',
+                coords: [[0,0],[20,0],[20,8],[0,8],[0,0]]
+            },
+            {
+                name: 'Tall Rectangle',
+                coords: [[0,0],[8,0],[8,20],[0,20],[0,0]]
+            },
+            {
+                name: 'L-shape',
+                coords: [[0,0],[10,0],[10,4],[4,4],[4,10],[0,10],[0,0]]
+            },
+            {
+                name: 'T-shape',
+                // Stem bottom, bar top
+                coords: [[3,0],[7,0],[7,7],[10,7],[10,10],[0,10],[0,7],[3,7],[3,0]]
+            },
+            {
+                name: 'Five-pointed Star',
+                // Alternating outer (R=5) and inner (r=2) points, center (5,5)
+                coords: [
+                    [5,10],[3.82,6.62],[0.24,6.55],[3.10,4.38],[2.06,0.96],
+                    [5,3],[7.94,0.96],[6.90,4.38],[9.76,6.55],[6.18,6.62],[5,10]
+                ]
+            },
+            {
+                name: 'Cross',
+                coords: [[3,0],[7,0],[7,3],[10,3],[10,7],[7,7],[7,10],[3,10],[3,7],[0,7],[0,3],[3,3],[3,0]]
+            },
+            {
+                name: 'Regular Pentagon',
+                // Center (5,5), R=5, top vertex at top
+                coords: [[5,10],[0.24,6.55],[2.06,0.96],[7.94,0.96],[9.76,6.55],[5,10]]
+            },
+            {
+                name: 'Regular Hexagon',
+                // Center (5,5), R=5, flat top/bottom
+                coords: [[5,10],[0.67,7.5],[0.67,2.5],[5,0],[9.33,2.5],[9.33,7.5],[5,10]]
+            },
+            {
+                name: 'Parallelogram',
+                coords: [[2,0],[12,0],[10,8],[0,8],[2,0]]
+            },
+            {
+                name: 'Diamond',
+                coords: [[5,0],[10,5],[5,10],[0,5],[5,0]]
+            },
+            {
+                name: 'Arrow',
+                // Pointing right
+                coords: [[0,3],[7,3],[7,0],[12,5],[7,10],[7,7],[0,7],[0,3]]
+            },
+            {
+                name: 'House',
+                // Square base with triangular roof
+                coords: [[0,0],[10,0],[10,6],[5,11],[0,6],[0,0]]
+            },
+            {
+                name: 'Octagon',
+                // Center (5,5), R=5
+                coords: [[5,10],[1.46,8.54],[0,5],[1.46,1.46],[5,0],[8.54,1.46],[10,5],[8.54,8.54],[5,10]]
+            },
+        ];
+
+        function makeShapeFeature(def) {
+            return {
+                type: 'Feature',
+                properties: { ADMIN: def.name },
+                geometry: { type: 'Polygon', coordinates: [def.coords] }
+            };
+        }
+
+        // --- Populate select with shapes immediately (no fetch needed) ---
+        const shapeFeatures = SHAPE_DEFS.map(makeShapeFeature);
+        allFeatures = [...shapeFeatures];
+
+        const shapeGroup = document.createElement('optgroup');
+        shapeGroup.label = 'Shapes';
+        shapeFeatures.forEach((f, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = f.properties.ADMIN;
+            shapeGroup.appendChild(opt);
+        });
+        select.appendChild(shapeGroup);
+
+        // --- Load country data ---
         fetch('countries.geojson')
             .then(r => r.json())
             .then(data => {
-                geojsonFeatures = data.features.sort((a, b) => {
+                const countryFeatures = data.features.sort((a, b) => {
                     const na = a.properties.ADMIN || a.properties.name || '';
                     const nb = b.properties.ADMIN || b.properties.name || '';
                     return na.localeCompare(nb);
                 });
-                select.innerHTML = '<option value="">-- Choose a Country --</option>';
-                geojsonFeatures.forEach((f, i) => {
+
+                const countryGroup = document.createElement('optgroup');
+                countryGroup.label = 'Countries';
+                const offset = allFeatures.length;
+                countryFeatures.forEach((f, i) => {
+                    allFeatures.push(f);
                     const opt = document.createElement('option');
-                    opt.value = i;
+                    opt.value = offset + i;
                     opt.textContent = f.properties.ADMIN || f.properties.name || 'Unknown';
-                    select.appendChild(opt);
+                    countryGroup.appendChild(opt);
                 });
+                select.appendChild(countryGroup);
             })
             .catch(() => {
-                select.innerHTML = '<option value="">Error - run a local server</option>';
+                const errGroup = document.createElement('optgroup');
+                errGroup.label = 'Countries';
+                const opt = document.createElement('option');
+                opt.disabled = true;
+                opt.textContent = 'Error loading - run a local server';
+                errGroup.appendChild(opt);
+                select.appendChild(errGroup);
             });
 
         // --- Event Listeners ---
         select.addEventListener('change', e => {
             if (e.target.value === '') return;
-            currentFeature = geojsonFeatures[e.target.value];
+            currentFeature = allFeatures[parseInt(e.target.value)];
             regenerateBtn.disabled = false;
             initGame();
         });
@@ -231,12 +340,12 @@
             for (let i = 0; i < 10000; i++) {
                 const x = rxMin + Math.random() * (rxMax - rxMin);
                 const y = ryMin + Math.random() * (ryMax - ryMin);
-                if (pointInCountry(x, y)) {
+                if (pointInShape(x, y)) {
                     treasure = { x, y };
                     return;
                 }
             }
-            // Fallback: centroid of the largest ring
+            // Fallback: centroid of first ring
             const ring = pixelRings[0];
             treasure = {
                 x: ring.reduce((s, p) => s + p.x, 0) / ring.length,
@@ -244,8 +353,8 @@
             };
         }
 
-        // --- Point-in-polygon (ray casting, even-odd) ---
-        function pointInCountry(px, py) {
+        // --- Point-in-polygon (ray casting, even-odd rule) ---
+        function pointInShape(px, py) {
             let inside = false;
             for (const ring of pixelRings) {
                 for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -270,7 +379,7 @@
             const px = (e.clientX - rect.left) * sx;
             const py = (e.clientY - rect.top) * sy;
 
-            if (!pointInCountry(px, py)) {
+            if (!pointInShape(px, py)) {
                 setStatus('Click must be on land.');
                 return;
             }
@@ -295,12 +404,12 @@
         // --- Drawing ---
         function redraw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawCountry();
+            drawShape();
             clickCircles.forEach(drawCircle);
             if (won) drawGem();
         }
 
-        function drawCountry() {
+        function drawShape() {
             const polygons = getPolygons(currentFeature);
             ctx.fillStyle = '#a8e6cf';
             ctx.strokeStyle = '#444';
@@ -322,18 +431,15 @@
 
         function drawCircle(c) {
             const color = SPECTRUM[c.colorIndex];
-            // Filled circle (transparent)
             ctx.beginPath();
             ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
             ctx.fillStyle = color + '20';
             ctx.fill();
-            // Ring
             ctx.beginPath();
             ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.stroke();
-            // Click dot
             ctx.beginPath();
             ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
             ctx.fillStyle = color;
@@ -360,6 +466,25 @@
 
         function setStatus(msg) { statusDiv.textContent = msg; }
         function setWinMsg(msg) { winMsgDiv.textContent = msg; }
+
+        // --- Convex Hull (for future use / Welzl safety) ---
+        function convexHull(points) {
+            if (points.length <= 3) return points;
+            const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+            const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+            const lower = [], upper = [];
+            for (const p of pts) {
+                while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+                lower.push(p);
+            }
+            for (let i = pts.length - 1; i >= 0; i--) {
+                const p = pts[i];
+                while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+                upper.push(p);
+            }
+            upper.pop(); lower.pop();
+            return lower.concat(upper);
+        }
     </script>
 </body>
 </html>
