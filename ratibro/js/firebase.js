@@ -84,7 +84,8 @@ async function recordAttempt(uid, skillId, rating) {
   progress[skillId].ratings.push({ rating, timestamp: Date.now() });
   progress[skillId].attempts = (progress[skillId].attempts || 0) + 1;
 
-  await updateDoc(ref, { progress });
+  // setDoc with merge works even if the document doesn't exist yet
+  await setDoc(ref, { progress }, { merge: true });
 }
 
 // === Firestore: Teacher ===
