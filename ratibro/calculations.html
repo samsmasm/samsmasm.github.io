@@ -23,6 +23,10 @@
         <button class="count-btn" onclick="selectCount(5)">5</button>
         <button class="count-btn selected" onclick="selectCount(10)">10</button>
       </div>
+      <div class="mode-picker">
+        <button class="mode-btn selected" id="mode-just" onclick="selectMode('just')">Just the numbers</button>
+        <button class="mode-btn" id="mode-hunt" onclick="selectMode('hunt')">Make me hunt</button>
+      </div>
       <button class="btn-primary" onclick="startSession()">Start session</button>
     </div>
 
@@ -34,18 +38,9 @@
         </div>
 
         <div class="calc-question-card" id="calc-card">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-            <div style="flex:1;min-width:0;">
-              <div class="calc-formula-name" id="calc-name"></div>
-              <div class="formula-peek-wrap" id="formula-peek-wrap">
-                <div class="calc-formula-str" id="calc-formula"></div>
-                <div class="formula-peek-cover" id="formula-peek-cover">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  Hold to peek
-                </div>
-              </div>
-            </div>
-            <span class="text-muted" style="font-size:0.8rem;font-weight:700;margin-left:12px;flex-shrink:0;" id="calc-counter"></span>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;">
+            <div class="calc-formula-name" id="calc-name"></div>
+            <span class="text-muted" style="font-size:0.8rem;font-weight:700;flex-shrink:0;margin-left:12px;" id="calc-counter"></span>
           </div>
 
           <div class="calc-inputs" id="calc-inputs"></div>
@@ -59,6 +54,14 @@
           <div class="def-actions">
             <button class="btn-secondary" onclick="skipCalc()">Skip</button>
             <button class="btn-secondary btn-reveal" id="calc-reveal-btn" onclick="revealCalcAnswer()">Reveal answer</button>
+          </div>
+
+          <div class="formula-peek-wrap" id="formula-peek-wrap">
+            <div class="calc-formula-str" id="calc-formula"></div>
+            <div class="formula-peek-cover" id="formula-peek-cover">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Hold to peek at formula
+            </div>
           </div>
 
           <div class="calc-correct-answer" id="calc-correct-answer">
@@ -125,11 +128,38 @@
   });
 
   let selectedCount = 10;
+  let huntMode = false;
   let sessionQuestions = [];
   let currentIndex = 0;
   let sessionResults = [];
 
   const FORMULA_KEYS = Object.keys(FORMULAS);
+
+  window.selectMode = function(mode) {
+    huntMode = mode === 'hunt';
+    document.getElementById('mode-just').classList.toggle('selected', !huntMode);
+    document.getElementById('mode-hunt').classList.toggle('selected', huntMode);
+  };
+
+  const DECOY_POOL = ['grossProfit','salesRevenue','pbit','capitalEmployed',
+    'currentAssets','currentLiabilities','stock','costOfSales',
+    'avgStock','debtors','creditors','nonCurrentLiabilities','totalReturns'];
+
+  function generateDecoys(q) {
+    const realKeys = new Set(q.formula.inputs);
+    const pool = DECOY_POOL.filter(k => !realKeys.has(k));
+    const count = 2 + Math.floor(Math.random() * 2); // 2 or 3 decoys
+    const picked = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+    const realMonetary = Object.entries(q.values)
+      .filter(([k]) => k !== 'yearsOfUse').map(([, v]) => v);
+    const base = realMonetary[Math.floor(Math.random() * realMonetary.length)] || 200000;
+    const result = {};
+    picked.forEach(key => {
+      const factor = 0.3 + Math.random() * 1.2;
+      result[key] = Math.round(base * factor / 25000) * 25000;
+    });
+    return result;
+  }
 
   // Formula peek interaction — set up once, works for all questions
   (function setupPeek() {
@@ -195,13 +225,17 @@
     checkEl.innerHTML = '';
     document.getElementById('formula-peek-wrap').classList.remove('peeking');
 
-    document.getElementById('calc-inputs').innerHTML = q.formula.inputs.map(key => {
-      const val = key === 'yearsOfUse'
-        ? fmt(q.values[key]) + ' years'
-        : '$' + fmt(q.values[key]);
+    let displayEntries = q.formula.inputs.map(k => [k, q.values[k]]);
+    if (huntMode) {
+      const decoys = generateDecoys(q);
+      displayEntries = [...displayEntries, ...Object.entries(decoys)]
+        .sort(() => Math.random() - 0.5);
+    }
+    document.getElementById('calc-inputs').innerHTML = displayEntries.map(([key, val]) => {
+      const display = key === 'yearsOfUse' ? fmt(val) + ' years' : '$' + fmt(val);
       return `<div class="calc-input-row">
         <div class="calc-input-label">${INPUT_LABELS[key]}</div>
-        <div class="calc-input-value">${val}</div>
+        <div class="calc-input-value">${display}</div>
       </div>`;
     }).join('');
   }
