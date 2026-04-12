@@ -117,16 +117,22 @@
     return progressCache[skillId] || { ratings: [], attempts: 0 };
   }
 
+  function earnedRating(p) {
+    // Last non-self-report rating, or null
+    return [...p.ratings].reverse().find(r => !r.selfReport)?.rating || null;
+  }
+
   function renderStats() {
     const total = ALL_SKILLS.length;
     let rated = 0, totalAttempts = 0, greens = 0;
     ALL_SKILLS.forEach(s => {
       const p = getLocal(s.id);
-      if (p.ratings.length) {
+      const earned = earnedRating(p);
+      if (earned !== null) {
         rated++;
-        totalAttempts += p.attempts;
-        if (p.ratings[p.ratings.length - 1].rating === 4) greens++;
+        if (earned === 4) greens++;
       }
+      totalAttempts += p.attempts;
     });
     document.getElementById('stats-row').innerHTML = `
       <div class="stat-card">
@@ -149,27 +155,34 @@
       const totalSkills = unit.clusters.reduce((n, c) => n + c.skills.length, 0);
 
       const clusterHTML = unit.clusters.map(cluster => {
-        // Mini status dots — one per skill, coloured by latest rating
+        // Mini status dots — one per skill, coloured by earned (non-self-report) rating only
         const dots = cluster.skills.map(skill => {
           const p = getLocal(skill.id);
-          const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
-          const attr = latest ? `data-r="${latest}"` : '';
+          const earned = earnedRating(p);
+          const attr = earned ? `data-r="${earned}"` : '';
           return `<span class="cluster-dot" data-skill-id="${skill.id}" ${attr}></span>`;
         }).join('');
 
         // Skill sub-rows
         const skillRows = cluster.skills.map(skill => {
           const p = getLocal(skill.id);
-          const latest = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
-          const recentDots = p.ratings.slice(-8);
+          const earned = earnedRating(p);
+          const lastEntry = p.ratings[p.ratings.length - 1];
+          const selfRep = lastEntry?.selfReport ? lastEntry.rating : null;
 
-          const ratingBtns = [1,2,3,4].map(r => `
-            <button class="rating-btn${latest === r ? ' selected' : ''}" data-r="${r}"
+          const ratingBtns = [1,2,3,4].map(r => {
+            const isEarned = earned === r;
+            const isSelf   = selfRep === r && selfRep !== earned;
+            return `<button class="rating-btn${isEarned ? ' selected' : ''}${isSelf ? ' self-reported' : ''}" data-r="${r}"
               title="${RATING_MEANINGS[r]}"
               onclick="rateSkill('${skill.id}', ${r}, this)">
-            </button>`).join('');
+            </button>`;
+          }).join('');
 
-          const dotOffset = Math.max(0, p.ratings.length - 8);
+          // History dots from earned attempts only
+          const earnedOnly = p.ratings.filter(r => !r.selfReport);
+          const recentDots = earnedOnly.slice(-8);
+          const dotOffset = Math.max(0, earnedOnly.length - 8);
           const historyDots = recentDots.length
             ? recentDots.map((e, i) => {
                 const hasDetail = e.q ? `data-has-detail data-sid="${skill.id}" data-idx="${dotOffset + i}"` : '';
@@ -230,89 +243,54 @@
     document.getElementById('cluster-' + clusterId).classList.toggle('collapsed');
   };
 
+  function updateRowButtons(skillId, row) {
+    const p = progressCache[skillId] || { ratings: [], attempts: 0 };
+    const earned = earnedRating(p);
+    const lastEntry = p.ratings[p.ratings.length - 1];
+    const selfRep = lastEntry?.selfReport ? lastEntry.rating : null;
+    row.querySelectorAll('.rating-btn').forEach(b => {
+      const r = parseInt(b.dataset.r);
+      b.classList.toggle('selected', earned === r);
+      b.classList.toggle('self-reported', selfRep === r && selfRep !== earned);
+    });
+    // Update cluster header dot (earned only)
+    const clusterDot = document.querySelector(`.cluster-dot[data-skill-id="${skillId}"]`);
+    if (clusterDot) {
+      if (earned) clusterDot.dataset.r = earned;
+      else delete clusterDot.dataset.r;
+    }
+  }
+
   window.rateSkill = async function(skillId, rating, btn) {
     if (!currentUser) return;
-
-    // Self-report: push rating but do NOT increment attempts count
     if (!progressCache[skillId]) progressCache[skillId] = { ratings: [], attempts: 0 };
-    progressCache[skillId].ratings.push({ rating, timestamp: Date.now(), selfReport: true });
+    const p = progressCache[skillId];
 
-    // Update rating buttons in skill row
-    const row = btn.closest('.skill-subrow');
-    row.querySelectorAll('.rating-btn').forEach(b =>
-      b.classList.toggle('selected', parseInt(b.dataset.r) === rating));
+    const lastEntry = p.ratings[p.ratings.length - 1];
+    const activeSelfRep = lastEntry?.selfReport ? lastEntry : null;
 
-    // Update history dots in skill row
-    const dotsContainer = row.querySelector('.history-dots');
-    const placeholder = dotsContainer.querySelector('span[style]');
-    if (placeholder) placeholder.remove();
-    const existingDots = dotsContainer.querySelectorAll('.history-dot');
-    if (existingDots.length >= 8) existingDots[0].remove();
-    const dot = document.createElement('span');
-    dot.className = 'history-dot';
-    dot.dataset.r = rating;
-    dot.title = RATING_MEANINGS[rating];
-    dotsContainer.appendChild(dot);
+    if (activeSelfRep && activeSelfRep.rating === rating) {
+      // Clicking the same hollow button — remove self-report
+      p.ratings.splice(p.ratings.length - 1, 1);
+      updateRowButtons(skillId, btn.closest('.skill-subrow'));
+      renderStats();
+      showToast('Self report removed');
+      try { await recordAttempt(currentUser.uid, skillId, 0, { removeSelfReport: true }); } catch(e) {}
+      return;
+    }
 
-    // Show remove-self-report button (replace old one if present)
-    const existing = row.querySelector('.self-report-remove');
-    if (existing) existing.remove();
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'self-report-remove';
-    removeBtn.textContent = '× self report';
-    removeBtn.onclick = () => removeSelfReport(skillId, row, removeBtn);
-    row.appendChild(removeBtn);
+    // Replace any existing self-report then add new one
+    if (activeSelfRep) p.ratings.splice(p.ratings.length - 1, 1);
+    p.ratings.push({ rating, timestamp: Date.now(), selfReport: true });
 
-    // Update the cluster header dot for this skill
-    const clusterDot = document.querySelector(`.cluster-dot[data-skill-id="${skillId}"]`);
-    if (clusterDot) clusterDot.dataset.r = rating;
-
+    // No dot, no attempt count, no cluster dot change
+    updateRowButtons(skillId, btn.closest('.skill-subrow'));
     renderStats();
-    showToast(`Rated: ${RATING_MEANINGS[rating]}`);
+    showToast(`Self-rated: ${RATING_MEANINGS[rating]}`);
 
     try {
       await recordAttempt(currentUser.uid, skillId, rating, { selfReport: true });
-    } catch(e) {
-      console.error('recordAttempt failed:', e);
-    }
-  };
-
-  window.removeSelfReport = async function(skillId, row, removeBtn) {
-    const p = progressCache[skillId];
-    if (!p) return;
-    // Remove the last self-report entry
-    const idx = [...p.ratings].map((r,i) => r.selfReport ? i : -1).filter(i => i >= 0).pop();
-    if (idx !== undefined) p.ratings.splice(idx, 1);
-
-    removeBtn.remove();
-
-    // Reset rating buttons to previous rating (if any)
-    const prev = p.ratings.length ? p.ratings[p.ratings.length - 1].rating : null;
-    row.querySelectorAll('.rating-btn').forEach(b =>
-      b.classList.toggle('selected', prev !== null && parseInt(b.dataset.r) === prev));
-
-    // Remove the last history dot
-    const dots = row.querySelectorAll('.history-dot');
-    if (dots.length) dots[dots.length - 1].remove();
-    if (!row.querySelectorAll('.history-dot').length) {
-      row.querySelector('.history-dots').innerHTML =
-        '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>';
-    }
-
-    // Update cluster dot
-    const clusterDot = document.querySelector(`.cluster-dot[data-skill-id="${skillId}"]`);
-    if (clusterDot) {
-      if (prev) clusterDot.dataset.r = prev;
-      else delete clusterDot.dataset.r;
-    }
-
-    renderStats();
-    showToast('Self report removed');
-
-    try {
-      // Record a removal marker in Firestore - use rating 0 as sentinel
-      await recordAttempt(currentUser.uid, skillId, 0, { removeSelfReport: true });
-    } catch(e) { console.warn(e); }
+    } catch(e) { console.error('recordAttempt failed:', e); }
   };
 
   // ── Cluster practice config ──
