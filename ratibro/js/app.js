@@ -1,4 +1,4 @@
-// RatIBro — shared app logic: theme, sidebar, toast, SVG icons
+// RatIBro -shared app logic: theme, sidebar, toast, SVG icons
 
 // === Theme ===
 function getTheme() {
@@ -49,7 +49,7 @@ function buildSidebar(activePage, displayName, isTeacher) {
     <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle menu">☰</button>
     <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-logo">
-        <img src="ratibrosm.png" alt="RatIBro mascot">
+        <img src="ratibroicon2sm.png" alt="RatIBro mascot">
         <span class="logo-text">Rat<span class="logo-ib">IB</span>ro</span>
       </div>
       <nav class="sidebar-nav">${navHtml}</nav>
@@ -137,4 +137,27 @@ function svgLogout() {
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
     <line x1="21" y1="12" x2="9" y2="12"/>
   </svg>`;
+}
+
+// === Help modal ===
+function showHelp(html) {
+  let overlay = document.getElementById('help-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'help-overlay';
+    overlay.className = 'help-overlay';
+    overlay.innerHTML = `<div class="help-modal" role="dialog" aria-modal="true">
+      <button class="help-close" onclick="closeHelp()" aria-label="Close help">&times;</button>
+      <div id="help-body"></div>
+    </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeHelp(); });
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('help-body').innerHTML = html;
+  overlay.classList.add('visible');
+}
+
+function closeHelp() {
+  const overlay = document.getElementById('help-overlay');
+  if (overlay) overlay.classList.remove('visible');
 }

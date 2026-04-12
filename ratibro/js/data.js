@@ -1,4 +1,4 @@
-// RatIBro — IB Finance topic data
+// RatIBro -IB Finance topic data
 // Definitions sourced from IB BM glossary and curriculum. Adjust wording as needed.
 //
 // Structure: TOPICS → units → clusters[] → skills[]
@@ -16,7 +16,7 @@ const TOPICS = [
         skills: [
           { id: 'role-of-finance', name: 'Role of finance for businesses', hl: false, definition: 'Finance enables businesses to fund start-up costs, cover day-to-day expenditure, invest in growth, and measure performance. Without finance, a business cannot acquire resources, pay employees, or pursue its objectives.' },
           { id: 'capital-expenditure', name: 'Capital expenditure', hl: false, definition: 'Spending on the non-current (fixed) assets of a business, such as buildings, machinery, or vehicles. These assets are used for more than one year.' },
-          { id: 'revenue-expenditure', name: 'Revenue expenditure', hl: false, definition: 'Spending on a company\'s general operational costs — such as wages, rent, and raw materials — that enables the business to generate ongoing revenue within the accounting period.' },
+          { id: 'revenue-expenditure', name: 'Revenue expenditure', hl: false, definition: 'Spending on a company\'s general operational costs -such as wages, rent, and raw materials -that enables the business to generate ongoing revenue within the accounting period.' },
         ]
       }
     ]
@@ -40,7 +40,7 @@ const TOPICS = [
         skills: [
           { id: 'overdrafts', name: 'Overdrafts', hl: false, definition: 'A high-cost, short-term loan attached to a bank account that allows the account holder to withdraw more than they currently hold, up to an agreed limit. Flexible but expensive.' },
           { id: 'trade-credit', name: 'Trade credit', hl: false, definition: 'A type of external finance whereby a business receives products from a supplier immediately but pays for them at a later agreed date, typically 30–90 days. Effectively an interest-free short-term loan.' },
-          { id: 'crowdfunding', name: 'Crowdfunding', hl: false, definition: 'A form of finance where many people, perhaps thousands, invest small amounts of money to fund a business or project — typically via an online platform, in exchange for rewards, equity, or interest.' },
+          { id: 'crowdfunding', name: 'Crowdfunding', hl: false, definition: 'A form of finance where many people, perhaps thousands, invest small amounts of money to fund a business or project -typically via an online platform, in exchange for rewards, equity, or interest.' },
         ]
       },
       {
@@ -71,10 +71,10 @@ const TOPICS = [
         id: 'cost-types',
         name: 'Cost types',
         skills: [
-          { id: 'fixed-costs', name: 'Fixed costs', hl: false, definition: 'Those costs that, during the relevant period, do not vary with output or activity — such as rent, insurance, and salaries. They are incurred whether or not the business produces anything.' },
-          { id: 'variable-costs', name: 'Variable costs', hl: false, definition: 'Those costs that vary directly with output — such as raw materials and piece-rate labour. If output doubles, total variable costs double.' },
-          { id: 'direct-costs', name: 'Direct costs', hl: false, definition: 'A cost that is precisely traceable to a specific cost object — which may be a product, a service or a department. For example, the leather used to make a specific shoe.' },
-          { id: 'indirect-costs', name: 'Indirect costs / Overheads', hl: false, definition: 'Costs that are used in multiple areas or activities of the business and, therefore, are not traceable to a specific cost object — such as management salaries or office rent.' },
+          { id: 'fixed-costs', name: 'Fixed costs', hl: false, definition: 'Those costs that, during the relevant period, do not vary with output or activity -such as rent, insurance, and salaries. They are incurred whether or not the business produces anything.' },
+          { id: 'variable-costs', name: 'Variable costs', hl: false, definition: 'Those costs that vary directly with output -such as raw materials and piece-rate labour. If output doubles, total variable costs double.' },
+          { id: 'direct-costs', name: 'Direct costs', hl: false, definition: 'A cost that is precisely traceable to a specific cost object -which may be a product, a service or a department. For example, the leather used to make a specific shoe.' },
+          { id: 'indirect-costs', name: 'Indirect costs / Overheads', hl: false, definition: 'Costs that are used in multiple areas or activities of the business and, therefore, are not traceable to a specific cost object -such as management salaries or office rent.' },
         ]
       },
       {
@@ -104,9 +104,9 @@ const TOPICS = [
         id: 'assets-depreciation',
         name: 'Assets and depreciation',
         skills: [
-          { id: 'intangible-assets', name: 'Intangible assets', hl: false, definition: 'Non-physical items of value owned by a company that have a lifespan of more than a year — such as goodwill, patents, trademarks, and brand recognition. Harder to value than tangible assets.' },
+          { id: 'intangible-assets', name: 'Intangible assets', hl: false, definition: 'Non-physical items of value owned by a company that have a lifespan of more than a year -such as goodwill, patents, trademarks, and brand recognition. Harder to value than tangible assets.' },
           { id: 'depreciation-straight-line', name: 'Straight line depreciation', hl: true, definition: 'A method of depreciation that spreads the cost of an asset evenly over its useful life. Annual depreciation = (Cost − Residual value) ÷ Years of useful life.' },
-          { id: 'depreciation-units', name: 'Units of production depreciation', hl: true, definition: 'A method of depreciation that allocates cost based on actual usage — the more the asset is used, the more it depreciates. Depreciation per unit = (Cost − Residual value) ÷ Estimated total units.' },
+          { id: 'depreciation-units', name: 'Units of production depreciation', hl: true, definition: 'A method of depreciation that allocates cost based on actual usage -the more the asset is used, the more it depreciates. Depreciation per unit = (Cost − Residual value) ÷ Estimated total units.' },
         ]
       }
     ]
@@ -166,7 +166,7 @@ const TOPICS = [
         id: 'cashflow-concepts',
         name: 'Cash flow concepts',
         skills: [
-          { id: 'profit-vs-cashflow', name: 'Profit vs cash flow', hl: false, definition: 'Profit is the surplus of revenue over costs over a period; cash flow is the movement of money into and out of a business. A business can be profitable but still run out of cash — for example, if customers pay late or inventory is bought in large quantities.' },
+          { id: 'profit-vs-cashflow', name: 'Profit vs cash flow', hl: false, definition: 'Profit is the surplus of revenue over costs over a period; cash flow is the movement of money into and out of a business. A business can be profitable but still run out of cash -for example, if customers pay late or inventory is bought in large quantities.' },
           { id: 'working-capital', name: 'Working capital', hl: false, definition: 'The difference between current assets and current liabilities. Sufficient working capital is essential for a business to meet its short-term obligations and fund day-to-day operations.' },
           { id: 'liquidity-position', name: 'Liquidity position', hl: false, definition: 'A measure of a business\'s ability to meet its short-term financial obligations. A strong liquidity position means the business can pay its debts as they fall due; a weak liquidity position risks insolvency even if the business is profitable.' },
         ]
@@ -254,15 +254,15 @@ function getSkill(id) {
 }
 
 // ============================================================
-// Vocabulary terms — definitions practice only, no dashboard tracking
+// Vocabulary terms -definitions practice only, no dashboard tracking
 // ============================================================
 const VOCAB_TERMS = [
   // 3.2 Sources of Finance
   { id: 'collateral',          name: 'Collateral',               definition: 'An asset that a business or individual can offer a lender in the event that they do not pay back a loan. Reduces the risk to the lender.',                                                                          unit: '3.2', unitName: 'Sources of Finance',              hl: false },
   { id: 'debt-finance',        name: 'Debt finance',             definition: 'Money that is borrowed from a bank or other financial institution, usually to fund investments. Must be repaid with interest, regardless of profit.',                                                               unit: '3.2', unitName: 'Sources of Finance',              hl: false },
   { id: 'equity-finance',      name: 'Equity finance',           definition: 'A type of funding whereby the provider receives part ownership of the business in exchange for the finance. No repayment obligation, but ownership and control are diluted.',                                       unit: '3.2', unitName: 'Sources of Finance',              hl: false },
-  { id: 'internal-source',     name: 'Internal source of finance', definition: 'Money for a business that is raised from the business\'s or owner\'s existing assets — such as retained profit, sale of assets, or personal savings.',                                                          unit: '3.2', unitName: 'Sources of Finance',              hl: false },
-  { id: 'external-source',     name: 'External source of finance', definition: 'Money for a business that is raised from outside the business — such as a bank loan, share issue, or crowdfunding.',                                                                                            unit: '3.2', unitName: 'Sources of Finance',              hl: false },
+  { id: 'internal-source',     name: 'Internal source of finance', definition: 'Money for a business that is raised from the business\'s or owner\'s existing assets -such as retained profit, sale of assets, or personal savings.',                                                          unit: '3.2', unitName: 'Sources of Finance',              hl: false },
+  { id: 'external-source',     name: 'External source of finance', definition: 'Money for a business that is raised from outside the business -such as a bank loan, share issue, or crowdfunding.',                                                                                            unit: '3.2', unitName: 'Sources of Finance',              hl: false },
   { id: 'long-term-financing', name: 'Long-term financing',      definition: 'Large-scale funds needed to finance expensive equipment and facilities that a business needs to operate. Typically repaid or held for more than one year.',                                                        unit: '3.2', unitName: 'Sources of Finance',              hl: false },
   { id: 'short-term-financing',name: 'Short-term financing',     definition: 'Small-scale funds needed to pay for inputs that will soon be processed and sold by the business; used to cover short-term working capital needs.',                                                                unit: '3.2', unitName: 'Sources of Finance',              hl: false },
   { id: 'seed-capital',        name: 'Seed capital',             definition: 'Money raised by a business in the very early stages of its development, before it has a proven product or revenue stream.',                                                                                       unit: '3.2', unitName: 'Sources of Finance',              hl: false },
@@ -274,18 +274,18 @@ const VOCAB_TERMS = [
   { id: 'gross-profit',        name: 'Gross profit',             definition: 'The sales revenue of a business minus the cost of sales. It measures how efficiently the business produces or sources its products before overhead costs are considered.',                                        unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
   { id: 'contribution',        name: 'Contribution (per unit)',  definition: 'The selling price of one unit minus its variable (direct) costs. Each unit sold contributes this amount towards covering fixed costs and, eventually, profit.',                                                   unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
   { id: 'total-contribution',  name: 'Total contribution',       definition: 'The sum of all contributions across total units sold: (Selling price − Variable cost) × Quantity. Once total contribution exceeds fixed costs, the business makes a profit.',                                   unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
-  { id: 'break-even',          name: 'Break-even',               definition: 'The level of output or sales at which total revenue equals total costs — the business makes neither a profit nor a loss. Formula: Fixed costs ÷ Contribution per unit.',                                        unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
+  { id: 'break-even',          name: 'Break-even',               definition: 'The level of output or sales at which total revenue equals total costs -the business makes neither a profit nor a loss. Formula: Fixed costs ÷ Contribution per unit.',                                        unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
   { id: 'margin-of-safety',    name: 'Margin of safety',         definition: 'The difference between the current (or forecasted) output and the break-even output. It shows how far sales can fall before the business starts making a loss.',                                                unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
   { id: 'unit-average-cost',   name: 'Unit (average) cost',      definition: 'The cost of producing a single unit of output. Formula: Total costs ÷ Total output. Falls as output increases (due to fixed costs being spread over more units).',                                              unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
   { id: 'total-costs',         name: 'Total costs',              definition: 'The sum of fixed costs and variable costs at a given level of output. Total costs = Fixed costs + Variable costs.',                                                                                               unit: '3.3', unitName: 'Costs and Revenues',              hl: false },
 
   // 3.4 Final Accounts
   { id: 'asset',               name: 'Asset',                    definition: 'An item of property that has value and is owned by a person or business. Assets appear on the statement of financial position.',                                                                                  unit: '3.4', unitName: 'Final Accounts',                  hl: false },
-  { id: 'fixed-asset',         name: 'Fixed asset (non-current asset)', definition: 'An item of property that has value, is owned by a business, and which the business plans on holding or using for longer than one year — such as machinery, land, or vehicles.',                          unit: '3.4', unitName: 'Final Accounts',                  hl: false },
-  { id: 'current-assets',      name: 'Current assets',           definition: 'Cash and other assets that a business plans to convert into cash within less than one year — including debtors (accounts receivable) and stock (inventory).',                                                    unit: '3.4', unitName: 'Final Accounts',                  hl: false },
-  { id: 'current-liabilities', name: 'Current liabilities',      definition: 'Debts and other payables that are due within one year — such as overdrafts, trade creditors, and short-term loans.',                                                                                            unit: '3.4', unitName: 'Final Accounts',                  hl: false },
-  { id: 'non-current-assets',  name: 'Non-current assets',       definition: 'Assets that are likely to be kept by the business for more than one year — including tangible assets (e.g. property, machinery) and intangible assets (e.g. goodwill, patents).',                              unit: '3.4', unitName: 'Final Accounts',                  hl: false },
-  { id: 'non-current-liabilities', name: 'Non-current liabilities', definition: 'Funds that a company owes to individuals or institutions that are paid back over a period typically longer than 12 months — such as long-term loans or mortgages.',                                         unit: '3.4', unitName: 'Final Accounts',                  hl: false },
+  { id: 'fixed-asset',         name: 'Fixed asset (non-current asset)', definition: 'An item of property that has value, is owned by a business, and which the business plans on holding or using for longer than one year -such as machinery, land, or vehicles.',                          unit: '3.4', unitName: 'Final Accounts',                  hl: false },
+  { id: 'current-assets',      name: 'Current assets',           definition: 'Cash and other assets that a business plans to convert into cash within less than one year -including debtors (accounts receivable) and stock (inventory).',                                                    unit: '3.4', unitName: 'Final Accounts',                  hl: false },
+  { id: 'current-liabilities', name: 'Current liabilities',      definition: 'Debts and other payables that are due within one year -such as overdrafts, trade creditors, and short-term loans.',                                                                                            unit: '3.4', unitName: 'Final Accounts',                  hl: false },
+  { id: 'non-current-assets',  name: 'Non-current assets',       definition: 'Assets that are likely to be kept by the business for more than one year -including tangible assets (e.g. property, machinery) and intangible assets (e.g. goodwill, patents).',                              unit: '3.4', unitName: 'Final Accounts',                  hl: false },
+  { id: 'non-current-liabilities', name: 'Non-current liabilities', definition: 'Funds that a company owes to individuals or institutions that are paid back over a period typically longer than 12 months -such as long-term loans or mortgages.',                                         unit: '3.4', unitName: 'Final Accounts',                  hl: false },
   { id: 'net-assets',          name: 'Net assets',               definition: 'The total assets of a business minus the total liabilities. On the statement of financial position, net assets = equity.',                                                                                       unit: '3.4', unitName: 'Final Accounts',                  hl: false },
   { id: 'equity-sfp',          name: 'Equity (balance sheet)',   definition: 'The residual interest in the assets of the business after deducting all liabilities. Represents the owners\' stake. Equity = Assets − Liabilities. Includes share capital and retained profit.',               unit: '3.4', unitName: 'Final Accounts',                  hl: false },
   { id: 'capital-employed',    name: 'Capital employed',         definition: 'The total value of long-term finance invested in a business, calculated as non-current liabilities + equity (or equivalently, total assets − current liabilities). Used in the ROCE formula.',                  unit: '3.4', unitName: 'Final Accounts',                  hl: false },
@@ -301,27 +301,27 @@ const VOCAB_TERMS = [
   { id: 'efficiency-ratios',   name: 'Efficiency ratios',        definition: 'Financial ratios that show how well a business is managing its operations in relation to the working capital cycle. Include stock turnover, debtor days, creditor days, and gearing.',                          unit: '3.6', unitName: 'Efficiency Ratio Analysis',         hl: true  },
 
   // 3.7 Cash Flow
-  { id: 'cash-inflow',         name: 'Cash inflow',              definition: 'Cash flowing into a business — from sales revenue, loans received, asset sales, or other sources. Recorded in the cash flow forecast as a positive figure.',                                                    unit: '3.7', unitName: 'Cash Flow',                       hl: false },
-  { id: 'cash-outflow',        name: 'Cash outflow',             definition: 'Cash flowing out of a business — for raw materials, wages, rent, loan repayments, or other payments. Recorded in the cash flow forecast as a negative figure.',                                                 unit: '3.7', unitName: 'Cash Flow',                       hl: false },
+  { id: 'cash-inflow',         name: 'Cash inflow',              definition: 'Cash flowing into a business -from sales revenue, loans received, asset sales, or other sources. Recorded in the cash flow forecast as a positive figure.',                                                    unit: '3.7', unitName: 'Cash Flow',                       hl: false },
+  { id: 'cash-outflow',        name: 'Cash outflow',             definition: 'Cash flowing out of a business -for raw materials, wages, rent, loan repayments, or other payments. Recorded in the cash flow forecast as a negative figure.',                                                 unit: '3.7', unitName: 'Cash Flow',                       hl: false },
   { id: 'net-cash-flow',       name: 'Net cash flow',            definition: 'The total cash inflows minus total cash outflows for a given period. A positive net cash flow increases the closing balance; a negative one decreases it.',                                                     unit: '3.7', unitName: 'Cash Flow',                       hl: false },
   { id: 'working-capital-cycle', name: 'Working capital cycle',  definition: 'The process of turning current assets into cash that can be used to purchase the resources needed to produce a product. A faster cycle means less cash is tied up in operations.',                             unit: '3.7', unitName: 'Cash Flow',                       hl: false },
 
   // 3.8 Investment Appraisal
   { id: 'discount-rate',       name: 'Discount rate',            definition: 'The rate of return that a business could earn on another comparable investment, used in NPV calculations to reduce future cash flows to their present-day value.',                                               unit: '3.8', unitName: 'Investment Appraisal',             hl: true  },
-  { id: 'investment-appraisal-gen', name: 'Investment appraisal', definition: 'A process of quantitative and qualitative evaluation of an investment decision — to determine whether a capital investment is worthwhile. Methods include payback period, ARR, and NPV.',                     unit: '3.8', unitName: 'Investment Appraisal',             hl: false },
+  { id: 'investment-appraisal-gen', name: 'Investment appraisal', definition: 'A process of quantitative and qualitative evaluation of an investment decision -to determine whether a capital investment is worthwhile. Methods include payback period, ARR, and NPV.',                     unit: '3.8', unitName: 'Investment Appraisal',             hl: false },
 
   // 3.9 Budgets
-  { id: 'adverse-variance',    name: 'Adverse variance',         definition: 'A situation where actual income and expenditure figures are worse for the business than expected — e.g. revenue is lower or costs are higher than budgeted. Denoted (A).',                                      unit: '3.9', unitName: 'Budgets',                          hl: true  },
-  { id: 'favourable-variance', name: 'Favourable variance',      definition: 'A situation where actual income and expenditure figures are better for the business than expected — e.g. revenue is higher or costs are lower than budgeted. Denoted (F).',                                    unit: '3.9', unitName: 'Budgets',                          hl: true  },
+  { id: 'adverse-variance',    name: 'Adverse variance',         definition: 'A situation where actual income and expenditure figures are worse for the business than expected -e.g. revenue is lower or costs are higher than budgeted. Denoted (A).',                                      unit: '3.9', unitName: 'Budgets',                          hl: true  },
+  { id: 'favourable-variance', name: 'Favourable variance',      definition: 'A situation where actual income and expenditure figures are better for the business than expected -e.g. revenue is higher or costs are lower than budgeted. Denoted (F).',                                    unit: '3.9', unitName: 'Budgets',                          hl: true  },
   { id: 'variance-analysis',   name: 'Variance analysis',        definition: 'A tool used to compare a business\'s budgeted sales revenue and costs with the actual figures over a period of time. Helps managers identify where performance is above or below plan and take corrective action.', unit: '3.9', unitName: 'Budgets',                       hl: true  },
 
   // 4.3 Sales Forecasting
   { id: 'time-series-analysis', name: 'Time series analysis',    definition: 'A statistical technique used by businesses to identify trends in historical sales data, recorded at regular intervals, in order to make forecasts about future performance.',                                    unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
   { id: 'moving-average',      name: 'Moving average',           definition: 'A calculation that smooths out fluctuations in a data series by averaging consecutive groups of values. Used in sales forecasting to reveal the underlying trend.',                                             unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
   { id: 'extrapolation',       name: 'Extrapolation',            definition: 'A forecasting method that identifies trends in past data and extends them to predict future values. Assumes that historical patterns will continue, which may not always hold.',                                 unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
-  { id: 'seasonal-variations', name: 'Seasonal variations',      definition: 'Predictable fluctuations in sales that occur at the same time each year — for example, higher ice cream sales in summer or toy sales before Christmas.',                                                       unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
-  { id: 'cyclical-variations', name: 'Cyclical variations',      definition: 'Variations in data due to cyclical changes in economic activity — such as periods of growth and recession — which affect sales levels over the medium to long term.',                                           unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
-  { id: 'random-variation',    name: 'Random variation',         definition: 'Variations in sales data caused by unpredictable, one-off events that cannot be anticipated or planned for — such as extreme weather or a sudden news event.',                                                  unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
+  { id: 'seasonal-variations', name: 'Seasonal variations',      definition: 'Predictable fluctuations in sales that occur at the same time each year -for example, higher ice cream sales in summer or toy sales before Christmas.',                                                       unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
+  { id: 'cyclical-variations', name: 'Cyclical variations',      definition: 'Variations in data due to cyclical changes in economic activity -such as periods of growth and recession -which affect sales levels over the medium to long term.',                                           unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
+  { id: 'random-variation',    name: 'Random variation',         definition: 'Variations in sales data caused by unpredictable, one-off events that cannot be anticipated or planned for -such as extreme weather or a sudden news event.',                                                  unit: '4.3', unitName: 'Sales Forecasting',               hl: true  },
 ];
 
 // Combined pool for definitions practice: all skills + all vocab terms
@@ -508,7 +508,7 @@ function generateCalcQuestion(formulaKey) {
 }
 
 // ============================================================
-// Financial Statements — data generators
+// Financial Statements -data generators
 // ============================================================
 
 const STMT_COMPANIES = [
@@ -609,7 +609,7 @@ function generateSFPStatement(hunt, retainedFromPL) {
     { label: 'Total current liabilities',     total:  -totalCL,   given: false, bold: true  },
     { type: 'spacer' },
     { type: 'header', label: 'Non-current liabilities' },
-    { label: 'Borrowings — long term',        detail:  ltBorrow,  given: true,  bold: false },
+    { label: 'Borrowings -long term',        detail:  ltBorrow,  given: true,  bold: false },
     { label: 'Total non-current liabilities', total:  -totalNCL,  given: false, bold: true  },
     { label: 'Total liabilities',             total:  -totalLiab, given: false, bold: true  },
     { label: 'Net assets',                    total:   netAssets, given: false, bold: true  },
