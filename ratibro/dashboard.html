@@ -37,6 +37,14 @@
         <div class="count-label">Ask me this many:</div>
         <div class="count-picker" id="pm-count-picker"></div>
       </div>
+      <!-- Calc mode picker -->
+      <div id="pm-calc-mode-section" class="hidden">
+        <div class="count-label">Mode:</div>
+        <div class="pm-mode-btns">
+          <button class="pm-mode-btn selected" id="pm-calc-just" onclick="pmSetCalcMode(false)">Just the numbers</button>
+          <button class="pm-mode-btn" id="pm-calc-hunt" onclick="pmSetCalcMode(true)">Make me hunt</button>
+        </div>
+      </div>
       <!-- Stmt mode picker -->
       <div id="pm-stmt-section" class="hidden">
         <div class="count-label">Choose mode:</div>
@@ -316,14 +324,15 @@
   };
 
   // ── Modal state ──
-  let pmType      = 'defs';
-  let pmClusterId = '';
-  let pmStmtType  = '';   // for stmt type: 'pl','sfp','cashflow','budget'
-  let pmStmtMode  = 'fill'; // 'fill' or 'figures'
-  let pmItems     = [];   // skill objects (defs) or question objects (calc)
-  let pmIndex     = 0;
-  let pmCount     = 5;
-  let pmResults   = [];
+  let pmType          = 'defs';
+  let pmClusterId     = '';
+  let pmStmtType      = '';
+  let pmStmtMode      = 'fill';
+  let pmCalcHuntMode  = false;
+  let pmItems         = [];
+  let pmIndex         = 0;
+  let pmCount         = 5;
+  let pmResults       = [];
 
   window.openPracticeModalBtn = function(btn) {
     openPracticeModal(btn.dataset.cid, btn.dataset.cname, btn.dataset.ptype);
@@ -336,8 +345,10 @@
     document.getElementById('pm-cluster-title').textContent = clusterName;
 
     const isStmt = type === 'stmt';
+    const isCalc = type === 'calc';
     document.getElementById('pm-count-section').classList.toggle('hidden', isStmt);
     document.getElementById('pm-stmt-section').classList.toggle('hidden', !isStmt);
+    document.getElementById('pm-calc-mode-section').classList.toggle('hidden', !isCalc);
     document.getElementById('pm-badge').textContent = isStmt ? 'Statements' : (type === 'defs' ? 'Definitions' : 'Calculations');
     document.getElementById('pm-badge').className = 'pm-badge pm-badge-' + type;
 
@@ -348,6 +359,11 @@
         document.getElementById('pm-mode-' + m).classList.toggle('selected', m === 'fill');
       });
     } else {
+      if (isCalc) {
+        pmCalcHuntMode = false;
+        document.getElementById('pm-calc-just').classList.add('selected');
+        document.getElementById('pm-calc-hunt').classList.remove('selected');
+      }
       const available = type === 'defs'
         ? ALL_SKILLS.filter(s => s.clusterId === clusterId)
         : (CLUSTER_CALCS[clusterId] || []);
@@ -373,6 +389,12 @@
     ['fill','figures','hunt'].forEach(m => {
       document.getElementById('pm-mode-' + m).classList.toggle('selected', m === mode);
     });
+  };
+
+  window.pmSetCalcMode = function(hunt) {
+    pmCalcHuntMode = hunt;
+    document.getElementById('pm-calc-just').classList.toggle('selected', !hunt);
+    document.getElementById('pm-calc-hunt').classList.toggle('selected', hunt);
   };
 
   window.pmSelectCount = function(n, btn) {
@@ -424,8 +446,12 @@
       </div>`;
     } else {
       const q = item;
-      const rows = q.formula.inputs.map(k => {
-        const v = q.values[k];
+      let displayEntries = q.formula.inputs.map(k => [k, q.values[k]]);
+      if (pmCalcHuntMode) {
+        const decoys = generateDecoys(q);
+        displayEntries = [...displayEntries, ...Object.entries(decoys)].sort(() => Math.random() - 0.5);
+      }
+      const rows = displayEntries.map(([k, v]) => {
         const display = k === 'yearsOfUse' ? pmFmt(v) + ' years' : '$' + pmFmt(v);
         return `<div class="calc-input-row"><div class="calc-input-label">${INPUT_LABELS[k]}</div><div class="calc-input-value">${display}</div></div>`;
       }).join('');
@@ -451,19 +477,23 @@
   window.pmReveal = function() {
     document.getElementById('pm-reveal-btn').disabled = true;
     if (pmType === 'defs') {
-      document.getElementById('pm-def-answer').classList.add('visible');
+      const ans = document.getElementById('pm-def-answer');
+      ans.classList.remove('hidden');
+      ans.classList.add('visible');
     } else {
       const q = pmItems[pmIndex];
       const raw = (document.getElementById('pm-calc-input')?.value || '').trim();
       const checkEl = document.getElementById('pm-check-result');
-      checkEl.classList.remove('hidden', 'check-correct', 'check-wrong', 'check-no-unit');
+      checkEl.classList.remove('hidden');
       if (raw) {
         const res = pmCheckAnswer(raw, q);
         if (res === 'correct')  { checkEl.className = 'calc-check-result check-correct'; checkEl.textContent = '✓ Correct!'; }
         else if (res === 'wrong')  { checkEl.className = 'calc-check-result check-wrong';   checkEl.textContent = '✗ Not quite - see correct answer below'; }
         else { checkEl.className = 'calc-check-result check-no-unit'; checkEl.innerHTML = `Include the unit, e.g. <strong>${UNIT_EG[q.formula.unit]}</strong>`; }
       }
-      document.getElementById('pm-correct-answer').classList.remove('hidden');
+      const ca = document.getElementById('pm-correct-answer');
+      ca.classList.remove('hidden');
+      ca.classList.add('visible');
     }
     document.getElementById('pm-actions').style.display = 'none';
     document.getElementById('pm-rating').classList.add('visible');
