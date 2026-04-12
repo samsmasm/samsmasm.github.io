@@ -21,6 +21,54 @@
   </main>
 </div>
 
+<!-- ── Inline practice modal ── -->
+<div id="pm-overlay" class="pm-overlay hidden" onclick="if(event.target===this)closePracticeModal()">
+  <div class="pm-box">
+    <button class="pm-close" onclick="closePracticeModal()">&times;</button>
+
+    <!-- Setup screen -->
+    <div id="pm-setup">
+      <div class="pm-header">
+        <span class="pm-badge" id="pm-badge">Definitions</span>
+        <h3 id="pm-cluster-title"></h3>
+      </div>
+      <div class="count-label">Ask me this many:</div>
+      <div class="count-picker" id="pm-count-picker"></div>
+      <button class="btn-primary" onclick="startPMSession()">Start</button>
+    </div>
+
+    <!-- Session screen -->
+    <div id="pm-session" class="hidden">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="pm-progress-fill" style="width:0%"></div>
+      </div>
+      <div id="pm-card"></div>
+      <div class="def-actions" id="pm-actions">
+        <button class="btn-secondary" onclick="pmSkip()">Skip</button>
+        <button class="btn-secondary btn-reveal" id="pm-reveal-btn" onclick="pmReveal()">Reveal answer</button>
+      </div>
+      <div class="rating-panel" id="pm-rating">
+        <div class="rating-panel-q">How well did you do?</div>
+        <div class="rating-options">
+          <button class="rating-option" data-r="1" onclick="pmRate(1)"><span class="rating-emoji">😬</span>Don't know it</button>
+          <button class="rating-option" data-r="2" onclick="pmRate(2)"><span class="rating-emoji">🤔</span>Shaky</button>
+          <button class="rating-option" data-r="3" onclick="pmRate(3)"><span class="rating-emoji">😊</span>Getting there</button>
+          <button class="rating-option" data-r="4" onclick="pmRate(4)"><span class="rating-emoji">🎉</span>Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Done screen -->
+    <div id="pm-done" class="hidden">
+      <div class="session-summary">
+        <div class="summary-title">Done!</div>
+        <div class="summary-sub" id="pm-done-sub"></div>
+        <button class="btn-primary" style="width:auto;padding:12px 28px" onclick="closePracticeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="js/app.js"></script>
 <script src="js/data.js"></script>
 <script type="module">
@@ -128,11 +176,21 @@
             </div>`;
         }).join('');
 
+        const clusterCalcKeys = CLUSTER_CALCS[cluster.id] || [];
+        const clusterStmtType = CLUSTER_STMTS[cluster.id] || '';
+        const cname = cluster.name.replace(/"/g, '&quot;');
+        const practiceBtns = `<span class="cluster-practice-btns" onclick="event.stopPropagation()">
+          <button class="cpb cpb-defs" data-cid="${cluster.id}" data-cname="${cname}" data-ptype="defs" onclick="openPracticeModalBtn(this)">Defs</button>
+          ${clusterCalcKeys.length ? `<button class="cpb cpb-calc" data-cid="${cluster.id}" data-cname="${cname}" data-ptype="calc" onclick="openPracticeModalBtn(this)">Calc</button>` : ''}
+          ${clusterStmtType ? `<button class="cpb cpb-stmt" onclick="openStatementsFor('${clusterStmtType}')">Stmt</button>` : ''}
+        </span>`;
+
         return `
           <div class="cluster-section collapsed" id="cluster-${cluster.id}">
             <div class="cluster-row" onclick="toggleCluster('${cluster.id}')">
               <span class="cluster-name">${cluster.name}</span>
               <span class="cluster-indicators">${dots}</span>
+              ${practiceBtns}
               <span class="cluster-chevron">▼</span>
             </div>
             <div class="cluster-skills">${skillRows}</div>
@@ -201,6 +259,224 @@
     } catch(e) {
       console.error('recordAttempt failed:', e);
     }
+  };
+
+  // ── Cluster practice config ──
+  const CLUSTER_CALCS = {
+    'profitability-ratios': ['gross-profit-margin', 'profit-margin', 'roce'],
+    'liquidity-ratios':     ['current-ratio', 'acid-test'],
+    'efficiency-ratios':    ['stock-turnover-times', 'stock-turnover-days', 'debtor-days', 'creditor-days'],
+    'gearing-solvency':     ['gearing'],
+    'investment-appraisal': ['arr'],
+  };
+  const CLUSTER_STMTS = {
+    'financial-statements': 'pl',
+    'assets-depreciation':  'sfp',
+    'cashflow-concepts':    'cashflow',
+    'cashflow-management':  'cashflow',
+    'budgets':              'budget',
+  };
+  const PM_SKILL_MAP = {
+    'gross-profit-margin': 'gross-profit-margin', 'profit-margin': 'profit-margin',
+    'roce': 'roce', 'current-ratio': 'current-ratio', 'acid-test': 'acid-test-ratio',
+    'arr': 'arr', 'stock-turnover-times': 'stock-turnover', 'stock-turnover-days': 'stock-turnover',
+    'debtor-days': 'debtor-days', 'creditor-days': 'creditor-days', 'gearing': 'gearing-ratio',
+  };
+
+  // ── Modal state ──
+  let pmType     = 'defs';
+  let pmClusterId = '';
+  let pmItems    = [];   // skill objects (defs) or question objects (calc)
+  let pmIndex    = 0;
+  let pmCount    = 5;
+  let pmResults  = [];
+
+  window.openPracticeModalBtn = function(btn) {
+    openPracticeModal(btn.dataset.cid, btn.dataset.cname, btn.dataset.ptype);
+  };
+
+  function openPracticeModal(clusterId, clusterName, type) {
+    pmType      = type;
+    pmClusterId = clusterId;
+    const available = type === 'defs'
+      ? ALL_SKILLS.filter(s => s.clusterId === clusterId)
+      : (CLUSTER_CALCS[clusterId] || []);
+    if (!available.length) return;
+
+    document.getElementById('pm-cluster-title').textContent = clusterName;
+    document.getElementById('pm-badge').textContent = type === 'defs' ? 'Definitions' : 'Calculations';
+    document.getElementById('pm-badge').className = 'pm-badge pm-badge-' + type;
+
+    // Build count picker
+    const total = available.length;
+    const opts = [3, 5, 10].filter(n => n < total);
+    if (!opts.length || opts[opts.length - 1] !== total) opts.push(total);
+    pmCount = opts[0] <= 5 ? (opts.find(n => n <= 5) || opts[0]) : opts[0];
+    document.getElementById('pm-count-picker').innerHTML = opts.map(n =>
+      `<button class="count-btn${n === pmCount ? ' selected' : ''}" onclick="pmSelectCount(${n},this)">${n}</button>`
+    ).join('');
+
+    // Show setup
+    document.getElementById('pm-setup').classList.remove('hidden');
+    document.getElementById('pm-session').classList.add('hidden');
+    document.getElementById('pm-done').classList.add('hidden');
+    document.getElementById('pm-overlay').classList.remove('hidden');
+  }
+
+  window.pmSelectCount = function(n, btn) {
+    pmCount = n;
+    document.querySelectorAll('#pm-count-picker .count-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  };
+
+  window.startPMSession = function() {
+    pmIndex = 0; pmResults = [];
+    if (pmType === 'defs') {
+      const skills = ALL_SKILLS.filter(s => s.clusterId === pmClusterId);
+      pmItems = [...skills].sort(() => Math.random() - 0.5).slice(0, pmCount);
+    } else {
+      const keys = [...(CLUSTER_CALCS[pmClusterId] || [])].sort(() => Math.random() - 0.5).slice(0, pmCount);
+      pmItems = keys.map(k => generateCalcQuestion(k));
+    }
+    document.getElementById('pm-setup').classList.add('hidden');
+    document.getElementById('pm-session').classList.remove('hidden');
+    pmLoadQuestion();
+  };
+
+  const UNIT_EG = { '%': '42.5%', ':1': '1.5:1', ' days': '45 days', ' times': '3.2 times' };
+  function pmFmt(n) { return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+
+  function pmLoadQuestion() {
+    const item = pmItems[pmIndex];
+    document.getElementById('pm-progress-fill').style.width = (pmIndex / pmItems.length * 100) + '%';
+    document.getElementById('pm-rating').classList.remove('visible');
+    document.getElementById('pm-actions').style.display = '';
+    document.getElementById('pm-reveal-btn').disabled = false;
+    document.getElementById('pm-reveal-btn').textContent = 'Reveal answer';
+
+    const card = document.getElementById('pm-card');
+    if (pmType === 'defs') {
+      card.innerHTML = `<div class="def-card">
+        <div class="def-card-meta"><span class="def-card-unit">${item.unit} ${item.unitName}</span></div>
+        <div class="def-term">${item.name}${item.hl ? '<span class="hl-tag">HL</span>' : ''}</div>
+        <textarea class="def-input" id="pm-def-input" placeholder="Write your definition here..."></textarea>
+        <div class="def-answer hidden" id="pm-def-answer">
+          <div class="def-answer-label">Definition</div>
+          <div class="def-answer-text">${item.definition}</div>
+        </div>
+      </div>`;
+    } else {
+      const q = item;
+      const rows = q.formula.inputs.map(k => {
+        const v = q.values[k];
+        const display = k === 'yearsOfUse' ? pmFmt(v) + ' years' : '$' + pmFmt(v);
+        return `<div class="calc-input-row"><div class="calc-input-label">${INPUT_LABELS[k]}</div><div class="calc-input-value">${display}</div></div>`;
+      }).join('');
+      card.innerHTML = `<div class="calc-question-card">
+        <div class="calc-formula-name">${q.formula.name}</div>
+        <div class="calc-inputs">${rows}</div>
+        <div class="calc-answer-input-wrap">
+          <span class="calc-answer-label">Your answer:</span>
+          <input type="text" class="calc-answer-input" id="pm-calc-input"
+            placeholder="${UNIT_EG[q.formula.unit] || '?'}" autocomplete="off" inputmode="decimal">
+        </div>
+        <div class="calc-check-result hidden" id="pm-check-result"></div>
+        <div class="calc-correct-answer hidden" id="pm-correct-answer">
+          <div class="calc-correct-label">Correct answer</div>
+          <div class="calc-correct-value">${pmFmt(Math.round(q.answer * 100) / 100)}${q.formula.unit}</div>
+        </div>
+      </div>`;
+    }
+    // Focus textarea for defs
+    if (pmType === 'defs') setTimeout(() => document.getElementById('pm-def-input')?.focus(), 50);
+  }
+
+  window.pmReveal = function() {
+    document.getElementById('pm-reveal-btn').disabled = true;
+    if (pmType === 'defs') {
+      document.getElementById('pm-def-answer').classList.remove('hidden');
+    } else {
+      const q = pmItems[pmIndex];
+      const raw = (document.getElementById('pm-calc-input')?.value || '').trim();
+      const checkEl = document.getElementById('pm-check-result');
+      checkEl.classList.remove('hidden', 'check-correct', 'check-wrong', 'check-no-unit');
+      if (raw) {
+        const res = pmCheckAnswer(raw, q);
+        if (res === 'correct')  { checkEl.className = 'calc-check-result check-correct'; checkEl.textContent = '✓ Correct!'; }
+        else if (res === 'wrong')  { checkEl.className = 'calc-check-result check-wrong';   checkEl.textContent = '✗ Not quite - see correct answer below'; }
+        else { checkEl.className = 'calc-check-result check-no-unit'; checkEl.innerHTML = `Include the unit, e.g. <strong>${UNIT_EG[q.formula.unit]}</strong>`; }
+      }
+      document.getElementById('pm-correct-answer').classList.remove('hidden');
+    }
+    document.getElementById('pm-actions').style.display = 'none';
+    document.getElementById('pm-rating').classList.add('visible');
+  };
+
+  function pmCheckAnswer(raw, q) {
+    const unit = q.formula.unit, lower = raw.toLowerCase().replace(/\s+/g,'');
+    let hasUnit = false, numStr = raw;
+    if (unit === '%')      { hasUnit = lower.endsWith('%');     numStr = raw.replace(/%/g,'').trim(); }
+    else if (unit === ':1'){ hasUnit = lower.includes(':1');    numStr = raw.replace(/:1/gi,'').trim(); }
+    else if (unit === ' days') { hasUnit = lower.endsWith('days');  numStr = raw.toLowerCase().replace('days','').trim(); }
+    else if (unit === ' times'){ hasUnit = lower.endsWith('times'); numStr = raw.toLowerCase().replace('times','').trim(); }
+    if (!hasUnit) return 'no-unit';
+    const s = parseFloat(numStr);
+    if (isNaN(s)) return 'no-unit';
+    return Math.round(s * 100) === Math.round(q.answer * 100) ? 'correct' : 'wrong';
+  }
+
+  window.pmSkip = function() { pmResults.push({}); pmAdvance(); };
+
+  window.pmRate = async function(rating) {
+    document.getElementById('pm-rating').classList.remove('visible');
+    const item = pmItems[pmIndex];
+    if (pmType === 'defs') {
+      const s = document.getElementById('pm-def-input')?.value?.trim() || '';
+      try {
+        if (currentUser) await recordAttempt(currentUser.uid, item.id, rating, { q: item.name, s, a: item.definition });
+      } catch(e) { console.warn(e); }
+      if (!progressCache[item.id]) progressCache[item.id] = { ratings: [], attempts: 0 };
+      progressCache[item.id].ratings.push({ rating, timestamp: Date.now(), q: item.name, s, a: item.definition });
+      progressCache[item.id].attempts++;
+    } else {
+      const q = item;
+      const skillId = PM_SKILL_MAP[q.formulaKey];
+      const s = document.getElementById('pm-calc-input')?.value?.trim() || '';
+      const a = pmFmt(Math.round(q.answer * 100) / 100) + q.formula.unit;
+      try {
+        if (skillId && currentUser) await recordAttempt(currentUser.uid, skillId, rating, { q: q.formula.name, s, a });
+      } catch(e) { console.warn(e); }
+      if (skillId) {
+        if (!progressCache[skillId]) progressCache[skillId] = { ratings: [], attempts: 0 };
+        progressCache[skillId].ratings.push({ rating, timestamp: Date.now(), q: q.formula.name, s, a });
+        progressCache[skillId].attempts++;
+      }
+    }
+    pmResults.push({ rating });
+    pmAdvance();
+  };
+
+  function pmAdvance() {
+    pmIndex++;
+    if (pmIndex >= pmItems.length) {
+      renderStats();
+      renderUnits();
+      document.getElementById('pm-session').classList.add('hidden');
+      document.getElementById('pm-done').classList.remove('hidden');
+      const done = pmResults.filter(r => r.rating).length;
+      document.getElementById('pm-done-sub').textContent =
+        `You completed ${done} out of ${pmItems.length} ${pmType === 'defs' ? 'definitions' : 'calculations'}.`;
+    } else {
+      pmLoadQuestion();
+    }
+  }
+
+  window.closePracticeModal = function() {
+    document.getElementById('pm-overlay').classList.add('hidden');
+  };
+
+  window.openStatementsFor = function(stmtType) {
+    window.location.href = `statements.html?type=${stmtType}`;
   };
 
   window.showDotDetail = function(skillId, idx) {
