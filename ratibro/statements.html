@@ -107,11 +107,13 @@ onAuthChange(async user => {
 });
 
 // ── State ──
-let stmtType  = 'pl';
-let stmtMode  = 'fill';
-let huntMode  = false;
-let allQueue  = [];   // for 'all' mode: array of statement objects
-let current   = null; // current statement object
+let stmtType        = 'pl';
+let stmtMode        = 'fill';
+let huntMode        = false;
+let allQueue        = [];   // for 'all' mode: array of statement objects
+let allFiguresPhase = false; // true while showing combined figures list in all+figures mode
+let allFiguresStmts = [];   // snapshot of all 4 stmts for combined list
+let current         = null; // current statement object
 
 // ── Setup selections ──
 window.selectType = function(btn) {
@@ -142,7 +144,19 @@ window.startSession = function() {
     allQueue = generateAllStatements(huntMode);
     const track = document.getElementById('all-progress-track');
     track.style.display = 'block';
-    loadNext();
+    document.getElementById('all-progress-fill').style.width = '0%';
+    if (stmtMode === 'figures') {
+      allFiguresPhase = true;
+      allFiguresStmts = [...allQueue];
+      document.getElementById('stmt-card').innerHTML = renderAllFigures(allFiguresStmts);
+      document.getElementById('rating-panel').classList.remove('visible');
+      document.getElementById('stmt-reveal-btn').disabled = false;
+      document.getElementById('stmt-reveal-btn').textContent = 'Reveal statements';
+      document.getElementById('stmt-actions').style.display = '';
+    } else {
+      allFiguresPhase = false;
+      loadNext();
+    }
   } else {
     allQueue = [];
     document.getElementById('all-progress-track').style.display = 'none';
@@ -168,10 +182,16 @@ function renderCard(stmt) {
   document.getElementById('stmt-actions').style.display = '';
 
   const card = document.getElementById('stmt-card');
-  if (stmt.type === 'pl')       card.innerHTML = stmtMode === 'fill' ? renderPLFill(stmt)      : renderPLFigures(stmt);
-  if (stmt.type === 'sfp')      card.innerHTML = stmtMode === 'fill' ? renderSFPFill(stmt)     : renderSFPFigures(stmt);
-  if (stmt.type === 'cashflow') card.innerHTML = stmtMode === 'fill' ? renderCFFill(stmt)      : renderCFFigures(stmt);
-  if (stmt.type === 'budget')   card.innerHTML = stmtMode === 'fill' ? renderBudgetFill(stmt)  : renderBudgetFigures(stmt);
+  // In all+figures mode, each statement is shown as a complete table (student already has the combined list)
+  const useComplete = stmtType === 'all' && stmtMode === 'figures';
+  if (stmt.type === 'pl')       card.innerHTML = useComplete ? renderPLComplete(stmt)     : (stmtMode === 'fill' ? renderPLFill(stmt)     : renderPLFigures(stmt));
+  if (stmt.type === 'sfp')      card.innerHTML = useComplete ? renderSFPComplete(stmt)    : (stmtMode === 'fill' ? renderSFPFill(stmt)    : renderSFPFigures(stmt));
+  if (stmt.type === 'cashflow') card.innerHTML = useComplete ? renderCFComplete(stmt)     : (stmtMode === 'fill' ? renderCFFill(stmt)     : renderCFFigures(stmt));
+  if (stmt.type === 'budget')   card.innerHTML = useComplete ? renderBudgetComplete(stmt) : (stmtMode === 'fill' ? renderBudgetFill(stmt) : renderBudgetFigures(stmt));
+  if (useComplete) {
+    document.getElementById('stmt-actions').style.display = 'none';
+    document.getElementById('rating-panel').classList.add('visible');
+  }
 }
 
 // ── Formatting helpers ──
@@ -194,6 +214,51 @@ function decoyBlock(decoys) {
   if (!decoys.length) return '';
   const items = decoys.map(d => `<span class="decoy-item"><span class="decoy-label">${d.label}</span><span class="decoy-val">${fv(d.value)}</span></span>`).join('');
   return `<div class="decoy-block"><span class="decoy-heading">Additional information provided:</span>${items}</div>`;
+}
+
+// ── All-statements combined figures list ──
+function renderAllFigures(stmts) {
+  const allFigs = [];
+  stmts.forEach(stmt => {
+    if (stmt.type === 'pl') {
+      stmt.rows.filter(r => r.given).forEach(r =>
+        allFigs.push({ label: r.label, value: r.neg ? -r.value : r.value })
+      );
+      if (huntMode) stmt.decoys.forEach(d => allFigs.push({ label: d.label, value: d.value }));
+    } else if (stmt.type === 'sfp') {
+      stmt.rows.filter(r => r.given && !r.type).forEach(r => {
+        allFigs.push({ label: r.label, value: r.detail != null ? r.detail : r.total });
+      });
+      if (huntMode) stmt.decoys.forEach(d => allFigs.push({ label: d.label, value: d.value }));
+    } else if (stmt.type === 'cashflow') {
+      const { months } = stmt;
+      allFigs.push({ label: 'Opening balance (Month 1)', value: months[0].openingBal });
+      months.forEach(m => {
+        m.inflows.forEach(f  => allFigs.push({ label: `${m.name} \u2014 ${f.label}`, value: f.value }));
+        m.outflows.forEach(f => allFigs.push({ label: `${m.name} \u2014 ${f.label}`, value: f.value }));
+      });
+      if (huntMode) stmt.decoys.forEach(d => allFigs.push({ label: d.label, value: d.value }));
+    } else if (stmt.type === 'budget') {
+      stmt.rows.filter(r => r.givenBudgeted).forEach(r => {
+        allFigs.push({ label: `${r.label} \u2014 Budgeted`, value: r.budgeted });
+        allFigs.push({ label: `${r.label} \u2014 Actual`,   value: r.actual   });
+      });
+      if (huntMode) stmt.decoys.forEach(d => allFigs.push({ label: d.label, value: d.value }));
+    }
+  });
+  allFigs.sort(() => Math.random() - 0.5);
+  const list = allFigs.map(f =>
+    `<div class="fig-row"><span class="fig-label">${f.label}</span><span class="fig-val">${fv(f.value)}</span></div>`
+  ).join('');
+  return `<div class="stmt-meta">
+    <div class="stmt-company">${stmts[0].company}</div>
+    <div class="stmt-subtitle">All statements \u2014 complete set of figures</div>
+    <div class="stmt-unit">Figures in $000</div>
+  </div>
+  <div class="figures-list">
+    <div class="figures-heading">All figures provided \u2014 work out each of the four statements on paper, then reveal them one by one ($000)</div>
+    ${list}
+  </div>`;
 }
 
 // ── P&L ──
@@ -219,9 +284,10 @@ function renderPLFill(stmt) {
 
 function renderPLFigures(stmt) {
   const givenItems = stmt.rows.filter(r => r.given);
-  const allItems = huntMode
-    ? [...givenItems, ...stmt.decoys.map(d => ({ label: d.label, value: d.value, given: true }))].sort(() => Math.random() - 0.5)
-    : givenItems;
+  const allItems = (huntMode
+    ? [...givenItems, ...stmt.decoys.map(d => ({ label: d.label, value: d.value, given: true }))]
+    : [...givenItems]
+  ).sort(() => Math.random() - 0.5);
 
   const list = allItems.map(r =>
     `<div class="fig-row"><span class="fig-label">${r.label}</span><span class="fig-val">${fv(r.value)}</span></div>`
@@ -266,9 +332,10 @@ function renderSFPFill(stmt) {
 
 function renderSFPFigures(stmt) {
   const givenRows = stmt.rows.filter(r => r.given && !r.type);
-  const allItems = huntMode
-    ? [...givenRows, ...stmt.decoys.map(d => ({ label: d.label, detail: d.value, given: true }))].sort(() => Math.random() - 0.5)
-    : givenRows;
+  const allItems = (huntMode
+    ? [...givenRows, ...stmt.decoys.map(d => ({ label: d.label, detail: d.value, given: true }))]
+    : [...givenRows]
+  ).sort(() => Math.random() - 0.5);
 
   const list = allItems.map(r => {
     const val = r.detail != null ? r.detail : (r.total != null ? r.total : r.value);
@@ -347,9 +414,10 @@ function renderCFFigures(stmt) {
     m.outflows.forEach(f => allFigures.push({ label: `${m.name} — ${f.label}`,       value: f.value }));
   });
 
-  let items = huntMode
-    ? [...allFigures, ...stmt.decoys.map(d => ({ label: d.label, value: d.value }))].sort(() => Math.random() - 0.5)
-    : allFigures;
+  let items = (huntMode
+    ? [...allFigures, ...stmt.decoys.map(d => ({ label: d.label, value: d.value }))]
+    : [...allFigures]
+  ).sort(() => Math.random() - 0.5);
 
   const list = items.map(r =>
     `<div class="fig-row"><span class="fig-label">${r.label}</span><span class="fig-val">${fv(r.value)}</span></div>`
@@ -361,8 +429,23 @@ function renderCFFigures(stmt) {
 
 // ── Reveal ──
 window.revealStatement = function() {
-  const c = current;
   document.getElementById('stmt-reveal-btn').disabled = true;
+
+  // All+figures: transition from combined list to first statement
+  if (allFiguresPhase) {
+    allFiguresPhase = false;
+    current = allQueue.shift();
+    const card = document.getElementById('stmt-card');
+    if (current.type === 'pl')       card.innerHTML = renderPLComplete(current);
+    if (current.type === 'sfp')      card.innerHTML = renderSFPComplete(current);
+    if (current.type === 'cashflow') card.innerHTML = renderCFComplete(current);
+    if (current.type === 'budget')   card.innerHTML = renderBudgetComplete(current);
+    document.getElementById('stmt-actions').style.display = 'none';
+    document.getElementById('rating-panel').classList.add('visible');
+    return;
+  }
+
+  const c = current;
 
   if (stmtMode === 'fill') {
     document.querySelectorAll('#stmt-card .stmt-input').forEach(input => {
@@ -496,15 +579,18 @@ function renderBudgetFill(stmt) {
 }
 
 function renderBudgetFigures(stmt) {
-  const items = stmt.rows.filter(r => r.givenBudgeted).map(r =>
-    `<div class="fig-row"><span class="fig-label">${r.label} — Budgeted</span><span class="fig-val">${fv(r.budgeted)}</span></div>
-     <div class="fig-row"><span class="fig-label">${r.label} — Actual</span><span class="fig-val">${fv(r.actual)}</span></div>`
+  const figs = [];
+  stmt.rows.filter(r => r.givenBudgeted).forEach(r => {
+    figs.push({ label: `${r.label} \u2014 Budgeted`, value: r.budgeted });
+    figs.push({ label: `${r.label} \u2014 Actual`,   value: r.actual   });
+  });
+  if (huntMode) stmt.decoys.forEach(d => figs.push({ label: d.label, value: d.value }));
+  figs.sort(() => Math.random() - 0.5);
+  const list = figs.map(f =>
+    `<div class="fig-row"><span class="fig-label">${f.label}</span><span class="fig-val">${fv(f.value)}</span></div>`
   ).join('');
-  const extra = huntMode
-    ? stmt.decoys.map(d => `<div class="fig-row"><span class="fig-label">${d.label}</span><span class="fig-val">${fv(d.value)}</span></div>`).join('')
-    : '';
   return stmtHeader(stmt, 'Budget — for the period ended 31 December 20XX')
-    + `<div class="figures-list"><div class="figures-heading">Figures provided ($000)</div>${items}${extra}</div>`;
+    + `<div class="figures-list"><div class="figures-heading">Figures provided ($000)</div>${list}</div>`;
 }
 
 function renderBudgetComplete(stmt) {
@@ -537,6 +623,7 @@ window.submitRating = async function(rating) {
 };
 
 window.skipStatement = function() {
+  if (allFiguresPhase) { allFiguresPhase = false; showDone(); return; }
   if (stmtType === 'all' && allQueue.length > 0) {
     loadNext();
   } else {
@@ -547,9 +634,9 @@ window.skipStatement = function() {
 function showDone() {
   document.getElementById('session-screen').classList.add('hidden');
   document.getElementById('done-screen').classList.remove('hidden');
-  const typeNames = { pl: 'Statement of Profit or Loss', sfp: 'Statement of Financial Position', cashflow: 'Cash Flow Forecast', surprise: 'statement', all: 'all three statements' };
+  const typeNames = { pl: 'Statement of Profit or Loss', sfp: 'Statement of Financial Position', cashflow: 'Cash Flow Forecast', budget: 'Budget', surprise: 'statement' };
   document.getElementById('done-sub').textContent = stmtType === 'all'
-    ? 'You worked through all three statements.'
+    ? 'You worked through all four statements.'
     : `You completed a ${typeNames[stmtType] || 'statement'}.`;
 }
 
