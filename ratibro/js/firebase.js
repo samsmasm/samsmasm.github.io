@@ -75,13 +75,17 @@ async function getProgress(uid) {
   return data?.progress || {};
 }
 
-async function recordAttempt(uid, skillId, rating) {
+async function recordAttempt(uid, skillId, rating, meta = {}) {
   const ref = doc(db, 'users', uid);
   const data = await getUserDoc(uid);
   const progress = data?.progress || {};
 
   if (!progress[skillId]) progress[skillId] = { ratings: [], attempts: 0 };
-  progress[skillId].ratings.push({ rating, timestamp: Date.now() });
+  const entry = { rating, timestamp: Date.now() };
+  if (meta.q) entry.q = String(meta.q).substring(0, 80);
+  if (meta.s) entry.s = String(meta.s).substring(0, 200);
+  if (meta.a) entry.a = String(meta.a).substring(0, 200);
+  progress[skillId].ratings.push(entry);
   progress[skillId].attempts = (progress[skillId].attempts || 0) + 1;
 
   // setDoc with merge works even if the document doesn't exist yet

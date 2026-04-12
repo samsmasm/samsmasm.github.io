@@ -109,8 +109,12 @@
               onclick="rateSkill('${skill.id}', ${r}, this)">
             </button>`).join('');
 
+          const dotOffset = Math.max(0, p.ratings.length - 8);
           const historyDots = recentDots.length
-            ? recentDots.map(e => `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}"></span>`).join('')
+            ? recentDots.map((e, i) => {
+                const hasDetail = e.q ? `data-has-detail data-sid="${skill.id}" data-idx="${dotOffset + i}"` : '';
+                return `<span class="history-dot" data-r="${e.rating}" title="${RATING_MEANINGS[e.rating]}" ${hasDetail} onclick="showDotDetail('${skill.id}', ${dotOffset + i})"></span>`;
+              }).join('')
             : '<span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;">No attempts yet</span>';
 
           return `
@@ -197,6 +201,21 @@
     } catch(e) {
       console.error('recordAttempt failed:', e);
     }
+  };
+
+  window.showDotDetail = function(skillId, idx) {
+    const p = progressCache[skillId];
+    const entry = p && p.ratings[idx];
+    if (!entry || !entry.q) {
+      showHelp(`<h3>No details stored</h3><p style="color:var(--text-muted);font-size:0.875rem;line-height:1.5;">This attempt was recorded before detailed tracking was added. Practice again and it will show here.</p>`);
+      return;
+    }
+    const studentAns = entry.s ? entry.s : '<em style="color:var(--text-muted)">nothing written</em>';
+    showHelp(`
+      <h3>${entry.q}</h3>
+      <div class="help-item"><strong>Your answer</strong><span>${studentAns}</span></div>
+      <div class="help-item"><strong>Correct answer</strong><span>${entry.a || ''}</span></div>
+    `);
   };
 </script>
 </body>
