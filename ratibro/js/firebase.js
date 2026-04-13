@@ -20,7 +20,7 @@ const googleProvider = new GoogleAuthProvider();
 
 // === Auth ===
 
-const TEACHER_EMAIL = 'samgetsstuffdone@gmail.com';
+const TEACHER_EMAILS = ['samgetsstuffdone@gmail.com', 'cgoussard@ssis.edu.vn'];
 
 async function loginWithGoogle() {
   const cred = await signInWithPopup(auth, googleProvider);
@@ -39,7 +39,7 @@ function onAuthChange(callback) {
 
 function isTeacher(user) {
   if (!user) return false;
-  return user.email === TEACHER_EMAIL;
+  return TEACHER_EMAILS.includes(user.email);
 }
 
 function getDisplayName(user) {
@@ -111,5 +111,5 @@ export {
   ensureUserDoc, getUserDoc,
   getProgress, recordAttempt,
   getAllUsers, setRealName,
-  TEACHER_EMAIL
+  TEACHER_EMAILS
 };
