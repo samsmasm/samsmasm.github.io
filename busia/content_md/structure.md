@@ -12,11 +12,10 @@ The IB specifies a three-section structure for the BM IA. Follow it. Within each
 
 ## Section 1: Introduction (~400 words)
 
-- **State the research question.** Put it clearly, early. The examiner should know within the first sentence or two what you are investigating.
-- **Introduce the business.** Give relevant context: what it does, where it operates, its scale, and why this business and this decision matter for your RQ.
-- **Define the key concept.** Explain what Change / Creativity / Ethics / Sustainability means - and, crucially, what it means specifically in the context of this business and this question.
-- **Define your key business terms.** Any significant terminology you will use in the analysis (e.g., brand equity, market penetration, triple bottom line) should be defined here.
-- **Identify your supporting documents.** Name them briefly (Document 1, 2...) and explain what role each plays in your research.
+- **The Company (Background):** Brief background on the organization - its industry, market position, and core activities.
+- **The Issue (The Problem):** A clear outline of the specific real-world business issue or strategic decision you are investigating, and why it is significant.
+- **The Concept (The Lens):** State your chosen key concept (Change, Creativity, Ethics, or Sustainability) and explain its direct relevance to your research question.
+- **The Methodology (Research Approach):** Explain the primary and secondary sources you used, justify why they were selected, and briefly name the business tools you will apply to analyse the data.
 
 ## Section 2: Analysis and Discussion (~1,100 words)
 
