@@ -307,6 +307,27 @@
     } catch(e) { console.error('recordAttempt failed:', e); }
   };
 
+  // ── Decoy generation for hunt mode ──
+  const DECOY_POOL = ['grossProfit','salesRevenue','pbit','capitalEmployed',
+    'currentAssets','currentLiabilities','stock','costOfSales',
+    'avgStock','debtors','creditors','nonCurrentLiabilities','totalReturns'];
+
+  function generateDecoys(q) {
+    const realKeys = new Set(q.formula.inputs);
+    const pool = DECOY_POOL.filter(k => !realKeys.has(k));
+    const count = 2 + Math.floor(Math.random() * 2);
+    const picked = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+    const realMonetary = Object.entries(q.values)
+      .filter(([k]) => k !== 'yearsOfUse').map(([, v]) => v);
+    const base = realMonetary[Math.floor(Math.random() * realMonetary.length)] || 200000;
+    const result = {};
+    picked.forEach(key => {
+      const factor = 0.3 + Math.random() * 1.2;
+      result[key] = Math.round(base * factor / 25000) * 25000;
+    });
+    return result;
+  }
+
   // ── Cluster practice config ──
   const CLUSTER_CALCS = {
     'profitability-ratios': ['gross-profit-margin', 'profit-margin', 'roce'],
