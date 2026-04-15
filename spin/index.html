@@ -10,7 +10,7 @@
       --bg: #0d0d1a;
       --surface: rgba(255,255,255,0.07);
       --border: rgba(255,255,255,0.13);
-      --ctrl-h: 148px;
+      --ctrl-h: 172px;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -163,7 +163,35 @@
     .toggle input:checked + .slider { background: #22c55e; }
     .toggle input:checked + .slider::before { transform: translateX(19px); }
 
-    #tracker { font-size: 11px; opacity: 0.45; text-align: right; min-height: 14px; }
+    .bottom-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #tracker { font-size: 11px; opacity: 0.45; text-align: right; flex: 1; }
+    #deleteBtn {
+      background: none; border: none; padding: 0;
+      font-size: 11px; color: #f87171; opacity: 0.7;
+      cursor: pointer; text-decoration: underline; flex-shrink: 0;
+      font-family: inherit; font-weight: 500;
+    }
+    #deleteBtn:hover { opacity: 1; }
+
+    /* Delete modal list */
+    .del-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+    .del-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-radius: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .del-item-name { flex: 1; }
+    .del-item-btn {
+      background: #7f1d1d; color: #fca5a5; border: none;
+      border-radius: 8px; padding: 5px 12px; font-size: 12px;
+      font-weight: 600; cursor: pointer; flex-shrink: 0; font-family: inherit;
+      width: auto; flex: none;
+    }
+    .del-item-btn:hover { background: #991b1b; }
+    .del-empty { font-size: 13px; opacity: 0.45; text-align: center; padding: 16px 0; }
 
     /* ── MODALS (shared) ────────────────────────────────── */
     .modal-wrap {
@@ -266,7 +294,10 @@
       </label>
     </div>
   </div>
-  <div id="tracker"></div>
+  <div class="bottom-row">
+    <button id="deleteBtn">Delete a list</button>
+    <div id="tracker"></div>
+  </div>
 </div>
 
 <!-- TEMP CUSTOM MODAL -->
@@ -311,6 +342,18 @@
   </div>
 </div>
 
+<!-- DELETE LIST MODAL -->
+<div id="delModal" class="modal-wrap">
+  <div class="modal-box">
+    <h2>Delete a Permanent List</h2>
+    <p>Built-in lists cannot be deleted.</p>
+    <div class="del-list" id="delList"></div>
+    <div class="modal-btns" style="margin-top:4px">
+      <button class="btn-dim" id="delClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ALL-USED BANNER -->
 <div id="allUsed">
   <p>All words shown!<br>Do you want to continue?</p>
@@ -324,7 +367,7 @@
 'use strict';
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, remove, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // ── Firebase (same DB as Dowser) ─────────────────────────
 const firebaseConfig = {
@@ -718,6 +761,8 @@ document.getElementById('tempCancel').addEventListener('click', () => {
 });
 
 // ── Password modal ────────────────────────────────────────
+let deleteMode = false;
+
 function openPwModal() {
   document.getElementById('pwInput').value = '';
   document.getElementById('pwError').classList.remove('show');
@@ -732,7 +777,8 @@ document.getElementById('pwSubmit').addEventListener('click', () => {
     return;
   }
   document.getElementById('pwModal').classList.remove('open');
-  openAddModal();
+  if (deleteMode) { deleteMode = false; openDelModal(); }
+  else             { openAddModal(); }
 });
 document.getElementById('pwCancel').addEventListener('click', () => {
   document.getElementById('pwModal').classList.remove('open');
@@ -766,6 +812,49 @@ document.getElementById('addSave').addEventListener('click', () => {
 });
 document.getElementById('addCancel').addEventListener('click', () => {
   document.getElementById('addModal').classList.remove('open');
+});
+
+// ── Delete list modal ─────────────────────────────────────
+function openDelModal() {
+  const list = document.getElementById('delList');
+  list.innerHTML = '';
+  const entries = Object.entries(firebaseLists);
+  if (!entries.length) {
+    list.innerHTML = '<div class="del-empty">No saved lists to delete.</div>';
+  } else {
+    entries.forEach(([fbKey, data]) => {
+      const row = document.createElement('div');
+      row.className = 'del-item';
+      row.innerHTML = `<span class="del-item-name">${data.title}</span>`;
+      const btn = document.createElement('button');
+      btn.className = 'del-item-btn';
+      btn.textContent = 'Delete';
+      btn.addEventListener('click', () => {
+        remove(ref(db, 'spinLists/' + fbKey)).then(() => {
+          // If this was the active set, fall back to animals
+          if (currentSetKey === 'fb_' + fbKey) {
+            currentSetKey = '__animals__';
+            loadSet('__animals__');
+          }
+          row.remove();
+          if (!document.querySelector('.del-item')) {
+            list.innerHTML = '<div class="del-empty">No saved lists to delete.</div>';
+          }
+        });
+      });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('delModal').classList.add('open');
+}
+document.getElementById('delClose').addEventListener('click', () => {
+  document.getElementById('delModal').classList.remove('open');
+});
+
+document.getElementById('deleteBtn').addEventListener('click', () => {
+  deleteMode = true;
+  openPwModal();
 });
 
 // ── Toggles ───────────────────────────────────────────────
