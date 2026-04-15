@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Spin!</title>
+  <style>
+    :root {
+      --gold: #FFD700;
+      --bg: #0d0d1a;
+      --surface: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.13);
+      --ctrl-h: 148px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Ambient glow background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 80% at 0% 50%, #1e0a3c 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 80% 20%, #0a1e3c 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ── WHEEL AREA ─────────────────────────────────────── */
+    #wheelWrap {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: var(--ctrl-h);
+      overflow: hidden;
+    }
+
+    #wheelCanvas {
+      position: absolute;
+      /* Most of wheel off-screen left; right portion visible */
+      left: -520px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      transition: filter 0.1s;
+    }
+    #wheelCanvas.charged {
+      filter: brightness(1.15) drop-shadow(0 0 12px rgba(255,215,0,0.4));
+    }
+
+    /* Pointer arrow (pointing LEFT, sitting just right of wheel edge) */
+    #pointer {
+      position: absolute;
+      left: 256px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      width: 0; height: 0;
+      border-top: 20px solid transparent;
+      border-bottom: 20px solid transparent;
+      border-right: 36px solid var(--gold);
+      filter: drop-shadow(0 0 10px var(--gold)) drop-shadow(0 0 4px #fff);
+    }
+
+    /* Current word display — right of pointer */
+    #wordDisplay {
+      position: absolute;
+      left: 302px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      width: 80px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.35;
+      word-break: break-word;
+      color: var(--gold);
+      text-shadow: 0 0 12px rgba(255,215,0,0.6);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    #wordDisplay.show { opacity: 1; }
+    #wordDisplay.landed {
+      font-size: 12px;
+      color: #fff;
+      text-shadow: 0 0 16px var(--gold);
+    }
+
+    /* Hold-to-spin hint */
+    #hint {
+      position: absolute;
+      bottom: 8px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 11px;
+      opacity: 0.35;
+      pointer-events: none;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── CONTROLS ───────────────────────────────────────── */
+    #controls {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: var(--ctrl-h);
+      padding: 10px 14px 18px;
+      background: rgba(10, 10, 22, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    select {
+      flex: 1;
+      padding: 9px 30px 9px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ffffff55'/%3E%3C/svg%3E")
+        no-repeat right 11px center;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      appearance: none;
+      -webkit-appearance: none;
+      outline: none;
+    }
+
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .toggle-group span {
+      font-size: 12px;
+      opacity: 0.65;
+    }
+
+    .toggle {
+      position: relative;
+      width: 42px; height: 23px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #333;
+      border-radius: 23px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 17px; height: 17px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.25s;
+    }
+    .toggle input:checked + .slider { background: #22c55e; }
+    .toggle input:checked + .slider::before { transform: translateX(19px); }
+
+    #tracker {
+      font-size: 11px;
+      opacity: 0.45;
+      text-align: right;
+      min-height: 14px;
+    }
+
+    /* ── CUSTOM MODAL ───────────────────────────────────── */
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+    }
+    #modal.open { display: flex; }
+
+    .modal-box {
+      background: #16162a;
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 20px 18px 32px;
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+    .modal-box h2 { font-size: 17px; font-weight: 700; }
+    .modal-box p  { font-size: 12px; opacity: 0.5; margin-top: -4px; }
+
+    input[type=text], textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    }
+    textarea {
+      height: 140px;
+      resize: none;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .modal-btns { display: flex; gap: 9px; }
+    button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-gold { background: var(--gold); color: #000; }
+    .btn-dim  { background: var(--surface); color: #fff; border: 1px solid var(--border); }
+
+    /* ── ALL-USED BANNER ────────────────────────────────── */
+    #allUsed {
+      display: none;
+      position: fixed;
+      top: 14px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      background: #16162a;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px 18px;
+      min-width: 260px;
+      max-width: 340px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+    #allUsed.show { display: block; }
+    #allUsed p { font-size: 14px; margin-bottom: 12px; }
+    #allUsed .modal-btns button { font-size: 14px; padding: 10px; }
+  </style>
+</head>
+<body>
+
+<!-- WHEEL -->
+<div id="wheelWrap">
+  <canvas id="wheelCanvas" width="800" height="800"></canvas>
+  <div id="pointer"></div>
+  <div id="wordDisplay"></div>
+  <div id="hint">Hold the wheel to spin &bull; longer hold = longer spin</div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <div class="ctrl-row">
+    <select id="setSelect"></select>
+    <div class="toggle-group">
+      <span>No&nbsp;repeat</span>
+      <label class="toggle">
+        <input type="checkbox" id="noRepeat">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  <div id="tracker"></div>
+</div>
+
+<!-- CUSTOM WORD SET MODAL -->
+<div id="modal">
+  <div class="modal-box">
+    <h2>Custom Word Set</h2>
+    <p>One word per line, or comma-separated &mdash; then tap Use.</p>
+    <input type="text" id="customTitle" placeholder="Set title (e.g. My Words)">
+    <textarea id="customWords" placeholder="Word 1&#10;Word 2&#10;Word 3&#10;&#10;or: Word 1, Word 2, Word 3"></textarea>
+    <div class="modal-btns">
+      <button class="btn-gold" id="customSave">Use these words</button>
+      <button class="btn-dim"  id="customCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ALL-WORDS-SHOWN BANNER -->
+<div id="allUsed">
+  <p>All words shown!<br>Do you want to continue?</p>
+  <div class="modal-btns">
+    <button class="btn-gold" id="continueYes">Yes, reset</button>
+    <button class="btn-dim"  id="continueNo">No</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORD SETS
+// ─────────────────────────────────────────────────────────────────────────────
+const BUILT_IN = {
+  "IB BM Unit 1": [
+    "Sole Trader","Partnership","Primary Sector","Secondary Sector",
+    "Tertiary Sector","Quaternary Sector","Limited Liability","Unlimited Liability",
+    "Public Sector","Private Sector","Entrepreneurship","Intrapreneurship",
+    "Business Plan","Cooperative","Microfinance","Public-Private Partnership",
+    "NGO","Charity","Vision Statement","Mission Statement",
+    "Aims","Objectives","Strategies","Tactics",
+    "Ethical Objectives","CSR","Internal Stakeholder","External Stakeholder",
+    "Shareholders","Managers","Employees","Customers",
+    "Suppliers","Competitors","Special Interest Group","Stakeholder Conflict",
+    "Deindustrialization","Market Research","Pressure Group Protest","Business Failure",
+    "Promotion/Marketing","Supply Chain Break","Government Regulation","Ethical Dilemma",
+    "Redundancy","Product Design","Expansion","Production Bottleneck",
+    "Recruitment (HR)","Training (HR)","Profit & Loss Account","Cash Flow Forecast",
+    "Pricing Strategy","Target Market","Quality Control","Just-in-Time",
+    "Capital-Intensive","Labour-Intensive","Audit","Market Share","Outsourcing"
+  ]
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COLOURS  (wheel-of-fortune palette, 20 vivid colours)
+// ─────────────────────────────────────────────────────────────────────────────
+const COLORS = [
+  '#E63946','#F4A261','#E9C46A','#2A9D8F','#457B9D',
+  '#6A4C93','#F72585','#4CC9F0','#F77F00','#43AA8B',
+  '#E76F51','#3A86FF','#8338EC','#FB5607','#06D6A0',
+  '#FFB703','#DC2F02','#1D3557','#80B918','#D62828',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS / WHEEL GEOMETRY
+// ─────────────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('wheelCanvas');
+const ctx    = canvas.getContext('2d');
+const CX = 400, CY = 400, R = 378;   // canvas center & radius
+const TAU = 2 * Math.PI;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let wordSets      = { ...BUILT_IN };
+let currentSet    = Object.keys(BUILT_IN)[0];
+let words         = [];          // active word list
+let available     = [];          // remaining in no-repeat pool
+let noRepeatOn    = false;
+let rotation      = 0;           // cumulative radians (increases clockwise)
+let spinning      = false;
+let selectedIdx   = -1;
+let holdStart     = null;
+let rafHandle     = null;
+let lastTickSect  = -1;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIO
+// ─────────────────────────────────────────────────────────────────────────────
+let audioCtx = null;
+function ac() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTick(speed) {  // speed 0..1
+  try {
+    const a = ac();
+    const osc  = a.createOscillator();
+    const gain = a.createGain();
+    osc.connect(gain);
+    gain.connect(a.destination);
+    osc.type = 'square';
+    osc.frequency.value = 500 + speed * 900;
+    const t = a.currentTime;
+    gain.gain.setValueAtTime(0.05, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+    osc.start(t);
+    osc.stop(t + 0.05);
+  } catch(e) {}
+}
+
+function playWin() {
+  try {
+    const a = ac();
+    [523, 659, 784, 1047, 1319].forEach((f, i) => {
+      const osc  = a.createOscillator();
+      const gain = a.createGain();
+      osc.connect(gain);
+      gain.connect(a.destination);
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const t = a.currentTime + i * 0.11;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.14, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+  } catch(e) {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHEEL DRAWING
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Which sector index is currently at the pointer (angle 0 = rightmost)?
+// Sectors are drawn at startAngle = rotation + i*sectorAngle (clockwise).
+// As rotation increases, sectors move clockwise, so the sector at angle 0 decreases in index.
+function sectorAtPointer() {
+  const n = words.length;
+  if (!n) return -1;
+  const sa = TAU / n;
+  // Normalise (-rotation) into [0, TAU)
+  const a = ((-rotation % TAU) + TAU) % TAU;
+  return Math.floor(a / sa) % n;
+}
+
+function drawWheel() {
+  ctx.clearRect(0, 0, 800, 800);
+  const n = words.length;
+  if (!n) return;
+
+  const sa    = TAU / n;
+  const atPtr = sectorAtPointer();
+
+  // Outer glow ring
+  const glow = ctx.createRadialGradient(CX, CY, R - 6, CX, CY, R + 18);
+  glow.addColorStop(0, 'rgba(255,215,0,0.18)');
+  glow.addColorStop(1, 'rgba(255,215,0,0)');
+  ctx.beginPath();
+  ctx.arc(CX, CY, R + 18, 0, TAU);
+  ctx.fillStyle = glow;
+  ctx.fill();
+
+  // Sectors
+  for (let i = 0; i < n; i++) {
+    const a0  = rotation + i * sa;
+    const a1  = a0 + sa;
+    const mid = a0 + sa / 2;
+    const col = COLORS[i % COLORS.length];
+    const sel = (i === atPtr) && !spinning;
+
+    // Fill
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.arc(CX, CY, R, a0, a1);
+    ctx.closePath();
+    ctx.fillStyle = sel ? brighten(col) : col;
+    if (sel) {
+      ctx.shadowColor = 'rgba(255,255,255,0.5)';
+      ctx.shadowBlur  = 16;
+    }
+    ctx.fill();
+    ctx.restore();
+
+    // Dividing line
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + R * Math.cos(a0), CY + R * Math.sin(a0));
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    // Text
+    drawLabel(mid, words[i], sa, sel, n);
+  }
+
+  // Outer ring stroke
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, TAU);
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Centre cap
+  const cap = ctx.createRadialGradient(CX - 6, CY - 6, 0, CX, CY, 26);
+  cap.addColorStop(0, '#ffffff');
+  cap.addColorStop(1, '#bbbbbb');
+  ctx.beginPath();
+  ctx.arc(CX, CY, 26, 0, TAU);
+  ctx.fillStyle = cap;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawLabel(midAngle, text, sectorAngle, selected, totalWords) {
+  ctx.save();
+  ctx.translate(CX, CY);
+  ctx.rotate(midAngle);
+
+  // Font sizing: based on arc height at 60% radius
+  const arcH = R * 0.6 * sectorAngle;
+  let fs = Math.min(15, Math.max(6.5, arcH * 0.5));
+  if (selected) fs = Math.min(fs * 1.25, 16);
+
+  ctx.font = `${selected ? 700 : 600} ${fs}px -apple-system, Arial, sans-serif`;
+  ctx.textAlign    = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = 'rgba(255,255,255,0.93)';
+  ctx.shadowColor  = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur   = 3;
+
+  // Truncate to fit
+  const maxW = R * 0.75;
+  let t = text;
+  if (ctx.measureText(t).width > maxW) {
+    while (t.length > 2 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    t += '…';
+  }
+
+  ctx.fillText(t, R * 0.88, 0);
+  ctx.restore();
+}
+
+function brighten(hex) {
+  // lighten a hex color by mixing with white
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (n >> 16)        + 55);
+  const g = Math.min(255, ((n >> 8) & 0xff)+ 55);
+  const b = Math.min(255, (n & 0xff)       + 55);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPIN LOGIC
+// ─────────────────────────────────────────────────────────────────────────────
+function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+
+function startSpin(holdMs) {
+  if (spinning || !words.length) return;
+
+  const duration = Math.max(900, Math.min(5000, holdMs));
+
+  // Pick target word
+  const pool = noRepeatOn ? available : words;
+  if (!pool.length) { showAllUsed(); return; }
+
+  const target    = pool[Math.floor(Math.random() * pool.length)];
+  const targetIdx = words.indexOf(target);
+  const sa        = TAU / words.length;
+
+  // How much to rotate so targetIdx arrives at pointer
+  // Pointer at sector: sectorAtPointer() = floor((-rotation) mod TAU / sa)
+  // We want that to equal targetIdx after spinning
+  // Target rotation mod TAU = (-targetIdx * sa - sa/2) normalised to positive
+  const targetRotMod = ((-targetIdx * sa - sa / 2) % TAU + TAU) % TAU;
+  const currentMod   = ((rotation % TAU) + TAU) % TAU;
+  let   delta        = targetRotMod - currentMod;
+  if (delta <= 0) delta += TAU;
+
+  const extraRots  = Math.ceil(duration / 800) * 3 + 4;
+  const spinAmt    = extraRots * TAU + delta;
+  const startRot   = rotation;
+  const startTime  = performance.now();
+
+  spinning     = true;
+  selectedIdx  = -1;
+  lastTickSect = -1;
+
+  setWordDisplay('', false);
+
+  function frame(now) {
+    const elapsed = now - startTime;
+    const t       = Math.min(1, elapsed / duration);
+    const eased   = easeOut(t);
+
+    rotation = startRot + spinAmt * eased;
+
+    // Tick sound on each sector boundary crossing
+    const sect = sectorAtPointer();
+    if (sect !== lastTickSect) {
+      playTick(1 - t);
+      lastTickSect = sect;
+      if (t < 0.97) setWordDisplay(words[sect], false);
+    }
+
+    drawWheel();
+
+    if (t < 1) {
+      rafHandle = requestAnimationFrame(frame);
+    } else {
+      rotation    = startRot + spinAmt;  // exact
+      spinning    = false;
+      selectedIdx = targetIdx;
+
+      if (noRepeatOn) {
+        available = available.filter(w => w !== target);
+        updateTracker();
+      }
+
+      drawWheel();
+      playWin();
+      setWordDisplay(target, true);
+
+      if (noRepeatOn && !available.length) {
+        setTimeout(showAllUsed, 1300);
+      }
+    }
+  }
+
+  rafHandle = requestAnimationFrame(frame);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function setWordDisplay(text, landed) {
+  const el = document.getElementById('wordDisplay');
+  el.textContent = text;
+  el.classList.toggle('show',   !!text);
+  el.classList.toggle('landed', landed);
+}
+
+function updateTracker() {
+  const el = document.getElementById('tracker');
+  if (noRepeatOn) {
+    const used = words.length - available.length;
+    el.textContent = `${used} of ${words.length} shown`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+function showAllUsed() {
+  document.getElementById('allUsed').classList.add('show');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOAD WORD SET
+// ─────────────────────────────────────────────────────────────────────────────
+function loadSet(name) {
+  currentSet  = name;
+  words       = [...wordSets[name]];
+  available   = [...words];
+  selectedIdx = -1;
+  rotation    = 0;
+  setWordDisplay('', false);
+  updateTracker();
+  drawWheel();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DROPDOWN
+// ─────────────────────────────────────────────────────────────────────────────
+const setSelect = document.getElementById('setSelect');
+
+function rebuildSelect() {
+  setSelect.innerHTML = '';
+  Object.keys(wordSets).forEach(name => {
+    const o = document.createElement('option');
+    o.value = o.textContent = name;
+    setSelect.appendChild(o);
+  });
+  const c = document.createElement('option');
+  c.value = '__custom__';
+  c.textContent = 'Custom…';
+  setSelect.appendChild(c);
+  setSelect.value = currentSet;
+}
+
+setSelect.addEventListener('change', () => {
+  if (setSelect.value === '__custom__') {
+    setSelect.value = currentSet;   // revert visually
+    openCustomModal();
+  } else {
+    loadSet(setSelect.value);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOM MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+function openCustomModal() {
+  document.getElementById('customTitle').value = '';
+  document.getElementById('customWords').value = '';
+  document.getElementById('customWords').style.borderColor = '';
+  document.getElementById('modal').classList.add('open');
+}
+
+document.getElementById('customSave').addEventListener('click', () => {
+  const title = document.getElementById('customTitle').value.trim() || 'Custom';
+  const raw   = document.getElementById('customWords').value.trim();
+
+  // Split by newlines; if only 1 line, split by comma
+  let parsed = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  if (parsed.length <= 1) parsed = raw.split(',').map(s => s.trim()).filter(Boolean);
+
+  if (parsed.length < 2) {
+    document.getElementById('customWords').style.borderColor = '#E63946';
+    return;
+  }
+
+  wordSets[title] = parsed;
+  currentSet = title;
+  document.getElementById('modal').classList.remove('open');
+  rebuildSelect();
+  loadSet(title);
+});
+
+document.getElementById('customCancel').addEventListener('click', () => {
+  document.getElementById('modal').classList.remove('open');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NO-REPEAT TOGGLE
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('noRepeat').addEventListener('change', e => {
+  noRepeatOn = e.target.checked;
+  available  = [...words];
+  updateTracker();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALL-USED BANNER
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('continueYes').addEventListener('click', () => {
+  available = [...words];
+  updateTracker();
+  document.getElementById('allUsed').classList.remove('show');
+});
+
+document.getElementById('continueNo').addEventListener('click', () => {
+  document.getElementById('allUsed').classList.remove('show');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOLD-TO-SPIN (pointer events — works for touch & mouse)
+// ─────────────────────────────────────────────────────────────────────────────
+canvas.addEventListener('pointerdown', e => {
+  if (spinning) return;
+  holdStart = Date.now();
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('charged');
+  // Unlock audio on first gesture
+  try { ac().resume(); } catch(err) {}
+});
+
+canvas.addEventListener('pointerup', () => {
+  if (holdStart === null) return;
+  const held = Date.now() - holdStart;
+  holdStart  = null;
+  canvas.classList.remove('charged');
+  startSpin(held);
+});
+
+canvas.addEventListener('pointercancel', () => {
+  holdStart = null;
+  canvas.classList.remove('charged');
+});
+
+// Prevent default touch scroll on the canvas
+canvas.addEventListener('touchstart',  e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove',   e => e.preventDefault(), { passive: false });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+rebuildSelect();
+loadSet(currentSet);
+</script>
+</body>
+</html>
