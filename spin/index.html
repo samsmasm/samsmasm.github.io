@@ -13,6 +13,40 @@
       --ctrl-h: 148px;
     }
 
+    /* ── TOP-RIGHT ANSWER DISPLAY ───────────────────────── */
+    #answerBox {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 20;
+      text-align: right;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.35s, transform 0.35s;
+    }
+    #answerBox.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #answerLabel {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.45;
+      margin-bottom: 3px;
+    }
+    #answerWord {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 0 20px var(--gold), 0 0 8px var(--gold);
+      line-height: 1.2;
+      word-break: break-word;
+      max-width: 160px;
+      margin-left: auto;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
@@ -193,6 +227,14 @@
       min-height: 14px;
     }
 
+    /* second row of toggles */
+    .ctrl-row2 {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      justify-content: flex-end;
+    }
+
     /* ── CUSTOM MODAL ───────────────────────────────────── */
     #modal {
       display: none;
@@ -275,6 +317,12 @@
 </head>
 <body>
 
+<!-- TOP-RIGHT ANSWER -->
+<div id="answerBox">
+  <div id="answerLabel">Result</div>
+  <div id="answerWord"></div>
+</div>
+
 <!-- WHEEL -->
 <div id="wheelWrap">
   <canvas id="wheelCanvas" width="800" height="800"></canvas>
@@ -287,10 +335,19 @@
 <div id="controls">
   <div class="ctrl-row">
     <select id="setSelect"></select>
+  </div>
+  <div class="ctrl-row2">
     <div class="toggle-group">
       <span>No&nbsp;repeat</span>
       <label class="toggle">
         <input type="checkbox" id="noRepeat">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-group">
+      <span>Blur&nbsp;others</span>
+      <label class="toggle">
+        <input type="checkbox" id="blurOthers">
         <span class="slider"></span>
       </label>
     </div>
@@ -373,6 +430,7 @@ let currentSet    = Object.keys(BUILT_IN)[0];
 let words         = [];          // active word list
 let available     = [];          // remaining in no-repeat pool
 let noRepeatOn    = false;
+let blurOn        = false;
 let rotation      = 0;           // cumulative radians (increases clockwise)
 let spinning      = false;
 let selectedIdx   = -1;
@@ -495,6 +553,23 @@ function drawWheel() {
     drawLabel(mid, words[i], sa, sel, n);
   }
 
+  // Blur overlay: darken every sector except the winner
+  if (blurOn && !spinning && selectedIdx !== -1) {
+    for (let i = 0; i < n; i++) {
+      if (i === atPtr) continue;
+      const a0 = rotation + i * sa;
+      const a1 = a0 + sa;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(CX, CY);
+      ctx.arc(CX, CY, R, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // Outer ring stroke
   ctx.beginPath();
   ctx.arc(CX, CY, R, 0, TAU);
@@ -556,12 +631,14 @@ function brighten(hex) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SPIN LOGIC
 // ─────────────────────────────────────────────────────────────────────────────
-function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+// Stronger ease-out: stays fast longer, then snaps to a stop
+function easeOut(t) { return 1 - Math.pow(1 - t, 5); }
 
 function startSpin(holdMs) {
   if (spinning || !words.length) return;
 
-  const duration = Math.max(900, Math.min(5000, holdMs));
+  // 1 s minimum (quick tap) → 8 s maximum (full hold)
+  const duration = Math.max(1000, Math.min(8000, holdMs));
 
   // Pick target word
   const pool = noRepeatOn ? available : words;
@@ -580,7 +657,8 @@ function startSpin(holdMs) {
   let   delta        = targetRotMod - currentMod;
   if (delta <= 0) delta += TAU;
 
-  const extraRots  = Math.ceil(duration / 800) * 3 + 4;
+  // Rotations scale sharply with duration: ~6 at 1 s, ~48 at 8 s
+  const extraRots  = Math.round((duration / 1000) * 6) + 2;
   const spinAmt    = extraRots * TAU + delta;
   const startRot   = rotation;
   const startTime  = performance.now();
@@ -590,6 +668,7 @@ function startSpin(holdMs) {
   lastTickSect = -1;
 
   setWordDisplay('', false);
+  setAnswerBox('');
 
   function frame(now) {
     const elapsed = now - startTime;
@@ -623,6 +702,7 @@ function startSpin(holdMs) {
       drawWheel();
       playWin();
       setWordDisplay(target, true);
+      setAnswerBox(target);
 
       if (noRepeatOn && !available.length) {
         setTimeout(showAllUsed, 1300);
@@ -641,6 +721,13 @@ function setWordDisplay(text, landed) {
   el.textContent = text;
   el.classList.toggle('show',   !!text);
   el.classList.toggle('landed', landed);
+}
+
+function setAnswerBox(text) {
+  const box  = document.getElementById('answerBox');
+  const word = document.getElementById('answerWord');
+  word.textContent = text;
+  box.classList.toggle('show', !!text);
 }
 
 function updateTracker() {
@@ -667,6 +754,7 @@ function loadSet(name) {
   selectedIdx = -1;
   rotation    = 0;
   setWordDisplay('', false);
+  setAnswerBox('');
   updateTracker();
   drawWheel();
 }
@@ -734,12 +822,17 @@ document.getElementById('customCancel').addEventListener('click', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NO-REPEAT TOGGLE
+// TOGGLES
 // ─────────────────────────────────────────────────────────────────────────────
 document.getElementById('noRepeat').addEventListener('change', e => {
   noRepeatOn = e.target.checked;
   available  = [...words];
   updateTracker();
+});
+
+document.getElementById('blurOthers').addEventListener('change', e => {
+  blurOn = e.target.checked;
+  drawWheel();   // redraw immediately if wheel is stopped
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
