@@ -558,6 +558,7 @@ function drawWheel() {
 
 function startSpin(holdMs) {
   if (spinning || !words.length) return;
+  timerAutoStart();
   const duration = Math.max(200, Math.min(8000, holdMs));
   const pool = noRepeatOn ? available : words;
   if (!pool.length) { showAllUsed(); return; }
@@ -762,8 +763,13 @@ function buildDiceValues() {
   diceRotation = 0; diceSelectedIdx = -1; setDiceResult(''); drawDice();
 }
 function diceColor(i, n) {
-  const t = n <= 1 ? 0.5 : i / (n-1);
-  return `hsl(${270 + t*90}, 80%, 55%)`;
+  // Rainbow: red → orange → yellow → green → blue → purple
+  const stops = [0, 28, 52, 120, 215, 270];
+  if (n <= 1) return 'hsl(0, 82%, 55%)';
+  const pos = (i / (n - 1)) * (stops.length - 1);
+  const lo = Math.floor(pos), hi = Math.min(lo + 1, stops.length - 1);
+  const hue = stops[lo] + (pos - lo) * (stops[hi] - stops[lo]);
+  return `hsl(${hue}, 82%, 55%)`;
 }
 function diceSectorAtPointer() {
   const n = diceValues.length; if (!n) return -1;
@@ -791,11 +797,15 @@ function drawDice() {
     diceCtx.strokeStyle = 'rgba(0,0,0,0.35)'; diceCtx.lineWidth = 1; diceCtx.stroke(); diceCtx.restore();
 
     diceCtx.save(); diceCtx.translate(DCX, DCY); diceCtx.rotate(mid);
+    // Flip text for sectors in the upper-left quadrant so numbers read correctly
+    const normMid = ((mid % TAU) + TAU) % TAU;
+    const flip = normMid > Math.PI / 2 && normMid < Math.PI * 1.5;
+    if (flip) diceCtx.rotate(Math.PI);
     const fs = Math.min(20, Math.max(7, DR*sa*0.3));
     diceCtx.font = `${sel?700:600} ${fs}px -apple-system,Arial,sans-serif`;
-    diceCtx.textAlign = 'right'; diceCtx.textBaseline = 'middle';
+    diceCtx.textAlign = flip ? 'left' : 'right'; diceCtx.textBaseline = 'middle';
     diceCtx.fillStyle = 'rgba(255,255,255,0.93)'; diceCtx.shadowColor = 'rgba(0,0,0,0.7)'; diceCtx.shadowBlur = 3;
-    diceCtx.fillText(String(diceValues[i]), DR*0.82, 0); diceCtx.restore();
+    diceCtx.fillText(String(diceValues[i]), flip ? -(DR*0.82) : DR*0.82, 0); diceCtx.restore();
   }
 
   if (blurOn && !diceSpinning && diceSelectedIdx !== -1) {
@@ -824,6 +834,7 @@ function drawDice() {
 
 function startDiceSpin(holdMs) {
   if (diceSpinning || !diceValues.length) return;
+  timerAutoStart();
   const duration = Math.max(200, Math.min(8000, holdMs));
   const targetIdx = Math.floor(Math.random() * diceValues.length);
   const sa = TAU / diceValues.length;
@@ -923,6 +934,18 @@ function toggleTimer() {
       if (timerRemaining <= 0) { clearInterval(timerInterval); timerRunning = false; timerDone(); }
     }, 1000);
   }
+}
+
+function timerAutoStart() {
+  if (!document.body.classList.contains('timer-on')) return;
+  clearInterval(timerInterval); timerRunning = false;
+  timerRemaining = timerDuration; updateTimerDisplay();
+  try { ac().resume(); } catch(e) {}
+  timerRunning = true;
+  timerInterval = setInterval(() => {
+    timerRemaining--; updateTimerDisplay();
+    if (timerRemaining <= 0) { clearInterval(timerInterval); timerRunning = false; timerDone(); }
+  }, 1000);
 }
 
 document.getElementById('timerRingWrap').addEventListener('click', toggleTimer);
