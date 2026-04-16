@@ -16,156 +16,177 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      color: #fff;
+      height: 100%; overflow: hidden;
+      background: var(--bg); color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
+      touch-action: none; user-select: none; -webkit-user-select: none;
     }
 
     body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
+      content: ''; position: fixed; inset: 0;
       background:
         radial-gradient(ellipse 60% 80% at 0% 50%, #1e0a3c 0%, transparent 70%),
         radial-gradient(ellipse 40% 60% at 80% 20%, #0a1e3c 0%, transparent 60%);
       pointer-events: none;
     }
 
+    body.dice-on { --ctrl-h: 210px; }
+
     /* ── TOP-RIGHT ANSWER ───────────────────────────────── */
     #answerBox {
-      position: fixed;
-      top: 14px; right: 14px;
-      z-index: 20;
-      text-align: right;
-      pointer-events: none;
-      opacity: 0;
-      transform: translateY(-6px);
+      position: fixed; top: 14px; right: 14px;
+      z-index: 20; text-align: right; pointer-events: none;
+      opacity: 0; transform: translateY(-6px);
       transition: opacity 0.35s, transform 0.35s;
     }
     #answerBox.show { opacity: 1; transform: translateY(0); }
-    #answerLabel {
-      font-size: 10px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      opacity: 0.45;
-      margin-bottom: 3px;
-    }
+    #answerLabel { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.45; margin-bottom: 3px; }
     #answerWord {
-      font-size: 36px;
-      font-weight: 800;
-      color: #fff;
+      font-size: 36px; font-weight: 800; color: #fff;
       text-shadow: 0 0 20px var(--gold), 0 0 8px var(--gold);
-      line-height: 1.2;
-      word-break: break-word;
-      max-width: 160px;
-      margin-left: auto;
+      line-height: 1.2; word-break: break-word; max-width: 160px; margin-left: auto;
     }
 
-    /* ── WHEEL AREA ─────────────────────────────────────── */
+    /* ── TIMER (top-centre) ─────────────────────────────── */
+    #timerWrap {
+      display: none; position: fixed;
+      top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 20; flex-direction: column; align-items: center; gap: 6px;
+    }
+    body.timer-on #timerWrap { display: flex; }
+
+    #timerRingWrap {
+      position: relative; width: 64px; height: 64px; cursor: pointer;
+    }
+    #timerRingWrap svg { width: 64px; height: 64px; transform: rotate(-90deg); }
+    .t-track { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 5; }
+    .t-arc   {
+      fill: none; stroke: var(--gold); stroke-width: 5;
+      stroke-linecap: round; transition: stroke 0.4s;
+    }
+    .t-arc.urgent { stroke: #ef4444; }
+    #timerText {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; letter-spacing: -0.03em;
+    }
+    #timerPresets { display: flex; gap: 5px; }
+    .t-preset {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 3px 8px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      color: rgba(255,255,255,0.65); transition: background 0.15s, color 0.15s;
+    }
+    .t-preset:hover { background: rgba(255,255,255,0.14); color: #fff; }
+    .t-preset.active { background: var(--gold); color: #000; border-color: var(--gold); }
+
+    #timerWrap.done { animation: tPulse 0.35s ease 3; }
+    @keyframes tPulse { 0%,100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.12); } }
+
+    /* ── MAIN WHEEL ─────────────────────────────────────── */
     #wheelWrap {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      bottom: var(--ctrl-h);
-      overflow: hidden;
+      position: fixed; top: 0; left: 0; right: 0;
+      bottom: var(--ctrl-h); overflow: hidden;
     }
-
     #wheelCanvas {
-      position: absolute;
-      left: -520px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      transition: filter 0.1s;
+      position: absolute; left: -520px; top: 50%;
+      transform: translateY(-50%); cursor: pointer; transition: filter 0.1s;
     }
-    #wheelCanvas.charged {
-      filter: brightness(1.15) drop-shadow(0 0 12px rgba(255,215,0,0.4));
-    }
-
+    #wheelCanvas.charged { filter: brightness(1.15) drop-shadow(0 0 12px rgba(255,215,0,0.4)); }
     #pointer {
-      position: absolute;
-      left: 256px; top: 50%;
-      transform: translateY(-50%);
-      z-index: 10;
-      width: 0; height: 0;
-      border-top: 20px solid transparent;
-      border-bottom: 20px solid transparent;
+      position: absolute; left: 256px; top: 50%; transform: translateY(-50%);
+      z-index: 10; width: 0; height: 0;
+      border-top: 20px solid transparent; border-bottom: 20px solid transparent;
       border-right: 36px solid var(--gold);
       filter: drop-shadow(0 0 10px var(--gold)) drop-shadow(0 0 4px #fff);
     }
-
     #wordDisplay { display: none; }
-
     #hint {
-      position: absolute;
-      bottom: 8px; left: 0; right: 0;
-      text-align: center;
-      font-size: 11px;
-      opacity: 0.35;
-      pointer-events: none;
-      letter-spacing: 0.05em;
+      position: absolute; bottom: 8px; left: 0; right: 0;
+      text-align: center; font-size: 11px; opacity: 0.35;
+      pointer-events: none; letter-spacing: 0.05em;
     }
+
+    /* ── DICE WHEEL (bottom-right corner) ───────────────── */
+    #diceWrap {
+      display: none; position: fixed;
+      right: 0; bottom: var(--ctrl-h);
+      transform: translate(50%, 50%);
+      z-index: 6; width: 280px; height: 280px;
+    }
+    body.dice-on #diceWrap { display: block; }
+    #diceCanvas { cursor: pointer; display: block; transition: filter 0.1s; }
+    #diceCanvas.charged { filter: brightness(1.15) drop-shadow(0 0 10px rgba(180,80,255,0.4)); }
+
+    /* × sits at top-left of canvas — outside the arc, inside the visible quadrant */
+    #diceClose {
+      position: absolute; top: 8px; left: 8px;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.6); font-size: 15px; line-height: 26px;
+      text-align: center; cursor: pointer; z-index: 12;
+      transition: background 0.15s, color 0.15s;
+    }
+    #diceClose:hover { background: rgba(255,255,255,0.18); color: #fff; }
+
+    #diceResult {
+      position: fixed; top: 14px; left: 14px;
+      font-size: 56px; font-weight: 800; line-height: 1; color: #fff;
+      text-shadow: 0 0 24px #cc44ff, 0 0 8px #cc44ff;
+      opacity: 0; transform: translateY(-6px);
+      transition: opacity 0.35s, transform 0.35s;
+      pointer-events: none; z-index: 20;
+    }
+    #diceResult.show { opacity: 1; transform: translateY(0); }
 
     /* ── CONTROLS ───────────────────────────────────────── */
     #controls {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      height: var(--ctrl-h);
-      padding: 10px 14px 18px;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--ctrl-h); padding: 10px 14px 18px;
       background: rgba(10,10,22,0.92);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
+      display: flex; flex-direction: column; gap: 9px;
     }
-
     .ctrl-row  { display: flex; align-items: center; gap: 10px; }
-    .ctrl-row2 { display: flex; align-items: center; gap: 18px; justify-content: flex-end; }
+    .ctrl-row2 { display: flex; align-items: center; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
 
     select {
-      flex: 1;
-      padding: 9px 30px 9px 12px;
-      border-radius: 12px;
+      flex: 1; padding: 9px 30px 9px 12px; border-radius: 12px;
       border: 1px solid var(--border);
       background: var(--surface)
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ffffff55'/%3E%3C/svg%3E")
         no-repeat right 11px center;
-      color: #fff;
-      font-size: 14px;
-      font-family: inherit;
-      appearance: none;
-      -webkit-appearance: none;
-      outline: none;
+      color: #fff; font-size: 14px; font-family: inherit;
+      appearance: none; -webkit-appearance: none; outline: none;
     }
     select option, select optgroup { background: #1a1a2e; color: #fff; }
 
-    .toggle-group { display: flex; align-items: center; gap: 7px; white-space: nowrap; flex-shrink: 0; }
+    .toggle-group { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
     .toggle-group span { font-size: 12px; opacity: 0.65; }
-
-    .toggle { position: relative; width: 42px; height: 23px; flex-shrink: 0; }
+    .toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
     .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .slider {
-      position: absolute; inset: 0;
-      background: #333; border-radius: 23px;
-      cursor: pointer; transition: background 0.25s;
-    }
+    .slider { position: absolute; inset: 0; background: #333; border-radius: 22px; cursor: pointer; transition: background 0.25s; }
     .slider::before {
-      content: ''; position: absolute;
-      width: 17px; height: 17px; left: 3px; top: 3px;
+      content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
       background: #fff; border-radius: 50%; transition: transform 0.25s;
     }
     .toggle input:checked + .slider { background: #22c55e; }
-    .toggle input:checked + .slider::before { transform: translateX(19px); }
+    .toggle input:checked + .slider::before { transform: translateX(16px); }
 
-    .bottom-row {
-      display: flex; align-items: center; justify-content: space-between;
+    #diceRangeRow { display: none; align-items: center; gap: 8px; }
+    body.dice-on #diceRangeRow { display: flex; }
+    #diceRangeRow span { font-size: 12px; opacity: 0.65; white-space: nowrap; }
+    #diceRangeRow input[type=number] {
+      width: 56px; padding: 7px 10px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: #fff; font-size: 14px; font-family: inherit; outline: none;
+      -moz-appearance: textfield; appearance: textfield;
     }
+    #diceRangeRow input[type=number]::-webkit-outer-spin-button,
+    #diceRangeRow input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .bottom-row { display: flex; align-items: center; justify-content: space-between; }
     #tracker { font-size: 11px; opacity: 0.45; text-align: right; flex: 1; }
     #deleteBtn {
       background: none; border: none; padding: 0;
@@ -175,13 +196,43 @@
     }
     #deleteBtn:hover { opacity: 1; }
 
-    /* Delete modal list */
+    /* ── MODALS ─────────────────────────────────────────── */
+    .modal-wrap {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 100;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-wrap.open { display: flex; }
+    .modal-box {
+      background: #16162a; border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0; padding: 20px 18px 32px;
+      width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 11px;
+    }
+    .modal-box h2 { font-size: 17px; font-weight: 700; }
+    .modal-box p  { font-size: 12px; opacity: 0.5; margin-top: -4px; }
+
+    input[type=text], input[type=password], textarea {
+      width: 100%; padding: 10px 12px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: #fff; font-size: 14px; font-family: inherit; outline: none;
+    }
+    textarea { height: 140px; resize: none; font-size: 13px; line-height: 1.5; }
+
+    .modal-btns { display: flex; gap: 9px; }
+    button {
+      flex: 1; padding: 12px; border-radius: 12px; border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .btn-gold { background: var(--gold); color: #000; }
+    .btn-dim  { background: var(--surface); color: #fff; border: 1px solid var(--border); }
+    .pw-error { font-size: 12px; color: #f87171; display: none; }
+    .pw-error.show { display: block; }
+
     .del-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
     .del-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 12px; border-radius: 10px;
-      background: var(--surface); border: 1px solid var(--border);
-      font-size: 14px;
+      background: var(--surface); border: 1px solid var(--border); font-size: 14px;
     }
     .del-item-name { flex: 1; }
     .del-item-btn {
@@ -193,132 +244,13 @@
     .del-item-btn:hover { background: #991b1b; }
     .del-empty { font-size: 13px; opacity: 0.45; text-align: center; padding: 16px 0; }
 
-    /* ── MODALS (shared) ────────────────────────────────── */
-    .modal-wrap {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.65);
-      z-index: 100;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .modal-wrap.open { display: flex; }
-
-    .modal-box {
-      background: #16162a;
-      border: 1px solid var(--border);
-      border-radius: 24px 24px 0 0;
-      padding: 20px 18px 32px;
-      width: 100%; max-width: 500px;
-      display: flex; flex-direction: column; gap: 11px;
-    }
-    .modal-box h2 { font-size: 17px; font-weight: 700; }
-    .modal-box p  { font-size: 12px; opacity: 0.5; margin-top: -4px; }
-
-    input[type=text], input[type=password], textarea {
-      width: 100%; padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: #fff; font-size: 14px;
-      font-family: inherit; outline: none;
-    }
-    textarea { height: 140px; resize: none; font-size: 13px; line-height: 1.5; }
-
-    .modal-btns { display: flex; gap: 9px; }
-    button {
-      flex: 1; padding: 12px;
-      border-radius: 12px; border: none;
-      font-size: 15px; font-weight: 600;
-      cursor: pointer; font-family: inherit;
-    }
-    .btn-gold { background: var(--gold); color: #000; }
-    .btn-dim  { background: var(--surface); color: #fff; border: 1px solid var(--border); }
-
-    .pw-error { font-size: 12px; color: #f87171; display: none; }
-    .pw-error.show { display: block; }
-
-    /* ── DICE WHEEL ─────────────────────────────────────── */
-    body.dice-on { --ctrl-h: 212px; }
-    #diceWrap {
-      display: none;
-      position: fixed;
-      bottom: var(--ctrl-h);
-      left: 50%;
-      transform: translateX(-50%) translateY(50%);
-      z-index: 5;
-      width: 360px; height: 360px;
-    }
-    body.dice-on #diceWrap { display: block; }
-    #diceCanvas { cursor: pointer; transition: filter 0.1s; }
-    #diceCanvas.charged {
-      filter: brightness(1.15) drop-shadow(0 0 10px rgba(180,80,255,0.5));
-    }
-    #dicePointer {
-      position: absolute;
-      top: 2px; left: 50%;
-      transform: translateX(-50%);
-      width: 0; height: 0;
-      border-left: 16px solid transparent;
-      border-right: 16px solid transparent;
-      border-top: 28px solid var(--gold);
-      filter: drop-shadow(0 0 8px var(--gold)) drop-shadow(0 0 3px #fff);
-      z-index: 10;
-      pointer-events: none;
-    }
-    #diceResult {
-      position: fixed;
-      top: 14px; left: 14px;
-      font-size: 56px; font-weight: 800; line-height: 1;
-      color: #fff;
-      text-shadow: 0 0 24px #cc44ff, 0 0 8px #cc44ff;
-      opacity: 0; transform: translateY(-6px);
-      transition: opacity 0.35s, transform 0.35s;
-      pointer-events: none; z-index: 20;
-    }
-    #diceResult.show { opacity: 1; transform: translateY(0); }
-    #diceClose {
-      position: absolute;
-      top: 78px; left: 50%;
-      transform: translateX(-50%);
-      width: 34px; height: 34px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: #fff; font-size: 18px; line-height: 34px;
-      text-align: center; cursor: pointer;
-      z-index: 11;
-      transition: background 0.15s;
-    }
-    #diceClose:hover { background: rgba(255,255,255,0.3); }
-    #diceRangeRow {
-      display: none; align-items: center; gap: 8px;
-    }
-    body.dice-on #diceRangeRow { display: flex; }
-    #diceRangeRow span { font-size: 12px; opacity: 0.65; white-space: nowrap; }
-    #diceRangeRow input[type=number] {
-      width: 58px; padding: 7px 10px;
-      border-radius: 10px; border: 1px solid var(--border);
-      background: var(--surface); color: #fff;
-      font-size: 14px; font-family: inherit; outline: none;
-      -moz-appearance: textfield; appearance: textfield;
-    }
-    #diceRangeRow input[type=number]::-webkit-outer-spin-button,
-    #diceRangeRow input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
-
     /* ── ALL-USED BANNER ────────────────────────────────── */
     #allUsed {
-      display: none;
-      position: fixed; top: 14px; left: 50%;
-      transform: translateX(-50%);
-      z-index: 90;
-      background: #16162a;
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px 18px;
+      display: none; position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 90; background: #16162a; border: 1px solid var(--border);
+      border-radius: 18px; padding: 16px 18px;
       min-width: 260px; max-width: 340px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
-      text-align: center;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6); text-align: center;
     }
     #allUsed.show { display: block; }
     #allUsed p { font-size: 14px; margin-bottom: 12px; }
@@ -333,7 +265,24 @@
   <div id="answerWord"></div>
 </div>
 
-<!-- WHEEL -->
+<!-- TIMER -->
+<div id="timerWrap">
+  <div id="timerRingWrap">
+    <svg viewBox="0 0 64 64">
+      <circle class="t-track" cx="32" cy="32" r="27"/>
+      <circle class="t-arc"   cx="32" cy="32" r="27" id="timerArc"/>
+    </svg>
+    <div id="timerText">2:00</div>
+  </div>
+  <div id="timerPresets">
+    <div class="t-preset" data-secs="30">30s</div>
+    <div class="t-preset" data-secs="60">1m</div>
+    <div class="t-preset active" data-secs="120">2m</div>
+    <div class="t-preset" data-secs="300">5m</div>
+  </div>
+</div>
+
+<!-- MAIN WHEEL -->
 <div id="wheelWrap">
   <canvas id="wheelCanvas" width="800" height="800"></canvas>
   <div id="pointer"></div>
@@ -343,8 +292,7 @@
 
 <!-- DICE WHEEL -->
 <div id="diceWrap">
-  <canvas id="diceCanvas" width="360" height="360"></canvas>
-  <div id="dicePointer"></div>
+  <canvas id="diceCanvas" width="280" height="280"></canvas>
   <div id="diceClose">×</div>
 </div>
 <div id="diceResult"></div>
@@ -357,24 +305,19 @@
   <div class="ctrl-row2">
     <div class="toggle-group">
       <span>No&nbsp;repeat</span>
-      <label class="toggle">
-        <input type="checkbox" id="noRepeat">
-        <span class="slider"></span>
-      </label>
+      <label class="toggle"><input type="checkbox" id="noRepeat"><span class="slider"></span></label>
     </div>
     <div class="toggle-group">
-      <span>Blur&nbsp;others</span>
-      <label class="toggle">
-        <input type="checkbox" id="blurOthers">
-        <span class="slider"></span>
-      </label>
+      <span>Blur</span>
+      <label class="toggle"><input type="checkbox" id="blurOthers"><span class="slider"></span></label>
     </div>
     <div class="toggle-group">
       <span>Dice</span>
-      <label class="toggle">
-        <input type="checkbox" id="diceToggle">
-        <span class="slider"></span>
-      </label>
+      <label class="toggle"><input type="checkbox" id="diceToggle"><span class="slider"></span></label>
+    </div>
+    <div class="toggle-group">
+      <span>Timer</span>
+      <label class="toggle"><input type="checkbox" id="timerToggle"><span class="slider"></span></label>
     </div>
   </div>
   <div id="diceRangeRow">
@@ -389,7 +332,7 @@
   </div>
 </div>
 
-<!-- TEMP CUSTOM MODAL -->
+<!-- MODALS -->
 <div id="tempModal" class="modal-wrap">
   <div class="modal-box">
     <h2>Temporary Word Set</h2>
@@ -403,7 +346,6 @@
   </div>
 </div>
 
-<!-- PASSWORD MODAL -->
 <div id="pwModal" class="modal-wrap">
   <div class="modal-box">
     <h2>Add Permanent List</h2>
@@ -417,7 +359,6 @@
   </div>
 </div>
 
-<!-- ADD PERMANENT LIST MODAL -->
 <div id="addModal" class="modal-wrap">
   <div class="modal-box">
     <h2>Save Permanent List</h2>
@@ -431,7 +372,6 @@
   </div>
 </div>
 
-<!-- DELETE LIST MODAL -->
 <div id="delModal" class="modal-wrap">
   <div class="modal-box">
     <h2>Delete a Permanent List</h2>
@@ -443,7 +383,6 @@
   </div>
 </div>
 
-<!-- ALL-USED BANNER -->
 <div id="allUsed">
   <p>All words shown!<br>Do you want to continue?</p>
   <div class="modal-btns">
@@ -458,7 +397,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, remove, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// ── Firebase (same DB as Dowser) ─────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
   authDomain: "dowserboard.firebaseapp.com",
@@ -471,7 +409,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 
-// ── Built-in word lists ───────────────────────────────────
+// ── Word lists ────────────────────────────────────────────
 const ANIMALS = [
   "Alligator","Axolotl","Baboon","Bison","Camel","Chameleon","Cheetah","Chimpanzee",
   "Cobra","Coyote","Crocodile","Dolphin","Eagle","Elephant","Emu","Fennec Fox",
@@ -481,7 +419,6 @@ const ANIMALS = [
   "Panda","Penguin","Platypus","Quokka","Red Panda","Rhinoceros","Salamander",
   "Sloth","Snow Leopard","Tapir","Zebra"
 ];
-
 const IB_BM_UNIT1 = [
   "Sole Trader","Partnership","Primary Sector","Secondary Sector",
   "Tertiary Sector","Quaternary Sector","Limited Liability","Unlimited Liability",
@@ -500,37 +437,17 @@ const IB_BM_UNIT1 = [
   "Capital-Intensive","Labour-Intensive","Audit","Market Share","Outsourcing"
 ];
 
-// Keys: '__animals__', '__ibBMUnit1__', 'tmp', 'fb_XXXX'
-let firebaseLists  = {};   // { fbKey: { title, words[] } }
+let firebaseLists   = {};
 let tempCustomWords = [];
 let tempCustomTitle = '';
 
-// ── Colours ───────────────────────────────────────────────
 const COLORS = [
   '#E63946','#F4A261','#E9C46A','#2A9D8F','#457B9D',
   '#6A4C93','#F72585','#4CC9F0','#F77F00','#43AA8B',
   '#E76F51','#3A86FF','#8338EC','#FB5607','#06D6A0',
   '#FFB703','#DC2F02','#1D3557','#80B918','#D62828',
 ];
-
-// ── Canvas ────────────────────────────────────────────────
-const canvas = document.getElementById('wheelCanvas');
-const ctx    = canvas.getContext('2d');
-const CX = 400, CY = 400, R = 378;
 const TAU = 2 * Math.PI;
-
-// ── State ─────────────────────────────────────────────────
-let currentSetKey = '__animals__';
-let words         = [];
-let available     = [];
-let noRepeatOn    = false;
-let blurOn        = false;
-let rotation      = 0;
-let spinning      = false;
-let selectedIdx   = -1;
-let holdStart     = null;
-let rafHandle     = null;
-let lastTickSect  = -1;
 
 // ── Audio ─────────────────────────────────────────────────
 let audioCtx = null;
@@ -565,266 +482,169 @@ function playWin() {
   } catch(e) {}
 }
 
-// ── Wheel drawing ─────────────────────────────────────────
-function sectorAtPointer() {
-  const n = words.length;
-  if (!n) return -1;
-  const a = ((-rotation % TAU) + TAU) % TAU;
-  return Math.floor(a / (TAU / n)) % n;
-}
-
-function drawWheel() {
-  ctx.clearRect(0, 0, 800, 800);
-  const n = words.length;
-  if (!n) return;
-  const sa    = TAU / n;
-  const atPtr = sectorAtPointer();
-
-  // Outer glow
-  const glow = ctx.createRadialGradient(CX, CY, R - 6, CX, CY, R + 18);
-  glow.addColorStop(0, 'rgba(255,215,0,0.18)');
-  glow.addColorStop(1, 'rgba(255,215,0,0)');
-  ctx.beginPath(); ctx.arc(CX, CY, R + 18, 0, TAU);
-  ctx.fillStyle = glow; ctx.fill();
-
-  // Sectors
-  for (let i = 0; i < n; i++) {
-    const a0  = rotation + i * sa;
-    const a1  = a0 + sa;
-    const mid = a0 + sa / 2;
-    const col = COLORS[i % COLORS.length];
-    const sel = (i === atPtr) && !spinning;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(CX, CY);
-    ctx.arc(CX, CY, R, a0, a1);
-    ctx.closePath();
-    ctx.fillStyle = sel ? brighten(col) : col;
-    if (sel) { ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 16; }
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(CX, CY);
-    ctx.lineTo(CX + R * Math.cos(a0), CY + R * Math.sin(a0));
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.restore();
-
-    drawLabel(mid, words[i], sa, sel);
-  }
-
-  // Blur overlay (darken non-winners)
-  if (blurOn && !spinning && selectedIdx !== -1) {
-    for (let i = 0; i < n; i++) {
-      if (i === atPtr) continue;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(CX, CY);
-      ctx.arc(CX, CY, R, rotation + i * sa, rotation + (i + 1) * sa);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  // Outer ring
-  ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU);
-  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 3; ctx.stroke();
-
-  // Centre cap
-  const cap = ctx.createRadialGradient(CX - 6, CY - 6, 0, CX, CY, 26);
-  cap.addColorStop(0, '#ffffff'); cap.addColorStop(1, '#bbbbbb');
-  ctx.beginPath(); ctx.arc(CX, CY, 26, 0, TAU);
-  ctx.fillStyle = cap; ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2; ctx.stroke();
-}
-
-function drawLabel(midAngle, text, sectorAngle, selected) {
-  ctx.save();
-  ctx.translate(CX, CY);
-  ctx.rotate(midAngle);
-  const arcH = R * 0.6 * sectorAngle;
-  let fs = Math.min(15, Math.max(6.5, arcH * 0.5));
-  if (selected) fs = Math.min(fs * 1.25, 16);
-  ctx.font = `${selected ? 700 : 600} ${fs}px -apple-system, Arial, sans-serif`;
-  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(255,255,255,0.93)';
-  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3;
-  const maxW = R * 0.75;
-  let t = text;
-  if (ctx.measureText(t).width > maxW) {
-    while (t.length > 2 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
-    t += '…';
-  }
-  ctx.fillText(t, R * 0.88, 0);
-  ctx.restore();
-}
-
+// ── Helpers ───────────────────────────────────────────────
+function easeOut(t) { return 1 - Math.pow(1 - t, 5); }
 function brighten(hex) {
   const n = parseInt(hex.slice(1), 16);
   return `rgb(${Math.min(255,(n>>16)+55)},${Math.min(255,((n>>8)&0xff)+55)},${Math.min(255,(n&0xff)+55)})`;
 }
 
-// ── Spin ──────────────────────────────────────────────────
-function easeOut(t) { return 1 - Math.pow(1 - t, 5); }
+// ── MAIN WHEEL ────────────────────────────────────────────
+const canvas = document.getElementById('wheelCanvas');
+const ctx    = canvas.getContext('2d');
+const CX = 400, CY = 400, R = 378;
+
+let currentSetKey = '__animals__';
+let words = [], available = [];
+let noRepeatOn = false, blurOn = false;
+let rotation = 0, spinning = false, selectedIdx = -1;
+let holdStart = null, lastTickSect = -1;
+
+function sectorAtPointer() {
+  const n = words.length; if (!n) return -1;
+  return Math.floor((((-rotation % TAU) + TAU) % TAU) / (TAU / n)) % n;
+}
+
+function drawWheel() {
+  ctx.clearRect(0, 0, 800, 800);
+  const n = words.length; if (!n) return;
+  const sa = TAU / n, atPtr = sectorAtPointer();
+
+  const glow = ctx.createRadialGradient(CX, CY, R-6, CX, CY, R+18);
+  glow.addColorStop(0, 'rgba(255,215,0,0.18)'); glow.addColorStop(1, 'rgba(255,215,0,0)');
+  ctx.beginPath(); ctx.arc(CX, CY, R+18, 0, TAU); ctx.fillStyle = glow; ctx.fill();
+
+  for (let i = 0; i < n; i++) {
+    const a0 = rotation + i*sa, a1 = a0+sa, mid = a0+sa/2;
+    const col = COLORS[i % COLORS.length], sel = (i === atPtr) && !spinning;
+    ctx.save(); ctx.beginPath(); ctx.moveTo(CX, CY); ctx.arc(CX, CY, R, a0, a1); ctx.closePath();
+    ctx.fillStyle = sel ? brighten(col) : col;
+    if (sel) { ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 16; }
+    ctx.fill(); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + R*Math.cos(a0), CY + R*Math.sin(a0));
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+
+    ctx.save(); ctx.translate(CX, CY); ctx.rotate(mid);
+    const arcH = R * 0.6 * sa;
+    let fs = Math.min(15, Math.max(6.5, arcH * 0.5));
+    if (sel) fs = Math.min(fs * 1.25, 16);
+    ctx.font = `${sel?700:600} ${fs}px -apple-system,Arial,sans-serif`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3;
+    const maxW = R * 0.75; let t = words[i];
+    if (ctx.measureText(t).width > maxW) {
+      while (t.length > 2 && ctx.measureText(t+'…').width > maxW) t = t.slice(0,-1); t += '…';
+    }
+    ctx.fillText(t, R*0.88, 0); ctx.restore();
+  }
+
+  if (blurOn && !spinning && selectedIdx !== -1) {
+    for (let i = 0; i < n; i++) {
+      if (i === atPtr) continue;
+      ctx.save(); ctx.beginPath(); ctx.moveTo(CX, CY);
+      ctx.arc(CX, CY, R, rotation+i*sa, rotation+(i+1)*sa); ctx.closePath();
+      ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fill(); ctx.restore();
+    }
+  }
+
+  ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU);
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 3; ctx.stroke();
+  const cap = ctx.createRadialGradient(CX-6, CY-6, 0, CX, CY, 26);
+  cap.addColorStop(0, '#ffffff'); cap.addColorStop(1, '#bbbbbb');
+  ctx.beginPath(); ctx.arc(CX, CY, 26, 0, TAU); ctx.fillStyle = cap; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+}
 
 function startSpin(holdMs) {
   if (spinning || !words.length) return;
   const duration = Math.max(200, Math.min(8000, holdMs));
   const pool = noRepeatOn ? available : words;
   if (!pool.length) { showAllUsed(); return; }
-
-  const target    = pool[Math.floor(Math.random() * pool.length)];
+  const target = pool[Math.floor(Math.random() * pool.length)];
   const targetIdx = words.indexOf(target);
-  const sa        = TAU / words.length;
-
-  const targetRotMod = ((-targetIdx * sa - sa / 2) % TAU + TAU) % TAU;
-  const currentMod   = ((rotation % TAU) + TAU) % TAU;
-  let   delta        = targetRotMod - currentMod;
-  if (delta <= 0) delta += TAU;
-
-  const extraRots = Math.max(1, Math.round((duration / 1000) * 6));
-  const spinAmt   = extraRots * TAU + delta;
-  const startRot  = rotation;
-  const startTime = performance.now();
-
-  spinning = true; selectedIdx = -1; lastTickSect = -1;
-  setAnswerBox('');
-
+  const sa = TAU / words.length;
+  const targetRotMod = ((-targetIdx*sa - sa/2) % TAU + TAU) % TAU;
+  const currentMod = ((rotation % TAU) + TAU) % TAU;
+  let delta = targetRotMod - currentMod; if (delta <= 0) delta += TAU;
+  const spinAmt = Math.max(1, Math.round((duration/1000)*6)) * TAU + delta;
+  const startRot = rotation, startTime = performance.now();
+  spinning = true; selectedIdx = -1; lastTickSect = -1; setAnswerBox('');
   function frame(now) {
-    const elapsed = now - startTime;
-    const t     = Math.min(1, elapsed / duration);
-    const eased = easeOut(t);
-    rotation = startRot + spinAmt * eased;
-
+    const t = Math.min(1, (now - startTime) / duration);
+    rotation = startRot + spinAmt * easeOut(t);
     const sect = sectorAtPointer();
-    if (sect !== lastTickSect) {
-      playTick(1 - t);
-      lastTickSect = sect;
-    }
+    if (sect !== lastTickSect) { playTick(1-t); lastTickSect = sect; }
     drawWheel();
-
-    if (t < 1) {
-      rafHandle = requestAnimationFrame(frame);
-    } else {
-      rotation = startRot + spinAmt;
-      spinning = false; selectedIdx = targetIdx;
-      if (noRepeatOn) {
-        available = available.filter(w => w !== target);
-        updateTracker();
-      }
-      drawWheel(); playWin(); setAnswerBox(target);
-      if (noRepeatOn && !available.length) setTimeout(showAllUsed, 1300);
-    }
+    if (t < 1) { requestAnimationFrame(frame); return; }
+    rotation = startRot + spinAmt; spinning = false; selectedIdx = targetIdx;
+    if (noRepeatOn) { available = available.filter(w => w !== target); updateTracker(); }
+    drawWheel(); playWin(); setAnswerBox(target);
+    if (noRepeatOn && !available.length) setTimeout(showAllUsed, 1300);
   }
-  rafHandle = requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 
-// ── UI helpers ────────────────────────────────────────────
 function setAnswerBox(text) {
   document.getElementById('answerWord').textContent = text;
   document.getElementById('answerBox').classList.toggle('show', !!text);
 }
-
 function updateTracker() {
-  const el = document.getElementById('tracker');
-  el.textContent = noRepeatOn
-    ? `${words.length - available.length} of ${words.length} shown`
-    : '';
+  document.getElementById('tracker').textContent = noRepeatOn
+    ? `${words.length - available.length} of ${words.length} shown` : '';
 }
-
 function showAllUsed() { document.getElementById('allUsed').classList.add('show'); }
 
-// ── Load set ──────────────────────────────────────────────
 function loadSet(key) {
   currentSetKey = key;
-  let arr;
-  if      (key === '__animals__')  arr = ANIMALS;
-  else if (key === '__ibBMUnit1__') arr = IB_BM_UNIT1;
-  else if (key === 'tmp')          arr = tempCustomWords;
-  else if (key.startsWith('fb_'))  arr = firebaseLists[key.slice(3)]?.words ?? [];
-  else arr = [];
-
-  words = [...arr]; available = [...words];
-  selectedIdx = -1; rotation = 0;
+  let arr = key === '__animals__' ? ANIMALS
+          : key === '__ibBMUnit1__' ? IB_BM_UNIT1
+          : key === 'tmp' ? tempCustomWords
+          : key.startsWith('fb_') ? (firebaseLists[key.slice(3)]?.words ?? [])
+          : [];
+  words = [...arr]; available = [...words]; selectedIdx = -1; rotation = 0;
   setAnswerBox(''); updateTracker(); drawWheel();
 }
 
 // ── Dropdown ──────────────────────────────────────────────
 const setSelect = document.getElementById('setSelect');
-
 function addOpt(parent, value, label) {
-  const o = document.createElement('option');
-  o.value = value; o.textContent = label;
-  parent.appendChild(o);
+  const o = document.createElement('option'); o.value = value; o.textContent = label; parent.appendChild(o);
 }
-
 function rebuildSelect() {
-  const prev = setSelect.value || currentSetKey;
-  setSelect.innerHTML = '';
-
-  // Built-in
-  const g1 = document.createElement('optgroup');
-  g1.label = 'Built-in';
-  addOpt(g1, '__animals__', '50 Animals');
-  setSelect.appendChild(g1);
-
-  // Custom actions
-  const g2 = document.createElement('optgroup');
-  g2.label = 'Custom';
-  addOpt(g2, '__temp__', 'Temporary custom...');
-  addOpt(g2, '__add__', '+ Add permanent list');
+  const prev = setSelect.value || currentSetKey; setSelect.innerHTML = '';
+  const g1 = document.createElement('optgroup'); g1.label = 'Built-in';
+  addOpt(g1, '__animals__', '50 Animals'); setSelect.appendChild(g1);
+  const g2 = document.createElement('optgroup'); g2.label = 'Custom';
+  addOpt(g2, '__temp__', 'Temporary custom...'); addOpt(g2, '__add__', '+ Add permanent list');
   if (tempCustomWords.length) addOpt(g2, 'tmp', tempCustomTitle || 'My Custom');
   setSelect.appendChild(g2);
-
-  // Saved (permanent)
-  const g3 = document.createElement('optgroup');
-  g3.label = 'Saved';
+  const g3 = document.createElement('optgroup'); g3.label = 'Saved';
   addOpt(g3, '__ibBMUnit1__', 'IB BM Unit 1');
-  Object.entries(firebaseLists).forEach(([fbKey, list]) => {
-    addOpt(g3, 'fb_' + fbKey, list.title);
-  });
+  Object.entries(firebaseLists).forEach(([k, list]) => addOpt(g3, 'fb_'+k, list.title));
   setSelect.appendChild(g3);
-
-  // Restore selection if still valid
-  const allVals = [...setSelect.options].map(o => o.value);
-  setSelect.value = allVals.includes(prev) ? prev : '__animals__';
+  const all = [...setSelect.options].map(o => o.value);
+  setSelect.value = all.includes(prev) ? prev : '__animals__';
   currentSetKey = setSelect.value;
 }
-
 setSelect.addEventListener('change', () => {
   const v = setSelect.value;
-  if (v === '__temp__') {
-    setSelect.value = currentSetKey;   // revert visually
-    openTempModal();
-  } else if (v === '__add__') {
-    setSelect.value = currentSetKey;
-    openPwModal();
-  } else {
-    loadSet(v);
-  }
+  if (v === '__temp__') { setSelect.value = currentSetKey; openTempModal(); }
+  else if (v === '__add__') { setSelect.value = currentSetKey; openPwModal(); }
+  else loadSet(v);
 });
 
-// ── Firebase: load permanent lists ────────────────────────
 onValue(ref(db, 'spinLists'), snap => {
   firebaseLists = {};
-  if (snap.exists()) {
-    snap.forEach(child => {
-      const d = child.val();
-      firebaseLists[child.key] = {
-        title: d.title,
-        words: Array.isArray(d.words) ? d.words : Object.values(d.words)
-      };
-    });
-  }
+  if (snap.exists()) snap.forEach(child => {
+    const d = child.val();
+    firebaseLists[child.key] = { title: d.title, words: Array.isArray(d.words) ? d.words : Object.values(d.words) };
+  });
   rebuildSelect();
-  // Re-load current set in case Firebase just populated it
   if (currentSetKey.startsWith('fb_')) loadSet(currentSetKey);
 });
 
-// ── Temp custom modal ─────────────────────────────────────
+// ── Modals ────────────────────────────────────────────────
 function openTempModal() {
   document.getElementById('tempTitle').value = '';
   document.getElementById('tempWords').value = '';
@@ -833,25 +653,17 @@ function openTempModal() {
 }
 document.getElementById('tempSave').addEventListener('click', () => {
   const title = document.getElementById('tempTitle').value.trim() || 'Custom';
-  const raw   = document.getElementById('tempWords').value.trim();
-  let parsed  = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  const raw = document.getElementById('tempWords').value.trim();
+  let parsed = raw.split('\n').map(s => s.trim()).filter(Boolean);
   if (parsed.length <= 1) parsed = raw.split(',').map(s => s.trim()).filter(Boolean);
   if (parsed.length < 2) { document.getElementById('tempWords').style.borderColor = '#E63946'; return; }
-
-  tempCustomWords = parsed;
-  tempCustomTitle = title;
+  tempCustomWords = parsed; tempCustomTitle = title;
   document.getElementById('tempModal').classList.remove('open');
-  rebuildSelect();
-  setSelect.value = 'tmp'; currentSetKey = 'tmp';
-  loadSet('tmp');
+  rebuildSelect(); setSelect.value = 'tmp'; currentSetKey = 'tmp'; loadSet('tmp');
 });
-document.getElementById('tempCancel').addEventListener('click', () => {
-  document.getElementById('tempModal').classList.remove('open');
-});
+document.getElementById('tempCancel').addEventListener('click', () => document.getElementById('tempModal').classList.remove('open'));
 
-// ── Password modal ────────────────────────────────────────
 let deleteMode = false;
-
 function openPwModal() {
   document.getElementById('pwInput').value = '';
   document.getElementById('pwError').classList.remove('show');
@@ -859,24 +671,16 @@ function openPwModal() {
   setTimeout(() => document.getElementById('pwInput').focus(), 100);
 }
 document.getElementById('pwSubmit').addEventListener('click', () => {
-  const pw = document.getElementById('pwInput').value;
-  if (pw !== 'shadowmaster') {
+  if (document.getElementById('pwInput').value !== 'shadowmaster') {
     document.getElementById('pwError').classList.add('show');
-    document.getElementById('pwInput').value = '';
-    return;
+    document.getElementById('pwInput').value = ''; return;
   }
   document.getElementById('pwModal').classList.remove('open');
-  if (deleteMode) { deleteMode = false; openDelModal(); }
-  else             { openAddModal(); }
+  if (deleteMode) { deleteMode = false; openDelModal(); } else openAddModal();
 });
-document.getElementById('pwCancel').addEventListener('click', () => {
-  document.getElementById('pwModal').classList.remove('open');
-});
-document.getElementById('pwInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('pwSubmit').click();
-});
+document.getElementById('pwCancel').addEventListener('click', () => document.getElementById('pwModal').classList.remove('open'));
+document.getElementById('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pwSubmit').click(); });
 
-// ── Add permanent list modal ──────────────────────────────
 function openAddModal() {
   document.getElementById('addTitle').value = '';
   document.getElementById('addWords').value = '';
@@ -885,286 +689,177 @@ function openAddModal() {
 }
 document.getElementById('addSave').addEventListener('click', () => {
   const title = document.getElementById('addTitle').value.trim();
-  const raw   = document.getElementById('addWords').value.trim();
+  const raw = document.getElementById('addWords').value.trim();
   if (!title) { document.getElementById('addTitle').style.borderColor = '#E63946'; return; }
-  let parsed  = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  let parsed = raw.split('\n').map(s => s.trim()).filter(Boolean);
   if (parsed.length <= 1) parsed = raw.split(',').map(s => s.trim()).filter(Boolean);
   if (parsed.length < 2) { document.getElementById('addWords').style.borderColor = '#E63946'; return; }
-
-  push(ref(db, 'spinLists'), { title, words: parsed })
-    .then(newRef => {
-      document.getElementById('addModal').classList.remove('open');
-      // Firebase onValue will fire and rebuild the select; pre-select the new list
-      const newKey = 'fb_' + newRef.key;
-      currentSetKey = newKey;
-    });
+  push(ref(db, 'spinLists'), { title, words: parsed }).then(newRef => {
+    document.getElementById('addModal').classList.remove('open');
+    currentSetKey = 'fb_' + newRef.key;
+  });
 });
-document.getElementById('addCancel').addEventListener('click', () => {
-  document.getElementById('addModal').classList.remove('open');
-});
+document.getElementById('addCancel').addEventListener('click', () => document.getElementById('addModal').classList.remove('open'));
 
-// ── Delete list modal ─────────────────────────────────────
 function openDelModal() {
-  const list = document.getElementById('delList');
-  list.innerHTML = '';
+  const list = document.getElementById('delList'); list.innerHTML = '';
   const entries = Object.entries(firebaseLists);
-  if (!entries.length) {
-    list.innerHTML = '<div class="del-empty">No saved lists to delete.</div>';
-  } else {
-    entries.forEach(([fbKey, data]) => {
-      const row = document.createElement('div');
-      row.className = 'del-item';
-      row.innerHTML = `<span class="del-item-name">${data.title}</span>`;
-      const btn = document.createElement('button');
-      btn.className = 'del-item-btn';
-      btn.textContent = 'Delete';
-      btn.addEventListener('click', () => {
-        remove(ref(db, 'spinLists/' + fbKey)).then(() => {
-          // If this was the active set, fall back to animals
-          if (currentSetKey === 'fb_' + fbKey) {
-            currentSetKey = '__animals__';
-            loadSet('__animals__');
-          }
-          row.remove();
-          if (!document.querySelector('.del-item')) {
-            list.innerHTML = '<div class="del-empty">No saved lists to delete.</div>';
-          }
-        });
+  if (!entries.length) { list.innerHTML = '<div class="del-empty">No saved lists to delete.</div>'; }
+  else entries.forEach(([fbKey, data]) => {
+    const row = document.createElement('div'); row.className = 'del-item';
+    row.innerHTML = `<span class="del-item-name">${data.title}</span>`;
+    const btn = document.createElement('button'); btn.className = 'del-item-btn'; btn.textContent = 'Delete';
+    btn.addEventListener('click', () => {
+      remove(ref(db, 'spinLists/'+fbKey)).then(() => {
+        if (currentSetKey === 'fb_'+fbKey) { currentSetKey = '__animals__'; loadSet('__animals__'); }
+        row.remove();
+        if (!document.querySelector('.del-item')) list.innerHTML = '<div class="del-empty">No saved lists to delete.</div>';
       });
-      row.appendChild(btn);
-      list.appendChild(row);
     });
-  }
+    row.appendChild(btn); list.appendChild(row);
+  });
   document.getElementById('delModal').classList.add('open');
 }
-document.getElementById('delClose').addEventListener('click', () => {
-  document.getElementById('delModal').classList.remove('open');
-});
-
-document.getElementById('deleteBtn').addEventListener('click', () => {
-  deleteMode = true;
-  openPwModal();
-});
+document.getElementById('delClose').addEventListener('click', () => document.getElementById('delModal').classList.remove('open'));
+document.getElementById('deleteBtn').addEventListener('click', () => { deleteMode = true; openPwModal(); });
 
 // ── Toggles ───────────────────────────────────────────────
-document.getElementById('noRepeat').addEventListener('change', e => {
-  noRepeatOn = e.target.checked;
-  available  = [...words];
-  updateTracker();
-});
-document.getElementById('blurOthers').addEventListener('change', e => {
-  blurOn = e.target.checked;
-  drawWheel();
-});
+document.getElementById('noRepeat').addEventListener('change', e => { noRepeatOn = e.target.checked; available = [...words]; updateTracker(); });
+document.getElementById('blurOthers').addEventListener('change', e => { blurOn = e.target.checked; drawWheel(); });
+document.getElementById('continueYes').addEventListener('click', () => { available = [...words]; updateTracker(); document.getElementById('allUsed').classList.remove('show'); });
+document.getElementById('continueNo').addEventListener('click',  () => document.getElementById('allUsed').classList.remove('show'));
 
-// ── All-used banner ───────────────────────────────────────
-document.getElementById('continueYes').addEventListener('click', () => {
-  available = [...words]; updateTracker();
-  document.getElementById('allUsed').classList.remove('show');
-});
-document.getElementById('continueNo').addEventListener('click', () => {
-  document.getElementById('allUsed').classList.remove('show');
-});
-
-// ── Hold-to-spin ──────────────────────────────────────────
+// ── Main wheel hold-to-spin ───────────────────────────────
 canvas.addEventListener('pointerdown', e => {
-  if (spinning) return;
-  holdStart = Date.now();
-  canvas.setPointerCapture(e.pointerId);
-  canvas.classList.add('charged');
-  try { ac().resume(); } catch(err) {}
+  if (spinning) return; holdStart = Date.now();
+  canvas.setPointerCapture(e.pointerId); canvas.classList.add('charged');
+  try { ac().resume(); } catch(e) {}
 });
 canvas.addEventListener('pointerup', () => {
   if (holdStart === null) return;
-  const held = Date.now() - holdStart;
-  holdStart  = null;
-  canvas.classList.remove('charged');
-  startSpin(held);
+  const held = Date.now() - holdStart; holdStart = null; canvas.classList.remove('charged'); startSpin(held);
 });
-canvas.addEventListener('pointercancel', () => {
-  holdStart = null; canvas.classList.remove('charged');
-});
+canvas.addEventListener('pointercancel', () => { holdStart = null; canvas.classList.remove('charged'); });
 canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 canvas.addEventListener('touchmove',  e => e.preventDefault(), { passive: false });
 
-// ── Dice wheel ────────────────────────────────────────────
-const diceCanvas  = document.getElementById('diceCanvas');
-const diceCtx     = diceCanvas.getContext('2d');
-const DCX = 180, DCY = 180, DR = 166;
-const DICE_PA     = Math.PI * 1.5; // pointer at top (270°)
+// ── DICE WHEEL ────────────────────────────────────────────
+const diceCanvas = document.getElementById('diceCanvas');
+const diceCtx    = diceCanvas.getContext('2d');
+const DCX = 140, DCY = 140, DR = 128;
+// Pointer at 225° — upper-left of the visible top-left quadrant
+const DICE_PA = Math.PI * 1.25;
 
-let diceValues      = [];
-let diceRotation    = 0;
-let diceSpinning    = false;
-let diceSelectedIdx = -1;
-let diceHoldStart   = null;
-let diceLastTick    = -1;
+let diceValues = [], diceRotation = 0, diceSpinning = false;
+let diceSelectedIdx = -1, diceHoldStart = null, diceLastTick = -1;
 
 function buildDiceValues() {
   const mn = parseInt(document.getElementById('diceMin').value);
   const mx = parseInt(document.getElementById('diceMax').value);
   if (isNaN(mn) || isNaN(mx)) return;
-  const lo = Math.min(mn, mx), hi = Math.max(mn, mx);
-  diceValues = [];
-  for (let i = lo; i <= hi; i++) diceValues.push(i);
-  diceRotation = 0; diceSelectedIdx = -1;
-  setDiceResult('');
-  drawDice();
+  const lo = Math.min(mn,mx), hi = Math.max(mn,mx);
+  diceValues = []; for (let i = lo; i <= hi; i++) diceValues.push(i);
+  diceRotation = 0; diceSelectedIdx = -1; setDiceResult(''); drawDice();
 }
-
 function diceColor(i, n) {
-  const t = n <= 1 ? 0.5 : i / (n - 1);
-  const hue = 270 + t * 90; // purple (270°) → red (360°)
-  return `hsl(${hue}, 80%, 55%)`;
+  const t = n <= 1 ? 0.5 : i / (n-1);
+  return `hsl(${270 + t*90}, 80%, 55%)`;
 }
-
 function diceSectorAtPointer() {
-  const n = diceValues.length;
-  if (!n) return -1;
-  const a = ((DICE_PA - diceRotation) % TAU + TAU) % TAU;
-  return Math.floor(a / (TAU / n)) % n;
+  const n = diceValues.length; if (!n) return -1;
+  return Math.floor(((DICE_PA - diceRotation) % TAU + TAU) % TAU / (TAU/n)) % n;
 }
-
 function drawDice() {
-  diceCtx.clearRect(0, 0, 360, 360);
-  const n = diceValues.length;
-  if (!n) return;
-  const sa    = TAU / n;
-  const atPtr = diceSectorAtPointer();
+  diceCtx.clearRect(0, 0, 280, 280);
+  const n = diceValues.length; if (!n) return;
+  const sa = TAU/n, atPtr = diceSectorAtPointer();
 
-  // Outer glow
-  const glow = diceCtx.createRadialGradient(DCX, DCY, DR - 6, DCX, DCY, DR + 14);
-  glow.addColorStop(0, 'rgba(180,80,255,0.2)');
-  glow.addColorStop(1, 'rgba(180,80,255,0)');
-  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, DR + 14, 0, TAU);
-  diceCtx.fillStyle = glow; diceCtx.fill();
+  const glow = diceCtx.createRadialGradient(DCX, DCY, DR-4, DCX, DCY, DR+12);
+  glow.addColorStop(0, 'rgba(180,80,255,0.2)'); glow.addColorStop(1, 'rgba(180,80,255,0)');
+  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, DR+12, 0, TAU); diceCtx.fillStyle = glow; diceCtx.fill();
 
   for (let i = 0; i < n; i++) {
-    const a0  = diceRotation + i * sa;
-    const a1  = a0 + sa;
-    const mid = a0 + sa / 2;
-    const col = diceColor(i, n);
-    const sel = (i === atPtr) && !diceSpinning;
-
-    diceCtx.save();
-    diceCtx.beginPath();
-    diceCtx.moveTo(DCX, DCY);
-    diceCtx.arc(DCX, DCY, DR, a0, a1);
-    diceCtx.closePath();
+    const a0 = diceRotation+i*sa, a1 = a0+sa, mid = a0+sa/2;
+    const col = diceColor(i,n), sel = (i===atPtr) && !diceSpinning;
+    diceCtx.save(); diceCtx.beginPath(); diceCtx.moveTo(DCX, DCY);
+    diceCtx.arc(DCX, DCY, DR, a0, a1); diceCtx.closePath();
     diceCtx.fillStyle = sel ? brighten(col) : col;
-    if (sel) { diceCtx.shadowColor = 'rgba(255,255,255,0.5)'; diceCtx.shadowBlur = 12; }
-    diceCtx.fill();
-    diceCtx.restore();
+    if (sel) { diceCtx.shadowColor = 'rgba(255,255,255,0.5)'; diceCtx.shadowBlur = 10; }
+    diceCtx.fill(); diceCtx.restore();
+    diceCtx.save(); diceCtx.beginPath(); diceCtx.moveTo(DCX, DCY);
+    diceCtx.lineTo(DCX + DR*Math.cos(a0), DCY + DR*Math.sin(a0));
+    diceCtx.strokeStyle = 'rgba(0,0,0,0.35)'; diceCtx.lineWidth = 1; diceCtx.stroke(); diceCtx.restore();
 
-    diceCtx.save();
-    diceCtx.beginPath();
-    diceCtx.moveTo(DCX, DCY);
-    diceCtx.lineTo(DCX + DR * Math.cos(a0), DCY + DR * Math.sin(a0));
-    diceCtx.strokeStyle = 'rgba(0,0,0,0.35)'; diceCtx.lineWidth = 1; diceCtx.stroke();
-    diceCtx.restore();
-
-    // Number label
-    diceCtx.save();
-    diceCtx.translate(DCX, DCY);
-    diceCtx.rotate(mid);
-    const fs = Math.min(20, Math.max(7, DR * sa * 0.3));
-    diceCtx.font = `${sel ? 700 : 600} ${fs}px -apple-system, Arial, sans-serif`;
+    diceCtx.save(); diceCtx.translate(DCX, DCY); diceCtx.rotate(mid);
+    const fs = Math.min(20, Math.max(7, DR*sa*0.3));
+    diceCtx.font = `${sel?700:600} ${fs}px -apple-system,Arial,sans-serif`;
     diceCtx.textAlign = 'right'; diceCtx.textBaseline = 'middle';
-    diceCtx.fillStyle = 'rgba(255,255,255,0.93)';
-    diceCtx.shadowColor = 'rgba(0,0,0,0.7)'; diceCtx.shadowBlur = 3;
-    diceCtx.fillText(String(diceValues[i]), DR * 0.82, 0);
-    diceCtx.restore();
+    diceCtx.fillStyle = 'rgba(255,255,255,0.93)'; diceCtx.shadowColor = 'rgba(0,0,0,0.7)'; diceCtx.shadowBlur = 3;
+    diceCtx.fillText(String(diceValues[i]), DR*0.82, 0); diceCtx.restore();
   }
 
-  // Blur overlay
   if (blurOn && !diceSpinning && diceSelectedIdx !== -1) {
     for (let i = 0; i < n; i++) {
       if (i === atPtr) continue;
-      diceCtx.save();
-      diceCtx.beginPath();
-      diceCtx.moveTo(DCX, DCY);
-      diceCtx.arc(DCX, DCY, DR, diceRotation + i * sa, diceRotation + (i + 1) * sa);
-      diceCtx.closePath();
-      diceCtx.fillStyle = 'rgba(0,0,0,0.72)'; diceCtx.fill();
-      diceCtx.restore();
+      diceCtx.save(); diceCtx.beginPath(); diceCtx.moveTo(DCX, DCY);
+      diceCtx.arc(DCX, DCY, DR, diceRotation+i*sa, diceRotation+(i+1)*sa); diceCtx.closePath();
+      diceCtx.fillStyle = 'rgba(0,0,0,0.72)'; diceCtx.fill(); diceCtx.restore();
     }
   }
 
-  // Outer ring
   diceCtx.beginPath(); diceCtx.arc(DCX, DCY, DR, 0, TAU);
   diceCtx.strokeStyle = 'rgba(255,255,255,0.45)'; diceCtx.lineWidth = 3; diceCtx.stroke();
 
-  // Centre cap
-  const cap = diceCtx.createRadialGradient(DCX - 4, DCY - 4, 0, DCX, DCY, 18);
+  // Gold pointer triangle drawn at DICE_PA on the ring
+  const px = DCX + (DR+4)*Math.cos(DICE_PA), py = DCY + (DR+4)*Math.sin(DICE_PA);
+  diceCtx.save(); diceCtx.translate(px, py); diceCtx.rotate(DICE_PA + Math.PI);
+  diceCtx.beginPath(); diceCtx.moveTo(0, 0); diceCtx.lineTo(-7, -13); diceCtx.lineTo(7, -13); diceCtx.closePath();
+  diceCtx.fillStyle = '#FFD700'; diceCtx.shadowColor = '#FFD700'; diceCtx.shadowBlur = 8; diceCtx.fill(); diceCtx.restore();
+
+  const cap = diceCtx.createRadialGradient(DCX-4, DCY-4, 0, DCX, DCY, 16);
   cap.addColorStop(0, '#ffffff'); cap.addColorStop(1, '#bbbbbb');
-  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, 18, 0, TAU);
-  diceCtx.fillStyle = cap; diceCtx.fill();
+  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, 16, 0, TAU); diceCtx.fillStyle = cap; diceCtx.fill();
   diceCtx.strokeStyle = 'rgba(0,0,0,0.25)'; diceCtx.lineWidth = 2; diceCtx.stroke();
 }
 
 function startDiceSpin(holdMs) {
   if (diceSpinning || !diceValues.length) return;
-  const duration  = Math.max(200, Math.min(8000, holdMs));
+  const duration = Math.max(200, Math.min(8000, holdMs));
   const targetIdx = Math.floor(Math.random() * diceValues.length);
-  const sa        = TAU / diceValues.length;
-
-  const targetRotMod = ((DICE_PA - targetIdx * sa - sa / 2) % TAU + TAU) % TAU;
-  const currentMod   = ((diceRotation % TAU) + TAU) % TAU;
-  let   delta        = targetRotMod - currentMod;
-  if (delta <= 0) delta += TAU;
-
-  const extraRots = Math.max(1, Math.round((duration / 1000) * 6));
-  const spinAmt   = extraRots * TAU + delta;
-  const startRot  = diceRotation;
-  const startTime = performance.now();
-
-  diceSpinning = true; diceSelectedIdx = -1; diceLastTick = -1;
-  setDiceResult('');
-
+  const sa = TAU / diceValues.length;
+  const targetRotMod = ((DICE_PA - targetIdx*sa - sa/2) % TAU + TAU) % TAU;
+  const currentMod = ((diceRotation % TAU) + TAU) % TAU;
+  let delta = targetRotMod - currentMod; if (delta <= 0) delta += TAU;
+  const spinAmt = Math.max(1, Math.round((duration/1000)*6)) * TAU + delta;
+  const startRot = diceRotation, startTime = performance.now();
+  diceSpinning = true; diceSelectedIdx = -1; diceLastTick = -1; setDiceResult('');
   function frame(now) {
-    const elapsed = now - startTime;
-    const t     = Math.min(1, elapsed / duration);
-    const eased = easeOut(t);
-    diceRotation = startRot + spinAmt * eased;
-
+    const t = Math.min(1, (now - startTime) / duration);
+    diceRotation = startRot + spinAmt * easeOut(t);
     const sect = diceSectorAtPointer();
-    if (sect !== diceLastTick) { playTick(1 - t); diceLastTick = sect; }
+    if (sect !== diceLastTick) { playTick(1-t); diceLastTick = sect; }
     drawDice();
-
-    if (t < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      diceRotation = startRot + spinAmt;
-      diceSpinning = false; diceSelectedIdx = targetIdx;
-      drawDice(); playWin(); setDiceResult(String(diceValues[targetIdx]));
-    }
+    if (t < 1) { requestAnimationFrame(frame); return; }
+    diceRotation = startRot + spinAmt; diceSpinning = false; diceSelectedIdx = targetIdx;
+    drawDice(); playWin(); setDiceResult(String(diceValues[targetIdx]));
   }
   requestAnimationFrame(frame);
 }
-
 function setDiceResult(text) {
   const el = document.getElementById('diceResult');
-  el.textContent = text;
-  el.classList.toggle('show', !!text);
+  el.textContent = text; el.classList.toggle('show', !!text);
 }
 
 diceCanvas.addEventListener('pointerdown', e => {
-  if (diceSpinning) return;
-  diceHoldStart = Date.now();
-  diceCanvas.setPointerCapture(e.pointerId);
-  diceCanvas.classList.add('charged');
-  try { ac().resume(); } catch(err) {}
+  if (diceSpinning) return; diceHoldStart = Date.now();
+  diceCanvas.setPointerCapture(e.pointerId); diceCanvas.classList.add('charged');
+  try { ac().resume(); } catch(e) {}
 });
 diceCanvas.addEventListener('pointerup', () => {
   if (diceHoldStart === null) return;
-  const held = Date.now() - diceHoldStart;
-  diceHoldStart = null;
-  diceCanvas.classList.remove('charged');
-  startDiceSpin(held);
+  const held = Date.now() - diceHoldStart; diceHoldStart = null; diceCanvas.classList.remove('charged'); startDiceSpin(held);
 });
-diceCanvas.addEventListener('pointercancel', () => {
-  diceHoldStart = null; diceCanvas.classList.remove('charged');
-});
+diceCanvas.addEventListener('pointercancel', () => { diceHoldStart = null; diceCanvas.classList.remove('charged'); });
 diceCanvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 diceCanvas.addEventListener('touchmove',  e => e.preventDefault(), { passive: false });
 
@@ -1179,8 +874,67 @@ document.getElementById('diceClose').addEventListener('click', () => {
 document.getElementById('diceMin').addEventListener('change', buildDiceValues);
 document.getElementById('diceMax').addEventListener('change', buildDiceValues);
 
+// ── TIMER ─────────────────────────────────────────────────
+const CIRC = 2 * Math.PI * 27;
+let timerDuration = 120, timerRemaining = 120;
+let timerRunning = false, timerInterval = null;
+
+function updateTimerDisplay() {
+  const m = Math.floor(timerRemaining / 60), s = timerRemaining % 60;
+  document.getElementById('timerText').textContent = m > 0 ? `${m}:${String(s).padStart(2,'0')}` : String(s);
+  const pct = timerDuration > 0 ? timerRemaining / timerDuration : 1;
+  const arc = document.getElementById('timerArc');
+  arc.style.strokeDasharray = `${pct * CIRC} ${CIRC}`;
+  arc.classList.toggle('urgent', timerRemaining > 0 && timerRemaining <= 10);
+}
+
+function timerDone() {
+  const wrap = document.getElementById('timerWrap');
+  wrap.classList.add('done'); setTimeout(() => wrap.classList.remove('done'), 1200);
+  try {
+    const a = ac();
+    [880, 660, 440].forEach((f, i) => {
+      const osc = a.createOscillator(), gain = a.createGain();
+      osc.connect(gain); gain.connect(a.destination); osc.type = 'sine'; osc.frequency.value = f;
+      const t = a.currentTime + i * 0.2;
+      gain.gain.setValueAtTime(0.18, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t); osc.stop(t + 0.37);
+    });
+  } catch(e) {}
+}
+
+function setTimerDuration(secs) {
+  clearInterval(timerInterval); timerRunning = false;
+  timerDuration = secs; timerRemaining = secs;
+  document.querySelectorAll('.t-preset').forEach(el => el.classList.toggle('active', +el.dataset.secs === secs));
+  updateTimerDisplay();
+}
+
+function toggleTimer() {
+  if (timerRemaining <= 0) { timerRemaining = timerDuration; updateTimerDisplay(); return; }
+  if (timerRunning) {
+    clearInterval(timerInterval); timerRunning = false;
+  } else {
+    try { ac().resume(); } catch(e) {}
+    timerRunning = true;
+    timerInterval = setInterval(() => {
+      timerRemaining--;
+      updateTimerDisplay();
+      if (timerRemaining <= 0) { clearInterval(timerInterval); timerRunning = false; timerDone(); }
+    }, 1000);
+  }
+}
+
+document.getElementById('timerRingWrap').addEventListener('click', toggleTimer);
+document.querySelectorAll('.t-preset').forEach(btn =>
+  btn.addEventListener('click', e => { e.stopPropagation(); setTimerDuration(+btn.dataset.secs); })
+);
+document.getElementById('timerToggle').addEventListener('change', e =>
+  document.body.classList.toggle('timer-on', e.target.checked)
+);
+
 // ── Init ──────────────────────────────────────────────────
-// Firebase onValue fires on load and builds the select + loads first set
+updateTimerDisplay();
 rebuildSelect();
 loadSet('__animals__');
 </script>
