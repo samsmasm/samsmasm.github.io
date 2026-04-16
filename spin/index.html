@@ -238,6 +238,60 @@
     .pw-error { font-size: 12px; color: #f87171; display: none; }
     .pw-error.show { display: block; }
 
+    /* ── DICE WHEEL ─────────────────────────────────────── */
+    body.dice-on { --ctrl-h: 212px; }
+    #diceWrap {
+      display: none;
+      position: fixed;
+      bottom: var(--ctrl-h);
+      left: 50%;
+      transform: translateX(-50%) translateY(50%);
+      z-index: 5;
+      width: 360px; height: 360px;
+    }
+    body.dice-on #diceWrap { display: block; }
+    #diceCanvas { cursor: pointer; transition: filter 0.1s; }
+    #diceCanvas.charged {
+      filter: brightness(1.15) drop-shadow(0 0 10px rgba(180,80,255,0.5));
+    }
+    #dicePointer {
+      position: absolute;
+      top: 2px; left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 28px solid var(--gold);
+      filter: drop-shadow(0 0 8px var(--gold)) drop-shadow(0 0 3px #fff);
+      z-index: 10;
+      pointer-events: none;
+    }
+    #diceResult {
+      position: fixed;
+      top: 14px; left: 14px;
+      font-size: 56px; font-weight: 800; line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 24px #cc44ff, 0 0 8px #cc44ff;
+      opacity: 0; transform: translateY(-6px);
+      transition: opacity 0.35s, transform 0.35s;
+      pointer-events: none; z-index: 20;
+    }
+    #diceResult.show { opacity: 1; transform: translateY(0); }
+    #diceRangeRow {
+      display: none; align-items: center; gap: 8px;
+    }
+    body.dice-on #diceRangeRow { display: flex; }
+    #diceRangeRow span { font-size: 12px; opacity: 0.65; white-space: nowrap; }
+    #diceRangeRow input[type=number] {
+      width: 58px; padding: 7px 10px;
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); color: #fff;
+      font-size: 14px; font-family: inherit; outline: none;
+      -moz-appearance: textfield; appearance: textfield;
+    }
+    #diceRangeRow input[type=number]::-webkit-outer-spin-button,
+    #diceRangeRow input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
     /* ── ALL-USED BANNER ────────────────────────────────── */
     #allUsed {
       display: none;
@@ -273,6 +327,13 @@
   <div id="hint">Hold the wheel to spin &bull; longer hold = longer spin</div>
 </div>
 
+<!-- DICE WHEEL -->
+<div id="diceWrap">
+  <canvas id="diceCanvas" width="360" height="360"></canvas>
+  <div id="dicePointer"></div>
+</div>
+<div id="diceResult"></div>
+
 <!-- CONTROLS -->
 <div id="controls">
   <div class="ctrl-row">
@@ -293,6 +354,19 @@
         <span class="slider"></span>
       </label>
     </div>
+    <div class="toggle-group">
+      <span>Dice</span>
+      <label class="toggle">
+        <input type="checkbox" id="diceToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  <div id="diceRangeRow">
+    <span>Dice range:</span>
+    <input type="number" id="diceMin" value="1" min="0" max="100">
+    <span>to</span>
+    <input type="number" id="diceMax" value="6" min="0" max="100">
   </div>
   <div class="bottom-row">
     <button id="deleteBtn">Delete a list</button>
@@ -897,6 +971,194 @@ canvas.addEventListener('pointercancel', () => {
 });
 canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 canvas.addEventListener('touchmove',  e => e.preventDefault(), { passive: false });
+
+// ── Dice wheel ────────────────────────────────────────────
+const diceCanvas  = document.getElementById('diceCanvas');
+const diceCtx     = diceCanvas.getContext('2d');
+const DCX = 180, DCY = 180, DR = 166;
+const DICE_PA     = Math.PI * 1.5; // pointer at top (270°)
+
+let diceValues      = [];
+let diceRotation    = 0;
+let diceSpinning    = false;
+let diceSelectedIdx = -1;
+let diceHoldStart   = null;
+let diceLastTick    = -1;
+
+function buildDiceValues() {
+  const mn = parseInt(document.getElementById('diceMin').value);
+  const mx = parseInt(document.getElementById('diceMax').value);
+  if (isNaN(mn) || isNaN(mx)) return;
+  const lo = Math.min(mn, mx), hi = Math.max(mn, mx);
+  diceValues = [];
+  for (let i = lo; i <= hi; i++) diceValues.push(i);
+  diceRotation = 0; diceSelectedIdx = -1;
+  setDiceResult('');
+  drawDice();
+}
+
+function diceColor(i, n) {
+  const t = n <= 1 ? 0.5 : i / (n - 1);
+  const hue = 270 + t * 90; // purple (270°) → red (360°)
+  return `hsl(${hue}, 80%, 55%)`;
+}
+
+function diceSectorAtPointer() {
+  const n = diceValues.length;
+  if (!n) return -1;
+  const a = ((DICE_PA - diceRotation) % TAU + TAU) % TAU;
+  return Math.floor(a / (TAU / n)) % n;
+}
+
+function drawDice() {
+  diceCtx.clearRect(0, 0, 360, 360);
+  const n = diceValues.length;
+  if (!n) return;
+  const sa    = TAU / n;
+  const atPtr = diceSectorAtPointer();
+
+  // Outer glow
+  const glow = diceCtx.createRadialGradient(DCX, DCY, DR - 6, DCX, DCY, DR + 14);
+  glow.addColorStop(0, 'rgba(180,80,255,0.2)');
+  glow.addColorStop(1, 'rgba(180,80,255,0)');
+  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, DR + 14, 0, TAU);
+  diceCtx.fillStyle = glow; diceCtx.fill();
+
+  for (let i = 0; i < n; i++) {
+    const a0  = diceRotation + i * sa;
+    const a1  = a0 + sa;
+    const mid = a0 + sa / 2;
+    const col = diceColor(i, n);
+    const sel = (i === atPtr) && !diceSpinning;
+
+    diceCtx.save();
+    diceCtx.beginPath();
+    diceCtx.moveTo(DCX, DCY);
+    diceCtx.arc(DCX, DCY, DR, a0, a1);
+    diceCtx.closePath();
+    diceCtx.fillStyle = sel ? brighten(col) : col;
+    if (sel) { diceCtx.shadowColor = 'rgba(255,255,255,0.5)'; diceCtx.shadowBlur = 12; }
+    diceCtx.fill();
+    diceCtx.restore();
+
+    diceCtx.save();
+    diceCtx.beginPath();
+    diceCtx.moveTo(DCX, DCY);
+    diceCtx.lineTo(DCX + DR * Math.cos(a0), DCY + DR * Math.sin(a0));
+    diceCtx.strokeStyle = 'rgba(0,0,0,0.35)'; diceCtx.lineWidth = 1; diceCtx.stroke();
+    diceCtx.restore();
+
+    // Number label
+    diceCtx.save();
+    diceCtx.translate(DCX, DCY);
+    diceCtx.rotate(mid);
+    const fs = Math.min(20, Math.max(7, DR * sa * 0.3));
+    diceCtx.font = `${sel ? 700 : 600} ${fs}px -apple-system, Arial, sans-serif`;
+    diceCtx.textAlign = 'right'; diceCtx.textBaseline = 'middle';
+    diceCtx.fillStyle = 'rgba(255,255,255,0.93)';
+    diceCtx.shadowColor = 'rgba(0,0,0,0.7)'; diceCtx.shadowBlur = 3;
+    diceCtx.fillText(String(diceValues[i]), DR * 0.82, 0);
+    diceCtx.restore();
+  }
+
+  // Blur overlay
+  if (blurOn && !diceSpinning && diceSelectedIdx !== -1) {
+    for (let i = 0; i < n; i++) {
+      if (i === atPtr) continue;
+      diceCtx.save();
+      diceCtx.beginPath();
+      diceCtx.moveTo(DCX, DCY);
+      diceCtx.arc(DCX, DCY, DR, diceRotation + i * sa, diceRotation + (i + 1) * sa);
+      diceCtx.closePath();
+      diceCtx.fillStyle = 'rgba(0,0,0,0.72)'; diceCtx.fill();
+      diceCtx.restore();
+    }
+  }
+
+  // Outer ring
+  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, DR, 0, TAU);
+  diceCtx.strokeStyle = 'rgba(255,255,255,0.45)'; diceCtx.lineWidth = 3; diceCtx.stroke();
+
+  // Centre cap
+  const cap = diceCtx.createRadialGradient(DCX - 4, DCY - 4, 0, DCX, DCY, 18);
+  cap.addColorStop(0, '#ffffff'); cap.addColorStop(1, '#bbbbbb');
+  diceCtx.beginPath(); diceCtx.arc(DCX, DCY, 18, 0, TAU);
+  diceCtx.fillStyle = cap; diceCtx.fill();
+  diceCtx.strokeStyle = 'rgba(0,0,0,0.25)'; diceCtx.lineWidth = 2; diceCtx.stroke();
+}
+
+function startDiceSpin(holdMs) {
+  if (diceSpinning || !diceValues.length) return;
+  const duration  = Math.max(200, Math.min(8000, holdMs));
+  const targetIdx = Math.floor(Math.random() * diceValues.length);
+  const sa        = TAU / diceValues.length;
+
+  const targetRotMod = ((DICE_PA - targetIdx * sa - sa / 2) % TAU + TAU) % TAU;
+  const currentMod   = ((diceRotation % TAU) + TAU) % TAU;
+  let   delta        = targetRotMod - currentMod;
+  if (delta <= 0) delta += TAU;
+
+  const extraRots = Math.max(1, Math.round((duration / 1000) * 6));
+  const spinAmt   = extraRots * TAU + delta;
+  const startRot  = diceRotation;
+  const startTime = performance.now();
+
+  diceSpinning = true; diceSelectedIdx = -1; diceLastTick = -1;
+  setDiceResult('');
+
+  function frame(now) {
+    const elapsed = now - startTime;
+    const t     = Math.min(1, elapsed / duration);
+    const eased = easeOut(t);
+    diceRotation = startRot + spinAmt * eased;
+
+    const sect = diceSectorAtPointer();
+    if (sect !== diceLastTick) { playTick(1 - t); diceLastTick = sect; }
+    drawDice();
+
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      diceRotation = startRot + spinAmt;
+      diceSpinning = false; diceSelectedIdx = targetIdx;
+      drawDice(); playWin(); setDiceResult(String(diceValues[targetIdx]));
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function setDiceResult(text) {
+  const el = document.getElementById('diceResult');
+  el.textContent = text;
+  el.classList.toggle('show', !!text);
+}
+
+diceCanvas.addEventListener('pointerdown', e => {
+  if (diceSpinning) return;
+  diceHoldStart = Date.now();
+  diceCanvas.setPointerCapture(e.pointerId);
+  diceCanvas.classList.add('charged');
+  try { ac().resume(); } catch(err) {}
+});
+diceCanvas.addEventListener('pointerup', () => {
+  if (diceHoldStart === null) return;
+  const held = Date.now() - diceHoldStart;
+  diceHoldStart = null;
+  diceCanvas.classList.remove('charged');
+  startDiceSpin(held);
+});
+diceCanvas.addEventListener('pointercancel', () => {
+  diceHoldStart = null; diceCanvas.classList.remove('charged');
+});
+diceCanvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+diceCanvas.addEventListener('touchmove',  e => e.preventDefault(), { passive: false });
+
+document.getElementById('diceToggle').addEventListener('change', e => {
+  document.body.classList.toggle('dice-on', e.target.checked);
+  if (e.target.checked && !diceValues.length) buildDiceValues();
+});
+document.getElementById('diceMin').addEventListener('change', buildDiceValues);
+document.getElementById('diceMax').addEventListener('change', buildDiceValues);
 
 // ── Init ──────────────────────────────────────────────────
 // Firebase onValue fires on load and builds the select + loads first set
