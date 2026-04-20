@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cold War Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1208;
+    --paper: #f0e8d0;
+    --paper-dark: #d9ccaa;
+    --red: #8b1a1a;
+    --red-light: #a52020;
+    --stamp: #4a3520;
+    --fade: #7a6a50;
+    --border: #5a4a2a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background-color: #2a2010;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px;
+    font-family: 'Courier Prime', monospace;
+  }
+
+  .paper {
+    background-color: var(--paper);
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 59px,
+        rgba(180,160,100,0.15) 59px,
+        rgba(180,160,100,0.15) 60px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 27px,
+        rgba(180,160,100,0.2) 27px,
+        rgba(180,160,100,0.2) 28px
+      );
+    max-width: 700px;
+    width: 100%;
+    min-height: 80vh;
+    padding: 60px 70px;
+    position: relative;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.3),
+      4px 4px 0 rgba(0,0,0,0.15),
+      8px 8px 0 rgba(0,0,0,0.08),
+      0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .paper::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 70px;
+    width: 1px; height: 100%;
+    background: rgba(180,80,80,0.25);
+  }
+
+  /* HEADER */
+  .site-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+    position: relative;
+  }
+
+  .site-header::after {
+    content: '';
+    display: block;
+    height: 1px;
+    background: var(--border);
+    margin-top: 4px;
+    opacity: 0.4;
+  }
+
+  .classified-stamp {
+    display: inline-block;
+    border: 3px solid var(--red);
+    color: var(--red);
+    font-family: 'Special Elite', serif;
+    font-size: 11px;
+    letter-spacing: 4px;
+    padding: 3px 12px;
+    transform: rotate(-2deg);
+    margin-bottom: 16px;
+    opacity: 0.75;
+  }
+
+  h1 {
+    font-family: 'Special Elite', serif;
+    font-size: 32px;
+    color: var(--ink);
+    letter-spacing: 1px;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--fade);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .all-topics-link {
+    display: block;
+    font-size: 10px;
+    color: var(--fade);
+    letter-spacing: 1px;
+    text-decoration: none;
+    margin-top: 12px;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .all-topics-link:hover { color: var(--red); text-decoration: underline; }
+
+  /* SCREEN MANAGEMENT */
+  .screen { display: none; animation: fadeIn 0.3s ease; }
+  .screen.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* QUESTION NODES */
+  .node-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fade);
+    margin-bottom: 10px;
+    font-family: 'Special Elite', serif;
+  }
+
+  .node-question {
+    font-family: 'Special Elite', serif;
+    font-size: 22px;
+    color: var(--ink);
+    line-height: 1.4;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--paper-dark);
+  }
+
+  .choices {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .choice-btn {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    text-align: left;
+    font-family: 'Courier Prime', monospace;
+    font-size: 14px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    line-height: 1.4;
+  }
+
+  .choice-btn::before {
+    content: '→';
+    margin-right: 10px;
+    color: var(--fade);
+    transition: color 0.15s;
+  }
+
+  .choice-btn:hover {
+    background: var(--stamp);
+    color: var(--paper);
+    border-color: var(--stamp);
+  }
+
+  .choice-btn:hover::before { color: var(--paper-dark); }
+
+  /* DESTINATION / OUTCOME */
+  .outcome-number {
+    font-family: 'Special Elite', serif;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--red);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .outcome-title {
+    font-family: 'Special Elite', serif;
+    font-size: 26px;
+    color: var(--ink);
+    line-height: 1.3;
+    margin-bottom: 16px;
+  }
+
+  .outcome-question {
+    font-style: italic;
+    font-size: 15px;
+    color: var(--stamp);
+    border-left: 3px solid var(--red);
+    padding-left: 14px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .outcome-divider {
+    border: none;
+    border-top: 1px solid var(--paper-dark);
+    margin: 20px 0;
+  }
+
+  .outcome-body {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.75;
+    margin-bottom: 24px;
+  }
+
+  .resources-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fade);
+    margin-bottom: 8px;
+    font-family: 'Special Elite', serif;
+  }
+
+  .resources-text {
+    font-size: 13px;
+    color: var(--stamp);
+    line-height: 1.6;
+    background: rgba(0,0,0,0.04);
+    border: 1px dashed var(--paper-dark);
+    padding: 12px 16px;
+  }
+
+  /* NAV BUTTONS */
+  .nav-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+  }
+
+  .nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    font-family: 'Courier Prime', monospace;
+    font-size: 13px;
+    color: var(--fade);
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+
+  .nav-btn:hover {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .nav-btn.primary {
+    background: var(--red);
+    color: var(--paper);
+    border-color: var(--red);
+  }
+
+  .nav-btn.primary:hover {
+    background: var(--red-light);
+    border-color: var(--red-light);
+  }
+
+  /* ALL TOPICS PAGE */
+  .all-topics-header {
+    font-family: 'Special Elite', serif;
+    font-size: 24px;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .all-topics-sub {
+    font-size: 12px;
+    color: var(--fade);
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+  }
+
+  .topic-section {
+    margin-bottom: 10px;
+    border: 1px solid var(--paper-dark);
+  }
+
+  .topic-section summary {
+    padding: 12px 16px;
+    font-family: 'Special Elite', serif;
+    font-size: 14px;
+    color: var(--ink);
+    cursor: pointer;
+    background: rgba(0,0,0,0.03);
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+  }
+
+  .topic-section summary::-webkit-details-marker { display: none; }
+
+  .topic-section summary::after {
+    content: '+';
+    font-size: 18px;
+    color: var(--fade);
+    font-family: 'Courier Prime', monospace;
+  }
+
+  .topic-section[open] summary::after { content: '−'; }
+
+  .topic-section-body {
+    padding: 16px;
+    border-top: 1px solid var(--paper-dark);
+  }
+
+  .topic-num {
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 2px;
+    font-family: 'Special Elite', serif;
+    margin-bottom: 4px;
+  }
+
+  .topic-title {
+    font-family: 'Special Elite', serif;
+    font-size: 16px;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .topic-q {
+    font-style: italic;
+    font-size: 12px;
+    color: var(--stamp);
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+
+  .topic-body {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.65;
+  }
+
+  .topic-divider {
+    border: none;
+    border-top: 1px dashed var(--paper-dark);
+    margin: 16px 0;
+  }
+
+  /* PAGE FOOTER */
+  .page-footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--paper-dark);
+    font-size: 10px;
+    color: var(--fade);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  .breadcrumb {
+    font-size: 10px;
+    color: var(--fade);
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    min-height: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="paper">
+
+  <header class="site-header">
+    <div class="classified-stamp">Grade 9 — History</div>
+    <h1>Cold War Explorer</h1>
+    <p class="subtitle">Spies · Counterculture · Civil Rights</p>
+    <a class="all-topics-link" onclick="showScreen('all-topics')">↓ View all possible topics of investigation</a>
+  </header>
+
+  <!-- ══════════ DECISION TREE SCREENS ══════════ -->
+
+  <!-- START -->
+  <div class="screen active" id="screen-start">
+    <div class="node-label">Begin here</div>
+    <div class="node-question">What draws you to the 1960s Cold War era?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="go('screen-1')">Spies and secret agencies</button></li>
+      <li><button class="choice-btn" onclick="go('screen-2')">Hippies and the counterculture</button></li>
+      <li><button class="choice-btn" onclick="go('screen-22')">The fight for civil rights</button></li>
+    </ul>
+  </div>
+
+  <!-- #1 SPIES -->
+  <div class="screen" id="screen-1">
+    <div class="breadcrumb">Spies &amp; agencies</div>
+    <div class="node-label">Spies — go deeper</div>
+    <div class="node-question">What interests you most about the secret world?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="go('screen-3')">Real double agents and betrayal</button></li>
+      <li><button class="choice-btn" onclick="go('screen-4')">How governments spied on their own people</button></li>
+      <li><button class="choice-btn" onclick="go('screen-25')">The technology and gadgets</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #2 COUNTERCULTURE -->
+  <div class="screen" id="screen-2">
+    <div class="breadcrumb">Counterculture</div>
+    <div class="node-label">Counterculture — go deeper</div>
+    <div class="node-question">What interests you most about the hippies and protest movements?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="go('screen-5')">The ideas and philosophy behind it all</button></li>
+      <li><button class="choice-btn" onclick="go('screen-6')">Specific people and key events</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #22 CIVIL RIGHTS -->
+  <div class="screen" id="screen-22">
+    <div class="breadcrumb">Civil rights</div>
+    <div class="node-label">Civil rights — go deeper</div>
+    <div class="node-question">What interests you most about the fight for civil rights?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="go('screen-23')">The ideas — how should oppressed people respond to oppression?</button></li>
+      <li><button class="choice-btn" onclick="go('screen-24')">The people and events — what actually happened?</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #3 DOUBLE AGENTS -->
+  <div class="screen" id="screen-3">
+    <div class="breadcrumb">Spies → Double agents</div>
+    <div class="node-label">Double agents — choose your angle</div>
+    <div class="node-question">What angle interests you most?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('7')">The psychology — why did they do it?</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('8')">The tradecraft — how did they avoid detection?</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-1')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #4 DOMESTIC SURVEILLANCE -->
+  <div class="screen" id="screen-4">
+    <div class="breadcrumb">Spies → Domestic surveillance</div>
+    <div class="node-label">Domestic surveillance — choose your angle</div>
+    <div class="node-question">What aspect of governments spying on their own people interests you?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('9')">COINTELPRO — the FBI targeting activists</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('10')">MKUltra — the CIA's secret experiments</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-1')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #5 PHILOSOPHY -->
+  <div class="screen" id="screen-5">
+    <div class="breadcrumb">Counterculture → Philosophy</div>
+    <div class="node-label">Philosophy — go deeper</div>
+    <div class="node-question">What draws you to the ideas behind the counterculture?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('11')">Anti-war and pacifism</button></li>
+      <li><button class="choice-btn" onclick="go('screen-15')">Dropping out — rejecting mainstream society entirely</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-2')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #6 PEOPLE + EVENTS -->
+  <div class="screen" id="screen-6">
+    <div class="breadcrumb">Counterculture → People &amp; events</div>
+    <div class="node-label">People &amp; events — choose your focus</div>
+    <div class="node-question">What would you like to explore?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('13')">Specific counterculture figures</button></li>
+      <li><button class="choice-btn" onclick="go('screen-17')">Key events and turning points</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-2')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #15 REJECTING MAINSTREAM -->
+  <div class="screen" id="screen-15">
+    <div class="breadcrumb">Counterculture → Philosophy → Rejecting mainstream society</div>
+    <div class="node-label">Rejecting mainstream society — where did it start?</div>
+    <div class="node-question">Which strand of the drop-out philosophy interests you?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('12')">The literary roots — Beatniks, Kerouac, Ginsberg</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('16')">The chemical and spiritual turn — Leary and psychedelics</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-5')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #17 KEY EVENTS -->
+  <div class="screen" id="screen-17">
+    <div class="breadcrumb">Counterculture → Key events</div>
+    <div class="node-label">Key events — choose one</div>
+    <div class="node-question">Which of these sounds most interesting to you?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('18')">A university campus becomes a battleground for free speech</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('14')">Half a million people gather in a field and something remarkable happens</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('19')">The year everything seemed to happen at once</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('20')">A concert meant to be "Woodstock West" ends in a murder</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('21')">The government shoots its own students</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-6')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #23 CIVIL IDEAS -->
+  <div class="screen" id="screen-23">
+    <div class="breadcrumb">Civil rights → Ideas &amp; thinkers</div>
+    <div class="node-label">Ideas &amp; thinkers — choose one</div>
+    <div class="node-question">Which thinker interests you most?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('26')">Martin Luther King and nonviolent resistance</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('27')">Malcolm X and the case for self-defence</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('28')">How do the two compare?</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-22')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- #24 CIVIL EVENTS -->
+  <div class="screen" id="screen-24">
+    <div class="breadcrumb">Civil rights → People &amp; events</div>
+    <div class="node-label">People &amp; events — choose one</div>
+    <div class="node-question">Which sounds most interesting?</div>
+    <ul class="choices">
+      <li><button class="choice-btn" onclick="showOutcome('29')">The sit-ins and freedom rides</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('30')">Birmingham and the March on Washington</button></li>
+      <li><button class="choice-btn" onclick="showOutcome('31')">The assassination of King and what followed</button></li>
+    </ul>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go('screen-22')">← Back</button>
+      <button class="nav-btn" onclick="go('screen-start')">← Start again</button>
+    </div>
+  </div>
+
+  <!-- ══════════ OUTCOME SCREEN ══════════ -->
+  <div class="screen" id="screen-outcome">
+    <div class="breadcrumb" id="outcome-breadcrumb"></div>
+    <div class="outcome-number" id="outcome-number"></div>
+    <div class="outcome-title" id="outcome-title"></div>
+    <div class="outcome-question" id="outcome-question"></div>
+    <hr class="outcome-divider">
+    <div class="outcome-body" id="outcome-body"></div>
+    <div class="resources-label">Where to look</div>
+    <div class="resources-text" id="outcome-resources"></div>
+    <div class="nav-buttons">
+      <button class="nav-btn" id="outcome-back-btn">← Back</button>
+      <button class="nav-btn primary" onclick="go('screen-start')">Start again</button>
+    </div>
+  </div>
+
+  <!-- ══════════ ALL TOPICS SCREEN ══════════ -->
+  <div class="screen" id="all-topics">
+    <div class="all-topics-header">All topics of investigation</div>
+    <div class="all-topics-sub">Every possible destination — use the tree to navigate, or browse here</div>
+
+    <details class="topic-section">
+      <summary>Spies &amp; agencies</summary>
+      <div class="topic-section-body" id="topics-spies"></div>
+    </details>
+
+    <details class="topic-section">
+      <summary>Counterculture</summary>
+      <div class="topic-section-body" id="topics-counter"></div>
+    </details>
+
+    <details class="topic-section">
+      <summary>Civil rights</summary>
+      <div class="topic-section-body" id="topics-civil"></div>
+    </details>
+
+    <div class="nav-buttons">
+      <button class="nav-btn primary" onclick="go('screen-start')">← Back to the tree</button>
+    </div>
+  </div>
+
+  <div class="page-footer">Cold War Explorer · Grade 9 History</div>
+</div>
+
+<script>
+// ── OUTCOME DATA ──
+const outcomes = {
+  '7': {
+    num: 'Investigation #7',
+    title: 'Psychology of betrayal',
+    question: 'What turns a loyal insider into a traitor, and can you ever really know who to trust?',
+    body: 'Kim Philby, Aldrich Ames, and Robert Hanssen all passed secrets to the Soviets for years without detection. They were trusted insiders, not obvious outsiders. What combination of ideology, money, ego, and resentment turns a loyal agent into a traitor?',
+    resources: 'Search "Aldrich Ames CIA betrayal" or "Kim Philby double agent" on Britannica or History.com. The BBC has a documentary series on Philby that is a good starting point.',
+    back: 'screen-3',
+    branch: 'Spies'
+  },
+  '8': {
+    num: 'Investigation #8',
+    title: 'Spy tradecraft',
+    question: 'If two spies never meet, never write, and never speak, how do they communicate?',
+    body: 'Cold War spies used dead drops, one-time pads, brush passes, and elaborate cover identities to communicate without ever meeting their handlers. The Moscow Rules were an informal code developed by CIA officers operating in the Soviet Union, where surveillance was total. It is a world of paranoia made into routine.',
+    resources: 'Search "spy tradecraft Cold War" on the International Spy Museum website (spymuseum.org). They have accessible explainers written for a general audience.',
+    back: 'screen-3',
+    branch: 'Spies'
+  },
+  '9': {
+    num: 'Investigation #9',
+    title: 'COINTELPRO',
+    question: 'If the government targets people for their political beliefs rather than their actions, what does that say about the limits of free speech?',
+    body: 'From 1956 to 1971, the FBI ran a covert programme to surveil, infiltrate, and discredit political organisations it considered subversive, including civil rights groups, antiwar movements, and the Black Panthers. Tactics included forged letters, planting informants, and tipping off rival gangs. It was not made public until activists broke into an FBI office and leaked the documents.',
+    resources: 'Search "COINTELPRO" on the Stanford Martin Luther King Jr. Research Institute website. The FBI also has its own declassified files available through their online vault — search "FBI vault COINTELPRO".',
+    back: 'screen-4',
+    branch: 'Spies'
+  },
+  '10': {
+    num: 'Investigation #10',
+    title: 'MKUltra',
+    question: 'If the government was secretly drugging its own citizens in the name of national security, who was watching the watchmen?',
+    body: 'Between the 1950s and early 1970s, the CIA secretly dosed unwitting subjects with LSD and other substances, trying to develop mind control techniques for use against Soviet agents. Some subjects were mental patients, prisoners, or soldiers who had no idea what was happening to them. The programme was officially denied until documents were declassified in the 1970s.',
+    resources: 'Search "MKUltra CIA declassified" — the CIA\'s own CREST document archive has released files on this. The original 1977 New York Times reporting is also worth finding. Note the connection to Investigation #16 — the government was experimenting with the same drug as Leary at exactly the same time.',
+    back: 'screen-4',
+    branch: 'Spies'
+  },
+  '11': {
+    num: 'Investigation #11',
+    title: 'The antiwar movement',
+    question: 'At what point does a citizen have not just the right but the obligation to refuse to fight in a war they believe is wrong?',
+    body: 'Opposition to the Vietnam War grew from small campus teach-ins in 1965 into a mass movement involving millions of Americans by the early 1970s. The draft lottery made the war feel personal and random, turning many young men who might have stayed quiet into active opponents. Civil disobedience, draft card burning, and marches were the main tools.',
+    resources: 'The Ken Burns Vietnam War documentary series has a companion website at pbs.org with timelines and primary sources. Search "Vietnam War draft lottery 1969" to find coverage of how the lottery worked and its impact.',
+    back: 'screen-5',
+    branch: 'Counterculture'
+  },
+  '12': {
+    num: 'Investigation #12',
+    title: 'The Beatniks',
+    question: 'Can a small group of writers and poets actually change a society, or do ideas only matter when they become a mass movement?',
+    body: 'Before the hippies, there were the Beatniks: a loose group of writers in the late 1940s and 1950s who rejected postwar American conformity, consumerism, and cold respectability. Jack Kerouac\'s On the Road and Allen Ginsberg\'s Howl were their key texts, celebrating spontaneity, jazz, and life lived outside the mainstream. The hippies inherited their spirit but turned it into a mass movement rather than a literary one.',
+    resources: 'The Poetry Foundation has a good introduction to Ginsberg at poetryfoundation.org. Search "Beat Generation Kerouac" on Britannica for context. Excerpts from Howl and On the Road are widely available online.',
+    back: 'screen-15',
+    branch: 'Counterculture'
+  },
+  '13': {
+    num: 'Investigation #13',
+    title: 'Key counterculture figures',
+    question: 'Is disruption and provocation a legitimate form of political protest, or does it undermine the causes it claims to support?',
+    body: 'Abbie Hoffman staged fake exorcisms at the Pentagon and threw dollar bills onto the floor of the New York Stock Exchange to make a point about greed. Jerry Rubin co-founded the Youth International Party — the Yippies — and later became a Wall Street stockbroker. Ken Kesey drove a psychedelic bus across America with a group called the Merry Pranksters before any of this was famous. These were performers and agitators who took ideas from the Beatniks and turned them into public spectacle.',
+    resources: 'Search individual names on History.com or Biography.com. The PBS American Experience series has documentary profiles of several counterculture figures available online.',
+    back: 'screen-6',
+    branch: 'Counterculture'
+  },
+  '14': {
+    num: 'Investigation #14',
+    title: 'Woodstock',
+    question: 'What would it take to get 400,000 people to cooperate peacefully with no infrastructure and no plan, and why has nothing like it happened since?',
+    body: 'Nearly 400,000 people arrived at a farm in upstate New York for a music festival that the organisers were completely unprepared for, and somehow it worked. No serious violence, remarkable cooperation, and a genuine sense that something new was possible. It became the symbolic high point of the counterculture, almost immediately mythologised. Consider: four months later came Altamont. What does it mean that both happened in the same year?',
+    resources: 'The 1970 documentary film Woodstock is available on YouTube and gives a strong sense of the atmosphere. Search "Woodstock 1969 history" on History.com for context and background.',
+    back: 'screen-17',
+    branch: 'Counterculture'
+  },
+  '16': {
+    num: 'Investigation #16',
+    title: 'Timothy Leary and psychedelics',
+    question: 'Can a drug be a political act?',
+    body: 'Leary was a Harvard psychologist who became convinced that LSD could expand human consciousness and dissolve the ego structures that made people violent, conformist, and spiritually empty. He was fired from Harvard, prosecuted repeatedly, and declared "the most dangerous man in America" by Nixon. Whether he was a visionary or a reckless self-promoter depends on who you ask. Note: the government was experimenting with LSD at exactly the same time — see Investigation #10.',
+    resources: 'Search "Timothy Leary" on Biography.com for an introductory profile. Search "Leary Harvard LSD" for coverage of his dismissal. The connection to MKUltra (#10) is worth exploring if you want to go further.',
+    back: 'screen-15',
+    branch: 'Counterculture'
+  },
+  '18': {
+    num: 'Investigation #18',
+    title: 'The Free Speech Movement, Berkeley 1964',
+    question: 'Should universities be spaces where any political idea can be expressed, or are there limits — and who gets to decide?',
+    body: 'Students at the University of California Berkeley were banned from distributing political literature on campus and decided to simply refuse to comply. When the university called police to arrest a student activist, hundreds of students surrounded the police car and would not let it move for 32 hours. It was the opening act of campus activism in America.',
+    resources: 'The Bancroft Library at UC Berkeley has a dedicated Free Speech Movement archive with photographs and oral histories — search "Berkeley Free Speech Movement archive". Search "FSM 1964 Berkeley" on History.com for an overview.',
+    back: 'screen-17',
+    branch: 'Counterculture'
+  },
+  '19': {
+    num: 'Investigation #19',
+    title: '1968: the year everything broke',
+    question: 'When a society loses its most hopeful voices in a single year, what fills the space they leave behind?',
+    body: 'Martin Luther King was assassinated in April. Robert Kennedy, who many believed could end the war, was assassinated in June. At the Democratic National Convention in Chicago, police beat protesters with batons on live television while delegates argued inside. It is one of the most concentrated years of political violence and disillusionment in modern American history.',
+    resources: 'The BBC has a strong retrospective series on 1968 available online. Time magazine\'s archive has contemporaneous coverage — search "Time magazine 1968" to find it. Search "1968 year of upheaval" on Britannica for a structured overview.',
+    back: 'screen-17',
+    branch: 'Counterculture'
+  },
+  '20': {
+    num: 'Investigation #20',
+    title: 'Altamont',
+    question: 'Was Altamont an accident or an inevitability, and what does it tell us about what the counterculture was actually built on?',
+    body: 'The Rolling Stones organised a free concert at a speedway in California, partly in response to criticism that they had not played Woodstock. The Hells Angels motorcycle club was hired to provide security in exchange for beer. A young man was stabbed to death in front of the stage while the Stones played. The concert is widely treated as the symbolic end of the 1960s dream.',
+    resources: 'The documentary Gimme Shelter filmed the event and its aftermath — it is available on YouTube. Rolling Stone magazine\'s archive has extensive original coverage. Search "Altamont 1969" on History.com.',
+    back: 'screen-17',
+    branch: 'Counterculture'
+  },
+  '21': {
+    num: 'Investigation #21',
+    title: 'Kent State',
+    question: 'If a government kills its own unarmed students for protesting, has it proved the protesters right?',
+    body: 'After Nixon announced the invasion of Cambodia, protests erupted across American universities. At Kent State in Ohio, the National Guard was deployed to the campus and opened fire on a crowd of students, killing four and wounding nine. One of those killed was not at the protest at all but walking between classes. John Filo\'s photograph of a teenage girl kneeling over a body became one of the most reproduced images of the century.',
+    resources: 'The May 4 Visitors Center at Kent State University has a detailed archive — search "Kent State May 4 archive". Search "Kent State 1970" on History.com or Britannica for an overview.',
+    back: 'screen-17',
+    branch: 'Counterculture'
+  },
+  '25': {
+    num: 'Investigation #25',
+    title: 'Spy technology',
+    question: 'When does surveillance technology stop being a tool of national security and start being a tool of control?',
+    body: 'The Cold War drove an extraordinary arms race in surveillance technology, from miniature cameras hidden in coat buttons to microphones planted inside wooden carvings gifted to ambassadors. The U-2 spy plane could photograph Soviet territory from 70,000 feet, and when one was shot down in 1960 and the pilot captured, it triggered a major diplomatic crisis between the US and the Soviet Union.',
+    resources: 'The International Spy Museum at spymuseum.org has a detailed technology section with accessible explainers. Search "CIA museum artefacts" on cia.gov to see descriptions of real spy hardware. Search "U-2 incident 1960" for the spy plane crisis.',
+    back: 'screen-1',
+    branch: 'Spies'
+  },
+  '26': {
+    num: 'Investigation #26',
+    title: 'Martin Luther King and nonviolent resistance',
+    question: 'Is it possible to change the heart of an oppressor, or is that asking too much of human nature?',
+    body: 'King drew on the philosophy of Gandhi and the Christian tradition of redemptive suffering to argue that meeting violence with violence only deepens the cycle of hatred. The goal was not just to win legal rights but to change the moral character of the nation, including the hearts of white moderates who preferred order to justice. His Letter from Birmingham Jail, written in the margins of a newspaper while imprisoned, is one of the great political documents of the twentieth century.',
+    resources: 'The Letter from Birmingham Jail is available in full at the King Center (thekingcenter.org). The Stanford Martin Luther King Jr. Research Institute (kinginstitute.stanford.edu) has a comprehensive collection of his speeches and writings.',
+    back: 'screen-23',
+    branch: 'Civil rights'
+  },
+  '27': {
+    num: 'Investigation #27',
+    title: 'Malcolm X and the case for self-defence',
+    question: 'If the system was never designed to include you, is working within it a strategy or a surrender?',
+    body: 'Malcolm X argued that nonviolence was a strategy that only made sense if the other side was capable of being shamed, and that white America had demonstrated it was not. Black communities had a right to defend themselves by any means necessary, and the demand for dignity and self-determination could not wait for the goodwill of oppressors.',
+    resources: 'His Autobiography, written with Alex Haley, is the starting point — excerpts are widely available online. The Malcolm X Project at Columbia University has scholarly resources. Biography.com has a solid introductory profile. Many of his speeches are available in full on YouTube.',
+    back: 'screen-23',
+    branch: 'Civil rights'
+  },
+  '28': {
+    num: 'Investigation #28',
+    title: 'King vs Malcolm X',
+    question: 'Were King and Malcolm X really opposites, or were they two people responding to the same reality from different starting points?',
+    body: 'The two men are often presented as opposites, but they were watching each other closely and both shifted their positions over time. By 1964 and 1965, King was becoming more radical about economic inequality and Malcolm X was becoming more open to coalition with white allies. They met in person only once, briefly, in a Senate corridor.',
+    resources: 'The Stanford King Institute (kinginstitute.stanford.edu) has comparative materials. Many speeches from both men are available in full on YouTube. Search "King Malcolm X compared" on Britannica for an overview of their similarities and differences.',
+    back: 'screen-23',
+    branch: 'Civil rights'
+  },
+  '29': {
+    num: 'Investigation #29',
+    title: 'Sit-ins and freedom rides',
+    question: 'What does it take to sit still and absorb violence without fighting back, and is that a form of strength or a form of sacrifice?',
+    body: 'Starting in 1960, Black students began sitting at whites-only lunch counters and refusing to leave, absorbing verbal abuse and physical violence without retaliating. Freedom riders boarded interstate buses to challenge segregation on public transport, knowing they would likely be attacked. The courage required was extraordinary and the strategy was deliberate: provoke a violent response, get it on camera, and force the federal government to act.',
+    resources: 'The Civil Rights Digital Library (crdl.usg.edu) has film footage and photographs from these events. Search "Greensboro sit-in 1960" and "freedom rides 1961" on History.com for overviews of both.',
+    back: 'screen-24',
+    branch: 'Civil rights'
+  },
+  '30': {
+    num: 'Investigation #30',
+    title: 'Birmingham and the March on Washington',
+    question: 'Is it ever justified to deliberately provoke a violent response in order to expose injustice to the world?',
+    body: 'In 1963, King chose Birmingham, Alabama deliberately because its public safety commissioner Bull Connor was known to respond to protest with maximum force. The images of fire hoses and police dogs turned on peaceful protesters shocked the world and gave Kennedy the political cover to push civil rights legislation. The March on Washington in August 1963, where King delivered his "I Have a Dream" speech, drew 250,000 people.',
+    resources: 'The full "I Have a Dream" speech and documentary footage are at the King Center (thekingcenter.org). Search "Birmingham 1963 civil rights" on History.com for coverage of the campaign.',
+    back: 'screen-24',
+    branch: 'Civil rights'
+  },
+  '31': {
+    num: 'Investigation #31',
+    title: 'The assassination of King and what followed',
+    question: 'When a movement loses its most visible leader to an assassin\'s bullet, does that prove the movement was right, or does it break the movement apart?',
+    body: 'King was shot on the balcony of the Lorraine Motel in Memphis on April 4 1968, where he had gone to support striking sanitation workers. Riots broke out in over 100 American cities in the following days. The civil rights movement did not end but it fractured, with more militant voices arguing that King\'s death proved nonviolence had failed.',
+    resources: 'The National Civil Rights Museum is built around the Lorraine Motel and has extensive online resources — search "National Civil Rights Museum Memphis". Search "assassination of MLK 1968" on History.com or Britannica.',
+    back: 'screen-24',
+    branch: 'Civil rights'
+  }
+};
+
+// ── NAVIGATION ──
+let history = [];
+
+function go(screenId) {
+  history.push(document.querySelector('.screen.active').id);
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showOutcome(id) {
+  const o = outcomes[id];
+  document.getElementById('outcome-number').textContent = o.num;
+  document.getElementById('outcome-title').textContent = o.title;
+  document.getElementById('outcome-question').textContent = o.question;
+  document.getElementById('outcome-body').textContent = o.body;
+  document.getElementById('outcome-resources').textContent = o.resources;
+  document.getElementById('outcome-breadcrumb').textContent = o.branch + ' → ' + o.title;
+  document.getElementById('outcome-back-btn').onclick = () => go(o.back);
+  go('screen-outcome');
+}
+
+// ── BUILD ALL TOPICS PAGE ──
+const spiesIds = ['7','8','9','10','25'];
+const counterIds = ['11','12','13','14','16','18','19','20','21'];
+const civilIds = ['26','27','28','29','30','31'];
+
+function buildTopicsSection(ids, containerId) {
+  const container = document.getElementById(containerId);
+  ids.forEach((id, i) => {
+    const o = outcomes[id];
+    const div = document.createElement('div');
+    if (i > 0) {
+      const hr = document.createElement('hr');
+      hr.className = 'topic-divider';
+      container.appendChild(hr);
+    }
+    div.innerHTML = `
+      <div class="topic-num">${o.num}</div>
+      <div class="topic-title">${o.title}</div>
+      <div class="topic-q">${o.question}</div>
+      <div class="topic-body">${o.body}<br><br><em>${o.resources}</em></div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+buildTopicsSection(spiesIds, 'topics-spies');
+buildTopicsSection(counterIds, 'topics-counter');
+buildTopicsSection(civilIds, 'topics-civil');
+</script>
+</body>
+</html>
