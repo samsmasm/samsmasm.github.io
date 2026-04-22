@@ -34,7 +34,8 @@ function buildSidebar(activePage, displayName, isTeacher) {
     { id: 'dashboard',    label: 'Dashboard',    href: 'dashboard.html',    icon: svgGrid() },
     { id: 'definitions',  label: 'Definitions',  href: 'definitions.html',  icon: svgBook() },
     { id: 'calculations', label: 'Calculations', href: 'calculations.html', icon: svgCalc() },
-    { id: 'statements',   label: 'Statements',   href: 'statements.html',   icon: svgDoc() },
+    { id: 'statements',    label: 'Statements',    href: 'statements.html',    icon: svgDoc() },
+    { id: 'understanding', label: 'Understanding', href: 'understanding.html', icon: svgBulb() },
   ];
   if (isTeacher) {
     nav.push({ id: 'teacher', label: 'Teacher panel', href: 'teacher.html', icon: svgTeacher() });
@@ -136,6 +137,12 @@ function svgTeacher() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>`;
+}
+function svgBulb() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/>
+    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
   </svg>`;
 }
 function svgLogout() {

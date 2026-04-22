@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Understanding | RatIBro</title>
+  <link rel="icon" type="image/png" href="ratibroicon2sm.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div class="page-title">Understanding</div>
+      <div class="page-subtitle">Multiple-choice questions to test your understanding of financial concepts.</div>
+    </div>
+
+    <!-- Setup -->
+    <div id="uq-setup">
+      <div class="uq-setup-wrap">
+
+        <div class="uq-section-label">Topic</div>
+        <div class="uq-chips" id="uq-topics"></div>
+
+        <div class="uq-section-label" style="margin-top:22px">Level</div>
+        <div class="uq-chips">
+          <button class="uq-chip selected" id="uq-lvl-all" onclick="setUQLevel('all')">SL + HL</button>
+          <button class="uq-chip" id="uq-lvl-sl" onclick="setUQLevel('sl')">SL only</button>
+          <button class="uq-chip" id="uq-lvl-hl" onclick="setUQLevel('hl')">HL only</button>
+        </div>
+
+        <div class="uq-section-label" style="margin-top:22px">How many?</div>
+        <div class="count-picker" style="justify-content:flex-start;margin-bottom:8px" id="uq-count-picker"></div>
+        <div class="uq-avail" id="uq-avail"></div>
+
+        <button class="btn-primary" style="width:auto;padding:13px 32px;margin-top:16px" onclick="startUQSession()">Start</button>
+      </div>
+    </div>
+
+    <!-- Session -->
+    <div id="uq-session" class="hidden">
+      <div class="uq-session-wrap">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="uq-progress-fill" style="width:0%"></div>
+        </div>
+        <div id="uq-card-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div id="uq-done" class="hidden">
+      <div class="uq-done-card">
+        <div class="uq-done-score" id="uq-done-score"></div>
+        <div class="uq-done-pct" id="uq-done-pct"></div>
+        <div class="uq-done-btns">
+          <button class="btn-secondary" style="flex:0 0 auto;padding:11px 22px" onclick="resetUQ()">Change settings</button>
+          <button class="btn-primary" style="width:auto;padding:13px 28px;margin-top:0" onclick="retryUQ()">Try again</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script type="module">
+  import { onAuthChange, logoutUser, getDisplayName, isTeacher, ensureUserDoc } from './js/firebase.js';
+
+  initTheme();
+
+  let MCQ_DATA = [];
+  let uqSubtopic = 'all';
+  let uqLevel    = 'all';
+  let uqCount    = 10;
+  let uqItems    = [];
+  let uqIndex    = 0;
+  let uqCorrect  = 0;
+  let uqAnswered = false;
+  let uqNarrowed = false;
+
+  const SUBTOPIC_LABELS = {
+    'sources-of-finance':   'Sources of finance',
+    'costs-revenues':       'Costs & revenues',
+    'financial-statements': 'Final accounts (P&L)',
+    'assets-depreciation':  'Assets & depreciation',
+    'profitability-ratios': 'Profitability ratios',
+    'liquidity-ratios':     'Liquidity ratios',
+    'efficiency-ratios':    'Efficiency ratios (HL)',
+    'gearing-solvency':     'Gearing & solvency',
+    'cashflow-concepts':    'Cash flow concepts',
+    'cashflow-management':  'Cash flow management',
+    'investment-appraisal': 'Investment appraisal',
+    'budgets':              'Budgets (HL)',
+  };
+
+  const TYPE_LABELS = {
+    'interpretation':      'Interpretation',
+    'strategy':            'Strategy',
+    'scenario':            'Scenario',
+    'purpose/stakeholder': 'Purpose',
+  };
+
+  onAuthChange(async user => {
+    if (!user) { window.location.replace('index.html'); return; }
+    await ensureUserDoc(user);
+    document.getElementById('sidebar-container').innerHTML =
+      buildSidebar('understanding', getDisplayName(user), isTeacher(user));
+    updateThemeToggle();
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+
+    const resp = await fetch('refdocs/myres/compqs.md');
+    MCQ_DATA = await resp.json();
+
+    const params = new URLSearchParams(window.location.search);
+    const sub = params.get('subtopic');
+    if (sub && SUBTOPIC_LABELS[sub]) uqSubtopic = sub;
+
+    buildTopicChips();
+    updateCountPicker();
+  });
+
+  function buildTopicChips() {
+    document.getElementById('uq-topics').innerHTML = [
+      `<button class="uq-chip${uqSubtopic === 'all' ? ' selected' : ''}" onclick="setUQSubtopic(this,'all')">All topics</button>`,
+      ...Object.entries(SUBTOPIC_LABELS).map(([id, label]) =>
+        `<button class="uq-chip${uqSubtopic === id ? ' selected' : ''}" onclick="setUQSubtopic(this,'${id}')">${label}</button>`
+      )
+    ].join('');
+  }
+
+  function getFiltered() {
+    return MCQ_DATA.filter(q => {
+      if (uqSubtopic !== 'all' && q.subtopic !== uqSubtopic) return false;
+      if (uqLevel === 'sl' && q.hl) return false;
+      if (uqLevel === 'hl' && !q.hl) return false;
+      return true;
+    });
+  }
+
+  function updateCountPicker() {
+    const available = getFiltered().length;
+    const base = [5, 10, 15, 20];
+    const opts = base.filter(n => n < available);
+    if (!opts.length || opts[opts.length - 1] < available) opts.push(available);
+    if (!opts.includes(uqCount)) uqCount = opts[0] ?? available;
+
+    document.getElementById('uq-count-picker').innerHTML = opts.map(n => {
+      const label = n === available
+        ? `All<br><small style="font-size:0.5em;font-weight:600;letter-spacing:0">(${n})</small>`
+        : n;
+      return `<button class="count-btn${n === uqCount ? ' selected' : ''}" onclick="setUQCount(${n},this)">${label}</button>`;
+    }).join('');
+
+    document.getElementById('uq-avail').textContent = available + ' questions available';
+  }
+
+  window.setUQSubtopic = function(btn, id) {
+    uqSubtopic = id;
+    document.querySelectorAll('#uq-topics .uq-chip').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    updateCountPicker();
+  };
+
+  window.setUQLevel = function(level) {
+    uqLevel = level;
+    ['all','sl','hl'].forEach(l =>
+      document.getElementById('uq-lvl-' + l).classList.toggle('selected', l === level)
+    );
+    updateCountPicker();
+  };
+
+  window.setUQCount = function(n, btn) {
+    uqCount = n;
+    document.querySelectorAll('#uq-count-picker .count-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  };
+
+  window.startUQSession = function() {
+    const pool = getFiltered();
+    if (!pool.length) { showToast('No questions match your filters.'); return; }
+    uqItems   = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(uqCount, pool.length));
+    uqIndex   = 0;
+    uqCorrect = 0;
+    document.getElementById('uq-setup').classList.add('hidden');
+    document.getElementById('uq-session').classList.remove('hidden');
+    loadUQQuestion();
+  };
+
+  function loadUQQuestion() {
+    const q = uqItems[uqIndex];
+    uqAnswered = false;
+    uqNarrowed = false;
+
+    document.getElementById('uq-progress-fill').style.width =
+      (uqIndex / uqItems.length * 100) + '%';
+
+    const optHTML = q.options.map((opt, i) =>
+      `<button class="uq-option" data-i="${i}" onclick="answerUQ(${i})">
+         <span class="uq-opt-letter">${'ABCD'[i]}</span>
+         <span class="uq-opt-text">${opt}</span>
+       </button>`
+    ).join('');
+
+    const typeKey  = (q.type || '').replace('/', '');
+    const typeLabel = TYPE_LABELS[q.type] || q.type;
+    const isLast   = uqIndex + 1 >= uqItems.length;
+
+    document.getElementById('uq-card-wrap').innerHTML = `
+      <div class="uq-card">
+        <div class="uq-meta">
+          <span class="uq-topic-tag">${q.topic}</span>
+          <span class="uq-type-tag uq-type-${typeKey}">${typeLabel}</span>
+          ${q.hl ? '<span class="hl-tag">HL</span>' : ''}
+          <span class="uq-counter">${uqIndex + 1} / ${uqItems.length}</span>
+        </div>
+        <div class="uq-question">${q.question}</div>
+        <div class="uq-options">${optHTML}</div>
+        <div class="uq-actions">
+          <button class="uq-narrow-btn" id="uq-narrow" onclick="narrowUQ()">Remove 2 wrong answers</button>
+        </div>
+        <div class="uq-explanation hidden" id="uq-explanation">
+          <div class="uq-exp-label">Explanation</div>
+          <div class="uq-exp-text">${q.explanation}</div>
+          <button class="btn-primary" style="width:auto;padding:12px 28px;margin-top:14px" onclick="nextUQ()">
+            ${isLast ? 'See results' : 'Next →'}
+          </button>
+        </div>
+      </div>`;
+  }
+
+  window.answerUQ = function(chosenIdx) {
+    if (uqAnswered) return;
+    uqAnswered = true;
+    const q = uqItems[uqIndex];
+    if (chosenIdx === q.correct) uqCorrect++;
+
+    document.querySelectorAll('.uq-option').forEach(btn => {
+      const i = parseInt(btn.dataset.i);
+      btn.disabled = true;
+      if (i === q.correct)      btn.classList.add('uq-opt-correct');
+      else if (i === chosenIdx) btn.classList.add('uq-opt-wrong');
+      else                      btn.classList.add('uq-opt-neutral');
+    });
+
+    const nb = document.getElementById('uq-narrow');
+    if (nb) nb.style.display = 'none';
+    document.getElementById('uq-explanation').classList.remove('hidden');
+  };
+
+  window.narrowUQ = function() {
+    if (uqAnswered || uqNarrowed) return;
+    uqNarrowed = true;
+    const q = uqItems[uqIndex];
+    const wrong = [0,1,2,3].filter(i => i !== q.correct);
+    wrong.sort(() => Math.random() - 0.5).slice(0, 2).forEach(i => {
+      document.querySelector(`.uq-option[data-i="${i}"]`)?.classList.add('uq-opt-removed');
+    });
+    document.getElementById('uq-narrow').style.display = 'none';
+  };
+
+  window.nextUQ = function() {
+    uqIndex++;
+    if (uqIndex >= uqItems.length) showDone();
+    else loadUQQuestion();
+  };
+
+  function showDone() {
+    document.getElementById('uq-session').classList.add('hidden');
+    document.getElementById('uq-done').classList.remove('hidden');
+    const pct   = Math.round(uqCorrect / uqItems.length * 100);
+    const emoji = pct >= 80 ? '🎉' : pct >= 60 ? '😊' : pct >= 40 ? '🤔' : '😬';
+    document.getElementById('uq-done-score').innerHTML =
+      `<span style="font-size:2.2rem">${emoji}</span> ${uqCorrect} / ${uqItems.length}`;
+    document.getElementById('uq-done-pct').textContent = pct + '% correct';
+  }
+
+  window.resetUQ = function() {
+    document.getElementById('uq-done').classList.add('hidden');
+    document.getElementById('uq-setup').classList.remove('hidden');
+  };
+
+  window.retryUQ = function() {
+    document.getElementById('uq-done').classList.add('hidden');
+    document.getElementById('uq-session').classList.remove('hidden');
+    uqIndex   = 0;
+    uqCorrect = 0;
+    uqItems   = [...uqItems].sort(() => Math.random() - 0.5);
+    loadUQQuestion();
+  };
+</script>
+</body>
+</html>
