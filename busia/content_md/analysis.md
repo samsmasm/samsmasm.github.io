@@ -6,7 +6,7 @@ source_page: analysis/index.html
 
 Plan first. Fill in the gaps. Write one section at a time.
 
-By this point you have your RQ, your five supporting documents, and a rough sketch of your thinking. The analysis section is where that becomes a 1,100-word argument. The trick is to plan the structure completely before you write a word of prose.
+By this point you have your RQ, your five supporting documents, and a rough sketch of your thinking. The analysis section is where that becomes a 1,100-word argument.
 
 > **Your goal: make it a fill-in-the-gaps exercise.** If your plan is detailed enough - real headings, real notes under each section - the actual writing becomes filling in what is already mapped out. Students who skip the plan and go straight to writing get stuck. Students who plan properly often find the writing faster than they expected.
 
@@ -21,7 +21,17 @@ List the specific pieces of evidence your argument requires. For each, identify 
 Choose the tools that genuinely fit your question (see [Structure](../structure/)). Decide what each tool will do in your argument - what dimension of the RQ does it address? If two tools address the same dimension, drop one.
 
 **3. What structure will I use?**
-Choose your organising principle (see [Structure](../structure/)). Write your actual sub-headings into a document. Then add rough notes under each heading - not prose, just bullet points: what evidence goes here, what the tool shows, what your conclusion for this section is. That is your plan. Now fill it in.
+Choose your organising principle. The options are:
+
+- **For vs. against:** advantages and disadvantages of the decision or strategy, especially useful for yes/no or should/shouldn't questions
+- **Internal vs. external stakeholder impacts:** how different groups are affected differently
+- **Ethical / evaluative framing:** "yes, the practice is justified because..." then "no, it is not because..."
+- **By business function:** finance, operations, marketing, HR (if your RQ spans multiple functions)
+- **By analytical tool:** one tool per sub-section, where each addresses a *different aspect* of the RQ (not the same point approached twice)
+
+The test: could someone read just your headings and follow the logic of your argument toward an answer to the RQ? If yes, your structure is working. See [Structure](../structure/) for more on this.
+
+Write your actual sub-headings into a document. Then add rough notes under each heading - not prose, just bullet points: what evidence goes here, what the tool shows, what your conclusion for this section is. That is your plan. Now fill it in.
 
 ## Description vs. analysis
 
@@ -32,6 +42,12 @@ This is the most important distinction in the whole IA. Description tells the re
 **Analysis (strong):** "Nike's 10% revenue growth in 2024 (Document 2) suggests that its pivot toward direct-to-consumer sales has not damaged overall volume, which weakens the argument that the strategy carries significant revenue risk."
 
 Notice what the analysis version does: it names the evidence and its source, draws a conclusion from the data, and connects that conclusion directly to the RQ. Every paragraph in your analysis section should do all three.
+
+## Keeping the key concept visible
+
+Criterion A rewards sustained integration of your key concept throughout the analysis - not just a mention in the introduction and conclusion. One practical way to do this is to **bold the key concept word** wherever it appears in your analysis. If you look at your draft and the word barely shows up, that is a signal to revise.
+
+A useful writing habit: in the last sentence of each paragraph, loop back to the RQ and to the concept. Something like: "This suggests that [company]'s approach to **sustainability** is driven more by regulatory pressure than genuine strategic change, which directly bears on whether the decision was justified." That last sentence does double duty - it closes the paragraph and re-anchors the argument. Apply this as a guideline, not a formula: some paragraphs will close more naturally than others, and forcing it reads worse than skipping it.
 
 ## Using your supporting documents
 
@@ -47,4 +63,4 @@ If you are staring at a blank page, start here. Pick the tool that feels most ce
 
 Check the [Sample IA](../sample/) to see how a tool application is structured: what the tool shows, what the specific data is, and how it connects to the RQ. Once you have one section working, the rest follow the same pattern.
 
-> **Go deep, not wide.** The analysis section is 1,100 words - not enough for five tools treated superficially. Two tools done properly, with specific evidence and a clear argument, will outperform four tools with no depth.
+> **Go deep, not wide.** The analysis section is 1,100 words - not enough for five tools treated superficially. Two or three tools or theories done properly, with specific evidence and a clear argument, will outperform four tools with no depth.
