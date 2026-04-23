@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flipping Hard Work</title>
+  <style>
+    :root {
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --yellow: #fbbf24;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 420px;
+      padding: 24px 20px;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .screen.active { display: flex; }
+    .logo { font-size: 2rem; font-weight: 900; letter-spacing: -1px; color: var(--text); }
+    .logo span { color: var(--yellow); }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .balance-big {
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1;
+    }
+    .balance-label { font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; }
+    .income-badge {
+      background: #dcfce7;
+      color: #16a34a;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      display: inline-block;
+    }
+    .hint-box {
+      background: #eff6ff;
+      border: 2px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      color: #1d4ed8;
+      font-style: italic;
+      width: 100%;
+    }
+    h2 { font-size: 1.4rem; font-weight: 800; }
+    h3 { font-size: 1.1rem; font-weight: 700; color: var(--muted); }
+    input[type=text], input[type=number] {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--blue); }
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-green { background: var(--green); color: white; }
+    .btn-muted { background: #e2e8f0; color: var(--text); }
+    .choice-row { display: flex; gap: 12px; width: 100%; }
+    .choice-btn {
+      flex: 1;
+      padding: 20px 10px;
+      border: 3px solid #e2e8f0;
+      border-radius: 14px;
+      background: white;
+      font-size: 1.5rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .choice-btn.selected-heads { border-color: var(--blue); background: #eff6ff; color: var(--blue); }
+    .choice-btn.selected-tails { border-color: var(--yellow); background: #fffbeb; color: #b45309; }
+    .waiting-pulse {
+      font-size: 1.1rem;
+      color: var(--muted);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* COIN ANIMATION */
+    .coin-wrap {
+      font-size: 6rem;
+      line-height: 1;
+      animation: coinSpin 0.15s steps(1) infinite;
+      display: block;
+    }
+    .coin-wrap.settling { animation: none; }
+    @keyframes coinSpin { 0%{content:'🪙'} }
+    .coin-display {
+      font-size: 6rem;
+      display: block;
+      transition: none;
+    }
+
+    /* WIN/LOSE */
+    .result-win { color: var(--green); }
+    .result-lose { color: var(--red); }
+    .result-big { font-size: 3rem; font-weight: 900; }
+    .confetti-wrap { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+    .confetti-piece {
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* END SCREEN */
+    .final-balance { font-size: 4rem; font-weight: 900; }
+    .reveal-box {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 2px solid #f59e0b;
+      border-radius: 14px;
+      padding: 20px;
+      width: 100%;
+    }
+    .class-label { font-size: 1.5rem; font-weight: 900; margin-bottom: 6px; }
+    .class-detail { font-size: 0.9rem; color: #92400e; line-height: 1.6; }
+
+    .error { color: var(--red); font-size: 0.9rem; font-weight: 600; }
+    .round-info { font-size: 0.85rem; color: var(--muted); }
+
+    /* Session entry */
+    #screen-session .logo { font-size: 2.5rem; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 0.95rem; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<!-- SESSION ENTRY -->
+<div id="screen-session" class="screen active">
+  <div class="logo">Flipping<span>Hard</span>Work</div>
+  <p class="subtitle">Enter the session name your teacher gave you</p>
+  <div class="card" style="gap:12px; display:flex; flex-direction:column;">
+    <input type="text" id="inp-session" placeholder="Session name" autocomplete="off" autocapitalize="none">
+    <input type="text" id="inp-name" placeholder="Your name" autocomplete="off">
+    <div id="session-error" class="error" style="display:none"></div>
+    <button class="btn btn-primary" onclick="joinSession()">Join</button>
+  </div>
+</div>
+
+<!-- WAITING FOR GAME TO START -->
+<div id="screen-waiting" class="screen">
+  <div class="logo">Flipping<span>Hard</span>Work</div>
+  <div class="card">
+    <h2 id="waiting-name" style="margin-bottom:12px;">Hey!</h2>
+    <p class="waiting-pulse">Waiting for your teacher to begin...</p>
+  </div>
+</div>
+
+<!-- BETTING SCREEN -->
+<div id="screen-bet" class="screen">
+  <div class="card">
+    <div class="balance-label">Your balance</div>
+    <div class="balance-big" id="bet-balance">$0</div>
+    <div style="margin-top:8px;" id="income-badge-wrap"></div>
+  </div>
+  <div id="hint-wrap" style="width:100%; display:none;">
+    <div class="hint-box" id="hint-text"></div>
+  </div>
+  <div class="card" style="display:flex; flex-direction:column; gap:12px;">
+    <h3>Choose your side</h3>
+    <div class="choice-row">
+      <button class="choice-btn" id="btn-heads" onclick="selectChoice('heads')">🪙 Heads</button>
+      <button class="choice-btn" id="btn-tails" onclick="selectChoice('tails')">🦊 Tails</button>
+    </div>
+    <h3>Bet amount ($0 – <span id="max-bet-label">0</span>)</h3>
+    <input type="number" id="inp-bet" min="0" placeholder="0" oninput="clampBet()">
+    <div id="bet-error" class="error" style="display:none"></div>
+    <button class="btn btn-green" onclick="submitBet()">Place Bet</button>
+  </div>
+  <div class="round-info" id="bet-round-info"></div>
+</div>
+
+<!-- WAITING FOR FLIP -->
+<div id="screen-waiting-flip" class="screen">
+  <div class="card">
+    <div class="balance-label">Your balance</div>
+    <div class="balance-big" id="wf-balance">$0</div>
+  </div>
+  <div class="card">
+    <p style="font-size:1.1rem; font-weight:700; margin-bottom:6px;">Bet placed ✓</p>
+    <p class="waiting-pulse">Waiting for the flip...</p>
+  </div>
+  <div class="round-info" id="wf-round-info"></div>
+</div>
+
+<!-- FLIP ANIMATION -->
+<div id="screen-flip" class="screen">
+  <div class="card" style="padding: 40px 24px;">
+    <div id="coin-display" class="coin-display">🪙</div>
+    <div id="flip-result-text" style="font-size:1.3rem; font-weight:800; margin-top:16px; min-height:2rem;"></div>
+  </div>
+</div>
+
+<!-- END OF ROUND RESULT -->
+<div id="screen-result" class="screen">
+  <div id="confetti-container" class="confetti-wrap"></div>
+  <div class="card">
+    <div class="balance-label">New balance</div>
+    <div class="balance-big" id="result-balance">$0</div>
+  </div>
+  <div class="card">
+    <div id="result-big-text" class="result-big" style="margin-bottom:8px;"></div>
+    <div id="result-sub-text" style="color: var(--muted); font-size:0.95rem;"></div>
+  </div>
+  <div class="round-info" id="result-round-info"></div>
+</div>
+
+<!-- GAME OVER - WAITING FOR REVEAL -->
+<div id="screen-gameover-wait" class="screen">
+  <div class="logo">Flipping<span>Hard</span>Work</div>
+  <div class="card">
+    <h2 style="margin-bottom:8px;">Game over!</h2>
+    <div class="balance-big" id="final-balance-wait">$0</div>
+    <p style="margin-top:12px;" class="waiting-pulse">Your teacher is about to reveal something...</p>
+  </div>
+</div>
+
+<!-- INDIVIDUAL REVEAL -->
+<div id="screen-reveal" class="screen">
+  <div class="logo">Flipping<span>Hard</span>Work</div>
+  <div class="card">
+    <div class="balance-label">You finished with</div>
+    <div class="final-balance" id="reveal-final-balance">$0</div>
+  </div>
+  <div class="reveal-box">
+    <div class="class-label" id="reveal-class-label"></div>
+    <div class="class-detail" id="reveal-class-detail"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
+  authDomain: "dowserboard.firebaseapp.com",
+  projectId: "dowserboard",
+  storageBucket: "dowserboard.firebasestorage.app",
+  messagingSenderId: "1032600748722",
+  appId: "1:1032600748722:web:1584c7508fbbca617cbfab"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const LEVELS = {
+  1: { label: "Struggling",     start: 1,  income: 1, info: false },
+  2: { label: "The Professional", start: 5, income: 1, info: true  },
+  3: { label: "The Comfortable",  start: 5, income: 5, info: false },
+  4: { label: "Elite",           start: 10, income: 5, info: true  },
+};
+
+let session = null;
+let studentId = null;
+let studentData = null;
+let currentRound = 0;
+let totalRounds = 0;
+let chosenSide = null;
+let gameStatus = null;
+let unsubGame = null;
+let unsubStudent = null;
+let unsubHints = null;
+let lastRoundSeen = -1;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+// ---- SESSION JOIN ----
+window.joinSession = async () => {
+  const sessRaw = document.getElementById('inp-session').value.trim().toLowerCase();
+  const nameRaw = document.getElementById('inp-name').value.trim();
+  const errEl = document.getElementById('session-error');
+  errEl.style.display = 'none';
+
+  if (!sessRaw || !nameRaw) { errEl.textContent = 'Enter both session name and your name.'; errEl.style.display='block'; return; }
+
+  // Check session exists
+  const configSnap = await get(ref(db, `flippinghard/${sessRaw}/config`));
+  if (!configSnap.exists()) {
+    errEl.textContent = "Session not found. Check the name and try again.";
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const config = configSnap.val();
+  session = sessRaw;
+  totalRounds = config.rounds;
+
+  // Check for existing student with same name (case-insensitive)
+  const studentsSnap = await get(ref(db, `flippinghard/${session}/students`));
+  let existingId = null;
+  if (studentsSnap.exists()) {
+    studentsSnap.forEach(child => {
+      if (child.val().name.toLowerCase() === nameRaw.toLowerCase()) {
+        existingId = child.key;
+      }
+    });
+  }
+
+  if (existingId) {
+    studentId = existingId;
+    studentData = studentsSnap.val()[existingId];
+  } else {
+    // New student - check name uniqueness
+    if (studentsSnap.exists()) {
+      let taken = false;
+      studentsSnap.forEach(child => {
+        if (child.val().name.toLowerCase() === nameRaw.toLowerCase()) taken = true;
+      });
+      if (taken) { errEl.textContent = 'That name is already taken in this session.'; errEl.style.display='block'; return; }
+    }
+
+    // Assign level using transaction on joinCount
+    const joinRef = ref(db, `flippinghard/${session}/joinCount`);
+    let assignedLevel = 1;
+    await runTransaction(joinRef, (current) => {
+      const count = (current || 0);
+      assignedLevel = (count % 4) + 1;
+      return count + 1;
+    });
+
+    const level = LEVELS[assignedLevel];
+    const newStudent = {
+      name: nameRaw,
+      level: assignedLevel,
+      balance: level.start,
+      joinedRound: config.currentRound || 0,
+    };
+
+    const newRef = ref(db, `flippinghard/${session}/students/${Date.now()}_${Math.random().toString(36).slice(2,7)}`);
+    studentId = newRef.key;
+    await set(newRef, newStudent);
+    studentData = newStudent;
+
+    // If joining mid-game (active), apply income for current round
+    if (config.status === 'active' && config.currentRound > 0) {
+      const income = level.income;
+      await update(ref(db, `flippinghard/${session}/students/${studentId}`), {
+        balance: level.start + income
+      });
+      studentData.balance = level.start + income;
+    }
+  }
+
+  document.getElementById('waiting-name').textContent = `Hey, ${studentData.name}!`;
+  subscribeToGame();
+};
+
+function subscribeToGame() {
+  if (unsubGame) unsubGame();
+  unsubGame = onValue(ref(db, `flippinghard/${session}/config`), snap => {
+    if (!snap.exists()) return;
+    const cfg = snap.val();
+    gameStatus = cfg.status;
+    currentRound = cfg.currentRound || 0;
+    totalRounds = cfg.rounds;
+
+    if (cfg.status === 'waiting') {
+      showScreen('waiting');
+    } else if (cfg.status === 'active') {
+      handleActiveRound(cfg);
+    } else if (cfg.status === 'flipping') {
+      handleFlipping(cfg);
+    } else if (cfg.status === 'reveal_individual') {
+      showIndividualReveal();
+    } else if (cfg.status === 'ended') {
+      refreshStudentData().then(() => showScreen('gameover-wait'));
+    }
+  });
+
+  subscribeToStudentData();
+}
+
+function subscribeToStudentData() {
+  if (unsubStudent) unsubStudent();
+  unsubStudent = onValue(ref(db, `flippinghard/${session}/students/${studentId}`), snap => {
+    if (snap.exists()) studentData = snap.val();
+  });
+}
+
+async function refreshStudentData() {
+  const snap = await get(ref(db, `flippinghard/${session}/students/${studentId}`));
+  if (snap.exists()) studentData = snap.val();
+}
+
+async function handleActiveRound(cfg) {
+  await refreshStudentData();
+  const round = cfg.currentRound;
+
+  // Check if we've already bet this round
+  const betSnap = await get(ref(db, `flippinghard/${session}/students/${studentId}/bets/round_${round}`));
+  if (betSnap.exists()) {
+    showWaitingFlip();
+    return;
+  }
+
+  // Show betting screen
+  chosenSide = null;
+  document.getElementById('btn-heads').className = 'choice-btn';
+  document.getElementById('btn-tails').className = 'choice-btn';
+  document.getElementById('bet-balance').textContent = '$' + studentData.balance;
+  document.getElementById('max-bet-label').textContent = studentData.balance;
+  document.getElementById('inp-bet').value = '';
+  document.getElementById('inp-bet').max = studentData.balance;
+  document.getElementById('bet-round-info').textContent = `Round ${round} of ${totalRounds}`;
+  document.getElementById('bet-error').style.display = 'none';
+
+  // Income badge
+  const level = LEVELS[studentData.level];
+  const badgeWrap = document.getElementById('income-badge-wrap');
+  if (lastRoundSeen !== round) {
+    badgeWrap.innerHTML = `<span class="income-badge">+$${level.income} income received</span>`;
+    lastRoundSeen = round;
+  }
+
+  // Hint
+  const hintWrap = document.getElementById('hint-wrap');
+  if (level.info) {
+    const hintSnap = await get(ref(db, `flippinghard/${session}/hints/${studentId}/round_${round}`));
+    if (hintSnap.exists()) {
+      const hint = hintSnap.val();
+      const side = hint.charAt(0).toUpperCase() + hint.slice(1);
+      document.getElementById('hint-text').innerHTML = `Our sources suggest: 75% chance it will be <strong>${side}</strong> this round.`;
+      hintWrap.style.display = 'block';
+    } else {
+      hintWrap.style.display = 'none';
+    }
+  } else {
+    hintWrap.style.display = 'none';
+  }
+
+  showScreen('bet');
+}
+
+function showWaitingFlip() {
+  document.getElementById('wf-balance').textContent = '$' + studentData.balance;
+  document.getElementById('wf-round-info').textContent = `Round ${currentRound} of ${totalRounds}`;
+  showScreen('waiting-flip');
+}
+
+async function handleFlipping(cfg) {
+  const round = cfg.currentRound;
+  const resultSnap = await get(ref(db, `flippinghard/${session}/flips/round_${round}`));
+  if (!resultSnap.exists()) return;
+  const result = resultSnap.val(); // 'heads' or 'tails'
+
+  // Get student's bet
+  const betSnap = await get(ref(db, `flippinghard/${session}/students/${studentId}/bets/round_${round}`));
+  let betAmount = 0, betChoice = 'heads';
+  if (betSnap.exists()) {
+    betAmount = betSnap.val().amount || 0;
+    betChoice = betSnap.val().choice || 'heads';
+  }
+
+  showCoinAnimation(result, betAmount, betChoice);
+}
+
+function showCoinAnimation(result, betAmount, betChoice) {
+  showScreen('flip');
+  const display = document.getElementById('coin-display');
+  const resultText = document.getElementById('flip-result-text');
+  resultText.textContent = '';
+
+  const sides = ['🪙', '🦊', '🪙', '🐻', '🪙', '🦊', '🪙', '🐻'];
+  let frame = 0;
+  let interval = 80;
+  let elapsed = 0;
+
+  const animate = () => {
+    display.textContent = sides[frame % sides.length];
+    frame++;
+    elapsed += interval;
+
+    if (elapsed < 1200) {
+      setTimeout(animate, interval);
+    } else if (elapsed < 2500) {
+      interval = 80 + (elapsed - 1200) * 0.4;
+      setTimeout(animate, interval);
+    } else {
+      display.textContent = result === 'heads' ? '🪙' : '🦊';
+      resultText.textContent = result === 'heads' ? 'HEADS!' : 'TAILS!';
+
+      const won = betChoice === result;
+      setTimeout(() => showRoundResult(result, betAmount, betChoice, won), 800);
+    }
+  };
+  animate();
+}
+
+async function showRoundResult(result, betAmount, betChoice, won) {
+  await refreshStudentData();
+  const balance = studentData.balance;
+
+  document.getElementById('result-balance').textContent = '$' + balance;
+  const bigText = document.getElementById('result-big-text');
+  const subText = document.getElementById('result-sub-text');
+  document.getElementById('result-round-info').textContent = `Round ${currentRound} of ${totalRounds}`;
+
+  if (betAmount === 0) {
+    bigText.textContent = '😐';
+    bigText.className = 'result-big';
+    subText.textContent = "You didn't bet this round.";
+  } else if (won) {
+    bigText.textContent = `+$${betAmount}`;
+    bigText.className = 'result-big result-win';
+    subText.textContent = `It was ${result}! You bet ${betChoice} and won.`;
+    spawnConfetti();
+  } else {
+    bigText.textContent = `-$${betAmount}`;
+    bigText.className = 'result-big result-lose';
+    subText.textContent = `It was ${result}. You bet ${betChoice} and lost.`;
+  }
+
+  showScreen('result');
+}
+
+function spawnConfetti() {
+  const container = document.getElementById('confetti-container');
+  container.innerHTML = '';
+  const colours = ['#fbbf24','#22c55e','#3b82f6','#ef4444','#a855f7','#f97316'];
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left: ${Math.random()*100}%;
+      background: ${colours[Math.floor(Math.random()*colours.length)]};
+      width: ${6+Math.random()*8}px;
+      height: ${6+Math.random()*8}px;
+      animation-duration: ${1.5+Math.random()*2}s;
+      animation-delay: ${Math.random()*0.5}s;
+    `;
+    container.appendChild(el);
+  }
+  setTimeout(() => container.innerHTML = '', 4000);
+}
+
+async function showIndividualReveal() {
+  await refreshStudentData();
+  const level = LEVELS[studentData.level];
+  document.getElementById('reveal-final-balance').textContent = '$' + studentData.balance;
+  document.getElementById('reveal-class-label').textContent = level.label;
+  document.getElementById('reveal-class-detail').innerHTML =
+    `Starting wealth: $${level.start}<br>` +
+    `Income per round: $${level.income}<br>` +
+    `Market information: ${level.info ? 'Yes — you received tips each round' : 'No — you had no tips'}`;
+  showScreen('reveal');
+}
+
+// ---- BETTING ACTIONS ----
+window.selectChoice = (side) => {
+  chosenSide = side;
+  document.getElementById('btn-heads').className = 'choice-btn' + (side === 'heads' ? ' selected-heads' : '');
+  document.getElementById('btn-tails').className = 'choice-btn' + (side === 'tails' ? ' selected-tails' : '');
+};
+
+window.clampBet = () => {
+  const inp = document.getElementById('inp-bet');
+  const max = parseInt(studentData.balance) || 0;
+  if (parseInt(inp.value) > max) inp.value = max;
+  if (parseInt(inp.value) < 0) inp.value = 0;
+};
+
+window.submitBet = async () => {
+  const errEl = document.getElementById('bet-error');
+  errEl.style.display = 'none';
+
+  if (!chosenSide) { errEl.textContent = 'Pick Heads or Tails first.'; errEl.style.display='block'; return; }
+
+  const raw = document.getElementById('inp-bet').value;
+  const amount = parseInt(raw) || 0;
+  const max = parseInt(studentData.balance) || 0;
+  if (amount < 0 || amount > max) { errEl.textContent = `Bet must be between $0 and $${max}.`; errEl.style.display='block'; return; }
+
+  await set(ref(db, `flippinghard/${session}/students/${studentId}/bets/round_${currentRound}`), {
+    amount,
+    choice: chosenSide,
+    defaulted: false,
+  });
+
+  showWaitingFlip();
+};
+</script>
+</body>
+</html>

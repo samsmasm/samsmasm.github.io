@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flipping Hard Work — Teacher</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --yellow: #fbbf24;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* SETUP */
+    #setup-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .setup-box {
+      background: var(--card); border-radius: 20px; padding: 36px;
+      width: 100%; max-width: 440px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .logo { font-size: 2rem; font-weight: 900; letter-spacing: -1px; margin-bottom: 4px; }
+    .logo span { color: var(--yellow); }
+    .subtitle { color: var(--muted); margin-bottom: 28px; font-size: 0.95rem; }
+    label { display: block; font-size: 0.85rem; font-weight: 700; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    input[type=text], input[type=number], input[type=password] {
+      width: 100%; padding: 13px 15px; border: 2px solid var(--border);
+      border-radius: 10px; font-size: 1rem; background: var(--bg);
+      color: var(--text); outline: none; transition: border-color 0.2s; margin-bottom: 18px;
+    }
+    input:focus { border-color: var(--blue); }
+    .btn {
+      width: 100%; padding: 15px; border: none; border-radius: 10px;
+      font-size: 1rem; font-weight: 800; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-green { background: var(--green); color: white; }
+    .btn-yellow { background: var(--yellow); color: #1e293b; }
+    .btn-red { background: var(--red); color: white; }
+    .btn-muted { background: var(--border); color: var(--text); }
+    .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
+    .error { color: var(--red); font-size: 0.9rem; margin-top: -10px; margin-bottom: 12px; font-weight: 600; }
+
+    /* MAIN GAME VIEW */
+    #game-screen { display: none; height: 100vh; overflow: hidden; flex-direction: column; }
+    #game-screen.active { display: flex; }
+
+    /* TOP BAR */
+    .topbar {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar-left { display: flex; flex-direction: column; }
+    .topbar-title { font-size: 1.2rem; font-weight: 900; }
+    .topbar-sub { font-size: 0.85rem; color: var(--muted); }
+    .round-display {
+      font-size: 2rem; font-weight: 900; color: var(--yellow);
+      text-align: center;
+    }
+    .round-sub { font-size: 0.8rem; color: var(--muted); text-align: center; }
+    .topbar-right { display: flex; gap: 8px; align-items: center; }
+    .btn-sm {
+      padding: 8px 14px; border: none; border-radius: 8px;
+      font-size: 0.8rem; font-weight: 700; cursor: pointer;
+    }
+
+    /* MAIN AREA */
+    .main-area {
+      display: flex; flex: 1; overflow: hidden; gap: 0;
+    }
+
+    /* LEADERBOARD */
+    .leaderboard-panel {
+      flex: 1; overflow-y: auto; padding: 20px;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .lb-title {
+      font-size: 0.8rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;
+    }
+    .lb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .lb-grid.single-col { grid-template-columns: 1fr; }
+    .lb-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--card); border-radius: 10px;
+      padding: 10px 14px; border: 1px solid var(--border);
+    }
+    .lb-rank { font-size: 0.85rem; color: var(--muted); width: 24px; flex-shrink: 0; font-weight: 700; }
+    .lb-name { font-size: 1rem; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-bal { font-size: 1.1rem; font-weight: 900; color: var(--green); flex-shrink: 0; }
+    .lb-row.rank-1 { border-color: var(--yellow); background: rgba(251,191,36,0.08); }
+    .lb-row.rank-2 { border-color: #94a3b8; }
+    .lb-row.rank-3 { border-color: #cd7f32; }
+    .lb-bet-badge {
+      font-size: 0.7rem; font-weight: 700; padding: 2px 7px;
+      border-radius: 999px; flex-shrink: 0;
+    }
+    .badge-placed { background: #16a34a; color: white; }
+    .badge-waiting { background: #334155; color: #94a3b8; }
+
+    /* CONTROLS PANEL */
+    .controls-panel {
+      width: 280px; flex-shrink: 0; background: var(--card);
+      border-left: 1px solid var(--border); padding: 20px;
+      display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
+    }
+    .controls-panel h3 { font-size: 0.8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .btn-flip {
+      background: var(--yellow); color: #1e293b;
+      font-size: 1.6rem; font-weight: 900; padding: 24px;
+      border: none; border-radius: 14px; cursor: pointer; width: 100%;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+    .btn-flip:active { transform: scale(0.97); }
+    .btn-flip:disabled { opacity: 0.4; cursor: not-allowed; }
+    .status-box {
+      background: var(--bg); border-radius: 10px; padding: 12px;
+      font-size: 0.85rem; color: var(--muted); text-align: center;
+    }
+    .status-box strong { color: var(--text); }
+    .divider { border: none; border-top: 1px solid var(--border); }
+    .btn-small-red { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+    /* JOIN PHASE */
+    #join-screen {
+      display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center;
+      gap: 24px; padding: 32px;
+    }
+    #join-screen.active { display: flex; }
+    .join-title { font-size: 3rem; font-weight: 900; text-align: center; }
+    .join-title span { color: var(--yellow); }
+    .session-code {
+      font-size: 2.5rem; font-weight: 900; color: var(--yellow);
+      background: var(--card); padding: 16px 40px; border-radius: 16px;
+      border: 2px solid var(--border); letter-spacing: 2px;
+    }
+    .join-url { font-size: 1.1rem; color: var(--muted); }
+    .join-students {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+      max-width: 800px; max-height: 200px; overflow-y: auto;
+    }
+    .student-chip {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 0.95rem;
+      animation: popIn 0.3s ease;
+    }
+    @keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .student-count { font-size: 1rem; color: var(--muted); }
+
+    /* QR OVERLAY */
+    #qr-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.92); display: none;
+      flex-direction: column; align-items: center; justify-content: center; z-index: 500;
+    }
+    #qr-overlay.active { display: flex; }
+    #qr-overlay h2 { font-size: 2rem; margin-bottom: 20px; color: white; }
+    #qrcode canvas, #qrcode img { border-radius: 12px; }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: rgba(0,0,0,0.7); display: none;
+      align-items: center; justify-content: center; z-index: 600;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: var(--card); border-radius: 18px; padding: 32px;
+      width: 100%; max-width: 380px; border: 1px solid var(--border);
+    }
+    .modal-box h2 { margin-bottom: 16px; font-size: 1.3rem; }
+
+    /* END REVEAL */
+    #reveal-screen { display: none; flex-direction: column; padding: 32px; gap: 20px; }
+    #reveal-screen.active { display: flex; }
+    .reveal-title { font-size: 2rem; font-weight: 900; }
+    .avg-table { width: 100%; border-collapse: collapse; }
+    .avg-table th { text-align: left; padding: 10px 14px; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    .avg-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 1rem; }
+    .avg-table tr:first-child td { font-weight: 900; }
+    .avg-bal { font-weight: 900; color: var(--green); font-size: 1.1rem; }
+    .level-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .level-table th { text-align: left; padding: 8px 12px; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    .level-table td { padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+    .info-yes { color: var(--green); font-weight: 700; }
+    .info-no { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup-screen">
+  <div class="setup-box">
+    <div class="logo">Flipping<span>Hard</span>Work</div>
+    <div class="subtitle">Teacher Panel</div>
+    <label>Session name</label>
+    <input type="text" id="inp-sess" placeholder="e.g. period3" autocapitalize="none">
+    <label>Teacher passcode</label>
+    <input type="password" id="inp-pass" placeholder="Set a passcode for this session">
+    <label>Number of rounds</label>
+    <input type="number" id="inp-rounds" value="16" min="1">
+    <div id="setup-error" class="error" style="display:none"></div>
+    <button class="btn btn-primary" onclick="startSetup()">Create Session</button>
+    <div style="margin-top:12px; text-align:center; color: var(--muted); font-size:0.85rem;">or</div>
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <input type="text" id="inp-resume-sess" placeholder="Existing session name" style="margin-bottom:0; flex:1;">
+      <input type="password" id="inp-resume-pass" placeholder="Passcode" style="margin-bottom:0; width:130px;">
+    </div>
+    <button class="btn btn-muted" style="margin-top:10px;" onclick="resumeSession()">Resume Session</button>
+    <div id="resume-error" class="error" style="margin-top:8px; display:none"></div>
+  </div>
+</div>
+
+<!-- JOIN PHASE -->
+<div id="join-screen">
+  <div class="join-title">Flipping<span>Hard</span>Work</div>
+  <div>
+    <div style="text-align:center; color:var(--muted); font-size:1rem; margin-bottom:6px;">Session</div>
+    <div class="session-code" id="display-session-code">---</div>
+  </div>
+  <div class="join-url" id="display-join-url"></div>
+  <div style="text-align:center;">
+    <div class="student-count" id="student-count-label">0 students joined</div>
+  </div>
+  <div class="join-students" id="join-students-list"></div>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+    <button class="btn btn-outline btn-sm" style="width:auto; padding:12px 24px;" onclick="toggleQR()">Show QR Code</button>
+    <button class="btn btn-green btn-sm" style="width:auto; padding:12px 28px; font-size:1rem;" onclick="beginFirstRound()">Begin First Round →</button>
+  </div>
+  <button class="btn btn-outline btn-sm" style="width:auto; padding:8px 18px; font-size:0.8rem; margin-top:-8px;" onclick="showResetModal()">Reset Session</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">Flipping<span style="color:var(--yellow)">Hard</span>Work</div>
+      <div class="topbar-sub" id="topbar-session"></div>
+    </div>
+    <div>
+      <div class="round-display" id="round-display">—</div>
+      <div class="round-sub" id="round-sub"></div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-sm btn-outline" style="border:1px solid var(--border); border-radius:8px; color:var(--text); background:transparent; padding:8px 14px;" onclick="toggleQR()">QR</button>
+      <button class="btn-sm" style="background:rgba(239,68,68,0.15); color:var(--red); border-radius:8px; border:none;" onclick="showResetModal()">Reset</button>
+    </div>
+  </div>
+  <div class="main-area">
+    <div class="leaderboard-panel">
+      <div class="lb-title">Leaderboard</div>
+      <div class="lb-grid" id="leaderboard"></div>
+    </div>
+    <div class="controls-panel">
+      <h3>Controls</h3>
+      <div class="status-box" id="ctrl-status">Waiting...</div>
+      <button class="btn-flip" id="btn-flip" onclick="doFlip()">🪙 FLIP</button>
+      <button class="btn btn-green" id="btn-next" style="display:none;" onclick="nextRound()">Next Round →</button>
+      <button class="btn btn-yellow" id="btn-endgame" style="display:none;" onclick="endGame()">End Game</button>
+      <hr class="divider">
+      <h3>Reveal</h3>
+      <button class="btn btn-outline" id="btn-reveal1" style="display:none;" onclick="triggerReveal1()">Reveal to Students</button>
+      <button class="btn btn-muted" id="btn-reveal2" style="display:none;" onclick="triggerReveal2()">Show Class Results</button>
+      <hr class="divider">
+      <button class="btn btn-small-red btn-sm" style="border-radius:8px;" onclick="showResetModal()">Reset Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVEAL SCREEN -->
+<div id="reveal-screen">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div class="reveal-title">🏆 Results</div>
+    <button class="btn btn-muted" style="width:auto; padding:10px 20px;" onclick="backToLeaderboard()">← Leaderboard</button>
+  </div>
+  <div style="display:flex; gap:20px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:280px;">
+      <h3 style="color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:12px;">Average Balance by Class</h3>
+      <table class="avg-table">
+        <thead><tr><th>Class</th><th>Avg Balance</th><th>Students</th></tr></thead>
+        <tbody id="avg-table-body"></tbody>
+      </table>
+    </div>
+    <div style="flex:1; min-width:280px;">
+      <h3 style="color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:12px;">Class Breakdown</h3>
+      <table class="level-table">
+        <thead><tr><th>Class</th><th>Start</th><th>Income</th><th>Info</th></tr></thead>
+        <tbody>
+          <tr><td>Struggling</td><td>$1</td><td>$1</td><td class="info-no">No</td></tr>
+          <tr><td>The Professional</td><td>$5</td><td>$1</td><td class="info-yes">Yes</td></tr>
+          <tr><td>The Comfortable</td><td>$5</td><td>$5</td><td class="info-no">No</td></tr>
+          <tr><td>Elite</td><td>$10</td><td>$5</td><td class="info-yes">Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- QR OVERLAY -->
+<div id="qr-overlay" onclick="toggleQR()">
+  <h2>SCAN TO JOIN</h2>
+  <div id="qrcode"></div>
+  <p style="color:#94a3b8; margin-top:16px; font-size:1rem;" id="qr-url-text"></p>
+  <p style="color:#64748b; margin-top:8px; font-size:0.85rem;">Tap anywhere to close</p>
+</div>
+
+<!-- RESET MODAL -->
+<div class="modal-overlay" id="reset-modal">
+  <div class="modal-box">
+    <h2>Reset Session</h2>
+    <p style="color:var(--muted); margin-bottom:16px; font-size:0.95rem;">Enter the passcode to wipe all student data and restart.</p>
+    <input type="password" id="reset-pass-inp" placeholder="Passcode">
+    <div id="reset-error" class="error" style="display:none; margin-top:-8px; margin-bottom:8px;"></div>
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button class="btn btn-muted" style="flex:1;" onclick="closeResetModal()">Cancel</button>
+      <button class="btn btn-red" style="flex:1;" onclick="confirmReset()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
+  authDomain: "dowserboard.firebaseapp.com",
+  projectId: "dowserboard",
+  storageBucket: "dowserboard.firebasestorage.app",
+  messagingSenderId: "1032600748722",
+  appId: "1:1032600748722:web:1584c7508fbbca617cbfab"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const LEVELS = {
+  1: { label: "Struggling",       start: 1,  income: 1, info: false },
+  2: { label: "The Professional", start: 5,  income: 1, info: true  },
+  3: { label: "The Comfortable",  start: 5,  income: 5, info: false },
+  4: { label: "Elite",            start: 10, income: 5, info: true  },
+};
+
+let session = null;
+let passcode = null;
+let totalRounds = 16;
+let currentRound = 0;
+let gameStatus = null;
+let studentsData = {};
+let qrGenerated = false;
+let unsubGame = null;
+let unsubStudents = null;
+
+// ---- SETUP ----
+window.startSetup = async () => {
+  const sess = document.getElementById('inp-sess').value.trim().toLowerCase();
+  const pass = document.getElementById('inp-pass').value.trim();
+  const rounds = parseInt(document.getElementById('inp-rounds').value) || 16;
+  const errEl = document.getElementById('setup-error');
+  errEl.style.display = 'none';
+
+  if (!sess || !pass) { errEl.textContent = 'Enter a session name and passcode.'; errEl.style.display='block'; return; }
+
+  const existing = await get(ref(db, `flippinghard/${sess}/config`));
+  if (existing.exists()) { errEl.textContent = 'Session already exists. Use Resume Session below.'; errEl.style.display='block'; return; }
+
+  session = sess;
+  passcode = pass;
+  totalRounds = rounds;
+
+  const flips = generateFlips(rounds);
+  const config = { rounds, status: 'waiting', currentRound: 0, passcode: pass };
+
+  await set(ref(db, `flippinghard/${session}/config`), config);
+  await set(ref(db, `flippinghard/${session}/flips`), flips);
+
+  enterJoinPhase();
+};
+
+window.resumeSession = async () => {
+  const sess = document.getElementById('inp-resume-sess').value.trim().toLowerCase();
+  const pass = document.getElementById('inp-resume-pass').value.trim();
+  const errEl = document.getElementById('resume-error');
+  errEl.style.display = 'none';
+
+  if (!sess || !pass) { errEl.textContent = 'Enter session name and passcode.'; errEl.style.display='block'; return; }
+
+  const snap = await get(ref(db, `flippinghard/${sess}/config`));
+  if (!snap.exists()) { errEl.textContent = 'Session not found.'; errEl.style.display='block'; return; }
+
+  const cfg = snap.val();
+  if (cfg.passcode !== pass) { errEl.textContent = 'Wrong passcode.'; errEl.style.display='block'; return; }
+
+  session = sess;
+  passcode = pass;
+  totalRounds = cfg.rounds;
+  currentRound = cfg.currentRound || 0;
+  gameStatus = cfg.status;
+
+  if (cfg.status === 'waiting') {
+    enterJoinPhase();
+  } else if (cfg.status === 'ended') {
+    document.getElementById('setup-screen').style.display = 'none';
+    enterGameScreen();
+  } else {
+    document.getElementById('setup-screen').style.display = 'none';
+    enterGameScreen();
+  }
+};
+
+function generateFlips(rounds) {
+  const flips = {};
+  for (let i = 1; i <= rounds; i++) {
+    flips[`round_${i}`] = Math.random() < 0.5 ? 'heads' : 'tails';
+  }
+  return flips;
+}
+
+// ---- JOIN PHASE ----
+function enterJoinPhase() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('join-screen').classList.add('active');
+  document.getElementById('display-session-code').textContent = session;
+
+  const studentUrl = `${window.location.origin}${window.location.pathname.replace('teacher.html','student.html')}`;
+  document.getElementById('display-join-url').textContent = studentUrl;
+
+  generateQR(studentUrl);
+  subscribeStudents();
+}
+
+function subscribeStudents() {
+  if (unsubStudents) unsubStudents();
+  unsubStudents = onValue(ref(db, `flippinghard/${session}/students`), snap => {
+    studentsData = snap.val() || {};
+    const list = Object.values(studentsData);
+    document.getElementById('student-count-label').textContent = `${list.length} student${list.length !== 1 ? 's' : ''} joined`;
+
+    const container = document.getElementById('join-students-list');
+    container.innerHTML = '';
+    list.forEach(s => {
+      const chip = document.createElement('div');
+      chip.className = 'student-chip';
+      chip.textContent = s.name;
+      container.appendChild(chip);
+    });
+  });
+}
+
+// ---- BEGIN FIRST ROUND ----
+window.beginFirstRound = async () => {
+  const students = Object.entries(studentsData);
+  if (students.length === 0) {
+    alert('No students have joined yet.');
+    return;
+  }
+
+  // Assign levels randomly, distributed as evenly as possible across 4 levels
+  const shuffled = [...students].sort(() => Math.random() - 0.5);
+  const levelPool = [];
+  const base = Math.floor(shuffled.length / 4);
+  const extra = shuffled.length % 4;
+  for (let l = 1; l <= 4; l++) {
+    const count = base + (l <= extra ? 1 : 0);
+    for (let i = 0; i < count; i++) levelPool.push(l);
+  }
+  // Shuffle level pool
+  for (let i = levelPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [levelPool[i], levelPool[j]] = [levelPool[j], levelPool[i]];
+  }
+
+  const updates = {};
+  shuffled.forEach(([id, student], idx) => {
+    const level = levelPool[idx];
+    const lvlData = LEVELS[level];
+    updates[`flippinghard/${session}/students/${id}/level`] = level;
+    updates[`flippinghard/${session}/students/${id}/balance`] = lvlData.start;
+  });
+
+  // Generate hints for all students × all rounds
+  const flipsSnap = await get(ref(db, `flippinghard/${session}/flips`));
+  const flips = flipsSnap.val();
+
+  shuffled.forEach(([id], idx) => {
+    const level = levelPool[idx];
+    const lvlData = LEVELS[level];
+    if (lvlData.info) {
+      for (let r = 1; r <= totalRounds; r++) {
+        const actual = flips[`round_${r}`];
+        const correct = Math.random() < 0.75;
+        const hint = correct ? actual : (actual === 'heads' ? 'tails' : 'heads');
+        updates[`flippinghard/${session}/hints/${id}/round_${r}`] = hint;
+      }
+    }
+  });
+
+  updates[`flippinghard/${session}/config/status`] = 'active';
+  updates[`flippinghard/${session}/config/currentRound`] = 1;
+  updates[`flippinghard/${session}/joinCount`] = shuffled.length;
+
+  await update(ref(db), updates);
+
+  // Apply income for round 1 (income starts from round 2 per spec - starting balance IS round 1 stake)
+  // Spec says: students start with their starting wealth; income paid at start of each round BEFORE betting
+  // Round 1 income was clarified: they start with starting wealth only (no income on round 1)
+  // So nothing extra needed here.
+
+  document.getElementById('join-screen').classList.remove('active');
+  enterGameScreen();
+};
+
+// ---- GAME SCREEN ----
+function enterGameScreen() {
+  document.getElementById('game-screen').classList.add('active');
+  document.getElementById('topbar-session').textContent = `Session: ${session}`;
+
+  if (unsubStudents) unsubStudents();
+  unsubStudents = onValue(ref(db, `flippinghard/${session}/students`), snap => {
+    studentsData = snap.val() || {};
+    renderLeaderboard();
+  });
+
+  if (unsubGame) unsubGame();
+  unsubGame = onValue(ref(db, `flippinghard/${session}/config`), snap => {
+    if (!snap.exists()) return;
+    const cfg = snap.val();
+    gameStatus = cfg.status;
+    currentRound = cfg.currentRound || 0;
+    totalRounds = cfg.rounds;
+    updateGameUI(cfg);
+  });
+}
+
+function updateGameUI(cfg) {
+  document.getElementById('round-display').textContent = `Round ${cfg.currentRound}`;
+  document.getElementById('round-sub').textContent = `of ${cfg.rounds}`;
+
+  const flipBtn = document.getElementById('btn-flip');
+  const nextBtn = document.getElementById('btn-next');
+  const endBtn = document.getElementById('btn-endgame');
+  const reveal1 = document.getElementById('btn-reveal1');
+  const reveal2 = document.getElementById('btn-reveal2');
+  const statusBox = document.getElementById('ctrl-status');
+
+  flipBtn.style.display = 'block';
+  nextBtn.style.display = 'none';
+  endBtn.style.display = 'none';
+  reveal1.style.display = 'none';
+  reveal2.style.display = 'none';
+
+  if (cfg.status === 'active') {
+    flipBtn.disabled = false;
+    const betsIn = countBetsPlaced(cfg.currentRound);
+    const total = Object.keys(studentsData).length;
+    statusBox.innerHTML = `<strong>${betsIn}/${total}</strong> bets placed`;
+  } else if (cfg.status === 'flipping') {
+    flipBtn.disabled = true;
+    statusBox.innerHTML = `Flipping round <strong>${cfg.currentRound}</strong>...`;
+    if (cfg.currentRound < cfg.rounds) {
+      nextBtn.style.display = 'block';
+    } else {
+      endBtn.style.display = 'block';
+    }
+  } else if (cfg.status === 'ended') {
+    flipBtn.style.display = 'none';
+    reveal1.style.display = 'block';
+    statusBox.innerHTML = `<strong>Game over!</strong>`;
+  } else if (cfg.status === 'reveal_individual') {
+    flipBtn.style.display = 'none';
+    reveal2.style.display = 'block';
+    statusBox.innerHTML = `Students can see their class.`;
+  }
+}
+
+function countBetsPlaced(round) {
+  return Object.values(studentsData).filter(s =>
+    s.bets && s.bets[`round_${round}`]
+  ).length;
+}
+
+function renderLeaderboard() {
+  const students = Object.values(studentsData).sort((a, b) => b.balance - a.balance);
+  const container = document.getElementById('leaderboard');
+  container.className = students.length > 30 ? 'lb-grid' : 'lb-grid single-col';
+  container.innerHTML = '';
+
+  students.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = `lb-row${i===0?' rank-1':i===1?' rank-2':i===2?' rank-3':''}`;
+
+    const hasBet = s.bets && s.bets[`round_${currentRound}`];
+    const badge = gameStatus === 'active'
+      ? `<span class="lb-bet-badge ${hasBet ? 'badge-placed' : 'badge-waiting'}">${hasBet ? '✓' : '…'}</span>`
+      : '';
+
+    row.innerHTML = `
+      <span class="lb-rank">${i+1}</span>
+      <span class="lb-name">${s.name}</span>
+      ${badge}
+      <span class="lb-bal">$${s.balance}</span>
+    `;
+    container.appendChild(row);
+  });
+}
+
+// ---- FLIP ----
+window.doFlip = async () => {
+  const flipBtn = document.getElementById('btn-flip');
+  flipBtn.disabled = true;
+
+  // Default bets for students who haven't bet yet
+  const updates = {};
+  const students = Object.entries(studentsData);
+  students.forEach(([id, s]) => {
+    if (!s.bets || !s.bets[`round_${currentRound}`]) {
+      updates[`flippinghard/${session}/students/${id}/bets/round_${currentRound}`] = {
+        amount: 0, choice: 'heads', defaulted: true
+      };
+    }
+  });
+
+  if (Object.keys(updates).length > 0) await update(ref(db), updates);
+
+  // Get flip result
+  const flipSnap = await get(ref(db, `flippinghard/${session}/flips/round_${currentRound}`));
+  const result = flipSnap.val();
+
+  // Resolve balances
+  const balUpdates = {};
+  const freshSnap = await get(ref(db, `flippinghard/${session}/students`));
+  freshSnap.forEach(child => {
+    const s = child.val();
+    const bet = s.bets && s.bets[`round_${currentRound}`];
+    if (!bet) return;
+
+    const amount = bet.amount || 0;
+    const choice = bet.choice || 'heads';
+    const won = choice === result;
+    const newBal = won ? s.balance + amount : Math.max(0, s.balance - amount);
+    balUpdates[`flippinghard/${session}/students/${child.key}/balance`] = newBal;
+  });
+
+  balUpdates[`flippinghard/${session}/config/status`] = 'flipping';
+  await update(ref(db), balUpdates);
+};
+
+// ---- NEXT ROUND ----
+window.nextRound = async () => {
+  const nextR = currentRound + 1;
+  const updates = {};
+
+  // Apply income to all students for the upcoming round
+  const snap = await get(ref(db, `flippinghard/${session}/students`));
+  snap.forEach(child => {
+    const s = child.val();
+    const income = LEVELS[s.level] ? LEVELS[s.level].income : 1;
+    updates[`flippinghard/${session}/students/${child.key}/balance`] = s.balance + income;
+  });
+
+  updates[`flippinghard/${session}/config/status`] = 'active';
+  updates[`flippinghard/${session}/config/currentRound`] = nextR;
+
+  await update(ref(db), updates);
+};
+
+// ---- END GAME ----
+window.endGame = async () => {
+  await update(ref(db, `flippinghard/${session}/config`), { status: 'ended' });
+};
+
+// ---- REVEAL ----
+window.triggerReveal1 = async () => {
+  await update(ref(db, `flippinghard/${session}/config`), { status: 'reveal_individual' });
+  document.getElementById('btn-reveal1').style.display = 'none';
+  document.getElementById('btn-reveal2').style.display = 'block';
+};
+
+window.triggerReveal2 = () => {
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('reveal-screen').classList.add('active');
+  renderClassResults();
+};
+
+window.backToLeaderboard = () => {
+  document.getElementById('reveal-screen').classList.remove('active');
+  document.getElementById('game-screen').classList.add('active');
+};
+
+function renderClassResults() {
+  const students = Object.values(studentsData);
+  const tbody = document.getElementById('avg-table-body');
+  tbody.innerHTML = '';
+
+  [4,3,2,1].forEach(lvl => {
+    const group = students.filter(s => s.level === lvl);
+    if (group.length === 0) return;
+    const avg = Math.round(group.reduce((sum, s) => sum + s.balance, 0) / group.length);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${LEVELS[lvl].label}</td>
+      <td class="avg-bal">$${avg}</td>
+      <td>${group.length}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---- RESET ----
+window.showResetModal = () => document.getElementById('reset-modal').classList.add('active');
+window.closeResetModal = () => {
+  document.getElementById('reset-modal').classList.remove('active');
+  document.getElementById('reset-error').style.display = 'none';
+  document.getElementById('reset-pass-inp').value = '';
+};
+
+window.confirmReset = async () => {
+  const entered = document.getElementById('reset-pass-inp').value.trim();
+  const errEl = document.getElementById('reset-error');
+  if (entered !== passcode) { errEl.textContent = 'Wrong passcode.'; errEl.style.display='block'; return; }
+
+  const flipsSnap = await get(ref(db, `flippinghard/${session}/flips`));
+  const newFlips = generateFlips(totalRounds);
+
+  await remove(ref(db, `flippinghard/${session}/students`));
+  await remove(ref(db, `flippinghard/${session}/hints`));
+  await set(ref(db, `flippinghard/${session}/joinCount`), 0);
+  await set(ref(db, `flippinghard/${session}/flips`), newFlips);
+  await update(ref(db, `flippinghard/${session}/config`), {
+    status: 'waiting', currentRound: 0
+  });
+
+  closeResetModal();
+  studentsData = {};
+
+  // Return to join screen
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('reveal-screen').classList.remove('active');
+  document.getElementById('join-screen').classList.add('active');
+  subscribeStudents();
+};
+
+// ---- QR ----
+function generateQR(url) {
+  if (qrGenerated) return;
+  const el = document.getElementById('qrcode');
+  el.innerHTML = '';
+  new QRCode(el, { text: url, width: 400, height: 400 });
+  document.getElementById('qr-url-text').textContent = url;
+  qrGenerated = true;
+}
+
+window.toggleQR = () => document.getElementById('qr-overlay').classList.toggle('active');
+</script>
+</body>
+</html>
