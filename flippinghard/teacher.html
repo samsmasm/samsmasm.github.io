@@ -187,9 +187,13 @@
     #reveal-screen.active { display: flex; }
     .reveal-title { font-size: 1.6rem; font-weight: 900; flex-shrink: 0; }
     .reveal-grid {
-      display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+      display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr auto;
       gap: 14px; flex: 1; min-height: 0;
     }
+    .lorenz-row { grid-column: 1 / -1; flex-direction: row !important; align-items: center; gap: 28px; }
+    .gini-number { font-size: 3.5rem; font-weight: 900; color: var(--yellow); line-height: 1; margin: 6px 0 4px; }
+    .gini-scale { font-size: 0.75rem; color: var(--muted); }
+    .gini-context { font-size: 0.85rem; color: var(--text); margin-top: 10px; line-height: 1.6; }
     .reveal-quadrant {
       background: var(--card); border-radius: 14px; border: 1px solid var(--border);
       padding: 14px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
@@ -361,6 +365,19 @@
     <div class="reveal-quadrant">
       <div class="quadrant-title">Final Rankings</div>
       <div id="final-rankings"></div>
+    </div>
+    <!-- FULL WIDTH: Lorenz curve + Gini -->
+    <div class="reveal-quadrant lorenz-row">
+      <div style="flex-shrink:0;">
+        <div class="quadrant-title">Lorenz Curve</div>
+        <svg id="lorenz-svg" viewBox="0 0 320 210" width="320" height="210"></svg>
+      </div>
+      <div style="flex:1;">
+        <div class="quadrant-title">Gini Coefficient</div>
+        <div class="gini-number" id="gini-value">—</div>
+        <div class="gini-scale">0 = perfect equality &nbsp;·&nbsp; 1 = maximum inequality</div>
+        <div class="gini-context" id="gini-context"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -780,6 +797,7 @@ window.triggerReveal1 = async () => {
 window.triggerReveal2 = async () => {
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('reveal-screen').classList.add('active');
+  await update(ref(db, `flippinghard/${session}/config`), { status: 'reveal_class' });
   await renderClassResults();
 };
 
@@ -789,6 +807,52 @@ window.backToLeaderboard = () => {
 };
 
 const CLASS_COLORS = { 1: '#ef4444', 2: '#f97316', 3: '#fbbf24', 4: '#22c55e' };
+
+function buildLorenz(balances) {
+  const sorted = [...balances].filter(b => typeof b === 'number' && b >= 0).sort((a, b) => a - b);
+  const n = sorted.length;
+  const total = sorted.reduce((s, b) => s + b, 0);
+  if (n === 0) return { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], gini: 0 };
+  const points = [{ x: 0, y: 0 }];
+  let cum = 0;
+  sorted.forEach((b, i) => { cum += b; points.push({ x: (i + 1) / n, y: total > 0 ? cum / total : 0 }); });
+  let area = 0;
+  for (let i = 1; i < points.length; i++)
+    area += (points[i].x - points[i-1].x) * (points[i-1].y + points[i].y) / 2;
+  return { points, gini: total > 0 ? Math.round((1 - 2 * area) * 100) / 100 : 0 };
+}
+
+function renderLorenzSvg(svgEl, points) {
+  const PL = 44, PT = 10, W = 256, H = 170;
+  const px = x => (PL + x * W).toFixed(1);
+  const py = y => (PT + (1 - y) * H).toFixed(1);
+  const curvePts = points.map(p => `${px(p.x)},${py(p.y)}`).join(' ');
+  const shadePts = points.map(p => `${px(p.x)},${py(p.y)}`).join(' ');
+  svgEl.innerHTML = `
+    <line x1="${px(0)}" y1="${py(0.5)}" x2="${px(1)}" y2="${py(0.5)}" stroke="#334155" stroke-width="0.5"/>
+    <line x1="${px(0.5)}" y1="${py(0)}" x2="${px(0.5)}" y2="${py(1)}" stroke="#334155" stroke-width="0.5"/>
+    <line x1="${px(0)}" y1="${py(1)}" x2="${px(0)}" y2="${py(0)}" stroke="#475569" stroke-width="1.5"/>
+    <line x1="${px(0)}" y1="${py(0)}" x2="${px(1)}" y2="${py(0)}" stroke="#475569" stroke-width="1.5"/>
+    <text x="${px(0.5)}" y="${(PT + H + 18).toFixed(0)}" text-anchor="middle" font-size="9" fill="#64748b">Cumulative population →</text>
+    <text x="10" y="${py(0.5)}" text-anchor="middle" font-size="9" fill="#64748b" transform="rotate(-90 10 ${py(0.5)})">Cumulative wealth →</text>
+    <text x="${px(0)}" y="${(PT + H + 12).toFixed(0)}" text-anchor="middle" font-size="8" fill="#64748b">0%</text>
+    <text x="${px(1)}" y="${(PT + H + 12).toFixed(0)}" text-anchor="middle" font-size="8" fill="#64748b">100%</text>
+    <text x="${(PL - 4).toFixed(0)}" y="${py(1)}" text-anchor="end" font-size="8" fill="#64748b">100%</text>
+    <text x="${(PL - 4).toFixed(0)}" y="${py(0)}" text-anchor="end" font-size="8" fill="#64748b">0%</text>
+    <line x1="${px(0)}" y1="${py(0)}" x2="${px(1)}" y2="${py(1)}" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <polygon points="${shadePts}" fill="rgba(251,191,36,0.15)"/>
+    <polyline points="${curvePts}" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linejoin="round"/>
+    ${points.slice(1).map(p => `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="2.5" fill="#fbbf24" opacity="0.7"/>`).join('')}
+  `;
+}
+
+function giniContext(g) {
+  if (g < 0.25) return 'Very equal — similar to Nordic countries (typically ~0.25 in the real world).';
+  if (g < 0.35) return 'Moderately equal — similar to most of Western Europe (~0.30).';
+  if (g < 0.45) return 'Moderate inequality — similar to the United States or China (~0.40).';
+  if (g < 0.55) return 'High inequality — similar to parts of Latin America (~0.50).';
+  return 'Extreme inequality — among the highest levels recorded in the world (>0.55).';
+}
 
 function calcStudentStats(s, flips) {
   let correctFlips = 0, totalRealBets = 0, bettingNet = 0, roundsSkipped = 0;
@@ -910,6 +974,12 @@ async function renderClassResults() {
     `;
     rankingsEl.appendChild(row);
   });
+
+  // LORENZ CURVE + GINI
+  const { points, gini } = buildLorenz(students.map(s => s.balance));
+  renderLorenzSvg(document.getElementById('lorenz-svg'), points);
+  document.getElementById('gini-value').textContent = gini.toFixed(2);
+  document.getElementById('gini-context').textContent = giniContext(gini);
 }
 
 // ---- RESET ----

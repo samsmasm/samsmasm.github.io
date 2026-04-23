@@ -164,6 +164,14 @@
 
     .error { color: var(--red); font-size: 0.9rem; font-weight: 600; }
     .round-info { font-size: 0.85rem; color: var(--muted); }
+    .cr-rank-row { display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .cr-rank-num { font-size:0.8rem; font-weight:700; color:var(--muted); width:20px; flex-shrink:0; }
+    .cr-rank-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .cr-rank-name { flex:1; font-size:0.9rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cr-rank-bal { font-size:0.9rem; font-weight:900; flex-shrink:0; }
+    .cr-rank-row.is-me { background:rgba(251,191,36,0.1); border-radius:6px; }
+    .cr-personal-class { font-size:1.1rem; font-weight:900; margin-bottom:4px; }
+    .cr-personal-detail { font-size:0.82rem; color:var(--muted); line-height:1.6; }
 
     /* Session entry */
     #screen-session .logo { font-size: 2.5rem; margin-bottom: 8px; }
@@ -273,6 +281,28 @@
   <div class="reveal-box">
     <div class="class-label" id="reveal-class-label"></div>
     <div class="class-detail" id="reveal-class-detail"></div>
+  </div>
+</div>
+
+<!-- CLASS REVEAL - full results on phone -->
+<div id="screen-class-reveal" class="screen">
+  <div class="logo" style="font-size:1.4rem;">Flipping<span>Hard</span>Work</div>
+  <div class="card" id="cr-personal-card"></div>
+  <div class="card">
+    <h2 style="font-size:1.1rem; margin-bottom:10px;">Wealth Inequality</h2>
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+      <div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-bottom:2px;">Gini Coefficient</div>
+        <div style="font-size:2.2rem; font-weight:900; color:var(--yellow); line-height:1;" id="cr-gini">—</div>
+        <div style="font-size:0.7rem; color:var(--muted); margin-top:2px;">0=equal · 1=unequal</div>
+      </div>
+      <div style="font-size:0.78rem; color:var(--muted); flex:1; line-height:1.5;" id="cr-gini-context"></div>
+    </div>
+    <svg id="cr-lorenz-svg" viewBox="0 0 300 200" style="width:100%; max-height:180px; display:block;"></svg>
+  </div>
+  <div class="card" style="padding:14px 16px;">
+    <h3 style="font-size:0.9rem; margin-bottom:10px;">Final Rankings</h3>
+    <div id="cr-rankings"></div>
   </div>
 </div>
 
@@ -411,6 +441,8 @@ function subscribeToGame() {
       handleFlipping(cfg);
     } else if (cfg.status === 'reveal_individual') {
       showIndividualReveal();
+    } else if (cfg.status === 'reveal_class') {
+      showClassReveal();
     } else if (cfg.status === 'ended') {
       refreshStudentData().then(() => showScreen('gameover-wait'));
     }
@@ -595,6 +627,116 @@ async function showIndividualReveal() {
 }
 
 // ---- BETTING ACTIONS ----
+// ---- CLASS REVEAL ----
+function buildLorenz(balances) {
+  const sorted = [...balances].filter(b => typeof b === 'number' && b >= 0).sort((a, b) => a - b);
+  const n = sorted.length;
+  const total = sorted.reduce((s, b) => s + b, 0);
+  if (n === 0) return { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], gini: 0 };
+  const points = [{ x: 0, y: 0 }];
+  let cum = 0;
+  sorted.forEach((b, i) => { cum += b; points.push({ x: (i + 1) / n, y: total > 0 ? cum / total : 0 }); });
+  let area = 0;
+  for (let i = 1; i < points.length; i++)
+    area += (points[i].x - points[i-1].x) * (points[i-1].y + points[i].y) / 2;
+  return { points, gini: total > 0 ? Math.round((1 - 2 * area) * 100) / 100 : 0 };
+}
+
+function renderLorenzSvg(svgEl, points) {
+  const PL = 38, PT = 8, W = 252, H = 160;
+  const px = x => (PL + x * W).toFixed(1);
+  const py = y => (PT + (1 - y) * H).toFixed(1);
+  const pts = points.map(p => `${px(p.x)},${py(p.y)}`).join(' ');
+  svgEl.innerHTML = `
+    <line x1="${px(0)}" y1="${py(0.5)}" x2="${px(1)}" y2="${py(0.5)}" stroke="#e2e8f0" stroke-width="0.4" opacity="0.3"/>
+    <line x1="${px(0.5)}" y1="${py(0)}" x2="${px(0.5)}" y2="${py(1)}" stroke="#e2e8f0" stroke-width="0.4" opacity="0.3"/>
+    <line x1="${px(0)}" y1="${py(1)}" x2="${px(0)}" y2="${py(0)}" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="${px(0)}" y1="${py(0)}" x2="${px(1)}" y2="${py(0)}" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="${px(0.5)}" y="${(PT+H+14).toFixed(0)}" text-anchor="middle" font-size="9" fill="#94a3b8">Cumulative population →</text>
+    <text x="${px(0)}" y="${(PT+H+10).toFixed(0)}" text-anchor="middle" font-size="8" fill="#94a3b8">0%</text>
+    <text x="${px(1)}" y="${(PT+H+10).toFixed(0)}" text-anchor="middle" font-size="8" fill="#94a3b8">100%</text>
+    <text x="${(PL-3).toFixed(0)}" y="${py(1)}" text-anchor="end" font-size="8" fill="#94a3b8">100%</text>
+    <line x1="${px(0)}" y1="${py(0)}" x2="${px(1)}" y2="${py(1)}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <polygon points="${pts}" fill="rgba(251,191,36,0.15)"/>
+    <polyline points="${pts}" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linejoin="round"/>
+    ${points.slice(1).map(p => `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="2" fill="#fbbf24" opacity="0.7"/>`).join('')}
+  `;
+}
+
+function giniContext(g) {
+  if (g < 0.25) return 'Very equal — similar to Nordic countries (~0.25).';
+  if (g < 0.35) return 'Moderately equal — similar to Western Europe (~0.30).';
+  if (g < 0.45) return 'Moderate inequality — similar to the US or China (~0.40).';
+  if (g < 0.55) return 'High inequality — similar to parts of Latin America (~0.50).';
+  return 'Extreme inequality — among the highest in the world (>0.55).';
+}
+
+const CLASS_COLORS = { 1: '#ef4444', 2: '#f97316', 3: '#fbbf24', 4: '#22c55e' };
+
+async function showClassReveal() {
+  await refreshStudentData();
+  const allSnap = await get(ref(db, `flippinghard/${session}/students`));
+  const flipsSnap = await get(ref(db, `flippinghard/${session}/flips`));
+  const allStudents = allSnap.val() ? Object.values(allSnap.val()) : [];
+  const flips = flipsSnap.val() || {};
+
+  // Personal card
+  const level = LEVELS[studentData.level];
+  const color = CLASS_COLORS[studentData.level] || '#94a3b8';
+  let correctFlips = 0, totalRealBets = 0, bettingNet = 0;
+  Object.entries(studentData.bets || {}).forEach(([rk, bet]) => {
+    if (!bet.defaulted && bet.amount > 0) {
+      totalRealBets++;
+      const won = bet.choice === flips[rk];
+      if (won) correctFlips++;
+      bettingNet += won ? bet.amount : -bet.amount;
+    }
+  });
+  const incomeTotal = Math.max(0, studentData.balance - (level?.start || 0) - bettingNet);
+  const betSign = bettingNet >= 0 ? `+$${bettingNet}` : `-$${Math.abs(bettingNet)}`;
+
+  const personalCard = document.getElementById('cr-personal-card');
+  personalCard.innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+      <div style="flex:1;">
+        <div style="font-size:0.75rem; color:var(--muted); margin-bottom:2px;">Your final balance</div>
+        <div style="font-size:2.2rem; font-weight:900; line-height:1;">$${studentData.balance}</div>
+      </div>
+      <div style="background:${color}; color:#0f172a; padding:8px 14px; border-radius:10px; font-weight:900; font-size:0.9rem;">${level?.label || '—'}</div>
+    </div>
+    <div class="cr-personal-detail">
+      Starting wealth: $${level?.start} &nbsp;·&nbsp; Income/round: $${level?.income} &nbsp;·&nbsp; Market info: ${level?.info ? 'Yes' : 'No'}<br>
+      Flips correct: ${correctFlips}/${totalRealBets} &nbsp;·&nbsp; Income received: $${incomeTotal} &nbsp;·&nbsp; Betting net: ${betSign}
+    </div>
+  `;
+
+  // Lorenz + Gini
+  const { points, gini } = buildLorenz(allStudents.map(s => s.balance));
+  document.getElementById('cr-gini').textContent = gini.toFixed(2);
+  document.getElementById('cr-gini-context').textContent = giniContext(gini);
+  renderLorenzSvg(document.getElementById('cr-lorenz-svg'), points);
+
+  // Rankings
+  const sorted = [...allStudents].sort((a, b) => b.balance - a.balance);
+  const rankingsEl = document.getElementById('cr-rankings');
+  rankingsEl.innerHTML = '';
+  sorted.forEach((s, i) => {
+    const c = CLASS_COLORS[s.level] || '#94a3b8';
+    const isMe = s.name.toLowerCase() === studentData.name.toLowerCase();
+    const row = document.createElement('div');
+    row.className = 'cr-rank-row' + (isMe ? ' is-me' : '');
+    row.innerHTML = `
+      <span class="cr-rank-num">${i + 1}</span>
+      <span class="cr-rank-dot" style="background:${c}"></span>
+      <span class="cr-rank-name">${s.name}${isMe ? ' ← you' : ''}</span>
+      <span class="cr-rank-bal" style="color:${c}">$${s.balance}</span>
+    `;
+    rankingsEl.appendChild(row);
+  });
+
+  showScreen('class-reveal');
+}
+
 window.selectChoice = (side) => {
   chosenSide = side;
   document.getElementById('btn-heads').className = 'choice-btn' + (side === 'heads' ? ' selected-heads' : '');
