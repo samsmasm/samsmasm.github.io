@@ -17,6 +17,8 @@ Work through these starters in a document or on paper. A sentence or two each is
 - What is still uncertain or up in the air is...
 - At this stage, my hunch is that the company should...
 
+Or try a five-minute unprompted free write. Set a timer. Do not stop writing. Do not judge, edit, or cross anything out. If you have no idea where to start, try this opening: *"The answer is... because... actually the answer might be... because..."* Keep going until the timer runs out.
+
 ## Get into the detail
 
 Once you have sketched your thinking, go deeper on two things.

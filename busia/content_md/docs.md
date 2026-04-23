@@ -87,6 +87,20 @@ A source from a different country or market, to test whether your research quest
 **Target 8: Other documents that do not fit the above**
 Government regulations, NGO reports, academic studies, court documents, staff review platforms, or interview/podcast transcripts. Anything that gives your IA an angle others will not have.
 
+## Locking in your final five
+
+Once you have a provisional list, do two checks before you commit.
+
+**Check 1: Balance.** Look at your five documents together. Do they give balance across these three dimensions?
+
+- The **types of information** they provide (financial data, stakeholder views, market data, company narrative...)
+- The **sources** they come from (not all from the company's own PR)
+- The **perspectives** they offer (do some support, some challenge, some complicate your argument?)
+
+Five documents that all make the same point are no stronger than one. The examiner is looking for breadth and range.
+
+**Check 2: The highlight test.** For each document, open it and highlight every part you will actually quote or reference in your IA. Then copy those highlights into the relevant section of your IA plan. Ask yourself: have I only highlighted five or eight sentences from this document? If so, it is not a real supporting document - it is a crutch. A genuine supporting document underpins a significant part of your analysis. Based on this exercise, which five documents are truly essential to your argument?
+
 > **The documents are your evidence, not your IA.** They go in the appendix. Your job in the commentary is to use them - reference specific data, quote key statements, and build analysis from what they show.
 
 Next: [Sketching Ideas](../sketching/)
