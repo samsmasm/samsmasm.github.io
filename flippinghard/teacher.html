@@ -221,10 +221,17 @@
       display: flex; align-items: center; gap: 10px;
       padding: 7px 10px; border-radius: 8px; background: rgba(255,255,255,0.03);
     }
-    .rank-num { font-weight: 700; color: var(--muted); width: 22px; font-size: 0.85rem; flex-shrink: 0; }
-    .rank-name { flex: 1; font-weight: 700; font-size: 0.9rem; }
-    .rank-bal { font-weight: 900; font-size: 0.95rem; flex-shrink: 0; }
-    .rank-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .rank-row { align-items: flex-start; }
+    .rank-num { font-weight: 700; color: var(--muted); width: 22px; font-size: 0.85rem; flex-shrink: 0; padding-top: 2px; }
+    .rank-name-wrap { flex: 1; min-width: 0; }
+    .rank-name { font-weight: 700; font-size: 0.9rem; }
+    .rank-stats { font-size: 0.7rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rank-bal { font-weight: 900; font-size: 0.95rem; flex-shrink: 0; padding-top: 2px; }
+    .rank-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .wealth-banner {
+      background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3);
+      border-radius: 8px; padding: 8px 12px; font-size: 0.82rem; text-align: center; flex-shrink: 0;
+    }
 
     /* FLIP ANIMATION OVERLAY */
     #flip-overlay {
@@ -333,7 +340,7 @@
     <div class="reveal-quadrant">
       <div class="quadrant-title">Average Balance by Class</div>
       <table class="avg-table">
-        <thead><tr><th>Class</th><th>Avg Balance</th><th>Students</th></tr></thead>
+        <thead><tr><th>Class</th><th>Avg Balance</th><th>Students</th><th>Flip Accuracy</th></tr></thead>
         <tbody id="avg-table-body"></tbody>
       </table>
     </div>
@@ -770,10 +777,10 @@ window.triggerReveal1 = async () => {
   document.getElementById('btn-reveal2').style.display = 'block';
 };
 
-window.triggerReveal2 = () => {
+window.triggerReveal2 = async () => {
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('reveal-screen').classList.add('active');
-  renderClassResults();
+  await renderClassResults();
 };
 
 window.backToLeaderboard = () => {
@@ -783,21 +790,47 @@ window.backToLeaderboard = () => {
 
 const CLASS_COLORS = { 1: '#ef4444', 2: '#f97316', 3: '#fbbf24', 4: '#22c55e' };
 
-function renderClassResults() {
-  const students = Object.values(studentsData);
+function calcStudentStats(s, flips) {
+  let correctFlips = 0, totalRealBets = 0, bettingNet = 0, roundsSkipped = 0;
+  const bets = s.bets || {};
+  Object.entries(bets).forEach(([roundKey, bet]) => {
+    const flipResult = flips[roundKey];
+    if (!flipResult) return;
+    if (bet.defaulted || bet.amount === 0) {
+      roundsSkipped++;
+    } else {
+      totalRealBets++;
+      const won = bet.choice === flipResult;
+      if (won) correctFlips++;
+      bettingNet += won ? bet.amount : -bet.amount;
+    }
+  });
+  const incomeTotal = Math.max(0, s.balance - (LEVELS[s.level]?.start || 0) - bettingNet);
+  return { correctFlips, totalRealBets, bettingNet, incomeTotal, roundsSkipped };
+}
 
-  // TOP LEFT: Average balance by class
+async function renderClassResults() {
+  const students = Object.values(studentsData);
+  const flipsSnap = await get(ref(db, `flippinghard/${session}/flips`));
+  const flips = flipsSnap.val() || {};
+
+  // TOP LEFT: Average balance + flip accuracy by class
   const avgTbody = document.getElementById('avg-table-body');
   avgTbody.innerHTML = '';
   [4, 3, 2, 1].forEach(lvl => {
     const group = students.filter(s => s.level === lvl);
     if (group.length === 0) return;
     const avg = Math.round(group.reduce((sum, s) => sum + s.balance, 0) / group.length);
+    const accuracyGroups = group.map(s => calcStudentStats(s, flips)).filter(st => st.totalRealBets > 0);
+    const avgAccuracy = accuracyGroups.length > 0
+      ? Math.round(accuracyGroups.reduce((sum, st) => sum + (st.correctFlips / st.totalRealBets) * 100, 0) / accuracyGroups.length)
+      : null;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><span style="font-weight:900; color:${CLASS_COLORS[lvl]}">${LEVELS[lvl].label}</span></td>
       <td class="avg-bal" style="color:${CLASS_COLORS[lvl]}">$${avg}</td>
       <td style="color:var(--muted)">${group.length}</td>
+      <td style="color:var(--muted)">${avgAccuracy !== null ? avgAccuracy + '%' : '—'}</td>
     `;
     avgTbody.appendChild(tr);
   });
@@ -812,7 +845,7 @@ function renderClassResults() {
       <td><span style="font-weight:900; color:${CLASS_COLORS[lvl]}">${l.label}</span></td>
       <td>$${l.start}</td>
       <td>$${l.income}</td>
-      <td class="${l.info ? 'info-yes' : 'info-no'}" style="${l.info ? 'color:'+CLASS_COLORS[lvl] : ''}">${l.info ? 'Yes' : 'No'}</td>
+      <td class="${l.info ? 'info-yes' : 'info-no'}" style="${l.info ? 'color:' + CLASS_COLORS[lvl] : ''}">${l.info ? 'Yes' : 'No'}</td>
     `;
     brkTbody.appendChild(tr);
   });
@@ -846,18 +879,33 @@ function renderClassResults() {
     classColumns.appendChild(col);
   });
 
-  // BOTTOM RIGHT: All students ranked by final balance
+  // BOTTOM RIGHT: Wealth concentration banner + ranked list with stats
   const rankingsEl = document.getElementById('final-rankings');
   rankingsEl.innerHTML = '';
   const sorted = [...students].sort((a, b) => b.balance - a.balance);
+  const totalWealth = sorted.reduce((sum, s) => sum + s.balance, 0);
+  const topN = Math.max(1, Math.ceil(sorted.length * 0.25));
+  const topWealth = sorted.slice(0, topN).reduce((sum, s) => sum + s.balance, 0);
+  const topPct = totalWealth > 0 ? Math.round((topWealth / totalWealth) * 100) : 0;
+
+  const banner = document.createElement('div');
+  banner.className = 'wealth-banner';
+  banner.innerHTML = `The top 25% of students hold <strong style="color:var(--yellow)">${topPct}%</strong> of all wealth`;
+  rankingsEl.appendChild(banner);
+
   sorted.forEach((s, i) => {
     const color = CLASS_COLORS[s.level] || '#94a3b8';
+    const st = calcStudentStats(s, flips);
+    const betSign = st.bettingNet >= 0 ? `+$${st.bettingNet}` : `-$${Math.abs(st.bettingNet)}`;
     const row = document.createElement('div');
     row.className = 'rank-row';
     row.innerHTML = `
       <span class="rank-num">${i + 1}</span>
       <span class="rank-dot" style="background:${color}"></span>
-      <span class="rank-name">${s.name}</span>
+      <div class="rank-name-wrap">
+        <div class="rank-name">${s.name}</div>
+        <div class="rank-stats">✓ ${st.correctFlips}/${st.totalRealBets} flips · income $${st.incomeTotal} · bets ${betSign} · skipped ${st.roundsSkipped}</div>
+      </div>
       <span class="rank-bal" style="color:${color}">$${s.balance}</span>
     `;
     rankingsEl.appendChild(row);
