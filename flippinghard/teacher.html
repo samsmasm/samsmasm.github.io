@@ -197,6 +197,20 @@
     .level-table td { padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .info-yes { color: var(--green); font-weight: 700; }
     .info-no { color: var(--muted); }
+
+    /* FLIP ANIMATION OVERLAY */
+    #flip-overlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: var(--bg); display:none;
+      flex-direction:column; align-items:center; justify-content:center;
+      z-index: 450;
+    }
+    #flip-overlay.active { display: flex; }
+    #teacher-coin { font-size: 14rem; line-height: 1; }
+    #teacher-flip-result {
+      font-size: 4rem; font-weight: 900; margin-top: 24px;
+      min-height: 5rem; opacity: 0; transition: opacity 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -315,6 +329,12 @@
   <div id="qrcode"></div>
   <p style="color:#94a3b8; margin-top:16px; font-size:1rem;" id="qr-url-text"></p>
   <p style="color:#64748b; margin-top:8px; font-size:0.85rem;">Tap anywhere to close</p>
+</div>
+
+<!-- FLIP ANIMATION OVERLAY -->
+<div id="flip-overlay">
+  <div id="teacher-coin">🪙</div>
+  <div id="teacher-flip-result"></div>
 </div>
 
 <!-- RESET MODAL -->
@@ -619,44 +639,71 @@ function renderLeaderboard() {
 
 // ---- FLIP ----
 window.doFlip = async () => {
-  const flipBtn = document.getElementById('btn-flip');
-  flipBtn.disabled = true;
+  document.getElementById('btn-flip').disabled = true;
 
-  // Default bets for students who haven't bet yet
-  const updates = {};
-  const students = Object.entries(studentsData);
-  students.forEach(([id, s]) => {
+  // Get result and default any missing bets first
+  const flipSnap = await get(ref(db, `flippinghard/${session}/flips/round_${currentRound}`));
+  const result = flipSnap.val();
+
+  const defaultUpdates = {};
+  Object.entries(studentsData).forEach(([id, s]) => {
     if (!s.bets || !s.bets[`round_${currentRound}`]) {
-      updates[`flippinghard/${session}/students/${id}/bets/round_${currentRound}`] = {
+      defaultUpdates[`flippinghard/${session}/students/${id}/bets/round_${currentRound}`] = {
         amount: 0, choice: 'heads', defaulted: true
       };
     }
   });
+  if (Object.keys(defaultUpdates).length > 0) await update(ref(db), defaultUpdates);
 
-  if (Object.keys(updates).length > 0) await update(ref(db), updates);
+  // Start teacher animation and trigger student animations at the same moment
+  showTeacherFlipAnimation(result);
+  await update(ref(db, `flippinghard/${session}/config`), { status: 'flipping' });
 
-  // Get flip result
-  const flipSnap = await get(ref(db, `flippinghard/${session}/flips/round_${currentRound}`));
-  const result = flipSnap.val();
-
-  // Resolve balances
-  const balUpdates = {};
+  // Resolve balances in background while animation plays
   const freshSnap = await get(ref(db, `flippinghard/${session}/students`));
+  const balUpdates = {};
   freshSnap.forEach(child => {
     const s = child.val();
     const bet = s.bets && s.bets[`round_${currentRound}`];
     if (!bet) return;
-
     const amount = bet.amount || 0;
     const choice = bet.choice || 'heads';
-    const won = choice === result;
-    const newBal = won ? s.balance + amount : Math.max(0, s.balance - amount);
-    balUpdates[`flippinghard/${session}/students/${child.key}/balance`] = newBal;
+    balUpdates[`flippinghard/${session}/students/${child.key}/balance`] = choice === result
+      ? s.balance + amount
+      : Math.max(0, s.balance - amount);
   });
-
-  balUpdates[`flippinghard/${session}/config/status`] = 'flipping';
   await update(ref(db), balUpdates);
 };
+
+function showTeacherFlipAnimation(result) {
+  const overlay = document.getElementById('flip-overlay');
+  const coinEl = document.getElementById('teacher-coin');
+  const resultEl = document.getElementById('teacher-flip-result');
+  overlay.classList.add('active');
+  resultEl.textContent = '';
+  resultEl.style.opacity = '0';
+
+  const sides = ['🪙', '🦊', '🪙', '🐻', '🪙', '🦊', '🪙', '🐻'];
+  let frame = 0, interval = 80, elapsed = 0;
+
+  const animate = () => {
+    coinEl.textContent = sides[frame % sides.length];
+    frame++;
+    elapsed += interval;
+    if (elapsed < 1200) {
+      setTimeout(animate, interval);
+    } else if (elapsed < 2500) {
+      interval = 80 + (elapsed - 1200) * 0.4;
+      setTimeout(animate, interval);
+    } else {
+      coinEl.textContent = result === 'heads' ? '🪙' : '🦊';
+      resultEl.textContent = result === 'heads' ? 'HEADS!' : 'TAILS!';
+      resultEl.style.opacity = '1';
+      setTimeout(() => overlay.classList.remove('active'), 2000);
+    }
+  };
+  animate();
+}
 
 // ---- NEXT ROUND ----
 window.nextRound = async () => {

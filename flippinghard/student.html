@@ -182,6 +182,7 @@
     <div id="session-error" class="error" style="display:none"></div>
     <button class="btn btn-primary" onclick="joinSession()">Join</button>
   </div>
+  <p style="margin-top:8px;"><a href="teacher.html" style="color:var(--muted); font-size:0.85rem;">Teacher panel →</a></p>
 </div>
 
 <!-- WAITING FOR GAME TO START -->
@@ -277,7 +278,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
@@ -315,6 +316,10 @@ function showScreen(id) {
   document.getElementById('screen-' + id).classList.add('active');
 }
 
+function sanitizeName(name) {
+  return name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 40) || 'student';
+}
+
 // ---- SESSION JOIN ----
 window.joinSession = async () => {
   const sessRaw = document.getElementById('inp-session').value.trim().toLowerCase();
@@ -324,7 +329,6 @@ window.joinSession = async () => {
 
   if (!sessRaw || !nameRaw) { errEl.textContent = 'Enter both session name and your name.'; errEl.style.display='block'; return; }
 
-  // Check session exists
   const configSnap = await get(ref(db, `flippinghard/${sessRaw}/config`));
   if (!configSnap.exists()) {
     errEl.textContent = "Session not found. Check the name and try again.";
@@ -336,59 +340,45 @@ window.joinSession = async () => {
   session = sessRaw;
   totalRounds = config.rounds;
 
-  // Check for existing student with same name (case-insensitive)
-  const studentsSnap = await get(ref(db, `flippinghard/${session}/students`));
-  let existingId = null;
-  if (studentsSnap.exists()) {
-    studentsSnap.forEach(child => {
-      if (child.val().name.toLowerCase() === nameRaw.toLowerCase()) {
-        existingId = child.key;
-      }
-    });
-  }
+  // Use sanitized name as key — prevents duplicates atomically
+  studentId = sanitizeName(nameRaw);
+  const existingSnap = await get(ref(db, `flippinghard/${session}/students/${studentId}`));
 
-  if (existingId) {
-    studentId = existingId;
-    studentData = studentsSnap.val()[existingId];
-  } else {
-    // New student - check name uniqueness
-    if (studentsSnap.exists()) {
-      let taken = false;
-      studentsSnap.forEach(child => {
-        if (child.val().name.toLowerCase() === nameRaw.toLowerCase()) taken = true;
-      });
-      if (taken) { errEl.textContent = 'That name is already taken in this session.'; errEl.style.display='block'; return; }
+  if (existingSnap.exists()) {
+    const existing = existingSnap.val();
+    // Name collision between two different students who sanitize to the same key
+    if (existing.name.toLowerCase() !== nameRaw.toLowerCase()) {
+      errEl.textContent = 'That name is too similar to an existing student. Try a different name.';
+      errEl.style.display = 'block';
+      return;
     }
-
-    // Assign level using transaction on joinCount
-    const joinRef = ref(db, `flippinghard/${session}/joinCount`);
-    let assignedLevel = 1;
-    await runTransaction(joinRef, (current) => {
-      const count = (current || 0);
-      assignedLevel = (count % 4) + 1;
-      return count + 1;
-    });
-
-    const level = LEVELS[assignedLevel];
-    const newStudent = {
-      name: nameRaw,
-      level: assignedLevel,
-      balance: level.start,
-      joinedRound: config.currentRound || 0,
-    };
-
-    const newRef = ref(db, `flippinghard/${session}/students/${Date.now()}_${Math.random().toString(36).slice(2,7)}`);
-    studentId = newRef.key;
-    await set(newRef, newStudent);
+    // Reconnect
+    studentData = existing;
+  } else {
+    // New student — write immediately (name-as-key makes this idempotent)
+    const newStudent = { name: nameRaw, balance: 0, level: null, joinedRound: config.currentRound || 0 };
+    await set(ref(db, `flippinghard/${session}/students/${studentId}`), newStudent);
     studentData = newStudent;
 
-    // If joining mid-game (active), apply income for current round
-    if (config.status === 'active' && config.currentRound > 0) {
-      const income = level.income;
-      await update(ref(db, `flippinghard/${session}/students/${studentId}`), {
-        balance: level.start + income
-      });
-      studentData.balance = level.start + income;
+    // Mid-game join: assign a random level + income for the current round
+    if (config.status === 'active') {
+      const assignedLevel = Math.floor(Math.random() * 4) + 1;
+      const lvlData = LEVELS[assignedLevel];
+      const flipsSnap = await get(ref(db, `flippinghard/${session}/flips`));
+      const flips = flipsSnap.val();
+      const midUpdates = {};
+      midUpdates[`flippinghard/${session}/students/${studentId}/level`] = assignedLevel;
+      midUpdates[`flippinghard/${session}/students/${studentId}/balance`] = lvlData.start + lvlData.income;
+      if (lvlData.info) {
+        for (let r = config.currentRound; r <= config.rounds; r++) {
+          const actual = flips[`round_${r}`];
+          const hint = Math.random() < 0.75 ? actual : (actual === 'heads' ? 'tails' : 'heads');
+          midUpdates[`flippinghard/${session}/hints/${studentId}/round_${r}`] = hint;
+        }
+      }
+      await update(ref(db), midUpdates);
+      studentData.level = assignedLevel;
+      studentData.balance = lvlData.start + lvlData.income;
     }
   }
 
