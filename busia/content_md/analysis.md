@@ -43,6 +43,8 @@ This is the most important distinction in the whole IA. Description tells the re
 
 Notice what the analysis version does: it names the evidence and its source, draws a conclusion from the data, and connects that conclusion directly to the RQ. Every paragraph in your analysis section should do all three.
 
+You do not need to define or describe a tool before using it. The examiner knows what a SWOT analysis is. Name the tool, apply it to your specific company and data, and draw your conclusion. Explaining what Porter's Five Forces is wastes words and reads as description, not analysis.
+
 ## Keeping the key concept visible
 
 Criterion A rewards sustained integration of your key concept throughout the analysis - not just a mention in the introduction and conclusion. One practical way to do this is to **bold the key concept word** wherever it appears in your analysis. If you look at your draft and the word barely shows up, that is a signal to revise.

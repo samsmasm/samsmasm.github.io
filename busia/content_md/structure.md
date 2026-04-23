@@ -50,7 +50,7 @@ These do not count: the research question itself, headings, references and bibli
 
 ## Choosing your tools
 
-The IB gives you a wide toolkit. The standard recommendation is **three to five tools, theories, or techniques**. More than five almost always leads to superficial coverage that hurts Criterion C more than it helps. The most important decision here is depth vs. breadth: two or three tools applied properly and deeply are much stronger than five tools summarised superficially.
+The IB allows up to five tools, theories, or techniques, but in practice **aim for two to three**. More than three almost always means not enough depth to score well on Criterion C. Three done superficially is worse than two done properly. Depth vs. breadth is the most important decision here.
 
 **Strong choices:**
 
@@ -73,6 +73,10 @@ The IB gives you a wide toolkit. The standard recommendation is **three to five 
 
 SWOT and STEEPLE are not banned. But if they are your primary analytical framework, they invite description rather than analysis. Use them as background context if needed, but build your analytical core around a tool that forces you to take a position.
 
-A note on the BCG Matrix and similar tools: you do not need to apply the full four-quadrant framework. A "partial application" is fine - focus only on the segment of the matrix relevant to the specific product or market in your RQ. Similarly, financial ratios (profitability, liquidity) are essential if your RQ touches on financial performance or market share: they provide the quantitative backbone that examiners expect to see.
+You do not need to apply the full framework of any tool. A partial application is fine - focus only on the dimensions relevant to your RQ. When you do this, name which parts you are using explicitly. For example: "The environmental and technological dimensions of a STEEPLE analysis are most relevant to this question." That signals deliberate selection, not incomplete work.
+
+HL students: using at least one HL tool is not required, but it tends to make an IA stand out. If your RQ has a financial dimension, investment appraisal (NPV, payback period) or profitability ratios are natural choices.
+
+Financial ratios (profitability, liquidity) are essential if your RQ touches on financial performance or market share: they provide the quantitative backbone that examiners expect to see.
 
 > **Go deep, not wide.** The examiner is more impressed by a thorough application of one tool - where you are clearly thinking, not just filling boxes - than by a shallow run through five frameworks.
