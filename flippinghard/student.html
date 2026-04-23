@@ -322,17 +322,24 @@ function sanitizeName(name) {
 
 // ---- SESSION JOIN ----
 window.joinSession = async () => {
+  const joinBtn = document.querySelector('#screen-session .btn-primary');
+  if (joinBtn.disabled) return;
+  joinBtn.disabled = true;
+
   const sessRaw = document.getElementById('inp-session').value.trim().toLowerCase();
   const nameRaw = document.getElementById('inp-name').value.trim();
   const errEl = document.getElementById('session-error');
   errEl.style.display = 'none';
 
-  if (!sessRaw || !nameRaw) { errEl.textContent = 'Enter both session name and your name.'; errEl.style.display='block'; return; }
+  const reEnable = () => { joinBtn.disabled = false; };
+
+  if (!sessRaw || !nameRaw) { errEl.textContent = 'Enter both session name and your name.'; errEl.style.display='block'; reEnable(); return; }
 
   const configSnap = await get(ref(db, `flippinghard/${sessRaw}/config`));
   if (!configSnap.exists()) {
     errEl.textContent = "Session not found. Check the name and try again.";
     errEl.style.display = 'block';
+    reEnable();
     return;
   }
 
@@ -350,6 +357,7 @@ window.joinSession = async () => {
     if (existing.name.toLowerCase() !== nameRaw.toLowerCase()) {
       errEl.textContent = 'That name is too similar to an existing student. Try a different name.';
       errEl.style.display = 'block';
+      reEnable();
       return;
     }
     // Reconnect
