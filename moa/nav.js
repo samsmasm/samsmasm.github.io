@@ -135,6 +135,16 @@ function initHitCounter() {
   footer.appendChild(span);
 }
 
+function initSidebarLogo() {
+  const logo = document.querySelector('.sidebar-logo');
+  if (!logo) return;
+  const base = getBase();
+  const img = document.createElement('img');
+  img.src = base + 'moa.png';
+  img.alt = 'MOA: Modern Origin Archive';
+  logo.prepend(img);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderNav();
   updateClock();
@@ -142,4 +152,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initFontCtrl();
   initHitCounter();
+  initSidebarLogo();
 });
