@@ -180,7 +180,6 @@ function renderButtons(q, qi, showAnswer) {
       <button class="answer-btn ${colorClass[opt.id]} ${extra}"
               data-opt="${opt.id}" ${submitted ? 'disabled' : ''}>
         <span class="opt-lbl">${opt.id}</span>
-        <span>${esc(opt.text)}</span>
       </button>
     `;
   }).join('');

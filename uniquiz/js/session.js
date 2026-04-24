@@ -284,10 +284,12 @@ async function calculateAndWriteScores() {
 
     let lastPoints = 0;
     if (answer === q.correctAnswer) {
-      if (session.timeLimit && session.questionStartedAt && session.timerEndsAt && answeredAt) {
-        const elapsed = answeredAt - session.questionStartedAt;
-        const limit   = session.timerEndsAt - session.questionStartedAt;
-        lastPoints = Math.round(Math.max(500, 1000 - 500 * elapsed / limit));
+      if (session.questionStartedAt && answeredAt) {
+        const elapsed = Math.max(0, answeredAt - session.questionStartedAt);
+        const window  = session.timerEndsAt
+          ? (session.timerEndsAt - session.questionStartedAt)
+          : 30000; // 30s reference when no timer set
+        lastPoints = Math.round(Math.max(500, 1000 - 500 * elapsed / window));
       } else {
         lastPoints = 1000;
       }
@@ -314,7 +316,8 @@ async function act(action) {
     await update(sessRef, {
       currentQuestionIndex: 0,
       showRankings: false,
-      ...(tl > 0 ? { questionStartedAt: now, timerEndsAt: now + tl * 1000 } : { timerEndsAt: null })
+      questionStartedAt: now,
+      timerEndsAt: tl > 0 ? now + tl * 1000 : null
     });
   } else if (action === 'show') {
     await reveal();
@@ -329,7 +332,8 @@ async function act(action) {
         currentQuestionIndex: next,
         showAnswer: false,
         showRankings: false,
-        ...(tl > 0 ? { questionStartedAt: now, timerEndsAt: now + tl * 1000 } : { timerEndsAt: null })
+        questionStartedAt: now,
+        timerEndsAt: tl > 0 ? now + tl * 1000 : null
       });
     }
   }
