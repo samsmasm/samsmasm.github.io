@@ -26,25 +26,74 @@ function setup() {
     });
   });
 
+  // ── AI prompt generator ──
+  const topicEl = document.getElementById('ai-topic');
+  const numEl   = document.getElementById('ai-num');
+  const promptEl = document.getElementById('ai-prompt');
+
+  function updatePrompt() {
+    const topic = topicEl.value.trim() || '[your topic here]';
+    const num   = parseInt(numEl.value) || 10;
+    promptEl.value = buildPrompt(topic, num);
+  }
+
+  topicEl.addEventListener('input', updatePrompt);
+  numEl.addEventListener('input', updatePrompt);
+  updatePrompt();
+
+  document.getElementById('copy-prompt-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(promptEl.value).then(() => {
+      const btn = document.getElementById('copy-prompt-btn');
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('btn-success');
+      setTimeout(() => { btn.textContent = 'Copy prompt'; btn.classList.remove('btn-success'); }, 2000);
+    });
+  });
+
+  // ── CSV file drop / browse ──
   const csvDrop  = document.getElementById('csv-drop');
   const csvInput = document.getElementById('csv-input');
 
   document.getElementById('csv-browse').addEventListener('click', () => csvInput.click());
-  csvInput.addEventListener('change', e => { if (e.target.files[0]) parseCSV(e.target.files[0]); });
+  csvInput.addEventListener('change', e => { if (e.target.files[0]) parseCSVFile(e.target.files[0]); });
 
   csvDrop.addEventListener('dragover',  e => { e.preventDefault(); csvDrop.classList.add('dragover'); });
   csvDrop.addEventListener('dragleave', () => csvDrop.classList.remove('dragover'));
   csvDrop.addEventListener('drop', e => {
     e.preventDefault();
     csvDrop.classList.remove('dragover');
-    const f = e.dataTransfer.files[0];
-    if (f) parseCSV(f);
+    if (e.dataTransfer.files[0]) parseCSVFile(e.dataTransfer.files[0]);
   });
   csvDrop.addEventListener('click', e => {
     if (e.target !== document.getElementById('csv-browse')) csvInput.click();
   });
+
+  // ── CSV paste ──
+  document.getElementById('csv-import-btn').addEventListener('click', () => {
+    const text = document.getElementById('csv-paste').value.trim();
+    if (!text) return;
+    parseCSVText(text);
+  });
 }
 
+// ── AI prompt template ──
+function buildPrompt(topic, num) {
+  return `Generate ${num} multiple-choice quiz questions about: ${topic}
+
+Return ONLY a CSV block with no other text. Use this exact header row:
+question,optionA,optionB,optionC,optionD,correctAnswer
+
+Rules:
+- correctAnswer must be exactly A, B, C, or D
+- Do not use commas inside any cell — rewrite with semicolons if needed
+- Include the header row exactly as shown above
+- No numbering, markdown formatting, or explanation — just the CSV
+
+Example row:
+What is the law of demand?,Quantity demanded rises as price falls,Quantity demanded rises as price rises,Quantity demanded falls as price rises,Demand is unaffected by price,A`;
+}
+
+// ── Manual question entry ──
 function addQuestion() {
   const text    = document.getElementById('q-text').value.trim();
   const optA    = document.getElementById('opt-a').value.trim();
@@ -74,56 +123,72 @@ function clearForm() {
   document.getElementById('correct-ans').value = '';
 }
 
-function parseCSV(file) {
+// ── CSV parsing (shared logic) ──
+function handleParsed({ data }, source) {
   const errContainer = document.getElementById('csv-errs');
   const okEl = document.getElementById('csv-ok');
   errContainer.innerHTML = '';
   okEl.classList.add('hidden');
 
+  const errors = [];
+  const parsed = [];
+
+  data.forEach((row, i) => {
+    const n       = i + 2;
+    const q       = (row.question || '').trim();
+    const a       = (row.optionA || '').trim();
+    const b       = (row.optionB || '').trim();
+    const c       = (row.optionC || '').trim();
+    const d       = (row.optionD || '').trim();
+    const correct = (row.correctAnswer || '').trim().toUpperCase();
+
+    if (!q)                    { errors.push(`Row ${n}: question is empty.`); return; }
+    if (!a||!b||!c||!d)        { errors.push(`Row ${n}: one or more options are empty.`); return; }
+    if (!['A','B','C','D'].includes(correct)) {
+      errors.push(`Row ${n}: correctAnswer "${row.correctAnswer}" must be A, B, C, or D.`); return;
+    }
+
+    parsed.push({ text: q, options: [
+      {id:'A',text:a},{id:'B',text:b},{id:'C',text:c},{id:'D',text:d}
+    ], correctAnswer: correct });
+  });
+
+  if (errors.length) {
+    errContainer.innerHTML = errors.map(e => `<div class="csv-err-item">${esc(e)}</div>`).join('');
+  }
+
+  if (parsed.length) {
+    questions.push(...parsed);
+    render();
+    okEl.textContent = `${parsed.length} question${parsed.length > 1 ? 's' : ''} imported.`;
+    okEl.classList.remove('hidden');
+    if (source === 'paste') document.getElementById('csv-paste').value = '';
+  }
+}
+
+function parseCSVFile(file) {
   window.Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete({ data }) {
-      const errors = [];
-      const parsed = [];
-
-      data.forEach((row, i) => {
-        const n = i + 2;
-        const q       = (row.question || '').trim();
-        const a       = (row.optionA || '').trim();
-        const b       = (row.optionB || '').trim();
-        const c       = (row.optionC || '').trim();
-        const d       = (row.optionD || '').trim();
-        const correct = (row.correctAnswer || '').trim().toUpperCase();
-
-        if (!q)                    { errors.push(`Row ${n}: question is empty.`); return; }
-        if (!a||!b||!c||!d)        { errors.push(`Row ${n}: one or more options are empty.`); return; }
-        if (!['A','B','C','D'].includes(correct)) {
-          errors.push(`Row ${n}: correctAnswer "${row.correctAnswer}" must be A, B, C, or D.`); return;
-        }
-
-        parsed.push({ text: q, options: [
-          {id:'A',text:a},{id:'B',text:b},{id:'C',text:c},{id:'D',text:d}
-        ], correctAnswer: correct });
-      });
-
-      if (errors.length) {
-        errContainer.innerHTML = errors.map(e => `<div class="csv-err-item">${esc(e)}</div>`).join('');
-      }
-
-      if (parsed.length) {
-        questions.push(...parsed);
-        render();
-        okEl.textContent = `${parsed.length} question${parsed.length > 1 ? 's' : ''} imported.`;
-        okEl.classList.remove('hidden');
-      }
-    },
-    error(err) {
-      errContainer.innerHTML = `<div class="csv-err-item">Failed to parse CSV: ${esc(err.message)}</div>`;
+    header: true, skipEmptyLines: true,
+    complete: result => handleParsed(result, 'file'),
+    error: err => {
+      document.getElementById('csv-errs').innerHTML =
+        `<div class="csv-err-item">Failed to parse file: ${esc(err.message)}</div>`;
     }
   });
 }
 
+function parseCSVText(text) {
+  window.Papa.parse(text, {
+    header: true, skipEmptyLines: true,
+    complete: result => handleParsed(result, 'paste'),
+    error: err => {
+      document.getElementById('csv-errs').innerHTML =
+        `<div class="csv-err-item">Failed to parse text: ${esc(err.message)}</div>`;
+    }
+  });
+}
+
+// ── Question list rendering ──
 function render() {
   const listEl   = document.getElementById('q-list');
   const countEl  = document.getElementById('q-count');
@@ -174,6 +239,7 @@ function clearAll() {
   render();
 }
 
+// ── Save ──
 async function saveQuiz() {
   const title   = document.getElementById('quiz-title').value.trim();
   const errEl   = document.getElementById('save-err');
@@ -186,12 +252,7 @@ async function saveQuiz() {
   saveBtn.textContent = 'Saving…';
   errEl.classList.add('hidden');
 
-  const data = {
-    title,
-    questions,
-    createdAt: serverTimestamp()
-  };
-
+  const data = { title, questions, createdAt: serverTimestamp() };
   if (document.getElementById('p-96h').checked) {
     data.deleteAfter = Date.now() + 96 * 3600 * 1000;
   }
