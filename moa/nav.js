@@ -147,6 +147,12 @@ function initSidebarLogo() {
   const img = document.createElement('img');
   img.src = base + 'moa.png';
   img.alt = 'MOA: Modern Origin Archive';
+  img.addEventListener('click', () => {
+    img.style.animation = 'none';
+    void img.offsetHeight;
+    img.style.animation = '';
+    setTimeout(() => { window.location.href = base + 'index.html'; }, 900);
+  });
   logo.prepend(img);
 }
 
