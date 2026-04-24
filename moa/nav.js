@@ -11,7 +11,7 @@ const PAGES = [
 
 function getCurrentSlug() {
   const path = window.location.pathname;
-  const match = path.match(/\/fmw\/([^/]+)\/?$/);
+  const match = path.match(/\/moa\/([^/]+)\/?$/);
   if (!match) return '';
   const seg = match[1];
   if (seg === 'index.html') return '';
@@ -20,9 +20,9 @@ function getCurrentSlug() {
 
 function getBase() {
   const path = window.location.pathname;
-  const idx = path.indexOf('/fmw/');
-  if (idx === -1) return '/fmw/';
-  return path.substring(0, idx) + '/fmw/';
+  const idx = path.indexOf('/moa/');
+  if (idx === -1) return '/moa/';
+  return path.substring(0, idx) + '/moa/';
 }
 
 function renderNav() {
