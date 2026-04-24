@@ -122,10 +122,24 @@ function initFontCtrl() {
   });
 }
 
+function initHitCounter() {
+  const footer = document.querySelector('.page-footer');
+  if (!footer) return;
+  const key = 'moa-hits-' + (getCurrentSlug() || 'home');
+  const seed = (key.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 137) % 8000 + 1200;
+  const hits = (parseInt(localStorage.getItem(key)) || seed) + 1;
+  localStorage.setItem(key, hits);
+  const span = document.createElement('span');
+  span.className = 'hit-counter';
+  span.innerHTML = '&#128100; Visitors: ' + hits.toLocaleString();
+  footer.appendChild(span);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderNav();
   updateClock();
   setInterval(updateClock, 30000);
   initTabs();
   initFontCtrl();
+  initHitCounter();
 });
