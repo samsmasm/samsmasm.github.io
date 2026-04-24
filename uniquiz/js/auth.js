@@ -71,8 +71,8 @@ export function initAuthOverlay(onSuccess) {
         input.value = '';
         input.focus();
       }
-    } catch {
-      errEl.textContent = 'Connection error. Check your internet and try again.';
+    } catch (err) {
+      errEl.textContent = err?.message || 'Unknown error';
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Enter';
