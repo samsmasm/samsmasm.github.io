@@ -37,9 +37,9 @@ function setup() {
     promptEl.value = buildPrompt(topic, num);
   }
 
+  document.getElementById('gen-prompt-btn').addEventListener('click', updatePrompt);
   topicEl.addEventListener('input', updatePrompt);
   numEl.addEventListener('input', updatePrompt);
-  updatePrompt();
 
   document.getElementById('copy-prompt-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(promptEl.value).then(() => {
