@@ -1,3 +1,14 @@
+/* Apply saved font size before paint to avoid flash */
+(function () {
+  const saved = parseInt(localStorage.getItem('moa-fontsize'));
+  if (saved) document.documentElement.style.setProperty('--fs', saved + 'px');
+})();
+
+const FONT_KEY     = 'moa-fontsize';
+const FONT_DEFAULT = 15;
+const FONT_MIN     = 11;
+const FONT_MAX     = 21;
+
 const PAGES = [
   { slug: '',             label: 'The Project'              },
   { slug: 'rq',           label: 'Research Question'        },
@@ -73,9 +84,48 @@ function initTabs() {
   activate(valid ? hash : btns[0].dataset.tab);
 }
 
+function initFontCtrl() {
+  const nav = document.getElementById('main-nav');
+  if (!nav) return;
+
+  const current = parseInt(
+    getComputedStyle(document.documentElement).getPropertyValue('--fs')
+  ) || FONT_DEFAULT;
+
+  const ctrl = document.createElement('div');
+  ctrl.className = 'font-ctrl';
+  ctrl.innerHTML = `
+    <div class="font-ctrl-label">Text Size</div>
+    <div class="font-ctrl-row">
+      <button class="font-btn" id="font-dec" title="Smaller">&#8722;</button>
+      <span class="font-val" id="font-val">${current}px</span>
+      <button class="font-btn" id="font-inc" title="Larger">+</button>
+    </div>`;
+  nav.parentNode.appendChild(ctrl);
+
+  function setSize(size) {
+    size = Math.min(FONT_MAX, Math.max(FONT_MIN, size));
+    document.documentElement.style.setProperty('--fs', size + 'px');
+    localStorage.setItem(FONT_KEY, size);
+    document.getElementById('font-val').textContent = size + 'px';
+    document.getElementById('font-dec').disabled = size <= FONT_MIN;
+    document.getElementById('font-inc').disabled = size >= FONT_MAX;
+  }
+
+  setSize(current);
+
+  document.getElementById('font-dec').addEventListener('click', () => {
+    setSize(parseInt(document.getElementById('font-val').textContent) - 1);
+  });
+  document.getElementById('font-inc').addEventListener('click', () => {
+    setSize(parseInt(document.getElementById('font-val').textContent) + 1);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderNav();
   updateClock();
   setInterval(updateClock, 30000);
   initTabs();
+  initFontCtrl();
 });
