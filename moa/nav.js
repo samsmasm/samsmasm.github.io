@@ -125,14 +125,19 @@ function initFontCtrl() {
 function initHitCounter() {
   const footer = document.querySelector('.page-footer');
   if (!footer) return;
-  const key = 'moa-hits-' + (getCurrentSlug() || 'home');
-  const seed = (key.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 137) % 8000 + 1200;
-  const hits = (parseInt(localStorage.getItem(key)) || seed) + 1;
-  localStorage.setItem(key, hits);
+
+  const placeholder = ['<span class="hc-label">VISITORS</span><span class="hc-digits">',
+    Array(6).fill('<span class="hc-d">-</span>').join(''),
+    '</span>'].join('');
   const span = document.createElement('span');
   span.className = 'hit-counter';
-  span.innerHTML = '&#128100; Visitors: ' + hits.toLocaleString();
+  span.innerHTML = placeholder;
   footer.appendChild(span);
+
+  const script = document.createElement('script');
+  script.type = 'module';
+  script.src = getBase() + 'firebase-counter.js';
+  document.head.appendChild(script);
 }
 
 function initSidebarLogo() {
