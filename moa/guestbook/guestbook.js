@@ -85,15 +85,6 @@ async function tryUnlock() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    entries = await loadEntries();
-  } catch {
-    document.getElementById('gb-entries').innerHTML =
-      '<p class="gb-empty">Could not load entries. Check that Firestore is enabled on the dowserboard project.</p>';
-    return;
-  }
-  renderEntries();
-
   document.getElementById('gb-lock').addEventListener('click', tryUnlock);
 
   const form = document.getElementById('gb-form');
@@ -126,4 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('Could not save: ' + err.message);
     }
   });
+
+  try {
+    entries = await loadEntries();
+    renderEntries();
+  } catch (err) {
+    document.getElementById('gb-entries').innerHTML =
+      `<p class="gb-empty">Could not load entries: ${err.message}</p>`;
+  }
 });
