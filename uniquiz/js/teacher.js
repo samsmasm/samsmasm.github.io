@@ -81,8 +81,10 @@ async function startSession(quiz, btn) {
       quizId: quiz.id,
       title: quiz.title,
       questions: quiz.questions,
+      timeLimit: quiz.timeLimit || 0,
       currentQuestionIndex: -1,
       showAnswer: false,
+      showRankings: false,
       responses: {},
       startedAt: serverTimestamp()
     });

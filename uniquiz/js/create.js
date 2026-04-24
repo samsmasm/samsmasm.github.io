@@ -16,6 +16,10 @@ function setup() {
   document.getElementById('save-btn').addEventListener('click', saveQuiz);
   document.getElementById('clear-all-btn').addEventListener('click', clearAll);
 
+  // ── Tabs ──
+  document.getElementById('tab-manual-btn').addEventListener('click', () => switchTab('manual'));
+  document.getElementById('tab-csv-btn').addEventListener('click',    () => switchTab('csv'));
+
   ['opt-a','opt-b','opt-c','opt-d'].forEach((id, i, arr) => {
     document.getElementById(id).addEventListener('keydown', e => {
       if (e.key === 'Enter') {
@@ -74,6 +78,14 @@ function setup() {
     if (!text) return;
     parseCSVText(text);
   });
+}
+
+// ── Tab switching ──
+function switchTab(tab) {
+  document.getElementById('tab-manual').classList.toggle('hidden', tab !== 'manual');
+  document.getElementById('tab-csv').classList.toggle('hidden',    tab !== 'csv');
+  document.getElementById('tab-manual-btn').classList.toggle('active', tab === 'manual');
+  document.getElementById('tab-csv-btn').classList.toggle('active',    tab === 'csv');
 }
 
 // ── AI prompt template ──
@@ -252,7 +264,8 @@ async function saveQuiz() {
   saveBtn.textContent = 'Saving…';
   errEl.classList.add('hidden');
 
-  const data = { title, questions, createdAt: serverTimestamp() };
+  const timeLimit = Math.max(0, parseInt(document.getElementById('time-limit').value) || 0);
+  const data = { title, questions, timeLimit, createdAt: serverTimestamp() };
   if (document.getElementById('p-96h').checked) {
     data.deleteAfter = Date.now() + 96 * 3600 * 1000;
   }
