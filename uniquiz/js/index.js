@@ -1,9 +1,9 @@
 import { db } from './firebase.js';
-import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const form   = document.getElementById('pin-form');
-const input  = document.getElementById('pin-input');
-const errEl  = document.getElementById('pin-error');
+const form  = document.getElementById('pin-form');
+const input = document.getElementById('pin-input');
+const errEl = document.getElementById('pin-error');
 
 input.addEventListener('input', () => {
   input.value = input.value.replace(/\D/g, '').slice(0, 6);
@@ -25,18 +25,18 @@ form.addEventListener('submit', async e => {
   errEl.classList.add('hidden');
 
   try {
-    const snap = await getDoc(doc(db, 'sessions', pin));
+    const snap = await get(ref(db, `uq/sessions/${pin}`));
     if (!snap.exists()) {
       showError('Session not found. Check your PIN.');
       return;
     }
-    if (snap.data().currentQuestionIndex === -2) {
+    if (snap.val().currentQuestionIndex === -2) {
       showError('This session has ended.');
       return;
     }
     window.location.href = `play.html?pin=${pin}`;
-  } catch {
-    showError('Connection error. Please try again.');
+  } catch (err) {
+    showError(err?.message || 'Connection error. Please try again.');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Join';

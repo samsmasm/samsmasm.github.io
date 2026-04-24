@@ -1,8 +1,8 @@
 import { db } from './firebase.js';
 import { initAuthOverlay } from './auth.js';
 import {
-  collection, addDoc, serverTimestamp, Timestamp
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  ref, push, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 let questions = [];
 
@@ -16,7 +16,6 @@ function setup() {
   document.getElementById('save-btn').addEventListener('click', saveQuiz);
   document.getElementById('clear-all-btn').addEventListener('click', clearAll);
 
-  // Allow Enter key in option inputs to move to next
   ['opt-a','opt-b','opt-c','opt-d'].forEach((id, i, arr) => {
     document.getElementById(id).addEventListener('keydown', e => {
       if (e.key === 'Enter') {
@@ -27,14 +26,13 @@ function setup() {
     });
   });
 
-  // CSV
   const csvDrop  = document.getElementById('csv-drop');
   const csvInput = document.getElementById('csv-input');
 
   document.getElementById('csv-browse').addEventListener('click', () => csvInput.click());
   csvInput.addEventListener('change', e => { if (e.target.files[0]) parseCSV(e.target.files[0]); });
 
-  csvDrop.addEventListener('dragover', e => { e.preventDefault(); csvDrop.classList.add('dragover'); });
+  csvDrop.addEventListener('dragover',  e => { e.preventDefault(); csvDrop.classList.add('dragover'); });
   csvDrop.addEventListener('dragleave', () => csvDrop.classList.remove('dragover'));
   csvDrop.addEventListener('drop', e => {
     e.preventDefault();
@@ -56,14 +54,14 @@ function addQuestion() {
   const correct = document.getElementById('correct-ans').value;
   const errEl   = document.getElementById('add-err');
 
-  if (!text)                    { showErr(errEl, 'Question text is required.'); return; }
+  if (!text)                      { showErr(errEl, 'Question text is required.'); return; }
   if (!optA||!optB||!optC||!optD) { showErr(errEl, 'All four options are required.'); return; }
-  if (!correct)                 { showErr(errEl, 'Select the correct answer.'); return; }
+  if (!correct)                   { showErr(errEl, 'Select the correct answer.'); return; }
 
   errEl.classList.add('hidden');
   questions.push({ text, options: [
-    { id:'A', text: optA }, { id:'B', text: optB },
-    { id:'C', text: optC }, { id:'D', text: optD }
+    {id:'A', text:optA}, {id:'B', text:optB},
+    {id:'C', text:optC}, {id:'D', text:optD}
   ], correctAnswer: correct });
 
   render();
@@ -91,11 +89,11 @@ function parseCSV(file) {
 
       data.forEach((row, i) => {
         const n = i + 2;
-        const q = (row.question || '').trim();
-        const a = (row.optionA || '').trim();
-        const b = (row.optionB || '').trim();
-        const c = (row.optionC || '').trim();
-        const d = (row.optionD || '').trim();
+        const q       = (row.question || '').trim();
+        const a       = (row.optionA || '').trim();
+        const b       = (row.optionB || '').trim();
+        const c       = (row.optionC || '').trim();
+        const d       = (row.optionD || '').trim();
         const correct = (row.correctAnswer || '').trim().toUpperCase();
 
         if (!q)                    { errors.push(`Row ${n}: question is empty.`); return; }
@@ -116,7 +114,7 @@ function parseCSV(file) {
       if (parsed.length) {
         questions.push(...parsed);
         render();
-        okEl.textContent = `${parsed.length} question${parsed.length > 1 ? 's' : ''} imported from CSV.`;
+        okEl.textContent = `${parsed.length} question${parsed.length > 1 ? 's' : ''} imported.`;
         okEl.classList.remove('hidden');
       }
     },
@@ -127,11 +125,11 @@ function parseCSV(file) {
 }
 
 function render() {
-  const listEl    = document.getElementById('q-list');
-  const countEl   = document.getElementById('q-count');
-  const emptyEl   = document.getElementById('q-empty');
-  const clearBtn  = document.getElementById('clear-all-btn');
-  const saveBtn   = document.getElementById('save-btn');
+  const listEl   = document.getElementById('q-list');
+  const countEl  = document.getElementById('q-count');
+  const emptyEl  = document.getElementById('q-empty');
+  const clearBtn = document.getElementById('clear-all-btn');
+  const saveBtn  = document.getElementById('save-btn');
 
   countEl.textContent = questions.length;
   clearBtn.classList.toggle('hidden', questions.length === 0);
@@ -158,7 +156,7 @@ function render() {
           `).join('')}
         </div>
       </div>
-      <button class="btn btn-ghost btn-sm" data-i="${i}" style="flex-shrink:0; padding:0.25rem 0.5rem;">✕</button>
+      <button class="btn btn-ghost btn-sm" data-i="${i}" style="flex-shrink:0;padding:0.25rem 0.5rem;">✕</button>
     </div>
   `).join('');
 
@@ -177,11 +175,11 @@ function clearAll() {
 }
 
 async function saveQuiz() {
-  const title  = document.getElementById('quiz-title').value.trim();
-  const errEl  = document.getElementById('save-err');
+  const title   = document.getElementById('quiz-title').value.trim();
+  const errEl   = document.getElementById('save-err');
   const saveBtn = document.getElementById('save-btn');
 
-  if (!title) { showErr(errEl, 'Enter a quiz title.'); return; }
+  if (!title)            { showErr(errEl, 'Enter a quiz title.'); return; }
   if (!questions.length) { showErr(errEl, 'Add at least one question.'); return; }
 
   saveBtn.disabled = true;
@@ -195,11 +193,11 @@ async function saveQuiz() {
   };
 
   if (document.getElementById('p-96h').checked) {
-    data.deleteAfter = Timestamp.fromDate(new Date(Date.now() + 96 * 3600 * 1000));
+    data.deleteAfter = Date.now() + 96 * 3600 * 1000;
   }
 
   try {
-    await addDoc(collection(db, 'quizzes'), data);
+    await push(ref(db, 'uq/quizzes'), data);
     window.location.href = 'teacher.html';
   } catch (err) {
     showErr(errEl, `Failed to save: ${err.message}`);

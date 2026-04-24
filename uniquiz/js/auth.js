@@ -1,5 +1,5 @@
 import { db } from './firebase.js';
-import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { ref, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const SESSION_KEY = 'uq_teacher_auth';
 const SESSION_TTL = 8 * 60 * 60 * 1000;
@@ -26,15 +26,13 @@ export function teacherLogout() {
   window.location.href = 'index.html';
 }
 
-// Injects a full-screen password overlay into the current page.
-// Calls onSuccess() once auth passes (or if already authed).
 export function initAuthOverlay(onSuccess) {
   if (isValid()) { onSuccess(); return; }
 
-  const overlay = document.getElementById('auth-overlay');
-  const form    = document.getElementById('auth-form');
-  const input   = document.getElementById('auth-password');
-  const errEl   = document.getElementById('auth-error');
+  const overlay   = document.getElementById('auth-overlay');
+  const form      = document.getElementById('auth-form');
+  const input     = document.getElementById('auth-password');
+  const errEl     = document.getElementById('auth-error');
   const submitBtn = document.getElementById('auth-submit');
 
   overlay.classList.remove('hidden');
@@ -51,18 +49,17 @@ export function initAuthOverlay(onSuccess) {
 
     try {
       const hash = await sha256(password);
-      const configRef = doc(db, 'config', 'teacher');
-      const snap = await getDoc(configRef);
+      const snap = await get(ref(db, 'uq/config/teacher'));
 
       if (!snap.exists()) {
-        await setDoc(configRef, { passwordHash: hash });
+        await set(ref(db, 'uq/config/teacher'), { passwordHash: hash });
         saveSession();
         overlay.classList.add('hidden');
         onSuccess();
         return;
       }
 
-      if (snap.data().passwordHash === hash) {
+      if (snap.val().passwordHash === hash) {
         saveSession();
         overlay.classList.add('hidden');
         onSuccess();
