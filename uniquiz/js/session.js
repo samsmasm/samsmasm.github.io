@@ -11,6 +11,8 @@ if (!pin) { window.location.href = 'teacher.html'; }
 document.getElementById('pin-display').textContent = pin;
 document.getElementById('pv-progress').textContent = `PIN: ${pin}`;
 
+const presentView = document.getElementById('present-view');
+
 let session = null;
 let unsub   = null;
 let timerInterval      = null;
@@ -18,10 +20,23 @@ let currentTimerEndsAt = null;
 let revealInProgress   = false;
 let prevQi             = null;
 
+// ── Present view ──
+function enterPresent() {
+  presentView.classList.add('active');
+  const el = presentView;
+  (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.())?.catch?.(() => {});
+}
+
+function exitPresent() {
+  presentView.classList.remove('active');
+  if (document.fullscreenElement) document.exitFullscreen?.().catch?.(() => {});
+}
+
 // ── Auth ──
 initAuthOverlay(() => {
   document.getElementById('main-content').classList.remove('hidden');
   listen();
+  enterPresent(); // auto-show present overlay; fullscreen needs a user click
 });
 
 // ── Realtime listener ──
@@ -288,11 +303,11 @@ async function calculateAndWriteScores() {
     let lastPoints = 0;
     if (answer === q.correctAnswer) {
       if (session.questionStartedAt && answeredAt) {
-        const elapsed = Math.max(0, answeredAt - session.questionStartedAt);
-        const window  = session.timerEndsAt
+        const elapsed     = Math.max(0, answeredAt - session.questionStartedAt);
+        const timeWindow  = session.timerEndsAt
           ? (session.timerEndsAt - session.questionStartedAt)
           : 30000; // 30s reference when no timer set
-        lastPoints = Math.round(Math.max(500, 1000 - 500 * elapsed / window));
+        lastPoints = Math.round(Math.max(500, 1000 - 500 * elapsed / timeWindow));
       } else {
         lastPoints = 1000;
       }
@@ -357,22 +372,14 @@ document.getElementById('end-btn').addEventListener('click', async () => {
   window.location.href = 'teacher.html';
 });
 
-// ── Fullscreen ──
-const presentView = document.getElementById('present-view');
-
-document.getElementById('present-btn').addEventListener('click', () => {
-  presentView.classList.add('active');
-  document.documentElement.requestFullscreen?.().catch?.(() => {});
+document.getElementById('present-btn').addEventListener('click', enterPresent);
+document.getElementById('pv-fullscreen-btn').addEventListener('click', () => {
+  const el = document.documentElement;
+  (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.())?.catch?.(() => {});
 });
-
 document.getElementById('pv-exit-btn').addEventListener('click', exitPresent);
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) exitPresent(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && presentView.classList.contains('active')) exitPresent(); });
-
-function exitPresent() {
-  presentView.classList.remove('active');
-  if (document.fullscreenElement) document.exitFullscreen?.().catch?.(() => {});
-}
 
 // ── Helpers ──
 function hide(id, hidden)  { document.getElementById(id).classList.toggle('hidden', hidden); }
