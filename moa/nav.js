@@ -159,8 +159,7 @@ function initSidebarLogo() {
   setInterval(spin, 60000);
 
   img.addEventListener('click', () => {
-    spin();
-    setTimeout(() => { window.location.href = base + 'index.html'; }, 1000);
+    window.location.href = base + 'index.html';
   });
 
   logo.prepend(img);
