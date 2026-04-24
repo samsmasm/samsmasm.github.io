@@ -135,21 +135,24 @@
 
     /* JOIN PHASE */
     #join-screen {
-      display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center;
-      gap: 24px; padding: 32px;
+      display: none; height: 100vh; align-items: center; justify-content: center; padding: 48px;
     }
     #join-screen.active { display: flex; }
-    .join-title { font-size: 3rem; font-weight: 900; text-align: center; }
+    .join-layout { display: flex; gap: 64px; align-items: center; width: 100%; max-width: 1200px; }
+    .join-qr-col { flex-shrink: 0; }
+    #join-qrcode canvas, #join-qrcode img { border-radius: 16px; display: block; }
+    .join-info-col { flex: 1; display: flex; flex-direction: column; gap: 18px; }
+    .join-title { font-size: 2rem; font-weight: 900; }
     .join-title span { color: var(--yellow); }
-    .session-code {
-      font-size: 2.5rem; font-weight: 900; color: var(--yellow);
-      background: var(--card); padding: 16px 40px; border-radius: 16px;
-      border: 2px solid var(--border); letter-spacing: 2px;
+    .join-big-url {
+      font-size: 4rem; font-weight: 900; color: #0f172a; line-height: 1;
+      background: white; padding: 22px 32px; border-radius: 16px; letter-spacing: -1px;
     }
-    .join-url { font-size: 1.1rem; color: var(--muted); }
+    .join-session-row { font-size: 1.4rem; font-weight: 700; color: var(--muted); }
+    .join-session-name { color: var(--yellow); font-size: 1.8rem; font-weight: 900; }
+    .student-count { font-size: 1rem; color: var(--muted); }
     .join-students {
-      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
-      max-width: 800px; max-height: 200px; overflow-y: auto;
+      display: flex; flex-wrap: wrap; gap: 8px; max-height: 160px; overflow-y: auto;
     }
     .student-chip {
       background: var(--card); border: 1px solid var(--border);
@@ -157,7 +160,7 @@
       animation: popIn 0.3s ease;
     }
     @keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    .student-count { font-size: 1rem; color: var(--muted); }
+    .join-actions { display: flex; flex-direction: column; gap: 8px; }
 
     /* QR OVERLAY */
     #qr-overlay {
@@ -279,21 +282,22 @@
 
 <!-- JOIN PHASE -->
 <div id="join-screen">
-  <div class="join-title">Flipping<span>Hard</span>Work</div>
-  <div>
-    <div style="text-align:center; color:var(--muted); font-size:1rem; margin-bottom:6px;">Session</div>
-    <div class="session-code" id="display-session-code">---</div>
+  <div class="join-layout">
+    <div class="join-qr-col">
+      <div id="join-qrcode"></div>
+    </div>
+    <div class="join-info-col">
+      <div class="join-title">Flipping<span>Hard</span>Work</div>
+      <div class="join-big-url">unisam.nz/flippinghard</div>
+      <div class="join-session-row">Session: <span class="join-session-name" id="display-session-code">---</span></div>
+      <div class="student-count" id="student-count-label">0 students joined</div>
+      <div class="join-students" id="join-students-list"></div>
+      <div class="join-actions">
+        <button class="btn btn-green" onclick="beginFirstRound()">Begin First Round →</button>
+        <button class="btn btn-outline" onclick="showResetModal()">Reset Session</button>
+      </div>
+    </div>
   </div>
-  <div class="join-url" id="display-join-url"></div>
-  <div style="text-align:center;">
-    <div class="student-count" id="student-count-label">0 students joined</div>
-  </div>
-  <div class="join-students" id="join-students-list"></div>
-  <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
-    <button class="btn btn-outline btn-sm" style="width:auto; padding:12px 24px;" onclick="toggleQR()">Show QR Code</button>
-    <button class="btn btn-green btn-sm" style="width:auto; padding:12px 28px; font-size:1rem;" onclick="beginFirstRound()">Begin First Round →</button>
-  </div>
-  <button class="btn btn-outline btn-sm" style="width:auto; padding:8px 18px; font-size:0.8rem; margin-top:-8px;" onclick="showResetModal()">Reset Session</button>
 </div>
 
 <!-- GAME SCREEN -->
@@ -509,15 +513,19 @@ function generateFlips(rounds) {
 }
 
 // ---- JOIN PHASE ----
+const JOIN_URL = 'https://unisam.nz/flippinghard';
+
 function enterJoinPhase() {
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('join-screen').classList.add('active');
   document.getElementById('display-session-code').textContent = session;
 
-  const studentUrl = `${window.location.origin}${window.location.pathname.replace('teacher.html','student.html')}`;
-  document.getElementById('display-join-url').textContent = studentUrl;
+  // Inline QR on the join screen
+  const joinQrEl = document.getElementById('join-qrcode');
+  joinQrEl.innerHTML = '';
+  new QRCode(joinQrEl, { text: JOIN_URL, width: 320, height: 320 });
 
-  generateQR(studentUrl);
+  generateQR(JOIN_URL);
   subscribeStudents();
 }
 
@@ -1022,7 +1030,7 @@ function generateQR(url) {
   const el = document.getElementById('qrcode');
   el.innerHTML = '';
   new QRCode(el, { text: url, width: 400, height: 400 });
-  document.getElementById('qr-url-text').textContent = url;
+  document.getElementById('qr-url-text').textContent = 'unisam.nz/flippinghard';
   qrGenerated = true;
 }
 
