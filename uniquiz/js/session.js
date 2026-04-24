@@ -95,10 +95,9 @@ function render(s) {
     reveal();
   }
 
-  setH('start-btn',         !waiting);
-  setH('show-ans-btn',      !active || showAnswer);
-  setH('show-rankings-btn', !active || !showAnswer || showRankings);
-  setH('next-btn',          !active || !showAnswer || !showRankings);
+  setH('start-btn',    !waiting);
+  setH('show-ans-btn', !active || showAnswer);
+  setH('next-btn',     !active || !showRankings);
 
   renderPresent(s, questions, q, counts, total);
 }
@@ -153,10 +152,9 @@ function renderPresent(s, questions, q, counts, total) {
       document.getElementById(`pv-opt-${l}`).classList.remove('reveal-correct','reveal-dim');
     });
     document.getElementById('pv-progress').textContent = `PIN: ${pin}`;
-    setH('pv-start-btn',    false);
-    setH('pv-show-btn',     true);
-    setH('pv-rankings-btn', true);
-    setH('pv-next-btn',     true);
+    setH('pv-start-btn', false);
+    setH('pv-show-btn',  true);
+    setH('pv-next-btn',  true);
     document.getElementById('pv-rankings').classList.remove('active');
     return;
   }
@@ -184,10 +182,9 @@ function renderPresent(s, questions, q, counts, total) {
   document.getElementById('pv-progress').textContent =
     `Q${qi+1}/${questions.length} · PIN: ${pin} · ${total} response${total !== 1 ? 's' : ''}`;
 
-  setH('pv-start-btn',    true);
-  setH('pv-show-btn',     !!showAnswer);
-  setH('pv-rankings-btn', !showAnswer || !!showRankings);
-  setH('pv-next-btn',     !showAnswer || !showRankings);
+  setH('pv-start-btn', true);
+  setH('pv-show-btn',  !!showAnswer);
+  setH('pv-next-btn',  !showRankings);
 
   document.getElementById('pv-rankings').classList.toggle('active', !!showRankings);
   if (showRankings) renderPvRankings(s.scores || {});
@@ -257,6 +254,12 @@ async function reveal() {
   try {
     await update(ref(db, `uq/sessions/${pin}`), { showAnswer: true });
     await calculateAndWriteScores();
+    // Auto-show rankings after a 4-second pause so students can see correct/wrong
+    setTimeout(async () => {
+      if (session && session.showAnswer && !session.showRankings) {
+        await update(ref(db, `uq/sessions/${pin}`), { showRankings: true });
+      }
+    }, 4000);
   } catch (err) {
     console.error('reveal failed', err);
     revealInProgress = false;
@@ -339,14 +342,12 @@ async function act(action) {
   }
 }
 
-document.getElementById('start-btn').addEventListener('click',          () => act('start'));
-document.getElementById('show-ans-btn').addEventListener('click',       () => act('show'));
-document.getElementById('show-rankings-btn').addEventListener('click',  () => act('rankings'));
-document.getElementById('next-btn').addEventListener('click',           () => act('next'));
-document.getElementById('pv-start-btn').addEventListener('click',     () => act('start'));
-document.getElementById('pv-show-btn').addEventListener('click',      () => act('show'));
-document.getElementById('pv-rankings-btn').addEventListener('click',  () => act('rankings'));
-document.getElementById('pv-next-btn').addEventListener('click',      () => act('next'));
+document.getElementById('start-btn').addEventListener('click',    () => act('start'));
+document.getElementById('show-ans-btn').addEventListener('click',  () => act('show'));
+document.getElementById('next-btn').addEventListener('click',      () => act('next'));
+document.getElementById('pv-start-btn').addEventListener('click',  () => act('start'));
+document.getElementById('pv-show-btn').addEventListener('click',   () => act('show'));
+document.getElementById('pv-next-btn').addEventListener('click',   () => act('next'));
 
 document.getElementById('end-btn').addEventListener('click', async () => {
   if (!confirm('End this session for all students?')) return;
