@@ -111,17 +111,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       timestamp: serverTimestamp(),
     };
 
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 8000));
     try {
-      await addDoc(collection(db, COL), data);
+      await Promise.race([addDoc(collection(db, COL), data), timeout]);
       form.reset();
       btn.textContent = '✓ Signed!';
       entries = await loadEntries();
       renderEntries();
       setTimeout(() => document.querySelector('[data-tab="read"]').click(), 800);
-    } catch {
+    } catch (err) {
       btn.disabled = false;
       btn.textContent = 'Sign!';
-      alert('Could not save your entry — please try again.');
+      alert('Could not save: ' + err.message);
     }
   });
 });
