@@ -18,6 +18,7 @@ const PAGES = [
   { slug: 'tcc',          label: 'Time, Continuity & Change'},
   { slug: 'conclusions',  label: 'Conclusions'              },
   { slug: 'timeline',     label: 'The Timeline'             },
+  { slug: 'guestbook',   label: '📖 Guestbook'             },
 ];
 
 function getCurrentSlug() {
@@ -151,7 +152,7 @@ function initSidebarLogo() {
     img.style.animation = 'none';
     void img.offsetHeight;
     img.style.animation = '';
-    setTimeout(() => { window.location.href = base + 'index.html'; }, 900);
+    setTimeout(() => { window.location.href = base + 'index.html'; }, 1000);
   });
   logo.prepend(img);
 }
