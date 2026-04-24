@@ -1,5 +1,6 @@
-import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp }
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc,
+         doc, getDoc, query, orderBy, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -14,6 +15,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig, 'moa-gb');
 const db  = getFirestore(app);
 const COL = 'moa-guestbook';
+
+let entries    = [];
+let deleteMode = false;
 
 function esc(s) {
   return String(s)
@@ -32,44 +36,67 @@ async function loadEntries() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-function renderEntries(entries) {
+function renderEntries() {
   const el = document.getElementById('gb-entries');
   if (!el) return;
+
+  const countBar = document.getElementById('gb-count-bar');
+  if (countBar) countBar.textContent =
+    entries.length ? `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}` : '';
+
   if (!entries.length) {
     el.innerHTML = '<p class="gb-empty">No entries yet. Be the first to sign!</p>';
     return;
   }
 
-  const countBar = document.getElementById('gb-count-bar');
-  if (countBar) countBar.textContent =
-    `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`;
-
   el.innerHTML = entries.map(e => `
-    <div class="gb-entry">
+    <div class="gb-entry" data-id="${esc(e.id)}">
       <div class="gb-meta">
         <span class="gb-name">${esc(e.name)}</span>
         ${e.location ? `<span class="gb-loc">📍 ${esc(e.location)}</span>` : ''}
         <span class="gb-date">${fmtDate(e.timestamp)}</span>
+        ${deleteMode ? `<button class="gb-del-btn" data-id="${esc(e.id)}">✕ Delete</button>` : ''}
       </div>
       ${e.url ? `<div class="gb-url">🌐 <a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.url)}</a></div>` : ''}
       <div class="gb-msg">${esc(e.message).replace(/\n/g,'<br>')}</div>
     </div>
   `).join('<div class="gb-divider">✦ ─────────────── ✦</div>');
+
+  el.querySelectorAll('.gb-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this entry?')) return;
+      await deleteDoc(doc(db, COL, btn.dataset.id));
+      entries = await loadEntries();
+      renderEntries();
+    });
+  });
+}
+
+async function tryUnlock() {
+  const entered = prompt('PIN:');
+  if (!entered) return;
+  const snap = await getDoc(doc(db, 'config', 'moa'));
+  if (entered === snap.data()?.deletePin) {
+    deleteMode = true;
+    renderEntries();
+  } else {
+    alert('Incorrect.');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  let entries = [];
   try {
     entries = await loadEntries();
-  } catch (e) {
+  } catch {
     document.getElementById('gb-entries').innerHTML =
       '<p class="gb-empty">Could not load entries. Check that Firestore is enabled on the dowserboard project.</p>';
+    return;
   }
-  renderEntries(entries);
+  renderEntries();
+
+  document.getElementById('gb-lock').addEventListener('click', tryUnlock);
 
   const form = document.getElementById('gb-form');
-  if (!form) return;
-
   form.addEventListener('submit', async ev => {
     ev.preventDefault();
     const btn = form.querySelector('.gb-submit');
@@ -89,9 +116,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       form.reset();
       btn.textContent = '✓ Signed!';
       entries = await loadEntries();
-      renderEntries(entries);
+      renderEntries();
       setTimeout(() => document.querySelector('[data-tab="read"]').click(), 800);
-    } catch (err) {
+    } catch {
       btn.disabled = false;
       btn.textContent = 'Sign!';
       alert('Could not save your entry — please try again.');
