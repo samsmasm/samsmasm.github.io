@@ -51,6 +51,12 @@ function renderNav() {
     a.href = page.slug === '' ? base + 'index.html' : base + page.slug + '/';
     if (page.slug === current) a.classList.add('active');
     a.textContent = page.label;
+    if (page.slug === 'guestbook') {
+      const badge = document.createElement('span');
+      badge.className = 'new-badge';
+      badge.textContent = 'NEW';
+      a.appendChild(badge);
+    }
     li.appendChild(a);
     ul.appendChild(li);
   });
@@ -141,6 +147,47 @@ function initHitCounter() {
   document.head.appendChild(script);
 }
 
+function initSidebarExtras() {
+  const win = document.querySelector('.sidebar-window');
+  if (!win) return;
+
+  const coolDiv = document.createElement('div');
+  coolDiv.className = 'sidebar-extra';
+  coolDiv.innerHTML = '<div class="sidebar-extra-title">✦ Cool Links</div>';
+  const ul = document.createElement('ul');
+  ul.className = 'cool-links-list';
+  const links = [
+    { label: '🏠 The Project',       href: getBase() + 'index.html',   ext: false },
+    { label: '❓ Research Question',  href: getBase() + 'rq/',           ext: false },
+    { label: '📚 Finding Sources',    href: getBase() + 'sources/',      ext: false },
+    { label: '📖 Sign Guestbook',     href: getBase() + 'guestbook/',    ext: false },
+    { label: '🌐 SSIS Library',       href: 'https://sites.google.com/ssis.edu.vn/library/library?authuser=2', ext: true },
+  ];
+  links.forEach(lnk => {
+    const li = document.createElement('li');
+    const a  = document.createElement('a');
+    a.href = lnk.href;
+    a.textContent = lnk.label;
+    if (lnk.ext) { a.target = '_blank'; a.rel = 'noopener'; }
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+  coolDiv.appendChild(ul);
+  win.appendChild(coolDiv);
+
+  const aboutDiv = document.createElement('div');
+  aboutDiv.className = 'sidebar-extra';
+  aboutDiv.innerHTML =
+    '<div class="sidebar-extra-title">ℹ About This Site</div>' +
+    '<p class="sidebar-about-text">' +
+      '<strong>MOA</strong> is a Grade&nbsp;9 History project site.<br>' +
+      'Unit: Foundations of the Modern World.<br>' +
+      'Events: <strong>1990–2015</strong>.<br>' +
+      'Best viewed at 800&times;600. ✦' +
+    '</p>';
+  win.appendChild(aboutDiv);
+}
+
 function initLastUpdated() {
   const footer = document.querySelector('.page-footer');
   if (!footer) return;
@@ -183,4 +230,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initHitCounter();
   initSidebarLogo();
   initLastUpdated();
+  initSidebarExtras();
 });
