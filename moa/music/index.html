@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MOA: Modern Origin Archive – Music Playlists</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="icon" href="/moa/moafav.png">
+  <style>
+    /* ── Animations ─────────────────────────────────── */
+    @keyframes rainbow {
+      0%   { color: #ff0000; }
+      14%  { color: #ff8800; }
+      28%  { color: #cccc00; }
+      42%  { color: #00aa00; }
+      57%  { color: #0077ff; }
+      71%  { color: #8800ff; }
+      85%  { color: #dd00aa; }
+      100% { color: #ff0000; }
+    }
+    @keyframes gblink {
+      0%, 49%  { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    @keyframes gspin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes gbounce {
+      0%, 100% { transform: translateY(0px); }
+      50%      { transform: translateY(-5px); }
+    }
+    @keyframes borderflash-teal {
+      0%, 49%  { border-color: var(--teal); }
+      50%, 100% { border-color: #dd0099; }
+    }
+    @keyframes borderflash-purple {
+      0%, 49%  { border-color: var(--purple); }
+      50%, 100% { border-color: var(--teal); }
+    }
+
+    .rainbow     { animation: rainbow 1.8s steps(7) infinite; }
+    .blink       { animation: gblink 0.9s step-end infinite; display: inline-block; }
+    .blink-slow  { animation: gblink 1.8s step-end infinite; display: inline-block; }
+    .spin-fast   { animation: gspin 1.5s steps(12) infinite; display: inline-block; }
+    .spin-med    { animation: gspin 3s steps(8) infinite; display: inline-block; }
+    .spin-slow   { animation: gspin 6s steps(8) infinite; display: inline-block; }
+    .bounce      { animation: gbounce 0.8s steps(2) infinite; display: inline-block; }
+
+    /* ── Music page title ───────────────────────────── */
+    .music-title-box {
+      background: #000033;
+      border: 4px double #dd0099;
+      outline: 3px solid var(--teal);
+      text-align: center;
+      padding: 18px 16px 14px;
+      margin-bottom: 14px;
+    }
+    .music-title {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 34px;
+      font-weight: bold;
+      text-shadow: 2px 2px 0 #dd0099, 4px 4px 0 var(--teal);
+      letter-spacing: 0.02em;
+      margin-bottom: 6px;
+      line-height: 1.15;
+    }
+    .music-subtitle {
+      font-size: 12px;
+      color: #aaddff;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── GIF decoration bar ─────────────────────────── */
+    .gif-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 6px;
+      font-size: 18px;
+      background: var(--purple-light);
+      border-top: 2px solid var(--purple);
+      border-bottom: 2px solid var(--purple);
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    /* ── Hazard stripe ──────────────────────────────── */
+    .hazard-bar {
+      height: 9px;
+      background: repeating-linear-gradient(
+        45deg,
+        #ffcc00 0px, #ffcc00 8px,
+        #111    8px, #111    16px
+      );
+      margin: 18px 0;
+      max-width: var(--content-max);
+      border: 1px solid #888;
+    }
+
+    /* ── Visitor notice ─────────────────────────────── */
+    .music-notice {
+      border: 2px solid #dd0099;
+      background: #fff0ff;
+      padding: 7px 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 16px;
+      max-width: var(--content-max);
+    }
+
+    /* ── Section headers ────────────────────────────── */
+    .pl-section-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--white);
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 5px 12px;
+      margin: 20px 0 8px;
+      border: 2px solid var(--teal-dark);
+      background: var(--teal);
+      max-width: var(--content-max);
+    }
+    .pl-section-head.purple-head {
+      background: var(--purple);
+      border-color: var(--purple-dark);
+    }
+    .pl-section-head.pink-head {
+      background: #cc0088;
+      border-color: #990066;
+    }
+    .pl-section-head.dark-head {
+      background: #003366;
+      border-color: #002244;
+    }
+
+    /* ── Playlist grid ──────────────────────────────── */
+    .playlist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 8px;
+      margin-bottom: 4px;
+      max-width: var(--content-max);
+    }
+    .pl-card {
+      border: 2px solid var(--teal);
+      background: var(--white);
+      padding: 10px 12px;
+      text-decoration: none !important;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      transition: background 0.1s;
+    }
+    .pl-card:nth-child(odd)  { animation: borderflash-teal   2s    steps(1) infinite; }
+    .pl-card:nth-child(even) { border-color: var(--purple);
+                               animation: borderflash-purple 2.6s steps(1) infinite; }
+    .pl-card:hover { background: var(--teal-light); }
+    .pl-card:nth-child(even):hover { background: var(--purple-light); }
+
+    .pl-icon { font-size: 22px; flex-shrink: 0; line-height: 1.3; }
+    .pl-info { flex: 1; }
+    .pl-name {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--teal);
+      line-height: 1.3;
+      margin-bottom: 3px;
+    }
+    .pl-card:nth-child(even) .pl-name { color: var(--purple); }
+    .pl-listen {
+      font-size: 9px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+
+    /* ── Mid-page gif strip ─────────────────────────── */
+    .gif-strip-mid {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      font-size: 22px;
+      padding: 6px 0;
+      max-width: var(--content-max);
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="taskbar">
+  <span>MOA: Modern Origin Archive</span>
+  <a class="taskbar-link" href="https://sites.google.com/ssis.edu.vn/library/library?authuser=2" target="_blank" rel="noopener">SSIS Library</a>
+  <span class="taskbar-clock" id="taskbar-clock">00:00</span>
+</div>
+
+<div class="marquee-bar">
+  <marquee>🎵 MOA MUSIC ARCHIVE &nbsp;&nbsp;&nbsp; The Global Soundtrack 1990–2015 &nbsp;&nbsp;&nbsp; ★ K-Pop ★ V-Pop ★ J-Pop ★ Cantopop ★ Hip-Hop ★ R&amp;B ★ Rock ★ Latin ★ &nbsp;&nbsp;&nbsp; ♪ Click any playlist and listen on Spotify! ♪ &nbsp;&nbsp;&nbsp;</marquee>
+</div>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-window">
+      <div class="sidebar-titlebar">
+        <span>MOA</span>
+        <div class="titlebar-buttons">
+          <div class="titlebar-btn">_</div>
+          <div class="titlebar-btn">□</div>
+          <div class="titlebar-btn">✕</div>
+        </div>
+      </div>
+      <div class="sidebar-logo">
+        <div class="site-title">MOA</div>
+        <div class="site-sub">Modern Origin Archive</div>
+      </div>
+      <nav id="main-nav"></nav>
+    </div>
+  </aside>
+
+  <div class="main-window">
+    <div class="main-titlebar">
+      <div class="titlebar-icon">🎵</div>
+      <span>Music Playlists – MOA: Modern Origin Archive</span>
+      <div class="titlebar-buttons">
+        <div class="titlebar-btn">_</div>
+        <div class="titlebar-btn">□</div>
+        <div class="titlebar-btn">✕</div>
+      </div>
+    </div>
+
+    <div class="tab-panel active">
+
+      <!-- ── Title banner ─────────────────────────────── -->
+      <div class="music-title-box">
+        <div class="music-title">
+          <span class="rainbow">🎵 THE MUSIC ARCHIVE 🎵</span>
+        </div>
+        <div class="music-subtitle">
+          <span class="blink">▶▶</span>
+          &nbsp;THE GLOBAL SOUNDTRACK: 1990–2015&nbsp;
+          <span class="blink-slow">◀◀</span>
+        </div>
+      </div>
+
+      <!-- ── Top gif bar ───────────────────────────────── -->
+      <div class="gif-bar">
+        <span class="spin-fast">✦</span>
+        <span class="bounce">🎵</span>
+        <span class="spin-med">★</span>
+        <span class="bounce" style="animation-delay:.2s">🎸</span>
+        <span class="spin-fast" style="animation-delay:.5s">✦</span>
+        <span class="bounce" style="animation-delay:.4s">🎤</span>
+        <span class="spin-slow">★</span>
+        <span class="bounce" style="animation-delay:.6s">💿</span>
+        <span class="spin-fast" style="animation-delay:.1s">✦</span>
+        <span class="bounce" style="animation-delay:.8s">🎧</span>
+        <span class="spin-med" style="animation-delay:.7s">★</span>
+        <span class="bounce" style="animation-delay:.3s">🎶</span>
+        <span class="spin-fast" style="animation-delay:.9s">✦</span>
+        <span class="bounce" style="animation-delay:.5s">🎹</span>
+        <span class="spin-slow" style="animation-delay:.2s">★</span>
+      </div>
+
+      <p class="music-notice">
+        <span class="blink">★</span>
+        All playlists open in <strong>Spotify</strong>. Click any card to listen!
+        <span class="blink-slow">★</span>
+      </p>
+
+      <!-- ── WESTERN POP ───────────────────────────────── -->
+      <div class="pl-section-head">
+        <span class="spin-med">♪</span> Western Pop
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/37i9dQZF1DWVcJK7WY4M52?si=84df76179ecf40f5" target="_blank" rel="noopener">
+          <span class="pl-icon">🎵</span>
+          <div class="pl-info">
+            <div class="pl-name">90s Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/008G1BbvK1NQvbAV8MHvDz?si=02bf2b76bad84f3d" target="_blank" rel="noopener">
+          <span class="pl-icon">🎵</span>
+          <div class="pl-info">
+            <div class="pl-name">00s Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── WESTERN ROCK ──────────────────────────────── -->
+      <div class="pl-section-head purple-head">
+        <span class="spin-fast">★</span> Western Rock
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/4rKBUMCDSvAlN8rYRF9cys?si=8bbe8c9150f64765" target="_blank" rel="noopener">
+          <span class="pl-icon">🎸</span>
+          <div class="pl-info">
+            <div class="pl-name">90s Rock</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/37i9dQZF1DX3oM43CtKnRV?si=256b6c13f0874d21" target="_blank" rel="noopener">
+          <span class="pl-icon">🎸</span>
+          <div class="pl-info">
+            <div class="pl-name">00s Rock</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── HIP HOP, R&B, DANCE ───────────────────────── -->
+      <div class="pl-section-head pink-head">
+        <span class="bounce">🎤</span> Hip-Hop, R&amp;B &amp; Dance
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/37i9dQZF1DX186v583rmzp?si=4b1281bfd7f34b6a" target="_blank" rel="noopener">
+          <span class="pl-icon">🎤</span>
+          <div class="pl-info">
+            <div class="pl-name">90s Hip-Hop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/37i9dQZF1DX1lHW2vbQwNN?si=1a178cd0cee24f8f" target="_blank" rel="noopener">
+          <span class="pl-icon">🎤</span>
+          <div class="pl-info">
+            <div class="pl-name">00s Hip-Hop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/1kMyrcNKPws587cSAOjyDP?si=5f3086fa72494dbf" target="_blank" rel="noopener">
+          <span class="pl-icon">🎼</span>
+          <div class="pl-info">
+            <div class="pl-name">90s R&amp;B</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/37i9dQZF1DWSj4n2q6ZYVe?si=d2bdfa5aa4f14cb2" target="_blank" rel="noopener">
+          <span class="pl-icon">💃</span>
+          <div class="pl-info">
+            <div class="pl-name">00s Dance</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── mid-page decoration ───────────────────────── -->
+      <div class="hazard-bar"></div>
+      <div class="gif-strip-mid">
+        <span class="spin-slow">✦</span>
+        <span class="blink">♪</span>
+        <span class="spin-fast" style="animation-delay:.3s">★</span>
+        <span class="bounce" style="animation-delay:.5s">🎵</span>
+        <span class="blink-slow">♫</span>
+        <span class="spin-med" style="animation-delay:.7s">✦</span>
+        <span class="bounce" style="animation-delay:.2s">💿</span>
+        <span class="blink" style="animation-delay:.4s">♪</span>
+        <span class="spin-slow" style="animation-delay:.9s">★</span>
+        <span class="bounce" style="animation-delay:.1s">🎶</span>
+        <span class="blink-slow" style="animation-delay:.6s">♫</span>
+        <span class="spin-fast" style="animation-delay:.8s">✦</span>
+      </div>
+      <div class="hazard-bar"></div>
+
+      <!-- ── LATIN ─────────────────────────────────────── -->
+      <div class="pl-section-head dark-head">
+        <span class="spin-slow">★</span> Latin
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/6t3mtBXBjmbTAOaOnQ9llK?si=1daf65fb6a30496c" target="_blank" rel="noopener">
+          <span class="pl-icon">🎺</span>
+          <div class="pl-info">
+            <div class="pl-name">90s–00s Latin</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── K-POP ──────────────────────────────────────── -->
+      <div class="pl-section-head pink-head">
+        <span class="bounce" style="animation-delay:.1s">✨</span> K-Pop
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/2GVpRH9Pozw3SSiwuuroJj?si=0ae926d4548a4174" target="_blank" rel="noopener">
+          <span class="pl-icon">✨</span>
+          <div class="pl-info">
+            <div class="pl-name">90s K-Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/6gdxPIG3WVmP99MjmYCe98?si=ace3be7d63e6400e" target="_blank" rel="noopener">
+          <span class="pl-icon">✨</span>
+          <div class="pl-info">
+            <div class="pl-name">00s–10s K-Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── V-POP ──────────────────────────────────────── -->
+      <div class="pl-section-head purple-head">
+        <span class="spin-med" style="animation-delay:.4s">♪</span> V-Pop
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/4yLx6j2Fdpy0m9cc5k52VL?si=53a315bd186a4ad0" target="_blank" rel="noopener">
+          <span class="pl-icon">🇻🇳</span>
+          <div class="pl-info">
+            <div class="pl-name">90s V-Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/0KQ6wpkjdCRpoyRhzUUEV3?si=07369f0ee19d44d8" target="_blank" rel="noopener">
+          <span class="pl-icon">🇻🇳</span>
+          <div class="pl-info">
+            <div class="pl-name">00s V-Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── J-POP & CANTOPOP ───────────────────────────── -->
+      <div class="pl-section-head">
+        <span class="spin-slow" style="animation-delay:.2s">★</span> J-Pop &amp; Cantopop
+      </div>
+      <div class="playlist-grid">
+        <a class="pl-card" href="https://open.spotify.com/playlist/7aLq60EWuAKJ1tCga3XMSi?si=4214d7bd29cd4302" target="_blank" rel="noopener">
+          <span class="pl-icon">🌸</span>
+          <div class="pl-info">
+            <div class="pl-name">90s–00s J-Pop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+        <a class="pl-card" href="https://open.spotify.com/playlist/12rjCFxeO1DFy2XSpg9AK4?si=e9945d2a2b0e46a0" target="_blank" rel="noopener">
+          <span class="pl-icon">🌟</span>
+          <div class="pl-info">
+            <div class="pl-name">90s–00s Cantopop</div>
+            <div class="pl-listen">▶ Open in Spotify</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ── Bottom gif bar ────────────────────────────── -->
+      <div class="hazard-bar"></div>
+      <div class="gif-bar" style="margin-top: 6px;">
+        <span class="spin-med" style="animation-delay:.6s">✦</span>
+        <span class="bounce" style="animation-delay:.1s">🎵</span>
+        <span class="spin-fast" style="animation-delay:.3s">★</span>
+        <span class="bounce" style="animation-delay:.9s">🎸</span>
+        <span class="spin-slow" style="animation-delay:.5s">✦</span>
+        <span class="bounce" style="animation-delay:.7s">🎤</span>
+        <span class="spin-med" style="animation-delay:.2s">★</span>
+        <span class="bounce" style="animation-delay:.4s">💿</span>
+        <span class="spin-fast" style="animation-delay:.8s">✦</span>
+        <span class="bounce" style="animation-delay:.6s">🎧</span>
+        <span class="spin-slow" style="animation-delay:.3s">★</span>
+        <span class="bounce" style="animation-delay:.5s">🎶</span>
+        <span class="spin-med" style="animation-delay:.1s">✦</span>
+      </div>
+
+    </div>
+
+    <div class="page-footer">
+      <span>Music Playlists</span>
+      <span>MOA: Modern Origin Archive &bull; Grade 9 Foundations of the Modern World</span>
+      <span>Best viewed at 800&times;600</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="../nav.js"></script>
+</body>
+</html>

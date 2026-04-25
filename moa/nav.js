@@ -18,6 +18,7 @@ const PAGES = [
   { slug: 'tcc',          label: 'Time, Continuity & Change'},
   { slug: 'conclusions',  label: 'Conclusions'              },
   { slug: 'timeline',     label: 'The Timeline'             },
+  { slug: 'music',        label: '🎵 Music'                 },
   { slug: 'guestbook',   label: '📖 Guestbook'             },
 ];
 
@@ -157,11 +158,9 @@ function initSidebarExtras() {
   const ul = document.createElement('ul');
   ul.className = 'cool-links-list';
   const links = [
-    { label: '🏠 The Project',       href: getBase() + 'index.html',   ext: false },
-    { label: '❓ Research Question',  href: getBase() + 'rq/',           ext: false },
-    { label: '📚 Finding Sources',    href: getBase() + 'sources/',      ext: false },
-    { label: '📖 Sign Guestbook',     href: getBase() + 'guestbook/',    ext: false },
-    { label: '🌐 SSIS Library',       href: 'https://sites.google.com/ssis.edu.vn/library/library?authuser=2', ext: true },
+    { label: '🎵 Music Playlists',  href: getBase() + 'music/',         ext: false },
+    { label: '📖 Sign Guestbook',   href: getBase() + 'guestbook/',     ext: false },
+    { label: '🌐 SSIS Library',     href: 'https://sites.google.com/ssis.edu.vn/library/library?authuser=2', ext: true },
   ];
   links.forEach(lnk => {
     const li = document.createElement('li');
