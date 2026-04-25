@@ -200,8 +200,9 @@ function initSidebarLogo() {
   const logo = document.querySelector('.sidebar-logo');
   if (!logo) return;
   const base = getBase();
+  const override = window.MOA_LOGO_OVERRIDE || {};
   const img = document.createElement('img');
-  img.src = base + 'moa.png';
+  img.src = override.src || (base + 'moa.png');
   img.alt = 'MOA: Modern Origin Archive';
 
   function spin() {
@@ -211,7 +212,7 @@ function initSidebarLogo() {
   }
 
   spin();
-  setInterval(spin, 60000);
+  setInterval(spin, override.interval || 60000);
 
   img.addEventListener('click', () => {
     window.location.href = base + 'index.html';
