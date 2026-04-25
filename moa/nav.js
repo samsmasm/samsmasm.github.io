@@ -141,6 +141,15 @@ function initHitCounter() {
   document.head.appendChild(script);
 }
 
+function initLastUpdated() {
+  const footer = document.querySelector('.page-footer');
+  if (!footer) return;
+  const span = document.createElement('span');
+  span.className = 'last-updated';
+  span.textContent = 'Last updated: April 2025';
+  footer.appendChild(span);
+}
+
 function initSidebarLogo() {
   const logo = document.querySelector('.sidebar-logo');
   if (!logo) return;
@@ -173,4 +182,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initFontCtrl();
   initHitCounter();
   initSidebarLogo();
+  initLastUpdated();
 });
