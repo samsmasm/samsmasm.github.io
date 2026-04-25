@@ -180,9 +180,9 @@ function initSidebarExtras() {
   aboutDiv.innerHTML =
     '<div class="sidebar-extra-title">ℹ About This Site</div>' +
     '<p class="sidebar-about-text">' +
-      '<strong>MOA</strong> is a Grade&nbsp;9 History project site.<br>' +
-      'Unit: Foundations of the Modern World.<br>' +
+      '<strong>MOA</strong> is a Grade&nbsp;9 Foundations of the Modern World site.<br>' +
       'Events: <strong>1990–2015</strong>.<br>' +
+      'This site is straight out of the 90s.<br>' +
       'Best viewed at 800&times;600. ✦' +
     '</p>';
   win.appendChild(aboutDiv);
@@ -193,7 +193,7 @@ function initLastUpdated() {
   if (!footer) return;
   const span = document.createElement('span');
   span.className = 'last-updated';
-  span.textContent = 'Last updated: April 2025';
+  span.textContent = 'Last updated: April 2026';
   footer.appendChild(span);
 }
 
