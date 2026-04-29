@@ -15,6 +15,7 @@ async function init() {
   DATA = await fetch("data/hlpi.json").then(r => r.json());
   buildGroupSelector();
   bindControls();
+  bindQuiz();
   render();
 }
 
@@ -363,6 +364,90 @@ function renderBarChart() {
       },
     },
   });
+}
+
+// ── Quiz ──────────────────────────────────────────────────────
+
+function bindQuiz() {
+  const toggle = document.getElementById("quiz-toggle");
+  const panel  = document.getElementById("quiz-panel");
+
+  toggle.addEventListener("click", () => {
+    const open = !panel.hasAttribute("hidden");
+    if (open) {
+      panel.setAttribute("hidden", "");
+      toggle.textContent = "Which group am I? →";
+    } else {
+      panel.removeAttribute("hidden");
+      toggle.textContent = "Close ✕";
+    }
+  });
+
+  document.getElementById("quiz-submit").addEventListener("click", runQuiz);
+}
+
+function runQuiz() {
+  const matches = [];
+
+  if (document.getElementById("quiz-superannuitant").checked) matches.push("superannuitants");
+  if (document.getElementById("quiz-beneficiary").checked)    matches.push("beneficiaries");
+  if (document.getElementById("quiz-maori").checked)          matches.push("maori");
+
+  const incomeQ = document.querySelector('input[name="quiz-income"]:checked');
+  if (incomeQ && incomeQ.value !== "none") matches.push(incomeQ.value);
+
+  const expQ = document.querySelector('input[name="quiz-exp"]:checked');
+  if (expQ && expQ.value !== "none") matches.push(expQ.value);
+
+  const resultEl = document.getElementById("quiz-result");
+  resultEl.removeAttribute("hidden");
+  resultEl.innerHTML = "";
+
+  if (matches.length === 0) {
+    const p = document.createElement("p");
+    p.className = "quiz-result-text";
+    p.textContent = "No specific group matched — All Households is your best fit.";
+    resultEl.appendChild(p);
+    return;
+  }
+
+  if (matches.length === 1) {
+    const g = groupById(matches[0]);
+    const p = document.createElement("p");
+    p.className = "quiz-result-text";
+    p.textContent = "Your closest match:";
+    resultEl.appendChild(p);
+    resultEl.appendChild(makeQuizSelectBtn(g));
+    return;
+  }
+
+  const p = document.createElement("p");
+  p.className = "quiz-result-text";
+  p.textContent = "You fit multiple groups — pick one to compare:";
+  resultEl.appendChild(p);
+
+  const choices = document.createElement("div");
+  choices.className = "quiz-result-choices";
+  matches.forEach(id => choices.appendChild(makeQuizSelectBtn(groupById(id))));
+  resultEl.appendChild(choices);
+}
+
+function makeQuizSelectBtn(g) {
+  const btn = document.createElement("button");
+  btn.className = "quiz-select-btn";
+  btn.textContent = g.label;
+  btn.style.setProperty("--btn-color",      g.color);
+  btn.style.setProperty("--btn-text-color", pillTextColor(g.color));
+  btn.addEventListener("click", () => applyQuizGroup(g.id));
+  return btn;
+}
+
+function applyQuizGroup(id) {
+  selectedGroups = [id];
+  syncPillStates();
+  render();
+  document.getElementById("quiz-panel").setAttribute("hidden", "");
+  document.getElementById("quiz-toggle").textContent = "Which group am I? →";
 }
 
 // ── Go ────────────────────────────────────────────────────────
