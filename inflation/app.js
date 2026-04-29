@@ -44,23 +44,21 @@ const TENURE_LABELS = {
 
 // ── Boot ────────────────────────────────────────────────────
 
+// Tab switching binds immediately (no data dependency)
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+});
+
 async function init() {
   DATA = await fetch("data/hlpi.json").then(r => r.json());
   buildGroupSelector();
   bindControls();
-  bindTabs();
   bindTenure();
   bindQuiz();
   render();
 }
 
 // ── Tabs ─────────────────────────────────────────────────────
-
-function bindTabs() {
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
-  });
-}
 
 function activateTab(name) {
   document.querySelectorAll(".tab-btn").forEach(b =>
