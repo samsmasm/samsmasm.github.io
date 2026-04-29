@@ -44,11 +44,6 @@ const TENURE_LABELS = {
 
 // ── Boot ────────────────────────────────────────────────────
 
-// Tab switching binds immediately (no data dependency)
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => activateTab(btn.dataset.tab));
-});
-
 async function init() {
   DATA = await fetch("data/hlpi.json").then(r => r.json());
   buildGroupSelector();
@@ -56,17 +51,6 @@ async function init() {
   bindTenure();
   bindQuiz();
   render();
-}
-
-// ── Tabs ─────────────────────────────────────────────────────
-
-function activateTab(name) {
-  document.querySelectorAll(".tab-btn").forEach(b =>
-    b.classList.toggle("active", b.dataset.tab === name)
-  );
-  document.querySelectorAll(".tab-panel").forEach(p =>
-    p.classList.toggle("active", p.dataset.tab === name)
-  );
 }
 
 // ── Group selector ──────────────────────────────────────────
@@ -90,9 +74,6 @@ function buildGroupSelector() {
     });
   });
 
-  document.getElementById("personalise-link").addEventListener("click", () => {
-    activateTab("personalise");
-  });
 }
 
 function makePill(group) {
@@ -325,7 +306,7 @@ function renderLineChart() {
     };
   }
 
-  const cpiDataset = buildDataset("CPI (headline)", "#000000", DATA.cpi.annual.all, true);
+  const cpiDataset = buildDataset("CPI (headline)", "#64748b", DATA.cpi.annual.all, true);
   if (isIndex) cpiDataset.data = rebase(sliceLast(DATA.cpi.index.all, n));
 
   const groupDatasets = selectedGroups.map(id => {
@@ -585,7 +566,6 @@ function applyQuizGroup(id) {
   render();
   document.getElementById("quiz-panel").setAttribute("hidden", "");
   document.getElementById("quiz-toggle").textContent = "Which group am I? →";
-  activateTab("groups");
 }
 
 // ── Go ────────────────────────────────────────────────────────
