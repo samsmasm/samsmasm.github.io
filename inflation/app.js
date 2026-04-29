@@ -384,6 +384,10 @@ function bindQuiz() {
   });
 
   document.getElementById("quiz-submit").addEventListener("click", runQuiz);
+
+  document.getElementById("quintile-info-btn").addEventListener("click", () => {
+    document.getElementById("quintile-info-panel").toggleAttribute("hidden");
+  });
 }
 
 function runQuiz() {
