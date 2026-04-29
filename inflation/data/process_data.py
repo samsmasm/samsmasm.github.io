@@ -228,7 +228,15 @@ def annual_change(index_by_q, quarters):
 # ── HLC24 weights ────────────────────────────────────────────
 
 def parse_hlc_weights(ws):
-    """Return {row_id: Dec-2024 weight} from an HLC24 table sheet."""
+    """Return {row_id: Dec-2024 weight} from an HLC24 table sheet.
+
+    Group-level rows (name in column 0) produce keys like:
+      housing_and_household_utilities_group
+    Subgroup-level rows (name in column 1) produce nested keys like:
+      housing_and_household_utilities_group__actual_rentals_for_housing
+    Source: HLC24.xlsx, December 2024 expenditure weights.
+    Update after each Stats NZ HLPI weights review (~every 3 years).
+    """
     rows_raw = list(ws.iter_rows(values_only=True))
 
     dec2024_col = None
@@ -252,33 +260,52 @@ def parse_hlc_weights(ws):
     weights = {}
     current_group_id = None
     parsing = False
+
     for row in rows_raw:
-        name = row[0]
-        if not name:
+        col0 = row[0] if len(row) > 0 else None
+        col1 = row[1] if len(row) > 1 else None
+
+        # Determine name and hierarchy level from column position
+        if col0 is not None:
+            name = str(col0)
+            is_subgroup = False
+        elif col1 is not None:
+            name = str(col1)
+            is_subgroup = True
+        else:
             continue
-        s = str(name)
-        if "Group or subgroup" in s:
+
+        if "Group or subgroup" in name:
             parsing = True
             continue
         if not parsing:
             continue
-        if any(t in s.lower() for t in {"source", "all groups", "figures may"}):
+
+        clean = name.strip()
+        if not clean:
             continue
-        indent = (len(s) - len(s.lstrip())) // 4
-        if indent >= 2:
+        if any(t in clean.lower() for t in {"source", "all groups", "figures may"}):
             continue
-        clean = s.strip()
+        if re.match(r"^\d+\.", clean):
+            continue
+
+        val = row[dec2024_col] if dec2024_col < len(row) else None
+        if val is None:
+            continue
+
         rid = slugify(clean)
-        if indent == 0:
-            current_group_id = rid
-        elif indent == 1:
+        if is_subgroup:
+            if current_group_id is None:
+                continue
             rid = current_group_id + "__" + rid
-        val = row[dec2024_col]
-        if val is not None:
-            try:
-                weights[rid] = round(float(val), 4)
-            except (TypeError, ValueError):
-                pass
+        else:
+            current_group_id = rid
+
+        try:
+            weights[rid] = round(float(val), 4)
+        except (TypeError, ValueError):
+            pass
+
     return weights
 
 

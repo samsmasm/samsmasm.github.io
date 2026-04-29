@@ -2,13 +2,45 @@
    Inflation Tracker — app.js
    ============================================================ */
 
-let DATA                = null;
-let selectedGroups      = ["all_households"];
-let selectedYears       = 1;
-let viewMode            = "annual";   // "annual" | "index"
-let lineChart           = null;
-let barChart            = null;
+let DATA                 = null;
+let selectedGroups       = ["all_households"];
+let selectedYears        = 1;
+let viewMode             = "annual";   // "annual" | "index"
+let selectedTenure       = null;       // null | "renter" | "outright" | "mortgaged"
+let lineChart            = null;
+let barChart             = null;
 let userHasSelectedGroup = false;
+
+// ── Tenure config ────────────────────────────────────────────
+// Home ownership proportions by group (owned outright + mortgaged, including family trusts).
+// Source: Stats NZ Table A1, 2022/23 Household Economic Survey.
+// Update after each HILS expenditure module cycle (~every 3 years).
+const HOME_OWNERSHIP_PCT = {
+  all_households:  65.8,
+  beneficiaries:   26.4,
+  maori:           47.0,
+  superannuitants: 85.7,
+  income_q1:       66.7,
+  income_q2:       53.2,
+  income_q3:       59.9,
+  income_q4:       69.9,
+  income_q5:       79.8,
+  expenditure_q1:  60.5,
+  expenditure_q2:  58.8,
+  expenditure_q3:  61.4,
+  expenditure_q4:  65.7,
+  expenditure_q5:  82.3,
+};
+
+// Fraction of homeowners carrying a mortgage (national estimate, HES 2022/23).
+// Assumed constant across groups. Update after each HES / HILS cycle.
+const F_MORT = 0.57;
+
+const TENURE_LABELS = {
+  renter:    "renter",
+  outright:  "outright owner",
+  mortgaged: "mortgaged owner",
+};
 
 // ── Boot ────────────────────────────────────────────────────
 
@@ -16,8 +48,27 @@ async function init() {
   DATA = await fetch("data/hlpi.json").then(r => r.json());
   buildGroupSelector();
   bindControls();
+  bindTabs();
+  bindTenure();
   bindQuiz();
   render();
+}
+
+// ── Tabs ─────────────────────────────────────────────────────
+
+function bindTabs() {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+  });
+}
+
+function activateTab(name) {
+  document.querySelectorAll(".tab-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === name)
+  );
+  document.querySelectorAll(".tab-panel").forEach(p =>
+    p.classList.toggle("active", p.dataset.tab === name)
+  );
 }
 
 // ── Group selector ──────────────────────────────────────────
@@ -39,6 +90,10 @@ function buildGroupSelector() {
       btn.classList.toggle("open", !isOpen);
       btn.querySelector(".section-chevron").textContent = isOpen ? "+" : "−";
     });
+  });
+
+  document.getElementById("personalise-link").addEventListener("click", () => {
+    activateTab("personalise");
   });
 }
 
@@ -101,6 +156,83 @@ function bindControls() {
   });
 }
 
+// ── Tenure ────────────────────────────────────────────────────
+
+function bindTenure() {
+  document.querySelectorAll('input[name="tenure"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      const val      = document.querySelector('input[name="tenure"]:checked')?.value;
+      selectedTenure = (val === "none") ? null : (val ?? null);
+      userHasSelectedGroup = true;
+      render();
+    });
+  });
+}
+
+// Adjust the annual % series for a specific housing tenure type.
+//
+// The group HLPI rate is a weighted average over all members, including
+// mixed tenure types. This function re-weights to reflect what a specific
+// tenure type actually pays:
+//   - Renter:          rent scaled up to 1/p_rent; rates/maintenance/interest removed
+//   - Outright owner:  rent removed; rates/maintenance scaled up to 1/p_own; interest removed
+//   - Mortgaged owner: rent removed; rates/maintenance scaled to 1/p_own; interest to 1/p_mort
+//
+// Weights: HLC24 Dec 2024 (in group.weights). Tenure proportions: HES 2022/23 Table A1.
+function computeTenureAdjustedAnnual(group, tenure) {
+  if (!tenure) return group.annual.all;
+
+  const p_own  = (HOME_OWNERSHIP_PCT[group.id] ?? 65.8) / 100;
+  const p_rent = 1 - p_own;
+  const p_mort = p_own * F_MORT;
+
+  const w       = group.weights;
+  const w_rent  = w["housing_and_household_utilities_group__actual_rentals_for_housing"]         ?? 0;
+  const w_rates = w["housing_and_household_utilities_group__property_rates_and_related_services"] ?? 0;
+  const w_maint = w["housing_and_household_utilities_group__property_maintenance"]                ?? 0;
+  const w_int   = w["interest_payments_group"]                                                    ?? 0;
+
+  const r_rent_s  = group.annual["sub__actual_rentals_for_housing"]              ?? [];
+  const r_rates_s = group.annual["sub__property_rates_and_related_services"]     ?? [];
+  const r_maint_s = group.annual["sub__property_maintenance"]                    ?? [];
+  const r_int_s   = group.annual["interest_payments"]                            ?? [];
+
+  return group.annual.all.map((r_group, i) => {
+    if (r_group == null) return null;
+    const r_rent  = r_rent_s[i];
+    const r_rates = r_rates_s[i];
+    const r_maint = r_maint_s[i];
+    const r_int   = r_int_s[i];
+    if (r_rent == null || r_rates == null || r_maint == null || r_int == null) return r_group;
+
+    let num, den;
+
+    if (tenure === "renter") {
+      const extra = p_rent > 0 ? w_rent * (1/p_rent - 1) : 0;
+      num = r_group * 100 + extra * r_rent - w_rates * r_rates - w_maint * r_maint - w_int * r_int;
+      den = 100 + extra - w_rates - w_maint - w_int;
+
+    } else if (tenure === "outright") {
+      const extra_r = p_own > 0 ? w_rates * (1/p_own - 1) : 0;
+      const extra_m = p_own > 0 ? w_maint * (1/p_own - 1) : 0;
+      num = r_group * 100 - w_rent * r_rent + extra_r * r_rates + extra_m * r_maint - w_int * r_int;
+      den = 100 - w_rent + extra_r + extra_m - w_int;
+
+    } else if (tenure === "mortgaged") {
+      const extra_r = p_own  > 0 ? w_rates * (1/p_own  - 1) : 0;
+      const extra_m = p_own  > 0 ? w_maint * (1/p_own  - 1) : 0;
+      const extra_i = p_mort > 0 ? w_int   * (1/p_mort - 1) : 0;
+      num = r_group * 100 - w_rent * r_rent + extra_r * r_rates + extra_m * r_maint + extra_i * r_int;
+      den = 100 - w_rent + extra_r + extra_m + extra_i;
+
+    } else {
+      return r_group;
+    }
+
+    return den > 0 ? round2(num / den) : r_group;
+  });
+}
+
 // ── Data helpers ─────────────────────────────────────────────
 
 function quartersForRange(years) {
@@ -119,7 +251,6 @@ function topLevelCategories() {
   return DATA.subgroups.filter(s => s.level === 0);
 }
 
-// Rebase an index array so that the first non-null value = 100
 function rebase(arr) {
   const first = arr.find(v => v != null);
   if (first == null) return arr.map(() => null);
@@ -157,13 +288,15 @@ function renderHero() {
   hookEl.setAttribute("hidden", "");
   statsEl.removeAttribute("hidden");
 
-  const primary = groupById(selectedGroups[0]);
-  const grpRate = primary.annual.all.at(-1);
-  const diff    = grpRate - cpiRate;
-  const sign    = diff > 0 ? "+" : "";
+  const primary   = groupById(selectedGroups[0]);
+  const adjSeries = computeTenureAdjustedAnnual(primary, selectedTenure);
+  const grpRate   = adjSeries.at(-1);
+  const diff      = grpRate - cpiRate;
+  const sign      = diff > 0 ? "+" : "";
 
+  const tenureLabel = selectedTenure ? ` · ${TENURE_LABELS[selectedTenure]}` : "";
   document.getElementById("hero-group-rate").textContent = grpRate.toFixed(1) + "%";
-  document.getElementById("hero-group-name").textContent = primary.label;
+  document.getElementById("hero-group-name").textContent = primary.label + tenureLabel;
 
   const diffEl = document.getElementById("hero-diff");
   diffEl.textContent = `${sign}${diff.toFixed(1)}% vs headline`;
@@ -183,11 +316,11 @@ function renderLineChart() {
     return {
       label,
       data,
-      borderColor:     color,
-      backgroundColor: color + "18",
-      borderDash:      dash ? [5, 4] : [],
-      borderWidth:     dash ? 2 : 2.5,
-      pointRadius:     dash ? 2 : 3,
+      borderColor:      color,
+      backgroundColor:  color + "18",
+      borderDash:       dash ? [5, 4] : [],
+      borderWidth:      dash ? 2 : 2.5,
+      pointRadius:      dash ? 2 : 3,
       pointHoverRadius: 5,
       tension: 0.35,
       order:   dash ? 99 : 1,
@@ -198,14 +331,18 @@ function renderLineChart() {
   if (isIndex) cpiDataset.data = rebase(sliceLast(DATA.cpi.index.all, n));
 
   const groupDatasets = selectedGroups.map(id => {
-    const g = groupById(id);
-    const arr = isIndex ? g.index.all : g.annual.all;
-    return buildDataset(g.label, g.color, arr);
+    const g      = groupById(id);
+    const adjArr = computeTenureAdjustedAnnual(g, selectedTenure);
+    const arr    = isIndex ? g.index.all : adjArr;
+    const label  = selectedTenure ? `${g.label} (${TENURE_LABELS[selectedTenure]})` : g.label;
+    return buildDataset(label, g.color, arr);
   });
 
   const yLabel = isIndex
     ? "Cumulative change since start (%)"
-    : "Annual change (%)";
+    : selectedTenure
+      ? `Annual change — ${TENURE_LABELS[selectedTenure]} (%)`
+      : "Annual change (%)";
 
   const ctx = document.getElementById("line-chart");
   if (lineChart) lineChart.destroy();
@@ -292,7 +429,7 @@ function renderBarChart() {
   const labels   = cats.map(s => s.label);
   const hlpiVals = cats.map(s => latestOrCumulative(primary.annual, primary.index, s.id));
   const cpiVals  = cats.map(s => {
-    if (!DATA.cpi.annual[s.id]) return null;  // Interest payments not in CPI
+    if (!DATA.cpi.annual[s.id]) return null;
     return latestOrCumulative(DATA.cpi.annual, DATA.cpi.index, s.id);
   });
 
@@ -300,8 +437,10 @@ function renderBarChart() {
     ? `cumulative since ${quartersForRange(selectedYears)[0]}`
     : `annual · ${DATA.quarters.at(-1)}`;
 
+  const groupLabel = primary.label;
+
   document.getElementById("bar-chart-subtitle").textContent =
-    `· ${primary.label} vs CPI · ${periodLabel}`;
+    `· ${groupLabel} vs CPI · ${periodLabel}`;
 
   const ctx = document.getElementById("bar-chart");
   if (barChart) barChart.destroy();
@@ -312,7 +451,7 @@ function renderBarChart() {
       labels,
       datasets: [
         {
-          label: primary.label,
+          label: groupLabel,
           data:  hlpiVals,
           backgroundColor: primary.color + "cc",
           borderRadius: 3,
@@ -448,6 +587,7 @@ function applyQuizGroup(id) {
   render();
   document.getElementById("quiz-panel").setAttribute("hidden", "");
   document.getElementById("quiz-toggle").textContent = "Which group am I? →";
+  activateTab("groups");
 }
 
 // ── Go ────────────────────────────────────────────────────────
