@@ -283,28 +283,21 @@ function renderBarChart() {
   const isIndex  = viewMode === "index";
   const n        = selectedYears * 4;
 
-  function latestOrCumulative(series, catId) {
-    const arr = series[catId];
-    if (!arr) return null;
+  function latestOrCumulative(annualSeries, indexSeries, catId) {
     if (isIndex) {
-      const sliced = sliceLast(arr, n);
-      const rebased = rebase(sliced);
-      return rebased.at(-1);
+      const arr = indexSeries[catId];
+      if (!arr) return null;
+      return rebase(sliceLast(arr, n)).at(-1);
     }
-    return arr.at(-1);
+    const arr = annualSeries[catId];
+    return arr ? arr.at(-1) : null;
   }
 
-  const labels    = cats.map(s => s.label);
-  const hlpiVals  = cats.map(s => latestOrCumulative(primary.annual,  s.id));
-  const cpiVals   = cats.map(s => {
-    const arr = DATA.cpi.annual[s.id];
-    if (!arr) return null;   // Interest payments not in CPI
-    if (isIndex) {
-      const sliced  = sliceLast(arr, n);
-      const rebased = rebase(sliceLast(DATA.cpi.index[s.id], n));
-      return rebased.at(-1);
-    }
-    return arr.at(-1);
+  const labels   = cats.map(s => s.label);
+  const hlpiVals = cats.map(s => latestOrCumulative(primary.annual, primary.index, s.id));
+  const cpiVals  = cats.map(s => {
+    if (!DATA.cpi.annual[s.id]) return null;  // Interest payments not in CPI
+    return latestOrCumulative(DATA.cpi.annual, DATA.cpi.index, s.id);
   });
 
   const periodLabel = isIndex
