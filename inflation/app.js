@@ -9,6 +9,7 @@ let viewMode             = "annual";   // "annual" | "index"
 let selectedTenure       = null;       // null | "renter" | "outright" | "mortgaged"
 let lineChart            = null;
 let barChart             = null;
+let selectedBarGroup     = null;
 let userHasSelectedGroup = false;
 
 // ── Tenure config ────────────────────────────────────────────
@@ -42,6 +43,19 @@ const TENURE_LABELS = {
   mortgaged: "mortgaged owner",
 };
 
+const QUINTILE_HINTS = {
+  income_q1:      "~$26k/yr",
+  income_q2:      "~$38k/yr",
+  income_q3:      "~$53k/yr",
+  income_q4:      "~$71k/yr",
+  income_q5:      "~$104k/yr",
+  expenditure_q1: "~$21k/yr",
+  expenditure_q2: "~$34k/yr",
+  expenditure_q3: "~$46k/yr",
+  expenditure_q4: "~$61k/yr",
+  expenditure_q5: "~$94k/yr",
+};
+
 // ── Boot ────────────────────────────────────────────────────
 
 async function init() {
@@ -49,7 +63,6 @@ async function init() {
   buildGroupSelector();
   bindControls();
   bindTenure();
-  bindQuiz();
   render();
 }
 
@@ -80,7 +93,10 @@ function makePill(group) {
   const btn = document.createElement("button");
   btn.className = "group-pill";
   btn.dataset.id = group.id;
-  btn.textContent = group.label;
+  const hint = QUINTILE_HINTS[group.id];
+  btn.innerHTML = hint
+    ? `${group.label} <span class="pill-hint">${hint}</span>`
+    : group.label;
   btn.style.setProperty("--pill-color", group.color);
   btn.style.setProperty("--pill-text-color", pillTextColor(group.color));
   if (selectedGroups.includes(group.id)) btn.classList.add("selected");
@@ -212,6 +228,63 @@ function computeTenureAdjustedAnnual(group, tenure) {
   });
 }
 
+// Same adjustment applied in index-level space (for cumulative view).
+// Mathematically equivalent to computeTenureAdjustedAnnual because the HLPI is
+// a weighted average of component indexes using the same basket weights.
+function computeTenureAdjustedIndex(group, tenure) {
+  if (!tenure) return group.index.all;
+
+  const p_own  = (HOME_OWNERSHIP_PCT[group.id] ?? 65.8) / 100;
+  const p_rent = 1 - p_own;
+  const p_mort = p_own * F_MORT;
+
+  const w       = group.weights;
+  const w_rent  = w["housing_and_household_utilities_group__actual_rentals_for_housing"]         ?? 0;
+  const w_rates = w["housing_and_household_utilities_group__property_rates_and_related_services"] ?? 0;
+  const w_maint = w["housing_and_household_utilities_group__property_maintenance"]                ?? 0;
+  const w_int   = w["interest_payments_group"]                                                    ?? 0;
+
+  const i_rent_s  = group.index["sub__actual_rentals_for_housing"]          ?? [];
+  const i_rates_s = group.index["sub__property_rates_and_related_services"] ?? [];
+  const i_maint_s = group.index["sub__property_maintenance"]                ?? [];
+  const i_int_s   = group.index["interest_payments"]                        ?? [];
+
+  return group.index.all.map((i_group, i) => {
+    if (i_group == null) return null;
+    const i_rent  = i_rent_s[i];
+    const i_rates = i_rates_s[i];
+    const i_maint = i_maint_s[i];
+    const i_int   = i_int_s[i];
+    if (i_rent == null || i_rates == null || i_maint == null || i_int == null) return i_group;
+
+    let num, den;
+
+    if (tenure === "renter") {
+      const extra = p_rent > 0 ? w_rent * (1/p_rent - 1) : 0;
+      num = i_group * 100 + extra * i_rent - w_rates * i_rates - w_maint * i_maint - w_int * i_int;
+      den = 100 + extra - w_rates - w_maint - w_int;
+
+    } else if (tenure === "outright") {
+      const extra_r = p_own > 0 ? w_rates * (1/p_own - 1) : 0;
+      const extra_m = p_own > 0 ? w_maint * (1/p_own - 1) : 0;
+      num = i_group * 100 - w_rent * i_rent + extra_r * i_rates + extra_m * i_maint - w_int * i_int;
+      den = 100 - w_rent + extra_r + extra_m - w_int;
+
+    } else if (tenure === "mortgaged") {
+      const extra_r = p_own  > 0 ? w_rates * (1/p_own  - 1) : 0;
+      const extra_m = p_own  > 0 ? w_maint * (1/p_own  - 1) : 0;
+      const extra_i = p_mort > 0 ? w_int   * (1/p_mort - 1) : 0;
+      num = i_group * 100 - w_rent * i_rent + extra_r * i_rates + extra_m * i_maint + extra_i * i_int;
+      den = 100 - w_rent + extra_r + extra_m + extra_i;
+
+    } else {
+      return i_group;
+    }
+
+    return den > 0 ? round2(num / den) : i_group;
+  });
+}
+
 // ── Data helpers ─────────────────────────────────────────────
 
 function quartersForRange(years) {
@@ -310,10 +383,11 @@ function renderLineChart() {
   if (isIndex) cpiDataset.data = rebase(sliceLast(DATA.cpi.index.all, n));
 
   const groupDatasets = selectedGroups.map(id => {
-    const g      = groupById(id);
-    const adjArr = computeTenureAdjustedAnnual(g, selectedTenure);
-    const arr    = isIndex ? g.index.all : adjArr;
-    const label  = selectedTenure ? `${g.label} (${TENURE_LABELS[selectedTenure]})` : g.label;
+    const g    = groupById(id);
+    const arr  = isIndex
+      ? computeTenureAdjustedIndex(g, selectedTenure)
+      : computeTenureAdjustedAnnual(g, selectedTenure);
+    const label = selectedTenure ? `${g.label} (${TENURE_LABELS[selectedTenure]})` : g.label;
     return buildDataset(label, g.color, arr);
   });
 
@@ -390,10 +464,27 @@ function renderLineChart() {
 // ── Bar chart ─────────────────────────────────────────────────
 
 function renderBarChart() {
-  const primary  = groupById(selectedGroups[0]);
-  const cats     = topLevelCategories();
-  const isIndex  = viewMode === "index";
-  const n        = selectedYears * 4;
+  if (!selectedBarGroup || !selectedGroups.includes(selectedBarGroup)) {
+    selectedBarGroup = selectedGroups[0];
+  }
+  const primary = groupById(selectedBarGroup);
+
+  // Render group tabs below the title
+  const tabsEl = document.getElementById("bar-group-tabs");
+  tabsEl.innerHTML = "";
+  selectedGroups.forEach(id => {
+    const g   = groupById(id);
+    const btn = document.createElement("button");
+    btn.className = "bar-group-tab" + (id === selectedBarGroup ? " active" : "");
+    btn.textContent = g.label;
+    btn.style.setProperty("--tab-color", g.color);
+    btn.addEventListener("click", () => { selectedBarGroup = id; renderBarChart(); });
+    tabsEl.appendChild(btn);
+  });
+
+  const cats    = topLevelCategories();
+  const isIndex = viewMode === "index";
+  const n       = selectedYears * 4;
 
   function latestOrCumulative(annualSeries, indexSeries, catId) {
     if (isIndex) {
@@ -416,10 +507,8 @@ function renderBarChart() {
     ? `cumulative since ${quartersForRange(selectedYears)[0]}`
     : `annual · ${DATA.quarters.at(-1)}`;
 
-  const groupLabel = primary.label;
-
   document.getElementById("bar-chart-subtitle").textContent =
-    `· ${groupLabel} vs CPI · ${periodLabel}`;
+    `${primary.label} vs CPI · ${periodLabel}`;
 
   const ctx = document.getElementById("bar-chart");
   if (barChart) barChart.destroy();
@@ -430,7 +519,7 @@ function renderBarChart() {
       labels,
       datasets: [
         {
-          label: groupLabel,
+          label: primary.label,
           data:  hlpiVals,
           backgroundColor: primary.color + "cc",
           borderRadius: 3,
@@ -477,95 +566,6 @@ function renderBarChart() {
       },
     },
   });
-}
-
-// ── Quiz ──────────────────────────────────────────────────────
-
-function bindQuiz() {
-  const toggle = document.getElementById("quiz-toggle");
-  const panel  = document.getElementById("quiz-panel");
-
-  toggle.addEventListener("click", () => {
-    const open = !panel.hasAttribute("hidden");
-    if (open) {
-      panel.setAttribute("hidden", "");
-      toggle.textContent = "Which group am I? →";
-    } else {
-      panel.removeAttribute("hidden");
-      toggle.textContent = "Close ✕";
-    }
-  });
-
-  document.getElementById("quiz-submit").addEventListener("click", runQuiz);
-
-  document.getElementById("quintile-info-btn").addEventListener("click", () => {
-    document.getElementById("quintile-info-panel").toggleAttribute("hidden");
-  });
-}
-
-function runQuiz() {
-  const matches = [];
-
-  if (document.getElementById("quiz-superannuitant").checked) matches.push("superannuitants");
-  if (document.getElementById("quiz-beneficiary").checked)    matches.push("beneficiaries");
-  if (document.getElementById("quiz-maori").checked)          matches.push("maori");
-
-  const incomeQ = document.querySelector('input[name="quiz-income"]:checked');
-  if (incomeQ && incomeQ.value !== "none") matches.push(incomeQ.value);
-
-  const expQ = document.querySelector('input[name="quiz-exp"]:checked');
-  if (expQ && expQ.value !== "none") matches.push(expQ.value);
-
-  const resultEl = document.getElementById("quiz-result");
-  resultEl.removeAttribute("hidden");
-  resultEl.innerHTML = "";
-
-  if (matches.length === 0) {
-    const p = document.createElement("p");
-    p.className = "quiz-result-text";
-    p.textContent = "No specific group matched — All Households is your best fit.";
-    resultEl.appendChild(p);
-    return;
-  }
-
-  if (matches.length === 1) {
-    const g = groupById(matches[0]);
-    const p = document.createElement("p");
-    p.className = "quiz-result-text";
-    p.textContent = "Your closest match:";
-    resultEl.appendChild(p);
-    resultEl.appendChild(makeQuizSelectBtn(g));
-    return;
-  }
-
-  const p = document.createElement("p");
-  p.className = "quiz-result-text";
-  p.textContent = "You fit multiple groups — pick one to compare:";
-  resultEl.appendChild(p);
-
-  const choices = document.createElement("div");
-  choices.className = "quiz-result-choices";
-  matches.forEach(id => choices.appendChild(makeQuizSelectBtn(groupById(id))));
-  resultEl.appendChild(choices);
-}
-
-function makeQuizSelectBtn(g) {
-  const btn = document.createElement("button");
-  btn.className = "quiz-select-btn";
-  btn.textContent = g.label;
-  btn.style.setProperty("--btn-color",      g.color);
-  btn.style.setProperty("--btn-text-color", pillTextColor(g.color));
-  btn.addEventListener("click", () => applyQuizGroup(g.id));
-  return btn;
-}
-
-function applyQuizGroup(id) {
-  userHasSelectedGroup = true;
-  selectedGroups = [id];
-  syncPillStates();
-  render();
-  document.getElementById("quiz-panel").setAttribute("hidden", "");
-  document.getElementById("quiz-toggle").textContent = "Which group am I? →";
 }
 
 // ── Go ────────────────────────────────────────────────────────
