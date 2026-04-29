@@ -2,12 +2,13 @@
    Inflation Tracker — app.js
    ============================================================ */
 
-let DATA = null;
-let selectedGroups = ["all_households"];
-let selectedYears  = 1;
-let viewMode       = "annual";   // "annual" | "index"
-let lineChart      = null;
-let barChart       = null;
+let DATA                = null;
+let selectedGroups      = ["all_households"];
+let selectedYears       = 1;
+let viewMode            = "annual";   // "annual" | "index"
+let lineChart           = null;
+let barChart            = null;
+let userHasSelectedGroup = false;
 
 // ── Boot ────────────────────────────────────────────────────
 
@@ -22,10 +23,6 @@ async function init() {
 // ── Group selector ──────────────────────────────────────────
 
 function buildGroupSelector() {
-  const standalone = document.getElementById("standalone-pills");
-  const allHH = DATA.groups.find(g => g.id === "all_households");
-  standalone.appendChild(makePill(allHH));
-
   ["demographic", "income", "expenditure"].forEach(category => {
     const container = document.getElementById(`pills-${category}`);
     DATA.groups
@@ -33,13 +30,14 @@ function buildGroupSelector() {
       .forEach(g => container.appendChild(makePill(g)));
   });
 
-  document.querySelectorAll(".accordion-toggle").forEach(btn => {
+  document.querySelectorAll(".section-toggle").forEach(btn => {
     btn.addEventListener("click", () => {
-      const cat = btn.dataset.category;
-      const content = document.getElementById(`pills-${cat}`);
-      const open = content.classList.contains("open");
-      content.classList.toggle("open", !open);
-      btn.classList.toggle("open", !open);
+      const cat    = btn.dataset.category;
+      const pills  = document.getElementById(`pills-${cat}`);
+      const isOpen = pills.classList.contains("open");
+      pills.classList.toggle("open", !isOpen);
+      btn.classList.toggle("open", !isOpen);
+      btn.querySelector(".section-chevron").textContent = isOpen ? "+" : "−";
     });
   });
 }
@@ -64,6 +62,7 @@ function pillTextColor(hex) {
 }
 
 function toggleGroup(id) {
+  userHasSelectedGroup = true;
   if (selectedGroups.includes(id)) {
     if (selectedGroups.length === 1) return;
     selectedGroups = selectedGroups.filter(g => g !== id);
@@ -133,7 +132,6 @@ function round2(n) { return Math.round(n * 100) / 100; }
 
 function render() {
   renderHero();
-  renderSelectedSummary();
   renderLineChart();
   renderBarChart();
 }
@@ -141,38 +139,35 @@ function render() {
 // ── Hero ──────────────────────────────────────────────────────
 
 function renderHero() {
-  const primary = groupById(selectedGroups[0]);
   const latestQ = DATA.quarters.at(-1);
-  const cpiRate  = DATA.cpi.annual.all.at(-1);
-  const grpRate  = primary.annual.all.at(-1);
-  const diff     = grpRate - cpiRate;
-  const sign     = diff > 0 ? "+" : "";
+  const cpiRate = DATA.cpi.annual.all.at(-1);
 
-  document.getElementById("hero-cpi-rate").textContent  = cpiRate.toFixed(1) + "%";
+  document.getElementById("hero-cpi-rate").textContent    = cpiRate.toFixed(1) + "%";
   document.getElementById("hero-cpi-quarter").textContent = latestQ;
+
+  const hookEl  = document.getElementById("hero-hook");
+  const statsEl = document.getElementById("hero-group-stats");
+
+  if (!userHasSelectedGroup) {
+    hookEl.removeAttribute("hidden");
+    statsEl.setAttribute("hidden", "");
+    return;
+  }
+
+  hookEl.setAttribute("hidden", "");
+  statsEl.removeAttribute("hidden");
+
+  const primary = groupById(selectedGroups[0]);
+  const grpRate = primary.annual.all.at(-1);
+  const diff    = grpRate - cpiRate;
+  const sign    = diff > 0 ? "+" : "";
+
   document.getElementById("hero-group-rate").textContent = grpRate.toFixed(1) + "%";
   document.getElementById("hero-group-name").textContent = primary.label;
 
   const diffEl = document.getElementById("hero-diff");
   diffEl.textContent = `${sign}${diff.toFixed(1)}% vs headline`;
   diffEl.className   = "hero-diff " + (diff > 0.1 ? "above" : diff < -0.1 ? "below" : "same");
-}
-
-// ── Selected summary chips ────────────────────────────────────
-
-function renderSelectedSummary() {
-  const el = document.getElementById("selected-summary");
-  el.innerHTML = "";
-  selectedGroups.forEach(id => {
-    const g = groupById(id);
-    const chip = document.createElement("div");
-    chip.className = "summary-chip";
-    chip.style.setProperty("--chip-color",  g.color + "22");
-    chip.style.setProperty("--chip-text",   g.color);
-    chip.style.setProperty("--chip-swatch", g.color);
-    chip.innerHTML = `<span class="chip-swatch"></span>${g.label}`;
-    el.appendChild(chip);
-  });
 }
 
 // ── Line chart ────────────────────────────────────────────────
@@ -447,6 +442,7 @@ function makeQuizSelectBtn(g) {
 }
 
 function applyQuizGroup(id) {
+  userHasSelectedGroup = true;
   selectedGroups = [id];
   syncPillStates();
   render();
