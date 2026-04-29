@@ -20,9 +20,9 @@ async function init() {
 // ── Group selector ──────────────────────────────────────────
 
 function buildGroupSelector() {
-  const allHouseholdsGroup = DATA.groups.find(g => g.id === "all_households");
   const standalone = document.getElementById("standalone-pills");
-  standalone.appendChild(makePill(allHouseholdsGroup));
+  const allHH = DATA.groups.find(g => g.id === "all_households");
+  standalone.appendChild(makePill(allHH));
 
   ["demographic", "income", "expenditure"].forEach(category => {
     const container = document.getElementById(`pills-${category}`);
@@ -55,7 +55,6 @@ function makePill(group) {
 }
 
 function pillTextColor(hex) {
-  // Simple luminance check to pick white or dark text
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
@@ -65,7 +64,7 @@ function pillTextColor(hex) {
 
 function toggleGroup(id) {
   if (selectedGroups.includes(id)) {
-    if (selectedGroups.length === 1) return; // always keep at least one
+    if (selectedGroups.length === 1) return;
     selectedGroups = selectedGroups.filter(g => g !== id);
   } else {
     selectedGroups.push(id);
@@ -95,14 +94,12 @@ function bindPeriodButtons() {
 
 // ── Data helpers ────────────────────────────────────────────
 
-function quartersForRange(years) {
-  const n = years * 4;
-  return DATA.quarters.slice(-n);
+function sliceLast(arr, n) {
+  return arr ? arr.slice(-n) : [];
 }
 
-function valuesForRange(arr, years) {
-  const n = years * 4;
-  return arr.slice(-n);
+function quartersForRange(years) {
+  return DATA.quarters.slice(-(years * 4));
 }
 
 function groupById(id) {
@@ -126,12 +123,20 @@ function render() {
 
 function renderHero() {
   const primaryGroup = groupById(selectedGroups[0]);
-  const latest = primaryGroup.annual.all.at(-1);
   const latestQuarter = DATA.quarters.at(-1);
+  const groupRate = primaryGroup.annual.all.at(-1);
+  const cpiRate = DATA.cpi.annual.all.at(-1);
+  const diff = groupRate - cpiRate;
+  const sign = diff > 0 ? "+" : "";
 
-  document.getElementById("hero-rate").textContent = latest.toFixed(1) + "%";
-  document.getElementById("hero-meta").innerHTML =
-    `<strong>${primaryGroup.label}</strong> · ${latestQuarter}`;
+  document.getElementById("hero-cpi-rate").textContent = cpiRate.toFixed(1) + "%";
+  document.getElementById("hero-cpi-quarter").textContent = latestQuarter;
+  document.getElementById("hero-group-rate").textContent = groupRate.toFixed(1) + "%";
+  document.getElementById("hero-group-name").textContent = primaryGroup.label;
+  document.getElementById("hero-diff").textContent =
+    `${sign}${diff.toFixed(1)}% vs headline`;
+  document.getElementById("hero-diff").className =
+    "hero-diff " + (diff > 0.1 ? "above" : diff < -0.1 ? "below" : "same");
 }
 
 // ── Selected summary chips ───────────────────────────────────
@@ -154,19 +159,35 @@ function renderSelectedSummary() {
 // ── Line chart ───────────────────────────────────────────────
 
 function renderLineChart() {
+  const n = selectedYears * 4;
   const quarters = quartersForRange(selectedYears);
 
-  const datasets = selectedGroups.map(id => {
+  // CPI always shown as black dashed reference line
+  const cpiDataset = {
+    label: "CPI (headline)",
+    data: sliceLast(DATA.cpi.annual.all, n),
+    borderColor: "#000000",
+    backgroundColor: "transparent",
+    borderDash: [5, 4],
+    borderWidth: 2,
+    pointRadius: 2,
+    pointHoverRadius: 4,
+    tension: 0.35,
+    order: 99,
+  };
+
+  const groupDatasets = selectedGroups.map(id => {
     const g = groupById(id);
     return {
       label: g.label,
-      data: valuesForRange(g.annual.all, selectedYears),
+      data: sliceLast(g.annual.all, n),
       borderColor: g.color,
       backgroundColor: g.color + "18",
       tension: 0.35,
       borderWidth: 2.5,
       pointRadius: 3,
       pointHoverRadius: 5,
+      order: 1,
     };
   });
 
@@ -175,35 +196,42 @@ function renderLineChart() {
 
   lineChart = new Chart(ctx, {
     type: "line",
-    data: { labels: quarters, datasets },
+    data: { labels: quarters, datasets: [cpiDataset, ...groupDatasets] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: {
-          display: selectedGroups.length > 1,
+          display: true,
           position: "top",
           labels: {
-            font: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", size: 12 },
-            boxWidth: 12,
+            font: { family: "inherit", size: 12 },
+            boxWidth: 20,
             padding: 12,
+            generateLabels(chart) {
+              return chart.data.datasets.map((ds, i) => ({
+                text: ds.label,
+                fillStyle: ds.borderColor,
+                strokeStyle: ds.borderColor,
+                lineWidth: 2,
+                lineDash: ds.borderDash || [],
+                hidden: false,
+                index: i,
+              }));
+            },
           },
         },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + "%" : "n/a"}`,
           },
         },
       },
       scales: {
         x: {
           grid: { color: "#e2e8f0" },
-          ticks: {
-            font: { size: 11 },
-            color: "#64748b",
-            maxRotation: 45,
-          },
+          ticks: { font: { size: 11 }, color: "#64748b", maxRotation: 45 },
         },
         y: {
           grid: { color: "#e2e8f0" },
@@ -232,17 +260,11 @@ function renderBarChart() {
   const groups = topLevelSubgroups();
 
   const labels = groups.map(s => s.label);
-  const values = groups.map(s => {
-    const arr = g.annual[s.id];
-    return arr ? arr.at(-1) : null;
-  });
-
-  const colors = values.map(v =>
-    v === null ? "#94a3b8" : v > 0 ? "#dc2626cc" : "#15803dcc"
-  );
+  const hlpiValues = groups.map(s => g.annual[s.id]?.at(-1) ?? null);
+  const cpiValues  = groups.map(s => DATA.cpi.annual[s.id]?.at(-1) ?? null);
 
   document.getElementById("bar-chart-subtitle").textContent =
-    `· ${g.label} · ${DATA.quarters.at(-1)}`;
+    `· ${g.label} vs CPI · ${DATA.quarters.at(-1)}`;
 
   const ctx = document.getElementById("bar-chart");
   if (barChart) barChart.destroy();
@@ -251,45 +273,48 @@ function renderBarChart() {
     type: "bar",
     data: {
       labels,
-      datasets: [{
-        data: values,
-        backgroundColor: colors,
-        borderRadius: 3,
-      }],
+      datasets: [
+        {
+          label: g.label,
+          data: hlpiValues,
+          backgroundColor: g.color + "cc",
+          borderRadius: 3,
+        },
+        {
+          label: "CPI (headline)",
+          data: cpiValues,
+          backgroundColor: "#00000033",
+          borderColor: "#000000",
+          borderWidth: 1,
+          borderRadius: 3,
+        },
+      ],
     },
     options: {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: "top",
+          labels: { font: { family: "inherit", size: 12 }, boxWidth: 14, padding: 12 },
+        },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${ctx.parsed.x !== null ? ctx.parsed.x.toFixed(1) + "%" : "n/a"}`,
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x != null ? ctx.parsed.x.toFixed(1) + "%" : "n/a"}`,
           },
         },
       },
       scales: {
         x: {
           grid: { color: "#e2e8f0" },
-          ticks: {
-            font: { size: 11 },
-            color: "#64748b",
-            callback: v => v.toFixed(0) + "%",
-          },
-          title: {
-            display: true,
-            text: "% change (annual)",
-            color: "#94a3b8",
-            font: { size: 11 },
-          },
+          ticks: { font: { size: 11 }, color: "#64748b", callback: v => v.toFixed(0) + "%" },
+          title: { display: true, text: "% change (annual)", color: "#94a3b8", font: { size: 11 } },
         },
         y: {
           grid: { display: false },
-          ticks: {
-            font: { size: 11 },
-            color: "#0f172a",
-          },
+          ticks: { font: { size: 11 }, color: "#0f172a" },
         },
       },
     },
