@@ -97,7 +97,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const data = {
       name:      form.gb_name.value.trim(),
       location:  form.gb_location.value.trim(),
-      url:       form.gb_url.value.trim(),
       message:   form.gb_message.value.trim(),
       timestamp: serverTimestamp(),
     };
