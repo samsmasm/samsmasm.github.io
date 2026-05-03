@@ -165,8 +165,9 @@ function initSidebarExtras() {
     { label: '🐱 Kitty Maze!',      href: 'https://www.unisam.nz/kittymaze',      ext: true },
     { label: '🔮 Mandelbrot',       href: 'https://www.unisam.nz/mandelbrot-v2',  ext: true },
     { label: '📺 \'90s internet',   href: 'https://www.youtube.com/watch?v=cH8ihSlc9s4', ext: true },
+    { label: '🖥️ More \'90s internet', href: 'https://www.webdesignmuseum.org/exhibitions/web-design-in-the-90s', ext: true },
   ];
-  const flashPeriods = [0.65, 1.05, 0.85, 1.35, 0.55, 1.6, 1.2];
+  const flashPeriods = [0.65, 1.05, 0.85, 1.35, 0.55, 1.6, 1.2, 0.75];
 links.forEach((lnk, i) => {
     const li    = document.createElement('li');
     const a     = document.createElement('a');
