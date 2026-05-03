@@ -5,7 +5,7 @@
 })();
 
 const FONT_KEY     = 'moa-fontsize';
-const FONT_DEFAULT = 15;
+const FONT_DEFAULT = 16;
 const FONT_MIN     = 11;
 const FONT_MAX     = 21;
 
