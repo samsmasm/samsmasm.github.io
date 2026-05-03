@@ -3,12 +3,13 @@ import { getDatabase, ref, runTransaction, get, set }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey:            "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
-  authDomain:        "dowserboard.firebaseapp.com",
-  projectId:         "dowserboard",
-  storageBucket:     "dowserboard.firebasestorage.app",
-  messagingSenderId: "1032600748722",
-  appId:             "1:1032600748722:web:1584c7508fbbca617cbfab"
+  apiKey:            "AIzaSyCOSkL0C9_P8VeqpefXJbGCeOfXYwMMegE",
+  authDomain:        "notes-ff975.firebaseapp.com",
+  databaseURL:       "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "notes-ff975",
+  storageBucket:     "notes-ff975.firebasestorage.app",
+  messagingSenderId: "977644569179",
+  appId:             "1:977644569179:web:5c23a086bb411bd1dfb57e"
 };
 
 const app = initializeApp(firebaseConfig, 'moa');
