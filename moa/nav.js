@@ -165,11 +165,18 @@ function initSidebarExtras() {
     { label: '🐱 Kitty Maze!',      href: 'https://www.unisam.nz/kittymaze',      ext: true },
     { label: '🔮 Mandelbrot',       href: 'https://www.unisam.nz/mandelbrot-v2',  ext: true },
   ];
-  links.forEach(lnk => {
-    const li = document.createElement('li');
-    const a  = document.createElement('a');
+  const flashPeriods = [0.65, 1.05, 0.85, 1.35, 0.55, 1.6];
+  links.forEach((lnk, i) => {
+    const li    = document.createElement('li');
+    const a     = document.createElement('a');
     a.href = lnk.href;
-    a.textContent = lnk.label;
+    const chars = [...lnk.label];
+    const emojiSpan = document.createElement('span');
+    emojiSpan.className = 'cool-emoji';
+    emojiSpan.style.animationDuration = (flashPeriods[i] || 1) + 's';
+    emojiSpan.textContent = chars[0];
+    a.appendChild(emojiSpan);
+    a.appendChild(document.createTextNode(chars.slice(1).join('')));
     if (lnk.ext) { a.target = '_blank'; a.rel = 'noopener'; }
     li.appendChild(a);
     ul.appendChild(li);
