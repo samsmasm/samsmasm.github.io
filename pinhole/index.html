@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinhole — Camera Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #0a0907;
+  --bg2:    #111009;
+  --bg3:    #1a1712;
+  --bg4:    #211e17;
+  --border: #2a2519;
+  --bord2:  #3a3328;
+  --amber:  #c47c2e;
+  --amb2:   #e09848;
+  --amb3:   #8a5218;
+  --amb4:   #f0b464;
+  --text:   #c8b894;
+  --text2:  #8a7a5c;
+  --text3:  #ede0c0;
+  --white:  #f4ead8;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;
+  min-height:100vh;
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.033;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Header */
+header{
+  display:flex;align-items:center;gap:1.2rem;
+  padding:1.5rem 2rem;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:var(--bg);z-index:100;
+}
+.ph-mark{
+  width:32px;height:32px;border-radius:50%;border:1px solid var(--amb3);
+  position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+}
+.ph-mark::before{
+  content:'';width:3px;height:3px;border-radius:50%;background:var(--amber);
+  box-shadow:0 0 8px var(--amber),0 0 18px var(--amb3);
+}
+.ph-mark::after{
+  content:'';position:absolute;inset:6px;border-radius:50%;border:1px solid var(--border);
+}
+h1{font-family:'Libre Baskerville',serif;font-size:1.2rem;font-weight:400;color:var(--white);letter-spacing:.04em;}
+h1 em{color:var(--amber);font-style:italic;}
+.h-sub{font-size:10px;color:var(--text2);letter-spacing:.16em;text-transform:uppercase;margin-top:.1rem;}
+
+/* Layout */
+.page{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 65px);}
+
+/* Config panel */
+aside{
+  border-right:1px solid var(--border);padding:1.8rem 1.4rem;
+  position:sticky;top:65px;height:calc(100vh - 65px);overflow-y:auto;
+  background:var(--bg2);
+}
+aside::-webkit-scrollbar{width:3px;}
+aside::-webkit-scrollbar-thumb{background:var(--bord2);border-radius:2px;}
+
+.sec-lbl{
+  font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--amb3);margin-bottom:.9rem;padding-bottom:.45rem;
+  border-bottom:1px solid var(--border);
+}
+.field{margin-bottom:1rem;}
+label{
+  display:block;font-size:9px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--text2);margin-bottom:.3rem;
+}
+input[type=number],select{
+  width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:1px;
+  color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:13px;
+  padding:.5rem .65rem;outline:none;transition:border-color .15s;
+  -moz-appearance:textfield;appearance:textfield;
+}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+input:focus,select:focus{border-color:var(--amb3);}
+select option{background:var(--bg3);}
+
+.mode-row{display:flex;gap:.35rem;margin-bottom:.9rem;}
+.mbtn{
+  flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:1px;
+  color:var(--text2);cursor:pointer;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;letter-spacing:.12em;padding:.4rem .25rem;text-align:center;
+  text-transform:uppercase;transition:all .15s;
+}
+.mbtn.on{background:var(--amb3);border-color:var(--amber);color:var(--white);}
+
+.opt-diam{
+  background:var(--bg4);border:1px solid var(--bord2);border-radius:1px;
+  padding:.45rem .65rem;font-size:11px;color:var(--amb2);margin-bottom:.9rem;
+}
+
+.tog-row{display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.9rem;}
+.tog-row input[type=checkbox]{width:13px;height:13px;accent-color:var(--amber);cursor:pointer;}
+.tog-row span{font-size:10px;color:var(--text2);letter-spacing:.1em;text-transform:uppercase;}
+
+.shift-flds{display:none;}
+.shift-flds.on{display:block;}
+hr.div{border:none;border-top:1px solid var(--border);margin:1.3rem 0;}
+
+/* Main area */
+main{padding:1.8rem 2.2rem;overflow-y:auto;}
+
+.portrait-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem;}
+.portrait-title{font-family:'Libre Baskerville',serif;font-size:1rem;font-weight:400;color:var(--white);}
+.portrait-sub{font-size:10px;color:var(--text2);letter-spacing:.1em;}
+
+.canvases-row{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-bottom:1.8rem;}
+.cv-block{}
+.cv-lbl{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--text2);margin-bottom:.5rem;}
+canvas{display:block;border:1px solid var(--border);border-radius:1px;width:100%;}
+
+.aov-dists{margin-top:.5rem;display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;}
+.aov-dc{background:var(--bg3);border:1px solid var(--border);border-radius:1px;padding:.35rem .5rem;text-align:center;}
+.aov-dd{font-size:9px;color:var(--text2);letter-spacing:.08em;}
+.aov-dw{font-family:'Libre Baskerville',serif;font-size:.9rem;color:var(--amb2);}
+
+.feel{
+  background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amb3);
+  border-radius:1px;padding:.9rem 1.1rem;margin-bottom:1.8rem;
+  font-family:'Libre Baskerville',serif;font-style:italic;font-size:.93rem;
+  color:var(--text2);line-height:1.75;
+}
+.feel strong{
+  color:var(--text);font-style:normal;font-size:.75rem;letter-spacing:.12em;
+  text-transform:uppercase;font-family:'IBM Plex Mono',monospace;
+  display:block;margin-bottom:.35rem;
+}
+
+.sec-hd{
+  font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--amb3);
+  margin-bottom:.9rem;margin-top:1.8rem;display:flex;align-items:center;gap:.8rem;
+}
+.sec-hd::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Numbers grid */
+.nums{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:1px;background:var(--border);border:1px solid var(--border);
+  border-radius:1px;margin-bottom:1.8rem;overflow:hidden;
+}
+.sc{background:var(--bg2);padding:.9rem 1rem;}
+.sn{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--text2);margin-bottom:.35rem;}
+.sv{font-family:'Libre Baskerville',serif;font-size:1.25rem;color:var(--amb4);line-height:1.1;}
+.su{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2);margin-left:.2rem;}
+.ss{font-size:10px;color:var(--text2);margin-top:.2rem;line-height:1.5;}
+
+.dbadge{
+  display:inline-block;padding:.12rem .48rem;border-radius:20px;
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-top:.35rem;
+}
+.d-opt{background:#162214;color:#7abf5a;border:1px solid #253d20;}
+.d-sm {background:#0e1c2a;color:#5aaacf;border:1px solid #1a2e3e;}
+.d-lg {background:#281c08;color:var(--amb2);border:1px solid #472e10;}
+
+/* Coverage table */
+.ctbl{width:100%;border-collapse:collapse;margin-bottom:1.8rem;font-size:11px;}
+.ctbl th{text-align:left;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);padding:.45rem .75rem;border-bottom:1px solid var(--border);font-weight:400;}
+.ctbl td{padding:.5rem .75rem;border-bottom:1px solid var(--border);color:var(--text);}
+.ctbl tr:last-child td{border-bottom:none;}
+.ctbl tr.cur td{color:var(--amb2);}
+.pill{display:inline-block;padding:.1rem .5rem;border-radius:20px;font-size:9px;letter-spacing:.09em;text-transform:uppercase;}
+.p-g{background:#152012;color:#7abf5a;border:1px solid #243d1e;}
+.p-a{background:#281b08;color:var(--amb2);border:1px solid #452e10;}
+.p-r{background:#260d08;color:#c85a3a;border:1px solid #42160e;}
+
+/* Shift */
+.shift-sec{margin-bottom:1.8rem;}
+.shift-cvs{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;}
+.swarn{margin-top:.9rem;padding:.6rem .85rem;background:#250e08;border:1px solid #401610;border-radius:1px;font-size:11px;color:#c85a3a;line-height:1.6;}
+
+@media(max-width:860px){
+  .page{grid-template-columns:1fr;}
+  aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);}
+  .canvases-row{grid-template-columns:1fr;}
+  .shift-cvs{grid-template-columns:1fr;}
+}
+@media(max-width:520px){
+  header{padding:1rem 1.2rem;}
+  main{padding:1.2rem;}
+  .nums{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="ph-mark"></div>
+  <div>
+    <h1>Pin<em>hole</em></h1>
+    <div class="h-sub">Camera Design Workspace</div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- Config -->
+  <aside>
+    <div class="sec-lbl">Film</div>
+    <div class="field">
+      <label>Format</label>
+      <select id="cf" oninput="upd()">
+        <option value="35mm">35mm — 36×24mm</option>
+        <option value="645">6×4.5 — 56×42mm</option>
+        <option value="66">6×6 — 56×56mm</option>
+        <option value="69">6×9 — 84×56mm</option>
+        <option value="4x5">4×5" — 120×96mm</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div id="cust-flds" style="display:none">
+      <div class="field"><label>Width (mm)</label><input type="number" id="cw" value="60" min="1" oninput="upd()"></div>
+      <div class="field"><label>Height (mm)</label><input type="number" id="ch" value="60" min="1" oninput="upd()"></div>
+    </div>
+
+    <hr class="div">
+    <div class="sec-lbl">Optics</div>
+
+    <div class="field">
+      <label>Focal Length (mm)</label>
+      <input type="number" id="fl" value="75" min="5" max="500" oninput="upd()">
+    </div>
+
+    <div class="mode-row">
+      <button class="mbtn on" id="b-opt" onclick="setPH('opt')">Optimal</button>
+      <button class="mbtn" id="b-man" onclick="setPH('man')">Manual</button>
+    </div>
+    <div class="opt-diam" id="opt-disp">—</div>
+    <div id="man-fld" style="display:none">
+      <div class="field">
+        <label>Pinhole Diameter (mm)</label>
+        <input type="number" id="diam" value="0.3" min="0.01" max="5" step="0.01" oninput="upd()">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Wavelength</label>
+      <select id="wl" oninput="upd()">
+        <option value="0.00055" selected>Green 550nm — standard</option>
+        <option value="0.00040">Violet 400nm</option>
+        <option value="0.00048">Blue 480nm</option>
+        <option value="0.00062">Red 620nm</option>
+        <option value="0.00070">Deep Red 700nm</option>
+      </select>
+    </div>
+
+    <hr class="div">
+    <div class="sec-lbl">Shift Pinhole</div>
+    <label class="tog-row">
+      <input type="checkbox" id="sh-on" onchange="togShift()">
+      <span>Enable shift pinhole</span>
+    </label>
+    <div class="shift-flds" id="sh-flds">
+      <div class="field"><label>Vertical Offset (mm)</label><input type="number" id="sh-off" value="10" min=".5" step=".5" oninput="upd()"></div>
+      <div class="field"><label>Subject Distance (m)</label><input type="number" id="sh-dist" value="30" min="1" oninput="upd()"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main>
+    <div class="portrait-hd">
+      <div>
+        <div class="portrait-title" id="pt">Camera Portrait</div>
+        <div class="portrait-sub" id="ps">Configure your camera to see results</div>
+      </div>
+    </div>
+
+    <div class="canvases-row">
+      <div class="cv-block">
+        <div class="cv-lbl">Frame — vignetting map</div>
+        <canvas id="vigC" height="260"></canvas>
+      </div>
+      <div class="cv-block">
+        <div class="cv-lbl">Angle of view — top-down projection</div>
+        <canvas id="aovC" height="260"></canvas>
+        <div class="aov-dists" id="aov-dists"></div>
+      </div>
+    </div>
+
+    <div class="feel" id="feel"><strong>Character</strong>Configure your camera to see results.</div>
+
+    <div class="sec-hd">Measurements</div>
+    <div class="nums" id="nums"></div>
+
+    <div class="sec-hd">35mm Equivalence</div>
+    <div class="nums" id="equiv"></div>
+
+    <div class="sec-hd">Format Coverage at this Focal Length</div>
+    <table class="ctbl">
+      <thead><tr><th>Format</th><th>Size</th><th>Corner °</th><th>Corner loss</th><th>Edge loss</th><th>Rating</th></tr></thead>
+      <tbody id="ctbody"></tbody>
+    </table>
+
+    <div class="shift-sec" id="sh-sec" style="display:none">
+      <div class="sec-hd">Shift Pinhole Analysis</div>
+      <div class="shift-cvs">
+        <div class="cv-block">
+          <div class="cv-lbl">Frame offset diagram</div>
+          <canvas id="shC" height="240"></canvas>
+        </div>
+        <div>
+          <div class="nums" id="sh-nums" style="margin-bottom:0"></div>
+          <div class="swarn" id="sh-warn" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────
+const FMTS = {
+  '35mm':{w:36, h:24, name:'35mm',   lat:'35mm is efficient but its small negative area tolerates less exposure variation than medium format.'},
+  '645': {w:56, h:42, name:'6×4.5',  lat:'Larger negative — pleasing grain and good latitude for longer pinhole exposures.'},
+  '66':  {w:56, h:56, name:'6×6',    lat:'The square frame rewards centred and symmetrical compositions. Generous negative area.'},
+  '69':  {w:84, h:56, name:'6×9',    lat:'One of the most forgiving formats for long pinhole exposures. Rich tonal range and generous latitude.'},
+  '4x5': {w:120,h:96, name:'4×5"',   lat:'Outstanding latitude. The large negative handles reciprocity failure and multi-minute exposures with ease.'},
+};
+const ALLFMTS = Object.entries(FMTS).map(([k,v])=>({key:k,...v}));
+const F35 = FMTS['35mm'];
+let phMode = 'opt';
+
+// ── Math ──────────────────────────────────────────────────────────────────
+const diag = (w,h) => Math.sqrt(w*w+h*h);
+const aovD = (dim,fl) => 2*Math.atan(dim/(2*fl))*(180/Math.PI);
+const flAOV = (deg,dim) => dim/(2*Math.tan(deg*Math.PI/360));
+function c4(ang) {
+  const r=ang*Math.PI/180, rel=Math.pow(Math.cos(r),4);
+  return {rel, pct:(rel*100).toFixed(1), stops:(-Math.log2(rel)).toFixed(2)};
+}
+
+// ── State readers ─────────────────────────────────────────────────────────
+function getFmt() {
+  const s = document.getElementById('cf').value;
+  if (s==='custom') return {w:+document.getElementById('cw').value||60, h:+document.getElementById('ch').value||60, name:'Custom', lat:'Custom dimensions.', key:'custom'};
+  return {...FMTS[s], key:s};
+}
+const getFL  = () => +document.getElementById('fl').value||75;
+const getWL  = () => +document.getElementById('wl').value||0.00055;
+const getOptD= () => Math.sqrt(2.44*getWL()*getFL());
+function getDiam() {
+  if (phMode==='opt') return getOptD();
+  return +document.getElementById('diam').value||0.3;
+}
+
+// ── UI toggles ────────────────────────────────────────────────────────────
+function setPH(m) {
+  phMode=m;
+  document.getElementById('b-opt').classList.toggle('on',m==='opt');
+  document.getElementById('b-man').classList.toggle('on',m==='man');
+  document.getElementById('opt-disp').style.display = m==='opt'?'block':'none';
+  document.getElementById('man-fld').style.display  = m==='man'?'block':'none';
+  upd();
+}
+function togShift() {
+  const on=document.getElementById('sh-on').checked;
+  document.getElementById('sh-flds').classList.toggle('on',on);
+  document.getElementById('sh-sec').style.display=on?'block':'none';
+  upd();
+}
+document.getElementById('cf').addEventListener('change',()=>{
+  document.getElementById('cust-flds').style.display=
+    document.getElementById('cf').value==='custom'?'block':'none';
+  upd();
+});
+
+// ── Main update ───────────────────────────────────────────────────────────
+function upd() {
+  const f=getFmt(), fl=getFL(), wl=getWL(), d=getDiam(), optD=getOptD();
+  const fstop=fl/d;
+  const shOn=document.getElementById('sh-on').checked;
+  const offset=+document.getElementById('sh-off').value||10;
+  const distM =+document.getElementById('sh-dist').value||30;
+
+  document.getElementById('opt-disp').textContent=`Optimal: ${optD.toFixed(3)} mm — f/${Math.round(fl/optD)}`;
+  document.getElementById('pt').textContent=`${f.name} · ${fl}mm · f/${Math.round(fstop)}`;
+  document.getElementById('ps').textContent=`${d.toFixed(3)}mm pinhole · ${(wl*1e6).toFixed(0)}nm wavelength`;
+
+  drawVig(f, fl, shOn?offset:0);
+  drawAOV(f, fl);
+  drawAOVDists(f, fl);
+  drawFeel(f, fl, d, optD);
+  drawNums(f, fl, d, optD, fstop);
+  drawEquiv(f, fl);
+  drawCoverage(fl, f.key);
+  if (shOn) drawShift(f, fl, offset, distM);
+}
+
+// ── Vignetting canvas ─────────────────────────────────────────────────────
+function drawVig(f, fl, offset) {
+  const cv=document.getElementById('vigC');
+  cv.width=cv.offsetWidth||380;
+  const ctx=cv.getContext('2d'), CW=cv.width, CH=cv.height;
+  ctx.clearRect(0,0,CW,CH);
+
+  const asp=f.w/f.h;
+  let fw,fh;
+  if (asp>=CW/CH){fw=CW-28;fh=fw/asp;}else{fh=CH-28;fw=fh*asp;}
+  const ox=(CW-fw)/2, oy=(CH-fh)/2;
+
+  // Pixel-accurate cos4 render
+  const iw=Math.ceil(fw), ih=Math.ceil(fh);
+  const img=ctx.createImageData(iw,ih);
+  for (let py=0;py<ih;py++) {
+    for (let px=0;px<iw;px++) {
+      const filmX=(px/iw-.5)*f.w;
+      const filmY=(py/ih-.5)*f.h - offset;
+      const r=Math.sqrt(filmX*filmX+filmY*filmY);
+      const a=Math.atan(r/fl)*180/Math.PI;
+      const rel=Math.pow(Math.cos(a*Math.PI/180),4);
+      const br=Math.round(rel*215);
+      const i=(py*iw+px)*4;
+      img.data[i]=br; img.data[i+1]=Math.round(br*.70); img.data[i+2]=Math.round(br*.38); img.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(img,ox,oy);
+  ctx.strokeStyle='#3a3328';ctx.lineWidth=1;ctx.strokeRect(ox,oy,fw,fh);
+
+  // Corner label
+  const hw=f.w/2,hh=f.h/2;
+  const ca=Math.atan(diag(hw,hh)/fl)*180/Math.PI;
+  const cv2=c4(ca);
+  ctx.font='8px IBM Plex Mono,monospace';ctx.fillStyle='rgba(130,112,80,.85)';
+  const p=4;
+  ctx.textAlign='left'; ctx.textBaseline='top';    ctx.fillText(cv2.pct+'%',ox+p,oy+p);
+  ctx.textAlign='right';ctx.textBaseline='top';    ctx.fillText(cv2.pct+'%',ox+fw-p,oy+p);
+  ctx.textAlign='left'; ctx.textBaseline='bottom'; ctx.fillText(cv2.pct+'%',ox+p,oy+fh-p);
+  ctx.textAlign='right';ctx.textBaseline='bottom'; ctx.fillText(cv2.pct+'%',ox+fw-p,oy+fh-p);
+
+  // Centre cross
+  ctx.strokeStyle='rgba(196,124,46,.22)';ctx.lineWidth=.5;
+  ctx.beginPath();
+  ctx.moveTo(CW/2-7,CH/2);ctx.lineTo(CW/2+7,CH/2);
+  ctx.moveTo(CW/2,CH/2-7);ctx.lineTo(CW/2,CH/2+7);
+  ctx.stroke();
+
+  // Shifted illumination centre dot
+  if (offset) {
+    const sp=(offset/f.h)*fh;
+    ctx.beginPath();ctx.arc(CW/2,oy+fh/2-sp,3,0,Math.PI*2);
+    ctx.fillStyle='rgba(196,124,46,.55)';ctx.fill();
+    ctx.font='8px IBM Plex Mono,monospace';ctx.fillStyle='rgba(196,124,46,.65)';
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText('light centre',CW/2,oy+fh/2-sp-5);
+  }
+}
+
+// ── AOV canvas ────────────────────────────────────────────────────────────
+function drawAOV(f, fl) {
+  const cv=document.getElementById('aovC');
+  cv.width=cv.offsetWidth||380;
+  const ctx=cv.getContext('2d'), CW=cv.width, CH=cv.height;
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle='#0d0b08';ctx.fillRect(0,0,CW,CH);
+
+  const px=CW/2, py=CH-22;
+  const reach=CH-50;
+  const aovH=aovD(f.w,fl), aovV=aovD(f.h,fl);
+  const halfH=aovH/2*Math.PI/180;
+  const coneW=reach*Math.tan(halfH);
+
+  // Cone fill
+  ctx.beginPath();
+  ctx.moveTo(px,py);ctx.lineTo(px-coneW,py-reach);ctx.lineTo(px+coneW,py-reach);ctx.closePath();
+  ctx.fillStyle='rgba(196,124,46,.06)';ctx.fill();
+
+  // Cone edges
+  ctx.beginPath();
+  ctx.moveTo(px,py);ctx.lineTo(px-coneW,py-reach);
+  ctx.moveTo(px,py);ctx.lineTo(px+coneW,py-reach);
+  ctx.strokeStyle='rgba(196,124,46,.45)';ctx.lineWidth=1;ctx.stroke();
+
+  // Film plane
+  ctx.beginPath();ctx.moveTo(px-coneW,py-reach);ctx.lineTo(px+coneW,py-reach);
+  ctx.strokeStyle='rgba(196,124,46,.38)';ctx.lineWidth=1.5;ctx.stroke();
+
+  // Distance rings
+  [[1,.1],[3,.36],[10,.76]].forEach(([dm,frac])=>{
+    const ry=py-reach*frac;
+    const rw=reach*frac*Math.tan(halfH);
+    ctx.beginPath();ctx.moveTo(px-rw,ry);ctx.lineTo(px+rw,ry);
+    ctx.strokeStyle='rgba(58,50,38,.75)';ctx.lineWidth=.5;
+    ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='8px IBM Plex Mono,monospace';ctx.fillStyle='rgba(130,110,78,.72)';
+    ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillText(dm+'m',px-rw-3,ry);
+    // Width annotation
+    const wm=(2*dm*1000*Math.tan(halfH)/1000).toFixed(1);
+    ctx.textAlign='left';ctx.fillText(wm+'m',px+rw+3,ry);
+  });
+
+  // AOV arc indicator
+  const arcR=28;
+  ctx.beginPath();ctx.arc(px,py,arcR,Math.PI*1.5-halfH,Math.PI*1.5+halfH);
+  ctx.strokeStyle='rgba(196,124,46,.3)';ctx.lineWidth=1;ctx.stroke();
+
+  // Pinhole
+  ctx.beginPath();ctx.arc(px,py,3,0,Math.PI*2);
+  ctx.fillStyle='#c47c2e';ctx.fill();
+  ctx.beginPath();ctx.arc(px,py,6,0,Math.PI*2);
+  ctx.strokeStyle='rgba(196,124,46,.28)';ctx.lineWidth=1;ctx.stroke();
+
+  // AOV label
+  ctx.font='8px IBM Plex Mono,monospace';ctx.fillStyle='rgba(196,124,46,.68)';
+  ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.fillText(`${aovH.toFixed(1)}° H  ·  ${aovV.toFixed(1)}° V`,px,py-reach-3);
+
+  ctx.strokeStyle='#2a2519';ctx.lineWidth=1;ctx.strokeRect(0,0,CW,CH);
+}
+
+function drawAOVDists(f, fl) {
+  const aovH=aovD(f.w,fl);
+  document.getElementById('aov-dists').innerHTML=[1,3,10].map(d=>{
+    const w=(2*d*1000*Math.tan(aovH/2*Math.PI/180)/1000).toFixed(2);
+    return `<div class="aov-dc"><div class="aov-dd">at ${d}m</div><div class="aov-dw">${w}m</div></div>`;
+  }).join('');
+}
+
+// ── Feel note ─────────────────────────────────────────────────────────────
+function drawFeel(f, fl, d, optD) {
+  const aovH=aovD(f.w,fl), ratio=d/optD, asp=f.w/f.h;
+
+  let fc='';
+  if (aovH>90) fc='extreme wide-angle — close to fisheye territory. Scenes expand dramatically, foregrounds dominate';
+  else if (aovH>70) fc='very wide — environmental and expansive. Architecture and landscape breathe naturally in this view';
+  else if (aovH>55) fc='wide — immersive and spatial, with natural-feeling perspective and good environmental context';
+  else if (aovH>40) fc='moderate — near the comfortable human field of vision. Relaxed and unforced';
+  else if (aovH>28) fc='slightly long — subjects sit comfortably, mild background compression begins to show';
+  else fc='telephoto — compressed perspective, subjects isolated against their background, narrow scene depth';
+
+  let fmtc='';
+  if (Math.abs(asp-1)<.05) fmtc='The square frame creates compositional tension — no natural reading direction. Balance must be earned.';
+  else if (asp>1.6) fmtc='The panoramic ratio is made for horizontals — landscapes, city skylines, building facades.';
+  else if (asp>1.2) fmtc='A classic rectangular frame with comfortable breathing room in the horizontal.';
+  else fmtc='A compact aspect ratio, versatile across subjects.';
+
+  let dc='';
+  if (ratio<.72) dc='The pinhole is well undersized for this focal length — diffraction dominates. Expect a luminous, glowing softness and star-like highlight rendering.';
+  else if (ratio<.87) dc='Slightly undersized — some diffraction character, with a soft luminous quality in highlights.';
+  else if (ratio<1.14) dc='Near-optimal — the best achievable balance between diffraction and geometric blur for this focal length.';
+  else if (ratio<1.38) dc='Slightly oversized — geometric blur begins to dominate. Softer but without the diffraction glow.';
+  else dc='Oversized pinhole — geometric blur is the defining character. Painterly, soft rendering throughout the frame.';
+
+  document.getElementById('feel').innerHTML=
+    `<strong>Character</strong>${f.name} at ${fl}mm is <em>${fc}</em>. ${fmtc} ${dc} ${f.lat}`;
+}
+
+// ── Numbers ───────────────────────────────────────────────────────────────
+function drawNums(f, fl, d, optD, fstop) {
+  const ratio=d/optD;
+  let dl,dc;
+  if (ratio<.8){dl='Diffraction-led';dc='d-sm';}
+  else if (ratio>1.25){dl='Geometry-led';dc='d-lg';}
+  else{dl='Near-optimal';dc='d-opt';}
+
+  const hw=f.w/2,hh=f.h/2;
+  const ca=Math.atan(diag(hw,hh)/fl)*180/Math.PI;
+  const ea=Math.atan(Math.max(hw,hh)/fl)*180/Math.PI;
+  const cv=c4(ca), ev=c4(ea);
+
+  // Near focus: geometric blur = optD when z is large; closer than fl it breaks down
+  // Simplified: z_near = fl * d / (d - optD) for oversized, else show "< film plane"
+  let nf='< film plane';
+  if (d>optD*1.05) {
+    const zn=(fl*d)/(d-optD*0.5);
+    nf=zn>1e6?'∞':(zn/1000).toFixed(2)+'m';
+  }
+
+  document.getElementById('nums').innerHTML=`
+    <div class="sc">
+      <div class="sn">Pinhole diameter</div>
+      <div class="sv">${d.toFixed(3)}<span class="su">mm</span></div>
+      <div class="ss">Optimal: ${optD.toFixed(3)}mm</div>
+      <span class="dbadge ${dc}">${dl}</span>
+    </div>
+    <div class="sc">
+      <div class="sn">f-stop equivalent</div>
+      <div class="sv">f/<span>${Math.round(fstop)}</span></div>
+      <div class="ss">Focal length ${fl}mm</div>
+    </div>
+    <div class="sc">
+      <div class="sn">Angle of view</div>
+      <div class="sv">${aovD(f.w,fl).toFixed(1)}<span class="su">° H</span></div>
+      <div class="ss">${aovD(f.h,fl).toFixed(1)}° V · ${aovD(diag(f.w,f.h),fl).toFixed(1)}° diagonal</div>
+    </div>
+    <div class="sc">
+      <div class="sn">Corner vignetting</div>
+      <div class="sv">${cv.pct}<span class="su">%</span></div>
+      <div class="ss">−${cv.stops} stops · ${ca.toFixed(1)}° off-axis</div>
+    </div>
+    <div class="sc">
+      <div class="sn">Edge vignetting</div>
+      <div class="sv">${ev.pct}<span class="su">%</span></div>
+      <div class="ss">−${ev.stops} stops · ${ea.toFixed(1)}° off-axis</div>
+    </div>
+    <div class="sc">
+      <div class="sn">Near focus limit</div>
+      <div class="sv" style="font-size:1rem">${nf}</div>
+      <div class="ss">Closest subject for geometric sharpness</div>
+    </div>`;
+}
+
+// ── Equivalence ───────────────────────────────────────────────────────────
+function drawEquiv(f, fl) {
+  const is66=Math.abs(f.w-f.h)<3;
+  const eH=flAOV(aovD(f.w,fl),F35.w);
+  const eV=flAOV(aovD(f.h,fl),F35.h);
+  const eD=flAOV(aovD(diag(f.w,f.h),fl),diag(F35.w,F35.h));
+
+  let html=`
+    <div class="sc">
+      <div class="sn">Diagonal equivalent</div>
+      <div class="sv">${eD.toFixed(1)}<span class="su">mm</span></div>
+      <div class="ss">Standard 35mm comparison</div>
+    </div>
+    <div class="sc">
+      <div class="sn">Horizontal equivalent</div>
+      <div class="sv">${eH.toFixed(1)}<span class="su">mm</span></div>
+      <div class="ss">Same H angle on 35mm</div>
+    </div>
+    <div class="sc">
+      <div class="sn">Vertical equivalent</div>
+      <div class="sv">${eV.toFixed(1)}<span class="su">mm</span></div>
+      <div class="ss">Same V angle on 35mm</div>
+    </div>`;
+
+  if (is66) {
+    html+=`<div class="sc" style="border-left:2px solid var(--amb3)">
+      <div class="sn">Square format note</div>
+      <div class="ss" style="font-size:11px;line-height:1.65;margin-top:.2rem">
+        The 6×6 frame sees <em>more</em> vertically than 35mm at the same horizontal angle.
+        H equiv ${eH.toFixed(0)}mm matches the horizontal width, but V equiv ${eV.toFixed(0)}mm shows
+        how much taller the frame feels. The diagonal ${eD.toFixed(0)}mm sits between the two.
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('equiv').innerHTML=html;
+}
+
+// ── Coverage table ────────────────────────────────────────────────────────
+function drawCoverage(fl, curKey) {
+  document.getElementById('ctbody').innerHTML=ALLFMTS.map(f=>{
+    const hw=f.w/2,hh=f.h/2;
+    const ca=Math.atan(diag(hw,hh)/fl)*180/Math.PI;
+    const ea=Math.atan(Math.max(hw,hh)/fl)*180/Math.PI;
+    const cv=c4(ca),ev=c4(ea);
+    const s=parseFloat(cv.stops);
+    let pill,lbl;
+    if(s<.5){pill='p-g';lbl='Clean';}
+    else if(s<1.3){pill='p-a';lbl='Moderate';}
+    else{pill='p-r';lbl='Heavy';}
+    const cur=f.key===curKey;
+    return `<tr${cur?' class="cur"':''}><td>${f.name}${cur?' ←':''}</td><td>${f.w}×${f.h}mm</td><td>${ca.toFixed(1)}°</td><td>${cv.pct}% / −${cv.stops} stops</td><td>${ev.pct}% / −${ev.stops} stops</td><td><span class="pill ${pill}">${lbl}</span></td></tr>`;
+  }).join('');
+}
+
+// ── Shift ─────────────────────────────────────────────────────────────────
+function drawShift(f, fl, offset, distM) {
+  const distMM=distM*1000;
+  const shiftM=(offset*(distMM/fl)/1000).toFixed(1);
+  const farEdge=f.h/2+offset, nearEdge=Math.max(f.h/2-offset,0);
+  const fa=Math.atan(farEdge/fl)*180/Math.PI;
+  const na=Math.atan(nearEdge/fl)*180/Math.PI;
+  const ka=Math.atan(diag(f.w/2,farEdge)/fl)*180/Math.PI;
+  const fv=c4(fa),nv=c4(na),kv=c4(ka);
+
+  document.getElementById('sh-nums').innerHTML=`
+    <div class="sc"><div class="sn">Coverage shift</div><div class="sv" style="font-size:1rem">${shiftM}<span class="su">m</span></div><div class="ss">at ${distM}m subject distance</div></div>
+    <div class="sc"><div class="sn">Far edge light</div><div class="sv">${fv.pct}<span class="su">%</span></div><div class="ss">−${fv.stops} stops · ${fa.toFixed(1)}° off-axis</div></div>
+    <div class="sc"><div class="sn">Near edge light</div><div class="sv">${nv.pct}<span class="su">%</span></div><div class="ss">−${nv.stops} stops · ${na.toFixed(1)}° off-axis</div></div>
+    <div class="sc"><div class="sn">Far corner light</div><div class="sv">${kv.pct}<span class="su">%</span></div><div class="ss">−${kv.stops} stops · ${ka.toFixed(1)}° off-axis</div></div>`;
+
+  const sw=document.getElementById('sh-warn');
+  if(parseFloat(kv.stops)>2){
+    sw.style.display='block';
+    sw.textContent=`Far corners receive only ${kv.pct}% of centre exposure (−${kv.stops} stops). This offset may be too aggressive for ${f.name} at ${fl}mm — consider a longer focal length or smaller offset.`;
+  } else sw.style.display='none';
+
+  drawShiftCv(f,fl,offset);
+}
+
+function drawShiftCv(f,fl,offset) {
+  const cv=document.getElementById('shC');
+  cv.width=cv.offsetWidth||280;
+  const ctx=cv.getContext('2d'),CW=cv.width,CH=cv.height;
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle='#0d0b08';ctx.fillRect(0,0,CW,CH);
+
+  const sc=Math.min((CW-56)/f.w,(CH-56)/(f.h+offset*2+8));
+  const fw=f.w*sc,fh=f.h*sc;
+  const cx=CW/2,cy=CH/2+offset*sc/2;
+
+  ctx.strokeStyle='#3a3328';ctx.lineWidth=1;
+  ctx.fillStyle='rgba(196,124,46,.04)';
+  ctx.beginPath();ctx.rect(cx-fw/2,cy-fh/2,fw,fh);ctx.fill();ctx.stroke();
+
+  const sp=offset*sc;
+  ctx.strokeStyle='rgba(196,124,46,.52)';ctx.lineWidth=1.5;
+  ctx.setLineDash([4,3]);
+  ctx.fillStyle='rgba(196,124,46,.07)';
+  ctx.beginPath();ctx.rect(cx-fw/2,cy-fh/2+sp,fw,fh);ctx.fill();ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='center';
+  ctx.fillStyle='rgba(96,84,64,.9)';ctx.fillText('centre pinhole',cx,cy-fh/2-5);
+  ctx.fillStyle='rgba(196,124,46,.78)';ctx.fillText('shifted pinhole',cx,cy+fh/2+sp+11);
+
+  const ax=cx+fw/2+10;
+  ctx.strokeStyle='rgba(196,124,46,.32)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(ax,cy);ctx.lineTo(ax,cy+sp);ctx.stroke();
+  ctx.fillStyle='rgba(196,124,46,.68)';ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.fillText(offset+'mm',ax+3,cy+sp/2);
+
+  ctx.strokeStyle='#2a2519';ctx.lineWidth=1;ctx.strokeRect(0,0,CW,CH);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+window.addEventListener('load',()=>{
+  upd();
+  let rt;
+  window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(upd,100);});
+});
+</script>
+</body>
+</html>
