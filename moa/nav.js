@@ -159,8 +159,11 @@ function initSidebarExtras() {
   ul.className = 'cool-links-list';
   const links = [
     { label: '🎵 Music Playlists',  href: getBase() + 'music/',         ext: false },
+    { label: '🎧 Gibbons',          href: getBase() + 'gibbons/',       ext: false },
     { label: '📖 Sign Guestbook',   href: getBase() + 'guestbook/',     ext: false },
     { label: '🌐 SSIS Library',     href: 'https://sites.google.com/ssis.edu.vn/library/library?authuser=2', ext: true },
+    { label: '🐱 Kitty Maze!',      href: 'https://www.unisam.nz/kittymaze',      ext: true },
+    { label: '🔮 Mandelbrot',       href: 'https://www.unisam.nz/mandelbrot-v2',  ext: true },
   ];
   links.forEach(lnk => {
     const li = document.createElement('li');
