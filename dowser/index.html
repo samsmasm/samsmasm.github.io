@@ -207,17 +207,99 @@
         document.getElementById('teacher-view').classList.remove('hidden');
         const simpleUrl = "https://unisam.nz/dowser#" + room;
         document.getElementById('bottom-url-display').innerText = simpleUrl;
-        
+
         new QRCode(document.getElementById("qrcode"), { text: simpleUrl, width: 500, height: 500 });
 
         onValue(ref(db, `rooms/${room}/q`), (snap) => {
             document.getElementById('display-q-large').innerText = snap.val() || "CLICK TO SET QUESTION";
         });
 
+        let boardInitialized = false;
         onValue(ref(db, `rooms/${room}/answers`), (snap) => {
+            const newNotes = [];
             snap.forEach(child => {
-                if(!document.getElementById(child.key)) createPostIt(child.key, child.val().text);
+                if (!document.getElementById(child.key))
+                    newNotes.push({ key: child.key, text: child.val().text });
             });
+            if (newNotes.length === 0) return;
+
+            if (!boardInitialized) {
+                // Initial load: create all elements, then lay them out in one pass
+                boardInitialized = true;
+                newNotes.forEach(n => createPostItElement(n.key, n.text));
+                layoutNotes();
+            } else {
+                // Live additions: place each new note into a gap
+                newNotes.forEach(n => createPostIt(n.key, n.text));
+            }
+        });
+    }
+
+    // Shared element factory (no positioning)
+    function createPostItElement(id, text) {
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'post-it';
+        div.style.zIndex = highestZ++;
+        div.style.left = '-9999px';
+        div.style.top = '-9999px';
+        div.innerHTML = `
+            <span class="del-x" onclick="del('${id}')">×</span>
+            <div class="text-content">${text}</div>
+            <div class="font-controls">
+                <div class="font-btn" onclick="changeFont('${id}', -2)">-</div>
+                <div class="font-btn" onclick="changeFont('${id}', 2)">+</div>
+            </div>
+        `;
+        document.getElementById('board-canvas').appendChild(div);
+
+        let dragStartX, dragStartY;
+        div.addEventListener('mousedown', (e) => {
+            dragStartX = e.clientX; dragStartY = e.clientY;
+            div.style.zIndex = highestZ++;
+        });
+        div.addEventListener('mouseup', (e) => {
+            if (e.target.closest('.del-x, .font-controls, .font-btn')) return;
+            if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < 5) openNoteZoom(text);
+        });
+        return div;
+    }
+
+    // Batch layout: positions ALL notes in a shuffled grid (used on initial load)
+    function layoutNotes() {
+        const notes = [...document.querySelectorAll('.post-it')];
+        const count = notes.length;
+        if (count === 0) return;
+
+        const scale = Math.max(0.45, Math.min(1, Math.sqrt(6 / count)));
+        document.documentElement.style.setProperty('--note-scale', scale);
+
+        const noteW = Math.ceil(250 * scale);
+        const noteH = Math.ceil(250 * scale);
+        const gap = 15;
+        const minX = gap, maxX = window.innerWidth - noteW - gap;
+        const minY = 130, maxY = window.innerHeight - noteH - 60;
+
+        // Build grid of valid positions then shuffle for random scatter
+        const positions = [];
+        for (let gy = minY; gy <= maxY; gy += noteH + gap)
+            for (let gx = minX; gx <= maxX; gx += noteW + gap)
+                positions.push({ x: gx, y: gy });
+
+        for (let i = positions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [positions[i], positions[j]] = [positions[j], positions[i]];
+        }
+
+        // Only reposition notes that haven't been manually dragged
+        const toPlace = notes.filter(n => n.dataset.dragged !== 'true');
+        toPlace.forEach((note, i) => {
+            const pos = positions[i] || { x: minX, y: minY };
+            note.style.left = pos.x + 'px';
+            note.style.top = pos.y + 'px';
+            note.setAttribute('data-x', 0);
+            note.setAttribute('data-y', 0);
+            note.style.transform = 'rotate(-2deg)';
         });
     }
 
@@ -228,17 +310,11 @@
     }
 
     function findPlacement(scale) {
-        // Total rendered size: content (200) + padding (25 each side) = 250
         const noteW = Math.ceil(250 * scale);
         const noteH = Math.ceil(250 * scale);
         const gap = 15;
-        const headerH = 130;
-        const footerH = 60;
-
-        const minX = gap;
-        const maxX = window.innerWidth - noteW - gap;
-        const minY = headerH;
-        const maxY = window.innerHeight - noteH - footerH;
+        const minX = gap, maxX = window.innerWidth - noteW - gap;
+        const minY = 130, maxY = window.innerHeight - noteH - 60;
 
         const existing = [...document.querySelectorAll('.post-it')].map(el => ({
             x: parseFloat(el.style.left) + (parseFloat(el.getAttribute('data-x')) || 0),
@@ -258,50 +334,24 @@
                 const y = minY + Math.random() * (maxY - minY);
                 if (!overlaps(x, y)) return { x, y };
             }
-            for (let gy = minY; gy <= maxY; gy += noteH + gap) {
-                for (let gx = minX; gx <= maxX; gx += noteW + gap) {
+            for (let gy = minY; gy <= maxY; gy += noteH + gap)
+                for (let gx = minX; gx <= maxX; gx += noteW + gap)
                     if (!overlaps(gx, gy)) return { x: gx, y: gy };
-                }
-            }
         }
 
         return { x: minX, y: minY };
     }
 
+    // Incremental add: create element then find a gap
     function createPostIt(id, text) {
-        const div = document.createElement('div');
-        div.id = id;
-        div.className = 'post-it';
-        div.style.zIndex = highestZ++;
-        div.innerHTML = `
-            <span class="del-x" onclick="del('${id}')">×</span>
-            <div class="text-content">${text}</div>
-            <div class="font-controls">
-                <div class="font-btn" onclick="changeFont('${id}', -2)">-</div>
-                <div class="font-btn" onclick="changeFont('${id}', 2)">+</div>
-            </div>
-        `;
-
-        // Set scale for the new count before appending, so findPlacement uses correct size
-        const newCount = document.querySelectorAll('.post-it').length + 1;
-        const scale = Math.max(0.45, Math.min(1, Math.sqrt(6 / newCount)));
+        createPostItElement(id, text);
+        const count = document.querySelectorAll('.post-it').length;
+        const scale = Math.max(0.45, Math.min(1, Math.sqrt(6 / count)));
         document.documentElement.style.setProperty('--note-scale', scale);
-
         const { x, y } = findPlacement(scale);
+        const div = document.getElementById(id);
         div.style.left = x + 'px';
         div.style.top = y + 'px';
-
-        document.getElementById('board-canvas').appendChild(div);
-
-        let dragStartX, dragStartY;
-        div.addEventListener('mousedown', (e) => {
-            dragStartX = e.clientX; dragStartY = e.clientY;
-            div.style.zIndex = highestZ++;
-        });
-        div.addEventListener('mouseup', (e) => {
-            if (e.target.closest('.del-x, .font-controls, .font-btn')) return;
-            if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < 5) openNoteZoom(text);
-        });
     }
 
     window.changeFont = (id, delta) => {
@@ -311,12 +361,14 @@
     };
 
     interact('.post-it').draggable({
-        listeners: { move (event) {
+        listeners: { move(event) {
             const t = event.target;
             const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
             const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
             t.style.transform = `translate(${x}px, ${y}px) rotate(-2deg)`;
-            t.setAttribute('data-x', x); t.setAttribute('data-y', y);
+            t.setAttribute('data-x', x);
+            t.setAttribute('data-y', y);
+            t.dataset.dragged = 'true';
         }}
     });
 
