@@ -197,7 +197,20 @@ links.forEach((lnk, i) => {
       'Events: <strong>1990–2015</strong>.<br>' +
       'This site is straight out of the 90s.<br>' +
       'Best viewed at 800&times;600. ✦' +
-    '</p>';
+    '</p>' +
+    '<a class="ai-toggle">How was AI used to make this site?</a>' +
+    '<div class="ai-expand">' +
+      'I built this site using AI as a production tool. I brought the ideas, the content, and the decisions: what the site should look like, what it should say, and how it should work. The AI took resources I had already created, reshaped and reformatted them, and occasionally added to them, while I iterated on the results, rejecting or refining anything that didn\'t fit. The creative vision and pedagogical judgement were mine throughout; the AI handled the implementation.' +
+    '</div>';
+
+  const toggle = aboutDiv.querySelector('.ai-toggle');
+  const expand = aboutDiv.querySelector('.ai-expand');
+  toggle.addEventListener('click', () => {
+    const isOpen = expand.style.display === 'block';
+    expand.style.display = isOpen ? 'none' : 'block';
+    toggle.classList.toggle('ai-toggle-open', !isOpen);
+  });
+
   win.appendChild(aboutDiv);
 }
 
