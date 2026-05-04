@@ -11,7 +11,11 @@ const FONT_MAX     = 21;
 
 const PAGES = [
   { slug: '',             label: 'The Project'              },
-  { slug: 'rq',           label: 'Research Question'        },
+  { slug: 'rq',           label: 'Research Question',
+    children: [
+      { slug: 'rq/starters', label: 'RQ Starters' },
+    ]
+  },
   { slug: 'sources',      label: 'Finding Sources'          },
   { slug: 'bibliography', label: 'Annotated Bibliography'   },
   { slug: 'narrative',    label: 'Crafting Your Narrative'  },
@@ -25,11 +29,10 @@ const PAGES = [
 
 function getCurrentSlug() {
   const path = window.location.pathname;
-  const match = path.match(/\/moa\/([^/]+)\/?$/);
-  if (!match) return '';
-  const seg = match[1];
-  if (seg === 'index.html') return '';
-  return seg;
+  const idx = path.indexOf('/moa/');
+  if (idx === -1) return '';
+  const after = path.slice(idx + 5).replace(/\/index\.html$/, '').replace(/\/$/, '');
+  return after;
 }
 
 function getBase() {
@@ -51,7 +54,9 @@ function renderNav() {
     const li = document.createElement('li');
     const a  = document.createElement('a');
     a.href = page.slug === '' ? base + 'index.html' : base + page.slug + '/';
-    if (page.slug === current) a.classList.add('active');
+    const isActive   = current === page.slug;
+    const isExpanded = page.children && (isActive || current.startsWith(page.slug + '/'));
+    if (isActive) a.classList.add('active');
     a.textContent = page.label;
     if (page.slug === 'guestbook') {
       const badge = document.createElement('span');
@@ -60,6 +65,20 @@ function renderNav() {
       a.appendChild(badge);
     }
     li.appendChild(a);
+    if (isExpanded) {
+      const subUl = document.createElement('ul');
+      subUl.className = 'sub-nav';
+      page.children.forEach(child => {
+        const subLi = document.createElement('li');
+        const subA  = document.createElement('a');
+        subA.href = base + child.slug + '/';
+        if (current === child.slug) subA.classList.add('active');
+        subA.textContent = child.label;
+        subLi.appendChild(subA);
+        subUl.appendChild(subLi);
+      });
+      li.appendChild(subUl);
+    }
     ul.appendChild(li);
   });
 
