@@ -10,7 +10,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         
-        :root { --bg: #e2e8f0; --accent: #4f46e5; --postit: #fef08a; --title-font: 'Inter', sans-serif; }
+        :root { --bg: #e2e8f0; --accent: #4f46e5; --postit: #fef08a; --title-font: 'Inter', sans-serif; --note-scale: 1; }
         body { font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; background: var(--bg); margin: 0; overflow: hidden; }
         
         h1, h2 { font-family: var(--title-font); text-transform: uppercase; letter-spacing: -1px; }
@@ -39,12 +39,35 @@
         }
 
         /* POST-IT TILES */
-        .post-it { 
-            width: 200px; min-height: 200px; padding: 25px; background: var(--postit); 
-            box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: absolute; 
+        .post-it {
+            width: calc(200px * var(--note-scale));
+            min-height: calc(200px * var(--note-scale));
+            padding: calc(25px * var(--note-scale));
+            background: var(--postit);
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: absolute;
             display: flex; align-items: center; justify-content: center; text-align: center;
-            font-size: 1.4rem; cursor: grab; border-bottom-right-radius: 40px 5px;
+            font-size: calc(1.4rem * var(--note-scale)); cursor: grab; border-bottom-right-radius: 40px 5px;
             transform: rotate(-2deg); touch-action: none; user-select: none;
+            transition: width 0.3s, min-height 0.3s, padding 0.3s, font-size 0.3s;
+        }
+
+        /* NOTE FULLSCREEN ZOOM */
+        #note-zoom-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 3000; cursor: pointer;
+        }
+        #note-zoom-content {
+            background: var(--postit);
+            padding: 60px 80px;
+            max-width: 80vw; max-height: 80vh; overflow: auto;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+            font-size: clamp(2rem, 5vw, 4rem);
+            text-align: center;
+            border-bottom-right-radius: 80px 10px;
+            box-shadow: 15px 15px 50px rgba(0,0,0,0.4);
+            cursor: default;
         }
         .del-x { position: absolute; top: 5px; right: 8px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; }
         
@@ -133,6 +156,10 @@
     </div>
 </div>
 
+<div id="note-zoom-overlay" class="hidden" onclick="closeNoteZoom()">
+    <div id="note-zoom-content" onclick="event.stopPropagation()"></div>
+</div>
+
 <div id="student-view" class="hidden">
     <div id="invalid-room-msg" class="hidden error-msg">
         Check your typing! You've come to an empty room.
@@ -194,6 +221,12 @@
         });
     }
 
+    function updateNoteScale() {
+        const count = document.querySelectorAll('.post-it').length;
+        const scale = Math.max(0.45, Math.min(1, Math.sqrt(6 / Math.max(count, 1))));
+        document.documentElement.style.setProperty('--note-scale', scale);
+    }
+
     function createPostIt(id, text) {
         const div = document.createElement('div');
         div.id = id;
@@ -207,13 +240,23 @@
                 <div class="font-btn" onclick="changeFont('${id}', 2)">+</div>
             </div>
         `;
-        
-        const x = Math.random() * (window.innerWidth - 220);
-        const y = 150 + Math.random() * (window.innerHeight - 450);
+
+        const x = Math.random() * (window.innerWidth * 0.8);
+        const y = 150 + Math.random() * (window.innerHeight * 0.6);
         div.style.left = x + 'px'; div.style.top = y + 'px';
         document.getElementById('board-canvas').appendChild(div);
-        
-        div.addEventListener('mousedown', () => div.style.zIndex = highestZ++);
+
+        let dragStartX, dragStartY;
+        div.addEventListener('mousedown', (e) => {
+            dragStartX = e.clientX; dragStartY = e.clientY;
+            div.style.zIndex = highestZ++;
+        });
+        div.addEventListener('mouseup', (e) => {
+            if (e.target.closest('.del-x, .font-controls, .font-btn')) return;
+            if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < 5) openNoteZoom(text);
+        });
+
+        updateNoteScale();
     }
 
     window.changeFont = (id, delta) => {
@@ -250,8 +293,24 @@
         document.getElementById('feedback').style.display = "block";
         setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
     };
-    window.del = (k) => confirm("Delete?") && remove(ref(db, `rooms/${room}/answers/${k}`)) && document.getElementById(k).remove();
-    window.clearAll = () => confirm("Clear?") && remove(ref(db, `rooms/${room}/answers`)) && (document.getElementById('board-canvas').innerHTML="");
+    window.del = (k) => {
+        if (!confirm("Delete?")) return;
+        remove(ref(db, `rooms/${room}/answers/${k}`));
+        document.getElementById(k).remove();
+        updateNoteScale();
+    };
+    window.clearAll = () => {
+        if (!confirm("Clear?")) return;
+        remove(ref(db, `rooms/${room}/answers`));
+        document.getElementById('board-canvas').innerHTML = "";
+        updateNoteScale();
+    };
+    window.openNoteZoom = (text) => {
+        document.getElementById('note-zoom-content').textContent = text;
+        document.getElementById('note-zoom-overlay').classList.remove('hidden');
+    };
+    window.closeNoteZoom = () => document.getElementById('note-zoom-overlay').classList.add('hidden');
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNoteZoom(); });
     window.toggleQR = () => document.getElementById('qr-overlay').classList.toggle('hidden');
     window.downloadCSV = () => {
         let c = "Response\n";
