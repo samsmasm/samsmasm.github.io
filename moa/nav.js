@@ -20,6 +20,7 @@ const PAGES = [
   { slug: 'timeline',     label: 'The Timeline'             },
   { slug: 'music',        label: '🎵 Music'                 },
   { slug: 'guestbook',   label: '📖 Guestbook'             },
+  { slug: 'big6',        label: '🔍 Big6'                  },
 ];
 
 function getCurrentSlug() {
