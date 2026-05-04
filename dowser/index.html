@@ -227,6 +227,47 @@
         document.documentElement.style.setProperty('--note-scale', scale);
     }
 
+    function findPlacement(scale) {
+        // Total rendered size: content (200) + padding (25 each side) = 250
+        const noteW = Math.ceil(250 * scale);
+        const noteH = Math.ceil(250 * scale);
+        const gap = 15;
+        const headerH = 130;
+        const footerH = 60;
+
+        const minX = gap;
+        const maxX = window.innerWidth - noteW - gap;
+        const minY = headerH;
+        const maxY = window.innerHeight - noteH - footerH;
+
+        const existing = [...document.querySelectorAll('.post-it')].map(el => ({
+            x: parseFloat(el.style.left) + (parseFloat(el.getAttribute('data-x')) || 0),
+            y: parseFloat(el.style.top) + (parseFloat(el.getAttribute('data-y')) || 0),
+        }));
+
+        function overlaps(x, y) {
+            return existing.some(r =>
+                x < r.x + noteW + gap && x + noteW > r.x - gap &&
+                y < r.y + noteH + gap && y + noteH > r.y - gap
+            );
+        }
+
+        if (maxX > minX && maxY > minY) {
+            for (let i = 0; i < 200; i++) {
+                const x = minX + Math.random() * (maxX - minX);
+                const y = minY + Math.random() * (maxY - minY);
+                if (!overlaps(x, y)) return { x, y };
+            }
+            for (let gy = minY; gy <= maxY; gy += noteH + gap) {
+                for (let gx = minX; gx <= maxX; gx += noteW + gap) {
+                    if (!overlaps(gx, gy)) return { x: gx, y: gy };
+                }
+            }
+        }
+
+        return { x: minX, y: minY };
+    }
+
     function createPostIt(id, text) {
         const div = document.createElement('div');
         div.id = id;
@@ -241,9 +282,15 @@
             </div>
         `;
 
-        const x = Math.random() * (window.innerWidth * 0.8);
-        const y = 150 + Math.random() * (window.innerHeight * 0.6);
-        div.style.left = x + 'px'; div.style.top = y + 'px';
+        // Set scale for the new count before appending, so findPlacement uses correct size
+        const newCount = document.querySelectorAll('.post-it').length + 1;
+        const scale = Math.max(0.45, Math.min(1, Math.sqrt(6 / newCount)));
+        document.documentElement.style.setProperty('--note-scale', scale);
+
+        const { x, y } = findPlacement(scale);
+        div.style.left = x + 'px';
+        div.style.top = y + 'px';
+
         document.getElementById('board-canvas').appendChild(div);
 
         let dragStartX, dragStartY;
@@ -255,8 +302,6 @@
             if (e.target.closest('.del-x, .font-controls, .font-btn')) return;
             if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < 5) openNoteZoom(text);
         });
-
-        updateNoteScale();
     }
 
     window.changeFont = (id, delta) => {
