@@ -214,6 +214,35 @@ links.forEach((lnk, i) => {
   win.appendChild(aboutDiv);
 }
 
+function initLibraryDropdown() {
+  const link = document.querySelector('a.taskbar-link');
+  if (!link) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'library-dropdown-wrap';
+  link.parentNode.insertBefore(wrap, link);
+  wrap.appendChild(link);
+
+  const drop = document.createElement('div');
+  drop.className = 'library-dropdown';
+  const dbLinks = [
+    { label: 'Gale: Global Issues',  href: 'https://go.gale.com/ps/i.do?p=GIC&sw=w&u=vnssis&v=2.1&pg=BasicSearch&it=static&sid=bookmark-GIC' },
+    { label: 'Gale: Global History', href: 'https://go.gale.com/ps/i.do?p=WHIC&sw=w&u=vnssis&v=2.1&pg=BasicSearch&it=static&sid=bookmark-WHIC' },
+    { label: 'Gale ebooks',          href: 'https://go.gale.com/ps/i.do?p=GVRL&sw=w&u=vnssis&v=2.1&pg=BasicSearch&it=static&sid=bookmark-GVRL' },
+    { label: 'JSTOR',                href: 'https://www.jstor.org/' },
+  ];
+  dbLinks.forEach(db => {
+    const a = document.createElement('a');
+    a.href = db.href;
+    a.textContent = db.label;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.className = 'library-dropdown-item';
+    drop.appendChild(a);
+  });
+  wrap.appendChild(drop);
+}
+
 function initLastUpdated() {
   const footer = document.querySelector('.page-footer');
   if (!footer) return;
@@ -258,4 +287,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initSidebarLogo();
   initLastUpdated();
   initSidebarExtras();
+  initLibraryDropdown();
 });
