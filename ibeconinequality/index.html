@@ -954,14 +954,6 @@
         <textarea id="ngo-text" rows="12" placeholder="Draft your NGO position statement here…"></textarea>
       </div>
 
-      <div style="margin-top: 1rem;">
-        <button class="btn btn-outline" id="ai-feedback-btn" onclick="getAiFeedback()">Get AI Feedback</button>
-      </div>
-
-      <div id="ai-feedback-area" style="display:none;">
-        <div class="ai-feedback-label">AI Feedback</div>
-        <div class="ai-feedback-box" id="ai-feedback-text"></div>
-      </div>
     </div>
 
     <button class="btn btn-primary btn-lg" onclick="continueFromS5()">Submit and finish</button>
@@ -1043,7 +1035,6 @@ import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/fir
 
 // ── Constants ──
 const TEACHER_PIN = "1234";
-const WORKER_URL  = 'https://taxworker.samgetsstuffdone.workers.dev';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
@@ -1560,47 +1551,9 @@ function loadS5() {
     if (val && document.activeElement !== ngoTa) ngoTa.value = val;
   });
 
-  // Load existing AI feedback if any
-  dbGet(dbPath('data', state.teamKey, 'ngofeedback')).then(val => {
-    if (val) {
-      document.getElementById('ai-feedback-text').textContent = val;
-      document.getElementById('ai-feedback-area').style.display = 'block';
-    }
-  });
-
   startAutoSave(() => dbSet(ngoPath, ngoTa.value));
 }
 
-window.getAiFeedback = async function() {
-  const ngoText = document.getElementById('ngo-text').value.trim();
-  if (!ngoText) { showToast('Write your NGO statement first', true); return; }
-
-  const btn = document.getElementById('ai-feedback-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Getting feedback…';
-
-  const system = `You are an IB Economics teacher giving brief formative feedback on a student group's policy recommendation statement. Be encouraging but honest. Check specifically: (1) Have they referenced the Lorenz curve or Gini coefficient? (2) Have they addressed both tax and non-tax policy? (3) Are their recommendations ranked and justified with economic reasoning? Keep feedback to 3–4 sentences.`;
-
-  try {
-    const res  = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system, message: ngoText, max_tokens: 600 }),
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || 'API error');
-
-    const feedback = data.text;
-    document.getElementById('ai-feedback-text').textContent = feedback;
-    document.getElementById('ai-feedback-area').style.display = 'block';
-    await dbSet(dbPath('data', state.teamKey, 'ngofeedback'), feedback);
-  } catch (e) {
-    showToast('Feedback unavailable — ' + e.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Get AI Feedback';
-  }
-};
 
 window.continueFromS5 = async function() {
   const ngoTa = document.getElementById('ngo-text');
@@ -1791,11 +1744,6 @@ async function buildTeacherPanel(key, displayName) {
         ${val(vals.ngo)}
       </div>
 
-      ${vals.ngofeedback ? `
-      <div class="data-section">
-        <div class="data-label">AI Feedback</div>
-        <div class="ai-feedback-box" style="margin:0;">${vals.ngofeedback}</div>
-      </div>` : ''}
 
     </div>
   `;
