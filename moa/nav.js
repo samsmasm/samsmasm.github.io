@@ -268,7 +268,7 @@ function initNoodleTools() {
   const a = document.createElement('a');
   a.href = 'https://my.noodletools.com/';
   a.textContent = 'NoodleTools';
-  a.className = 'taskbar-link';
+  a.className = 'taskbar-link taskbar-link-nt';
   a.target = '_blank';
   a.rel = 'noopener';
   clock.parentNode.insertBefore(a, clock);
