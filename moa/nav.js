@@ -262,6 +262,18 @@ function initLibraryDropdown() {
   wrap.appendChild(drop);
 }
 
+function initNoodleTools() {
+  const clock = document.getElementById('taskbar-clock');
+  if (!clock) return;
+  const a = document.createElement('a');
+  a.href = 'https://my.noodletools.com/';
+  a.textContent = 'NoodleTools';
+  a.className = 'taskbar-link';
+  a.target = '_blank';
+  a.rel = 'noopener';
+  clock.parentNode.insertBefore(a, clock);
+}
+
 function initLastUpdated() {
   const footer = document.querySelector('.page-footer');
   if (!footer) return;
@@ -304,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFontCtrl();
   initHitCounter();
   initSidebarLogo();
+  initNoodleTools();
   initLastUpdated();
   initSidebarExtras();
   initLibraryDropdown();
