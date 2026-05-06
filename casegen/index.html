@@ -155,10 +155,26 @@
     .dot-purple { box-shadow: 0 0 8px rgba(168,85,247,0.9); }
     .dot-green  { box-shadow: 0 0 8px rgba(74,222,128,0.9); }
 
-    .output-text { font-size: 0.875rem; line-height: 1.75; color: #cbd5e1; }
-    .output-text p + p { margin-top: 0.85rem; }
-    .output-text strong { color: #e2e8f0; font-weight: 600; }
-    .output-text em { color: #a5b4fc; font-style: italic; }
+    /* Exam paper output */
+    .exam-paper-hdr {
+      background: #0d0d20;
+      border-bottom: 2px solid #c9a227;
+      padding: 13px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .exam-paper-body {
+      background: #fffef7;
+      padding: 26px 30px 32px;
+      font-family: Georgia, 'Times New Roman', serif;
+      color: #16120a;
+      font-size: 0.9rem;
+      line-height: 1.85;
+    }
+    .exam-paper-body p + p { margin-top: 0.9rem; }
+    .exam-paper-body strong { font-weight: 700; color: #0a0800; }
+    .exam-paper-body em { font-style: italic; color: #3a2e0a; }
 
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: #06061a; }
@@ -267,21 +283,21 @@
         </div>
       </div>
 
-      <!-- Output card (hidden until first generation) -->
-      <div id="outputCard" class="hidden card card-result p-5">
+      <!-- Output card: IB exam paper style -->
+      <div id="outputCard" class="hidden mt-1" style="border-radius:10px; overflow:hidden; border:1px solid #c9a227;">
 
-        <!-- Loading -->
-        <div id="outputLoading" class="flex items-center gap-3 py-4 text-slate-500 text-sm">
+        <!-- Loading (dark, matches site) -->
+        <div id="outputLoading" class="flex items-center gap-3 px-6 py-5 text-slate-500 text-sm" style="background:#0d0d20;">
           <div class="loader"></div>
           <span>Generating case study and questions...</span>
         </div>
 
-        <!-- Content -->
+        <!-- Exam paper -->
         <div id="outputContent" class="hidden">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full bg-cyan-400 dot-cyan"></div>
-              <span class="reel-tag text-cyan-400">Generated Output</span>
+          <div class="exam-paper-hdr">
+            <div>
+              <div style="font-size:0.58rem; letter-spacing:0.2em; text-transform:uppercase; color:#64748b; font-family:system-ui,sans-serif; font-weight:600;">IB Business Management</div>
+              <div style="font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:#c9a227; font-family:system-ui,sans-serif; font-weight:700; margin-top:3px;">Unit 3: Finance &mdash; Practice Paper</div>
             </div>
             <button id="copyOutputBtn" class="copy-btn px-4 py-1.5 text-white font-semibold text-xs flex items-center gap-2">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -291,11 +307,13 @@
               <span id="copyOutputLabel">Copy</span>
             </button>
           </div>
-          <div id="outputText" class="output-text"></div>
+          <div class="exam-paper-body">
+            <div id="outputText"></div>
+          </div>
         </div>
 
         <!-- Error -->
-        <div id="outputError" class="hidden text-sm text-red-400/90 py-2"></div>
+        <div id="outputError" class="hidden px-6 py-4 text-sm text-red-400" style="background:#0d0d20;"></div>
 
       </div>
 
@@ -303,8 +321,9 @@
   </div>
 
   <script>
-    // ── Replace this with your Cloudflare Worker URL after deployment ──
-    const WORKER_URL = 'https://your-worker.workers.dev';
+    const WORKER_URL = 'https://casegen.samgetsstuffdone.workers.dev';
+
+    const SYSTEM_INSTRUCTION = 'You are an IB Business Management Senior Examiner. Create a 150-word case study based on the context words. Use formal business terminology and include specific financial data (e.g., price per unit, fixed costs). Draft three analytical questions (AO2/AO3) based on the theory words. Use IB Command Terms like Analyse, Evaluate, or To what extent.';
 
     const COOLDOWN_MS = 60000;
 
@@ -402,23 +421,23 @@
     }
 
     function buildPrompt(c, t) {
-      return `Use ${c[0]}, ${c[1]}, and ${c[2]} to create a business case study of approximately 150 words for IB Business Management students. Then, create three questions based on ${t[0]}, ${t[1]}, and ${t[2]}. Make sure that the context gives enough relevant information to answer these questions. These should be analytical or evaluative questions (roughly 6 marks in depth), not simple definition or essay-style questions.`;
+      return `Context words: ${c[0]}, ${c[1]}, and ${c[2]}. Theory words: ${t[0]}, ${t[1]}, and ${t[2]}.`;
     }
 
     function startCooldown() {
       const btn = document.getElementById('spinBtn');
-      const lbl = document.getElementById('spinLabel');
       btn.disabled = true;
       const end = Date.now() + COOLDOWN_MS;
       cooldownTimer = setInterval(() => {
+        if (spinning) return; // don't overwrite "SPINNING..." during animation
         const remaining = Math.ceil((end - Date.now()) / 1000);
         if (remaining <= 0) {
           clearInterval(cooldownTimer);
           cooldownTimer = null;
           btn.disabled = false;
-          lbl.textContent = '⚡ SPIN';
+          document.getElementById('spinLabel').textContent = '⚡ SPIN';
         } else {
-          lbl.textContent = `⏳ ${remaining}s`;
+          document.getElementById('spinLabel').textContent = `⏳ ${remaining}s`;
         }
       }, 200);
     }
@@ -459,7 +478,8 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: document.getElementById('promptOut').value }] }]
+            prompt: document.getElementById('promptOut').value,
+            systemInstruction: SYSTEM_INSTRUCTION
           })
         });
 
@@ -497,11 +517,12 @@
       const results = document.getElementById('results');
       const genBtn = document.getElementById('generateBtn');
 
-      spinBtn.disabled = true;
       spinBtn.classList.add('pulsing');
       spinLabel.textContent = '⚡ SPINNING...';
       genBtn.disabled = true;
       document.getElementById('generateLabel').textContent = 'Generate Case Study';
+
+      startCooldown(); // 60s starts the moment Spin is clicked
 
       results.classList.add('hidden');
       document.getElementById('outputCard').classList.add('hidden');
@@ -537,8 +558,7 @@
       results.classList.add('results-in');
 
       spinBtn.classList.remove('pulsing');
-      spinning = false;
-      startCooldown();
+      spinning = false; // countdown label kicks in on next timer tick
 
       genBtn.disabled = false;
     }

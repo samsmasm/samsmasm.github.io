@@ -4,9 +4,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-const SYSTEM_PROMPT =
-  'You are an IB Business Management Senior Examiner. Create a 150-word case study based on the context words. Use formal business terminology and include specific financial data (e.g., price per unit, fixed costs). Draft three analytical questions (AO2/AO3) based on the theory words. Use IB Command Terms like Analyse, Evaluate, or To what extent.';
-
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -28,8 +25,8 @@ export default {
     }
 
     const payload = {
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: body.contents,
+      system_instruction: { parts: [{ text: body.systemInstruction }] },
+      contents: [{ parts: [{ text: body.prompt }] }],
     };
 
     const upstream = await fetch(
