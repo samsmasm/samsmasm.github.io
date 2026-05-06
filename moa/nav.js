@@ -10,6 +10,7 @@ const FONT_MIN     = 11;
 const FONT_MAX     = 21;
 
 const PAGES = [
+  { slug: 'today',        label: '📅 Today'                 },
   { slug: '',             label: 'The Project'              },
   { slug: 'rq',           label: 'Research Question',
     children: [
