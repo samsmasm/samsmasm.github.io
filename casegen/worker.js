@@ -42,7 +42,7 @@ export default {
         messages: [{ role: 'user', content: body.prompt }],
       };
 
-      const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+      const upstream = await fetch('https://gateway.ai.cloudflare.com/v1/5f1a884e9b49e3269e8b789e3c40b49b/casegen/anthropic/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
