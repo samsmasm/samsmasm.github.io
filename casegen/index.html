@@ -74,6 +74,15 @@
       60%  { transform: scale(1.04); opacity: 1; }
       100% { transform: scale(1);    opacity: 1; }
     }
+    .slot-item.interactive { cursor: pointer; }
+    .slot-item.interactive:hover { filter: brightness(1.25); }
+    .slot-item.pressing { transform: scale(0.95); transition: transform 0.1s; }
+    .slot-item.editing { cursor: text; }
+    .slot-item.editing input {
+      background: transparent; border: none; outline: none;
+      color: inherit; font: inherit; font-size: 0.78rem;
+      width: 100%; text-align: center; padding: 0;
+    }
 
     .spin-btn {
       background: linear-gradient(135deg, #7c3aed 0%, #0e7490 100%);
@@ -584,6 +593,7 @@
     let cooldownTimer = null;
     let selCompanies = [], selProducts = [], selLocations = [], selTheory = [];
     let currentStyle = 'surreal';
+    let currentTheoryPool = [];
     let lastOutputRaw = '';
 
     function pickUnique(arr, n) {
@@ -647,6 +657,108 @@
       const prLabel = products.length > 1 ? 'products' : 'product';
       const loLabel = locations.length > 1 ? 'locations' : 'location';
       return `Write a 150-word business case study featuring the ${coLabel} ${co}, selling the ${prLabel} ${pr}, operating in ${lo}. Include specific financial data such as price per unit, fixed costs, and revenue. Then write ${nQ} analytical questions at AO2/AO3 level (approximately 6 marks each) that use the following theory terms and can be answered from the case study: ${th}. Use IB Command Terms such as Analyse, Evaluate, or To what extent. Number each question.`;
+    }
+
+    function getCellPool(prefix) {
+      const ws = WORDS[currentStyle];
+      return { co: ws.companies, pr: ws.products, lo: ws.locations, th: currentTheoryPool }[prefix] || [];
+    }
+    function getLockClass(prefix) {
+      return { co: 'locked-companies', pr: 'locked-products', lo: 'locked-locations', th: 'locked-theory' }[prefix];
+    }
+    function getSelections(prefix) {
+      return { co: selCompanies, pr: selProducts, lo: selLocations, th: selTheory }[prefix] || [];
+    }
+
+    function updateResultsTable() {
+      const n = (i, c) => `<span class="text-${c}-700 font-mono text-xs mt-px">${i}.</span>`;
+      document.getElementById('coTable').innerHTML = selCompanies.map((w,i) => `<div class="flex gap-2">${n(i+1,'cyan')}<span>${w}</span></div>`).join('');
+      document.getElementById('prTable').innerHTML = selProducts.map( (w,i) => `<div class="flex gap-2">${n(i+1,'amber')}<span>${w}</span></div>`).join('');
+      document.getElementById('loTable').innerHTML = selLocations.map((w,i) => `<div class="flex gap-2">${n(i+1,'green')}<span>${w}</span></div>`).join('');
+      document.getElementById('thTable').innerHTML = selTheory.map(   (w,i) => `<div class="flex gap-2">${n(i+1,'purple')}<span>${w}</span></div>`).join('');
+    }
+
+    function refreshPrompt() {
+      const nQ = parseInt(document.getElementById('sliderQ').value);
+      document.getElementById('promptOut').value = buildPrompt(selCompanies, selProducts, selLocations, selTheory, nQ);
+    }
+
+    function enterEditMode(el, prefix, index) {
+      if (el.classList.contains('editing')) return;
+      const saved = el.textContent;
+      el.classList.add('editing');
+      el.innerHTML = '';
+      const input = document.createElement('input');
+      input.value = saved;
+      el.appendChild(input);
+      input.focus();
+      input.select();
+      let done = false;
+      function confirm() {
+        if (done) return;
+        done = true;
+        const val = input.value.trim() || saved;
+        el.innerHTML = '';
+        el.textContent = val;
+        el.classList.remove('editing');
+        getSelections(prefix)[index] = val;
+        updateResultsTable();
+        refreshPrompt();
+      }
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); confirm(); }
+        if (e.key === 'Escape') { done = true; el.textContent = saved; el.classList.remove('editing'); }
+      });
+      input.addEventListener('blur', confirm);
+    }
+
+    async function rerollCell(el, prefix, index) {
+      if (spinning) return;
+      const pool = getCellPool(prefix);
+      const sel  = getSelections(prefix);
+      const others = sel.filter((_, i) => i !== index);
+      const available = pool.filter(w => !others.includes(w));
+      if (!available.length) return;
+      const word = available[Math.floor(Math.random() * available.length)];
+      el.classList.remove('interactive');
+      await animateReel(el.id, pool, word, getLockClass(prefix), 0);
+      el.classList.add('interactive');
+      sel[index] = word;
+      updateResultsTable();
+      refreshPrompt();
+    }
+
+    function attachCellInteraction(el, prefix, index) {
+      if (el.dataset.ia) return;
+      el.dataset.ia = '1';
+      el.classList.add('interactive');
+      el.title = 'Click to reroll · Hold to edit';
+      let timer = null, longFired = false;
+      el.addEventListener('pointerdown', () => {
+        if (spinning || el.classList.contains('editing')) return;
+        longFired = false;
+        el.classList.add('pressing');
+        timer = setTimeout(() => {
+          longFired = true;
+          el.classList.remove('pressing');
+          enterEditMode(el, prefix, index);
+        }, 650);
+      });
+      el.addEventListener('pointerup', () => {
+        clearTimeout(timer);
+        el.classList.remove('pressing');
+        if (!longFired && !spinning && !el.classList.contains('editing')) rerollCell(el, prefix, index);
+        longFired = false;
+      });
+      el.addEventListener('pointercancel', () => { clearTimeout(timer); el.classList.remove('pressing'); longFired = false; });
+      el.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    function attachAllCellInteractions() {
+      selCompanies.forEach((_, i) => attachCellInteraction(document.getElementById(`co-${i}`), 'co', i));
+      selProducts.forEach( (_, i) => attachCellInteraction(document.getElementById(`pr-${i}`), 'pr', i));
+      selLocations.forEach((_, i) => attachCellInteraction(document.getElementById(`lo-${i}`), 'lo', i));
+      selTheory.forEach(   (_, i) => attachCellInteraction(document.getElementById(`th-${i}`), 'th', i));
     }
 
     function startCooldown() {
@@ -773,6 +885,7 @@
       selProducts  = pickUnique(wordSet.products,  nPr);
       selLocations = pickUnique(wordSet.locations,  nLo);
       selTheory    = pickUnique(theoryPool, 3);
+      currentTheoryPool = theoryPool;
 
       const animations = [];
       let delay = 0;
@@ -782,18 +895,15 @@
       selTheory.forEach(   (w, i) => { animations.push(animateReel(`th-${i}`, theoryPool,         w, 'locked-theory',     delay)); delay += 90; });
       await Promise.all(animations);
 
-      const numItem = (n, color) => `<span class="text-${color}-700 font-mono text-xs mt-px">${n}.</span>`;
-      document.getElementById('coTable').innerHTML = selCompanies.map((w,i) => `<div class="flex gap-2">${numItem(i+1,'cyan')}<span>${w}</span></div>`).join('');
-      document.getElementById('prTable').innerHTML = selProducts.map( (w,i) => `<div class="flex gap-2">${numItem(i+1,'amber')}<span>${w}</span></div>`).join('');
-      document.getElementById('loTable').innerHTML = selLocations.map((w,i) => `<div class="flex gap-2">${numItem(i+1,'green')}<span>${w}</span></div>`).join('');
-      document.getElementById('thTable').innerHTML = selTheory.map(   (w,i) => `<div class="flex gap-2">${numItem(i+1,'purple')}<span>${w}</span></div>`).join('');
-
-      document.getElementById('promptOut').value = buildPrompt(selCompanies, selProducts, selLocations, selTheory, nQ);
+      updateResultsTable();
+      refreshPrompt();
 
       results.classList.remove('hidden');
       results.classList.remove('results-in');
       void results.offsetWidth;
       results.classList.add('results-in');
+
+      attachAllCellInteractions();
 
       spinBtn.classList.remove('pulsing');
       spinning = false;
