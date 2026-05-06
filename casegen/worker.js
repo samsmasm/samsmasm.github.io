@@ -10,6 +10,16 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
+    if (request.method === 'GET') {
+      const key = env.CASEGEN_KEY || '';
+      const probe = await fetch('https://httpbin.org/get', { headers: { 'X-Test': 'ok' } });
+      return new Response(JSON.stringify({
+        keyLength: key.length,
+        keyPrefix: key.substring(0, 10),
+        probeStatus: probe.status,
+      }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+    }
+
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405, headers: CORS });
     }
