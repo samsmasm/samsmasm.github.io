@@ -63,6 +63,38 @@
     .promo-box-title      { background: #000080; color: #ffff00; font-family: Arial, sans-serif; }
     .promo-box.promo-teal .promo-box-title { background: #006600; }
     .promo-link           { color: #0000ee; font-family: Arial, sans-serif; }
+
+    /* ── Today card ───────────────────────────────────────────── */
+    .today-card { max-width: var(--content-max); margin-bottom: 16px; }
+    .today-hd { background: #000080; color: #ffff00; padding: 10px 14px; font-family: Impact, 'Arial Black', Arial, sans-serif; font-size: 20px; letter-spacing: 0.03em; }
+    .today-bd { border: 3px solid #000080; background: #fffff0; padding: 14px; white-space: pre-wrap; font-family: 'Times New Roman', Times, serif; font-size: var(--fs); line-height: 1.55; }
+    .today-ts { font-size: 10px; font-family: Arial, sans-serif; color: #888; margin-top: 8px; font-style: italic; }
+
+    /* ── Admin clock trigger ──────────────────────────────────── */
+    #taskbar-clock { cursor: pointer; }
+    #taskbar-clock:hover { opacity: 0.75; }
+
+    /* ── Admin modals ─────────────────────────────────────────── */
+    .adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; }
+    .adm-overlay.visible { display: flex; }
+    .adm-win { background: #fff; border: 3px solid #000080; width: 360px; max-width: 95vw; }
+    .adm-win.wide { width: 460px; }
+    .adm-titlebar { background: #000080; color: #ffff00; font-family: Impact, 'Arial Black', Arial, sans-serif; font-size: 14px; padding: 7px 12px; }
+    .adm-body { padding: 14px 16px 4px; }
+    .adm-label { font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #000080; margin-bottom: 5px; display: block; }
+    .adm-input { box-sizing: border-box; width: 100%; border: 2px solid #000080; padding: 6px 8px; font-family: 'Times New Roman', Times, serif; font-size: 18px; background: #fffff0; letter-spacing: 0.2em; }
+    .adm-textarea { box-sizing: border-box; width: 100%; border: 2px solid #000080; padding: 8px; font-family: 'Times New Roman', Times, serif; font-size: var(--fs); background: #fffff0; min-height: 150px; resize: vertical; }
+    .adm-error { color: #cc0000; font-family: Arial, sans-serif; font-size: 11px; margin-top: 5px; }
+    .adm-footer { padding: 10px 16px 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .adm-btn { padding: 6px 18px; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; border: 2px solid; cursor: pointer; }
+    .adm-save   { background: #006600; color: #fff; border-color: #009900; }
+    .adm-save:hover   { background: #009900; }
+    .adm-clear  { background: #880000; color: #fff; border-color: #cc0000; }
+    .adm-clear:hover  { background: #cc0000; }
+    .adm-cancel { background: #555; color: #fff; border-color: #888; margin-left: auto; }
+    .adm-cancel:hover { background: #888; }
+    .adm-unlock { background: #000080; color: #ffff00; border-color: #0000cc; }
+    .adm-unlock:hover { background: #0000cc; }
   </style>
 </head>
 <body>
@@ -115,6 +147,16 @@
 
     <!-- OVERVIEW TAB ─────────────────────────────────────────── -->
     <div id="overview" class="tab-panel">
+
+      <!-- Today card (shown when teacher has posted content) -->
+      <div class="today-card" id="today-card" style="display:none;">
+        <div class="today-hd">📋 What's happening today?</div>
+        <div class="today-bd" id="today-body"></div>
+        <div class="today-ts" id="today-ts"></div>
+      </div>
+
+      <!-- Default overview (hidden when today card is active) -->
+      <div id="overview-default">
       <div class="welcome-hero">
         <span class="spin-star">✦</span>
         <div class="welcome-title">Welcome to the MOA Homepage!</div>
@@ -256,6 +298,7 @@
           <a class="promo-link" href="/moa/guestbook/">Visit Guestbook →</a>
         </div>
       </div>
+      </div><!-- end overview-default -->
     </div>
 
     <!-- ACTIVITIES TAB ───────────────────────────────────────── -->
@@ -303,5 +346,117 @@
 </div>
 
 <script src="nav.js"></script>
+
+<!-- Passcode modal -->
+<div class="adm-overlay" id="adm-pass-modal">
+  <div class="adm-win">
+    <div class="adm-titlebar">🔒 Teacher Access</div>
+    <div class="adm-body">
+      <label class="adm-label" for="adm-pass-input">Passcode</label>
+      <input class="adm-input" id="adm-pass-input" type="password" maxlength="10" autocomplete="off" placeholder="••••">
+      <div class="adm-error" id="adm-pass-error">Incorrect passcode.</div>
+    </div>
+    <div class="adm-footer">
+      <button class="adm-btn adm-unlock" id="adm-pass-btn">Unlock</button>
+      <button class="adm-btn adm-cancel" id="adm-pass-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="adm-overlay" id="adm-edit-modal">
+  <div class="adm-win wide">
+    <div class="adm-titlebar">📋 What's happening today?</div>
+    <div class="adm-body">
+      <label class="adm-label" for="adm-edit-textarea">Type what students should see when they open this page. Clear to restore the normal overview.</label>
+      <textarea class="adm-textarea" id="adm-edit-textarea" placeholder="e.g. Today we are finishing Activity 2 and starting Activity 3. Make sure you have your RQ written down before we begin."></textarea>
+    </div>
+    <div class="adm-footer">
+      <button class="adm-btn adm-save" id="adm-save-btn">Save</button>
+      <button class="adm-btn adm-clear" id="adm-clear-btn">Clear board</button>
+      <button class="adm-btn adm-cancel" id="adm-edit-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }                       from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+const app = initializeApp({
+  apiKey:            'AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0',
+  authDomain:        'dowserboard.firebaseapp.com',
+  projectId:         'dowserboard',
+  databaseURL:       'https://dowserboard-default-rtdb.firebaseio.com',
+  storageBucket:     'dowserboard.firebasestorage.app',
+  messagingSenderId: '1032600748722',
+  appId:             '1:1032600748722:web:1584c7508fbbca617cbfab',
+}, 'moa-today');
+const db = getDatabase(app);
+const TODAY = ref(db, 'moa/today');
+
+let currentText = '';
+
+onValue(TODAY, snap => {
+  const data = snap.val();
+  const card = document.getElementById('today-card');
+  const dflt = document.getElementById('overview-default');
+  if (data && data.text && data.text.trim()) {
+    currentText = data.text;
+    document.getElementById('today-body').textContent = data.text;
+    const d = new Date(data.ts);
+    document.getElementById('today-ts').textContent =
+      'Posted ' + d.toLocaleDateString() + ' at ' +
+      d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    card.style.display = 'block';
+    dflt.style.display = 'none';
+  } else {
+    currentText = '';
+    card.style.display = 'none';
+    dflt.style.display = '';
+  }
+});
+
+document.getElementById('taskbar-clock').addEventListener('click', () => {
+  document.getElementById('adm-pass-input').value = '';
+  document.getElementById('adm-pass-error').style.display = 'none';
+  document.getElementById('adm-pass-modal').classList.add('visible');
+  setTimeout(() => document.getElementById('adm-pass-input').focus(), 50);
+});
+
+function tryPasscode() {
+  if (document.getElementById('adm-pass-input').value === '0987') {
+    document.getElementById('adm-pass-modal').classList.remove('visible');
+    document.getElementById('adm-edit-textarea').value = currentText;
+    document.getElementById('adm-edit-modal').classList.add('visible');
+    setTimeout(() => document.getElementById('adm-edit-textarea').focus(), 50);
+  } else {
+    document.getElementById('adm-pass-error').style.display = 'block';
+    document.getElementById('adm-pass-input').value = '';
+  }
+}
+
+document.getElementById('adm-pass-btn').addEventListener('click', tryPasscode);
+document.getElementById('adm-pass-input').addEventListener('keydown', e => { if (e.key === 'Enter') tryPasscode(); });
+document.getElementById('adm-pass-cancel').addEventListener('click', () => {
+  document.getElementById('adm-pass-modal').classList.remove('visible');
+});
+
+document.getElementById('adm-save-btn').addEventListener('click', () => {
+  const text = document.getElementById('adm-edit-textarea').value.trim();
+  if (!text) return;
+  set(TODAY, { text, ts: Date.now() });
+  document.getElementById('adm-edit-modal').classList.remove('visible');
+});
+
+document.getElementById('adm-clear-btn').addEventListener('click', () => {
+  remove(TODAY);
+  document.getElementById('adm-edit-modal').classList.remove('visible');
+});
+
+document.getElementById('adm-edit-cancel').addEventListener('click', () => {
+  document.getElementById('adm-edit-modal').classList.remove('visible');
+});
+</script>
 </body>
 </html>
