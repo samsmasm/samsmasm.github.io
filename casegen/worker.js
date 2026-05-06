@@ -43,6 +43,7 @@ export default {
       });
 
       const data = await upstream.json();
+      data._status = upstream.status;
 
       return new Response(JSON.stringify(data), {
         status: upstream.status,
