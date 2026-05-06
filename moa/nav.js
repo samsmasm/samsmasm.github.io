@@ -54,7 +54,7 @@ function renderNav() {
   PAGES.forEach(page => {
     const li = document.createElement('li');
     const a  = document.createElement('a');
-    a.href = page.slug === '' ? base + 'index.html' : base + page.slug + '/';
+    a.href = page.slug === '' ? base + '?direct=1' : base + page.slug + '/';
     const isActive   = current === page.slug;
     const isExpanded = page.children && (isActive || current.startsWith(page.slug + '/'));
     if (isActive) a.classList.add('active');
