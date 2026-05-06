@@ -10,12 +10,6 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
-    if (request.method === 'GET') {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${env.CASEGEN_KEY}`);
-      const data = await res.json();
-      return new Response(JSON.stringify(data, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } });
-    }
-
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405, headers: CORS });
     }
@@ -32,18 +26,21 @@ export default {
       }
 
       const payload = {
-        system_instruction: { parts: [{ text: body.systemInstruction }] },
-        contents: [{ parts: [{ text: body.prompt }] }],
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: body.systemInstruction,
+        messages: [{ role: 'user', content: body.prompt }],
       };
 
-      const upstream = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite-preview:generateContent?key=${env.CASEGEN_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
+      const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.CASEGEN_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await upstream.json();
 
