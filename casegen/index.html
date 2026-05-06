@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CaseGen — IB BM Surreal Finance Generator</title>
+  <title>CaseGen — IB BM Case Study Generator</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
@@ -13,19 +13,19 @@
         radial-gradient(ellipse at 85% 85%, rgba(8, 145, 178, 0.08) 0%, transparent 55%);
       min-height: 100vh;
     }
-
     .card { background: #0c0c22; border-radius: 14px; }
-    .card-context { border: 1px solid rgba(34, 211, 238, 0.25); }
-    .card-theory  { border: 1px solid rgba(168, 85, 247, 0.25); }
-    .card-output  { border: 1px solid rgba(168, 85, 247, 0.2); }
-    .card-result  { border: 1px solid rgba(34, 211, 238, 0.2); }
+    .card-controls { border: 1px solid rgba(255,255,255,0.07); }
+    .card-scenario  { border: 1px solid rgba(34, 211, 238, 0.25); }
+    .card-theory    { border: 1px solid rgba(168, 85, 247, 0.25); }
+    .card-output    { border: 1px solid rgba(168, 85, 247, 0.2); }
+    .card-result    { border: 1px solid rgba(34, 211, 238, 0.2); }
 
     .slot-item {
-      height: 60px;
+      min-height: 52px;
       display: flex; align-items: center; justify-content: center;
       border-radius: 8px;
-      font-size: 0.82rem; font-weight: 500;
-      padding: 0 14px; text-align: center;
+      font-size: 0.78rem; font-weight: 500;
+      padding: 8px 14px; text-align: center;
       color: #475569;
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
@@ -37,12 +37,29 @@
       background: rgba(255,255,255,0.04);
       border-color: rgba(255,255,255,0.1);
     }
-    .slot-item.locked-context {
+    .slot-item.locked-companies {
       color: #22d3ee;
       background: rgba(34,211,238,0.06);
       border-color: rgba(34,211,238,0.4);
       box-shadow: 0 0 14px rgba(34,211,238,0.15), inset 0 0 10px rgba(34,211,238,0.04);
       animation: lockIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: normal; overflow: visible;
+    }
+    .slot-item.locked-products {
+      color: #fb923c;
+      background: rgba(251,146,60,0.06);
+      border-color: rgba(251,146,60,0.4);
+      box-shadow: 0 0 14px rgba(251,146,60,0.15), inset 0 0 10px rgba(251,146,60,0.04);
+      animation: lockIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: normal; overflow: visible;
+    }
+    .slot-item.locked-locations {
+      color: #4ade80;
+      background: rgba(74,222,128,0.06);
+      border-color: rgba(74,222,128,0.4);
+      box-shadow: 0 0 14px rgba(74,222,128,0.15), inset 0 0 10px rgba(74,222,128,0.04);
+      animation: lockIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: normal; overflow: visible;
     }
     .slot-item.locked-theory {
       color: #c084fc;
@@ -50,11 +67,12 @@
       border-color: rgba(168,85,247,0.4);
       box-shadow: 0 0 14px rgba(168,85,247,0.15), inset 0 0 10px rgba(168,85,247,0.04);
       animation: lockIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: normal; overflow: visible;
     }
     @keyframes lockIn {
       0%   { transform: scale(0.93); opacity: 0.4; }
       60%  { transform: scale(1.04); opacity: 1; }
-      100% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1);    opacity: 1; }
     }
 
     .spin-btn {
@@ -84,10 +102,7 @@
       border-radius: 8px;
       transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
     }
-    .gen-btn:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 16px rgba(124,58,237,0.45);
-    }
+    .gen-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(124,58,237,0.45); }
     .gen-btn:active:not(:disabled) { transform: scale(0.97); }
     .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -99,18 +114,10 @@
     .copy-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(5,150,105,0.4); }
     .copy-btn.done  { background: linear-gradient(135deg, #047857, #065f46); }
 
-    .results-in {
-      animation: slideUp 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
-    }
+    .results-in { animation: slideUp 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }
     @keyframes slideUp {
       from { opacity: 0; transform: translateY(18px); }
       to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .result-table {
-      border: 1px solid rgba(168,85,247,0.2);
-      border-radius: 10px;
-      overflow: hidden;
     }
 
     .prompt-area {
@@ -151,11 +158,64 @@
       text-transform: uppercase;
       font-weight: 700;
     }
+    .sub-reel-tag {
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 5px;
+    }
     .dot-cyan   { box-shadow: 0 0 8px rgba(34,211,238,0.9); }
     .dot-purple { box-shadow: 0 0 8px rgba(168,85,247,0.9); }
     .dot-green  { box-shadow: 0 0 8px rgba(74,222,128,0.9); }
 
-    /* Exam paper output */
+    .toggle-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 0.73rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .toggle-btn.active {
+      background: rgba(124,58,237,0.2);
+      border-color: rgba(124,58,237,0.5);
+      color: #a78bfa;
+    }
+    .toggle-btn:hover:not(.active) { border-color: rgba(255,255,255,0.2); color: #94a3b8; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      width: 100%;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: #7c3aed;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { background: #a78bfa; }
+    input[type="range"]::-moz-range-thumb {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: #7c3aed;
+      border: none;
+      cursor: pointer;
+    }
+
     .exam-paper-hdr {
       background: #0d0d20;
       border-bottom: 2px solid #c9a227;
@@ -185,7 +245,6 @@
 
   <div class="max-w-3xl mx-auto px-4 py-12">
 
-    <!-- Header -->
     <header class="text-center mb-10">
       <div class="inline-flex items-center gap-3 mb-2">
         <div class="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm text-white"
@@ -195,24 +254,81 @@
           CaseGen
         </h1>
       </div>
-      <p class="text-slate-500 text-sm">IB Business Management &middot; Unit 3 Finance &middot; Surreal Case Study Generator</p>
+      <p class="text-slate-500 text-sm">IB Business Management &middot; Unit 3 Finance &middot; Case Study Generator</p>
       <div class="glow-divider mt-7"></div>
     </header>
+
+    <!-- Controls -->
+    <div class="card card-controls p-5 mb-5">
+      <div class="flex flex-wrap items-center gap-5 mb-5">
+        <div class="flex items-center gap-2">
+          <span class="reel-tag text-slate-500">Style</span>
+          <button class="toggle-btn active" id="btnSurreal">Surreal</button>
+          <button class="toggle-btn" id="btnRealistic">Mostly Realistic</button>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="reel-tag text-slate-500">Theory from</span>
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="check31" checked class="w-3.5 h-3.5 accent-purple-500">
+            <span class="text-xs text-slate-400">3.1&#8211;3.3</span>
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="check34" checked class="w-3.5 h-3.5 accent-purple-500">
+            <span class="text-xs text-slate-400">3.4&#8211;3.9</span>
+          </label>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <span class="reel-tag text-cyan-500">Companies</span>
+            <span id="sliderCoVal" class="text-xs text-slate-400 font-mono">2</span>
+          </div>
+          <input type="range" min="1" max="3" value="2" id="sliderCo">
+          <div class="flex justify-between text-slate-700 text-xs mt-0.5"><span>1</span><span>2</span><span>3</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <span class="reel-tag text-amber-500">Products</span>
+            <span id="sliderPrVal" class="text-xs text-slate-400 font-mono">1</span>
+          </div>
+          <input type="range" min="1" max="2" value="1" id="sliderPr">
+          <div class="flex justify-between text-slate-700 text-xs mt-0.5"><span>1</span><span>2</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <span class="reel-tag text-green-500">Locations</span>
+            <span id="sliderLoVal" class="text-xs text-slate-400 font-mono">1</span>
+          </div>
+          <input type="range" min="1" max="2" value="1" id="sliderLo">
+          <div class="flex justify-between text-slate-700 text-xs mt-0.5"><span>1</span><span>2</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <span class="reel-tag text-purple-400">Questions</span>
+            <span id="sliderQVal" class="text-xs text-slate-400 font-mono">3</span>
+          </div>
+          <input type="range" min="3" max="6" value="3" id="sliderQ">
+          <div class="flex justify-between text-slate-700 text-xs mt-0.5"><span>3</span><span>4</span><span>5</span><span>6</span></div>
+        </div>
+      </div>
+    </div>
 
     <!-- Slot Machine -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-7">
 
-      <!-- Context Reel -->
-      <div class="card card-context p-5">
+      <!-- Scenario Reel -->
+      <div class="card card-scenario p-5">
         <div class="flex items-center gap-2 mb-4">
           <div class="w-2 h-2 rounded-full bg-cyan-400 dot-cyan"></div>
-          <span class="reel-tag text-cyan-400">Context</span>
+          <span class="reel-tag text-cyan-400">Scenario</span>
         </div>
-        <div class="flex flex-col gap-2">
-          <div id="c1" class="slot-item">&#8212;</div>
-          <div id="c2" class="slot-item">&#8212;</div>
-          <div id="c3" class="slot-item">&#8212;</div>
-        </div>
+        <span class="sub-reel-tag text-cyan-600">Companies</span>
+        <div id="companiesReel" class="flex flex-col gap-2 mb-3"></div>
+        <span class="sub-reel-tag text-amber-600">Products</span>
+        <div id="productsReel" class="flex flex-col gap-2 mb-3"></div>
+        <span class="sub-reel-tag text-green-600">Locations</span>
+        <div id="locationsReel" class="flex flex-col gap-2"></div>
       </div>
 
       <!-- Theory Reel -->
@@ -222,9 +338,9 @@
           <span class="reel-tag text-purple-400">Theory</span>
         </div>
         <div class="flex flex-col gap-2">
-          <div id="t1" class="slot-item">&#8212;</div>
-          <div id="t2" class="slot-item">&#8212;</div>
-          <div id="t3" class="slot-item">&#8212;</div>
+          <div id="th-0" class="slot-item">&#8212;</div>
+          <div id="th-1" class="slot-item">&#8212;</div>
+          <div id="th-2" class="slot-item">&#8212;</div>
         </div>
       </div>
 
@@ -237,26 +353,34 @@
       </button>
     </div>
 
-    <!-- Results (hidden until first spin) -->
+    <!-- Results -->
     <div id="results" class="hidden">
 
       <div class="glow-divider mb-8"></div>
 
-      <!-- Word table -->
-      <div class="result-table mb-6">
-        <div class="grid grid-cols-2 text-xs">
-          <div class="px-5 py-3 border-b border-r border-purple-900/30 bg-cyan-950/30">
-            <span class="reel-tag text-cyan-400">Context Words</span>
+      <!-- Summary -->
+      <div class="card card-result p-5 mb-6">
+        <div class="grid grid-cols-2 gap-x-6 gap-y-5">
+          <div>
+            <span class="reel-tag text-cyan-400 block mb-2">Companies</span>
+            <div id="coTable" class="space-y-1 text-sm text-cyan-100/90"></div>
           </div>
-          <div class="px-5 py-3 border-b border-purple-900/30 bg-purple-950/30">
-            <span class="reel-tag text-purple-400">Theory Words</span>
+          <div>
+            <span class="reel-tag text-amber-400 block mb-2">Products</span>
+            <div id="prTable" class="space-y-1 text-sm text-amber-100/90"></div>
           </div>
-          <div id="ctxTable" class="px-5 py-4 border-r border-purple-900/20 space-y-2 text-sm text-cyan-100/90"></div>
-          <div id="thTable"  class="px-5 py-4 space-y-2 text-sm text-purple-100/90"></div>
+          <div>
+            <span class="reel-tag text-green-400 block mb-2">Locations</span>
+            <div id="loTable" class="space-y-1 text-sm text-green-100/90"></div>
+          </div>
+          <div>
+            <span class="reel-tag text-purple-400 block mb-2">Theory Terms</span>
+            <div id="thTable" class="space-y-1 text-sm text-purple-100/90"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Prompt card -->
+      <!-- Prompt -->
       <div class="card card-output p-5 mb-5">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
@@ -269,8 +393,7 @@
         <div class="flex items-center gap-3 mt-3 flex-wrap">
           <button id="copyBtn" class="copy-btn px-5 py-2 text-white font-semibold text-xs flex items-center gap-2">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
             <span id="copyLabel">Copy Prompt</span>
           </button>
@@ -283,38 +406,28 @@
         </div>
       </div>
 
-      <!-- Output card: IB exam paper style -->
+      <!-- Output: IB exam paper -->
       <div id="outputCard" class="hidden mt-1" style="border-radius:10px; overflow:hidden; border:1px solid #c9a227;">
-
-        <!-- Loading (dark, matches site) -->
         <div id="outputLoading" class="flex items-center gap-3 px-6 py-5 text-slate-500 text-sm" style="background:#0d0d20;">
           <div class="loader"></div>
           <span>Generating case study and questions...</span>
         </div>
-
-        <!-- Exam paper -->
         <div id="outputContent" class="hidden">
           <div class="exam-paper-hdr">
             <div>
               <div style="font-size:0.58rem; letter-spacing:0.2em; text-transform:uppercase; color:#64748b; font-family:system-ui,sans-serif; font-weight:600;">IB Business Management</div>
-              <div style="font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:#c9a227; font-family:system-ui,sans-serif; font-weight:700; margin-top:3px;">Unit 3: Finance &mdash; Practice Paper</div>
+              <div style="font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:#c9a227; font-family:system-ui,sans-serif; font-weight:700; margin-top:3px;">Unit 3: Finance &ndash; Practice Paper</div>
             </div>
             <button id="copyOutputBtn" class="copy-btn px-4 py-1.5 text-white font-semibold text-xs flex items-center gap-2">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
               <span id="copyOutputLabel">Copy</span>
             </button>
           </div>
-          <div class="exam-paper-body">
-            <div id="outputText"></div>
-          </div>
+          <div class="exam-paper-body"><div id="outputText"></div></div>
         </div>
-
-        <!-- Error -->
         <div id="outputError" class="hidden px-6 py-4 text-sm text-red-400" style="background:#0d0d20;"></div>
-
       </div>
 
     </div>
@@ -323,67 +436,154 @@
   <script>
     const WORKER_URL = 'https://casegen.samgetsstuffdone.workers.dev';
 
-    const SYSTEM_INSTRUCTION = 'You are an IB Business Management Senior Examiner. Create a 150-word case study based on the context words. Use formal business terminology and include specific financial data (e.g., price per unit, fixed costs). Draft three analytical questions (AO2/AO3) based on the theory words. Use IB Command Terms like Analyse, Evaluate, or To what extent.';
+    const SYSTEM_INSTRUCTION = 'You are an IB Business Management Senior Examiner. Write a 150-word case study using the company names, products, and locations provided. Use formal business language and include specific financial data such as price per unit, fixed costs, and revenue figures. Then write the specified number of analytical questions at AO2/AO3 level using the theory terms provided. Use IB Command Terms such as Analyse, Evaluate, or To what extent. Number each question. Do not use em dashes. Do not bold words mid-sentence. Write the case study in plain prose.';
 
     const COOLDOWN_MS = 60000;
 
-    const CONTEXT = [
-      "Dinosaurs", "Vikings", "Robots", "Wizards", "Antarctica", "The Moon",
-      "Luxury Nail Polish", "Jetpacks", "Mermaids", "Pirates", "Ninjas",
-      "Time Travellers", "Underwater City", "Giant Mushrooms", "Dragon Tamers",
-      "Alien Tourists", "Medieval Knights", "Cyberpunk Hackers", "Space Miners",
-      "Telepathic Cats", "Ghost Detectives", "Sentient Plants", "Ice Sculptors",
-      "Cloud Architects", "Memory Merchants", "Dream Weavers", "Zombie Accountants",
-      "Vampire Baristas", "Werewolf Chefs", "Goblin Lawyers", "Fairy Godparents",
-      "Quantum Physicists", "Interdimensional Traders", "Invisible Artists",
-      "Hologram Boutique", "Brain Uploading Clinic", "Enchanted Forest Resort",
-      "Lava Island Hotel", "Arctic Research Station", "Desert Nomads",
-      "Underground Kingdom", "Sky Castles", "Bioluminescent Caves",
-      "Coral Reef Resort", "Floating Market", "Zero-Gravity Gym",
-      "Lunar Bakery", "Martian Farm", "Asteroid Mining Co.",
-      "Mammoth Cloning Lab", "AI Fashion House", "Neon City Street Food",
-      "Sentient Furniture Store", "Emotion Bottling Company",
-      "Memory Erasing Clinic", "Teleportation Hub", "Anti-Gravity Sports League",
-      "Bespoke Potion Shop", "Enchanted Bookshop", "Cyborg Athletes",
-      "Mermaid Spa", "Unicorn Ranch", "Dragon Egg Auction House",
-      "Crystal Ball Consultancy", "Wormhole Travel Agency",
-      "Steampunk Airship Company", "Neon Jellyfish Farm", "Space Tourism Agency",
-      "Underground Mushroom Market", "Robot Therapy Centre", "Alien Streetwear Brand",
-      "Holographic Museum", "Sentient Coffee Shop", "Deep Sea Restaurant",
-      "Orbital Hotel", "Mars Colony Café", "Cybernetic Tailor",
-      "Enchanted Toy Factory", "Volcanic Winery", "Submarine Food Truck",
-      "Sentient Library", "Ghost Town Real Estate", "Dragon Racing Circuit",
-      "Underwater Hockey League", "Immortality Spa", "Anti-Ageing Potion Brand",
-      "Telekinesis Training Academy", "Galactic Farmers Market",
-      "Synthetic Emotion Studio", "Plague Doctor Collective",
-      "Bio-engineered Pets Boutique", "Time Capsule Storage",
-      "Invisible Architecture Firm", "Cybernetic Fashion Show",
-      "Giant Spider Silk Mill", "Enchanted Mirror Gallery",
-      "Psychic Stock Exchange", "Interdimensional Post Office",
-      "Cloud City Café", "Dinosaur Safari Park"
-    ];
+    const WORDS = {
+      surreal: {
+        companies: [
+          'Intergalactic Sandstone Polishers','The Sentient Toaster Collective','Gravity-Defying Hat Importers',
+          'Nebula-Based Accountant Squad','Quantum Soup Architects','Telepathic Hamster Logistics',
+          'Invisible Ink Manufacturers','Time-Traveling Debt Collectors','Dream-Harvesting Conglomerate',
+          'Levitating Llama Enterprises','Bioluminescent Moss Promoters','Psychic Umbrella Repairers',
+          'Parallel Universe Real Estate','Cloud-Sculpting Cooperatives','Subatomic Pizza Bakers',
+          'Extraterrestrial Tea Blenders','Glitch-in-the-Matrix Handymen','Mythological Creature HR',
+          'Astral Plane Interior Design','Robotic Hummingbird Breeders','Void-Saturated Fashion House',
+          'Reverse-Aging Logistics','Multidimensional Stationery Hub','Sentient Dust Bunny Relocators',
+          'Comet-Tail Weavers','Black Hole Garbage Disposal','Shadow-Puppet Private Investigators',
+          'Galactic Hitchhiker Insurance','Binary Star Botanists','Paradox-Proof Safe Crackers',
+          'Liquid Gold Plumbers','Cosmic Dust Sweepers','Ancient Deity PR Firm',
+          'Solar Flare Harnessers','Ghost-Writing Phantoms','Stardust Jewelers',
+          'Aurora Borealis Painters','Memory-Wiping Sanitizers','Gravity-Switch Technicians',
+          'Infinite Loop Consultants'
+        ],
+        products: [
+          'Dehydrated Oceans','Self-Writing Apologies','Inflatable Portals','Bottled Moonlight',
+          'Recursive Breakfast Cereal','Teleporting Socks','Echo-Location Spectacles','Edible Geometry',
+          'Hovering Teapots','Non-Euclidean Suitcases','Instant-Atmosphere Spray','Mood-Altering Wallpaper',
+          'Weightless Lead','Solar-Powered Flashlights','Time-Dilation Watches','Liquid Sound Recordings',
+          'Floating Garden Soil','Synthetic Nostalgia','Anti-Gravity Paperweights','Infinite-Sided Dice',
+          'Universal Translation Chewing Gum','Glowing Water','Frozen Lightning Bolts','Magnetic Memory Foam',
+          'Self-Folding Reality','Invisible Safety Vests','Clockwork Butterflies','Portable Shade',
+          'Scented Static','Dream-Recording Pillowcases','Unbreakable Bubbles','Miniature Black Holes',
+          'Solar System Marbles','Liquid Glass Fabrics','Hover-Boots','Zero-Calorie Sunlight',
+          'Flying Carpets','Telepathic Earplugs','Pocket-Sized Storm Clouds','Reversible Time-Sand'
+        ],
+        locations: [
+          'The Underwater Volcano Library','A Floating Island of Forgotten Keys','The Diamond Desert of Mars',
+          'An Underground Rainforest','The Vertical City of Glass','A Moon Made of Green Cheese',
+          'The Infinite Mirror Maze','A Castle Built of Clouds','The Neon Swamp',
+          'A Forest of Singing Trees','The Bottomless Tea Room','A Planet of Purple Sand',
+          'The Giant Mushroom Valley','A City Inside a Clock','The Crystal Caves of Saturn',
+          'A Village in a Bubble','The Sky-High Treehouse','A Beach of Black Pearls',
+          'The Floating Opera House','A Tunnel Through Time','The Garden of Metal Flowers',
+          'A Mountain of Melting Wax','The City of Echoes','A Bridge Between Dimensions',
+          'The Island of Lost Shadows','A Palace of Perpetual Twilight','The Canyon of Whispers',
+          'A Sea of Liquid Silver','The Flying Observatory','A Fortress of Books',
+          'The Jungle of Gears','A River of Starlight','The Valley of Falling Stars',
+          'A Town Where It Rains Gold','The Labyrinth of Dreams','A Meadow of Blue Fire',
+          'The Tower of Frozen Wind','A Crater of Cosmic Dust','The Archipelago of Wonders',
+          'A Temple of Silent Bells'
+        ]
+      },
+      realistic: {
+        companies: [
+          'Sustainable Timber Co','Urban Logistics Group','Global Fintech Solutions',
+          'Artisan Coffee Roasters','Green Energy Partners','Precision Medical Labs',
+          'Digital Marketing Collective','Boutique Hotel Group','Smart Home Systems',
+          'Specialized Dental Practice','Fleet Management Inc','Independent Publishers',
+          'Craft Brewery Association','Solar Installation Experts','Luxury Car Rentals',
+          'Commercial Real Estate','Cloud Storage Providers','Industrial Design Studio',
+          'Organic Farm Network','Venture Capital Group','Cybersecurity Services',
+          'E-commerce Logistics','Renewable Power Corp','Professional Consulting',
+          'Landscape Architecture','International Logistics','Educational Tech',
+          'Premium Pet Supplies','Wholesale Grocery','Event Planning Inc',
+          'Marine Engineering','Private Equity Firm','Construction Management',
+          'Legal Advisory Group','Public Relations Firm','Travel Management',
+          'Recruitment Agency','Interior Design Firm','Tech Support Services',
+          'Corporate Catering'
+        ],
+        products: [
+          'Electric Scooters','Wireless Earbuds','Ergonomic Office Chairs','Organic Protein Powder',
+          'Smart Thermostats','Reusable Water Bottles','High-Performance Laptops','Solar Chargers',
+          'Sustainable Yoga Mats','Gourmet Chocolate Bars','Noise-Canceling Headphones',
+          'Biodegradable Cleaning Supplies','Professional Cameras','Compact Espresso Machines',
+          'Portable Power Banks','Natural Skincare Serums','Smart Watches','Weighted Blankets',
+          'Designer Sunglasses','Air Purifiers','Mechanical Keyboards','All-Weather Hiking Boots',
+          'Smart Light Bulbs','Electric Toothbrushes','Eco-Friendly Backpacks',
+          'High-Thread Count Linens','Wireless Charging Pads','Fitness Trackers',
+          'Artisan Sourdough','Bamboo Cutting Boards','Premium Olive Oil',
+          'Vacuum Insulated Flasks','Cordless Drills','High-Speed Routers',
+          'Tablet Computers','Memory Foam Pillows','Bluetooth Speakers',
+          'Compact Blenders','Stainless Steel Cookware','LED Desk Lamps'
+        ],
+        locations: [
+          'Downtown Business District','Coastal Resort Town','Suburban Shopping Mall',
+          'Mountain Ski Village','Technology Research Park','University Campus',
+          'Industrial Port','Metropolitan Airport','Rural Farming Community',
+          'Regional Distribution Center','Historic City Center','Medical Research Hub',
+          'Tropical Holiday Island','Urban Arts District','Financial District',
+          'Waterfront Development','Luxury Housing Estate','Sustainable Forest',
+          'National Park','Central Railway Station','Suburban Business Park',
+          'High-Street Retail Row','Corporate Headquarters','Botanical Research Garden',
+          'Convention Center','Marine Terminal','Logistics Warehouse',
+          'Craft Market Square','Modern Hospital Complex','Public Library Plaza',
+          'Government District','Renewable Energy Farm','Scientific Observatory',
+          'Boutique Shopping Street','Urban Parklands','Residential Suburb',
+          'Commercial Office Tower','Port Authority','Exhibition Hall',
+          'International Trade Zone'
+        ]
+      }
+    };
 
-    const THEORY = [
-      "Internal Finance", "External Finance", "Personal Funds", "Retained Profit",
-      "Sale of Assets", "Share Capital", "Loan Capital", "Overdrafts",
-      "Trade Credit", "Grants", "Subsidies", "Debt Factoring",
-      "Leasing", "Venture Capital", "Business Angels", "Crowdfunding",
-      "IPO", "Rights Issue", "Capital Expenditure", "Revenue Expenditure",
-      "Fixed Costs", "Variable Costs", "Semi-variable Costs", "Direct Costs",
-      "Indirect Costs", "Overheads", "Total Cost", "Average Cost",
-      "Revenue", "Revenue Stream", "Total Revenue", "Sales Volume",
-      "Break-even Point", "Short Run", "Long Run", "Contribution per Unit",
-      "Total Contribution", "Margin of Safety", "Break-even Chart",
-      "Break-even Quantity", "Target Profit Output", "Target Profit Price",
-      "Break-even Analysis", "Profit", "Loss", "CVP Analysis",
-      "Safety Buffer", "Linearity Assumption", "Price Elasticity of Demand",
-      "Unit Contribution"
-    ];
+    const THEORY_POOLS = {
+      '3.1-3.3': [
+        'Internal Finance','External Finance','Personal Funds','Retained Profit',
+        'Sale of Assets','Share Capital','Loan Capital','Overdrafts',
+        'Trade Credit','Grants','Subsidies','Debt Factoring',
+        'Leasing','Venture Capital','Business Angels','Crowdfunding',
+        'Initial Public Offering (IPO)','Rights Issue','Capital Expenditure','Revenue Expenditure',
+        'Fixed Costs','Variable Costs','Semi-variable Costs','Direct Costs',
+        'Indirect Costs','Overheads','Total Cost','Average Cost',
+        'Revenue','Revenue Stream','Total Revenue','Sales Volume',
+        'Break-even Point','Short Run','Long Run','Contribution per Unit',
+        'Total Contribution','Margin of Safety','Break-even Chart',
+        'Break-even Quantity','Target Profit Output','Target Profit Price',
+        'Break-even Analysis','Profit','Loss','CVP Analysis',
+        'Safety Buffer','Linearity Assumption','Price Elasticity of Demand','Unit Contribution'
+      ],
+      '3.4-3.9': [
+        'Break-even point','Total revenue','Total costs','Fixed costs','Variable costs',
+        'Semi-variable costs','Contribution per unit','Total contribution','Margin of safety',
+        'Target profit output','Target profit price','Break-even chart','Unit contribution',
+        'Income statement','Balance sheet','Statement of financial position',
+        'Trading account','Sales revenue','Cost of goods sold',
+        'Gross profit','Net profit','Operating profit',
+        'Interest','Tax','Dividends','Retained profit',
+        'Fixed assets','Current assets','Current liabilities',
+        'Long-term liabilities','Share capital','Accumulated retained profit',
+        'Depreciation','Straight-line method','Reducing balance method',
+        'Book value','Residual value','Intangible assets','Goodwill',
+        'Gross profit margin','Net profit margin','Current ratio',
+        'Acid test ratio','Return on capital employed','Inventory turnover',
+        'Days in receivable','Days in payable','Gearing ratio','Debt-to-equity ratio',
+        'Liquidity','Profitability','Solvency','Cash flow forecast',
+        'Inflows','Outflows','Net cash flow','Opening balance','Closing balance',
+        'Working capital','Working capital cycle','Insolvency','Debtors','Creditors',
+        'Overdraft','Credit control','Payback period','Average rate of return',
+        'Net present value','Discounting','Discount factor',
+        'Initial investment','Annual net cash flow','Budgeting',
+        'Cost center','Profit center','Variance analysis',
+        'Favorable variance','Adverse variance','Flexible budget','Fixed budget'
+      ]
+    };
 
     let spinning = false;
     let generating = false;
     let cooldownTimer = null;
-    let ctx = [], th = [];
+    let selCompanies = [], selProducts = [], selLocations = [], selTheory = [];
+    let currentStyle = 'surreal';
     let lastOutputRaw = '';
 
     function pickUnique(arr, n) {
@@ -393,6 +593,24 @@
         [copy[i], copy[j]] = [copy[j], copy[i]];
       }
       return copy.slice(0, n);
+    }
+
+    function renderCells(reelId, prefix, count) {
+      const reel = document.getElementById(reelId);
+      reel.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.id = `${prefix}-${i}`;
+        el.className = 'slot-item';
+        el.textContent = '—';
+        reel.appendChild(el);
+      }
+    }
+
+    function updateReelLayout() {
+      renderCells('companiesReel', 'co', parseInt(document.getElementById('sliderCo').value));
+      renderCells('productsReel',  'pr', parseInt(document.getElementById('sliderPr').value));
+      renderCells('locationsReel', 'lo', parseInt(document.getElementById('sliderLo').value));
     }
 
     function animateReel(id, pool, finalWord, lockClass, startDelay) {
@@ -420,8 +638,15 @@
       });
     }
 
-    function buildPrompt(c, t) {
-      return `Use ${c[0]}, ${c[1]}, and ${c[2]} to create a business case study of approximately 150 words for IB Business Management students. Then, create three questions based on ${t[0]}, ${t[1]}, and ${t[2]}. Make sure that the context gives enough relevant information to answer these questions. These should be analytical or evaluative questions (roughly 6 marks in depth), not simple definition or essay-style questions.`;
+    function buildPrompt(companies, products, locations, theory, nQ) {
+      const co = companies.join(', ');
+      const pr = products.join(' and ');
+      const lo = locations.join(' and ');
+      const th = theory.join(', ');
+      const coLabel = companies.length > 1 ? 'companies' : 'company';
+      const prLabel = products.length > 1 ? 'products' : 'product';
+      const loLabel = locations.length > 1 ? 'locations' : 'location';
+      return `Write a 150-word business case study featuring the ${coLabel} ${co}, selling the ${prLabel} ${pr}, operating in ${lo}. Include specific financial data such as price per unit, fixed costs, and revenue. Then write ${nQ} analytical questions at AO2/AO3 level (approximately 6 marks each) that use the following theory terms and can be answered from the case study: ${th}. Use IB Command Terms such as Analyse, Evaluate, or To what extent. Number each question.`;
     }
 
     function startCooldown() {
@@ -429,7 +654,7 @@
       btn.disabled = true;
       const end = Date.now() + COOLDOWN_MS;
       cooldownTimer = setInterval(() => {
-        if (spinning) return; // don't overwrite "SPINNING..." during animation
+        if (spinning) return;
         const remaining = Math.ceil((end - Date.now()) / 1000);
         if (remaining <= 0) {
           clearInterval(cooldownTimer);
@@ -443,10 +668,7 @@
     }
 
     function renderMarkdown(raw) {
-      const esc = raw
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      const esc = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return '<p>' + esc
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
@@ -467,7 +689,6 @@
 
       genBtn.disabled = true;
       genLabel.textContent = 'Generating...';
-
       outputCard.classList.remove('hidden');
       outputLoading.classList.remove('hidden');
       outputContent.classList.add('hidden');
@@ -485,8 +706,7 @@
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          const msg = errData?.error?.message || errData?.error || `Worker returned ${response.status}`;
-          throw new Error(msg);
+          throw new Error(errData?.error?.message || errData?.error || `Worker returned ${response.status}`);
         }
 
         const data = await response.json();
@@ -511,47 +731,64 @@
 
     async function spin() {
       if (spinning || cooldownTimer) return;
+
+      const theoryPool = [];
+      if (document.getElementById('check31').checked) theoryPool.push(...THEORY_POOLS['3.1-3.3']);
+      if (document.getElementById('check34').checked) theoryPool.push(...THEORY_POOLS['3.4-3.9']);
+      if (theoryPool.length < 3) {
+        alert('Select at least one theory section.');
+        return;
+      }
+
       spinning = true;
 
-      const spinBtn = document.getElementById('spinBtn');
+      const nCo = parseInt(document.getElementById('sliderCo').value);
+      const nPr = parseInt(document.getElementById('sliderPr').value);
+      const nLo = parseInt(document.getElementById('sliderLo').value);
+      const nQ  = parseInt(document.getElementById('sliderQ').value);
+      const wordSet = WORDS[currentStyle];
+
+      const spinBtn   = document.getElementById('spinBtn');
       const spinLabel = document.getElementById('spinLabel');
-      const results = document.getElementById('results');
-      const genBtn = document.getElementById('generateBtn');
+      const results   = document.getElementById('results');
+      const genBtn    = document.getElementById('generateBtn');
 
       spinBtn.classList.add('pulsing');
       spinLabel.textContent = '⚡ SPINNING...';
       genBtn.disabled = true;
       document.getElementById('generateLabel').textContent = 'Generate Case Study';
-
-      startCooldown(); // 60s starts the moment Spin is clicked
+      startCooldown();
 
       results.classList.add('hidden');
       document.getElementById('outputCard').classList.add('hidden');
 
-      ['c1','c2','c3','t1','t2','t3'].forEach(id => {
+      updateReelLayout();
+      ['th-0','th-1','th-2'].forEach(id => {
         const el = document.getElementById(id);
         el.className = 'slot-item';
         el.textContent = '—';
       });
 
-      ctx = pickUnique(CONTEXT, 3);
-      th  = pickUnique(THEORY, 3);
+      selCompanies = pickUnique(wordSet.companies, nCo);
+      selProducts  = pickUnique(wordSet.products,  nPr);
+      selLocations = pickUnique(wordSet.locations,  nLo);
+      selTheory    = pickUnique(theoryPool, 3);
 
-      await Promise.all([
-        animateReel('c1', CONTEXT, ctx[0], 'locked-context', 0),
-        animateReel('c2', CONTEXT, ctx[1], 'locked-context', 180),
-        animateReel('c3', CONTEXT, ctx[2], 'locked-context', 360),
-        animateReel('t1', THEORY,  th[0],  'locked-theory',  90),
-        animateReel('t2', THEORY,  th[1],  'locked-theory',  270),
-        animateReel('t3', THEORY,  th[2],  'locked-theory',  450),
-      ]);
+      const animations = [];
+      let delay = 0;
+      selCompanies.forEach((w, i) => { animations.push(animateReel(`co-${i}`, wordSet.companies, w, 'locked-companies', delay)); delay += 180; });
+      selProducts.forEach( (w, i) => { animations.push(animateReel(`pr-${i}`, wordSet.products,  w, 'locked-products',  delay)); delay += 180; });
+      selLocations.forEach((w, i) => { animations.push(animateReel(`lo-${i}`, wordSet.locations,  w, 'locked-locations',  delay)); delay += 180; });
+      selTheory.forEach(   (w, i) => { animations.push(animateReel(`th-${i}`, theoryPool,         w, 'locked-theory',     delay)); delay += 90; });
+      await Promise.all(animations);
 
-      document.getElementById('ctxTable').innerHTML =
-        ctx.map((w, i) => `<div class="flex gap-2"><span class="text-cyan-700 font-mono text-xs mt-px">${i+1}.</span><span>${w}</span></div>`).join('');
-      document.getElementById('thTable').innerHTML =
-        th.map((w, i) => `<div class="flex gap-2"><span class="text-purple-700 font-mono text-xs mt-px">${i+1}.</span><span>${w}</span></div>`).join('');
+      const numItem = (n, color) => `<span class="text-${color}-700 font-mono text-xs mt-px">${n}.</span>`;
+      document.getElementById('coTable').innerHTML = selCompanies.map((w,i) => `<div class="flex gap-2">${numItem(i+1,'cyan')}<span>${w}</span></div>`).join('');
+      document.getElementById('prTable').innerHTML = selProducts.map( (w,i) => `<div class="flex gap-2">${numItem(i+1,'amber')}<span>${w}</span></div>`).join('');
+      document.getElementById('loTable').innerHTML = selLocations.map((w,i) => `<div class="flex gap-2">${numItem(i+1,'green')}<span>${w}</span></div>`).join('');
+      document.getElementById('thTable').innerHTML = selTheory.map(   (w,i) => `<div class="flex gap-2">${numItem(i+1,'purple')}<span>${w}</span></div>`).join('');
 
-      document.getElementById('promptOut').value = buildPrompt(ctx, th);
+      document.getElementById('promptOut').value = buildPrompt(selCompanies, selProducts, selLocations, selTheory, nQ);
 
       results.classList.remove('hidden');
       results.classList.remove('results-in');
@@ -559,15 +796,34 @@
       results.classList.add('results-in');
 
       spinBtn.classList.remove('pulsing');
-      spinning = false; // countdown label kicks in on next timer tick
-
+      spinning = false;
       genBtn.disabled = false;
     }
+
+    // Slider listeners
+    [['Co','Co'],['Pr','Pr'],['Lo','Lo'],['Q','Q']].forEach(([key]) => {
+      document.getElementById(`slider${key}`).addEventListener('input', function() {
+        document.getElementById(`slider${key}Val`).textContent = this.value;
+        if (key !== 'Q') updateReelLayout();
+      });
+    });
+
+    // Style toggle
+    document.getElementById('btnSurreal').addEventListener('click', () => {
+      currentStyle = 'surreal';
+      document.getElementById('btnSurreal').classList.add('active');
+      document.getElementById('btnRealistic').classList.remove('active');
+    });
+    document.getElementById('btnRealistic').addEventListener('click', () => {
+      currentStyle = 'realistic';
+      document.getElementById('btnRealistic').classList.add('active');
+      document.getElementById('btnSurreal').classList.remove('active');
+    });
 
     document.getElementById('spinBtn').addEventListener('click', spin);
     document.getElementById('generateBtn').addEventListener('click', generate);
 
-    document.getElementById('copyBtn').addEventListener('click', function () {
+    document.getElementById('copyBtn').addEventListener('click', function() {
       const text = document.getElementById('promptOut').value;
       if (!text) return;
       const lbl = document.getElementById('copyLabel');
@@ -582,7 +838,7 @@
       });
     });
 
-    document.getElementById('copyOutputBtn').addEventListener('click', function () {
+    document.getElementById('copyOutputBtn').addEventListener('click', function() {
       if (!lastOutputRaw) return;
       const lbl = document.getElementById('copyOutputLabel');
       navigator.clipboard.writeText(lastOutputRaw).then(() => {
@@ -593,6 +849,8 @@
         setTimeout(() => { this.classList.remove('done'); lbl.textContent = 'Copy'; }, 2000);
       });
     });
+
+    updateReelLayout();
   </script>
 
 </body>
