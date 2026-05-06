@@ -10,6 +10,12 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
+    if (request.method === 'GET') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${env.CASEGEN_KEY}`);
+      const data = await res.json();
+      return new Response(JSON.stringify(data, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+    }
+
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405, headers: CORS });
     }
@@ -31,7 +37,7 @@ export default {
       };
 
       const upstream = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${env.CASEGEN_KEY}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite-preview:generateContent?key=${env.CASEGEN_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
