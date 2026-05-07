@@ -385,7 +385,11 @@
         </div>
         <div id="topicsGrid" style="flex:1; display:flex; flex-direction:column; gap:5px;"></div>
       </div>
-      <div style="text-align:right; margin-top:5px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:7px;">
+        <label style="display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none;">
+          <input type="checkbox" id="checkCalc" checked class="w-3.5 h-3.5 accent-purple-500">
+          <span style="font-size:0.7rem; color:#94a3b8;">Include calculation questions</span>
+        </label>
         <span id="termCount" style="font-size:0.68rem; color:#475569;"></span>
       </div>
     </div>
@@ -806,15 +810,19 @@
       });
     }
 
-    function buildPrompt(companies, products, locations, theory, nQ) {
+    function buildPrompt(companies, products, locations, theory) {
       const co = companies.join(', ');
       const pr = products.join(' and ');
       const lo = locations.join(' and ');
       const th = theory.join(', ');
       const coLabel = companies.length > 1 ? 'companies' : 'company';
       const prLabel = products.length > 1 ? 'products' : 'product';
-      const loLabel = locations.length > 1 ? 'locations' : 'location';
-      return `Write a 200-word case study about the ${coLabel} ${co}, which sells the ${prLabel} ${pr} and operates in ${lo}. This is for IB Business Management ${currentLevel.toUpperCase()} students. Give the company a brief backstory and then focus on a specific challenge or decision it is currently facing. Before writing, note that the written questions will be about these theory terms: ${th}. Make sure the case study contains the specific figures and context a student would need to answer all five questions below. Include financial data where it arises naturally in the story. Write as a narrative, not a financial summary. Then write five questions. First write two calculation questions (numbered 1 and 2): each must use a specific IB BM formula drawn from anywhere in the IB BM curriculum, state the formula, and identify the relevant figures from the case study. Then write three analytical questions (numbered 3, 4, and 5) at AO2/AO3 level using the theory terms ${th} and IB Command Terms such as Analyse, Evaluate, or To what extent.`;
+      const useCalc = document.getElementById('checkCalc').checked;
+      const qSection = useCalc
+        ? `Then write five questions. First write two calculation questions (numbered 1 and 2): each must use a specific IB BM formula drawn from anywhere in the IB BM curriculum, state the formula, and identify the relevant figures from the case study. Then write three analytical questions (numbered 3, 4, and 5) at AO2/AO3 level using the theory terms ${th} and IB Command Terms such as Analyse, Evaluate, or To what extent.`
+        : `Then write three analytical questions (numbered 1, 2, and 3) at AO2/AO3 level using the theory terms ${th} and IB Command Terms such as Analyse, Evaluate, or To what extent.`;
+      const figureNote = useCalc ? ' Make sure the case study contains the specific figures a student would need to attempt calculations.' : '';
+      return `Write a 200-word case study about the ${coLabel} ${co}, which sells the ${prLabel} ${pr} and operates in ${lo}. This is for IB Business Management ${currentLevel.toUpperCase()} students. Give the company a brief backstory and then focus on a specific challenge or decision it is currently facing. Before writing, note that the written questions will be about these theory terms: ${th}.${figureNote} Write as a narrative, not a financial summary. ${qSection}`;
     }
 
     function getCellPool(prefix) {
@@ -837,7 +845,7 @@
     }
 
     function refreshPrompt() {
-      document.getElementById('promptOut').value = buildPrompt(selCompanies, selProducts, selLocations, selTheory, 3);
+      document.getElementById('promptOut').value = buildPrompt(selCompanies, selProducts, selLocations, selTheory);
     }
 
     function enterEditMode(el, prefix, index) {
@@ -1094,6 +1102,7 @@
 
     document.getElementById('spinBtn').addEventListener('click', spin);
     document.getElementById('generateBtn').addEventListener('click', generate);
+    document.getElementById('checkCalc').addEventListener('change', refreshPrompt);
 
     document.getElementById('copyBtn').addEventListener('click', function() {
       const text = document.getElementById('promptOut').value;
