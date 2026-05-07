@@ -278,6 +278,47 @@
 </head>
 <body class="text-slate-300 antialiased">
 
+  <!-- Password gate -->
+  <div id="gateOverlay" style="
+    position:fixed; inset:0; z-index:9999;
+    background:#06061a;
+    display:flex; align-items:center; justify-content:center;
+  ">
+    <div style="
+      background:#0c0c22;
+      border:1px solid rgba(168,85,247,0.35);
+      border-radius:16px;
+      padding:40px 44px;
+      max-width:360px; width:90%;
+      text-align:center;
+      box-shadow:0 0 60px rgba(124,58,237,0.2);
+    ">
+      <div style="font-size:2.2rem; margin-bottom:16px;">🐉</div>
+      <p style="font-size:0.95rem; color:#94a3b8; margin-bottom:22px; letter-spacing:0.01em;">What's our animal?</p>
+      <input id="gateInput" type="text" autocomplete="off" spellcheck="false"
+        placeholder="..."
+        style="
+          width:100%; padding:10px 14px;
+          background:rgba(0,0,0,0.4);
+          border:1px solid rgba(168,85,247,0.3);
+          border-radius:8px;
+          color:#e2e8f0; font-size:0.9rem;
+          text-align:center; outline:none;
+          margin-bottom:14px;
+          font-family:inherit;
+        ">
+      <div id="gateError" style="color:#f87171; font-size:0.78rem; min-height:1.2em; margin-bottom:10px;"></div>
+      <button id="gateBtn" style="
+        width:100%; padding:10px;
+        background:linear-gradient(135deg,#7c3aed,#a21caf);
+        border:none; border-radius:8px;
+        color:#fff; font-size:0.85rem; font-weight:600;
+        cursor:pointer; letter-spacing:0.04em;
+        transition:opacity 0.15s;
+      ">Enter</button>
+    </div>
+  </div>
+
   <div class="max-w-3xl mx-auto px-4 py-12">
 
     <header class="text-center mb-10">
@@ -436,6 +477,26 @@
   </div>
 
   <script>
+    (function() {
+      const overlay = document.getElementById('gateOverlay');
+      if (sessionStorage.getItem('slop_auth') === '1') { overlay.remove(); return; }
+      const input = document.getElementById('gateInput');
+      const err   = document.getElementById('gateError');
+      function attempt() {
+        if (input.value.trim().toLowerCase() === 'dragon') {
+          sessionStorage.setItem('slop_auth', '1');
+          overlay.remove();
+        } else {
+          err.textContent = 'Wrong answer. Try again.';
+          input.value = '';
+          input.focus();
+        }
+      }
+      document.getElementById('gateBtn').addEventListener('click', attempt);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
+      input.focus();
+    })();
+
     const WORKER_URL = 'https://casegen.samgetsstuffdone.workers.dev';
 
     const SYSTEM_INSTRUCTION = 'You are an IB Business Management examiner writing engaging case studies for students. Write in a narrative style: give the company a brief backstory, describe a current challenge or decision it faces, and weave financial figures naturally into the story. The case study should read like a short business profile with a human angle, not a financial report. Financial data (costs, prices, revenue) should appear where the story calls for it, not as a list. Then write exam questions at AO2/AO3 level using the theory terms provided. Use IB Command Terms such as Analyse, Evaluate, or To what extent. Number each question. Do not use em dashes. Do not bold words mid-sentence.';
