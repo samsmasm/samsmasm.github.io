@@ -1221,31 +1221,17 @@ window.continueFromS1 = function() {
 };
 
 function loadExpertScreen() {
-  const screen = state.role === 'A' ? 'screen-s2a' : state.role === 'B' ? 'screen-s2b' : 'screen-s2c';
-  const notesId = 'notes-2' + state.role.toLowerCase();
-  const bannerId = 's2' + state.role.toLowerCase() + '-readonly-banner';
+  const notesId    = 'notes-2' + state.role.toLowerCase();
   const continueId = 's2' + state.role.toLowerCase() + '-continue';
-  const key = dbPath('data', state.teamKey, state.role + '_phase1notes');
+  const key        = dbPath('data', state.teamKey, state.role + '_phase1notes');
 
   dbGet(key).then(val => {
     if (val) document.getElementById(notesId).value = val;
   });
 
-  const isLocked = savedScreens.has('s2');
-  document.getElementById(notesId).readOnly = isLocked;
-  document.getElementById(continueId).style.display = isLocked ? 'none' : 'block';
-
-  if (isLocked) {
-    document.getElementById(bannerId).innerHTML = readonlyBanner('s2');
-  }
-
-  if (!isLocked) {
-    const saveFn = () => {
-      const val = document.getElementById(notesId).value;
-      dbSet(key, val);
-    };
-    startAutoSave(saveFn);
-  }
+  document.getElementById(notesId).readOnly = false;
+  document.getElementById(continueId).style.display = 'block';
+  startAutoSave(() => dbSet(key, document.getElementById(notesId).value));
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1328,32 +1314,20 @@ function loadS3() {
     });
   });
 
-  // Check if dd was previously submitted
+  // Load previously saved DD placement if any
   const ddKey = dbPath('data', state.teamKey, state.role + '_dragdrop');
-  const s3cont = document.getElementById('s3-continue');
   dbGet(ddKey).then(val => {
-    const ddLocked = savedScreens.has('s3') || !!val;
-    if (s3cont) s3cont.style.display = ddLocked ? 'none' : 'block';
-    if (ddLocked && val) {
-      // val is stored as {text: zone} — convert to id-keyed for local state
+    if (val) {
       const textToId = Object.fromEntries(DD_CARDS.map(c => [c.text, c.id]));
       DD_CARDS.forEach(c => { ddState[c.id] = 'pool'; });
       Object.entries(val).forEach(([text, zone]) => {
         const id = textToId[text];
         if (id) ddState[id] = zone;
       });
-      showDdReadonly();
-    } else {
-      renderDd();
+      sessionStorage.setItem('tax_dd', JSON.stringify(ddState));
     }
+    renderDd();
   });
-
-  const wikiLocked = savedScreens.has('s3');
-  if (wikiLocked) {
-    ['progressive','regressive','proportional'].forEach(k => {
-      document.getElementById('wiki-' + k).readOnly = true;
-    });
-  }
 
   // Auto-save wiki
   const wikiSaveFn = () => saveWiki();
@@ -1499,22 +1473,15 @@ window.continueFromS3 = async function() {
 // ─────────────────────────────────────────────────────────
 function loadS4() {
   clearListeners();
-  const key     = dbPath('data', state.teamKey, state.role + '_vietnamsummary');
-  const isLocked = savedScreens.has('s4');
-  const ta      = document.getElementById('notes-vietnam');
-  const banner  = document.getElementById('s4-readonly-banner');
-  const cont    = document.getElementById('s4-continue');
+  const key  = dbPath('data', state.teamKey, state.role + '_vietnamsummary');
+  const ta   = document.getElementById('notes-vietnam');
+  const cont = document.getElementById('s4-continue');
 
   dbGet(key).then(val => { if (val) ta.value = val; });
 
-  ta.readOnly = isLocked;
-  cont.style.display = isLocked ? 'none' : 'block';
-
-  if (isLocked) {
-    banner.innerHTML = readonlyBanner('s4');
-  } else {
-    startAutoSave(() => dbSet(key, ta.value));
-  }
+  ta.readOnly = false;
+  cont.style.display = 'block';
+  startAutoSave(() => dbSet(key, ta.value));
 }
 
 window.continueFromS4 = async function() {
