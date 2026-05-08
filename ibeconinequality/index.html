@@ -966,6 +966,7 @@
 <div id="screen-s6" class="screen">
   <div class="topbar">
     <div class="topbar-title">Activity complete</div>
+    <button class="back-btn" onclick="goBack('s6')">&#8592; Back</button>
   </div>
   <div class="shell">
     <div class="progress-dots">
@@ -1019,9 +1020,12 @@
     <button class="back-btn" onclick="showScreen('screen-entry')">Exit</button>
   </div>
   <div class="shell-wide">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-      <h2 style="margin: 0;">All Groups</h2>
-      <button class="btn btn-outline" onclick="loadTeacherData()">&#8635; Refresh</button>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <button class="btn btn-primary btn-sm" id="view-by-group-btn" onclick="setTeacherView('group')">By Group</button>
+        <button class="btn btn-outline btn-sm" id="view-by-question-btn" onclick="setTeacherView('question')">By Question</button>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="loadTeacherData()">&#8635; Refresh</button>
     </div>
     <div id="teacher-panels">
       <div class="card" style="text-align: center; color: var(--muted);">Loading groups…</div>
@@ -1631,6 +1635,18 @@ async function loadS6() {
 // ─────────────────────────────────────────────────────────
 // TEACHER VIEW
 // ─────────────────────────────────────────────────────────
+let cachedTeamsData = null;
+let teacherViewMode = 'group';
+
+window.setTeacherView = function(mode) {
+  teacherViewMode = mode;
+  document.getElementById('view-by-group-btn').className =
+    mode === 'group' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  document.getElementById('view-by-question-btn').className =
+    mode === 'question' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  if (cachedTeamsData) renderTeacherView();
+};
+
 window.loadTeacherData = async function() {
   const container = document.getElementById('teacher-panels');
   container.innerHTML = '<div class="card" style="text-align:center;color:var(--muted)">Loading…</div>';
@@ -1641,52 +1657,64 @@ window.loadTeacherData = async function() {
     return;
   }
 
-  const teams = Object.entries(teamsSnap); // [[key, displayName], ...]
-  container.innerHTML = '';
-
+  const teams = Object.entries(teamsSnap);
+  cachedTeamsData = [];
   for (const [key, displayName] of teams) {
-    const panel = await buildTeacherPanel(key, displayName);
-    container.appendChild(panel);
+    const vals = await loadTeamData(key);
+    cachedTeamsData.push({ key, displayName, vals });
   }
+  renderTeacherView();
 };
 
-async function buildTeacherPanel(key, displayName) {
-  const roles = ['A','B','C'];
+async function loadTeamData(key) {
   const paths = {
-    A_notes:   dbPath('data', key, 'A_phase1notes'),
-    B_notes:   dbPath('data', key, 'B_phase1notes'),
-    C_notes:   dbPath('data', key, 'C_phase1notes'),
-    wiki_p:    dbPath('data', key, 'wiki_progressive'),
-    wiki_r:    dbPath('data', key, 'wiki_regressive'),
-    wiki_pr:   dbPath('data', key, 'wiki_proportional'),
-    A_dd:      dbPath('data', key, 'A_dragdrop'),
-    B_dd:      dbPath('data', key, 'B_dragdrop'),
-    C_dd:      dbPath('data', key, 'C_dragdrop'),
-    A_viet:    dbPath('data', key, 'A_vietnamsummary'),
-    B_viet:    dbPath('data', key, 'B_vietnamsummary'),
-    C_viet:    dbPath('data', key, 'C_vietnamsummary'),
-    ngo:       dbPath('data', key, 'ngo'),
-    ngofeedback: dbPath('data', key, 'ngofeedback'),
+    A_notes: dbPath('data', key, 'A_phase1notes'),
+    B_notes: dbPath('data', key, 'B_phase1notes'),
+    C_notes: dbPath('data', key, 'C_phase1notes'),
+    wiki_p:  dbPath('data', key, 'wiki_progressive'),
+    wiki_r:  dbPath('data', key, 'wiki_regressive'),
+    wiki_pr: dbPath('data', key, 'wiki_proportional'),
+    A_dd:    dbPath('data', key, 'A_dragdrop'),
+    B_dd:    dbPath('data', key, 'B_dragdrop'),
+    C_dd:    dbPath('data', key, 'C_dragdrop'),
+    A_viet:  dbPath('data', key, 'A_vietnamsummary'),
+    B_viet:  dbPath('data', key, 'B_vietnamsummary'),
+    C_viet:  dbPath('data', key, 'C_vietnamsummary'),
+    ngo:     dbPath('data', key, 'ngo'),
   };
-
   const vals = {};
   await Promise.all(Object.entries(paths).map(([k, p]) => dbGet(p).then(v => { vals[k] = v; })));
+  return vals;
+}
 
-  function val(v) {
-    return `<div class="data-value${!v ? ' empty' : ''}">${v || '(not submitted)'}</div>`;
+function renderTeacherView() {
+  const container = document.getElementById('teacher-panels');
+  container.innerHTML = '';
+  if (teacherViewMode === 'group') {
+    for (const { displayName, vals } of cachedTeamsData) {
+      container.appendChild(buildGroupPanel(displayName, vals));
+    }
+  } else {
+    buildQuestionView(cachedTeamsData).forEach(card => container.appendChild(card));
   }
+}
 
-  function ddDisplay(ddData) {
-    if (!ddData) return '<div class="data-value empty">(not submitted)</div>';
-    return ['progressive','regressive','proportional'].map(z => {
-      const cards = Object.entries(ddData)
-        .filter(([,zone]) => zone === z)
-        .map(([card]) => `<span class="dd-card-readonly">${card}</span>`)
-        .join(' ');
-      return `<div style="margin-bottom:0.3rem;"><strong>${z.charAt(0).toUpperCase()+z.slice(1)}:</strong> ${cards || '(none)'}</div>`;
-    }).join('');
-  }
+function tVal(v) {
+  return `<div class="data-value${!v ? ' empty' : ''}">${v || '(not submitted)'}</div>`;
+}
 
+function tDdDisplay(ddData) {
+  if (!ddData) return '<div class="data-value empty">(not submitted)</div>';
+  return ['progressive','regressive','proportional'].map(z => {
+    const items = Object.entries(ddData)
+      .filter(([,zone]) => zone === z)
+      .map(([card]) => `<span class="dd-card-readonly">${card}</span>`)
+      .join(' ');
+    return `<div style="margin-bottom:0.3rem;"><strong>${z.charAt(0).toUpperCase()+z.slice(1)}:</strong> ${items || '(none)'}</div>`;
+  }).join('');
+}
+
+function buildGroupPanel(displayName, vals) {
   const panel = document.createElement('div');
   panel.className = 'team-panel';
   panel.innerHTML = `
@@ -1695,59 +1723,95 @@ async function buildTeacherPanel(key, displayName) {
       <span style="font-size:0.9rem;opacity:0.8;">▼</span>
     </div>
     <div class="team-panel-body">
-
       <div class="data-section">
         <div class="data-label">Phase 1 Expert Notes</div>
         <div class="person-row">
           <div>
             <div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person A — Progressive</div>
-            ${val(vals.A_notes)}
+            ${tVal(vals.A_notes)}
           </div>
           <div>
             <div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person B — Regressive</div>
-            ${val(vals.B_notes)}
+            ${tVal(vals.B_notes)}
           </div>
           <div>
             <div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person C — Proportional</div>
-            ${val(vals.C_notes)}
+            ${tVal(vals.C_notes)}
           </div>
         </div>
       </div>
-
       <div class="data-section">
         <div class="data-label">Group Definitions (Wiki)</div>
-        <div style="margin-bottom:0.4rem;"><strong>Progressive:</strong> ${val(vals.wiki_p)}</div>
-        <div style="margin-bottom:0.4rem;"><strong>Regressive:</strong> ${val(vals.wiki_r)}</div>
-        <div><strong>Proportional:</strong> ${val(vals.wiki_pr)}</div>
+        <div style="margin-bottom:0.4rem;"><strong>Progressive:</strong> ${tVal(vals.wiki_p)}</div>
+        <div style="margin-bottom:0.4rem;"><strong>Regressive:</strong> ${tVal(vals.wiki_r)}</div>
+        <div><strong>Proportional:</strong> ${tVal(vals.wiki_pr)}</div>
       </div>
-
       <div class="data-section">
         <div class="data-label">Card Sorting Results</div>
         <div class="person-row">
-          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person A</div>${ddDisplay(vals.A_dd)}</div>
-          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person B</div>${ddDisplay(vals.B_dd)}</div>
-          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person C</div>${ddDisplay(vals.C_dd)}</div>
+          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person A</div>${tDdDisplay(vals.A_dd)}</div>
+          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person B</div>${tDdDisplay(vals.B_dd)}</div>
+          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person C</div>${tDdDisplay(vals.C_dd)}</div>
         </div>
       </div>
-
       <div class="data-section">
         <div class="data-label">Vietnam Research Summaries</div>
         <div class="person-row">
-          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person A</div>${val(vals.A_viet)}</div>
-          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person B</div>${val(vals.B_viet)}</div>
-          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person C</div>${val(vals.C_viet)}</div>
+          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person A</div>${tVal(vals.A_viet)}</div>
+          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person B</div>${tVal(vals.B_viet)}</div>
+          <div><div style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">Person C</div>${tVal(vals.C_viet)}</div>
         </div>
       </div>
-
       <div class="data-section">
         <div class="data-label">NGO Position Statement</div>
-        ${val(vals.ngo)}
+        ${tVal(vals.ngo)}
       </div>
-
-
     </div>
   `;
   return panel;
+}
+
+function buildQuestionView(teamsData) {
+  const cards = [];
+
+  function makeCard(title, rows) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    const rowsHtml = rows.map((r, i) => `
+      <div>
+        <div style="font-size:0.8rem;font-weight:700;color:var(--teal);margin-bottom:0.25rem;">${r.groupName}</div>
+        ${r.content}
+      </div>
+      ${i < rows.length - 1 ? '<hr class="divider">' : ''}
+    `).join('');
+    el.innerHTML = `<h3 style="margin-bottom:1rem;color:var(--teal-dark);">${title}</h3>${rowsHtml}`;
+    return el;
+  }
+
+  const sections = [
+    { title: 'Phase 1 Notes — Person A (Progressive Tax)',  key: 'A_notes', fn: tVal },
+    { title: 'Phase 1 Notes — Person B (Regressive Tax)',   key: 'B_notes', fn: tVal },
+    { title: 'Phase 1 Notes — Person C (Proportional Tax)', key: 'C_notes', fn: tVal },
+    { title: 'Definition — Progressive Tax',   key: 'wiki_p',  fn: tVal },
+    { title: 'Definition — Regressive Tax',    key: 'wiki_r',  fn: tVal },
+    { title: 'Definition — Proportional Tax',  key: 'wiki_pr', fn: tVal },
+    { title: 'Card Sorting — Person A', key: 'A_dd', fn: tDdDisplay },
+    { title: 'Card Sorting — Person B', key: 'B_dd', fn: tDdDisplay },
+    { title: 'Card Sorting — Person C', key: 'C_dd', fn: tDdDisplay },
+    { title: 'Vietnam Research — Person A', key: 'A_viet', fn: tVal },
+    { title: 'Vietnam Research — Person B', key: 'B_viet', fn: tVal },
+    { title: 'Vietnam Research — Person C', key: 'C_viet', fn: tVal },
+    { title: 'NGO Position Statement', key: 'ngo', fn: tVal },
+  ];
+
+  for (const sec of sections) {
+    cards.push(makeCard(sec.title, teamsData.map(t => ({
+      groupName: t.displayName,
+      content: sec.fn(t.vals[sec.key]),
+    }))));
+  }
+
+  return cards;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1765,6 +1829,7 @@ window.goBack = function(currentScreenKey) {
     s3:  () => { showScreen('screen-s' + { A:'2a', B:'2b', C:'2c' }[state.role]); loadExpertScreen(); },
     s4:  () => { showScreen('screen-s3'); loadS3(); },
     s5:  () => { showScreen('screen-s4'); loadS4(); },
+    s6:  () => { showScreen('screen-s5'); loadS5(); },
   };
   if (prev[currentScreenKey]) prev[currentScreenKey]();
 };
