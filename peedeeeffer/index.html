@@ -19,6 +19,7 @@
         .merge-view .page-card { cursor: default; pointer-events: none; }
         .split-view .page-card { cursor: pointer; }
         #extractTextContent, #epubTextContent { user-select: text; }
+        .epub-view .page-card { cursor: pointer; }
     </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -132,10 +133,24 @@
                         <button onclick="setEpubFormat('markdown')" id="tabEpubMd" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Markdown</button>
                         <button onclick="setEpubFormat('plain')" id="tabEpubPlain" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Plain Text</button>
                     </div>
-                    <div id="epubExportArea" class="hidden pt-4 border-t space-y-3">
+
+                    <div class="space-y-3">
+                        <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Blocks</div>
+                        <div id="epubRangeInputs" class="space-y-2">
+                            <input type="text" placeholder="e.g. 1-5" onfocus="epubActiveBox = this" oninput="updateEpubVisualSelect()" class="epub-range-field w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:bg-white outline-none" style="user-select:text;">
+                        </div>
+                        <button onclick="addEpubRangeInput()" class="text-xs font-bold text-blue-600">+ ADD RANGE</button>
+                    </div>
+
+                    <div id="epubDownloadArea" class="hidden pt-4 border-t space-y-3">
+                        <button onclick="downloadEpubParts()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download Individual Parts</button>
+                        <button onclick="downloadEpubAsZip()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Download All as ZIP</button>
+                    </div>
+
+                    <div id="epubPreviewArea" class="hidden pt-4 border-t space-y-3">
                         <p id="epubCharCount" class="text-[10px] text-slate-400 font-semibold"></p>
-                        <button onclick="copyEpubText()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Copy to Clipboard</button>
-                        <button onclick="downloadEpubText()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download .txt</button>
+                        <button onclick="copyEpubPreview()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Copy Preview</button>
+                        <button onclick="downloadEpubPreview()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Download Preview .txt</button>
                     </div>
                 </div>
             </div>
@@ -155,35 +170,30 @@
 
             <!-- Extract workspace: 75% preview / 25% text -->
             <div id="extractWorkspace" class="hidden flex-1 w-full rounded-[2rem] border bg-white overflow-hidden flex flex-col">
-                <!-- Top 75%: PDF thumbnails -->
                 <div style="flex:3;min-height:0;" class="overflow-y-auto relative">
                     <div id="extractEmptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Upload a PDF to preview</div>
                     <div id="extractCanvasGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 w-full p-10 max-w-7xl"></div>
                 </div>
-                <!-- Control bar: page range + extract button -->
                 <div class="flex-none border-t border-b bg-slate-50 px-4 py-3 flex items-center gap-3">
                     <input id="extractPageRange" type="text" placeholder="Pages: e.g. 1-5, 7, 10-13 (blank = all)" class="flex-1 px-4 py-2.5 bg-white border rounded-xl text-sm outline-none focus:ring-2 ring-blue-500" style="user-select:text;">
                     <button onclick="runExtract()" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm whitespace-nowrap">Extract Text</button>
                 </div>
-                <!-- Bottom 25%: extracted text output -->
                 <div style="flex:1;min-height:0;" class="overflow-y-auto bg-white">
                     <pre id="extractTextContent" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed p-6" style="font-family:'Inter',sans-serif;"></pre>
                 </div>
             </div>
 
-            <!-- EPUB workspace: chapter cards / text output -->
-            <div id="epubWorkspace" class="hidden flex-1 w-full rounded-[2rem] border bg-white overflow-hidden flex flex-col">
-                <!-- Top: chapter cards -->
+            <!-- EPUB workspace: block cards / text preview -->
+            <div id="epubWorkspace" class="hidden flex-1 w-full rounded-[2rem] border bg-white overflow-hidden flex flex-col epub-view">
                 <div style="flex:3;min-height:0;" class="overflow-y-auto relative">
-                    <div id="epubEmptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Upload an EPUB to view chapters</div>
-                    <div id="epubChapterGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 w-full p-10 max-w-7xl"></div>
+                    <div id="epubEmptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Upload an EPUB to view blocks</div>
+                    <div id="epubBlockGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 w-full p-10 max-w-7xl"></div>
                 </div>
-                <!-- Control bar -->
                 <div class="flex-none border-t border-b bg-slate-50 px-4 py-3 flex items-center gap-3">
-                    <span id="epubChapterCount" class="text-xs text-slate-500 font-medium"></span>
-                    <button onclick="runEpubExtract()" class="ml-auto px-5 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm whitespace-nowrap">Extract Text</button>
+                    <span id="epubBlockCount" class="text-xs text-slate-500 font-medium"></span>
+                    <span id="epubSelectionCount" class="text-xs text-blue-600 font-semibold hidden"></span>
+                    <button onclick="runEpubPreview()" class="ml-auto px-5 py-2.5 bg-slate-700 text-white rounded-xl font-semibold text-sm whitespace-nowrap">Preview Selection</button>
                 </div>
-                <!-- Bottom: extracted text -->
                 <div style="flex:1;min-height:0;" class="overflow-y-auto bg-white">
                     <pre id="epubTextContent" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed p-6" style="font-family:'Inter',sans-serif;"></pre>
                 </div>
@@ -206,9 +216,10 @@
         let sourceFileHandle = null;
 
         // EPUB state
-        let epubChapters = [], epubExtractedText = '', epubFormat = 'markdown', currentEpubFile = null;
+        let epubBlocks = [], epubPreviewText = '', epubFormat = 'markdown';
+        let currentEpubFile = null, epubActiveBox = null, epubLastClickedIdx = null;
 
-        // --- File upload via File System Access API (with <input> fallback) ---
+        // --- File upload ---
         document.getElementById('uploadLabelBox').addEventListener('click', async (e) => {
             if (!window.showOpenFilePicker) return;
             e.preventDefault();
@@ -225,9 +236,7 @@
                 if (currentMode !== 'extract' && currentMode !== 'epub' && pendingFiles.some(f => f.size > 50 * 1024 * 1024))
                     document.getElementById('modal').classList.remove('hidden');
                 else confirmLoad('full');
-            } catch (err) {
-                // AbortError = user cancelled
-            }
+            } catch (err) {}
         });
 
         document.getElementById('pdfInput').onchange = (e) => {
@@ -268,7 +277,6 @@
                     `flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto relative ${mode}-view`;
             }
 
-            // Update file input for epub vs pdf
             const input = document.getElementById('pdfInput');
             const labelText = document.getElementById('uploadLabelText');
             if (isEpub) {
@@ -284,7 +292,7 @@
             updateUploadUI();
 
             if (isEpub) {
-                if (epubChapters.length > 0) renderEpubChapters();
+                if (epubBlocks.length > 0) renderEpubBlocks();
             } else if (mergeFiles.length > 0) {
                 if (isExtract) {
                     renderExtractPreview();
@@ -314,10 +322,11 @@
             currentRenderTask++;
             mergeFiles = []; globalRotations = {}; activeBox = null; lastClickedIdx = null;
             calculatedChunks = []; extractedText = ''; pdfLibDocCache = {}; sourceFileHandle = null;
-            currentEpubFile = null; epubChapters = []; epubExtractedText = '';
+            currentEpubFile = null; epubBlocks = []; epubPreviewText = '';
+            epubActiveBox = null; epubLastClickedIdx = null;
             document.getElementById('canvasGrid').innerHTML = '';
             document.getElementById('extractCanvasGrid').innerHTML = '';
-            document.getElementById('epubChapterGrid').innerHTML = '';
+            document.getElementById('epubBlockGrid').innerHTML = '';
             document.getElementById('mergeList').innerHTML = '';
             document.getElementById('emptyState').classList.remove('hidden');
             document.getElementById('extractEmptyState').classList.remove('hidden');
@@ -329,12 +338,15 @@
             document.getElementById('extractTextContent').textContent = '';
             document.getElementById('extractExportArea').classList.add('hidden');
             document.getElementById('epubTextContent').textContent = '';
-            document.getElementById('epubExportArea').classList.add('hidden');
-            document.getElementById('epubChapterCount').textContent = '';
+            document.getElementById('epubDownloadArea').classList.add('hidden');
+            document.getElementById('epubPreviewArea').classList.add('hidden');
+            document.getElementById('epubBlockCount').textContent = '';
+            document.getElementById('epubSelectionCount').classList.add('hidden');
             document.getElementById('mergeManualName').value = '';
             document.getElementById('splitManualName').value = '';
             document.getElementById('extractPageRange').value = '';
             document.querySelectorAll('.range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
+            document.querySelectorAll('.epub-range-field').forEach((el, i) => i === 0 ? el.value = '' : el.remove());
             updateUploadUI();
             setStatus('System Ready', 'slate');
         }
@@ -351,9 +363,9 @@
                 currentEpubFile = { name: file.name };
                 try {
                     setStatus('Parsing EPUB…', 'amber');
-                    epubChapters = await parseEpub(data);
-                    renderEpubChapters();
-                    setStatus(`Loaded — ${epubChapters.length} chapter${epubChapters.length !== 1 ? 's' : ''}`, 'slate');
+                    epubBlocks = await parseEpub(data);
+                    renderEpubBlocks();
+                    setStatus(`Loaded — ${epubBlocks.length} block${epubBlocks.length !== 1 ? 's' : ''}`, 'slate');
                 } catch (err) {
                     setStatus('Error: ' + err.message, 'amber');
                     currentEpubFile = null;
@@ -496,11 +508,10 @@
                 if (idref) spineIds.push(idref);
             });
 
-            const chapters = [];
+            const blocks = [];
             for (const id of spineIds) {
                 const item = manifest[id];
-                if (!item) continue;
-                if (!item.mediaType.includes('html')) continue;
+                if (!item || !item.mediaType.includes('html')) continue;
 
                 const file = zip.file(item.href);
                 if (!file) continue;
@@ -516,31 +527,184 @@
                 if (!bodyText) continue;
 
                 const preview = bodyText.substring(0, 160) + (bodyText.length > 160 ? '…' : '');
-                chapters.push({ title, bodyHtml, preview, href: item.href });
+                blocks.push({ title, bodyHtml, preview, href: item.href });
             }
 
-            return chapters;
+            return blocks;
         }
 
-        function renderEpubChapters() {
-            const grid = document.getElementById('epubChapterGrid');
+        function renderEpubBlocks() {
+            const grid = document.getElementById('epubBlockGrid');
             grid.innerHTML = '';
             document.getElementById('epubEmptyState').classList.add('hidden');
-            document.getElementById('epubChapterCount').textContent =
-                `${epubChapters.length} chapter${epubChapters.length !== 1 ? 's' : ''}`;
+            document.getElementById('epubBlockCount').textContent =
+                `${epubBlocks.length} block${epubBlocks.length !== 1 ? 's' : ''}`;
+            document.getElementById('epubDownloadArea').classList.remove('hidden');
 
-            epubChapters.forEach((ch, i) => {
+            epubBlocks.forEach((block, i) => {
+                const blockNum = i + 1;
                 const card = document.createElement('div');
                 card.className = 'page-card p-4 bg-white rounded-xl shadow-sm border-2 flex flex-col gap-1';
+                card.dataset.blockNum = blockNum;
                 card.innerHTML = `
-                    <div class="text-[8px] font-bold text-slate-300 uppercase">Chapter ${i + 1}</div>
-                    <div class="font-semibold text-sm text-slate-800 leading-snug">${escapeHtml(ch.title)}</div>
-                    <div class="text-xs text-slate-400 leading-relaxed mt-1">${escapeHtml(ch.preview)}</div>
+                    <div class="text-[8px] font-bold text-slate-300 uppercase">Block ${blockNum}</div>
+                    <div class="font-semibold text-sm text-slate-800 leading-snug">${escapeHtml(block.title)}</div>
+                    <div class="text-xs text-slate-400 leading-relaxed mt-1">${escapeHtml(block.preview)}</div>
                 `;
+                card.onclick = (e) => handleEpubBlockClick(blockNum, e);
                 grid.appendChild(card);
             });
 
             updateUploadUI();
+            updateEpubVisualSelect();
+        }
+
+        function handleEpubBlockClick(blockNum, event) {
+            if (!epubActiveBox) epubActiveBox = document.querySelector('.epub-range-field');
+
+            if (event.shiftKey && epubLastClickedIdx !== null) {
+                const start = Math.min(epubLastClickedIdx, blockNum);
+                const end = Math.max(epubLastClickedIdx, blockNum);
+                const rangeArr = Array.from({length: end - start + 1}, (_, i) => start + i);
+                let set = parseRange(epubActiveBox.value);
+                rangeArr.forEach(idx => set.add(idx));
+                epubActiveBox.value = setToString(set);
+            } else {
+                let set = parseRange(epubActiveBox.value);
+                set.has(blockNum) ? set.delete(blockNum) : set.add(blockNum);
+                epubActiveBox.value = setToString(set);
+                epubLastClickedIdx = blockNum;
+            }
+            updateEpubVisualSelect();
+        }
+
+        function addEpubRangeInput() {
+            const input = document.createElement('input');
+            input.className = 'epub-range-field w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:bg-white mt-2 outline-none';
+            input.style.userSelect = 'text';
+            input.placeholder = 'e.g. 7-8';
+            input.onfocus = () => epubActiveBox = input;
+            input.oninput = updateEpubVisualSelect;
+            document.getElementById('epubRangeInputs').appendChild(input);
+            input.focus();
+            epubActiveBox = input;
+        }
+
+        function parseEpubAllRanges() {
+            let combined = new Set();
+            document.querySelectorAll('.epub-range-field').forEach(inp => parseRange(inp.value).forEach(n => combined.add(n)));
+            return combined;
+        }
+
+        function updateEpubVisualSelect() {
+            const allRanges = parseEpubAllRanges();
+            const cards = document.querySelectorAll('#epubBlockGrid .page-card');
+            cards.forEach(card => {
+                const n = parseInt(card.dataset.blockNum);
+                const isSel = allRanges.has(n);
+                card.classList.toggle('selected-page', isSel);
+                card.classList.toggle('excluded', allRanges.size > 0 && !isSel);
+            });
+            const selCount = allRanges.size;
+            const selEl = document.getElementById('epubSelectionCount');
+            if (selCount > 0) {
+                selEl.textContent = `${selCount} selected`;
+                selEl.classList.remove('hidden');
+            } else {
+                selEl.classList.add('hidden');
+            }
+        }
+
+        function buildEpubText(blockIndices) {
+            const parts = [];
+            const sortedIndices = Array.from(blockIndices).sort((a, b) => a - b);
+            for (const idx of sortedIndices) {
+                const block = epubBlocks[idx - 1];
+                if (!block) continue;
+                const text = htmlToFormattedText(block.bodyHtml, epubFormat);
+                if (!text.trim()) continue;
+                parts.push(text);
+                parts.push('');
+            }
+            return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+        }
+
+        async function downloadEpubParts() {
+            if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
+
+            const inputs = Array.from(document.querySelectorAll('.epub-range-field')).filter(i => i.value.trim());
+            if (!inputs.length) { setStatus('Define at least one range first', 'amber'); return; }
+
+            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
+            setStatus('Exporting parts…', 'blue');
+
+            for (let i = 0; i < inputs.length; i++) {
+                const blockSet = parseRange(inputs[i].value);
+                if (!blockSet.size) continue;
+                const text = buildEpubText(blockSet);
+                const rangeLabel = inputs[i].value.trim().replace(/\s/g, '');
+                await saveText(text, `${baseName}_part${i + 1}_blocks${rangeLabel}.txt`);
+                await new Promise(r => setTimeout(r, 800));
+            }
+
+            setStatus(`Done — ${inputs.length} part${inputs.length !== 1 ? 's' : ''}`, 'green');
+        }
+
+        async function downloadEpubAsZip() {
+            if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
+
+            const inputs = Array.from(document.querySelectorAll('.epub-range-field')).filter(i => i.value.trim());
+            if (!inputs.length) { setStatus('Define at least one range first', 'amber'); return; }
+
+            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
+            setStatus('Building ZIP…', 'blue');
+
+            const zip = new JSZip();
+            for (let i = 0; i < inputs.length; i++) {
+                setStatus(`Building part ${i + 1} of ${inputs.length}…`, 'blue');
+                const blockSet = parseRange(inputs[i].value);
+                if (!blockSet.size) continue;
+                const text = buildEpubText(blockSet);
+                const rangeLabel = inputs[i].value.trim().replace(/\s/g, '');
+                zip.file(`${baseName}_part${i + 1}_blocks${rangeLabel}.txt`, text);
+            }
+
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${baseName}_parts.zip`;
+            a.click();
+            setStatus('Done', 'green');
+        }
+
+        function runEpubPreview() {
+            if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
+
+            const allRanges = parseEpubAllRanges();
+            const indices = allRanges.size > 0
+                ? allRanges
+                : new Set(epubBlocks.map((_, i) => i + 1));
+
+            setStatus('Rendering preview…', 'blue');
+            epubPreviewText = buildEpubText(indices);
+            document.getElementById('epubTextContent').textContent = epubPreviewText;
+
+            const chars = epubPreviewText.length;
+            const kb = (new TextEncoder().encode(epubPreviewText).byteLength / 1024).toFixed(1);
+            document.getElementById('epubCharCount').textContent = `${chars.toLocaleString()} characters — ${kb} KB`;
+            document.getElementById('epubPreviewArea').classList.remove('hidden');
+            setStatus(`Preview ready — ${kb} KB`, 'green');
+        }
+
+        function copyEpubPreview() {
+            if (!epubPreviewText) return;
+            navigator.clipboard.writeText(epubPreviewText).then(() => setStatus('Copied!', 'green'));
+        }
+
+        function downloadEpubPreview() {
+            if (!epubPreviewText) return;
+            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
+            saveText(epubPreviewText, baseName + '_preview.txt');
         }
 
         function htmlToFormattedText(html, fmt) {
@@ -587,28 +751,6 @@
             return parts.join('').replace(/\n{3,}/g, '\n\n').trim();
         }
 
-        async function runEpubExtract() {
-            if (!epubChapters.length) { setStatus('No EPUB loaded', 'amber'); return; }
-            setStatus('Extracting…', 'blue');
-
-            const outputParts = [];
-            for (const chapter of epubChapters) {
-                const text = htmlToFormattedText(chapter.bodyHtml, epubFormat);
-                if (!text.trim()) continue;
-                outputParts.push(text);
-                outputParts.push('');
-            }
-
-            epubExtractedText = outputParts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-            document.getElementById('epubTextContent').textContent = epubExtractedText;
-
-            const chars = epubExtractedText.length;
-            const kb = (new TextEncoder().encode(epubExtractedText).byteLength / 1024).toFixed(1);
-            document.getElementById('epubCharCount').textContent = `${chars.toLocaleString()} characters — ${kb} KB`;
-            document.getElementById('epubExportArea').classList.remove('hidden');
-            setStatus(`Done — ${kb} KB`, 'green');
-        }
-
         function setEpubFormat(fmt) {
             epubFormat = fmt;
             document.getElementById('tabEpubMd').className = fmt === 'markdown'
@@ -619,22 +761,11 @@
                 : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
         }
 
-        function copyEpubText() {
-            if (!epubExtractedText) return;
-            navigator.clipboard.writeText(epubExtractedText).then(() => setStatus('Copied!', 'green'));
-        }
-
-        function downloadEpubText() {
-            if (!epubExtractedText) return;
-            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
-            saveText(epubExtractedText, baseName + '.txt');
-        }
-
         function escapeHtml(str) {
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // --- Page selection & manipulation ---
+        // --- PDF page selection ---
 
         function handlePageClick(pageId, absIdx, event) {
             if (currentMode !== 'split') return;
