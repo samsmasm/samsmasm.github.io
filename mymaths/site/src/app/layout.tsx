@@ -1,6 +1,20 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { EB_Garamond, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+
+const garamond = EB_Garamond({
+  subsets: ['latin'],
+  variable: '--font-garamond',
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+})
+
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono-var',
+  weight: ['400', '500', '600'],
+})
 
 export const metadata: Metadata = {
   title: 'mymaths — Graduate Mathematics Study Plan',
@@ -9,14 +23,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
-      <body className="min-h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-        <header style={{ borderBottom: '1px solid #1e293b' }} className="px-6 py-4 flex items-center justify-between sticky top-0 z-50" suppressHydrationWarning>
-          <div style={{ backgroundColor: 'var(--bg-primary)' }} className="absolute inset-0 -z-10" />
-          <Link href="/" className="text-lg font-bold tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
+    <html lang="en" className={`${garamond.variable} ${mono.variable} h-full`}>
+      <body className="min-h-full flex flex-col">
+        <header
+          className="px-6 py-3 flex items-center justify-between sticky top-0 z-50"
+          style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+        >
+          <Link
+            href="/"
+            style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}
+          >
             mymaths
           </Link>
-          <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)', letterSpacing: '0.05em' }}>
             NCEA L3 → Graduate
           </span>
         </header>

@@ -4,62 +4,85 @@ import { curriculum, getModule, getPhase } from '@/lib/curriculum'
 import type { Resource } from '@/types/curriculum'
 
 const RESOURCE_TYPE_ICONS: Record<string, string> = {
-  text: '📖',
-  video: '🎬',
-  exercises: '✏️',
-  interactive: '🔢',
-  tool: '🛠',
-  advanced: '🎓',
-  theory: '∮',
+  text: '📖', video: '🎬', exercises: '✏️',
+  interactive: '🔢', tool: '🛠', advanced: '🎓', theory: '∮',
 }
 
 const ROLE_ORDER = ['primary', 'alternative', 'supplementary', 'solutions', 'environment', 'advanced', 'theory']
 
+const ROLE_LABELS: Record<string, string> = {
+  primary: 'Primary textbook', alternative: 'Alternative text',
+  supplementary: 'Supplementary', solutions: 'Solutions & practice',
+  environment: 'Tools', advanced: 'Advanced reading', theory: 'Theory reference',
+}
+
 function ResourceGroup({ resources, groupLabel }: { resources: Resource[]; groupLabel: string }) {
   if (!resources.length) return null
   return (
-    <div className="mb-4">
-      <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
         {groupLabel}
       </div>
-      <div className="flex flex-col gap-2">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {resources.map((r, i) => (
           <a
             key={i}
             href={r.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-start gap-2 p-3 rounded-lg transition-opacity hover:opacity-80"
-            style={{ background: '#1e293b', border: '1px solid #334155' }}
+            className="resource-link"
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 12px', borderRadius: 6,
+              background: 'var(--bg-subtle)', border: '1px solid var(--border)',
+              textDecoration: 'none',
+            }}
           >
-            <span className="text-base mt-0.5 shrink-0">{RESOURCE_TYPE_ICONS[r.type] ?? '📄'}</span>
-            <div className="min-w-0">
-              <div className="text-sm font-medium leading-snug" style={{ color: '#f1f5f9' }}>
-                {r.title}
-              </div>
-              {r.author && (
-                <div className="text-xs mt-0.5" style={{ color: '#64748b' }}>
-                  {r.author}
-                </div>
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                <span
-                  className="text-xs px-1.5 py-0.5 rounded"
-                  style={{
-                    background: r.free ? '#16a34a20' : '#dc262620',
-                    color: r.free ? '#4ade80' : '#f87171',
-                  }}
-                >
+            <span style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }}>{RESOURCE_TYPE_ICONS[r.type] ?? '📄'}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.3 }}>{r.title}</div>
+              {r.author && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontStyle: 'italic' }}>{r.author}</div>}
+              <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center' }}>
+                <span style={{
+                  fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                  background: r.free ? '#f0fdf4' : '#fef2f2',
+                  color: r.free ? '#15803d' : '#dc2626',
+                  border: `1px solid ${r.free ? '#bbf7d0' : '#fecaca'}`,
+                }}>
                   {r.free ? 'Free' : 'Paid'}
                 </span>
-                <span className="text-xs" style={{ color: '#475569' }}>
-                  {r.type}
-                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{r.type}</span>
               </div>
             </div>
           </a>
         ))}
       </div>
+    </div>
+  )
+}
+
+function Card({ children, accentColor }: { children: React.ReactNode; accentColor?: string }) {
+  return (
+    <div style={{
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      padding: '20px',
+      borderLeft: accentColor ? `3px solid ${accentColor}` : undefined,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function CardLabel({ children, color }: { children: React.ReactNode; color?: string }) {
+  return (
+    <div style={{
+      fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+      color: color ?? 'var(--text-3)', fontFamily: 'var(--font-mono)',
+      marginBottom: 10,
+    }}>
+      {children}
     </div>
   )
 }
@@ -77,299 +100,196 @@ export default async function ModulePage({ params }: { params: Promise<{ id: str
   const prereqModules = module.prerequisites.map(pid => getModule(pid)).filter(Boolean)
   const unlocksModules = module.unlocks.map(uid => getModule(uid)).filter(Boolean)
 
-  // Group resources by role
   const resourcesByRole = ROLE_ORDER.reduce<Record<string, Resource[]>>((acc, role) => {
     const group = module.resources.filter(r => r.role === role)
     if (group.length) acc[role] = group
     return acc
   }, {})
 
-  const roleLabelMap: Record<string, string> = {
-    primary: 'Primary Textbook',
-    alternative: 'Alternative Text',
-    supplementary: 'Supplementary',
-    solutions: 'Solutions / Practice',
-    environment: 'Tools & Environment',
-    advanced: 'Advanced Reading',
-    theory: 'Theory Reference',
-  }
-
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
 
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm mb-6" style={{ color: '#475569' }}>
-        <Link href="/" className="hover:underline" style={{ color: '#64748b' }}>Home</Link>
+      <nav style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-3)', marginBottom: '1.75rem', fontFamily: 'var(--font-mono)' }}>
+        <Link href="/" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>mymaths</Link>
         <span>/</span>
-        <span style={{ color: phase.color }}>{phase.label} · {phase.name}</span>
+        <span style={{ color: phase.color }}>{phase.label}</span>
         <span>/</span>
-        <span style={{ color: '#94a3b8' }}>{module.id}</span>
+        <span>{module.id}</span>
       </nav>
 
       {/* Module header */}
-      <div
-        className="rounded-xl p-6 mb-8"
-        style={{
-          background: '#0f172a',
-          border: `1px solid ${phase.color}40`,
-          borderLeft: `4px solid ${phase.color}`,
-        }}
-      >
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
-          <span
-            className="text-sm font-mono font-bold px-2 py-1 rounded"
-            style={{ background: phase.color + '20', color: phase.color }}
-          >
+      <div style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderLeft: `4px solid ${phase.color}`,
+        borderRadius: 8,
+        padding: '24px 28px',
+        marginBottom: '2rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+            color: phase.color, letterSpacing: '0.06em',
+          }}>
             {module.id}
           </span>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {module.critical_path && (
-              <span
-                className="text-xs px-2 py-1 rounded font-medium"
-                style={{ background: '#f59e0b20', color: '#f59e0b' }}
-              >
-                ⚡ Critical Path
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>
+                ⚡ Critical path
               </span>
             )}
             {module.specialisation_track && (
-              <span
-                className="text-xs px-2 py-1 rounded font-medium"
-                style={{ background: '#8b5cf620', color: '#8b5cf6' }}
-              >
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', fontFamily: 'var(--font-mono)' }}>
                 Track {module.specialisation_track}
               </span>
             )}
-            <span
-              className="text-xs px-2 py-1 rounded"
-              style={{ background: '#1e293b', color: '#94a3b8' }}
-            >
-              {module.duration_weeks} weeks · {module.load_hrs_week} hrs/wk
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'var(--bg-subtle)', color: 'var(--text-2)', border: '1px solid var(--border)', fontFamily: 'var(--font-mono)' }}>
+              {module.duration_weeks}wk · {module.load_hrs_week}h/wk
             </span>
-            <span
-              className="text-xs px-2 py-1 rounded"
-              style={{ background: '#1e293b', color: '#64748b' }}
-            >
-              Wk {module.gantt_start_week}–{module.gantt_end_week}
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'var(--bg-subtle)', color: 'var(--text-3)', border: '1px solid var(--border)', fontFamily: 'var(--font-mono)' }}>
+              wk {module.gantt_start_week}–{module.gantt_end_week}
             </span>
           </div>
         </div>
-        <h1
-          className="text-3xl font-bold leading-tight"
-          style={{ fontFamily: 'Georgia, serif', color: '#f1f5f9' }}
-        >
+        <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2.25rem)', fontWeight: 500, lineHeight: 1.2, color: 'var(--text)', letterSpacing: '-0.02em' }}>
           {module.name}
         </h1>
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Two-column */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
 
-        {/* Main content — 2 cols */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        {/* Main */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-          {/* Description */}
-          <section
-            className="rounded-xl p-5"
-            style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: '#475569' }}>
-              Overview
-            </h2>
-            <p className="text-sm leading-relaxed" style={{ color: '#cbd5e1' }}>
-              {module.description}
-            </p>
-          </section>
+          <Card>
+            <CardLabel>Overview</CardLabel>
+            <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--text)' }}>{module.description}</p>
+          </Card>
 
-          {/* Why it matters */}
-          <section
-            className="rounded-xl p-5"
-            style={{ background: '#0c1829', border: `1px solid ${phase.color}25` }}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: phase.color }}>
-              Why This Matters
-            </h2>
-            <p className="text-sm leading-relaxed" style={{ color: '#94a3b8' }}>
-              {module.why_it_matters}
-            </p>
-          </section>
+          <Card accentColor={phase.color}>
+            <CardLabel color={phase.color}>Why this matters</CardLabel>
+            <p style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-2)', fontStyle: 'italic' }}>{module.why_it_matters}</p>
+          </Card>
 
-          {/* Learning outcomes */}
-          <section
-            className="rounded-xl p-5"
-            style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: '#475569' }}>
-              Learning Outcomes
-            </h2>
-            <ol className="flex flex-col gap-2.5">
+          <Card>
+            <CardLabel>Learning outcomes</CardLabel>
+            <ol style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
               {module.learning_outcomes.map((lo, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span
-                    className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono font-bold mt-0.5"
-                    style={{ background: phase.color + '25', color: phase.color }}
-                  >
+                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{
+                    flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
+                    background: phase.color + '18', border: `1px solid ${phase.color}50`,
+                    color: phase.color, fontSize: 11, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginTop: 1, fontFamily: 'var(--font-mono)',
+                  }}>
                     {i + 1}
                   </span>
-                  <span className="text-sm leading-relaxed" style={{ color: '#cbd5e1' }}>{lo}</span>
+                  <span style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)' }}>{lo}</span>
                 </li>
               ))}
             </ol>
-          </section>
+          </Card>
 
-          {/* Milestone */}
-          <section
-            className="rounded-xl p-5"
-            style={{ background: '#0f172a', border: '1px solid #f59e0b30' }}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: '#f59e0b' }}>
-              ⚡ Milestone Checkpoint
-            </h2>
-            <p className="text-sm leading-relaxed" style={{ color: '#cbd5e1' }}>
-              {module.milestone}
-            </p>
-          </section>
+          <Card accentColor="#d97706">
+            <CardLabel color="#92400e">⚡ Milestone checkpoint</CardLabel>
+            <p style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{module.milestone}</p>
+          </Card>
 
-          {/* AI integration */}
-          <section
-            className="rounded-xl p-5"
-            style={{ background: '#0f172a', border: '1px solid #3b82f630' }}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: '#3b82f6' }}>
-              AI Integration
-            </h2>
-            <p className="text-sm leading-relaxed" style={{ color: '#94a3b8' }}>
-              {module.ai_integration}
-            </p>
-          </section>
+          <Card accentColor="#3b82f6">
+            <CardLabel color="#1d4ed8">AI integration</CardLabel>
+            <p style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-2)' }}>{module.ai_integration}</p>
+          </Card>
 
         </div>
 
-        {/* Sidebar — 1 col */}
-        <div className="flex flex-col gap-5">
+        {/* Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-          {/* Resources */}
-          <section
-            className="rounded-xl p-5"
-            style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: '#475569' }}>
-              Resources
-            </h2>
-            {ROLE_ORDER.map(role => (
+          <Card>
+            <CardLabel>Resources</CardLabel>
+            {ROLE_ORDER.map(role =>
               resourcesByRole[role] ? (
-                <ResourceGroup
-                  key={role}
-                  resources={resourcesByRole[role]}
-                  groupLabel={roleLabelMap[role] ?? role}
-                />
+                <ResourceGroup key={role} resources={resourcesByRole[role]} groupLabel={ROLE_LABELS[role] ?? role} />
               ) : null
-            ))}
-          </section>
+            )}
+          </Card>
 
-          {/* Prerequisites */}
           {prereqModules.length > 0 && (
-            <section
-              className="rounded-xl p-5"
-              style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-            >
-              <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: '#475569' }}>
-                Prerequisites
-              </h2>
-              <div className="flex flex-col gap-2">
+            <Card>
+              <CardLabel>Prerequisites</CardLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {prereqModules.map(m => {
                   const p = getPhase(m!.phase)!
                   return (
                     <Link
                       key={m!.id}
                       href={`/modules/${m!.id}`}
-                      className="flex items-center gap-2 p-2.5 rounded-lg transition-opacity hover:opacity-80"
-                      style={{ background: '#1e293b', border: '1px solid #334155' }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 10px', borderRadius: 5,
+                        background: 'var(--bg-subtle)', border: '1px solid var(--border)',
+                        textDecoration: 'none',
+                      }}
                     >
-                      <span
-                        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: p.color + '20', color: p.color }}
-                      >
-                        {m!.id}
-                      </span>
-                      <span className="text-sm truncate" style={{ color: '#cbd5e1' }}>
-                        {m!.short_name}
-                      </span>
+                      <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, color: p.color }}>{m!.id}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m!.short_name}</span>
                     </Link>
                   )
                 })}
               </div>
-            </section>
+            </Card>
           )}
 
-          {/* Unlocks */}
           {unlocksModules.length > 0 && (
-            <section
-              className="rounded-xl p-5"
-              style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-            >
-              <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: '#475569' }}>
-                Unlocks
-              </h2>
-              <div className="flex flex-col gap-2">
+            <Card>
+              <CardLabel>Unlocks</CardLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {unlocksModules.map(m => {
                   const p = getPhase(m!.phase)!
                   return (
                     <Link
                       key={m!.id}
                       href={`/modules/${m!.id}`}
-                      className="flex items-center gap-2 p-2.5 rounded-lg transition-opacity hover:opacity-80"
-                      style={{ background: '#1e293b', border: '1px solid #334155' }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 10px', borderRadius: 5,
+                        background: 'var(--bg-subtle)', border: '1px solid var(--border)',
+                        textDecoration: 'none',
+                      }}
                     >
-                      <span
-                        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: p.color + '20', color: p.color }}
-                      >
-                        {m!.id}
-                      </span>
-                      <span className="text-sm truncate" style={{ color: '#cbd5e1' }}>
-                        {m!.short_name}
-                      </span>
+                      <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, color: p.color }}>{m!.id}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m!.short_name}</span>
                     </Link>
                   )
                 })}
               </div>
-            </section>
+            </Card>
           )}
 
-          {/* University equivalents */}
           {module.university_equivalents.length > 0 && (
-            <section
-              className="rounded-xl p-5"
-              style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-            >
-              <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: '#475569' }}>
-                University Equivalents
-              </h2>
-              <ul className="flex flex-col gap-1.5">
+            <Card>
+              <CardLabel>University equivalents</CardLabel>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {module.university_equivalents.map((eq, i) => (
-                  <li key={i} className="text-xs" style={{ color: '#64748b' }}>
-                    {eq}
-                  </li>
+                  <li key={i} style={{ fontSize: 12, color: 'var(--text-2)', fontStyle: 'italic' }}>{eq}</li>
                 ))}
               </ul>
-            </section>
+            </Card>
           )}
 
         </div>
       </div>
 
       {/* Bottom nav */}
-      <div className="mt-10 pt-6 flex justify-between items-center" style={{ borderTop: '1px solid #1e293b' }}>
-        <Link
-          href="/"
-          className="text-sm hover:underline"
-          style={{ color: '#64748b' }}
-        >
+      <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Link href="/" style={{ fontSize: 13, color: 'var(--text-2)', textDecoration: 'none' }}>
           ← Back to curriculum
         </Link>
-        <span className="text-xs font-mono" style={{ color: '#334155' }}>
-          {module.id}
-        </span>
+        <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{module.id}</span>
       </div>
 
     </div>

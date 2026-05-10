@@ -1,148 +1,88 @@
 import { curriculum } from '@/lib/curriculum'
-import ModuleCard from '@/components/ModuleCard'
 import DependencyGraph from '@/components/DependencyGraph'
 import GanttChart from '@/components/GanttChart'
+import FilteredModuleGrid from '@/components/FilteredModuleGrid'
 
 export default function Home() {
   const { meta, phases, modules, critical_path } = curriculum
-
   const totalHours = Math.round(meta.estimated_weeks_min * meta.hours_per_week)
-  const criticalLength = critical_path.pure_analysis_track.length
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '3rem 1.5rem 4rem' }}>
 
       {/* Hero */}
-      <div className="mb-10">
-        <h1
-          className="text-4xl font-bold tracking-tight mb-2"
-          style={{ fontFamily: 'Georgia, serif', color: '#f1f5f9' }}
-        >
+      <div style={{ marginBottom: '3rem', paddingBottom: '2.5rem', borderBottom: '1px solid var(--border)' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.75rem' }}>
+          Personal study plan
+        </p>
+        <h1 style={{ fontSize: 'clamp(2rem, 4vw, 3.25rem)', fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.02em', color: 'var(--text)', marginBottom: '0.5rem' }}>
           {meta.title}
         </h1>
-        <p className="text-lg mb-6" style={{ color: '#64748b' }}>
+        <p style={{ fontSize: '1.1rem', color: 'var(--text-2)', marginBottom: '2rem', fontStyle: 'italic' }}>
           {meta.subtitle}
         </p>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', maxWidth: 560 }}>
           {[
-            { label: 'Modules', value: meta.total_modules.toString() },
-            { label: 'Min. Weeks', value: meta.estimated_weeks_min.toString() },
-            { label: 'Est. Hours', value: totalHours.toLocaleString() },
-            { label: 'Critical Steps', value: criticalLength.toString() },
+            { label: 'Modules', value: meta.total_modules },
+            { label: 'Min. weeks', value: meta.estimated_weeks_min },
+            { label: 'Est. hours', value: totalHours.toLocaleString() },
+            { label: 'Hrs/week', value: meta.hours_per_week },
           ].map(({ label, value }) => (
-            <div
-              key={label}
-              className="rounded-xl p-4"
-              style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-            >
-              <div className="text-2xl font-bold font-mono" style={{ color: '#f1f5f9' }}>{value}</div>
-              <div className="text-xs mt-1" style={{ color: '#475569' }}>{label}</div>
+            <div key={label} style={{ background: 'var(--bg-card)', padding: '1rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.75rem', fontWeight: 500, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                {value}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 4, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+                {label}
+              </div>
             </div>
           ))}
         </div>
 
         {/* Tracks */}
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div style={{ marginTop: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {meta.specialisation_tracks.map(t => (
-            <div
+            <span
               key={t.id}
-              className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-full"
-              style={{ background: '#1e293b', color: '#94a3b8' }}
+              style={{ fontSize: '12px', color: 'var(--text-2)', background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 10px', fontFamily: 'var(--font-mono)' }}
             >
-              <span
-                className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
-                style={{ background: '#8b5cf620', color: '#8b5cf6' }}
-              >
-                Track {t.id}
-              </span>
-              {t.name}
-            </div>
+              Track {t.id}: {t.name}
+            </span>
           ))}
-          <div
-            className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-full"
-            style={{ background: '#1e293b', color: '#94a3b8' }}
-          >
-            <span style={{ color: '#f59e0b' }}>⚡</span>
-            {meta.hours_per_week} hrs/week target
-          </div>
         </div>
       </div>
 
       {/* Dependency Graph */}
-      <section className="mb-10">
+      <section style={{ marginBottom: '2.5rem' }}>
+        <SectionLabel>Dependency graph</SectionLabel>
         <DependencyGraph modules={modules} phases={phases} />
       </section>
 
       {/* Gantt Chart */}
-      <section className="mb-12">
+      <section style={{ marginBottom: '3rem' }}>
+        <SectionLabel>Timeline</SectionLabel>
         <GanttChart modules={modules} phases={phases} />
       </section>
 
-      {/* Phase sections */}
-      {phases.map(phase => {
-        const phaseModules = modules.filter(m => m.phase === phase.id)
-        return (
-          <section key={phase.id} className="mb-10">
-            <div className="flex items-baseline gap-3 mb-4">
-              <span
-                className="text-xs font-mono font-bold px-2 py-1 rounded"
-                style={{ background: phase.color + '20', color: phase.color }}
-              >
-                {phase.label}
-              </span>
-              <h2
-                className="text-xl font-bold"
-                style={{ color: '#f1f5f9', fontFamily: 'Georgia, serif' }}
-              >
-                {phase.name}
-              </h2>
-              <span className="text-sm" style={{ color: '#475569' }}>
-                ~{phase.duration_months_approx} months
-              </span>
-            </div>
-            <p className="text-sm mb-4" style={{ color: '#64748b', maxWidth: '64ch' }}>
-              {phase.goal}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {phaseModules.map(m => (
-                <ModuleCard key={m.id} module={m} phase={phase} />
-              ))}
-            </div>
-          </section>
-        )
-      })}
-
-      {/* Critical path callout */}
-      <section
-        className="rounded-xl p-5 mb-10"
-        style={{ background: '#0f172a', border: '1px solid #f59e0b30' }}
-      >
-        <h2 className="text-base font-semibold mb-3" style={{ color: '#f59e0b' }}>
-          ⚡ Critical Path — Pure Analysis Track
-        </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          {critical_path.pure_analysis_track.map((id, i) => (
-            <span key={id} className="flex items-center gap-2">
-              <a
-                href={`/modules/${id}`}
-                className="text-sm font-mono px-2 py-1 rounded transition-opacity hover:opacity-80"
-                style={{ background: '#f59e0b20', color: '#f59e0b' }}
-              >
-                {id}
-              </a>
-              {i < critical_path.pure_analysis_track.length - 1 && (
-                <span style={{ color: '#334155' }}>→</span>
-              )}
-            </span>
-          ))}
-        </div>
-        <p className="text-xs mt-3" style={{ color: '#475569' }}>
-          Bottlenecks (cannot be parallelised): {critical_path.bottleneck_modules.join(', ')}
-        </p>
+      {/* Filtered module grid */}
+      <section>
+        <SectionLabel>Modules</SectionLabel>
+        <FilteredModuleGrid modules={modules} phases={phases} criticalPath={critical_path} />
       </section>
 
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)' }}>
+        {children}
+      </span>
+      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
     </div>
   )
 }

@@ -6,64 +6,58 @@ interface Props {
   phase: Phase
 }
 
-const TRACK_LABEL: Record<string, string> = {
-  A: 'Finance',
-  B: 'ML Theory',
-}
-
 export default function ModuleCard({ module: m, phase }: Props) {
   return (
     <Link
       href={`/modules/${m.id}`}
-      className="block rounded-xl p-4 transition-all hover:scale-[1.02]"
+      className="module-card"
       style={{
-        background: '#0f172a',
-        border: `1px solid ${phase.color}30`,
+        display: 'block',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
         borderLeft: `3px solid ${phase.color}`,
+        borderRadius: 6,
+        padding: '14px 16px',
+        textDecoration: 'none',
       }}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span
-          className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
-          style={{ background: phase.color + '20', color: phase.color }}
-        >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '11px',
+          fontWeight: 600,
+          color: phase.color,
+          letterSpacing: '0.04em',
+        }}>
           {m.id}
         </span>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {m.critical_path && (
-            <span
-              className="text-xs px-1.5 py-0.5 rounded font-medium"
-              style={{ background: '#f59e0b20', color: '#f59e0b' }}
-            >
-              ⚡ Critical
+            <span style={{ fontSize: '10px', color: '#92400e', background: '#fef3c7', borderRadius: 3, padding: '1px 6px' }}>
+              ⚡ critical
             </span>
           )}
           {m.specialisation_track && (
-            <span
-              className="text-xs px-1.5 py-0.5 rounded font-medium"
-              style={{ background: '#8b5cf620', color: '#8b5cf6' }}
-            >
-              Track {m.specialisation_track}: {TRACK_LABEL[m.specialisation_track]}
+            <span style={{ fontSize: '10px', color: '#6d28d9', background: '#ede9fe', borderRadius: 3, padding: '1px 6px', fontFamily: 'var(--font-mono)' }}>
+              {m.specialisation_track}
             </span>
           )}
         </div>
       </div>
 
-      <h3 className="font-semibold text-sm leading-snug mb-1" style={{ color: '#f1f5f9', fontFamily: 'Georgia, serif' }}>
+      <h3 style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text)', lineHeight: 1.3, marginBottom: 8 }}>
         {m.name}
       </h3>
 
-      <p className="text-xs leading-relaxed mb-3 line-clamp-2" style={{ color: '#64748b' }}>
+      <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {m.learning_outcomes[0]}
       </p>
 
-      <div className="flex items-center gap-3 text-xs" style={{ color: '#475569' }}>
-        <span>{m.duration_weeks} weeks</span>
-        <span>·</span>
-        <span>{m.load_hrs_week} hrs/wk</span>
-        <span className="ml-auto" style={{ color: '#334155' }}>
-          Wk {m.gantt_start_week}–{m.gantt_end_week}
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+        <span>{m.duration_weeks}wk</span>
+        <span style={{ color: 'var(--border-mid)' }}>·</span>
+        <span>{m.load_hrs_week}h/wk</span>
+        <span style={{ marginLeft: 'auto', color: 'var(--text-3)' }}>wk {m.gantt_start_week}–{m.gantt_end_week}</span>
       </div>
     </Link>
   )

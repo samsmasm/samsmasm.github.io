@@ -33,7 +33,7 @@ export default function DependencyGraph({ modules, phases }: Props) {
     if (!el) return
 
     const width = el.clientWidth || 900
-    const height = 540
+    const height = 520
 
     const svg = d3.select(el)
     svg.selectAll('*').remove()
@@ -41,31 +41,30 @@ export default function DependencyGraph({ modules, phases }: Props) {
     const phaseColorMap: Record<number, string> = {}
     phases.forEach(p => { phaseColorMap[p.id] = p.color })
 
-    // Arrow markers
     const defs = svg.append('defs')
     defs.append('marker')
       .attr('id', 'arrow-normal')
       .attr('viewBox', '0 -4 8 8')
-      .attr('refX', 22)
+      .attr('refX', 24)
       .attr('refY', 0)
       .attr('markerWidth', 5)
       .attr('markerHeight', 5)
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-4L8,0L0,4')
-      .attr('fill', '#475569')
+      .attr('fill', '#cdc8be')
 
     defs.append('marker')
       .attr('id', 'arrow-critical')
       .attr('viewBox', '0 -4 8 8')
-      .attr('refX', 22)
+      .attr('refX', 24)
       .attr('refY', 0)
       .attr('markerWidth', 5)
       .attr('markerHeight', 5)
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-4L8,0L0,4')
-      .attr('fill', '#f59e0b')
+      .attr('fill', '#d97706')
 
     const nodes: GraphNode[] = modules.map(m => ({
       id: m.id,
@@ -136,7 +135,7 @@ export default function DependencyGraph({ modules, phases }: Props) {
 
     nodeSel.append('circle')
       .attr('r', d => Math.max(22, 18 + d.duration / 3))
-      .attr('fill', d => phaseColorMap[d.phase] + '28')
+      .attr('fill', d => phaseColorMap[d.phase] + '18')
       .attr('stroke', d => phaseColorMap[d.phase])
       .attr('stroke-width', d => d.critical ? 2.5 : 1.5)
 
@@ -145,7 +144,7 @@ export default function DependencyGraph({ modules, phases }: Props) {
       .attr('dy', '0.3em')
       .attr('font-size', '10px')
       .attr('font-weight', '600')
-      .attr('fill', '#f1f5f9')
+      .attr('fill', '#1a1714')
       .attr('pointer-events', 'none')
       .text(d => d.label)
 
@@ -153,12 +152,11 @@ export default function DependencyGraph({ modules, phases }: Props) {
       .attr('text-anchor', 'middle')
       .attr('dy', '-1.6em')
       .attr('font-size', '8px')
-      .attr('fill', '#64748b')
+      .attr('fill', '#a09890')
       .attr('pointer-events', 'none')
       .attr('font-family', 'monospace')
       .text(d => d.id)
 
-    // Tooltip
     let tooltip = document.querySelector<HTMLDivElement>('.graph-tooltip')
     if (!tooltip) {
       tooltip = document.createElement('div')
@@ -172,9 +170,9 @@ export default function DependencyGraph({ modules, phases }: Props) {
         const phase = phases[d.phase]
         const color = phaseColorMap[d.phase]
         tooltip!.innerHTML = `
-          <div style="font-family:monospace;font-size:10px;color:${color};margin-bottom:4px">${d.id} · ${phase.label}</div>
-          <div style="font-weight:bold;margin-bottom:4px;font-size:13px">${d.name}</div>
-          <div style="color:#94a3b8;font-size:11px">${d.duration} weeks${d.critical ? ' · ⚡ Critical' : ''}${d.track ? ` · Track ${d.track}` : ''}</div>
+          <div style="font-family:monospace;font-size:9px;color:${color};margin-bottom:4px;letter-spacing:0.06em;text-transform:uppercase">${d.id} · ${phase.label}</div>
+          <div style="font-weight:600;margin-bottom:4px;font-size:13px">${d.name}</div>
+          <div style="color:#a09890;font-size:11px">${d.duration} weeks${d.critical ? ' · ⚡ Critical' : ''}${d.track ? ` · Track ${d.track}` : ''}</div>
         `
         tooltip!.style.opacity = '1'
       })
@@ -200,34 +198,23 @@ export default function DependencyGraph({ modules, phases }: Props) {
   }, [modules, phases, router])
 
   return (
-    <div style={{ background: '#0a1628', border: '1px solid #1e293b', borderRadius: '12px' }} className="overflow-hidden">
-      <div className="px-5 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid #1e293b' }}>
-        <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-          Dependency Graph
-        </span>
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          drag nodes · scroll to zoom · click to open
-        </span>
-        <div className="ml-auto flex items-center gap-4">
-          {[
-            { color: '#6b7280', label: 'Pre-Phase' },
-            { color: '#3b82f6', label: 'Phase 1' },
-            { color: '#8b5cf6', label: 'Phase 2' },
-            { color: '#ec4899', label: 'Phase 3' },
-            { color: '#f59e0b', label: 'Phase 4' },
-          ].map(({ color, label }) => (
-            <span key={label} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: color }} />
-              {label}
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-2)' }}>Drag · scroll to zoom · click to open</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          {phases.map(p => (
+            <span key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '11px', color: 'var(--text-3)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, display: 'inline-block' }} />
+              {p.label}
             </span>
           ))}
-          <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span className="inline-block h-px w-4" style={{ background: '#f59e0b' }} />
-            critical path
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '11px', color: 'var(--text-3)' }}>
+            <span style={{ display: 'inline-block', height: 2, width: 14, background: '#d97706' }} />
+            critical
           </span>
         </div>
       </div>
-      <svg ref={svgRef} className="w-full" style={{ height: '520px' }} />
+      <svg ref={svgRef} className="w-full" style={{ height: 520, background: 'var(--bg)' }} />
     </div>
   )
 }
