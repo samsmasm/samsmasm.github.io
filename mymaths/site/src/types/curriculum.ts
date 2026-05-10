@@ -1,3 +1,13 @@
+export interface LOSubtopic {
+  name: string
+  description: string
+  examples: string[]
+}
+
+export interface LODetail {
+  subtopics: LOSubtopic[]
+}
+
 export interface Resource {
   type: 'text' | 'video' | 'exercises' | 'interactive' | 'tool' | 'advanced' | 'theory'
   role: 'primary' | 'alternative' | 'supplementary' | 'solutions' | 'environment' | 'advanced' | 'theory'
@@ -24,6 +34,7 @@ export interface Module {
   why_it_matters: string
   university_equivalents: string[]
   learning_outcomes: string[]
+  lo_detail?: LODetail[]
   milestone: string
   ai_integration: string
   resources: Resource[]

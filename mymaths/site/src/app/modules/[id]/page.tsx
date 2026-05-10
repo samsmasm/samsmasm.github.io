@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { curriculum, getModule, getPhase } from '@/lib/curriculum'
 import type { Resource } from '@/types/curriculum'
+import LearningOutcomes from '@/components/LearningOutcomes'
 
 const RESOURCE_TYPE_ICONS: Record<string, string> = {
   text: '📖', video: '🎬', exercises: '✏️',
@@ -153,22 +154,11 @@ export default async function ModulePage({ params }: { params: Promise<{ id: str
 
           <Card>
             <CardLabel>Learning outcomes</CardLabel>
-            <ol style={{ display: 'flex', flexDirection: 'column', gap: 12, listStyle: 'none', padding: 0, margin: 0 }}>
-              {module.learning_outcomes.map((lo, i) => (
-                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                  <span style={{
-                    flexShrink: 0, width: 24, height: 24, borderRadius: '50%',
-                    background: phase.color + '18', border: `1px solid ${phase.color}50`,
-                    color: phase.color, fontSize: 'var(--text-2xs)', fontWeight: 600,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginTop: 1, fontFamily: 'var(--font-mono)',
-                  }}>
-                    {i + 1}
-                  </span>
-                  <span style={{ fontSize: 'var(--text-sm)', lineHeight: 1.6, color: 'var(--text)' }}>{lo}</span>
-                </li>
-              ))}
-            </ol>
+            <LearningOutcomes
+              outcomes={module.learning_outcomes}
+              detail={module.lo_detail}
+              phaseColor={phase.color}
+            />
           </Card>
 
           <Card accentColor="#d97706">
