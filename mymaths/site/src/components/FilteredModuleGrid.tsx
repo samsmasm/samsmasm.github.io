@@ -31,25 +31,19 @@ export default function FilteredModuleGrid({ modules, phases, criticalPath }: Pr
   }, [modules, phaseFilter, trackFilter, criticalOnly])
 
   const visiblePhases = phases.filter(p => filtered.some(m => m.phase === p.id))
-  const totalCount = filtered.length
 
   return (
     <div>
       {/* Filter bar */}
-      <div
-        className="mb-8 pb-5"
-        style={{ borderBottom: '1px solid var(--border)' }}
-      >
-        <div className="flex flex-wrap gap-y-3 gap-x-6 items-start">
+      <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem 2rem', alignItems: 'flex-start' }}>
+
           {/* Phase */}
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginRight: 4 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', letterSpacing: '0.08em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginRight: 2 }}>
               Phase
             </span>
-            <button
-              className={`filter-pill${phaseFilter === 'all' ? ' active' : ''}`}
-              onClick={() => setPhaseFilter('all')}
-            >
+            <button className={`filter-pill${phaseFilter === 'all' ? ' active' : ''}`} onClick={() => setPhaseFilter('all')}>
               All
             </button>
             {phases.map(p => (
@@ -57,24 +51,17 @@ export default function FilteredModuleGrid({ modules, phases, criticalPath }: Pr
                 key={p.id}
                 onClick={() => setPhaseFilter(p.id)}
                 className="filter-pill"
-                style={phaseFilter === p.id ? {
-                  background: p.color,
-                  borderColor: p.color,
-                  color: '#fff',
-                } : {}}
+                style={phaseFilter === p.id ? { background: p.color, borderColor: p.color, color: '#fff' } : {}}
               >
-                <span
-                  className="inline-block w-2 h-2 rounded-full"
-                  style={{ background: p.color, opacity: phaseFilter === p.id ? 0.7 : 1 }}
-                />
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, display: 'inline-block', opacity: phaseFilter === p.id ? 0.7 : 1 }} />
                 {p.label}
               </button>
             ))}
           </div>
 
           {/* Track */}
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginRight: 4 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', letterSpacing: '0.08em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginRight: 2 }}>
               Track
             </span>
             {([
@@ -83,40 +70,29 @@ export default function FilteredModuleGrid({ modules, phases, criticalPath }: Pr
               { value: 'A', label: 'A · Finance' },
               { value: 'B', label: 'B · ML Theory' },
             ] as { value: TrackFilter; label: string }[]).map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setTrackFilter(value)}
-                className={`filter-pill${trackFilter === value ? ' active' : ''}`}
-              >
+              <button key={value} onClick={() => setTrackFilter(value)} className={`filter-pill${trackFilter === value ? ' active' : ''}`}>
                 {label}
               </button>
             ))}
           </div>
 
-          {/* Critical path toggle */}
-          <div className="flex items-center gap-1.5">
-            <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
+          {/* Critical path */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 'var(--text-2xs)', letterSpacing: '0.08em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
               Path
             </span>
             <button
               onClick={() => setCriticalOnly(!criticalOnly)}
               className="filter-pill"
-              style={criticalOnly ? {
-                background: '#d97706',
-                borderColor: '#d97706',
-                color: '#fff',
-              } : {}}
+              style={criticalOnly ? { background: '#d97706', borderColor: '#d97706', color: '#fff' } : {}}
             >
               ⚡ Critical only
             </button>
           </div>
 
           {/* Count */}
-          <span
-            className="ml-auto self-center"
-            style={{ fontSize: '13px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}
-          >
-            {totalCount} / {modules.length}
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginLeft: 'auto', alignSelf: 'center' }}>
+            {filtered.length} / {modules.length}
           </span>
         </div>
       </div>
@@ -125,25 +101,25 @@ export default function FilteredModuleGrid({ modules, phases, criticalPath }: Pr
       {visiblePhases.map(phase => {
         const phaseModules = filtered.filter(m => m.phase === phase.id)
         return (
-          <section key={phase.id} className="mb-12">
-            <div className="flex items-center gap-4 mb-2">
-              <div style={{ width: 3, height: 28, background: phase.color, borderRadius: 2, flexShrink: 0 }} />
+          <section key={phase.id} style={{ marginBottom: '3rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+              <div style={{ width: 3, height: 30, background: phase.color, borderRadius: 2, flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: '11px', letterSpacing: '0.1em', color: phase.color, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 1 }}>
+                <div style={{ fontSize: 'var(--text-2xs)', letterSpacing: '0.1em', color: phase.color, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 2 }}>
                   {phase.label}
                 </div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
+                <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
                   {phase.name}
                 </h2>
               </div>
-              <span style={{ fontSize: '13px', color: 'var(--text-3)', marginLeft: 8 }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', marginLeft: 4 }}>
                 ~{phase.duration_months_approx} months
               </span>
             </div>
-            <p style={{ fontSize: '14px', color: 'var(--text-2)', maxWidth: '60ch', marginBottom: '1.25rem', marginLeft: 19, paddingLeft: 12, borderLeft: `1px solid ${phase.color}40` }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', maxWidth: '62ch', marginBottom: '1.25rem', marginLeft: 19, paddingLeft: 12, borderLeft: `1px solid ${phase.color}40` }}>
               {phase.goal}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
               {phaseModules.map(m => (
                 <ModuleCard key={m.id} module={m} phase={phase} />
               ))}
@@ -153,36 +129,32 @@ export default function FilteredModuleGrid({ modules, phases, criticalPath }: Pr
       })}
 
       {filtered.length === 0 && (
-        <div className="py-16 text-center" style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>
+        <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-3)', fontStyle: 'italic', fontSize: 'var(--text-base)' }}>
           No modules match the current filters.
         </div>
       )}
 
-      {/* Critical path sequence */}
-      <section
-        className="rounded-lg p-5 mb-6"
-        style={{ background: '#fffbeb', border: '1px solid #fde68a' }}
-      >
-        <h2 style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400e', marginBottom: 12 }}>
+      {/* Critical path */}
+      <section style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
+        <h2 style={{ fontSize: 'var(--text-2xs)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400e', marginBottom: 12 }}>
           ⚡ Critical Path — Pure Analysis Track
         </h2>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
           {criticalPath.pure_analysis_track.map((id, i) => (
-            <span key={id} className="flex items-center gap-1.5">
+            <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Link
                 href={`/modules/${id}`}
-                className="text-sm font-mono px-2 py-0.5 rounded transition-opacity hover:opacity-70"
-                style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
+                style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', textDecoration: 'none' }}
               >
                 {id}
               </Link>
               {i < criticalPath.pure_analysis_track.length - 1 && (
-                <span style={{ color: '#d97706', fontSize: 12 }}>→</span>
+                <span style={{ color: '#d97706', fontSize: 'var(--text-xs)' }}>→</span>
               )}
             </span>
           ))}
         </div>
-        <p style={{ fontSize: '12px', color: '#a16207', marginTop: 10 }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: '#a16207', marginTop: 10 }}>
           Bottlenecks: {criticalPath.bottleneck_modules.join(', ')}
         </p>
       </section>

@@ -31,11 +31,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <Link
             href="/"
-            style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}
+            style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em', textDecoration: 'none' }}
           >
             mymaths
           </Link>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)', letterSpacing: '0.05em' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', color: 'var(--text-3)', letterSpacing: '0.05em' }}>
             NCEA L3 → Graduate
           </span>
         </header>
