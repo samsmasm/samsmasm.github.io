@@ -18,7 +18,7 @@
         .canvas-container { transition: transform 0.3s ease; }
         .merge-view .page-card { cursor: default; pointer-events: none; }
         .split-view .page-card { cursor: pointer; }
-        #extractTextContent { user-select: text; }
+        #extractTextContent, #epubTextContent { user-select: text; }
     </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -39,19 +39,20 @@
         <aside class="w-full lg:w-96 bg-white border-r border-slate-200 flex flex-col h-full z-20">
             <div class="p-6">
                 <h1 class="text-lg font-bold tracking-tight">PeeDeeEffer</h1>
-                <p class="text-[10px] uppercase tracking-widest text-slate-400 mt-1 font-semibold">Private PDF merging, splitting &amp; extraction</p>
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 mt-1 font-semibold">Private PDF merging, splitting, extraction &amp; EPUB reading</p>
             </div>
 
             <div class="flex p-1 mx-6 bg-slate-100 rounded-xl mb-6">
-                <button onclick="handleTabSwitch('split')" id="tabSplit" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Split</button>
-                <button onclick="handleTabSwitch('merge')" id="tabMerge" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Merge</button>
-                <button onclick="handleTabSwitch('extract')" id="tabExtract" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Extract</button>
+                <button onclick="handleTabSwitch('split')" id="tabSplit" class="flex-1 py-2 text-xs font-semibold rounded-lg bg-white shadow-sm transition">Split</button>
+                <button onclick="handleTabSwitch('merge')" id="tabMerge" class="flex-1 py-2 text-xs font-medium text-slate-500 transition">Merge</button>
+                <button onclick="handleTabSwitch('extract')" id="tabExtract" class="flex-1 py-2 text-xs font-medium text-slate-500 transition">Extract</button>
+                <button onclick="handleTabSwitch('epub')" id="tabEpub" class="flex-1 py-2 text-xs font-medium text-slate-500 transition">EPUB</button>
             </div>
 
             <div class="px-6 flex-1 overflow-y-auto pb-6">
                 <div id="uploadArea" class="mb-8">
                     <label id="uploadLabelBox" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all group">
-                        <span class="text-xs font-medium text-slate-500">Upload PDF(s)</span>
+                        <span id="uploadLabelText" class="text-xs font-medium text-slate-500">Upload PDF(s)</span>
                         <input type="file" id="pdfInput" class="hidden" accept="application/pdf" multiple />
                     </label>
                     <div id="splitFileInfo" class="hidden p-4 bg-slate-900 text-white rounded-2xl flex justify-between items-center">
@@ -124,6 +125,19 @@
                         <button onclick="downloadExtractedText()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download .txt</button>
                     </div>
                 </div>
+
+                <div id="controlsEpub" class="hidden space-y-5">
+                    <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Output Format</div>
+                    <div class="flex p-1 bg-slate-100 rounded-xl">
+                        <button onclick="setEpubFormat('markdown')" id="tabEpubMd" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Markdown</button>
+                        <button onclick="setEpubFormat('plain')" id="tabEpubPlain" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Plain Text</button>
+                    </div>
+                    <div id="epubExportArea" class="hidden pt-4 border-t space-y-3">
+                        <p id="epubCharCount" class="text-[10px] text-slate-400 font-semibold"></p>
+                        <button onclick="copyEpubText()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Copy to Clipboard</button>
+                        <button onclick="downloadEpubText()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download .txt</button>
+                    </div>
+                </div>
             </div>
 
             <div class="p-6 bg-slate-50 border-t text-[10px] font-bold text-slate-400 flex items-center">
@@ -157,6 +171,24 @@
                 </div>
             </div>
 
+            <!-- EPUB workspace: chapter cards / text output -->
+            <div id="epubWorkspace" class="hidden flex-1 w-full rounded-[2rem] border bg-white overflow-hidden flex flex-col">
+                <!-- Top: chapter cards -->
+                <div style="flex:3;min-height:0;" class="overflow-y-auto relative">
+                    <div id="epubEmptyState" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm italic">Upload an EPUB to view chapters</div>
+                    <div id="epubChapterGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 w-full p-10 max-w-7xl"></div>
+                </div>
+                <!-- Control bar -->
+                <div class="flex-none border-t border-b bg-slate-50 px-4 py-3 flex items-center gap-3">
+                    <span id="epubChapterCount" class="text-xs text-slate-500 font-medium"></span>
+                    <button onclick="runEpubExtract()" class="ml-auto px-5 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm whitespace-nowrap">Extract Text</button>
+                </div>
+                <!-- Bottom: extracted text -->
+                <div style="flex:1;min-height:0;" class="overflow-y-auto bg-white">
+                    <pre id="epubTextContent" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed p-6" style="font-family:'Inter',sans-serif;"></pre>
+                </div>
+            </div>
+
             <div id="actionBar" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-6 z-50">
                 <span id="selectCount" class="text-xs font-bold border-r border-slate-700 pr-6 uppercase tracking-widest">0 Pages</span>
                 <button onclick="rotateSelected(-90)" class="text-xs font-bold uppercase hover:text-blue-400">Rotate</button>
@@ -173,22 +205,28 @@
         let currentRenderTask = 0;
         let sourceFileHandle = null;
 
+        // EPUB state
+        let epubChapters = [], epubExtractedText = '', epubFormat = 'markdown', currentEpubFile = null;
+
         // --- File upload via File System Access API (with <input> fallback) ---
         document.getElementById('uploadLabelBox').addEventListener('click', async (e) => {
-            if (!window.showOpenFilePicker) return; // let label trigger input natively
+            if (!window.showOpenFilePicker) return;
             e.preventDefault();
             try {
+                const isEpub = currentMode === 'epub';
                 const handles = await window.showOpenFilePicker({
-                    types: [{ description: 'PDF Files', accept: { 'application/pdf': ['.pdf'] } }],
+                    types: isEpub
+                        ? [{ description: 'EPUB Files', accept: { 'application/epub+zip': ['.epub'] } }]
+                        : [{ description: 'PDF Files', accept: { 'application/pdf': ['.pdf'] } }],
                     multiple: currentMode === 'merge'
                 });
                 sourceFileHandle = handles[0];
                 pendingFiles = await Promise.all(handles.map(h => h.getFile()));
-                if (currentMode !== 'extract' && pendingFiles.some(f => f.size > 50 * 1024 * 1024))
+                if (currentMode !== 'extract' && currentMode !== 'epub' && pendingFiles.some(f => f.size > 50 * 1024 * 1024))
                     document.getElementById('modal').classList.remove('hidden');
                 else confirmLoad('full');
             } catch (err) {
-                // AbortError = user cancelled, anything else: silently fail
+                // AbortError = user cancelled
             }
         });
 
@@ -197,36 +235,57 @@
             if (!files.length) return;
             sourceFileHandle = null;
             pendingFiles = files;
-            if (currentMode !== 'extract' && files.some(f => f.size > 50 * 1024 * 1024))
+            if (currentMode !== 'extract' && currentMode !== 'epub' && files.some(f => f.size > 50 * 1024 * 1024))
                 document.getElementById('modal').classList.remove('hidden');
             else confirmLoad('full');
             e.target.value = '';
         };
 
-        // --- Tab switching (no resetState) ---
+        // --- Tab switching ---
         function handleTabSwitch(mode) {
             currentMode = mode;
-            ['split', 'merge', 'extract'].forEach(m => {
+            ['split', 'merge', 'extract', 'epub'].forEach(m => {
                 const active = m === mode;
-                document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1)).className =
-                    active ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
-                           : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+                const btn = document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (btn) btn.className = active
+                    ? 'flex-1 py-2 text-xs font-semibold rounded-lg bg-white shadow-sm transition'
+                    : 'flex-1 py-2 text-xs font-medium text-slate-500 transition';
             });
+
             document.getElementById('controlsMerge').classList.toggle('hidden', mode !== 'merge');
             document.getElementById('controlsSplit').classList.toggle('hidden', mode !== 'split');
             document.getElementById('controlsExtract').classList.toggle('hidden', mode !== 'extract');
+            document.getElementById('controlsEpub').classList.toggle('hidden', mode !== 'epub');
 
             const isExtract = mode === 'extract';
-            document.getElementById('workspace').classList.toggle('hidden', isExtract);
+            const isEpub = mode === 'epub';
+            document.getElementById('workspace').classList.toggle('hidden', isExtract || isEpub);
             document.getElementById('extractWorkspace').classList.toggle('hidden', !isExtract);
-            if (!isExtract) {
+            document.getElementById('epubWorkspace').classList.toggle('hidden', !isEpub);
+
+            if (!isExtract && !isEpub) {
                 document.getElementById('workspace').className =
                     `flex-1 w-full rounded-[2rem] border bg-white overflow-y-auto relative ${mode}-view`;
             }
 
+            // Update file input for epub vs pdf
+            const input = document.getElementById('pdfInput');
+            const labelText = document.getElementById('uploadLabelText');
+            if (isEpub) {
+                input.accept = '.epub';
+                input.multiple = false;
+                labelText.textContent = 'Upload EPUB';
+            } else {
+                input.accept = 'application/pdf';
+                input.multiple = currentMode === 'merge';
+                labelText.textContent = 'Upload PDF(s)';
+            }
+
             updateUploadUI();
 
-            if (mergeFiles.length > 0) {
+            if (isEpub) {
+                if (epubChapters.length > 0) renderEpubChapters();
+            } else if (mergeFiles.length > 0) {
                 if (isExtract) {
                     renderExtractPreview();
                 } else {
@@ -237,11 +296,14 @@
         }
 
         function updateUploadUI() {
-            const hasFiles = mergeFiles.length > 0;
-            if (currentMode === 'split' || currentMode === 'extract') {
+            const hasFiles = currentMode === 'epub' ? currentEpubFile !== null : mergeFiles.length > 0;
+            if (currentMode === 'split' || currentMode === 'extract' || currentMode === 'epub') {
                 document.getElementById('uploadLabelBox').classList.toggle('hidden', hasFiles);
                 document.getElementById('splitFileInfo').classList.toggle('hidden', !hasFiles);
-                if (hasFiles) document.getElementById('splitNameDisplay').innerText = mergeFiles[0].name;
+                if (hasFiles) {
+                    document.getElementById('splitNameDisplay').innerText =
+                        currentMode === 'epub' ? currentEpubFile.name : mergeFiles[0].name;
+                }
             } else {
                 document.getElementById('uploadLabelBox').classList.remove('hidden');
                 document.getElementById('splitFileInfo').classList.add('hidden');
@@ -252,17 +314,23 @@
             currentRenderTask++;
             mergeFiles = []; globalRotations = {}; activeBox = null; lastClickedIdx = null;
             calculatedChunks = []; extractedText = ''; pdfLibDocCache = {}; sourceFileHandle = null;
+            currentEpubFile = null; epubChapters = []; epubExtractedText = '';
             document.getElementById('canvasGrid').innerHTML = '';
             document.getElementById('extractCanvasGrid').innerHTML = '';
+            document.getElementById('epubChapterGrid').innerHTML = '';
             document.getElementById('mergeList').innerHTML = '';
             document.getElementById('emptyState').classList.remove('hidden');
             document.getElementById('extractEmptyState').classList.remove('hidden');
+            document.getElementById('epubEmptyState').classList.remove('hidden');
             document.getElementById('mergeExportArea').classList.add('hidden');
             document.getElementById('splitExportArea').classList.add('hidden');
             document.getElementById('chunkResults').classList.add('hidden');
             document.getElementById('actionBar').classList.add('hidden');
             document.getElementById('extractTextContent').textContent = '';
             document.getElementById('extractExportArea').classList.add('hidden');
+            document.getElementById('epubTextContent').textContent = '';
+            document.getElementById('epubExportArea').classList.add('hidden');
+            document.getElementById('epubChapterCount').textContent = '';
             document.getElementById('mergeManualName').value = '';
             document.getElementById('splitManualName').value = '';
             document.getElementById('extractPageRange').value = '';
@@ -274,7 +342,25 @@
         async function confirmLoad(pMode) {
             previewLimitMode = pMode;
             document.getElementById('modal').classList.add('hidden');
-            setStatus('Loading PDF…', 'amber');
+            setStatus('Loading…', 'amber');
+
+            if (currentMode === 'epub') {
+                if (!pendingFiles.length) return;
+                const file = pendingFiles[0];
+                const data = await file.arrayBuffer();
+                currentEpubFile = { name: file.name };
+                try {
+                    setStatus('Parsing EPUB…', 'amber');
+                    epubChapters = await parseEpub(data);
+                    renderEpubChapters();
+                    setStatus(`Loaded — ${epubChapters.length} chapter${epubChapters.length !== 1 ? 's' : ''}`, 'slate');
+                } catch (err) {
+                    setStatus('Error: ' + err.message, 'amber');
+                    currentEpubFile = null;
+                    updateUploadUI();
+                }
+                return;
+            }
 
             if (currentMode === 'split' || currentMode === 'extract') {
                 currentRenderTask++;
@@ -283,7 +369,7 @@
                 document.getElementById('extractCanvasGrid').innerHTML = '';
                 document.getElementById('extractTextContent').textContent = '';
                 document.getElementById('extractExportArea').classList.add('hidden');
-                pendingFiles = pendingFiles.slice(0, 1); // single file for split/extract
+                pendingFiles = pendingFiles.slice(0, 1);
             }
 
             for (let f of pendingFiles) {
@@ -372,6 +458,183 @@
             }
             if (currentRenderTask === thisTaskID) setStatus('Loaded — specify pages and click Extract', 'slate');
         }
+
+        // --- EPUB ---
+
+        async function parseEpub(arrayBuffer) {
+            const zip = await JSZip.loadAsync(arrayBuffer);
+            const parser = new DOMParser();
+
+            const containerFile = zip.file('META-INF/container.xml');
+            if (!containerFile) throw new Error('Not a valid EPUB (missing container.xml)');
+
+            const containerXml = await containerFile.async('string');
+            const containerDoc = parser.parseFromString(containerXml, 'application/xml');
+            const rootfilePath = containerDoc.querySelector('rootfile')?.getAttribute('full-path');
+            if (!rootfilePath) throw new Error('Not a valid EPUB (no rootfile)');
+
+            const opfFile = zip.file(rootfilePath);
+            if (!opfFile) throw new Error('OPF file not found in EPUB');
+
+            const opfXml = await opfFile.async('string');
+            const opfDoc = parser.parseFromString(opfXml, 'application/xml');
+            const opfDir = rootfilePath.includes('/') ? rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1) : '';
+
+            const manifest = {};
+            opfDoc.querySelectorAll('item').forEach(item => {
+                const id = item.getAttribute('id');
+                const href = item.getAttribute('href');
+                const mediaType = item.getAttribute('media-type') || '';
+                if (id && href) {
+                    manifest[id] = { href: opfDir + decodeURIComponent(href), mediaType };
+                }
+            });
+
+            const spineIds = [];
+            opfDoc.querySelectorAll('itemref').forEach(itemref => {
+                const idref = itemref.getAttribute('idref');
+                if (idref) spineIds.push(idref);
+            });
+
+            const chapters = [];
+            for (const id of spineIds) {
+                const item = manifest[id];
+                if (!item) continue;
+                if (!item.mediaType.includes('html')) continue;
+
+                const file = zip.file(item.href);
+                if (!file) continue;
+
+                const html = await file.async('string');
+                const doc = parser.parseFromString(html, 'text/html');
+                doc.querySelectorAll('script, style, nav').forEach(el => el.remove());
+
+                const heading = doc.querySelector('h1, h2, h3, h4');
+                const title = (heading?.textContent || doc.title || item.href.split('/').pop().replace(/\.[^.]+$/, '')).trim();
+                const bodyHtml = doc.body?.innerHTML || '';
+                const bodyText = (doc.body?.textContent || '').trim().replace(/\s+/g, ' ');
+                if (!bodyText) continue;
+
+                const preview = bodyText.substring(0, 160) + (bodyText.length > 160 ? '…' : '');
+                chapters.push({ title, bodyHtml, preview, href: item.href });
+            }
+
+            return chapters;
+        }
+
+        function renderEpubChapters() {
+            const grid = document.getElementById('epubChapterGrid');
+            grid.innerHTML = '';
+            document.getElementById('epubEmptyState').classList.add('hidden');
+            document.getElementById('epubChapterCount').textContent =
+                `${epubChapters.length} chapter${epubChapters.length !== 1 ? 's' : ''}`;
+
+            epubChapters.forEach((ch, i) => {
+                const card = document.createElement('div');
+                card.className = 'page-card p-4 bg-white rounded-xl shadow-sm border-2 flex flex-col gap-1';
+                card.innerHTML = `
+                    <div class="text-[8px] font-bold text-slate-300 uppercase">Chapter ${i + 1}</div>
+                    <div class="font-semibold text-sm text-slate-800 leading-snug">${escapeHtml(ch.title)}</div>
+                    <div class="text-xs text-slate-400 leading-relaxed mt-1">${escapeHtml(ch.preview)}</div>
+                `;
+                grid.appendChild(card);
+            });
+
+            updateUploadUI();
+        }
+
+        function htmlToFormattedText(html, fmt) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(`<html><body>${html}</body></html>`, 'text/html');
+            doc.querySelectorAll('script, style, nav').forEach(el => el.remove());
+
+            const parts = [];
+
+            function walk(node) {
+                if (node.nodeType === 3) {
+                    const t = node.textContent.replace(/\s+/g, ' ');
+                    if (t.trim()) parts.push(t);
+                    return;
+                }
+                if (node.nodeType !== 1) return;
+                const tag = node.tagName.toLowerCase();
+                if (['script', 'style', 'nav'].includes(tag)) return;
+
+                if (/^h[1-6]$/.test(tag)) {
+                    const text = node.textContent.trim();
+                    if (!text) return;
+                    const lvl = parseInt(tag[1]);
+                    parts.push('\n');
+                    if (fmt === 'markdown') {
+                        parts.push('#'.repeat(lvl) + ' ' + text);
+                    } else {
+                        parts.push(text);
+                        if (lvl === 1) parts.push('='.repeat(Math.min(text.length, 72)));
+                        else if (lvl === 2) parts.push('-'.repeat(Math.min(text.length, 72)));
+                    }
+                    parts.push('\n');
+                    return;
+                }
+
+                for (const child of node.childNodes) walk(child);
+
+                if (['p', 'div', 'li', 'blockquote', 'section', 'article', 'br', 'td', 'th'].includes(tag)) {
+                    parts.push('\n');
+                }
+            }
+
+            walk(doc.body);
+            return parts.join('').replace(/\n{3,}/g, '\n\n').trim();
+        }
+
+        async function runEpubExtract() {
+            if (!epubChapters.length) { setStatus('No EPUB loaded', 'amber'); return; }
+            setStatus('Extracting…', 'blue');
+
+            const outputParts = [];
+            for (const chapter of epubChapters) {
+                const text = htmlToFormattedText(chapter.bodyHtml, epubFormat);
+                if (!text.trim()) continue;
+                outputParts.push(text);
+                outputParts.push('');
+            }
+
+            epubExtractedText = outputParts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+            document.getElementById('epubTextContent').textContent = epubExtractedText;
+
+            const chars = epubExtractedText.length;
+            const kb = (new TextEncoder().encode(epubExtractedText).byteLength / 1024).toFixed(1);
+            document.getElementById('epubCharCount').textContent = `${chars.toLocaleString()} characters — ${kb} KB`;
+            document.getElementById('epubExportArea').classList.remove('hidden');
+            setStatus(`Done — ${kb} KB`, 'green');
+        }
+
+        function setEpubFormat(fmt) {
+            epubFormat = fmt;
+            document.getElementById('tabEpubMd').className = fmt === 'markdown'
+                ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
+                : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+            document.getElementById('tabEpubPlain').className = fmt === 'plain'
+                ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
+                : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+        }
+
+        function copyEpubText() {
+            if (!epubExtractedText) return;
+            navigator.clipboard.writeText(epubExtractedText).then(() => setStatus('Copied!', 'green'));
+        }
+
+        function downloadEpubText() {
+            if (!epubExtractedText) return;
+            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
+            saveText(epubExtractedText, baseName + '.txt');
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // --- Page selection & manipulation ---
 
         function handlePageClick(pageId, absIdx, event) {
             if (currentMode !== 'split') return;
@@ -564,7 +827,7 @@
             updateVisualSelect();
         }
 
-        // --- Text Extraction ---
+        // --- Text Extraction (PDF) ---
         let extractFormat = 'markdown';
         let extractedText = '';
 
