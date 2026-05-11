@@ -385,6 +385,84 @@ body {
   color:#c8c4bc; line-height:1.8; z-index:300; pointer-events:none;
 }
 
+/* ── User area (header) ───────────────────────────────────────────────── */
+.user-area {
+  display:flex; align-items:center; gap:7px;
+  cursor:pointer; padding:2px 6px; border-radius:5px;
+  transition:background .1s; flex-shrink:0;
+}
+.user-area:hover { background:#f5f3ef; }
+.user-avatar {
+  width:24px; height:24px; border-radius:50%;
+  border:1.5px solid #ddd; flex-shrink:0;
+}
+.user-display-name {
+  font-size:12px; color:#444; white-space:nowrap;
+  max-width:110px; overflow:hidden; text-overflow:ellipsis;
+}
+.user-signout {
+  font-size:10px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase;
+  color:#aaa; cursor:pointer; border:none; background:none; padding:0;
+}
+.user-signout:hover { color:#ef5350; }
+
+/* ── My Maps panel ────────────────────────────────────────────────────── */
+#my-maps-panel {
+  position:fixed; top:48px; left:0; bottom:0; width:290px;
+  background:#fff; border-right:1px solid #e4e0d8;
+  display:flex; flex-direction:column; z-index:200;
+  transform:translateX(-100%); transition:transform .2s ease;
+  box-shadow:2px 0 12px rgba(0,0,0,.06);
+}
+#my-maps-panel.open { transform:translateX(0); }
+
+.mmp-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px 12px; border-bottom:1px solid #f0ece5; flex-shrink:0;
+}
+.mmp-title {
+  font-size:11px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:#888;
+}
+.mmp-close {
+  width:22px; height:22px; border:none; background:transparent; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  color:#bbb; font-size:18px; border-radius:4px;
+  transition:color .1s, background .1s;
+}
+.mmp-close:hover { color:#555; background:#f5f3ef; }
+
+.mmp-list { flex:1; overflow-y:auto; padding:8px 0; }
+
+.mmp-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 16px; cursor:pointer; transition:background .1s;
+  border-bottom:1px solid #f8f6f2; gap:8px;
+}
+.mmp-item:hover { background:#faf8f5; }
+.mmp-item-info { flex:1; min-width:0; }
+.mmp-item-title {
+  font-size:13px; color:#2c2c2c; font-weight:500;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.mmp-item-meta {
+  font-size:10px; font-family:'Courier New',monospace;
+  color:#bbb; margin-top:2px; letter-spacing:.03em;
+}
+.mmp-item-del {
+  width:22px; height:22px; border:none; background:transparent; cursor:pointer;
+  color:#ddd; font-size:15px; border-radius:3px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:color .1s, background .1s;
+}
+.mmp-item-del:hover { color:#ef5350; background:#fff2f2; }
+
+.mmp-empty {
+  padding:32px 20px; text-align:center;
+  font-size:12px; color:#bbb; font-style:italic; line-height:1.6;
+}
+
 /* ── Toast ────────────────────────────────────────────────────────────── */
 #toast {
   position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
@@ -407,8 +485,28 @@ body {
   <button class="hdr-btn" id="btn-export">Export</button>
   <button class="hdr-btn primary" id="btn-save">Save</button>
   <button class="hdr-btn" id="btn-load">Load</button>
+  <!-- signed-in state -->
+  <button class="hdr-btn" id="btn-my-maps" style="display:none">My Maps</button>
+  <div class="user-area" id="user-area" style="display:none">
+    <img class="user-avatar" id="user-avatar" src="" alt="">
+    <span class="user-display-name" id="user-display-name"></span>
+    <button class="user-signout" id="btn-signout">Sign out</button>
+  </div>
+  <!-- signed-out state -->
+  <button class="hdr-btn" id="btn-signin">Sign in</button>
   <div class="status-chip" id="status-chip">Draft</div>
 </header>
+
+<!-- My Maps panel -->
+<div id="my-maps-panel">
+  <div class="mmp-head">
+    <span class="mmp-title">My Maps</span>
+    <button class="mmp-close" id="btn-mmp-close">×</button>
+  </div>
+  <div class="mmp-list" id="mmp-list">
+    <div class="mmp-empty">No saved maps yet.<br>Save a map to see it here.</div>
+  </div>
+</div>
 
 <!-- Add-node panel -->
 <div class="float-panel" id="add-panel">
@@ -517,8 +615,10 @@ body {
 
 <script type="module">
 import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc }
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc }
                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }
+                                from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // ── Firebase (financehub project) ─────────────────────────────────────
 // Firestore rules needed: allow read, write on /argmap_maps/{code}
@@ -530,7 +630,9 @@ const fbApp = initializeApp({
   messagingSenderId: '162506983187',
   appId:             '1:162506983187:web:31b4151a044dd907f2bce6',
 });
-const db = getFirestore(fbApp);
+const db   = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const googleProvider = new GoogleAuthProvider();
 
 // ── Initial data ───────────────────────────────────────────────────────
 const INITIAL_NODES = [
@@ -1117,11 +1219,15 @@ async function saveMap() {
       }
       if (!code) throw new Error('Could not generate unique code');
     }
+    const title   = document.getElementById('map-name').textContent.trim();
+    const savedAt = new Date().toISOString();
     await setDoc(doc(db,'argmap_maps',code), {
-      nodes: nodes.map(n=>({...n})),
-      title: document.getElementById('map-name').textContent.trim(),
-      savedAt: new Date().toISOString(),
+      nodes: nodes.map(n=>({...n})), title, savedAt,
     });
+    // If signed in, write metadata to private user index
+    if (currentUser) {
+      await setDoc(doc(db,'users',currentUser.uid,'maps',code), { title, savedAt, code });
+    }
     currentCode=code;
     localStorage.setItem('argmap_code',code);
     location.hash='#'+code;
@@ -1197,6 +1303,89 @@ document.getElementById('btn-load-confirm').addEventListener('click', ()=>{
 document.getElementById('code-input').addEventListener('keydown', e=>{
   if (e.key==='Enter') loadMap(e.target.value);
 });
+
+// ── Auth & My Maps ────────────────────────────────────────────────────
+let currentUser = null;
+
+const btnSignin   = document.getElementById('btn-signin');
+const btnSignout  = document.getElementById('btn-signout');
+const btnMyMaps   = document.getElementById('btn-my-maps');
+const userArea    = document.getElementById('user-area');
+const userAvatar  = document.getElementById('user-avatar');
+const userNameEl  = document.getElementById('user-display-name');
+const mmpPanel    = document.getElementById('my-maps-panel');
+const mmpList     = document.getElementById('mmp-list');
+
+btnSignin.addEventListener('click', () => signInWithPopup(auth, googleProvider).catch(console.error));
+btnSignout.addEventListener('click', () => signOut(auth));
+
+btnMyMaps.addEventListener('click', e => {
+  e.stopPropagation();
+  mmpPanel.classList.toggle('open');
+  if (mmpPanel.classList.contains('open')) loadMyMaps();
+});
+document.getElementById('btn-mmp-close').addEventListener('click', () => mmpPanel.classList.remove('open'));
+// Close panel on canvas click
+viewport.addEventListener('mousedown', () => mmpPanel.classList.remove('open'));
+
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  if (user) {
+    btnSignin.style.display  = 'none';
+    userArea.style.display   = 'flex';
+    btnMyMaps.style.display  = 'flex';
+    userAvatar.src           = user.photoURL || '';
+    userNameEl.textContent   = user.displayName || user.email || '';
+  } else {
+    btnSignin.style.display  = '';
+    userArea.style.display   = 'none';
+    btnMyMaps.style.display  = 'none';
+    mmpPanel.classList.remove('open');
+  }
+});
+
+async function loadMyMaps() {
+  if (!currentUser) return;
+  mmpList.innerHTML = '<div class="mmp-empty">Loading…</div>';
+  try {
+    const snap = await getDocs(collection(db, 'users', currentUser.uid, 'maps'));
+    if (snap.empty) {
+      mmpList.innerHTML = '<div class="mmp-empty">No saved maps yet.<br>Save a map to see it here.</div>';
+      return;
+    }
+    // Sort newest first
+    const items = snap.docs.map(d => ({code: d.id, ...d.data()}))
+                           .sort((a,b) => (b.savedAt||'').localeCompare(a.savedAt||''));
+    mmpList.innerHTML = '';
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'mmp-item';
+      const date = item.savedAt ? new Date(item.savedAt).toLocaleDateString() : '';
+      row.innerHTML = `
+        <div class="mmp-item-info">
+          <div class="mmp-item-title">${escHtml(item.title || 'Untitled')}</div>
+          <div class="mmp-item-meta">${item.code} &nbsp;·&nbsp; ${date}</div>
+        </div>
+        <button class="mmp-item-del" title="Delete">×</button>`;
+      row.querySelector('.mmp-item-info').addEventListener('click', () => {
+        loadMap(item.code);
+        mmpPanel.classList.remove('open');
+      });
+      row.querySelector('.mmp-item-del').addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('Delete "' + (item.title||'Untitled') + '"?')) return;
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'maps', item.code));
+        row.remove();
+        if (!mmpList.children.length)
+          mmpList.innerHTML = '<div class="mmp-empty">No saved maps yet.<br>Save a map to see it here.</div>';
+      });
+      mmpList.appendChild(row);
+    });
+  } catch(err) {
+    console.error(err);
+    mmpList.innerHTML = '<div class="mmp-empty">Could not load maps.</div>';
+  }
+}
 
 // ── Canvas interactions ────────────────────────────────────────────────
 viewport.addEventListener('mousedown', e=>{
