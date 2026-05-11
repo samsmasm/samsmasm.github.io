@@ -565,11 +565,55 @@ body {
   display:block;
 }
 
+/* ── Import modal ─────────────────────────────────────────────────────── */
+.import-tabs { display:flex; gap:4px; padding-bottom:10px; border-bottom:1px solid #f0ece5; }
+.import-tab {
+  font-size:10px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; padding:5px 12px;
+  border:1px solid transparent; border-radius:4px; background:transparent;
+  color:#aaa; cursor:pointer; transition:all .1s;
+}
+.import-tab.active { background:#f5f3ef; color:#333; border-color:#ddd; }
+.import-tab:hover:not(.active) { color:#666; }
+.import-desc { font-size:12px; color:#999; line-height:1.55; margin:0; }
+.import-prompt-pre {
+  background:#fafaf8; border:1px solid #e8e4dc; border-radius:4px;
+  padding:12px 14px; font-family:'Courier New',monospace; font-size:11px;
+  line-height:1.65; color:#555; white-space:pre; overflow:auto;
+  max-height:36vh; flex:1;
+}
+.import-json-ta {
+  width:100%; border:1px solid #ddd; border-radius:4px; padding:10px 12px;
+  font-family:'Courier New',monospace; font-size:11.5px; line-height:1.6;
+  color:#333; background:#fafaf8; resize:vertical; outline:none; min-height:160px;
+}
+.import-json-ta:focus { border-color:#aaa; }
+.import-json-ta::placeholder { color:#ccc; }
+
+/* ── Help modal ───────────────────────────────────────────────────────── */
+.help-grid {
+  border:1px solid #ede9e1; border-radius:5px; overflow:hidden;
+  max-height:58vh; overflow-y:auto;
+}
+.help-row { display:grid; grid-template-columns:118px 1fr; }
+.help-row + .help-row { border-top:1px solid #f0ece5; }
+.help-key {
+  padding:9px 14px; font-family:'Courier New',monospace; font-size:10px;
+  font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:#999; background:#fafaf8; border-right:1px solid #ede9e1;
+  display:flex; align-items:center;
+}
+.help-val { padding:9px 14px; font-size:12.5px; line-height:1.6; color:#444; }
+.help-val kbd {
+  font-family:'Courier New',monospace; font-size:10px; background:#f0ece5;
+  border:1px solid #ddd; border-radius:3px; padding:1px 5px; white-space:nowrap;
+}
+
 /* ── Print ────────────────────────────────────────────────────────────── */
 @media print {
   .app-header, .zoom-panel, .hint, #toast, #my-maps-panel,
   #hover-strip, #detach-btn, #type-picker, #conn-hint, .snap-guide,
-  .modal-backdrop, .modal, #add-panel, #load-panel, #minimap,
+  .modal-backdrop, .modal, #add-panel, #load-panel, #minimap, #import-modal, #help-modal,
   .btn-delete, .btn-collapse, .btn-connect, .island-footer,
   .source-label { display:none !important; }
   body { height:auto; overflow:visible; background:#fff; }
@@ -589,6 +633,7 @@ body {
   <button class="hdr-btn" id="btn-new">New</button>
   <button class="hdr-btn" id="btn-add-node"><span style="font-size:14px;line-height:1">+</span> Node</button>
   <button class="hdr-btn" id="btn-add-island"><span style="font-size:14px;line-height:1">+</span> Draft</button>
+  <button class="hdr-btn" id="btn-import">Import</button>
   <button class="hdr-btn" id="btn-export">Export</button>
   <button class="hdr-btn" id="btn-tidy">Tidy</button>
   <button class="hdr-btn" id="btn-print">Print</button>
@@ -604,6 +649,7 @@ body {
   </div>
   <!-- signed-out state -->
   <button class="hdr-btn" id="btn-signin">Sign in</button>
+  <button class="hdr-btn" id="btn-help" title="Help" style="padding:0;width:28px;font-family:Georgia,serif;font-size:15px;font-weight:400">?</button>
   <div class="status-chip" id="status-chip">Draft</div>
 </header>
 
@@ -698,6 +744,53 @@ body {
   </div>
 </div>
 
+<!-- Import modal -->
+<div class="modal-backdrop" id="import-backdrop"></div>
+<div class="modal" id="import-modal">
+  <div class="modal-title">Import from AI</div>
+  <div class="import-tabs">
+    <button class="import-tab active" id="import-tab-btn-prompt">1 · Get prompt</button>
+    <button class="import-tab" id="import-tab-btn-json">2 · Paste JSON</button>
+  </div>
+  <div id="import-pane-prompt" style="display:flex;flex-direction:column;gap:10px">
+    <p class="import-desc">Copy this prompt, paste it into Claude or ChatGPT along with your text, then switch to tab 2 and paste the result.</p>
+    <pre class="import-prompt-pre" id="import-prompt-pre"></pre>
+  </div>
+  <div id="import-pane-json" style="display:none;flex-direction:column;gap:10px">
+    <p class="import-desc">Paste the JSON returned by the AI below.</p>
+    <textarea class="import-json-ta" id="import-json-ta" placeholder='{"title":"...","nodes":[{"id":1,"type":"contention","text":"...","parentId":null}]}'></textarea>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-cancel" id="btn-import-copy-prompt">Copy prompt</button>
+    <button class="btn-confirm" id="btn-import-confirm" style="display:none">Import map</button>
+    <button class="btn-cancel" id="btn-import-close">Close</button>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div class="modal-backdrop" id="help-backdrop"></div>
+<div class="modal" id="help-modal" style="width:640px">
+  <div class="modal-title">How to use Argument Mapper</div>
+  <div class="help-grid">
+    <div class="help-row"><div class="help-key">Navigate</div><div class="help-val">Drag blank canvas to pan · scroll to zoom · <kbd>Ctrl Z</kbd> to undo</div></div>
+    <div class="help-row"><div class="help-key">Add nodes</div><div class="help-val">Hover any node → click the coloured buttons that appear below it · or use <kbd>+ Node</kbd> in the toolbar for full options</div></div>
+    <div class="help-row"><div class="help-key">Drafts</div><div class="help-val"><kbd>+ Draft</kbd> creates a floating node · click <kbd>Connect →</kbd> on it to attach to a parent, then pick its type</div></div>
+    <div class="help-row"><div class="help-key">Change type</div><div class="help-val">Click the type badge (Reason, Objection…) on any non-contention node to change its type</div></div>
+    <div class="help-row"><div class="help-key">Detach</div><div class="help-val">Hover a connector line · click the <kbd>−</kbd> button that appears to detach the child as an island</div></div>
+    <div class="help-row"><div class="help-key">Co-premises</div><div class="help-val">Drag two sibling nodes close together — they snap with a shared bar · click <kbd>AND</kbd> / <kbd>OR</kbd> to toggle the relationship · drag apart to separate</div></div>
+    <div class="help-row"><div class="help-key">Collapse</div><div class="help-val">Click <kbd>▾</kbd> on any node to hide its subtree · click <kbd>▸</kbd> to expand again</div></div>
+    <div class="help-row"><div class="help-key">Tidy</div><div class="help-val">Auto-arranges the full tree neatly · dissolves any co-premise groups</div></div>
+    <div class="help-row"><div class="help-key">Save</div><div class="help-val">Signed in: saves silently to My Maps · Guest: shows a 6-char code to share or bookmark · use Share in My Maps for a shareable link</div></div>
+    <div class="help-row"><div class="help-key">Import</div><div class="help-val">Copy the prompt, paste it with any text into an AI assistant, then paste the returned JSON to build a map automatically</div></div>
+    <div class="help-row"><div class="help-key">Export</div><div class="help-val">Generates a structured plain-text outline — copy to clipboard or download as .md / .txt</div></div>
+    <div class="help-row"><div class="help-key">Check</div><div class="help-val">Flags nodes with no evidence and objections with no rebuttal · summarises the top-level reasons for the contention</div></div>
+    <div class="help-row"><div class="help-key">Print</div><div class="help-val">Fits the whole map to the page and opens the print / PDF dialog</div></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-cancel" id="btn-help-close">Close</button>
+  </div>
+</div>
+
 <!-- Detach button (viewport-space, shown at connector midpoint on hover) -->
 <button id="detach-btn" title="Detach node">−</button>
 
@@ -747,7 +840,7 @@ body {
 
 <script type="module">
 import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc }
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, increment }
                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }
                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -2173,6 +2266,173 @@ nodes.forEach(buildNode);
 applyTransform();
 requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
 window.addEventListener('resize', drawConnectors);
+
+// ── Analytics ────────────────────────────────────────────────────────
+function trackClick(name) {
+  setDoc(doc(db,'argmap_analytics','clicks'), {[name]:increment(1)}, {merge:true}).catch(()=>{});
+}
+function tracked(id, name) {
+  document.getElementById(id)?.addEventListener('click', () => trackClick(name));
+}
+tracked('btn-undo','undo');       tracked('btn-new','new');
+tracked('btn-add-node','add_node'); tracked('btn-add-island','add_draft');
+tracked('btn-import','import');   tracked('btn-export','export');
+tracked('btn-tidy','tidy');       tracked('btn-print','print');
+tracked('btn-check','check');     tracked('btn-save','save');
+tracked('btn-load','load');       tracked('btn-my-maps','my_maps');
+tracked('btn-signin','signin');   tracked('btn-zoom-in','zoom_in');
+tracked('btn-zoom-out','zoom_out'); tracked('btn-zoom-fit','zoom_fit');
+tracked('btn-help','help');
+
+// ── Import modal ──────────────────────────────────────────────────────
+const IMPORT_PROMPT =
+`Analyse the following text and extract its argument structure as JSON.
+
+Return ONLY valid JSON — no explanation, no markdown code fences.
+
+Schema:
+{
+  "title": "short descriptive title",
+  "nodes": [
+    { "id": 1, "type": "contention", "text": "...", "parentId": null },
+    { "id": 2, "type": "reason",     "text": "...", "parentId": 1    }
+  ]
+}
+
+Node type rules:
+  contention — the central claim or thesis. Exactly one. parentId must be null.
+  reason     — supports its parent (a contention or another reason).
+  objection  — challenges its parent (a contention or reason).
+  rebuttal   — defends against its parent objection.
+  evidence   — empirical grounding for its parent. Add optional "source": "Author (Year) — title".
+
+Every node needs: id (unique integer), type, text (1–2 sentences), parentId (integer or null).
+
+Text to analyse:
+[PASTE YOUR TEXT HERE]`;
+
+const importModal       = document.getElementById('import-modal');
+const importBackdrop    = document.getElementById('import-backdrop');
+const importPromptPre   = document.getElementById('import-prompt-pre');
+const importJsonTa      = document.getElementById('import-json-ta');
+const importPanePrompt  = document.getElementById('import-pane-prompt');
+const importPaneJson    = document.getElementById('import-pane-json');
+const btnImportConfirm  = document.getElementById('btn-import-confirm');
+const btnImportCopyPr   = document.getElementById('btn-import-copy-prompt');
+
+function openImportModal() {
+  importPromptPre.textContent = IMPORT_PROMPT;
+  importJsonTa.value = '';
+  switchImportTab('prompt');
+  importModal.classList.add('visible');
+  importBackdrop.classList.add('visible');
+}
+function closeImportModal() {
+  importModal.classList.remove('visible');
+  importBackdrop.classList.remove('visible');
+}
+function switchImportTab(tab) {
+  const onPrompt = tab === 'prompt';
+  importPanePrompt.style.display = onPrompt ? 'flex' : 'none';
+  importPaneJson.style.display   = onPrompt ? 'none' : 'flex';
+  btnImportConfirm.style.display = onPrompt ? 'none' : '';
+  btnImportCopyPr.style.display  = onPrompt ? '' : 'none';
+  document.getElementById('import-tab-btn-prompt').classList.toggle('active', onPrompt);
+  document.getElementById('import-tab-btn-json').classList.toggle('active', !onPrompt);
+}
+
+document.getElementById('btn-import').addEventListener('click', openImportModal);
+document.getElementById('import-tab-btn-prompt').addEventListener('click', () => switchImportTab('prompt'));
+document.getElementById('import-tab-btn-json').addEventListener('click', () => switchImportTab('json'));
+btnImportCopyPr.addEventListener('click', () =>
+  navigator.clipboard.writeText(IMPORT_PROMPT).then(() => showToast('Prompt copied'))
+);
+document.getElementById('btn-import-close').addEventListener('click', closeImportModal);
+importBackdrop.addEventListener('click', closeImportModal);
+
+btnImportConfirm.addEventListener('click', () => {
+  const txt = importJsonTa.value.trim();
+  if (!txt) { showToast('Paste JSON first', 2000); return; }
+  if (doImport(txt)) closeImportModal();
+});
+
+function doImport(jsonText) {
+  let data;
+  try { data = JSON.parse(jsonText); }
+  catch(e) { showToast('Invalid JSON — ' + e.message, 4000); return false; }
+
+  const VTYPES = new Set(['contention','reason','objection','rebuttal','evidence']);
+  const raw = (data.nodes||[]).filter(n => VTYPES.has(n.type));
+  if (!raw.length) { showToast('No valid nodes found in JSON', 4000); return false; }
+  if (!raw.some(n => n.type === 'contention')) { showToast('JSON must include a contention node', 4000); return false; }
+  if (!confirm('Replace the current map with the imported one?')) return false;
+
+  pushUndo();
+  nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
+  coGroups = []; cgCounter = 1; uidCounter = 1;
+
+  const idMap = {};
+  nodes = raw.map(n => {
+    const newId = `n${uidCounter++}`;
+    idMap[String(n.id)] = newId;
+    return { id:newId, type:n.type, text:String(n.text||''), source:String(n.source||''),
+             parentId:null, x:400, y:50, collapsed:false };
+  });
+  raw.forEach((orig, i) => {
+    if (orig.parentId != null) {
+      const p = idMap[String(orig.parentId)];
+      if (p) nodes[i].parentId = p;
+    }
+  });
+
+  if (data.title) document.getElementById('map-name').textContent = data.title;
+  currentCode = null; location.hash = '';
+  document.getElementById('status-chip').textContent = 'Draft';
+  undoStack.length = 0; // fresh start after import
+
+  nodes.forEach(buildNode);
+
+  // Layout without a second undo push
+  requestAnimationFrame(() => {
+    const NW=234, G=30;
+    const root=nodes.find(n=>n.type==='contention');
+    if (!root) { drawConnectors(); return; }
+    const cache={};
+    function sw(id){
+      if(cache[id]!==undefined)return cache[id];
+      const ch=nodes.filter(n=>n.parentId===id);
+      if(!ch.length)return(cache[id]=NW);
+      return(cache[id]=Math.max(NW,ch.reduce((s,c)=>s+sw(c.id),0)+(ch.length-1)*G));
+    }
+    function assign(id,cx,d){
+      const n=nodes.find(n=>n.id===id);if(!n)return;
+      n.x=cx-NW/2; n.y=SNAP_LEVELS[Math.min(d,SNAP_LEVELS.length-1)];
+      const ch=nodes.filter(n=>n.parentId===id);if(!ch.length)return;
+      const tot=ch.reduce((s,c)=>s+sw(c.id),0)+(ch.length-1)*G;
+      let x=cx-tot/2; ch.forEach(c=>{const cw=sw(c.id);assign(c.id,x+cw/2,d+1);x+=cw+G;});
+    }
+    const r=viewport.getBoundingClientRect();
+    assign(root.id,(r.width/2-tx)/sc,0);
+    Object.values(elOf).forEach(el=>el.classList.add('layout-animate'));
+    nodes.forEach(n=>{const el=elOf[n.id];if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';}});
+    setTimeout(()=>{Object.values(elOf).forEach(el=>el.classList.remove('layout-animate'));drawConnectors();},320);
+  });
+  showToast(`Imported ${nodes.length} nodes`);
+  return true;
+}
+
+// ── Help modal ────────────────────────────────────────────────────────
+const helpModal    = document.getElementById('help-modal');
+const helpBackdrop = document.getElementById('help-backdrop');
+document.getElementById('btn-help').addEventListener('click', () => {
+  helpModal.classList.add('visible'); helpBackdrop.classList.add('visible');
+});
+document.getElementById('btn-help-close').addEventListener('click', () => {
+  helpModal.classList.remove('visible'); helpBackdrop.classList.remove('visible');
+});
+helpBackdrop.addEventListener('click', () => {
+  helpModal.classList.remove('visible'); helpBackdrop.classList.remove('visible');
+});
 
 // Auto-load from URL hash only — localStorage no longer silently restores the hash,
 // because deleting the hash and navigating to /argmap should give a clean slate.
