@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Argument Mapper</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    DESIGN TOKENS — edit these to restyle the whole app
@@ -740,7 +741,7 @@ body {
 <canvas id="minimap" width="180" height="124" title="Click to centre view"></canvas>
 
 <div class="hint">
-  Drag nodes &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Alt+drag: free vertical
+  Drag nodes &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Alt+drag: free vertical &nbsp;·&nbsp; Drag siblings close: co-premise
 </div>
 <div id="toast"></div>
 
@@ -812,6 +813,8 @@ let pendingConnTarget = null; // nodeId of chosen parent during connection
 let currentHoverNode  = null;
 let currentCode       = null;
 let stripHideTimer    = null; // module-level so strip's mouseenter can cancel it
+let coGroups   = []; // co-premise groups: [{ id, nodeIds:[], operator:'AND'|'OR' }]
+let cgCounter  = 1;
 
 // ── DOM refs ───────────────────────────────────────────────────────────
 const viewport    = document.getElementById('viewport');
@@ -829,7 +832,10 @@ const MAX_UNDO = 40;
 const undoStack = [];
 
 function pushUndo() {
-  undoStack.push(nodes.map(n => ({...n})));
+  undoStack.push({
+    nodes:    nodes.map(n => ({...n})),
+    coGroups: coGroups.map(cg => ({...cg, nodeIds:[...cg.nodeIds]})),
+  });
   if (undoStack.length > MAX_UNDO) undoStack.shift();
 }
 
@@ -847,7 +853,9 @@ function rebuildAll() {
 
 function undo() {
   if (!undoStack.length) { showToast('Nothing to undo'); return; }
-  nodes = undoStack.pop();
+  const state = undoStack.pop();
+  nodes = state.nodes;
+  coGroups = state.coGroups;
   rebuildAll();
 }
 
@@ -896,6 +904,7 @@ function newMap() {
   if (!confirm('Start a new map? Unsaved work will be lost.')) return;
   // Clear canvas
   undoStack.length = 0;
+  coGroups = []; cgCounter = 1;
   nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
   nodes = [];
   uidCounter = 1;
@@ -933,6 +942,7 @@ function drawConnectors() {
   for (const node of nodes) {
     if (!node.parentId) continue;
     if (isHiddenByCollapse(node.id)) continue;
+    if (node.coGroupId) continue; // handled by drawCoGroupConnector
     const parent = nodes.find(n => n.id===node.parentId);
     if (!parent) continue;
     const cEl=elOf[node.id], pEl=elOf[parent.id];
@@ -961,7 +971,79 @@ function drawConnectors() {
     hitPath.addEventListener('mouseleave', scheduleHideDetachBtn);
     svgLayer.appendChild(hitPath);
   }
+  coGroups.forEach(cg => drawCoGroupConnector(cg));
   updateMinimap();
+}
+
+// ── Co-premise group connector ─────────────────────────────────────────
+function drawCoGroupConnector(cg) {
+  const groupNodes = cg.nodeIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+  if (groupNodes.length < 2) return;
+  if (groupNodes.some(n => !elOf[n.id] || isHiddenByCollapse(n.id))) return;
+  const parent = nodes.find(n => n.id === groupNodes[0].parentId);
+  if (!parent) return;
+  const pEl = elOf[parent.id]; if (!pEl) return;
+
+  const W = 234;
+  groupNodes.sort((a, b) => a.x - b.x);
+  const barY    = Math.min(...groupNodes.map(n => n.y)) - 16;
+  const barCX1  = groupNodes[0].x + W/2;
+  const barCX2  = groupNodes[groupNodes.length-1].x + W/2;
+  const barMidX = (barCX1 + barCX2) / 2;
+
+  // Horizontal bar connecting node centres
+  const bar = document.createElementNS('http://www.w3.org/2000/svg','line');
+  bar.setAttribute('x1',barCX1); bar.setAttribute('y1',barY);
+  bar.setAttribute('x2',barCX2); bar.setAttribute('y2',barY);
+  bar.setAttribute('stroke','var(--connector-stroke)'); bar.setAttribute('stroke-width','1.5');
+  bar.style.pointerEvents='none';
+  svgLayer.appendChild(bar);
+
+  // Tick from bar down to each node's top
+  groupNodes.forEach(n => {
+    const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1',n.x+W/2); tick.setAttribute('y1',barY);
+    tick.setAttribute('x2',n.x+W/2); tick.setAttribute('y2',n.y);
+    tick.setAttribute('stroke','var(--connector-stroke)'); tick.setAttribute('stroke-width','1.5');
+    tick.style.pointerEvents='none';
+    svgLayer.appendChild(tick);
+  });
+
+  // Single bezier from bar midpoint up to parent bottom
+  const pw=pEl.offsetWidth||234, ph=pEl.offsetHeight||80;
+  const x2=parent.x+pw/2, y2=parent.y+ph;
+  const stretch=Math.max(40,Math.abs(barY-y2)*0.42);
+  const d=`M${barMidX},${barY} C${barMidX},${barY-stretch} ${x2},${y2+stretch} ${x2},${y2}`;
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',d); path.setAttribute('fill','none');
+  path.setAttribute('stroke','var(--connector-stroke)'); path.setAttribute('stroke-width','1.5');
+  path.setAttribute('marker-end','url(#arrow)');
+  path.style.pointerEvents='none';
+  svgLayer.appendChild(path);
+
+  // AND/OR label (clickable to toggle)
+  const labelBg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  labelBg.setAttribute('x',barMidX-14); labelBg.setAttribute('y',barY-16);
+  labelBg.setAttribute('width',28); labelBg.setAttribute('height',13);
+  labelBg.setAttribute('rx',3);
+  labelBg.setAttribute('fill','var(--canvas-bg)'); labelBg.setAttribute('stroke','#d0ccc4');
+  labelBg.setAttribute('stroke-width','1');
+  labelBg.style.cursor='pointer';
+  svgLayer.appendChild(labelBg);
+
+  const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+  label.setAttribute('x',barMidX); label.setAttribute('y',barY-6);
+  label.setAttribute('text-anchor','middle');
+  label.setAttribute('font-size','9'); label.setAttribute('font-family','Courier New,monospace');
+  label.setAttribute('font-weight','700'); label.setAttribute('letter-spacing','0.5');
+  label.setAttribute('fill','#888');
+  label.textContent=cg.operator;
+  label.style.cursor='pointer'; label.style.userSelect='none';
+  svgLayer.appendChild(label);
+
+  const toggleOp = () => { pushUndo(); cg.operator = cg.operator==='AND'?'OR':'AND'; drawConnectors(); };
+  labelBg.addEventListener('click', toggleOp);
+  label.addEventListener('click', toggleOp);
 }
 
 // ── Build node card ────────────────────────────────────────────────────
@@ -1001,7 +1083,6 @@ function buildNode(node) {
     </div>`;
 
   const ta = el.querySelector('.node-text');
-  autoResize(ta);
   ta.addEventListener('input', () => { node.text=ta.value; autoResize(ta); drawConnectors(); });
 
   if (isEv) {
@@ -1082,6 +1163,7 @@ function buildNode(node) {
   });
 
   canvas.appendChild(el);
+  autoResize(ta);
   elOf[node.id] = el;
   return el;
 }
@@ -1093,6 +1175,7 @@ function removeNode(id) {
   const dead=[];
   function collect(nid) { dead.push(nid); nodes.filter(n=>n.parentId===nid).forEach(n=>collect(n.id)); }
   collect(id);
+  dead.forEach(nid => removeFromCoGroup(nid));
   dead.forEach(nid => { elOf[nid]?.remove(); delete elOf[nid]; });
   nodes = nodes.filter(n=>!dead.includes(n.id));
   drawConnectors();
@@ -1144,7 +1227,7 @@ hoverStrip.addEventListener('mouseleave', () => hideStrip());
 
 // ── Auto-arrange: push overlapping nodes apart at each Y level ────────
 function resolveOverlaps() {
-  const W = 234, GAP = 22;
+  const W = 234, GAP = 22, GAP_CO = 4;
   // Group non-draft nodes by Y position
   const groups = {};
   nodes.filter(n => n.type !== 'draft' && !isHiddenByCollapse(n.id)).forEach(n => {
@@ -1156,8 +1239,11 @@ function resolveOverlaps() {
     if (group.length < 2) return;
     group.sort((a, b) => a.x - b.x);
     for (let i = 1; i < group.length; i++) {
-      const minX = group[i-1].x + W + GAP;
-      if (group[i].x < minX) { group[i].x = minX; changed = true; }
+      const prev = group[i-1], cur = group[i];
+      const inSameCG = prev.coGroupId && prev.coGroupId === cur.coGroupId;
+      const gap = inSameCG ? GAP_CO : GAP;
+      const minX = prev.x + W + gap;
+      if (cur.x < minX) { cur.x = minX; changed = true; }
     }
   });
   if (!changed) return;
@@ -1452,6 +1538,7 @@ function toggleCollapse(nodeId) {
 // ── Auto-layout ("Tidy") ───────────────────────────────────────────────
 function autoLayout() {
   pushUndo();
+  coGroups = []; nodes.forEach(n => { if (n.coGroupId !== undefined) n.coGroupId = null; });
   const nodeW = 234, gap = 30;
   const root = nodes.find(n => n.type === 'contention');
   if (!root) { showToast('No contention node found'); return; }
@@ -1541,10 +1628,11 @@ function updateMinimap() {
   mmOffX  = MM_PAD + ((MM_W-MM_PAD*2) - cw*mmScale) / 2 - minX*mmScale;
   mmOffY  = MM_PAD + ((MM_H-MM_PAD*2) - ch*mmScale) / 2 - minY*mmScale;
 
-  // Connectors
+  // Connectors (individual nodes, skip co-grouped)
   mmCtx.strokeStyle = '#cdc9c1'; mmCtx.lineWidth = 1;
   nodes.forEach(n => {
     if (!n.parentId || isHiddenByCollapse(n.id)) return;
+    if (n.coGroupId) return; // drawn via co-group loop below
     const parent=nodes.find(p=>p.id===n.parentId);
     if (!parent) return;
     const cEl=elOf[n.id], pEl=elOf[parent.id];
@@ -1553,6 +1641,21 @@ function updateMinimap() {
     mmCtx.moveTo(n.x*mmScale+mmOffX+(cEl.offsetWidth||234)*mmScale/2, n.y*mmScale+mmOffY);
     mmCtx.lineTo(parent.x*mmScale+mmOffX+(pEl.offsetWidth||234)*mmScale/2, (parent.y+(pEl.offsetHeight||80))*mmScale+mmOffY);
     mmCtx.stroke();
+  });
+
+  // Co-group bars on minimap
+  coGroups.forEach(cg => {
+    const gn = cg.nodeIds.map(id=>nodes.find(n=>n.id===id)).filter(Boolean);
+    if (gn.length < 2) return;
+    if (gn.some(n=>!elOf[n.id]||isHiddenByCollapse(n.id))) return;
+    const par = nodes.find(n=>n.id===gn[0].parentId); if(!par) return;
+    const pEl = elOf[par.id]; if(!pEl) return;
+    const W=234; gn.sort((a,b)=>a.x-b.x);
+    const barY=Math.min(...gn.map(n=>n.y))-16;
+    const lCX=gn[0].x+W/2, rCX=gn[gn.length-1].x+W/2, midX=(lCX+rCX)/2;
+    mmCtx.beginPath(); mmCtx.moveTo(lCX*mmScale+mmOffX,barY*mmScale+mmOffY); mmCtx.lineTo(rCX*mmScale+mmOffX,barY*mmScale+mmOffY); mmCtx.stroke();
+    gn.forEach(n=>{ mmCtx.beginPath(); mmCtx.moveTo((n.x+W/2)*mmScale+mmOffX,barY*mmScale+mmOffY); mmCtx.lineTo((n.x+W/2)*mmScale+mmOffX,n.y*mmScale+mmOffY); mmCtx.stroke(); });
+    mmCtx.beginPath(); mmCtx.moveTo(midX*mmScale+mmOffX,barY*mmScale+mmOffY); mmCtx.lineTo((par.x+(pEl.offsetWidth||234)/2)*mmScale+mmOffX,(par.y+(pEl.offsetHeight||80))*mmScale+mmOffY); mmCtx.stroke();
   });
 
   // Nodes
@@ -1622,6 +1725,7 @@ detachBtn.addEventListener('click', () => {
   pushUndo();
   const node = nodes.find(n => n.id === detachTargetId);
   if (!node) return;
+  if (node.coGroupId) removeFromCoGroup(node.id);
   node.parentId = null;
   // Rebuild node element so it gains island styling and Connect → button
   elOf[node.id]?.remove(); delete elOf[node.id];
@@ -1762,7 +1866,7 @@ async function saveMap() {
     const title   = document.getElementById('map-name').textContent.trim();
     const savedAt = new Date().toISOString();
     await setDoc(doc(db,'argmap_maps',code), {
-      nodes: nodes.map(n=>({...n})), title, savedAt,
+      nodes: nodes.map(n=>({...n})), coGroups, title, savedAt,
     });
     currentCode=code;
     localStorage.setItem('argmap_code',code);
@@ -1795,6 +1899,8 @@ async function loadMap(code) {
     undoStack.length = 0;
     nodes.forEach(n=>{ elOf[n.id]?.remove(); delete elOf[n.id]; });
     nodes = (data.nodes||[]).map(n=>({...n}));
+    coGroups = (data.coGroups||[]).map(cg=>({...cg, nodeIds:[...cg.nodeIds]}));
+    cgCounter = coGroups.reduce((m,cg)=>Math.max(m,parseInt(cg.id.replace('cg',''))||0),0)+1;
     if (data.title) document.getElementById('map-name').textContent = data.title;
     uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
     nodes.forEach(buildNode);
@@ -1941,6 +2047,71 @@ async function loadMyMaps() {
   }
 }
 
+// ── Co-premise helpers ────────────────────────────────────────────────
+function removeFromCoGroup(nodeId) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node || !node.coGroupId) return;
+  const cgId = node.coGroupId;
+  const cg = coGroups.find(cg => cg.id === cgId);
+  if (!cg) { node.coGroupId = null; return; }
+  cg.nodeIds = cg.nodeIds.filter(id => id !== nodeId);
+  node.coGroupId = null;
+  if (cg.nodeIds.length < 2) {
+    cg.nodeIds.forEach(id => { const n=nodes.find(n=>n.id===id); if(n) n.coGroupId=null; });
+    coGroups = coGroups.filter(cg2 => cg2.id !== cgId);
+  }
+}
+
+function checkCoPremiseSnap(nodeId) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node || !node.parentId) return;
+  const W = 234, SNAP_DIST = 20;
+
+  // Leave current co-group if dragged far enough from partner
+  if (node.coGroupId) {
+    const cg = coGroups.find(cg => cg.id === node.coGroupId);
+    if (cg) {
+      const allFar = cg.nodeIds.filter(id=>id!==nodeId).every(pid => {
+        const p = nodes.find(n=>n.id===pid); if(!p) return true;
+        return Math.abs((node.x+W/2)-(p.x+W/2)) >= W+SNAP_DIST;
+      });
+      if (allFar) removeFromCoGroup(nodeId);
+    }
+  }
+  if (node.coGroupId) return; // still grouped
+
+  // Snap to nearby un-grouped sibling at the same depth level
+  const siblings = nodes.filter(n =>
+    n.parentId===node.parentId && n.id!==nodeId &&
+    !isHiddenByCollapse(n.id) && n.y===node.y && !n.coGroupId
+  );
+  for (const sib of siblings) {
+    const dist = Math.abs((node.x+W/2)-(sib.x+W/2));
+    if (dist < W+SNAP_DIST) {
+      const leftId  = node.x <= sib.x ? nodeId : sib.id;
+      const rightId = node.x <= sib.x ? sib.id : nodeId;
+      snapIntoCoPremise(leftId, rightId);
+      return;
+    }
+  }
+}
+
+function snapIntoCoPremise(leftId, rightId) {
+  const leftNode  = nodes.find(n=>n.id===leftId);
+  const rightNode = nodes.find(n=>n.id===rightId);
+  if (!leftNode||!rightNode||leftNode.coGroupId||rightNode.coGroupId) return;
+  rightNode.x = leftNode.x + 234 + 4;
+  if (elOf[rightNode.id]) {
+    elOf[rightNode.id].classList.add('layout-animate');
+    elOf[rightNode.id].style.left = rightNode.x+'px';
+    setTimeout(()=>elOf[rightNode.id]?.classList.remove('layout-animate'),280);
+  }
+  const cgId = `cg${cgCounter++}`;
+  coGroups.push({ id:cgId, nodeIds:[leftId,rightId], operator:'AND' });
+  leftNode.coGroupId  = cgId;
+  rightNode.coGroupId = cgId;
+}
+
 // ── Canvas interactions ────────────────────────────────────────────────
 viewport.addEventListener('mousedown', e=>{
   if (e.target===viewport||e.target===canvas||e.target===svgLayer) {
@@ -1969,13 +2140,16 @@ document.addEventListener('mousemove', e=>{
 
 document.addEventListener('mouseup', e=>{
   if (drag) {
-    const node=nodes.find(n=>n.id===drag.nodeId), el=elOf[drag.nodeId];
+    const nodeId=drag.nodeId;
+    const node=nodes.find(n=>n.id===nodeId), el=elOf[nodeId];
     if (node&&el&&!e.altKey&&node.type!=='draft') {
-      node.y=snapY(drag.nodeId); el.style.top=node.y+'px';
+      node.y=snapY(nodeId); el.style.top=node.y+'px';
     }
     el?.classList.remove('is-dragging');
     snapGuide.classList.remove('visible');
-    drag=null; drawConnectors();
+    drag=null;
+    checkCoPremiseSnap(nodeId);
+    drawConnectors();
     resolveOverlaps();
   }
   if (pan) { pan=null; viewport.classList.remove('is-panning'); }
