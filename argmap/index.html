@@ -6,443 +6,385 @@
 <title>Argument Mapper</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS — change these to restyle the whole app
+   DESIGN TOKENS — edit these to restyle the whole app
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Typography */
-  --font-node-text:   15px;   /* main argument text inside cards        */
-  --font-source-text: 12.5px; /* evidence source / citation field       */
-  --font-badge:       10px;   /* CONTENTION / REASON … type labels      */
-  --font-ui:          13px;   /* header, labels, panel controls         */
-  --font-hint:        11px;   /* bottom hint bar                        */
+  --font-node-text:   15px;
+  --font-source-text: 12.5px;
+  --font-badge:       10px;
+  --font-ui:          13px;
+  --font-hint:        11px;
 
-  /* Node geometry */
   --node-width:  234px;
   --node-radius: 6px;
+  --canvas-bg:   #f5f3ef;
 
-  /* Canvas */
-  --canvas-bg: #f5f3ef;
-
-  /* Type accent colours (left border stripe) */
   --c-contention: #5c6bc0;
   --c-reason:     #43a047;
   --c-objection:  #ef5350;
   --c-rebuttal:   #fb8c00;
   --c-evidence:   #00897b;
 
-  /* Type badge fills */
   --badge-contention-bg: #ede7f6;  --badge-contention-fg: #4527a0;
   --badge-reason-bg:     #e8f5e9;  --badge-reason-fg:     #2e7d32;
   --badge-objection-bg:  #ffebee;  --badge-objection-fg:  #c62828;
   --badge-rebuttal-bg:   #fff3e0;  --badge-rebuttal-fg:   #e65100;
   --badge-evidence-bg:   #e0f2f1;  --badge-evidence-fg:   #00695c;
 
-  /* Connectors */
   --connector-stroke: #cdc9c1;
   --connector-arrow:  #c9c4bb;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   RESET / BASE
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ── Reset ────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: var(--font-ui);
   background: var(--canvas-bg);
-  height: 100vh;
-  overflow: hidden;
+  height: 100vh; overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   HEADER
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ── Header ───────────────────────────────────────────────────────────── */
 .app-header {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 48px;
-  background: #fff;
-  border-bottom: 1px solid #e4e0d8;
-  display: flex;
-  align-items: center;
-  padding: 0 18px;
-  gap: 14px;
-  z-index: 300;
+  position: fixed; top: 0; left: 0; right: 0; height: 48px;
+  background: #fff; border-bottom: 1px solid #e4e0d8;
+  display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 300;
 }
-
-.app-logo {
-  font-size: var(--font-ui);
-  font-weight: 600;
-  color: #3a3a3a;
-  letter-spacing: 0.025em;
-  white-space: nowrap;
-}
-
-.header-rule {
-  width: 1px; height: 16px;
-  background: #ddd;
-  flex-shrink: 0;
-}
-
-.map-name {
-  font-size: var(--font-ui);
-  color: #999;
-  font-style: italic;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.btn-add-node {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  background: #fff;
-  font-family: 'Courier New', monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: #555;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background 0.1s, border-color 0.1s;
-}
-.btn-add-node:hover        { background: #f5f3ef; border-color: #ccc; }
-.btn-add-node.is-open      { background: #f5f3ef; border-color: #bbb; color: #333; }
-.btn-add-node-plus         { font-size: 16px; line-height: 1; color: #888; }
-
+.app-logo { font-size: var(--font-ui); font-weight: 600; color: #3a3a3a; letter-spacing:.025em; white-space:nowrap; }
+.header-rule { width:1px; height:16px; background:#ddd; flex-shrink:0; }
+.map-name { font-size: var(--font-ui); color:#999; font-style:italic; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .status-chip {
-  font-size: 10px;
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: 3px;
-  background: #f0ece4;
-  color: #999;
-  white-space: nowrap;
+  font-size:10px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; padding:3px 8px;
+  border-radius:3px; background:#f0ece4; color:#999; white-space:nowrap;
 }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   ADD-NODE PANEL (popover)
-   ═══════════════════════════════════════════════════════════════════════ */
-.add-panel {
-  position: fixed;
-  top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 390px;
-  background: #fff;
-  border: 1px solid #e0dbd3;
-  border-radius: 8px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.11), 0 0 0 0.5px rgba(0,0,0,0.05);
-  z-index: 400;
-  padding: 16px;
-  display: none;
-  flex-direction: column;
-  gap: 13px;
+/* Header buttons */
+.hdr-btn {
+  display:flex; align-items:center; gap:5px; height:28px; padding:0 10px;
+  border:1px solid #ddd; border-radius:5px; background:#fff;
+  font-family:'Courier New',monospace; font-size:10px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; color:#555;
+  cursor:pointer; white-space:nowrap; flex-shrink:0;
+  transition:background .1s, border-color .1s;
 }
-.add-panel.is-open { display: flex; }
+.hdr-btn:hover     { background:#f5f3ef; border-color:#ccc; }
+.hdr-btn.is-open   { background:#f5f3ef; border-color:#bbb; color:#333; }
+.hdr-btn.primary   { background:#3a3a3a; color:#fff; border-color:#3a3a3a; }
+.hdr-btn.primary:hover { background:#111; }
 
-.panel-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* ── Add-node panel ───────────────────────────────────────────────────── */
+.float-panel {
+  position:fixed; top:56px; left:50%; transform:translateX(-50%);
+  width:390px; background:#fff; border:1px solid #e0dbd3; border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.11); z-index:400;
+  padding:16px; display:none; flex-direction:column; gap:13px;
 }
-
-.panel-label {
-  font-size: 10px;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #aaa;
-}
-
-/* Type pills */
-.type-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
+.float-panel.is-open { display:flex; }
+.float-panel.right { left:auto; right:16px; transform:none; width:260px; }
+.panel-row { display:flex; flex-direction:column; gap:6px; }
+.panel-label { font-size:10px; font-family:'Courier New',monospace; text-transform:uppercase; letter-spacing:.1em; color:#aaa; }
+.type-pills { display:flex; flex-wrap:wrap; gap:5px; }
 .type-pill {
-  font-size: 10px;
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: 4px;
-  border: 1.5px solid transparent;
-  background: #f0ede8;
-  color: #888;
-  cursor: pointer;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  font-size:10px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; padding:4px 9px;
+  border-radius:4px; border:1.5px solid transparent;
+  background:#f0ede8; color:#888; cursor:pointer;
+  transition:background .1s,border-color .1s,color .1s;
 }
-
-.type-pill[data-type="contention"].selected { background: var(--badge-contention-bg); color: var(--badge-contention-fg); border-color: var(--c-contention); }
-.type-pill[data-type="reason"].selected     { background: var(--badge-reason-bg);     color: var(--badge-reason-fg);     border-color: var(--c-reason); }
-.type-pill[data-type="objection"].selected  { background: var(--badge-objection-bg);  color: var(--badge-objection-fg);  border-color: var(--c-objection); }
-.type-pill[data-type="rebuttal"].selected   { background: var(--badge-rebuttal-bg);   color: var(--badge-rebuttal-fg);   border-color: var(--c-rebuttal); }
-.type-pill[data-type="evidence"].selected   { background: var(--badge-evidence-bg);   color: var(--badge-evidence-fg);   border-color: var(--c-evidence); }
-
-/* Parent selector */
+.type-pill[data-type="contention"].selected { background:var(--badge-contention-bg); color:var(--badge-contention-fg); border-color:var(--c-contention); }
+.type-pill[data-type="reason"].selected     { background:var(--badge-reason-bg);     color:var(--badge-reason-fg);     border-color:var(--c-reason); }
+.type-pill[data-type="objection"].selected  { background:var(--badge-objection-bg);  color:var(--badge-objection-fg);  border-color:var(--c-objection); }
+.type-pill[data-type="rebuttal"].selected   { background:var(--badge-rebuttal-bg);   color:var(--badge-rebuttal-fg);   border-color:var(--c-rebuttal); }
+.type-pill[data-type="evidence"].selected   { background:var(--badge-evidence-bg);   color:var(--badge-evidence-fg);   border-color:var(--c-evidence); }
 .parent-select {
-  width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-family: Georgia, serif;
-  font-size: 12.5px;
-  color: #444;
-  background: #fafaf8;
-  outline: none;
-  cursor: pointer;
+  width:100%; border:1px solid #ddd; border-radius:4px; padding:6px 8px;
+  font-family:Georgia,serif; font-size:12.5px; color:#444;
+  background:#fafaf8; outline:none; cursor:pointer;
 }
-.parent-select:focus { border-color: #aaa; }
-
-/* Text entry */
+.parent-select:focus { border-color:#aaa; }
 .panel-textarea {
-  width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 7px 9px;
-  font-family: Georgia, serif;
-  font-size: var(--font-node-text);
-  line-height: 1.55;
-  color: #2d2d2d;
-  background: #fafaf8;
-  resize: none;
-  outline: none;
-  min-height: 62px;
-  overflow: hidden;
+  width:100%; border:1px solid #ddd; border-radius:4px; padding:7px 9px;
+  font-family:Georgia,serif; font-size:var(--font-node-text); line-height:1.55;
+  color:#2d2d2d; background:#fafaf8; resize:none; outline:none; min-height:62px; overflow:hidden;
 }
-.panel-textarea:focus      { border-color: #aaa; }
-.panel-textarea::placeholder { color: #ccc; }
-
-/* Source row (evidence only) */
-.source-panel-row { display: none; }
-.source-panel-row.visible { display: flex; flex-direction: column; gap: 6px; }
-
+.panel-textarea:focus { border-color:#aaa; }
+.panel-textarea::placeholder { color:#ccc; }
+.source-panel-row { display:none; }
+.source-panel-row.visible { display:flex; flex-direction:column; gap:6px; }
 .panel-input {
-  width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-family: 'Courier New', monospace;
-  font-size: var(--font-source-text);
-  color: #555;
-  background: #fafaf8;
-  outline: none;
+  width:100%; border:1px solid #ddd; border-radius:4px; padding:6px 8px;
+  font-family:'Courier New',monospace; font-size:var(--font-source-text);
+  color:#555; background:#fafaf8; outline:none;
 }
-.panel-input:focus      { border-color: #aaa; }
-.panel-input::placeholder { color: #ccc; }
-
-/* Footer buttons */
-.panel-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 2px;
-}
-
+.panel-input:focus { border-color:#aaa; }
+.panel-input::placeholder { color:#ccc; }
+.panel-footer { display:flex; justify-content:flex-end; gap:8px; padding-top:2px; }
 .btn-cancel {
-  height: 32px;
-  padding: 0 14px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  background: transparent;
-  font-family: 'Courier New', monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #999;
-  cursor: pointer;
-  transition: background 0.1s;
+  height:32px; padding:0 14px; border:1px solid #ddd; border-radius:5px;
+  background:transparent; font-family:'Courier New',monospace; font-size:10.5px;
+  font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:#999; cursor:pointer; transition:background .1s;
 }
-.btn-cancel:hover { background: #f5f3ef; }
-
+.btn-cancel:hover { background:#f5f3ef; }
 .btn-confirm {
-  height: 32px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 5px;
-  background: #3a3a3a;
-  font-family: 'Courier New', monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.1s;
+  height:32px; padding:0 16px; border:none; border-radius:5px; background:#3a3a3a;
+  font-family:'Courier New',monospace; font-size:10.5px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase; color:#fff; cursor:pointer;
+  transition:background .1s;
 }
-.btn-confirm:hover { background: #111; }
+.btn-confirm:hover { background:#111; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   VIEWPORT & CANVAS
-   ═══════════════════════════════════════════════════════════════════════ */
-.viewport {
-  position: fixed;
-  top: 48px; left: 0; right: 0; bottom: 0;
-  overflow: hidden;
-  cursor: default;
+/* ── Load panel ───────────────────────────────────────────────────────── */
+#load-panel { top:56px; right:16px; left:auto; transform:none; width:280px; }
+.load-row { display:flex; gap:8px; align-items:center; }
+.code-input {
+  flex:1; border:1px solid #ddd; border-radius:4px; padding:6px 10px;
+  font-family:'Courier New',monospace; font-size:14px; font-weight:700;
+  letter-spacing:.15em; text-transform:uppercase; color:#333;
+  background:#fafaf8; outline:none;
 }
-.viewport.is-panning { cursor: grabbing !important; }
+.code-input:focus { border-color:#aaa; }
+
+/* ── Modals ───────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:490; display:none;
+}
+.modal-backdrop.visible { display:block; }
+.modal {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:#fff; border:1px solid #e0dbd3; border-radius:8px;
+  box-shadow:0 8px 32px rgba(0,0,0,.15); z-index:500;
+  padding:24px; width:580px; max-width:92vw;
+  display:none; flex-direction:column; gap:16px;
+}
+.modal.visible { display:flex; }
+.modal-title {
+  font-size:11px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:#888;
+}
+.modal-footer { display:flex; justify-content:flex-end; gap:8px; }
+
+/* Export modal */
+.export-pre {
+  background:#fafaf8; border:1px solid #e8e4dc; border-radius:4px;
+  padding:14px 16px; font-family:'Courier New',monospace; font-size:12px;
+  line-height:1.7; color:#444; white-space:pre; overflow:auto;
+  max-height:52vh; min-height:160px; flex:1;
+}
+
+/* Code modal */
+.code-display {
+  font-size:32px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.3em; color:#3a3a3a; text-align:center;
+  padding:18px; background:#f5f3ef; border-radius:6px;
+  border:1px solid #e0dbd3; user-select:all;
+}
+.code-sub { font-size:12px; color:#999; font-style:italic; text-align:center; }
+
+/* ── Viewport & Canvas ────────────────────────────────────────────────── */
+.viewport {
+  position:fixed; top:48px; left:0; right:0; bottom:0;
+  overflow:hidden; cursor:default;
+}
+.viewport.is-panning { cursor:grabbing !important; }
+.viewport.connection-mode { cursor:crosshair !important; }
 
 .canvas {
-  position: absolute;
-  top: 0; left: 0;
-  transform-origin: 0 0;
-  will-change: transform;
+  position:absolute; top:0; left:0;
+  transform-origin:0 0; will-change:transform;
 }
-
 .connector-svg {
-  position: absolute;
-  top: 0; left: 0;
-  width: 0; height: 0;
-  overflow: visible;
-  pointer-events: none;
+  position:absolute; top:0; left:0; width:0; height:0;
+  overflow:visible; pointer-events:none;
 }
-
 .snap-guide {
-  position: absolute;
-  left: -2000px; width: 8000px;
-  height: 0;
-  border-top: 1.5px dashed rgba(90, 130, 190, 0.35);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  z-index: 4;
+  position:absolute; left:-2000px; width:8000px; height:0;
+  border-top:1.5px dashed rgba(90,130,190,.35);
+  pointer-events:none; opacity:0; transition:opacity .1s ease; z-index:4;
 }
-.snap-guide.visible { opacity: 1; }
+.snap-guide.visible { opacity:1; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   NODE CARDS
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ── Node cards ───────────────────────────────────────────────────────── */
 .node {
-  position: absolute;
-  width: var(--node-width);
-  background: #fff;
-  border: 1px solid #e2dfd8;
-  border-radius: var(--node-radius);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 1px rgba(0,0,0,0.04);
-  cursor: move;
-  transition: box-shadow 0.15s ease;
-  user-select: none;
+  position:absolute; width:var(--node-width); background:#fff;
+  border:1px solid #e2dfd8; border-radius:var(--node-radius);
+  box-shadow:0 1px 3px rgba(0,0,0,.07), 0 0 1px rgba(0,0,0,.04);
+  cursor:move; transition:box-shadow .15s ease, outline .1s ease;
+  user-select:none;
 }
-.node:hover       { box-shadow: 0 2px 10px rgba(0,0,0,0.10), 0 0 1px rgba(0,0,0,0.04); }
-.node.is-dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.14), 0 0 1px rgba(0,0,0,0.06); z-index: 50; }
+.node:hover       { box-shadow:0 2px 10px rgba(0,0,0,.10), 0 0 1px rgba(0,0,0,.04); }
+.node.is-dragging { box-shadow:0 8px 24px rgba(0,0,0,.14); z-index:50; }
 
-.node[data-type="contention"] { border-left: 4px solid var(--c-contention); }
-.node[data-type="reason"]     { border-left: 4px solid var(--c-reason); }
-.node[data-type="objection"]  { border-left: 4px solid var(--c-objection); }
-.node[data-type="rebuttal"]   { border-left: 4px solid var(--c-rebuttal); }
-.node[data-type="evidence"]   { border-left: 4px solid var(--c-evidence); }
+/* Accent stripe */
+.node[data-type="contention"] { border-left:4px solid var(--c-contention); }
+.node[data-type="reason"]     { border-left:4px solid var(--c-reason); }
+.node[data-type="objection"]  { border-left:4px solid var(--c-objection); }
+.node[data-type="rebuttal"]   { border-left:4px solid var(--c-rebuttal); }
+.node[data-type="evidence"]   { border-left:4px solid var(--c-evidence); }
+
+/* Draft / island node */
+.node[data-type="draft"] {
+  border:1.5px dashed #c8c4bc !important;
+  background:#fdfcfa;
+}
+
+/* Connection mode highlighting */
+.node.connectable {
+  outline:2px solid rgba(90,140,220,.45);
+  outline-offset:3px;
+  cursor:pointer !important;
+}
+.node.connectable:hover { outline-color:rgba(90,140,220,.85); }
 
 .node-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 7px 6px 9px;
-  border-bottom: 1px solid #f0ece5;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 7px 6px 9px; border-bottom:1px solid #f0ece5;
 }
-
 .type-badge {
-  font-size: var(--font-badge);
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 3px;
-  line-height: 1.5;
+  font-size:var(--font-badge); font-family:'Courier New',Courier,monospace;
+  font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:3px; line-height:1.5;
 }
-
-.node[data-type="contention"] .type-badge { background: var(--badge-contention-bg); color: var(--badge-contention-fg); }
-.node[data-type="reason"]     .type-badge { background: var(--badge-reason-bg);     color: var(--badge-reason-fg); }
-.node[data-type="objection"]  .type-badge { background: var(--badge-objection-bg);  color: var(--badge-objection-fg); }
-.node[data-type="rebuttal"]   .type-badge { background: var(--badge-rebuttal-bg);   color: var(--badge-rebuttal-fg); }
-.node[data-type="evidence"]   .type-badge { background: var(--badge-evidence-bg);   color: var(--badge-evidence-fg); }
+.node[data-type="contention"] .type-badge { background:var(--badge-contention-bg); color:var(--badge-contention-fg); }
+.node[data-type="reason"]     .type-badge { background:var(--badge-reason-bg);     color:var(--badge-reason-fg); }
+.node[data-type="objection"]  .type-badge { background:var(--badge-objection-bg);  color:var(--badge-objection-fg); }
+.node[data-type="rebuttal"]   .type-badge { background:var(--badge-rebuttal-bg);   color:var(--badge-rebuttal-fg); }
+.node[data-type="evidence"]   .type-badge { background:var(--badge-evidence-bg);   color:var(--badge-evidence-fg); }
+.node[data-type="draft"]      .type-badge { background:#f0ede8; color:#b0aba3; }
 
 .btn-delete {
-  width: 20px; height: 20px;
-  border: none; background: transparent; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 4px;
-  color: #ccc; font-size: 16px; line-height: 1; padding: 0; flex-shrink: 0;
-  transition: color 0.12s, background 0.12s;
+  width:20px; height:20px; border:none; background:transparent; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:4px; color:#ccc; font-size:16px; line-height:1; padding:0; flex-shrink:0;
+  transition:color .12s, background .12s;
 }
-.btn-delete:hover { color: #ef5350; background: #fff2f2; }
+.btn-delete:hover { color:#ef5350; background:#fff2f2; }
 
-.node-body { padding: 8px 10px 10px 9px; }
-
+.node-body { padding:8px 10px 10px 9px; }
 .node-text {
-  width: 100%;
-  border: none; outline: none; resize: none; background: transparent;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: var(--font-node-text);
-  line-height: 1.6; color: #2d2d2d;
-  cursor: text; overflow: hidden; min-height: 42px; display: block;
+  width:100%; border:none; outline:none; resize:none; background:transparent;
+  font-family:Georgia,'Times New Roman',serif; font-size:var(--font-node-text);
+  line-height:1.6; color:#2d2d2d; cursor:text; overflow:hidden; min-height:42px; display:block;
 }
-.node-text::placeholder { color: #d0cbc3; }
-
-.source-row {
-  margin-top: 8px; padding-top: 8px;
-  border-top: 1px solid #f0ece5;
-}
-.source-label {
-  font-size: 9px; font-family: 'Courier New', monospace;
-  text-transform: uppercase; letter-spacing: 0.12em;
-  color: #bbb; margin-bottom: 3px;
-}
+.node-text::placeholder { color:#d0cbc3; }
+.source-row { margin-top:8px; padding-top:8px; border-top:1px solid #f0ece5; }
+.source-label { font-size:9px; font-family:'Courier New',monospace; text-transform:uppercase; letter-spacing:.12em; color:#bbb; margin-bottom:3px; }
 .source-input {
-  width: 100%;
-  border: none; outline: none; background: transparent;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: var(--font-source-text);
-  color: #777; line-height: 1.45; cursor: text;
+  width:100%; border:none; outline:none; background:transparent;
+  font-family:'Courier New',Courier,monospace; font-size:var(--font-source-text);
+  color:#777; line-height:1.45; cursor:text;
 }
-.source-input::placeholder { color: #d0cbc3; }
+.source-input::placeholder { color:#d0cbc3; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   ZOOM PANEL & HINT
-   ═══════════════════════════════════════════════════════════════════════ */
+/* Draft node footer (connect button) */
+.island-footer {
+  margin-top:8px; padding-top:8px; border-top:1px solid #f0ece5;
+  display:flex; align-items:center; gap:8px;
+}
+.btn-connect {
+  font-family:'Courier New',monospace; font-size:10px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; padding:4px 10px;
+  border:1px solid #ddd; border-radius:4px; background:transparent;
+  color:#888; cursor:pointer; transition:all .1s;
+}
+.btn-connect:hover  { background:#f5f3ef; border-color:#bbb; color:#555; }
+.btn-connect.active { background:#e8f0fb; border-color:#7c9ef5; color:#3451c7; }
+
+/* ── Hover strip (fixed viewport-space overlay) ───────────────────────── */
+#hover-strip {
+  position:fixed; display:flex; gap:7px; z-index:250;
+  transform:translateX(-50%);
+  opacity:0; pointer-events:none; transition:opacity .12s ease;
+}
+#hover-strip.visible { opacity:1; pointer-events:auto; }
+
+.strip-btn {
+  position:relative; width:28px; height:28px; border-radius:50%;
+  border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.18);
+  transition:transform .1s, box-shadow .1s;
+}
+.strip-btn:hover { transform:scale(1.18); box-shadow:0 3px 10px rgba(0,0,0,.25); }
+.strip-btn[data-type="contention"] { background:var(--c-contention); }
+.strip-btn[data-type="reason"]     { background:var(--c-reason); }
+.strip-btn[data-type="objection"]  { background:var(--c-objection); }
+.strip-btn[data-type="rebuttal"]   { background:var(--c-rebuttal); }
+.strip-btn[data-type="evidence"]   { background:var(--c-evidence); }
+/* CSS tooltip */
+.strip-btn::after {
+  content: attr(data-label);
+  position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:rgba(30,30,30,.85); color:#fff;
+  font-size:9.5px; font-family:'Courier New',monospace; letter-spacing:.07em;
+  padding:2px 7px; border-radius:3px; white-space:nowrap;
+  opacity:0; pointer-events:none; transition:opacity .1s;
+}
+.strip-btn:hover::after { opacity:1; }
+
+/* ── Connection mode type picker (fixed viewport-space) ───────────────── */
+#conn-picker {
+  position:fixed; display:flex; flex-direction:column; gap:4px;
+  background:#fff; border:1px solid #e0dbd3; border-radius:6px;
+  padding:8px 10px; box-shadow:0 4px 16px rgba(0,0,0,.13);
+  z-index:450; opacity:0; pointer-events:none; transition:opacity .1s;
+  min-width:120px;
+}
+#conn-picker.visible { opacity:1; pointer-events:auto; }
+#conn-picker-label {
+  font-size:9px; font-family:'Courier New',monospace; text-transform:uppercase;
+  letter-spacing:.1em; color:#aaa; margin-bottom:2px;
+}
+.conn-type-btn {
+  font-size:10px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; padding:5px 9px;
+  border-radius:4px; border:1.5px solid transparent; cursor:pointer;
+  text-align:left; transition:background .1s;
+}
+.conn-type-btn[data-type="contention"] { background:var(--badge-contention-bg); color:var(--badge-contention-fg); }
+.conn-type-btn[data-type="reason"]     { background:var(--badge-reason-bg);     color:var(--badge-reason-fg); }
+.conn-type-btn[data-type="objection"]  { background:var(--badge-objection-bg);  color:var(--badge-objection-fg); }
+.conn-type-btn[data-type="rebuttal"]   { background:var(--badge-rebuttal-bg);   color:var(--badge-rebuttal-fg); }
+.conn-type-btn[data-type="evidence"]   { background:var(--badge-evidence-bg);   color:var(--badge-evidence-fg); }
+
+/* ── Connection hint bar ──────────────────────────────────────────────── */
+#conn-hint {
+  position:fixed; top:58px; left:50%; transform:translateX(-50%);
+  background:rgba(44,66,140,.88); color:#fff;
+  font-family:'Courier New',monospace; font-size:11px; letter-spacing:.05em;
+  padding:6px 16px; border-radius:4px; z-index:450;
+  display:none; pointer-events:none;
+}
+#conn-hint.visible { display:block; }
+
+/* ── Zoom & hint ──────────────────────────────────────────────────────── */
 .zoom-panel {
-  position: fixed; bottom: 22px; right: 22px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  z-index: 300;
+  position:fixed; bottom:22px; right:22px;
+  display:flex; flex-direction:column; align-items:center; gap:4px; z-index:300;
 }
 .zoom-btn {
-  width: 30px; height: 30px;
-  border: 1px solid #ddd; background: #fff; border-radius: 5px;
-  cursor: pointer; font-size: 18px; color: #666;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
-  transition: background 0.1s; flex-shrink: 0;
+  width:30px; height:30px; border:1px solid #ddd; background:#fff;
+  border-radius:5px; cursor:pointer; font-size:18px; color:#666;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.07); transition:background .1s;
 }
-.zoom-btn:hover { background: #f5f3ef; }
-.zoom-readout {
-  font-size: 10px; font-family: 'Courier New', monospace;
-  color: #bbb; letter-spacing: 0.04em;
+.zoom-btn:hover { background:#f5f3ef; }
+.zoom-readout { font-size:10px; font-family:'Courier New',monospace; color:#bbb; letter-spacing:.04em; }
+.hint {
+  position:fixed; bottom:18px; left:22px;
+  font-size:var(--font-hint); font-family:'Courier New',monospace;
+  color:#c8c4bc; line-height:1.8; z-index:300; pointer-events:none;
 }
 
-.hint {
-  position: fixed; bottom: 18px; left: 22px;
-  font-size: var(--font-hint); font-family: 'Courier New', monospace;
-  color: #c8c4bc; line-height: 1.8; z-index: 300; pointer-events: none;
+/* ── Toast ────────────────────────────────────────────────────────────── */
+#toast {
+  position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
+  background:#333; color:#fff; font-family:'Courier New',monospace; font-size:11px;
+  padding:8px 18px; border-radius:5px; z-index:600;
+  opacity:0; transition:opacity .2s; pointer-events:none;
 }
+#toast.visible { opacity:1; }
 </style>
 </head>
 <body>
@@ -450,16 +392,17 @@ body {
 <header class="app-header">
   <div class="app-logo">Argument Mapper</div>
   <div class="header-rule"></div>
-  <div class="map-name">Should governments intervene in markets to correct market failures?</div>
-  <button class="btn-add-node" id="btn-add-node">
-    <span class="btn-add-node-plus">+</span> Add Node
-  </button>
-  <div class="status-chip">Draft</div>
+  <div class="map-name" id="map-name">Should governments intervene in markets to correct market failures?</div>
+  <button class="hdr-btn" id="btn-add-node"><span style="font-size:14px;line-height:1">+</span> Node</button>
+  <button class="hdr-btn" id="btn-add-island"><span style="font-size:14px;line-height:1">+</span> Draft</button>
+  <button class="hdr-btn" id="btn-export">Export</button>
+  <button class="hdr-btn primary" id="btn-save">Save</button>
+  <button class="hdr-btn" id="btn-load">Load</button>
+  <div class="status-chip" id="status-chip">Draft</div>
 </header>
 
-<!-- ── Add-node popover ───────────────────────────────────────────────── -->
-<div class="add-panel" id="add-panel">
-
+<!-- Add-node panel -->
+<div class="float-panel" id="add-panel">
   <div class="panel-row">
     <div class="panel-label">Type</div>
     <div class="type-pills" id="type-pills">
@@ -470,38 +413,80 @@ body {
       <button class="type-pill" data-type="contention">Contention</button>
     </div>
   </div>
-
   <div class="panel-row">
     <div class="panel-label">Connects to</div>
     <select class="parent-select" id="parent-select"></select>
   </div>
-
   <div class="panel-row">
     <div class="panel-label">Argument</div>
-    <textarea class="panel-textarea" id="panel-text"
-              placeholder="Write the argument for this node…" rows="3"></textarea>
+    <textarea class="panel-textarea" id="panel-text" placeholder="Write the argument for this node…" rows="3"></textarea>
   </div>
-
   <div class="source-panel-row panel-row" id="source-panel-row">
     <div class="panel-label">Source / Citation</div>
-    <input class="panel-input" id="panel-source" type="text"
-           placeholder="Author (Year) — description">
+    <input class="panel-input" id="panel-source" type="text" placeholder="Author (Year) — description">
   </div>
-
   <div class="panel-footer">
-    <button class="btn-cancel" id="btn-cancel">Cancel</button>
-    <button class="btn-confirm" id="btn-confirm">Add to map</button>
+    <button class="btn-cancel" id="btn-add-cancel">Cancel</button>
+    <button class="btn-confirm" id="btn-add-confirm">Add to map</button>
   </div>
-
 </div>
 
-<!-- ── Main canvas ────────────────────────────────────────────────────── -->
+<!-- Load panel -->
+<div class="float-panel" id="load-panel">
+  <div class="panel-row">
+    <div class="panel-label">Enter your 6-character code</div>
+    <div class="load-row">
+      <input class="code-input" id="code-input" type="text" maxlength="6" placeholder="ABC123">
+      <button class="btn-confirm" id="btn-load-confirm">Load</button>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <button class="btn-cancel" id="btn-load-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Export modal -->
+<div class="modal-backdrop" id="export-backdrop"></div>
+<div class="modal" id="export-modal">
+  <div class="modal-title">Export — Argument Outline</div>
+  <pre class="export-pre" id="export-pre"></pre>
+  <div class="modal-footer">
+    <button class="btn-cancel" id="btn-export-dl-md">Download .md</button>
+    <button class="btn-cancel" id="btn-export-dl-txt">Download .txt</button>
+    <button class="btn-confirm" id="btn-export-copy">Copy to clipboard</button>
+    <button class="btn-cancel" id="btn-export-close">Close</button>
+  </div>
+</div>
+
+<!-- Code modal (shown after save) -->
+<div class="modal-backdrop" id="code-backdrop"></div>
+<div class="modal" id="code-modal">
+  <div class="modal-title">Map saved</div>
+  <div class="code-display" id="code-display">------</div>
+  <div class="code-sub">Write this code down to return to your map. Bookmark this page to save it automatically.</div>
+  <div class="modal-footer">
+    <button class="btn-confirm" id="btn-copy-code">Copy code</button>
+    <button class="btn-cancel" id="btn-close-code">Close</button>
+  </div>
+</div>
+
+<!-- Hover strip (viewport-space) -->
+<div id="hover-strip"></div>
+
+<!-- Connection mode type picker (viewport-space) -->
+<div id="conn-picker">
+  <div id="conn-picker-label">Classify as</div>
+</div>
+
+<!-- Connection mode hint -->
+<div id="conn-hint">Click a node to connect it · Esc to cancel</div>
+
+<!-- Canvas -->
 <div class="viewport" id="viewport">
   <div class="canvas" id="canvas">
     <svg class="connector-svg" id="svg-layer">
       <defs>
-        <marker id="arrow" markerWidth="8" markerHeight="6"
-                refX="8" refY="3" orient="auto">
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
           <polygon points="0 0, 8 3, 0 6" fill="var(--connector-arrow)"/>
         </marker>
       </defs>
@@ -517,187 +502,230 @@ body {
 </div>
 
 <div class="hint">
-  Drag nodes &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Alt+drag for free vertical
+  Drag nodes &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Alt+drag: free vertical
 </div>
+<div id="toast"></div>
 
-<script>
-'use strict';
+<script type="module">
+import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc }
+                                from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-/* ── Initial data ──────────────────────────────────────────────────────── */
+// ── Firebase (financehub project) ─────────────────────────────────────
+// Firestore rules needed: allow read, write on /argmap_maps/{code}
+const fbApp = initializeApp({
+  apiKey:            'AIzaSyBad5uovt_JcF8Z7mjIg0rlrcrHlSCPYWs',
+  authDomain:        'financehub-58eb2.firebaseapp.com',
+  projectId:         'financehub-58eb2',
+  storageBucket:     'financehub-58eb2.firebasestorage.app',
+  messagingSenderId: '98813964924',
+  appId:             '1:98813964924:web:e247f54da079ba99354ff9',
+}, 'argmap');
+const db = getFirestore(fbApp);
+
+// ── Initial data ───────────────────────────────────────────────────────
 const INITIAL_NODES = [
-  { id: 'n0', type: 'contention', parentId: null,
-    text: 'Governments should intervene in markets to correct market failures.',
-    source: '', x: 386, y: 50 },
-  { id: 'n1', type: 'reason', parentId: 'n0',
-    text: 'Markets underprovide public goods due to the free-rider problem.',
-    source: '', x: 100, y: 280 },
-  { id: 'n2', type: 'reason', parentId: 'n0',
-    text: 'Negative externalities lead to overconsumption without intervention.',
-    source: '', x: 690, y: 280 },
-  { id: 'n3', type: 'evidence', parentId: 'n1',
-    text: 'Demonstrates the inevitability of underprovision in competitive markets.',
-    source: 'Samuelson (1954) — public goods theory', x: -20, y: 510 },
-  { id: 'n4', type: 'objection', parentId: 'n1',
-    text: 'Private provision can emerge through voluntary mechanisms (Coase).',
-    source: '', x: 270, y: 510 },
-  { id: 'n5', type: 'rebuttal', parentId: 'n4',
-    text: 'Transaction costs make voluntary provision inefficient at scale.',
-    source: '', x: 270, y: 730 },
-  { id: 'n6', type: 'evidence', parentId: 'n2',
-    text: 'Provides the theoretical basis for corrective Pigouvian taxes.',
-    source: 'Pigou (1920) — externality tax framework', x: 690, y: 510 },
+  { id:'n0', type:'contention', parentId:null,
+    text:'Governments should intervene in markets to correct market failures.', source:'', x:386, y:50 },
+  { id:'n1', type:'reason', parentId:'n0',
+    text:'Markets underprovide public goods due to the free-rider problem.', source:'', x:100, y:280 },
+  { id:'n2', type:'reason', parentId:'n0',
+    text:'Negative externalities lead to overconsumption without intervention.', source:'', x:690, y:280 },
+  { id:'n3', type:'evidence', parentId:'n1',
+    text:'Demonstrates the inevitability of underprovision in competitive markets.',
+    source:'Samuelson (1954) — public goods theory', x:-20, y:510 },
+  { id:'n4', type:'objection', parentId:'n1',
+    text:'Private provision can emerge through voluntary mechanisms (Coase).', source:'', x:270, y:510 },
+  { id:'n5', type:'rebuttal', parentId:'n4',
+    text:'Transaction costs make voluntary provision inefficient at scale.', source:'', x:270, y:730 },
+  { id:'n6', type:'evidence', parentId:'n2',
+    text:'Provides the theoretical basis for corrective Pigouvian taxes.',
+    source:'Pigou (1920) — externality tax framework', x:690, y:510 },
 ];
 
-/* Snap y-coordinate per tree depth (canvas-space pixels) */
-const SNAP_LEVELS = [50, 280, 510, 730, 950, 1170];
+const SNAP_LEVELS   = [50, 280, 510, 730, 950, 1170];
+const VALID_CHILDREN = {
+  contention: ['reason', 'objection', 'evidence'],
+  reason:     ['reason', 'objection', 'evidence'],
+  objection:  ['rebuttal', 'evidence'],
+  rebuttal:   ['evidence'],
+  evidence:   [],
+  draft:      [],
+};
+const TYPE_LABEL = {
+  contention:'Contention', reason:'Reason', objection:'Objection',
+  rebuttal:'Rebuttal', evidence:'Evidence', draft:'Draft',
+};
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-/* ── State ─────────────────────────────────────────────────────────────── */
-let nodes = INITIAL_NODES.map(n => ({ ...n }));
-let uidCounter = 10;
-const elOf = {};
-let tx = 90, ty = 36, sc = 1;
-let drag = null; // { nodeId, ox, oy }
-let pan  = null; // { cx0, cy0, tx0, ty0 }
+// ── State ──────────────────────────────────────────────────────────────
+let nodes       = INITIAL_NODES.map(n => ({...n}));
+let uidCounter  = 10;
+const elOf      = {};
+let tx=90, ty=36, sc=1;
+let drag        = null; // {nodeId, ox, oy}
+let pan         = null; // {cx0, cy0, tx0, ty0}
+let connectionSrc = null; // nodeId of island being connected
+let pendingConnTarget = null; // nodeId of chosen parent during connection
+let currentHoverNode  = null;
+let currentCode       = null;
 
-/* ── DOM refs ──────────────────────────────────────────────────────────── */
+// ── DOM refs ───────────────────────────────────────────────────────────
 const viewport    = document.getElementById('viewport');
 const canvas      = document.getElementById('canvas');
 const svgLayer    = document.getElementById('svg-layer');
 const snapGuide   = document.getElementById('snap-guide');
 const zoomReadout = document.getElementById('zoom-readout');
+const hoverStrip  = document.getElementById('hover-strip');
+const connPicker  = document.getElementById('conn-picker');
+const connHint    = document.getElementById('conn-hint');
+const toastEl     = document.getElementById('toast');
 
-const btnAddNode    = document.getElementById('btn-add-node');
-const addPanel      = document.getElementById('add-panel');
-const typePillsEl   = document.getElementById('type-pills');
-const parentSelect  = document.getElementById('parent-select');
-const panelText     = document.getElementById('panel-text');
-const sourcePanelRow= document.getElementById('source-panel-row');
-const panelSource   = document.getElementById('panel-source');
-const btnCancel     = document.getElementById('btn-cancel');
-const btnConfirm    = document.getElementById('btn-confirm');
-
-/* ── Transform helpers ─────────────────────────────────────────────────── */
+// ── Transform ─────────────────────────────────────────────────────────
 function applyTransform() {
   canvas.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`;
-  zoomReadout.textContent = Math.round(sc * 100) + '%';
+  zoomReadout.textContent = Math.round(sc*100)+'%';
+  updateStripPosition();
 }
 
 function toCanvas(cx, cy) {
   const r = viewport.getBoundingClientRect();
-  return { x: (cx - r.left - tx) / sc, y: (cy - r.top - ty) / sc };
+  return { x:(cx-r.left-tx)/sc, y:(cy-r.top-ty)/sc };
 }
 
-/* ── Tree helpers ──────────────────────────────────────────────────────── */
+function toViewport(cx, cy) {
+  const r = viewport.getBoundingClientRect();
+  return { x: cx*sc + tx + r.left, y: cy*sc + ty + r.top };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
 function nodeDepth(id) {
-  const n = nodes.find(n => n.id === id);
-  if (!n || !n.parentId) return 0;
+  const n = nodes.find(n => n.id===id);
+  if (!n||!n.parentId) return 0;
   return 1 + nodeDepth(n.parentId);
 }
+function snapY(id) { return SNAP_LEVELS[Math.min(nodeDepth(id), SNAP_LEVELS.length-1)]; }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function autoResize(ta) { ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
+function truncate(s,len=48) { return s.length>len ? s.slice(0,len)+'…' : s; }
 
-function snapY(id) {
-  return SNAP_LEVELS[Math.min(nodeDepth(id), SNAP_LEVELS.length - 1)];
+function showToast(msg, ms=2200) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('visible');
+  setTimeout(() => toastEl.classList.remove('visible'), ms);
 }
 
-/* ── Utilities ─────────────────────────────────────────────────────────── */
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function viewportCenter() {
+  const r = viewport.getBoundingClientRect();
+  return { x:(r.width/2-tx)/sc - 117, y:(r.height/2-ty)/sc - 40 };
 }
 
-function autoResize(ta) {
-  ta.style.height = 'auto';
-  ta.style.height = ta.scrollHeight + 'px';
-}
-
-function truncate(s, len = 46) {
-  return s.length > len ? s.slice(0, len) + '…' : s;
-}
-
-/* ── Connector drawing ─────────────────────────────────────────────────── */
+// ── Connectors ─────────────────────────────────────────────────────────
 function drawConnectors() {
   while (svgLayer.childNodes.length > 1) svgLayer.removeChild(svgLayer.lastChild);
-
   for (const node of nodes) {
     if (!node.parentId) continue;
-    const parent = nodes.find(n => n.id === node.parentId);
+    const parent = nodes.find(n => n.id===node.parentId);
     if (!parent) continue;
-    const cEl = elOf[node.id], pEl = elOf[parent.id];
-    if (!cEl || !pEl) continue;
-
-    const cw = cEl.offsetWidth  || 234;
-    const ph = pEl.offsetHeight || 80;
-    const pw = pEl.offsetWidth  || 234;
-
-    const x1 = node.x   + cw / 2, y1 = node.y;
-    const x2 = parent.x + pw / 2, y2 = parent.y + ph;
-
-    const stretch = Math.max(40, Math.abs(y1 - y2) * 0.42);
-    const d = `M${x1},${y1} C${x1},${y1-stretch} ${x2},${y2+stretch} ${x2},${y2}`;
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'var(--connector-stroke)');
-    path.setAttribute('stroke-width', '1.5');
-    path.setAttribute('marker-end', 'url(#arrow)');
+    const cEl=elOf[node.id], pEl=elOf[parent.id];
+    if (!cEl||!pEl) continue;
+    const cw=cEl.offsetWidth||234, ph=pEl.offsetHeight||80, pw=pEl.offsetWidth||234;
+    const x1=node.x+cw/2, y1=node.y;
+    const x2=parent.x+pw/2, y2=parent.y+ph;
+    const stretch=Math.max(40,Math.abs(y1-y2)*.42);
+    const d=`M${x1},${y1} C${x1},${y1-stretch} ${x2},${y2+stretch} ${x2},${y2}`;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',d); path.setAttribute('fill','none');
+    path.setAttribute('stroke','var(--connector-stroke)'); path.setAttribute('stroke-width','1.5');
+    path.setAttribute('marker-end','url(#arrow)');
     svgLayer.appendChild(path);
   }
 }
 
-/* ── Build a node card ─────────────────────────────────────────────────── */
-const TYPE_LABEL = {
-  contention: 'Contention', reason: 'Reason',
-  objection: 'Objection', rebuttal: 'Rebuttal', evidence: 'Evidence',
-};
-
+// ── Build node card ────────────────────────────────────────────────────
 function buildNode(node) {
   const el = document.createElement('div');
-  el.className = 'node';
+  el.className  = 'node';
   el.dataset.type = node.type;
   el.dataset.id   = node.id;
-  el.style.left   = node.x + 'px';
-  el.style.top    = node.y + 'px';
+  el.style.left   = node.x+'px';
+  el.style.top    = node.y+'px';
 
-  const isEv = node.type === 'evidence';
+  const isEv    = node.type==='evidence';
+  const isDraft = node.type==='draft';
+
   el.innerHTML = `
     <div class="node-head">
       <span class="type-badge">${TYPE_LABEL[node.type]}</span>
-      <button class="btn-delete" title="Delete node">×</button>
+      <button class="btn-delete" title="Delete">×</button>
     </div>
     <div class="node-body">
-      <textarea class="node-text" placeholder="Write your argument…" rows="2">${escHtml(node.text)}</textarea>
+      <textarea class="node-text" placeholder="${isDraft?'Draft idea…':'Write your argument…'}" rows="2">${escHtml(node.text)}</textarea>
       ${isEv ? `<div class="source-row">
         <div class="source-label">Source</div>
-        <input class="source-input" type="text"
-               placeholder="Author (Year) — description"
-               value="${escHtml(node.source || '')}">
+        <input class="source-input" type="text" placeholder="Author (Year) — description" value="${escHtml(node.source||'')}">
+      </div>` : ''}
+      ${isDraft ? `<div class="island-footer">
+        <button class="btn-connect" data-id="${node.id}">Connect →</button>
       </div>` : ''}
     </div>`;
 
   const ta = el.querySelector('.node-text');
   autoResize(ta);
-  ta.addEventListener('input', () => { node.text = ta.value; autoResize(ta); drawConnectors(); });
+  ta.addEventListener('input', () => { node.text=ta.value; autoResize(ta); drawConnectors(); });
 
   if (isEv) {
     const si = el.querySelector('.source-input');
-    si.addEventListener('input', () => { node.source = si.value; });
+    si.addEventListener('input', () => { node.source=si.value; });
+  }
+
+  if (isDraft) {
+    const btnC = el.querySelector('.btn-connect');
+    btnC.addEventListener('mousedown', e => e.stopPropagation());
+    btnC.addEventListener('click', e => { e.stopPropagation(); toggleConnectionMode(node.id); });
   }
 
   const delBtn = el.querySelector('.btn-delete');
   delBtn.addEventListener('mousedown', e => e.stopPropagation());
   delBtn.addEventListener('click', e => { e.stopPropagation(); removeNode(node.id); });
 
+  // Drag
   el.addEventListener('mousedown', e => {
-    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
-    if (e.target.closest('.btn-delete')) return;
+    if (e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT') return;
+    if (e.target.closest('.btn-delete,.btn-connect,.island-footer')) return;
+    hideStrip();
     e.preventDefault(); e.stopPropagation();
-    const pos = toCanvas(e.clientX, e.clientY);
-    drag = { nodeId: node.id, ox: pos.x - node.x, oy: pos.y - node.y };
+    const pos = toCanvas(e.clientX,e.clientY);
+    drag = { nodeId:node.id, ox:pos.x-node.x, oy:pos.y-node.y };
     el.classList.add('is-dragging');
-    if (!e.altKey) {
-      snapGuide.style.top = snapY(node.id) + 'px';
+    if (!e.altKey && node.type!=='draft') {
+      snapGuide.style.top = snapY(node.id)+'px';
       snapGuide.classList.add('visible');
     }
+  });
+
+  // Hover strip
+  let hoverTimer=null, inNode=false;
+  el.addEventListener('mouseenter', () => {
+    inNode=true;
+    if (drag||pan||connectionSrc) return;
+    if (VALID_CHILDREN[node.type]?.length===0) return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => { if (inNode) showStripFor(node); }, 180);
+  });
+  el.addEventListener('mouseleave', e => {
+    inNode=false; clearTimeout(hoverTimer);
+    setTimeout(() => { if (!inNode && !hoverStrip.matches(':hover')) hideStrip(); }, 60);
+  });
+
+  // Connection mode click
+  el.addEventListener('click', e => {
+    if (!connectionSrc) return;
+    if (node.id===connectionSrc) return;
+    if (!el.classList.contains('connectable')) return;
+    e.stopPropagation();
+    pendingConnTarget = node.id;
+    showConnPicker(node.id, e.clientX, e.clientY);
   });
 
   canvas.appendChild(el);
@@ -705,180 +733,462 @@ function buildNode(node) {
   return el;
 }
 
-/* ── Remove node + descendants ─────────────────────────────────────────── */
+// ── Remove node + descendants ──────────────────────────────────────────
 function removeNode(id) {
-  const dead = [];
-  function collect(nid) {
-    dead.push(nid);
-    nodes.filter(n => n.parentId === nid).forEach(n => collect(n.id));
-  }
+  if (connectionSrc===id) exitConnectionMode();
+  const dead=[];
+  function collect(nid) { dead.push(nid); nodes.filter(n=>n.parentId===nid).forEach(n=>collect(n.id)); }
   collect(id);
   dead.forEach(nid => { elOf[nid]?.remove(); delete elOf[nid]; });
-  nodes = nodes.filter(n => !dead.includes(n.id));
+  nodes = nodes.filter(n=>!dead.includes(n.id));
   drawConnectors();
 }
 
-/* ── Add-node panel ────────────────────────────────────────────────────── */
-let selectedType = 'reason';
-
-function populateParentSelect() {
-  parentSelect.innerHTML = '';
-  const none = document.createElement('option');
-  none.value = ''; none.textContent = '— none (root node) —';
-  parentSelect.appendChild(none);
-  nodes.forEach(n => {
-    const opt = document.createElement('option');
-    opt.value = n.id;
-    opt.textContent = `[${TYPE_LABEL[n.type]}] ${truncate(n.text || '(empty)')}`;
-    parentSelect.appendChild(opt);
+// ── Hover strip (viewport-space) ───────────────────────────────────────
+function showStripFor(node) {
+  currentHoverNode = node;
+  const validTypes = VALID_CHILDREN[node.type] || [];
+  hoverStrip.innerHTML = '';
+  validTypes.forEach(type => {
+    const btn = document.createElement('button');
+    btn.className  = 'strip-btn';
+    btn.dataset.type  = type;
+    btn.dataset.label = TYPE_LABEL[type];
+    btn.title = TYPE_LABEL[type];
+    btn.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); });
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      addNodeOfType(type, node.id);
+      hideStrip();
+    });
+    hoverStrip.appendChild(btn);
   });
-  const contention = nodes.find(n => n.type === 'contention');
-  if (contention) parentSelect.value = contention.id;
+  positionStrip(node);
+  hoverStrip.classList.add('visible');
 }
 
-function openPanel() {
-  populateParentSelect();
-  panelText.value = '';
-  panelSource.value = '';
-  autoResize(panelText);
+function positionStrip(node) {
+  const el = elOf[node.id]; if (!el) return;
+  const vp = toViewport(node.x + (el.offsetWidth||234)/2, node.y + (el.offsetHeight||80));
+  hoverStrip.style.left = vp.x+'px';
+  hoverStrip.style.top  = (vp.y+8)+'px';
+}
+
+function updateStripPosition() {
+  if (currentHoverNode && hoverStrip.classList.contains('visible')) {
+    positionStrip(currentHoverNode);
+  }
+}
+
+function hideStrip() {
+  hoverStrip.classList.remove('visible');
+  currentHoverNode = null;
+}
+
+hoverStrip.addEventListener('mouseleave', () => hideStrip());
+
+// ── Add node of type under parent ──────────────────────────────────────
+function addNodeOfType(type, parentId, text='', source='') {
+  const parent   = nodes.find(n=>n.id===parentId);
+  const depth    = nodeDepth(parentId)+1;
+  const y        = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length-1)];
+  const siblings = nodes.filter(n=>n.parentId===parentId);
+  const x        = siblings.length ? Math.max(...siblings.map(n=>n.x))+260 : parent.x;
+  const newNode  = { id:`n${uidCounter++}`, type, parentId, text, source, x, y };
+  nodes.push(newNode);
+  const el = buildNode(newNode);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ drawConnectors(); el.querySelector('.node-text')?.focus(); }));
+  return newNode;
+}
+
+// ── Island node ────────────────────────────────────────────────────────
+function addIslandNode() {
+  const {x,y} = viewportCenter();
+  const newNode = { id:`n${uidCounter++}`, type:'draft', parentId:null, text:'', source:'', x, y };
+  nodes.push(newNode);
+  buildNode(newNode);
+  drawConnectors();
+}
+
+// ── Connection mode ────────────────────────────────────────────────────
+function toggleConnectionMode(srcId) {
+  if (connectionSrc===srcId) { exitConnectionMode(); return; }
+  if (connectionSrc) exitConnectionMode();
+  connectionSrc = srcId;
+  viewport.classList.add('connection-mode');
+  connHint.classList.add('visible');
+  // Highlight valid parents (all non-draft, non-evidence, non-source nodes)
+  nodes.forEach(n => {
+    if (n.id===srcId||n.type==='draft'||n.type==='evidence') return;
+    elOf[n.id]?.classList.add('connectable');
+  });
+  elOf[srcId]?.querySelector('.btn-connect')?.classList.add('active');
+}
+
+function exitConnectionMode() {
+  if (!connectionSrc) return;
+  nodes.forEach(n => elOf[n.id]?.classList.remove('connectable'));
+  elOf[connectionSrc]?.querySelector('.btn-connect')?.classList.remove('active');
+  viewport.classList.remove('connection-mode');
+  connHint.classList.remove('visible');
+  hideConnPicker();
+  connectionSrc = null;
+  pendingConnTarget = null;
+}
+
+// ── Connection type picker ─────────────────────────────────────────────
+function showConnPicker(parentId, clientX, clientY) {
+  const parent = nodes.find(n=>n.id===parentId);
+  const validTypes = VALID_CHILDREN[parent.type]||[];
+
+  // Remove old buttons (keep label)
+  connPicker.querySelectorAll('.conn-type-btn').forEach(b=>b.remove());
+
+  validTypes.forEach(type => {
+    const btn = document.createElement('button');
+    btn.className = 'conn-type-btn';
+    btn.dataset.type = type;
+    btn.textContent = TYPE_LABEL[type];
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      upgradeIsland(connectionSrc, type, parentId);
+      exitConnectionMode();
+    });
+    connPicker.appendChild(btn);
+  });
+
+  // Position: keep within viewport bounds
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const pw=140, ph=valids(validTypes)*38+30;
+  const left = Math.min(clientX+8, vw-pw-8);
+  const top  = Math.min(clientY-10, vh-ph-8);
+  connPicker.style.left = left+'px';
+  connPicker.style.top  = top+'px';
+  connPicker.classList.add('visible');
+}
+function valids(arr) { return arr.length; }
+
+function hideConnPicker() { connPicker.classList.remove('visible'); }
+
+document.addEventListener('mousedown', e => {
+  if (!connPicker.contains(e.target)) hideConnPicker();
+});
+
+// ── Upgrade island node to real node ──────────────────────────────────
+function upgradeIsland(id, type, parentId) {
+  const node = nodes.find(n=>n.id===id); if (!node) return;
+  const parent = nodes.find(n=>n.id===parentId); if (!parent) return;
+
+  // Remove old element
+  elOf[id]?.remove(); delete elOf[id];
+
+  // Update data
+  node.type     = type;
+  node.parentId = parentId;
+  const depth = nodeDepth(id);
+  node.y = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length-1)];
+
+  // Rebuild
+  buildNode(node);
+  requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+}
+
+// ── Add-node panel ─────────────────────────────────────────────────────
+let selectedType = 'reason';
+const addPanel    = document.getElementById('add-panel');
+const typePillsEl = document.getElementById('type-pills');
+const parentSel   = document.getElementById('parent-select');
+const panelText   = document.getElementById('panel-text');
+const srcPanelRow = document.getElementById('source-panel-row');
+const panelSrc    = document.getElementById('panel-source');
+
+function openAddPanel() {
+  parentSel.innerHTML='';
+  const none=document.createElement('option'); none.value=''; none.textContent='— none (root) —';
+  parentSel.appendChild(none);
+  nodes.filter(n=>n.type!=='draft').forEach(n=>{
+    const opt=document.createElement('option');
+    opt.value=n.id; opt.textContent=`[${TYPE_LABEL[n.type]}] ${truncate(n.text||'(empty)')}`;
+    parentSel.appendChild(opt);
+  });
+  const con=nodes.find(n=>n.type==='contention');
+  if (con) parentSel.value=con.id;
+  panelText.value=''; panelSrc.value=''; autoResize(panelText);
   addPanel.classList.add('is-open');
-  btnAddNode.classList.add('is-open');
+  document.getElementById('btn-add-node').classList.add('is-open');
   panelText.focus();
 }
-
-function closePanel() {
+function closeAddPanel() {
   addPanel.classList.remove('is-open');
-  btnAddNode.classList.remove('is-open');
+  document.getElementById('btn-add-node').classList.remove('is-open');
 }
 
 typePillsEl.addEventListener('click', e => {
-  const pill = e.target.closest('.type-pill');
-  if (!pill) return;
-  typePillsEl.querySelectorAll('.type-pill').forEach(p => p.classList.remove('selected'));
-  pill.classList.add('selected');
-  selectedType = pill.dataset.type;
-  sourcePanelRow.classList.toggle('visible', selectedType === 'evidence');
+  const pill=e.target.closest('.type-pill'); if (!pill) return;
+  typePillsEl.querySelectorAll('.type-pill').forEach(p=>p.classList.remove('selected'));
+  pill.classList.add('selected'); selectedType=pill.dataset.type;
+  srcPanelRow.classList.toggle('visible', selectedType==='evidence');
 });
-
-btnAddNode.addEventListener('click', e => {
+document.getElementById('btn-add-node').addEventListener('click', e => {
   e.stopPropagation();
-  addPanel.classList.contains('is-open') ? closePanel() : openPanel();
+  addPanel.classList.contains('is-open') ? closeAddPanel() : openAddPanel();
 });
+document.getElementById('btn-add-cancel').addEventListener('click', closeAddPanel);
+panelText.addEventListener('input', ()=>autoResize(panelText));
 
-btnCancel.addEventListener('click', closePanel);
-
-document.addEventListener('mousedown', e => {
-  if (!addPanel.contains(e.target) && !btnAddNode.contains(e.target)) closePanel();
-});
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
-
-panelText.addEventListener('input', () => autoResize(panelText));
-
-/* Place new node below its parent, to the right of existing siblings */
-function choosePosition(parentId) {
-  if (!parentId) {
-    const roots = nodes.filter(n => !n.parentId);
-    const x = roots.length ? Math.max(...roots.map(n => n.x + 260)) : 386;
-    return { x, y: SNAP_LEVELS[0] };
+document.getElementById('btn-add-confirm').addEventListener('click', ()=>{
+  const parentId = parentSel.value||null;
+  let x, y;
+  if (parentId) {
+    const pos = choosePos(parentId); x=pos.x; y=pos.y;
+  } else {
+    const c = viewportCenter(); x=c.x; y=SNAP_LEVELS[0];
   }
-  const parent = nodes.find(n => n.id === parentId);
-  const depth  = nodeDepth(parentId) + 1;
-  const y = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length - 1)];
-  const siblings = nodes.filter(n => n.parentId === parentId);
-  const x = siblings.length
-    ? Math.max(...siblings.map(n => n.x)) + 260
-    : parent.x;
-  return { x, y };
-}
-
-btnConfirm.addEventListener('click', () => {
-  const parentId = parentSelect.value || null;
-  const { x, y } = choosePosition(parentId);
-  const newNode = {
-    id: `n${uidCounter++}`,
-    type: selectedType,
-    parentId,
-    text:   panelText.value.trim(),
-    source: selectedType === 'evidence' ? panelSource.value.trim() : '',
-    x, y,
-  };
+  const newNode = { id:`n${uidCounter++}`, type:selectedType, parentId,
+    text:panelText.value.trim(), source:selectedType==='evidence'?panelSrc.value.trim():'', x, y };
   nodes.push(newNode);
   buildNode(newNode);
-  requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
-  closePanel();
+  requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+  closeAddPanel();
 });
 
-/* ── Canvas pan ────────────────────────────────────────────────────────── */
-viewport.addEventListener('mousedown', e => {
-  if (e.target === viewport || e.target === canvas || e.target === svgLayer) {
-    pan = { cx0: e.clientX, cy0: e.clientY, tx0: tx, ty0: ty };
+function choosePos(parentId) {
+  const parent=nodes.find(n=>n.id===parentId);
+  const depth=nodeDepth(parentId)+1;
+  const y=SNAP_LEVELS[Math.min(depth,SNAP_LEVELS.length-1)];
+  const siblings=nodes.filter(n=>n.parentId===parentId);
+  const x=siblings.length ? Math.max(...siblings.map(n=>n.x))+260 : parent.x;
+  return {x,y};
+}
+
+document.getElementById('btn-add-island').addEventListener('click', e=>{e.stopPropagation(); addIslandNode();});
+
+// Close panels on outside click
+document.addEventListener('mousedown', e=>{
+  if (!addPanel.contains(e.target)&&!document.getElementById('btn-add-node').contains(e.target)) closeAddPanel();
+  const lp=document.getElementById('load-panel');
+  if (!lp.contains(e.target)&&!document.getElementById('btn-load').contains(e.target)) closeLoadPanel();
+});
+document.addEventListener('keydown', e=>{
+  if (e.key==='Escape') { closeAddPanel(); closeLoadPanel(); exitConnectionMode(); }
+});
+
+// ── Export ─────────────────────────────────────────────────────────────
+function buildExportText() {
+  const lines = [];
+  const roots = nodes.filter(n=>!n.parentId&&n.type!=='draft')
+                     .sort((a,b)=>a.x-b.x);
+
+  function traverse(id, depth) {
+    const node = nodes.find(n=>n.id===id); if (!node||node.type==='draft') return;
+    const indent = depth===0 ? '' : '  '+'    '.repeat(depth-1);
+    if (depth===0) {
+      if (lines.length) lines.push('');
+      lines.push(node.text);
+    } else {
+      const prefixes = { reason:'• ', objection:'Counter: ', rebuttal:'Rebuttal: ', evidence:'Evidence: ' };
+      const prefix = prefixes[node.type]||'';
+      const content = node.type==='evidence' ? (node.source||node.text) : node.text;
+      lines.push(indent+prefix+content);
+    }
+    const children = nodes.filter(n=>n.parentId===id&&n.type!=='draft').sort((a,b)=>a.x-b.x);
+    children.forEach(c=>traverse(c.id, depth+1));
+    if (node.type==='reason') lines.push('');
+  }
+
+  roots.forEach(r=>traverse(r.id,0));
+  return lines.join('\n').trimEnd();
+}
+
+const exportModal    = document.getElementById('export-modal');
+const exportBackdrop = document.getElementById('export-backdrop');
+const exportPre      = document.getElementById('export-pre');
+
+document.getElementById('btn-export').addEventListener('click', ()=>{
+  exportPre.textContent = buildExportText();
+  exportModal.classList.add('visible');
+  exportBackdrop.classList.add('visible');
+});
+function closeExport() { exportModal.classList.remove('visible'); exportBackdrop.classList.remove('visible'); }
+document.getElementById('btn-export-close').addEventListener('click', closeExport);
+exportBackdrop.addEventListener('click', closeExport);
+
+document.getElementById('btn-export-copy').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(exportPre.textContent).then(()=>showToast('Copied to clipboard'));
+});
+
+function downloadFile(text, filename) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
+  a.download=filename; a.click(); URL.revokeObjectURL(a.href);
+}
+document.getElementById('btn-export-dl-txt').addEventListener('click',()=>downloadFile(exportPre.textContent,'argument-map.txt'));
+document.getElementById('btn-export-dl-md').addEventListener('click', ()=>downloadFile(exportPre.textContent,'argument-map.md'));
+
+// ── Firebase save / load ───────────────────────────────────────────────
+function genCode() {
+  let c=''; for (let i=0;i<6;i++) c+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]; return c;
+}
+
+async function saveMap() {
+  const btn = document.getElementById('btn-save');
+  btn.textContent='Saving…'; btn.disabled=true;
+  try {
+    let code = currentCode;
+    if (!code) {
+      // Find a unique code (max 8 attempts)
+      for (let i=0; i<8; i++) {
+        const candidate = genCode();
+        const snap = await getDoc(doc(db,'argmap_maps',candidate));
+        if (!snap.exists()) { code=candidate; break; }
+      }
+      if (!code) throw new Error('Could not generate unique code');
+    }
+    await setDoc(doc(db,'argmap_maps',code), {
+      nodes: nodes.map(n=>({...n})),
+      savedAt: new Date().toISOString(),
+    });
+    currentCode=code;
+    localStorage.setItem('argmap_code',code);
+    location.hash='#'+code;
+    document.getElementById('code-display').textContent=code;
+    document.getElementById('code-modal').classList.add('visible');
+    document.getElementById('code-backdrop').classList.add('visible');
+    document.getElementById('status-chip').textContent='Saved';
+  } catch(err) {
+    console.error(err); showToast('Save failed: '+err.message, 3500);
+  } finally {
+    btn.textContent='Save'; btn.disabled=false;
+  }
+}
+
+async function loadMap(code) {
+  const upper = code.trim().toUpperCase(); if (!upper) return;
+  try {
+    const snap = await getDoc(doc(db,'argmap_maps',upper));
+    if (!snap.exists()) { showToast('No map found for that code.', 3000); return; }
+    const data = snap.data();
+    // Clear canvas
+    nodes.forEach(n=>{ elOf[n.id]?.remove(); delete elOf[n.id]; });
+    nodes = (data.nodes||[]).map(n=>({...n}));
+    uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
+    nodes.forEach(buildNode);
+    currentCode=upper;
+    localStorage.setItem('argmap_code',upper);
+    location.hash='#'+upper;
+    document.getElementById('status-chip').textContent='Loaded';
+    requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+    closeLoadPanel();
+    showToast('Map loaded ('+upper+')');
+  } catch(err) {
+    console.error(err); showToast('Load failed: '+err.message, 3500);
+  }
+}
+
+document.getElementById('btn-save').addEventListener('click', saveMap);
+
+const codeBackdrop = document.getElementById('code-backdrop');
+document.getElementById('btn-copy-code').addEventListener('click',()=>{
+  navigator.clipboard.writeText(currentCode||'').then(()=>showToast('Code copied'));
+});
+document.getElementById('btn-close-code').addEventListener('click',()=>{
+  document.getElementById('code-modal').classList.remove('visible');
+  codeBackdrop.classList.remove('visible');
+});
+codeBackdrop.addEventListener('click',()=>{
+  document.getElementById('code-modal').classList.remove('visible');
+  codeBackdrop.classList.remove('visible');
+});
+
+// Load panel
+const loadPanel = document.getElementById('load-panel');
+function closeLoadPanel() {
+  loadPanel.classList.remove('is-open');
+  document.getElementById('btn-load').classList.remove('is-open');
+}
+document.getElementById('btn-load').addEventListener('click', e=>{
+  e.stopPropagation();
+  loadPanel.classList.contains('is-open') ? closeLoadPanel() : (() => {
+    document.getElementById('code-input').value='';
+    loadPanel.classList.add('is-open');
+    document.getElementById('btn-load').classList.add('is-open');
+    document.getElementById('code-input').focus();
+  })();
+});
+document.getElementById('btn-load-cancel').addEventListener('click', closeLoadPanel);
+document.getElementById('btn-load-confirm').addEventListener('click', ()=>{
+  loadMap(document.getElementById('code-input').value);
+});
+document.getElementById('code-input').addEventListener('keydown', e=>{
+  if (e.key==='Enter') loadMap(e.target.value);
+});
+
+// ── Canvas interactions ────────────────────────────────────────────────
+viewport.addEventListener('mousedown', e=>{
+  if (e.target===viewport||e.target===canvas||e.target===svgLayer) {
+    if (connectionSrc) { exitConnectionMode(); return; }
+    pan={cx0:e.clientX,cy0:e.clientY,tx0:tx,ty0:ty};
     viewport.classList.add('is-panning');
     e.preventDefault();
   }
 });
 
-document.addEventListener('mousemove', e => {
+document.addEventListener('mousemove', e=>{
   if (drag) {
-    const node = nodes.find(n => n.id === drag.nodeId);
-    const el   = elOf[drag.nodeId];
-    if (!node || !el) return;
-    const pos = toCanvas(e.clientX, e.clientY);
-    node.x = pos.x - drag.ox;
-    node.y = pos.y - drag.oy;
-    el.style.left = node.x + 'px';
-    el.style.top  = node.y + 'px';
-    if (!e.altKey) snapGuide.style.top = snapY(drag.nodeId) + 'px';
-    drawConnectors();
-    return;
+    const node=nodes.find(n=>n.id===drag.nodeId), el=elOf[drag.nodeId];
+    if (!node||!el) return;
+    const pos=toCanvas(e.clientX,e.clientY);
+    node.x=pos.x-drag.ox; node.y=pos.y-drag.oy;
+    el.style.left=node.x+'px'; el.style.top=node.y+'px';
+    if (!e.altKey&&node.type!=='draft') snapGuide.style.top=snapY(drag.nodeId)+'px';
+    drawConnectors(); return;
   }
   if (pan) {
-    tx = pan.tx0 + (e.clientX - pan.cx0);
-    ty = pan.ty0 + (e.clientY - pan.cy0);
+    tx=pan.tx0+(e.clientX-pan.cx0); ty=pan.ty0+(e.clientY-pan.cy0);
     applyTransform();
   }
 });
 
-document.addEventListener('mouseup', e => {
+document.addEventListener('mouseup', e=>{
   if (drag) {
-    const node = nodes.find(n => n.id === drag.nodeId);
-    const el   = elOf[drag.nodeId];
-    if (node && el && !e.altKey) {
-      node.y = snapY(drag.nodeId);
-      el.style.top = node.y + 'px';
+    const node=nodes.find(n=>n.id===drag.nodeId), el=elOf[drag.nodeId];
+    if (node&&el&&!e.altKey&&node.type!=='draft') {
+      node.y=snapY(drag.nodeId); el.style.top=node.y+'px';
     }
     el?.classList.remove('is-dragging');
     snapGuide.classList.remove('visible');
-    drag = null;
-    drawConnectors();
+    drag=null; drawConnectors();
   }
-  if (pan) { pan = null; viewport.classList.remove('is-panning'); }
+  if (pan) { pan=null; viewport.classList.remove('is-panning'); }
 });
 
-/* ── Zoom ──────────────────────────────────────────────────────────────── */
-viewport.addEventListener('wheel', e => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 1.1 : 1/1.1;
-  const newSc  = Math.min(2.5, Math.max(0.2, sc * factor));
-  const r = viewport.getBoundingClientRect();
-  tx = (e.clientX - r.left) - ((e.clientX - r.left) - tx) * (newSc / sc);
-  ty = (e.clientY - r.top)  - ((e.clientY - r.top)  - ty) * (newSc / sc);
-  sc = newSc;
-  applyTransform();
-}, { passive: false });
+// ── Zoom ───────────────────────────────────────────────────────────────
+viewport.addEventListener('wheel', e=>{
+  e.preventDefault(); hideStrip();
+  const f=e.deltaY<0?1.1:1/1.1, ns=Math.min(2.5,Math.max(.2,sc*f));
+  const r=viewport.getBoundingClientRect();
+  tx=(e.clientX-r.left)-((e.clientX-r.left)-tx)*(ns/sc);
+  ty=(e.clientY-r.top) -((e.clientY-r.top) -ty)*(ns/sc);
+  sc=ns; applyTransform();
+},{passive:false});
 
-document.getElementById('btn-zoom-in').addEventListener('click', () => {
-  sc = Math.min(2.5, sc * 1.2); applyTransform();
-});
-document.getElementById('btn-zoom-out').addEventListener('click', () => {
-  sc = Math.max(0.2, sc / 1.2); applyTransform();
-});
+document.getElementById('btn-zoom-in').addEventListener('click',()=>{sc=Math.min(2.5,sc*1.2);applyTransform();});
+document.getElementById('btn-zoom-out').addEventListener('click',()=>{sc=Math.max(.2,sc/1.2);applyTransform();});
 
-/* ── Init ──────────────────────────────────────────────────────────────── */
+// ── Init ───────────────────────────────────────────────────────────────
 nodes.forEach(buildNode);
 applyTransform();
-requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
+requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
 window.addEventListener('resize', drawConnectors);
+
+// Auto-load from URL hash or localStorage
+const hashCode = location.hash.replace('#','').trim().toUpperCase();
+if (hashCode.length===6) {
+  loadMap(hashCode);
+} else {
+  const stored = localStorage.getItem('argmap_code');
+  if (stored) { currentCode=stored; location.hash='#'+stored; }
+}
 </script>
 </body>
 </html>
