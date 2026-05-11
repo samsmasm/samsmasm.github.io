@@ -458,6 +458,14 @@ body {
 }
 .mmp-item-del:hover { color:#ef5350; background:#fff2f2; }
 
+.mmp-item-share {
+  padding:3px 8px; border:1px solid #ddd; background:transparent; cursor:pointer;
+  color:#aaa; font-size:10px; border-radius:3px; flex-shrink:0;
+  font-family:'Courier New',monospace; letter-spacing:.03em;
+  transition:color .1s, background .1s, border-color .1s;
+}
+.mmp-item-share:hover { color:#5c6bc0; background:#ede7f6; border-color:#5c6bc0; }
+
 .mmp-empty {
   padding:32px 20px; text-align:center;
   font-size:12px; color:#bbb; font-style:italic; line-height:1.6;
@@ -568,9 +576,9 @@ body {
 <!-- Code modal (shown after save) -->
 <div class="modal-backdrop" id="code-backdrop"></div>
 <div class="modal" id="code-modal">
-  <div class="modal-title">Map saved</div>
+  <div class="modal-title" id="code-modal-title">Map saved</div>
   <div class="code-display" id="code-display">------</div>
-  <div class="code-sub">Write this code down to return to your map. Bookmark this page to save it automatically.</div>
+  <div class="code-sub" id="code-sub">Write this code down to return to your map. Bookmark this page to save it automatically.</div>
   <div class="modal-footer">
     <button class="btn-confirm" id="btn-copy-code">Copy code</button>
     <button class="btn-cancel" id="btn-close-code">Close</button>
@@ -1211,7 +1219,6 @@ async function saveMap() {
   try {
     let code = currentCode;
     if (!code) {
-      // Find a unique code (max 8 attempts)
       for (let i=0; i<8; i++) {
         const candidate = genCode();
         const snap = await getDoc(doc(db,'argmap_maps',candidate));
@@ -1224,17 +1231,20 @@ async function saveMap() {
     await setDoc(doc(db,'argmap_maps',code), {
       nodes: nodes.map(n=>({...n})), title, savedAt,
     });
-    // If signed in, write metadata to private user index
-    if (currentUser) {
-      await setDoc(doc(db,'users',currentUser.uid,'maps',code), { title, savedAt, code });
-    }
     currentCode=code;
     localStorage.setItem('argmap_code',code);
     location.hash='#'+code;
-    document.getElementById('code-display').textContent=code;
-    document.getElementById('code-modal').classList.add('visible');
-    document.getElementById('code-backdrop').classList.add('visible');
     document.getElementById('status-chip').textContent='Saved';
+    if (currentUser) {
+      await setDoc(doc(db,'users',currentUser.uid,'maps',code), { title, savedAt, code });
+      showToast('Saved to My Maps');
+    } else {
+      document.getElementById('code-modal-title').textContent='Map saved';
+      document.getElementById('code-sub').textContent='Write this code down to return to your map. Bookmark this page to save it automatically.';
+      document.getElementById('code-display').textContent=code;
+      document.getElementById('code-modal').classList.add('visible');
+      document.getElementById('code-backdrop').classList.add('visible');
+    }
   } catch(err) {
     console.error(err); showToast('Save failed: '+err.message, 3500);
   } finally {
@@ -1270,7 +1280,8 @@ document.getElementById('btn-save').addEventListener('click', saveMap);
 
 const codeBackdrop = document.getElementById('code-backdrop');
 document.getElementById('btn-copy-code').addEventListener('click',()=>{
-  navigator.clipboard.writeText(currentCode||'').then(()=>showToast('Code copied'));
+  const code = document.getElementById('code-display').textContent.trim();
+  navigator.clipboard.writeText(code||'').then(()=>showToast('Code copied'));
 });
 document.getElementById('btn-close-code').addEventListener('click',()=>{
   document.getElementById('code-modal').classList.remove('visible');
@@ -1364,12 +1375,21 @@ async function loadMyMaps() {
       row.innerHTML = `
         <div class="mmp-item-info">
           <div class="mmp-item-title">${escHtml(item.title || 'Untitled')}</div>
-          <div class="mmp-item-meta">${item.code} &nbsp;·&nbsp; ${date}</div>
+          <div class="mmp-item-meta">${date}</div>
         </div>
+        <button class="mmp-item-share" title="Get shareable code">Share</button>
         <button class="mmp-item-del" title="Delete">×</button>`;
       row.querySelector('.mmp-item-info').addEventListener('click', () => {
         loadMap(item.code);
         mmpPanel.classList.remove('open');
+      });
+      row.querySelector('.mmp-item-share').addEventListener('click', e => {
+        e.stopPropagation();
+        document.getElementById('code-modal-title').textContent='Share map';
+        document.getElementById('code-sub').textContent='Anyone with this code can load this map.';
+        document.getElementById('code-display').textContent=item.code;
+        document.getElementById('code-modal').classList.add('visible');
+        document.getElementById('code-backdrop').classList.add('visible');
       });
       row.querySelector('.mmp-item-del').addEventListener('click', async e => {
         e.stopPropagation();
