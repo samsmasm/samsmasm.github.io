@@ -23,13 +23,13 @@
   --c-reason:     #43a047;
   --c-objection:  #ef5350;
   --c-rebuttal:   #fb8c00;
-  --c-evidence:   #00897b;
+  --c-evidence:   #1e88e5;
 
   --badge-contention-bg: #ede7f6;  --badge-contention-fg: #4527a0;
   --badge-reason-bg:     #e8f5e9;  --badge-reason-fg:     #2e7d32;
   --badge-objection-bg:  #ffebee;  --badge-objection-fg:  #c62828;
   --badge-rebuttal-bg:   #fff3e0;  --badge-rebuttal-fg:   #e65100;
-  --badge-evidence-bg:   #e0f2f1;  --badge-evidence-fg:   #00695c;
+  --badge-evidence-bg:   #e3f2fd;  --badge-evidence-fg:   #1565c0;
 
   --connector-stroke: #cdc9c1;
   --connector-arrow:  #c9c4bb;
@@ -213,6 +213,7 @@ body {
   cursor:move; transition:box-shadow .15s ease, outline .1s ease;
   user-select:none;
 }
+.node.layout-animate { transition:box-shadow .15s ease, outline .1s ease, left .22s ease; }
 .node:hover       { box-shadow:0 2px 10px rgba(0,0,0,.10), 0 0 1px rgba(0,0,0,.04); }
 .node.is-dragging { box-shadow:0 8px 24px rgba(0,0,0,.14); z-index:50; }
 
@@ -569,6 +570,7 @@ let connectionSrc = null; // nodeId of island being connected
 let pendingConnTarget = null; // nodeId of chosen parent during connection
 let currentHoverNode  = null;
 let currentCode       = null;
+let stripHideTimer    = null; // module-level so strip's mouseenter can cancel it
 
 // ── DOM refs ───────────────────────────────────────────────────────────
 const viewport    = document.getElementById('viewport');
@@ -708,14 +710,15 @@ function buildNode(node) {
   let hoverTimer=null, inNode=false;
   el.addEventListener('mouseenter', () => {
     inNode=true;
+    clearTimeout(stripHideTimer); // cancel any pending hide
     if (drag||pan||connectionSrc) return;
     if (VALID_CHILDREN[node.type]?.length===0) return;
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => { if (inNode) showStripFor(node); }, 180);
   });
-  el.addEventListener('mouseleave', e => {
+  el.addEventListener('mouseleave', () => {
     inNode=false; clearTimeout(hoverTimer);
-    setTimeout(() => { if (!inNode && !hoverStrip.matches(':hover')) hideStrip(); }, 60);
+    stripHideTimer = setTimeout(() => { if (!hoverStrip.matches(':hover')) hideStrip(); }, 150);
   });
 
   // Connection mode click
@@ -771,7 +774,7 @@ function positionStrip(node) {
   const el = elOf[node.id]; if (!el) return;
   const vp = toViewport(node.x + (el.offsetWidth||234)/2, node.y + (el.offsetHeight||80));
   hoverStrip.style.left = vp.x+'px';
-  hoverStrip.style.top  = (vp.y+8)+'px';
+  hoverStrip.style.top  = (vp.y+3)+'px';
 }
 
 function updateStripPosition() {
@@ -785,7 +788,34 @@ function hideStrip() {
   currentHoverNode = null;
 }
 
+hoverStrip.addEventListener('mouseenter', () => clearTimeout(stripHideTimer));
 hoverStrip.addEventListener('mouseleave', () => hideStrip());
+
+// ── Auto-arrange: push overlapping nodes apart at each Y level ────────
+function resolveOverlaps() {
+  const W = 234, GAP = 22;
+  // Group non-draft nodes by Y position
+  const groups = {};
+  nodes.filter(n => n.type !== 'draft').forEach(n => {
+    if (!groups[n.y]) groups[n.y] = [];
+    groups[n.y].push(n);
+  });
+  let changed = false;
+  Object.values(groups).forEach(group => {
+    if (group.length < 2) return;
+    group.sort((a, b) => a.x - b.x);
+    for (let i = 1; i < group.length; i++) {
+      const minX = group[i-1].x + W + GAP;
+      if (group[i].x < minX) { group[i].x = minX; changed = true; }
+    }
+  });
+  if (!changed) return;
+  // Animate the repositioning
+  Object.values(elOf).forEach(el => el.classList.add('layout-animate'));
+  nodes.forEach(n => { if (elOf[n.id]) elOf[n.id].style.left = n.x + 'px'; });
+  setTimeout(() => Object.values(elOf).forEach(el => el.classList.remove('layout-animate')), 280);
+  drawConnectors();
+}
 
 // ── Add node of type under parent ──────────────────────────────────────
 function addNodeOfType(type, parentId, text='', source='') {
@@ -797,7 +827,7 @@ function addNodeOfType(type, parentId, text='', source='') {
   const newNode  = { id:`n${uidCounter++}`, type, parentId, text, source, x, y };
   nodes.push(newNode);
   const el = buildNode(newNode);
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ drawConnectors(); el.querySelector('.node-text')?.focus(); }));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ drawConnectors(); resolveOverlaps(); el.querySelector('.node-text')?.focus(); }));
   return newNode;
 }
 
@@ -948,7 +978,7 @@ document.getElementById('btn-add-confirm').addEventListener('click', ()=>{
     text:panelText.value.trim(), source:selectedType==='evidence'?panelSrc.value.trim():'', x, y };
   nodes.push(newNode);
   buildNode(newNode);
-  requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ drawConnectors(); resolveOverlaps(); }));
   closeAddPanel();
 });
 
@@ -1158,6 +1188,7 @@ document.addEventListener('mouseup', e=>{
     el?.classList.remove('is-dragging');
     snapGuide.classList.remove('visible');
     drag=null; drawConnectors();
+    resolveOverlaps();
   }
   if (pan) { pan=null; viewport.classList.remove('is-panning'); }
 });
