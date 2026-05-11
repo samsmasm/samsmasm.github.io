@@ -301,6 +301,12 @@ body {
 }
 .source-input::placeholder { color:#d0cbc3; }
 
+.node-resize {
+  position:absolute; right:0; top:0; bottom:0; width:7px;
+  cursor:col-resize; border-radius:0 var(--node-radius) var(--node-radius) 0;
+}
+.node-resize:hover, .node-resize:active { background:rgba(0,0,0,.06); }
+
 /* Draft node footer (connect button) */
 .island-footer {
   margin-top:8px; padding-top:8px; border-top:1px solid #f0ece5;
@@ -880,6 +886,8 @@ const INITIAL_NODES = [
 ];
 
 const SNAP_LEVELS   = [50, 280, 510, 730, 950, 1170];
+const LEVEL_PAD     = 30; // px gap below tallest node at a level before the next level starts
+let dynamicLevels   = [...SNAP_LEVELS];
 const VALID_CHILDREN = {
   contention: ['reason', 'objection'],
   reason:     ['reason', 'objection', 'evidence'],
@@ -900,6 +908,7 @@ let uidCounter  = 10;
 const elOf      = {};
 let tx=90, ty=36, sc=1;
 let drag        = null; // {nodeId, ox, oy}
+let widthDrag   = null; // {nodeId, startX, startW}
 let pan         = null; // {cx0, cy0, tx0, ty0}
 let connectionSrc = null; // nodeId of island being connected
 let pendingConnTarget = null; // nodeId of chosen parent during connection
@@ -941,7 +950,7 @@ function rebuildAll() {
   nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
   nodes.forEach(buildNode);
   applyCollapsed();
-  requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
+  requestAnimationFrame(() => requestAnimationFrame(() => { computeDynamicLevels(); drawConnectors(); }));
 }
 
 function undo() {
@@ -976,7 +985,24 @@ function nodeDepth(id) {
   if (!n||!n.parentId) return 0;
   return 1 + nodeDepth(n.parentId);
 }
-function snapY(id) { return SNAP_LEVELS[Math.min(nodeDepth(id), SNAP_LEVELS.length-1)]; }
+function snapY(id) { return dynamicLevels[Math.min(nodeDepth(id), dynamicLevels.length-1)]; }
+function computeDynamicLevels() {
+  const maxH = {};
+  nodes.filter(n => n.type !== 'draft').forEach(n => {
+    const d = nodeDepth(n.id);
+    const el = elOf[n.id];
+    maxH[d] = Math.max(maxH[d] || 0, el ? el.offsetHeight : 80);
+  });
+  const maxDepth = Object.keys(maxH).length ? Math.max(...Object.keys(maxH).map(Number)) : SNAP_LEVELS.length - 1;
+  const levels = [SNAP_LEVELS[0]];
+  for (let d = 0; d <= maxDepth; d++) {
+    levels.push(levels[d] + (maxH[d] || 80) + LEVEL_PAD);
+  }
+  while (levels.length < SNAP_LEVELS.length) {
+    levels.push(levels[levels.length - 1] + 230);
+  }
+  dynamicLevels = levels;
+}
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function autoResize(ta) { ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
 function truncate(s,len=48) { return s.length>len ? s.slice(0,len)+'…' : s; }
@@ -1077,11 +1103,11 @@ function drawCoGroupConnector(cg) {
   if (!parent) return;
   const pEl = elOf[parent.id]; if (!pEl) return;
 
-  const W = 234;
+  const nCX = n => n.x + (elOf[n.id]?.offsetWidth || n.width || 234) / 2;
   groupNodes.sort((a, b) => a.x - b.x);
   const barY    = Math.min(...groupNodes.map(n => n.y)) - 16;
-  const barCX1  = groupNodes[0].x + W/2;
-  const barCX2  = groupNodes[groupNodes.length-1].x + W/2;
+  const barCX1  = nCX(groupNodes[0]);
+  const barCX2  = nCX(groupNodes[groupNodes.length-1]);
   const barMidX = (barCX1 + barCX2) / 2;
 
   // Horizontal bar connecting node centres
@@ -1095,8 +1121,8 @@ function drawCoGroupConnector(cg) {
   // Tick from bar down to each node's top
   groupNodes.forEach(n => {
     const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
-    tick.setAttribute('x1',n.x+W/2); tick.setAttribute('y1',barY);
-    tick.setAttribute('x2',n.x+W/2); tick.setAttribute('y2',n.y);
+    tick.setAttribute('x1',nCX(n)); tick.setAttribute('y1',barY);
+    tick.setAttribute('x2',nCX(n)); tick.setAttribute('y2',n.y);
     tick.setAttribute('stroke','var(--connector-stroke)'); tick.setAttribute('stroke-width','1.5');
     tick.style.pointerEvents='none';
     svgLayer.appendChild(tick);
@@ -1157,6 +1183,7 @@ function buildNode(node) {
   if (isIsland && !isDraft) el.dataset.island = 'true';
 
   el.innerHTML = `
+    <div class="node-resize" title="Drag to resize"></div>
     <div class="node-head">
       <span class="type-badge"${node.type !== 'contention' ? ' data-clickable="true"' : ''}>${TYPE_LABEL[node.type]}</span>
       <div class="node-btns">
@@ -1176,7 +1203,14 @@ function buildNode(node) {
     </div>`;
 
   const ta = el.querySelector('.node-text');
-  ta.addEventListener('input', () => { node.text=ta.value; autoResize(ta); drawConnectors(); });
+  ta.addEventListener('input', () => { node.text=ta.value; autoResize(ta); computeDynamicLevels(); drawConnectors(); });
+
+  const resizeHandle = el.querySelector('.node-resize');
+  resizeHandle.addEventListener('mousedown', e => {
+    e.stopPropagation(); e.preventDefault();
+    pushUndo();
+    widthDrag = { nodeId: node.id, startX: e.clientX, startW: node.width || 234 };
+  });
 
   if (isEv) {
     const si = el.querySelector('.source-input');
@@ -1256,6 +1290,7 @@ function buildNode(node) {
   });
 
   canvas.appendChild(el);
+  if (node.width) el.style.width = node.width + 'px';
   autoResize(ta);
   elOf[node.id] = el;
   return el;
@@ -1320,7 +1355,7 @@ hoverStrip.addEventListener('mouseleave', () => hideStrip());
 
 // ── Auto-arrange: push overlapping nodes apart at each Y level ────────
 function resolveOverlaps() {
-  const W = 234, GAP = 22, GAP_CO = 4;
+  const GAP = 22, GAP_CO = 4;
   // Group non-draft nodes by Y position
   const groups = {};
   nodes.filter(n => n.type !== 'draft' && !isHiddenByCollapse(n.id)).forEach(n => {
@@ -1335,7 +1370,7 @@ function resolveOverlaps() {
       const prev = group[i-1], cur = group[i];
       const inSameCG = prev.coGroupId && prev.coGroupId === cur.coGroupId;
       const gap = inSameCG ? GAP_CO : GAP;
-      const minX = prev.x + W + gap;
+      const minX = prev.x + (prev.width || 234) + gap;
       if (cur.x < minX) { cur.x = minX; changed = true; }
     }
   });
@@ -1352,7 +1387,7 @@ function addNodeOfType(type, parentId, text='', source='') {
   pushUndo();
   const parent   = nodes.find(n=>n.id===parentId);
   const depth    = nodeDepth(parentId)+1;
-  const y        = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length-1)];
+  const y        = dynamicLevels[Math.min(depth, dynamicLevels.length-1)];
   const siblings = nodes.filter(n=>n.parentId===parentId);
   const x        = siblings.length ? Math.max(...siblings.map(n=>n.x))+260 : parent.x;
   const newNode  = { id:`n${uidCounter++}`, type, parentId, text, source, x, y };
@@ -1632,23 +1667,28 @@ function toggleCollapse(nodeId) {
 function autoLayout() {
   pushUndo();
   coGroups = []; nodes.forEach(n => { if (n.coGroupId !== undefined) n.coGroupId = null; });
-  const nodeW = 234, gap = 30;
+  const defaultW = 234, gap = 30;
   const root = nodes.find(n => n.type === 'contention');
   if (!root) { showToast('No contention node found'); return; }
+
+  computeDynamicLevels();
 
   const cache = {};
   function subtreeW(id) {
     if (cache[id] !== undefined) return cache[id];
-    const ch = nodes.filter(n => n.parentId === id);
-    if (!ch.length) return (cache[id] = nodeW);
+    const n = nodes.find(nd => nd.id === id);
+    const myW = (n && n.width) || defaultW;
+    const ch = nodes.filter(c => c.parentId === id);
+    if (!ch.length) return (cache[id] = myW);
     const total = ch.reduce((s, c) => s + subtreeW(c.id), 0) + (ch.length - 1) * gap;
-    return (cache[id] = Math.max(nodeW, total));
+    return (cache[id] = Math.max(myW, total));
   }
 
   function assign(id, centerX, depth) {
     const node = nodes.find(n => n.id === id); if (!node) return;
-    node.x = centerX - nodeW / 2;
-    node.y = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length - 1)];
+    const w = node.width || defaultW;
+    node.x = centerX - w / 2;
+    node.y = dynamicLevels[Math.min(depth, dynamicLevels.length - 1)];
     const ch = nodes.filter(n => n.parentId === id);
     if (!ch.length) return;
     const totalW = ch.reduce((s, c) => s + subtreeW(c.id), 0) + (ch.length - 1) * gap;
@@ -2193,7 +2233,7 @@ function snapIntoCoPremise(leftId, rightId) {
   const leftNode  = nodes.find(n=>n.id===leftId);
   const rightNode = nodes.find(n=>n.id===rightId);
   if (!leftNode||!rightNode||leftNode.coGroupId||rightNode.coGroupId) return;
-  rightNode.x = leftNode.x + 234 + 4;
+  rightNode.x = leftNode.x + (leftNode.width || 234) + 4;
   if (elOf[rightNode.id]) {
     elOf[rightNode.id].classList.add('layout-animate');
     elOf[rightNode.id].style.left = rightNode.x+'px';
@@ -2216,6 +2256,17 @@ viewport.addEventListener('mousedown', e=>{
 });
 
 document.addEventListener('mousemove', e=>{
+  if (widthDrag) {
+    const node=nodes.find(n=>n.id===widthDrag.nodeId), el=elOf[widthDrag.nodeId];
+    if (node&&el) {
+      node.width = Math.max(120, Math.round(widthDrag.startW + (e.clientX - widthDrag.startX) / sc));
+      el.style.width = node.width + 'px';
+      const ta = el.querySelector('.node-text');
+      if (ta) autoResize(ta);
+      drawConnectors();
+    }
+    return;
+  }
   if (drag) {
     const node=nodes.find(n=>n.id===drag.nodeId), el=elOf[drag.nodeId];
     if (!node||!el) return;
@@ -2232,6 +2283,13 @@ document.addEventListener('mousemove', e=>{
 });
 
 document.addEventListener('mouseup', e=>{
+  if (widthDrag) {
+    widthDrag = null;
+    computeDynamicLevels();
+    drawConnectors();
+    resolveOverlaps();
+    return;
+  }
   if (drag) {
     const nodeId=drag.nodeId;
     const node=nodes.find(n=>n.id===nodeId), el=elOf[nodeId];
@@ -2394,6 +2452,7 @@ function doImport(jsonText) {
 
   // Layout without a second undo push
   requestAnimationFrame(() => {
+    computeDynamicLevels();
     const NW=234, G=30;
     const root=nodes.find(n=>n.type==='contention');
     if (!root) { drawConnectors(); return; }
@@ -2406,7 +2465,7 @@ function doImport(jsonText) {
     }
     function assign(id,cx,d){
       const n=nodes.find(n=>n.id===id);if(!n)return;
-      n.x=cx-NW/2; n.y=SNAP_LEVELS[Math.min(d,SNAP_LEVELS.length-1)];
+      n.x=cx-NW/2; n.y=dynamicLevels[Math.min(d,dynamicLevels.length-1)];
       const ch=nodes.filter(n=>n.parentId===id);if(!ch.length)return;
       const tot=ch.reduce((s,c)=>s+sw(c.id),0)+(ch.length-1)*G;
       let x=cx-tot/2; ch.forEach(c=>{const cw=sw(c.id);assign(c.id,x+cw/2,d+1);x+=cw+G;});
