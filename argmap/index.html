@@ -203,7 +203,8 @@ body {
 }
 .connector-svg {
   position:absolute; top:0; left:0; width:0; height:0;
-  overflow:visible; pointer-events:none;
+  overflow:visible;
+  /* pointer-events handled per-path: none on visible paths, stroke on hit paths */
 }
 .snap-guide {
   position:absolute; left:-2000px; width:8000px; height:0;
@@ -236,6 +237,15 @@ body {
   border:1.5px dashed #c8c4bc !important;
   background:#fdfcfa;
 }
+
+/* Detached non-draft island: keep coloured left stripe, dashed on other sides */
+.node[data-island] {
+  border-color: #c8c4bc; border-style: dashed; background: #fdfcfa;
+}
+.node[data-island][data-type="reason"]    { border-left: 4px solid var(--c-reason); }
+.node[data-island][data-type="objection"] { border-left: 4px solid var(--c-objection); }
+.node[data-island][data-type="rebuttal"]  { border-left: 4px solid var(--c-rebuttal); }
+.node[data-island][data-type="evidence"]  { border-left: 4px solid var(--c-evidence); }
 
 /* Connection mode highlighting */
 .node.connectable {
@@ -471,6 +481,43 @@ body {
   font-size:12px; color:#bbb; font-style:italic; line-height:1.6;
 }
 
+/* ── Detach button (viewport-space, shown at connector midpoint) ──────── */
+#detach-btn {
+  position:fixed; z-index:260;
+  width:22px; height:22px; border-radius:50%;
+  background:#fff; border:1.5px solid #ddd;
+  color:#bbb; font-size:17px; line-height:1; cursor:pointer;
+  display:none; align-items:center; justify-content:center;
+  transform:translate(-50%,-50%);
+  box-shadow:0 1px 5px rgba(0,0,0,.14);
+  transition:color .1s, border-color .1s, background .1s;
+}
+#detach-btn:hover { color:#ef5350; border-color:#ef5350; background:#fff8f8; }
+#detach-btn.visible { display:flex; }
+
+/* ── Type picker (click badge to open) ────────────────────────────────── */
+#type-picker {
+  position:fixed; z-index:460;
+  background:#fff; border:1px solid #e0dbd3; border-radius:6px;
+  padding:6px 5px; box-shadow:0 4px 16px rgba(0,0,0,.12);
+  display:none; flex-direction:column; gap:2px; min-width:110px;
+}
+#type-picker.visible { display:flex; }
+#type-picker-label {
+  font-family:'Courier New',monospace; font-size:9px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:#bbb;
+  padding:2px 8px 5px; border-bottom:1px solid #f0ece5; margin-bottom:1px;
+}
+.type-picker-btn {
+  padding:5px 10px; border:none; background:transparent; cursor:pointer;
+  text-align:left; border-radius:3px; font-size:11px;
+  font-family:'Courier New',monospace; color:#555;
+  transition:background .1s;
+}
+.type-picker-btn:hover { background:#f5f3ef; }
+.type-badge[data-clickable] { cursor:pointer; }
+.type-badge[data-clickable]:hover { opacity:.75; }
+
 /* ── Check modal ──────────────────────────────────────────────────────── */
 .check-issues { display:flex; flex-direction:column; gap:5px; max-height:230px; overflow-y:auto; }
 .check-issue {
@@ -510,6 +557,7 @@ body {
   <div class="app-logo">Argument Mapper</div>
   <div class="header-rule"></div>
   <div class="map-name" id="map-name" contenteditable="true" spellcheck="false">Should governments intervene in markets to correct market failures?</div>
+  <button class="hdr-btn" id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
   <button class="hdr-btn" id="btn-new">New</button>
   <button class="hdr-btn" id="btn-add-node"><span style="font-size:14px;line-height:1">+</span> Node</button>
   <button class="hdr-btn" id="btn-add-island"><span style="font-size:14px;line-height:1">+</span> Draft</button>
@@ -618,6 +666,14 @@ body {
   <div class="modal-footer">
     <button class="btn-cancel" id="btn-close-check">Close</button>
   </div>
+</div>
+
+<!-- Detach button (viewport-space, shown at connector midpoint on hover) -->
+<button id="detach-btn" title="Detach node">−</button>
+
+<!-- Type picker (shown when clicking a node's type badge) -->
+<div id="type-picker">
+  <div id="type-picker-label">Change type</div>
 </div>
 
 <!-- Hover strip (viewport-space) -->
@@ -736,6 +792,32 @@ const connPicker  = document.getElementById('conn-picker');
 const connHint    = document.getElementById('conn-hint');
 const toastEl     = document.getElementById('toast');
 
+// ── Undo stack ────────────────────────────────────────────────────────
+const MAX_UNDO = 40;
+const undoStack = [];
+
+function pushUndo() {
+  undoStack.push(nodes.map(n => ({...n})));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function rebuildAll() {
+  drag = null; pan = null;
+  exitConnectionMode();
+  hideStrip();
+  if (typeof hideDetachBtn === 'function') hideDetachBtn();
+  if (typeof hideTypePicker === 'function') hideTypePicker();
+  nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
+  nodes.forEach(buildNode);
+  requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
+}
+
+function undo() {
+  if (!undoStack.length) { showToast('Nothing to undo'); return; }
+  nodes = undoStack.pop();
+  rebuildAll();
+}
+
 // ── Transform ─────────────────────────────────────────────────────────
 function applyTransform() {
   canvas.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`;
@@ -779,6 +861,7 @@ function viewportCenter() {
 function newMap() {
   if (!confirm('Start a new map? Unsaved work will be lost.')) return;
   // Clear canvas
+  undoStack.length = 0;
   nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
   nodes = [];
   uidCounter = 1;
@@ -824,11 +907,24 @@ function drawConnectors() {
     const x2=parent.x+pw/2, y2=parent.y+ph;
     const stretch=Math.max(40,Math.abs(y1-y2)*.42);
     const d=`M${x1},${y1} C${x1},${y1-stretch} ${x2},${y2+stretch} ${x2},${y2}`;
+
+    // Visible connector path
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d',d); path.setAttribute('fill','none');
     path.setAttribute('stroke','var(--connector-stroke)'); path.setAttribute('stroke-width','1.5');
     path.setAttribute('marker-end','url(#arrow)');
+    path.style.pointerEvents = 'none';
     svgLayer.appendChild(path);
+
+    // Wide transparent hit path for detach hover (bezier midpoint = (x1+x2)/2, (y1+y2)/2 for symmetric ctrl pts)
+    const mx = (x1+x2)/2, my = (y1+y2)/2;
+    const hitPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    hitPath.setAttribute('d',d); hitPath.setAttribute('fill','none');
+    hitPath.setAttribute('stroke','transparent'); hitPath.setAttribute('stroke-width','16');
+    hitPath.style.pointerEvents = 'stroke';
+    hitPath.addEventListener('mouseenter', () => showDetachBtn(node.id, mx, my));
+    hitPath.addEventListener('mouseleave', scheduleHideDetachBtn);
+    svgLayer.appendChild(hitPath);
   }
 }
 
@@ -841,12 +937,15 @@ function buildNode(node) {
   el.style.left   = node.x+'px';
   el.style.top    = node.y+'px';
 
-  const isEv    = node.type==='evidence';
-  const isDraft = node.type==='draft';
+  const isEv     = node.type === 'evidence';
+  const isDraft  = node.type === 'draft';
+  const isIsland = node.parentId === null && node.type !== 'contention';
+
+  if (isIsland && !isDraft) el.dataset.island = 'true';
 
   el.innerHTML = `
     <div class="node-head">
-      <span class="type-badge">${TYPE_LABEL[node.type]}</span>
+      <span class="type-badge"${node.type !== 'contention' ? ' data-clickable="true"' : ''}>${TYPE_LABEL[node.type]}</span>
       <button class="btn-delete" title="Delete">×</button>
     </div>
     <div class="node-body">
@@ -855,7 +954,7 @@ function buildNode(node) {
         <div class="source-label">Source</div>
         <input class="source-input" type="text" placeholder="Author (Year) — description" value="${escHtml(node.source||'')}">
       </div>` : ''}
-      ${isDraft ? `<div class="island-footer">
+      ${isIsland ? `<div class="island-footer">
         <button class="btn-connect" data-id="${node.id}">Connect →</button>
       </div>` : ''}
     </div>`;
@@ -869,10 +968,17 @@ function buildNode(node) {
     si.addEventListener('input', () => { node.source=si.value; });
   }
 
-  if (isDraft) {
+  if (isIsland) {
     const btnC = el.querySelector('.btn-connect');
     btnC.addEventListener('mousedown', e => e.stopPropagation());
     btnC.addEventListener('click', e => { e.stopPropagation(); toggleConnectionMode(node.id); });
+  }
+
+  // Badge click → type picker (not for contention)
+  if (node.type !== 'contention') {
+    const badge = el.querySelector('.type-badge');
+    badge.addEventListener('mousedown', e => e.stopPropagation());
+    badge.addEventListener('click', e => { e.stopPropagation(); showTypePicker(node.id, e.clientX, e.clientY); });
   }
 
   const delBtn = el.querySelector('.btn-delete');
@@ -882,9 +988,10 @@ function buildNode(node) {
   // Drag
   el.addEventListener('mousedown', e => {
     if (e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT') return;
-    if (e.target.closest('.btn-delete,.btn-connect,.island-footer')) return;
+    if (e.target.closest('.btn-delete,.btn-connect,.island-footer,.type-badge')) return;
     hideStrip();
     e.preventDefault(); e.stopPropagation();
+    pushUndo();
     const pos = toCanvas(e.clientX,e.clientY);
     drag = { nodeId:node.id, ox:pos.x-node.x, oy:pos.y-node.y };
     el.classList.add('is-dragging');
@@ -926,6 +1033,7 @@ function buildNode(node) {
 
 // ── Remove node + descendants ──────────────────────────────────────────
 function removeNode(id) {
+  pushUndo();
   if (connectionSrc===id) exitConnectionMode();
   const dead=[];
   function collect(nid) { dead.push(nid); nodes.filter(n=>n.parentId===nid).forEach(n=>collect(n.id)); }
@@ -1007,6 +1115,7 @@ function resolveOverlaps() {
 
 // ── Add node of type under parent ──────────────────────────────────────
 function addNodeOfType(type, parentId, text='', source='') {
+  pushUndo();
   const parent   = nodes.find(n=>n.id===parentId);
   const depth    = nodeDepth(parentId)+1;
   const y        = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length-1)];
@@ -1021,7 +1130,15 @@ function addNodeOfType(type, parentId, text='', source='') {
 
 // ── Island node ────────────────────────────────────────────────────────
 function addIslandNode() {
-  const {x,y} = viewportCenter();
+  pushUndo();
+  const r = viewport.getBoundingClientRect();
+  const nodeW = 234, pad = 28;
+  // Top-right of the visible canvas area in canvas coordinates
+  let x = (r.width - tx) / sc - nodeW - pad;
+  let y = (48 - ty) / sc + pad; // 48px header
+  // Stack downward if another node is already near this spot
+  const clash = () => nodes.some(n => Math.abs(n.x - x) < nodeW && Math.abs(n.y - y) < 70);
+  while (clash()) y += 72;
   const newNode = { id:`n${uidCounter++}`, type:'draft', parentId:null, text:'', source:'', x, y };
   nodes.push(newNode);
   buildNode(newNode);
@@ -1035,9 +1152,10 @@ function toggleConnectionMode(srcId) {
   connectionSrc = srcId;
   viewport.classList.add('connection-mode');
   connHint.classList.add('visible');
-  // Highlight valid parents (all non-draft, non-evidence, non-source nodes)
+  // Highlight valid parents (exclude islands, evidence, and the source node itself)
   nodes.forEach(n => {
-    if (n.id===srcId||n.type==='draft'||n.type==='evidence') return;
+    if (n.id===srcId||n.type==='evidence') return;
+    if (n.parentId===null && n.type!=='contention') return; // skip other islands
     elOf[n.id]?.classList.add('connectable');
   });
   elOf[srcId]?.querySelector('.btn-connect')?.classList.add('active');
@@ -1094,6 +1212,7 @@ document.addEventListener('mousedown', e => {
 
 // ── Upgrade island node to real node ──────────────────────────────────
 function upgradeIsland(id, type, parentId) {
+  pushUndo();
   const node = nodes.find(n=>n.id===id); if (!node) return;
   const parent = nodes.find(n=>n.id===parentId); if (!parent) return;
 
@@ -1243,6 +1362,96 @@ function downloadFile(text, filename) {
 document.getElementById('btn-export-dl-txt').addEventListener('click',()=>downloadFile(exportPre.textContent,'argument-map.txt'));
 document.getElementById('btn-export-dl-md').addEventListener('click', ()=>downloadFile(exportPre.textContent,'argument-map.md'));
 
+// ── Detach button ─────────────────────────────────────────────────────
+const detachBtn = document.getElementById('detach-btn');
+let detachHideTimer = null;
+let detachTargetId  = null;
+
+function showDetachBtn(childId, mxCanvas, myCanvas) {
+  clearTimeout(detachHideTimer);
+  detachTargetId = childId;
+  const vp = toViewport(mxCanvas, myCanvas);
+  detachBtn.style.left = vp.x + 'px';
+  detachBtn.style.top  = vp.y + 'px';
+  detachBtn.classList.add('visible');
+}
+
+function scheduleHideDetachBtn() {
+  detachHideTimer = setTimeout(() => {
+    detachBtn.classList.remove('visible');
+    detachTargetId = null;
+  }, 160);
+}
+
+function hideDetachBtn() {
+  clearTimeout(detachHideTimer);
+  detachBtn.classList.remove('visible');
+  detachTargetId = null;
+}
+
+detachBtn.addEventListener('mouseenter', () => clearTimeout(detachHideTimer));
+detachBtn.addEventListener('mouseleave', scheduleHideDetachBtn);
+detachBtn.addEventListener('click', () => {
+  if (!detachTargetId) return;
+  pushUndo();
+  const node = nodes.find(n => n.id === detachTargetId);
+  if (!node) return;
+  node.parentId = null;
+  // Rebuild node element so it gains island styling and Connect → button
+  elOf[node.id]?.remove(); delete elOf[node.id];
+  buildNode(node);
+  hideDetachBtn();
+  drawConnectors();
+});
+
+// ── Type picker ────────────────────────────────────────────────────────
+const typePicker = document.getElementById('type-picker');
+let typePickerTarget = null;
+const ALL_TYPES = ['reason','objection','rebuttal','evidence'];
+
+function showTypePicker(nodeId, clientX, clientY) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  typePickerTarget = nodeId;
+  typePicker.querySelectorAll('.type-picker-btn').forEach(b => b.remove());
+  ALL_TYPES.filter(t => t !== node.type).forEach(type => {
+    const btn = document.createElement('button');
+    btn.className = 'type-picker-btn';
+    btn.textContent = TYPE_LABEL[type];
+    btn.style.borderLeft = `3px solid var(--c-${type})`;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      pushUndo();
+      node.type = type;
+      elOf[nodeId]?.remove(); delete elOf[nodeId];
+      buildNode(node);
+      drawConnectors();
+      hideTypePicker();
+    });
+    typePicker.appendChild(btn);
+  });
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const estH = ALL_TYPES.length * 30 + 30;
+  typePicker.style.left = Math.min(clientX, vw - 130) + 'px';
+  typePicker.style.top  = Math.min(clientY, vh - estH) + 'px';
+  typePicker.classList.add('visible');
+}
+
+function hideTypePicker() {
+  typePicker.classList.remove('visible');
+  typePickerTarget = null;
+}
+
+document.addEventListener('mousedown', e => {
+  if (!typePicker.contains(e.target)) hideTypePicker();
+});
+
+// ── Undo button + keyboard shortcut ───────────────────────────────────
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+});
+
 // ── Argument check ────────────────────────────────────────────────────
 function runCheck() {
   const childrenOf = id => nodes.filter(n => n.parentId === id);
@@ -1356,7 +1565,8 @@ async function loadMap(code) {
     const snap = await getDoc(doc(db,'argmap_maps',upper));
     if (!snap.exists()) { showToast('No map found for that code.', 3000); return; }
     const data = snap.data();
-    // Clear canvas
+    // Clear canvas and undo history
+    undoStack.length = 0;
     nodes.forEach(n=>{ elOf[n.id]?.remove(); delete elOf[n.id]; });
     nodes = (data.nodes||[]).map(n=>({...n}));
     if (data.title) document.getElementById('map-name').textContent = data.title;
