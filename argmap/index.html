@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Argument Mapper</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Georgia, 'Times New Roman', serif;
+  background: #f5f3ef;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.app-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  background: #ffffff;
+  border-bottom: 1px solid #e4e0d8;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 14px;
+  z-index: 300;
+}
+
+.app-logo {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3a3a3a;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.header-rule {
+  width: 1px;
+  height: 16px;
+  background: #ddd;
+  flex-shrink: 0;
+}
+
+.map-name {
+  font-size: 13px;
+  color: #999;
+  font-style: italic;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-chip {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: #f0ece4;
+  color: #999;
+  white-space: nowrap;
+}
+
+/* ── Viewport ─────────────────────────────────────────────────────── */
+.viewport {
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+  cursor: default;
+}
+
+.viewport.is-panning { cursor: grabbing !important; }
+
+/* ── Canvas (the transform target) ───────────────────────────────── */
+.canvas {
+  position: absolute;
+  top: 0; left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ── SVG connector layer ──────────────────────────────────────────── */
+.connector-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 0; height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ── Snap guide ───────────────────────────────────────────────────── */
+.snap-guide {
+  position: absolute;
+  left: -2000px;
+  width: 8000px;
+  height: 0;
+  border-top: 1.5px dashed rgba(90, 130, 190, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 4;
+}
+.snap-guide.visible { opacity: 1; }
+
+/* ── Node cards ───────────────────────────────────────────────────── */
+.node {
+  position: absolute;
+  width: 228px;
+  background: #ffffff;
+  border: 1px solid #e2dfd8;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 1px rgba(0,0,0,0.04);
+  cursor: move;
+  transition: box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.node:hover {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.10), 0 0 1px rgba(0,0,0,0.04);
+}
+
+.node.is-dragging {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14), 0 0 1px rgba(0,0,0,0.06);
+  z-index: 50;
+}
+
+/* Left accent border by type */
+.node[data-type="contention"] { border-left: 4px solid #5c6bc0; }
+.node[data-type="reason"]     { border-left: 4px solid #43a047; }
+.node[data-type="objection"]  { border-left: 4px solid #ef5350; }
+.node[data-type="rebuttal"]   { border-left: 4px solid #fb8c00; }
+.node[data-type="evidence"]   { border-left: 4px solid #00897b; }
+
+/* Node head row */
+.node-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 7px 6px 9px;
+  border-bottom: 1px solid #f0ece5;
+}
+
+.type-badge {
+  font-size: 9.5px;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  line-height: 1.5;
+}
+
+.node[data-type="contention"] .type-badge { background: #ede7f6; color: #4527a0; }
+.node[data-type="reason"]     .type-badge { background: #e8f5e9; color: #2e7d32; }
+.node[data-type="objection"]  .type-badge { background: #ffebee; color: #c62828; }
+.node[data-type="rebuttal"]   .type-badge { background: #fff3e0; color: #e65100; }
+.node[data-type="evidence"]   .type-badge { background: #e0f2f1; color: #00695c; }
+
+.btn-delete {
+  width: 20px; height: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+}
+.btn-delete:hover { color: #ef5350; background: #fff2f2; }
+
+/* Node body */
+.node-body {
+  padding: 8px 10px 10px 9px;
+}
+
+.node-text {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #2d2d2d;
+  cursor: text;
+  overflow: hidden;
+  min-height: 40px;
+  display: block;
+}
+.node-text::placeholder { color: #d0cbc3; }
+
+/* Evidence source field */
+.source-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0ece5;
+}
+
+.source-label {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #bbb;
+  margin-bottom: 3px;
+}
+
+.source-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: #777;
+  line-height: 1.45;
+  cursor: text;
+}
+.source-input::placeholder { color: #d0cbc3; }
+
+/* ── Zoom controls ────────────────────────────────────────────────── */
+.zoom-panel {
+  position: fixed;
+  bottom: 22px; right: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 300;
+}
+
+.zoom-btn {
+  width: 30px; height: 30px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  transition: background 0.1s;
+  flex-shrink: 0;
+}
+.zoom-btn:hover { background: #f5f3ef; }
+
+.zoom-readout {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: #bbb;
+  letter-spacing: 0.04em;
+}
+
+/* ── Hint ─────────────────────────────────────────────────────────── */
+.hint {
+  position: fixed;
+  bottom: 18px; left: 22px;
+  font-size: 10.5px;
+  font-family: 'Courier New', monospace;
+  color: #c8c4bc;
+  line-height: 1.8;
+  z-index: 300;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">Argument Mapper</div>
+  <div class="header-rule"></div>
+  <div class="map-name">Should governments intervene in markets to correct market failures?</div>
+  <div class="status-chip">Draft</div>
+</header>
+
+<div class="viewport" id="viewport">
+  <div class="canvas" id="canvas">
+    <svg class="connector-svg" id="svg-layer">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6"
+                refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#c9c4bb"/>
+        </marker>
+      </defs>
+    </svg>
+    <div class="snap-guide" id="snap-guide"></div>
+  </div>
+</div>
+
+<div class="zoom-panel">
+  <button class="zoom-btn" id="btn-zoom-in" title="Zoom in">+</button>
+  <div class="zoom-readout" id="zoom-readout">100%</div>
+  <button class="zoom-btn" id="btn-zoom-out" title="Zoom out">−</button>
+</div>
+
+<div class="hint">
+  Drag nodes &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Alt+drag for free vertical
+</div>
+
+<script>
+'use strict';
+
+// ─── Node data ────────────────────────────────────────────────────────────────
+const INITIAL_NODES = [
+  {
+    id: 'n0', type: 'contention', parentId: null,
+    text: 'Governments should intervene in markets to correct market failures.',
+    source: '',
+    x: 386, y: 50,
+  },
+  {
+    id: 'n1', type: 'reason', parentId: 'n0',
+    text: 'Markets underprovide public goods due to the free-rider problem.',
+    source: '',
+    x: 100, y: 280,
+  },
+  {
+    id: 'n2', type: 'reason', parentId: 'n0',
+    text: 'Negative externalities lead to overconsumption without intervention.',
+    source: '',
+    x: 690, y: 280,
+  },
+  {
+    id: 'n3', type: 'evidence', parentId: 'n1',
+    text: 'Demonstrates the inevitability of underprovision in competitive markets.',
+    source: 'Samuelson (1954) — public goods theory',
+    x: -20, y: 510,
+  },
+  {
+    id: 'n4', type: 'objection', parentId: 'n1',
+    text: 'Private provision can emerge through voluntary mechanisms (Coase).',
+    source: '',
+    x: 270, y: 510,
+  },
+  {
+    id: 'n5', type: 'rebuttal', parentId: 'n4',
+    text: 'Transaction costs make voluntary provision inefficient at scale.',
+    source: '',
+    x: 270, y: 730,
+  },
+  {
+    id: 'n6', type: 'evidence', parentId: 'n2',
+    text: 'Provides the theoretical basis for corrective Pigouvian taxes.',
+    source: 'Pigou (1920) — externality tax framework',
+    x: 690, y: 510,
+  },
+];
+
+// Snap y-positions by tree depth (pixels in canvas-space)
+const SNAP_LEVELS = [50, 280, 510, 730, 950];
+
+const NODE_W = 228;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let nodes = INITIAL_NODES.map(n => ({ ...n }));
+const elOf = {};             // nodeId → DOM element
+let tx = 90, ty = 36, sc = 1; // canvas transform
+let drag  = null;  // { nodeId, ox, oy } — node drag in progress
+let pan   = null;  // { cx0, cy0, tx0, ty0 } — canvas pan in progress
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+const viewport  = document.getElementById('viewport');
+const canvas    = document.getElementById('canvas');
+const svgLayer  = document.getElementById('svg-layer');
+const snapGuide = document.getElementById('snap-guide');
+const zoomOut   = document.getElementById('zoom-readout');
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function applyTransform() {
+  canvas.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`;
+  zoomOut.textContent = Math.round(sc * 100) + '%';
+}
+
+// Convert viewport clientX/Y to canvas-space coordinates
+function toCanvas(cx, cy) {
+  const r = viewport.getBoundingClientRect();
+  return { x: (cx - r.left - tx) / sc, y: (cy - r.top - ty) / sc };
+}
+
+// Compute depth of a node in the tree
+function nodeDepth(id) {
+  const n = nodes.find(n => n.id === id);
+  if (!n || !n.parentId) return 0;
+  return 1 + nodeDepth(n.parentId);
+}
+
+// Return the snap-level y for a given node id
+function snapY(id) {
+  const d = nodeDepth(id);
+  return SNAP_LEVELS[Math.min(d, SNAP_LEVELS.length - 1)];
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function autoResize(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+}
+
+// ─── Connectors ───────────────────────────────────────────────────────────────
+function drawConnectors() {
+  // Remove all children except <defs> (first child)
+  while (svgLayer.childNodes.length > 1) {
+    svgLayer.removeChild(svgLayer.lastChild);
+  }
+
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    const parent = nodes.find(n => n.id === node.parentId);
+    if (!parent) continue;
+
+    const cEl = elOf[node.id];
+    const pEl = elOf[parent.id];
+    if (!cEl || !pEl) continue;
+
+    const cw = cEl.offsetWidth  || NODE_W;
+    const ch = cEl.offsetHeight || 80;
+    const pw = pEl.offsetWidth  || NODE_W;
+    const ph = pEl.offsetHeight || 80;
+
+    // From child's top-centre up to parent's bottom-centre
+    const x1 = node.x   + cw / 2;
+    const y1 = node.y;              // child top
+    const x2 = parent.x + pw / 2;
+    const y2 = parent.y + ph;       // parent bottom
+
+    // Cubic bezier: depart upward, arrive from below
+    const stretch = Math.max(40, Math.abs(y1 - y2) * 0.42);
+    const d = `M${x1},${y1} C${x1},${y1 - stretch} ${x2},${y2 + stretch} ${x2},${y2}`;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#cdc9c1');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('marker-end', 'url(#arrow)');
+    svgLayer.appendChild(path);
+  }
+}
+
+// ─── Build a node card ────────────────────────────────────────────────────────
+const TYPE_LABEL = {
+  contention: 'Contention',
+  reason:     'Reason',
+  objection:  'Objection',
+  rebuttal:   'Rebuttal',
+  evidence:   'Evidence',
+};
+
+function buildNode(node) {
+  const el = document.createElement('div');
+  el.className  = 'node';
+  el.dataset.type = node.type;
+  el.dataset.id   = node.id;
+  el.style.left   = node.x + 'px';
+  el.style.top    = node.y + 'px';
+
+  const isEvidence = node.type === 'evidence';
+
+  el.innerHTML = `
+    <div class="node-head">
+      <span class="type-badge">${TYPE_LABEL[node.type]}</span>
+      <button class="btn-delete" title="Delete node">×</button>
+    </div>
+    <div class="node-body">
+      <textarea class="node-text" placeholder="Write your argument…" rows="2">${escHtml(node.text)}</textarea>
+      ${isEvidence ? `
+      <div class="source-row">
+        <div class="source-label">Source</div>
+        <input class="source-input" type="text"
+               placeholder="Author (Year) — description"
+               value="${escHtml(node.source || '')}">
+      </div>` : ''}
+    </div>`;
+
+  // Textarea auto-resize + sync
+  const ta = el.querySelector('.node-text');
+  autoResize(ta);
+  ta.addEventListener('input', () => {
+    node.text = ta.value;
+    autoResize(ta);
+    drawConnectors();
+  });
+
+  // Source field sync
+  if (isEvidence) {
+    const si = el.querySelector('.source-input');
+    si.addEventListener('input', () => { node.source = si.value; });
+  }
+
+  // Delete: stop propagation on mousedown so we don't start a node drag
+  const delBtn = el.querySelector('.btn-delete');
+  delBtn.addEventListener('mousedown', e => e.stopPropagation());
+  delBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    removeNode(node.id);
+  });
+
+  // Start node drag on card mousedown (skip interactive children)
+  el.addEventListener('mousedown', e => {
+    const tag = e.target.tagName;
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+    if (e.target.closest('.btn-delete')) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const pos = toCanvas(e.clientX, e.clientY);
+    drag = { nodeId: node.id, ox: pos.x - node.x, oy: pos.y - node.y };
+    el.classList.add('is-dragging');
+
+    if (!e.altKey) {
+      snapGuide.style.top = snapY(node.id) + 'px';
+      snapGuide.classList.add('visible');
+    }
+  });
+
+  canvas.appendChild(el);
+  elOf[node.id] = el;
+}
+
+// ─── Remove node + descendants ────────────────────────────────────────────────
+function removeNode(id) {
+  const dead = [];
+  function collect(nid) {
+    dead.push(nid);
+    nodes.filter(n => n.parentId === nid).forEach(n => collect(n.id));
+  }
+  collect(id);
+
+  dead.forEach(nid => {
+    elOf[nid]?.remove();
+    delete elOf[nid];
+  });
+  nodes = nodes.filter(n => !dead.includes(n.id));
+  drawConnectors();
+}
+
+// ─── Mouse events ─────────────────────────────────────────────────────────────
+
+// Canvas pan: only when clicking the bare canvas/viewport (not a node)
+viewport.addEventListener('mousedown', e => {
+  if (e.target === viewport || e.target === canvas || e.target === svgLayer) {
+    pan = { cx0: e.clientX, cy0: e.clientY, tx0: tx, ty0: ty };
+    viewport.classList.add('is-panning');
+    e.preventDefault();
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (drag) {
+    const node = nodes.find(n => n.id === drag.nodeId);
+    const el   = elOf[drag.nodeId];
+    if (!node || !el) return;
+
+    const pos = toCanvas(e.clientX, e.clientY);
+    node.x = pos.x - drag.ox;
+    node.y = pos.y - drag.oy;
+    el.style.left = node.x + 'px';
+    el.style.top  = node.y + 'px';
+
+    // Keep snap guide at target level while dragging
+    if (!e.altKey) {
+      snapGuide.style.top = snapY(drag.nodeId) + 'px';
+    }
+
+    drawConnectors();
+    return;
+  }
+
+  if (pan) {
+    tx = pan.tx0 + (e.clientX - pan.cx0);
+    ty = pan.ty0 + (e.clientY - pan.cy0);
+    applyTransform();
+  }
+});
+
+document.addEventListener('mouseup', e => {
+  if (drag) {
+    const node = nodes.find(n => n.id === drag.nodeId);
+    const el   = elOf[drag.nodeId];
+
+    // Snap to level unless Alt is held
+    if (node && el && !e.altKey) {
+      node.y = snapY(drag.nodeId);
+      el.style.top = node.y + 'px';
+    }
+
+    el?.classList.remove('is-dragging');
+    snapGuide.classList.remove('visible');
+    drag = null;
+    drawConnectors();
+  }
+
+  if (pan) {
+    pan = null;
+    viewport.classList.remove('is-panning');
+  }
+});
+
+// ─── Zoom ─────────────────────────────────────────────────────────────────────
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor   = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+  const newScale = Math.min(2.5, Math.max(0.2, sc * factor));
+
+  const r  = viewport.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+
+  tx = mx - (mx - tx) * (newScale / sc);
+  ty = my - (my - ty) * (newScale / sc);
+  sc = newScale;
+  applyTransform();
+}, { passive: false });
+
+document.getElementById('btn-zoom-in').addEventListener('click', () => {
+  sc = Math.min(2.5, sc * 1.2);
+  applyTransform();
+});
+document.getElementById('btn-zoom-out').addEventListener('click', () => {
+  sc = Math.max(0.2, sc / 1.2);
+  applyTransform();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+nodes.forEach(buildNode);
+applyTransform();
+
+// Two rAF passes: first to let the DOM lay out, second to measure offsetHeight
+requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
+
+window.addEventListener('resize', drawConnectors);
+</script>
+</body>
+</html>
