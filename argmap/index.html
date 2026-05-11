@@ -471,6 +471,29 @@ body {
   font-size:12px; color:#bbb; font-style:italic; line-height:1.6;
 }
 
+/* ── Check modal ──────────────────────────────────────────────────────── */
+.check-issues { display:flex; flex-direction:column; gap:5px; max-height:230px; overflow-y:auto; }
+.check-issue {
+  display:grid; grid-template-columns:76px 1fr; align-items:baseline; gap:8px;
+  padding:7px 12px; border-radius:4px; background:#fafaf8; border:1px solid #ede9e1;
+  font-size:12.5px; line-height:1.5;
+}
+.check-issue-badge {
+  font-family:'Courier New',monospace; font-size:9.5px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em;
+  padding:2px 6px; border-radius:3px; text-align:center;
+}
+.check-issue-text { color:#555; }
+.check-ok {
+  text-align:center; color:#43a047; font-size:12px;
+  font-family:'Courier New',monospace; padding:10px 0; letter-spacing:.04em;
+}
+.check-summary {
+  background:#f5f3ef; border-radius:5px; padding:14px 16px;
+  font-size:13px; line-height:1.75; color:#3a3a3a;
+  border-left:3px solid var(--c-contention);
+}
+
 /* ── Toast ────────────────────────────────────────────────────────────── */
 #toast {
   position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
@@ -491,6 +514,7 @@ body {
   <button class="hdr-btn" id="btn-add-node"><span style="font-size:14px;line-height:1">+</span> Node</button>
   <button class="hdr-btn" id="btn-add-island"><span style="font-size:14px;line-height:1">+</span> Draft</button>
   <button class="hdr-btn" id="btn-export">Export</button>
+  <button class="hdr-btn" id="btn-check">Check</button>
   <button class="hdr-btn primary" id="btn-save">Save</button>
   <button class="hdr-btn" id="btn-load">Load</button>
   <!-- signed-in state -->
@@ -582,6 +606,17 @@ body {
   <div class="modal-footer">
     <button class="btn-confirm" id="btn-copy-code">Copy code</button>
     <button class="btn-cancel" id="btn-close-code">Close</button>
+  </div>
+</div>
+
+<!-- Check modal -->
+<div class="modal-backdrop" id="check-backdrop"></div>
+<div class="modal" id="check-modal">
+  <div class="modal-title">Argument Check</div>
+  <div class="check-issues" id="check-issues"></div>
+  <div class="check-summary" id="check-summary"></div>
+  <div class="modal-footer">
+    <button class="btn-cancel" id="btn-close-check">Close</button>
   </div>
 </div>
 
@@ -1207,6 +1242,69 @@ function downloadFile(text, filename) {
 }
 document.getElementById('btn-export-dl-txt').addEventListener('click',()=>downloadFile(exportPre.textContent,'argument-map.txt'));
 document.getElementById('btn-export-dl-md').addEventListener('click', ()=>downloadFile(exportPre.textContent,'argument-map.md'));
+
+// ── Argument check ────────────────────────────────────────────────────
+function runCheck() {
+  const childrenOf = id => nodes.filter(n => n.parentId === id);
+  const contention = nodes.find(n => n.type === 'contention');
+  const issues = [];
+  for (const n of nodes) {
+    if (['draft','contention','evidence'].includes(n.type)) continue;
+    const ch = childrenOf(n.id);
+    if (!ch.some(c => c.type === 'evidence'))
+      issues.push({ nodeType:n.type, text:n.text, issue:'no-evidence', msg:'No supporting Evidence' });
+    if (n.type === 'objection' && !ch.some(c => c.type === 'rebuttal'))
+      issues.push({ nodeType:n.type, text:n.text, issue:'no-rebuttal', msg:'No Rebuttal' });
+  }
+  const topReasons = contention
+    ? childrenOf(contention.id).filter(n => n.type === 'reason') : [];
+  return { issues, contention, topReasons };
+}
+
+function openCheckModal() {
+  const { issues, contention, topReasons } = runCheck();
+  const issuesEl  = document.getElementById('check-issues');
+  const summaryEl = document.getElementById('check-summary');
+
+  issuesEl.innerHTML = '';
+  if (issues.length === 0) {
+    issuesEl.innerHTML = '<div class="check-ok">No issues found.</div>';
+  } else {
+    issues.forEach(iss => {
+      const short = iss.text.length > 58 ? iss.text.slice(0,58)+'…' : iss.text;
+      const div = document.createElement('div');
+      div.className = 'check-issue';
+      div.innerHTML =
+        `<span class="check-issue-badge" style="background:var(--badge-${iss.nodeType}-bg);color:var(--badge-${iss.nodeType}-fg)">${TYPE_LABEL[iss.nodeType]}</span>` +
+        `<span class="check-issue-text">${escHtml(iss.msg)}: <em>"${escHtml(short)}"</em></span>`;
+      issuesEl.appendChild(div);
+    });
+  }
+
+  if (contention && topReasons.length) {
+    const ct = contention.text.replace(/[.?!]\s*$/, '');
+    const rl = topReasons.map(r => `<em>${escHtml(r.text.replace(/[.?!]\s*$/,''))}</em>`).join('; ');
+    summaryEl.innerHTML =
+      `If you assume the following are true, are you convinced of the contention that "<strong>${escHtml(ct)}</strong>"?<br><br>${rl}.`;
+    summaryEl.style.display = '';
+  } else {
+    summaryEl.style.display = 'none';
+  }
+
+  document.getElementById('check-modal').classList.add('visible');
+  document.getElementById('check-backdrop').classList.add('visible');
+}
+
+const checkBackdrop = document.getElementById('check-backdrop');
+document.getElementById('btn-check').addEventListener('click', openCheckModal);
+document.getElementById('btn-close-check').addEventListener('click', () => {
+  document.getElementById('check-modal').classList.remove('visible');
+  checkBackdrop.classList.remove('visible');
+});
+checkBackdrop.addEventListener('click', () => {
+  document.getElementById('check-modal').classList.remove('visible');
+  checkBackdrop.classList.remove('visible');
+});
 
 // ── Firebase save / load ───────────────────────────────────────────────
 function genCode() {
