@@ -53,7 +53,14 @@ body {
 }
 .app-logo { font-size: var(--font-ui); font-weight: 600; color: #3a3a3a; letter-spacing:.025em; white-space:nowrap; }
 .header-rule { width:1px; height:16px; background:#ddd; flex-shrink:0; }
-.map-name { font-size: var(--font-ui); color:#999; font-style:italic; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.map-name {
+  font-size: 15px; font-weight: 500; color: #2c2c2c;
+  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: text; border-radius: 4px; padding: 2px 6px; margin: 0 -6px;
+  outline: none; transition: background .1s;
+}
+.map-name:hover { background: #f5f3ef; }
+.map-name:focus { background: #f5f3ef; box-shadow: 0 0 0 1.5px #c8c4bc; white-space: normal; overflow: visible; }
 .status-chip {
   font-size:10px; font-family:'Courier New',monospace; font-weight:700;
   letter-spacing:.1em; text-transform:uppercase; padding:3px 8px;
@@ -393,7 +400,7 @@ body {
 <header class="app-header">
   <div class="app-logo">Argument Mapper</div>
   <div class="header-rule"></div>
-  <div class="map-name" id="map-name">Should governments intervene in markets to correct market failures?</div>
+  <div class="map-name" id="map-name" contenteditable="true" spellcheck="false">Should governments intervene in markets to correct market failures?</div>
   <button class="hdr-btn" id="btn-new">New</button>
   <button class="hdr-btn" id="btn-add-node"><span style="font-size:14px;line-height:1">+</span> Node</button>
   <button class="hdr-btn" id="btn-add-island"><span style="font-size:14px;line-height:1">+</span> Draft</button>
@@ -645,6 +652,18 @@ function newMap() {
 }
 
 document.getElementById('btn-new').addEventListener('click', newMap);
+
+// Map title editing
+const mapNameEl = document.getElementById('map-name');
+mapNameEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); mapNameEl.blur(); }
+});
+// Prevent pasting formatted content
+mapNameEl.addEventListener('paste', e => {
+  e.preventDefault();
+  const text = e.clipboardData.getData('text/plain');
+  document.execCommand('insertText', false, text);
+});
 
 // ── Connectors ─────────────────────────────────────────────────────────
 function drawConnectors() {
@@ -1100,6 +1119,7 @@ async function saveMap() {
     }
     await setDoc(doc(db,'argmap_maps',code), {
       nodes: nodes.map(n=>({...n})),
+      title: document.getElementById('map-name').textContent.trim(),
       savedAt: new Date().toISOString(),
     });
     currentCode=code;
@@ -1125,6 +1145,7 @@ async function loadMap(code) {
     // Clear canvas
     nodes.forEach(n=>{ elOf[n.id]?.remove(); delete elOf[n.id]; });
     nodes = (data.nodes||[]).map(n=>({...n}));
+    if (data.title) document.getElementById('map-name').textContent = data.title;
     uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
     nodes.forEach(buildNode);
     currentCode=upper;
