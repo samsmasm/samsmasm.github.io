@@ -221,7 +221,7 @@ body {
   cursor:move; transition:box-shadow .15s ease, outline .1s ease;
   user-select:none;
 }
-.node.layout-animate { transition:box-shadow .15s ease, outline .1s ease, left .22s ease; }
+.node.layout-animate { transition:box-shadow .15s ease, outline .1s ease, left .28s ease, top .28s ease; }
 .node:hover       { box-shadow:0 2px 10px rgba(0,0,0,.10), 0 0 1px rgba(0,0,0,.04); }
 .node.is-dragging { box-shadow:0 8px 24px rgba(0,0,0,.14); z-index:50; }
 
@@ -271,13 +271,18 @@ body {
 .node[data-type="evidence"]   .type-badge { background:var(--badge-evidence-bg);   color:var(--badge-evidence-fg); }
 .node[data-type="draft"]      .type-badge { background:#f0ede8; color:#b0aba3; }
 
-.btn-delete {
+.node-btns { display:flex; align-items:center; gap:1px; }
+.btn-delete, .btn-collapse {
   width:20px; height:20px; border:none; background:transparent; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  border-radius:4px; color:#ccc; font-size:16px; line-height:1; padding:0; flex-shrink:0;
+  border-radius:4px; color:#ccc; font-size:12px; line-height:1; padding:0; flex-shrink:0;
   transition:color .12s, background .12s;
 }
+.btn-delete { font-size:16px; }
 .btn-delete:hover { color:#ef5350; background:#fff2f2; }
+.btn-collapse:hover { color:#888; background:#f5f3ef; }
+.node[data-collapsed] > .node-body { display:none; }
+.node[data-collapsed] { opacity:.85; }
 
 .node-body { padding:8px 10px 10px 9px; }
 .node-text {
@@ -549,6 +554,28 @@ body {
   opacity:0; transition:opacity .2s; pointer-events:none;
 }
 #toast.visible { opacity:1; }
+
+/* ── Minimap ──────────────────────────────────────────────────────────── */
+#minimap {
+  position:fixed; bottom:18px; left:16px;
+  width:180px; height:124px;
+  background:rgba(250,248,245,.94); border:1px solid #ddd; border-radius:5px;
+  z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.08); cursor:pointer;
+  display:block;
+}
+
+/* ── Print ────────────────────────────────────────────────────────────── */
+@media print {
+  .app-header, .zoom-panel, .hint, #toast, #my-maps-panel,
+  #hover-strip, #detach-btn, #type-picker, #conn-hint, .snap-guide,
+  .modal-backdrop, .modal, #add-panel, #load-panel, #minimap,
+  .btn-delete, .btn-collapse, .btn-connect, .island-footer,
+  .source-label { display:none !important; }
+  body { height:auto; overflow:visible; background:#fff; }
+  .viewport { position:static !important; overflow:visible !important; top:0 !important; }
+  .node { box-shadow:none !important; cursor:default !important; }
+  @page { margin:12mm; size:landscape; }
+}
 </style>
 </head>
 <body>
@@ -562,6 +589,8 @@ body {
   <button class="hdr-btn" id="btn-add-node"><span style="font-size:14px;line-height:1">+</span> Node</button>
   <button class="hdr-btn" id="btn-add-island"><span style="font-size:14px;line-height:1">+</span> Draft</button>
   <button class="hdr-btn" id="btn-export">Export</button>
+  <button class="hdr-btn" id="btn-tidy">Tidy</button>
+  <button class="hdr-btn" id="btn-print">Print</button>
   <button class="hdr-btn" id="btn-check">Check</button>
   <button class="hdr-btn primary" id="btn-save">Save</button>
   <button class="hdr-btn" id="btn-load">Load</button>
@@ -705,7 +734,10 @@ body {
   <button class="zoom-btn" id="btn-zoom-in">+</button>
   <div class="zoom-readout" id="zoom-readout">100%</div>
   <button class="zoom-btn" id="btn-zoom-out">−</button>
+  <button class="zoom-btn" id="btn-zoom-fit" title="Fit all" style="font-size:11px">⊡</button>
 </div>
+
+<canvas id="minimap" width="180" height="124" title="Click to centre view"></canvas>
 
 <div class="hint">
   Drag nodes &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Alt+drag: free vertical
@@ -809,6 +841,7 @@ function rebuildAll() {
   if (typeof hideTypePicker === 'function') hideTypePicker();
   nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
   nodes.forEach(buildNode);
+  applyCollapsed();
   requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
 }
 
@@ -823,6 +856,7 @@ function applyTransform() {
   canvas.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`;
   zoomReadout.textContent = Math.round(sc*100)+'%';
   updateStripPosition();
+  updateMinimap();
 }
 
 function toCanvas(cx, cy) {
@@ -898,6 +932,7 @@ function drawConnectors() {
   while (svgLayer.childNodes.length > 1) svgLayer.removeChild(svgLayer.lastChild);
   for (const node of nodes) {
     if (!node.parentId) continue;
+    if (isHiddenByCollapse(node.id)) continue;
     const parent = nodes.find(n => n.id===node.parentId);
     if (!parent) continue;
     const cEl=elOf[node.id], pEl=elOf[parent.id];
@@ -926,6 +961,7 @@ function drawConnectors() {
     hitPath.addEventListener('mouseleave', scheduleHideDetachBtn);
     svgLayer.appendChild(hitPath);
   }
+  updateMinimap();
 }
 
 // ── Build node card ────────────────────────────────────────────────────
@@ -937,16 +973,21 @@ function buildNode(node) {
   el.style.left   = node.x+'px';
   el.style.top    = node.y+'px';
 
-  const isEv     = node.type === 'evidence';
-  const isDraft  = node.type === 'draft';
-  const isIsland = node.parentId === null && node.type !== 'contention';
-
+  const isEv       = node.type === 'evidence';
+  const isDraft    = node.type === 'draft';
+  const isIsland   = node.parentId === null && node.type !== 'contention';
+  const canCollapse = !['evidence','draft'].includes(node.type);
+  node.collapsed   = node.collapsed || false;
+  if (node.collapsed) el.dataset.collapsed = 'true';
   if (isIsland && !isDraft) el.dataset.island = 'true';
 
   el.innerHTML = `
     <div class="node-head">
       <span class="type-badge"${node.type !== 'contention' ? ' data-clickable="true"' : ''}>${TYPE_LABEL[node.type]}</span>
-      <button class="btn-delete" title="Delete">×</button>
+      <div class="node-btns">
+        ${canCollapse ? `<button class="btn-collapse" title="Collapse/expand">${node.collapsed ? '▸' : '▾'}</button>` : ''}
+        <button class="btn-delete" title="Delete">×</button>
+      </div>
     </div>
     <div class="node-body">
       <textarea class="node-text" placeholder="${isDraft?'Draft idea…':'Write your argument…'}" rows="2">${escHtml(node.text)}</textarea>
@@ -979,6 +1020,13 @@ function buildNode(node) {
     const badge = el.querySelector('.type-badge');
     badge.addEventListener('mousedown', e => e.stopPropagation());
     badge.addEventListener('click', e => { e.stopPropagation(); showTypePicker(node.id, e.clientX, e.clientY); });
+  }
+
+  // Collapse toggle
+  if (canCollapse) {
+    const btnCol = el.querySelector('.btn-collapse');
+    btnCol.addEventListener('mousedown', e => e.stopPropagation());
+    btnCol.addEventListener('click', e => { e.stopPropagation(); toggleCollapse(node.id); });
   }
 
   const delBtn = el.querySelector('.btn-delete');
@@ -1092,7 +1140,7 @@ function resolveOverlaps() {
   const W = 234, GAP = 22;
   // Group non-draft nodes by Y position
   const groups = {};
-  nodes.filter(n => n.type !== 'draft').forEach(n => {
+  nodes.filter(n => n.type !== 'draft' && !isHiddenByCollapse(n.id)).forEach(n => {
     if (!groups[n.y]) groups[n.y] = [];
     groups[n.y].push(n);
   });
@@ -1123,6 +1171,8 @@ function addNodeOfType(type, parentId, text='', source='') {
   const x        = siblings.length ? Math.max(...siblings.map(n=>n.x))+260 : parent.x;
   const newNode  = { id:`n${uidCounter++}`, type, parentId, text, source, x, y };
   nodes.push(newNode);
+  // Auto-expand parent if collapsed so new child is visible
+  if (parent && parent.collapsed) { parent.collapsed = false; applyCollapsed(); }
   const el = buildNode(newNode);
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ drawConnectors(); resolveOverlaps(); el.querySelector('.node-text')?.focus(); }));
   return newNode;
@@ -1361,6 +1411,175 @@ function downloadFile(text, filename) {
 }
 document.getElementById('btn-export-dl-txt').addEventListener('click',()=>downloadFile(exportPre.textContent,'argument-map.txt'));
 document.getElementById('btn-export-dl-md').addEventListener('click', ()=>downloadFile(exportPre.textContent,'argument-map.md'));
+
+// ── Collapse ───────────────────────────────────────────────────────────
+function isHiddenByCollapse(nodeId) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node || !node.parentId) return false;
+  const parent = nodes.find(n => n.id === node.parentId);
+  if (!parent) return false;
+  return parent.collapsed || isHiddenByCollapse(node.parentId);
+}
+
+function applyCollapsed() {
+  nodes.forEach(n => {
+    const el = elOf[n.id]; if (!el) return;
+    const hidden = isHiddenByCollapse(n.id);
+    el.style.display = hidden ? 'none' : '';
+    if (n.collapsed) { el.dataset.collapsed = 'true'; }
+    else             { delete el.dataset.collapsed; }
+    const btn = el.querySelector('.btn-collapse');
+    if (btn) btn.textContent = n.collapsed ? '▸' : '▾';
+  });
+}
+
+function toggleCollapse(nodeId) {
+  const node = nodes.find(n => n.id === nodeId); if (!node) return;
+  const children = nodes.filter(n => n.parentId === nodeId);
+  if (!children.length) return; // nothing to collapse
+  node.collapsed = !node.collapsed;
+  applyCollapsed();
+  drawConnectors();
+}
+
+// ── Auto-layout ("Tidy") ───────────────────────────────────────────────
+function autoLayout() {
+  pushUndo();
+  const nodeW = 234, gap = 30;
+  const root = nodes.find(n => n.type === 'contention');
+  if (!root) { showToast('No contention node found'); return; }
+
+  const cache = {};
+  function subtreeW(id) {
+    if (cache[id] !== undefined) return cache[id];
+    const ch = nodes.filter(n => n.parentId === id);
+    if (!ch.length) return (cache[id] = nodeW);
+    const total = ch.reduce((s, c) => s + subtreeW(c.id), 0) + (ch.length - 1) * gap;
+    return (cache[id] = Math.max(nodeW, total));
+  }
+
+  function assign(id, centerX, depth) {
+    const node = nodes.find(n => n.id === id); if (!node) return;
+    node.x = centerX - nodeW / 2;
+    node.y = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length - 1)];
+    const ch = nodes.filter(n => n.parentId === id);
+    if (!ch.length) return;
+    const totalW = ch.reduce((s, c) => s + subtreeW(c.id), 0) + (ch.length - 1) * gap;
+    let x = centerX - totalW / 2;
+    ch.forEach(c => { const cw = subtreeW(c.id); assign(c.id, x + cw / 2, depth + 1); x += cw + gap; });
+  }
+
+  const r = viewport.getBoundingClientRect();
+  assign(root.id, (r.width / 2 - tx) / sc, 0);
+
+  Object.values(elOf).forEach(el => el.classList.add('layout-animate'));
+  nodes.forEach(n => { const el = elOf[n.id]; if (el) { el.style.left = n.x+'px'; el.style.top = n.y+'px'; } });
+  setTimeout(() => { Object.values(elOf).forEach(el => el.classList.remove('layout-animate')); drawConnectors(); }, 320);
+}
+
+// ── Zoom to fit ────────────────────────────────────────────────────────
+function zoomToFit() {
+  const pad = 60;
+  const r = viewport.getBoundingClientRect();
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  nodes.forEach(n => {
+    const el = elOf[n.id]; if (!el || el.style.display==='none') return;
+    const w = el.offsetWidth||234, h = el.offsetHeight||80;
+    minX=Math.min(minX,n.x); maxX=Math.max(maxX,n.x+w);
+    minY=Math.min(minY,n.y); maxY=Math.max(maxY,n.y+h);
+  });
+  if (!isFinite(minX)) return;
+  const cw = maxX-minX+pad*2, ch = maxY-minY+pad*2;
+  sc = Math.min(Math.min(r.width/cw, r.height/ch), 1.5);
+  sc = Math.max(sc, 0.15);
+  tx = r.width/2  - (minX-pad + cw/2) * sc;
+  ty = r.height/2 - (minY-pad + ch/2) * sc;
+  applyTransform();
+  drawConnectors();
+}
+
+// ── Print ──────────────────────────────────────────────────────────────
+function printMap() {
+  const saveTx=tx, saveTy=ty, saveSc=sc;
+  zoomToFit();
+  setTimeout(() => {
+    window.print();
+    tx=saveTx; ty=saveTy; sc=saveSc;
+    applyTransform();
+    drawConnectors();
+  }, 120);
+}
+
+// ── Minimap ────────────────────────────────────────────────────────────
+const minimapEl = document.getElementById('minimap');
+const mmCtx = minimapEl.getContext('2d');
+const MM_W = 180, MM_H = 124, MM_PAD = 8;
+const TYPE_FILL = { contention:'#5c6bc0', reason:'#43a047', objection:'#ef5350', rebuttal:'#fb8c00', evidence:'#1e88e5', draft:'#c8c4bc' };
+let mmScale=1, mmOffX=0, mmOffY=0; // updated by updateMinimap, used by click handler
+
+function updateMinimap() {
+  mmCtx.clearRect(0, 0, MM_W, MM_H);
+  const visible = nodes.filter(n => { const el=elOf[n.id]; return el && el.style.display!=='none'; });
+  if (!visible.length) return;
+
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  visible.forEach(n => {
+    const el=elOf[n.id], w=el.offsetWidth||234, h=el.offsetHeight||80;
+    minX=Math.min(minX,n.x); maxX=Math.max(maxX,n.x+w);
+    minY=Math.min(minY,n.y); maxY=Math.max(maxY,n.y+h);
+  });
+
+  const cw=maxX-minX||1, ch=maxY-minY||1;
+  mmScale = Math.min((MM_W-MM_PAD*2)/cw, (MM_H-MM_PAD*2)/ch);
+  mmOffX  = MM_PAD + ((MM_W-MM_PAD*2) - cw*mmScale) / 2 - minX*mmScale;
+  mmOffY  = MM_PAD + ((MM_H-MM_PAD*2) - ch*mmScale) / 2 - minY*mmScale;
+
+  // Connectors
+  mmCtx.strokeStyle = '#cdc9c1'; mmCtx.lineWidth = 1;
+  nodes.forEach(n => {
+    if (!n.parentId || isHiddenByCollapse(n.id)) return;
+    const parent=nodes.find(p=>p.id===n.parentId);
+    if (!parent) return;
+    const cEl=elOf[n.id], pEl=elOf[parent.id];
+    if (!cEl||!pEl) return;
+    mmCtx.beginPath();
+    mmCtx.moveTo(n.x*mmScale+mmOffX+(cEl.offsetWidth||234)*mmScale/2, n.y*mmScale+mmOffY);
+    mmCtx.lineTo(parent.x*mmScale+mmOffX+(pEl.offsetWidth||234)*mmScale/2, (parent.y+(pEl.offsetHeight||80))*mmScale+mmOffY);
+    mmCtx.stroke();
+  });
+
+  // Nodes
+  visible.forEach(n => {
+    const el=elOf[n.id], w=(el.offsetWidth||234)*mmScale, h=(el.offsetHeight||80)*mmScale;
+    const x=n.x*mmScale+mmOffX, y=n.y*mmScale+mmOffY;
+    mmCtx.fillStyle='#fff'; mmCtx.fillRect(x,y,w,h);
+    mmCtx.strokeStyle=TYPE_FILL[n.type]||'#aaa'; mmCtx.lineWidth=1.5; mmCtx.strokeRect(x,y,w,h);
+  });
+
+  // Viewport rect
+  const vr = viewport.getBoundingClientRect();
+  const vl=(-tx/sc)*mmScale+mmOffX, vt=(-ty/sc)*mmScale+mmOffY;
+  const vw=(vr.width/sc)*mmScale, vh=(vr.height/sc)*mmScale;
+  mmCtx.strokeStyle='rgba(90,130,190,.65)'; mmCtx.lineWidth=1.5;
+  mmCtx.setLineDash([3,2]); mmCtx.strokeRect(vl,vt,vw,vh); mmCtx.setLineDash([]);
+}
+
+minimapEl.addEventListener('click', e => {
+  const rect = minimapEl.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  // Convert minimap click to canvas coords, then pan to centre on that point
+  const cx = (mx - mmOffX) / mmScale;
+  const cy = (my - mmOffY) / mmScale;
+  const r  = viewport.getBoundingClientRect();
+  tx = r.width/2  - cx * sc;
+  ty = r.height/2 - cy * sc;
+  applyTransform();
+});
+
+// Buttons
+document.getElementById('btn-tidy').addEventListener('click', autoLayout);
+document.getElementById('btn-print').addEventListener('click', printMap);
+document.getElementById('btn-zoom-fit').addEventListener('click', zoomToFit);
 
 // ── Detach button ─────────────────────────────────────────────────────
 const detachBtn = document.getElementById('detach-btn');
