@@ -1071,7 +1071,14 @@ function buildNode(node) {
     if (!el.classList.contains('connectable')) return;
     e.stopPropagation();
     pendingConnTarget = node.id;
-    showConnPicker(node.id, e.clientX, e.clientY);
+    const srcNode = nodes.find(n => n.id === connectionSrc);
+    if (srcNode && srcNode.type !== 'draft') {
+      // Node already has a real type — connect directly, no picker, keep its position
+      upgradeIsland(connectionSrc, srcNode.type, node.id, true);
+      exitConnectionMode();
+    } else {
+      showConnPicker(node.id, e.clientX, e.clientY);
+    }
   });
 
   canvas.appendChild(el);
@@ -1261,21 +1268,21 @@ document.addEventListener('mousedown', e => {
 });
 
 // ── Upgrade island node to real node ──────────────────────────────────
-function upgradeIsland(id, type, parentId) {
+function upgradeIsland(id, type, parentId, keepPosition = false) {
   pushUndo();
   const node = nodes.find(n=>n.id===id); if (!node) return;
   const parent = nodes.find(n=>n.id===parentId); if (!parent) return;
 
-  // Remove old element
   elOf[id]?.remove(); delete elOf[id];
 
-  // Update data
   node.type     = type;
   node.parentId = parentId;
-  const depth = nodeDepth(id);
-  node.y = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length-1)];
+  // Only snap Y for blank drafts; keep position for detached nodes placed by the user
+  if (!keepPosition) {
+    const depth = nodeDepth(id);
+    node.y = SNAP_LEVELS[Math.min(depth, SNAP_LEVELS.length-1)];
+  }
 
-  // Rebuild
   buildNode(node);
   requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
 }
