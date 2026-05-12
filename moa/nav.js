@@ -263,6 +263,18 @@ function initLibraryDropdown() {
   wrap.appendChild(drop);
 }
 
+function initArgmap() {
+  const clock = document.getElementById('taskbar-clock');
+  if (!clock) return;
+  const a = document.createElement('a');
+  a.href = 'https://www.unisam.nz/argmap';
+  a.textContent = 'ArgMap';
+  a.className = 'taskbar-link taskbar-link-argmap';
+  a.target = '_blank';
+  a.rel = 'noopener';
+  clock.parentNode.insertBefore(a, clock);
+}
+
 function initNoodleTools() {
   const clock = document.getElementById('taskbar-clock');
   if (!clock) return;
@@ -317,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFontCtrl();
   initHitCounter();
   initSidebarLogo();
+  initArgmap();
   initNoodleTools();
   initLastUpdated();
   initSidebarExtras();
