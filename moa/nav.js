@@ -11,7 +11,11 @@ const FONT_MAX     = 21;
 
 const PAGES = [
   { slug: 'today',        label: '📅 Today'                 },
-  { slug: '',             label: 'The Project'              },
+  { slug: '',             label: 'The Project',
+    children: [
+      { slug: 'docs', label: 'Official Docs' },
+    ]
+  },
   { slug: 'rq',           label: 'Research Question',
     children: [
       { slug: 'rq/starters', label: 'RQ Starters' },
@@ -56,7 +60,7 @@ function renderNav() {
     const a  = document.createElement('a');
     a.href = page.slug === '' ? base + '?direct=1' : base + page.slug + '/';
     const isActive   = current === page.slug;
-    const isExpanded = page.children && (isActive || current.startsWith(page.slug + '/'));
+    const isExpanded = page.children && (isActive || (page.slug ? current.startsWith(page.slug + '/') : page.children.some(c => current === c.slug || current.startsWith(c.slug + '/'))));
     if (isActive) a.classList.add('active');
     a.textContent = page.label;
     if (page.slug === 'guestbook') {
