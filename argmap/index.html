@@ -203,9 +203,9 @@ body {
   transform-origin:0 0; will-change:transform;
 }
 .connector-svg {
-  position:absolute; top:0; left:0; width:0; height:0;
+  position:absolute; top:0; left:0;
   overflow:visible;
-  /* pointer-events handled per-path: none on visible paths, stroke on hit paths */
+  /* width/height set dynamically in drawConnectors() */
 }
 .snap-guide {
   position:absolute; left:-2000px; width:8000px; height:0;
@@ -1058,6 +1058,16 @@ mapNameEl.addEventListener('paste', e => {
 // ── Connectors ─────────────────────────────────────────────────────────
 function drawConnectors() {
   while (svgLayer.childNodes.length > 1) svgLayer.removeChild(svgLayer.lastChild);
+
+  // Size the SVG to cover all node positions so Chrome doesn't clip content
+  let maxX = 800, maxY = 600;
+  nodes.forEach(n => {
+    const el = elOf[n.id]; if (!el) return;
+    maxX = Math.max(maxX, n.x + (el.offsetWidth  || 234) + 60);
+    maxY = Math.max(maxY, n.y + (el.offsetHeight || 80)  + 60);
+  });
+  svgLayer.setAttribute('width',  maxX);
+  svgLayer.setAttribute('height', maxY);
   for (const node of nodes) {
     if (!node.parentId) continue;
     if (isHiddenByCollapse(node.id)) continue;
