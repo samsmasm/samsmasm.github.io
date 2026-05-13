@@ -24,6 +24,7 @@ const PAGES = [
   { slug: 'sources',      label: 'Finding Sources'          },
   { slug: 'bibliography', label: 'Annotated Bibliography'   },
   { slug: 'narrative',    label: 'Crafting Your Narrative'  },
+  { slug: 'argmap',      label: '🧩 Argument Maps'          },
   { slug: 'tcc',          label: 'Time, Continuity & Change'},
   { slug: 'conclusions',  label: 'Conclusions'              },
   { slug: 'timeline',     label: 'The Timeline'             },
