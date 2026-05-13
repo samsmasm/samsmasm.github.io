@@ -11,11 +11,8 @@ const FONT_MAX     = 21;
 
 const PAGES = [
   { slug: 'today',        label: '📅 Today'                 },
-  { slug: '',             label: 'The Project',
-    children: [
-      { slug: 'docs', label: 'Official Docs' },
-    ]
-  },
+  { slug: '',             label: 'The Project'              },
+  { slug: 'docs',         label: 'Official Docs'            },
   { slug: 'rq',           label: 'Research Question',
     children: [
       { slug: 'rq/starters', label: 'RQ Starters' },
