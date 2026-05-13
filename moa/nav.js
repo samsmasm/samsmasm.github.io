@@ -19,15 +19,14 @@ const PAGES = [
     ]
   },
   { slug: 'sources',      label: 'Finding Sources'          },
-  { slug: 'bibliography', label: 'Annotated Bibliography'   },
+  { slug: 'argmap',       label: 'Argument Map'             },
+  { slug: 'justifying',   label: 'Justifying Sources'       },
   { slug: 'narrative',    label: 'Crafting Your Narrative'  },
-  { slug: 'argmap',      label: 'Argument Maps'             },
-  { slug: 'tcc',          label: 'Time, Continuity & Change'},
-  { slug: 'conclusions',  label: 'Conclusions'              },
+  { slug: 'reflecting',   label: 'Reflecting'               },
   { slug: 'timeline',     label: 'The Timeline'             },
   { slug: 'music',        label: '🎵 Music'                 },
-  { slug: 'guestbook',   label: '📖 Guestbook'             },
-  { slug: 'big6',        label: '🔍 Big6'                  },
+  { slug: 'guestbook',    label: '📖 Guestbook'             },
+  { slug: 'big6',         label: '🔍 Big6'                  },
 ];
 
 function getCurrentSlug() {
