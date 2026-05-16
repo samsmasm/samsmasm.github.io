@@ -1,81 +1,55 @@
-// Web Worker: runs full simulation without blocking UI
-
-import { buildSpiralCoords, expandVectors, cellKey } from './spiral.js';
+// Web Worker: instant full-grid simulation, same optimizations as engine.js
+import { buildSpiralCoords, expandVectors, numKey } from './spiral.js';
 
 self.onmessage = function(e) {
   const { totalCells, factionCount, factionVectors } = e.data;
-  const spiralCoords = buildSpiralCoords(totalCells + 200);
+  const n = totalCells + 500;
+  const spiralCoords = buildSpiralCoords(n);
+  const fullVectors  = factionVectors.map(qv => expandVectors(qv));
 
-  // occupiedBy: faction index (0-based), or -1
-  // attackedBy: Set of faction indices
-  const occupiedBy = new Map();  // key -> faction index
-  const attackedBy = new Map();  // key -> Set of faction indices
+  // Build coord→index map
+  const coordToIdx = new Map();
+  for (let i = 0; i < n; i++) {
+    const { x, y } = spiralCoords[i];
+    coordToIdx.set(numKey(x, y), i);
+  }
 
-  // Each faction tracks its placed positions
-  const factionPlacements = Array.from({ length: factionCount }, () => []);
-
-  // Precompute full attack vectors per faction
-  const fullVectors = factionVectors.map(qv => expandVectors(qv));
-
-  let turn = 0; // current faction index
+  const occupiedBy = new Uint8Array(n);  // 0=free, 1+f=faction
+  const attackedBy = new Uint8Array(n);  // bitmask
+  const scanPtrs   = new Int32Array(factionCount);
+  let turn = 0;
 
   for (let placed = 0; placed < totalCells; placed++) {
-    const faction = turn % factionCount;
-    const vectors = fullVectors[faction];
+    const f = turn % factionCount;
+    const enemyMask = ((1 << factionCount) - 1) ^ (1 << f);
 
-    // Scan spiral for lowest valid cell
-    let foundIdx = -1;
-    for (let i = 0; i < totalCells; i++) {
-      const { x, y } = spiralCoords[i];
-      const key = cellKey(x, y);
-      if (occupiedBy.has(key)) continue;
-      const attacked = attackedBy.get(key);
-      if (attacked) {
-        // Check if any attacking faction is an enemy
-        let blocked = false;
-        for (const attacker of attacked) {
-          if (attacker !== faction) { blocked = true; break; }
-        }
-        if (blocked) continue;
-      }
-      foundIdx = i;
-      break;
+    let ptr = scanPtrs[f];
+    while (ptr < n &&
+           (occupiedBy[ptr] !== 0 || (attackedBy[ptr] & enemyMask) !== 0)) {
+      ptr++;
     }
+    scanPtrs[f] = ptr;
 
-    if (foundIdx === -1) break; // no valid cell, simulation complete
+    if (ptr >= n) break;
 
-    const { x, y } = spiralCoords[foundIdx];
-    const key = cellKey(x, y);
-    occupiedBy.set(key, faction);
-    factionPlacements[faction].push(foundIdx);
+    const { x, y } = spiralCoords[ptr];
+    occupiedBy[ptr] = f + 1;
 
-    // Project attack vectors
-    for (const { dx, dy } of vectors) {
-      const ax = x + dx, ay = y + dy;
-      const akey = cellKey(ax, ay);
-      if (!attackedBy.has(akey)) attackedBy.set(akey, new Set());
-      attackedBy.get(akey).add(faction);
+    for (const { dx, dy } of fullVectors[f]) {
+      const idx = coordToIdx.get(numKey(x + dx, y + dy));
+      if (idx !== undefined) attackedBy[idx] |= (1 << f);
     }
 
     turn++;
 
-    // Report progress every 10000 placements
-    if (placed % 10000 === 0) {
+    if (placed % 50000 === 0) {
       self.postMessage({ type: 'progress', placed, totalCells });
     }
   }
 
-  // Serialize result: array of [spiralIndex, factionIndex]
-  const placements = [];
-  for (const [key, faction] of occupiedBy) {
-    placements.push({ key, faction });
-  }
-
-  // Also send attack coverage as flat array for rendering
-  const attacks = [];
-  for (const [key, factions] of attackedBy) {
-    attacks.push({ key, factions: Array.from(factions) });
-  }
-
-  self.postMessage({ type: 'done', placements, attacks });
+  // Transfer typed arrays directly (zero-copy)
+  self.postMessage(
+    { type: 'done', occupiedBy, attackedBy, n },
+    [occupiedBy.buffer, attackedBy.buffer]
+  );
 };

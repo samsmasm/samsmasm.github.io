@@ -1,83 +1,82 @@
-// Main simulation engine (runs on main thread for animated playback)
-
-import { buildSpiralCoords, expandVectors, cellKey } from './spiral.js';
+import { buildSpiralCoords, expandVectors, numKey } from './spiral.js';
 
 export const FACTION_COLORS = ['#e74c3c', '#2c2c2c', '#3498db', '#27ae60', '#9b59b6', '#f39c12'];
 export const FACTION_NAMES  = ['Red', 'Black', 'Blue', 'Green', 'Purple', 'Orange'];
 
 export class SimEngine {
-  constructor() {
-    this.reset();
-  }
+  constructor() { this.ready = false; }
 
   init(gridW, gridH, factionCount, factionVectors) {
     this.gridW = gridW;
     this.gridH = gridH;
     this.factionCount = factionCount;
-    // factionVectors[i] = array of {dx,dy} from the 6x6 grid (first quadrant)
-    this.factionVectors = factionVectors;
     this.fullVectors = factionVectors.map(qv => expandVectors(qv));
-    const totalCells = gridW * gridH;
-    this.spiralCoords = buildSpiralCoords(totalCells + 200); // slight buffer
+
+    const n = gridW * gridH + 500;
+    this.spiralCoords = buildSpiralCoords(n);
+    this.n = n;
+
+    // coordToIdx: integer key → spiral index, for O(1) attack projection
+    this.coordToIdx = new Map();
+    for (let i = 0; i < n; i++) {
+      const { x, y } = this.spiralCoords[i];
+      this.coordToIdx.set(numKey(x, y), i);
+    }
+
+    this.ready = true;
     this.reset();
   }
 
   reset() {
-    this.occupiedBy  = new Map(); // cellKey -> faction index
-    this.attackedBy  = new Map(); // cellKey -> Set of faction indices
-    this.turn        = 0;
-    this.stepCount   = 0;
-    this.done        = false;
-    this.scanPointer = 0; // optimisation: track lowest unchecked cell
+    if (!this.ready) return;
+    // occupiedBy[i]: 0 = free, 1..6 = factionIndex+1
+    this.occupiedBy = new Uint8Array(this.n);
+    // attackedBy[i]: bitmask -- bit f means faction f attacks this cell
+    this.attackedBy = new Uint8Array(this.n);
+    // Per-faction scan pointers (only advance, never retreat -- O(n) total)
+    this.scanPtrs = new Int32Array(this.factionCount);
+    this.turn = 0;
+    this.stepCount = 0;
+    this.done = false;
   }
 
-  // Run one placement. Returns {x, y, faction} or null if done.
   step() {
     if (this.done) return null;
-    const faction = this.turn % this.factionCount;
-    const vectors = this.fullVectors[faction];
-    const coords  = this.spiralCoords;
+    const f = this.turn % this.factionCount;
+    const enemyMask = ((1 << this.factionCount) - 1) ^ (1 << f);
 
-    let foundIdx = -1;
-    for (let i = 0; i < coords.length; i++) {
-      const { x, y } = coords[i];
-      const key = cellKey(x, y);
-      if (this.occupiedBy.has(key)) continue;
-      const attacked = this.attackedBy.get(key);
-      if (attacked) {
-        let blocked = false;
-        for (const attacker of attacked) {
-          if (attacker !== faction) { blocked = true; break; }
-        }
-        if (blocked) continue;
-      }
-      foundIdx = i;
-      break;
+    // Advance pointer past permanently-blocked cells
+    let ptr = this.scanPtrs[f];
+    while (ptr < this.n &&
+           (this.occupiedBy[ptr] !== 0 || (this.attackedBy[ptr] & enemyMask) !== 0)) {
+      ptr++;
     }
+    this.scanPtrs[f] = ptr;
 
-    if (foundIdx === -1) { this.done = true; return null; }
+    if (ptr >= this.n) { this.done = true; return null; }
 
-    const { x, y } = coords[foundIdx];
-    const key = cellKey(x, y);
-    this.occupiedBy.set(key, faction);
+    const { x, y } = this.spiralCoords[ptr];
+    this.occupiedBy[ptr] = f + 1;
 
-    for (const { dx, dy } of vectors) {
-      const akey = cellKey(x + dx, y + dy);
-      if (!this.attackedBy.has(akey)) this.attackedBy.set(akey, new Set());
-      this.attackedBy.get(akey).add(faction);
+    // Project attack vectors onto grid (integer keys, no string allocation)
+    for (const { dx, dy } of this.fullVectors[f]) {
+      const idx = this.coordToIdx.get(numKey(x + dx, y + dy));
+      if (idx !== undefined) this.attackedBy[idx] |= (1 << f);
     }
 
     this.turn++;
     this.stepCount++;
-    return { x, y, faction };
+    return { x, y, faction: f };
   }
 
   getState() {
     return {
-      occupiedBy: this.occupiedBy,
-      attackedBy: this.attackedBy,
-      stepCount:  this.stepCount,
-      done:       this.done,
+      occupiedBy:   this.occupiedBy,
+      attackedBy:   this.attackedBy,
+      spiralCoords: this.spiralCoords,
+      n:            this.n,
+      stepCount:    this.stepCount,
+      done:         this.done,
     };
   }
 }
