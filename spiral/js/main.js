@@ -1,92 +1,103 @@
 import { SimEngine, FACTION_NAMES } from './engine.js';
 
-// 10 colour options
 const COLOR_OPTIONS = [
-  '#e53935', // red
-  '#1e88e5', // blue
-  '#fdd835', // yellow
-  '#43a047', // green
-  '#8e24aa', // purple
-  '#fb8c00', // orange
-  '#d81b60', // pink
-  '#00897b', // teal
-  '#3949ab', // indigo
-  '#1a1a1a', // black
+  '#e53935', '#1e88e5', '#fdd835', '#43a047',
+  '#8e24aa', '#fb8c00', '#d81b60', '#00897b',
+  '#3949ab', '#1a1a1a',
 ];
-
-// Per-faction colours -- defaults: red, blue, yellow, green, purple, orange, pink, teal, indigo, black
 let factionColors = [...COLOR_OPTIONS];
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// ── Simulation state ──────────────────────────────────────────────────────────
 const engine = new SimEngine();
-
-let gridW = 200, gridH = 200;
-let factionCount = 2;
+let gridSize      = 200;
+let factionCount  = 2;
 let uniqueMatrices = false;
 let factionVectors = Array.from({ length: 10 }, () => []);
 let sharedVectors  = [];
-
 let playing    = false;
 let intervalId = null;
 let tickMs     = 0;
 let worker     = null;
 
+// ── View state (zoom/pan) ─────────────────────────────────────────────────────
+let viewCX    = 0;   // grid coord at canvas centre X
+let viewCY    = 0;   // grid coord at canvas centre Y
+let viewScale = 4;   // pixels per cell
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const canvas         = document.getElementById('canvas');
-const ctx            = canvas.getContext('2d');
-const btnPlay        = document.getElementById('btn-play');
-const btnPause       = document.getElementById('btn-pause');
-const btnStep        = document.getElementById('btn-step');
-const btnReset       = document.getElementById('btn-reset');
-const btnCalc        = document.getElementById('btn-calc');
-const speedSlider    = document.getElementById('speed-slider');
-const speedLabel     = document.getElementById('speed-label');
-const factionSelect  = document.getElementById('faction-select');
-const gridWInput     = document.getElementById('grid-w');
-const gridHInput     = document.getElementById('grid-h');
-const uniqueToggle   = document.getElementById('unique-toggle');
+const canvas          = document.getElementById('canvas');
+const ctx             = canvas.getContext('2d');
+const btnPlay         = document.getElementById('btn-play');
+const btnPause        = document.getElementById('btn-pause');
+const btnStep         = document.getElementById('btn-step');
+const btnReset        = document.getElementById('btn-reset');
+const btnCalc         = document.getElementById('btn-calc');
+const btnZoomIn       = document.getElementById('btn-zoom-in');
+const btnZoomOut      = document.getElementById('btn-zoom-out');
+const btnZoomFit      = document.getElementById('btn-zoom-fit');
+const speedSlider     = document.getElementById('speed-slider');
+const speedLabel      = document.getElementById('speed-label');
+const factionSelect   = document.getElementById('faction-select');
+const gridSizeInput   = document.getElementById('grid-size');
+const uniqueToggle    = document.getElementById('unique-toggle');
 const factionColorsDiv = document.getElementById('faction-colors');
-const matricesDiv    = document.getElementById('matrices');
-const stepCounter    = document.getElementById('step-counter');
-const progressBar    = document.getElementById('progress-bar');
-const progressWrap   = document.getElementById('progress-wrap');
-const progressMsg    = document.getElementById('progress-msg');
+const matricesDiv     = document.getElementById('matrices');
+const stepCounter     = document.getElementById('step-counter');
+const progressBar     = document.getElementById('progress-bar');
+const progressWrap    = document.getElementById('progress-wrap');
+const progressMsg     = document.getElementById('progress-msg');
 
-// ── Canvas / Rendering ────────────────────────────────────────────────────────
-let tileSize = 4;
-
-function canvasSetup() {
-  tileSize = Math.max(1, Math.floor(800 / Math.max(gridW, gridH)));
-  canvas.width  = gridW * tileSize;
-  canvas.height = gridH * tileSize;
-  const scale = Math.min(1, 800 / Math.max(canvas.width, canvas.height));
-  canvas.style.width  = (canvas.width  * scale) + 'px';
-  canvas.style.height = (canvas.height * scale) + 'px';
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+function initCanvas() {
+  // Match canvas internal resolution to its CSS rendered size
+  const wrap = canvas.parentElement;
+  const size = wrap.getBoundingClientRect().width || 600;
+  canvas.width  = Math.round(size);
+  canvas.height = Math.round(size);
 }
 
-function worldToCanvas(x, y) {
-  const cx = Math.floor(gridW / 2) + x;
-  const cy = Math.floor(gridH / 2) - y;
-  return { px: cx * tileSize, py: cy * tileSize };
+// Fit the entire grid in the viewport
+function fitView() {
+  viewCX = 0;
+  viewCY = 0;
+  viewScale = Math.max(1, canvas.width / gridSize);
 }
 
+// ── Coordinate transforms ─────────────────────────────────────────────────────
+function gridToCanvas(gx, gy) {
+  return {
+    px: canvas.width  / 2 + (gx - viewCX) * viewScale,
+    py: canvas.height / 2 - (gy - viewCY) * viewScale,
+  };
+}
+
+function canvasToGrid(px, py) {
+  return {
+    gx: viewCX + (px - canvas.width  / 2) / viewScale,
+    gy: viewCY - (py - canvas.height / 2) / viewScale,
+  };
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
 function clearCanvas() {
   ctx.fillStyle = '#f8f8f4';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-function drawCell(x, y, color) {
-  const { px, py } = worldToCanvas(x, y);
-  if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) return;
+function drawCell(gx, gy, color) {
+  const { px, py } = gridToCanvas(gx, gy);
+  const s = viewScale;
+  if (px + s < 0 || py + s < 0 || px >= canvas.width || py >= canvas.height) return;
   ctx.fillStyle = color;
-  ctx.fillRect(px, py, tileSize, tileSize);
+  ctx.fillRect(px, py, s, s);
 }
 
 function renderFull() {
   clearCanvas();
   const { occupiedBy, attackedBy, spiralCoords, n } = engine.getState();
+  if (!spiralCoords) return;
 
-  ctx.globalAlpha = 0.12;
+  ctx.globalAlpha = 0.13;
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) continue;
     const atk = attackedBy[i];
@@ -104,12 +115,13 @@ function renderFull() {
       drawCell(x, y, factionColors[occupiedBy[i] - 1]);
     }
   }
+
+  if (sel.active) drawSelectionRect();
 }
 
 function renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords) {
   clearCanvas();
-
-  ctx.globalAlpha = 0.12;
+  ctx.globalAlpha = 0.13;
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) continue;
     const atk = attackedBy[i];
@@ -120,17 +132,129 @@ function renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords) {
     }
   }
   ctx.globalAlpha = 1;
-
   let count = 0;
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) {
-      const { x, y } = spiralCoords[i];
-      drawCell(x, y, factionColors[occupiedBy[i] - 1]);
+      drawCell(spiralCoords[i].x, spiralCoords[i].y, factionColors[occupiedBy[i] - 1]);
       count++;
     }
   }
   stepCounter.textContent = count;
 }
+
+// ── Selection rectangle ───────────────────────────────────────────────────────
+const sel = { active: false, x0: 0, y0: 0, x1: 0, y1: 0 }; // canvas pixels
+
+function drawSelectionRect() {
+  const x = Math.min(sel.x0, sel.x1);
+  const y = Math.min(sel.y0, sel.y1);
+  const w = Math.abs(sel.x1 - sel.x0);
+  const h = Math.abs(sel.y1 - sel.y0);
+  ctx.save();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 3]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(100,100,200,0.08)';
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+// ── Canvas mouse interaction ───────────────────────────────────────────────────
+// Left drag  → select area to zoom
+// Right drag → pan
+// Scroll     → zoom toward cursor
+
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / r.width;
+  const scaleY = canvas.height / r.height;
+  return { px: (e.clientX - r.left) * scaleX, py: (e.clientY - r.top) * scaleY };
+}
+
+let panDrag = null; // { px, py, cx, cy } for right-drag pan
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+  const { px, py } = canvasPos(e);
+  if (e.button === 2) {
+    // Right click: start pan
+    panDrag = { px, py, cx: viewCX, cy: viewCY };
+  } else {
+    // Left click: start selection
+    sel.active = true;
+    sel.x0 = sel.x1 = px;
+    sel.y0 = sel.y1 = py;
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const { px, py } = canvasPos(e);
+  if (panDrag) {
+    const dx = (px - panDrag.px) / viewScale;
+    const dy = (py - panDrag.py) / viewScale;
+    viewCX = panDrag.cx - dx;
+    viewCY = panDrag.cy + dy;
+    renderFull();
+  } else if (sel.active) {
+    sel.x1 = px;
+    sel.y1 = py;
+    renderFull();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (panDrag && e.button === 2) {
+    panDrag = null;
+    return;
+  }
+  if (!sel.active) return;
+  sel.active = false;
+
+  const w = Math.abs(sel.x1 - sel.x0);
+  const h = Math.abs(sel.y1 - sel.y0);
+  if (w < 8 || h < 8) { renderFull(); return; } // too small → ignore
+
+  // Convert selection corners to grid coords
+  const g0 = canvasToGrid(Math.min(sel.x0, sel.x1), Math.min(sel.y0, sel.y1));
+  const g1 = canvasToGrid(Math.max(sel.x0, sel.x1), Math.max(sel.y0, sel.y1));
+
+  const gW = g1.gx - g0.gx;
+  const gH = g0.gy - g1.gy; // g0.gy > g1.gy because y flips
+
+  viewScale = Math.min(canvas.width / gW, canvas.height / gH);
+  viewCX = (g0.gx + g1.gx) / 2;
+  viewCY = (g0.gy + g1.gy) / 2;
+  renderFull();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (sel.active) { sel.active = false; renderFull(); }
+  panDrag = null;
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const { px, py } = canvasPos(e);
+  const factor = e.deltaY < 0 ? 1.25 : 1 / 1.25;
+
+  // Grid point under cursor before zoom
+  const g = canvasToGrid(px, py);
+
+  viewScale = Math.max(0.5, Math.min(200, viewScale * factor));
+
+  // Shift centre so that same grid point stays under cursor
+  viewCX = g.gx - (px - canvas.width  / 2) / viewScale;
+  viewCY = g.gy + (py - canvas.height / 2) / viewScale;
+
+  renderFull();
+}, { passive: false });
+
+// ── Zoom buttons ──────────────────────────────────────────────────────────────
+btnZoomIn.addEventListener('click',  () => { viewScale = Math.min(200, viewScale * 1.5); renderFull(); });
+btnZoomOut.addEventListener('click', () => { viewScale = Math.max(0.5, viewScale / 1.5); renderFull(); });
+btnZoomFit.addEventListener('click', () => { fitView(); renderFull(); });
 
 // ── Simulation helpers ────────────────────────────────────────────────────────
 function getCurrentVectors() {
@@ -139,8 +263,8 @@ function getCurrentVectors() {
 }
 
 function engineInit() {
-  engine.init(gridW, gridH, factionCount, getCurrentVectors());
-  canvasSetup();
+  engine.init(gridSize, gridSize, factionCount, getCurrentVectors());
+  fitView();
   clearCanvas();
   stepCounter.textContent = '0';
 }
@@ -194,20 +318,14 @@ function resetAll() {
   engineInit();
 }
 
-// ── Speed slider ──────────────────────────────────────────────────────────────
+// ── Controls ──────────────────────────────────────────────────────────────────
 speedSlider.addEventListener('input', () => {
   const v = parseFloat(speedSlider.value);
-  if (v === 0) {
-    tickMs = 0;
-    speedLabel.textContent = 'max speed';
-  } else {
-    tickMs = Math.round(Math.pow(10, (v / 100) * 3));
-    speedLabel.textContent = tickMs + ' ms';
-  }
+  if (v === 0) { tickMs = 0; speedLabel.textContent = 'max speed'; }
+  else { tickMs = Math.round(Math.pow(10, (v / 100) * 3)); speedLabel.textContent = tickMs + ' ms'; }
   if (playing) { stopPlayback(); startPlayback(); }
 });
 
-// ── Faction select ────────────────────────────────────────────────────────────
 factionSelect.addEventListener('change', () => {
   factionCount = parseInt(factionSelect.value);
   buildFactionColors();
@@ -215,26 +333,18 @@ factionSelect.addEventListener('change', () => {
   resetAll();
 });
 
-// ── Grid size ─────────────────────────────────────────────────────────────────
-gridWInput.addEventListener('change', () => {
-  gridW = Math.max(10, Math.min(1000, parseInt(gridWInput.value) || 200));
-  gridWInput.value = gridW;
-  resetAll();
-});
-gridHInput.addEventListener('change', () => {
-  gridH = Math.max(10, Math.min(1000, parseInt(gridHInput.value) || 200));
-  gridHInput.value = gridH;
+gridSizeInput.addEventListener('change', () => {
+  gridSize = Math.max(10, Math.min(1000, parseInt(gridSizeInput.value) || 200));
+  gridSizeInput.value = gridSize;
   resetAll();
 });
 
-// ── Unique matrices toggle ────────────────────────────────────────────────────
 uniqueToggle.addEventListener('change', () => {
   uniqueMatrices = uniqueToggle.checked;
   buildMatrices();
   resetAll();
 });
 
-// ── Buttons ───────────────────────────────────────────────────────────────────
 btnPlay.addEventListener('click',  startPlayback);
 btnPause.addEventListener('click', stopPlayback);
 btnStep.addEventListener('click',  () => { stopPlayback(); stepOnce(); });
@@ -243,18 +353,16 @@ btnReset.addEventListener('click', resetAll);
 btnCalc.addEventListener('click', () => {
   stopPlayback();
   if (worker) worker.terminate();
-
   progressWrap.style.display = 'flex';
   progressBar.style.width = '0%';
   progressMsg.textContent = 'Calculating…';
 
   const vectors      = getCurrentVectors();
-  const totalCells   = gridW * gridH;
+  const totalCells   = gridSize * gridSize;
   const spiralCoords = engine.getState().spiralCoords;
 
   worker = new Worker('js/worker.js', { type: 'module' });
   worker.postMessage({ totalCells, factionCount, factionVectors: vectors });
-
   worker.onmessage = (e) => {
     const { type, placed, occupiedBy, attackedBy, n } = e.data;
     if (type === 'progress') {
@@ -263,12 +371,10 @@ btnCalc.addEventListener('click', () => {
       progressBar.style.width = '100%';
       progressMsg.textContent = 'Done';
       setTimeout(() => { progressWrap.style.display = 'none'; }, 800);
-      canvasSetup();
       renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords);
       worker = null;
     }
   };
-
   worker.onerror = (err) => {
     console.error('Worker error:', err);
     progressMsg.textContent = 'Worker error — check console';
@@ -276,7 +382,7 @@ btnCalc.addEventListener('click', () => {
   };
 });
 
-// ── Faction colour cards (always per-faction) ─────────────────────────────────
+// ── Faction colour cards ──────────────────────────────────────────────────────
 function buildFactionColors() {
   factionColorsDiv.innerHTML = '';
   for (let f = 0; f < factionCount; f++) {
@@ -295,12 +401,11 @@ function buildFactionColors() {
       const sw = document.createElement('div');
       sw.className = 'swatch' + (hex === factionColors[f] ? ' selected' : '');
       sw.style.backgroundColor = hex;
-      sw.title = hex;
       sw.addEventListener('click', () => {
         factionColors[f] = hex;
         buildFactionColors();
-        buildMatrices();   // matrix titles use faction colour
-        renderFull();      // recolour canvas immediately
+        buildMatrices();
+        renderFull();
       });
       picker.appendChild(sw);
     }
@@ -309,56 +414,45 @@ function buildFactionColors() {
   }
 }
 
-// ── Movement matrix/matrices ──────────────────────────────────────────────────
+// ── Movement matrices ─────────────────────────────────────────────────────────
 function buildMatrices() {
   matricesDiv.innerHTML = '';
-
   if (uniqueMatrices) {
-    // One grid per faction
     for (let f = 0; f < factionCount; f++) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'matrix-wrapper';
-
-      const title = document.createElement('div');
-      title.className = 'matrix-title';
-      title.textContent = `Faction ${f + 1}`;
-      title.style.color = factionColors[f];
-      wrapper.appendChild(title);
-
-      wrapper.appendChild(makeGrid(f, factionVectors[f], factionColors[f]));
-      matricesDiv.appendChild(wrapper);
+      const w = document.createElement('div');
+      w.className = 'matrix-wrapper';
+      const t = document.createElement('div');
+      t.className = 'matrix-title';
+      t.textContent = `Faction ${f + 1}`;
+      t.style.color = factionColors[f];
+      w.appendChild(t);
+      w.appendChild(makeGrid(f, factionVectors[f], factionColors[f]));
+      matricesDiv.appendChild(w);
     }
   } else {
-    // One shared grid
-    const wrapper = document.createElement('div');
-    wrapper.className = 'matrix-wrapper';
-
-    const title = document.createElement('div');
-    title.className = 'matrix-title';
-    title.style.color = '#555';
-    title.textContent = 'Shared';
-    wrapper.appendChild(title);
-
-    wrapper.appendChild(makeGrid(0, sharedVectors, '#5b6af0'));
-    matricesDiv.appendChild(wrapper);
+    const w = document.createElement('div');
+    w.className = 'matrix-wrapper';
+    const t = document.createElement('div');
+    t.className = 'matrix-title';
+    t.style.color = '#555';
+    t.textContent = 'Shared';
+    w.appendChild(t);
+    w.appendChild(makeGrid(0, sharedVectors, '#5b6af0'));
+    matricesDiv.appendChild(w);
   }
 }
 
 function makeGrid(factionIdx, vecArray, activeColor) {
   const grid = document.createElement('div');
   grid.className = 'matrix-grid';
-
   for (let row = 5; row >= 0; row--) {
     for (let col = 0; col < 6; col++) {
       const cell = document.createElement('div');
       cell.className = 'matrix-cell';
       if (col === 0 && row === 0) {
         cell.classList.add('origin');
-        cell.title = 'Origin (piece position)';
       } else {
-        if (vecArray.some(v => v.dx === col && v.dy === row)) {
-          applyActiveStyle(cell, activeColor);
-        }
+        if (vecArray.some(v => v.dx === col && v.dy === row)) applyActiveStyle(cell, activeColor);
         cell.addEventListener('click', () => toggleVector(factionIdx, col, row, cell, activeColor, vecArray));
       }
       grid.appendChild(cell);
@@ -381,27 +475,20 @@ function clearActiveStyle(cell) {
 
 function toggleVector(factionIdx, dx, dy, cell, color, vecArray) {
   const idx = vecArray.findIndex(v => v.dx === dx && v.dy === dy);
-  if (idx === -1) {
-    vecArray.push({ dx, dy });
-    applyActiveStyle(cell, color);
-  } else {
-    vecArray.splice(idx, 1);
-    clearActiveStyle(cell);
-  }
-  if (!uniqueMatrices) {
-    factionVectors = Array.from({ length: 10 }, () => [...sharedVectors]);
-  }
+  if (idx === -1) { vecArray.push({ dx, dy }); applyActiveStyle(cell, color); }
+  else            { vecArray.splice(idx, 1);    clearActiveStyle(cell); }
+  if (!uniqueMatrices) factionVectors = Array.from({ length: 10 }, () => [...sharedVectors]);
   resetAll();
 }
 
-// ── Default: knight moves ─────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 function setDefaultKnight() {
   sharedVectors = [{ dx: 1, dy: 2 }, { dx: 2, dy: 1 }];
   factionVectors = Array.from({ length: 10 }, () => [...sharedVectors]);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 setDefaultKnight();
+initCanvas();
 buildFactionColors();
 buildMatrices();
 engineInit();
