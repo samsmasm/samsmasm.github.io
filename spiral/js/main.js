@@ -24,6 +24,10 @@ let viewCX    = 0;   // grid coord at canvas centre X
 let viewCY    = 0;   // grid coord at canvas centre Y
 let viewScale = 4;   // pixels per cell
 
+// Cache of the last data sent to the canvas -- used by zoom/pan to redraw
+// without losing worker results or requiring engine re-read
+let renderCache = null; // { occupiedBy, attackedBy, n, spiralCoords }
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const canvas          = document.getElementById('canvas');
 const ctx             = canvas.getContext('2d');
@@ -92,10 +96,10 @@ function drawCell(gx, gy, color) {
   ctx.fillRect(px, py, s, s);
 }
 
-function renderFull() {
+// Core draw -- always updates renderCache so zoom/pan can redraw correctly
+function drawData(occupiedBy, attackedBy, n, spiralCoords) {
+  renderCache = { occupiedBy, attackedBy, n, spiralCoords };
   clearCanvas();
-  const { occupiedBy, attackedBy, spiralCoords, n } = engine.getState();
-  if (!spiralCoords) return;
 
   ctx.globalAlpha = 0.13;
   for (let i = 0; i < n; i++) {
@@ -119,26 +123,25 @@ function renderFull() {
   if (sel.active) drawSelectionRect();
 }
 
+// Redraw from engine state (animated play)
+function renderFull() {
+  const { occupiedBy, attackedBy, spiralCoords, n } = engine.getState();
+  if (spiralCoords) drawData(occupiedBy, attackedBy, n, spiralCoords);
+}
+
+// Redraw from cached data -- used by zoom/pan/fit so worker results aren't lost
+function redraw() {
+  if (renderCache) drawData(
+    renderCache.occupiedBy, renderCache.attackedBy,
+    renderCache.n, renderCache.spiralCoords
+  );
+}
+
+// Called when worker finishes
 function renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords) {
-  clearCanvas();
-  ctx.globalAlpha = 0.13;
-  for (let i = 0; i < n; i++) {
-    if (occupiedBy[i] !== 0) continue;
-    const atk = attackedBy[i];
-    if (atk === 0) continue;
-    const { x, y } = spiralCoords[i];
-    for (let f = 0; f < factionCount; f++) {
-      if (atk & (1 << f)) drawCell(x, y, factionColors[f]);
-    }
-  }
-  ctx.globalAlpha = 1;
+  drawData(occupiedBy, attackedBy, n, spiralCoords);
   let count = 0;
-  for (let i = 0; i < n; i++) {
-    if (occupiedBy[i] !== 0) {
-      drawCell(spiralCoords[i].x, spiralCoords[i].y, factionColors[occupiedBy[i] - 1]);
-      count++;
-    }
-  }
+  for (let i = 0; i < n; i++) if (occupiedBy[i] !== 0) count++;
   stepCounter.textContent = count;
 }
 
@@ -196,41 +199,36 @@ canvas.addEventListener('mousemove', e => {
     const dy = (py - panDrag.py) / viewScale;
     viewCX = panDrag.cx - dx;
     viewCY = panDrag.cy + dy;
-    renderFull();
+    redraw();
   } else if (sel.active) {
     sel.x1 = px;
     sel.y1 = py;
-    renderFull();
+    redraw();
   }
 });
 
 canvas.addEventListener('mouseup', e => {
-  if (panDrag && e.button === 2) {
-    panDrag = null;
-    return;
-  }
+  if (panDrag && e.button === 2) { panDrag = null; return; }
   if (!sel.active) return;
   sel.active = false;
 
   const w = Math.abs(sel.x1 - sel.x0);
   const h = Math.abs(sel.y1 - sel.y0);
-  if (w < 8 || h < 8) { renderFull(); return; } // too small → ignore
+  if (w < 8 || h < 8) { redraw(); return; }
 
-  // Convert selection corners to grid coords
   const g0 = canvasToGrid(Math.min(sel.x0, sel.x1), Math.min(sel.y0, sel.y1));
   const g1 = canvasToGrid(Math.max(sel.x0, sel.x1), Math.max(sel.y0, sel.y1));
-
   const gW = g1.gx - g0.gx;
-  const gH = g0.gy - g1.gy; // g0.gy > g1.gy because y flips
+  const gH = g0.gy - g1.gy;
 
   viewScale = Math.min(canvas.width / gW, canvas.height / gH);
   viewCX = (g0.gx + g1.gx) / 2;
   viewCY = (g0.gy + g1.gy) / 2;
-  renderFull();
+  redraw();
 });
 
 canvas.addEventListener('mouseleave', () => {
-  if (sel.active) { sel.active = false; renderFull(); }
+  if (sel.active) { sel.active = false; redraw(); }
   panDrag = null;
 });
 
@@ -238,23 +236,17 @@ canvas.addEventListener('wheel', e => {
   e.preventDefault();
   const { px, py } = canvasPos(e);
   const factor = e.deltaY < 0 ? 1.25 : 1 / 1.25;
-
-  // Grid point under cursor before zoom
   const g = canvasToGrid(px, py);
-
   viewScale = Math.max(0.5, Math.min(200, viewScale * factor));
-
-  // Shift centre so that same grid point stays under cursor
   viewCX = g.gx - (px - canvas.width  / 2) / viewScale;
   viewCY = g.gy + (py - canvas.height / 2) / viewScale;
-
-  renderFull();
+  redraw();
 }, { passive: false });
 
 // ── Zoom buttons ──────────────────────────────────────────────────────────────
-btnZoomIn.addEventListener('click',  () => { viewScale = Math.min(200, viewScale * 1.5); renderFull(); });
-btnZoomOut.addEventListener('click', () => { viewScale = Math.max(0.5, viewScale / 1.5); renderFull(); });
-btnZoomFit.addEventListener('click', () => { fitView(); renderFull(); });
+btnZoomIn.addEventListener('click',  () => { viewScale = Math.min(200, viewScale * 1.5); redraw(); });
+btnZoomOut.addEventListener('click', () => { viewScale = Math.max(0.5, viewScale / 1.5); redraw(); });
+btnZoomFit.addEventListener('click', () => { fitView(); redraw(); });
 
 // ── Simulation helpers ────────────────────────────────────────────────────────
 function getCurrentVectors() {
@@ -315,6 +307,7 @@ function resetAll() {
   stopPlayback();
   if (worker) { worker.terminate(); worker = null; }
   progressWrap.style.display = 'none';
+  renderCache = null;
   engineInit();
 }
 
