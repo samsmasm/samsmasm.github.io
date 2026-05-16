@@ -1,4 +1,20 @@
-import { SimEngine, FACTION_COLORS, FACTION_NAMES } from './engine.js';
+import { SimEngine, FACTION_NAMES } from './engine.js';
+
+const COLOR_OPTIONS = [
+  '#e53935', // red
+  '#1a1a1a', // black
+  '#1e88e5', // blue
+  '#43a047', // green
+  '#8e24aa', // purple
+  '#fb8c00', // orange
+  '#d81b60', // pink
+  '#00897b', // teal
+  '#3949ab', // indigo
+  '#f9a825', // amber
+];
+
+// Mutable per-faction colours (defaults: red, black, blue, green, purple, orange)
+let factionColors = ['#e53935', '#1a1a1a', '#1e88e5', '#43a047', '#8e24aa', '#fb8c00'];
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const engine = new SimEngine();
@@ -55,7 +71,7 @@ function worldToCanvas(x, y) {
 }
 
 function clearCanvas() {
-  ctx.fillStyle = '#1a1a2e';
+  ctx.fillStyle = '#f8f8f4';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -78,7 +94,7 @@ function renderFull() {
     if (atk === 0) continue;
     const { x, y } = spiralCoords[i];
     for (let f = 0; f < factionCount; f++) {
-      if (atk & (1 << f)) drawCell(x, y, FACTION_COLORS[f]);
+      if (atk & (1 << f)) drawCell(x, y, factionColors[f]);
     }
   }
   ctx.globalAlpha = 1;
@@ -87,7 +103,7 @@ function renderFull() {
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) {
       const { x, y } = spiralCoords[i];
-      drawCell(x, y, FACTION_COLORS[occupiedBy[i] - 1]);
+      drawCell(x, y, factionColors[occupiedBy[i] - 1]);
     }
   }
 }
@@ -103,7 +119,7 @@ function renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords) {
     if (atk === 0) continue;
     const { x, y } = spiralCoords[i];
     for (let f = 0; f < factionCount; f++) {
-      if (atk & (1 << f)) drawCell(x, y, FACTION_COLORS[f]);
+      if (atk & (1 << f)) drawCell(x, y, factionColors[f]);
     }
   }
   ctx.globalAlpha = 1;
@@ -112,7 +128,7 @@ function renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords) {
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) {
       const { x, y } = spiralCoords[i];
-      drawCell(x, y, FACTION_COLORS[occupiedBy[i] - 1]);
+      drawCell(x, y, factionColors[occupiedBy[i] - 1]);
       count++;
     }
   }
@@ -135,7 +151,7 @@ function engineInit() {
 function stepOnce() {
   const result = engine.step();
   if (result) {
-    drawCell(result.x, result.y, FACTION_COLORS[result.faction]);
+    drawCell(result.x, result.y, factionColors[result.faction]);
     stepCounter.textContent = engine.stepCount;
   }
   if (engine.done) stopPlayback();
@@ -272,17 +288,39 @@ function buildMatrices() {
 
   for (let f = 0; f < count; f++) {
     const label = uniqueMatrices ? FACTION_NAMES[f] : 'All Factions';
-    const color = uniqueMatrices ? FACTION_COLORS[f] : '#aaa';
+    const activeColor = factionColors[f];
 
     const wrapper = document.createElement('div');
     wrapper.className = 'matrix-wrapper';
 
+    // Header: title + colour swatches
+    const header = document.createElement('div');
+    header.className = 'matrix-header';
+
     const title = document.createElement('div');
     title.className = 'matrix-title';
     title.textContent = label;
-    title.style.color = color;
-    wrapper.appendChild(title);
+    title.style.color = activeColor;
+    header.appendChild(title);
 
+    const picker = document.createElement('div');
+    picker.className = 'colour-picker';
+    for (const hex of COLOR_OPTIONS) {
+      const sw = document.createElement('div');
+      sw.className = 'swatch' + (hex === factionColors[f] ? ' selected' : '');
+      sw.style.backgroundColor = hex;
+      sw.title = hex;
+      sw.addEventListener('click', () => {
+        factionColors[f] = hex;
+        buildMatrices();  // rebuild to update selection + title colour
+        renderFull();     // redraw canvas with new colour (no reset needed)
+      });
+      picker.appendChild(sw);
+    }
+    header.appendChild(picker);
+    wrapper.appendChild(header);
+
+    // 6x6 grid
     const grid = document.createElement('div');
     grid.className = 'matrix-grid';
 
@@ -295,8 +333,9 @@ function buildMatrices() {
           cell.title = 'Origin (piece position)';
         } else {
           const vec = uniqueMatrices ? factionVectors[f] : sharedVectors;
-          if (vec.some(v => v.dx === col && v.dy === row)) cell.classList.add('active');
-          cell.addEventListener('click', () => toggleVector(f, col, row, cell));
+          const isActive = vec.some(v => v.dx === col && v.dy === row);
+          if (isActive) applyActiveStyle(cell, activeColor);
+          cell.addEventListener('click', () => toggleVector(f, col, row, cell, activeColor));
         }
         grid.appendChild(cell);
       }
@@ -307,15 +346,27 @@ function buildMatrices() {
   }
 }
 
-function toggleVector(factionIdx, dx, dy, cell) {
+function applyActiveStyle(cell, color) {
+  cell.style.backgroundColor = color;
+  cell.style.borderColor = color;
+  cell.style.opacity = '0.65';
+}
+
+function clearActiveStyle(cell) {
+  cell.style.backgroundColor = '';
+  cell.style.borderColor = '';
+  cell.style.opacity = '';
+}
+
+function toggleVector(factionIdx, dx, dy, cell, color) {
   const vec = uniqueMatrices ? factionVectors[factionIdx] : sharedVectors;
   const idx = vec.findIndex(v => v.dx === dx && v.dy === dy);
   if (idx === -1) {
     vec.push({ dx, dy });
-    cell.classList.add('active');
+    applyActiveStyle(cell, color);
   } else {
     vec.splice(idx, 1);
-    cell.classList.remove('active');
+    clearActiveStyle(cell);
   }
   if (!uniqueMatrices) {
     factionVectors = Array.from({ length: 6 }, () => [...sharedVectors]);

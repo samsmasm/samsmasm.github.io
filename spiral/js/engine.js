@@ -1,7 +1,6 @@
 import { buildSpiralCoords, expandVectors, numKey } from './spiral.js';
 
-export const FACTION_COLORS = ['#e74c3c', '#2c2c2c', '#3498db', '#27ae60', '#9b59b6', '#f39c12'];
-export const FACTION_NAMES  = ['Red', 'Black', 'Blue', 'Green', 'Purple', 'Orange'];
+export const FACTION_NAMES = ['Red', 'Black', 'Blue', 'Green', 'Purple', 'Orange'];
 
 export class SimEngine {
   constructor() { this.ready = false; }
