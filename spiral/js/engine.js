@@ -31,7 +31,7 @@ export class SimEngine {
     // occupiedBy[i]: 0 = free, 1..6 = factionIndex+1
     this.occupiedBy = new Uint8Array(this.n);
     // attackedBy[i]: bitmask -- bit f means faction f attacks this cell
-    this.attackedBy = new Uint8Array(this.n);
+    this.attackedBy = new Uint16Array(this.n);
     // Per-faction scan pointers (only advance, never retreat -- O(n) total)
     this.scanPtrs = new Int32Array(this.factionCount);
     this.turn = 0;

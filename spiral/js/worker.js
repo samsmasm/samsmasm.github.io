@@ -15,7 +15,7 @@ self.onmessage = function(e) {
   }
 
   const occupiedBy = new Uint8Array(n);  // 0=free, 1+f=faction
-  const attackedBy = new Uint8Array(n);  // bitmask
+  const attackedBy = new Uint16Array(n); // bitmask (supports up to 16 factions)
   const scanPtrs   = new Int32Array(factionCount);
   let turn = 0;
 

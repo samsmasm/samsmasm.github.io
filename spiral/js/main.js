@@ -1,65 +1,65 @@
 import { SimEngine, FACTION_NAMES } from './engine.js';
 
+// 10 colour options
 const COLOR_OPTIONS = [
   '#e53935', // red
-  '#1a1a1a', // black
   '#1e88e5', // blue
+  '#fdd835', // yellow
   '#43a047', // green
   '#8e24aa', // purple
   '#fb8c00', // orange
   '#d81b60', // pink
   '#00897b', // teal
   '#3949ab', // indigo
-  '#f9a825', // amber
+  '#1a1a1a', // black
 ];
 
-// Mutable per-faction colours (defaults: red, black, blue, green, purple, orange)
-let factionColors = ['#e53935', '#1a1a1a', '#1e88e5', '#43a047', '#8e24aa', '#fb8c00'];
+// Per-faction colours -- defaults: red, blue, yellow, green, purple, orange, pink, teal, indigo, black
+let factionColors = [...COLOR_OPTIONS];
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const engine = new SimEngine();
 
-let gridW = 100, gridH = 100;
+let gridW = 200, gridH = 200;
 let factionCount = 2;
 let uniqueMatrices = false;
-let factionVectors = Array.from({ length: 6 }, () => []); // per faction
+let factionVectors = Array.from({ length: 10 }, () => []);
 let sharedVectors  = [];
 
 let playing    = false;
 let intervalId = null;
-let tickMs     = 50;
+let tickMs     = 0;
 let worker     = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const canvas        = document.getElementById('canvas');
-const ctx           = canvas.getContext('2d');
-const btnPlay       = document.getElementById('btn-play');
-const btnPause      = document.getElementById('btn-pause');
-const btnStep       = document.getElementById('btn-step');
-const btnReset      = document.getElementById('btn-reset');
-const btnCalc       = document.getElementById('btn-calc');
-const speedSlider   = document.getElementById('speed-slider');
-const speedLabel    = document.getElementById('speed-label');
-const factionSlider = document.getElementById('faction-slider');
-const factionLabel  = document.getElementById('faction-label');
-const gridWInput    = document.getElementById('grid-w');
-const gridHInput    = document.getElementById('grid-h');
-const uniqueToggle  = document.getElementById('unique-toggle');
-const matricesDiv   = document.getElementById('matrices');
-const stepCounter   = document.getElementById('step-counter');
-const progressBar   = document.getElementById('progress-bar');
-const progressWrap  = document.getElementById('progress-wrap');
-const progressMsg   = document.getElementById('progress-msg');
+const canvas         = document.getElementById('canvas');
+const ctx            = canvas.getContext('2d');
+const btnPlay        = document.getElementById('btn-play');
+const btnPause       = document.getElementById('btn-pause');
+const btnStep        = document.getElementById('btn-step');
+const btnReset       = document.getElementById('btn-reset');
+const btnCalc        = document.getElementById('btn-calc');
+const speedSlider    = document.getElementById('speed-slider');
+const speedLabel     = document.getElementById('speed-label');
+const factionSelect  = document.getElementById('faction-select');
+const gridWInput     = document.getElementById('grid-w');
+const gridHInput     = document.getElementById('grid-h');
+const uniqueToggle   = document.getElementById('unique-toggle');
+const factionColorsDiv = document.getElementById('faction-colors');
+const matricesDiv    = document.getElementById('matrices');
+const stepCounter    = document.getElementById('step-counter');
+const progressBar    = document.getElementById('progress-bar');
+const progressWrap   = document.getElementById('progress-wrap');
+const progressMsg    = document.getElementById('progress-msg');
 
 // ── Canvas / Rendering ────────────────────────────────────────────────────────
-let tileSize = 6;
+let tileSize = 4;
 
 function canvasSetup() {
   tileSize = Math.max(1, Math.floor(800 / Math.max(gridW, gridH)));
   canvas.width  = gridW * tileSize;
   canvas.height = gridH * tileSize;
-  const maxPx = 800;
-  const scale = Math.min(1, maxPx / Math.max(canvas.width, canvas.height));
+  const scale = Math.min(1, 800 / Math.max(canvas.width, canvas.height));
   canvas.style.width  = (canvas.width  * scale) + 'px';
   canvas.style.height = (canvas.height * scale) + 'px';
 }
@@ -86,7 +86,6 @@ function renderFull() {
   clearCanvas();
   const { occupiedBy, attackedBy, spiralCoords, n } = engine.getState();
 
-  // Attack zones
   ctx.globalAlpha = 0.12;
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) continue;
@@ -99,7 +98,6 @@ function renderFull() {
   }
   ctx.globalAlpha = 1;
 
-  // Occupied cells
   for (let i = 0; i < n; i++) {
     if (occupiedBy[i] !== 0) {
       const { x, y } = spiralCoords[i];
@@ -108,7 +106,6 @@ function renderFull() {
   }
 }
 
-// Render result from worker (typed arrays transferred directly)
 function renderFromWorkerData(occupiedBy, attackedBy, n, spiralCoords) {
   clearCanvas();
 
@@ -164,7 +161,6 @@ function startPlayback() {
   btnPause.disabled = false;
 
   if (tickMs === 0) {
-    // Burst mode: batch many steps per animation frame
     const rafLoop = () => {
       if (!playing) return;
       for (let i = 0; i < 2000 && !engine.done; i++) engine.step();
@@ -176,7 +172,6 @@ function startPlayback() {
     requestAnimationFrame(rafLoop);
   } else {
     intervalId = setInterval(() => {
-      // At faster speeds, run multiple steps per tick to hit target rate
       const stepsPerTick = tickMs <= 10 ? Math.ceil(10 / tickMs) : 1;
       for (let i = 0; i < stepsPerTick && !engine.done; i++) stepOnce();
       if (engine.done) stopPlayback();
@@ -199,7 +194,7 @@ function resetAll() {
   engineInit();
 }
 
-// ── Speed slider (logarithmic 0–1000ms) ───────────────────────────────────────
+// ── Speed slider ──────────────────────────────────────────────────────────────
 speedSlider.addEventListener('input', () => {
   const v = parseFloat(speedSlider.value);
   if (v === 0) {
@@ -212,22 +207,22 @@ speedSlider.addEventListener('input', () => {
   if (playing) { stopPlayback(); startPlayback(); }
 });
 
-// ── Faction slider ────────────────────────────────────────────────────────────
-factionSlider.addEventListener('input', () => {
-  factionCount = parseInt(factionSlider.value);
-  factionLabel.textContent = factionCount;
+// ── Faction select ────────────────────────────────────────────────────────────
+factionSelect.addEventListener('change', () => {
+  factionCount = parseInt(factionSelect.value);
+  buildFactionColors();
   buildMatrices();
   resetAll();
 });
 
-// ── Grid size inputs ───────────────────────────────────────────────────────────
+// ── Grid size ─────────────────────────────────────────────────────────────────
 gridWInput.addEventListener('change', () => {
-  gridW = Math.max(10, Math.min(1000, parseInt(gridWInput.value) || 100));
+  gridW = Math.max(10, Math.min(1000, parseInt(gridWInput.value) || 200));
   gridWInput.value = gridW;
   resetAll();
 });
 gridHInput.addEventListener('change', () => {
-  gridH = Math.max(10, Math.min(1000, parseInt(gridHInput.value) || 100));
+  gridH = Math.max(10, Math.min(1000, parseInt(gridHInput.value) || 200));
   gridHInput.value = gridH;
   resetAll();
 });
@@ -255,7 +250,7 @@ btnCalc.addEventListener('click', () => {
 
   const vectors      = getCurrentVectors();
   const totalCells   = gridW * gridH;
-  const spiralCoords = engine.getState().spiralCoords; // already built at init
+  const spiralCoords = engine.getState().spiralCoords;
 
   worker = new Worker('js/worker.js', { type: 'module' });
   worker.postMessage({ totalCells, factionCount, factionVectors: vectors });
@@ -281,27 +276,18 @@ btnCalc.addEventListener('click', () => {
   };
 });
 
-// ── 6x6 Matrix builder ────────────────────────────────────────────────────────
-function buildMatrices() {
-  matricesDiv.innerHTML = '';
-  const count = uniqueMatrices ? factionCount : 1;
+// ── Faction colour cards (always per-faction) ─────────────────────────────────
+function buildFactionColors() {
+  factionColorsDiv.innerHTML = '';
+  for (let f = 0; f < factionCount; f++) {
+    const card = document.createElement('div');
+    card.className = 'faction-color-card';
 
-  for (let f = 0; f < count; f++) {
-    const label = uniqueMatrices ? FACTION_NAMES[f] : 'All Factions';
-    const activeColor = factionColors[f];
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'matrix-wrapper';
-
-    // Header: title + colour swatches
-    const header = document.createElement('div');
-    header.className = 'matrix-header';
-
-    const title = document.createElement('div');
-    title.className = 'matrix-title';
-    title.textContent = label;
-    title.style.color = activeColor;
-    header.appendChild(title);
+    const name = document.createElement('div');
+    name.className = 'faction-color-name';
+    name.textContent = `Faction ${f + 1}`;
+    name.style.color = factionColors[f];
+    card.appendChild(name);
 
     const picker = document.createElement('div');
     picker.className = 'colour-picker';
@@ -312,38 +298,73 @@ function buildMatrices() {
       sw.title = hex;
       sw.addEventListener('click', () => {
         factionColors[f] = hex;
-        buildMatrices();  // rebuild to update selection + title colour
-        renderFull();     // redraw canvas with new colour (no reset needed)
+        buildFactionColors();
+        buildMatrices();   // matrix titles use faction colour
+        renderFull();      // recolour canvas immediately
       });
       picker.appendChild(sw);
     }
-    header.appendChild(picker);
-    wrapper.appendChild(header);
+    card.appendChild(picker);
+    factionColorsDiv.appendChild(card);
+  }
+}
 
-    // 6x6 grid
-    const grid = document.createElement('div');
-    grid.className = 'matrix-grid';
+// ── Movement matrix/matrices ──────────────────────────────────────────────────
+function buildMatrices() {
+  matricesDiv.innerHTML = '';
 
-    for (let row = 5; row >= 0; row--) {
-      for (let col = 0; col < 6; col++) {
-        const cell = document.createElement('div');
-        cell.className = 'matrix-cell';
-        if (col === 0 && row === 0) {
-          cell.classList.add('origin');
-          cell.title = 'Origin (piece position)';
-        } else {
-          const vec = uniqueMatrices ? factionVectors[f] : sharedVectors;
-          const isActive = vec.some(v => v.dx === col && v.dy === row);
-          if (isActive) applyActiveStyle(cell, activeColor);
-          cell.addEventListener('click', () => toggleVector(f, col, row, cell, activeColor));
-        }
-        grid.appendChild(cell);
-      }
+  if (uniqueMatrices) {
+    // One grid per faction
+    for (let f = 0; f < factionCount; f++) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'matrix-wrapper';
+
+      const title = document.createElement('div');
+      title.className = 'matrix-title';
+      title.textContent = `Faction ${f + 1}`;
+      title.style.color = factionColors[f];
+      wrapper.appendChild(title);
+
+      wrapper.appendChild(makeGrid(f, factionVectors[f], factionColors[f]));
+      matricesDiv.appendChild(wrapper);
     }
+  } else {
+    // One shared grid
+    const wrapper = document.createElement('div');
+    wrapper.className = 'matrix-wrapper';
 
-    wrapper.appendChild(grid);
+    const title = document.createElement('div');
+    title.className = 'matrix-title';
+    title.style.color = '#555';
+    title.textContent = 'Shared';
+    wrapper.appendChild(title);
+
+    wrapper.appendChild(makeGrid(0, sharedVectors, '#5b6af0'));
     matricesDiv.appendChild(wrapper);
   }
+}
+
+function makeGrid(factionIdx, vecArray, activeColor) {
+  const grid = document.createElement('div');
+  grid.className = 'matrix-grid';
+
+  for (let row = 5; row >= 0; row--) {
+    for (let col = 0; col < 6; col++) {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      if (col === 0 && row === 0) {
+        cell.classList.add('origin');
+        cell.title = 'Origin (piece position)';
+      } else {
+        if (vecArray.some(v => v.dx === col && v.dy === row)) {
+          applyActiveStyle(cell, activeColor);
+        }
+        cell.addEventListener('click', () => toggleVector(factionIdx, col, row, cell, activeColor, vecArray));
+      }
+      grid.appendChild(cell);
+    }
+  }
+  return grid;
 }
 
 function applyActiveStyle(cell, color) {
@@ -358,18 +379,17 @@ function clearActiveStyle(cell) {
   cell.style.opacity = '';
 }
 
-function toggleVector(factionIdx, dx, dy, cell, color) {
-  const vec = uniqueMatrices ? factionVectors[factionIdx] : sharedVectors;
-  const idx = vec.findIndex(v => v.dx === dx && v.dy === dy);
+function toggleVector(factionIdx, dx, dy, cell, color, vecArray) {
+  const idx = vecArray.findIndex(v => v.dx === dx && v.dy === dy);
   if (idx === -1) {
-    vec.push({ dx, dy });
+    vecArray.push({ dx, dy });
     applyActiveStyle(cell, color);
   } else {
-    vec.splice(idx, 1);
+    vecArray.splice(idx, 1);
     clearActiveStyle(cell);
   }
   if (!uniqueMatrices) {
-    factionVectors = Array.from({ length: 6 }, () => [...sharedVectors]);
+    factionVectors = Array.from({ length: 10 }, () => [...sharedVectors]);
   }
   resetAll();
 }
@@ -377,11 +397,12 @@ function toggleVector(factionIdx, dx, dy, cell, color) {
 // ── Default: knight moves ─────────────────────────────────────────────────────
 function setDefaultKnight() {
   sharedVectors = [{ dx: 1, dy: 2 }, { dx: 2, dy: 1 }];
-  factionVectors = Array.from({ length: 6 }, () => [...sharedVectors]);
+  factionVectors = Array.from({ length: 10 }, () => [...sharedVectors]);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 setDefaultKnight();
+buildFactionColors();
 buildMatrices();
 engineInit();
 btnPause.disabled = true;
