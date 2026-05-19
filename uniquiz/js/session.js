@@ -112,7 +112,7 @@ function render(s) {
 
   setH('start-btn',    !waiting);
   setH('show-ans-btn', !active || showAnswer);
-  setH('next-btn',     !active || !showRankings);
+  setH('next-btn',     !active || !showAnswer);
 
   renderPresent(s, questions, q, counts, total);
 }
@@ -199,7 +199,7 @@ function renderPresent(s, questions, q, counts, total) {
 
   setH('pv-start-btn', true);
   setH('pv-show-btn',  !!showAnswer);
-  setH('pv-next-btn',  !showRankings);
+  setH('pv-next-btn',  !showAnswer);
 
   document.getElementById('pv-rankings').classList.toggle('active', !!showRankings);
   if (showRankings) renderPvRankings(s.scores || {});
@@ -269,12 +269,6 @@ async function reveal() {
   try {
     await update(ref(db, `uq/sessions/${pin}`), { showAnswer: true });
     await calculateAndWriteScores();
-    // Auto-show rankings after a 4-second pause so students can see correct/wrong
-    setTimeout(async () => {
-      if (session && session.showAnswer && !session.showRankings) {
-        await update(ref(db, `uq/sessions/${pin}`), { showRankings: true });
-      }
-    }, 4000);
   } catch (err) {
     console.error('reveal failed', err);
     revealInProgress = false;
@@ -342,6 +336,10 @@ async function act(action) {
   } else if (action === 'rankings') {
     await update(sessRef, { showRankings: true });
   } else if (action === 'next') {
+    if (session.showAnswer && !session.showRankings) {
+      await update(sessRef, { showRankings: true });
+      return;
+    }
     const next = qi + 1;
     if (next >= questions.length) {
       await update(sessRef, { currentQuestionIndex: -2 });
