@@ -65,6 +65,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let vertices         = [];
   let running          = false;
   let animFrameId      = null;
+  let timeoutId        = null;
   let lastVertexIndex  = -1;
   let iterationCount   = 0;
   let totalIterations  = 0;
@@ -105,15 +106,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
   modeSelect.addEventListener("change", updateModeUI);
 
-  const SPEED_BATCHES = [30, 100, 300, 1000, 5000, Infinity];
-  const SPEED_LABELS  = ["Slow", "Medium", "Fast", "Faster", "Max", "Instant"];
-  function getBatch() { return SPEED_BATCHES[parseInt(speedInput.value) - 1]; }
+  const SPEED_CONFIG = [
+    { batch: 1,        delay: 200, label: "Slowest"   },
+    { batch: 1,        delay: 50,  label: "Very Slow" },
+    { batch: 30,       delay: 0,   label: "Slow"      },
+    { batch: 100,      delay: 0,   label: "Medium"    },
+    { batch: 300,      delay: 0,   label: "Fast"      },
+    { batch: 1000,     delay: 0,   label: "Faster"    },
+    { batch: 5000,     delay: 0,   label: "Max"       },
+    { batch: Infinity, delay: 0,   label: "Instant"   },
+  ];
+  function getSpeed() { return SPEED_CONFIG[parseInt(speedInput.value) - 1]; }
 
   fractionInput.addEventListener("input", () =>
     fractionDisplay.textContent = parseFloat(fractionInput.value).toFixed(2)
   );
   speedInput.addEventListener("input", () =>
-    speedDisplay.textContent = SPEED_LABELS[parseInt(speedInput.value) - 1]
+    speedDisplay.textContent = getSpeed().label
   );
   blueProbInput.addEventListener("input", () =>
     blueProbDisplay.textContent = parseFloat(blueProbInput.value).toFixed(2)
@@ -281,9 +290,20 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  function scheduleNext() {
+    const { delay } = getSpeed();
+    if (delay > 0) {
+      timeoutId = setTimeout(simulationLoop, delay);
+    } else {
+      animFrameId = requestAnimationFrame(simulationLoop);
+    }
+  }
+
   function simulationLoop() {
     if (!running) return;
-    const batch = getBatch();
+    animFrameId = null;
+    timeoutId   = null;
+    const { batch } = getSpeed();
     runBatch(isFinite(batch) ? batch : totalIterations - iterationCount);
 
     if (isFinite(batch) && iterationCount % 6000 < batch) {
@@ -291,13 +311,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (iterationCount >= totalIterations) {
-      running     = false;
-      animFrameId = null;
+      running = false;
       setControls(true);
       statusMsg.textContent = `Done — ${totalIterations.toLocaleString()} iterations`;
       drawVertices();
     } else {
-      animFrameId = requestAnimationFrame(simulationLoop);
+      scheduleNext();
     }
   }
 
@@ -317,11 +336,12 @@ document.addEventListener("DOMContentLoaded", function () {
     currentPoint   = { ...vertices[Math.floor(Math.random() * vertices.length)] };
     setControls(false);
     statusMsg.textContent = "Running...";
-    animFrameId = requestAnimationFrame(simulationLoop);
+    scheduleNext();
   }
 
   function stopSimulation() {
     if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+    if (timeoutId)   { clearTimeout(timeoutId);           timeoutId   = null; }
     running = false;
     setControls(true);
   }
