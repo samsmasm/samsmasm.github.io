@@ -70,8 +70,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // ── Canvas sizing ─────────────────────────────────────────
   function resizeCanvas() {
     if (running) return;
-    const w = canvasArea.clientWidth;
-    const h = canvasArea.clientHeight;
+    const rect = canvasArea.getBoundingClientRect();
+    const w = rect.width  || window.innerWidth;
+    const h = rect.height || window.innerHeight;
     const newSize = Math.max(Math.min(w, h) - 24, 200);
     if (vertices.length > 0 && canvas.width > 0) {
       const scale = newSize / canvas.width;
