@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const colorPointsCheckbox = document.getElementById("colorPoints");
   const showLabelsCheckbox  = document.getElementById("showLabels");
   const exclusionSelect     = document.getElementById("exclusionRule");
+  const speedInput          = document.getElementById("speed");
+  const speedDisplay        = document.getElementById("speedDisplay");
   const startButton         = document.getElementById("startButton");
   const resetSimButton      = document.getElementById("resetSimulationButton");
   const resetAllButton      = document.getElementById("resetAllButton");
@@ -102,8 +104,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   modeSelect.addEventListener("change", updateModeUI);
 
+  const SPEED_BATCHES = [30, 100, 300, 1000, 5000, Infinity];
+  const SPEED_LABELS  = ["Slow", "Medium", "Fast", "Faster", "Max", "Instant"];
+  function getBatch() { return SPEED_BATCHES[parseInt(speedInput.value) - 1]; }
+
   fractionInput.addEventListener("input", () =>
     fractionDisplay.textContent = parseFloat(fractionInput.value).toFixed(2)
+  );
+  speedInput.addEventListener("input", () =>
+    speedDisplay.textContent = SPEED_LABELS[parseInt(speedInput.value) - 1]
   );
   blueProbInput.addEventListener("input", () =>
     blueProbDisplay.textContent = parseFloat(blueProbInput.value).toFixed(2)
@@ -248,19 +257,15 @@ document.addEventListener("DOMContentLoaded", function () {
     return vertices[idx];
   }
 
-  const BATCH = 600;
-
-  function simulationLoop() {
-    if (!running) return;
+  function runBatch(n) {
     const fraction    = parseFloat(fractionInput.value);
     const drawTraces  = drawTracesCheckbox.checked;
     const colorPoints = colorPointsCheckbox.checked;
-
-    for (let i = 0; i < BATCH && iterationCount < totalIterations; i++) {
+    const limit = Math.min(n, totalIterations - iterationCount);
+    for (let i = 0; i < limit; i++) {
       const t    = pickTarget();
       const newX = currentPoint.x + fraction * (t.x - currentPoint.x);
       const newY = currentPoint.y + fraction * (t.y - currentPoint.y);
-
       if (drawTraces) {
         ctx.strokeStyle = "rgba(180,180,180,0.12)";
         ctx.beginPath();
@@ -268,15 +273,19 @@ document.addEventListener("DOMContentLoaded", function () {
         ctx.lineTo(newX, newY);
         ctx.stroke();
       }
-
       ctx.fillStyle = colorPoints ? t.color : "#fff";
       ctx.fillRect(newX, newY, 1, 1);
-
       currentPoint = { x: newX, y: newY };
       iterationCount++;
     }
+  }
 
-    if (iterationCount % 6000 < BATCH) {
+  function simulationLoop() {
+    if (!running) return;
+    const batch = getBatch();
+    runBatch(isFinite(batch) ? batch : totalIterations - iterationCount);
+
+    if (isFinite(batch) && iterationCount % 6000 < batch) {
       statusMsg.textContent = `${iterationCount.toLocaleString()} / ${totalIterations.toLocaleString()}`;
     }
 
@@ -285,7 +294,7 @@ document.addEventListener("DOMContentLoaded", function () {
       animFrameId = null;
       setControls(true);
       statusMsg.textContent = `Done — ${totalIterations.toLocaleString()} iterations`;
-      drawVertices(); // re-stamp labels on top
+      drawVertices();
     } else {
       animFrameId = requestAnimationFrame(simulationLoop);
     }
