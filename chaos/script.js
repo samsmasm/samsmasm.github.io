@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const speedInput          = document.getElementById("speed");
   const speedDisplay        = document.getElementById("speedDisplay");
   const startButton         = document.getElementById("startButton");
+  const stopButton          = document.getElementById("stopButton");
   const resetSimButton      = document.getElementById("resetSimulationButton");
   const resetAllButton      = document.getElementById("resetAllButton");
   const exportButton        = document.getElementById("exportButton");
@@ -326,12 +327,17 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function setControls(enabled) {
-    startButton.disabled   = !enabled;
+    startButton.disabled    = !enabled;
+    stopButton.disabled     = enabled;
     resetSimButton.disabled = !enabled;
     resetAllButton.disabled = !enabled;
   }
 
   startButton.addEventListener("click", startChaosGame);
+  stopButton.addEventListener("click", () => {
+    stopSimulation();
+    statusMsg.textContent = `Stopped at ${iterationCount.toLocaleString()} iterations`;
+  });
 
   resetSimButton.addEventListener("click", () => {
     stopSimulation();
