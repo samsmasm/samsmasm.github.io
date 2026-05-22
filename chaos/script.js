@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const vertexColorContainer = document.getElementById("vertexColorContainer");
     const iterationsInput = document.getElementById("iterations");
     const fractionInput = document.getElementById("fraction");
+    const fractionDisplay = document.getElementById("fractionDisplay");
+    fractionInput.addEventListener("input", () => fractionDisplay.textContent = fractionInput.value);
     const drawTracesCheckbox = document.getElementById("drawTraces");
     const colorPointsCheckbox = document.getElementById("colorPoints");
     const startButton = document.getElementById("startButton");
