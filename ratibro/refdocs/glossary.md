@@ -1,0 +1,1895 @@
+- **above the line promotion (ATL)**  
+- **** Glossary term: above the line promotion (ATL)****  
+- Promotion aimed at mass audiences, generally not targeted.  
+- **absorption costing**  
+- **** Glossary term: absorption costing****  
+- A cost accounting method that allocates indirect costs among products, departments or regions based on predetermined criteria such as output, sales revenue, number of employees or the value of the equipment.  
+- **accountability**  
+- **** Glossary term: accountability****  
+- Being responsible for one's own and others' actions and results.  
+- **accountant**  
+- **** Glossary term: accountant****  
+- A person who maintains, inspects and analyse financial accounts.  
+- **accounting**  
+- **** Glossary term: accounting****  
+- The process of recording money flows and assets of a business.  
+- **acid test (quick) ratio**  
+- **** Glossary term: acid test (quick) ratio****  
+- A liquidity ratio that measures the value of current assets without stock included, relative to current liabilities.  
+- **acquired needs theory**  
+- **** Glossary term: acquired needs theory****  
+- A theory claiming that human beings have three dominant needs that drive motivation: achievement, power and affiliation. Each person weighs up these factors differently.  
+- **acquisition**  
+- **** Glossary term: acquisition****  
+- A form of external growth where one company purchases another company; it is usually friendly or desired by the company being taken over.  
+- **adaptation**  
+- **** Glossary term: adaptation****  
+- Changes in the marketing mix to better meet the needs of consumers in different markets.  
+- **adverse variance**  
+- **** Glossary term: adverse variance****  
+- A situation where actual income and expenditure figures are worse for the business than expected.  
+- **after-sales service**  
+- **** Glossary term: after-sales service****  
+- The maintenance, help and information a business provides to the customer after they purchase a product.  
+- **agent**  
+- **** Glossary term: agent****  
+- A person who acts on behalf of another person or group.  
+- **agility**  
+- **** Glossary term: agility****  
+- The ability to move quickly in reaction to changing conditions.  
+- **algorithm**  
+- **** Glossary term: algorithm****  
+- A set of instructions to solve a problem or to complete a task or computation.  
+- **antitrust laws**  
+- **** Glossary term: antitrust laws****  
+- Laws that limit the market power of individual companies, encouraging competition that can promote innovation and lower prices.  
+- **appraisal**  
+- **** Glossary term: appraisal****  
+- An assessment of an employee's performance; can take many forms.  
+- **arbitration**  
+- **** Glossary term: arbitration****  
+- A method of conflict resolution where management and employees present arguments to a third party, who makes binding decisions in the conflict.  
+- **artificial intelligence**  
+- **** Glossary term: artificial intelligence****  
+- The ability of a computer or robot to carry out tasks previously done by humans.  
+- **artificial neural networks**  
+- **** Glossary term: artificial neural networks****  
+- The connections of computing systems and nodes that are like the neurons of a human brain.  
+- **asset**  
+- **** Glossary term: asset****  
+- An item of property that has value and is owned by a person or business.  
+- **autocratic leadership**  
+- **** Glossary term: autocratic leadership****  
+- A leadership style where the leader retains control of all decision-making and does not delegate.  
+- **autonomy**  
+- **** Glossary term: autonomy****  
+- The ability of a person to make decisions for themselves and act independently.  
+- **average rate of return (ARR)**  
+- **** Glossary term: average rate of return (ARR)****  
+- An investment appraisal technique that expresses the annual forecast returns as a percentage of the initial capital cost.  
+**** Start of Words in Glossary Letter B****  
+- **B2C**  
+- **** Glossary term: B2C****  
+- The process of a business selling products to consumers.  
+- **balance sheet**  
+- **** Glossary term: balance sheet****  
+- A statement that records a business's assets, liabilities and equity; also known as the statement of financial position.  
+- **bankruptcy**  
+- **** Glossary term: bankruptcy****  
+- A situation where an insolvent business has to follow a legal process to settle its debts.  
+- **barrier to communication**  
+- **** Glossary term: barrier to communication****  
+- Anything that interferes with the transfer of information in an organisation.  
+- **batch production**  
+- **** Glossary term: batch production****  
+- A production method that involves producing similar items in groups.  
+- **below the line promotion (BTL)**  
+- **** Glossary term: below the line promotion (BTL)****  
+- Promotion aimed at specific segments and do not rely on mass market techniques.  
+- **benchmarking**  
+- **** Glossary term: benchmarking****  
+- The process of a business comparing itself with industry leaders on certain criteria, to learn from other’s techniques.  
+- **big data**  
+- **** Glossary term: big data****  
+- Very large amounts of data collected by advanced technologies; the volume and variety of data gathered is impossible for human beings to process  
+- **biomimicry**  
+- **** Glossary term: biomimicry****  
+- The process of mimicking nature’s forms, processes and systems to solve human problems.  
+- **Boston Consulting Group (BCG) matrix**  
+- **** Glossary term: Boston Consulting Group (BCG) matrix****  
+- A matrix that classifies the products of a business into high and low market share and market growth categories.  
+- **bottom-up communication**  
+- **** Glossary term: bottom-up communication****  
+- Communication from employees lower down in the hierarchy to senior managers.  
+- **brand**  
+- **** Glossary term: brand****  
+- A name, symbol or design that is used to identify a product or company.  
+- **brand awareness**  
+- **** Glossary term: brand awareness****  
+- The degree to which consumers recognise a product by its name and special characteristics.  
+- **brand development**  
+- **** Glossary term: brand development****  
+- Building brand awareness by cultivating the business's values and consumer perceptions of the product.  
+- **brand loyalty**  
+- **** Glossary term: brand loyalty****  
+- When customers continue to buy a particular brand, even where alternatives exist.  
+- **brand value**  
+- **** Glossary term: brand value****  
+- How much a brand is worth as an intangible asset, a form of goodwill; recorded on the statement of financial position.  
+- **break-even**  
+- **** Glossary term: break-even****  
+- The quantity or output where total revenue equals total cost.  
+- **breaking bulk**  
+- **** Glossary term: breaking bulk****  
+- When wholesalers break larger units of product into smaller units to deliver to retail outlets.  
+- **broker**  
+- **** Glossary term: broker****  
+- An intermediary in the process of selling and buying a product.  
+- **budget**  
+- **** Glossary term: budget****  
+- A plan that outlines a business’ revenue and expenditure over a period of time.  
+- **buffer stock**  
+- **** Glossary term: buffer stock****  
+- Additional quantities of stock (inventory) kept by a company in case of need.  
+- **bureaucracy**  
+- **** Glossary term: bureaucracy****  
+- A system of administration that involves multiple layers of authority and complex approval processes, often resulting in slow decision-making.  
+- **business angel**  
+- **** Glossary term: business angel****  
+- A wealthy business person who invests their money into new businesses.  
+- **business cycle**  
+- **** Glossary term: business cycle****  
+- A cycle of economic growth and recession.  
+- **business plan**  
+- **** Glossary term: business plan****  
+- An evidence-based explanation of the why, how and what of a business.  
+**** Start of Words in Glossary Letter C****  
+- **C2C**  
+- **** Glossary term: C2C****  
+- The process of consumers selling products to other consumers.  
+- **capacity utilisation**  
+- **** Glossary term: capacity utilisation****  
+- A measure of the extent to which a business is using its productive capacity, expressed as a percent.  
+- **capital employed**  
+- **** Glossary term: capital employed****  
+- The value of all sources of internal and external finance for a business, calculated from the sum of non‐current liabilities and equity.  
+- **capital expenditure**  
+- **** Glossary term: capital expenditure****  
+- Spending on the non-current (fixed) assets of a business.  
+- **capital gains**  
+- **** Glossary term: capital gains****  
+- The increase in the value of an asset.  
+- **capital goods**  
+- **** Glossary term: capital goods****  
+- The physical equipment and machines that are used to produce other goods.  
+- **capital intensive**  
+- **** Glossary term: capital intensive****  
+- A production process that uses relatively more physical capital than human labour.  
+- **capital productivity**  
+- **** Glossary term: capital productivity****  
+- A measure of how efficiently a business uses its capital; total output/capital input.  
+- **cash flow**  
+- **** Glossary term: cash flow****  
+- Payments received by a business (inflows) and payments made by a business (outflows).  
+- **cash flow forecast**  
+- **** Glossary term: cash flow forecast****  
+- A prediction of future cash inflows, cash outflows and net cash flow for a specific time period.  
+- **cash inflow**  
+- **** Glossary term: cash inflow****  
+- Cash flowing into or earned by a business from sales, debtors or other activities.  
+- **cash outflow**  
+- **** Glossary term: cash outflow****  
+- Cash flowing out or paid out by the business for raw materials, creditors, electricity or other spending.  
+- **causal model**  
+- **** Glossary term: causal model****  
+- A quantitative representation of real-world business dynamics, showing the causal relationship between an independent and dependent variable.  
+- **centralisation**  
+- **** Glossary term: centralisation****  
+- A situation where the decision-making authority of an organisation is held by one person, or a small group of people.  
+- **chain of command**  
+- **** Glossary term: chain of command****  
+- The line of authority in an organisation, specifying who reports to whom.  
+- **change**  
+- **** Glossary term: change****  
+- An act or process through which something becomes different.  
+- **circular business model**  
+- **** Glossary term: circular business model****  
+- A business model that aims to work more like nature, by designing systems that feed back outputs as inputs, and by designing out waste from the start.  
+- **circular production**  
+- **** Glossary term: circular production****  
+- A production model that reduces waste by ensuring outputs of the production system feed back into the system as inputs.  
+- **circular supply model**  
+- **** Glossary term: circular supply model****  
+- A business model that enables businesses to reduce new material inputs, replacing them with recovered or bio-based materials.  
+- **cloud computing**  
+- **** Glossary term: cloud computing****  
+- Involves data storage and the networking of computers, software, databases and servers to allow information to be stored and accessed from anywhere in the world.  
+- **clustering**  
+- **** Glossary term: clustering****  
+- A situation where similar businesses are located near each other.  
+- **cognitive bias**  
+- **** Glossary term: cognitive bias****  
+- A subconscious error in thinking that leads people to misinterpret information in the world around them.  
+- **collateral**  
+- **** Glossary term: collateral****  
+- An asset that a business or individual can offer a lender in the event that they do not pay back a loan.  
+- **collective bargaining**  
+- **** Glossary term: collective bargaining****  
+- A situation in which employees work together with management to negotiate wages and work conditions.  
+- **commission**  
+- **** Glossary term: commission****  
+- A type of payment to an employee or agent based on the number of sales or a percentage of the value of sales.  
+- **communication**  
+- **** Glossary term: communication****  
+- The transfer of information from one party to another, both inside and outside an organisation.  
+- **company (corporation)**  
+- **** Glossary term: company (corporation)****  
+- A business owned by multiple shareholders who have limited liability; can be privately held or publicly held.  
+- **compensation**  
+- **** Glossary term: compensation****  
+- Payment or reward in some form for work done.  
+- **competence**  
+- **** Glossary term: competence****  
+- A feeling of capability to do things in the world.  
+- **competitive advantage**  
+- **** Glossary term: competitive advantage****  
+- A condition in a business that enables it to offer better products, or products at lower production cost, than its rivals.  
+- **competitive pricing**  
+- **** Glossary term: competitive pricing****  
+- When a company bases the price of its goods or services upon what its competitors are charging for similar goods and services.  
+- **conciliation**  
+- **** Glossary term: conciliation****  
+- A method of conflict resolution where management and employees present arguments to a third party, who makes non-binding recommendations in the conflict.  
+- **consumer goods**  
+- **** Glossary term: consumer goods****  
+- Products created for consumption.  
+- **contingency planning**  
+- **** Glossary term: contingency planning****  
+- When an organisation creates an action plan to follow in case a crisis occurs.  
+- **continuous improvement (kaizen)**  
+- **** Glossary term: continuous improvement (kaizen)****  
+- A quality management approach where employees are encouraged always to seek and implement production improvements.  
+- **contribution**  
+- **** Glossary term: contribution****  
+- The price of the product minus the variable (direct) costs per unit.  
+- **contribution costing**  
+- **** Glossary term: contribution costing****  
+- A cost accounting method that only considers the direct costs of the product, department or region and their resulting contribution to covering the indirect costs of the business as a whole.  
+- **contribution per unit**  
+- **** Glossary term: contribution per unit****  
+- The price of the product minus the variable (direct) costs per unit.  
+- **contribution pricing**  
+- **** Glossary term: contribution pricing****  
+- A pricing strategy where the price charged for a product reflects the variable costs plus some markup; the markup is the contribution to fixed costs.  
+- **convenience sampling**  
+- **** Glossary term: convenience sampling****  
+- A sampling method where the sample is made up of whoever is willing to take part in the research.  
+- **conversions**  
+- **** Glossary term: conversions****  
+- The action of getting customers or potential customers to respond to the 'call to action' of a business.  
+- **cooperative**  
+- **** Glossary term: cooperative****  
+- A business owned and operated by its members, who share the profits.  
+- **copyright**  
+- **** Glossary term: copyright****  
+- Legal protection that gives an author or creator the exclusive right to reproduce work for a specific period of time.  
+- **corporate social responsibility (CSR)**  
+- **** Glossary term: corporate social responsibility (CSR)****  
+- Businesses actively seeking ways to improve society and the environment through core business activities and business designs.  
+- **cost**  
+- **** Glossary term: cost****  
+- All the expenses needed to produce a good or a service.  
+- **cost centre**  
+- **** Glossary term: cost centre****  
+- A department in a business that generates costs, but no revenue.  
+- **cost focus strategy**  
+- **** Glossary term: cost focus strategy****  
+- A situation where a business becomes the low-cost producer in a niche market; one of Porter's Generic Strategies.  
+- **cost leadership strategy**  
+- **** Glossary term: cost leadership strategy****  
+- A situation where a business becomes the low-cost producer in the industry; one of Porter's Generic Strategies.  
+- **cost of sales**  
+- **** Glossary term: cost of sales****  
+- The cost of goods actually sold by a business over a period of time.  
+- **cost-plus (markup) pricing**  
+- **** Glossary term: cost-plus (markup) pricing****  
+- A pricing strategy where the price charged for the product reflects a markup added to the direct and indirect costs of production.  
+- **cost to buy (CTB)**  
+- **** Glossary term: cost to buy (CTB)****  
+- The total cost of production if a business decides to subcontract production to a supplier.  
+- **cost to make (CTM)**  
+- **** Glossary term: cost to make (CTM)****  
+- The total cost of production if manufacturing is kept inhouse.  
+- **cradle-to-cradle design and manufacturing**  
+- **** Glossary term: cradle-to-cradle design and manufacturing****  
+- A design and production process that aims to work more like nature, by designing systems that feed back outputs as inputs, and by designing out waste from the start; akin to circular business models and production.  
+- **creativity**  
+- **** Glossary term: creativity****  
+- Generating new ideas and considering existing ideas from new perspectives.  
+- **creditor days**  
+- **** Glossary term: creditor days****  
+- A measure of the average number of days it takes a business to pay its debts; creditors / cost of sales × 365  
+- **crisis management**  
+- **** Glossary term: crisis management****  
+- The steps a company takes to limit the damage caused by an unpredicted event or crisis.  
+- **critical path**  
+- **** Glossary term: critical path****  
+- The minimum time period that a project needs to be completed.  
+- **critical path analysis (CPA)**  
+- **** Glossary term: critical path analysis (CPA)****  
+- A project planning tool that shows the minimum time period that a project needs to be completed.  
+- **crowdfunding**  
+- **** Glossary term: crowdfunding****  
+- A form of finance where many people, perhaps thousands, invest small amounts of money to fund a business or project.  
+- **cultural clash**  
+- **** Glossary term: cultural clash****  
+- When more than one culture competes for dominance, and conflict results.  
+- **current assets**  
+- **** Glossary term: current assets****  
+- Cash and other assets that a business plans to convert into cash in less than one year (debtors and stock/inventory).  
+- **current liabilities**  
+- **** Glossary term: current liabilities****  
+- Debts and other payables that are due within one year.  
+- **current ratio**  
+- **** Glossary term: current ratio****  
+- A liquidity ratio that measures the value of current assets relative to current liabilities, calculated by dividing current assets by current liabilities.  
+- **customer loyalty programmes**  
+- **** Glossary term: customer loyalty programmes****  
+- A marketing strategy that rewards customers who repeatedly purchase products from a business.  
+- **cybercrime**  
+- **** Glossary term: cybercrime****  
+- Criminal activity carried out using computers, networks and digital technologies.  
+- **cybersecurity**  
+- **** Glossary term: cybersecurity****  
+- The use of technologies and systems designed to block access to technology systems by criminals.  
+- **cyclical variations**  
+- **** Glossary term: cyclical variations****  
+- Variations in data due to cyclical changes in economic activity.  
+**** Start of Words in Glossary Letter D****  
+- **data analytics**  
+- **** Glossary term: data analytics****  
+- The science of analysing data to establish patterns, trends and behaviours in order to draw conclusions.  
+- **database**  
+- **** Glossary term: database****  
+- An organised collection of information stored in an electronic system.  
+- **data centres**  
+- **** Glossary term: data centres****  
+- Buildings or sub-sections of buildings that contain servers, support computer networks and run systems needed to provide digital technologies or services.  
+- **data mining**  
+- **** Glossary term: data mining****  
+- The process of searching for and finding patterns and trends within large data sets.  
+- **debt finance**  
+- **** Glossary term: debt finance****  
+- Money that is borrowed from a bank or other financial institution, usually to fund investments.  
+- **debtor**  
+- **** Glossary term: debtor****  
+- A person or business that has bought products on credit from another business, but has not yet paid for the products.  
+- **debtor days**  
+- **** Glossary term: debtor days****  
+- A measure of the average number of days that it takes a business to collect its debts; debtors / sales revenue x 365.  
+- **decentralisation**  
+- **** Glossary term: decentralisation****  
+- A situation where the decision-making powers are passed down to the lower levels in the organisation.  
+- **decision tree**  
+- **** Glossary term: decision tree****  
+- A decision-making tool with branches representing choices with associated costs and probabilities and results.  
+- **decline stage**  
+- **** Glossary term: decline stage****  
+- The fourth stage of the product life cycle, where sales decrease.  
+- **defect rate**  
+- **** Glossary term: defect rate****  
+- A measure of the products that fail to meet specified quality guidelines; expressed as a percentage of output.  
+- **deflation**  
+- **** Glossary term: deflation****  
+- A decrease in the general price level, usually expressed as percentage change.  
+- **deindustrialisation**  
+- **** Glossary term: deindustrialisation****  
+- The process of moving from secondary to tertiary and quaternary production in a country.  
+- **delayering**  
+- **** Glossary term: delayering****  
+- The removal of unnecessary levels of hierarchy in an organisation.  
+- **delegation**  
+- **** Glossary term: delegation****  
+- Assigning responsibility for a task to someone further down the chain of command.  
+- **demand**  
+- **** Glossary term: demand****  
+- The willingness and ability of consumers to buy products at a particular price and time.  
+- **democratic leadership**  
+- **** Glossary term: democratic leadership****  
+- A leadership style where a leader actively seeks employee participation in decision-making.  
+- **demographic changes**  
+- **** Glossary term: demographic changes****  
+- Changes to the characteristics of a population, such as age structure or gender distribution.  
+- **demographic segmentation**  
+- **** Glossary term: demographic segmentation****  
+- Dividing consumers into target groups according to characteristics such as age, gender and occupation.  
+- **dependent variable**  
+- **** Glossary term: dependent variable****  
+- The variable that is being measured or tested in an experiment or analysis of data.  
+- **depreciation**  
+- **** Glossary term: depreciation****  
+1. The loss of the value of a long-term asset over time.  
+   
+   2. The exact allocation in a financial statement of the cost of a long-term asset over the life of the asset.  
+- **differentiation**  
+- **** Glossary term: differentiation****  
+- The process of highlighting the differences between a product and its rivals.  
+- **differentiation focus strategy**  
+- **** Glossary term: differentiation focus strategy****  
+- A strategy where a business is producing a specialised or differentiated product for a niche market; one of Porter's Generic Strategies.  
+- **differentiation strategy**  
+- **** Glossary term: differentiation strategy****  
+- A strategy where a business is producing a specialised or differentiated product for a broad market; one of Porter's Generic Strategies.  
+- **digital marketing**  
+- **** Glossary term: digital marketing****  
+- The use of the internet, mobile devices, social media, search engines and other channels to reach consumers.  
+- **digital Taylorism**  
+- **** Glossary term: digital Taylorism****  
+- A modern version of Taylor’s scientific management that uses digital technologies to monitor every aspect of employee performance.  
+- **direct cost**  
+- **** Glossary term: direct cost****  
+- A cost that is precisely traceable to a specific cost object, which may be a product, a service or a department.  
+- **direct distribution**  
+- **** Glossary term: direct distribution****  
+- A type of distribution channel in which the producer deals directly with the customers.  
+- **direct investment**  
+- **** Glossary term: direct investment****  
+- A situation where a company opens operations in another country.  
+- **direct marketing**  
+- **** Glossary term: direct marketing****  
+- A form of marketing communication that uses one or more types of media to communicate directly with a target audience and measure their response.  
+- **discount rate**  
+- **** Glossary term: discount rate****  
+- The rate of return that a business could earn on another comparable investment; applied to the expected future cash flows from an investment to reduce them to reflect today's value of that future cash flow.  
+- **diseconomies of scale**  
+- **** Glossary term: diseconomies of scale****  
+- The increase in the per-unit production cost as a business grows.  
+- **dismissal**  
+- **** Glossary term: dismissal****  
+- When a business releases an employee from their job, usually because of poor work performance or misconduct.  
+- **disruptive innovation**  
+- **** Glossary term: disruptive innovation****  
+- When something is created that fundamentally disrupts a market or opens a completely new market.  
+- **distribution channel**  
+- **** Glossary term: distribution channel****  
+- The network used to move a product from the manufacturer to the end users.  
+- **distributive business**  
+- **** Glossary term: distributive business****  
+- A business that optimises and distributes value for multiple stakeholders, rather than maximising profits for shareholders.  
+- **diversification**  
+- **** Glossary term: diversification****  
+- A high-risk growth strategy that involves selling new products in new markets.  
+- **dividends**  
+- **** Glossary term: dividends****  
+- A portion of a business’s profits distributed to the owners/shareholders.  
+- **Doughnut economics model**  
+- **** Glossary term: Doughnut economics model****  
+- A model that outlines the social foundation (human needs) and ecological ceiling (planetary boundaries) that economic activity needs to respect to find the 'safe and just space for humanity'.  
+- **driving forces**  
+- **** Glossary term: driving forces****  
+- Factors that support or promote change.  
+- **dummy activity**  
+- **** Glossary term: dummy activity****  
+- An activity in a critical path diagram that has no duration and has been added to show the relationships between real activities.  
+- **dynamic pricing**  
+- **** Glossary term: dynamic pricing****  
+- The practice of changing the price of a good or service according to the demand.  
+**** Start of Words in Glossary Letter E****  
+- **ecological ceiling**  
+- **** Glossary term: ecological ceiling****  
+- The limits of planetary systems; the outer ring of the Doughnut Economics model.  
+- **e-commerce**  
+- **** Glossary term: e-commerce****  
+- Buying and selling products over the internet.  
+- **economies of scale**  
+- **** Glossary term: economies of scale****  
+- The reduction in per-unit production cost as a business grows.  
+- **economy**  
+- **** Glossary term: economy****  
+- A system for producing and provisioning or distributing goods and services among a group of people.  
+- **efficiency**  
+- **** Glossary term: efficiency****  
+- How well a business transforms physical, human and financial inputs into outputs.  
+- **efficiency ratio**  
+- **** Glossary term: efficiency ratio****  
+- A financial ratio that shows how well a business is managing its operations in relation to the working capital cycle.  
+- **embedded economy model**  
+- **** Glossary term: embedded economy model****  
+- A model that shows the economy embedded in nature, with inputs of energy from the Sun and outputs of waste; provisioning occurs through markets, households, the state and the commons.  
+- **employee participation**  
+- **** Glossary term: employee participation****  
+- A method of working whereby employees are actively involved in decision-making and therefore have a say in their work.  
+- **employee share ownership schemes**  
+- **** Glossary term: employee share ownership schemes****  
+- A financial reward where employees receive shares in the business or are allowed to buy shares at below-market price.  
+- **empowerment**  
+- **** Glossary term: empowerment****  
+- A non-financial reward where an employee is given greater responsibility to make decisions in the workplace and to choose how to perform their job.  
+- **entrepreneur**  
+- **** Glossary term: entrepreneur****  
+- A person who organises human, physical and financial resources to start a business.  
+- **equity**  
+- **** Glossary term: equity****  
+1. Fair treatment of individuals or groups.  
+   
+   2. The value of shares issued by a company.  
+- **equity finance**  
+- **** Glossary term: equity finance****  
+- A type of funding whereby the provider receives part ownership of the business in exchange for the finance.  
+- **equity stake**  
+- **** Glossary term: equity stake****  
+- Ownership of a company as a shareholder.  
+- **equity theory**  
+- **** Glossary term: equity theory****  
+- A motivation theory claiming that employees’ satisfaction in the workplace is determined by understanding of fairness.  
+- **ethics**  
+- **** Glossary term: ethics****  
+- The moral principles that govern the behaviour of a person or group.  
+- **Exchange rate**  
+- **** Glossary term: Exchange rate****  
+- The price of one country’s currency in terms of another country’s currency.  
+- **expectancy theory**  
+- **** Glossary term: expectancy theory****  
+- A motivation theory claiming that human behaviour is motivated by anticipated results or consequences; people will be motivated to perform if they think that their performance will be recognised and appropriately rewarded.  
+- **expected value**  
+- **** Glossary term: expected value****  
+- In a decision tree, the predicted profit of each outcome given the expected probabilities, revenues and costs.  
+- **expenses**  
+- **** Glossary term: expenses****  
+- Costs that are not directly related to the core operations of a business.  
+- **exporting**  
+- **** Glossary term: exporting****  
+- Selling overseas without establishing production units in another country; the simplest form of international expansion.  
+- **extension strategy**  
+- **** Glossary term: extension strategy****  
+- A practice used to keep a product in the maturity stage of the product lifecycle, rather than letting it go into the decline stage.  
+- **external diseconomies of scale**  
+- **** Glossary term: external diseconomies of scale****  
+- The increased unit cost of production for a business due to the expansion of the industry in which the business operates.  
+- **external economies of scale**  
+- **** Glossary term: external economies of scale****  
+- Cost-saving benefits of large businesses in their region or industry that are not under the control of the business.  
+- **external growth**  
+- **** Glossary term: external growth****  
+- Expansion of a business by relying on external resources, typically with another organisation.  
+- **external recruitment**  
+- **** Glossary term: external recruitment****  
+- When a business fills a job vacancy by recruiting an employee from outside the organisation, usually because the company needs certain skills that it lacks in its current employees.  
+- **external sources of finance**  
+- **** Glossary term: external sources of finance****  
+- Money for a business that is raised from outside the business, such a bank loan.  
+- **external stakeholder**  
+- **** Glossary term: external stakeholder****  
+- An individual or group that affects, or is affected by, an organisation, but who is not directly involved inside the organisation.  
+- **extrapolation**  
+- **** Glossary term: extrapolation****  
+- A forecasting method used by businesses to identify trends using past data and extending this information and trend to predict future data.  
+- **extrinsic motivation**  
+- **** Glossary term: extrinsic motivation****  
+- Where a person engages in an activity because of a reward outside the activity itself, such as being paid.  
+**** Start of Words in Glossary Letter F****  
+- **favourable variance**  
+- **** Glossary term: favourable variance****  
+- A situation whereby actual income and expenditure figures are better for the business than expected.  
+- **feedback**  
+- **** Glossary term: feedback****  
+- Process by which the output of a system becomes an input to the same system.  
+- **financial economies of scale**  
+- **** Glossary term: financial economies of scale****  
+- Lower costs of production that occur when a large business takes out a larger loan, with a lower interest rate, for investment.  
+- **financial ratios**  
+- **** Glossary term: financial ratios****  
+- Quantitative expressions of the relationship between variables in the final accounts; useful for evaluating the performance of a business.  
+- **financial resources**  
+- **** Glossary term: financial resources****  
+- The funds needed to set up and invest in a business and keep it running; can be short-term, medium-term and long-term.  
+- **financial rewards**  
+- **** Glossary term: financial rewards****  
+- Rewards for employees that involve monetary compensation for work.  
+- **fixed asset**  
+- **** Glossary term: fixed asset****  
+- An item or property that has value, is owned by a person or business, and which the business plans on holding or using for longer than one year.  
+- **fixed costs**  
+- **** Glossary term: fixed costs****  
+- Those costs that, during the relevant period, do not vary with output or activity.  
+- **flat (horizontal) organisational structure**  
+- **** Glossary term: flat (horizontal) organisational structure****  
+- A type of business organisation with few levels of hierarchy.  
+- **flexitime**  
+- **** Glossary term: flexitime****  
+- Flexible hours agreed and scheduled by the management and the employee.  
+- **float time**  
+- **** Glossary term: float time****  
+- The amount of time an activity, network path or project can be delayed from the early start without changing the completion date of the project.  
+- **focus group**  
+- **** Glossary term: focus group****  
+- An interview conducted with a group of individuals, usually with similar characteristics.  
+- **foreign direct investment (FDI)**  
+- **** Glossary term: foreign direct investment (FDI)****  
+- The long-term investment by a multinational corporation in a foreign country; involves either setting up factories and expanding operations in the new country or the purchase of at least a 10% share of a foreign company.  
+- **formal communication**  
+- **** Glossary term: formal communication****  
+- The transfer of information in an organisation that uses defined channels and tends to flow along the chain of command.  
+- **formative appraisal**  
+- **** Glossary term: formative appraisal****  
+- The continuous appraisal of employees so that they can improve their performance.  
+- **for-profit commercial enterprise**  
+- **** Glossary term: for-profit commercial enterprise****  
+- A type of business that earns profits, which are distributed to owners or shareholders; profits may have prioritity over other objectives.  
+- **for-profit social enterprise**  
+- **** Glossary term: for-profit social enterprise****  
+- A type of social enterprise that earns revenue and profits, but integrates social and/or environmental impact directly into its business model.  
+- **fracking**  
+- **** Glossary term: fracking****  
+- Injecting liquid at high pressure into rocks underground to force open existing cracks and extract oil or gas.  
+- **franchisee**  
+- **** Glossary term: franchisee****  
+- A business owner who pays a franchisor for the right to use the name and business model of an enterprise.  
+- **franchising**  
+- **** Glossary term: franchising****  
+- A form of external growth where a franchisee buys the rights to use the name and business model of a franchisor.  
+- **franchisor**  
+- **** Glossary term: franchisor****  
+- A business owner who sells the right to use the name and business model of an enterprise to a franchisee.  
+- **free float**  
+- **** Glossary term: free float****  
+- The amount of time that an activity can overrun its time estimate, but not delay the next activity.  
+- **fringe payments**  
+- **** Glossary term: fringe payments****  
+- Rewards given to an employee in addition to pay, such as a company car, additional insurance, or schooling for children.  
+**** Start of Words in Glossary Letter G****  
+- **Gantt chart**  
+- **** Glossary term: Gantt chart****  
+- A business management tool that is a visual representation of a project plan, at a minimum including tasks and the time involved for each task.  
+- **gap in the market**  
+- **** Glossary term: gap in the market****  
+- An unmet need that can be addressed by a business.  
+- **gearing ratio**  
+- **** Glossary term: gearing ratio****  
+- A measure of how much of a business’s capital employed is financed by long-term debt.  
+- **generative (regenerative) business**  
+- **** Glossary term: generative (regenerative) business****  
+- A business that aims to strengthen its social and environmental ecosystems by creating opportunities for other businesses and communities to develop, and by restoring the natural environment. The business enjoys a network of mutual benefits and increased resiliency.  
+- **geographic segmentation**  
+- **** Glossary term: geographic segmentation****  
+- A way of dividing potential customers based on their geographic location.  
+- **gig economy**  
+- **** Glossary term: gig economy****  
+- The section of the economy that provides temporary work for freelancers. Workers can take work flexibly, but do not have the same protections and benefits as those on long-term employment contracts.  
+- **globalisation**  
+- **** Glossary term: globalisation****  
+- The increased movement of people, products, ideas, culture and finance across international borders.  
+- **global localisation strategy**  
+- **** Glossary term: global localisation strategy****  
+- A strategy whereby globally-available products are tailored to meet the needs of local consumers; all elements of the marketing mix could potentially be adjusted.  
+- **global marketing strategy**  
+- **** Glossary term: global marketing strategy****  
+- A strategy whereby the same marketing mix is used for every country; products are not tailored to meet the needs of local markets.  
+- **goods**  
+- **** Glossary term: goods****  
+- The products of a business that are tangible, meaning they have physical characteristics and can be measured.  
+- **greenwashing**  
+- **** Glossary term: greenwashing****  
+- When a business gives the public a false impression of the social and environmental sustainability of its products.  
+- **gross domestic product**  
+- **** Glossary term: gross domestic product****  
+- The total value of all goods and services produced within the borders of a country in a certain time period.  
+- **gross domestic product per capita**  
+- **** Glossary term: gross domestic product per capita****  
+- The total value of all goods and services produced within the borders of a country, divided by the country’s population.  
+- **gross profit**  
+- **** Glossary term: gross profit****  
+- The sales revenue of a business minus the cost of sales.  
+- **gross profit margin (GPM)**  
+- **** Glossary term: gross profit margin (GPM)****  
+- A profitability ratio that shows the gross profit as a percentage of sales revenue.  
+- **growth**  
+- **** Glossary term: growth****  
+- The expansion of a business in terms of revenue, profit, number of employees, locations or another important metric.  
+- **growth stage**  
+- **** Glossary term: growth stage****  
+- The second stage of the product life cycle, which is characterised by an increase of sales over time.  
+**** Start of Words in Glossary Letter H****  
+- **Handy's Gods of Management theory**  
+- **** Glossary term: Handy's Gods of Management theory****  
+- A theory of organisational culture claiming that there are four dominant cultures in business: power culture, role culture, task culture, and person culture.  
+- **hierarchy**  
+- **** Glossary term: hierarchy****  
+- A system in which members of an organisation are ranked according to authority.  
+- **Hofstede's cultural dimensions**  
+- **** Glossary term: Hofstede's cultural dimensions****  
+- A theory of culture claiming that there are six main dimensions that define national cultures.  
+- **holacracy**  
+- **** Glossary term: holacracy****  
+- A type of flat organisational structure where teams work autonomously to accomplish tasks and company goals.  
+- **host country**  
+- **** Glossary term: host country****  
+- A country that allows a multinational company to operate within its borders.  
+- **human resource management**  
+- **** Glossary term: human resource management****  
+- The business function that involves recruitment, training, compensation and motivation of employees to meet business objectives.  
+- **human resources**  
+- **** Glossary term: human resources****  
+- The people needed to run the business.  
+- **hygiene factors**  
+- **** Glossary term: hygiene factors****  
+- Factors that cause job dissatisfaction amongst employees.  
+**** Start of Words in Glossary Letter I****  
+- **immigration**  
+- **** Glossary term: immigration****  
+- The movement of people from one country to another country for residence.  
+- **import**  
+- **** Glossary term: import****  
+- Products brought into a country.  
+- **income statement**  
+- **** Glossary term: income statement****  
+- A statement that records sales revenues and costs of a business to determine the net profit and distribution of profit; also known as the statement of profit or loss.  
+- **incremental innovation**  
+- **** Glossary term: incremental innovation****  
+- When small and continuous improvements are made to the existing products, services or processes in a business.  
+- **independent variable**  
+- **** Glossary term: independent variable****  
+- A factor that a business suspects has an impact on a dependent variable (for example, monthly sales).  
+- **indirect costs/overheads**  
+- **** Glossary term: indirect costs/overheads****  
+- Costs that are used in multiple areas or activities of the business and, therefore, are not traceable to a specific cost object.  
+- **indirect distribution**  
+- **** Glossary term: indirect distribution****  
+- A type of distribution channel in which the producer reaches the customers via one or more intermediaries.  
+- **induction**  
+- **** Glossary term: induction****  
+- Training for new employees when they first start their work in the organisation.  
+- **industrial action**  
+- **** Glossary term: industrial action****  
+- An organised display of dissatisfaction over working conditions, usually by employees; includes strikes and work-to-rule among other actions.  
+- **industrial democracy**  
+- **** Glossary term: industrial democracy****  
+- The process of allowing workers to have a say in the decision-making of a business; could include workers sitting on the board of directors of the company.  
+- **inflation**  
+- **** Glossary term: inflation****  
+- An increase in the general price level, usually expressed as a percentage change.  
+- **influencer**  
+- **** Glossary term: influencer****  
+- A content creator with followers on social media.  
+- **informal communication**  
+- **** Glossary term: informal communication****  
+- The transfer of information in an organisation that does not use defined channels.  
+- **infrastructure**  
+- **** Glossary term: infrastructure****  
+- Large-scale capital goods, usually funded by governments, that are necessary for economic activity.  
+- **initial public offering (IPO)**  
+- **** Glossary term: initial public offering (IPO)****  
+- A situation where a company sells all or part of the business to external shareholders for the first time.  
+- **innovation**  
+- **** Glossary term: innovation****  
+- When a person or organisation creates something new with value.  
+- **inputs**  
+- **** Glossary term: inputs****  
+- The human, physical and financial resources needed to create a product.  
+- **insolvency**  
+- **** Glossary term: insolvency****  
+- A situation in which a business is unable to pay its debts.  
+- **insourcing**  
+- **** Glossary term: insourcing****  
+- When a business decides to have its own personnel perform tasks or operations previously performed by an external organisation.  
+- **intangible assets**  
+- **** Glossary term: intangible assets****  
+- Non-physical items of value owned by a company that have a lifespan of more than a year.  
+- **integrated business**  
+- **** Glossary term: integrated business****  
+- A business whose activities span two or more sectors.  
+- **intellectual property**  
+- **** Glossary term: intellectual property****  
+- Creations of the mind such as inventions, artistic works or brand names.  
+- **interest rate**  
+- **** Glossary term: interest rate****  
+- The cost of borrowing money; expressed as a percentage of the amount borrowed.  
+- **intermediary**  
+- **** Glossary term: intermediary****  
+- A person or business that acts as a go-between in a transaction.  
+- **internal customers**  
+- **** Glossary term: internal customers****  
+- Individuals or groups in a business that receive goods or services from within the business.  
+- **internal diseconomies of scale**  
+- **** Glossary term: internal diseconomies of scale****  
+- The increase in per-unit production cost as a business grows, usually explained by the difficulty of managing internally large operations.  
+- **internal economies of scale**  
+- **** Glossary term: internal economies of scale****  
+- Cost reductions experienced by a business when it expands its output.  
+- **internal growth**  
+- **** Glossary term: internal growth****  
+- Expansion of a business with its own resources.  
+- **internal recruitment**  
+- **** Glossary term: internal recruitment****  
+- Where a job vacancy is filled from within the business by promoting and retraining an existing employee rather than hiring a person from outside the business.  
+- **internal source of finance**  
+- **** Glossary term: internal source of finance****  
+- Money for a business that is raised from the business’s or owner's existing assets.  
+- **internal stakeholder**  
+- **** Glossary term: internal stakeholder****  
+- An individual or group that affects, or is affected by, an organisation and is directly involved inside the organisation.  
+- **international marketing**  
+- **** Glossary term: international marketing****  
+- The process of selling goods and services in more than one country.  
+- **internet of things (IoT)**  
+- **** Glossary term: internet of things (IoT)****  
+- The connections (networks) of physical objects using software that enables them to communicate and exchange data.  
+- **intrapreneur**  
+- **** Glossary term: intrapreneur****  
+- A person who develops new ideas, processes or products for a business in which they already work.  
+- **intrinsic motivation**  
+- **** Glossary term: intrinsic motivation****  
+- When a person engages in an activity because there is a reward or pleasure in the activity itself.  
+- **introduction stage**  
+- **** Glossary term: introduction stage****  
+- The first stage of the product life cycle, when the product is initially launched to the market.  
+- **intuitive thinking/management**  
+- **** Glossary term: intuitive thinking/management****  
+- A process of fast reasoning developed by experienced managers, combining emotional intelligence, experience and learning from past mistakes.  
+- **inventory**  
+- **** Glossary term: inventory****  
+- The raw materials used in production, as well as the goods produced that are available for sale.  
+- **investment**  
+- **** Glossary term: investment****  
+- Spending by a business on non-current (fixed) assets; also known as capital expenditure.  
+- **investment appraisal**  
+- **** Glossary term: investment appraisal****  
+- A process of quantitative and qualitative evaluation of an investment decision.  
+- **iteration**  
+- **** Glossary term: iteration****  
+- The process of creating a new version of something.  
+**** Start of Words in Glossary Letter J****  
+- **jargon**  
+- **** Glossary term: jargon****  
+- Terminology and technical phrases used by people in certain professions and industries.  
+- **job enlargement**  
+- **** Glossary term: job enlargement****  
+- A non-financial reward where more tasks, usually of the same skill and difficulty level, are officially added to an employee’s job description.  
+- **job enrichment**  
+- **** Glossary term: job enrichment****  
+- A non-financial reward whereby an employee is given additional challenging tasks that make the work more interesting and lead to professional growth.  
+- **job production**  
+- **** Glossary term: job production****  
+- Producing unique items that are tailor made to meet the needs of individual customers.  
+- **job rotation**  
+- **** Glossary term: job rotation****  
+- A non-financial reward where employees are regularly rotated into different positions, allowing them to gain experience and acquire new skills.  
+- **joint venture**  
+- **** Glossary term: joint venture****  
+- A form of external growth where two businesses create, own and operate a third organisation.  
+- **just-in-case (JIC)**  
+- **** Glossary term: just-in-case (JIC)****  
+- An operations management strategy where a business holds relatively large levels of buffer stocks so that a business can continue to operate when faced with an unforeseen event.  
+- **just-in-time (JIT)**  
+- **** Glossary term: just-in-time (JIT)****  
+- An operations management strategy where raw materials or other inputs are ordered and delivered immediately before their use, so that stock (inventory) can be minimised.  
+- **labour intensive**  
+- **** Glossary term: labour intensive****  
+- A production process that uses more human labour relative to physical capital.  
+- **labour mobility**  
+- **** Glossary term: labour mobility****  
+- The extent to which workers can move to a new location to take a job (geographical mobility) or change careers (occupational mobility).  
+- **labour productivity**  
+- **** Glossary term: labour productivity****  
+- The output per worker over a defined period of time; total output divided by number of employees.  
+- **labour turnover**  
+- **** Glossary term: labour turnover****  
+- The percentage of workers leaving the business in a period of time.  
+- **laissez-faire leadership**  
+- **** Glossary term: laissez-faire leadership****  
+- A leadership style whereby the leader ‘lets go’ of decision-making and allows members of the group or team to make decisions.  
+- **leadership**  
+- **** Glossary term: leadership****  
+- The use of strategic and creative thinking that inspires people to meet challenges and accomplish goals.  
+- **lead time**  
+- **** Glossary term: lead time****  
+- How long it takes for a supplier to make a delivery from the time of ordering.  
+- **lean production**  
+- **** Glossary term: lean production****  
+- A set of strategies to reduce waste in the production process.  
+- **leasing**  
+- **** Glossary term: leasing****  
+- A business renting (hiring) a fixed asset over a period of time, rather than buying it.  
+- **levels of hierarchy**  
+- **** Glossary term: levels of hierarchy****  
+- The number of layers of authority available within an organisation.  
+- **liability**  
+- **** Glossary term: liability****  
+- Being legally responsible for something.  
+- **limited liability**  
+- **** Glossary term: limited liability****  
+- A situation where the owners of a business are not personally responsible for the debts of the business if it fails; the owners and the business are legally separated.  
+- **linear production**  
+- **** Glossary term: linear production****  
+- Taking resources from the Earth, making products with them and then disposing of the products.  
+- **line of best fit**  
+- **** Glossary term: line of best fit****  
+- A line through a scatter diagram (or scatter plot) of data points that best expresses the relationship between those points.  
+- **liquidity**  
+- **** Glossary term: liquidity****  
+- The ability of a business to convert its current assets into cash.  
+- **liquidity ratios**  
+- **** Glossary term: liquidity ratios****  
+- Financial ratios that measure a business’s ability to settle its short-term debt obligations; comparing the value of current assets to the value of current liabilities.  
+- **loan**  
+- **** Glossary term: loan****  
+- A medium- or long-term source of finance, often used to buy fixed assets.  
+- **location**  
+- **** Glossary term: location****  
+- The geographic position of a business; where it is positioned or sited.  
+- **lock-out**  
+- **** Glossary term: lock-out****  
+- A situation where management blocks workers from entering the workplace; a negotiation tactic to put pressure on workers to compromise in labour negotiations.  
+- **long-term financing**  
+- **** Glossary term: long-term financing****  
+- Large-scale funds needed to finance expensive equipment and facilities that a business needs to operate.  
+- **long-term liabilities**  
+- **** Glossary term: long-term liabilities****  
+- Long-term borrowing that does not have to repaid within a year.  
+- **loss leader**  
+- **** Glossary term: loss leader****  
+- A product that is sold at a loss to attract customers.  
+**** Start of Words in Glossary Letter M****  
+- **machine learning**  
+- **** Glossary term: machine learning****  
+- A type of artificial intelligence that uses data and algorithms to improve processes and outputs over time.  
+- **make or buy analysis**  
+- **** Glossary term: make or buy analysis****  
+- The use of qualitative and/or quantitative data by a business to decide whether to buy or make a product or component.  
+- **management**  
+- **** Glossary term: management****  
+- The work of directing a business organisation’s resources to achieve business objectives.  
+- **management information systems (MIS)**  
+- **** Glossary term: management information systems (MIS)****  
+- Systems that collect, collate, coordinate, control and channel information within an organisation.  
+- **managerial economies of scale**  
+- **** Glossary term: managerial economies of scale****  
+- Lower costs of production that occur when the cost of hiring a manager is spread over a larger output.  
+- **margin of safety**  
+- **** Glossary term: margin of safety****  
+- The difference between the current or forecasted quantity or output and the current or forecasted break-even quantity.  
+- **market**  
+- **** Glossary term: market****  
+- A place where buyers and sellers come together or interact; a location and a type of product.  
+- **market analysis**  
+- **** Glossary term: market analysis****  
+- A research report usually published by a market research company.  
+- **market capitalisation**  
+- **** Glossary term: market capitalisation****  
+- The total value of a company's shares; the number of shares multiplied by the price of a share.  
+- **market development**  
+- **** Glossary term: market development****  
+- A medium-risk growth strategy that involves selling existing products in new markets.  
+- **market growth**  
+- **** Glossary term: market growth****  
+- The increase in sales revenues or sales volume in an individual market over time.  
+- **marketing**  
+- **** Glossary term: marketing****  
+- All of the processes involved in identifying and satisfying customer needs.  
+- **marketing economies of scale**  
+- **** Glossary term: marketing economies of scale****  
+- Lower costs of production that occur when the cost of a marketing campaign is spread over a larger quantity of output, thus lowering the average cost of the campaign.  
+- **marketing mix**  
+- **** Glossary term: marketing mix****  
+- The decisions of a business regarding its product, price, promotion, place, people, processes and physical evidence.  
+- **marketing plan**  
+- **** Glossary term: marketing plan****  
+- A document that outlines a company's entire marketing process.  
+- **market leader**  
+- **** Glossary term: market leader****  
+- The product or brand with the highest market share.  
+- **market orientation**  
+- **** Glossary term: market orientation****  
+- A situation where the sole focus of a business is on the needs and wants of a market segment.  
+- **market penetration**  
+- **** Glossary term: market penetration****  
+- A low-risk growth strategy that involves selling more of the same products and services to the same customers, or to the same types of customers; achieved through changes to price, promotion or distribution.  
+- **market research**  
+- **** Glossary term: market research****  
+- Gathering information to support marketing decisions.  
+- **market share**  
+- **** Glossary term: market share****  
+- The value of a single company's sales or revenues compared with the sales of all businesses in a market.  
+- **Maslow's hierarchy of needs**  
+- **** Glossary term: Maslow's hierarchy of needs****  
+- A motivation theory stating that human beings have basic needs, psychological needs and self-fulfillment needs; basic needs have to be satisfied before psychological needs and self-fulfillment needs.  
+- **mass customisation**  
+- **** Glossary term: mass customisation****  
+- The production of large quantities of goods that can be adjusted to customer specifications.  
+- **mass/flow production**  
+- **** Glossary term: mass/flow production****  
+- The production of large amounts of standardised products on an assembly line.  
+- **mass market**  
+- **** Glossary term: mass market****  
+- A market for goods that are produced in very large quantities.  
+- **matrix structure**  
+- **** Glossary term: matrix structure****  
+- An organisational structure that has two or more reporting structures; employees working on a project report to both a project manager and to a functional manager.  
+- **maturity stage**  
+- **** Glossary term: maturity stage****  
+- The third phase of the product life cycle, where sales are stable over a period of time.  
+- **mean**  
+- **** Glossary term: mean****  
+- An average number found by adding all the numbers in a set together and then dividing by the total number in the set.  
+- **median**  
+- **** Glossary term: median****  
+- The middle value in a list of ordered numbers.  
+- **merchandising**  
+- **** Glossary term: merchandising****  
+- The promotion of goods that are available for purchase for both wholesale and retail sales.  
+- **merger**  
+- **** Glossary term: merger****  
+- A form of external growth where two businesses combine to form a new business; the new business replaces the two that existed before the merger.  
+- **metaverse**  
+- **** Glossary term: metaverse****  
+- Digital worlds where people work, play, and gather together.  
+- **microcredit**  
+- **** Glossary term: microcredit****  
+- Small loans that enable someone to start up or continue to finance a small-scale business; a subset of microfinance.  
+- **microfinance**  
+- **** Glossary term: microfinance****  
+- Financial services provided to individuals who have very limited income and assets and are not able to get services from traditional banks.  
+- **minimum stock level**  
+- **** Glossary term: minimum stock level****  
+- The minimum quantity of stock that a business wants to hold to ensure that it always has stocks on hand for production or sale.  
+- **mission statement**  
+- **** Glossary term: mission statement****  
+- A short statement that defines what the organisation does, right now, in order to achieve its vision.  
+- **mode**  
+- **** Glossary term: mode****  
+- The most frequently occurring value in a set of values.  
+- **monopoly**  
+- **** Glossary term: monopoly****  
+- A situation in which a market is dominated by one supplier.  
+- **monopsony**  
+- **** Glossary term: monopsony****  
+- A situation in which a market has only one buyer.  
+- **mortgage**  
+- **** Glossary term: mortgage****  
+- A special type of long-term loan that is used to purchase land or buildings.  
+- **motivation**  
+- **** Glossary term: motivation****  
+- The reasons why a human being does something.  
+- **motivators**  
+- **** Glossary term: motivators****  
+- Factors that influence a person to do something.  
+- **moving average**  
+- **** Glossary term: moving average****  
+- A calculation that evens out the fluctuations in a data series to show an average.  
+- **multinational**  
+- **** Glossary term: multinational****  
+- A company that operates in at least two countries, one of which is not the company's home country.  
+**** Start of Words in Glossary Letter N****  
+- **narrative bias**  
+- **** Glossary term: narrative bias****  
+- A mental shortcut that people can use to create stories that make sense of the world; people are often attracted to narratives.  
+- **negative correlation**  
+- **** Glossary term: negative correlation****  
+- As the value of the independent variable increases, the value of the dependent variable decreases.  
+- **negative feedback**  
+- **** Glossary term: negative feedback****  
+- When the output feeds back into the inputs in a way that moves the system in the opposite direction.  
+- **net assets**  
+- **** Glossary term: net assets****  
+- The total assets of a business minus the total liabilities.  
+- **net cash flow**  
+- **** Glossary term: net cash flow****  
+- The payments received by a business minus the payments made by a business.  
+- **net present value (NPV)**  
+- **** Glossary term: net present value (NPV)****  
+- A method of making investment appraisals more accurate by using a discount rate to adjust the value of future returns.  
+- **niche market**  
+- **** Glossary term: niche market****  
+- A small part of a larger market where customers have very specialised needs.  
+- **niche product**  
+- **** Glossary term: niche product****  
+- A product whose target market is very small with highly specialised needs or wants.  
+- **non-current assets**  
+- **** Glossary term: non-current assets****  
+- Assets that are likely to be kept by the business for more than one year.  
+- **non-current liabilities**  
+- **** Glossary term: non-current liabilities****  
+- Funds that a company owes individuals and/or institutions that are paid back over a period of time that is typically more than 12 months.  
+- **non-financial rewards**  
+- **** Glossary term: non-financial rewards****  
+- Methods of recognising employee efforts and improving motivation through improved job design.  
+- **non-govermental organisation (NGO)**  
+- **** Glossary term: non-govermental organisation (NGO)****  
+- A type of non-profit social enterprise that often operates on a large scale, nationally or internationally. NGOs are not operated by governments, but may receive some funding from governments or cooperate with governments.  
+- **non-governmental organisations**  
+- **** Glossary term: non-governmental organisations****  
+- A type of non-profit social enterprise that often operates on a large scale, nationally or internationally. NGOs are not operated by governments, but may receive some funding from governments or cooperate with governments.  
+- **non-profit social enterprises**  
+- **** Glossary term: non-profit social enterprises****  
+- A type of social enterprise that produces goods and services to meet human needs, but where any surpluses earned must, by law, be reinvested back into the business.  
+- **normative**  
+- **** Glossary term: normative****  
+- A way of thinking about how the world should be or how to value actions or situations.  
+- **no-strike agreement**  
+- **** Glossary term: no-strike agreement****  
+- When workers agree not to strike or take other industrial action against the company for a specified period of time.  
+**** Start of Words in Glossary Letter O****  
+- **objectives**  
+- **** Glossary term: objectives****  
+- A stated outcome that a business aims to achieve; can be broadly stated in vision and mission statements, or more narrowly stated with measurable outcomes.  
+- **offshoring**  
+- **** Glossary term: offshoring****  
+- When a business moves some of its business operations to another country.  
+- **off-the-job training**  
+- **** Glossary term: off-the-job training****  
+- Training employees offsite, usually by an outside party.  
+- **on-the-job training**  
+- **** Glossary term: on-the-job training****  
+- Training employees onsite during their normal working hours.  
+- **operating leverage**  
+- **** Glossary term: operating leverage****  
+- The measure of a company’s fixed costs relative to total costs.  
+- **operations management**  
+- **** Glossary term: operations management****  
+- The process of transforming resources (or inputs) into outputs to achieve business objectives.  
+- **opportunity**  
+- **** Glossary term: opportunity****  
+- Any favourable external condition or trend that might be beneficial for a business.  
+- **opportunity cost**  
+- **** Glossary term: opportunity cost****  
+- The potential cost of missing an opportunity by choosing one option and foregoing another.  
+- **organisational chart**  
+- **** Glossary term: organisational chart****  
+- A visual representation of the structure of an organisation that shows reporting relationships within the organisation.  
+- **organisational culture**  
+- **** Glossary term: organisational culture****  
+- The beliefs, values, assumptions and practices of an organisation; differs from business to business, but will often reflect some cultural norms of the host country.  
+- **organisational structure by function**  
+- **** Glossary term: organisational structure by function****  
+- An organisational structure in which the organisation is divided into smaller groups based on specialised functional areas, such as marketing, production, finance, IT and others.  
+- **organisational structure by product**  
+- **** Glossary term: organisational structure by product****  
+- An organisational structure where the organisation is divided into different departments, each focused on a different product.  
+- **organisational structure by region**  
+- **** Glossary term: organisational structure by region****  
+- An organisational structure used by organisations with operations in different geographical locations.  
+- **output**  
+- **** Glossary term: output****  
+- What a business produces; can be physical products, services, solutions or waste.  
+- **outsourcing (subcontracting)**  
+- **** Glossary term: outsourcing (subcontracting)****  
+- When a business takes an internal function and has it performed externally by another person or business.  
+- **overdraft**  
+- **** Glossary term: overdraft****  
+- A high-cost, short-term loan attached to a bank account; allows the account holder to withdraw an amount of money that is greater than the amount they currently hold.  
+- **overtime ban**  
+- **** Glossary term: overtime ban****  
+- A large scale refusal to work any additional hours beyond the specified contracted hours.  
+**** Start of Words in Glossary Letter P****  
+- **paradigm innovation**  
+- **** Glossary term: paradigm innovation****  
+- A change that fundamentally alters an entire industry.  
+- **parent company**  
+- **** Glossary term: parent company****  
+- A company that controls the interests of another company.  
+- **partnership**  
+- **** Glossary term: partnership****  
+- A business owned and run by two or more people who share the responsibility for the business and the profits; there is no legal separation between the business and the owners.  
+- **patent**  
+- **** Glossary term: patent****  
+- A licence or grant that gives an inventor the exclusive right to make, use or sell a product for a specific period of time.  
+- **paternalistic leadership**  
+- **** Glossary term: paternalistic leadership****  
+- A leadership style whereby the head of an organisation treats employees as though they are part of the family; loyalty and obedience are expected in return.  
+- **patient capital**  
+- **** Glossary term: patient capital****  
+- Long-term financing, where investors are willing to wait longer to see returns and expect a fair, not excessive return on their money.  
+- **payback period**  
+- **** Glossary term: payback period****  
+- A calculation of the length of time that it takes for a capital investment to pay for itself, by estimating future cash flow each year and working out the month and year in which the cash flow will finally cover the investment cost.  
+- **penetration pricing**  
+- **** Glossary term: penetration pricing****  
+- A pricing strategy where the business sets a very low price on a new product or service to encourage customers to buy it; later the price is increased.  
+- **people**  
+- **** Glossary term: people****  
+- Those who are involved in offering a service; an element of the marketing mix.  
+- **perceived obsolescence**  
+- **** Glossary term: perceived obsolescence****  
+- When a customer is convinced that they need an updated product, even though the existing product is working well.  
+- **person culture**  
+- **** Glossary term: person culture****  
+- An organisational culture that values every person as an expert and relies on their experiences to operate the business; employee-centric and employees have a similar level of knowledge and expertise.  
+- **physical evidence**  
+- **** Glossary term: physical evidence****  
+- An element of the marketing mix related to all the sensory elements that the customer sees, smells, hears and touches when interacting with a business.  
+- **physical resources**  
+- **** Glossary term: physical resources****  
+- The raw materials and semi-finished goods that a business needs to begin production.  
+- **place**  
+- **** Glossary term: place****  
+- An element of the marketing mix related to the physical distribution of products.  
+- **planetary boundaries**  
+- **** Glossary term: planetary boundaries****  
+- The limits of planetary systems; the outer ring of the Doughnut Economics model.  
+- **population**  
+- **** Glossary term: population****  
+- A group of individuals from which a sample is drawn.  
+- **Porter's Generic Strategies matrix**  
+- **** Glossary term: Porter's Generic Strategies matrix****  
+- A matrix that identifies cost and differentiation strategies for a business looking to gain a competitive advantage.  
+- **positioning innovation**  
+- **** Glossary term: positioning innovation****  
+- When a product is marketed to a new target audience.  
+- **positive correlation**  
+- **** Glossary term: positive correlation****  
+- As the value of the independent variable increases, the value of the dependent variable also increases.  
+- **positive feedback**  
+- **** Glossary term: positive feedback****  
+- Occurs when the output feeds back into the inputs in a way that moves systems and processes in the same direction.  
+- **power culture**  
+- **** Glossary term: power culture****  
+- An organisational culture where an individual or a selected group of people makes decisions for the organisation and communication is highly centralised.  
+- **predatory pricing**  
+- **** Glossary term: predatory pricing****  
+- A pricing strategy where a business sells a product or service at such a low price that other businesses cannot compete and are forced to leave the market; illegal in many countries.  
+- **premium pricing**  
+- **** Glossary term: premium pricing****  
+- A pricing strategy where a business sets the price of its products higher to create the impression that the products are higher quality or value than their lower-cost equivalents.  
+- **price**  
+- **** Glossary term: price****  
+- The amount of money that a business charges for its product or service.  
+- **price elastic demand**  
+- **** Glossary term: price elastic demand****  
+- When a price change of a product causes a more than proportional change in its demand.  
+- **price elasticity of demand (PED)**  
+- **** Glossary term: price elasticity of demand (PED)****  
+- A measure of how sensitive consumer demand is to changes in the price of a product.  
+- **price inelastic demand**  
+- **** Glossary term: price inelastic demand****  
+- When a price change of a product causes a less than proportional change in its demand.  
+- **price leadership**  
+- **** Glossary term: price leadership****  
+- A situation where a business has a large amount of control over the price of its product due to its position as a market leader.  
+- **primary research (primary market research)**  
+- **** Glossary term: primary research (primary market research)****  
+- Research (in a market) that involves creating new information that is gathered through surveys, interviews, observations, focus groups, camera studies or other methods.  
+- **primary sector**  
+- **** Glossary term: primary sector****  
+- A section of an economy that extracts materials (minerals, oil, etc.) or harvests products from the Earth.  
+- **primary sources**  
+- **** Glossary term: primary sources****  
+- New information that is gathered through surveys, interviews, observations, focus groups, camera studies or other methods.  
+- **privately held company**  
+- **** Glossary term: privately held company****  
+- A company that is privately owned and often has family or friends as the shareholders; the shares are not sold to the wider public and are not traded on a stock exchange.  
+- **private sector**  
+- **** Glossary term: private sector****  
+- The portion of an economy not owned or directed by the government.  
+- **private sector for-profit social enterprise**  
+- **** Glossary term: private sector for-profit social enterprise****  
+- A type of social enterprise that produces goods and services that are typically sold in markets for a price by for-profit businesses.  
+- **process**  
+- **** Glossary term: process****  
+- An element of the services part of the marketing mix related to the activities needed in the interaction between the customer and the business.  
+- **process innovation**  
+- **** Glossary term: process innovation****  
+- The development of a new method of production.  
+- **procurement**  
+- **** Glossary term: procurement****  
+- The process of purchasing goods and services that are used by a business to produce its products.  
+- **product**  
+- **** Glossary term: product****  
+- An element of the marketing mix related to the good or service designed to satisfy a need or want in a market.  
+- **product development**  
+- **** Glossary term: product development****  
+- A medium-risk growth strategy that involves selling new products to the same customers.  
+- **product innovation**  
+- **** Glossary term: product innovation****  
+- Developing and improving existing products.  
+- **production planning**  
+- **** Glossary term: production planning****  
+- The organisation of resources to establish what, when, how and where something can be produced.  
+- **productivity**  
+- **** Glossary term: productivity****  
+- The ratio of output per unit of input (labour or capital) over a period of time.  
+- **product life cycle**  
+- **** Glossary term: product life cycle****  
+- The length of time from when a product is first introduced in a market to when it is removed from the market.  
+- **product life extension models**  
+- **** Glossary term: product life extension models****  
+- Business models that focus on extending the time that a consumer uses products.  
+- **product–market fit**  
+- **** Glossary term: product–market fit****  
+- A situation where the product offered by a business meets the needs and wants of the target market.  
+- **product orientation**  
+- **** Glossary term: product orientation****  
+- A situation where a business prioritises research and development of high quality, specialised products, rather than prioritising market research.  
+- **product portfolio**  
+- **** Glossary term: product portfolio****  
+- All of the goods and services that a business offers.  
+- **product positioning**  
+- **** Glossary term: product positioning****  
+- Distinguishing a brand from its competitors.  
+- **product service system models**  
+- **** Glossary term: product service system models****  
+- Business models that involve selling the service for using a product rather than selling the product itself.  
+- **profit**  
+- **** Glossary term: profit****  
+- Total revenue minus total costs.  
+- **profitability ratios**  
+- **** Glossary term: profitability ratios****  
+- Financial ratios that show the profit of a business in relation to other financial figures.  
+- **profit and loss account**  
+- **** Glossary term: profit and loss account****  
+- A statement that records sales revenues and costs of a business to determine the net profit and distribution of profit.  
+- **profit centre**  
+- **** Glossary term: profit centre****  
+- A department in a business that generates both revenues and expenditures, so that its contribution to the profit of the business can be determined.  
+- **profit margin (PM)**  
+- **** Glossary term: profit margin (PM)****  
+- A profitability ratio that shows the profit before interest and tax as a percentage of sales revenue.  
+- **project-based organisational structure**  
+- **** Glossary term: project-based organisational structure****  
+- An organisational structure that has two or more reporting structures; employees working on a project report to both a project manager and to a functional manager (see matrix structure).  
+- **promotion**  
+- **** Glossary term: promotion****  
+- Part of the marketing mix related to advertising, sponsorships, sales promotion, or other tactics to inform and persuade customers to buy a product.  
+- **psychographic segmentation**  
+- **** Glossary term: psychographic segmentation****  
+- A way of dividing the population according to lifestyle and personal interests.  
+- **publicly held company**  
+- **** Glossary term: publicly held company****  
+- A company that is publicly owned and has many shareholders who can buy and sell their shares through a stock exchange.  
+- **public sector**  
+- **** Glossary term: public sector****  
+- The portion of the economy controlled or owned by the government such as government services, schools and state-owned businesses.  
+- **public sector for-profit social enterprise**  
+- **** Glossary term: public sector for-profit social enterprise****  
+- A type of social enterprise that produces goods and services that are typically provided by the public sector.  
+- **purchasing economies of scale**  
+- **** Glossary term: purchasing economies of scale****  
+- Lower costs of production that occur when a business is able to buy large quantities of inputs and negotiate lower prices for the inputs.  
+- **purpose**  
+- **** Glossary term: purpose****  
+- When the employee seeks to make a positive contribution with their work for the greater good; considered a non-financial motivator.  
+**** Start of Words in Glossary Letter Q****  
+- **qualitative data**  
+- **** Glossary term: qualitative data****  
+- Non-numerical data that describes qualities or characteristics.  
+- **qualitative research**  
+- **** Glossary term: qualitative research****  
+- The collection of non-numerical data, such as opinions.  
+- **quality**  
+- **** Glossary term: quality****  
+- The characteristics of a product or service that meet customer needs and expectations.  
+- **quality assurance**  
+- **** Glossary term: quality assurance****  
+- Strategies to prevent defects and improve products.  
+- **quality circle**  
+- **** Glossary term: quality circle****  
+- A group of employees who meet regularly to discuss potential improvements to product quality.  
+- **quality control**  
+- **** Glossary term: quality control****  
+- The inspection of a product to find defects and remove them before they are delivered to retailers or customers.  
+- **quality management**  
+- **** Glossary term: quality management****  
+- A set of strategies to ensure that products meet or exceed customers’ expectations.  
+- **quantitative data**  
+- **** Glossary term: quantitative data****  
+- Information that can be counted and has a numerical value.  
+- **quantitative research**  
+- **** Glossary term: quantitative research****  
+- The collection of numerical data and information that can be counted.  
+- **quartile**  
+- **** Glossary term: quartile****  
+- One of four equal groups into which a set of data is divided.  
+- **quaternary sector**  
+- **** Glossary term: quaternary sector****  
+- The area of economic activity involved with knowledge and the movement of information.  
+- **quota sampling**  
+- **** Glossary term: quota sampling****  
+- A sampling method that involves dividing the population into strata (layers) based on a given characteristic; a proportional sample is then taken from each stratum.  
+**** Start of Words in Glossary Letter R****  
+- **random sampling**  
+- **** Glossary term: random sampling****  
+- A sampling method whereby everyone in the population has the same chance of being selected to take part in the research.  
+- **random variation**  
+- **** Glossary term: random variation****  
+- Variations caused by irregularities and changes in factors that have not been anticipated by the business.  
+- **ratio analysis**  
+- **** Glossary term: ratio analysis****  
+- A quantitative method used to obtain information about the liquidity, efficiency and profitability of a business by analysing financial statements such as the statement of profit or loss and statement of financial position.  
+- **recession**  
+- **** Glossary term: recession****  
+- A period when GDP decreases for two or more successive quarters (three-month periods).  
+- **recruitment**  
+- **** Glossary term: recruitment****  
+- The process of seeking, finding and hiring people for a position in an organisation.  
+- **redundancy**  
+- **** Glossary term: redundancy****  
+- When the job someone is doing is no longer required, and the business eliminates the position.  
+- **related diversification**  
+- **** Glossary term: related diversification****  
+- When a business enters a new industry that has similarities with the company's existing industry.  
+- **relatedness**  
+- **** Glossary term: relatedness****  
+- A feeling of connection with other people; a sense of belonging to a group.  
+- **reorder level**  
+- **** Glossary term: reorder level****  
+- The level of stock that indicates that a new stock order should be made in order to prevent stock depletion.  
+- **reorder quantity**  
+- **** Glossary term: reorder quantity****  
+- The amount of stock that a business orders when stocks have been depleted to a certain level.  
+- **research and development (R&D)**  
+- **** Glossary term: research and development (R&D)****  
+- The process of bringing new products to market.  
+- **reshoring**  
+- **** Glossary term: reshoring****  
+- When a business moves an operation that is performed in another country back to the company’s home country.  
+- **resilience**  
+- **** Glossary term: resilience****  
+- The ability to withstand and adapt to a disruption.  
+- **resource recovery models**  
+- **** Glossary term: resource recovery models****  
+- Business models that are focused on collecting, sorting and processing waste materials to be used as inputs in the production process.  
+- **restraining forces**  
+- **** Glossary term: restraining forces****  
+- Factors that resist change.  
+- **retailer**  
+- **** Glossary term: retailer****  
+- A business that sells products to the public in relatively small quantities for use or consumption rather than for resale.  
+- **retained earnings**  
+- **** Glossary term: retained earnings****  
+- Money that a company has left at the end of the trading year after paying all costs, expenses, dividends and taxes (see retained profit).  
+- **retained profit**  
+- **** Glossary term: retained profit****  
+- Money that a company has left at the end of the trading year after paying all costs, expenses, dividends and taxes.  
+- **return on capital employed (ROCE)**  
+- **** Glossary term: return on capital employed (ROCE)****  
+- A profitability ratio that shows the profit before interest and tax as a percentage of capital employed.  
+- **revenue**  
+- **** Glossary term: revenue****  
+- The income that a business generates.  
+- **revenue expenditure**  
+- **** Glossary term: revenue expenditure****  
+- Spending on a company's general operational costs; this spending will enable the business to generate ongoing revenue.  
+- **revenue stream**  
+- **** Glossary term: revenue stream****  
+- Income that a business generates for a particular activity.  
+- **role culture**  
+- **** Glossary term: role culture****  
+- An organisational culture that is defined by clear rules and hierarchies for the smooth operation of an organisation; people have power through their position, rather than their own qualities.  
+- **royalty**  
+- **** Glossary term: royalty****  
+- The payment that is made to an individual or a company for the use of an asset.  
+**** Start of Words in Glossary Letter S****  
+- **salary**  
+- **** Glossary term: salary****  
+- A fixed, regular payment to employees, typically on a bi-weekly or monthly basis.  
+- **sales forecasting**  
+- **** Glossary term: sales forecasting****  
+- A quantitative technique used by companies to predict what levels of sales they may expect in the future.  
+- **sample**  
+- **** Glossary term: sample****  
+- A subset of individuals from a given population that is used to make some estimation or prediction of the population as a whole.  
+- **sampling**  
+- **** Glossary term: sampling****  
+- A technique of selecting a subset of individuals (sample) from a given population to make some estimation or prediction of the population as a whole.  
+- **satisficing**  
+- **** Glossary term: satisficing****  
+- A business objective that aims to achieve enough profit to keep the owner happy; profit is optimised rather than maximised.  
+- **scatter diagram**  
+- **** Glossary term: scatter diagram****  
+- A graph showing the relationship between two variables.  
+- **scientific thinking/management**  
+- **** Glossary term: scientific thinking/management****  
+- A management style whereby decisions are made using quantitative research and quantitative techniques.  
+- **seasonal variations**  
+- **** Glossary term: seasonal variations****  
+- Products that experience higher sales volumes and variations at certain times of the year.  
+- **secondary research (secondary market research)**  
+- **** Glossary term: secondary research (secondary market research)****  
+- Research that involves using evidence (about a market) gathered by others.  
+- **secondary sector**  
+- **** Glossary term: secondary sector****  
+- The area of economic activity that produces finished goods through manufacturing.  
+- **secondary sources**  
+- **** Glossary term: secondary sources****  
+- Sources of information that use evidence gathered by others.  
+- **sector**  
+- **** Glossary term: sector****  
+- An area of the economy.  
+- **seed capital**  
+- **** Glossary term: seed capital****  
+- Money raised by a business in the very early stages of its development.  
+- **segmentation**  
+- **** Glossary term: segmentation****  
+- The process of dividing a broad market group into various segments (age, interests, special needs, location and so on); allows businesses to develop marketing strategies to meet the needs of diverse groups.  
+- **self-appraisal**  
+- **** Glossary term: self-appraisal****  
+- A type of appraisal where an employee evaluates their own performance; can be part of formative or summative assessment.  
+- **self-determination theory**  
+- **** Glossary term: self-determination theory****  
+- A motivation theory claiming that there are three factors that drive intrinsic motivation: autonomy, competence and relatedness.   
+- **services**  
+- **** Glossary term: services****  
+- The products of a business that are intangible, meaning that they do not have physical characteristics; can be a service or a solution.  
+- **share capital**  
+- **** Glossary term: share capital****  
+- Finance for a business that is raised through the issue of shares to new investors on a stock market.  
+- **shareholder**  
+- **** Glossary term: shareholder****  
+- Someone who owns part of a business.  
+- **sharing model**  
+- **** Glossary term: sharing model****  
+- A business model that allows consumers to share the use of products with strangers, reducing the new inputs needed for products that might be underutilised by the consumer.  
+- **short-term financing**  
+- **** Glossary term: short-term financing****  
+- Small-scale funds needed to pay for inputs that will soon be processed and sold by the business; used to cover short-term working capital needs.  
+- **simple linear regression analysis**  
+- **** Glossary term: simple linear regression analysis****  
+- A mathematical method to sort out the possible factors that can have an impact on future sales.  
+- **single union agreement**  
+- **** Glossary term: single union agreement****  
+- The agreement by workers and management that all workers at the company or at a specific site will be represented by the same union.  
+- **situational leadership**  
+- **** Glossary term: situational leadership****  
+- A leadership style whereby the leader adopts a suitable style for the place, time, people and the nature of the task or project.  
+- **SMART objectives**  
+- **** Glossary term: SMART objectives****  
+- 'Specific', 'measureable', 'attainable', 'relevant' and 'time-focused' objectives for a business; these can be applied in all the business management functions.  
+- **social enterprise**  
+- **** Glossary term: social enterprise****  
+- Any organisation that has a social and/or environmental purpose at its core; it describes the primary purpose of a business, not its legal form.  
+- **social foundation**  
+- **** Glossary term: social foundation****  
+- Human needs; the center of the Doughnut Economics model.  
+- **social media**  
+- **** Glossary term: social media****  
+- A computer-based technology that facilitates the sharing of ideas, thoughts, and information through virtual networks and communities.  
+- **social washing**  
+- **** Glossary term: social washing****  
+- When a business makes misleading claims about its positive social impact to improve customer perceptions of the brand.  
+- **sociocultural sustainability**  
+- **** Glossary term: sociocultural sustainability****  
+- Giving opportunities to people to enable them to fulfil their potential.  
+- **sole trader**  
+- **** Glossary term: sole trader****  
+- A business owned and run by one person; there is no legal separation between the owner and the business.  
+- **span of control**  
+- **** Glossary term: span of control****  
+- The number of people who report to a manager.  
+- **stakeholders**  
+- **** Glossary term: stakeholders****  
+- Any individual or group that affects, or is affected by, an organisation.  
+- **standard deviation**  
+- **** Glossary term: standard deviation****  
+- The dispersion of data around its mean.  
+- **standardisation**  
+- **** Glossary term: standardisation****  
+- An undifferentiated use of the marketing mix in many different countries.  
+- **statement of financial position**  
+- **** Glossary term: statement of financial position****  
+- A statement that records a business's assets, liabilities and equity; also known as the balance sheet.  
+- **statement of profit or loss**  
+- **** Glossary term: statement of profit or loss****  
+- A statement that records sales revenues and costs of a business to determine the net profit and distribution of profit; also known as the income statement.  
+- **STEEPLE**  
+- **** Glossary term: STEEPLE****  
+- A business management tool that analyses the external conditions that may be opportunities or threats for a business.  
+- **stock**  
+- **** Glossary term: stock****  
+- The inventory held by a business to sell to customers.  
+- **stock control chart**  
+- **** Glossary term: stock control chart****  
+- A chart that records when stocks are delivered, when they are sold and when and how much stock is reordered.  
+- **stock turnover ratio**  
+- **** Glossary term: stock turnover ratio****  
+- A measure of the number of times, on average, that a company sells and replenishes its stock; or the rate at which a manufacturing business uses its stock of resources in a given time period.  
+- **straight-line method of depreciation**  
+- **** Glossary term: straight-line method of depreciation****  
+- A method used in accounting to calculate the fall in value of an asset evenly over its useful life.  
+- **strategic alliance**  
+- **** Glossary term: strategic alliance****  
+- A form of external growth where two or more businesses work together to achieve common objectives but do not create a new enterprise.  
+- **strategy**  
+- **** Glossary term: strategy****  
+- A plan that an organisation creates in order to reach a specific goal.  
+- **strike action (strike)**  
+- **** Glossary term: strike action (strike)****  
+- When workers stop working, typically because of complaints about wages or working conditions; puts pressure on employer to negotiate  
+- **subcontracting**  
+- **** Glossary term: subcontracting****  
+- When a business takes an internal function and has it performed externally by another person or business (see outsourcing)  
+- **subsidiary**  
+- **** Glossary term: subsidiary****  
+- A company that belongs to another company.  
+- **Subsidy**  
+- **** Glossary term: Subsidy****  
+- A payment by a government to individuals or businesses.  
+- **substitute good**  
+- **** Glossary term: substitute good****  
+- A product that consumers see as essentially the same as – or similar enough to – another product.  
+- **summative appraisal**  
+- **** Glossary term: summative appraisal****  
+- The formal, documented appraisal of an employee, which usually takes place at a fixed time during the year.  
+- **supply chain**  
+- **** Glossary term: supply chain****  
+- The steps involved in creating finished goods.  
+- **supply chain management**  
+- **** Glossary term: supply chain management****  
+- The process of working with all of a business’s suppliers to ensure reliable and quality production and delivery of components and final goods.  
+- **surplus**  
+- **** Glossary term: surplus****  
+- A situation where a non-profit social enterprise has greater revenue than costs; non-profits must reinvest the money into the enterprise.  
+- **sustainability**  
+- **** Glossary term: sustainability****  
+- Meeting the needs of the present without compromising the ability of future generations to meet their own needs.  
+- **SWOT**  
+- **** Glossary term: SWOT****  
+- A business management tool that analyses the internal strengths and weaknesses as well as the external opportunities and threats for a business.  
+- **system**  
+- **** Glossary term: system****  
+- A group of related parts that move or work together for a purpose.  
+- ** **  
+- **tactic**  
+- **** Glossary term: tactic****  
+- A small action that a business takes to reach its goals.  
+- **takeover**  
+- **** Glossary term: takeover****  
+- A form of external growth where one company purchases another company; typically hostile, or not wanted by the company being taken over.  
+- **tall (vertical) organisational structure**  
+- **** Glossary term: tall (vertical) organisational structure****  
+- A type of business organisation with many levels of hierarchy.  
+- **targeting**  
+- **** Glossary term: targeting****  
+- Selecting the most appropriate market segment for a marketing campaign.  
+- **target market**  
+- **** Glossary term: target market****  
+- The market segment at which a product is aimed.  
+- **target output**  
+- **** Glossary term: target output****  
+- The quantity or output that a business needs to produce to reach its target profit.  
+- **target price**  
+- **** Glossary term: target price****  
+- The price that a business needs to charge to reach its target profit.  
+- **target profit**  
+- **** Glossary term: target profit****  
+- A specific profit objective for a business.  
+- **Tariff**  
+- **** Glossary term: Tariff****  
+- A tax on imports.  
+- **tarrif**  
+- **** Glossary term: tarrif****  
+- A tax on imports.  
+- **task culture**  
+- **** Glossary term: task culture****  
+- An organisational culture that supports dynamic, innovative and flexible companies by giving power to experts within a group.  
+- **tax**  
+- **** Glossary term: tax****  
+- A payment by individuals or businesses to the government.  
+- **teamwork**  
+- **** Glossary term: teamwork****  
+- When a group of employees work together to further the business or solve a problem.  
+- **technical economies of scale**  
+- **** Glossary term: technical economies of scale****  
+- Lower costs of production that occur when a large business is able to purchase equipment that makes the business more efficient.  
+- **tertiary sector**  
+- **** Glossary term: tertiary sector****  
+- The area of economic activity that provides services.  
+- **test marketing**  
+- **** Glossary term: test marketing****  
+- A marketing method that explores consumers' responses to different products or marketing campaigns.  
+- **threat**  
+- **** Glossary term: threat****  
+- Any unfavourable external condition or trend that might harm a business.  
+- **through the line promotion (TTL)**  
+- **** Glossary term: through the line promotion (TTL)****  
+- An integrated marketing approach that includes both above the line and below the line elements.  
+- **time series analysis**  
+- **** Glossary term: time series analysis****  
+- A statistical technique used by businesses to identify trends in historical data, such as sales revenue figures of previous years recorded at proper intervals in the past.  
+- **top-down communication**  
+- **** Glossary term: top-down communication****  
+- Communication from senior managers to employees lower down the hierarchy.  
+- **total contribution**  
+- **** Glossary term: total contribution****  
+- The sum of all the contributions per unit of a product at a certain quantity.  
+- **total costs**  
+- **** Glossary term: total costs****  
+- The sum of the fixed costs and the variable costs.  
+- **total float**  
+- **** Glossary term: total float****  
+- The amount of time that an activity can overrun its time estimate, but not delay the whole project.  
+- **total quality management (TQM)**  
+- **** Glossary term: total quality management (TQM)****  
+- A quality management strategy where every employee is jointly responsible for maintaining the overall quality of the final product.  
+- **trade credit**  
+- **** Glossary term: trade credit****  
+- A type of external finance whereby a business receives products from a supplier immediately, but pays for them at a later date.  
+- **trade creditors**  
+- **** Glossary term: trade creditors****  
+- A line or item on the statement of financial position that refers to money that the business owes to other businesses from whom it has bought goods on credit.  
+- **trademark**  
+- **** Glossary term: trademark****  
+- A form of intellectual property that refers to a word, symbol or phrase that identifies a specific product and distinguishes it from other products.  
+- **trade union**  
+- **** Glossary term: trade union****  
+- An organised group of workers formed to protect and improve worker interests and rights.  
+- **trading account**  
+- **** Glossary term: trading account****  
+- A statement that shows how gross profit of a business is calculated.  
+- **training**  
+- **** Glossary term: training****  
+- Teaching employees new skills or improving the skills they already have.  
+- **two-factor theory**  
+- **** Glossary term: two-factor theory****  
+- A motivation theory that claims that there are entirely different reasons for job dissatisfaction and for motivation; reducing factors that cause dissatisfaction will not result in motivation.  
+**** Start of Words in Glossary Letter U****  
+- **unemployment**  
+- **** Glossary term: unemployment****  
+- A situation where a person of working age is able and willing to work, but cannot find or get a paid job.  
+- **unemployment rate**  
+- **** Glossary term: unemployment rate****  
+- The percentage of the labour force that is out of work but actively seeking employment at a given time.  
+- **unique selling point/proposition (USP)**  
+- **** Glossary term: unique selling point/proposition (USP)****  
+- A feature of the product that distinguishes it from its competitors.  
+- **unitary elastic demand**  
+- **** Glossary term: unitary elastic demand****  
+- When the demand for a product changes proportionally to its price.  
+- **unit (average) cost**  
+- **** Glossary term: unit (average) cost****  
+- The cost of producing a single unit of output.  
+- **units of production method of depreciation**  
+- **** Glossary term: units of production method of depreciation****  
+- A method used in accounting to calculate the loss in value of an asset by estimating the units produced annually.  
+- **unlimited liability**  
+- **** Glossary term: unlimited liability****  
+- A situation where the owners of a business are personally responsible for all the debts of the business if it fails; the owners and the business are not legally separated.  
+- **unrelated diversification**  
+- **** Glossary term: unrelated diversification****  
+- When a business enters a new industry that has no similarities with the company's existing industry.  
+**** Start of Words in Glossary Letter V****  
+- **value**  
+- **** Glossary term: value****  
+- All the benefits that a business creates for the stakeholders involved.  
+- **value extraction**  
+- **** Glossary term: value extraction****  
+- The capturing of value from other stakeholders, either outside or inside the business.  
+- **variable costs**  
+- **** Glossary term: variable costs****  
+- Those costs that vary with output.  
+- **variance**  
+- **** Glossary term: variance****  
+- In cost or managerial accounting, variance is the difference between planned or budgeted sales revenue and costs and the actual sales revenue and costs.  
+- **variance analysis**  
+- **** Glossary term: variance analysis****  
+- A tool used to compare a business’s budgeted sales revenue and costs with the actual figures over a period of time.  
+- **venture capital**  
+- **** Glossary term: venture capital****  
+- Financing that pools resources from a group of investors to fund new businesses.  
+- **vertical integration**  
+- **** Glossary term: vertical integration****  
+- A situation where elements of the supply chain of a business are owned and operated by that business.  
+- **virtual reality (VR)**  
+- **** Glossary term: virtual reality (VR)****  
+- The use of computer technologies to create a simulated 3D experience.  
+- **vision statement**  
+- **** Glossary term: vision statement****  
+- A long term goal, a dream or understanding of what the future should look like.  
+** **  
+**** Start of Words in Glossary Letter W****  
+- **wages (time and piece rates)**  
+- **** Glossary term: wages (time and piece rates)****  
+- The compensation paid by an employer to an employee for work completed; can be paid according to time worked (time-rate wages) or output produced (piece-rate wages).  
+- **waste**  
+- **** Glossary term: waste****  
+- Any part of the production process that does not add value to the final consumer.  
+- **wholesaler**  
+- **** Glossary term: wholesaler****  
+- A business selling goods in large quantities to retailers, generally at a low price.  
+- **workforce planning**  
+- **** Glossary term: workforce planning****  
+- Forecasting how many and what type of employees are needed now and in the future.  
+- **working capital**  
+- **** Glossary term: working capital****  
+- The difference between current assets and current liabilities.  
+- **working capital cycle**  
+- **** Glossary term: working capital cycle****  
+- The process of turning current assets into cash that can be used to purchase the resources needed to produce a product.  
+- **work-to-rule**  
+- **** Glossary term: work-to-rule****  
+A form of industrial action where workers follow the rules of work, but do no more than that; reduces output to put pressure on employers to negotiate.  
+   
+  Based on the **Unit 3: Finance and Accounts** and  **Unit 4.3: Sales Forecasting** syllabus, here are the relevant terms and definitions extracted from glossary.md:  
+### **Unit 3.1 & 3.2: Introduction to Finance and Sources of Finance**  
+- **Business angel**: A wealthy business person who invests their money into new businesses.  
+- **Capital expenditure**: Spending on the non-current (fixed) assets of a business.  
+- **Collateral**: An asset that a business or individual can offer a lender in the event that they do not pay back a loan.  
+- **Crowdfunding**: A form of finance where many people, perhaps thousands, invest small amounts of money to fund a business or project.  
+- **Debt finance**: Money that is borrowed from a bank or other financial institution, usually to fund investments.  
+- **Equity finance**: A type of funding whereby the provider receives part ownership of the business in exchange for the finance.  
+- **External sources of finance**: Money for a business that is raised from outside the business, such as a bank loan.  
+- **Financial resources**: The funds needed to set up and invest in a business and keep it running; can be short-term, medium-term and long-term.  
+- **Internal source of finance**: Money for a business that is raised from the business’s or owner's existing assets.  
+- **Leasing**: A business renting (hiring) a fixed asset over a period of time, rather than buying it.  
+- **Loan**: A medium- or long-term source of finance, often used to buy fixed assets.  
+- **Microcredit**: Small loans that enable someone to start up or continue to finance a small-scale business; a subset of microfinance.  
+- **Microfinance**: Financial services provided to individuals who have very limited income and assets and are not able to get services from traditional banks.  
+- **Mortgage**: A special type of long-term loan that is used to purchase land or buildings.  
+- **Retained earnings / Retained profit**: Money that a company has left at the end of the trading year after paying all costs, expenses, dividends and taxes.  
+- **Revenue expenditure**: Spending on a company's general operational costs; this spending will enable the business to generate ongoing revenue.  
+- **Seed capital**: Money raised by a business in the very early stages of its development.  
+- **Share capital**: Finance for a business that is raised through the issue of shares to new investors on a stock market.  
+- **Short-term financing**: Small-scale funds needed to pay for inputs that will soon be processed and sold by the business; used to cover short-term working capital needs.  
+### **Unit 3.3: Costs and Revenues**  
+- **Absorption costing**: A cost accounting method that allocates indirect costs among products, departments or regions based on predetermined criteria such as output, sales revenue, number of employees or the value of the equipment.  
+- **Break-even**: The quantity or output where total revenue equals total cost.  
+- **Contribution**: The price of the product minus the variable (direct) costs per unit.  
+- **Contribution costing**: A cost accounting method that only considers the direct costs of the product, department or region and their resulting contribution to covering the indirect costs of the business as a whole.  
+- **Contribution per unit**: The price of the product minus the variable (direct) costs per unit.  
+- **Cost**: All the expenses needed to produce a good or a service.  
+- **Cost of sales**: The cost of goods actually sold by a business over a period of time.  
+- **Direct cost**: A cost that is precisely traceable to a specific cost object, which may be a product, a service or a department.  
+- **Fixed costs**: Those costs that, during the relevant period, do not vary with output or activity.  
+- **Revenue**: The income that a business generates.  
+- **Revenue stream**: Income that a business generates for a particular activity.  
+### **Unit 3.4: Final Accounts**  
+- **Asset**: An item of property that has value and is owned by a person or business.  
+- **Balance sheet**: A statement that records a business's assets, liabilities and equity; also known as the statement of financial position.  
+- **Current assets**: Cash and other assets that a business plans to convert into cash in less than one year (debtors and stock/inventory).  
+- **Current liabilities**: Debts and other payables that are due within one year.  
+- **Depreciation**: 1. The loss of the value of a long-term asset over time. 2. The exact allocation in a financial statement of the cost of a long-term asset over the life of the asset.  
+- **Equity**: The value of shares issued by a company.  
+- **Fixed asset**: An item or property that has value, is owned by a person or business, and which the business plans on holding or using for longer than one year.  
+- **Intangible assets**: Non-physical items of value owned by a company that have a lifespan of more than a year.  
+- **Liability**: Being legally responsible for something.  
+- **Net assets**: The total assets of a business minus the total liabilities.  
+- **Non-current assets**: Assets that are likely to be kept by the business for more than one year.  
+- **Non-current liabilities**: Funds that a company owes individuals and/or institutions that are paid back over a period of time that is typically more than 12 months.  
+- **Statement of financial position**: A statement that records a business's assets, liabilities and equity; also known as the balance sheet.  
+### **Unit 3.5 & 3.6: Ratio Analysis**  
+- **Acid test (quick) ratio**: A liquidity ratio that measures the value of current assets without stock included, relative to current liabilities.  
+- **Bankruptcy**: A situation where an insolvent business has to follow a legal process to settle its debts.  
+- **Capital employed**: The value of all sources of internal and external finance for a business, calculated from the sum of non‐current liabilities and equity.  
+- **Creditor days**: A measure of the average number of days it takes a business to pay its debts; creditors / cost of sales × 365.  
+- **Current ratio**: A liquidity ratio that measures the value of current assets relative to current liabilities, calculated by dividing current assets by current liabilities.  
+- **Debtor**: A person or business that has bought products on credit from another business, but has not yet paid for the products.  
+- **Debtor days**: A measure of the average number of days that it takes a business to collect its debts; debtors / sales revenue x 365.  
+- **Efficiency ratio**: A financial ratio that shows how well a business is managing its operations in relation to the working capital cycle.  
+- **Financial ratios**: Quantitative expressions of the relationship between variables in the final accounts; useful for evaluating the performance of a business.  
+- **Gearing ratio**: A measure of how much of a business’s capital employed is financed by long-term debt.  
+- **Insolvency**: A situation in which a business is unable to pay its debts.  
+- **Liquidity**: The ability of a business to convert its current assets into cash.  
+- **Liquidity ratios**: Financial ratios that measure a business’s ability to settle its short-term debt obligations; comparing the value of current assets to the value of current liabilities.  
+- **Ratio analysis**: A quantitative method used to obtain information about the liquidity, efficiency and profitability of a business by analysing financial statements such as the statement of profit or loss and statement of financial position.  
+- **Return on capital employed (ROCE)**: A profitability ratio that shows the profit before interest and tax as a percentage of capital employed.  
+### **Unit 3.7: Cash Flow**  
+- **Cash flow**: Payments received by a business (inflows) and payments made by a business (outflows).  
+- **Cash flow forecast**: A prediction of future cash inflows, cash outflows and net cash flow for a specific time period.  
+- **Cash inflow**: Cash flowing into or earned by a business from sales, debtors or other activities.  
+- **Cash outflow**: Cash flowing out or paid out by the business for raw materials, creditors, electricity or other spending.  
+- **Net cash flow**: The payments received by a business minus the payments made by a business.  
+- **Working capital**: The difference between current assets and current liabilities.  
+- **Working capital cycle**: The process of turning current assets into cash that can be used to purchase the resources needed to produce a product.  
+### **Unit 3.8: Investment Appraisal**  
+- **Average rate of return (ARR)**: An investment appraisal technique that expresses the annual forecast returns as a percentage of the initial capital cost.  
+- **Discount rate**: The rate of return that a business could earn on another comparable investment; applied to the expected future cash flows from an investment to reduce them to reflect today's value of that future cash flow.  
+- **Net present value (NPV)**: A method of making investment appraisals more accurate by using a discount rate to adjust the value of future returns.  
+### **Unit 3.9: Budgets**  
+- **Adverse variance**: A situation where actual income and expenditure figures are worse for the business than expected.  
+- **Budget**: A plan that outlines a business’ revenue and expenditure over a period of time.  
+- **Cost centre**: A department in a business that generates costs, but no revenue.  
+- **Favourable variance**: A situation whereby actual income and expenditure figures are better for the business than expected.  
+### **Unit 4.3: Sales Forecasting**  
+- **Sales forecasting**: A quantitative technique used by companies to predict what levels of sales they may expect in the future.  
+### **Other Finance-Related Terms**  
+- **Accountant**: A person who maintains, inspects and analyse financial accounts.  
+- **Accounting**: The process of recording money flows and assets of a business.  
+- **Capital gains**: The increase in the value of an asset.  
+- **Commission**: A type of payment to an employee or agent based on the number of sales or a percentage of the value of sales.  
+- **Dividends**: A portion of a business’s profits distributed to the owners/shareholders.  
+- **Expenses**: Costs that are not directly related to the core operations of a business.  
+- **Interest rate**: The cost of borrowing money; expressed as a percentage of the amount borrowed.  
+- **Limited liability**: A situation where the owners of a business are not personally responsible for the debts of the business if it fails; the owners and the business are legally separated.  
+- **Royalty**: The payment that is made to an individual or a company for the use of an asset.  
+- **Salary**: A fixed, regular payment to employees, typically on a bi-weekly or monthly basis.  
+- **Shareholder**: Someone who owns part of a business.  
+- **Wages**: The compensation paid by an employer to an employee for work completed; can be paid according to time worked (time-rate wages) or output produced (piece-rate wages).  
+-    
