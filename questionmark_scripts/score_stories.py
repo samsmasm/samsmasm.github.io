@@ -30,36 +30,31 @@ RSS_FEEDS = [
 ]
 
 IBM_KEYWORDS = {
-    # Unit 1: Business organisation and environment
-    "merger", "acquisition", "takeover", "joint venture", "franchise", "franchisee",
-    "stakeholder", "shareholder", "multinational", "conglomerate",
-    "ipo", "listing", "public offering", "going public",
-    "bankruptcy", "insolvency", "liquidation", "administration", "collapse",
-    "nationalisation", "nationalization", "privatisation", "privatization",
-    "restructuring", "reorganisation", "reorganization", "spinoff", "spin-off",
-    "subsidiary", "corporate social responsibility", "csr",
-    # Unit 2: Human resource management
-    "layoff", "layoffs", "redundancy", "redundancies", "retrenchment",
-    "strike", "industrial action", "walkout", "union",
-    "ceo", "chief executive", "board of directors", "chairman",
-    "workforce", "employees", "hiring", "fired", "dismissed",
-    "collective bargaining", "remote work", "hybrid work",
-    "diversity", "inclusion", "pay gap", "wages",
-    # Unit 3: Finance and accounts
-    "profit", "loss", "revenue", "earnings", "quarterly", "annual results",
-    "debt", "loan", "bond", "dividend",
-    "cash flow", "write-off", "writedown", "write-down",
-    "bailout", "funding round", "valuation", "capital",
-    # Unit 4: Marketing
-    "rebrand", "rebranding", "product launch", "brand",
-    "market share", "advertising campaign", "pricing",
-    "product recall", "recall",
-    # Unit 5: Operations management
-    "supply chain", "factory", "manufacturing", "production",
-    "shortage", "outsourcing", "automation",
-    # Unit 6: Strategy (HL)
-    "strategy", "strategic", "expansion", "market entry",
-    "competitive advantage", "innovation", "patent",
+    # Corporate events and structure
+    "merger", "acquisition", "takeover", "acquires", "acquired",
+    "joint venture", "franchise", "franchisee",
+    "ipo", "public offering", "going public", "listed",
+    "bankruptcy", "insolvency", "liquidation", "administration",
+    "restructuring", "spinoff", "spin-off", "demerger",
+    "corporate social responsibility", "csr",
+    # HRM events
+    "layoff", "layoffs", "redundancy", "redundancies", "retrenchment", "cuts jobs",
+    "strike", "industrial action", "walkout",
+    "ceo", "chief executive", "fired", "dismissed", "resigns", "steps down",
+    "board of directors", "chairman",
+    # Finance events (company-level)
+    "profit", "loss", "earnings", "quarterly results", "annual results",
+    "dividend", "write-off", "write-down", "bailout",
+    "funding round", "valuation", "debt deal",
+    # Marketing events
+    "product launch", "rebranding", "rebrand", "product recall", "recall",
+    "advertising campaign", "market share",
+    # Operations events
+    "supply chain", "factory closure", "plant closure", "manufacturing",
+    "outsourcing", "product defect",
+    # Growth and strategy events
+    "expansion", "market entry", "market exit", "closes stores",
+    "opens stores", "new market", "patent", "lawsuit",
 }
 
 IBM_WATCHLIST = {
@@ -76,11 +71,13 @@ def is_ibm_relevant(article):
 
 
 SCORING_PROMPT = """\
-You are an editorial assistant for a student-facing website connecting real corporate events to the IB Business Management curriculum.
+You are an editorial assistant for a student-facing website about real corporate events for IB Business Management students.
+
+IMPORTANT: These case studies must be about specific companies making decisions or experiencing events. Reject stories about general economic trends, government policy, or market movements with no named company at the centre.
 
 Score each story below against THREE criteria:
-1. significant - Is this a major real-world development? (large company, large market movement, major strategic decision)
-2. curriculum_linked - Does this clearly connect to IB Business Management concepts? (HRM, finance, marketing, operations, business organisation, strategy)
+1. significant - Does this involve a well-known company making a major decision or experiencing a major event? (large acquisition, mass layoffs, bankruptcy, major product launch, CEO departure, etc.) Score false if no specific company is the subject.
+2. curriculum_linked - Does this clearly connect to IB Business Management concepts? (HRM, finance and accounts, marketing, operations management, business organisation, growth and evolution)
 3. weird - Is this surprising, counterintuitive, or genuinely unusual in a way students would find interesting?
 
 For each story return an object with:
