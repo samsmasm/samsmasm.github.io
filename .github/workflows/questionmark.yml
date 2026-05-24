@@ -1,0 +1,35 @@
+name: Question Mark scoring
+
+on:
+  schedule:
+    - cron: '0 8 * * 0'   # Sunday 08:00 UTC
+  workflow_dispatch:       # allow manual trigger from GitHub UI
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install feedparser anthropic
+
+      - name: Score candidate stories
+        run: python questionmark_scripts/score_stories.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Commit scored stories
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add questionmark/candidate_stories.json
+          git diff --cached --quiet || git commit -m "questionmark: score stories $(date +%Y-%m-%d)"
+          git push
