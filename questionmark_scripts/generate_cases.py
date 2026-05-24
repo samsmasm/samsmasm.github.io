@@ -3,7 +3,6 @@
 
 import json
 import os
-import re
 import sys
 from datetime import datetime
 
@@ -29,50 +28,71 @@ The story:
 Title: {title}
 Source: {source}
 Published: {published}
-Summary: {summary}
+Summary: {summary}"""
 
-Write the case study and return a single JSON object with these exact fields:
-
-"title"
-A punchy case study title that frames the business question -- not just the article headline.
-
-"hook"
-1-2 sentences. Journalistic, punchy. Something a student would actually want to read.
-
-"background"
-One short paragraph. Who is this company and what do they do? Assume the student knows nothing about them.
-
-"what_happened"
-Array of strings. The key developments, factual and clear, no editorialising. 3-5 items.
-
-"data_snapshot"
-Array of strings. Key numbers and figures -- revenue, growth, margins, market share, job cuts, whatever is relevant. Present each figure simply with context. Omit this field entirely if the story has no meaningful data.
-
-"the_tension"
-2-3 paragraphs of prose. What is the core business problem here? What competing pressures or interests are at play? This is the analytical heart. Name the IB Business Management concepts at work (e.g. stakeholder conflict, cash flow management, brand equity, span of control).
-
-"outside_view"
-One paragraph. How are journalists, analysts, or competitors interpreting this differently from how the company frames it? Omit this field entirely if no meaningful outside view exists.
-
-"reflection_questions"
-Array of exactly 5 questions. Each must:
-- Require analysis or evaluation, not just recall
-- Connect to IB Business Management concepts where natural
-- One must be a "what would you need to know to decide?" question
-- One must be a genuinely open evaluative question with no obvious right answer
-
-"extension"
-One suggested task for students who want to go further. Could be research, a debate motion, data interpretation, or a comparison with a rival company. Omit this field entirely if nothing natural comes to mind.
-
-"curriculum_links"
-Array of IB BM unit areas this case study connects to. Use these labels only:
-"Unit 1: Business organisation and environment"
-"Unit 2: Human resource management"
-"Unit 3: Finance and accounts"
-"Unit 4: Marketing"
-"Unit 5: Operations management"
-
-Return ONLY the JSON object. No markdown fences. No other text."""
+CASE_STUDY_TOOL = {
+    "name": "create_case_study",
+    "description": "Output a structured IB Business Management case study.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "A punchy case study title that frames the business question -- not just the article headline.",
+            },
+            "hook": {
+                "type": "string",
+                "description": "1-2 sentences. Journalistic, punchy. Something a student would actually want to read.",
+            },
+            "background": {
+                "type": "string",
+                "description": "One short paragraph. Who is this company and what do they do? Assume the student knows nothing about them.",
+            },
+            "what_happened": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "The key developments, factual and clear, no editorialising. 3-5 items.",
+            },
+            "data_snapshot": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Key numbers and figures with context. Omit entirely if the story has no meaningful data.",
+            },
+            "the_tension": {
+                "type": "string",
+                "description": "2-3 paragraphs of prose. The core business problem, competing pressures, and IB BM concepts at work.",
+            },
+            "outside_view": {
+                "type": "string",
+                "description": "One paragraph on how analysts or journalists interpret this differently from the company. Omit if no meaningful outside view exists.",
+            },
+            "reflection_questions": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Exactly 5 questions requiring analysis or evaluation. At least one 'what would you need to know to decide?' and one genuinely open evaluative question.",
+            },
+            "extension": {
+                "type": "string",
+                "description": "One suggested task for students who want to go further. Omit if nothing natural comes to mind.",
+            },
+            "curriculum_links": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": [
+                        "Unit 1: Business organisation and environment",
+                        "Unit 2: Human resource management",
+                        "Unit 3: Finance and accounts",
+                        "Unit 4: Marketing",
+                        "Unit 5: Operations management",
+                    ],
+                },
+                "description": "IB BM unit areas this case study connects to.",
+            },
+        },
+        "required": ["title", "hook", "background", "what_happened", "the_tension", "reflection_questions", "curriculum_links"],
+    },
+}
 
 
 def load_selected_story():
@@ -99,11 +119,11 @@ def generate_case_study(client, story):
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=4000,
+        tools=[CASE_STUDY_TOOL],
+        tool_choice={"type": "tool", "name": "create_case_study"},
         messages=[{"role": "user", "content": prompt}],
     )
-    raw = response.content[0].text.strip()
-    cleaned = re.sub(r"```json\n?|```", "", raw).strip()
-    return json.loads(cleaned)
+    return response.content[0].input
 
 
 def main():
