@@ -193,10 +193,14 @@ def merge_and_rank(articles, scores):
                 "weird": weird,
             },
             "total": total,
-            "selected": total >= 2,
+            "selected": False,
             "justification": s.get("justification", ""),
         })
-    results.sort(key=lambda x: x["total"], reverse=True)
+    # Sort by total desc, weird as tiebreaker (weird stories are more interesting for students)
+    results.sort(key=lambda x: (x["total"], x["scores"]["weird"]), reverse=True)
+    # Select the single best story if it qualifies
+    if results and results[0]["total"] >= 2:
+        results[0]["selected"] = True
     return results
 
 
@@ -211,10 +215,15 @@ def main():
     ranked = merge_and_rank(articles, scores)
 
     selected = [r for r in ranked if r["selected"]]
-    print(f"\n{len(selected)} stories selected (scored 2 or more of 3):", file=sys.stderr)
-    for r in selected:
+    if selected:
+        r = selected[0]
         flags = " + ".join(k for k, v in r["scores"].items() if v)
-        print(f"  [{r['total']}/3] {r['title'][:70]} ({flags})", file=sys.stderr)
+        print(f"\nSelected story this week:", file=sys.stderr)
+        print(f"  [{r['total']}/3] {r['title'][:70]}", file=sys.stderr)
+        print(f"  Criteria: {flags}", file=sys.stderr)
+        print(f"  {r['justification']}", file=sys.stderr)
+    else:
+        print("\nNo story scored 2 or more -- nothing selected this week.", file=sys.stderr)
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
