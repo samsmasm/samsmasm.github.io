@@ -13,12 +13,20 @@ import feedparser
 
 RSS_FEEDS = [
     "https://finance.yahoo.com/rss/",
-    "https://feeds.reuters.com/reuters/businessNews",
     "https://feeds.marketwatch.com/marketwatch/topstories/",
     "http://www.cnbc.com/id/10001147/device/rss/rss.html",
     "http://www.theguardian.com/business/rss",
-    "https://rsshub.rss3.workers.dev/apnews/topics/business",
     "https://www.ft.com/rss/home",
+    "https://rss.dw.com/atom/rss-en-bus",
+    "https://rsshub.rss3.workers.dev/apnews/topics/economy",
+    "https://rsshub.rss3.workers.dev/apnews/topics/business",
+    "https://rsshub.rss3.workers.dev/nikkei/asia",
+    "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/business/economy/rss.xml",
+    "https://www.euronews.com/rss?level=vertical&name=business",
+    "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936",
+    "https://e.vnexpress.net/rss/business.rss",
+    "https://www.africanews.com/feed/rss?themes=business",
+    "https://www.koreaherald.com/rss/kh_Business",
 ]
 
 SCORING_PROMPT = """\
