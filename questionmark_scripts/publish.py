@@ -65,6 +65,8 @@ def render_html(case):
         </div>"""
 
     source_domain = case.get("source", "")
+    src_url = case.get("source_url", "#")
+    src_title = case.get("source_title", "Original article")
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -113,6 +115,11 @@ def render_html(case):
         <ol class="reflection-list">{questions_html}</ol>
 {extension_html}
       </section>
+
+      <section class="sources-section">
+        <h2>Source</h2>
+        <p><a href="{src_url}" target="_blank" rel="noopener">{src_title}</a> ({source_domain})</p>
+      </section>
     </main>
 
     <footer>unisam.nz</footer>
@@ -138,6 +145,7 @@ def update_cases_json(case, filename):
         "filename": filename,
         "title": case["title"],
         "hook": case["hook"],
+        "background": case.get("background", ""),
         "curriculum_links": case.get("curriculum_links", []),
     })
 

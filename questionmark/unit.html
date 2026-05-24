@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Question Mark &mdash; IB Business Management Case Studies</title>
+  <title>Question Mark &mdash; Unit Cases</title>
   <link rel="icon" type="image/jpeg" href="/unisamicon.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
 
   <div class="page">
 
-    <a class="back-link" href="/">&#8592; UniSam</a>
+    <a class="back-link" href="index.html">&#8592; Question Mark</a>
 
     <div class="masthead">
       <div class="masthead-inner">
@@ -22,7 +22,7 @@
         <h1>Question Mark</h1>
         <img src="/unisamicon.jpg" alt="UniSam" class="masthead-seal">
       </div>
-      <div class="masthead-tagline">IB Business Management &mdash; Weekly Case Studies</div>
+      <div class="masthead-tagline" id="unit-tagline">IB Business Management &mdash; Unit Cases</div>
     </div>
 
     <nav class="unit-nav">
@@ -44,7 +44,27 @@
   <script>
     const PER_PAGE = 10;
     let currentPage = 0;
-    let allCases = [];
+    let filteredCases = [];
+
+    const UNIT_LABELS = {
+      '1': 'Unit 1: Business organisation and environment',
+      '2': 'Unit 2: Human resource management',
+      '3': 'Unit 3: Finance and accounts',
+      '4': 'Unit 4: Marketing',
+      '5': 'Unit 5: Operations management',
+    };
+
+    const UNIT_NAMES = {
+      '1': 'Business Organisation and Environment',
+      '2': 'Human Resource Management',
+      '3': 'Finance and Accounts',
+      '4': 'Marketing',
+      '5': 'Operations Management',
+    };
+
+    function getUnitParam() {
+      return new URLSearchParams(window.location.search).get('n') || '1';
+    }
 
     function formatDate(str) {
       const [y, m, day] = str.split('-').map(Number);
@@ -74,13 +94,18 @@
     function renderPage(page) {
       const content = document.getElementById('content');
       const start = page * PER_PAGE;
-      const slice = allCases.slice(start, start + PER_PAGE);
+      const slice = filteredCases.slice(start, start + PER_PAGE);
+
+      if (slice.length === 0) {
+        content.innerHTML = '<p class="empty-state">No case studies for this unit yet.</p>';
+        return;
+      }
 
       let html = '<div class="cases-list">'
         + slice.map(caseCardHTML).join('')
         + '</div>';
 
-      const totalPages = Math.ceil(allCases.length / PER_PAGE);
+      const totalPages = Math.ceil(filteredCases.length / PER_PAGE);
       if (totalPages > 1) {
         html += '<div class="pagination">';
         if (page > 0) {
@@ -103,16 +128,29 @@
     }
 
     async function render() {
+      const unitN = getUnitParam();
+      const unitLabel = UNIT_LABELS[unitN];
+      const unitName = UNIT_NAMES[unitN] || 'Unit ' + unitN;
+
+      document.title = 'Unit ' + unitN + ': ' + unitName + ' — Question Mark';
+      document.getElementById('unit-tagline').textContent = 'Unit ' + unitN + ': ' + unitName;
+
+      // Highlight active unit button
+      document.querySelectorAll('.unit-btn').forEach(btn => {
+        if (btn.getAttribute('href') === 'unit.html?n=' + unitN) {
+          btn.classList.add('active');
+        }
+      });
+
       const content = document.getElementById('content');
       try {
         const res = await fetch('cases.json');
         if (!res.ok) throw new Error();
-        allCases = await res.json();
+        const allCases = await res.json();
 
-        if (!Array.isArray(allCases) || allCases.length === 0) {
-          content.innerHTML = '<p class="empty-state">No case studies yet &mdash; check back next week.</p>';
-          return;
-        }
+        filteredCases = allCases.filter(c =>
+          c.curriculum_links && c.curriculum_links.some(l => l === unitLabel)
+        );
 
         renderPage(0);
       } catch (e) {

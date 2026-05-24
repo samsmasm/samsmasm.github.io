@@ -19,8 +19,10 @@ Tone rules:
 - Engaging but not condescending
 - Assume intelligence, not prior business knowledge
 - Explain any business jargon the first time you use it
-- Prose in the main body -- no bullet-point overload
-- Never use em dashes
+- Prose in the main body, no bullet-point overload
+- Never use em dashes (not even "--"). Use commas, colons, or rephrase instead.
+
+Target length: the total body of the case study (all sections combined) should be around 500-600 words. Be tight. Every sentence must earn its place.
 
 You may draw on your own knowledge of the company and story to add depth, but stay factually grounded. Do not invent specific numbers or quotes.
 
@@ -46,34 +48,34 @@ CASE_STUDY_TOOL = {
             },
             "background": {
                 "type": "string",
-                "description": "One short paragraph. Who is this company and what do they do? Assume the student knows nothing about them.",
+                "description": "2-3 sentences only. Who is this company and what do they do? Assume the student knows nothing.",
             },
             "what_happened": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "The key developments, factual and clear, no editorialising. 3-5 items.",
+                "description": "3-4 items maximum. One sentence each. Factual, no editorialising.",
             },
             "data_snapshot": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Key numbers and figures with context. Omit entirely if the story has no meaningful data.",
+                "description": "2-3 key figures with brief context. Omit entirely if the story has no meaningful data.",
             },
             "the_tension": {
                 "type": "string",
-                "description": "2-3 paragraphs of prose. The core business problem, competing pressures, and IB BM concepts at work.",
+                "description": "One tight paragraph, around 100-120 words. What is the core business problem? Name the IB BM concepts at work. No em dashes.",
             },
             "outside_view": {
                 "type": "string",
-                "description": "One paragraph on how analysts or journalists interpret this differently from the company. Omit if no meaningful outside view exists.",
+                "description": "2-3 sentences on how analysts or journalists see this differently from the company. Omit if nothing meaningful to add.",
             },
             "reflection_questions": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Exactly 5 questions requiring analysis or evaluation. At least one 'what would you need to know to decide?' and one genuinely open evaluative question.",
+                "description": "Exactly 5 questions. Keep each to one sentence. At least one 'what would you need to know to decide?' and one genuinely open evaluative question.",
             },
             "extension": {
                 "type": "string",
-                "description": "One suggested task for students who want to go further. Omit if nothing natural comes to mind.",
+                "description": "One sentence suggesting a task for students who want to go further. Omit if nothing natural.",
             },
             "curriculum_links": {
                 "type": "array",
