@@ -29,12 +29,58 @@ RSS_FEEDS = [
     "https://www.koreaherald.com/rss/kh_Business",
 ]
 
+IBM_KEYWORDS = {
+    # Unit 1: Business organisation and environment
+    "merger", "acquisition", "takeover", "joint venture", "franchise", "franchisee",
+    "stakeholder", "shareholder", "multinational", "conglomerate",
+    "ipo", "listing", "public offering", "going public",
+    "bankruptcy", "insolvency", "liquidation", "administration", "collapse",
+    "nationalisation", "nationalization", "privatisation", "privatization",
+    "restructuring", "reorganisation", "reorganization", "spinoff", "spin-off",
+    "subsidiary", "corporate social responsibility", "csr",
+    # Unit 2: Human resource management
+    "layoff", "layoffs", "redundancy", "redundancies", "retrenchment",
+    "strike", "industrial action", "walkout", "union",
+    "ceo", "chief executive", "board of directors", "chairman",
+    "workforce", "employees", "hiring", "fired", "dismissed",
+    "collective bargaining", "remote work", "hybrid work",
+    "diversity", "inclusion", "pay gap", "wages",
+    # Unit 3: Finance and accounts
+    "profit", "loss", "revenue", "earnings", "quarterly", "annual results",
+    "debt", "loan", "bond", "dividend",
+    "cash flow", "write-off", "writedown", "write-down",
+    "bailout", "funding round", "valuation", "capital",
+    # Unit 4: Marketing
+    "rebrand", "rebranding", "product launch", "brand",
+    "market share", "advertising campaign", "pricing",
+    "product recall", "recall",
+    # Unit 5: Operations management
+    "supply chain", "factory", "manufacturing", "production",
+    "shortage", "outsourcing", "automation",
+    # Unit 6: Strategy (HL)
+    "strategy", "strategic", "expansion", "market entry",
+    "competitive advantage", "innovation", "patent",
+}
+
+IBM_WATCHLIST = {
+    "apple", "microsoft", "alphabet", "google", "amazon", "meta", "tesla",
+    "nike", "unilever", "lvmh", "mcdonald", "coca-cola", "coca cola",
+    "nestle", "nestlé", "toyota", "samsung", "tsmc", "spotify", "netflix",
+    "airbnb", "openai", "patagonia",
+}
+
+
+def is_ibm_relevant(article):
+    text = (article["title"] + " " + article["summary"]).lower()
+    return any(kw in text for kw in IBM_KEYWORDS | IBM_WATCHLIST)
+
+
 SCORING_PROMPT = """\
-You are an editorial assistant for a student-facing website connecting real corporate events to IB Business Management and IB Economics curriculum.
+You are an editorial assistant for a student-facing website connecting real corporate events to the IB Business Management curriculum.
 
 Score each story below against THREE criteria:
-1. significant - Is this a major real-world development? (large company, large market movement, major strategic decision, macro event)
-2. curriculum_linked - Does this clearly connect to IB Business Management or IB Economics concepts? (market structures, elasticity, HRM, finance, macro policy, trade, etc.)
+1. significant - Is this a major real-world development? (large company, large market movement, major strategic decision)
+2. curriculum_linked - Does this clearly connect to IB Business Management concepts? (HRM, finance, marketing, operations, business organisation, strategy)
 3. weird - Is this surprising, counterintuitive, or genuinely unusual in a way students would find interesting?
 
 For each story return an object with:
@@ -99,7 +145,10 @@ def fetch_all():
                 if article["url"] not in seen_urls:
                     seen_urls.add(article["url"])
                     all_articles.append(article)
-    print(f"Total unique articles from last 7 days: {len(all_articles)}", file=sys.stderr)
+    before = len(all_articles)
+    all_articles = [a for a in all_articles if is_ibm_relevant(a)]
+    print(f"Total unique articles from last 7 days: {before}", file=sys.stderr)
+    print(f"After IB BM keyword filter: {len(all_articles)} articles", file=sys.stderr)
     return all_articles
 
 
