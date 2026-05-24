@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Question Mark — IB Business Management Case Studies</title>
+  <link rel="icon" type="image/jpeg" href="/unisamicon.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="page">
+
+    <a class="back-link" href="/">← UniSam</a>
+
+    <div class="masthead">
+      <div class="masthead-inner">
+        <img src="/unisamicon.jpg" alt="UniSam" class="masthead-seal">
+        <h1>Question Mark</h1>
+        <img src="/unisamicon.jpg" alt="UniSam" class="masthead-seal">
+      </div>
+      <div class="masthead-tagline">IB Business Management &mdash; Weekly Case Studies</div>
+    </div>
+
+    <div id="content">
+      <p class="empty-state">Loading&hellip;</p>
+    </div>
+
+    <footer>unisam.nz</footer>
+
+  </div>
+
+  <script>
+    function formatDateLong(str) {
+      const [y, m, day] = str.split('-').map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      });
+    }
+
+    function formatDateShort(str) {
+      const [y, m, day] = str.split('-').map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+    }
+
+    function tagsHTML(links) {
+      if (!links || !links.length) return '';
+      return '<div class="curriculum-tags">'
+        + links.map(l => '<span class="curriculum-tag">' + l + '</span>').join('')
+        + '</div>';
+    }
+
+    function latestCaseHTML(c) {
+      return '<div class="latest-case">'
+        + '<div class="latest-case-meta">'
+        + '<span class="latest-case-date">' + formatDateLong(c.date) + '</span>'
+        + tagsHTML(c.curriculum_links)
+        + '</div>'
+        + '<h2>' + c.title + '</h2>'
+        + '<p class="latest-hook">' + c.hook + '</p>'
+        + '<a class="read-link" href="cases/' + c.filename + '">Read the case study &rarr;</a>'
+        + '</div>';
+    }
+
+    function prevCaseHTML(c, index) {
+      const id = 'prev-' + index;
+      return '<div class="prev-case">'
+        + '<div class="prev-case-header" onclick="togglePrev(\'' + id + '\')">'
+        + '<div class="prev-case-left">'
+        + '<span class="prev-case-date">' + formatDateShort(c.date) + '</span>'
+        + '<span class="prev-case-title">' + c.title + '</span>'
+        + '</div>'
+        + '<span class="prev-case-toggle" id="toggle-' + id + '">Expand</span>'
+        + '</div>'
+        + '<div class="prev-case-body" id="' + id + '">'
+        + '<p class="prev-case-hook">' + c.hook + '</p>'
+        + tagsHTML(c.curriculum_links)
+        + '<br>'
+        + '<a class="prev-case-link" href="cases/' + c.filename + '">Read the full case study &rarr;</a>'
+        + '</div>'
+        + '</div>';
+    }
+
+    function archiveEntryHTML(c, index) {
+      const id = 'arch-' + index;
+      return '<div class="archive-entry" onclick="toggleArchive(\'' + id + '\')">'
+        + '<div class="archive-entry-header">'
+        + '<div>'
+        + '<span class="archive-entry-date">' + formatDateShort(c.date) + ' &nbsp;</span>'
+        + '<span class="archive-entry-title">' + c.title + '</span>'
+        + '</div>'
+        + '<span class="archive-entry-toggle" id="toggle-' + id + '">+</span>'
+        + '</div>'
+        + '<div class="archive-entry-body" id="' + id + '">'
+        + '<p class="archive-entry-hook">' + c.hook + '</p>'
+        + '<a class="archive-entry-link" href="cases/' + c.filename + '">Read &rarr;</a>'
+        + '</div>'
+        + '</div>';
+    }
+
+    function togglePrev(id) {
+      const body = document.getElementById(id);
+      const toggle = document.getElementById('toggle-' + id);
+      const open = body.classList.toggle('open');
+      toggle.textContent = open ? 'Collapse' : 'Expand';
+    }
+
+    function toggleArchive(id) {
+      const body = document.getElementById(id);
+      const toggle = document.getElementById('toggle-' + id);
+      const open = body.classList.toggle('open');
+      toggle.textContent = open ? '−' : '+';
+    }
+
+    async function render() {
+      const content = document.getElementById('content');
+      try {
+        const res = await fetch('cases.json');
+        if (!res.ok) throw new Error();
+        const cases = await res.json();
+
+        if (!Array.isArray(cases) || cases.length === 0) {
+          content.innerHTML = '<p class="empty-state">No case studies yet &mdash; check back next week.</p>';
+          return;
+        }
+
+        let html = '';
+
+        // Latest case -- prominent
+        html += latestCaseHTML(cases[0]);
+
+        // Cases 2-6 -- expandable
+        const prev = cases.slice(1, 6);
+        if (prev.length) {
+          html += '<p class="section-heading">Previous cases</p>'
+            + '<div class="prev-cases-list">'
+            + prev.map((c, i) => prevCaseHTML(c, i)).join('')
+            + '</div>';
+        }
+
+        // Cases 7+ -- archive list
+        const archive = cases.slice(6);
+        if (archive.length) {
+          html += '<p class="section-heading" style="margin-top:28px">Archive</p>'
+            + '<div class="archive-list">'
+            + archive.map((c, i) => archiveEntryHTML(c, i)).join('')
+            + '</div>';
+        }
+
+        content.innerHTML = html;
+      } catch (e) {
+        content.innerHTML = '<p class="empty-state">Could not load case studies.</p>';
+      }
+    }
+
+    render();
+  </script>
+
+</body>
+</html>
