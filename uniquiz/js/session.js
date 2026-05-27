@@ -25,9 +25,29 @@ let pvRankAnimating    = false;
 // ── Audio ──
 const questionAudio = new Audio('questions.mp3');
 questionAudio.loop = true;
-const rankingsAudio = new Audio('rankings.mp3');
-rankingsAudio.loop = true;
-let _audioState = 'none';
+
+const RANKINGS_TRACKS = [
+  'rankings.mp3','rankings2.mp3','rankings3.mp3',
+  'rankings4.mp3','rankings5.mp3','rankings6.mp3'
+];
+let _rankingsPlaylist = [];
+let _rankingsAudio    = null;
+let _audioState       = 'none';
+
+function nextRankingsAudio() {
+  if (_rankingsPlaylist.length === 0) {
+    // Fisher-Yates shuffle into a fresh playlist
+    _rankingsPlaylist = [...RANKINGS_TRACKS];
+    for (let i = _rankingsPlaylist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [_rankingsPlaylist[i], _rankingsPlaylist[j]] = [_rankingsPlaylist[j], _rankingsPlaylist[i]];
+    }
+  }
+  if (_rankingsAudio) { _rankingsAudio.pause(); _rankingsAudio.src = ''; }
+  _rankingsAudio = new Audio(_rankingsPlaylist.pop());
+  _rankingsAudio.loop = true;
+  return _rankingsAudio;
+}
 
 function fadeIn(audio, ms = 1000) {
   audio.volume = 0;
@@ -54,10 +74,10 @@ function fadeOut(audio, ms = 1000) {
 function setAudio(state) {
   if (state === _audioState) return;
   if (_audioState === 'question') fadeOut(questionAudio);
-  else if (_audioState === 'rankings') fadeOut(rankingsAudio);
+  else if (_audioState === 'rankings' && _rankingsAudio) fadeOut(_rankingsAudio);
   _audioState = state;
   if (state === 'question') fadeIn(questionAudio);
-  else if (state === 'rankings') fadeIn(rankingsAudio);
+  else if (state === 'rankings') fadeIn(nextRankingsAudio());
 }
 
 // ── Present view ──
