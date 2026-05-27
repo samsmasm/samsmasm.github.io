@@ -19,6 +19,46 @@ let timerInterval      = null;
 let currentTimerEndsAt = null;
 let revealInProgress   = false;
 let prevQi             = null;
+let prevShowRankings   = false;
+let pvRankAnimating    = false;
+
+// ── Audio ──
+const questionAudio = new Audio('questions.mp3');
+questionAudio.loop = true;
+const rankingsAudio = new Audio('rankings.mp3');
+rankingsAudio.loop = true;
+let _audioState = 'none';
+
+function fadeIn(audio, ms = 1000) {
+  audio.volume = 0;
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+  const t0 = Date.now();
+  const id = setInterval(() => {
+    const p = Math.min(1, (Date.now() - t0) / ms);
+    audio.volume = p;
+    if (p >= 1) clearInterval(id);
+  }, 30);
+}
+
+function fadeOut(audio, ms = 1000) {
+  const v0 = audio.volume;
+  const t0 = Date.now();
+  const id = setInterval(() => {
+    const p = Math.min(1, (Date.now() - t0) / ms);
+    audio.volume = Math.max(0, v0 * (1 - p));
+    if (p >= 1) { clearInterval(id); audio.pause(); audio.volume = 1; }
+  }, 30);
+}
+
+function setAudio(state) {
+  if (state === _audioState) return;
+  if (_audioState === 'question') fadeOut(questionAudio);
+  else if (_audioState === 'rankings') fadeOut(rankingsAudio);
+  _audioState = state;
+  if (state === 'question') fadeIn(questionAudio);
+  else if (state === 'rankings') fadeIn(rankingsAudio);
+}
 
 // ── Present view ──
 function enterPresent() {
@@ -70,7 +110,12 @@ function render(s) {
   if (qi !== prevQi) {
     prevQi = qi;
     revealInProgress = false;
+    prevShowRankings = false;
+    pvRankAnimating  = false;
   }
+
+  const rankingsJustAppeared = showRankings && !prevShowRankings;
+  prevShowRankings = showRankings;
 
   const raw    = active ? (responses[qi] || {}) : {};
   const counts = { A: raw.A||0, B: raw.B||0, C: raw.C||0, D: raw.D||0 };
@@ -94,7 +139,14 @@ function render(s) {
     if (!showRankings) renderBars(counts, total, q.correctAnswer, showAnswer);
   }
 
-  if (active && showRankings) renderRankings(s.scores || {});
+  if (active && showRankings) {
+    renderRankings(s.scores || {});
+    renderAnswerChart(
+      document.getElementById('rankings-chart'),
+      responses[qi] || {},
+      q?.correctAnswer
+    );
+  }
 
   // Timer
   if (active && s.timerEndsAt && !showAnswer) {
@@ -113,6 +165,20 @@ function render(s) {
   setH('start-btn',    !waiting);
   setH('show-ans-btn', !active || showAnswer);
   setH('next-btn',     !active || !showAnswer);
+
+  // Audio
+  if (active && !showAnswer) {
+    setAudio('question');
+  } else if (active && showRankings) {
+    setAudio('rankings');
+  } else {
+    setAudio('none');
+  }
+
+  // Trigger rankings animation once when rankings first appear
+  if (rankingsJustAppeared) {
+    animatePvRankings(s.scores || {}, responses[qi] || {}, q?.correctAnswer);
+  }
 
   renderPresent(s, questions, q, counts, total);
 }
@@ -152,6 +218,28 @@ function renderRankings(scores) {
   `).join('');
 }
 
+function renderAnswerChart(container, responses, correctAnswer) {
+  if (!container) return;
+  const counts = { A: responses.A||0, B: responses.B||0, C: responses.C||0, D: responses.D||0 };
+  const total  = counts.A + counts.B + counts.C + counts.D;
+  const clr    = { A: 'var(--a)', B: 'var(--b)', C: 'var(--c)', D: 'var(--d)' };
+
+  container.innerHTML = ['A','B','C','D'].map(opt => {
+    const n   = counts[opt];
+    const pct = total > 0 ? Math.round(n / total * 100) : 0;
+    const ok  = opt === correctAnswer;
+    return `
+      <div class="ans-chart-row${ok ? ' ans-chart-correct' : ''}">
+        <div class="ans-chart-lbl">${opt}${ok ? ' ✓' : ''}</div>
+        <div class="ans-chart-track">
+          <div class="ans-chart-fill" style="width:${pct}%;background:${clr[opt]}"></div>
+        </div>
+        <div class="ans-chart-count">${n}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 function renderPresent(s, questions, q, counts, total) {
   const qi           = s.currentQuestionIndex;
   const showAnswer   = s.showAnswer;
@@ -162,7 +250,7 @@ function renderPresent(s, questions, q, counts, total) {
     document.getElementById('pv-question').textContent = 'Waiting for host to start…';
     ['a','b','c','d'].forEach(l => {
       document.getElementById(`pv-text-${l}`).textContent = '';
-      document.getElementById(`pv-cnt-${l}`).textContent  = '0';
+      document.getElementById(`pv-cnt-${l}`).textContent  = '';
       document.getElementById(`pv-bar-${l}`).style.width  = '0';
       document.getElementById(`pv-opt-${l}`).classList.remove('reveal-correct','reveal-dim');
     });
@@ -170,7 +258,7 @@ function renderPresent(s, questions, q, counts, total) {
     setH('pv-start-btn', false);
     setH('pv-show-btn',  true);
     setH('pv-next-btn',  true);
-    document.getElementById('pv-rankings').classList.remove('active');
+    if (!pvRankAnimating) document.getElementById('pv-rankings').classList.remove('active');
     return;
   }
 
@@ -182,8 +270,9 @@ function renderPresent(s, questions, q, counts, total) {
     const n   = counts[opt.id] || 0;
     const pct = total > 0 ? (n / total * 100).toFixed(1) : 0;
     document.getElementById(`pv-text-${l}`).textContent = opt.text;
-    document.getElementById(`pv-cnt-${l}`).textContent  = n;
-    document.getElementById(`pv-bar-${l}`).style.width  = `${pct}%`;
+    // Hide live counts and bars until answer is revealed
+    document.getElementById(`pv-cnt-${l}`).textContent  = showAnswer ? n : '';
+    document.getElementById(`pv-bar-${l}`).style.width  = showAnswer ? `${pct}%` : '0';
 
     const optEl = document.getElementById(`pv-opt-${l}`);
     if (showAnswer) {
@@ -201,20 +290,82 @@ function renderPresent(s, questions, q, counts, total) {
   setH('pv-show-btn',  !!showAnswer);
   setH('pv-next-btn',  !showAnswer);
 
-  document.getElementById('pv-rankings').classList.toggle('active', !!showRankings);
-  if (showRankings) renderPvRankings(s.scores || {});
+  // Rankings overlay: don't touch DOM during animation
+  if (!pvRankAnimating) {
+    document.getElementById('pv-rankings').classList.toggle('active', !!showRankings);
+    if (showRankings) renderPvRankingsList(document.getElementById('pv-rank-list'), s.scores || {}, true);
+  }
 }
 
+// ── Present view rankings ──
 function renderPvRankings(scores) {
+  renderPvRankingsList(document.getElementById('pv-rank-list'), scores, true);
+}
+
+function renderPvRankingsList(container, scores, showDeltas) {
   const sorted = Object.entries(scores).sort(([,a],[,b]) => b.total - a.total);
-  document.getElementById('pv-rank-list').innerHTML = sorted.slice(0, 5).map(([, s], i) => `
-    <div class="pv-rank-item">
+  container.innerHTML = sorted.slice(0, 5).map(([sid, s], i) => `
+    <div class="pv-rank-item" data-sid="${esc(sid)}">
       <div class="pv-rank-pos">${i + 1}</div>
       <div class="pv-rank-name">${esc(s.name)}</div>
       <div class="pv-rank-score">${s.total}</div>
-      ${s.lastPoints > 0 ? `<div class="pv-rank-delta">+${s.lastPoints}</div>` : ''}
+      ${showDeltas && s.lastPoints > 0 ? `<div class="pv-rank-delta">+${s.lastPoints}</div>` : ''}
     </div>
   `).join('');
+}
+
+async function animatePvRankings(scores, responses, correctAnswer) {
+  pvRankAnimating = true;
+  const pvRankings = document.getElementById('pv-rankings');
+  const list       = document.getElementById('pv-rank-list');
+  const chartEl    = document.getElementById('pv-chart');
+
+  // Phase 1: show old rankings (scores before this round)
+  const oldScores = {};
+  Object.entries(scores).forEach(([sid, s]) => {
+    oldScores[sid] = { ...s, total: s.total - (s.lastPoints || 0), lastPoints: 0 };
+  });
+  renderPvRankingsList(list, oldScores, false);
+  renderAnswerChart(chartEl, responses, correctAnswer);
+  pvRankings.classList.add('active');
+
+  // Hold old state for 2s so teacher/students can see where they were
+  await new Promise(r => setTimeout(r, 2000));
+
+  // FLIP animation: First — record positions of existing items
+  const oldItems = Array.from(list.children);
+  const oldRects = new Map();
+  oldItems.forEach(el => oldRects.set(el.dataset.sid, el.getBoundingClientRect()));
+
+  // Last — re-render in new order with score deltas
+  renderPvRankingsList(list, scores, true);
+
+  // Invert — shift items back to where they visually were
+  const newItems = Array.from(list.children);
+  newItems.forEach(el => {
+    const oldRect = oldRects.get(el.dataset.sid);
+    el.style.transition = 'none';
+    if (oldRect) {
+      const newRect = el.getBoundingClientRect();
+      el.style.transform = `translateY(${oldRect.top - newRect.top}px)`;
+      el.style.opacity = '1';
+    } else {
+      el.style.transform = 'translateY(24px)';
+      el.style.opacity = '0';
+    }
+  });
+
+  list.offsetHeight; // force reflow before animating
+
+  // Play — animate to final positions
+  newItems.forEach(el => {
+    el.style.transition = 'transform 0.65s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.45s';
+    el.style.transform  = '';
+    el.style.opacity    = '1';
+  });
+
+  await new Promise(r => setTimeout(r, 700));
+  pvRankAnimating = false;
 }
 
 // ── Timer ──
@@ -300,7 +451,7 @@ async function calculateAndWriteScores() {
         const elapsed     = Math.max(0, answeredAt - session.questionStartedAt);
         const timeWindow  = session.timerEndsAt
           ? (session.timerEndsAt - session.questionStartedAt)
-          : 30000; // 30s reference when no timer set
+          : 30000;
         lastPoints = Math.round(Math.max(500, 1000 - 500 * elapsed / timeWindow));
       } else {
         lastPoints = 1000;
