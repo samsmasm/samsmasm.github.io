@@ -15,10 +15,20 @@ if (!studentId) {
   localStorage.setItem('uq_sid', studentId);
 }
 
-let playerName         = '';
-let myAnswers          = {};
+const ANIMALS = [
+  '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
+  '🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆',
+  '🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋',
+  '🐌','🐞','🐜','🦟','🦗','��','🐢','🐍','🦎','🐊'
+];
+
+let playerName          = '';
+let myAvatar            = '';
+let myAnswers           = {};
 let playerTimerInterval = null;
-let nameEntrySetup     = false;
+let nameEntrySetup      = false;
+let avatarPickerSetup   = false;
+let avatarClaimsUnsub   = null;
 
 const STATES = ['loading','notfound','waiting','question','rankings','ended'];
 
@@ -46,19 +56,72 @@ function submitName() {
   playerName = name;
   localStorage.setItem('uq_name', name);
   document.getElementById('name-form').style.display = 'none';
-  document.getElementById('name-set').style.display  = 'flex';
-  document.getElementById('name-display').textContent = `Playing as: ${name}`;
-  registerStudent(name);
+  showAvatarPicker();
 }
 
-async function registerStudent(name) {
+function showAvatarPicker() {
+  document.getElementById('avatar-picker').style.display = 'flex';
+  setupAvatarPicker();
+}
+
+function showNameSet() {
+  document.getElementById('name-form').style.display    = 'none';
+  document.getElementById('avatar-picker').style.display = 'none';
+  document.getElementById('name-set').style.display     = 'flex';
+  document.getElementById('name-display').textContent   = `${myAvatar} Playing as: ${playerName}`;
+}
+
+// ── Avatar picker ──
+function setupAvatarPicker() {
+  if (avatarPickerSetup) return;
+  avatarPickerSetup = true;
+
+  const grid = document.getElementById('avatar-grid');
+  grid.innerHTML = ANIMALS.map((emoji, i) => `
+    <button class="avatar-btn" data-idx="${i}" title="${emoji}">${emoji}</button>
+  `).join('');
+
+  grid.querySelectorAll('.avatar-btn').forEach(btn => {
+    btn.addEventListener('click', () => claimAvatar(Number(btn.dataset.idx)));
+  });
+
+  // Live updates — grey out taken animals
+  avatarClaimsUnsub = onValue(ref(db, `uq/sessions/${pin}/avatarClaims`), snap => {
+    const claims = snap.val() || {};
+    grid.querySelectorAll('.avatar-btn').forEach(btn => {
+      const idx     = btn.dataset.idx;
+      const claimer = claims[idx];
+      const taken   = claimer && claimer !== studentId;
+      btn.classList.toggle('avatar-taken', taken);
+      btn.disabled = taken;
+    });
+  });
+}
+
+async function claimAvatar(idx) {
+  const claimRef = ref(db, `uq/sessions/${pin}/avatarClaims/${idx}`);
   try {
-    await set(ref(db, `uq/sessions/${pin}/students/${studentId}`), { name, joinedAt: Date.now() });
+    const result = await runTransaction(claimRef, current => {
+      if (current !== null) return; // taken — abort
+      return studentId;
+    });
+    if (!result.committed) return; // someone else just claimed it
+    myAvatar = ANIMALS[idx];
+    if (avatarClaimsUnsub) { avatarClaimsUnsub(); avatarClaimsUnsub = null; }
+    await registerStudent(playerName, myAvatar);
+    showNameSet();
+  } catch { /* non-fatal — let them try another */ }
+}
+
+async function registerStudent(name, avatar) {
+  try {
+    await set(ref(db, `uq/sessions/${pin}/students/${studentId}`), { name, avatar, joinedAt: Date.now() });
   } catch { /* non-fatal */ }
 }
 
 // ── Init ──
 async function init() {
+  // Restore existing answers
   try {
     const ansSnap = await get(ref(db, `uq/sessions/${pin}/studentAnswers/${studentId}`));
     if (ansSnap.exists()) {
@@ -66,6 +129,16 @@ async function init() {
       Object.entries(raw).forEach(([k, v]) => {
         myAnswers[Number(k)] = typeof v === 'object' ? v.answer : v;
       });
+    }
+  } catch { /* non-fatal */ }
+
+  // Restore name + avatar if already registered in this session
+  try {
+    const stuSnap = await get(ref(db, `uq/sessions/${pin}/students/${studentId}`));
+    if (stuSnap.exists() && stuSnap.val().name) {
+      playerName    = stuSnap.val().name;
+      myAvatar      = stuSnap.val().avatar || '';
+      nameEntrySetup = true;
     }
   } catch { /* non-fatal */ }
 
@@ -83,6 +156,11 @@ async function init() {
       if (!nameEntrySetup) {
         nameEntrySetup = true;
         setupNameEntry();
+      } else if (playerName && myAvatar) {
+        showNameSet();
+      } else if (playerName && !myAvatar) {
+        document.getElementById('name-form').style.display = 'none';
+        showAvatarPicker();
       }
       show('waiting');
       return;
@@ -151,6 +229,7 @@ function renderPlayerRankings(scores) {
   document.getElementById('rankings-list-player').innerHTML = sorted.slice(0, 10).map(([sid, s], i) => `
     <div class="rank-item ${sid === studentId ? 'rank-item-me' : ''}">
       <div class="rank-pos">${i + 1}</div>
+      <span class="rank-avatar">${s.avatar || ''}</span>
       <div class="rank-name">${esc(s.name)}</div>
       <div class="rank-score">${s.total}</div>
       ${s.lastPoints > 0 ? `<div class="rank-delta">+${s.lastPoints}</div>` : '<div class="rank-delta"></div>'}

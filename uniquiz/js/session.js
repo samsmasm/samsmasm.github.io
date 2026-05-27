@@ -211,6 +211,7 @@ function renderRankings(scores) {
   document.getElementById('rankings-list').innerHTML = sorted.slice(0, 10).map(([, s], i) => `
     <div class="rank-item">
       <div class="rank-pos">${i + 1}</div>
+      <span class="rank-avatar">${s.avatar || ''}</span>
       <div class="rank-name">${esc(s.name)}</div>
       <div class="rank-score">${s.total}</div>
       ${s.lastPoints > 0 ? `<div class="rank-delta">+${s.lastPoints}</div>` : '<div class="rank-delta"></div>'}
@@ -262,7 +263,9 @@ function renderPresent(s, questions, q, counts, total) {
     return;
   }
 
-  document.getElementById('pv-question').textContent = q.text;
+  const pvQ = document.getElementById('pv-question');
+  pvQ.textContent = q.text;
+  fitPvQuestion(pvQ);
 
   const letterMap = ['a','b','c','d'];
   q.options.forEach((opt, i) => {
@@ -307,6 +310,7 @@ function renderPvRankingsList(container, scores, showDeltas) {
   container.innerHTML = sorted.slice(0, 5).map(([sid, s], i) => `
     <div class="pv-rank-item" data-sid="${esc(sid)}">
       <div class="pv-rank-pos">${i + 1}</div>
+      <span class="pv-rank-avatar">${s.avatar || ''}</span>
       <div class="pv-rank-name">${esc(s.name)}</div>
       <div class="pv-rank-score">${s.total}</div>
       ${showDeltas && s.lastPoints > 0 ? `<div class="pv-rank-delta">+${s.lastPoints}</div>` : ''}
@@ -442,7 +446,8 @@ async function calculateAndWriteScores() {
     if (entry === undefined || entry === null) return;
     const answer     = typeof entry === 'object' ? entry.answer    : entry;
     const answeredAt = typeof entry === 'object' ? entry.answeredAt : null;
-    const name       = session.students?.[sid]?.name || 'Player';
+    const name       = session.students?.[sid]?.name   || 'Player';
+    const avatar     = session.students?.[sid]?.avatar || '';
     const existing   = session.scores?.[sid] || { total: 0 };
 
     let lastPoints = 0;
@@ -458,7 +463,7 @@ async function calculateAndWriteScores() {
       }
     }
 
-    updates[`scores/${sid}`] = { name, total: (existing.total || 0) + lastPoints, lastPoints };
+    updates[`scores/${sid}`] = { name, avatar, total: (existing.total || 0) + lastPoints, lastPoints };
   });
 
   if (Object.keys(updates).length) {
@@ -529,6 +534,19 @@ document.getElementById('pv-fullscreen-btn').addEventListener('click', () => {
 document.getElementById('pv-exit-btn').addEventListener('click', exitPresent);
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) exitPresent(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && presentView.classList.contains('active')) exitPresent(); });
+
+// ── Font fitting ──
+function fitPvQuestion(el) {
+  el.style.fontSize = '';
+  requestAnimationFrame(() => {
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    const min = 16;
+    while (el.scrollHeight > el.clientHeight + 2 && size > min) {
+      size -= 1;
+      el.style.fontSize = size + 'px';
+    }
+  });
+}
 
 // ── Helpers ──
 function hide(id, hidden)  { document.getElementById(id).classList.toggle('hidden', hidden); }
