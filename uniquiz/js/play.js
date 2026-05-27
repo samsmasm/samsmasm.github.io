@@ -19,7 +19,7 @@ const ANIMALS = [
   '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
   '🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆',
   '🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋',
-  '🐌','🐞','🐜','🦟','🦗','��','🐢','🐍','🦎','🐊'
+  '🐌','🐞','🐜','🦟','🦗','🦂','🐢','🐍','🦎','🐊'
 ];
 
 let playerName          = '';
@@ -82,18 +82,19 @@ function setupAvatarPicker() {
   `).join('');
 
   grid.querySelectorAll('.avatar-btn').forEach(btn => {
-    btn.addEventListener('click', () => claimAvatar(Number(btn.dataset.idx)));
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('avatar-taken')) return;
+      claimAvatar(Number(btn.dataset.idx));
+    });
   });
 
-  // Live updates — grey out taken animals
+  // Live updates — grey out taken animals (class only, no disabled attribute)
   avatarClaimsUnsub = onValue(ref(db, `uq/sessions/${pin}/avatarClaims`), snap => {
     const claims = snap.val() || {};
     grid.querySelectorAll('.avatar-btn').forEach(btn => {
       const idx     = btn.dataset.idx;
       const claimer = claims[idx];
-      const taken   = claimer && claimer !== studentId;
-      btn.classList.toggle('avatar-taken', taken);
-      btn.disabled = taken;
+      btn.classList.toggle('avatar-taken', !!(claimer && claimer !== studentId));
     });
   });
 }
@@ -162,6 +163,7 @@ async function init() {
         document.getElementById('name-form').style.display = 'none';
         showAvatarPicker();
       }
+      renderJoinedStudents(s.students || {});
       show('waiting');
       return;
     }
@@ -190,6 +192,22 @@ async function init() {
     show('question');
 
   }, () => show('notfound'));
+}
+
+// ── Joined students list ──
+function renderJoinedStudents(students) {
+  const countEl = document.getElementById('joined-count');
+  const listEl  = document.getElementById('joined-list');
+  if (!countEl || !listEl) return;
+
+  const entries = Object.values(students).filter(s => s.name);
+  countEl.textContent = `${entries.length} player${entries.length !== 1 ? 's' : ''} joined`;
+  listEl.innerHTML = entries.map(s => `
+    <div class="joined-item">
+      <span class="joined-avatar">${s.avatar || '👤'}</span>
+      <span class="joined-name">${esc(s.name)}</span>
+    </div>
+  `).join('');
 }
 
 // ── Timer (player side) ──
