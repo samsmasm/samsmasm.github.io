@@ -85,6 +85,7 @@ HTML_TEMPLATE = """\
         <button class="font-btn" onclick="changeArticleFont(1)">A+</button>
       </span>
     </div>
+    <div class="issue-lede">In this issue: {issue_lede}</div>
     <main>
       {articles_html}
     </main>
@@ -186,9 +187,12 @@ def build_html(articles, date_str):
             questions=questions_html,
         ))
 
+    issue_lede = " · ".join(a["title"] for a in articles)
+
     return HTML_TEMPLATE.format(
         title_date=title_date,
         long_date=long_date,
+        issue_lede=issue_lede,
         articles_html="\n\n".join(cards),
     )
 
