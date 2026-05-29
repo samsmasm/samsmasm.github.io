@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate feed.json for econnews and questionmark sub-sites.
+Generate feed.json for econnews and businews sub-sites.
 Run from the repo root: python3 generate-feeds.py
 """
 
@@ -46,8 +46,8 @@ def generate_econnews_feed():
     print(f"econnews/feed.json — {len(items)} items")
 
 
-def generate_questionmark_feed():
-    cases_path = os.path.join(REPO, "questionmark", "cases.json")
+def generate_businews_feed():
+    cases_path = os.path.join(REPO, "businews", "cases.json")
     with open(cases_path) as f:
         cases = json.load(f)
 
@@ -57,16 +57,16 @@ def generate_questionmark_feed():
             "title": case["title"],
             "excerpt": case.get("hook", ""),
             "date": case["date"],
-            "url": "/questionmark/cases/" + case["filename"],
-            "source": "questionmark",
+            "url": "/businews/cases/" + case["filename"],
+            "source": "businews",
         })
 
-    out_path = os.path.join(REPO, "questionmark", "feed.json")
+    out_path = os.path.join(REPO, "businews", "feed.json")
     with open(out_path, "w") as f:
         json.dump(items, f, indent=2, ensure_ascii=False)
-    print(f"questionmark/feed.json — {len(items)} items")
+    print(f"businews/feed.json — {len(items)} items")
 
 
 if __name__ == "__main__":
     generate_econnews_feed()
-    generate_questionmark_feed()
+    generate_businews_feed()

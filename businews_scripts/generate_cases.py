@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Question Mark step 2: generate a case study from the selected story."""
+"""BusiNews step 2: generate a case study from the selected story."""
 
 import json
 import os
@@ -9,8 +9,8 @@ from datetime import datetime
 import anthropic
 
 BASE = os.environ.get("GITHUB_WORKSPACE", "/home/sam/samsmasm.github.io")
-INPUT_PATH = os.path.join(BASE, "questionmark", "candidate_stories.json")
-OUTPUT_PATH = os.path.join(BASE, "questionmark", "case_study.json")
+INPUT_PATH = os.path.join(BASE, "businews", "candidate_stories.json")
+OUTPUT_PATH = os.path.join(BASE, "businews", "case_study.json")
 
 GENERATION_PROMPT = """\
 You are writing an IB Business Management case study for 16-18 year old students.

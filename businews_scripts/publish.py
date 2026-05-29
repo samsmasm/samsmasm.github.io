@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Question Mark step 3: render case_study.json to HTML and update cases.json."""
+"""BusiNews step 3: render case_study.json to HTML and update cases.json."""
 
 import json
 import os
@@ -7,9 +7,9 @@ import sys
 from datetime import datetime
 
 BASE = os.environ.get("GITHUB_WORKSPACE", "/home/sam/samsmasm.github.io")
-CASE_STUDY_PATH = os.path.join(BASE, "questionmark", "case_study.json")
-CASES_DIR = os.path.join(BASE, "questionmark", "cases")
-CASES_JSON = os.path.join(BASE, "questionmark", "cases.json")
+CASE_STUDY_PATH = os.path.join(BASE, "businews", "case_study.json")
+CASES_DIR = os.path.join(BASE, "businews", "cases")
+CASES_JSON = os.path.join(BASE, "businews", "cases.json")
 
 
 def format_date_long(date_str):
@@ -73,7 +73,7 @@ def render_html(case):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{case["title"]} — Question Mark</title>
+  <title>{case["title"]} — BusiNews</title>
   <link rel="icon" type="image/jpeg" href="/unisamicon.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -82,7 +82,7 @@ def render_html(case):
 </head>
 <body>
   <div class="container">
-    <a href="../index.html" class="back-link">← Question Mark</a>
+    <a href="../index.html" class="back-link">← BusiNews</a>
 
     <header class="case-header">
       <div class="case-meta-bar">

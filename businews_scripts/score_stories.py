@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Question Mark step 1: ingest RSS feeds, filter to last 7 days, score stories."""
+"""BusiNews step 1: ingest RSS feeds, filter to last 7 days, score stories."""
 
 import json
 import os
@@ -93,7 +93,7 @@ Stories:
 Return ONLY a JSON array of score objects, one per story. No markdown fences. No other text."""
 
 BASE = os.environ.get("GITHUB_WORKSPACE", "/home/sam/samsmasm.github.io")
-OUTPUT_PATH = os.path.join(BASE, "questionmark", "candidate_stories.json")
+OUTPUT_PATH = os.path.join(BASE, "businews", "candidate_stories.json")
 
 
 def fetch_feed(url):

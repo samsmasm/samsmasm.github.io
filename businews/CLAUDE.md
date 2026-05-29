@@ -1,7 +1,7 @@
-# CLAUDE.md — Question Mark
+# CLAUDE.md — BusiNews
 
 ## Project Purpose
-**Question Mark** is an automated system that generates curriculum-relevant IB Business Management case studies from real-world corporate events. Output is a student-facing website that accumulates cases over time. Primary audience: IB Business Management students (16-18 years old).
+**BusiNews** is an automated system that generates curriculum-relevant IB Business Management case studies from real-world corporate events. Output is a student-facing website that accumulates cases over time. Primary audience: IB Business Management students (16-18 years old).
 
 The name comes from the BCG Matrix quadrant -- products with uncertain futures and high potential. It reflects the editorial philosophy: we don't give students answers, we give them better questions.
 
@@ -23,8 +23,8 @@ This project follows the same pattern as the existing econnews project. Refer to
 6. Publish to GitHub Pages as a blog-style accumulating archive -- NOT YET BUILT
 
 **Scripts:**
-- `questionmark_scripts/score_stories.py` -- steps 1-4, outputs `questionmark/candidate_stories.json`
-- `questionmark_scripts/generate_cases.py` -- step 5, outputs `questionmark/case_study.json`
+- `businews_scripts/score_stories.py` -- steps 1-4, outputs `businews/candidate_stories.json`
+- `businews_scripts/generate_cases.py` -- step 5, outputs `businews/case_study.json`
 
 **Output format:** Blog-style HTML. Most recent case study prominent at top. Older cases accumulate below. Each case study is a standalone page. Student-facing: clear, engaging, no jargon without explanation.
 
