@@ -128,20 +128,6 @@
   .btn-ghost:hover { background: var(--bg); }
   .btn-sm { padding: 5px 12px; font-size: 12px; }
 
-  /* ── Upload zone ── */
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 30px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .15s;
-    margin-bottom: 12px;
-  }
-  .upload-zone:hover { border-color: var(--primary); background: var(--primary-light); }
-  .upload-zone .upload-icon { font-size: 28px; margin-bottom: 8px; }
-  .upload-zone p { color: var(--text-muted); font-size: 13px; }
-
   /* ── Class mapping row ── */
   .mapping-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
   .class-tag {
@@ -347,99 +333,80 @@
   <!-- ════════════════════════════════ SETUP ════════════════════════════════ -->
   <div id="tab-setup" class="tab-content active">
 
-    <div class="card">
-      <div class="card-title">Upload Student CSV</div>
-      <p class="hint">One row per student: <code>FirstName,LastName,Class,Block,Gender</code><br>
-      Class: <code>FMW</code> / <code>Bus</code> / <code>Econ</code> &nbsp;·&nbsp; Block: any label, e.g. <code>A</code>, <code>B</code>, <code>1</code>, <code>2</code> &nbsp;·&nbsp; Gender: <code>M</code>, <code>F</code>, or <code>N</code><br>
-      Re-uploading preserves all existing traits. Last name is used for sorting only, not in comments.</p>
-      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
-        <div class="upload-icon">📄</div>
-        <p>Click to upload, or drag and drop your CSV here</p>
-        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="onCsvUpload(event)">
-      </div>
-      <div id="csv-msg"></div>
-      <div style="margin-top:16px">
-        <div class="section-label">Or paste CSV text directly</div>
-        <p class="hint" style="margin-bottom:8px">Paste from a spreadsheet, Google Sheets, or any plain text. A header row is optional.</p>
-        <textarea id="csv-paste-area" rows="5" placeholder="FirstName,LastName,Class,Block,Gender&#10;Alex,Smith,MATH,A,N&#10;Jordan,Lee,MATH,A,F"></textarea>
-        <div style="margin-top:8px">
-          <button class="btn btn-ghost btn-sm" onclick="onCsvPaste()">Load pasted CSV</button>
-        </div>
-      </div>
+    <!-- ── Overview ── -->
+    <div class="card" style="padding:16px 22px">
+      <ol style="margin:0;padding-left:18px;font-size:13px;line-height:2;color:var(--text)">
+        <li>Load your student list below.</li>
+        <li>If your subject isn't IB Economics, IB Business, or FMW — generate and load a comment bank.</li>
+        <li>Add course preambles and configure which trait chips to show.</li>
+        <li>Go to <strong>Students</strong> to assign traits. Review and export from <strong>Comments</strong>.</li>
+      </ol>
     </div>
 
-    <!-- ── CSV Helper ── -->
+    <!-- ── Student List ── -->
     <div class="card">
-      <div class="card-title">Format Your Student List</div>
-      <p class="hint">Use this prompt with Claude, ChatGPT, or any AI assistant to convert a class list into the required CSV format. Or follow the Google Sheets guide if your list is already there.</p>
-      <details style="margin-bottom:14px">
-        <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">Google Sheets instructions ▸</summary>
-        <div style="margin-top:10px;padding:12px 14px;background:var(--bg);border-radius:7px;font-size:13px;line-height:1.65;color:var(--text)">
-          Make sure your sheet has these columns (add them if missing): <code>FirstName</code>, <code>LastName</code>, <code>Class</code>, <code>Block</code>, <code>Gender</code>.<br><br>
-          <strong>Class</strong> — a short subject code, e.g. <code>MATH</code>, <code>ENG</code>, <code>HIST</code>. Use the same code for every student in a class.<br>
-          <strong>Block</strong> — the period or group, e.g. <code>A</code>, <code>B</code>, <code>1</code>, <code>2</code>.<br>
-          <strong>Gender</strong> — <code>M</code> (he/him), <code>F</code> (she/her), or <code>N</code> (they/them).<br><br>
-          Then go to <strong>File → Download → Comma-separated values (.csv)</strong> and upload that file above.<br>
-          Alternatively, copy your sheet data and paste it into the LLM prompt below.
-        </div>
-      </details>
-      <textarea id="csv-prompt-ta" readonly rows="7" style="font-size:12px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);resize:none;padding:12px;border-radius:7px;line-height:1.6;width:100%"></textarea>
-      <div style="margin-top:8px">
-        <button class="btn btn-primary btn-sm" id="copy-prompt-csv" onclick="copyPrompt('csv')">Copy prompt</button>
+      <div class="card-title">Student List</div>
+      <p class="hint">Your list needs five columns: <code>FirstName</code>, <code>LastName</code>, <code>Class</code>, <code>Block</code>, <code>Gender</code> — where Class is a short subject code (e.g. <code>MATH</code>), Block is the period or group, and Gender is <code>M</code>, <code>F</code>, or <code>N</code>. Re-loading preserves existing traits.</p>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <details>
+          <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">From Google Sheets ▸</summary>
+          <div style="margin-top:8px;padding:12px 14px;background:var(--bg);border-radius:7px;font-size:13px;line-height:1.7;color:var(--text)">
+            Make sure your sheet has columns <code>FirstName</code>, <code>LastName</code>, <code>Class</code>, <code>Block</code>, <code>Gender</code>. Then <strong>File → Download → Comma-separated values (.csv)</strong>, open the file in a text editor, and paste the contents below.
+          </div>
+        </details>
+        <details>
+          <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">List needs formatting? Use an LLM ▸</summary>
+          <div style="margin-top:8px">
+            <p class="hint">Copy this prompt into Claude or ChatGPT, paste your class list, and it will return the correctly formatted CSV.</p>
+            <textarea id="csv-prompt-ta" readonly rows="6" style="font-size:12px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);resize:none;padding:12px;border-radius:7px;line-height:1.6;width:100%"></textarea>
+            <div style="margin-top:6px"><button class="btn btn-ghost btn-sm" id="copy-prompt-csv" onclick="copyPrompt('csv')">Copy prompt</button></div>
+          </div>
+        </details>
       </div>
+
+      <textarea id="csv-paste-area" rows="5" placeholder="Paste your CSV here — FirstName,LastName,Class,Block,Gender&#10;Alex,Smith,MATH,A,N&#10;Jordan,Lee,MATH,A,F"></textarea>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:14px">
+        <button class="btn btn-primary btn-sm" onclick="onCsvPaste()">Load list</button>
+        <label style="font-size:12px;color:var(--text-muted);cursor:pointer">or <span style="color:var(--primary)">upload .csv file</span><input type="file" id="csv-input" accept=".csv" style="display:none" onchange="onCsvUpload(event)"></label>
+      </div>
+      <div id="csv-msg" style="margin-top:8px"></div>
     </div>
 
     <!-- ── Comment Banks ── -->
     <div class="card">
       <div class="card-title">Comment Banks</div>
-      <p class="hint">A comment bank is a JSON file containing template sentences for a subject. It lets teachers who don't use the built-in subjects (IB Economics, IB Business, FMW) generate comments in their own style. Upload one below, or use the LLM prompt to create one.</p>
+      <p class="hint">Skip this section if your students are in IB Economics, IB Business, or FMW — those subjects are built in. For anything else, use the prompt below to generate a bank, then paste the output to load it.</p>
 
-      <div id="bank-list" style="margin-bottom:16px"></div>
+      <div class="section-label" style="margin-bottom:8px">Step 1 — Generate a bank</div>
+      <p class="hint">Copy this prompt into Claude or ChatGPT. It will ask about your subjects and style, then output a JSON array.</p>
+      <textarea id="bank-prompt-ta" readonly rows="8" style="font-size:12px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);resize:vertical;padding:12px;border-radius:7px;line-height:1.6;width:100%"></textarea>
+      <div style="margin-top:6px"><button class="btn btn-primary btn-sm" id="copy-prompt-bank" onclick="copyPrompt('bank')">Copy prompt</button></div>
 
-      <details style="margin-bottom:12px">
-        <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">Load a comment bank ▸</summary>
-        <div style="margin-top:12px;padding:14px;background:var(--bg);border-radius:7px">
-          <p class="hint" style="margin-bottom:12px">Multi-subject files include class codes automatically. For a single-subject file without class codes, enter them in the last field.</p>
-          <div style="margin-bottom:12px">
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:5px">Paste JSON directly</label>
-            <textarea id="bank-paste-area" rows="5" placeholder='Paste the JSON array from the LLM here and click Load, or upload a file below.' style="font-size:12px;font-family:monospace;line-height:1.5"></textarea>
-          </div>
-          <div style="margin-bottom:12px">
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:5px">Or upload a .json file</label>
-            <input type="file" id="bank-file-input" accept=".json" style="font-size:13px;width:auto">
-          </div>
-          <div style="margin-bottom:12px">
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:5px">Class codes (single-subject files only)</label>
-            <input type="text" id="bank-codes-input" placeholder="e.g. MATH, 10ENG — not needed for multi-subject format" style="width:auto;max-width:400px">
-          </div>
+      <div style="margin-top:22px">
+        <div class="section-label" style="margin-bottom:8px">Step 2 — Paste the output</div>
+        <textarea id="bank-paste-area" rows="5" placeholder="Paste the JSON array from the LLM here, then click Load bank." style="font-size:12px;font-family:monospace;line-height:1.5"></textarea>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="onBankLoad()">Load bank</button>
-          <div id="bank-msg" style="margin-top:8px"></div>
+          <input type="text" id="bank-codes-input" placeholder="Class codes — only needed for single-subject format" style="font-size:12px;width:auto;max-width:320px;padding:5px 10px">
         </div>
-      </details>
+        <div id="bank-msg" style="margin-top:8px"></div>
+      </div>
 
-      <details>
-        <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">Generate a bank with an LLM ▸</summary>
-        <div style="margin-top:12px">
-          <p class="hint">Paste this prompt into Claude or ChatGPT. It will ask you a few questions about your subject and style, then output a bank JSON you can save as a <code>.json</code> file and upload above.</p>
-          <textarea id="bank-prompt-ta" readonly rows="10" style="font-size:12px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);resize:vertical;padding:12px;border-radius:7px;line-height:1.6;width:100%"></textarea>
-          <div style="margin-top:8px">
-            <button class="btn btn-primary btn-sm" id="copy-prompt-bank" onclick="copyPrompt('bank')">Copy prompt</button>
-          </div>
-        </div>
-      </details>
+      <div id="bank-list" style="margin-top:16px"></div>
     </div>
 
     <div id="trait-config" class="card"></div>
 
     <div class="card">
       <div class="card-title">Course Preambles</div>
-      <p class="hint">Each preamble appears before the generated comment, separated by a blank line. Write them here; they are saved automatically.</p>
+      <p class="hint">Text that appears before each comment (excluded from the character count). One field per subject — appears after you load a student list.</p>
       <div id="preamble-fields"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">Save &amp; Restore Data</div>
-      <p class="hint">Your data is saved automatically in this browser. Use these buttons to back it up as a file on your laptop — useful before clearing your browser, or to move to another computer.</p>
+      <div class="card-title">Save &amp; Restore</div>
+      <p class="hint">Data saves automatically in this browser. Back it up before clearing your browser or switching computers.</p>
       <div class="row gap-8">
         <button class="btn btn-ghost" onclick="saveBackup()">⬇ Save backup</button>
         <label class="btn btn-ghost" style="cursor:pointer">⬆ Load backup<input type="file" accept=".json" style="display:none" onchange="onBackupUpload(event)"></label>
@@ -1270,19 +1237,7 @@ function onCsvPaste(){
   renderAll();
 }
 
-// Drag-and-drop
-const dz = document.getElementById('drop-zone');
-dz.addEventListener('dragover',  e=>{ e.preventDefault(); dz.style.borderColor='var(--primary)'; });
-dz.addEventListener('dragleave', ()=>{ dz.style.borderColor=''; });
-dz.addEventListener('drop', e=>{
-  e.preventDefault(); dz.style.borderColor='';
-  const file = e.dataTransfer.files[0];
-  if(!file) return;
-  const inp = document.getElementById('csv-input');
-  const dt = new DataTransfer(); dt.items.add(file);
-  inp.files = dt.files;
-  onCsvUpload({target:{files:dt.files}});
-});
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  BACKUP / RESTORE
@@ -1497,32 +1452,16 @@ function processBankData(parsed, codesInput, msgEl){
 }
 
 function onBankLoad(){
-  const fileInput  = document.getElementById('bank-file-input');
   const pasteArea  = document.getElementById('bank-paste-area');
   const codesInput = document.getElementById('bank-codes-input');
   const msgEl      = document.getElementById('bank-msg');
-
-  const pastedText = pasteArea?.value?.trim();
-  if(pastedText){
-    let parsed;
-    try{ parsed = JSON.parse(pastedText); }
-    catch{ msgEl.innerHTML='<p class="status-msg status-err">Could not parse pasted JSON — check for syntax errors and try again.</p>'; return; }
-    processBankData(parsed, codesInput, msgEl);
-    pasteArea.value = '';
-    return;
-  }
-
-  if(!fileInput?.files?.[0]){ msgEl.innerHTML='<p class="status-msg status-err">Paste JSON above or select a .json file.</p>'; return; }
-
-  const reader = new FileReader();
-  reader.onload = ev => {
-    let parsed;
-    try{ parsed = JSON.parse(ev.target.result); }
-    catch{ msgEl.innerHTML='<p class="status-msg status-err">Invalid JSON — check the file and try again.</p>'; return; }
-    processBankData(parsed, codesInput, msgEl);
-    fileInput.value = '';
-  };
-  reader.readAsText(fileInput.files[0]);
+  const text = pasteArea?.value?.trim();
+  if(!text){ msgEl.innerHTML='<p class="status-msg status-err">Paste the JSON output above first.</p>'; return; }
+  let parsed;
+  try{ parsed = JSON.parse(text); }
+  catch{ msgEl.innerHTML='<p class="status-msg status-err">Could not parse — check for syntax errors.</p>'; return; }
+  processBankData(parsed, codesInput, msgEl);
+  pasteArea.value = '';
 }
 
 function removeBank(id){
