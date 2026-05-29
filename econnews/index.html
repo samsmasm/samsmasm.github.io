@@ -58,11 +58,10 @@
     async function fetchArticles(filename) {
       try {
         const res = await fetch('posts/' + filename);
-        if (!res.ok) return { lede: '', articles: [] };
+        if (!res.ok) return [];
         const html = await res.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        const lede = doc.querySelector('.issue-lede')?.textContent.trim() || '';
-        const articles = Array.from(doc.querySelectorAll('.article-card')).map(card => {
+        return Array.from(doc.querySelectorAll('.article-card')).map(card => {
           const a    = card.querySelector('h2 a');
           const src  = card.querySelector('.article-source');
           const sum  = card.querySelector('p');
@@ -75,8 +74,7 @@
             questions: qs.map(q => q.textContent.trim())
           };
         });
-        return { lede, articles };
-      } catch (e) { return { lede: '', articles: [] }; }
+      } catch (e) { return []; }
     }
 
     async function fetchTitles(filename) {
@@ -145,11 +143,10 @@
             + '</span>'
             + '</div>';
 
-          const { lede, articles } = await fetchArticles(latest.filename);
+          const articles = await fetchArticles(latest.filename);
           if (articles.length) {
-            html += '<p class="section-heading">Today\'s stories</p>';
-            if (lede) html += '<div class="issue-lede">' + lede + '</div>';
-            html += '<div class="story-grid">'
+            html += '<p class="section-heading">Today\'s stories</p>'
+              + '<div class="story-grid">'
               + articles.map(storyCardHTML).join('')
               + '</div>';
           } else {
@@ -171,11 +168,10 @@
             + '</span>'
             + '</div>';
 
-          const { lede, articles } = await fetchArticles(latest.filename);
+          const articles = await fetchArticles(latest.filename);
           if (articles.length) {
-            html += '<p class="section-heading">Latest stories</p>';
-            if (lede) html += '<div class="issue-lede">' + lede + '</div>';
-            html += '<div class="story-grid">'
+            html += '<p class="section-heading">Latest stories</p>'
+              + '<div class="story-grid">'
               + articles.map(storyCardHTML).join('')
               + '</div>';
           } else {

@@ -48,12 +48,6 @@ Here are the articles:
 
 Return ONLY a JSON array of exactly 6 selected articles with fields: title, url, summary. No other text."""
 
-LEDE_PROMPT = """\
-Write a one-sentence teaser blurb for an economics news digest issue. Start with "In this issue, we look at" and then list concise, evocative phrases for each of the six articles (2-5 words each), connected with commas and a final "and". Do not use em dashes. Return only the sentence, no other text.
-
-Articles:
-{articles_json}"""
-
 QUESTIONS_PROMPT = """\
 For each of the following economics news articles, generate 2-3 discussion questions suitable for curious 16-18 year old students. Questions should spark genuine thinking and debate, not test recall. They can be provocative, hypothetical, or connect to students' own lives in Vietnam/Asia. Avoid questions that sound like exam questions.
 
@@ -91,7 +85,7 @@ HTML_TEMPLATE = """\
         <button class="font-btn" onclick="changeArticleFont(1)">A+</button>
       </span>
     </div>
-    <div class="issue-lede">{issue_lede}</div>
+    <div class="issue-lede">In this issue: {issue_lede}</div>
     <main>
       {articles_html}
     </main>
@@ -176,18 +170,7 @@ def generate_questions(client, selected):
     return json.loads(cleaned)
 
 
-def generate_lede(client, articles):
-    print("Generating issue lede...")
-    titles = [{"title": a["title"]} for a in articles]
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=200,
-        messages=[{"role": "user", "content": LEDE_PROMPT.format(articles_json=json.dumps(titles))}],
-    )
-    return response.content[0].text.strip()
-
-
-def build_html(articles, date_str, lede):
+def build_html(articles, date_str):
     now = datetime.strptime(date_str, "%Y-%m-%d")
     long_date = now.strftime("%A, %-d %B %Y")
     title_date = now.strftime("%-d %B %Y")
@@ -204,10 +187,12 @@ def build_html(articles, date_str, lede):
             questions=questions_html,
         ))
 
+    issue_lede = " · ".join(a["title"] for a in articles)
+
     return HTML_TEMPLATE.format(
         title_date=title_date,
         long_date=long_date,
-        issue_lede=lede,
+        issue_lede=issue_lede,
         articles_html="\n\n".join(cards),
     )
 
@@ -218,10 +203,9 @@ def main():
     all_articles = fetch_all_feeds()
     selected = select_articles(client, all_articles)
     with_questions = generate_questions(client, selected)
-    lede = generate_lede(client, with_questions)
 
     date_str = datetime.now().strftime("%Y-%m-%d")
-    html = build_html(with_questions, date_str, lede)
+    html = build_html(with_questions, date_str)
 
     out_path = os.path.join(POSTS_DIR, f"{date_str}.html")
     with open(out_path, "w", encoding="utf-8") as f:
