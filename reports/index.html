@@ -316,6 +316,21 @@
   .status-msg { font-size: 13px; padding: 8px 0; }
   .status-ok { color: var(--success); }
   .status-err { color: var(--danger); }
+
+  /* ── Editable template cells ── */
+  .tmpl-edit {
+    cursor: text;
+    border-radius: 4px;
+    transition: background .12s, box-shadow .12s;
+    white-space: pre-wrap;
+    min-width: 120px;
+  }
+  .tmpl-edit:hover { background: var(--primary-light); }
+  .tmpl-edit:focus {
+    outline: none;
+    background: white;
+    box-shadow: inset 0 0 0 1.5px var(--primary);
+  }
 </style>
 </head>
 <body>
@@ -1873,6 +1888,21 @@ function exportAll(){
 //  TEMPLATES TAB
 // ═══════════════════════════════════════════════════════════════════════════
 
+function saveTemplateEdit(bankId, path, el){
+  const value = el.innerText.replace(/\n/g, ' ').trim();
+  const banks = loadBanks();
+  const entry = banks.find(b => b.id === bankId);
+  if(!entry) return;
+  const keys = path.split('.');
+  let obj = entry.bank;
+  for(let i = 0; i < keys.length - 1; i++){
+    if(obj[keys[i]] == null) return;
+    obj = obj[keys[i]];
+  }
+  obj[keys[keys.length - 1]] = value;
+  saveBanks(banks);
+}
+
 function renderTemplates(){
   const el = document.getElementById('templates-content');
   if(!el) return;
@@ -1883,89 +1913,86 @@ function renderTemplates(){
     return;
   }
 
-  const pN = P.N;
-  const name = 'Name';
+  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  const section = (title, note, rows) => `
+  const lbl = (s, first) =>
+    `<td style="padding:8px 10px;${first?'font-weight:600;white-space:nowrap;color:var(--text-muted)':'line-height:1.55'}">${s}</td>`;
+
+  const edt = (bid, path, raw) =>
+    `<td class="tmpl-edit" contenteditable="true"
+      data-bank-id="${bid}" data-path="${path}"
+      onblur="saveTemplateEdit(this.dataset.bankId,this.dataset.path,this)"
+      style="padding:8px 10px;line-height:1.55">${esc(raw||'')}</td>`;
+
+  const table = (title, note, headers, rows) => `
     <div class="card" style="margin-bottom:16px">
       <div class="card-title">${title}</div>
-      ${note ? `<p class="hint">${note}</p>` : ''}
+      ${note?`<p class="hint">${note}</p>`:''}
       <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead>
-          <tr style="border-bottom:2px solid var(--border)">
-            ${rows.headers.map(h=>`<th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${h}</th>`).join('')}
-          </tr>
-        </thead>
+        <thead><tr style="border-bottom:2px solid var(--border)">
+          ${headers.map(h=>`<th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${h}</th>`).join('')}
+        </tr></thead>
         <tbody>
-          ${rows.data.map((r,i)=>`
-            <tr style="border-bottom:1px solid var(--bg);background:${i%2?'var(--bg)':'white'}">
-              ${r.map((c,ci)=>`<td style="padding:8px 10px;${ci===0?'font-weight:600;white-space:nowrap;color:var(--text-muted)':'line-height:1.55'}">${c}</td>`).join('')}
-            </tr>
-          `).join('')}
+          ${rows.map((r,i)=>`<tr style="border-bottom:1px solid var(--bg);background:${i%2?'var(--bg)':'white'}">${r.join('')}</tr>`).join('')}
         </tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 
   const qualIds = ['default','analytical','original','bold','critical','passionate','focused_questions','focused_questions_long'];
   const pairs   = [['group','quiet'],['quiet','social'],['group','social']];
 
-  let html = '';
+  let html = '<p class="hint" style="margin-bottom:4px">Click any template cell to edit it. Changes save automatically when you click away.</p>';
 
-  banks.forEach(bankEntry => {
-    const bank  = bankEntry.bank;
-    const sk    = bank.meta?.skills_phrase || 'core skills';
-    const label = bank.meta?.subject_label || bankEntry.class_codes.join('/');
-    const t     = tmpl => applyTokens(tmpl||'', name, pN, sk);
-
-    html += `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--border);color:var(--text)">${label} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">${bankEntry.class_codes.join(', ')}</span></h2>`;
+  banks.forEach(({id: bid, bank, class_codes}) => {
+    const label = bank.meta?.subject_label || class_codes.join('/');
+    html += `<h2 style="font-size:15px;font-weight:700;margin:24px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--border);color:var(--text)">${label} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">${class_codes.join(', ')}</span></h2>`;
 
     // Opening sentences
-    const openingRows = { headers:['Disposition','Quality','Opening sentence'], data:[] };
+    const openRows = [];
     TRAIT_DEFS.disposition.forEach(d => {
       qualIds.forEach(qid => {
-        const tmpl = bank.opening?.[d.id]?.[qid];
-        if(!tmpl) return;
-        const qLabel = qid==='default' ? '(none)' : (TRAIT_DEFS.qualities.find(q=>q.id===qid)?.label || qid);
-        openingRows.data.push([d.label, qLabel, t(tmpl)]);
+        const raw = bank.opening?.[d.id]?.[qid];
+        if(!raw) return;
+        const qLabel = qid==='default' ? '(none)' : (TRAIT_DEFS.qualities.find(q=>q.id===qid)?.label||qid);
+        openRows.push([lbl(d.label,true), lbl(qLabel), edt(bid, `opening.${d.id}.${qid}`, raw)]);
       });
     });
     pairs.forEach(([a,b]) => {
-      const key  = [a,b].sort().join('+');
-      const tmpl = bank.opening_double?.[key];
-      if(!tmpl) return;
+      const key = [a,b].sort().join('+');
+      const raw = bank.opening_double?.[key];
+      if(!raw) return;
       const la = TRAIT_DEFS.disposition.find(x=>x.id===a).label;
       const lb = TRAIT_DEFS.disposition.find(x=>x.id===b).label;
-      openingRows.data.push([`${la} + ${lb}`, '—', t(tmpl)]);
+      openRows.push([lbl(`${la} + ${lb}`,true), lbl('—'), edt(bid, `opening_double.${key}`, raw)]);
     });
-    html += section('Opening Sentences', 'First sentence of each comment, driven by disposition and the first applicable quality.', openingRows);
+    html += table('Opening Sentences', null, ['Disposition','Quality','Template (click to edit)'], openRows);
 
     // Performance × work ethic
-    const perfRows = { headers:['Performance','Work Ethic','Sentence'], data:[] };
+    const perfRows = [];
     TRAIT_DEFS.performance.forEach(perf => {
       TRAIT_DEFS.workEthic.forEach(ethic => {
-        const tmpl = bank.performance?.[perf.id]?.[ethic.id];
-        if(tmpl) perfRows.data.push([perf.label, ethic.label, t(tmpl)]);
+        const raw = bank.performance?.[perf.id]?.[ethic.id];
+        if(raw) perfRows.push([lbl(perf.label,true), lbl(ethic.label), edt(bid, `performance.${perf.id}.${ethic.id}`, raw)]);
       });
     });
-    html += section('Performance × Work Ethic', null, perfRows);
+    html += table('Performance × Work Ethic', null, ['Performance','Work Ethic','Template (click to edit)'], perfRows);
 
     // Next steps
-    const stepRows = { headers:['Next step','Phrase'], data:[] };
+    const stepRows = [];
     TRAIT_DEFS.nextSteps.forEach(step => {
-      const tmpl = bank.next_steps?.[step.id];
-      if(tmpl) stepRows.data.push([step.label, t(tmpl)]);
+      const raw = bank.next_steps?.[step.id];
+      if(raw) stepRows.push([lbl(step.label,true), edt(bid, `next_steps.${step.id}`, raw)]);
     });
-    html += section('Next Steps', '"Name would benefit from [phrase]."', stepRows);
+    html += table('Next Steps', 'Slot into "Name would benefit from [phrase]."', ['Next step','Template (click to edit)'], stepRows);
 
     // Quality phrases + progress note
-    const qualRows = { headers:['Quality','Phrase / sentence'], data:[] };
-    TRAIT_DEFS.qualities.filter(q => q.id !== 'strong_progress').forEach(q => {
-      const phrase = bank.qual_phrases?.[q.id];
-      if(phrase) qualRows.data.push([q.label, t(phrase)]);
+    const qualRows = [];
+    TRAIT_DEFS.qualities.filter(q=>q.id!=='strong_progress').forEach(q => {
+      const raw = bank.qual_phrases?.[q.id];
+      if(raw) qualRows.push([lbl(q.label,true), edt(bid, `qual_phrases.${q.id}`, raw)]);
     });
-    if(bank.progress_note) qualRows.data.push(['Strong progress / resilience', t(bank.progress_note)]);
-    html += section('Quality Phrases', '"Their work shows [phrase], enriching their engagement with the subject."', qualRows);
+    if(bank.progress_note) qualRows.push([lbl('Strong progress / resilience',true), edt(bid, 'progress_note', bank.progress_note)]);
+    html += table('Quality Phrases', 'Slot into "Their work shows [phrase], enriching their engagement with the subject."', ['Quality','Template (click to edit)'], qualRows);
   });
 
   el.innerHTML = html;
