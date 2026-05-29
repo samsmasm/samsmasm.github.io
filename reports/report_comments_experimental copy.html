@@ -1,0 +1,2066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Comment Generator (test)</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --border: #e0e4ea;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --primary-dark: #1d4ed8;
+    --text: #1a1f2e;
+    --text-muted: #6b7280;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --warning-light: #fffbeb;
+    --danger: #ef4444;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+  code { font-family: monospace; background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  header h1 { font-size: 16px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+  nav { display: flex; gap: 2px; }
+  .tab-btn {
+    padding: 7px 18px;
+    border: none;
+    background: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all .15s;
+  }
+  .tab-btn:hover { background: var(--bg); color: var(--text); }
+  .tab-btn.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+  /* ── Main layout ── */
+  main { max-width: 1140px; margin: 0 auto; padding: 24px 24px 48px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    margin-bottom: 10px;
+  }
+  .hint { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5; }
+
+  /* ── Inputs ── */
+  textarea, input[type="text"], select {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--text);
+    width: 100%;
+    transition: border .15s;
+  }
+  textarea { resize: vertical; }
+  textarea:focus, input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: white;
+  }
+  select { width: auto; min-width: 220px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-ghost:hover { background: var(--bg); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    margin-bottom: 12px;
+  }
+  .upload-zone:hover { border-color: var(--primary); background: var(--primary-light); }
+  .upload-zone .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-zone p { color: var(--text-muted); font-size: 13px; }
+
+  /* ── Class mapping row ── */
+  .mapping-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .class-tag {
+    padding: 5px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    min-width: 180px;
+    font-weight: 500;
+  }
+  .mapping-arrow { color: var(--text-muted); font-size: 13px; }
+
+  /* ── Students layout ── */
+  #students-layout { display: grid; grid-template-columns: 290px 1fr; gap: 16px; align-items: start; }
+  #student-list-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    max-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 78px;
+  }
+  .list-header { padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  #student-search {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--bg);
+    margin-bottom: 8px;
+  }
+  #student-search:focus { outline: none; border-color: var(--primary); background: white; }
+  .filter-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .filter-pill {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: all .15s;
+    background: white;
+  }
+  .filter-pill:hover { border-color: var(--primary); color: var(--primary); }
+  .filter-pill.active { background: var(--primary); border-color: var(--primary); color: white; }
+  #student-list-items { overflow-y: auto; flex: 1; }
+  .student-row {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background .1s;
+  }
+  .student-row:hover { background: var(--bg); }
+  .student-row.active { background: var(--primary-light); }
+  .student-name { font-weight: 500; font-size: 13px; }
+  .student-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .dot.done { background: var(--success); }
+
+  /* ── Trait panel ── */
+  #trait-panel-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+  }
+  .trait-group { margin-bottom: 20px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    padding: 6px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all .15s;
+    user-select: none;
+    background: white;
+    color: var(--text);
+  }
+  .chip:hover { border-color: var(--primary); color: var(--primary); }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: white; }
+
+  /* ── Preview box ── */
+  #preview-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    line-height: 1.65;
+    font-size: 13.5px;
+    min-height: 80px;
+  }
+  #preview-box.double-disp { border-left: 3px solid var(--warning); }
+  .stacked-label { font-style: italic; color: var(--warning); font-size: 12px; margin-bottom: 4px; }
+  .char-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .char-count { font-size: 11px; color: var(--text-muted); }
+  .char-count.soft { color: var(--warning); font-weight: 600; }
+  .char-count.hard { color: var(--danger); font-weight: 700; }
+  .char-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .char-fill { height: 100%; border-radius: 2px; transition: width .3s, background .3s; }
+
+  /* ── Comments tab ── */
+  .comment-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+  .comment-card.double-disp { border-left: 3px solid var(--warning); }
+  .comment-card.over-cap { border-left: 3px solid var(--danger); }
+  .comment-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .comment-student-name { font-weight: 600; font-size: 15px; }
+  .comment-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .preamble-block {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--bg);
+    line-height: 1.6;
+  }
+  .comment-body { font-size: 13.5px; line-height: 1.65; }
+  .comment-footer { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+  .comment-footer .char-note { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .comment-footer .char-note.warn { color: var(--warning); }
+  .comment-footer .char-note.over { color: var(--danger); font-weight: 600; }
+
+  /* ── Review flag ── */
+  .review-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 15px; color: var(--border); padding: 2px 4px;
+    line-height: 1; border-radius: 4px; transition: color .15s; flex-shrink: 0;
+  }
+  .review-btn:hover { color: var(--warning); }
+  .review-btn.on { color: var(--warning); }
+
+  /* ── Version pills ── */
+  .version-pills { display: flex; gap: 4px; align-items: center; }
+  .version-pill {
+    font-size: 11px; padding: 3px 10px;
+    border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; color: var(--text-muted); background: white;
+    user-select: none; transition: all .12s;
+  }
+  .version-pill.active { background: var(--primary); border-color: var(--primary); color: white; font-weight: 600; }
+  .version-pill:not(.active):hover { border-color: var(--primary); color: var(--primary); }
+
+  /* ── Alt comment (bracketed version) ── */
+  .alt-comment {
+    margin-top: 10px; padding: 10px 14px;
+    background: var(--bg); border-radius: 7px;
+    font-size: 12.5px; color: var(--text-muted); line-height: 1.6; font-style: italic;
+  }
+
+  /* ── Edit textarea ── */
+  .edit-textarea {
+    width: 100%; min-height: 110px; padding: 10px 12px;
+    font-size: 13.5px; font-family: inherit; line-height: 1.65;
+    border: 1.5px solid var(--primary); border-radius: 7px;
+    resize: vertical; background: white; color: var(--text);
+  }
+
+  /* ── Flex helpers ── */
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; }
+  .gap-8 { gap: 8px; }
+  .mb-16 { margin-bottom: 16px; }
+
+  /* ── Empty states ── */
+  .empty { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+  .empty h3 { font-size: 15px; margin-bottom: 6px; color: var(--text); }
+  .empty p { font-size: 13px; }
+  .status-msg { font-size: 13px; padding: 8px 0; }
+  .status-ok { color: var(--success); }
+  .status-err { color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <h1>📝 Report Comment Generator <span style="font-size:12px;font-weight:500;color:var(--warning);background:var(--warning-light);padding:2px 8px;border-radius:5px;vertical-align:middle">test</span></h1>
+  <nav>
+    <button class="tab-btn active" data-tab="setup">Setup</button>
+    <button class="tab-btn" data-tab="students">Students</button>
+    <button class="tab-btn" data-tab="comments">Comments</button>
+    <button class="tab-btn" data-tab="templates">Templates</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ════════════════════════════════ SETUP ════════════════════════════════ -->
+  <div id="tab-setup" class="tab-content active">
+
+    <div class="card">
+      <div class="card-title">Upload Student CSV</div>
+      <p class="hint">One row per student: <code>FirstName,LastName,Class,Block,Gender</code><br>
+      Class: <code>FMW</code> / <code>Bus</code> / <code>Econ</code> &nbsp;·&nbsp; Block: any label, e.g. <code>A</code>, <code>B</code>, <code>1</code>, <code>2</code> &nbsp;·&nbsp; Gender: <code>M</code>, <code>F</code>, or <code>N</code><br>
+      Re-uploading preserves all existing traits. Last name is used for sorting only, not in comments.</p>
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
+        <div class="upload-icon">📄</div>
+        <p>Click to upload, or drag and drop your CSV here</p>
+        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="onCsvUpload(event)">
+      </div>
+      <div id="csv-msg"></div>
+      <div style="margin-top:16px">
+        <div class="section-label">Or paste CSV text directly</div>
+        <p class="hint" style="margin-bottom:8px">Paste from a spreadsheet, Google Sheets, or any plain text. A header row is optional.</p>
+        <textarea id="csv-paste-area" rows="5" placeholder="FirstName,LastName,Class,Block,Gender&#10;Alex,Smith,MATH,A,N&#10;Jordan,Lee,MATH,A,F"></textarea>
+        <div style="margin-top:8px">
+          <button class="btn btn-ghost btn-sm" onclick="onCsvPaste()">Load pasted CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CSV Helper ── -->
+    <div class="card">
+      <div class="card-title">Format Your Student List</div>
+      <p class="hint">Use this prompt with Claude, ChatGPT, or any AI assistant to convert a class list into the required CSV format. Or follow the Google Sheets guide if your list is already there.</p>
+      <details style="margin-bottom:14px">
+        <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">Google Sheets instructions ▸</summary>
+        <div style="margin-top:10px;padding:12px 14px;background:var(--bg);border-radius:7px;font-size:13px;line-height:1.65;color:var(--text)">
+          Make sure your sheet has these columns (add them if missing): <code>FirstName</code>, <code>LastName</code>, <code>Class</code>, <code>Block</code>, <code>Gender</code>.<br><br>
+          <strong>Class</strong> — a short subject code, e.g. <code>MATH</code>, <code>ENG</code>, <code>HIST</code>. Use the same code for every student in a class.<br>
+          <strong>Block</strong> — the period or group, e.g. <code>A</code>, <code>B</code>, <code>1</code>, <code>2</code>.<br>
+          <strong>Gender</strong> — <code>M</code> (he/him), <code>F</code> (she/her), or <code>N</code> (they/them).<br><br>
+          Then go to <strong>File → Download → Comma-separated values (.csv)</strong> and upload that file above.<br>
+          Alternatively, copy your sheet data and paste it into the LLM prompt below.
+        </div>
+      </details>
+      <textarea id="csv-prompt-ta" readonly rows="7" style="font-size:12px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);resize:none;padding:12px;border-radius:7px;line-height:1.6;width:100%"></textarea>
+      <div style="margin-top:8px">
+        <button class="btn btn-primary btn-sm" id="copy-prompt-csv" onclick="copyPrompt('csv')">Copy prompt</button>
+      </div>
+    </div>
+
+    <!-- ── Comment Banks ── -->
+    <div class="card">
+      <div class="card-title">Comment Banks</div>
+      <p class="hint">A comment bank is a JSON file containing template sentences for a subject. It lets teachers who don't use the built-in subjects (IB Economics, IB Business, FMW) generate comments in their own style. Upload one below, or use the LLM prompt to create one.</p>
+
+      <div id="bank-list" style="margin-bottom:16px"></div>
+
+      <details style="margin-bottom:12px">
+        <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">Upload a comment bank ▸</summary>
+        <div style="margin-top:12px;padding:14px;background:var(--bg);border-radius:7px">
+          <div style="margin-bottom:12px">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:5px">Class codes this bank applies to (comma-separated)</label>
+            <input type="text" id="bank-codes-input" placeholder="e.g. MATH, 10ENG, SCI" style="width:auto;max-width:340px">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:5px">Bank JSON file</label>
+            <input type="file" id="bank-file-input" accept=".json" style="font-size:13px;width:auto">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="onBankUpload()">Upload bank</button>
+          <div id="bank-msg" style="margin-top:8px"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--primary);user-select:none">Generate a bank with an LLM ▸</summary>
+        <div style="margin-top:12px">
+          <p class="hint">Paste this prompt into Claude or ChatGPT. It will ask you a few questions about your subject and style, then output a bank JSON you can save as a <code>.json</code> file and upload above.</p>
+          <textarea id="bank-prompt-ta" readonly rows="10" style="font-size:12px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);resize:vertical;padding:12px;border-radius:7px;line-height:1.6;width:100%"></textarea>
+          <div style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" id="copy-prompt-bank" onclick="copyPrompt('bank')">Copy prompt</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div id="trait-config" class="card"></div>
+
+    <div class="card">
+      <div class="card-title">Course Preambles</div>
+      <p class="hint">Each preamble appears before the generated comment, separated by a blank line. Write them here; they are saved automatically.</p>
+      <div id="preamble-fields"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Save &amp; Restore Data</div>
+      <p class="hint">Your data is saved automatically in this browser. Use these buttons to back it up as a file on your laptop — useful before clearing your browser, or to move to another computer.</p>
+      <div class="row gap-8">
+        <button class="btn btn-ghost" onclick="saveBackup()">⬇ Save backup</button>
+        <label class="btn btn-ghost" style="cursor:pointer">⬆ Load backup<input type="file" accept=".json" style="display:none" onchange="onBackupUpload(event)"></label>
+      </div>
+      <div id="backup-msg" style="margin-top:8px"></div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════ STUDENTS ════════════════════════════════ -->
+  <div id="tab-students" class="tab-content">
+    <div id="students-empty" class="empty">
+      <h3>No students yet</h3>
+      <p>Upload a CSV in the Setup tab to get started.</p>
+    </div>
+    <div id="students-layout" style="display:none">
+      <div id="student-list-panel">
+        <div class="list-header">
+          <input type="text" id="student-search" placeholder="Search by name…" oninput="renderList()">
+          <div class="filter-pills" id="list-filters"></div>
+        </div>
+        <div id="student-list-items"></div>
+      </div>
+      <div id="trait-panel-wrap">
+        <div class="empty" id="trait-empty"><h3>Select a student</h3><p>Click a name on the left to configure their report traits.</p></div>
+        <div id="trait-form" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════ TEMPLATES ════════════════════════════════ -->
+  <div id="tab-templates" class="tab-content">
+    <div id="templates-content"></div>
+  </div>
+
+  <!-- ════════════════════════════════ COMMENTS ════════════════════════════════ -->
+  <div id="tab-comments" class="tab-content">
+    <div class="row-between mb-16">
+      <div class="filter-pills" id="comment-filters"></div>
+      <div class="row gap-8">
+        <span id="export-progress" style="font-size:12px;color:var(--text-muted)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="exportAll()">⬇ Export configured</button>
+      </div>
+    </div>
+    <div id="comment-list"></div>
+  </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const P = {
+  M: { sub:'he',  obj:'him',  pos:'his',  capSub:'He',  capObj:'Him',  capPos:'His',  label:'he/him'   },
+  F: { sub:'she', obj:'her',  pos:'her',  capSub:'She', capObj:'Her',  capPos:'Her',  label:'she/her'  },
+  N: { sub:'they',obj:'them', pos:'their',capSub:'They',capObj:'Them', capPos:'Their',label:'they/them'}
+};
+
+const SUBJECT_LABELS = { FMW:'Foundations of the Modern World', Business:'IB Business Management', Economics:'IB Economics' };
+const ALL_TYPES = ['FMW','Business','Economics'];
+
+// Map CSV class abbreviations → subject type
+const CLS_MAP = { FMW:'FMW', BUS:'Business', ECON:'Economics' };
+function clsToSubject(cls){ return CLS_MAP[(cls||'').toUpperCase().trim()] || 'Economics'; }
+
+const SKILLS = {
+  FMW:      'historical thinking',
+  Business: 'business frameworks and concepts',
+  Economics:'economic concepts and analysis'
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LLM PROMPTS  (copyable by teachers to generate their own data)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CSV_PROMPT =
+`I need to format a class list for a report comment generator. Please convert the data I paste below into a CSV with this exact format:
+
+FirstName,LastName,Class,Block,Gender
+
+Rules:
+- Class: a short code identifying the subject (e.g. ECON, MATH, ENG, HIST). Use the same code for every student in the same class.
+- Block: the period, set, or group identifier (e.g. A, B, 1, 2, Mon)
+- Gender: M (he/him), F (she/her), or N (they/them — use for any student where you are unsure or prefer neutral language)
+- No extra spaces; wrap a value in double-quotes only if it contains a comma
+- Include the header row exactly as shown above
+
+Here is my class list:
+[PASTE YOUR LIST OR TABLE HERE]
+
+Please output only the CSV, with no other text.`;
+
+const BANK_PROMPT =
+`I need help creating a comment bank JSON file for a report comment generator tool. The tool generates end-of-year written report comments by assembling template sentences based on a teacher's assessment of each student.
+
+Please work through the following steps with me.
+
+━━━━ STEP 1: Tell me about your subject ━━━━
+Please answer these questions before writing anything else:
+1. What is the subject or course name?
+2. Write a skills phrase — 4–8 words describing what students develop in your class. Examples: "economic concepts and analysis" / "mathematical reasoning and problem-solving" / "historical thinking and source analysis" / "creative writing and literary techniques"
+3. Optional: paste 3–5 example comments from your previous reports and I will match your style and tone. Otherwise I will use a clear, professional British-English style.
+
+Wait for my answers before continuing.
+
+━━━━ STEP 2: Generate the comment bank ━━━━
+
+Once I have answered, generate a JSON comment bank. Here is what each section must contain:
+
+OPENING SENTENCES — 24 templates (3 dispositions × 8 quality variants)
+Dispositions: quiet (works independently, focused), group (collaborative, thrives with peers), social (outgoing, occasionally off-task)
+Quality variants: default (no special quality), analytical, original, bold, critical, passionate, focused_questions (short), focused_questions_long
+
+TWO-DISPOSITION OPENINGS — 3 templates
+Used when a student shows two dispositions: group+quiet, quiet+social, group+social
+
+PERFORMANCE × WORK ETHIC — 16 templates (4 performance levels × 4 ethic levels)
+Performance: strong, solid, capable (but inconsistent), building (foundations)
+Work ethic: diligent, consistent, needs_prompt (needs encouragement), inconsistent
+
+QUALITY PHRASES — 7 noun phrases that slot into: "Their work shows [PHRASE], enriching their engagement with the subject."
+
+NEXT STEPS — 10 fragments used in "[NAME] would benefit from..."
+Write each as a gerund phrase (beginning with an -ing verb) that completes "would benefit from ..."
+- read: reading more widely in the subject (articles, books, broader research beyond class)
+- focus: sustaining focus and reducing distraction during class time
+- prep: preparing consistently before each lesson (reviewing notes, completing assigned tasks beforehand)
+- assessment: developing a clearer understanding of what assessments require (command terms, rubrics, marking criteria)
+- questions: asking questions and seeking clarification when unsure, both during and after class
+- support: proactively seeking additional support and feedback from the teacher
+- collab: widening collaboration — working productively with a broader range of peers
+- verbal: building confidence in verbal participation and contributing ideas in class discussion
+- structure: developing skills in structuring and sustaining written arguments
+- current: engaging with current events, news, or real-world developments related to the subject
+
+━━━━ TOKEN SYSTEM ━━━━
+Use these tokens exactly — the app replaces them with the correct pronoun automatically:
+[NAME]           → student's first name
+[THEIR]          → their / his / her  (possessive, mid-sentence)
+[THEIR_CAP]      → Their / His / Her  (possessive, sentence-start)
+[THEY]           → they / he / she    (subject, mid-sentence)
+[THEY_CAP]       → They / He / She    (subject, sentence-start)
+[THEM]           → them / him / her   (object)
+[SUBJECT_SKILLS] → your skills phrase from meta (used in building-level performance templates)
+
+━━━━ STYLE RULES ━━━━
+- Opening templates: 1 sentence, always begin with [NAME]
+- Performance templates: 1 sentence; begin with [THEIR_CAP] except for needs_prompt which uses "While [THEIR] understanding is ..., [THEY] would benefit from ..."
+- NEVER begin a sentence with [THEIR] or [THEY] alone — use the _CAP versions at sentence start
+- Vary the sentence structures across the 24 opening templates — avoid starting every sentence the same way
+- Keep each template to 1–2 sentences, roughly 15–35 words
+- Write in American English
+
+━━━━ OUTPUT FORMAT ━━━━
+Output only the JSON below in a code block, with every key filled in. Do not leave any value as an empty string.
+
+{
+  "meta": {
+    "version": "1",
+    "subject_label": "YOUR SUBJECT NAME",
+    "skills_phrase": "YOUR SKILLS PHRASE"
+  },
+  "opening": {
+    "quiet": {
+      "default": "",
+      "analytical": "",
+      "original": "",
+      "bold": "",
+      "critical": "",
+      "passionate": "",
+      "focused_questions": "",
+      "focused_questions_long": ""
+    },
+    "group": {
+      "default": "",
+      "analytical": "",
+      "original": "",
+      "bold": "",
+      "critical": "",
+      "passionate": "",
+      "focused_questions": "",
+      "focused_questions_long": ""
+    },
+    "social": {
+      "default": "",
+      "analytical": "",
+      "original": "",
+      "bold": "",
+      "critical": "",
+      "passionate": "",
+      "focused_questions": "",
+      "focused_questions_long": ""
+    }
+  },
+  "opening_double": {
+    "group+quiet": "",
+    "quiet+social": "",
+    "group+social": ""
+  },
+  "performance": {
+    "strong":   { "diligent": "", "consistent": "", "needs_prompt": "", "inconsistent": "" },
+    "solid":    { "diligent": "", "consistent": "", "needs_prompt": "", "inconsistent": "" },
+    "capable":  { "diligent": "", "consistent": "", "needs_prompt": "", "inconsistent": "" },
+    "building": { "diligent": "", "consistent": "", "needs_prompt": "", "inconsistent": "" }
+  },
+  "qual_phrases": {
+    "analytical":             "analytical depth",
+    "original":               "original thinking",
+    "bold":                   "a willingness to take intellectual risks",
+    "critical":               "a critical approach to ideas",
+    "passionate":             "genuine enthusiasm for the subject",
+    "focused_questions":      "a clear awareness of [THEIR] learning",
+    "focused_questions_long": "a clear awareness of [THEIR] learning and depth of engagement"
+  },
+  "progress_note": "[THEIR_CAP] progress this year has been strong, showing resilience and a conscious commitment to [THEIR] own development.",
+  "next_steps": {
+    "read":       "reading widely in the subject to deepen [THEIR] understanding",
+    "focus":      "directing [THEIR] natural energy more consistently into the task at hand",
+    "prep":       "preparing consistently before each class",
+    "assessment": "developing a clearer understanding of what assessments require",
+    "questions":  "asking questions and seeking clarification when unsure",
+    "support":    "making regular use of teacher support",
+    "collab":     "widening [THEIR] collaboration circle",
+    "verbal":     "building confidence in contributing ideas verbally",
+    "structure":  "practising how to structure and develop [THEIR] arguments",
+    "current":    "engaging with current developments in the subject"
+  }
+}`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMMENT BANKS  (teacher-uploaded JSON templates)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BANK_KEY = 'rcg_banks_exp_v1'; // separate from stable version
+
+function loadBanks(){ try{ return JSON.parse(localStorage.getItem(BANK_KEY))||[]; } catch{ return []; } }
+function saveBanks(b){ localStorage.setItem(BANK_KEY, JSON.stringify(b)); }
+
+function findBankForClass(cls){
+  const banks = loadBanks();
+  const up = (cls||'').toUpperCase().trim();
+  return banks.find(b => (b.class_codes||[]).map(c=>c.toUpperCase().trim()).includes(up)) || null;
+}
+
+function validateBank(bank){
+  const errs = [];
+  if(!bank?.meta?.subject_label) errs.push('meta.subject_label');
+  if(!bank?.meta?.skills_phrase)  errs.push('meta.skills_phrase');
+  const disps  = ['quiet','group','social'];
+  const quals  = ['default','analytical','original','bold','critical','passionate','focused_questions','focused_questions_long'];
+  const pairs  = ['group+quiet','quiet+social','group+social'];
+  const perfs  = ['strong','solid','capable','building'];
+  const ethics = ['diligent','consistent','needs_prompt','inconsistent'];
+  const qids   = ['analytical','original','bold','critical','passionate','focused_questions','focused_questions_long'];
+  const steps  = ['read','focus','prep','assessment','questions','support','collab','verbal','structure','current'];
+  disps.forEach(d=>{
+    if(!bank?.opening?.[d]) errs.push(`opening.${d}`);
+    else quals.forEach(q=>{ if(!bank.opening[d][q]) errs.push(`opening.${d}.${q}`); });
+  });
+  pairs.forEach(pair=>{ if(!bank?.opening_double?.[pair]) errs.push(`opening_double["${pair}"]`); });
+  perfs.forEach(pr=>{ ethics.forEach(et=>{ if(!bank?.performance?.[pr]?.[et]) errs.push(`performance.${pr}.${et}`); }); });
+  qids.forEach(q=>{ if(!bank?.qual_phrases?.[q]) errs.push(`qual_phrases.${q}`); });
+  steps.forEach(s=>{ if(!bank?.next_steps?.[s]) errs.push(`next_steps.${s}`); });
+  return errs;
+}
+
+// Token substitution: [NAME], [THEIR], [THEIR_CAP], [THEY], [THEY_CAP], [THEM], [SUBJECT_SKILLS]
+function applyTokens(tmpl, name, p, sk){
+  return (tmpl||'')
+    .replace(/\[NAME\]/g,           name)
+    .replace(/\[THEIR_CAP\]/g,      p.capPos)
+    .replace(/\[THEY_CAP\]/g,       p.capSub)
+    .replace(/\[THEIR\]/g,          p.pos)
+    .replace(/\[THEY\]/g,           p.sub)
+    .replace(/\[THEM\]/g,           p.obj)
+    .replace(/\[SUBJECT_SKILLS\]/g, sk||'core skills');
+}
+
+// ── Trait definitions ──────────────────────────────────────────────────────
+const TRAIT_DEFS = {
+  performance: [
+    { id:'strong',       label:'Strong performer'         },
+    { id:'solid',        label:'Solid / developing'       },
+    { id:'capable',      label:'Capable but inconsistent' },
+    { id:'building',     label:'Building foundations'     }
+  ],
+  workEthic: [
+    { id:'diligent',     label:'Diligent & self-directed' },
+    { id:'consistent',   label:'Consistent effort'        },
+    { id:'needs_prompt', label:'Needs encouragement'      },
+    { id:'inconsistent', label:'Inconsistent effort'      }
+  ],
+  disposition: [
+    { id:'quiet',        label:'Quietly engaged'          },
+    { id:'group',        label:'Group learner'            },
+    { id:'social',       label:'Social / distractible'    }
+  ],
+  qualities: [
+    { id:'analytical',        label:'Analytical'                    },
+    { id:'original',          label:'Original thinker'              },
+    { id:'bold',              label:'Bold in thinking'              },
+    { id:'critical',          label:'Critical approach'             },
+    { id:'passionate',        label:'Passionate / deeply interested' },
+    { id:'focused_questions',      label:'Asks focused questions (short)' },
+    { id:'focused_questions_long', label:'Asks focused questions (long)'  },
+    { id:'strong_progress',   label:'Strong progress / resilience'  }
+  ],
+  nextSteps: [
+    { id:'read',         label:'Read widely'                   },
+    { id:'focus',        label:'Sustained focus in class'      },
+    { id:'prep',         label:'Consistent class preparation'  },
+    { id:'assessment',   label:'Understand assessment demands' },
+    { id:'questions',    label:'Ask questions & clarify'       },
+    { id:'support',      label:'Seek teacher support'          },
+    { id:'collab',       label:'Widen collaboration'           },
+    { id:'verbal',       label:'Build verbal confidence'       },
+    { id:'structure',    label:'Structure arguments'           },
+    { id:'current',      label:'Engage with current events'    }
+  ]
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMMENT GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ── Opening sentence templates (subject-specific) ────────────────────────
+// Structure: OPENING_TEMPLATES[subject][disposition][quality|'default'] = (name, p) => string
+const OPENING_TEMPLATES = {
+  Economics: {
+    quiet: {
+      default:              (n,p) => `${n} engages thoughtfully with economic theory, approaching ${p.pos} work with quiet focus.`,
+      analytical:           (n,p) => `${n} is quietly engaged, bringing careful analytical thinking to the ideas and arguments of the course.`,
+      original:             (n,p) => `${n} is quietly engaged, often bringing original thinking to ${p.pos} engagement with economic ideas.`,
+      bold:                 (n,p) => `${n} is quietly engaged and is not afraid to challenge economic ideas or take intellectual risks.`,
+      critical:             (n,p) => `${n} is quietly engaged and brings a thoughtful, critical eye to economic arguments and models.`,
+      passionate:           (n,p) => `${n} is quietly engaged with a genuine curiosity about economic ideas and how they connect to the world.`,
+      focused_questions:    (n,p) => `${n} is quietly engaged, asking focused questions that show awareness of ${p.pos} economic learning.`,
+      focused_questions_long:(n,p)=>`${n} is quietly engaged, asking focused questions that show awareness of ${p.pos} learning and enrich ${p.pos} engagement with economic ideas.`,
+    },
+    group: {
+      default:              (n,p) => `${n} engages enthusiastically in collaborative work and contributes positively to ${p.pos} peers.`,
+      analytical:           (n,p) => `${n} engages well with peers, bringing careful analytical thinking to group discussions of economic ideas.`,
+      original:             (n,p) => `${n} engages enthusiastically with others, contributing original perspectives to group exploration of economic concepts.`,
+      bold:                 (n,p) => `${n} engages confidently with ${p.pos} peers, bringing bold thinking to collaborative discussions of economic ideas.`,
+      critical:             (n,p) => `${n} engages well with others and brings a critical perspective to group discussions of economic theory.`,
+      passionate:           (n,p) => `${n} engages enthusiastically with others, bringing genuine curiosity about economic ideas to group discussions.`,
+      focused_questions:    (n,p) => `${n} engages enthusiastically with others, asking focused questions that deepen the group's engagement with economic ideas.`,
+      focused_questions_long:(n,p)=>`${n} engages enthusiastically with others, asking focused questions that show awareness of ${p.pos} learning and enrich the group's engagement with economic concepts.`,
+    },
+    social: {
+      default:              (n,p) => `${n} brings warmth and energy to the class and has a natural ease with ${p.pos} peers.`,
+      analytical:           (n,p) => `${n} brings energy and warmth to the class and shows real analytical potential when ${p.sub} channels it into economic ideas.`,
+      original:             (n,p) => `${n} brings energy and warmth to the class and, at ${p.pos} best, offers original ways of thinking about economic concepts.`,
+      bold:                 (n,p) => `${n} is outgoing and brings bold, energetic thinking to discussions of economic ideas.`,
+      critical:             (n,p) => `${n} brings energy and warmth to the class and shows a naturally critical approach to economic arguments.`,
+      passionate:           (n,p) => `${n} brings warmth and energy to the class and shows genuine enthusiasm for economic ideas and arguments.`,
+      focused_questions:    (n,p) => `${n} brings warmth and energy to the class and asks focused questions that show awareness of ${p.pos} economic learning.`,
+      focused_questions_long:(n,p)=>`${n} brings warmth and energy to the class and asks focused questions that show awareness of ${p.pos} learning and enrich ${p.pos} engagement with economic ideas.`,
+    }
+  },
+  Business: {
+    quiet: {
+      default:              (n,p) => `${n} engages carefully with business concepts, approaching the real-world contexts and cases of the course with genuine focus.`,
+      analytical:           (n,p) => `${n} is quietly engaged, bringing careful analytical thinking to business cases and the concepts that underpin them.`,
+      original:             (n,p) => `${n} is quietly engaged, often finding original angles when exploring business concepts and real-world applications.`,
+      bold:                 (n,p) => `${n} is quietly engaged and is not afraid to take bold positions when analysing business decisions and outcomes.`,
+      critical:             (n,p) => `${n} is quietly engaged and applies a thoughtful, critical approach to business cases and decisions.`,
+      passionate:           (n,p) => `${n} is quietly engaged with genuine interest in how businesses operate and how the course ideas apply to the real world.`,
+      focused_questions:    (n,p) => `${n} is quietly engaged, asking focused questions that show awareness of ${p.pos} learning in business.`,
+      focused_questions_long:(n,p)=>`${n} is quietly engaged, asking focused questions that show awareness of ${p.pos} learning and deepen ${p.pos} engagement with business concepts.`,
+    },
+    group: {
+      default:              (n,p) => `${n} engages enthusiastically in collaborative work and contributes positively to ${p.pos} peers.`,
+      analytical:           (n,p) => `${n} engages well with peers, bringing analytical thinking to group work on business cases and concepts.`,
+      original:             (n,p) => `${n} engages enthusiastically with others, contributing original approaches to business problems in group settings.`,
+      bold:                 (n,p) => `${n} engages confidently with ${p.pos} peers, bringing bold thinking to collaborative analysis of business decisions.`,
+      critical:             (n,p) => `${n} engages well with others and brings a critical perspective to group discussions of business cases.`,
+      passionate:           (n,p) => `${n} engages enthusiastically with others, driven by genuine interest in business ideas and their real-world applications.`,
+      focused_questions:    (n,p) => `${n} engages enthusiastically with others, asking focused questions that strengthen the group's engagement with business concepts.`,
+      focused_questions_long:(n,p)=>`${n} engages enthusiastically with others, asking focused questions that show awareness of ${p.pos} learning and enrich the group's engagement with business ideas.`,
+    },
+    social: {
+      default:              (n,p) => `${n} brings warmth and energy to the class and has a natural ease with ${p.pos} peers.`,
+      analytical:           (n,p) => `${n} brings energy and warmth to the class and shows real analytical potential when ${p.sub} channels it into business cases.`,
+      original:             (n,p) => `${n} brings energy and warmth to the class and, at ${p.pos} best, offers original approaches to business problems.`,
+      bold:                 (n,p) => `${n} is outgoing and brings bold, energetic thinking to business discussions and case analysis.`,
+      critical:             (n,p) => `${n} brings energy and warmth to the class and shows a naturally critical approach to business decisions and outcomes.`,
+      passionate:           (n,p) => `${n} brings warmth and energy to the class and shows genuine enthusiasm for the business world and its real-world connections.`,
+      focused_questions:    (n,p) => `${n} brings warmth and energy to the class and asks focused questions that show awareness of ${p.pos} learning in business.`,
+      focused_questions_long:(n,p)=>`${n} brings warmth and energy to the class and asks focused questions that show awareness of ${p.pos} learning and deepen ${p.pos} engagement with business concepts.`,
+    }
+  },
+  FMW: {
+    quiet: {
+      default:              (n,p) => `${n} engages thoughtfully with the ideas and events of the course, approaching historical questions with genuine focus.`,
+      analytical:           (n,p) => `${n} is quietly engaged, bringing careful analytical thinking to the historical connections and evidence of the course.`,
+      original:             (n,p) => `${n} is quietly engaged, often bringing original perspectives to ${p.pos} exploration of historical events and ideas.`,
+      bold:                 (n,p) => `${n} is quietly engaged and is not afraid to take bold positions when weighing historical evidence and interpretations.`,
+      critical:             (n,p) => `${n} is quietly engaged and brings a thoughtful, critical approach to historical sources and perspectives.`,
+      passionate:           (n,p) => `${n} is quietly engaged with genuine curiosity about historical events and the ideas and connections that run through them.`,
+      focused_questions:    (n,p) => `${n} is quietly engaged, asking focused questions that show awareness of ${p.pos} historical thinking.`,
+      focused_questions_long:(n,p)=>`${n} is quietly engaged, asking focused questions that show awareness of ${p.pos} historical thinking and enrich ${p.pos} engagement with the course.`,
+    },
+    group: {
+      default:              (n,p) => `${n} engages enthusiastically in collaborative work and contributes positively to ${p.pos} peers.`,
+      analytical:           (n,p) => `${n} engages well with peers, bringing analytical thinking to group exploration of historical connections and evidence.`,
+      original:             (n,p) => `${n} engages enthusiastically with others, contributing original perspectives to group discussion of historical events.`,
+      bold:                 (n,p) => `${n} engages confidently with ${p.pos} peers, bringing bold thinking to collaborative discussion of historical interpretations.`,
+      critical:             (n,p) => `${n} engages well with others and brings a critical perspective to group analysis of historical sources.`,
+      passionate:           (n,p) => `${n} engages enthusiastically with others, bringing genuine curiosity about historical events and ideas to the class.`,
+      focused_questions:    (n,p) => `${n} engages enthusiastically with others, asking focused questions that enrich the group's exploration of historical ideas.`,
+      focused_questions_long:(n,p)=>`${n} engages enthusiastically with others, asking focused questions that show awareness of ${p.pos} historical thinking and enrich the group's engagement with the course.`,
+    },
+    social: {
+      default:              (n,p) => `${n} brings warmth and energy to the class and has a natural ease with ${p.pos} peers.`,
+      analytical:           (n,p) => `${n} brings energy and warmth to the class and shows real analytical potential when ${p.sub} channels it into historical questions.`,
+      original:             (n,p) => `${n} brings energy and warmth to the class and, at ${p.pos} best, brings original thinking to ${p.pos} exploration of historical events.`,
+      bold:                 (n,p) => `${n} is outgoing and brings bold, energetic perspectives to historical discussions and debate.`,
+      critical:             (n,p) => `${n} brings energy and warmth to the class and shows a naturally critical approach to historical sources and interpretations.`,
+      passionate:           (n,p) => `${n} brings warmth and energy to the class and shows genuine enthusiasm for history and the ideas and events of the course.`,
+      focused_questions:    (n,p) => `${n} brings warmth and energy to the class and asks focused questions that show awareness of ${p.pos} historical thinking.`,
+      focused_questions_long:(n,p)=>`${n} brings warmth and energy to the class and asks focused questions that show awareness of ${p.pos} historical thinking and enrich ${p.pos} engagement with the course.`,
+    }
+  }
+};
+
+// Two-disposition combos, per subject
+const OPENING_DOUBLE = {
+  'group+quiet': {
+    Economics: (n,p) => `${n} is quietly engaged in individual work and contributes well when exploring economic ideas collaboratively.`,
+    Business:  (n,p) => `${n} is quietly engaged in individual work and contributes well when working through business cases with peers.`,
+    FMW:       (n,p) => `${n} is quietly engaged in individual work and contributes well in collaborative historical inquiry.`,
+  },
+  'quiet+social': {
+    Economics: (n,p) => `${n} can work with quiet focus and brings warmth and energy when engaging with peers around economic ideas.`,
+    Business:  (n,p) => `${n} can work with quiet focus and brings warmth and energy to collaborative business discussions.`,
+    FMW:       (n,p) => `${n} can work with quiet focus and brings warmth and energy when engaging with peers in historical discussion.`,
+  },
+  'group+social': {
+    Economics: (n,p) => `${n} is sociable and brings energy to collaborative work, engaging enthusiastically with peers around economic ideas.`,
+    Business:  (n,p) => `${n} is sociable and brings energy to collaborative work, engaging enthusiastically with peers on business cases.`,
+    FMW:       (n,p) => `${n} is sociable and brings energy to collaborative historical work, engaging enthusiastically with ${p.pos} peers.`,
+  }
+};
+
+// Quality priority order for single-quality-in-opening selection
+const QUAL_PRIORITY = ['analytical','original','bold','critical','passionate','focused_questions','focused_questions_long'];
+
+// ── Bank-driven generation (mirrors hardcoded logic but uses uploaded templates) ──
+function generateFromBank(student, bankEntry){
+  const bank = bankEntry.bank;
+  const p    = P[student.gender] || P.N;
+  const n    = student.first;
+  const t    = student.traits || {};
+  const sk   = bank.meta?.skills_phrase || 'core skills';
+  const tok  = tmpl => applyTokens(tmpl, n, p, sk);
+
+  const disp  = t.disposition || [];
+  const quals = t.qualities   || [];
+  const perf  = t.performance || [];
+  const ethic = t.workEthic   || [];
+  const steps = t.nextSteps   || [];
+
+  if(!disp.length && !perf.length) return '';
+
+  const dispForOpening = disp.length ? disp : ['quiet'];
+  const qualsForElab   = quals.filter(q => q !== 'strong_progress');
+
+  // Opening
+  let openingText = '';
+  if(disp.length >= 2){
+    const pair = [disp[0],disp[1]].sort().join('+');
+    openingText = tok(bank.opening_double?.[pair] || '');
+  } else {
+    const d        = dispForOpening[0] || 'quiet';
+    const dispTmpl = bank.opening?.[d] || bank.opening?.quiet || {};
+    const matchedQ = QUAL_PRIORITY.find(qid => quals.includes(qid)) || 'default';
+    openingText    = tok(dispTmpl[matchedQ] || dispTmpl.default || '');
+  }
+
+  // Performance + work ethic
+  let perfText = '';
+  if(perf.length){
+    const pr = perf[0]||'solid', et = ethic[0]||'consistent';
+    perfText = tok(bank.performance?.[pr]?.[et] || '');
+  }
+
+  // Strong-progress note
+  const progressNote = quals.includes('strong_progress')
+    ? tok(bank.progress_note || '[THEIR_CAP] progress this year has been strong, showing resilience and a conscious commitment to [THEIR] own development.')
+    : '';
+
+  // Quality elaboration (same threshold logic as hardcoded version)
+  const hasDoubleDisp  = disp.length >= 2;
+  const qualElabNeeded = hasDoubleDisp ? qualsForElab.length >= 1 : qualsForElab.length >= 2;
+  let qualText = '';
+  if(qualElabNeeded && qualsForElab.length && bank.qual_phrases){
+    const phrases = qualsForElab.map(q => bank.qual_phrases[q]).filter(Boolean).map(tok);
+    if(phrases.length === 1){
+      qualText = `${p.capPos} work shows ${phrases[0]}, enriching ${p.pos} engagement with the subject.`;
+    } else if(phrases.length > 1){
+      const last = phrases[phrases.length-1];
+      qualText = `${p.capPos} work shows ${phrases.slice(0,-1).join(', ')} and ${last}, enriching ${p.pos} engagement with the subject.`;
+    }
+  }
+
+  // Next steps
+  let stepsText = '';
+  if(steps.length && bank.next_steps){
+    const clauses = steps.map(id => { const tmpl = bank.next_steps[id]; return tmpl ? tok(tmpl) : null; }).filter(Boolean);
+    if(clauses.length){
+      const needsSerial = clauses.slice(0,-1).some(c => /\band\b/.test(c));
+      if(clauses.length===1)      stepsText = `${n} would benefit from ${clauses[0]}.`;
+      else if(clauses.length===2) stepsText = `${n} would benefit from ${clauses[0]}${needsSerial?', and':' and'} ${clauses[1]}.`;
+      else                        stepsText = `${n} would benefit from ${clauses.slice(0,-1).join(', ')}, and ${clauses[clauses.length-1]}.`;
+      const impacts=[];
+      if(steps.some(s=>['read','current'].includes(s)))         impacts.push(`deepen ${p.pos} understanding of the subject`);
+      if(steps.some(s=>['focus','prep'].includes(s)))           impacts.push(`strengthen ${p.pos} engagement`);
+      if(steps.some(s=>['questions','support'].includes(s)))    impacts.push(`refine ${p.pos} approach`);
+      if(steps.some(s=>['structure','assessment'].includes(s))) impacts.push(`communicate ${p.pos} ideas more effectively`);
+      if(steps.some(s=>['verbal','collab'].includes(s)))        impacts.push(`grow in confidence`);
+      if(impacts.length) stepsText += ` This will help ${p.obj} ${impacts[0]}.`;
+    }
+  }
+
+  return [openingText, perfText, progressNote, qualText, stepsText].filter(Boolean).join(' ');
+}
+
+function opening(name, disp, quals, p, subj){
+  const d1 = disp[0], d2 = disp[1];
+  const q = quals || [];
+  const s = subj || 'Economics';
+
+  // Two dispositions
+  if(d2){
+    const pair = [d1,d2].sort().join('+');
+    const dblMap = OPENING_DOUBLE[pair];
+    if(dblMap){
+      const fn = dblMap[s] || dblMap['Economics'];
+      return fn(name, p);
+    }
+    return `${name} engages with ${p.pos} learning in a variety of ways.`;
+  }
+
+  // Single disposition
+  const subjTemplates = OPENING_TEMPLATES[s] || OPENING_TEMPLATES.Economics;
+  const dispTemplates = subjTemplates[d1] || subjTemplates.quiet;
+  const matchedQ = QUAL_PRIORITY.find(qid => q.includes(qid)) || 'default';
+  const tmpl = dispTemplates[matchedQ] || dispTemplates.default;
+  return tmpl(name, p);
+}
+
+// ── Performance + work ethic sentence ────────────────────────────────────
+function perfEthic(name, perf, ethic, p, subj){
+  const sk = SKILLS[subj] || 'core concepts';
+  const pr = perf[0]||'solid', et = ethic[0]||'consistent';
+
+  const t = {
+    strong:{
+      diligent:     `${p.capPos} understanding is strong and ${p.pos} skills are applied with confidence, supported by diligent, self-directed effort.`,
+      consistent:   `${p.capPos} understanding is strong, and ${p.pos} skills are applied with consistent commitment.`,
+      needs_prompt: `While ${p.pos} understanding is strong, ${p.sub} would benefit from bringing greater self-direction to ${p.pos} learning.`,
+      inconsistent: `${p.capPos} understanding is strong, and greater consistency in effort will help ${p.obj} realise ${p.pos} full potential.`
+    },
+    solid:{
+      diligent:     `${p.capPos} understanding is solid and ${p.pos} skills are developing steadily, supported by diligent effort.`,
+      consistent:   `${p.capPos} understanding is solid and ${p.pos} skills are developing with consistent effort.`,
+      needs_prompt: `While ${p.pos} understanding is solid, ${p.sub} would benefit from bringing greater initiative to ${p.pos} learning.`,
+      inconsistent: `${p.capPos} understanding is solid, though greater consistency in effort will help ${p.obj} build on this foundation.`
+    },
+    capable:{
+      diligent:     `${p.capPos} clear capability, combined with a diligent approach, will help ${p.obj} develop more consistent outcomes.`,
+      consistent:   `${p.capPos} real capability has not always been consistently reflected in ${p.pos} results.`,
+      needs_prompt: `${p.capPos} capability is clear, and bringing greater consistency and self-direction to ${p.pos} work would help ${p.obj} achieve more.`,
+      inconsistent: `${p.capPos} capability is clear, though ${p.pos} outcomes have been uneven; greater consistency will make a real difference.`
+    },
+    building:{
+      diligent:     `${p.capPos} foundational understanding of ${sk} is developing with real diligence and commitment.`,
+      consistent:   `${p.capPos} foundational understanding is developing steadily with consistent effort.`,
+      needs_prompt: `${p.capPos} foundational understanding is developing, and taking greater ownership of ${p.pos} learning will help ${p.obj} make stronger progress.`,
+      inconsistent: `${p.capPos} foundational understanding is developing, and greater consistency will help ${p.obj} build on this.`
+    }
+  };
+
+  return (t[pr]&&t[pr][et]) || `${name} is making progress in ${p.pos} studies.`;
+}
+
+// ── Qualities elaboration ─────────────────────────────────────────────────
+// Called with minCount=1 for double-disposition students (quality can't be
+// woven into the opening), minCount=2 for single-disposition (quality is
+// already woven in; elaboration only needed when a second quality is present).
+// Uses noun-phrase map + "Their work shows…" so no subject-verb agreement
+// issues arise with singular they.
+function qualElaboration(name, quals, p){
+  if(!quals || quals.length < 1) return '';
+  const map = {
+    analytical:             'analytical depth',
+    original:               'original thinking',
+    bold:                   'a willingness to take intellectual risks',
+    critical:               'a critical approach to ideas',
+    passionate:             'genuine enthusiasm for the ideas of the course',
+    focused_questions:      `a clear awareness of ${p.pos} learning`,
+    focused_questions_long: `a clear awareness of ${p.pos} learning`
+  };
+  const phrases = quals.map(q=>map[q]).filter(Boolean);
+  if(phrases.length < 1) return '';
+  if(phrases.length === 1) return `${p.capPos} work shows ${phrases[0]}, enriching ${p.pos} engagement with the subject.`;
+  const last = phrases.pop();
+  return `${p.capPos} work shows ${phrases.join(', ')} and ${last}, enriching ${p.pos} engagement with the subject.`;
+}
+
+// ── Next steps sentence ───────────────────────────────────────────────────
+function nextSteps(name, steps, p, subj){
+  if(!steps||steps.length===0) return '';
+
+  const ph = {
+    read: {
+      FMW:      `reading widely about historical events and their connections`,
+      Business: `engaging with current business news to connect theory to real-world contexts`,
+      Economics:`reading widely in economics to connect concepts to current developments`
+    },
+    focus:      `directing ${p.pos} natural energy more consistently into the task at hand`,
+    prep:       `preparing consistently before each class`,
+    assessment: `developing a clearer understanding of what assessments require`,
+    questions:  `asking questions and seeking clarification when unsure`,
+    support:    `making regular use of teacher support`,
+    collab:     `widening ${p.pos} collaboration circle`,
+    verbal:     `building confidence in contributing ideas verbally`,
+    structure:  `practising how to structure and develop ${p.pos} arguments`,
+    current: {
+      FMW:      `following current events and drawing historical parallels`,
+      Business: `following business developments and connecting them to course concepts`,
+      Economics:`engaging with current economic developments and their implications`
+    }
+  };
+
+  const get = id => {
+    const v = ph[id];
+    if(!v) return null;
+    return (typeof v==='object') ? (v[subj]||v['Economics']) : v;
+  };
+
+  const clauses = steps.map(get).filter(Boolean);
+  if(clauses.length===0) return '';
+
+  // Use serial comma when any non-final clause itself contains "and", to avoid "A and B and C"
+  const needsSerialComma = clauses.slice(0,-1).some(c => /\band\b/.test(c));
+  let sentence;
+  if(clauses.length===1) sentence = `${name} would benefit from ${clauses[0]}.`;
+  else if(clauses.length===2) sentence = `${name} would benefit from ${clauses[0]}${needsSerialComma ? ', and' : ' and'} ${clauses[1]}.`;
+  else {
+    const rest = clauses.slice(0,-1);
+    sentence = `${name} would benefit from ${rest.join(', ')}, and ${clauses[clauses.length-1]}.`;
+  }
+
+  // Tailored impact closer
+  const impacts = [];
+  if(steps.some(s=>['read','current'].includes(s)))      impacts.push(`deepen ${p.pos} understanding of the subject`);
+  if(steps.some(s=>['focus','prep'].includes(s)))        impacts.push(`strengthen ${p.pos} engagement`);
+  if(steps.some(s=>['questions','support'].includes(s))) impacts.push(`refine ${p.pos} approach`);
+  if(steps.some(s=>['structure','assessment'].includes(s))) impacts.push(`communicate ${p.pos} ideas more effectively`);
+  if(steps.some(s=>['verbal','collab'].includes(s)))     impacts.push(`grow in confidence`);
+
+  if(impacts.length) sentence += ` This will help ${p.obj} ${impacts[0]}.`;
+  return sentence;
+}
+
+// ── Master generate ───────────────────────────────────────────────────────
+function generate(student){
+  // Use uploaded comment bank if one is mapped to this student's class code
+  const bankEntry = findBankForClass(student.cls);
+  if(bankEntry) return generateFromBank(student, bankEntry);
+
+  const subj = clsToSubject(student.cls);
+  const p = P[student.gender] || P.N;
+  const n = student.first;
+  const t = student.traits || {};
+
+  const disp  = t.disposition || [];
+  const quals  = t.qualities   || [];
+  const perf  = t.performance || [];
+  const ethic = t.workEthic   || [];
+  const steps = t.nextSteps   || [];
+
+  // Need at least disposition or performance
+  if(!disp.length && !perf.length) return '';
+
+  const dispForOpening = disp.length ? disp : ['quiet'];
+
+  // strong_progress is rendered as its own sentence; focused_questions variants stay in pool for elaboration
+  const qualsForElab = quals.filter(q => q !== 'strong_progress');
+  const progressNote = quals.includes('strong_progress')
+    ? `${p.capPos} progress this year has been strong, showing resilience and a conscious commitment to ${p.pos} own development.`
+    : '';
+
+  // With two dispositions, the opening is a fixed paired template with no quality hook.
+  // Any quality must therefore be expressed via elaboration, even if there's only one.
+  // With a single disposition, qualities are woven into the opening, so elaboration
+  // only kicks in when a second quality is present.
+  const hasDoubleDisp = disp.length >= 2;
+  const qualElabNeeded = hasDoubleDisp ? qualsForElab.length >= 1 : qualsForElab.length >= 2;
+
+  const parts = [
+    opening(n, dispForOpening, quals, p, subj),
+    perf.length ? perfEthic(n, perf, ethic, p, subj) : '',
+    progressNote,
+    qualElabNeeded ? qualElaboration(n, qualsForElab, p) : '',
+    steps.length ? nextSteps(n, steps, p, subj) : ''
+  ].filter(Boolean);
+
+  return parts.join(' ');
+}
+
+function isStacked(t){ return (t.performance||[]).length>1 || (t.workEthic||[]).length>1; }
+function doubleDisp(t){ return (t.disposition||[]).length>1; }
+function isConfigured(s){ const t=s.traits||{}; return (t.disposition||[]).length>0 || (t.performance||[]).length>0; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STATE  (localStorage)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const KEY = 'rcg_exp_v1'; // separate from stable version
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(KEY))||{}; } catch{ return {}; }
+}
+function save(state){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function update(fn){ const s=load(); fn(s); save(s); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CSV
+// ═══════════════════════════════════════════════════════════════════════════
+
+function parseCSV(text){
+  const rows = text.trim().split(/\r?\n/);
+  const out = [];
+  for(let i=0;i<rows.length;i++){
+    const line = rows[i].trim();
+    if(!line) continue;
+    // Skip header row
+    if(i===0 && /first.?name|firstname/i.test(line.split(',')[0])) continue;
+    const cols = line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.length<5) continue;
+    const [first,last,cls,block,g] = cols;
+    if(!first||!last) continue;
+    const gender = (['M','F','N'].includes((g||'').toUpperCase().charAt(0))) ? g.toUpperCase().charAt(0) : 'N';
+    const id = (first+'_'+last+'_'+cls+'_'+block).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+    out.push({ id, first, last, cls, block: block||'', gender, traits:{} });
+  }
+  return out;
+}
+
+// Sort students: by block, then last name within block
+function sortStudents(arr){
+  return [...arr].sort((a,b)=>{
+    const bc = (a.block||'').localeCompare(b.block||'');
+    if(bc!==0) return bc;
+    return (a.last||'').localeCompare(b.last||'');
+  });
+}
+
+function onCsvUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const students = parseCSV(ev.target.result);
+    if(!students.length){
+      document.getElementById('csv-msg').innerHTML = '<p class="status-msg status-err">No valid rows found. Check format: FirstName,LastName,ClassName,Gender</p>';
+      return;
+    }
+    update(s => {
+      const existing = {};
+      (s.students||[]).forEach(x=>{ existing[x.id]=x; });
+      // Preserve traits for existing students matched by id; merge new ones
+      s.students = students.map(st => existing[st.id] ? {...st, traits: existing[st.id].traits} : st);
+    });
+    document.getElementById('csv-msg').innerHTML = `<p class="status-msg status-ok">✓ ${students.length} students loaded. Existing traits preserved.</p>`;
+    renderAll();
+  };
+  reader.readAsText(file);
+}
+
+function onCsvPaste(){
+  const ta = document.getElementById('csv-paste-area');
+  if(!ta || !ta.value.trim()) return;
+  const students = parseCSV(ta.value);
+  if(!students.length){
+    document.getElementById('csv-msg').innerHTML = '<p class="status-msg status-err">No valid rows found. Check format: FirstName,LastName,Class,Block,Gender</p>';
+    return;
+  }
+  update(s => {
+    const existing = {};
+    (s.students||[]).forEach(x=>{ existing[x.id]=x; });
+    s.students = students.map(st => existing[st.id] ? {...st, traits: existing[st.id].traits} : st);
+  });
+  document.getElementById('csv-msg').innerHTML = `<p class="status-msg status-ok">✓ ${students.length} students loaded from pasted text. Existing traits preserved.</p>`;
+  ta.value = '';
+  renderAll();
+}
+
+// Drag-and-drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover',  e=>{ e.preventDefault(); dz.style.borderColor='var(--primary)'; });
+dz.addEventListener('dragleave', ()=>{ dz.style.borderColor=''; });
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.style.borderColor='';
+  const file = e.dataTransfer.files[0];
+  if(!file) return;
+  const inp = document.getElementById('csv-input');
+  const dt = new DataTransfer(); dt.items.add(file);
+  inp.files = dt.files;
+  onCsvUpload({target:{files:dt.files}});
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BACKUP / RESTORE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function saveBackup(){
+  const data = load();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `rcg_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function onBackupUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    let data;
+    try{ data = JSON.parse(ev.target.result); }
+    catch{
+      document.getElementById('backup-msg').innerHTML = '<p class="status-msg status-err">Could not read file — make sure it\'s a valid backup JSON.</p>';
+      return;
+    }
+    if(!data.students && !data.preambles){
+      document.getElementById('backup-msg').innerHTML = '<p class="status-msg status-err">This doesn\'t look like a valid backup file.</p>';
+      return;
+    }
+    save(data);
+    document.getElementById('backup-msg').innerHTML = `<p class="status-msg status-ok">✓ Restored — ${(data.students||[]).length} students loaded.</p>`;
+    renderAll();
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SETUP TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getVisibleDefs(key){
+  const hidden = (load().hiddenTraits || {})[key] || [];
+  return TRAIT_DEFS[key].filter(it => !hidden.includes(it.id));
+}
+
+function toggleTraitVisibility(key, id){
+  update(s => {
+    if(!s.hiddenTraits) s.hiddenTraits = {};
+    if(!s.hiddenTraits[key]) s.hiddenTraits[key] = [];
+    const arr = s.hiddenTraits[key];
+    const idx = arr.indexOf(id);
+    if(idx >= 0) arr.splice(idx, 1);
+    else arr.push(id);
+  });
+  renderAll();
+}
+
+function renderTraitConfig(){
+  const el = document.getElementById('trait-config');
+  if(!el) return;
+  const hidden = load().hiddenTraits || {};
+  const cats = [
+    { key:'performance', label:'Performance'        },
+    { key:'workEthic',   label:'Work Ethic'         },
+    { key:'disposition', label:'Disposition'        },
+    { key:'qualities',   label:'Optional Qualities' },
+    { key:'nextSteps',   label:'Next Steps'         }
+  ];
+  el.innerHTML = `
+    <div class="card-title">Configure Visible Traits</div>
+    <p class="hint">Uncheck traits you don't use — they'll be hidden from the student editor. Existing student data is not affected.</p>
+    ${cats.map(cat => {
+      const hiddenIds = hidden[cat.key] || [];
+      return `<div style="margin-bottom:16px">
+        <div class="section-label" style="margin-bottom:8px">${cat.label}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px 20px">
+          ${TRAIT_DEFS[cat.key].map(it => `
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;user-select:none">
+              <input type="checkbox" ${hiddenIds.includes(it.id)?'':'checked'}
+                onchange="toggleTraitVisibility('${cat.key}','${it.id}')">
+              ${it.label}
+            </label>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function renderSetup(){
+  // Populate prompt textareas (safe: sets value, no HTML injection)
+  const csvTa  = document.getElementById('csv-prompt-ta');
+  const bankTa = document.getElementById('bank-prompt-ta');
+  if(csvTa  && !csvTa.value)  csvTa.value  = CSV_PROMPT;
+  if(bankTa && !bankTa.value) bankTa.value = BANK_PROMPT;
+  renderBankSetup();
+  renderTraitConfig();
+
+  const s = load();
+  const students = s.students||[];
+  const preambles = s.preambles||{};
+
+  // Show summary of loaded students
+  if(students.length){
+    const blocks = [...new Set(students.map(x=>x.block))].sort();
+    const done = students.filter(isConfigured).length;
+    document.getElementById('csv-msg').innerHTML =
+      `<p class="status-msg status-ok">✓ ${students.length} students across ${blocks.length} block(s), ${done} configured.</p>`;
+  }
+
+  // Show preamble fields only for subjects that appear in the loaded student list
+  const subjectKeys = [...new Set(students.map(st => clsToSubject(st.cls)))];
+  const subjectLabels = Object.fromEntries(
+    subjectKeys.map(k => [k, SUBJECT_LABELS[k] || k])
+  );
+  const showTypes = subjectKeys;
+  const pf = document.getElementById('preamble-fields');
+
+  if(!students.length){
+    pf.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">Upload or paste a student CSV above — preamble fields will appear here based on the subjects in your class list.</p>';
+  } else {
+    // Only re-render if the set of types changed (avoids losing focus mid-type)
+    const current = [...pf.querySelectorAll('[data-type]')].map(el=>el.dataset.type);
+    const same = current.length===showTypes.length && showTypes.every((t,i)=>t===current[i]);
+    if(!same){
+      pf.innerHTML = showTypes.map(type=>`
+        <div style="margin-bottom:20px">
+          <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">${subjectLabels[type]}</label>
+          <textarea rows="4" data-type="${type}" placeholder="Enter the course preamble for ${subjectLabels[type]}…"
+            oninput="savePreamble('${type}',this.value)">${preambles[type]||''}</textarea>
+        </div>
+      `).join('');
+    } else {
+      showTypes.forEach(type=>{
+        const ta = pf.querySelector(`[data-type="${type}"]`);
+        if(ta && document.activeElement!==ta) ta.value = preambles[type]||'';
+      });
+    }
+  }
+}
+
+function savePreamble(type, value){
+  update(s=>{ if(!s.preambles) s.preambles={}; s.preambles[type]=value; });
+}
+
+// ── Bank management ────────────────────────────────────────────────────────
+
+function renderBankSetup(){
+  const el = document.getElementById('bank-list');
+  if(!el) return;
+  const banks = loadBanks();
+  if(!banks.length){
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No comment banks loaded. Built-in templates (IB Economics, IB Business, FMW) are used by default.</p>';
+    return;
+  }
+  el.innerHTML = banks.map(b => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:7px;margin-bottom:8px">
+      <div>
+        <span style="font-weight:600;font-size:13px">${b.bank.meta?.subject_label||'Unnamed bank'}</span>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:10px">Class codes: ${b.class_codes.join(', ')}</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="removeBank('${b.id}')">Remove</button>
+    </div>
+  `).join('');
+}
+
+function onBankUpload(){
+  const fileInput  = document.getElementById('bank-file-input');
+  const codesInput = document.getElementById('bank-codes-input');
+  const msgEl      = document.getElementById('bank-msg');
+  if(!fileInput?.files?.[0]){ msgEl.innerHTML='<p class="status-msg status-err">Please select a JSON file.</p>'; return; }
+  const codes = (codesInput?.value||'').split(',').map(c=>c.trim()).filter(Boolean);
+  if(!codes.length){ msgEl.innerHTML='<p class="status-msg status-err">Please enter at least one class code (e.g. MATH, 10ENG).</p>'; return; }
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    let bank;
+    try{ bank = JSON.parse(ev.target.result); }
+    catch{ msgEl.innerHTML='<p class="status-msg status-err">Invalid JSON — check the file and try again.</p>'; return; }
+
+    const errs = validateBank(bank);
+    if(errs.length){
+      const shown = errs.slice(0,6).join(', ') + (errs.length>6 ? ` + ${errs.length-6} more` : '');
+      msgEl.innerHTML=`<p class="status-msg status-err">Bank is missing required fields: ${shown}</p>`;
+      return;
+    }
+    // Replace any existing bank for those codes
+    const codesUp = codes.map(c=>c.toUpperCase());
+    const existing = loadBanks().filter(b => !b.class_codes.some(c=>codesUp.includes(c.toUpperCase())));
+    existing.push({ id: Date.now().toString(), class_codes: codes, bank });
+    saveBanks(existing);
+    fileInput.value=''; codesInput.value='';
+    msgEl.innerHTML=`<p class="status-msg status-ok">✓ "${bank.meta.subject_label}" loaded for: ${codes.join(', ')}</p>`;
+    renderBankSetup();
+    renderAll();
+  };
+  reader.readAsText(fileInput.files[0]);
+}
+
+function removeBank(id){
+  saveBanks(loadBanks().filter(b=>b.id!==id));
+  renderBankSetup();
+  renderAll();
+}
+
+function copyPrompt(which){
+  const text = which==='csv' ? CSV_PROMPT : BANK_PROMPT;
+  const btn  = document.getElementById('copy-prompt-'+which);
+  if(!btn) return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig = btn.textContent; btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent=orig, 1600);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STUDENTS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+let selId = null;
+let listFilter = 'all';
+
+function renderStudents(){
+  const s = load();
+  const students = s.students||[];
+  if(!students.length){
+    document.getElementById('students-empty').style.display='';
+    document.getElementById('students-layout').style.display='none';
+    return;
+  }
+  document.getElementById('students-empty').style.display='none';
+  document.getElementById('students-layout').style.display='';
+  renderList();
+  renderTraitPanel();
+}
+
+function renderList(){
+  const s = load();
+  const students = sortStudents(s.students||[]);
+  const search = (document.getElementById('student-search')||{}).value||'';
+  const blocks = [...new Set(students.map(x=>x.block||''))].sort();
+  const classes = [...new Set(students.map(x=>x.cls))].sort();
+
+  // Filter pills: blocks + classes
+  const fp = document.getElementById('list-filters');
+  const allFilters = [
+    {id:'all', label:`All (${students.length})`},
+    ...blocks.map(b=>({ id:'block:'+b, label:`Block ${b} (${students.filter(x=>x.block===b).length})` })),
+    ...classes.map(c=>({ id:'cls:'+c, label:`${c} (${students.filter(x=>x.cls===c).length})` }))
+  ];
+  fp.innerHTML = allFilters.map(f=>`<button class="filter-pill ${listFilter===f.id?'active':''}" onclick="setListFilter('${f.id}')">${f.label}</button>`).join('');
+
+  // Filter + search
+  const visible = students.filter(st=>{
+    let mf = listFilter==='all';
+    if(!mf && listFilter.startsWith('block:')) mf = st.block===(listFilter.slice(6));
+    if(!mf && listFilter.startsWith('cls:'))   mf = st.cls===(listFilter.slice(4));
+    const ms = !search || (st.first+' '+st.last).toLowerCase().includes(search.toLowerCase());
+    return mf && ms;
+  });
+
+  const li = document.getElementById('student-list-items');
+  li.innerHTML = visible.map(st=>`
+    <div class="student-row ${selId===st.id?'active':''}" onclick="selectStudent('${st.id}')">
+      <div>
+        <div class="student-name">${st.last}, ${st.first}</div>
+        <div class="student-sub">${st.cls} · Block ${st.block}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="review-btn ${st.reviewLater?'on':''}" onclick="toggleReview('${st.id}',event)" title="Flag for review">★</button>
+        <div class="dot ${isConfigured(st)?'done':''}"></div>
+      </div>
+    </div>
+  `).join('') || '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">No students found</div>';
+}
+
+function setListFilter(f){ listFilter=f; renderList(); }
+
+function selectStudent(id){
+  selId=id;
+  renderList();
+  renderTraitPanel();
+}
+
+function renderTraitPanel(){
+  const s = load();
+  const student = (s.students||[]).find(x=>x.id===selId);
+  document.getElementById('trait-empty').style.display  = student ? 'none' : '';
+  document.getElementById('trait-form').style.display   = student ? '' : 'none';
+  if(!student) return;
+
+  const t = student.traits||{};
+  const subj = clsToSubject(student.cls);
+  const panel = document.getElementById('trait-form');
+
+  const section = (key, title, items) => `
+    <div class="trait-group">
+      <div class="section-label">${title}</div>
+      <div class="chips">${items.map(it=>`
+        <div class="chip ${(t[key]||[]).includes(it.id)?'on':''}" onclick="toggleTrait('${key}','${it.id}')">${it.label}</div>
+      `).join('')}</div>
+    </div>
+  `;
+
+  const comment = generate(student);
+  const clen = comment.length;
+  const fillW = Math.min(100, Math.round(clen/5));
+  const fillC = clen>500?'var(--danger)':clen>400?'var(--warning)':'var(--success)';
+  const cClass = clen>500?'hard':clen>400?'soft':'';
+  const cMsg   = clen>500?`⚠ ${clen} chars (over hard cap)`:clen>400?`~${clen} chars (approaching soft cap)`:clen>0?`${clen} chars`:'';
+
+  panel.innerHTML = `
+    <div class="row-between" style="margin-bottom:18px">
+      <div>
+        <span style="font-weight:700;font-size:16px">${student.first} ${student.last}</span>
+        <span style="color:var(--text-muted);font-size:12px;margin-left:8px">${SUBJECT_LABELS[subj]} · Block ${student.block} · ${(P[student.gender]||P.N).label}</span>
+      </div>
+      <button class="review-btn ${student.reviewLater?'on':''}" onclick="toggleReview('${student.id}',event)" title="Flag for review" style="font-size:18px">★</button>
+    </div>
+
+    ${section('performance','Performance',getVisibleDefs('performance'))}
+    ${section('workEthic','Work Ethic',getVisibleDefs('workEthic'))}
+    ${section('disposition','Disposition',getVisibleDefs('disposition'))}
+    ${section('qualities','Optional Qualities (add-ons)',getVisibleDefs('qualities'))}
+    ${section('nextSteps','Next Steps',getVisibleDefs('nextSteps'))}
+
+    <div style="margin-top:24px">
+      <div class="section-label">Comment Preview</div>
+      ${isStacked(t)?'<div class="stacked-label">stacked</div>':''}
+      <div id="preview-box" class="${doubleDisp(t)?'double-disp':''}">
+        ${comment || '<em style="color:var(--text-muted)">Select traits above to preview the comment.</em>'}
+      </div>
+      <div class="char-bar">
+        <div class="char-track"><div class="char-fill" style="width:${fillW}%;background:${fillC}"></div></div>
+        <span class="char-count ${cClass}">${cMsg}</span>
+      </div>
+    </div>
+  `;
+}
+
+function toggleTrait(key, val){
+  const s = load();
+  const student = (s.students||[]).find(x=>x.id===selId);
+  if(!student) return;
+  if(!student.traits) student.traits={};
+  if(!student.traits[key]) student.traits[key]=[];
+  const arr = student.traits[key];
+  const idx = arr.indexOf(val);
+  if(idx>=0){
+    arr.splice(idx,1);
+  } else {
+    // Disposition: max 2
+    if(key==='disposition' && arr.length>=2) arr.shift();
+    arr.push(val);
+  }
+  save(s);
+  renderList();
+  renderTraitPanel();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMMENTS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+let commentFilter = 'all';
+let editingId = null;
+
+function renderComments(){
+  const s = load();
+  const allStudents = sortStudents(s.students||[]);
+  const preambles = s.preambles||{};
+  const blocks = [...new Set(allStudents.map(x=>x.block||''))].sort();
+  const classes = [...new Set(allStudents.map(x=>x.cls))].sort();
+  const flaggedCount = allStudents.filter(x=>x.reviewLater).length;
+
+  // Progress counter
+  const configuredCount = allStudents.filter(isConfigured).length;
+  const prog = document.getElementById('export-progress');
+  if(prog) prog.textContent = `${configuredCount} / ${allStudents.length} configured`;
+
+  // Filter pills: all + blocks + classes + flagged
+  const allFilters = [
+    {id:'all',     label:`All (${allStudents.length})`},
+    ...blocks.map(b=>({ id:'block:'+b, label:`Block ${b}` })),
+    ...classes.map(c=>({ id:'cls:'+c,  label:c })),
+    ...(flaggedCount ? [{id:'flagged', label:`★ Flagged (${flaggedCount})`}] : [])
+  ];
+  document.getElementById('comment-filters').innerHTML = allFilters
+    .map(f=>`<button class="filter-pill ${commentFilter===f.id?'active':''}" onclick="setCommentFilter('${f.id}')">${f.label}</button>`)
+    .join('');
+
+  let visible = allStudents.filter(st=>{
+    if(commentFilter==='all')           return true;
+    if(commentFilter.startsWith('block:')) return st.block===(commentFilter.slice(6));
+    if(commentFilter.startsWith('cls:'))   return st.cls===(commentFilter.slice(4));
+    if(commentFilter==='flagged')       return !!st.reviewLater;
+    return true;
+  });
+
+  const cl = document.getElementById('comment-list');
+  if(!visible.length){
+    cl.innerHTML='<div class="empty"><h3>No students loaded</h3><p>Upload a CSV in the Setup tab first.</p></div>';
+    return;
+  }
+
+  // Group by block
+  const byBlock = {};
+  visible.forEach(st=>{ const b=st.block||''; if(!byBlock[b]) byBlock[b]=[]; byBlock[b].push(st); });
+  const blockOrder = Object.keys(byBlock).sort();
+
+  let html = '';
+  blockOrder.forEach(block=>{
+    const group = byBlock[block];
+    html += `<div style="margin-bottom:8px;margin-top:${html?'28px':'0'}">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);padding:0 2px;margin-bottom:10px">
+        Block ${block} &nbsp;·&nbsp; ${group.length} students &nbsp;·&nbsp; ${group.filter(isConfigured).length} configured
+      </div>
+    </div>`;
+
+    group.forEach(st=>{
+      const subj     = clsToSubject(st.cls);
+      const preamble = preambles[subj]||'';
+      const origComment   = generate(st);
+      const editedComment = st.editedComment||'';
+      const useEdited     = !!(st.useEdited && editedComment);
+      const activeComment = useEdited ? editedComment : origComment;
+      const altComment    = useEdited ? origComment   : editedComment;
+      const hasEdited     = !!editedComment;
+      const isEditing     = editingId === st.id;
+      const configured    = isConfigured(st);
+      const stacked       = isStacked(st.traits||{});
+      const dd            = doubleDisp(st.traits||{});
+      const clen          = activeComment.length;
+      const overCap       = clen>500;
+      const nearCap       = clen>400 && !overCap;
+      const charNote = overCap ? `⚠ ${clen} chars (over hard cap)` : nearCap ? `${clen} chars (near soft cap)` : clen ? `${clen} chars` : '';
+      const charClass = overCap?'over':nearCap?'warn':'';
+
+      // Version pills (only shown when an edited version exists and not currently editing)
+      const versionPills = (hasEdited && !isEditing) ? `
+        <div class="version-pills">
+          <button class="version-pill ${!useEdited?'active':''}" onclick="setVersion('${st.id}',false)">Original</button>
+          <button class="version-pill ${useEdited?'active':''}" onclick="setVersion('${st.id}',true)">Edited</button>
+        </div>` : '';
+
+      // Body: textarea while editing, otherwise the comment + optional alt
+      const bodyArea = isEditing ? `
+        <textarea class="edit-textarea" id="edit-ta-${st.id}" oninput="updateEditCharCount('${st.id}',this.value)">${activeComment}</textarea>
+        <div class="char-bar" style="margin-top:6px">
+          <div class="char-track"><div class="char-fill" id="edit-fill-${st.id}" style="width:${Math.min(100,Math.round(activeComment.length/5))}%;background:${activeComment.length>500?'var(--danger)':activeComment.length>400?'var(--warning)':'var(--success)'}"></div></div>
+          <span class="char-count" id="edit-count-${st.id}">${activeComment.length} chars</span>
+        </div>` : `
+        <div class="comment-body" id="cb-${st.id}">
+          ${activeComment||'<em style="color:var(--text-muted)">No traits selected yet. Click Edit traits.</em>'}
+        </div>
+        ${hasEdited && altComment ? `<div class="alt-comment">[${altComment}]</div>` : ''}`;
+
+      html += `
+        <div class="comment-card ${dd?'double-disp':''} ${overCap?'over-cap':''}">
+          <div class="comment-header">
+            <div>
+              ${stacked?'<div class="stacked-label">stacked</div>':''}
+              <div class="comment-student-name">${st.last}, ${st.first}${st.reviewLater?' <span style="color:var(--warning);font-size:13px" title="Flagged for review">★</span>':''}</div>
+              <div class="comment-meta">${SUBJECT_LABELS[subj]} · Block ${block}</div>
+            </div>
+            <div class="row gap-8" style="flex-wrap:wrap;justify-content:flex-end">
+              <button class="review-btn ${st.reviewLater?'on':''}" onclick="toggleReview('${st.id}',event)" title="${st.reviewLater?'Remove flag':'Flag for review'}">★</button>
+              ${versionPills}
+              <button class="btn btn-ghost btn-sm" onclick="goToStudent('${st.id}')">Edit traits</button>
+              ${configured && !isEditing ? `<button class="btn btn-ghost btn-sm" onclick="startEdit('${st.id}')">✏ Edit</button>` : ''}
+              ${isEditing ? `<button class="btn btn-primary btn-sm" onclick="saveEdit('${st.id}')">Save</button>
+                             <button class="btn btn-ghost btn-sm" onclick="discardEdit('${st.id}')">Discard</button>` : ''}
+              ${configured && !isEditing ? `<button class="btn btn-primary btn-sm" onclick="copyComment('${st.id}',this)">Copy</button>` : ''}
+            </div>
+          </div>
+          ${preamble?`<div class="preamble-block">${preamble}</div>`:''}
+          ${bodyArea}
+          <div class="comment-footer">
+            ${charNote?`<span class="char-note ${charClass}" style="margin-left:auto">${charNote}</span>`:''}
+          </div>
+        </div>
+      `;
+    });
+  });
+
+  cl.innerHTML = html;
+
+  // If we just rendered in edit mode, focus the textarea
+  if(editingId){
+    const ta = document.getElementById('edit-ta-'+editingId);
+    if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  }
+}
+
+function setCommentFilter(f){ commentFilter=f; renderComments(); }
+
+// ── Review flag ───────────────────────────────────────────────────────────
+function toggleReview(id, e){
+  if(e) e.stopPropagation();
+  update(s=>{
+    const st = (s.students||[]).find(x=>x.id===id);
+    if(!st) return;
+    st.reviewLater = !st.reviewLater;
+  });
+  renderList();
+  if(selId === id) renderTraitPanel();
+  renderComments();
+}
+
+// ── Edit / version functions ──────────────────────────────────────────────
+function startEdit(id){
+  editingId = id;
+  renderComments();
+}
+
+function saveEdit(id){
+  const ta = document.getElementById('edit-ta-'+id);
+  if(!ta) return;
+  const text = ta.value.trim();
+  update(s=>{
+    const st = (s.students||[]).find(x=>x.id===id);
+    if(!st) return;
+    if(text){
+      st.editedComment = text;
+      st.useEdited = true;
+    } else {
+      delete st.editedComment;
+      delete st.useEdited;
+    }
+  });
+  editingId = null;
+  renderComments();
+}
+
+function discardEdit(id){
+  editingId = null;
+  renderComments();
+}
+
+function setVersion(id, useEdited){
+  update(s=>{
+    const st = (s.students||[]).find(x=>x.id===id);
+    if(!st) return;
+    st.useEdited = useEdited;
+  });
+  renderComments();
+}
+
+function updateEditCharCount(id, text){
+  const fill  = document.getElementById('edit-fill-'+id);
+  const count = document.getElementById('edit-count-'+id);
+  if(!fill || !count) return;
+  const len = text.length;
+  fill.style.width      = Math.min(100, Math.round(len/5))+'%';
+  fill.style.background = len>500 ? 'var(--danger)' : len>400 ? 'var(--warning)' : 'var(--success)';
+  count.textContent     = len+' chars';
+  count.className       = 'char-count'+(len>500?' hard':len>400?' soft':'');
+}
+
+function copyComment(id, btn){
+  const s = load();
+  const st = (s.students||[]).find(x=>x.id===id);
+  if(!st) return;
+  const subj          = clsToSubject(st.cls);
+  const preamble      = (s.preambles||{})[subj]||'';
+  const origComment   = generate(st);
+  const editedComment = st.editedComment||'';
+  const useEdited     = !!(st.useEdited && editedComment);
+  const activeComment = useEdited ? editedComment : origComment;
+  const altComment    = useEdited ? origComment   : editedComment;
+  const stacked       = isStacked(st.traits||{});
+  const lines = [
+    ...(stacked ? ['stacked'] : []),
+    st.first,
+    ...(preamble ? [preamble, ''] : ['']),
+    activeComment,
+    ...(altComment ? ['', `[${altComment}]`] : [])
+  ];
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{
+    const orig=btn.textContent; btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent=orig, 1600);
+  });
+}
+
+function goToStudent(id){
+  selId=id;
+  switchTab('students');
+  setTimeout(()=>{
+    renderStudents();
+    const row=document.querySelector('.student-row.active');
+    if(row) row.scrollIntoView({block:'center'});
+  },60);
+}
+
+function exportAll(){
+  const s = load();
+  const preambles = s.preambles||{};
+
+  // Apply current filter, then restrict to configured students only, sorted by block then last name
+  let pool = sortStudents(s.students||[]).filter(st=>{
+    if(commentFilter==='all')              return true;
+    if(commentFilter.startsWith('block:')) return st.block===(commentFilter.slice(6));
+    if(commentFilter.startsWith('cls:'))   return st.cls===(commentFilter.slice(4));
+    if(commentFilter==='flagged')          return !!st.reviewLater;
+    return true;
+  }).filter(isConfigured);
+
+  if(!pool.length){
+    alert('No configured students to export yet.');
+    return;
+  }
+
+  // Group by block for the export file
+  const byBlock = {};
+  pool.forEach(st=>{ const b=st.block||''; if(!byBlock[b]) byBlock[b]=[]; byBlock[b].push(st); });
+  const blockOrder = Object.keys(byBlock).sort();
+
+  const sections = blockOrder.map(block=>{
+    const header = `BLOCK ${block}\n${'═'.repeat(40)}`;
+    const entries = byBlock[block].map(st=>{
+      const subj          = clsToSubject(st.cls);
+      const preamble      = preambles[subj]||'';
+      const origComment   = generate(st);
+      const editedComment = st.editedComment||'';
+      const useEdited     = !!(st.useEdited && editedComment);
+      const activeComment = useEdited ? editedComment : origComment;
+      const altComment    = useEdited ? origComment   : editedComment;
+      const stacked       = isStacked(st.traits||{});
+      return [
+        ...(stacked ? ['stacked'] : []),
+        st.first,
+        ...(preamble ? [preamble, ''] : ['']),
+        activeComment,
+        ...(altComment ? ['', `[${altComment}]`] : [])
+      ].join('\n');
+    });
+    return [header, ...entries].join('\n\n');
+  });
+
+  const text = sections.join('\n\n\n');
+  const blob = new Blob([text], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`report_comments_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TEMPLATES TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderTemplates(){
+  const el = document.getElementById('templates-content');
+  if(!el) return;
+
+  // Use neutral placeholder pronouns for display
+  const pN = P.N; // they/them/their
+  const name = 'Name';
+
+  // Helper: render a section with rows
+  const section = (title, note, rows) => `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title">${title}</div>
+      ${note ? `<p class="hint">${note}</p>` : ''}
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            ${rows.headers.map(h=>`<th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${h}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.data.map((r,i)=>`
+            <tr style="border-bottom:1px solid var(--bg);background:${i%2?'var(--bg)':'white'}">
+              ${r.map((c,ci)=>`<td style="padding:8px 10px;${ci===0?'font-weight:600;white-space:nowrap;color:var(--text-muted)':'line-height:1.55'}">${c}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // ── 1. Opening sentences (per subject) ───────────────────────────────
+  const dispositions = TRAIT_DEFS.disposition;
+  const qualityIds = TRAIT_DEFS.qualities.map(q=>q.id).filter(q=>!['strong_progress','focused_questions_long'].includes(q));
+  const dispPairs = [['quiet','group'],['quiet','social'],['group','social']];
+  const subjectList = [
+    { key:'Economics', label:'IB Economics' },
+    { key:'Business',  label:'IB Business Management' },
+    { key:'FMW',       label:'Foundations of the Modern World' }
+  ];
+
+  // Build one rows object per subject
+  const openingRowsBySubj = subjectList.map(({key, label}) => {
+    const rows = { headers:['Disposition','Quality add-on','Opening sentence'], data:[] };
+    dispositions.forEach(d=>{
+      rows.data.push([d.label, '(none)', opening(name,[d.id],[],pN,key)]);
+      qualityIds.forEach(qid=>{
+        const ql = TRAIT_DEFS.qualities.find(x=>x.id===qid);
+        const text = opening(name,[d.id],[qid],pN,key);
+        const base = opening(name,[d.id],[],pN,key);
+        if(text!==base) rows.data.push([d.label, ql.label, text]);
+      });
+    });
+    dispPairs.forEach(([a,b])=>{
+      const la = TRAIT_DEFS.disposition.find(x=>x.id===a).label;
+      const lb = TRAIT_DEFS.disposition.find(x=>x.id===b).label;
+      rows.data.push([`${la} + ${lb}`, '—', opening(name,[a,b],[],pN,key)]);
+    });
+    return { label, rows };
+  });
+
+  // ── 2. Strong progress quality ────────────────────────────────────────
+  const progressRows = { headers:['Quality','Sentence'], data:[
+    ['Strong progress / resilience',
+      `${name} has made strong progress through the year, showing resilience and a conscious commitment to ${pN.pos} own development.`]
+  ]};
+
+  // ── 3. Performance × Work Ethic ──────────────────────────────────────
+  const perfRows = { headers:['Performance','Work Ethic','Sentence (Economics shown; FMW &amp; Business follow the same structure)'], data:[] };
+  TRAIT_DEFS.performance.forEach(perf=>{
+    TRAIT_DEFS.workEthic.forEach(ethic=>{
+      perfRows.data.push([perf.label, ethic.label, perfEthic(name,[perf.id],[ethic.id],pN,'Economics')]);
+    });
+  });
+
+  // ── 4. Next steps ────────────────────────────────────────────────────
+  const stepRows = { headers:['Next step','FMW','IB Business','IB Economics'], data:[] };
+  const ph_focus = `directing ${pN.pos} natural energy more consistently into the task at hand`;
+  const ph_collab = `widening ${pN.pos} collaboration circle`;
+  const ph_structure = `practising how to structure and develop ${pN.pos} arguments`;
+
+  TRAIT_DEFS.nextSteps.forEach(step=>{
+    const getPhrase = (subj) => {
+      const phMap = {
+        read:       { FMW:`reading widely about historical events and their connections`, Business:`engaging with current business news to connect theory to real-world contexts`, Economics:`reading widely in economics to connect concepts to current developments` },
+        focus:      ph_focus,
+        prep:       `preparing consistently before each class`,
+        assessment: `developing a clearer understanding of what assessments require`,
+        questions:  `asking questions and seeking clarification when unsure`,
+        support:    `making regular use of teacher support`,
+        collab:     ph_collab,
+        verbal:     `building confidence in contributing ideas verbally`,
+        structure:  ph_structure,
+        current:    { FMW:`following current events and drawing historical parallels`, Business:`following business developments and connecting them to course concepts`, Economics:`engaging with current economic developments and their implications` }
+      };
+      const v = phMap[step.id];
+      if(!v) return '—';
+      return typeof v==='object' ? (v[subj]||'—') : v;
+    };
+    const fmw  = getPhrase('FMW');
+    const bus  = getPhrase('Business');
+    const econ = getPhrase('Economics');
+    // Collapse identical values to save space
+    const allSame = fmw===bus && bus===econ;
+    stepRows.data.push([
+      step.label,
+      fmw,
+      allSame ? '↑ same' : bus,
+      allSame ? '↑ same' : econ
+    ]);
+  });
+
+  // ── 5. Quality elaboration (2+ qualities) ────────────────────────────
+  const qualRows = { headers:['Quality combination','Elaboration sentence (added when 2+ qualities selected)'], data:[] };
+  // Show a few representative combos
+  const qualCombos = [
+    ['analytical','original'], ['analytical','critical'], ['bold','critical'],
+    ['analytical','focused_questions'], ['original','bold']
+  ];
+  qualCombos.forEach(combo=>{
+    const labels = combo.map(id=>TRAIT_DEFS.qualities.find(x=>x.id===id).label).join(' + ');
+    qualRows.data.push([labels, qualElaboration(name, combo, pN)||'(woven into opening)']);
+  });
+
+  el.innerHTML = `
+    <p class="hint" style="margin-bottom:20px">Read-only view of all comment strings. Uses "Name" and they/them as placeholders. Editing these directly is planned for a future version.</p>
+    ${openingRowsBySubj.map(({label, rows}) => section(`Opening Sentences — ${label}`, 'First sentence of each comment, driven by disposition and the first applicable quality.', rows)).join('')}
+    ${section('Strong Progress / Resilience Quality', 'Inserted as a standalone sentence after the performance sentence when this quality is ticked.', progressRows)}
+    ${section('Performance × Work Ethic', 'Middle sentence, all 16 combinations. Subject skills vocabulary varies by class but structure is the same.', perfRows)}
+    ${section('Next Steps', 'Clause used inside "Name would benefit from…". Subject-specific variants shown where they differ.', stepRows)}
+    ${section('Quality Elaboration (2+ qualities)', 'Extra sentence added when two or more qualities are ticked together. Single qualities are woven into the opening sentence instead.', qualRows)}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TABS & INIT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active', c.id==='tab-'+name));
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    switchTab(btn.dataset.tab);
+    renderAll();
+  });
+});
+
+function renderAll(){
+  renderSetup();
+  renderStudents();
+  renderComments();
+  renderTemplates();
+}
+
+renderAll();
+</script>
+</body>
+</html>
