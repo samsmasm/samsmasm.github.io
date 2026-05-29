@@ -337,7 +337,7 @@
     <div class="card" style="padding:16px 22px">
       <ol style="margin:0;padding-left:18px;font-size:13px;line-height:2;color:var(--text)">
         <li>Load your student list below.</li>
-        <li>If your subject isn't IB Economics, IB Business, or FMW — generate and load a comment bank.</li>
+        <li>Generate and load a comment bank for your subject.</li>
         <li>Add course preambles and configure which trait chips to show.</li>
         <li>Go to <strong>Students</strong> to assign traits. Review and export from <strong>Comments</strong>.</li>
       </ol>
@@ -376,7 +376,7 @@
     <!-- ── Comment Banks ── -->
     <div class="card">
       <div class="card-title">Comment Banks</div>
-      <p class="hint">Skip this section if your students are in IB Economics, IB Business, or FMW — those subjects are built in. For anything else, use the prompt below to generate a bank, then paste the output to load it.</p>
+      <p class="hint">Use the prompt below to generate a comment bank for your subjects, then paste the output to load it.</p>
 
       <div class="section-label" style="margin-bottom:8px">Step 1 — Generate a bank</div>
       <p class="hint">Copy this prompt into Claude or ChatGPT. It will ask about your subjects and style, then output a JSON array.</p>
@@ -1105,48 +1105,9 @@ function nextSteps(name, steps, p, subj){
 
 // ── Master generate ───────────────────────────────────────────────────────
 function generate(student){
-  // Use uploaded comment bank if one is mapped to this student's class code
   const bankEntry = findBankForClass(student.cls);
-  if(bankEntry) return generateFromBank(student, bankEntry);
-
-  const subj = clsToSubject(student.cls);
-  const p = P[student.gender] || P.N;
-  const n = student.first;
-  const t = student.traits || {};
-
-  const disp  = t.disposition || [];
-  const quals  = t.qualities   || [];
-  const perf  = t.performance || [];
-  const ethic = t.workEthic   || [];
-  const steps = t.nextSteps   || [];
-
-  // Need at least disposition or performance
-  if(!disp.length && !perf.length) return '';
-
-  const dispForOpening = disp.length ? disp : ['quiet'];
-
-  // strong_progress is rendered as its own sentence; focused_questions variants stay in pool for elaboration
-  const qualsForElab = quals.filter(q => q !== 'strong_progress');
-  const progressNote = quals.includes('strong_progress')
-    ? `${p.capPos} progress this year has been strong, showing resilience and a conscious commitment to ${p.pos} own development.`
-    : '';
-
-  // With two dispositions, the opening is a fixed paired template with no quality hook.
-  // Any quality must therefore be expressed via elaboration, even if there's only one.
-  // With a single disposition, qualities are woven into the opening, so elaboration
-  // only kicks in when a second quality is present.
-  const hasDoubleDisp = disp.length >= 2;
-  const qualElabNeeded = hasDoubleDisp ? qualsForElab.length >= 1 : qualsForElab.length >= 2;
-
-  const parts = [
-    opening(n, dispForOpening, quals, p, subj),
-    perf.length ? perfEthic(n, perf, ethic, p, subj) : '',
-    progressNote,
-    qualElabNeeded ? qualElaboration(n, qualsForElab, p) : '',
-    steps.length ? nextSteps(n, steps, p, subj) : ''
-  ].filter(Boolean);
-
-  return parts.join(' ');
+  if(!bankEntry) return '';
+  return generateFromBank(student, bankEntry);
 }
 
 function isStacked(t){ return (t.performance||[]).length>1 || (t.workEthic||[]).length>1; }
@@ -1391,7 +1352,7 @@ function renderBankSetup(){
   if(!el) return;
   const banks = loadBanks();
   if(!banks.length){
-    el.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No comment banks loaded. Built-in templates (IB Economics, IB Business, FMW) are used by default.</p>';
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No comment banks loaded.</p>';
     return;
   }
   el.innerHTML = banks.map(b => `
@@ -1557,7 +1518,6 @@ function renderTraitPanel(){
   if(!student) return;
 
   const t = student.traits||{};
-  const subj = clsToSubject(student.cls);
   const panel = document.getElementById('trait-form');
 
   const section = (key, title, items) => `
@@ -1917,13 +1877,17 @@ function renderTemplates(){
   const el = document.getElementById('templates-content');
   if(!el) return;
 
-  // Use neutral placeholder pronouns for display
-  const pN = P.N; // they/them/their
+  const banks = loadBanks();
+  if(!banks.length){
+    el.innerHTML = '<div class="empty"><h3>No comment banks loaded</h3><p>Load a comment bank in Setup to see templates here.</p></div>';
+    return;
+  }
+
+  const pN = P.N;
   const name = 'Name';
 
-  // Helper: render a section with rows
   const section = (title, note, rows) => `
-    <div class="card" style="margin-bottom:20px">
+    <div class="card" style="margin-bottom:16px">
       <div class="card-title">${title}</div>
       ${note ? `<p class="hint">${note}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -1943,107 +1907,68 @@ function renderTemplates(){
     </div>
   `;
 
-  // ── 1. Opening sentences (per subject) ───────────────────────────────
-  const dispositions = TRAIT_DEFS.disposition;
-  const qualityIds = TRAIT_DEFS.qualities.map(q=>q.id).filter(q=>!['strong_progress','focused_questions_long'].includes(q));
-  const dispPairs = [['quiet','group'],['quiet','social'],['group','social']];
-  const subjectList = [
-    { key:'Economics', label:'IB Economics' },
-    { key:'Business',  label:'IB Business Management' },
-    { key:'FMW',       label:'Foundations of the Modern World' }
-  ];
+  const qualIds = ['default','analytical','original','bold','critical','passionate','focused_questions','focused_questions_long'];
+  const pairs   = [['group','quiet'],['quiet','social'],['group','social']];
 
-  // Build one rows object per subject
-  const openingRowsBySubj = subjectList.map(({key, label}) => {
-    const rows = { headers:['Disposition','Quality add-on','Opening sentence'], data:[] };
-    dispositions.forEach(d=>{
-      rows.data.push([d.label, '(none)', opening(name,[d.id],[],pN,key)]);
-      qualityIds.forEach(qid=>{
-        const ql = TRAIT_DEFS.qualities.find(x=>x.id===qid);
-        const text = opening(name,[d.id],[qid],pN,key);
-        const base = opening(name,[d.id],[],pN,key);
-        if(text!==base) rows.data.push([d.label, ql.label, text]);
+  let html = '';
+
+  banks.forEach(bankEntry => {
+    const bank  = bankEntry.bank;
+    const sk    = bank.meta?.skills_phrase || 'core skills';
+    const label = bank.meta?.subject_label || bankEntry.class_codes.join('/');
+    const t     = tmpl => applyTokens(tmpl||'', name, pN, sk);
+
+    html += `<h2 style="font-size:15px;font-weight:700;margin:28px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--border);color:var(--text)">${label} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">${bankEntry.class_codes.join(', ')}</span></h2>`;
+
+    // Opening sentences
+    const openingRows = { headers:['Disposition','Quality','Opening sentence'], data:[] };
+    TRAIT_DEFS.disposition.forEach(d => {
+      qualIds.forEach(qid => {
+        const tmpl = bank.opening?.[d.id]?.[qid];
+        if(!tmpl) return;
+        const qLabel = qid==='default' ? '(none)' : (TRAIT_DEFS.qualities.find(q=>q.id===qid)?.label || qid);
+        openingRows.data.push([d.label, qLabel, t(tmpl)]);
       });
     });
-    dispPairs.forEach(([a,b])=>{
+    pairs.forEach(([a,b]) => {
+      const key  = [a,b].sort().join('+');
+      const tmpl = bank.opening_double?.[key];
+      if(!tmpl) return;
       const la = TRAIT_DEFS.disposition.find(x=>x.id===a).label;
       const lb = TRAIT_DEFS.disposition.find(x=>x.id===b).label;
-      rows.data.push([`${la} + ${lb}`, '—', opening(name,[a,b],[],pN,key)]);
+      openingRows.data.push([`${la} + ${lb}`, '—', t(tmpl)]);
     });
-    return { label, rows };
-  });
+    html += section('Opening Sentences', 'First sentence of each comment, driven by disposition and the first applicable quality.', openingRows);
 
-  // ── 2. Strong progress quality ────────────────────────────────────────
-  const progressRows = { headers:['Quality','Sentence'], data:[
-    ['Strong progress / resilience',
-      `${name} has made strong progress through the year, showing resilience and a conscious commitment to ${pN.pos} own development.`]
-  ]};
-
-  // ── 3. Performance × Work Ethic ──────────────────────────────────────
-  const perfRows = { headers:['Performance','Work Ethic','Sentence (Economics shown; FMW &amp; Business follow the same structure)'], data:[] };
-  TRAIT_DEFS.performance.forEach(perf=>{
-    TRAIT_DEFS.workEthic.forEach(ethic=>{
-      perfRows.data.push([perf.label, ethic.label, perfEthic(name,[perf.id],[ethic.id],pN,'Economics')]);
+    // Performance × work ethic
+    const perfRows = { headers:['Performance','Work Ethic','Sentence'], data:[] };
+    TRAIT_DEFS.performance.forEach(perf => {
+      TRAIT_DEFS.workEthic.forEach(ethic => {
+        const tmpl = bank.performance?.[perf.id]?.[ethic.id];
+        if(tmpl) perfRows.data.push([perf.label, ethic.label, t(tmpl)]);
+      });
     });
+    html += section('Performance × Work Ethic', null, perfRows);
+
+    // Next steps
+    const stepRows = { headers:['Next step','Phrase'], data:[] };
+    TRAIT_DEFS.nextSteps.forEach(step => {
+      const tmpl = bank.next_steps?.[step.id];
+      if(tmpl) stepRows.data.push([step.label, t(tmpl)]);
+    });
+    html += section('Next Steps', '"Name would benefit from [phrase]."', stepRows);
+
+    // Quality phrases + progress note
+    const qualRows = { headers:['Quality','Phrase / sentence'], data:[] };
+    TRAIT_DEFS.qualities.filter(q => q.id !== 'strong_progress').forEach(q => {
+      const phrase = bank.qual_phrases?.[q.id];
+      if(phrase) qualRows.data.push([q.label, t(phrase)]);
+    });
+    if(bank.progress_note) qualRows.data.push(['Strong progress / resilience', t(bank.progress_note)]);
+    html += section('Quality Phrases', '"Their work shows [phrase], enriching their engagement with the subject."', qualRows);
   });
 
-  // ── 4. Next steps ────────────────────────────────────────────────────
-  const stepRows = { headers:['Next step','FMW','IB Business','IB Economics'], data:[] };
-  const ph_focus = `directing ${pN.pos} natural energy more consistently into the task at hand`;
-  const ph_collab = `widening ${pN.pos} collaboration circle`;
-  const ph_structure = `practising how to structure and develop ${pN.pos} arguments`;
-
-  TRAIT_DEFS.nextSteps.forEach(step=>{
-    const getPhrase = (subj) => {
-      const phMap = {
-        read:       { FMW:`reading widely about historical events and their connections`, Business:`engaging with current business news to connect theory to real-world contexts`, Economics:`reading widely in economics to connect concepts to current developments` },
-        focus:      ph_focus,
-        prep:       `preparing consistently before each class`,
-        assessment: `developing a clearer understanding of what assessments require`,
-        questions:  `asking questions and seeking clarification when unsure`,
-        support:    `making regular use of teacher support`,
-        collab:     ph_collab,
-        verbal:     `building confidence in contributing ideas verbally`,
-        structure:  ph_structure,
-        current:    { FMW:`following current events and drawing historical parallels`, Business:`following business developments and connecting them to course concepts`, Economics:`engaging with current economic developments and their implications` }
-      };
-      const v = phMap[step.id];
-      if(!v) return '—';
-      return typeof v==='object' ? (v[subj]||'—') : v;
-    };
-    const fmw  = getPhrase('FMW');
-    const bus  = getPhrase('Business');
-    const econ = getPhrase('Economics');
-    // Collapse identical values to save space
-    const allSame = fmw===bus && bus===econ;
-    stepRows.data.push([
-      step.label,
-      fmw,
-      allSame ? '↑ same' : bus,
-      allSame ? '↑ same' : econ
-    ]);
-  });
-
-  // ── 5. Quality elaboration (2+ qualities) ────────────────────────────
-  const qualRows = { headers:['Quality combination','Elaboration sentence (added when 2+ qualities selected)'], data:[] };
-  // Show a few representative combos
-  const qualCombos = [
-    ['analytical','original'], ['analytical','critical'], ['bold','critical'],
-    ['analytical','focused_questions'], ['original','bold']
-  ];
-  qualCombos.forEach(combo=>{
-    const labels = combo.map(id=>TRAIT_DEFS.qualities.find(x=>x.id===id).label).join(' + ');
-    qualRows.data.push([labels, qualElaboration(name, combo, pN)||'(woven into opening)']);
-  });
-
-  el.innerHTML = `
-    <p class="hint" style="margin-bottom:20px">Read-only view of all comment strings. Uses "Name" and they/them as placeholders. Editing these directly is planned for a future version.</p>
-    ${openingRowsBySubj.map(({label, rows}) => section(`Opening Sentences — ${label}`, 'First sentence of each comment, driven by disposition and the first applicable quality.', rows)).join('')}
-    ${section('Strong Progress / Resilience Quality', 'Inserted as a standalone sentence after the performance sentence when this quality is ticked.', progressRows)}
-    ${section('Performance × Work Ethic', 'Middle sentence, all 16 combinations. Subject skills vocabulary varies by class but structure is the same.', perfRows)}
-    ${section('Next Steps', 'Clause used inside "Name would benefit from…". Subject-specific variants shown where they differ.', stepRows)}
-    ${section('Quality Elaboration (2+ qualities)', 'Extra sentence added when two or more qualities are ticked together. Single qualities are woven into the opening sentence instead.', qualRows)}
-  `;
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
