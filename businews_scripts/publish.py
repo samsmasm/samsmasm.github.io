@@ -146,6 +146,7 @@ def update_cases_json(case, filename):
         "title": case["title"],
         "hook": case["hook"],
         "background": case.get("background", ""),
+        "what_happened": case.get("what_happened", [])[:3],
         "curriculum_links": case.get("curriculum_links", []),
     })
 
