@@ -67,7 +67,7 @@ Use very soft colours — `#f0e8ff` for dividers, `1px solid` not `0.5px`. The s
 
 ### Background
 
-Page background: white (`#fff`) or very slightly warm white (`#fefcff`). Never grey.
+Page background: white (`#fff`) or very light grey. Never beige, never warm/creamy white — these read as dated or cosy in a way that conflicts with the site's tone. Beige backgrounds (`#f7f4ec` style) are explicitly prohibited.
 
 ---
 
