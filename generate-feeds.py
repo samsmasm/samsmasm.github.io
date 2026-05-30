@@ -46,6 +46,40 @@ def generate_econnews_feed():
     print(f"econnews/feed.json — {len(items)} items")
 
 
+def generate_quiz_feed():
+    posts_dir = os.path.join(REPO, "quiz", "posts")
+    if not os.path.isdir(posts_dir):
+        print("quiz/posts/ not found, skipping")
+        return
+
+    filenames = sorted(
+        [f for f in os.listdir(posts_dir) if f.endswith(".html")],
+        reverse=True,
+    )
+
+    items = []
+    for filename in filenames:
+        date_str = filename.replace(".html", "")
+        try:
+            from datetime import datetime
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            formatted = dt.strftime("%-d %B %Y")
+        except ValueError:
+            formatted = date_str
+        items.append({
+            "title": f"Talkonomics — {formatted}",
+            "excerpt": "Weekly economics and business quiz",
+            "date": date_str,
+            "url": f"/quiz/posts/{filename}",
+            "source": "quiz",
+        })
+
+    out_path = os.path.join(REPO, "quiz", "feed.json")
+    with open(out_path, "w") as f:
+        json.dump(items, f, indent=2, ensure_ascii=False)
+    print(f"quiz/feed.json — {len(items)} items")
+
+
 def generate_businews_feed():
     cases_path = os.path.join(REPO, "businews", "cases.json")
     with open(cases_path) as f:
@@ -69,4 +103,5 @@ def generate_businews_feed():
 
 if __name__ == "__main__":
     generate_econnews_feed()
+    generate_quiz_feed()
     generate_businews_feed()
