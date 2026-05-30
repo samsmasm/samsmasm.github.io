@@ -134,6 +134,14 @@ Structure for each explanation:
 
 Tone: Like a teacher who finds this genuinely interesting. Help the reader understand something about how the world works, not just confirm the answer.
 
+Word count targets per explanation:
+- Most explanations: 40-60 words
+- Rich business or economics stories: up to 70 words maximum
+- Simple general knowledge or single-stat questions: 25-40 words is enough
+- Never pad to hit a target — if the point is made, stop
+
+The answers PDF page shows the full question text and explanation only — answer options are not repeated. Keep explanations tight and self-contained.
+
 ## Geographic diversity
 
 Maximum 4 questions centred on the US. At least 2 questions centred on countries outside the US and UK. Q9 and Q7 are the natural homes for international coverage.
@@ -696,7 +704,12 @@ def update_index(posts_dir, index_path):
             label = dt.strftime("%-d %B %Y")
         except ValueError:
             label = date_str
-        editions_html += f'      <li><a href="posts/{html_lib.escape(fname)}">{html_lib.escape(label)}</a></li>\n'
+        pdf_fname = fname.replace(".html", ".pdf")
+        pdf_exists = os.path.exists(os.path.join(posts_dir, pdf_fname))
+        pdf_link = (f' &nbsp;<a href="posts/{html_lib.escape(pdf_fname)}" class="pdf-link">PDF</a>'
+                    if pdf_exists else "")
+        editions_html += (f'      <li><a href="posts/{html_lib.escape(fname)}">'
+                          f'{html_lib.escape(label)}</a>{pdf_link}</li>\n')
 
     latest = ""
     if post_files:
@@ -707,13 +720,19 @@ def update_index(posts_dir, index_path):
             label = dt.strftime("%-d %B %Y")
         except ValueError:
             label = date_str
+        pdf_fname = fname.replace(".html", ".pdf")
+        pdf_exists = os.path.exists(os.path.join(posts_dir, pdf_fname))
+        pdf_link = (f'\n        <a class="edition-link pdf-featured" href="posts/{html_lib.escape(pdf_fname)}">'
+                    f'<span class="edition-date">{html_lib.escape(label)}</span>'
+                    f'<span class="edition-cta">Download PDF &#8595;</span></a>'
+                    if pdf_exists else "")
         latest = f"""
     <section class="latest">
       <p class="section-label">Latest edition</p>
       <a class="edition-link featured" href="posts/{html_lib.escape(fname)}">
         <span class="edition-date">{html_lib.escape(label)}</span>
         <span class="edition-cta">Open slideshow &#8594;</span>
-      </a>
+      </a>{pdf_link}
     </section>"""
 
     index_html = f"""<!DOCTYPE html>
@@ -748,6 +767,10 @@ body{{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--
 .archives li a{{display:flex;align-items:center;justify-content:space-between;padding:11px 0;font-size:0.85rem;color:var(--link);text-decoration:none}}
 .archives li a:hover{{color:var(--accent)}}
 .archives li a::after{{content:'&#8594;';font-size:0.75rem;color:var(--light)}}
+.pdf-link{{font-size:0.7rem;font-weight:700;color:#7a2d0a;text-decoration:none;margin-left:0.5rem;letter-spacing:0.04em;flex-shrink:0}}
+.pdf-link:hover{{text-decoration:underline}}
+.pdf-featured{{margin-top:4px;background:#fff5f0;border-color:#f5c9b0}}
+.pdf-featured .edition-cta{{color:#7a2d0a}}
 footer{{margin-top:48px;padding-top:12px;border-top:1px solid #ddd7cc;font-size:0.68rem;color:var(--light);text-align:center;letter-spacing:0.03em}}
 @media(max-width:560px){{.page{{padding:20px 16px 60px}}.masthead h1{{font-size:2.2rem}}}}
 </style>
@@ -779,6 +802,105 @@ footer{{margin-top:48px;padding-top:12px;border-top:1px solid #ddd7cc;font-size:
     print(f"Updated {index_path}", file=sys.stderr)
 
 
+# ── PDF generation ────────────────────────────────────────────────────────
+
+BANNER_PATH = os.path.join(BASE, "quiz", "Talkonomics7banner.png")
+PDF_FONT = "Liberation Sans, FreeSans, Ubuntu, sans-serif"
+PDF_SIZES = [10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0]
+
+
+def _pdf_css():
+    return f"""
+      @page {{ size: A4; margin: 0; }}
+      * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+      body {{ font-family: {PDF_FONT}; font-size: 10pt; color: #000; background: #fff; }}
+      .banner-wrap {{ position: relative; width: 100%; }}
+      .banner-wrap img {{ width: 100%; display: block; }}
+      .banner-label {{ position: absolute; top: 5px; right: 10px; font-size: 7pt; font-style: italic; color: #fff; }}
+      .body {{ padding: 4mm 10mm; columns: 2; column-gap: 5mm; }}
+      .section-hd {{ font-weight: bold; font-size: 1.06em; margin-top: 3pt; margin-bottom: 2pt; break-after: avoid; }}
+      .q {{ margin-bottom: 5pt; break-inside: avoid; }}
+      .q-text {{ margin-bottom: 1pt; line-height: 1.22; }}
+      .opt {{ margin-left: 11pt; line-height: 1.22; margin-bottom: 0; }}
+      .expl {{ font-style: italic; margin-top: 1.5pt; line-height: 1.22; }}
+    """
+
+
+def _questions_body(quiz_data):
+    html = ""
+    current_cat = None
+    for q in quiz_data["questions"]:
+        if q["category"] != current_cat:
+            current_cat = q["category"]
+            html += f'<p class="section-hd">{_e(current_cat)}</p>\n'
+        opts = "".join(
+            f'<p class="opt">{letter}.&nbsp; {_e(q["options"][letter])}</p>'
+            for letter in ("a", "b", "c")
+        )
+        html += (f'<div class="q"><p class="q-text">{q["number"]}.&nbsp; {_e(q["question"])}</p>'
+                 f'{opts}</div>\n')
+    return html
+
+
+def _answers_body(quiz_data):
+    html = ""
+    current_cat = None
+    for q in quiz_data["questions"]:
+        if q["category"] != current_cat:
+            current_cat = q["category"]
+            html += f'<p class="section-hd">{_e(current_cat)}</p>\n'
+        html += (f'<div class="q"><p class="q-text">{q["number"]}.&nbsp; {_e(q["question"])}</p>'
+                 f'<p class="expl">{_e(q["explanation"])}</p></div>\n')
+    return html
+
+
+def _probe_size(body_html, label):
+    from weasyprint import HTML as WP
+    for size in PDF_SIZES:
+        html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>{_pdf_css()}</style></head><body>
+<div class="banner-wrap"><img src="{BANNER_PATH}">
+<span class="banner-label">{_e(label)}</span></div>
+<div class="body" style="font-size:{size}pt">{body_html}</div>
+</body></html>"""
+        doc = WP(string=html, base_url=os.path.dirname(BANNER_PATH)).render()
+        if len(doc.pages) == 1:
+            return size
+    return PDF_SIZES[-1]
+
+
+def generate_pdf(quiz_data, date_str):
+    from weasyprint import HTML as WP
+    now = datetime.strptime(date_str, "%Y-%m-%d")
+    date_label = now.strftime("%-d/%-m/%y")
+
+    q_body = _questions_body(quiz_data)
+    a_body = _answers_body(quiz_data)
+
+    q_size = _probe_size(q_body, f"Weekly quiz {date_label}")
+    a_size = _probe_size(a_body, f"Answers {date_label}")
+    print(f"  PDF font sizes — questions: {q_size}pt, answers: {a_size}pt", file=sys.stderr)
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>{_pdf_css()}</style></head><body>
+<div style="page-break-after:always">
+  <div class="banner-wrap"><img src="{BANNER_PATH}">
+  <span class="banner-label">Weekly quiz {_e(date_label)}</span></div>
+  <div class="body" style="font-size:{q_size}pt">{q_body}</div>
+</div>
+<div>
+  <div class="banner-wrap"><img src="{BANNER_PATH}">
+  <span class="banner-label">Answers {_e(date_label)}</span></div>
+  <div class="body" style="font-size:{a_size}pt">{a_body}</div>
+</div>
+</body></html>"""
+
+    out_path = os.path.join(POSTS_DIR, f"{date_str}.pdf")
+    WP(string=html, base_url=os.path.dirname(BANNER_PATH)).write_pdf(out_path)
+    print(f"Wrote {out_path}", file=sys.stderr)
+    return out_path
+
+
 def main():
     client = anthropic.Anthropic()
     os.makedirs(POSTS_DIR, exist_ok=True)
@@ -801,6 +923,11 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"Wrote {out_path}", file=sys.stderr)
+
+    try:
+        generate_pdf(quiz_data, date_str)
+    except Exception as e:
+        print(f"PDF generation failed (non-fatal): {e}", file=sys.stderr)
 
     update_index(POSTS_DIR, INDEX_PATH)
 
