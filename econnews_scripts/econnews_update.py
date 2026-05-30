@@ -73,9 +73,9 @@ HTML_TEMPLATE = """\
     <a href="../index.html" class="back-link">&#8592; Econ News</a>
     <div class="masthead">
       <div class="masthead-inner">
-        <img src="/unisamicon.jpg" alt="UniSam" class="masthead-seal">
+        <img src="/geocornsmall.png" alt="UniSam" class="masthead-seal">
         <h1>Econ News</h1>
-        <img src="/unisamicon.jpg" alt="UniSam" class="masthead-seal">
+        <img src="/geocornsmall.png" alt="UniSam" class="masthead-seal">
       </div>
     </div>
     <div class="post-controls">
