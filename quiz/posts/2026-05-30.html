@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talkonomics &mdash; 30 May 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f4ec;
+  --surface:#fff;
+  --border:#111;
+  --text:#111;
+  --muted:#4a4540;
+  --light:#7a7268;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',system-ui,sans-serif}
+/* Slides */
+#slides{height:100vh;position:relative}
+.slide{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg);
+}
+.slide.active{display:flex}
+/* Category accent */
+.slide-top{
+  background:var(--cat-bg,#f0f5ff);
+  border-bottom:2px solid var(--cat-border,#b6cff5);
+  padding:0.55rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.category-badge{
+  font-family:'Inter',sans-serif;
+  font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--cat-fg,#1a3a7a);
+}
+.q-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.7rem;font-weight:600;
+  color:var(--cat-fg,#1a3a7a);
+  opacity:0.7;
+}
+/* Slide body */
+.slide-body{
+  flex:1;overflow-y:auto;
+  padding:2rem 2.5rem 1rem;
+  display:flex;flex-direction:column;
+  gap:1.4rem;
+  max-width:900px;width:100%;margin:0 auto;
+}
+/* Title slide */
+.title-body{
+  align-items:center;justify-content:center;text-align:center;
+  gap:1rem;
+  background:
+    radial-gradient(ellipse at 15% 50%, #ffd6e7 0%, transparent 50%),
+    radial-gradient(ellipse at 35% 20%, #d6f0ff 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+    #f7f4ec;
+}
+.title-wordmark{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4.5rem);
+  font-weight:900;
+  color:var(--text);
+  line-height:1;
+}
+.title-tagline{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.85rem,2vw,1.1rem);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.18em;
+  color:var(--light);
+}
+.title-date{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1rem,2.5vw,1.5rem);
+  color:var(--muted);
+  font-style:italic;
+}
+.title-meta{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;
+  color:var(--light);
+  letter-spacing:0.04em;
+}
+/* Question */
+.question-text{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1.1rem,2.8vw,1.55rem);
+  line-height:1.45;
+  color:var(--text);
+  font-weight:700;
+}
+/* Options */
+.options{display:flex;flex-direction:column;gap:0.65rem}
+.option{
+  display:flex;align-items:flex-start;gap:0.9rem;
+  background:var(--surface);
+  border:1.5px solid #ddd7cc;
+  border-radius:6px;
+  padding:0.75rem 1rem;
+  transition:background 0.2s,border-color 0.2s,opacity 0.25s;
+  cursor:default;
+}
+.option-letter{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--light);
+  flex-shrink:0;
+  margin-top:0.1rem;
+  min-width:1.1rem;
+}
+.option-text{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.9rem,2vw,1.05rem);
+  line-height:1.45;
+  color:var(--text);
+}
+/* Revealed state */
+.slide.revealed .option.correct{
+  background:#d6f5e8;
+  border-color:#145c34;
+}
+.slide.revealed .option.correct .option-letter{color:#145c34}
+.slide.revealed .option:not(.correct){opacity:0.32}
+.slide.revealed .explanation{display:block}
+.slide.revealed .btn-reveal{display:none}
+/* Explanation */
+.explanation{
+  display:none;
+  background:#f0f5ff;
+  border:1.5px solid #b6cff5;
+  border-radius:6px;
+  padding:0.9rem 1.1rem;
+}
+.explanation p{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.82rem,1.8vw,0.95rem);
+  line-height:1.6;
+  color:#1a3a7a;
+  font-style:italic;
+}
+/* Nav bar */
+.slide-nav{
+  flex-shrink:0;
+  border-top:1px solid #ddd7cc;
+  background:var(--surface);
+  padding:0.65rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0.75rem;
+}
+.slide-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--light);
+}
+/* Buttons */
+.btn-nav{
+  font-family:'Inter',sans-serif;
+  font-size:0.75rem;font-weight:600;
+  color:#1a3a7a;
+  background:none;border:1.5px solid #b6cff5;
+  border-radius:4px;padding:0.4rem 0.9rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s,border-color 0.12s;
+}
+.btn-nav:hover{background:#f0f5ff;border-color:#1a3a7a}
+.btn-reveal{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;border:none;
+  border-radius:4px;padding:0.45rem 1.2rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-reveal:hover{background:#2a4a9a}
+.btn-primary{
+  font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;
+  border:none;border-radius:4px;
+  padding:0.6rem 1.6rem;
+  cursor:pointer;text-decoration:none;
+  display:inline-block;
+  letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-primary:hover{background:#2a4a9a}
+/* Print */
+@media print{
+  html,body{overflow:visible;height:auto}
+  #slides{height:auto;position:static}
+  .slide{position:static;display:flex!important;page-break-before:always;min-height:100vh}
+  .slide:first-child{page-break-before:avoid}
+  .slide-nav{display:none}
+  .btn-reveal{display:none!important}
+  .slide.revealed .option{opacity:1!important}
+  .explanation{display:block!important}
+}
+</style>
+</head>
+<body>
+<div id="slides">
+
+  <div class="slide active" id="slide-0">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
+      <div class="title-date">Weekly Quiz &mdash; 30 May 2026</div>
+      <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
+      <button class="btn-primary" onclick="goTo(1)">Begin &#8594;</button>
+    </div>
+    <div class="slide-nav">
+      <span></span>
+      <span class="slide-counter">Talkonomics</span>
+      <span></span>
+    </div>
+  </div>
+  <div class="slide" id="slide-1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Best Buy&#x27;s share price recently did something that surprised a lot of investors who had written off the electronics retailer. After reporting its latest earnings, the stock moved by roughly how much in a single day?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Up 15%</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Down 8%</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Up 3%</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Best Buy&#x27;s stock jumped 15% after reporting better-than-expected earnings. The result defied the prevailing narrative that big-box electronics retailers are in terminal decline, showing that cost discipline and selective promotions can still produce upside surprises. For context, a 15% single-day move is enormous for an established retailer — it reflects just how bearish the market had become before the report landed.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The drinks industry is seeing a generational shift this year. Hard seltzers — fizzy alcoholic water drinks like White Claw — dominated the last decade, but a new category is now stealing the spotlight among Gen Z drinkers. What is replacing them?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Non-alcoholic craft beers</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Non-carbonated alcoholic drinks like Surfside and BeatBox</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Canned wines and rosé spritzers</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Non-carbonated alcoholic drinks such as Surfside iced teas and BeatBox party punches are displacing hard seltzers as the trendy choice among Gen Z drinkers. The shift matters commercially because it signals that the seltzer boom — which reshaped the entire beer-and-spirits supply chain — may have peaked. Brands that bet heavily on fizzy formats are now scrambling to reformulate, while newer entrants built around still drinks are capturing shelf space and marketing budgets.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">American Airlines just announced a major overhaul of in-flight Wi-Fi across more than 500 of its aircraft. The airline is ditching its existing provider and switching to a satellite internet service that many passengers will recognise from another context. Which service is it installing?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Amazon&#x27;s Project Kuiper</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Boeing&#x27;s Connexion revival</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">SpaceX&#x27;s Starlink</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. American Airlines is equipping more than 500 planes with SpaceX&#x27;s Starlink satellite internet. Starlink uses a large constellation of low-Earth-orbit satellites to deliver faster, lower-latency broadband than older in-flight systems — a meaningful upgrade for passengers used to painfully slow plane Wi-Fi. The deal is a commercial coup for Elon Musk&#x27;s space venture, which is increasingly competing in enterprise and infrastructure markets well beyond its original consumer broadband focus.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">A fraudster recently claimed he was about to acquire Honey Birdette, a high-end lingerie brand. He raised real money from investors on the back of this fictional deal. What did investigators find he actually spent the funds on?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Luxury watches, jewellery, private-club memberships, and OnlyFans subscriptions</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">A failed rival lingerie start-up and a fleet of leased sports cars</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Cryptocurrency trading and an unsuccessful crowdfunded film project</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Kevin Juin raised money by falsely claiming he was buying Honey Birdette, then spent it on luxury watches, jewellery, private-club memberships, and OnlyFans subscriptions — a detail that made the story irresistible to business journalists everywhere. The scam is a textbook example of affinity fraud built around a glamorous acquisition story: investors are dazzled by the deal&#x27;s prestige and skip basic due diligence. It also illustrates how private deals in niche luxury markets can be harder to verify than public-company transactions.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US inflation (the rate at which prices across the economy are rising) hit its fastest pace in three years in April, driven partly by higher energy costs linked to the ongoing conflict with Iran. Which of the following best describes what that means for Federal Reserve (the US central bank) policy expectations?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Markets now expect the Fed to cut interest rates sooner to support growth</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Markets now expect the Fed to hold or raise rates to cool price rises</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The Fed is expected to introduce price controls on energy imports</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. When inflation accelerates, central banks typically respond by keeping interest rates higher for longer — or even raising them — because higher borrowing costs cool spending and slow price growth. The Fed&#x27;s primary inflation target is 2% annually, so a three-year high in the pace of price rises pushes that target further out of reach. Bond markets reacted by pricing in fewer rate cuts for 2025, which raises borrowing costs for everything from mortgages to corporate loans.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">New York City recently passed a &#x27;pied-à-terre tax&#x27; on second homes — properties owned by wealthy people who live elsewhere most of the year. The tax targets luxury real estate left largely empty. Which of these is NOT a commonly cited risk of this kind of policy?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Wealthy owners sell up, flooding the market with supply and briefly pushing prices down</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The tax triggers a surge in new affordable housing construction by developers</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Revenue projections prove optimistic because owners restructure ownership through holding companies</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. A pied-à-terre tax does not directly incentivise developers to build affordable housing — that requires separate planning and subsidy policies. The other two options are genuine concerns: a wave of luxury sell-offs can temporarily distort the market, and wealthy owners frequently use legal structures like shell companies or trusts to reduce or avoid the tax liability, which is why revenue from these taxes often falls short of projections. New York&#x27;s version is being watched closely by other cities considering similar measures.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Oil prices fell and global stock markets rose recently after reports emerged that the US and Iran had agreed in principle to extend their ceasefire. Why does a US-Iran ceasefire specifically tend to push oil prices lower?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Iran is a major oil producer, and reduced conflict risk makes supply disruption less likely</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The US immediately releases its entire strategic petroleum reserve when ceasefires are signed</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Iran controls the pricing algorithms used by OPEC member states</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Iran is one of the world&#x27;s significant oil producers and sits on the strategically vital Strait of Hormuz, through which roughly 20% of global oil trade passes. When conflict in the region escalates, traders price in a risk premium — an extra cost reflecting the possibility of supply disruption. A ceasefire reduces that premium, so oil prices fall. Falling oil prices are broadly good for economies that import energy, which is why stock markets in Europe and Asia often rally on Middle East de-escalation news.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Vietnam made a surprising appearance on a global industrial league table this month — not for electronics or textiles, where it is already well known, but for heavy manufacturing. Vietnam ranked 10th in the world for producing which material, with output of 2.1 million tonnes in a single month?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Aluminium</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Crude steel</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Refined copper</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Vietnam ranked as the world&#x27;s 10th largest crude steel producer in April, the first time it has ever reached that position, with monthly output of 2.1 million tonnes. Steel production is a classic indicator of industrial maturity — it requires significant energy, capital, and logistics infrastructure — making Vietnam&#x27;s entry into the top ten genuinely significant. For comparison, the list is otherwise dominated by China (which produces more than half the world&#x27;s steel), India, Japan, and the US, so Vietnam is punching well above its traditional economic weight.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Steel just featured in our quiz, so here&#x27;s a related geography question. Which country is the world&#x27;s largest producer of iron ore, the raw material used to make steel?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Brazil</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">China</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Australia</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Australia is the world&#x27;s largest exporter and producer of iron ore by volume, with its Pilbara region in Western Australia home to some of the largest mines on Earth. Mining giants Rio Tinto, BHP, and Fortescue all operate major Pilbara operations. Australia exports the vast majority of its iron ore to China, which then smelts it into steel — making the Australia-China iron ore trade one of the most important bilateral commodity flows in the global economy, worth tens of billions of dollars annually.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">One of history&#x27;s most influential economists published a book in 1776 — the same year as the American Declaration of Independence — that became the founding text of modern economics. Who wrote &#x27;The Wealth of Nations&#x27;?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Ricardo</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">John Stuart Mill</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith, a Scottish philosopher, published &#x27;The Wealth of Nations&#x27; in 1776, introducing ideas like the division of labour and the &#x27;invisible hand&#x27; — the notion that individuals pursuing self-interest in free markets can, unintentionally, produce good outcomes for society as a whole. The book is often cited as the origin of economics as a formal discipline. Smith also wrote &#x27;The Theory of Moral Sentiments&#x27;, which argued that empathy and social bonds are essential to a functioning society — a side of his thinking that tends to get less airtime than the free-market ideas.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-end">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">That&#8217;s all 10!</div>
+      <div class="title-date">30 May 2026</div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+        <button class="btn-primary" onclick="goTo(0)">&#8592; Start again</button>
+        <a class="btn-primary" href="../index.html">All editions</a>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">End</span>
+      <span></span>
+    </div>
+  </div>
+</div>
+<script>
+var current = 0;
+var total = document.querySelectorAll('.slide').length - 1; // exclude title (slide-0 = index 0)
+
+function goTo(n) {
+  var slides = document.querySelectorAll('.slide');
+  slides.forEach(function(s) { s.classList.remove('active'); });
+  var target = n === 'end' ? slides[slides.length - 1] : slides[n];
+  if (target) target.classList.add('active');
+  current = typeof n === 'number' ? n : total;
+  window.scrollTo(0, 0);
+}
+
+function nextSlide() {
+  var slides = document.querySelectorAll('.slide');
+  if (current < slides.length - 1) goTo(current + 1);
+}
+
+function prevSlide() {
+  if (current > 0) goTo(current - 1);
+}
+
+function revealSlide(btn) {
+  var slide = btn.closest('.slide');
+  slide.classList.add('revealed');
+  var exp = slide.querySelector('.explanation');
+  if (exp) exp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSlide();
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevSlide();
+  else if (e.key === ' ' || e.key === 'Enter') {
+    var slide = document.querySelector('.slide.active');
+    if (slide && !slide.classList.contains('revealed')) {
+      var btn = slide.querySelector('.btn-reveal');
+      if (btn) revealSlide(btn);
+    } else {
+      nextSlide();
+    }
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
