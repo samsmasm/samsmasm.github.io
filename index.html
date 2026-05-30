@@ -236,6 +236,38 @@ body {
 .sub-block { margin-bottom: 1.75rem; }
 .sub-block + .sub-block { margin-top: 0.25rem; }
 
+/* ── Nav popup menu ── */
+.nav-popup {
+  position: fixed;
+  background: #fff;
+  border: 1.5px solid #e0d4ff;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(80,40,120,0.13);
+  z-index: 999;
+  min-width: 150px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.nav-popup.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.nav-popup a {
+  display: block;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #2d1a4a;
+  text-decoration: none;
+  border-bottom: 1px solid #f0e8ff;
+}
+.nav-popup a:last-child { border-bottom: none; }
+.nav-popup a:hover { background: #f5f0ff; }
+
 /* ── Footer ── */
 .site-footer {
   padding: 1rem 2.5rem 1.5rem;
@@ -316,6 +348,7 @@ body {
     <div class="section-label">IB Business Management</div>
     <div class="tool-grid">
       <a class="tool-card bm" href="/ratibro"><div class="tool-name">RatIBro</div><div class="tool-desc">Self-rate your BM skills, identify gaps, and practise definitions across all units.</div></a>
+      <a class="tool-card bm" href="/businews"><div class="tool-name">Businews</div><div class="tool-desc">Curated business case studies with IB-style analysis questions.</div></a>
       <a class="tool-card bm" href="/busia"><div class="tool-name">Busia</div><div class="tool-desc">Stage-by-stage IA study guide with marking criteria and key concepts.</div></a>
       <a class="tool-card bm" href="/slopstudy"><div class="tool-name">Slop Study</div><div class="tool-desc">AI-generated BM case studies and exam questions. Good for last-minute practice.</div></a>
       <a class="tool-card bm" href="/qreview"><div class="tool-name">Review Questions</div><div class="tool-desc">Random questions drawn from across the IB Business Management syllabus.</div></a>
@@ -350,7 +383,6 @@ body {
       <a class="tool-card class" href="/wb"><div class="tool-name">Whiteboard</div><div class="tool-desc">Basic whiteboard app.</div></a>
       <a class="tool-card class" href="/peedeeeffer"><div class="tool-name">PeeDeeEffer</div><div class="tool-desc">Merge and split PDFs privately, entirely on your own device.</div></a>
       <a class="tool-card class" href="/pdfwrite"><div class="tool-name">PDF Annotator</div><div class="tool-desc">Annotate a PDF and download your notes.</div></a>
-      <a class="tool-card class" href="/tote"><div class="tool-name">Tote</div><div class="tool-desc">Paste text and share the link. Notes expire after 96 hours.</div></a>
     </div>
   </div>
 
@@ -520,9 +552,107 @@ body {
 </footer>
 
 <script>
+// ── Nav popup menus ──
+const NAV_MENUS = {
+  econ: [
+    { label: 'EconNews',     url: '/econnews' },
+    { label: 'Econia',       url: '/econia' },
+    { label: 'Graph Drawer', url: '/graphs' },
+    { label: 'I Beat Econ',  url: '/ibecon' },
+  ],
+  bm: [
+    { label: 'RatIBro',        url: '/ratibro' },
+    { label: 'Businews',       url: '/businews' },
+    { label: 'Busia',          url: '/busia' },
+    { label: 'Slop Study',     url: '/slopstudy' },
+    { label: 'I Beat BM',      url: '/ibbm' },
+  ],
+  class: [
+    { label: 'UniQuiz',         url: '/uniquiz' },
+    { label: 'PeeDeeEffer',     url: '/peedeeeffer' },
+    { label: 'Pulse',           url: '/pulse' },
+    { label: 'Scrim',           url: '/scrim' },
+    { label: 'Argument Mapper', url: '/argmap' },
+    { label: 'Griz',            url: '/griz' },
+  ],
+  exp: [
+    { label: 'Race Cars',       url: '/racecar' },
+    { label: 'Pinhole',         url: '/pinhole' },
+    { label: 'Photos',          url: '/photos' },
+    { label: 'Mandelbrot',      url: '/mandelbrot-v2' },
+    { label: 'Chaos',           url: '/chaos' },
+    { label: 'Sudoku',          url: '/sudoku' },
+    { label: 'Kittymaze',       url: '/kittymaze' },
+    { label: 'Algebra Exam Qs', url: '/algeqs' },
+  ],
+};
+
+const popup = document.createElement('div');
+popup.className = 'nav-popup';
+document.body.appendChild(popup);
+
+let hideTimer = null;
+let suppressNextClick = false;
+let holdTimer = null;
+let activeNav = null;
+
+function showPopup(navEl) {
+  const view = navEl.dataset.view;
+  const items = NAV_MENUS[view];
+  if (!items) return;
+
+  clearTimeout(hideTimer);
+  activeNav = navEl;
+
+  popup.innerHTML = items.map(i =>
+    `<a href="${i.url}">${i.label}</a>`
+  ).join('');
+
+  const rect = navEl.getBoundingClientRect();
+  popup.style.left = rect.left + 'px';
+  popup.style.top  = (rect.bottom + 4) + 'px';
+  popup.classList.add('visible');
+}
+
+function hidePopup(delay) {
+  hideTimer = setTimeout(() => {
+    popup.classList.remove('visible');
+    activeNav = null;
+  }, delay || 0);
+}
+
+// Hover (mouse) behaviour
+document.querySelectorAll('.nav-item').forEach(navEl => {
+  navEl.addEventListener('mouseenter', () => showPopup(navEl));
+  navEl.addEventListener('mouseleave', () => hidePopup(120));
+});
+popup.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+popup.addEventListener('mouseleave', () => hidePopup(120));
+
+// Hold (touch) behaviour
+document.querySelectorAll('.nav-item').forEach(navEl => {
+  navEl.addEventListener('touchstart', e => {
+    holdTimer = setTimeout(() => {
+      suppressNextClick = true;
+      showPopup(navEl);
+    }, 500);
+  }, { passive: true });
+
+  navEl.addEventListener('touchmove', () => clearTimeout(holdTimer), { passive: true });
+  navEl.addEventListener('touchend', () => clearTimeout(holdTimer), { passive: true });
+});
+
+// Hide popup on tap outside
+document.addEventListener('touchstart', e => {
+  if (!popup.contains(e.target) && !e.target.closest('.nav-item')) {
+    hidePopup(0);
+  }
+}, { passive: true });
+
 // ── Tab navigation ──
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
+    if (suppressNextClick) { suppressNextClick = false; return; }
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     item.classList.add('active');
