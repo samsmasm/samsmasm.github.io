@@ -205,3 +205,15 @@ Bad: *"An exciting interactive tool to explore inequality concepts!"*
 Sub-pages inherit the header gradient (with positional variation), the logo, the typography, and the colour system. They do not need the index tab navigation. Each sub-page should feel like it belongs to the same site without being a clone of the index.
 
 The subject colour for a sub-page should be the dominant colour for that page's section (e.g. an Economics tool uses teal/green as its accent throughout).
+
+---
+
+## Sub-page implementations
+
+### EconNews (`/econnews`)
+
+The reference implementation. Colours: `--accent: #145c34`, `--link: #145c34`, borders from the Economics green column. Masthead gradient leans green (`#d6ffe8` dominant). Logo `/unisamsq.png` with `border-radius: 10px` and white semi-transparent backing. Body font: Georgia serif. UI font: Inter.
+
+### BusiNews (`/businews`)
+
+Business Management weekly case studies. Colours: `--accent: #1a3a7a`, `--link: #1a3a7a`, `--link-hover: #0d2255`. Borders: `--border-mid: #b6cff5`, `--border-soft: #dce8f8`, `--border-pale: #eef4ff`. Muted text: `#3a4a6a`, light text: `#5a7298`. Masthead gradient leans blue (`#d6e8ff` dominant), base `#f0f5ff`. Curriculum tags: `background: #d6e8ff; color: #1a3a7a; border-radius: 4px` (soft pill, no border outline). Logo `/unisamsq.png` with `border-radius: 14px`.
