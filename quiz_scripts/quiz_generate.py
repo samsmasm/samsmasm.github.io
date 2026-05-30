@@ -258,7 +258,16 @@ def slide_title(date_formatted):
       <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
       <div class="title-date">Weekly Quiz &mdash; {_e(date_formatted)}</div>
       <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
-      <button class="btn-primary" onclick="goTo(1)">Begin &#8594;</button>
+      <div class="mode-buttons">
+        <button class="btn-mode" onclick="selectMode('asgo')">
+          <span class="btn-mode-title">Answers as we go</span>
+          <span class="btn-mode-desc">Reveal each answer before moving on</span>
+        </button>
+        <button class="btn-mode" onclick="selectMode('atend')">
+          <span class="btn-mode-title">Answers at the end</span>
+          <span class="btn-mode-desc">All 10 questions first, then all answers</span>
+        </button>
+      </div>
     </div>
     <div class="slide-nav">
       <span></span>
@@ -282,7 +291,7 @@ def slide_question(q, total=10):
         <span class="option-text">{_e(text)}</span>
       </div>"""
     return f"""
-  <div class="slide" id="slide-{n}" style="--cat-bg:{bg};--cat-fg:{fg};--cat-border:{border}">
+  <div class="slide q-slide" id="slide-{n}" style="--cat-bg:{bg};--cat-fg:{fg};--cat-border:{border}">
     <div class="slide-top">
       <span class="category-badge">{_e(cat)}</span>
       <span class="q-counter">Q{n} / {total}</span>
@@ -298,6 +307,41 @@ def slide_question(q, total=10):
     <div class="slide-nav">
       <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
       <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>"""
+
+
+def slide_answer(q, total=10):
+    n = q["number"]
+    cat = q["category"]
+    bg, fg, border = CATEGORY_COLOURS.get(cat, ("#fff", "#111", "#ddd"))
+    options_html = ""
+    for letter in ("a", "b", "c"):
+        text = q["options"].get(letter, "")
+        correct_class = " correct" if letter == q["correct"] else ""
+        options_html += f"""
+      <div class="option{correct_class}" data-letter="{letter}">
+        <span class="option-letter">{letter}</span>
+        <span class="option-text">{_e(text)}</span>
+      </div>"""
+    return f"""
+  <div class="slide a-slide revealed" id="slide-a{n}" style="--cat-bg:{bg};--cat-fg:{fg};--cat-border:{border}">
+    <div class="slide-top">
+      <span class="category-badge">{_e(cat)} &mdash; Answer</span>
+      <span class="q-counter">A{n} / {total}</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">{_e(q['question'])}</p>
+      <div class="options">{options_html}
+      </div>
+      <div class="explanation">
+        <p>{_e(q['explanation'])}</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A{n} / {total}</span>
       <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
     </div>
   </div>"""
@@ -334,7 +378,7 @@ HTML_HEAD = """\
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
 :root{{
-  --bg:#f7f4ec;
+  --bg:#fff;
   --surface:#fff;
   --border:#111;
   --text:#111;
@@ -388,7 +432,7 @@ html,body{{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',
     radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
     radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
     radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
-    #f7f4ec;
+    #fff;
 }}
 .title-wordmark{{
   font-family:'Playfair Display',Georgia,serif;
@@ -524,6 +568,19 @@ html,body{{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',
   transition:background 0.12s;
 }}
 .btn-primary:hover{{background:#2a4a9a}}
+/* Mode buttons on title slide */
+.mode-buttons{{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}}
+.btn-mode{{
+  background:var(--surface);
+  border:2px solid #b6cff5;border-radius:8px;
+  padding:0.9rem 1.4rem;cursor:pointer;text-align:center;
+  min-width:190px;transition:border-color 0.15s,background 0.15s;
+}}
+.btn-mode:hover{{border-color:#1a3a7a;background:#f0f5ff}}
+.btn-mode-title{{display:block;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:700;color:#1a3a7a;margin-bottom:0.3rem}}
+.btn-mode-desc{{display:block;font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--light);line-height:1.4}}
+/* Hide reveal button in at-end mode on question slides */
+body[data-mode="atend"] .q-slide .btn-reveal{{display:none}}
 /* Print */
 @media print{{
   html,body{{overflow:visible;height:auto}}
@@ -544,25 +601,41 @@ html,body{{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',
 HTML_FOOT = """
 </div>
 <script>
-var current = 0;
-var total = document.querySelectorAll('.slide').length - 1; // exclude title (slide-0 = index 0)
+var TOTAL = document.querySelectorAll('.q-slide').length;
+var pos = 0;
+var SEQ = [];
 
-function goTo(n) {
-  var slides = document.querySelectorAll('.slide');
-  slides.forEach(function(s) { s.classList.remove('active'); });
-  var target = n === 'end' ? slides[slides.length - 1] : slides[n];
-  if (target) target.classList.add('active');
-  current = typeof n === 'number' ? n : total;
-  window.scrollTo(0, 0);
+function buildSeq(m) {
+  var s = ['slide-0'];
+  for (var i = 1; i <= TOTAL; i++) s.push('slide-' + i);
+  if (m === 'atend') {
+    for (var i = 1; i <= TOTAL; i++) s.push('slide-a' + i);
+  }
+  s.push('slide-end');
+  return s;
 }
 
+function selectMode(m) {
+  SEQ = buildSeq(m);
+  document.body.setAttribute('data-mode', m);
+  showAt(1);
+}
+
+function showAt(p) {
+  pos = p;
+  document.querySelectorAll('.slide').forEach(function(s) { s.classList.remove('active'); });
+  var el = document.getElementById(SEQ[p]);
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+}
+
+function goTo(p) { showAt(p); }
+
 function nextSlide() {
-  var slides = document.querySelectorAll('.slide');
-  if (current < slides.length - 1) goTo(current + 1);
+  if (pos < SEQ.length - 1) showAt(pos + 1);
 }
 
 function prevSlide() {
-  if (current > 0) goTo(current - 1);
+  if (pos > 0) showAt(pos - 1);
 }
 
 function revealSlide(btn) {
@@ -573,16 +646,15 @@ function revealSlide(btn) {
 }
 
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSlide();
-  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevSlide();
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextSlide(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { prevSlide(); e.preventDefault(); }
   else if (e.key === ' ' || e.key === 'Enter') {
     var slide = document.querySelector('.slide.active');
     if (slide && !slide.classList.contains('revealed')) {
       var btn = slide.querySelector('.btn-reveal');
-      if (btn) revealSlide(btn);
-    } else {
-      nextSlide();
+      if (btn) { revealSlide(btn); e.preventDefault(); return; }
     }
+    nextSlide();
     e.preventDefault();
   }
 });
@@ -602,6 +674,8 @@ def build_slideshow(quiz_data, date_str):
     parts.append(slide_title(date_formatted))
     for q in questions:
         parts.append(slide_question(q, total))
+    for q in questions:
+        parts.append(slide_answer(q, total))
     parts.append(slide_end(date_formatted))
     parts.append(HTML_FOOT)
     return "".join(parts)
