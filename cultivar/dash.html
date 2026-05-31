@@ -81,7 +81,8 @@
 <script type="module">
 import { auth } from './js/config.js';
 import { getUser, getPublicDecks, resetDeckProgress, getUserSettings, updateUserSettings,
-         getDeckWordsWithProgress, setWordStatus, moveWordBox, removeWordFromCycle, boxLabel } from './js/db.js';
+         getDeckWordsWithProgress, setWordStatus, bulkSetWordStatus, moveWordBox,
+         removeWordFromCycle, boxLabel } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
@@ -133,6 +134,7 @@ async function loadWordList() {
   list.innerHTML = '';
 
   const words = await getDeckWordsWithProgress(uid, currentDeckId);
+  const totalPending = words.filter(w => !w.introduced && w.status !== 'never').length;
   document.getElementById('word-list-heading').textContent = `Words (${words.length})`;
   loading.style.display = 'none';
 
@@ -141,8 +143,67 @@ async function loadWordList() {
     return;
   }
 
+  // Top-level bulk button (whole deck)
+  if (totalPending > 0) {
+    const topBtn = document.createElement('button');
+    topBtn.className = 'btn btn-secondary btn-full';
+    topBtn.style.marginBottom = '16px';
+    topBtn.textContent = `Ask all ${totalPending} pending words soon`;
+    topBtn.addEventListener('click', async () => {
+      topBtn.disabled = true; topBtn.textContent = 'Marking…';
+      const ids = words.filter(w => !w.introduced && w.status !== 'never').map(w => w.id);
+      await bulkSetWordStatus(uid, currentDeckId, ids, 'ask_soon');
+      await loadWordList();
+    });
+    list.appendChild(topBtn);
+  }
+
+  // Group by category
+  const grouped = {};
   for (const item of words) {
-    list.appendChild(renderWordRow(item));
+    const cat = item.word.category || '';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(item);
+  }
+
+  const cats = Object.keys(grouped).sort((a, b) => {
+    if (!a && b) return 1;
+    if (a && !b) return -1;
+    return a.localeCompare(b);
+  });
+
+  const showHeaders = cats.length > 1 || cats[0] !== '';
+
+  for (const cat of cats) {
+    const catWords  = grouped[cat];
+    const catPending = catWords.filter(w => !w.introduced && w.status !== 'never');
+
+    if (showHeaders) {
+      const header = document.createElement('div');
+      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:16px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--border)';
+
+      const title = document.createElement('span');
+      title.textContent = cat || 'Uncategorised';
+      title.style.cssText = 'font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em';
+      header.appendChild(title);
+
+      if (catPending.length > 0) {
+        const catBtn = document.createElement('button');
+        catBtn.textContent = `Ask all ${catPending.length} pending`;
+        catBtn.style.cssText = 'font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--correct);background:none;color:var(--correct)';
+        catBtn.addEventListener('click', async () => {
+          catBtn.disabled = true; catBtn.textContent = 'Marking…';
+          await bulkSetWordStatus(uid, currentDeckId, catPending.map(w => w.id), 'ask_soon');
+          await loadWordList();
+        });
+        header.appendChild(catBtn);
+      }
+      list.appendChild(header);
+    }
+
+    for (const item of catWords) {
+      list.appendChild(renderWordRow(item));
+    }
   }
 }
 
@@ -182,21 +243,18 @@ function renderWordRow(item) {
     rightBtn.disabled = progress.level === 6;
     rightBtn.style.cssText = leftBtn.style.cssText;
 
-    leftBtn.addEventListener('click', async () => {
+    const moveAndRefresh = async (direction) => {
       leftBtn.disabled = rightBtn.disabled = true;
-      await moveWordBox(uid, id, 'earlier');
-      const updated = await getDeckWordsWithProgress(uid, currentDeckId);
-      const newItem = updated.find(w => w.id === id);
-      if (newItem) row.replaceWith(renderWordRow(newItem));
-    });
+      await moveWordBox(uid, id, direction);
+      const newLevel = direction === 'earlier'
+        ? Math.max(0, progress.level - 1)
+        : Math.min(6, progress.level + 1);
+      const newItem = { ...item, progress: { ...progress, level: newLevel } };
+      row.replaceWith(renderWordRow(newItem));
+    };
 
-    rightBtn.addEventListener('click', async () => {
-      leftBtn.disabled = rightBtn.disabled = true;
-      await moveWordBox(uid, id, 'later');
-      const updated = await getDeckWordsWithProgress(uid, currentDeckId);
-      const newItem = updated.find(w => w.id === id);
-      if (newItem) row.replaceWith(renderWordRow(newItem));
-    });
+    leftBtn.addEventListener('click',  () => moveAndRefresh('earlier'));
+    rightBtn.addEventListener('click', () => moveAndRefresh('later'));
 
     boxWrap.append(leftBtn, boxSpan, rightBtn);
     row.appendChild(boxWrap);
@@ -233,9 +291,7 @@ function renderWordRow(item) {
         btn.disabled = true;
         const newStatus = isActive ? 'normal' : key;
         await setWordStatus(uid, currentDeckId, id, newStatus);
-        const updated = await getDeckWordsWithProgress(uid, currentDeckId);
-        const newItem = updated.find(w => w.id === id);
-        if (newItem) row.replaceWith(renderWordRow(newItem));
+        row.replaceWith(renderWordRow({ ...item, status: newStatus }));
       });
       btnWrap.appendChild(btn);
     }

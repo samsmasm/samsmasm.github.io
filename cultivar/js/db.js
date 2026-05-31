@@ -596,6 +596,15 @@ export async function setWordStatus(uid, deckId, wordId, status) {
   );
 }
 
+export async function bulkSetWordStatus(uid, deckId, wordIds, status) {
+  if (!wordIds.length) return;
+  const updates = {};
+  for (const wordId of wordIds) {
+    updates[`word_status.${deckId}_${wordId}`] = status === 'normal' ? deleteField() : status;
+  }
+  await updateDoc(doc(db, 'users', uid), updates);
+}
+
 export async function moveWordBox(uid, wordId, direction) {
   for (const dir of ['vn_en', 'en_vn']) {
     const ref = doc(db, 'users', uid, 'progress', `${wordId}_${dir}`);
