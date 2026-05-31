@@ -70,12 +70,18 @@
 </div>
 
 <!-- ── Dashboard (logged in) ──────────────────────────────── -->
-<div id="app-view" class="hidden">
+<div id="app-view" class="hidden" style="position:relative">
   <header class="page-header">
     <div style="width:44px"></div>
     <div></div>
-    <button class="btn btn-secondary" id="logout-btn" style="font-size:.75rem;padding:5px 12px;min-height:30px">Sign out</button>
+    <button class="btn-icon" id="menu-btn" aria-label="Menu" style="font-size:1.5rem;line-height:1">☰</button>
   </header>
+
+  <!-- Hamburger dropdown -->
+  <div id="menu-dropdown" class="hidden" style="position:absolute;top:46px;right:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);z-index:60;overflow:hidden;min-width:170px">
+    <button class="menu-item" id="menu-help" style="display:block;width:100%;text-align:left;padding:13px 16px;background:none;border:none;font-family:inherit;font-size:.95rem;color:var(--text);cursor:pointer">❓&nbsp; Help</button>
+    <button class="menu-item" id="menu-settings" style="display:block;width:100%;text-align:left;padding:13px 16px;background:none;border:none;border-top:1px solid var(--border);font-family:inherit;font-size:.95rem;color:var(--text);cursor:pointer">⚙️&nbsp; Settings</button>
+  </div>
 
   <main class="main-pad">
 
@@ -110,9 +116,61 @@
   </nav>
 </div>
 
+<!-- ── Help sheet ─────────────────────────────────────────── -->
+<div id="help-modal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 style="margin:0;font-size:1.2rem">How Cultivar works</h2>
+      <button class="sheet-close" data-close="help-modal">✕</button>
+    </div>
+    <div class="sheet-body">
+      <p><strong>Cultivar</strong> helps you memorise vocabulary using spaced repetition: words you know come back less often, words you struggle with come back sooner.</p>
+
+      <h3>Getting started</h3>
+      <ul>
+        <li><strong>Decks</strong> — enrol in word lists your teacher shares, or add your own cards. Each deck is studied on its own.</li>
+        <li><strong>Home</strong> — each deck gets two buttons. <em>New + review</em> gives you a batch of new words plus everything due to review. <em>Review only</em> skips new words for days you're short on time.</li>
+      </ul>
+
+      <h3>How words progress</h3>
+      <p>Each time you get a word right it moves up a box and comes back later — New → Seen it → Know a bit → Getting there → Comfortable → Strong → Mastered (intervals stretch from 1 day out to a year). Get it wrong and it drops back to the start.</p>
+      <p>You get a fixed number of new words a day. Once you've started them all, you can add more — this keeps things from piling up.</p>
+
+      <h3>Dashboard</h3>
+      <p>See every word in a deck and which box it's in. Nudge words between boxes, mark ones to ask soon, skip, or never. Change your daily limits here too.</p>
+
+      <h3>Revise (Cram Mode)</h3>
+      <p>Before an exam, drill all words from any decks you pick — both directions, in random order. Rate each <em>Know it</em>, <em>Partially</em> or <em>Don't know</em>. This is separate from your normal schedule and never disturbs it.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings sheet ─────────────────────────────────────── -->
+<div id="settings-modal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 style="margin:0;font-size:1.2rem">Settings</h2>
+      <button class="sheet-close" data-close="settings-modal">✕</button>
+    </div>
+    <div class="sheet-body">
+      <h3>Reset a deck's progress</h3>
+      <p style="color:var(--muted);font-size:.85rem">Permanently deletes your learning history for one deck. Your enrolment and the deck's words stay; only your progress is wiped.</p>
+      <div class="form-group" style="margin:10px 0">
+        <label for="reset-deck-select">Deck</label>
+        <select id="reset-deck-select"><option value="">— choose a deck —</option></select>
+      </div>
+      <button class="btn btn-secondary btn-full" id="reset-deck-btn" disabled style="color:var(--incorrect);border-color:var(--incorrect)">Reset this deck</button>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+
+      <button class="btn btn-secondary btn-full" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { auth } from './js/config.js';
-import { getOrCreateUser, getPublicDecks, getUser, getPersonalCards, getProgressStats } from './js/db.js';
+import { getOrCreateUser, getPublicDecks, getUser, getPersonalCards, getProgressStats, resetDeckProgress } from './js/db.js';
 import {
   onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -186,6 +244,11 @@ onAuthStateChanged(auth, async user => {
 
     for (const deck of myDecks) renderDeck(deck.id, deck.name);
     if (personalCards.length > 0) renderDeck('personal', 'Personal cards');
+
+    // Populate the Settings → reset-deck selector
+    const resetSel = document.getElementById('reset-deck-select');
+    for (const deck of myDecks) resetSel.appendChild(new Option(deck.name, deck.id));
+    if (personalCards.length > 0) resetSel.appendChild(new Option('Personal cards', 'personal'));
   } catch (e) { console.error('deck buttons', e); }
 
   // Progress stats — loads independently
@@ -253,6 +316,54 @@ document.getElementById('google-btn').addEventListener('click', async () => {
     errEl.textContent = 'Sign-in failed. Please try again.';
     errEl.classList.remove('hidden');
     btn.disabled = false;
+  }
+});
+
+// ── Hamburger menu + sheets ───────────────────────────────────────────────────
+const menuBtn = document.getElementById('menu-btn');
+const dropdown = document.getElementById('menu-dropdown');
+
+function closeMenu() { dropdown.classList.add('hidden'); }
+menuBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  dropdown.classList.toggle('hidden');
+});
+document.addEventListener('click', e => {
+  if (!dropdown.contains(e.target) && e.target !== menuBtn) closeMenu();
+});
+
+function openSheet(id) { closeMenu(); document.getElementById(id).classList.remove('hidden'); }
+function closeSheet(id) { document.getElementById(id).classList.add('hidden'); }
+
+document.getElementById('menu-help').addEventListener('click', () => openSheet('help-modal'));
+document.getElementById('menu-settings').addEventListener('click', () => openSheet('settings-modal'));
+
+// Close buttons + tap-outside-to-close
+document.querySelectorAll('.sheet-close').forEach(b =>
+  b.addEventListener('click', () => closeSheet(b.dataset.close)));
+document.querySelectorAll('.sheet-overlay').forEach(ov =>
+  ov.addEventListener('click', e => { if (e.target === ov) closeSheet(ov.id); }));
+
+// ── Settings actions ──────────────────────────────────────────────────────────
+const resetSel = document.getElementById('reset-deck-select');
+const resetBtn = document.getElementById('reset-deck-btn');
+resetSel.addEventListener('change', () => { resetBtn.disabled = !resetSel.value; });
+
+resetBtn.addEventListener('click', async () => {
+  const name = resetSel.selectedOptions[0]?.text || 'this deck';
+  const first = confirm(`Reset progress for "${name}"?\n\nThis permanently deletes your learning history for every word in this deck. Your enrolment and the deck's words are kept, but all levels and review history are wiped.`);
+  if (!first) return;
+  const second = confirm(`Are you absolutely sure?\n\nThis cannot be undone. You'll start "${name}" again from scratch.`);
+  if (!second) return;
+
+  resetBtn.disabled = true; resetBtn.textContent = 'Resetting…';
+  try {
+    await resetDeckProgress(auth.currentUser.uid, resetSel.value);
+    resetBtn.textContent = 'Progress reset ✓';
+    setTimeout(() => { resetBtn.textContent = 'Reset this deck'; resetBtn.disabled = false; resetSel.value = ''; resetBtn.disabled = true; }, 1500);
+  } catch (e) {
+    console.error(e);
+    resetBtn.textContent = 'Reset failed'; resetBtn.disabled = false;
   }
 });
 
