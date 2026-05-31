@@ -23,12 +23,19 @@
 
   <p style="color:var(--muted);font-size:.88rem;margin-bottom:16px">
     Exam mode: drill every word from the decks you pick, both directions, in random order.
-    This does <strong>not</strong> affect your normal spaced-repetition schedule.
+    Rate each as <strong>Know it</strong> (drops out until you reset),
+    <strong>Partially</strong> (comes back near the end) or <strong>Don't know</strong>
+    (comes back soon). Your progress carries over day to day and does
+    <strong>not</strong> affect your normal spaced-repetition schedule.
   </p>
 
   <div id="loading" class="page-center"><div class="spinner"></div></div>
 
   <div id="picker" class="hidden">
+    <div id="known-note" class="hidden" style="background:var(--brand-light);border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span id="known-text" style="color:var(--brand-dark)"></span>
+      <button id="reset-cram-btn" style="background:none;border:1px solid var(--brand);color:var(--brand);border-radius:6px;padding:4px 10px;font-size:.78rem;cursor:pointer;white-space:nowrap">Reset</button>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <span style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Choose decks</span>
       <button id="select-all-btn" style="background:none;border:none;color:var(--brand);font-size:.8rem;cursor:pointer;text-decoration:underline">Select all</button>
@@ -57,11 +64,30 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getUser, getPublicDecks, getPersonalCards } from './js/db.js';
+import { getUser, getPublicDecks, getPersonalCards, getCramKnown, resetCram } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
 const selected = new Set();
+
+async function refreshKnownNote() {
+  const known = await getCramKnown(uid);
+  const n = Object.keys(known).length;
+  const note = document.getElementById('known-note');
+  if (n > 0) {
+    document.getElementById('known-text').textContent =
+      `${n} card${n !== 1 ? 's' : ''} marked “known” and skipped in cram mode.`;
+    note.classList.remove('hidden');
+  } else {
+    note.classList.add('hidden');
+  }
+}
+
+document.getElementById('reset-cram-btn').addEventListener('click', async () => {
+  if (!confirm('Reset cram progress? Every word will be asked again next time you revise.')) return;
+  await resetCram(uid);
+  await refreshKnownNote();
+});
 
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
@@ -70,6 +96,7 @@ onAuthStateChanged(auth, async user => {
   const [userData, decks, personalCards] = await Promise.all([
     getUser(uid), getPublicDecks(), getPersonalCards(uid)
   ]);
+  refreshKnownNote();
   const subscribed = new Set(userData?.subscribed_decks || []);
   const myDecks = decks.filter(d => subscribed.has(d.id));
 

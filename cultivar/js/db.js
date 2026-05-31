@@ -297,7 +297,9 @@ export async function getTodayCardsForDeck(uid, deckId) {
 }
 
 // Cram / exam-revision mode: every word from the chosen decks in both
-// directions, ignoring SRS scheduling entirely. No progress is read or written.
+// directions, ignoring SRS scheduling entirely. No SRS progress is read or
+// written. Cram keeps its own "known" set on the user doc (cram_known), keyed
+// by `${wordId}_${direction}`, which persists across days until reset.
 export async function getCramCards(uid, deckIds) {
   const all = [];
   for (const deckId of deckIds) {
@@ -311,6 +313,21 @@ export async function getCramCards(uid, deckIds) {
     }
   }
   return all;
+}
+
+export async function getCramKnown(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  return snap.data()?.cram_known || {};
+}
+
+export async function setCramKnown(uid, cardKey, known) {
+  await updateDoc(doc(db, 'users', uid), {
+    [`cram_known.${cardKey}`]: known ? true : deleteField()
+  });
+}
+
+export async function resetCram(uid) {
+  await updateDoc(doc(db, 'users', uid), { cram_known: {} });
 }
 
 export async function subscribeToDeck(uid, deckId) {
