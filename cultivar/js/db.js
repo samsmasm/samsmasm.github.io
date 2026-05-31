@@ -38,19 +38,6 @@ export async function getUser(uid) {
   return snap.exists() ? snap.data() : null;
 }
 
-export async function getUserStats(uid) {
-  const endTs = Timestamp.fromDate(endOfToday());
-  const q = query(collection(db, 'users', uid, 'progress'), where('due_date', '<=', endTs));
-  const [dueSnap, allSnap] = await Promise.all([
-    getDocs(q),
-    getDocs(collection(db, 'users', uid, 'progress'))
-  ]);
-  // Count unique words (each word has 2 progress records, one per direction)
-  const dueWords = new Set(dueSnap.docs.map(d => d.data().word_id));
-  const allWords = new Set(allSnap.docs.map(d => d.data().word_id));
-  return { due: dueWords.size, total: allWords.size };
-}
-
 // ── Decks ────────────────────────────────────────────────────────────────────
 
 export async function getPublicDecks() {
@@ -84,33 +71,9 @@ export async function getDeckProgress(uid, deckId) {
 
 // ── Subscriptions ─────────────────────────────────────────────────────────────
 
-const DAILY_NEW_LIMIT = 12;
-const DAILY_REVIEW_LIMIT = 48;
-
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-async function dailyAllowanceRemaining(uid) {
-  const snap = await getDoc(doc(db, 'users', uid));
-  const d = snap.data() || {};
-  if (d.new_today_date === todayStr()) {
-    return Math.max(0, DAILY_NEW_LIMIT - (d.new_today_count || 0));
-  }
-  return DAILY_NEW_LIMIT;
-}
-
-async function bumpDailyCount(uid, wordIds) {
-  const snap = await getDoc(doc(db, 'users', uid));
-  const d = snap.data() || {};
-  const today = todayStr();
-  const isToday = d.new_today_date === today;
-  await updateDoc(doc(db, 'users', uid), {
-    new_today_date: today,
-    new_today_count: (isToday ? (d.new_today_count || 0) : 0) + wordIds.length,
-    new_today_word_ids: [...(isToday ? (d.new_today_word_ids || []) : []), ...wordIds]
-  });
 }
 
 // Finds deck words that have no progress records yet (pending pool)
@@ -121,94 +84,6 @@ async function pendingWordsForDeck(uid, deckId) {
   ]);
   const existing = new Set(progressSnap.docs.map(d => d.data().word_id));
   return words.filter(w => !existing.has(w.id)).map(w => ({ deckId, word: w }));
-}
-
-export async function getPendingCount(uid) {
-  const userData = await getUser(uid);
-  const deckIds = userData?.subscribed_decks || [];
-  let count = 0;
-  for (const deckId of deckIds) {
-    const pending = await pendingWordsForDeck(uid, deckId);
-    count += pending.length;
-  }
-  return count;
-}
-
-export async function introduceWords(uid, count) {
-  if (count <= 0) return 0;
-  const userData = await getUser(uid);
-  const deckIds = userData?.subscribed_decks || [];
-
-  const pending = [];
-  for (const deckId of deckIds) {
-    pending.push(...await pendingWordsForDeck(uid, deckId));
-    if (pending.length >= count) break;
-  }
-
-  const toIntroduce = pending.slice(0, count);
-  if (toIntroduce.length === 0) return 0;
-
-  const now = Timestamp.fromDate(new Date());
-  for (let i = 0; i < toIntroduce.length; i += 499) {
-    const batch = writeBatch(db);
-    for (const { deckId, word } of toIntroduce.slice(i, i + 499)) {
-      for (const dir of ['vn_en', 'en_vn']) {
-        batch.set(doc(db, 'users', uid, 'progress', `${word.id}_${dir}`), {
-          word_id: word.id, deck_id: deckId, source: 'deck',
-          direction: dir, level: 0, due_date: now,
-          last_reviewed: null, correct_count: 0, incorrect_count: 0
-        });
-      }
-    }
-    await batch.commit();
-  }
-  await bumpDailyCount(uid, toIntroduce.map(({ word }) => word.id));
-  return toIntroduce.length;
-}
-
-export async function getTodayCards(uid) {
-  const userData = await getUser(uid);
-  if (userData?.new_today_date !== todayStr()) return [];
-  const wordIds = userData?.new_today_word_ids || [];
-  if (wordIds.length === 0) return [];
-
-  const progressIds = wordIds.flatMap(id => [`${id}_vn_en`, `${id}_en_vn`]);
-  const progressSnaps = await Promise.all(
-    progressIds.map(pid => getDoc(doc(db, 'users', uid, 'progress', pid)))
-  );
-  const existing = progressSnaps.filter(s => s.exists());
-
-  const deckFetches = {}, personalIds = [];
-  for (const s of existing) {
-    const { word_id, source, deck_id } = s.data();
-    if (source === 'deck') { if (!deckFetches[word_id]) deckFetches[word_id] = { deck_id, word_id }; }
-    else personalIds.push(word_id);
-  }
-
-  const wordCache = {};
-  await Promise.all([
-    ...Object.values(deckFetches).map(async ({ deck_id, word_id }) => {
-      const s = await getDoc(doc(db, 'decks', deck_id, 'words', word_id));
-      if (s.exists()) wordCache[word_id] = s.data();
-    }),
-    ...personalIds.map(async id => {
-      const s = await getDoc(doc(db, 'users', uid, 'cards', id));
-      if (s.exists()) wordCache[id] = s.data();
-    })
-  ]);
-
-  return existing.map(s => {
-    const progress = s.data();
-    const word = wordCache[progress.word_id];
-    if (!word) return null;
-    return { progressId: s.id, progress, word, direction: progress.direction };
-  }).filter(Boolean);
-}
-
-export async function autoIntroduceDaily(uid) {
-  const remaining = await dailyAllowanceRemaining(uid);
-  if (remaining <= 0) return 0;
-  return introduceWords(uid, remaining);
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -298,11 +173,35 @@ export async function introduceWordsForDeck(uid, deckId, count) {
   return toIntroduce.length;
 }
 
+// Counts progress records still in the "New" box (level 0) for a deck.
+// Used to gate introducing more words: you must clear the New box first.
+export async function countNewBoxForDeck(uid, deckId) {
+  const q = deckId === 'personal'
+    ? query(collection(db, 'users', uid, 'progress'), where('source', '==', 'personal'))
+    : query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId));
+  const snap = await getDocs(q);
+  return snap.docs.filter(d => d.data().level === 0).length;
+}
+
+// True only when there are pending words AND the New box is empty
+// (all introduced words have moved past level 0 / "passed to tomorrow").
+export async function canIntroduceMoreForDeck(uid, deckId) {
+  if (deckId === 'personal') return false;
+  const [pending, newBox] = await Promise.all([
+    getPendingCountForDeck(uid, deckId),
+    countNewBoxForDeck(uid, deckId)
+  ]);
+  return pending > 0 && newBox === 0;
+}
+
 export async function autoIntroduceDailyForDeck(uid, deckId) {
   if (deckId === 'personal') return 0;
   const settings = await getUserSettings(uid);
   const remaining = await getDailyAllowanceRemainingForDeck(uid, deckId, settings.daily_new);
   if (remaining <= 0) return 0;
+  // Don't introduce new words while the New box still has cards to clear.
+  const newBox = await countNewBoxForDeck(uid, deckId);
+  if (newBox > 0) return 0;
   return introduceWordsForDeck(uid, deckId, remaining);
 }
 
@@ -397,9 +296,8 @@ export async function subscribeToDeck(uid, deckId) {
   if (!arr.includes(deckId)) {
     await updateDoc(userRef, { subscribed_decks: [...arr, deckId] });
   }
-  // Only introduce up to today's remaining allowance, not all words at once
-  const remaining = await dailyAllowanceRemaining(uid);
-  return introduceWords(uid, remaining);
+  // Words are introduced per-deck when the review session is first opened
+  // (autoIntroduceDailyForDeck), so nothing is introduced at subscribe time.
 }
 
 export async function unenrollFromDeck(uid, deckId) {
@@ -409,92 +307,7 @@ export async function unenrollFromDeck(uid, deckId) {
   await updateDoc(userRef, { subscribed_decks: arr });
 }
 
-export async function syncNewDeckWords(uid, deckId) {
-  const [words, existingSnap] = await Promise.all([
-    getDeckWords(deckId),
-    getDocs(query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId)))
-  ]);
-  const existing = new Set(existingSnap.docs.map(d => d.id));
-  const now = Timestamp.fromDate(new Date());
-
-  const missing = [];
-  for (const word of words) {
-    for (const dir of ['vn_en', 'en_vn']) {
-      const pid = `${word.id}_${dir}`;
-      if (!existing.has(pid)) missing.push({ pid, word_id: word.id, dir });
-    }
-  }
-
-  for (let i = 0; i < missing.length; i += 499) {
-    const batch = writeBatch(db);
-    for (const { pid, word_id, dir } of missing.slice(i, i + 499)) {
-      batch.set(doc(db, 'users', uid, 'progress', pid), {
-        word_id, deck_id: deckId, source: 'deck',
-        direction: dir, level: 0, due_date: now,
-        last_reviewed: null, correct_count: 0, incorrect_count: 0
-      });
-    }
-    await batch.commit();
-  }
-  return missing.length;
-}
-
 // ── Review ───────────────────────────────────────────────────────────────────
-
-export async function getDueCards(uid) {
-  const endTs = Timestamp.fromDate(endOfToday());
-  const q = query(collection(db, 'users', uid, 'progress'), where('due_date', '<=', endTs));
-  const progressSnap = await getDocs(q);
-  if (progressSnap.empty) return [];
-
-  // Group word fetches by source to parallelise
-  const deckFetches = {};  // wordId → {deckId, wordId}
-  const personalIds = [];
-
-  for (const pd of progressSnap.docs) {
-    const { word_id, source, deck_id } = pd.data();
-    if (source === 'deck') {
-      if (!deckFetches[word_id]) deckFetches[word_id] = { deck_id, word_id };
-    } else {
-      personalIds.push(word_id);
-    }
-  }
-
-  const wordCache = {};
-  await Promise.all([
-    ...Object.values(deckFetches).map(async ({ deck_id, word_id }) => {
-      const snap = await getDoc(doc(db, 'decks', deck_id, 'words', word_id));
-      if (snap.exists()) wordCache[word_id] = snap.data();
-    }),
-    ...personalIds.map(async id => {
-      const snap = await getDoc(doc(db, 'users', uid, 'cards', id));
-      if (snap.exists()) wordCache[id] = snap.data();
-    })
-  ]);
-
-  const cards = progressSnap.docs
-    .map(pd => {
-      const progress = pd.data();
-      const word = wordCache[progress.word_id];
-      if (!word) return null;
-      return { progressId: pd.id, progress, word, direction: progress.direction };
-    })
-    .filter(Boolean);
-
-  // Three buckets:
-  // 1. Genuinely new — level 0, never reviewed (last_reviewed null) → cap at 12 words × 2 directions
-  // 2. Failed-reset  — level 0, previously reviewed then got wrong → always include (retry cycle)
-  // 3. Review        — level > 0 → cap at DAILY_REVIEW_LIMIT
-  const genuinelyNew = cards.filter(c => c.progress.level === 0 && !c.progress.last_reviewed);
-  const failedReset  = cards.filter(c => c.progress.level === 0 &&  c.progress.last_reviewed);
-  const reviewCards  = cards.filter(c => c.progress.level  > 0);
-
-  return [
-    ...genuinelyNew.slice(0, DAILY_NEW_LIMIT * 2),
-    ...failedReset,
-    ...reviewCards.slice(0, DAILY_REVIEW_LIMIT)
-  ];
-}
 
 export async function updateProgress(uid, progressId, correct) {
   const ref = doc(db, 'users', uid, 'progress', progressId);
@@ -549,9 +362,6 @@ export async function resetDeckProgress(uid, deckId) {
     await batch.commit();
   }
   await updateDoc(doc(db, 'users', uid), {
-    new_today_date: null,
-    new_today_count: 0,
-    new_today_word_ids: [],
     [`deck_today.${deckId}`]: deleteField()
   });
 }

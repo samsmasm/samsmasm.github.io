@@ -73,7 +73,7 @@
 import { auth } from './js/config.js';
 import { updateProgress, autoIntroduceDailyForDeck, getDueCardsForDeck,
          getTodayCardsForDeck, introduceWordsForDeck, getPendingCountForDeck,
-         getUserSettings } from './js/db.js';
+         canIntroduceMoreForDeck, getUserSettings } from './js/db.js';
 import { levelLabel } from './js/srs.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -117,11 +117,22 @@ async function showPracticeButton() {
   if (todayCards.length > 0) {
     document.getElementById('repeat-btn').classList.remove('hidden');
   }
-  const pending = await getPendingCountForDeck(uid, deckId);
+  // Only offer more words once the New box is cleared (all passed to tomorrow)
+  const [pending, canMore] = await Promise.all([
+    getPendingCountForDeck(uid, deckId),
+    canIntroduceMoreForDeck(uid, deckId)
+  ]);
   if (pending > 0) {
     const btn = document.getElementById('more-btn');
-    btn.textContent = `Introduce more words (${pending} pending)`;
-    btn.classList.remove('hidden');
+    if (canMore) {
+      btn.textContent = `Add 12 more words (${pending} pending)`;
+      btn.disabled = false;
+      btn.classList.remove('hidden');
+    } else {
+      btn.textContent = `Clear today's words to add more (${pending} pending)`;
+      btn.disabled = true;
+      btn.classList.remove('hidden');
+    }
   }
 }
 
@@ -133,7 +144,8 @@ document.getElementById('repeat-btn').addEventListener('click', async () => {
 
 document.getElementById('more-btn').addEventListener('click', async () => {
   const btn = document.getElementById('more-btn');
-  btn.disabled = true; btn.textContent = 'Introducing…';
+  if (btn.disabled) return;
+  btn.disabled = true; btn.textContent = 'Adding…';
   await introduceWordsForDeck(uid, deckId, settings.daily_new);
   const cards = await getDueCardsForDeck(uid, deckId);
   startSession(cards);
