@@ -11,6 +11,19 @@
 </head>
 <body>
 
+<!-- Filter / start screen -->
+<div id="filter-view" class="page-center hidden" style="flex-direction:column;gap:16px;padding:24px">
+  <h2 style="margin:0">Review</h2>
+  <div class="form-group" style="width:100%;max-width:300px">
+    <label for="subject-filter">Subject</label>
+    <select id="subject-filter">
+      <option value="">All subjects</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" id="start-btn" style="width:100%;max-width:300px">Start review</button>
+  <a href="index.html" class="btn btn-secondary" style="width:100%;max-width:300px">Cancel</a>
+</div>
+
 <!-- Loading -->
 <div id="loading-view" class="page-center">
   <div class="spinner"></div>
@@ -69,7 +82,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getDueCards, updateProgress } from './js/db.js';
+import { getDueCards, updateProgress, getPublicDecks, getUser } from './js/db.js';
 import { levelLabel } from './js/srs.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -78,26 +91,69 @@ let totalUnique = 0;
 let mastered = 0;
 let uid = null;
 let flipped = false;
+let allCards = [];
+let deckMeta = {};
 
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
 
-  const cards = await getDueCards(uid);
-  document.getElementById('loading-view').classList.add('hidden');
+  const [cards, userData, decks] = await Promise.all([
+    getDueCards(uid),
+    getUser(uid),
+    getPublicDecks()
+  ]);
 
-  if (cards.length === 0) {
+  document.getElementById('loading-view').classList.add('hidden');
+  allCards = cards;
+
+  // Build deck metadata lookup
+  for (const d of decks) deckMeta[d.id] = d;
+
+  // Populate subject filter from subscribed decks that have due cards
+  const subjectSet = new Set();
+  const subscribed = new Set(userData?.subscribed_decks || []);
+  for (const c of cards) {
+    if (c.deck_id && deckMeta[c.deck_id]?.subject) {
+      subjectSet.add(deckMeta[c.deck_id].subject);
+    }
+  }
+  const sel = document.getElementById('subject-filter');
+  for (const s of [...subjectSet].sort()) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    sel.appendChild(opt);
+  }
+
+  document.getElementById('filter-view').classList.remove('hidden');
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  const subject = document.getElementById('subject-filter').value;
+  let filtered = allCards;
+  if (subject) {
+    filtered = allCards.filter(c => {
+      if (!c.deck_id) return false;
+      return deckMeta[c.deck_id]?.subject === subject;
+    });
+  }
+
+  document.getElementById('filter-view').classList.add('hidden');
+
+  if (filtered.length === 0) {
     const doneView = document.getElementById('done-view');
     document.getElementById('done-title').textContent = 'All caught up! 🎉';
-    document.getElementById('done-msg').textContent = 'No cards due today. Come back tomorrow!';
+    document.getElementById('done-msg').textContent = subject
+      ? `No cards due today for ${subject}.`
+      : 'No cards due today. Come back tomorrow!';
     doneView.classList.remove('hidden');
     return;
   }
 
-  queue = shuffle([...cards]);
+  queue = shuffle([...filtered]);
   totalUnique = queue.length;
   mastered = 0;
-
   document.getElementById('review-view').classList.remove('hidden');
   showCard(queue[0]);
 });

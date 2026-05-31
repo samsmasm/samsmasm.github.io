@@ -220,10 +220,10 @@ export async function deletePersonalCard(uid, cardId) {
 
 // ── Admin ────────────────────────────────────────────────────────────────────
 
-export async function createDeck(name, description) {
+export async function createDeck(name, description, subject = '', unit = '', subunit = '') {
   const ref = doc(collection(db, 'decks'));
   await setDoc(ref, {
-    name, description,
+    name, description, subject, unit, subunit,
     is_public: true,
     word_count: 0,
     created_by: auth.currentUser.uid,

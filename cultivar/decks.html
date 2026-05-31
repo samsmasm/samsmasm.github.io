@@ -74,33 +74,60 @@ async function loadDecks() {
   const list = document.getElementById('deck-list');
   list.innerHTML = '';
 
+  // Group by subject → unit
+  const groups = {};
   for (const deck of decks) {
-    const isSub = subscribed.has(deck.id);
-    const prog = progressMap[deck.id];
-    const pct = prog && prog.total > 0 ? Math.round((prog.mastered / prog.total) * 100) : 0;
+    const s = deck.subject || '';
+    const u = deck.unit || '';
+    if (!groups[s]) groups[s] = {};
+    if (!groups[s][u]) groups[s][u] = [];
+    groups[s][u].push(deck);
+  }
 
-    const card = document.createElement('div');
-    card.className = 'list-card';
-    card.innerHTML = `
-      <div class="list-card-body">
-        <div class="list-card-title">${esc(deck.name)}</div>
-        ${deck.description ? `<div class="list-card-sub">${esc(deck.description)}</div>` : ''}
-        <div class="deck-meta">
-          <span>${deck.word_count ?? 0} words</span>
-          ${isSub && prog ? `<span>${prog.mastered}/${prog.total} mastered</span>` : ''}
-        </div>
-        ${isSub && prog && prog.total > 0 ? `
-          <div class="mini-bar">
-            <div class="mini-bar-fill" style="width:${pct}%"></div>
-          </div>` : ''}
-      </div>
-      ${isSub
-        ? `<span class="badge badge-success">Enrolled</span>`
-        : `<button class="btn btn-primary" style="font-size:.875rem;padding:8px 16px;min-height:38px"
-             data-deck-id="${deck.id}" data-deck-name="${esc(deck.name)}">Join</button>`
+  for (const subject of Object.keys(groups).sort()) {
+    if (subject) {
+      const sh = document.createElement('h2');
+      sh.className = 'section-heading';
+      sh.style.cssText = 'margin:20px 0 8px;font-size:1rem;color:var(--muted)';
+      sh.textContent = subject;
+      list.appendChild(sh);
+    }
+    for (const unit of Object.keys(groups[subject]).sort()) {
+      if (unit) {
+        const uh = document.createElement('h3');
+        uh.style.cssText = 'margin:12px 0 6px;font-size:.85rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em';
+        uh.textContent = unit;
+        list.appendChild(uh);
       }
-    `;
-    list.appendChild(card);
+      for (const deck of groups[subject][unit]) {
+        const isSub = subscribed.has(deck.id);
+        const prog = progressMap[deck.id];
+        const pct = prog && prog.total > 0 ? Math.round((prog.mastered / prog.total) * 100) : 0;
+
+        const card = document.createElement('div');
+        card.className = 'list-card';
+        card.innerHTML = `
+          <div class="list-card-body">
+            <div class="list-card-title">${esc(deck.name)}</div>
+            ${deck.description ? `<div class="list-card-sub">${esc(deck.description)}</div>` : ''}
+            <div class="deck-meta">
+              <span>${deck.word_count ?? 0} words</span>
+              ${isSub && prog ? `<span>${prog.mastered}/${prog.total} mastered</span>` : ''}
+            </div>
+            ${isSub && prog && prog.total > 0 ? `
+              <div class="mini-bar">
+                <div class="mini-bar-fill" style="width:${pct}%"></div>
+              </div>` : ''}
+          </div>
+          ${isSub
+            ? `<span class="badge badge-success">Enrolled</span>`
+            : `<button class="btn btn-primary" style="font-size:.875rem;padding:8px 16px;min-height:38px"
+                 data-deck-id="${deck.id}" data-deck-name="${esc(deck.name)}">Join</button>`
+          }
+        `;
+        list.appendChild(card);
+      }
+    }
   }
 
   list.classList.remove('hidden');
