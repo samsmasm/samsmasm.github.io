@@ -173,25 +173,30 @@ export async function introduceWordsForDeck(uid, deckId, count) {
   return toIntroduce.length;
 }
 
-// Counts progress records still in the "New" box (level 0) for a deck.
-// Used to gate introducing more words: you must clear the New box first.
-export async function countNewBoxForDeck(uid, deckId) {
+// Counts UNSTARTED new words for a deck: level 0 AND never attempted
+// (last_reviewed is null). A word that dropped to level 0 from a failed
+// review has last_reviewed set, so it does NOT count here — failed reviews
+// must never hold back new words.
+export async function countUnstartedForDeck(uid, deckId) {
   const q = deckId === 'personal'
     ? query(collection(db, 'users', uid, 'progress'), where('source', '==', 'personal'))
     : query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId));
   const snap = await getDocs(q);
-  return snap.docs.filter(d => d.data().level === 0).length;
+  return snap.docs.filter(d => {
+    const p = d.data();
+    return p.level === 0 && !p.last_reviewed;
+  }).length;
 }
 
-// True only when there are pending words AND the New box is empty
-// (all introduced words have moved past level 0 / "passed to tomorrow").
+// True only when there are pending words AND you've started every new word
+// you've already been given (no unstarted ones waiting).
 export async function canIntroduceMoreForDeck(uid, deckId) {
   if (deckId === 'personal') return false;
-  const [pending, newBox] = await Promise.all([
+  const [pending, unstarted] = await Promise.all([
     getPendingCountForDeck(uid, deckId),
-    countNewBoxForDeck(uid, deckId)
+    countUnstartedForDeck(uid, deckId)
   ]);
-  return pending > 0 && newBox === 0;
+  return pending > 0 && unstarted === 0;
 }
 
 export async function autoIntroduceDailyForDeck(uid, deckId) {
@@ -199,9 +204,10 @@ export async function autoIntroduceDailyForDeck(uid, deckId) {
   const settings = await getUserSettings(uid);
   const remaining = await getDailyAllowanceRemainingForDeck(uid, deckId, settings.daily_new);
   if (remaining <= 0) return 0;
-  // Don't introduce new words while the New box still has cards to clear.
-  const newBox = await countNewBoxForDeck(uid, deckId);
-  if (newBox > 0) return 0;
+  // Don't pile on new words while you still have unstarted ones to begin.
+  // (Failed reviews don't count — only never-attempted new words block this.)
+  const unstarted = await countUnstartedForDeck(uid, deckId);
+  if (unstarted > 0) return 0;
   return introduceWordsForDeck(uid, deckId, remaining);
 }
 
