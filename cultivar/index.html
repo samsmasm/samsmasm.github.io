@@ -143,28 +143,28 @@ onAuthStateChanged(auth, async user => {
   authView.classList.add('hidden');
   appView.classList.remove('hidden');
 
-  const userData = await getOrCreateUser(user);
-  document.getElementById('user-name').textContent = userData.display_name;
+  try {
+    const userData = await getOrCreateUser(user);
+    document.getElementById('user-name').textContent = userData.display_name;
+    if (userData.is_admin) document.getElementById('admin-link').classList.remove('hidden');
+  } catch (e) { console.error('user load', e); }
 
-  if (userData.is_admin) {
-    document.getElementById('admin-link').classList.remove('hidden');
-  }
-
-  const [{ due, total }, pending] = await Promise.all([
-    getUserStats(user.uid),
-    getPendingCount(user.uid)
-  ]);
-  document.getElementById('stat-due').textContent = due;
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-pending').textContent = pending;
-
-  const cta = document.getElementById('review-cta');
-  if (due === 0) {
-    cta.textContent = '✓ All caught up!';
-    cta.style.background = 'var(--correct)';
-  } else {
-    cta.textContent = `Review ${due} word${due !== 1 ? 's' : ''} due today`;
-  }
+  // Load stats independently so an error here never breaks the page
+  Promise.all([
+    getUserStats(user.uid).catch(() => ({ due: '–', total: '–' })),
+    getPendingCount(user.uid).catch(() => '–')
+  ]).then(([{ due, total }, pending]) => {
+    document.getElementById('stat-due').textContent = due;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-pending').textContent = pending;
+    const cta = document.getElementById('review-cta');
+    if (due === 0) {
+      cta.textContent = '✓ All caught up!';
+      cta.style.background = 'var(--correct)';
+    } else if (due !== '–') {
+      cta.textContent = `Review ${due} word${due !== 1 ? 's' : ''} due today`;
+    }
+  });
 });
 
 document.getElementById('google-btn').addEventListener('click', async () => {
