@@ -212,6 +212,18 @@ export async function autoIntroduceDaily(uid) {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
+export async function getProgressStats(uid) {
+  const snap = await getDocs(collection(db, 'users', uid, 'progress'));
+  const byWord = {};
+  for (const d of snap.docs) {
+    const { word_id, level } = d.data();
+    if (byWord[word_id] === undefined || level < byWord[word_id]) byWord[word_id] = level;
+  }
+  const counts = Array(7).fill(0);
+  for (const level of Object.values(byWord)) counts[level]++;
+  return counts; // index = SRS level 0–6
+}
+
 export async function getUserSettings(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
   const s = snap.data()?.settings || {};

@@ -71,21 +71,29 @@
 
 <!-- ── Dashboard (logged in) ──────────────────────────────── -->
 <div id="app-view" class="hidden">
-  <header class="page-header" style="justify-content:flex-end;background:transparent;box-shadow:none">
-    <button class="btn-icon" id="logout-btn" title="Sign out" style="color:var(--muted)">⏻</button>
+  <header class="page-header">
+    <div style="width:44px"></div>
+    <div></div>
+    <button class="btn btn-secondary" id="logout-btn" style="font-size:.75rem;padding:5px 12px;min-height:30px">Sign out</button>
   </header>
 
   <main class="main-pad">
 
-    <div style="text-align:center;padding:20px 0 24px">
-      <img src="cultivarlogo.png" alt="Cultivar" style="height:64px;width:auto;filter:drop-shadow(0 2px 8px rgba(79,70,229,.18))">
+    <div style="text-align:center;padding:12px 0 20px">
+      <img src="cultivarlogo.png" alt="Cultivar" style="height:60px;width:auto">
       <div style="font-size:1.75rem;font-weight:800;color:var(--brand);letter-spacing:-.03em;margin-top:8px">Cultivar</div>
       <div style="font-size:.82rem;color:var(--muted);margin-top:2px">Spaced repetition learning</div>
       <p class="greeting" style="margin-top:10px;font-size:.9rem">Welcome back, <strong id="user-name">…</strong></p>
     </div>
 
-    <div id="deck-buttons" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+    <div id="deck-buttons" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
       <div class="spinner" style="margin:24px auto"></div>
+    </div>
+
+    <!-- Progress stats -->
+    <div id="stats-section" class="hidden" style="margin-bottom:20px">
+      <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your progress</div>
+      <div id="stats-bars"></div>
     </div>
 
     <div class="quick-grid">
@@ -104,7 +112,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getOrCreateUser, getPublicDecks, getUser, getPersonalCards } from './js/db.js';
+import { getOrCreateUser, getPublicDecks, getUser, getPersonalCards, getProgressStats } from './js/db.js';
 import {
   onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -168,6 +176,52 @@ onAuthStateChanged(auth, async user => {
       container.appendChild(a);
     }
   } catch (e) { console.error('deck buttons', e); }
+
+  // Progress stats — loads independently
+  getProgressStats(user.uid).then(counts => {
+    const labels = [
+      'Still learning',
+      'One more day',
+      'A bit',
+      'Get in there!',
+      'In the bank',
+      'Way out',
+      'Nailed it'
+    ];
+    const total = counts.reduce((s, n) => s + n, 0);
+    if (total === 0) return;
+
+    const section = document.getElementById('stats-section');
+    const bars    = document.getElementById('stats-bars');
+    bars.innerHTML = '';
+    const max = Math.max(...counts, 1);
+
+    counts.forEach((n, i) => {
+      if (n === 0 && i > 3) return; // hide empty high-level boxes
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:5px';
+
+      const lbl = document.createElement('span');
+      lbl.textContent = labels[i];
+      lbl.style.cssText = 'font-size:.78rem;color:var(--muted);width:110px;flex-shrink:0';
+
+      const track = document.createElement('div');
+      track.style.cssText = 'flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden';
+      const fill = document.createElement('div');
+      const hue = Math.round(i * (120 / 6)); // green=120 at level 6, red-ish=0 at level 0
+      fill.style.cssText = `height:100%;border-radius:4px;width:${Math.round((n/max)*100)}%;background:hsl(${hue},60%,52%);transition:width .4s`;
+      track.appendChild(fill);
+
+      const cnt = document.createElement('span');
+      cnt.textContent = n;
+      cnt.style.cssText = 'font-size:.78rem;font-weight:600;color:var(--text);min-width:24px;text-align:right';
+
+      row.append(lbl, track, cnt);
+      bars.appendChild(row);
+    });
+
+    section.classList.remove('hidden');
+  }).catch(() => {});
 });
 
 document.getElementById('google-btn').addEventListener('click', async () => {
