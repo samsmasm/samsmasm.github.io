@@ -568,7 +568,7 @@ export async function deletePersonalCard(uid, cardId) {
 // ── Dashboard word management ────────────────────────────────────────────────
 
 const SRS_INTERVALS = [0, 1, 3, 7, 30, 90, 365];
-const BOX_LABELS    = ['Today', 'Tomorrow', '3 days', '7 days', '30 days', '90 days', '1 year'];
+const BOX_LABELS    = ['New', 'Seen it', 'Know a bit', 'Getting there', 'Comfortable', 'Strong', 'Mastered'];
 
 export function boxLabel(level) { return BOX_LABELS[level] ?? '?'; }
 
