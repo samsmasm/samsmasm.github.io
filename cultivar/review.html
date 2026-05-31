@@ -20,6 +20,18 @@
       <option value="">All subjects</option>
     </select>
   </div>
+  <div class="form-group" style="width:100%;max-width:300px">
+    <label for="tier-filter">Tier</label>
+    <select id="tier-filter">
+      <option value="">All tiers</option>
+    </select>
+  </div>
+  <div class="form-group" style="width:100%;max-width:300px">
+    <label for="category-filter">Category</label>
+    <select id="category-filter">
+      <option value="">All categories</option>
+    </select>
+  </div>
   <button class="btn btn-primary" id="start-btn" style="width:100%;max-width:300px">Start review</button>
   <a href="index.html" class="btn btn-secondary" style="width:100%;max-width:300px">Cancel</a>
 </div>
@@ -110,43 +122,51 @@ onAuthStateChanged(auth, async user => {
   // Build deck metadata lookup
   for (const d of decks) deckMeta[d.id] = d;
 
-  // Populate subject filter from subscribed decks that have due cards
   const subjectSet = new Set();
-  const subscribed = new Set(userData?.subscribed_decks || []);
+  const tierSet = new Set();
+  const categorySet = new Set();
+
   for (const c of cards) {
-    if (c.deck_id && deckMeta[c.deck_id]?.subject) {
-      subjectSet.add(deckMeta[c.deck_id].subject);
+    if (c.progress.deck_id && deckMeta[c.progress.deck_id]?.subject) {
+      subjectSet.add(deckMeta[c.progress.deck_id].subject);
+    }
+    if (c.word.tier) tierSet.add(c.word.tier);
+    if (c.word.category) categorySet.add(c.word.category);
+  }
+
+  function populateSelect(id, values, labelFn = v => v) {
+    const sel = document.getElementById(id);
+    for (const v of [...values].sort()) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = labelFn(v);
+      sel.appendChild(opt);
     }
   }
-  const sel = document.getElementById('subject-filter');
-  for (const s of [...subjectSet].sort()) {
-    const opt = document.createElement('option');
-    opt.value = s;
-    opt.textContent = s;
-    sel.appendChild(opt);
-  }
+
+  populateSelect('subject-filter', subjectSet);
+  populateSelect('tier-filter', tierSet, v => `Tier ${v}`);
+  populateSelect('category-filter', categorySet);
 
   document.getElementById('filter-view').classList.remove('hidden');
 });
 
 document.getElementById('start-btn').addEventListener('click', () => {
-  const subject = document.getElementById('subject-filter').value;
+  const subject  = document.getElementById('subject-filter').value;
+  const tier     = document.getElementById('tier-filter').value;
+  const category = document.getElementById('category-filter').value;
+
   let filtered = allCards;
-  if (subject) {
-    filtered = allCards.filter(c => {
-      if (!c.deck_id) return false;
-      return deckMeta[c.deck_id]?.subject === subject;
-    });
-  }
+  if (subject)  filtered = filtered.filter(c => deckMeta[c.progress.deck_id]?.subject === subject);
+  if (tier)     filtered = filtered.filter(c => c.word.tier === tier);
+  if (category) filtered = filtered.filter(c => c.word.category === category);
 
   document.getElementById('filter-view').classList.add('hidden');
 
   if (filtered.length === 0) {
     const doneView = document.getElementById('done-view');
     document.getElementById('done-title').textContent = 'All caught up! 🎉';
-    document.getElementById('done-msg').textContent = subject
-      ? `No cards due today for ${subject}.`
-      : 'No cards due today. Come back tomorrow!';
+    document.getElementById('done-msg').textContent = 'No cards due today match those filters.';
     doneView.classList.remove('hidden');
     return;
   }
