@@ -12,7 +12,11 @@
 <body>
 
 <header class="page-header">
-  <h1>Dashboard</h1>
+  <div style="display:flex;align-items:center;gap:8px">
+    <img src="cultivarlogo.png" alt="" style="height:22px;width:auto;opacity:.55">
+    <h1>Dashboard</h1>
+  </div>
+  <div style="width:44px"></div>
 </header>
 
 <main class="main-pad">
@@ -70,6 +74,14 @@
 
 </main>
 
+<!-- Selection action bar — appears above nav when words are checked -->
+<div id="selection-bar" style="display:none;position:fixed;bottom:var(--nav-h);left:0;right:0;max-width:540px;margin:0 auto;background:var(--surface);border-top:2px solid var(--brand);padding:10px 16px;align-items:center;gap:10px;z-index:20;box-shadow:0 -2px 8px rgba(0,0,0,.08)">
+  <span id="sel-count" style="flex:1;font-size:.9rem;font-weight:600;color:var(--brand)"></span>
+  <button id="sel-earlier-btn" class="btn btn-secondary" style="padding:6px 16px;min-height:36px">← Earlier</button>
+  <button id="sel-later-btn" class="btn btn-secondary" style="padding:6px 16px;min-height:36px">Later →</button>
+  <button id="sel-clear-btn" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:4px">Clear</button>
+</div>
+
 <nav class="bottom-nav">
   <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
   <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
@@ -82,7 +94,7 @@
 import { auth } from './js/config.js';
 import { getUser, getPublicDecks, resetDeckProgress, getUserSettings, updateUserSettings,
          getDeckWordsWithProgress, setWordStatus, bulkSetWordStatus, moveWordBox,
-         removeWordFromCycle, boxLabel } from './js/db.js';
+         bulkMoveWordBox, removeWordFromCycle, boxLabel } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
@@ -120,6 +132,8 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
 });
 
 let currentDeckId = null;
+let selectedIds   = new Set();
+let lastCheckedIdx = -1;
 
 document.getElementById('dash-deck-select').addEventListener('change', async e => {
   currentDeckId = e.target.value || null;
@@ -127,7 +141,49 @@ document.getElementById('dash-deck-select').addEventListener('change', async e =
   if (currentDeckId) await loadWordList();
 });
 
+// ── Selection bar ─────────────────────────────────────────────────────────────
+
+function updateSelectionBar() {
+  const bar = document.getElementById('selection-bar');
+  const n   = selectedIds.size;
+  document.getElementById('sel-count').textContent = `${n} selected`;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+}
+
+document.getElementById('sel-clear-btn').addEventListener('click', () => {
+  selectedIds.clear();
+  lastCheckedIdx = -1;
+  document.querySelectorAll('.word-cb').forEach(c => c.checked = false);
+  updateSelectionBar();
+});
+
+async function bulkMove(direction) {
+  const eBtn = document.getElementById('sel-earlier-btn');
+  const lBtn = document.getElementById('sel-later-btn');
+  eBtn.disabled = lBtn.disabled = true;
+  eBtn.textContent = direction === 'earlier' ? '← Moving…' : '← Earlier';
+  lBtn.textContent = direction === 'later'   ? 'Moving… →' : 'Later →';
+
+  const ids = [...selectedIds];
+  await bulkMoveWordBox(uid, ids, direction);
+
+  selectedIds.clear();
+  lastCheckedIdx = -1;
+  eBtn.textContent = '← Earlier'; lBtn.textContent = 'Later →';
+  eBtn.disabled = lBtn.disabled = false;
+  await loadWordList();
+}
+
+document.getElementById('sel-earlier-btn').addEventListener('click', () => bulkMove('earlier'));
+document.getElementById('sel-later-btn').addEventListener('click',   () => bulkMove('later'));
+
+// ── Word list ─────────────────────────────────────────────────────────────────
+
 async function loadWordList() {
+  selectedIds.clear();
+  lastCheckedIdx = -1;
+  updateSelectionBar();
+
   const loading = document.getElementById('word-loading');
   const list    = document.getElementById('word-list');
   loading.style.display = 'block';
@@ -143,7 +199,7 @@ async function loadWordList() {
     return;
   }
 
-  // Top-level bulk button (whole deck)
+  // Top-level bulk "Ask all pending" for the whole deck
   if (totalPending > 0) {
     const topBtn = document.createElement('button');
     topBtn.className = 'btn btn-secondary btn-full';
@@ -151,8 +207,7 @@ async function loadWordList() {
     topBtn.textContent = `Ask all ${totalPending} pending words soon`;
     topBtn.addEventListener('click', async () => {
       topBtn.disabled = true; topBtn.textContent = 'Marking…';
-      const ids = words.filter(w => !w.introduced && w.status !== 'never').map(w => w.id);
-      await bulkSetWordStatus(uid, currentDeckId, ids, 'ask_soon');
+      await bulkSetWordStatus(uid, currentDeckId, words.filter(w => !w.introduced && w.status !== 'never').map(w => w.id), 'ask_soon');
       await loadWordList();
     });
     list.appendChild(topBtn);
@@ -165,28 +220,23 @@ async function loadWordList() {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(item);
   }
-
-  const cats = Object.keys(grouped).sort((a, b) => {
-    if (!a && b) return 1;
-    if (a && !b) return -1;
-    return a.localeCompare(b);
-  });
-
+  const cats = Object.keys(grouped).sort((a, b) =>
+    !a && b ? 1 : a && !b ? -1 : a.localeCompare(b)
+  );
   const showHeaders = cats.length > 1 || cats[0] !== '';
 
+  let orderIdx = 0;
   for (const cat of cats) {
-    const catWords  = grouped[cat];
+    const catWords   = grouped[cat];
     const catPending = catWords.filter(w => !w.introduced && w.status !== 'never');
 
     if (showHeaders) {
       const header = document.createElement('div');
       header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:16px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--border)';
-
       const title = document.createElement('span');
       title.textContent = cat || 'Uncategorised';
       title.style.cssText = 'font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em';
       header.appendChild(title);
-
       if (catPending.length > 0) {
         const catBtn = document.createElement('button');
         catBtn.textContent = `Ask all ${catPending.length} pending`;
@@ -202,96 +252,104 @@ async function loadWordList() {
     }
 
     for (const item of catWords) {
-      list.appendChild(renderWordRow(item));
+      list.appendChild(renderWordRow(item, orderIdx++));
     }
   }
 }
 
-function renderWordRow(item) {
+function renderWordRow(item, orderIdx = -1) {
   const { id, word, introduced, progress, status } = item;
-  const front = word.vietnamese || word.term || '';
-  const back  = word.english   || word.definition || '';
+  const front = word.vietnamese || '';
+  const back  = word.english   || '';
 
   const row = document.createElement('div');
-  row.dataset.wordId = id;
-  row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap';
+  row.dataset.wordId   = id;
+  if (orderIdx >= 0) row.dataset.orderIdx = orderIdx;
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)';
+
+  // Checkbox
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.className = 'word-cb';
+  cb.style.cssText = 'width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--brand)';
+  cb.addEventListener('click', e => {
+    if (e.shiftKey && lastCheckedIdx >= 0 && orderIdx >= 0) {
+      const lo = Math.min(orderIdx, lastCheckedIdx);
+      const hi = Math.max(orderIdx, lastCheckedIdx);
+      document.querySelectorAll('[data-order-idx]').forEach(r => {
+        const rIdx = parseInt(r.dataset.orderIdx);
+        if (rIdx >= lo && rIdx <= hi) {
+          const c = r.querySelector('.word-cb');
+          if (c) { c.checked = true; selectedIds.add(r.dataset.wordId); }
+        }
+      });
+    } else {
+      cb.checked ? selectedIds.add(id) : selectedIds.delete(id);
+    }
+    if (orderIdx >= 0) lastCheckedIdx = orderIdx;
+    updateSelectionBar();
+  });
+  row.appendChild(cb);
 
   // Word text
   const label = document.createElement('div');
-  label.style.cssText = 'flex:1;min-width:0';
-  label.innerHTML = `<span style="font-weight:600">${esc(front)}</span><span style="color:var(--muted);margin:0 4px">→</span><span style="color:var(--muted)">${esc(back)}</span>`;
+  label.style.cssText = 'flex:1;min-width:0;overflow:hidden';
+  label.innerHTML = `<span style="font-weight:600">${esc(front)}</span><span style="color:var(--muted);margin:0 4px">→</span><span style="color:var(--muted);font-size:.9rem">${esc(back)}</span>`;
   row.appendChild(label);
 
   if (introduced && progress) {
-    // Box label + left/right arrows
     const boxWrap = document.createElement('div');
     boxWrap.style.cssText = 'display:flex;align-items:center;gap:4px;flex-shrink:0';
 
-    const leftBtn = document.createElement('button');
-    leftBtn.textContent = '←';
-    leftBtn.title = 'Earlier box';
-    leftBtn.disabled = progress.level === 0;
-    leftBtn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:.85rem';
-
-    const boxSpan = document.createElement('span');
-    boxSpan.textContent = boxLabel(progress.level);
-    boxSpan.style.cssText = 'font-size:.8rem;color:var(--muted);min-width:60px;text-align:center';
-
-    const rightBtn = document.createElement('button');
-    rightBtn.textContent = '→';
-    rightBtn.title = 'Later box';
+    const btnStyle = 'background:none;border:1px solid var(--border);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:.85rem';
+    const leftBtn  = Object.assign(document.createElement('button'), { textContent: '←', title: 'Earlier box' });
+    const boxSpan  = document.createElement('span');
+    const rightBtn = Object.assign(document.createElement('button'), { textContent: '→', title: 'Later box'   });
+    [leftBtn, rightBtn].forEach(b => b.style.cssText = btnStyle);
+    leftBtn.disabled  = progress.level === 0;
     rightBtn.disabled = progress.level === 6;
-    rightBtn.style.cssText = leftBtn.style.cssText;
+    boxSpan.textContent = boxLabel(progress.level);
+    boxSpan.style.cssText = 'font-size:.8rem;color:var(--muted);min-width:58px;text-align:center';
 
-    const moveAndRefresh = async (direction) => {
+    const moveOne = async direction => {
       leftBtn.disabled = rightBtn.disabled = true;
+      selectedIds.delete(id); updateSelectionBar();
       await moveWordBox(uid, id, direction);
-      const newLevel = direction === 'earlier'
-        ? Math.max(0, progress.level - 1)
-        : Math.min(6, progress.level + 1);
-      const newItem = { ...item, progress: { ...progress, level: newLevel } };
-      row.replaceWith(renderWordRow(newItem));
+      const newLevel = direction === 'earlier' ? Math.max(0, progress.level-1) : Math.min(6, progress.level+1);
+      row.replaceWith(renderWordRow({ ...item, progress: { ...progress, level: newLevel } }, orderIdx));
     };
-
-    leftBtn.addEventListener('click',  () => moveAndRefresh('earlier'));
-    rightBtn.addEventListener('click', () => moveAndRefresh('later'));
-
+    leftBtn.addEventListener('click',  () => moveOne('earlier'));
+    rightBtn.addEventListener('click', () => moveOne('later'));
     boxWrap.append(leftBtn, boxSpan, rightBtn);
     row.appendChild(boxWrap);
 
-    // Never ask button
     const neverBtn = document.createElement('button');
-    neverBtn.textContent = 'Never ask';
-    neverBtn.style.cssText = 'background:none;border:none;font-size:.75rem;color:var(--muted);cursor:pointer;text-decoration:underline;flex-shrink:0';
+    neverBtn.textContent = 'Never';
+    neverBtn.style.cssText = 'background:none;border:none;font-size:.72rem;color:var(--muted);cursor:pointer;text-decoration:underline;flex-shrink:0';
     neverBtn.addEventListener('click', async () => {
       if (!confirm(`Remove "${front}" from your review cycle?`)) return;
       neverBtn.disabled = true;
       await removeWordFromCycle(uid, currentDeckId, id);
+      selectedIds.delete(id); updateSelectionBar();
       row.remove();
     });
     row.appendChild(neverBtn);
 
   } else {
-    // Pending word — status buttons
     const btnWrap = document.createElement('div');
     btnWrap.style.cssText = 'display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap';
-
-    const statuses = [
-      { key: 'ask_soon', label: 'Ask soon', color: 'var(--correct)' },
-      { key: 'skip',     label: 'Skip for now', color: 'var(--muted)' },
-      { key: 'never',    label: 'Never',    color: 'var(--incorrect)' },
-    ];
-
-    for (const { key, label, color } of statuses) {
+    for (const { key, label, color } of [
+      { key: 'ask_soon', label: 'Ask soon',    color: 'var(--correct)'   },
+      { key: 'skip',     label: 'Skip',        color: 'var(--muted)'     },
+      { key: 'never',    label: 'Never',       color: 'var(--incorrect)' },
+    ]) {
+      const isActive = status === key;
       const btn = document.createElement('button');
       btn.textContent = label;
-      const isActive = status === key;
       btn.style.cssText = `font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid ${color};background:${isActive ? color : 'none'};color:${isActive ? '#fff' : color}`;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        const newStatus = isActive ? 'normal' : key;
-        await setWordStatus(uid, currentDeckId, id, newStatus);
-        row.replaceWith(renderWordRow({ ...item, status: newStatus }));
+        await setWordStatus(uid, currentDeckId, id, isActive ? 'normal' : key);
+        row.replaceWith(renderWordRow({ ...item, status: isActive ? 'normal' : key }, orderIdx));
       });
       btnWrap.appendChild(btn);
     }

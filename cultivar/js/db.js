@@ -605,6 +605,28 @@ export async function bulkSetWordStatus(uid, deckId, wordIds, status) {
   await updateDoc(doc(db, 'users', uid), updates);
 }
 
+export async function bulkMoveWordBox(uid, wordIds, direction) {
+  if (!wordIds.length) return;
+  const snaps = await Promise.all(
+    wordIds.flatMap(id => ['vn_en', 'en_vn'].map(dir =>
+      getDoc(doc(db, 'users', uid, 'progress', `${id}_${dir}`))
+    ))
+  );
+  for (let i = 0; i < snaps.length; i += 499) {
+    const batch = writeBatch(db);
+    for (const snap of snaps.slice(i, i + 499)) {
+      if (!snap.exists()) continue;
+      const { level } = snap.data();
+      const newLevel = direction === 'earlier' ? Math.max(0, level - 1) : Math.min(6, level + 1);
+      const days = SRS_INTERVALS[newLevel];
+      const due = new Date();
+      if (days > 0) due.setDate(due.getDate() + days);
+      batch.update(snap.ref, { level: newLevel, due_date: Timestamp.fromDate(due), last_reviewed: serverTimestamp() });
+    }
+    await batch.commit();
+  }
+}
+
 export async function moveWordBox(uid, wordId, direction) {
   for (const dir of ['vn_en', 'en_vn']) {
     const ref = doc(db, 'users', uid, 'progress', `${wordId}_${dir}`);
