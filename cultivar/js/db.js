@@ -220,6 +220,16 @@ export async function deletePersonalCard(uid, cardId) {
 
 // ── Admin ────────────────────────────────────────────────────────────────────
 
+export async function findOrCreateDeck(subject, unit, subunit) {
+  const decks = await getAllDecks();
+  const match = decks.find(d =>
+    d.subject === subject && d.unit === unit && (d.subunit || '') === (subunit || '')
+  );
+  if (match) return match.id;
+  const name = subunit || unit;
+  return createDeck(name, '', subject, unit, subunit);
+}
+
 export async function createDeck(name, description, subject = '', unit = '', subunit = '') {
   const ref = doc(collection(db, 'decks'));
   await setDoc(ref, {

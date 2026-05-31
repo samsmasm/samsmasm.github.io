@@ -60,13 +60,31 @@
     <div class="panel-title">📥 Import from CSV</div>
     <div class="panel-body">
       <div class="csv-hint" id="csv-hint-personal">
-        Format: <code>vietnamese,english,example_vn,example_en,notes</code><br>
-        First row can be a header (will be skipped). Last 3 columns optional.
+        Format: <code>Vietnamese,English,ExampleVN,ExampleEN,Notes</code><br>
+        Header row skipped. Last 3 columns optional.
       </div>
       <div class="csv-hint hidden" id="csv-hint-deck">
-        Format: <code>Tier,Category,Vietnamese,English,Notes</code><br>
-        First row can be a header (will be skipped).
+        Format: <code>Subject,Unit,Subunit,Vietnamese,English,Notes</code><br>
+        Subunit and Notes can be blank. Decks are created automatically. Header row skipped.
       </div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:.85rem;color:var(--muted)">Copy prompt for LLM</summary>
+        <div style="margin-top:8px">
+          <textarea id="llm-prompt" rows="8" readonly style="width:100%;font-size:.78rem;font-family:monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;resize:none">Generate a vocabulary CSV for a spaced repetition flashcard app.
+
+Columns: Subject, Unit, Subunit, Vietnamese, English, Notes
+- Subject: the broad subject (e.g. "Vietnamese", "Business")
+- Unit: the topic area (e.g. "At home", "Finance")
+- Subunit: optional difficulty or subtopic (e.g. "Beginner", "Investment Appraisal") — leave blank if not applicable
+- Vietnamese: the Vietnamese word or phrase
+- English: the English meaning
+- Notes: optional usage note, example sentence, register, or dialect — leave blank if not applicable
+
+Include a header row. Leave optional fields as empty cells (just a comma).
+Output only the CSV with no explanation or markdown formatting.</textarea>
+          <button class="btn btn-secondary" style="margin-top:6px;font-size:.8rem;padding:5px 12px;min-height:30px" onclick="navigator.clipboard.writeText(document.getElementById('llm-prompt').value).then(()=>this.textContent='Copied!').catch(()=>{})">Copy</button>
+        </div>
+      </details>
       <div class="form-group">
         <label for="csv-input">Paste CSV</label>
         <textarea id="csv-input" placeholder="xin chào,hello,Xin chào bạn!,Hello friend!,&#10;cảm ơn,thank you,,," rows="5"></textarea>
@@ -101,7 +119,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getPersonalCards, addPersonalCard, deletePersonalCard, getUser, getPublicDecks, addWordToDeck, bulkAddWordsToDeck } from './js/db.js';
+import { getPersonalCards, addPersonalCard, deletePersonalCard, getUser, getPublicDecks, addWordToDeck, bulkAddWordsToDeck, findOrCreateDeck } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
@@ -237,23 +255,29 @@ document.getElementById('csv-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Importing…';
 
-  const deckId = targetDeckId();
   let added = 0;
 
-  if (deckId) {
-    // Deck format: Tier,Category,Vietnamese,English,Notes
-    const words = rows
-      .filter(r => r[2]?.trim() && r[3]?.trim())
-      .map(r => ({
-        tier:       (r[0] || '').trim(),
-        category:   (r[1] || '').trim(),
-        vietnamese: r[2].trim(),
-        english:    r[3].trim(),
-        notes:      (r[4] || '').trim(),
-      }));
-    added = await bulkAddWordsToDeck(deckId, words);
+  if (isAdmin) {
+    // Admin: Subject,Unit,Subunit,Vietnamese,English,Notes — auto-route to decks
+    const groups = {};
+    for (const r of rows) {
+      const subject = (r[0] || '').trim();
+      const unit    = (r[1] || '').trim();
+      const subunit = (r[2] || '').trim();
+      const vn      = (r[3] || '').trim();
+      const en      = (r[4] || '').trim();
+      const notes   = (r[5] || '').trim();
+      if (!subject || !unit || !vn || !en) continue;
+      const key = `${subject}||${unit}||${subunit}`;
+      if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
+      groups[key].words.push({ vietnamese: vn, english: en, notes });
+    }
+    for (const { subject, unit, subunit, words } of Object.values(groups)) {
+      const deckId = await findOrCreateDeck(subject, unit, subunit);
+      added += await bulkAddWordsToDeck(deckId, words);
+    }
   } else {
-    // Personal card format: Vietnamese,English,ExampleVN,ExampleEN,Notes
+    // Student: Vietnamese,English,ExampleVN,ExampleEN,Notes → personal cards
     for (const row of rows) {
       if (!row[0] || !row[1]) continue;
       await addPersonalCard(uid, {
@@ -296,7 +320,7 @@ function parseCSV(text) {
     }
     cells.push(cur);
     // Skip header row if first cell looks like a column name
-    if (rows.length === 0 && /^(vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
+    if (rows.length === 0 && /^(subject|vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
     rows.push(cells);
   }
   return rows;

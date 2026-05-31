@@ -107,23 +107,6 @@
       </div>
     </div>
 
-    <!-- Bulk CSV import -->
-    <div class="panel">
-      <div class="panel-title">📥 Bulk import CSV</div>
-      <div class="panel-body">
-        <div class="csv-hint">
-          Format: <code>Tier,Category,Vietnamese,English,Notes</code><br>
-          Header row auto-detected and skipped. Tier and Category are stored but optional.
-        </div>
-        <div class="form-group" style="margin-top:10px">
-          <label for="bulk-csv">Paste CSV</label>
-          <textarea id="bulk-csv" rows="6" placeholder="1,At home / with kids,rửa,wash,e.g. rửa tay&#10;1,At home / with kids,lau,wipe or clean,lau bàn"></textarea>
-        </div>
-        <p class="error-msg hidden" id="bulk-error"></p>
-        <button class="btn btn-primary btn-full" id="bulk-btn">Import words</button>
-      </div>
-    </div>
-
     <!-- Word list -->
     <div>
       <div class="section-heading">
@@ -136,6 +119,24 @@
 
   </div>
 
+  <!-- Bulk CSV import (auto-routes to deck by subject/unit/subunit) -->
+  <div class="panel">
+    <div class="panel-title">📥 Bulk import CSV</div>
+    <div class="panel-body">
+      <div class="csv-hint">
+        Format: <code>Subject,Unit,Subunit,Vietnamese,English,Notes</code><br>
+        Subunit and Notes can be blank. Decks are created automatically if they don't exist.<br>
+        Header row auto-detected and skipped.
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label for="bulk-csv">Paste CSV</label>
+        <textarea id="bulk-csv" rows="6" placeholder="Vietnamese,At home,Beginner,rửa,wash,e.g. rửa tay&#10;Vietnamese,At home,Beginner,lau,wipe or clean,lau bàn"></textarea>
+      </div>
+      <p class="error-msg hidden" id="bulk-error"></p>
+      <button class="btn btn-primary btn-full" id="bulk-btn">Import words</button>
+    </div>
+  </div>
+
 </main>
 
 <div class="toast" id="toast"></div>
@@ -143,7 +144,7 @@
 <script type="module">
 import { auth } from './js/config.js';
 import {
-  getUser, getAllDecks, createDeck,
+  getUser, getAllDecks, createDeck, findOrCreateDeck,
   addWordToDeck, bulkAddWordsToDeck, getDeckWords
 } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
@@ -238,39 +239,46 @@ document.getElementById('word-form').addEventListener('submit', async e => {
   btn.disabled = false; btn.textContent = 'Add word';
 });
 
-// Bulk CSV import
+// Bulk CSV import — auto-routes rows to decks by subject/unit/subunit
 document.getElementById('bulk-btn').addEventListener('click', async () => {
-  if (!selectedDeckId) return;
   const raw = document.getElementById('bulk-csv').value.trim();
   const errEl = document.getElementById('bulk-error');
   errEl.classList.add('hidden');
   if (!raw) return;
 
   const rows = parseCSV(raw);
-  const words = rows
-    .filter(r => r[2]?.trim() && r[3]?.trim())
-    .map(r => ({
-      tier:       (r[0] || '').trim(),
-      category:   (r[1] || '').trim(),
-      vietnamese: r[2].trim(),
-      english:    r[3].trim(),
-      notes:      (r[4] || '').trim(),
-    }));
+  const groups = {};
+  for (const r of rows) {
+    const subject = (r[0] || '').trim();
+    const unit    = (r[1] || '').trim();
+    const subunit = (r[2] || '').trim();
+    const vn      = (r[3] || '').trim();
+    const en      = (r[4] || '').trim();
+    const notes   = (r[5] || '').trim();
+    if (!subject || !unit || !vn || !en) continue;
+    const key = `${subject}||${unit}||${subunit}`;
+    if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
+    groups[key].words.push({ vietnamese: vn, english: en, notes });
+  }
 
-  if (words.length === 0) {
-    errEl.textContent = 'No valid rows found (need at least vietnamese,english columns).';
+  const totalWords = Object.values(groups).reduce((n, g) => n + g.words.length, 0);
+  if (totalWords === 0) {
+    errEl.textContent = 'No valid rows found. Need Subject, Unit, Vietnamese, English at minimum.';
     errEl.classList.remove('hidden');
     return;
   }
 
   const btn = document.getElementById('bulk-btn');
-  btn.disabled = true; btn.textContent = `Importing ${words.length} words…`;
+  btn.disabled = true; btn.textContent = `Importing ${totalWords} words…`;
 
   try {
-    await bulkAddWordsToDeck(selectedDeckId, words);
+    let added = 0;
+    for (const { subject, unit, subunit, words } of Object.values(groups)) {
+      const deckId = await findOrCreateDeck(subject, unit, subunit);
+      added += await bulkAddWordsToDeck(deckId, words);
+    }
     document.getElementById('bulk-csv').value = '';
-    showToast(`Imported ${words.length} words`);
-    await loadWords();
+    showToast(`Imported ${added} words across ${Object.keys(groups).length} deck(s)`);
     await refreshDeckList();
   } catch (err) {
     console.error(err);
@@ -333,7 +341,7 @@ function parseCSV(text) {
       }
     }
     cells.push(cur);
-    if (rows.length === 0 && /^(tier|vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
+    if (rows.length === 0 && /^(subject|tier|vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
     rows.push(cells);
   }
   return rows;
