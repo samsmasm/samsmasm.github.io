@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="cultivarlogo.png">
+  <title>Revise — Cultivar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="page-header">
+  <div style="display:flex;align-items:center;gap:8px">
+    <img src="cultivarlogo.png" alt="" style="height:22px;width:auto;opacity:.55">
+    <h1>Revise</h1>
+  </div>
+  <div style="width:44px"></div>
+</header>
+
+<main class="main-pad">
+
+  <p style="color:var(--muted);font-size:.88rem;margin-bottom:16px">
+    Exam mode: drill every word from the decks you pick, both directions, in random order.
+    This does <strong>not</strong> affect your normal spaced-repetition schedule.
+  </p>
+
+  <div id="loading" class="page-center"><div class="spinner"></div></div>
+
+  <div id="picker" class="hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Choose decks</span>
+      <button id="select-all-btn" style="background:none;border:none;color:var(--brand);font-size:.8rem;cursor:pointer;text-decoration:underline">Select all</button>
+    </div>
+    <div id="deck-tree"></div>
+  </div>
+
+  <div id="empty" class="page-center empty-state hidden" style="min-height:auto;padding:24px 0">
+    <p style="color:var(--muted)">Enrol in a deck first to revise it.</p>
+  </div>
+
+</main>
+
+<!-- Sticky start bar -->
+<div id="start-bar" style="display:none;position:fixed;bottom:var(--nav-h);left:0;right:0;max-width:540px;margin:0 auto;background:var(--surface);border-top:2px solid var(--brand);padding:10px 16px;align-items:center;gap:10px;z-index:20;box-shadow:0 -2px 8px rgba(0,0,0,.08)">
+  <span id="start-count" style="flex:1;font-size:.9rem;font-weight:600;color:var(--brand)"></span>
+  <button id="start-btn" class="btn btn-primary" style="padding:8px 20px;min-height:40px">Start revision</button>
+</div>
+
+<nav class="bottom-nav">
+  <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
+  <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
+  <a href="revise.html" class="nav-item active"><span class="nav-icon">🎯</span><span class="nav-label">Revise</span></a>
+  <a href="dash.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
+</nav>
+
+<script type="module">
+import { auth } from './js/config.js';
+import { getUser, getPublicDecks, getPersonalCards } from './js/db.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+let uid = null;
+const selected = new Set();
+
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = 'index.html'; return; }
+  uid = user.uid;
+
+  const [userData, decks, personalCards] = await Promise.all([
+    getUser(uid), getPublicDecks(), getPersonalCards(uid)
+  ]);
+  const subscribed = new Set(userData?.subscribed_decks || []);
+  const myDecks = decks.filter(d => subscribed.has(d.id));
+
+  document.getElementById('loading').classList.add('hidden');
+
+  if (myDecks.length === 0 && personalCards.length === 0) {
+    document.getElementById('empty').classList.remove('hidden');
+    return;
+  }
+
+  // Group by subject → unit
+  const tree = {};
+  for (const d of myDecks) {
+    const subj = d.subject || 'Other';
+    const unit = d.unit || '';
+    (tree[subj] ??= {});
+    (tree[subj][unit] ??= []).push(d);
+  }
+
+  const container = document.getElementById('deck-tree');
+
+  for (const subj of Object.keys(tree).sort()) {
+    const subjHeader = document.createElement('div');
+    subjHeader.textContent = subj;
+    subjHeader.style.cssText = 'font-size:.95rem;font-weight:700;color:var(--text);margin:16px 0 4px';
+    container.appendChild(subjHeader);
+
+    for (const unit of Object.keys(tree[subj]).sort()) {
+      const unitDecks = tree[subj][unit];
+
+      if (unit) {
+        const unitRow = document.createElement('label');
+        unitRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border)';
+        const unitCb = document.createElement('input');
+        unitCb.type = 'checkbox';
+        unitCb.style.cssText = 'width:18px;height:18px;accent-color:var(--brand)';
+        unitCb.addEventListener('change', () => {
+          for (const d of unitDecks) toggle(d.id, unitCb.checked);
+          renderState();
+        });
+        unitCb.dataset.unitFor = unitDecks.map(d => d.id).join(',');
+        const unitLbl = document.createElement('span');
+        unitLbl.textContent = unit;
+        unitLbl.style.cssText = 'font-size:.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em';
+        unitRow.append(unitCb, unitLbl);
+        container.appendChild(unitRow);
+      }
+
+      for (const d of unitDecks) {
+        container.appendChild(deckRow(d.id, d.name, !!unit));
+      }
+    }
+  }
+
+  if (personalCards.length > 0) {
+    const subjHeader = document.createElement('div');
+    subjHeader.textContent = 'Personal';
+    subjHeader.style.cssText = 'font-size:.95rem;font-weight:700;color:var(--text);margin:16px 0 4px';
+    container.appendChild(subjHeader);
+    container.appendChild(deckRow('personal', 'Personal cards', false));
+  }
+
+  document.getElementById('picker').classList.remove('hidden');
+});
+
+function deckRow(id, name, indent) {
+  const row = document.createElement('label');
+  row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 0 8px ${indent ? '24px' : '0'};cursor:pointer;border-bottom:1px solid var(--border)`;
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.dataset.deckId = id;
+  cb.style.cssText = 'width:18px;height:18px;accent-color:var(--brand)';
+  cb.addEventListener('change', () => { toggle(id, cb.checked); renderState(); });
+  const lbl = document.createElement('span');
+  lbl.textContent = name;
+  lbl.style.cssText = 'font-size:.92rem';
+  row.append(cb, lbl);
+  return row;
+}
+
+function toggle(id, on) {
+  if (on) selected.add(id); else selected.delete(id);
+  const cb = document.querySelector(`[data-deck-id="${id}"]`);
+  if (cb) cb.checked = on;
+}
+
+function renderState() {
+  const bar = document.getElementById('start-bar');
+  document.getElementById('start-count').textContent = `${selected.size} deck${selected.size !== 1 ? 's' : ''} selected`;
+  bar.style.display = selected.size > 0 ? 'flex' : 'none';
+}
+
+document.getElementById('select-all-btn').addEventListener('click', () => {
+  const boxes = document.querySelectorAll('[data-deck-id]');
+  const allOn = [...boxes].every(b => b.checked);
+  boxes.forEach(b => toggle(b.dataset.deckId, !allOn));
+  document.querySelectorAll('[data-unit-for]').forEach(u => u.checked = !allOn);
+  renderState();
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  if (selected.size === 0) return;
+  sessionStorage.setItem('cramDecks', JSON.stringify([...selected]));
+  location.href = 'review.html?mode=cram';
+});
+</script>
+</body>
+</html>

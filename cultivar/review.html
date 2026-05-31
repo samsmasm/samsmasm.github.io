@@ -73,16 +73,22 @@
 import { auth } from './js/config.js';
 import { updateProgress, autoIntroduceDailyForDeck, getDueCardsForDeck,
          getTodayCardsForDeck, introduceWordsForDeck, getPendingCountForDeck,
-         canIntroduceMoreForDeck, getUserSettings } from './js/db.js';
+         canIntroduceMoreForDeck, getUserSettings, getCramCards } from './js/db.js';
 import { levelLabel } from './js/srs.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const params = new URLSearchParams(location.search);
+const mode = params.get('mode');
+const reviewOnly = mode === 'review';
+const cramMode = mode === 'cram';
 const deckId = params.get('deck');
-const reviewOnly = params.get('mode') === 'review';
-if (!deckId) location.href = 'index.html';
+// Cram sessions read their deck list from sessionStorage (set by revise.html)
+const cramDeckIds = cramMode ? JSON.parse(sessionStorage.getItem('cramDecks') || '[]') : [];
+if (!cramMode && !deckId) location.href = 'index.html';
+if (cramMode && cramDeckIds.length === 0) location.href = 'revise.html';
 
 let queue = [];
+let cramCards = [];
 let totalUnique = 0;
 let mastered = 0;
 let uid = null;
@@ -92,20 +98,26 @@ let settings = { daily_new: 12, session_max: 36 };
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
-
   settings = await getUserSettings(uid);
-  // Review-only sessions never introduce new words.
-  if (!reviewOnly) await autoIntroduceDailyForDeck(uid, deckId);
-  const cards = await getDueCardsForDeck(uid, deckId, { reviewOnly });
+
+  let cards;
+  if (cramMode) {
+    cramCards = await getCramCards(uid, cramDeckIds);
+    cards = cramCards;
+  } else {
+    // Review-only sessions never introduce new words.
+    if (!reviewOnly) await autoIntroduceDailyForDeck(uid, deckId);
+    cards = await getDueCardsForDeck(uid, deckId, { reviewOnly });
+  }
 
   document.getElementById('loading-view').classList.add('hidden');
 
   if (cards.length === 0) {
-    document.getElementById('done-title').textContent = 'All caught up! 🎉';
-    document.getElementById('done-msg').textContent = reviewOnly
-      ? 'No review words due today for this deck.'
-      : 'No cards due today for this deck.';
-    showPracticeButton();
+    document.getElementById('done-title').textContent = cramMode ? 'Nothing to revise' : 'All caught up! 🎉';
+    document.getElementById('done-msg').textContent = cramMode
+      ? 'The selected decks have no words yet.'
+      : (reviewOnly ? 'No review words due today for this deck.' : 'No cards due today for this deck.');
+    if (!cramMode) showPracticeButton();
     document.getElementById('done-view').classList.remove('hidden');
     return;
   }
@@ -145,7 +157,7 @@ async function showPracticeButton() {
 }
 
 document.getElementById('repeat-btn').addEventListener('click', async () => {
-  const cards = await getTodayCardsForDeck(uid, deckId);
+  const cards = cramMode ? cramCards : await getTodayCardsForDeck(uid, deckId);
   if (!cards.length) return;
   startSession(cards);
 });
@@ -198,7 +210,7 @@ function showCard(card) {
   document.getElementById('back-answer').textContent = backAnswer;
   setOptional('back-example', example);
   setOptional('back-notes', word.notes || '');
-  document.getElementById('level-label').textContent = `Level: ${levelLabel(progress.level)}`;
+  document.getElementById('level-label').textContent = progress ? `Level: ${levelLabel(progress.level)}` : '';
   updateBar();
 }
 
@@ -230,15 +242,21 @@ async function answer(correct) {
   document.getElementById('btn-wrong').disabled = true;
 
   const card = queue.shift();
-  updateProgress(uid, card.progressId, correct).catch(console.error);
+  // Cram/revision mode never touches the spaced-repetition schedule.
+  if (!cramMode) updateProgress(uid, card.progressId, correct).catch(console.error);
   if (correct) { mastered++; } else { queue.push(card); }
 
   if (queue.length === 0) {
     document.getElementById('review-view').classList.add('hidden');
     document.getElementById('done-title').textContent = 'Session complete! 🎉';
     document.getElementById('done-msg').textContent =
-      `${mastered} card${mastered !== 1 ? 's' : ''} done. Keep it up!`;
-    showPracticeButton();
+      `${mastered} card${mastered !== 1 ? 's' : ''} done.`;
+    if (cramMode) {
+      document.getElementById('repeat-btn').textContent = 'Revise again';
+      document.getElementById('repeat-btn').classList.remove('hidden');
+    } else {
+      showPracticeButton();
+    }
     document.getElementById('done-view').classList.remove('hidden');
     return;
   }
@@ -267,6 +285,7 @@ function shuffle(arr) {
 <nav class="bottom-nav">
   <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
   <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
+  <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Revise</span></a>
   <a href="dash.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
 </nav>
 </body>

@@ -296,6 +296,23 @@ export async function getTodayCardsForDeck(uid, deckId) {
   }).filter(Boolean);
 }
 
+// Cram / exam-revision mode: every word from the chosen decks in both
+// directions, ignoring SRS scheduling entirely. No progress is read or written.
+export async function getCramCards(uid, deckIds) {
+  const all = [];
+  for (const deckId of deckIds) {
+    const words = deckId === 'personal'
+      ? (await getDocs(collection(db, 'users', uid, 'cards'))).docs.map(d => ({ id: d.id, ...d.data() }))
+      : await getDeckWords(deckId);
+    for (const word of words) {
+      for (const direction of ['vn_en', 'en_vn']) {
+        all.push({ word, direction });
+      }
+    }
+  }
+  return all;
+}
+
 export async function subscribeToDeck(uid, deckId) {
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
