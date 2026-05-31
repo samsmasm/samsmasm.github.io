@@ -14,6 +14,7 @@
 <!-- Filter / start screen -->
 <div id="filter-view" class="page-center hidden" style="flex-direction:column;gap:16px;padding:24px">
   <h2 style="margin:0">Review</h2>
+  <p id="session-summary" style="margin:0;font-size:.9rem;color:var(--muted);text-align:center"></p>
   <div class="form-group" style="width:100%;max-width:300px">
     <label for="subject-filter">Subject</label>
     <select id="subject-filter">
@@ -33,6 +34,7 @@
     </select>
   </div>
   <button class="btn btn-primary" id="start-btn" style="width:100%;max-width:300px">Start review</button>
+  <button class="btn btn-secondary" id="add-more-btn" style="width:100%;max-width:300px"></button>
   <a href="index.html" class="btn btn-secondary" style="width:100%;max-width:300px">Cancel</a>
 </div>
 
@@ -94,7 +96,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getDueCards, updateProgress, getPublicDecks, getUser } from './js/db.js';
+import { getDueCards, updateProgress, getPublicDecks, getUser, autoIntroduceDaily, introduceWords, getPendingCount } from './js/db.js';
 import { levelLabel } from './js/srs.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -105,31 +107,49 @@ let uid = null;
 let flipped = false;
 let allCards = [];
 let deckMeta = {};
+let pendingCount = 0;
+
+async function loadAllCards() {
+  const [cards, pending] = await Promise.all([getDueCards(uid), getPendingCount(uid)]);
+  allCards = cards;
+  pendingCount = pending;
+}
+
+function updateFilterUI() {
+  const newCount    = allCards.filter(c => c.progress.level === 0).length / 2; // words not directions
+  const reviewCount = allCards.filter(c => c.progress.level  > 0).length;
+  document.getElementById('session-summary').textContent =
+    `${Math.round(newCount)} new word${Math.round(newCount) !== 1 ? 's' : ''} · ${reviewCount} reviews` +
+    (pendingCount > 0 ? ` · ${pendingCount} pending` : '');
+
+  const addBtn = document.getElementById('add-more-btn');
+  if (pendingCount > 0) {
+    addBtn.textContent = `Add 12 more words (${pendingCount} pending)`;
+    addBtn.disabled = false;
+  } else {
+    addBtn.textContent = 'No more pending words';
+    addBtn.disabled = true;
+  }
+}
 
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
 
-  const [cards, userData, decks] = await Promise.all([
-    getDueCards(uid),
-    getUser(uid),
-    getPublicDecks()
-  ]);
+  // Auto-introduce today's new words before loading the queue
+  await autoIntroduceDaily(uid);
+
+  const [decks] = await Promise.all([getPublicDecks(), loadAllCards()]);
+  for (const d of decks) deckMeta[d.id] = d;
 
   document.getElementById('loading-view').classList.add('hidden');
-  allCards = cards;
-
-  // Build deck metadata lookup
-  for (const d of decks) deckMeta[d.id] = d;
 
   const subjectSet = new Set();
   const tierSet = new Set();
   const categorySet = new Set();
-
-  for (const c of cards) {
-    if (c.progress.deck_id && deckMeta[c.progress.deck_id]?.subject) {
+  for (const c of allCards) {
+    if (c.progress.deck_id && deckMeta[c.progress.deck_id]?.subject)
       subjectSet.add(deckMeta[c.progress.deck_id].subject);
-    }
     if (c.word.tier) tierSet.add(c.word.tier);
     if (c.word.category) categorySet.add(c.word.category);
   }
@@ -138,17 +158,26 @@ onAuthStateChanged(auth, async user => {
     const sel = document.getElementById(id);
     for (const v of [...values].sort()) {
       const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = labelFn(v);
+      opt.value = v; opt.textContent = labelFn(v);
       sel.appendChild(opt);
     }
   }
-
   populateSelect('subject-filter', subjectSet);
   populateSelect('tier-filter', tierSet, v => `Tier ${v}`);
   populateSelect('category-filter', categorySet);
 
+  updateFilterUI();
   document.getElementById('filter-view').classList.remove('hidden');
+});
+
+document.getElementById('add-more-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('add-more-btn');
+  btn.disabled = true; btn.textContent = 'Introducing…';
+  const introduced = await introduceWords(uid, 12);
+  if (introduced > 0) {
+    await loadAllCards();
+    updateFilterUI();
+  }
 });
 
 document.getElementById('start-btn').addEventListener('click', () => {

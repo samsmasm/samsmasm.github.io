@@ -88,6 +88,10 @@
         <span class="stat-num" id="stat-total">–</span>
         <span class="stat-lbl">Total words</span>
       </div>
+      <div class="stat-tile">
+        <span class="stat-num" id="stat-pending">–</span>
+        <span class="stat-lbl">Pending</span>
+      </div>
     </div>
 
     <a href="review.html" class="btn btn-primary btn-full btn-large" id="review-cta">
@@ -111,7 +115,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getOrCreateUser, getUserStats } from './js/db.js';
+import { getOrCreateUser, getUserStats, getPendingCount } from './js/db.js';
 import {
   onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -142,9 +146,13 @@ onAuthStateChanged(auth, async user => {
     document.getElementById('admin-link').classList.remove('hidden');
   }
 
-  const { due, total } = await getUserStats(user.uid);
+  const [{ due, total }, pending] = await Promise.all([
+    getUserStats(user.uid),
+    getPendingCount(user.uid)
+  ]);
   document.getElementById('stat-due').textContent = due;
   document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-pending').textContent = pending;
 
   const cta = document.getElementById('review-cta');
   if (due === 0) {

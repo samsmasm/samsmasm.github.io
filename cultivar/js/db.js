@@ -84,15 +84,102 @@ export async function getDeckProgress(uid, deckId) {
 
 // ── Subscriptions ─────────────────────────────────────────────────────────────
 
+const DAILY_NEW_LIMIT = 12;
+const DAILY_REVIEW_LIMIT = 48;
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function dailyAllowanceRemaining(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const d = snap.data() || {};
+  if (d.new_today_date === todayStr()) {
+    return Math.max(0, DAILY_NEW_LIMIT - (d.new_today_count || 0));
+  }
+  return DAILY_NEW_LIMIT;
+}
+
+async function bumpDailyCount(uid, wordsAdded) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const d = snap.data() || {};
+  const today = todayStr();
+  const prev = d.new_today_date === today ? (d.new_today_count || 0) : 0;
+  await updateDoc(doc(db, 'users', uid), {
+    new_today_date: today,
+    new_today_count: prev + wordsAdded
+  });
+}
+
+// Finds deck words that have no progress records yet (pending pool)
+async function pendingWordsForDeck(uid, deckId) {
+  const [words, progressSnap] = await Promise.all([
+    getDeckWords(deckId),
+    getDocs(query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId)))
+  ]);
+  const existing = new Set(progressSnap.docs.map(d => d.data().word_id));
+  return words.filter(w => !existing.has(w.id)).map(w => ({ deckId, word: w }));
+}
+
+export async function getPendingCount(uid) {
+  const userData = await getUser(uid);
+  const deckIds = userData?.subscribed_decks || [];
+  let count = 0;
+  for (const deckId of deckIds) {
+    const pending = await pendingWordsForDeck(uid, deckId);
+    count += pending.length;
+  }
+  return count;
+}
+
+export async function introduceWords(uid, count) {
+  if (count <= 0) return 0;
+  const userData = await getUser(uid);
+  const deckIds = userData?.subscribed_decks || [];
+
+  const pending = [];
+  for (const deckId of deckIds) {
+    pending.push(...await pendingWordsForDeck(uid, deckId));
+    if (pending.length >= count) break;
+  }
+
+  const toIntroduce = pending.slice(0, count);
+  if (toIntroduce.length === 0) return 0;
+
+  const now = Timestamp.fromDate(new Date());
+  for (let i = 0; i < toIntroduce.length; i += 499) {
+    const batch = writeBatch(db);
+    for (const { deckId, word } of toIntroduce.slice(i, i + 499)) {
+      for (const dir of ['vn_en', 'en_vn']) {
+        batch.set(doc(db, 'users', uid, 'progress', `${word.id}_${dir}`), {
+          word_id: word.id, deck_id: deckId, source: 'deck',
+          direction: dir, level: 0, due_date: now,
+          last_reviewed: null, correct_count: 0, incorrect_count: 0
+        });
+      }
+    }
+    await batch.commit();
+  }
+  await bumpDailyCount(uid, toIntroduce.length);
+  return toIntroduce.length;
+}
+
+export async function autoIntroduceDaily(uid) {
+  const remaining = await dailyAllowanceRemaining(uid);
+  if (remaining <= 0) return 0;
+  return introduceWords(uid, remaining);
+}
+
 export async function subscribeToDeck(uid, deckId) {
-  const newCount = await syncNewDeckWords(uid, deckId);
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
   const arr = userSnap.data().subscribed_decks || [];
   if (!arr.includes(deckId)) {
     await updateDoc(userRef, { subscribed_decks: [...arr, deckId] });
   }
-  return newCount;
+  // Only introduce up to today's remaining allowance, not all words at once
+  const remaining = await dailyAllowanceRemaining(uid);
+  return introduceWords(uid, remaining);
 }
 
 export async function unenrollFromDeck(uid, deckId) {
@@ -165,7 +252,7 @@ export async function getDueCards(uid) {
     })
   ]);
 
-  return progressSnap.docs
+  const cards = progressSnap.docs
     .map(pd => {
       const progress = pd.data();
       const word = wordCache[progress.word_id];
@@ -173,6 +260,12 @@ export async function getDueCards(uid) {
       return { progressId: pd.id, progress, word, direction: progress.direction };
     })
     .filter(Boolean);
+
+  // New cards (level 0) are already capped by the daily introduction limit.
+  // Cap review cards (level > 0) at DAILY_REVIEW_LIMIT.
+  const newCards    = cards.filter(c => c.progress.level === 0);
+  const reviewCards = cards.filter(c => c.progress.level  > 0).slice(0, DAILY_REVIEW_LIMIT);
+  return [...newCards, ...reviewCards];
 }
 
 export async function updateProgress(uid, progressId, correct) {
