@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="cultivarlogo.png">
+  <title>Dashboard — Cultivar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="page-header">
+  <h1>Dashboard</h1>
+</header>
+
+<main class="main-pad">
+
+  <div class="form-group" style="margin-bottom:24px">
+    <label for="dash-deck-select">Deck</label>
+    <select id="dash-deck-select">
+      <option value="">— choose a deck —</option>
+    </select>
+  </div>
+
+  <div id="dash-content" class="hidden">
+    <!-- Future dashboard features go here -->
+    <p style="color:var(--muted);font-size:.9rem;text-align:center;padding:32px 0">
+      More dashboard features coming soon.
+    </p>
+
+    <!-- Reset progress — always at the bottom -->
+    <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);text-align:center">
+      <button id="reset-deck-btn" style="background:none;border:none;color:var(--muted);font-size:.8rem;cursor:pointer;text-decoration:underline">
+        Reset progress for this deck
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<nav class="bottom-nav">
+  <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
+  <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
+  <a href="dash.html" class="nav-item active"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { auth } from './js/config.js';
+import { getUser, getPublicDecks, resetDeckProgress } from './js/db.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+let uid = null;
+
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = 'index.html'; return; }
+  uid = user.uid;
+
+  const [userData, decks] = await Promise.all([getUser(uid), getPublicDecks()]);
+  const subscribed = new Set(userData?.subscribed_decks || []);
+  const sel = document.getElementById('dash-deck-select');
+
+  // Personal cards option
+  sel.appendChild(new Option('Personal cards', 'personal'));
+
+  // Subscribed decks
+  for (const d of decks.filter(d => subscribed.has(d.id))) {
+    sel.appendChild(new Option(d.name, d.id));
+  }
+});
+
+document.getElementById('dash-deck-select').addEventListener('change', e => {
+  const hasSelection = !!e.target.value;
+  document.getElementById('dash-content').classList.toggle('hidden', !hasSelection);
+});
+
+document.getElementById('reset-deck-btn').addEventListener('click', async () => {
+  const sel = document.getElementById('dash-deck-select');
+  const deckName = sel.selectedOptions[0]?.text || 'this deck';
+
+  const first = confirm(`Reset progress for "${deckName}"?\n\nYour SRS history for all words in this deck will be permanently deleted. You'll start from scratch with this deck.`);
+  if (!first) return;
+  const second = confirm(`Are you absolutely sure?\n\nThis cannot be undone.`);
+  if (!second) return;
+
+  const btn = document.getElementById('reset-deck-btn');
+  btn.textContent = 'Resetting…';
+  btn.disabled = true;
+
+  try {
+    await resetDeckProgress(uid, sel.value);
+    showToast(`Progress reset for "${deckName}"`);
+    btn.textContent = 'Progress reset';
+  } catch (err) {
+    console.error(err);
+    showToast('Reset failed. Try again.');
+    btn.textContent = 'Reset progress for this deck';
+    btn.disabled = false;
+  }
+});
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>

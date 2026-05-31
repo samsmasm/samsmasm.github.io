@@ -358,13 +358,17 @@ export async function getPersonalCards(uid) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-export async function resetProgress(uid) {
-  const progressSnap = await getDocs(collection(db, 'users', uid, 'progress'));
-  for (let i = 0; i < progressSnap.docs.length; i += 499) {
+export async function resetDeckProgress(uid, deckId) {
+  const q = deckId === 'personal'
+    ? query(collection(db, 'users', uid, 'progress'), where('source', '==', 'personal'))
+    : query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId));
+  const snap = await getDocs(q);
+  for (let i = 0; i < snap.docs.length; i += 499) {
     const batch = writeBatch(db);
-    for (const d of progressSnap.docs.slice(i, i + 499)) batch.delete(d.ref);
+    for (const d of snap.docs.slice(i, i + 499)) batch.delete(d.ref);
     await batch.commit();
   }
+  // Reset daily intro counter so user gets fresh words today
   await updateDoc(doc(db, 'users', uid), {
     new_today_date: null,
     new_today_count: 0,
