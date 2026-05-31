@@ -49,6 +49,7 @@
   <div class="empty-icon">🎉</div>
   <h2 id="done-title">Session complete!</h2>
   <p id="done-msg">You're all caught up for today.</p>
+  <button class="btn btn-secondary hidden" id="repeat-btn" style="margin-top:8px;width:100%;max-width:280px">Repeat today's words</button>
   <a href="index.html" class="btn btn-primary" style="margin-top:8px">Back to Home</a>
 </div>
 
@@ -108,6 +109,7 @@ let flipped = false;
 let allCards = [];
 let deckMeta = {};
 let pendingCount = 0;
+let sessionCards = [];
 
 async function loadAllCards() {
   const [cards, pending] = await Promise.all([getDueCards(uid), getPendingCount(uid)]);
@@ -200,7 +202,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
     return;
   }
 
-  queue = shuffle([...filtered]);
+  sessionCards = shuffle([...filtered]);
+  queue = [...sessionCards];
   totalUnique = queue.length;
   mastered = 0;
   document.getElementById('review-view').classList.remove('hidden');
@@ -210,7 +213,11 @@ document.getElementById('start-btn').addEventListener('click', () => {
 function showCard(card) {
   flipped = false;
   const fc = document.getElementById('flip-card');
+  // Snap back to front instantly — no transition so answer never flashes
+  fc.style.transition = 'none';
   fc.classList.remove('flipped');
+  fc.getBoundingClientRect(); // force reflow before re-enabling transition
+  fc.style.transition = '';
 
   document.getElementById('answer-row').classList.add('hidden');
   document.getElementById('tap-prompt').classList.remove('hidden');
@@ -247,15 +254,33 @@ function setOptional(id, text) {
 }
 
 document.getElementById('flip-wrap').addEventListener('click', () => {
-  if (flipped) return;
-  flipped = true;
-  document.getElementById('flip-card').classList.add('flipped');
-  document.getElementById('answer-row').classList.remove('hidden');
-  document.getElementById('tap-prompt').classList.add('hidden');
+  if (flipped) {
+    // Flip back to question
+    flipped = false;
+    document.getElementById('flip-card').classList.remove('flipped');
+    document.getElementById('answer-row').classList.add('hidden');
+    document.getElementById('tap-prompt').classList.remove('hidden');
+  } else {
+    // Flip to answer
+    flipped = true;
+    document.getElementById('flip-card').classList.add('flipped');
+    document.getElementById('answer-row').classList.remove('hidden');
+    document.getElementById('tap-prompt').classList.add('hidden');
+  }
 });
 
 document.getElementById('btn-right').addEventListener('click', () => answer(true));
 document.getElementById('btn-wrong').addEventListener('click', () => answer(false));
+
+document.getElementById('repeat-btn').addEventListener('click', () => {
+  document.getElementById('done-view').classList.add('hidden');
+  document.getElementById('repeat-btn').classList.add('hidden');
+  queue = shuffle([...sessionCards]);
+  totalUnique = queue.length;
+  mastered = 0;
+  document.getElementById('review-view').classList.remove('hidden');
+  showCard(queue[0]);
+});
 
 async function answer(correct) {
   // Disable buttons briefly to prevent double-tap
@@ -273,11 +298,13 @@ async function answer(correct) {
 
   if (queue.length === 0) {
     document.getElementById('review-view').classList.add('hidden');
-    const doneView = document.getElementById('done-view');
     document.getElementById('done-title').textContent = 'Session complete! 🎉';
     document.getElementById('done-msg').textContent =
       `You mastered ${mastered} card${mastered !== 1 ? 's' : ''} in this session. Keep it up!`;
-    doneView.classList.remove('hidden');
+    if (sessionCards.length > 0) {
+      document.getElementById('repeat-btn').classList.remove('hidden');
+    }
+    document.getElementById('done-view').classList.remove('hidden');
     return;
   }
 
