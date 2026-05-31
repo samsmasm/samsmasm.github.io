@@ -261,11 +261,19 @@ export async function getDueCards(uid) {
     })
     .filter(Boolean);
 
-  // New cards (level 0) are already capped by the daily introduction limit.
-  // Cap review cards (level > 0) at DAILY_REVIEW_LIMIT.
-  const newCards    = cards.filter(c => c.progress.level === 0);
-  const reviewCards = cards.filter(c => c.progress.level  > 0).slice(0, DAILY_REVIEW_LIMIT);
-  return [...newCards, ...reviewCards];
+  // Three buckets:
+  // 1. Genuinely new — level 0, never reviewed (last_reviewed null) → cap at 12 words × 2 directions
+  // 2. Failed-reset  — level 0, previously reviewed then got wrong → always include (retry cycle)
+  // 3. Review        — level > 0 → cap at DAILY_REVIEW_LIMIT
+  const genuinelyNew = cards.filter(c => c.progress.level === 0 && !c.progress.last_reviewed);
+  const failedReset  = cards.filter(c => c.progress.level === 0 &&  c.progress.last_reviewed);
+  const reviewCards  = cards.filter(c => c.progress.level  > 0);
+
+  return [
+    ...genuinelyNew.slice(0, DAILY_NEW_LIMIT * 2),
+    ...failedReset,
+    ...reviewCards.slice(0, DAILY_REVIEW_LIMIT)
+  ];
 }
 
 export async function updateProgress(uid, progressId, correct) {
