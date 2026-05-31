@@ -254,8 +254,17 @@ export async function getPendingCountForDeck(uid, deckId) {
 
 export async function introduceWordsForDeck(uid, deckId, count) {
   if (count <= 0 || deckId === 'personal') return 0;
-  const pendingItems = await pendingWordsForDeck(uid, deckId);
-  const toIntroduce = pendingItems.slice(0, count).map(item => item.word);
+  const [pendingItems, userData] = await Promise.all([pendingWordsForDeck(uid, deckId), getUser(uid)]);
+  const wordStatus = userData?.word_status || {};
+
+  // Filter out skip/never; ask_soon words go first
+  const eligible = pendingItems.filter(({ word }) => {
+    const s = wordStatus[`${deckId}_${word.id}`];
+    return s !== 'skip' && s !== 'never';
+  });
+  const askSoon = eligible.filter(({ word }) => wordStatus[`${deckId}_${word.id}`] === 'ask_soon');
+  const normal  = eligible.filter(({ word }) => !wordStatus[`${deckId}_${word.id}`]);
+  const toIntroduce = [...askSoon, ...normal].slice(0, count).map(item => item.word);
   if (toIntroduce.length === 0) return 0;
 
   const now = Timestamp.fromDate(new Date());
@@ -543,6 +552,76 @@ export async function deletePersonalCard(uid, cardId) {
 }
 
 // ── Admin ────────────────────────────────────────────────────────────────────
+
+// ── Dashboard word management ────────────────────────────────────────────────
+
+const SRS_INTERVALS = [0, 1, 3, 7, 30, 90, 365];
+const BOX_LABELS    = ['Today', 'Tomorrow', '3 days', '7 days', '30 days', '90 days', '1 year'];
+
+export function boxLabel(level) { return BOX_LABELS[level] ?? '?'; }
+
+export async function getDeckWordsWithProgress(uid, deckId) {
+  const [words, progressSnap, userData] = await Promise.all([
+    deckId === 'personal'
+      ? getDocs(collection(db, 'users', uid, 'cards')).then(s => s.docs.map(d => ({ id: d.id, ...d.data() })))
+      : getDeckWords(deckId),
+    deckId === 'personal'
+      ? getDocs(query(collection(db, 'users', uid, 'progress'), where('source', '==', 'personal')))
+      : getDocs(query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId))),
+    getUser(uid)
+  ]);
+
+  const wordStatus = userData?.word_status || {};
+  const progressByWord = {};
+  for (const d of progressSnap.docs) {
+    const { word_id, level, due_date, last_reviewed } = d.data();
+    if (!progressByWord[word_id] || level > progressByWord[word_id].level) {
+      progressByWord[word_id] = { level, due_date, last_reviewed };
+    }
+  }
+
+  return words.map(word => ({
+    id: word.id,
+    word,
+    introduced: !!progressByWord[word.id],
+    progress: progressByWord[word.id] || null,
+    status: wordStatus[`${deckId}_${word.id}`] || 'normal'
+  }));
+}
+
+export async function setWordStatus(uid, deckId, wordId, status) {
+  const key = `word_status.${deckId}_${wordId}`;
+  await updateDoc(doc(db, 'users', uid),
+    status === 'normal' ? { [key]: deleteField() } : { [key]: status }
+  );
+}
+
+export async function moveWordBox(uid, wordId, direction) {
+  for (const dir of ['vn_en', 'en_vn']) {
+    const ref = doc(db, 'users', uid, 'progress', `${wordId}_${dir}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) continue;
+    const { level } = snap.data();
+    const newLevel = direction === 'earlier' ? Math.max(0, level - 1) : Math.min(6, level + 1);
+    const days = SRS_INTERVALS[newLevel];
+    const due = new Date();
+    if (days > 0) due.setDate(due.getDate() + days);
+    await updateDoc(ref, {
+      level: newLevel,
+      due_date: Timestamp.fromDate(due),
+      last_reviewed: serverTimestamp()
+    });
+  }
+}
+
+export async function removeWordFromCycle(uid, deckId, wordId) {
+  const batch = writeBatch(db);
+  for (const dir of ['vn_en', 'en_vn']) {
+    batch.delete(doc(db, 'users', uid, 'progress', `${wordId}_${dir}`));
+  }
+  await batch.commit();
+  await setWordStatus(uid, deckId, wordId, 'never');
+}
 
 export async function deleteDeck(deckId) {
   const words = await getDeckWords(deckId);

@@ -30,18 +30,34 @@
     <div class="panel" style="margin-bottom:16px">
       <div class="panel-title">⚙️ Daily limits</div>
       <div class="panel-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px">
           <div class="form-group">
             <label for="setting-daily-new">New words / day</label>
             <input type="number" id="setting-daily-new" min="1" max="50" value="12" style="width:100%">
           </div>
           <div class="form-group">
-            <label for="setting-session-max">Max cards / session</label>
+            <label for="setting-session-max">Session cap (total)</label>
             <input type="number" id="setting-session-max" min="12" max="200" value="36" style="width:100%">
           </div>
         </div>
+        <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">
+          Each new word is tested in both directions, so 12 new words = 24 cards.
+          The session cap is the total including new cards — the rest are reviews.
+          Default 12 new / 36 total leaves 12 slots for reviews.
+        </p>
         <button class="btn btn-primary btn-full" id="save-settings-btn">Save settings</button>
       </div>
+    </div>
+
+    <!-- Word list -->
+    <div id="word-list-section" style="margin-bottom:32px">
+      <div class="section-heading">
+        <h2 id="word-list-heading">Words</h2>
+      </div>
+      <div id="word-loading" style="text-align:center;padding:20px;display:none">
+        <div class="spinner" style="margin:0 auto"></div>
+      </div>
+      <div id="word-list"></div>
     </div>
 
     <!-- Reset progress — always at the bottom -->
@@ -64,7 +80,8 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getUser, getPublicDecks, resetDeckProgress, getUserSettings, updateUserSettings } from './js/db.js';
+import { getUser, getPublicDecks, resetDeckProgress, getUserSettings, updateUserSettings,
+         getDeckWordsWithProgress, setWordStatus, moveWordBox, removeWordFromCycle, boxLabel } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
@@ -101,10 +118,136 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
   btn.disabled = false; btn.textContent = 'Save settings';
 });
 
-document.getElementById('dash-deck-select').addEventListener('change', e => {
-  const hasSelection = !!e.target.value;
-  document.getElementById('dash-content').classList.toggle('hidden', !hasSelection);
+let currentDeckId = null;
+
+document.getElementById('dash-deck-select').addEventListener('change', async e => {
+  currentDeckId = e.target.value || null;
+  document.getElementById('dash-content').classList.toggle('hidden', !currentDeckId);
+  if (currentDeckId) await loadWordList();
 });
+
+async function loadWordList() {
+  const loading = document.getElementById('word-loading');
+  const list    = document.getElementById('word-list');
+  loading.style.display = 'block';
+  list.innerHTML = '';
+
+  const words = await getDeckWordsWithProgress(uid, currentDeckId);
+  document.getElementById('word-list-heading').textContent = `Words (${words.length})`;
+  loading.style.display = 'none';
+
+  if (words.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:.9rem;padding:8px 0">No words yet.</p>';
+    return;
+  }
+
+  for (const item of words) {
+    list.appendChild(renderWordRow(item));
+  }
+}
+
+function renderWordRow(item) {
+  const { id, word, introduced, progress, status } = item;
+  const front = word.vietnamese || word.term || '';
+  const back  = word.english   || word.definition || '';
+
+  const row = document.createElement('div');
+  row.dataset.wordId = id;
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap';
+
+  // Word text
+  const label = document.createElement('div');
+  label.style.cssText = 'flex:1;min-width:0';
+  label.innerHTML = `<span style="font-weight:600">${esc(front)}</span><span style="color:var(--muted);margin:0 4px">→</span><span style="color:var(--muted)">${esc(back)}</span>`;
+  row.appendChild(label);
+
+  if (introduced && progress) {
+    // Box label + left/right arrows
+    const boxWrap = document.createElement('div');
+    boxWrap.style.cssText = 'display:flex;align-items:center;gap:4px;flex-shrink:0';
+
+    const leftBtn = document.createElement('button');
+    leftBtn.textContent = '←';
+    leftBtn.title = 'Earlier box';
+    leftBtn.disabled = progress.level === 0;
+    leftBtn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:.85rem';
+
+    const boxSpan = document.createElement('span');
+    boxSpan.textContent = boxLabel(progress.level);
+    boxSpan.style.cssText = 'font-size:.8rem;color:var(--muted);min-width:60px;text-align:center';
+
+    const rightBtn = document.createElement('button');
+    rightBtn.textContent = '→';
+    rightBtn.title = 'Later box';
+    rightBtn.disabled = progress.level === 6;
+    rightBtn.style.cssText = leftBtn.style.cssText;
+
+    leftBtn.addEventListener('click', async () => {
+      leftBtn.disabled = rightBtn.disabled = true;
+      await moveWordBox(uid, id, 'earlier');
+      const updated = await getDeckWordsWithProgress(uid, currentDeckId);
+      const newItem = updated.find(w => w.id === id);
+      if (newItem) row.replaceWith(renderWordRow(newItem));
+    });
+
+    rightBtn.addEventListener('click', async () => {
+      leftBtn.disabled = rightBtn.disabled = true;
+      await moveWordBox(uid, id, 'later');
+      const updated = await getDeckWordsWithProgress(uid, currentDeckId);
+      const newItem = updated.find(w => w.id === id);
+      if (newItem) row.replaceWith(renderWordRow(newItem));
+    });
+
+    boxWrap.append(leftBtn, boxSpan, rightBtn);
+    row.appendChild(boxWrap);
+
+    // Never ask button
+    const neverBtn = document.createElement('button');
+    neverBtn.textContent = 'Never ask';
+    neverBtn.style.cssText = 'background:none;border:none;font-size:.75rem;color:var(--muted);cursor:pointer;text-decoration:underline;flex-shrink:0';
+    neverBtn.addEventListener('click', async () => {
+      if (!confirm(`Remove "${front}" from your review cycle?`)) return;
+      neverBtn.disabled = true;
+      await removeWordFromCycle(uid, currentDeckId, id);
+      row.remove();
+    });
+    row.appendChild(neverBtn);
+
+  } else {
+    // Pending word — status buttons
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap';
+
+    const statuses = [
+      { key: 'ask_soon', label: 'Ask soon', color: 'var(--correct)' },
+      { key: 'skip',     label: 'Skip for now', color: 'var(--muted)' },
+      { key: 'never',    label: 'Never',    color: 'var(--incorrect)' },
+    ];
+
+    for (const { key, label, color } of statuses) {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      const isActive = status === key;
+      btn.style.cssText = `font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid ${color};background:${isActive ? color : 'none'};color:${isActive ? '#fff' : color}`;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const newStatus = isActive ? 'normal' : key;
+        await setWordStatus(uid, currentDeckId, id, newStatus);
+        const updated = await getDeckWordsWithProgress(uid, currentDeckId);
+        const newItem = updated.find(w => w.id === id);
+        if (newItem) row.replaceWith(renderWordRow(newItem));
+      });
+      btnWrap.appendChild(btn);
+    }
+    row.appendChild(btnWrap);
+  }
+
+  return row;
+}
+
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 document.getElementById('reset-deck-btn').addEventListener('click', async () => {
   const sel = document.getElementById('dash-deck-select');
