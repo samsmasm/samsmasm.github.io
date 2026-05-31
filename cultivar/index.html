@@ -103,6 +103,10 @@
       <a href="cards.html" class="quick-tile">➕ My Cards</a>
       <a href="admin.html" class="quick-tile hidden" id="admin-link">⚙️ Admin</a>
     </div>
+
+    <div style="text-align:center;margin-top:32px;padding-bottom:8px">
+      <button id="reset-btn" style="background:none;border:none;color:var(--muted);font-size:.8rem;cursor:pointer;text-decoration:underline">Reset all progress</button>
+    </div>
   </main>
 
   <nav class="bottom-nav">
@@ -115,7 +119,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getOrCreateUser, getUserStats, getPendingCount } from './js/db.js';
+import { getOrCreateUser, getUserStats, getPendingCount, resetProgress } from './js/db.js';
 import {
   onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -185,6 +189,32 @@ document.getElementById('google-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  const first = confirm('Reset all progress?\n\nThis will permanently delete your SRS history for every word. Your enrolled decks and personal cards will be kept, but all levels and review history will be gone.');
+  if (!first) return;
+  const second = confirm('Are you absolutely sure?\n\nThis cannot be undone. You will start from scratch with 12 new words tomorrow.');
+  if (!second) return;
+
+  const btn = document.getElementById('reset-btn');
+  btn.textContent = 'Resetting…';
+  btn.disabled = true;
+
+  try {
+    const user = auth.currentUser;
+    await resetProgress(user.uid);
+    document.getElementById('stat-due').textContent = '0';
+    document.getElementById('stat-total').textContent = '0';
+    document.getElementById('stat-pending').textContent = '–';
+    document.getElementById('review-cta').textContent = 'Start Review';
+    document.getElementById('review-cta').style.background = '';
+    btn.textContent = 'Progress reset';
+  } catch (err) {
+    console.error(err);
+    btn.textContent = 'Reset failed';
+    btn.disabled = false;
+  }
+});
 </script>
 </body>
 </html>

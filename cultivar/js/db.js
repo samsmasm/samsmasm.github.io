@@ -318,6 +318,19 @@ export async function getPersonalCards(uid) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+export async function resetProgress(uid) {
+  const progressSnap = await getDocs(collection(db, 'users', uid, 'progress'));
+  for (let i = 0; i < progressSnap.docs.length; i += 499) {
+    const batch = writeBatch(db);
+    for (const d of progressSnap.docs.slice(i, i + 499)) batch.delete(d.ref);
+    await batch.commit();
+  }
+  await updateDoc(doc(db, 'users', uid), {
+    new_today_date: null,
+    new_today_count: 0
+  });
+}
+
 export async function deletePersonalCard(uid, cardId) {
   const batch = writeBatch(db);
   batch.delete(doc(db, 'users', uid, 'cards', cardId));
