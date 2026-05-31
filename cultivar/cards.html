@@ -21,37 +21,65 @@
   <div class="panel">
     <div class="panel-title">➕ Add a card</div>
     <div class="panel-body">
+
+      <!-- Tab bar -->
+      <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:16px;gap:0">
+        <button class="card-tab active" data-tab="language" style="flex:1;padding:8px;background:none;border:none;border-bottom:2px solid var(--primary);margin-bottom:-2px;font-weight:600;color:var(--primary);cursor:pointer">Language</button>
+        <button class="card-tab" data-tab="subject" style="flex:1;padding:8px;background:none;border:none;color:var(--muted);cursor:pointer">Subject vocab</button>
+      </div>
+
+      <!-- Admin deck selector -->
       <div class="form-group hidden" id="deck-select-group" style="margin-bottom:14px">
         <label for="target-deck">Add to</label>
         <select id="target-deck">
           <option value="">My personal cards</option>
         </select>
       </div>
-      <form id="add-form">
+
+      <!-- Language form -->
+      <form id="add-form-lang">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
           <div class="form-group">
-            <label for="vn">Vietnamese</label>
-            <input type="text" id="vn" placeholder="xin chào" required>
+            <label for="lang-other">Other language</label>
+            <input type="text" id="lang-other" placeholder="xin chào" required>
           </div>
           <div class="form-group">
-            <label for="en">English</label>
-            <input type="text" id="en" placeholder="hello" required>
+            <label for="lang-yours">Your language</label>
+            <input type="text" id="lang-yours" placeholder="hello" required>
           </div>
         </div>
         <div class="form-group" style="margin-bottom:10px">
-          <label for="ex-vn">Example sentence (Vietnamese)</label>
-          <input type="text" id="ex-vn" placeholder="Xin chào! Bạn khoẻ không?">
+          <label for="lang-ex-other">Example (other language)</label>
+          <input type="text" id="lang-ex-other" placeholder="Xin chào! Bạn khoẻ không?">
         </div>
         <div class="form-group" style="margin-bottom:10px">
-          <label for="ex-en">Example sentence (English)</label>
-          <input type="text" id="ex-en" placeholder="Hello! How are you?">
+          <label for="lang-ex-yours">Example (your language)</label>
+          <input type="text" id="lang-ex-yours" placeholder="Hello! How are you?">
         </div>
         <div class="form-group" style="margin-bottom:14px">
-          <label for="notes">Notes</label>
-          <input type="text" id="notes" placeholder="e.g. Southern dialect pronunciation">
+          <label for="lang-notes">Notes</label>
+          <input type="text" id="lang-notes" placeholder="e.g. Southern dialect, formal register">
         </div>
-        <button type="submit" class="btn btn-primary btn-full" id="add-btn">Add card</button>
+        <button type="submit" class="btn btn-primary btn-full">Add card</button>
       </form>
+
+      <!-- Subject vocab form -->
+      <form id="add-form-subj" class="hidden">
+        <div class="form-group" style="margin-bottom:10px">
+          <label for="subj-term">Term</label>
+          <input type="text" id="subj-term" placeholder="opportunity cost" required>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label for="subj-def">Definition</label>
+          <input type="text" id="subj-def" placeholder="the next best alternative foregone" required>
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label for="subj-ex">Example <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <input type="text" id="subj-ex" placeholder="Choosing to study means the opportunity cost is leisure time">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Add card</button>
+      </form>
+
     </div>
   </div>
 
@@ -59,35 +87,51 @@
   <div class="panel">
     <div class="panel-title">📥 Import from CSV</div>
     <div class="panel-body">
-      <div class="csv-hint" id="csv-hint-personal">
-        Format: <code>Vietnamese,English,ExampleVN,ExampleEN,Notes</code><br>
-        Header row skipped. Last 3 columns optional.
+      <div id="csv-hint-lang">
+        <div class="csv-hint">
+          Format: <code>OtherLanguage,YourLanguage,ExampleOther,ExampleYours,Notes</code><br>
+          Header row skipped. Last 3 columns optional.
+        </div>
       </div>
-      <div class="csv-hint hidden" id="csv-hint-deck">
-        Format: <code>Subject,Unit,Subunit,Vietnamese,English,Notes</code><br>
-        Subunit and Notes can be blank. Decks are created automatically. Header row skipped.
+      <div id="csv-hint-subj" class="hidden">
+        <div class="csv-hint">
+          Format: <code>Term,Definition,Example</code><br>
+          Header row skipped. Example optional.
+        </div>
       </div>
       <details style="margin-top:10px">
         <summary style="cursor:pointer;font-size:.85rem;color:var(--muted)">Copy prompt for LLM</summary>
         <div style="margin-top:8px">
-          <textarea id="llm-prompt" rows="8" readonly style="width:100%;font-size:.78rem;font-family:monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;resize:none">Generate a vocabulary CSV for a spaced repetition flashcard app.
+          <textarea id="llm-prompt-lang" rows="9" readonly style="width:100%;font-size:.78rem;font-family:monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;resize:none">Generate a vocabulary CSV for a spaced repetition flashcard app.
 
-Columns: Subject, Unit, Subunit, Vietnamese, English, Notes
+Columns: Subject, Unit, Subunit, OtherLanguage, YourLanguage, Notes
 - Subject: the broad subject (e.g. "Vietnamese", "Business")
 - Unit: the topic area (e.g. "At home", "Finance")
-- Subunit: optional difficulty or subtopic (e.g. "Beginner", "Investment Appraisal") — leave blank if not applicable
-- Vietnamese: the Vietnamese word or phrase
-- English: the English meaning
-- Notes: optional usage note, example sentence, register, or dialect — leave blank if not applicable
+- Subunit: optional subtopic or level (e.g. "Beginner") — leave blank if not applicable
+- OtherLanguage: the word or phrase in the language being learned
+- YourLanguage: the meaning in your own language
+- Notes: optional usage note, example, register, or dialect — leave blank if not applicable
 
 Include a header row. Leave optional fields as empty cells (just a comma).
 Output only the CSV with no explanation or markdown formatting.</textarea>
-          <button class="btn btn-secondary" style="margin-top:6px;font-size:.8rem;padding:5px 12px;min-height:30px" onclick="navigator.clipboard.writeText(document.getElementById('llm-prompt').value).then(()=>this.textContent='Copied!').catch(()=>{})">Copy</button>
+          <textarea id="llm-prompt-subj" rows="9" readonly class="hidden" style="width:100%;font-size:.78rem;font-family:monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;resize:none">Generate a subject vocabulary CSV for a spaced repetition flashcard app.
+
+Columns: Subject, Unit, Subunit, Term, Definition, Example
+- Subject: the broad subject (e.g. "Economics", "Business")
+- Unit: the topic area (e.g. "Microeconomics", "Finance")
+- Subunit: optional subtopic (e.g. "Market Failure") — leave blank if not applicable
+- Term: the key term or concept
+- Definition: the definition or explanation
+- Example: optional example sentence or context — leave blank if not applicable
+
+Include a header row. Leave optional fields as empty cells (just a comma).
+Output only the CSV with no explanation or markdown formatting.</textarea>
+          <button class="btn btn-secondary" id="copy-prompt-btn" style="margin-top:6px;font-size:.8rem;padding:5px 12px;min-height:30px">Copy</button>
         </div>
       </details>
-      <div class="form-group">
+      <div class="form-group" style="margin-top:10px">
         <label for="csv-input">Paste CSV</label>
-        <textarea id="csv-input" placeholder="xin chào,hello,Xin chào bạn!,Hello friend!,&#10;cảm ơn,thank you,,," rows="5"></textarea>
+        <textarea id="csv-input" rows="5"></textarea>
       </div>
       <p class="error-msg hidden" id="csv-error"></p>
       <button class="btn btn-primary btn-full" id="csv-btn">Import</button>
@@ -124,11 +168,39 @@ import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/fi
 
 let uid = null;
 let isAdmin = false;
+let activeTab = 'language';
 
-function targetDeckId() {
-  return document.getElementById('target-deck')?.value || '';
-}
+// ── Tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.card-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.card-tab').forEach(b => {
+      const isActive = b === btn;
+      b.style.borderBottom = isActive ? '2px solid var(--primary)' : 'none';
+      b.style.marginBottom = isActive ? '-2px' : '0';
+      b.style.fontWeight = isActive ? '600' : '400';
+      b.style.color = isActive ? 'var(--primary)' : 'var(--muted)';
+    });
+    document.getElementById('add-form-lang').classList.toggle('hidden', activeTab !== 'language');
+    document.getElementById('add-form-subj').classList.toggle('hidden', activeTab !== 'subject');
+    document.getElementById('csv-hint-lang').classList.toggle('hidden', activeTab !== 'language');
+    document.getElementById('csv-hint-subj').classList.toggle('hidden', activeTab !== 'subject');
+    document.getElementById('llm-prompt-lang').classList.toggle('hidden', activeTab !== 'language');
+    document.getElementById('llm-prompt-subj').classList.toggle('hidden', activeTab !== 'subject');
+  });
+});
 
+document.getElementById('copy-prompt-btn').addEventListener('click', function() {
+  const promptEl = activeTab === 'language'
+    ? document.getElementById('llm-prompt-lang')
+    : document.getElementById('llm-prompt-subj');
+  navigator.clipboard.writeText(promptEl.value).then(() => {
+    this.textContent = 'Copied!';
+    setTimeout(() => this.textContent = 'Copy', 2000);
+  }).catch(() => {});
+});
+
+// ── Auth + init ───────────────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
@@ -145,26 +217,17 @@ onAuthStateChanged(auth, async user => {
       sel.appendChild(opt);
     }
     document.getElementById('deck-select-group').classList.remove('hidden');
-
-    // Pre-select deck from URL param
     const param = new URLSearchParams(location.search).get('deck');
     if (param) sel.value = param;
-
-    sel.addEventListener('change', () => {
-      const isDeck = !!sel.value;
-      document.getElementById('csv-hint-personal').classList.toggle('hidden', isDeck);
-      document.getElementById('csv-hint-deck').classList.toggle('hidden', !isDeck);
-    });
-    if (param) sel.dispatchEvent(new Event('change'));
   }
 
   await loadCards();
 });
 
+// ── Card list ─────────────────────────────────────────────────────────────────
 async function loadCards() {
   const cards = await getPersonalCards(uid);
   document.getElementById('loading-cards').classList.add('hidden');
-
   const list = document.getElementById('card-list');
   const empty = document.getElementById('empty-cards');
 
@@ -177,13 +240,15 @@ async function loadCards() {
 
   empty.classList.add('hidden');
   document.getElementById('cards-heading').textContent = `My cards (${cards.length})`;
-
   list.innerHTML = '';
+
   for (const card of cards) {
+    const isSubject = card.card_type === 'subject';
     const el = document.createElement('div');
     el.className = 'list-card';
     el.innerHTML = `
       <div class="list-card-body">
+        ${isSubject ? '<span style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Subject</span>' : ''}
         <div class="list-card-title">${esc(card.vietnamese)} — ${esc(card.english)}</div>
         ${card.example_vn ? `<div class="list-card-sub">${esc(card.example_vn)}</div>` : ''}
         ${card.notes ? `<div class="list-card-sub" style="font-style:italic">${esc(card.notes)}</div>` : ''}
@@ -204,44 +269,59 @@ async function loadCards() {
   });
 }
 
-document.getElementById('add-form').addEventListener('submit', async e => {
+// ── Add single card ───────────────────────────────────────────────────────────
+async function submitCard(card) {
+  const deckId = document.getElementById('target-deck')?.value || '';
+  if (deckId) {
+    await addWordToDeck(deckId, card);
+  } else {
+    await addPersonalCard(uid, card);
+  }
+}
+
+document.getElementById('add-form-lang').addEventListener('submit', async e => {
   e.preventDefault();
-  const btn = document.getElementById('add-btn');
-  btn.disabled = true;
-  btn.textContent = 'Adding…';
-
-  const card = {
-    vietnamese: document.getElementById('vn').value.trim(),
-    english:    document.getElementById('en').value.trim(),
-    example_vn: document.getElementById('ex-vn').value.trim(),
-    example_en: document.getElementById('ex-en').value.trim(),
-    notes:      document.getElementById('notes').value.trim(),
-  };
-
-  const deckId = targetDeckId();
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Adding…';
   try {
-    if (deckId) {
-      await addWordToDeck(deckId, card);
-    } else {
-      await addPersonalCard(uid, card);
-    }
+    await submitCard({
+      card_type:  'language',
+      vietnamese: document.getElementById('lang-other').value.trim(),
+      english:    document.getElementById('lang-yours').value.trim(),
+      example_vn: document.getElementById('lang-ex-other').value.trim(),
+      example_en: document.getElementById('lang-ex-yours').value.trim(),
+      notes:      document.getElementById('lang-notes').value.trim(),
+    });
     e.target.reset();
     showToast('Card added!');
     await loadCards();
-  } catch (err) {
-    console.error(err);
-    showToast('Failed to add card.');
-  }
-
-  btn.disabled = false;
-  btn.textContent = 'Add card';
+  } catch (err) { console.error(err); showToast('Failed to add card.'); }
+  btn.disabled = false; btn.textContent = 'Add card';
 });
 
+document.getElementById('add-form-subj').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    await submitCard({
+      card_type:  'subject',
+      vietnamese: document.getElementById('subj-term').value.trim(),
+      english:    document.getElementById('subj-def').value.trim(),
+      example_vn: document.getElementById('subj-ex').value.trim(),
+    });
+    e.target.reset();
+    showToast('Card added!');
+    await loadCards();
+  } catch (err) { console.error(err); showToast('Failed to add card.'); }
+  btn.disabled = false; btn.textContent = 'Add card';
+});
+
+// ── CSV import ────────────────────────────────────────────────────────────────
 document.getElementById('csv-btn').addEventListener('click', async () => {
   const raw = document.getElementById('csv-input').value.trim();
   const errEl = document.getElementById('csv-error');
   errEl.classList.add('hidden');
-
   if (!raw) return;
 
   const rows = parseCSV(raw);
@@ -252,54 +332,69 @@ document.getElementById('csv-btn').addEventListener('click', async () => {
   }
 
   const btn = document.getElementById('csv-btn');
-  btn.disabled = true;
-  btn.textContent = 'Importing…';
+  btn.disabled = true; btn.textContent = 'Importing…';
 
   let added = 0;
+  try {
+    if (isAdmin) {
+      // Admin: Subject,Unit,Subunit,Word/Term,Translation/Definition,Notes/Example
+      const cardType = activeTab === 'subject' ? 'subject' : 'language';
+      const groups = {};
+      for (const r of rows) {
+        const subject = (r[0] || '').trim();
+        const unit    = (r[1] || '').trim();
+        const subunit = (r[2] || '').trim();
+        const col4    = (r[3] || '').trim();
+        const col5    = (r[4] || '').trim();
+        const col6    = (r[5] || '').trim();
+        if (!subject || !unit || !col4 || !col5) continue;
+        const key = `${subject}||${unit}||${subunit}`;
+        if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
+        groups[key].words.push({ card_type: cardType, vietnamese: col4, english: col5, example_vn: col6, notes: '' });
+      }
+      for (const { subject, unit, subunit, words } of Object.values(groups)) {
+        const deckId = await findOrCreateDeck(subject, unit, subunit);
+        added += await bulkAddWordsToDeck(deckId, words);
+      }
+    } else if (activeTab === 'subject') {
+      // Student subject vocab: Term,Definition,Example
+      for (const row of rows) {
+        if (!row[0]?.trim() || !row[1]?.trim()) continue;
+        await addPersonalCard(uid, {
+          card_type:  'subject',
+          vietnamese: row[0].trim(),
+          english:    row[1].trim(),
+          example_vn: (row[2] || '').trim(),
+        });
+        added++;
+      }
+    } else {
+      // Student language: OtherLanguage,YourLanguage,ExampleOther,ExampleYours,Notes
+      for (const row of rows) {
+        if (!row[0]?.trim() || !row[1]?.trim()) continue;
+        await addPersonalCard(uid, {
+          card_type:  'language',
+          vietnamese: row[0].trim(),
+          english:    row[1].trim(),
+          example_vn: (row[2] || '').trim(),
+          example_en: (row[3] || '').trim(),
+          notes:      (row[4] || '').trim(),
+        });
+        added++;
+      }
+    }
 
-  if (isAdmin) {
-    // Admin: Subject,Unit,Subunit,Vietnamese,English,Notes — auto-route to decks
-    const groups = {};
-    for (const r of rows) {
-      const subject = (r[0] || '').trim();
-      const unit    = (r[1] || '').trim();
-      const subunit = (r[2] || '').trim();
-      const vn      = (r[3] || '').trim();
-      const en      = (r[4] || '').trim();
-      const notes   = (r[5] || '').trim();
-      if (!subject || !unit || !vn || !en) continue;
-      const key = `${subject}||${unit}||${subunit}`;
-      if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
-      groups[key].words.push({ vietnamese: vn, english: en, notes });
-    }
-    for (const { subject, unit, subunit, words } of Object.values(groups)) {
-      const deckId = await findOrCreateDeck(subject, unit, subunit);
-      added += await bulkAddWordsToDeck(deckId, words);
-    }
-  } else {
-    // Student: Vietnamese,English,ExampleVN,ExampleEN,Notes → personal cards
-    for (const row of rows) {
-      if (!row[0] || !row[1]) continue;
-      await addPersonalCard(uid, {
-        vietnamese: row[0].trim(),
-        english:    row[1].trim(),
-        example_vn: (row[2] || '').trim(),
-        example_en: (row[3] || '').trim(),
-        notes:      (row[4] || '').trim(),
-      });
-      added++;
-    }
+    document.getElementById('csv-input').value = '';
+    showToast(`Imported ${added} card${added !== 1 ? 's' : ''}`);
+    if (!isAdmin) await loadCards();
+  } catch (err) {
+    console.error(err);
+    showToast('Import failed.');
   }
 
-  document.getElementById('csv-input').value = '';
-  showToast(`Imported ${added} card${added !== 1 ? 's' : ''}`);
-  await loadCards();
-
-  btn.disabled = false;
-  btn.textContent = 'Import';
+  btn.disabled = false; btn.textContent = 'Import';
 });
 
-// Simple CSV parser — handles quoted fields with commas inside
 function parseCSV(text) {
   const rows = [];
   for (const line of text.split('\n')) {
@@ -319,8 +414,7 @@ function parseCSV(text) {
       }
     }
     cells.push(cur);
-    // Skip header row if first cell looks like a column name
-    if (rows.length === 0 && /^(subject|vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
+    if (rows.length === 0 && /^(subject|term|otherlanguage|vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
     rows.push(cells);
   }
   return rows;
