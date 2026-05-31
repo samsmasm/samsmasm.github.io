@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="cultivarlogo.png">
+  <title>Review — Cultivar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-view" class="page-center">
+  <div class="spinner"></div>
+  <p style="color:var(--muted);font-size:.9rem">Loading cards…</p>
+</div>
+
+<!-- All done -->
+<div id="done-view" class="page-center empty-state hidden">
+  <div class="empty-icon">🎉</div>
+  <h2 id="done-title">Session complete!</h2>
+  <p id="done-msg">You're all caught up for today.</p>
+  <a href="index.html" class="btn btn-primary" style="margin-top:8px">Back to Home</a>
+</div>
+
+<!-- Review UI -->
+<div id="review-view" class="hidden">
+  <header class="review-header">
+    <a href="index.html" class="btn-icon" style="font-size:1.1rem">←</a>
+    <div class="progress-track">
+      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+    <span id="progress-text">0/0</span>
+  </header>
+
+  <div class="review-body">
+    <div class="direction-chip" id="dir-chip"></div>
+
+    <!-- Flashcard -->
+    <div class="flip-wrap" id="flip-wrap">
+      <div class="flip-card" id="flip-card">
+        <div class="flip-front">
+          <span class="card-hint-text">Tap to reveal</span>
+          <div class="card-main-word" id="front-word"></div>
+          <div class="card-example" id="front-extra" style="display:none"></div>
+        </div>
+        <div class="flip-back">
+          <div class="card-translation" id="back-answer"></div>
+          <div class="card-example" id="back-example" style="display:none"></div>
+          <div class="card-notes" id="back-notes" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Answer buttons (hidden until flipped) -->
+    <div class="answer-row hidden" id="answer-row">
+      <button class="btn-wrong" id="btn-wrong">✗ Didn't know</button>
+      <button class="btn-right" id="btn-right">✓ Got it!</button>
+    </div>
+
+    <p class="tap-prompt" id="tap-prompt">Tap card to reveal answer</p>
+
+    <!-- Level indicator -->
+    <p id="level-label" style="font-size:.8rem;color:var(--muted)"></p>
+  </div>
+</div>
+
+<script type="module">
+import { auth } from './js/config.js';
+import { getDueCards, updateProgress } from './js/db.js';
+import { levelLabel } from './js/srs.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+let queue = [];
+let totalUnique = 0;
+let mastered = 0;
+let uid = null;
+let flipped = false;
+
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = 'index.html'; return; }
+  uid = user.uid;
+
+  const cards = await getDueCards(uid);
+  document.getElementById('loading-view').classList.add('hidden');
+
+  if (cards.length === 0) {
+    const doneView = document.getElementById('done-view');
+    document.getElementById('done-title').textContent = 'All caught up! 🎉';
+    document.getElementById('done-msg').textContent = 'No cards due today. Come back tomorrow!';
+    doneView.classList.remove('hidden');
+    return;
+  }
+
+  queue = shuffle([...cards]);
+  totalUnique = queue.length;
+  mastered = 0;
+
+  document.getElementById('review-view').classList.remove('hidden');
+  showCard(queue[0]);
+});
+
+function showCard(card) {
+  flipped = false;
+  const fc = document.getElementById('flip-card');
+  fc.classList.remove('flipped');
+
+  document.getElementById('answer-row').classList.add('hidden');
+  document.getElementById('tap-prompt').classList.remove('hidden');
+
+  const { word, direction, progress } = card;
+
+  document.getElementById('dir-chip').textContent =
+    direction === 'vn_en' ? 'Vietnamese → English' : 'English → Vietnamese';
+
+  const frontWord  = direction === 'vn_en' ? word.vietnamese : word.english;
+  const backAnswer = direction === 'vn_en' ? word.english    : word.vietnamese;
+  const example    = direction === 'vn_en'
+    ? (word.example_vn || word.example || '')
+    : (word.example_en || word.example || '');
+
+  document.getElementById('front-word').textContent = frontWord;
+  setOptional('front-extra', '');
+  document.getElementById('back-answer').textContent = backAnswer;
+  setOptional('back-example', example);
+  setOptional('back-notes', word.notes || '');
+
+  document.getElementById('level-label').textContent =
+    `Current level: ${levelLabel(progress.level)}`;
+
+  updateBar();
+}
+
+function setOptional(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.display = text ? '' : 'none';
+}
+
+document.getElementById('flip-wrap').addEventListener('click', () => {
+  if (flipped) return;
+  flipped = true;
+  document.getElementById('flip-card').classList.add('flipped');
+  document.getElementById('answer-row').classList.remove('hidden');
+  document.getElementById('tap-prompt').classList.add('hidden');
+});
+
+document.getElementById('btn-right').addEventListener('click', () => answer(true));
+document.getElementById('btn-wrong').addEventListener('click', () => answer(false));
+
+async function answer(correct) {
+  // Disable buttons briefly to prevent double-tap
+  document.getElementById('btn-right').disabled = true;
+  document.getElementById('btn-wrong').disabled = true;
+
+  const card = queue.shift();
+  updateProgress(uid, card.progressId, correct).catch(console.error);
+
+  if (correct) {
+    mastered++;
+  } else {
+    queue.push(card); // retry at end of session
+  }
+
+  if (queue.length === 0) {
+    document.getElementById('review-view').classList.add('hidden');
+    const doneView = document.getElementById('done-view');
+    document.getElementById('done-title').textContent = 'Session complete! 🎉';
+    document.getElementById('done-msg').textContent =
+      `You mastered ${mastered} card${mastered !== 1 ? 's' : ''} in this session. Keep it up!`;
+    doneView.classList.remove('hidden');
+    return;
+  }
+
+  // Short delay for visual feedback before showing next card
+  setTimeout(() => {
+    document.getElementById('btn-right').disabled = false;
+    document.getElementById('btn-wrong').disabled = false;
+    showCard(queue[0]);
+  }, 160);
+}
+
+function updateBar() {
+  const pct = totalUnique > 0 ? (mastered / totalUnique) * 100 : 0;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = `${mastered}/${totalUnique}`;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+</script>
+</body>
+</html>

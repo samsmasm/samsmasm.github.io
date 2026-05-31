@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="cultivarlogo.png">
+  <title>Admin — Cultivar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="page-header">
+  <a href="index.html" class="btn-icon" style="font-size:1.1rem">←</a>
+  <h1>Admin</h1>
+  <div style="width:44px"></div>
+</header>
+
+<!-- Access denied -->
+<div id="denied-view" class="page-center hidden">
+  <div class="empty-icon">🔒</div>
+  <h2>Access denied</h2>
+  <p>Admin only.</p>
+  <a href="index.html" class="btn btn-secondary">Go home</a>
+</div>
+
+<main class="main-pad hidden" id="admin-view">
+
+  <!-- Create deck -->
+  <div class="panel">
+    <div class="panel-title">📦 Create a deck</div>
+    <div class="panel-body">
+      <form id="deck-form">
+        <div class="form-group" style="margin-bottom:10px">
+          <label for="deck-name">Deck name</label>
+          <input type="text" id="deck-name" placeholder="IB Vietnamese SL — Core Vocab" required>
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label for="deck-desc">Description</label>
+          <input type="text" id="deck-desc" placeholder="SL prescribed vocabulary list">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="deck-btn">Create deck</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Deck selector -->
+  <div>
+    <div class="section-heading">
+      <h2>Manage deck words</h2>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="deck-select">Select deck</label>
+      <select id="deck-select">
+        <option value="">— choose a deck —</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Word management (shown when deck selected) -->
+  <div id="word-section" class="hidden">
+
+    <!-- Add single word -->
+    <div class="panel">
+      <div class="panel-title">➕ Add a word</div>
+      <div class="panel-body">
+        <form id="word-form">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="form-group">
+              <label for="w-vn">Vietnamese</label>
+              <input type="text" id="w-vn" placeholder="xin chào" required>
+            </div>
+            <div class="form-group">
+              <label for="w-en">English</label>
+              <input type="text" id="w-en" placeholder="hello" required>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label for="w-ex-vn">Example (Vietnamese)</label>
+            <input type="text" id="w-ex-vn" placeholder="Xin chào! Bạn khoẻ không?">
+          </div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label for="w-ex-en">Example (English)</label>
+            <input type="text" id="w-ex-en" placeholder="Hello! How are you?">
+          </div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label for="w-notes">Notes</label>
+            <input type="text" id="w-notes" placeholder="Pronunciation tip, register, etc.">
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="word-btn">Add word</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bulk CSV import -->
+    <div class="panel">
+      <div class="panel-title">📥 Bulk import CSV</div>
+      <div class="panel-body">
+        <div class="csv-hint">
+          Format: <code>vietnamese,english,example_vn,example_en,notes</code><br>
+          Last 3 columns optional. Header row auto-detected and skipped.
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <label for="bulk-csv">Paste CSV</label>
+          <textarea id="bulk-csv" rows="6" placeholder="xin chào,hello,Xin chào bạn!,Hello friend!,greeting&#10;cảm ơn,thank you,,,"></textarea>
+        </div>
+        <p class="error-msg hidden" id="bulk-error"></p>
+        <button class="btn btn-primary btn-full" id="bulk-btn">Import words</button>
+      </div>
+    </div>
+
+    <!-- Word list -->
+    <div>
+      <div class="section-heading">
+        <h2 id="word-count-label">Words</h2>
+        <button class="btn btn-secondary" id="refresh-words-btn" style="font-size:.8rem;padding:6px 12px;min-height:36px">Refresh</button>
+      </div>
+      <div id="word-loading" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></div>
+      <div class="card-list hidden" id="word-list"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { auth } from './js/config.js';
+import {
+  getUser, getAllDecks, createDeck,
+  addWordToDeck, bulkAddWordsToDeck, getDeckWords
+} from './js/db.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+let uid = null;
+let selectedDeckId = null;
+
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = 'index.html'; return; }
+  uid = user.uid;
+  const userData = await getUser(uid);
+
+  if (!userData?.is_admin) {
+    document.getElementById('denied-view').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('admin-view').classList.remove('hidden');
+  await refreshDeckList();
+});
+
+async function refreshDeckList() {
+  const decks = await getAllDecks();
+  const sel = document.getElementById('deck-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— choose a deck —</option>';
+  for (const d of decks) {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = `${d.name} (${d.word_count ?? 0} words)`;
+    sel.appendChild(opt);
+  }
+  if (prev) sel.value = prev;
+}
+
+// Create deck
+document.getElementById('deck-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('deck-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const id = await createDeck(
+      document.getElementById('deck-name').value.trim(),
+      document.getElementById('deck-desc').value.trim()
+    );
+    e.target.reset();
+    await refreshDeckList();
+    document.getElementById('deck-select').value = id;
+    document.getElementById('deck-select').dispatchEvent(new Event('change'));
+    showToast('Deck created!');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to create deck.');
+  }
+  btn.disabled = false; btn.textContent = 'Create deck';
+});
+
+// Deck selector
+document.getElementById('deck-select').addEventListener('change', async e => {
+  selectedDeckId = e.target.value || null;
+  const section = document.getElementById('word-section');
+  if (!selectedDeckId) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  await loadWords();
+});
+
+// Add single word
+document.getElementById('word-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!selectedDeckId) return;
+  const btn = document.getElementById('word-btn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    await addWordToDeck(selectedDeckId, {
+      vietnamese: document.getElementById('w-vn').value.trim(),
+      english:    document.getElementById('w-en').value.trim(),
+      example_vn: document.getElementById('w-ex-vn').value.trim(),
+      example_en: document.getElementById('w-ex-en').value.trim(),
+      notes:      document.getElementById('w-notes').value.trim(),
+    });
+    e.target.reset();
+    showToast('Word added!');
+    await loadWords();
+    await refreshDeckList();
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to add word.');
+  }
+  btn.disabled = false; btn.textContent = 'Add word';
+});
+
+// Bulk CSV import
+document.getElementById('bulk-btn').addEventListener('click', async () => {
+  if (!selectedDeckId) return;
+  const raw = document.getElementById('bulk-csv').value.trim();
+  const errEl = document.getElementById('bulk-error');
+  errEl.classList.add('hidden');
+  if (!raw) return;
+
+  const rows = parseCSV(raw);
+  const words = rows
+    .filter(r => r[0]?.trim() && r[1]?.trim())
+    .map(r => ({
+      vietnamese: r[0].trim(),
+      english:    r[1].trim(),
+      example_vn: (r[2] || '').trim(),
+      example_en: (r[3] || '').trim(),
+      notes:      (r[4] || '').trim(),
+    }));
+
+  if (words.length === 0) {
+    errEl.textContent = 'No valid rows found (need at least vietnamese,english columns).';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('bulk-btn');
+  btn.disabled = true; btn.textContent = `Importing ${words.length} words…`;
+
+  try {
+    await bulkAddWordsToDeck(selectedDeckId, words);
+    document.getElementById('bulk-csv').value = '';
+    showToast(`Imported ${words.length} words`);
+    await loadWords();
+    await refreshDeckList();
+  } catch (err) {
+    console.error(err);
+    showToast('Import failed.');
+  }
+  btn.disabled = false; btn.textContent = 'Import words';
+});
+
+document.getElementById('refresh-words-btn').addEventListener('click', loadWords);
+
+async function loadWords() {
+  if (!selectedDeckId) return;
+  document.getElementById('word-loading').classList.remove('hidden');
+  document.getElementById('word-list').classList.add('hidden');
+
+  const words = await getDeckWords(selectedDeckId);
+  document.getElementById('word-loading').classList.add('hidden');
+  document.getElementById('word-count-label').textContent = `Words (${words.length})`;
+
+  const list = document.getElementById('word-list');
+  list.innerHTML = '';
+
+  if (words.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:.9rem;padding:8px 0">No words yet.</p>';
+    list.classList.remove('hidden');
+    return;
+  }
+
+  for (const w of words) {
+    const el = document.createElement('div');
+    el.className = 'list-card';
+    el.innerHTML = `
+      <div class="list-card-body">
+        <div class="list-card-title">${esc(w.vietnamese)} — ${esc(w.english)}</div>
+        ${w.example_vn ? `<div class="list-card-sub">${esc(w.example_vn)}</div>` : ''}
+        ${w.notes ? `<div class="list-card-sub" style="font-style:italic">${esc(w.notes)}</div>` : ''}
+      </div>
+    `;
+    list.appendChild(el);
+  }
+  list.classList.remove('hidden');
+}
+
+function parseCSV(text) {
+  const rows = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const cells = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (ch === '"') {
+        if (inQ && trimmed[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) {
+        cells.push(cur); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    cells.push(cur);
+    if (rows.length === 0 && /^(vietnamese|vn|word|front)$/i.test(cells[0].trim())) continue;
+    rows.push(cells);
+  }
+  return rows;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
