@@ -54,9 +54,9 @@ export async function getUserStats(uid) {
 // ── Decks ────────────────────────────────────────────────────────────────────
 
 export async function getPublicDecks() {
-  const q = query(collection(db, 'decks'), where('is_public', '==', true), orderBy('name'));
+  const q = query(collection(db, 'decks'), where('is_public', '==', true));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getDeck(deckId) {
