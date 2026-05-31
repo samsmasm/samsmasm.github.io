@@ -25,10 +25,24 @@
   </div>
 
   <div id="dash-content" class="hidden">
-    <!-- Future dashboard features go here -->
-    <p style="color:var(--muted);font-size:.9rem;text-align:center;padding:32px 0">
-      More dashboard features coming soon.
-    </p>
+
+    <!-- Settings -->
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-title">⚙️ Daily limits</div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="form-group">
+            <label for="setting-daily-new">New words / day</label>
+            <input type="number" id="setting-daily-new" min="1" max="50" value="12" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label for="setting-session-max">Max cards / session</label>
+            <input type="number" id="setting-session-max" min="12" max="200" value="36" style="width:100%">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" id="save-settings-btn">Save settings</button>
+      </div>
+    </div>
 
     <!-- Reset progress — always at the bottom -->
     <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);text-align:center">
@@ -50,7 +64,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getUser, getPublicDecks, resetDeckProgress } from './js/db.js';
+import { getUser, getPublicDecks, resetDeckProgress, getUserSettings, updateUserSettings } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
@@ -59,7 +73,10 @@ onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
 
-  const [userData, decks] = await Promise.all([getUser(uid), getPublicDecks()]);
+  const [userData, decks, settings] = await Promise.all([getUser(uid), getPublicDecks(), getUserSettings(uid)]);
+  document.getElementById('setting-daily-new').value = settings.daily_new;
+  document.getElementById('setting-session-max').value = settings.session_max;
+
   const subscribed = new Set(userData?.subscribed_decks || []);
   const sel = document.getElementById('dash-deck-select');
 
@@ -70,6 +87,18 @@ onAuthStateChanged(auth, async user => {
   for (const d of decks.filter(d => subscribed.has(d.id))) {
     sel.appendChild(new Option(d.name, d.id));
   }
+});
+
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('save-settings-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const daily_new   = Math.max(1,  Math.min(50,  parseInt(document.getElementById('setting-daily-new').value)  || 12));
+  const session_max = Math.max(12, Math.min(200, parseInt(document.getElementById('setting-session-max').value) || 36));
+  try {
+    await updateUserSettings(uid, { daily_new, session_max });
+    showToast('Settings saved');
+  } catch (e) { showToast('Save failed'); }
+  btn.disabled = false; btn.textContent = 'Save settings';
 });
 
 document.getElementById('dash-deck-select').addEventListener('change', e => {

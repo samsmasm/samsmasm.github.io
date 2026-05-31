@@ -1,6 +1,6 @@
 import { db, auth } from './config.js';
 import {
-  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
+  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, deleteField,
   collection, query, where, orderBy,
   writeBatch, Timestamp, serverTimestamp, increment
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
@@ -210,6 +210,164 @@ export async function autoIntroduceDaily(uid) {
   return introduceWords(uid, remaining);
 }
 
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+export async function getUserSettings(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const s = snap.data()?.settings || {};
+  return { daily_new: s.daily_new ?? 12, session_max: s.session_max ?? 36 };
+}
+
+export async function updateUserSettings(uid, settings) {
+  await updateDoc(doc(db, 'users', uid), { settings });
+}
+
+// ── Per-deck daily counter ────────────────────────────────────────────────────
+
+async function getDailyAllowanceRemainingForDeck(uid, deckId, dailyNew) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const dt = snap.data()?.deck_today?.[deckId] || {};
+  return dt.date === todayStr() ? Math.max(0, dailyNew - (dt.count || 0)) : dailyNew;
+}
+
+async function bumpDailyCountForDeck(uid, deckId, wordIds) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const existing = snap.data()?.deck_today?.[deckId] || {};
+  const today = todayStr();
+  const isToday = existing.date === today;
+  await updateDoc(doc(db, 'users', uid), {
+    [`deck_today.${deckId}`]: {
+      date: today,
+      count: (isToday ? (existing.count || 0) : 0) + wordIds.length,
+      word_ids: [...(isToday ? (existing.word_ids || []) : []), ...wordIds]
+    }
+  });
+}
+
+// ── Per-deck introduction ─────────────────────────────────────────────────────
+
+export async function getPendingCountForDeck(uid, deckId) {
+  if (deckId === 'personal') return 0;
+  const pending = await pendingWordsForDeck(uid, deckId);
+  return pending.length;
+}
+
+export async function introduceWordsForDeck(uid, deckId, count) {
+  if (count <= 0 || deckId === 'personal') return 0;
+  const pendingItems = await pendingWordsForDeck(uid, deckId);
+  const toIntroduce = pendingItems.slice(0, count).map(item => item.word);
+  if (toIntroduce.length === 0) return 0;
+
+  const now = Timestamp.fromDate(new Date());
+  for (let i = 0; i < toIntroduce.length; i += 499) {
+    const batch = writeBatch(db);
+    for (const word of toIntroduce.slice(i, i + 499)) {
+      for (const dir of ['vn_en', 'en_vn']) {
+        batch.set(doc(db, 'users', uid, 'progress', `${word.id}_${dir}`), {
+          word_id: word.id, deck_id: deckId, source: 'deck',
+          direction: dir, level: 0, due_date: now,
+          last_reviewed: null, correct_count: 0, incorrect_count: 0
+        });
+      }
+    }
+    await batch.commit();
+  }
+  await bumpDailyCountForDeck(uid, deckId, toIntroduce.map(w => w.id));
+  return toIntroduce.length;
+}
+
+export async function autoIntroduceDailyForDeck(uid, deckId) {
+  if (deckId === 'personal') return 0;
+  const settings = await getUserSettings(uid);
+  const remaining = await getDailyAllowanceRemainingForDeck(uid, deckId, settings.daily_new);
+  if (remaining <= 0) return 0;
+  return introduceWordsForDeck(uid, deckId, remaining);
+}
+
+// ── Per-deck review ───────────────────────────────────────────────────────────
+
+export async function getDueCardsForDeck(uid, deckId) {
+  const settings = await getUserSettings(uid);
+  const endTs = Timestamp.fromDate(endOfToday());
+
+  const q = deckId === 'personal'
+    ? query(collection(db, 'users', uid, 'progress'), where('source', '==', 'personal'))
+    : query(collection(db, 'users', uid, 'progress'), where('deck_id', '==', deckId));
+
+  const snap = await getDocs(q);
+  if (snap.empty) return [];
+
+  const dueDocs = snap.docs.filter(d => {
+    const dd = d.data().due_date;
+    return dd && dd.toMillis() <= endTs.toMillis();
+  });
+  if (dueDocs.length === 0) return [];
+
+  const fetches = {};
+  for (const d of dueDocs) {
+    const { word_id, source, deck_id } = d.data();
+    if (!fetches[word_id]) {
+      fetches[word_id] = source === 'personal'
+        ? getDoc(doc(db, 'users', uid, 'cards', word_id))
+        : getDoc(doc(db, 'decks', deck_id, 'words', word_id));
+    }
+  }
+  const wordCache = {};
+  await Promise.all(Object.entries(fetches).map(async ([id, p]) => {
+    const s = await p;
+    if (s.exists()) wordCache[id] = s.data();
+  }));
+
+  const cards = dueDocs.map(d => {
+    const progress = d.data();
+    const word = wordCache[progress.word_id];
+    if (!word) return null;
+    return { progressId: d.id, progress, word, direction: progress.direction };
+  }).filter(Boolean);
+
+  const genuinelyNew = cards.filter(c => c.progress.level === 0 && !c.progress.last_reviewed);
+  const failedReset  = cards.filter(c => c.progress.level === 0 &&  c.progress.last_reviewed);
+  const reviewCards  = cards.filter(c => c.progress.level  > 0);
+
+  const cappedNew    = genuinelyNew.slice(0, settings.daily_new * 2);
+  const usedSlots    = cappedNew.length + failedReset.length;
+  const cappedReview = reviewCards.slice(0, Math.max(0, settings.session_max - usedSlots));
+
+  return [...cappedNew, ...failedReset, ...cappedReview];
+}
+
+export async function getTodayCardsForDeck(uid, deckId) {
+  if (deckId === 'personal') return [];
+  const snap = await getDoc(doc(db, 'users', uid));
+  const dt = snap.data()?.deck_today?.[deckId] || {};
+  if (dt.date !== todayStr() || !dt.word_ids?.length) return [];
+
+  const progressIds = dt.word_ids.flatMap(id => [`${id}_vn_en`, `${id}_en_vn`]);
+  const pSnaps = await Promise.all(progressIds.map(pid => getDoc(doc(db, 'users', uid, 'progress', pid))));
+  const existing = pSnaps.filter(s => s.exists());
+
+  const fetches = {};
+  for (const s of existing) {
+    const { word_id, source, deck_id } = s.data();
+    if (!fetches[word_id]) {
+      fetches[word_id] = source === 'personal'
+        ? getDoc(doc(db, 'users', uid, 'cards', word_id))
+        : getDoc(doc(db, 'decks', deck_id, 'words', word_id));
+    }
+  }
+  const wordCache = {};
+  await Promise.all(Object.entries(fetches).map(async ([id, p]) => {
+    const s = await p; if (s.exists()) wordCache[id] = s.data();
+  }));
+
+  return existing.map(s => {
+    const progress = s.data();
+    const word = wordCache[progress.word_id];
+    if (!word) return null;
+    return { progressId: s.id, progress, word, direction: progress.direction };
+  }).filter(Boolean);
+}
+
 export async function subscribeToDeck(uid, deckId) {
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
@@ -368,11 +526,11 @@ export async function resetDeckProgress(uid, deckId) {
     for (const d of snap.docs.slice(i, i + 499)) batch.delete(d.ref);
     await batch.commit();
   }
-  // Reset daily intro counter so user gets fresh words today
   await updateDoc(doc(db, 'users', uid), {
     new_today_date: null,
     new_today_count: 0,
-    new_today_word_ids: []
+    new_today_word_ids: [],
+    [`deck_today.${deckId}`]: deleteField()
   });
 }
 
