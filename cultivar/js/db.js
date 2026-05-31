@@ -213,7 +213,7 @@ export async function autoIntroduceDailyForDeck(uid, deckId) {
 
 // ── Per-deck review ───────────────────────────────────────────────────────────
 
-export async function getDueCardsForDeck(uid, deckId) {
+export async function getDueCardsForDeck(uid, deckId, { reviewOnly = false } = {}) {
   const settings = await getUserSettings(uid);
   const endTs = Timestamp.fromDate(endOfToday());
 
@@ -256,7 +256,8 @@ export async function getDueCardsForDeck(uid, deckId) {
   const failedReset  = cards.filter(c => c.progress.level === 0 &&  c.progress.last_reviewed);
   const reviewCards  = cards.filter(c => c.progress.level  > 0);
 
-  const cappedNew    = genuinelyNew.slice(0, settings.daily_new * 2);
+  // Review-only: skip brand-new words, keep failed-resets and the review cycle.
+  const cappedNew    = reviewOnly ? [] : genuinelyNew.slice(0, settings.daily_new * 2);
   const usedSlots    = cappedNew.length + failedReset.length;
   const cappedReview = reviewCards.slice(0, Math.max(0, settings.session_max - usedSlots));
 

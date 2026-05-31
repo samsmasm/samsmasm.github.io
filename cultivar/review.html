@@ -77,7 +77,9 @@ import { updateProgress, autoIntroduceDailyForDeck, getDueCardsForDeck,
 import { levelLabel } from './js/srs.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-const deckId = new URLSearchParams(location.search).get('deck');
+const params = new URLSearchParams(location.search);
+const deckId = params.get('deck');
+const reviewOnly = params.get('mode') === 'review';
 if (!deckId) location.href = 'index.html';
 
 let queue = [];
@@ -92,14 +94,17 @@ onAuthStateChanged(auth, async user => {
   uid = user.uid;
 
   settings = await getUserSettings(uid);
-  await autoIntroduceDailyForDeck(uid, deckId);
-  const cards = await getDueCardsForDeck(uid, deckId);
+  // Review-only sessions never introduce new words.
+  if (!reviewOnly) await autoIntroduceDailyForDeck(uid, deckId);
+  const cards = await getDueCardsForDeck(uid, deckId, { reviewOnly });
 
   document.getElementById('loading-view').classList.add('hidden');
 
   if (cards.length === 0) {
     document.getElementById('done-title').textContent = 'All caught up! 🎉';
-    document.getElementById('done-msg').textContent = 'No cards due today for this deck.';
+    document.getElementById('done-msg').textContent = reviewOnly
+      ? 'No review words due today for this deck.'
+      : 'No cards due today for this deck.';
     showPracticeButton();
     document.getElementById('done-view').classList.remove('hidden');
     return;
@@ -117,6 +122,8 @@ async function showPracticeButton() {
   if (todayCards.length > 0) {
     document.getElementById('repeat-btn').classList.remove('hidden');
   }
+  // Review-only sessions never offer new words.
+  if (reviewOnly) return;
   // Only offer more words once you've started every new word already given
   const [pending, canMore] = await Promise.all([
     getPendingCountForDeck(uid, deckId),
