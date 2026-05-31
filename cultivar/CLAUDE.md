@@ -1,116 +1,106 @@
-# Cultivar — Claude Code Context
+# Cultivar: Claude Code Context
 
-Spaced repetition learning app for ~60 students. Static frontend on GitHub Pages (unisam.nz), Firebase backend.
+Spaced repetition vocabulary app for students. Static frontend on GitHub Pages (served at `unisam.nz/cultivar/`), Firebase backend. Originally built for Vietnamese, now subject-agnostic (languages and subject-vocab both supported).
 
 ## Architecture
 
-**Frontend:** Vanilla HTML/CSS/JS, ES modules, no build step. Firebase SDK loaded from CDN (v10.7.1). All pages are standalone HTML files sharing `style.css` and the `js/` modules.
+**Frontend:** Vanilla HTML/CSS/JS, ES modules, no build step. Firebase SDK from CDN (v10.7.1). Each page is a standalone HTML file sharing `style.css` and the `js/` modules.
 
-**Backend:** Firebase — Firestore for data, Google Sign-In for auth. No server.
+**Backend:** Firebase, using Firestore for data and Google Sign-In for auth. No server.
 
-**Auth:** Google Sign-In only (popup on desktop, redirect fallback on mobile). No email/password.
+**Auth:** Google Sign-In only (popup on desktop, redirect fallback on mobile). Auth guard at the top of every page's module: `onAuthStateChanged` → redirect to `index.html` if no user.
 
-## File structure
+## Files
 
 ```
-js/config.js     — Firebase init; user must fill in their project credentials
-js/srs.js        — Spaced repetition algorithm (levels + interval calculation)
-js/db.js         — All Firestore reads/writes (single source of truth)
-style.css        — Shared mobile-first CSS (CSS custom properties, no framework)
-index.html       — Login (Google) + dashboard (stats, navigation)
-review.html      — Daily review session (flip card, Yes/No, retry on fail)
-decks.html       — Browse public decks, subscribe, sync new words
-cards.html       — Personal cards: add form + CSV import
-admin.html       — Admin only: create decks, add/bulk-import words
-firestore.rules  — Security rules (paste into Firebase console Rules tab)
-SETUP.md         — Step-by-step Firebase setup for humans
+js/config.js   - Firebase init (real project credentials are committed)
+js/srs.js      - SRS levels + interval calc (nextInterval, levelLabel)
+js/db.js       - ALL Firestore reads/writes (single source of truth)
+style.css      - shared mobile-first CSS (custom properties; bottom-sheet modal styles)
+index.html     - Home: per-deck session buttons, progress stats, hamburger menu (Help/Settings)
+decks.html     - Browse/enrol/unenroll decks; "Add cards" link to cards.html
+cards.html     - Add cards: Language vs Subject-vocab tabs; CSV import; admin can target a deck
+dash.html      - Dashboard: per-deck word management (boxes, statuses, multi-select), daily-limit settings, per-deck reset
+revise.html    - Cram Mode setup: pick decks (grouped subject→unit), reset cram progress
+review.html    - Session player for ALL three modes (SRS, review-only, cram) via query params
+admin.html     - Admin only: create decks, bulk CSV import (auto-routes to decks), delete deck
+firestore.rules - security rules (paste into console)
+SETUP.md       - Firebase setup steps for humans
 ```
 
-## Firestore schema
+Bottom nav (all pages): Home / Decks / Revise / Dash. `cards.html` is reached from Decks; `admin.html` from a Home quick-tile (admins only).
+
+## Data model
+
+A **deck = one (subject, unit, subunit) combination**. `findOrCreateDeck` makes a deck per combo; deck `name` defaults to the subunit. There is no category field on words - "units/subunits" ARE decks. (The dashboard groups words by `word.category`, which is currently unset, so everything sits under one group; the category UI is built but dormant.)
 
 ```
 decks/{deckId}
-  name: string
-  description: string
-  is_public: boolean
-  word_count: number          ← denormalised; updated via increment() on add
-  created_by: uid
-  created_at: timestamp
+  name, description
+  subject, unit, subunit
+  is_public: true
+  word_count                  ← denormalised, increment() on add
+  created_by, created_at
 
 decks/{deckId}/words/{wordId}
-  vietnamese: string
-  english: string
-  example_vn: string          ← optional
-  example_en: string          ← optional
-  notes: string               ← optional
-  created_at: timestamp
+  vietnamese, english         ← generic front/back (also used for term/definition)
+  notes                       ← optional
+  card_type                   ← optional 'subject' (personal subject-vocab cards)
+  example_vn, example_en      ← optional (personal cards)
+  created_at
 
 users/{uid}
-  email: string
-  display_name: string
-  is_admin: boolean           ← set manually in Firestore console; never via app
-  subscribed_decks: string[]  ← array of deckIds
-  created_at: timestamp
+  email, display_name, created_at
+  is_admin                    ← set manually in console; app can never set it true
+  subscribed_decks: string[]
+  settings: { daily_new: 12, session_max: 36 }      ← per-user, editable on Dash
+  deck_today: { [deckId]: { date, count, word_ids[] } }  ← per-deck daily intro counter
+  word_status: { [`${deckId}_${wordId}`]: 'ask_soon'|'skip'|'never' }
+  cram_known: { [`${wordId}_${direction}`]: true }  ← Cram Mode "known" set, persists until reset
 
-users/{uid}/progress/{progressId}
-  progressId format: "{wordId}_vn_en" or "{wordId}_en_vn"
-  word_id: string
-  deck_id: string | null      ← null for personal cards
-  source: "deck" | "personal"
-  direction: "vn_en" | "en_vn"
-  level: 0–6                  ← SRS level
-  due_date: timestamp
-  last_reviewed: timestamp | null
-  correct_count: number
-  incorrect_count: number
+users/{uid}/progress/{progressId}   ← progressId = "{wordId}_{vn_en|en_vn}"
+  word_id, deck_id (null for personal), source: 'deck'|'personal', direction
+  level: 0–6, due_date, last_reviewed (null until first attempt)
+  correct_count, incorrect_count
 
-users/{uid}/cards/{cardId}    ← personal cards (not in any deck)
-  vietnamese, english, example_vn, example_en, notes, created_at
-  (progress records created automatically at add time, same schema as above)
+users/{uid}/cards/{cardId}          ← personal cards (progress created at add time)
 ```
 
-## SRS algorithm (js/srs.js)
+## SRS (js/srs.js)
 
-Leitner-style 7 levels. Intervals: 0 (same session), 1d, 3d, 7d, 30d, 90d, 365d.
-- Correct → level + 1 (capped at 6), due_date = now + interval
-- Incorrect → level = 0, due_date = start of today (retried this session)
+7 Leitner levels. Intervals (days): 0, 1, 3, 7, 30, 90, 365. Box labels (UI): New, Seen it, Know a bit, Getting there, Comfortable, Strong, Mastered.
+- Correct → level+1 (cap 6), due = now + interval
+- Incorrect → level 0, due = start of today (retried this session)
 
-Each word gets TWO progress records (one per direction). When a user subscribes to a deck, progress records are batch-created for all words × 2 directions. The `syncNewDeckWords()` function handles new words added after subscription.
+Each word has TWO progress records (one per direction). `todayStr()` uses **local** date (not UTC) so daily resets happen at local midnight.
 
-"Mastered" threshold = level ≥ 4 (30-day interval).
+## Core mechanics (the important bits)
 
-## Review session logic (review.html)
+**Per-deck, independent sessions.** Each deck has its own daily new-word allowance and its own review queue. No global pooling. Two decks = up to 2× new words/day.
 
-1. Load all progress records where `due_date <= end of today`
-2. Fetch word content in parallel (grouped by deck to minimise reads)
-3. Shuffle queue; show one card at a time
-4. Tap card → flip animation → reveal answer
-5. Yes: `updateProgress(correct=true)`, remove from queue, increment mastered count
-6. No: `updateProgress(correct=false)` (resets to level 0), push card to end of queue for retry
-7. Session ends when queue is empty
+**Daily introduction gate.** `autoIntroduceDailyForDeck` introduces up to `settings.daily_new` (default 12) new words per deck per check-in day, but ONLY if there are no *unstarted* new words waiting (`countUnstartedForDeck` = level 0 AND `last_reviewed` null). Crucially, **a failed review (level 0 WITH last_reviewed) does NOT block new words** - only never-attempted words do. The manual "Add N more" button on the done screen uses the same gate (`canIntroduceMoreForDeck`).
 
-Progress bar = mastered / initial queue size. Failed cards extend the session but don't increase the denominator.
+**Session shape.** `getDueCardsForDeck` returns genuinely-new (capped at daily_new×2 cards) + failed-resets (always) + reviews (filling up to `session_max` total). `{ reviewOnly: true }` drops all new words.
 
-## Key conventions
+**Home buttons.** Per deck: "New + review" (`review.html?deck=ID`) and "Review only" (`review.html?deck=ID&mode=review`). Personal cards get their own button (`deck=personal`). Personal cards are created straight into the SRS cycle (no introduction gate).
 
-- All DB logic lives in `js/db.js` — HTML pages import from there, never call Firestore directly
-- `esc()` helper used everywhere HTML is built with string interpolation (XSS prevention)
-- `showToast()` for feedback messages (each page has its own toast element)
-- Auth guard pattern: `onAuthStateChanged` at top of every page's module script; redirect to `index.html` if no user
-- Firestore writes on review answers are fire-and-forget (`updateProgress(...).catch(console.error)`) — acceptable for this use case
-- `is_admin` can never be set to `true` via the app (Firestore rule blocks it); must be set manually in console
+**Cram Mode (revise.html → review.html?mode=cram).** Exam revision, completely separate from SRS. Pick decks (passed via `sessionStorage.cramDecks`); drills every word both directions. Three ratings: Know it (persisted to `cram_known`, drops out until reset), Partially (requeue near end), Don't know (requeue ~4 ahead). Never reads or writes SRS progress. Reset clears `cram_known` (on cram done screen and on revise.html).
 
-## What's NOT built yet (known gaps)
+**Review session player (review.html)** handles all three modes by branching on `mode` param. Tap card to flip (and tap back to unflip). Wrong/partial cards recycle within the session.
 
-- No unsubscribe from deck (would need to decide whether to delete progress records)
-- No word edit/delete in admin (delete is complex — needs to clean up all subscriber progress)
-- No user management / student list view for admin
-- No streak tracking or study history stats
-- No PWA manifest / service worker (could add for "Add to Home Screen" UX)
-- No offline support
+## Conventions
+
+- All Firestore access goes through `js/db.js`. Pages never call Firestore directly.
+- `esc()` used wherever HTML is built from data (XSS).
+- Progress writes on answers are fire-and-forget (`updateProgress(...).catch(console.error)`).
+- `is_admin` can only be set manually in the console (Firestore rule blocks the app from setting it).
+- Firestore rules allow a user to update their own doc EXCEPT `is_admin`; deck words are admin-write, auth-read.
+- Bulk CSV import: admin format is `Subject,Unit,Subunit,Vietnamese,English,Notes` (auto-routes/creates decks). Personal cards: Language tab `Other,Your,ExampleOther,ExampleYours,Notes`; Subject tab `Term,Definition,Example`.
+- **No em dashes in user-facing copy** (project-wide writing rule).
+- Always `git push` immediately after committing.
 
 ## Deployment
 
-Copy this folder into the GitHub Pages repo as a subfolder (e.g. `/viet/`). No build step needed. Must be served over HTTPS (GitHub Pages does this automatically) — Firebase Auth won't work on `file://`.
+Lives in the GitHub Pages repo `samsmasm.github.io` under `/cultivar/`. No build step. Must be served over HTTPS (Firebase Auth won't work on `file://`). `js/config.js` already has the project credentials (`cultivar-d3add`). Authorized domains in Firebase: `unisam.nz`, `www.unisam.nz`, `samsmasm.github.io`, `localhost`.
 
 For local dev: `npx serve .` from this directory.
