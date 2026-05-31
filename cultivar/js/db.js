@@ -100,14 +100,15 @@ async function dailyAllowanceRemaining(uid) {
   return DAILY_NEW_LIMIT;
 }
 
-async function bumpDailyCount(uid, wordsAdded) {
+async function bumpDailyCount(uid, wordIds) {
   const snap = await getDoc(doc(db, 'users', uid));
   const d = snap.data() || {};
   const today = todayStr();
-  const prev = d.new_today_date === today ? (d.new_today_count || 0) : 0;
+  const isToday = d.new_today_date === today;
   await updateDoc(doc(db, 'users', uid), {
     new_today_date: today,
-    new_today_count: prev + wordsAdded
+    new_today_count: (isToday ? (d.new_today_count || 0) : 0) + wordIds.length,
+    new_today_word_ids: [...(isToday ? (d.new_today_word_ids || []) : []), ...wordIds]
   });
 }
 
@@ -160,8 +161,47 @@ export async function introduceWords(uid, count) {
     }
     await batch.commit();
   }
-  await bumpDailyCount(uid, toIntroduce.length);
+  await bumpDailyCount(uid, toIntroduce.map(({ word }) => word.id));
   return toIntroduce.length;
+}
+
+export async function getTodayCards(uid) {
+  const userData = await getUser(uid);
+  if (userData?.new_today_date !== todayStr()) return [];
+  const wordIds = userData?.new_today_word_ids || [];
+  if (wordIds.length === 0) return [];
+
+  const progressIds = wordIds.flatMap(id => [`${id}_vn_en`, `${id}_en_vn`]);
+  const progressSnaps = await Promise.all(
+    progressIds.map(pid => getDoc(doc(db, 'users', uid, 'progress', pid)))
+  );
+  const existing = progressSnaps.filter(s => s.exists());
+
+  const deckFetches = {}, personalIds = [];
+  for (const s of existing) {
+    const { word_id, source, deck_id } = s.data();
+    if (source === 'deck') { if (!deckFetches[word_id]) deckFetches[word_id] = { deck_id, word_id }; }
+    else personalIds.push(word_id);
+  }
+
+  const wordCache = {};
+  await Promise.all([
+    ...Object.values(deckFetches).map(async ({ deck_id, word_id }) => {
+      const s = await getDoc(doc(db, 'decks', deck_id, 'words', word_id));
+      if (s.exists()) wordCache[word_id] = s.data();
+    }),
+    ...personalIds.map(async id => {
+      const s = await getDoc(doc(db, 'users', uid, 'cards', id));
+      if (s.exists()) wordCache[id] = s.data();
+    })
+  ]);
+
+  return existing.map(s => {
+    const progress = s.data();
+    const word = wordCache[progress.word_id];
+    if (!word) return null;
+    return { progressId: s.id, progress, word, direction: progress.direction };
+  }).filter(Boolean);
 }
 
 export async function autoIntroduceDaily(uid) {
@@ -327,7 +367,8 @@ export async function resetProgress(uid) {
   }
   await updateDoc(doc(db, 'users', uid), {
     new_today_date: null,
-    new_today_count: 0
+    new_today_count: 0,
+    new_today_word_ids: []
   });
 }
 
