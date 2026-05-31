@@ -75,6 +75,13 @@
   <!-- Word management (shown when deck selected) -->
   <div id="word-section" class="hidden">
 
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button class="btn btn-secondary" id="delete-deck-btn"
+        style="font-size:.8rem;padding:6px 14px;min-height:32px;color:var(--incorrect);border-color:var(--incorrect)">
+        Delete deck
+      </button>
+    </div>
+
     <!-- Add single word -->
     <div class="panel">
       <div class="panel-title">➕ Add a word</div>
@@ -152,7 +159,7 @@
 import { auth } from './js/config.js';
 import {
   getUser, getAllDecks, createDeck, findOrCreateDeck,
-  addWordToDeck, bulkAddWordsToDeck, getDeckWords
+  addWordToDeck, bulkAddWordsToDeck, getDeckWords, deleteDeck
 } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -210,6 +217,30 @@ document.getElementById('deck-form').addEventListener('submit', async e => {
     showToast('Failed to create deck.');
   }
   btn.disabled = false; btn.textContent = 'Create deck';
+});
+
+// Delete deck
+document.getElementById('delete-deck-btn').addEventListener('click', async () => {
+  if (!selectedDeckId) return;
+  const deckName = document.getElementById('deck-select').selectedOptions[0]?.text || 'this deck';
+  const first = confirm(`Delete "${deckName}"?\n\nThis will permanently delete the deck and all its words. This cannot be undone.`);
+  if (!first) return;
+  const second = confirm(`Are you absolutely sure?\n\nDeleting "${deckName}" is permanent. Students who were enrolled will lose access, though their progress records remain in the database.`);
+  if (!second) return;
+
+  const btn = document.getElementById('delete-deck-btn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try {
+    await deleteDeck(selectedDeckId);
+    selectedDeckId = null;
+    document.getElementById('word-section').classList.add('hidden');
+    await refreshDeckList();
+    showToast('Deck deleted.');
+  } catch (err) {
+    console.error(err);
+    showToast('Delete failed.');
+  }
+  btn.disabled = false; btn.textContent = 'Delete deck';
 });
 
 // Deck selector

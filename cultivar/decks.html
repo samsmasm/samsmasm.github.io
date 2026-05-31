@@ -39,7 +39,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getPublicDecks, getDeckProgress, subscribeToDeck, syncNewDeckWords, getUser } from './js/db.js';
+import { getPublicDecks, getDeckProgress, subscribeToDeck, syncNewDeckWords, getUser, unenrollFromDeck } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
@@ -121,7 +121,9 @@ async function loadDecks() {
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
             ${isSub
-              ? `<span class="badge badge-success">Enrolled</span>`
+              ? `<span class="badge badge-success">Enrolled</span>
+                 <button class="btn btn-secondary unenroll-btn" data-deck-id="${deck.id}" data-deck-name="${esc(deck.name)}"
+                   style="font-size:.75rem;padding:4px 10px;min-height:28px;color:var(--incorrect);border-color:var(--incorrect)">Unenroll</button>`
               : `<button class="btn btn-primary" style="font-size:.875rem;padding:8px 16px;min-height:38px"
                    data-deck-id="${deck.id}" data-deck-name="${esc(deck.name)}">Join</button>`
             }
@@ -136,8 +138,13 @@ async function loadDecks() {
   list.classList.remove('hidden');
 
   // Attach join listeners
-  list.querySelectorAll('[data-deck-id]').forEach(btn => {
+  list.querySelectorAll('[data-deck-id]:not(.unenroll-btn)').forEach(btn => {
     btn.addEventListener('click', () => handleJoin(btn));
+  });
+
+  // Attach unenroll listeners
+  list.querySelectorAll('.unenroll-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleUnenroll(btn));
   });
 }
 
@@ -158,6 +165,24 @@ async function handleJoin(btn) {
     showToast('Something went wrong. Try again.');
     btn.disabled = false;
     btn.textContent = 'Join';
+  }
+}
+
+async function handleUnenroll(btn) {
+  const deckName = btn.dataset.deckName;
+  if (!confirm(`Unenroll from "${deckName}"?\n\nYour progress is saved — if you rejoin later you'll pick up where you left off.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Unenrolling…';
+  try {
+    await unenrollFromDeck(uid, btn.dataset.deckId);
+    showToast(`Unenrolled from "${deckName}"`);
+    userData = await getUser(uid);
+    await loadDecks();
+  } catch (err) {
+    console.error(err);
+    showToast('Something went wrong. Try again.');
+    btn.disabled = false;
+    btn.textContent = 'Unenroll';
   }
 }
 

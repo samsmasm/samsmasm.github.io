@@ -95,6 +95,13 @@ export async function subscribeToDeck(uid, deckId) {
   return newCount;
 }
 
+export async function unenrollFromDeck(uid, deckId) {
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  const arr = (snap.data().subscribed_decks || []).filter(id => id !== deckId);
+  await updateDoc(userRef, { subscribed_decks: arr });
+}
+
 export async function syncNewDeckWords(uid, deckId) {
   const [words, existingSnap] = await Promise.all([
     getDeckWords(deckId),
@@ -219,6 +226,18 @@ export async function deletePersonalCard(uid, cardId) {
 }
 
 // ── Admin ────────────────────────────────────────────────────────────────────
+
+export async function deleteDeck(deckId) {
+  const words = await getDeckWords(deckId);
+  for (let i = 0; i < words.length; i += 499) {
+    const batch = writeBatch(db);
+    for (const w of words.slice(i, i + 499)) {
+      batch.delete(doc(db, 'decks', deckId, 'words', w.id));
+    }
+    await batch.commit();
+  }
+  await deleteDoc(doc(db, 'decks', deckId));
+}
 
 export async function findOrCreateDeck(subject, unit, subunit) {
   const decks = await getAllDecks();
