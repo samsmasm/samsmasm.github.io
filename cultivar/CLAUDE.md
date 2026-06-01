@@ -28,7 +28,7 @@ Every page follows this structure (copy this when adding a new page):
 <nav class="bottom-nav">
   <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
   <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
-  <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Cram</span></a>
+  <a href="cram.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Cram</span></a>
   <a href="dash.html" class="nav-item active"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
 </nav>
 
@@ -121,14 +121,14 @@ index.html     - Home: per-deck session buttons, progress stats, hamburger menu 
 decks.html     - Browse/enrol/unenroll decks; "Add cards" link to cards.html
 cards.html     - Add cards: Language vs Subject-vocab tabs; CSV import; admin deck selector
 dash.html      - Dashboard: per-deck word management (boxes, statuses, multi-select), daily-limit settings, per-deck reset
-revise.html    - Cram setup (UI label: "Cram"): direction selector, deck picker, reset cram progress
+cram.html    - Cram setup (UI label: "Cram"): direction selector, deck picker, reset cram progress
 review.html    - Session player for ALL three modes (SRS, review-only, cram) via query params
 admin.html     - Admin only: create decks, bulk CSV import (single deck), mass delete decks
 firestore.rules - security rules (paste into console)
 SETUP.md       - Firebase setup steps for humans
 ```
 
-Bottom nav (all pages): Home / Decks / Cram / Dash. The nav label is "Cram" but the file is still `revise.html`. `cards.html` is reached from Decks; `admin.html` from a Home quick-tile (admins only).
+Bottom nav (all pages): Home / Decks / Cram / Dash. The nav label is "Cram" but the file is still `cram.html`. `cards.html` is reached from Decks; `admin.html` from a Home quick-tile (admins only).
 
 ## Data model
 
@@ -196,7 +196,7 @@ Each word has TWO progress records (one per direction). `todayStr()` uses **loca
 
 **Home buttons.** Per deck: "New + review" (`review.html?deck=ID`) and "Review only" (`review.html?deck=ID&mode=review`). Personal cards: `deck=personal`. Personal cards skip the introduction gate entirely.
 
-**Cram Mode.** `revise.html` → `review.html?mode=cram`. Deck IDs passed via `sessionStorage.cramDecks` (JSON array). Direction passed as `?dir=vn_en|en_vn` URL param (omit for both). Words with `skip` or `never` status are excluded. Separate from SRS entirely.
+**Cram Mode.** `cram.html` → `review.html?mode=cram`. Deck IDs passed via `sessionStorage.cramDecks` (JSON array). Direction passed as `?dir=vn_en|en_vn` URL param (omit for both). Words with `skip` or `never` status are excluded. Separate from SRS entirely.
 
 ## review.html — URL params and session flow
 
@@ -233,9 +233,9 @@ review.html?mode=cram&dir=en_vn                 Cram — Def → Term only (Jeop
 - `more-btn` — calls `introduceWordsForDeck` then starts new session; disabled if unstarted words pending
 - `cram-reset-btn` — cram only: resets `cram_known` and restarts
 
-## Cram page (revise.html)
+## Cram page (cram.html)
 
-UI label is "Cram" (nav, page title). The filename stays `revise.html`.
+UI label is "Cram" (nav, page title). The filename stays `cram.html`.
 
 **Direction selector** (shown inside `#picker`, above deck list): three pill buttons — "Both ways" (default, no `?dir=` param), "Term → Def" (`?dir=vn_en`), "Jeopardy" (`?dir=en_vn`). Active button gets brand fill. Selected direction stored in `cramDir` variable.
 

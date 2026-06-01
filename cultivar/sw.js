@@ -1,11 +1,11 @@
-const CACHE = 'cultivar-v2';
+const CACHE = 'cultivar-v3';
 const PRECACHE = [
   '/cultivar/',
   '/cultivar/index.html',
   '/cultivar/decks.html',
   '/cultivar/cards.html',
   '/cultivar/dash.html',
-  '/cultivar/revise.html',
+  '/cultivar/cram.html',
   '/cultivar/review.html',
   '/cultivar/admin.html',
   '/cultivar/style.css',
