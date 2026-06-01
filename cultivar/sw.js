@@ -1,4 +1,4 @@
-const CACHE = 'cultivar-v4';
+const CACHE = 'cultivar-v5';
 const PRECACHE = [
   '/cultivar/',
   '/cultivar/index.html',

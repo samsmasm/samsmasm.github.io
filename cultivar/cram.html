@@ -123,9 +123,19 @@ onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
 
-  const [userData, decks, personalCards] = await Promise.all([
-    getUser(uid), getPublicDecks(), getPersonalCards(uid)
-  ]);
+  let userData, decks, personalCards;
+  try {
+    [userData, decks, personalCards] = await Promise.all([
+      getUser(uid), getPublicDecks(), getPersonalCards(uid)
+    ]);
+  } catch (err) {
+    console.error('cram load error', err);
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('empty').classList.remove('hidden');
+    document.querySelector('#empty p').textContent = 'Failed to load. Check your connection and reload.';
+    return;
+  }
+
   refreshKnownNote();
 
   const subscribed = new Set(userData?.subscribed_decks || []);
