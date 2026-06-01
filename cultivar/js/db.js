@@ -301,12 +301,16 @@ export async function getTodayCardsForDeck(uid, deckId) {
 // written. Cram keeps its own "known" set on the user doc (cram_known), keyed
 // by `${wordId}_${direction}`, which persists across days until reset.
 export async function getCramCards(uid, deckIds) {
+  const userData = await getUser(uid);
+  const wordStatus = userData?.word_status || {};
   const all = [];
   for (const deckId of deckIds) {
     const words = deckId === 'personal'
       ? (await getDocs(collection(db, 'users', uid, 'cards'))).docs.map(d => ({ id: d.id, ...d.data() }))
       : await getDeckWords(deckId);
     for (const word of words) {
+      const status = wordStatus[`${deckId}_${word.id}`];
+      if (status === 'skip' || status === 'never') continue;
       for (const direction of ['vn_en', 'en_vn']) {
         all.push({ word, direction });
       }
