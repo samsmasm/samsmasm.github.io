@@ -28,7 +28,7 @@ Every page follows this structure (copy this when adding a new page):
 <nav class="bottom-nav">
   <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
   <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
-  <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Revise</span></a>
+  <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Cram</span></a>
   <a href="dash.html" class="nav-item active"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
 </nav>
 
@@ -121,14 +121,14 @@ index.html     - Home: per-deck session buttons, progress stats, hamburger menu 
 decks.html     - Browse/enrol/unenroll decks; "Add cards" link to cards.html
 cards.html     - Add cards: Language vs Subject-vocab tabs; CSV import; admin deck selector
 dash.html      - Dashboard: per-deck word management (boxes, statuses, multi-select), daily-limit settings, per-deck reset
-revise.html    - Cram Mode setup: pick decks (grouped subject→unit), reset cram progress
+revise.html    - Cram setup (UI label: "Cram"): direction selector, deck picker, reset cram progress
 review.html    - Session player for ALL three modes (SRS, review-only, cram) via query params
 admin.html     - Admin only: create decks, bulk CSV import (single deck), mass delete decks
 firestore.rules - security rules (paste into console)
 SETUP.md       - Firebase setup steps for humans
 ```
 
-Bottom nav (all pages): Home / Decks / Revise / Dash. `cards.html` is reached from Decks; `admin.html` from a Home quick-tile (admins only).
+Bottom nav (all pages): Home / Decks / Cram / Dash. The nav label is "Cram" but the file is still `revise.html`. `cards.html` is reached from Decks; `admin.html` from a Home quick-tile (admins only).
 
 ## Data model
 
@@ -173,10 +173,10 @@ A word starts as "pending" — it exists in the deck but has no progress record 
 
 - **no status (normal):** pending word is eligible for introduction in the normal daily queue
 - **`ask_soon`:** pending word is prioritised — introduced before other normal words in the same session
-- **`skip`:** pending word is excluded from the introduction queue for now (user can un-skip later)
-- **`never`:** word is permanently excluded from the user's SRS cycle; also used when a word is manually removed from the cycle via "Never" button on the dashboard
+- **`skip`:** pending word is excluded from the SRS introduction queue for now (user can un-skip later); also excluded from cram sessions
+- **`never`:** word is permanently excluded from the user's SRS cycle; also used when a word is manually removed via "Never" button on the dashboard; also excluded from cram sessions
 
-Only pending (non-introduced) words are affected by `ask_soon`/`skip`/`never`. Introduced words have progress records and follow the SRS schedule regardless of status.
+Only pending (non-introduced) words are affected by `ask_soon`/`skip`/`never` in the SRS introduction gate. Introduced words follow the SRS schedule regardless of status. Both `skip` and `never` are filtered out in `getCramCards`.
 
 ## SRS (js/srs.js)
 
@@ -196,33 +196,54 @@ Each word has TWO progress records (one per direction). `todayStr()` uses **loca
 
 **Home buttons.** Per deck: "New + review" (`review.html?deck=ID`) and "Review only" (`review.html?deck=ID&mode=review`). Personal cards: `deck=personal`. Personal cards skip the introduction gate entirely.
 
-**Cram Mode.** `revise.html` → `review.html?mode=cram`. Deck IDs passed via `sessionStorage.cramDecks` (JSON array). Separate from SRS entirely.
+**Cram Mode.** `revise.html` → `review.html?mode=cram`. Deck IDs passed via `sessionStorage.cramDecks` (JSON array). Direction passed as `?dir=vn_en|en_vn` URL param (omit for both). Words with `skip` or `never` status are excluded. Separate from SRS entirely.
 
 ## review.html — URL params and session flow
 
 ```
-review.html?deck=DECK_ID              Normal SRS session (new + review)
-review.html?deck=DECK_ID&mode=review  Review-only (no new words introduced)
-review.html?mode=cram                 Cram mode — reads deck list from sessionStorage.cramDecks
+review.html?deck=DECK_ID                        Normal SRS session (new + review)
+review.html?deck=DECK_ID&mode=review            Review-only (no new words introduced)
+review.html?mode=cram                           Cram — reads decks from sessionStorage.cramDecks, both directions
+review.html?mode=cram&dir=vn_en                 Cram — Term → Def only
+review.html?mode=cram&dir=en_vn                 Cram — Def → Term only (Jeopardy)
 ```
+
+`dirFilter = params.get('dir')` is read at the top of the script. For cram, it filters the word pool before computing `totalUnique` and `mastered`. For SRS, direction filtering is not applied (both directions always run).
+
+**Progress bar** (`#prog-track`, `.progress-track` — `display:flex`, 10px tall):
+- SRS: green (mastered) / red (wrong, still in queue) / grey (not yet seen). Tracked via `wrongInSession` Set of progressIds.
+- Cram: green (known) / yellow `#f59e0b` (partial) / red (don't know) / grey (not yet rated). Tracked via `cramRatings` Map of `cardKey → 'known'|'partial'|'soon'`. Pre-known cards from previous sessions are pre-populated as `'known'` on load.
+- Rendered by `segs(items, total)` which outputs `<div style="flex:N;...">` children.
 
 **SRS session flow:**
 1. `autoIntroduceDailyForDeck` runs (skipped in review-only mode)
-2. `getDueCardsForDeck` builds the queue
-3. Cards are shuffled and shown one at a time; tap to flip, then ✓/✗
-4. Wrong answers are pushed to the end of the queue (recycled within session)
-5. On queue empty → done screen with "Practice today's words" (repeat-btn) and "Add N more words" (more-btn)
+2. `getDueCardsForDeck` builds the queue (both directions always)
+3. Cards shuffled; tap to flip, then ✓/✗
+4. Correct: `mastered++`, removed from `wrongInSession`. Wrong: added to `wrongInSession`, pushed to end of queue
+5. Done screen → "Practice today's words" (repeat-btn) and "Add N more words" (more-btn)
 
 **Cram session flow:**
-1. `getCramCards` fetches all words from all chosen decks (both directions)
-2. `getCramKnown` filters out already-known cards
-3. Three ratings: "Know it" (persists to `cram_known`, removed from pool), "Partially" (pushed to end), "Don't know" (inserted ~4 cards ahead)
-4. Done screen has "Reset & revise again" which calls `resetCram` (clears `cram_known`) and restarts
+1. `getCramCards` fetches words from chosen decks, excluding `skip`/`never` words, filtered by `dirFilter`
+2. `getCramKnown` filters out already-known cards; pre-known are marked in `cramRatings`
+3. Three ratings: "Know it" → `cramRatings.set(key,'known')`, persists to `cram_known`, removed from queue; "Partially" → `cramRatings.set(key,'partial')`, pushed to end; "Don't know" → `cramRatings.set(key,'soon')`, inserted ~4 ahead
+4. Done screen has "Reset & cram again" which calls `resetCram` (clears `cram_known`) and restarts from full pool
 
 **Done screen buttons:**
-- `repeat-btn` — "Practice today's words": replays today's introduced words via `getTodayCardsForDeck`
-- `more-btn` — "Add N more words": calls `introduceWordsForDeck` then starts a new session; disabled (with explanation) if unstarted words are still pending
-- `cram-reset-btn` — cram mode only: resets `cram_known` and restarts from full word set
+- `repeat-btn` — replays today's introduced words via `getTodayCardsForDeck`
+- `more-btn` — calls `introduceWordsForDeck` then starts new session; disabled if unstarted words pending
+- `cram-reset-btn` — cram only: resets `cram_known` and restarts
+
+## Cram page (revise.html)
+
+UI label is "Cram" (nav, page title). The filename stays `revise.html`.
+
+**Direction selector** (shown inside `#picker`, above deck list): three pill buttons — "Both ways" (default, no `?dir=` param), "Term → Def" (`?dir=vn_en`), "Jeopardy" (`?dir=en_vn`). Active button gets brand fill. Selected direction stored in `cramDir` variable.
+
+**Deck picker:** grouped by `deck.subject` → `deck.unit`. Unit rows have a checkbox that toggles all decks under that unit. "Select all" toggle at top.
+
+**Known-cards note:** shown if `cram_known` has any entries — displays count and a Reset button that calls `resetCram`.
+
+**Start cram button** (sticky bar above nav, appears when ≥1 deck selected): sets `sessionStorage.cramDecks` then navigates to `review.html?mode=cram[&dir=DIRECTION]`.
 
 ## cards.html — adding cards
 
