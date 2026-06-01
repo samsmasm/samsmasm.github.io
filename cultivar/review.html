@@ -32,9 +32,7 @@
 <div id="review-view" class="hidden">
   <header class="review-header">
     <a href="index.html" class="btn-icon" style="font-size:1.1rem">←</a>
-    <div class="progress-track">
-      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
-    </div>
+    <div class="progress-track" id="prog-track"></div>
     <span id="progress-text">0/0</span>
   </header>
 
@@ -91,6 +89,7 @@ const mode = params.get('mode');
 const reviewOnly = mode === 'review';
 const cramMode = mode === 'cram';
 const deckId = params.get('deck');
+const dirFilter = params.get('dir'); // 'vn_en', 'en_vn', or null (both)
 // Cram sessions read their deck list from sessionStorage (set by revise.html)
 const cramDeckIds = cramMode ? JSON.parse(sessionStorage.getItem('cramDecks') || '[]') : [];
 if (!cramMode && !deckId) location.href = 'index.html';
@@ -108,6 +107,8 @@ let mastered = 0;
 let uid = null;
 let flipped = false;
 let settings = { daily_new: 12, session_max: 36 };
+let wrongInSession = new Set(); // progressIds answered wrong this session (SRS)
+let cramRatings    = new Map(); // cardKey → 'known'|'partial'|'soon' (cram)
 
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
@@ -118,7 +119,10 @@ onAuthStateChanged(auth, async user => {
   if (cramMode) {
     const [all, known] = await Promise.all([getCramCards(uid, cramDeckIds), getCramKnown(uid)]);
     cramCards = all;
-    // Pool excludes words already marked "known"; that set persists day to day.
+    // Pre-populate ratings for already-known cards from previous sessions
+    for (const c of all) {
+      if (known[cardKey(c)]) cramRatings.set(cardKey(c), 'known');
+    }
     cards = all.filter(c => !known[cardKey(c)]);
     totalUnique = all.length;
     mastered = all.length - cards.length; // already-known count fills the bar
@@ -126,6 +130,7 @@ onAuthStateChanged(auth, async user => {
     // Review-only sessions never introduce new words.
     if (!reviewOnly) await autoIntroduceDailyForDeck(uid, deckId);
     cards = await getDueCardsForDeck(uid, deckId, { reviewOnly });
+    if (dirFilter) cards = cards.filter(c => c.direction === dirFilter);
   }
 
   document.getElementById('loading-view').classList.add('hidden');
@@ -147,7 +152,8 @@ onAuthStateChanged(auth, async user => {
 });
 
 async function showPracticeButton() {
-  const todayCards = await getTodayCardsForDeck(uid, deckId);
+  let todayCards = await getTodayCardsForDeck(uid, deckId);
+  if (dirFilter) todayCards = todayCards.filter(c => c.direction === dirFilter);
   if (todayCards.length > 0) {
     document.getElementById('repeat-btn').classList.remove('hidden');
   }
@@ -174,7 +180,8 @@ async function showPracticeButton() {
 }
 
 document.getElementById('repeat-btn').addEventListener('click', async () => {
-  const cards = await getTodayCardsForDeck(uid, deckId);
+  let cards = await getTodayCardsForDeck(uid, deckId);
+  if (dirFilter) cards = cards.filter(c => c.direction === dirFilter);
   if (!cards.length) return;
   startSession(cards);
 });
@@ -184,11 +191,13 @@ document.getElementById('more-btn').addEventListener('click', async () => {
   if (btn.disabled) return;
   btn.disabled = true; btn.textContent = 'Adding…';
   await introduceWordsForDeck(uid, deckId, settings.daily_new);
-  const cards = await getDueCardsForDeck(uid, deckId);
+  let cards = await getDueCardsForDeck(uid, deckId);
+  if (dirFilter) cards = cards.filter(c => c.direction === dirFilter);
   startSession(cards);
 });
 
 function startSession(cards) {
+  wrongInSession.clear();
   document.getElementById('done-view').classList.add('hidden');
   document.getElementById('repeat-btn').classList.add('hidden');
   document.getElementById('more-btn').classList.add('hidden');
@@ -262,7 +271,13 @@ async function answer(correct) {
 
   const card = queue.shift();
   updateProgress(uid, card.progressId, correct).catch(console.error);
-  if (correct) { mastered++; } else { queue.push(card); }
+  if (correct) {
+    mastered++;
+    wrongInSession.delete(card.progressId);
+  } else {
+    wrongInSession.add(card.progressId);
+    queue.push(card);
+  }
 
   if (queue.length === 0) {
     document.getElementById('review-view').classList.add('hidden');
@@ -290,13 +305,17 @@ document.getElementById('cram-no').addEventListener('click',      () => cramAnsw
 function cramAnswer(rating) {
   cramBtns.forEach(b => b.disabled = true);
   const card = queue.shift();
+  const key = cardKey(card);
 
   if (rating === 'known') {
-    setCramKnown(uid, cardKey(card), true).catch(console.error);
+    cramRatings.set(key, 'known');
+    setCramKnown(uid, key, true).catch(console.error);
     mastered++;
   } else if (rating === 'soon') {
+    cramRatings.set(key, 'soon');
     queue.splice(Math.min(queue.length, 4), 0, card); // ask again fairly soon
   } else {
+    cramRatings.set(key, 'partial');
     queue.push(card); // partial: ask again near the end
   }
 
@@ -334,9 +353,37 @@ document.getElementById('cram-reset-btn').addEventListener('click', async () => 
 });
 
 function updateBar() {
-  const pct = totalUnique > 0 ? (mastered / totalUnique) * 100 : 0;
-  document.getElementById('prog-fill').style.width = pct + '%';
+  const track = document.getElementById('prog-track');
+  if (cramMode) {
+    const vals         = [...cramRatings.values()];
+    const knownCount   = vals.filter(v => v === 'known').length;
+    const partialCount = vals.filter(v => v === 'partial').length;
+    const soonCount    = vals.filter(v => v === 'soon').length;
+    const unseenCount  = Math.max(0, totalUnique - knownCount - partialCount - soonCount);
+    track.innerHTML = segs([
+      { n: knownCount,   color: 'var(--correct)'  },
+      { n: partialCount, color: '#f59e0b'          },
+      { n: soonCount,    color: 'var(--incorrect)' },
+      { n: unseenCount,  color: 'var(--border)'    },
+    ], totalUnique);
+  } else {
+    const wrongCount  = wrongInSession.size;
+    const unseenCount = Math.max(0, totalUnique - mastered - wrongCount);
+    track.innerHTML = segs([
+      { n: mastered,    color: 'var(--correct)'  },
+      { n: wrongCount,  color: 'var(--incorrect)' },
+      { n: unseenCount, color: 'var(--border)'    },
+    ], totalUnique);
+  }
   document.getElementById('progress-text').textContent = `${mastered}/${totalUnique}`;
+}
+
+function segs(items, total) {
+  if (!total) return '';
+  return items
+    .filter(s => s.n > 0)
+    .map(s => `<div style="flex:${s.n};background:${s.color};height:100%"></div>`)
+    .join('');
 }
 
 function shuffle(arr) {
@@ -350,7 +397,7 @@ function shuffle(arr) {
 <nav class="bottom-nav">
   <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
   <a href="decks.html" class="nav-item"><span class="nav-icon">📦</span><span class="nav-label">Decks</span></a>
-  <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Revise</span></a>
+  <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Cram</span></a>
   <a href="dash.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
 </nav>
 </body>
