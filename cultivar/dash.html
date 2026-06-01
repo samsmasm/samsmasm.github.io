@@ -239,8 +239,6 @@ async function loadWordList() {
     list.appendChild(topBtn);
   }
 
-  // Words with a unit field → two-level (unit → subunit)
-  // Words without → flat (subunit || category || '')
   const byUnit = {};
   const flat   = {};
   for (const item of words) {
@@ -257,13 +255,17 @@ async function loadWordList() {
     }
   }
 
+  const totalTopLevelGroups = Object.keys(byUnit).length + Object.keys(flat).length;
+  const autoCollapse = words.length > 250 && totalTopLevelGroups > 1;
+
   let orderIdx = 0;
 
   function makeSelectAllCb(ids, size) {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.style.cssText = `width:${size}px;height:${size}px;flex-shrink:0;cursor:pointer;accent-color:var(--brand)`;
-    cb.addEventListener('click', () => {
+    cb.addEventListener('click', e => {
+      e.stopPropagation();
       for (const wid of ids) {
         const rowEl = list.querySelector(`[data-word-id="${wid}"]`);
         const c = rowEl?.querySelector('.word-cb');
@@ -279,12 +281,31 @@ async function loadWordList() {
     const btn = document.createElement('button');
     btn.textContent = label;
     btn.style.cssText = 'font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--correct);background:none;color:var(--correct)';
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
       btn.disabled = true; btn.textContent = 'Marking…';
       await bulkSetWordStatus(uid, currentDeckId, pendingItems.map(w => w.id), 'ask_soon');
       await loadWordList();
     });
     return btn;
+  }
+
+  function makeChevron(collapsed, color) {
+    const ch = document.createElement('span');
+    ch.textContent = collapsed ? '▶' : '▼';
+    ch.style.cssText = `font-size:.65rem;color:${color};flex-shrink:0;width:10px;text-align:center`;
+    return ch;
+  }
+
+  function wireCollapse(headerEl, bodyEl, chevronEl) {
+    headerEl.style.cursor = 'pointer';
+    headerEl.style.userSelect = 'none';
+    headerEl.addEventListener('click', e => {
+      if (e.target.type === 'checkbox') return;
+      const hidden = bodyEl.style.display === 'none';
+      bodyEl.style.display = hidden ? '' : 'none';
+      chevronEl.textContent = hidden ? '▼' : '▶';
+    });
   }
 
   // ── Unit-grouped ──────────────────────────────────────────────────────────
@@ -294,10 +315,17 @@ async function loadWordList() {
     const unitIds     = unitItems.map(w => w.id);
     const unitPending = unitItems.filter(w => !w.introduced && w.status !== 'never');
 
+    const uChevron = makeChevron(autoCollapse, 'var(--brand)');
+    const uBody    = document.createElement('div');
+    if (autoCollapse) uBody.style.display = 'none';
+
     const uHead = document.createElement('div');
-    uHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:20px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--brand)';
+    uHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:20px 0 0;padding-bottom:6px;border-bottom:2px solid var(--brand)';
+    wireCollapse(uHead, uBody, uChevron);
+
     const uLeft = document.createElement('div');
     uLeft.style.cssText = 'display:flex;align-items:center;gap:8px';
+    uLeft.appendChild(uChevron);
     uLeft.appendChild(makeSelectAllCb(unitIds, 18));
     const uTitle = document.createElement('span');
     uTitle.textContent = unit;
@@ -306,6 +334,7 @@ async function loadWordList() {
     uHead.appendChild(uLeft);
     if (unitPending.length > 0) uHead.appendChild(makeAskPendingBtn(unitPending, `Ask all ${unitPending.length} pending`));
     list.appendChild(uHead);
+    list.appendChild(uBody);
 
     for (const sub of Object.keys(subMap).sort()) {
       const subItems   = subMap[sub];
@@ -313,10 +342,17 @@ async function loadWordList() {
       const subPending = subItems.filter(w => !w.introduced && w.status !== 'never');
 
       if (sub) {
+        const sChevron      = makeChevron(autoCollapse, 'var(--muted)');
+        const sWordsContainer = document.createElement('div');
+        if (autoCollapse) sWordsContainer.style.display = 'none';
+
         const sHead = document.createElement('div');
-        sHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:12px 0 2px 8px;padding-bottom:3px;border-bottom:1px solid var(--border)';
+        sHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:12px 0 0 8px;padding-bottom:3px;border-bottom:1px solid var(--border)';
+        wireCollapse(sHead, sWordsContainer, sChevron);
+
         const sLeft = document.createElement('div');
         sLeft.style.cssText = 'display:flex;align-items:center;gap:8px';
+        sLeft.appendChild(sChevron);
         sLeft.appendChild(makeSelectAllCb(subIds, 16));
         const sTitle = document.createElement('span');
         sTitle.textContent = sub;
@@ -324,10 +360,12 @@ async function loadWordList() {
         sLeft.appendChild(sTitle);
         sHead.appendChild(sLeft);
         if (subPending.length > 0) sHead.appendChild(makeAskPendingBtn(subPending, `Ask all ${subPending.length}`));
-        list.appendChild(sHead);
+        uBody.appendChild(sHead);
+        for (const item of subItems) sWordsContainer.appendChild(renderWordRow(item, orderIdx++));
+        uBody.appendChild(sWordsContainer);
+      } else {
+        for (const item of subItems) uBody.appendChild(renderWordRow(item, orderIdx++));
       }
-
-      for (const item of subItems) list.appendChild(renderWordRow(item, orderIdx++));
     }
   }
 
@@ -341,10 +379,17 @@ async function loadWordList() {
     const catPending = catItems.filter(w => !w.introduced && w.status !== 'never');
 
     if (showFlatHeaders) {
+      const catChevron = makeChevron(autoCollapse, 'var(--muted)');
+      const catBody    = document.createElement('div');
+      if (autoCollapse) catBody.style.display = 'none';
+
       const header = document.createElement('div');
-      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:16px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--border)';
+      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:16px 0 0;padding-bottom:4px;border-bottom:2px solid var(--border)';
+      wireCollapse(header, catBody, catChevron);
+
       const left = document.createElement('div');
       left.style.cssText = 'display:flex;align-items:center;gap:8px';
+      left.appendChild(catChevron);
       left.appendChild(makeSelectAllCb(catIds, 18));
       const title = document.createElement('span');
       title.textContent = cat || 'Uncategorised';
@@ -353,9 +398,11 @@ async function loadWordList() {
       header.appendChild(left);
       if (catPending.length > 0) header.appendChild(makeAskPendingBtn(catPending, `Ask all ${catPending.length} pending`));
       list.appendChild(header);
+      for (const item of catItems) catBody.appendChild(renderWordRow(item, orderIdx++));
+      list.appendChild(catBody);
+    } else {
+      for (const item of catItems) list.appendChild(renderWordRow(item, orderIdx++));
     }
-
-    for (const item of catItems) list.appendChild(renderWordRow(item, orderIdx++));
   }
 }
 
