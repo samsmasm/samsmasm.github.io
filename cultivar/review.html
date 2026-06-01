@@ -118,19 +118,19 @@ onAuthStateChanged(auth, async user => {
   let cards;
   if (cramMode) {
     const [all, known] = await Promise.all([getCramCards(uid, cramDeckIds), getCramKnown(uid)]);
-    cramCards = all;
-    // Pre-populate ratings for already-known cards from previous sessions
-    for (const c of all) {
+    const pool = dirFilter ? all.filter(c => c.direction === dirFilter) : all;
+    // Pre-populate ratings for already-known cards in this direction
+    for (const c of pool) {
       if (known[cardKey(c)]) cramRatings.set(cardKey(c), 'known');
     }
-    cards = all.filter(c => !known[cardKey(c)]);
-    totalUnique = all.length;
-    mastered = all.length - cards.length; // already-known count fills the bar
+    cramCards = pool;
+    cards = pool.filter(c => !known[cardKey(c)]);
+    totalUnique = pool.length;
+    mastered = pool.length - cards.length;
   } else {
     // Review-only sessions never introduce new words.
     if (!reviewOnly) await autoIntroduceDailyForDeck(uid, deckId);
     cards = await getDueCardsForDeck(uid, deckId, { reviewOnly });
-    if (dirFilter) cards = cards.filter(c => c.direction === dirFilter);
   }
 
   document.getElementById('loading-view').classList.add('hidden');
@@ -152,8 +152,7 @@ onAuthStateChanged(auth, async user => {
 });
 
 async function showPracticeButton() {
-  let todayCards = await getTodayCardsForDeck(uid, deckId);
-  if (dirFilter) todayCards = todayCards.filter(c => c.direction === dirFilter);
+  const todayCards = await getTodayCardsForDeck(uid, deckId);
   if (todayCards.length > 0) {
     document.getElementById('repeat-btn').classList.remove('hidden');
   }
@@ -180,8 +179,7 @@ async function showPracticeButton() {
 }
 
 document.getElementById('repeat-btn').addEventListener('click', async () => {
-  let cards = await getTodayCardsForDeck(uid, deckId);
-  if (dirFilter) cards = cards.filter(c => c.direction === dirFilter);
+  const cards = await getTodayCardsForDeck(uid, deckId);
   if (!cards.length) return;
   startSession(cards);
 });
@@ -191,8 +189,7 @@ document.getElementById('more-btn').addEventListener('click', async () => {
   if (btn.disabled) return;
   btn.disabled = true; btn.textContent = 'Adding…';
   await introduceWordsForDeck(uid, deckId, settings.daily_new);
-  let cards = await getDueCardsForDeck(uid, deckId);
-  if (dirFilter) cards = cards.filter(c => c.direction === dirFilter);
+  const cards = await getDueCardsForDeck(uid, deckId);
   startSession(cards);
 });
 
