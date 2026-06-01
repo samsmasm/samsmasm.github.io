@@ -75,27 +75,31 @@
   <a href="dash.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
 </nav>
 
-<script type="module">
+<script type=”module”>
 import { auth } from './js/config.js';
-import { getUser, getPublicDecks, getPersonalCards, getCramKnown, resetCram } from './js/db.js';
+import { getUser, getPublicDecks, getPersonalCards, getDeckWords, getCramKnown, resetCram } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
-const selected = new Set();
 let cramDir = '';
+const deckSelections = new Map(); // deckId → 'all' | Set<subunit>
+const wordCache      = new Map(); // deckId → word[]
+const deckMeta       = new Map(); // deckId → deck object
 
+// ── Direction selector ─────────────────────────────────────────────────────────
 document.querySelectorAll('.dir-opt').forEach(btn => {
   btn.addEventListener('click', () => {
     cramDir = btn.dataset.dir;
     document.querySelectorAll('.dir-opt').forEach(b => {
       const on = b === btn;
-      b.style.background   = on ? 'var(--brand)' : 'none';
-      b.style.color        = on ? '#fff' : 'var(--muted)';
-      b.style.borderColor  = on ? 'var(--brand)' : 'var(--border)';
+      b.style.background  = on ? 'var(--brand)' : 'none';
+      b.style.color       = on ? '#fff' : 'var(--muted)';
+      b.style.borderColor = on ? 'var(--brand)' : 'var(--border)';
     });
   });
 });
 
+// ── Known-note ─────────────────────────────────────────────────────────────────
 async function refreshKnownNote() {
   const known = await getCramKnown(uid);
   const n = Object.keys(known).length;
@@ -115,6 +119,7 @@ document.getElementById('reset-cram-btn').addEventListener('click', async () => 
   await refreshKnownNote();
 });
 
+// ── Auth + init ────────────────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
@@ -123,6 +128,7 @@ onAuthStateChanged(auth, async user => {
     getUser(uid), getPublicDecks(), getPersonalCards(uid)
   ]);
   refreshKnownNote();
+
   const subscribed = new Set(userData?.subscribed_decks || []);
   const myDecks = decks.filter(d => subscribed.has(d.id));
 
@@ -133,99 +139,220 @@ onAuthStateChanged(auth, async user => {
     return;
   }
 
-  // Group by subject → unit
-  const tree = {};
-  for (const d of myDecks) {
-    const subj = d.subject || 'Other';
-    const unit = d.unit || '';
-    (tree[subj] ??= {});
-    (tree[subj][unit] ??= []).push(d);
-  }
-
   const container = document.getElementById('deck-tree');
+  container.innerHTML = '';
 
-  for (const subj of Object.keys(tree).sort()) {
-    const subjHeader = document.createElement('div');
-    subjHeader.textContent = subj;
-    subjHeader.style.cssText = 'font-size:.95rem;font-weight:700;color:var(--text);margin:16px 0 4px';
-    container.appendChild(subjHeader);
-
-    for (const unit of Object.keys(tree[subj]).sort()) {
-      const unitDecks = tree[subj][unit];
-
-      if (unit) {
-        const unitRow = document.createElement('label');
-        unitRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border)';
-        const unitCb = document.createElement('input');
-        unitCb.type = 'checkbox';
-        unitCb.style.cssText = 'width:18px;height:18px;accent-color:var(--brand)';
-        unitCb.addEventListener('change', () => {
-          for (const d of unitDecks) toggle(d.id, unitCb.checked);
-          renderState();
-        });
-        unitCb.dataset.unitFor = unitDecks.map(d => d.id).join(',');
-        const unitLbl = document.createElement('span');
-        unitLbl.textContent = unit;
-        unitLbl.style.cssText = 'font-size:.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em';
-        unitRow.append(unitCb, unitLbl);
-        container.appendChild(unitRow);
-      }
-
-      for (const d of unitDecks) {
-        container.appendChild(deckRow(d.id, d.name, !!unit));
-      }
-    }
+  for (const d of myDecks) {
+    deckMeta.set(d.id, d);
+    container.appendChild(buildDeckRow(d.id, d.name, d.word_count ?? 0, false));
   }
-
   if (personalCards.length > 0) {
-    const subjHeader = document.createElement('div');
-    subjHeader.textContent = 'Personal';
-    subjHeader.style.cssText = 'font-size:.95rem;font-weight:700;color:var(--text);margin:16px 0 4px';
-    container.appendChild(subjHeader);
-    container.appendChild(deckRow('personal', 'Personal cards', false));
+    deckMeta.set('personal', { name: 'Personal cards', word_count: personalCards.length });
+    container.appendChild(buildDeckRow('personal', 'Personal cards', personalCards.length, true));
   }
 
   document.getElementById('picker').classList.remove('hidden');
 });
 
-function deckRow(id, name, indent) {
-  const row = document.createElement('label');
-  row.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 0 8px ${indent ? '24px' : '0'};cursor:pointer;border-bottom:1px solid var(--border)`;
+// ── Deck row ───────────────────────────────────────────────────────────────────
+function buildDeckRow(deckId, name, wordCount, noTree) {
+  const wrap = document.createElement('div');
+  let treeDiv = null;
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)';
+
   const cb = document.createElement('input');
   cb.type = 'checkbox';
-  cb.dataset.deckId = id;
-  cb.style.cssText = 'width:18px;height:18px;accent-color:var(--brand)';
-  cb.addEventListener('change', () => { toggle(id, cb.checked); renderState(); });
+  cb.dataset.deckId = deckId;
+  cb.style.cssText = 'width:18px;height:18px;accent-color:var(--brand);flex-shrink:0';
+  cb.addEventListener('change', () => {
+    if (cb.checked) {
+      deckSelections.set(deckId, 'all');
+      if (treeDiv) treeDiv.querySelectorAll('input[type=checkbox]').forEach(s => { s.checked = false; s.indeterminate = false; });
+    } else {
+      deckSelections.delete(deckId);
+    }
+    renderState();
+  });
+
   const lbl = document.createElement('span');
+  lbl.style.cssText = 'flex:1;font-size:.92rem';
   lbl.textContent = name;
-  lbl.style.cssText = 'font-size:.92rem';
-  row.append(cb, lbl);
-  return row;
+  if (wordCount) {
+    const c = document.createElement('span');
+    c.style.cssText = 'color:var(--muted);font-size:.78rem;margin-left:5px';
+    c.textContent = `(${wordCount})`;
+    lbl.appendChild(c);
+  }
+
+  row.appendChild(cb);
+  row.appendChild(lbl);
+
+  if (!noTree) {
+    const expandBtn = document.createElement('button');
+    expandBtn.style.cssText = 'flex-shrink:0;background:none;border:1px solid var(--border);border-radius:6px;color:var(--brand);font-size:.75rem;cursor:pointer;padding:3px 10px';
+    expandBtn.textContent = '▼ Units';
+    treeDiv = document.createElement('div');
+    treeDiv.style.display = 'none';
+    let loaded = false;
+    expandBtn.addEventListener('click', async () => {
+      if (treeDiv.style.display === 'none') {
+        treeDiv.style.display = '';
+        expandBtn.textContent = '▲ Units';
+        if (!loaded) {
+          loaded = true;
+          treeDiv.innerHTML = '<div style=”padding:8px 20px;color:var(--muted);font-size:.82rem”>Loading…</div>';
+          await buildUnitTree(deckId, treeDiv, cb);
+        }
+      } else {
+        treeDiv.style.display = 'none';
+        expandBtn.textContent = '▼ Units';
+      }
+    });
+    row.appendChild(expandBtn);
+    wrap.appendChild(row);
+    wrap.appendChild(treeDiv);
+  } else {
+    wrap.appendChild(row);
+  }
+
+  return wrap;
 }
 
-function toggle(id, on) {
-  if (on) selected.add(id); else selected.delete(id);
-  const cb = document.querySelector(`[data-deck-id="${id}"]`);
-  if (cb) cb.checked = on;
+// ── Unit/subunit tree (lazy loaded) ───────────────────────────────────────────
+async function buildUnitTree(deckId, container, deckCb) {
+  let words;
+  if (wordCache.has(deckId)) {
+    words = wordCache.get(deckId);
+  } else {
+    words = await getDeckWords(deckId);
+    wordCache.set(deckId, words);
+  }
+
+  const unitMap = new Map();
+  for (const w of words) {
+    const u = w.unit || '';
+    const s = w.subunit || '';
+    if (!unitMap.has(u)) unitMap.set(u, new Map());
+    unitMap.get(u).set(s, (unitMap.get(u).get(s) || 0) + 1);
+  }
+
+  const units = [...unitMap.keys()].filter(u => u).sort();
+  if (units.length === 0) {
+    container.innerHTML = '<div style=”padding:6px 20px;color:var(--muted);font-size:.82rem”>No unit structure — select the whole deck above.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  const allSubCbs = []; // all subunit checkboxes for this deck (for onSubunitChange)
+
+  for (const unit of units) {
+    const subMap   = unitMap.get(unit);
+    const subkeys  = [...subMap.keys()].filter(s => s).sort();
+    const unitTotal = [...subMap.values()].reduce((a, b) => a + b, 0);
+
+    const section = document.createElement('div');
+    section.style.cssText = 'padding:2px 0 2px 12px';
+
+    const unitRow = document.createElement('div');
+    unitRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 0';
+
+    const unitCb = document.createElement('input');
+    unitCb.type = 'checkbox';
+    unitCb.style.cssText = 'width:17px;height:17px;accent-color:var(--brand);flex-shrink:0';
+
+    const unitLbl = document.createElement('span');
+    unitLbl.style.cssText = 'font-size:.82rem;font-weight:600;color:var(--brand)';
+    unitLbl.textContent = `${unit} (${unitTotal} words)`;
+    unitRow.append(unitCb, unitLbl);
+    section.appendChild(unitRow);
+
+    const unitSubCbs = [];
+    for (const sub of subkeys) {
+      const count = subMap.get(sub);
+      const subRow = document.createElement('div');
+      subRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:3px 0 3px 20px';
+      const subCb = document.createElement('input');
+      subCb.type = 'checkbox';
+      subCb.dataset.subunit = sub;
+      subCb.style.cssText = 'width:15px;height:15px;accent-color:var(--brand);flex-shrink:0';
+      const subLbl = document.createElement('span');
+      subLbl.style.cssText = 'font-size:.82rem;color:var(--text)';
+      subLbl.textContent = `${sub} (${count})`;
+      subCb.addEventListener('change', () => {
+        const allOn  = unitSubCbs.every(s => s.checked);
+        const noneOn = unitSubCbs.every(s => !s.checked);
+        unitCb.indeterminate = !allOn && !noneOn;
+        unitCb.checked = allOn;
+        onSubunitChange(deckId, deckCb, allSubCbs);
+      });
+      subRow.append(subCb, subLbl);
+      section.appendChild(subRow);
+      unitSubCbs.push(subCb);
+      allSubCbs.push(subCb);
+    }
+
+    unitCb.addEventListener('change', () => {
+      unitSubCbs.forEach(s => s.checked = unitCb.checked);
+      unitCb.indeterminate = false;
+      onSubunitChange(deckId, deckCb, allSubCbs);
+    });
+
+    container.appendChild(section);
+  }
 }
 
+function onSubunitChange(deckId, deckCb, allSubCbs) {
+  const checked = new Set(allSubCbs.filter(s => s.checked).map(s => s.dataset.subunit));
+  if (checked.size === 0) {
+    if (!deckCb.checked) deckSelections.delete(deckId);
+  } else {
+    deckCb.checked = false;
+    deckSelections.set(deckId, checked);
+  }
+  renderState();
+}
+
+// ── Selection state / start bar ───────────────────────────────────────────────
 function renderState() {
+  let totalWords = 0;
+  for (const [deckId, sel] of deckSelections) {
+    if (sel === 'all') {
+      const cached = wordCache.get(deckId);
+      totalWords += cached ? cached.length : (deckMeta.get(deckId)?.word_count ?? 0);
+    } else {
+      const cached = wordCache.get(deckId) || [];
+      totalWords += cached.filter(w => sel.has(w.subunit || '')).length;
+    }
+  }
+  const hasSelection = deckSelections.size > 0;
   const bar = document.getElementById('start-bar');
-  document.getElementById('start-count').textContent = `${selected.size} deck${selected.size !== 1 ? 's' : ''} selected`;
-  bar.style.display = selected.size > 0 ? 'flex' : 'none';
+  bar.style.display = hasSelection ? 'flex' : 'none';
+  document.getElementById('start-count').textContent = totalWords > 0
+    ? `${totalWords} word${totalWords !== 1 ? 's' : ''} selected`
+    : `${deckSelections.size} deck${deckSelections.size !== 1 ? 's' : ''} selected`;
 }
 
 document.getElementById('select-all-btn').addEventListener('click', () => {
-  const boxes = document.querySelectorAll('[data-deck-id]');
-  const allOn = [...boxes].every(b => b.checked);
-  boxes.forEach(b => toggle(b.dataset.deckId, !allOn));
-  document.querySelectorAll('[data-unit-for]').forEach(u => u.checked = !allOn);
+  const deckCbs = [...document.querySelectorAll('#deck-tree input[data-deck-id]')];
+  const allOn   = deckCbs.length > 0 && deckCbs.every(cb => deckSelections.has(cb.dataset.deckId));
+  document.querySelectorAll('#deck-tree input[type=checkbox]').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+  deckSelections.clear();
+  if (!allOn) {
+    deckCbs.forEach(cb => { cb.checked = true; deckSelections.set(cb.dataset.deckId, 'all'); });
+  }
   renderState();
 });
 
 document.getElementById('start-btn').addEventListener('click', () => {
-  if (selected.size === 0) return;
-  sessionStorage.setItem('cramDecks', JSON.stringify([...selected]));
+  if (deckSelections.size === 0) return;
+  const cramFilter = {};
+  for (const [deckId, sel] of deckSelections) {
+    if (sel !== 'all') cramFilter[deckId] = [...sel];
+  }
+  sessionStorage.setItem('cramDecks', JSON.stringify([...deckSelections.keys()]));
+  sessionStorage.setItem('cramFilter', JSON.stringify(cramFilter));
   location.href = `review.html?mode=cram${cramDir ? `&dir=${cramDir}` : ''}`;
 });
 </script>

@@ -91,7 +91,8 @@ const mode = params.get('mode');
 const reviewOnly = mode === 'review';
 const cramMode = mode === 'cram';
 const deckId = params.get('deck');
-const dirFilter = params.get('dir'); // 'vn_en', 'en_vn', or null (both)
+const dirFilter  = params.get('dir'); // 'vn_en', 'en_vn', or null (both)
+const cramFilter = cramMode ? JSON.parse(sessionStorage.getItem('cramFilter') || '{}') : {};
 // Cram sessions read their deck list from sessionStorage (set by revise.html)
 const cramDeckIds = cramMode ? JSON.parse(sessionStorage.getItem('cramDecks') || '[]') : [];
 if (!cramMode && !deckId) location.href = 'index.html';
@@ -122,7 +123,15 @@ onAuthStateChanged(auth, async user => {
   let cards;
   if (cramMode) {
     const [all, known] = await Promise.all([getCramCards(uid, cramDeckIds), getCramKnown(uid)]);
-    const pool = dirFilter ? all.filter(c => c.direction === dirFilter) : all;
+    // Apply subunit filter (from cram page unit/subunit picker)
+    const subFiltered = Object.keys(cramFilter).length > 0
+      ? all.filter(c => {
+          const f = cramFilter[c.deckId];
+          if (!f) return true;
+          return f.includes(c.word.subunit || '');
+        })
+      : all;
+    const pool = dirFilter ? subFiltered.filter(c => c.direction === dirFilter) : subFiltered;
     // Pre-populate ratings for already-known cards in this direction
     for (const c of pool) {
       if (known[cardKey(c)]) cramRatings.set(cardKey(c), 'known');

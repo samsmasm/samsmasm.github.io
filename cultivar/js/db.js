@@ -312,7 +312,7 @@ export async function getCramCards(uid, deckIds) {
       const status = wordStatus[`${deckId}_${word.id}`];
       if (status === 'skip' || status === 'never') continue;
       for (const direction of ['vn_en', 'en_vn']) {
-        all.push({ word, direction });
+        all.push({ word, direction, deckId });
       }
     }
   }
