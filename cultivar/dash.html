@@ -75,11 +75,18 @@
 </main>
 
 <!-- Selection action bar — appears above nav when words are checked -->
-<div id="selection-bar" style="display:none;position:fixed;bottom:var(--nav-h);left:0;right:0;max-width:540px;margin:0 auto;background:var(--surface);border-top:2px solid var(--brand);padding:10px 16px;align-items:center;gap:10px;z-index:20;box-shadow:0 -2px 8px rgba(0,0,0,.08)">
-  <span id="sel-count" style="flex:1;font-size:.9rem;font-weight:600;color:var(--brand)"></span>
-  <button id="sel-earlier-btn" class="btn btn-secondary" style="padding:6px 16px;min-height:36px">← Earlier</button>
-  <button id="sel-later-btn" class="btn btn-secondary" style="padding:6px 16px;min-height:36px">Later →</button>
-  <button id="sel-clear-btn" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:4px">Clear</button>
+<div id="selection-bar" style="display:none;flex-direction:column;gap:6px;position:fixed;bottom:var(--nav-h);left:0;right:0;max-width:540px;margin:0 auto;background:var(--surface);border-top:2px solid var(--brand);padding:8px 16px;z-index:20;box-shadow:0 -2px 8px rgba(0,0,0,.08)">
+  <div style="display:flex;align-items:center">
+    <span id="sel-count" style="flex:1;font-size:.9rem;font-weight:600;color:var(--brand)"></span>
+    <button id="sel-clear-btn" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:4px">Clear</button>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <button id="sel-earlier-btn" class="btn btn-secondary" style="padding:5px 11px;min-height:32px;font-size:.82rem">← Earlier</button>
+    <button id="sel-later-btn" class="btn btn-secondary" style="padding:5px 11px;min-height:32px;font-size:.82rem">Later →</button>
+    <button id="sel-ask-soon-btn" style="padding:5px 11px;min-height:32px;font-size:.82rem;border-radius:8px;cursor:pointer;border:1px solid var(--correct);background:none;color:var(--correct)">Ask soon</button>
+    <button id="sel-skip-btn" style="padding:5px 11px;min-height:32px;font-size:.82rem;border-radius:8px;cursor:pointer;border:1px solid var(--muted);background:none;color:var(--muted)">Skip</button>
+    <button id="sel-never-btn" style="padding:5px 11px;min-height:32px;font-size:.82rem;border-radius:8px;cursor:pointer;border:1px solid var(--incorrect);background:none;color:var(--incorrect)">Never</button>
+  </div>
 </div>
 
 <nav class="bottom-nav">
@@ -178,6 +185,24 @@ async function bulkMove(direction) {
 document.getElementById('sel-earlier-btn').addEventListener('click', () => bulkMove('earlier'));
 document.getElementById('sel-later-btn').addEventListener('click',   () => bulkMove('later'));
 
+async function bulkStatus(status) {
+  const ids = [...selectedIds];
+  if (!ids.length) return;
+  ['sel-ask-soon-btn','sel-skip-btn','sel-never-btn','sel-earlier-btn','sel-later-btn'].forEach(id => {
+    const b = document.getElementById(id); if (b) b.disabled = true;
+  });
+  await bulkSetWordStatus(uid, currentDeckId, ids, status);
+  selectedIds.clear(); lastCheckedIdx = -1;
+  ['sel-ask-soon-btn','sel-skip-btn','sel-never-btn','sel-earlier-btn','sel-later-btn'].forEach(id => {
+    const b = document.getElementById(id); if (b) b.disabled = false;
+  });
+  await loadWordList();
+}
+
+document.getElementById('sel-ask-soon-btn').addEventListener('click', () => bulkStatus('ask_soon'));
+document.getElementById('sel-skip-btn').addEventListener('click',     () => bulkStatus('skip'));
+document.getElementById('sel-never-btn').addEventListener('click',    () => bulkStatus('never'));
+
 // ── Word list ─────────────────────────────────────────────────────────────────
 
 async function loadWordList() {
@@ -214,70 +239,123 @@ async function loadWordList() {
     list.appendChild(topBtn);
   }
 
-  // Group by subunit (new imports), falling back to category (legacy) or unit
-  const grouped = {};
+  // Words with a unit field → two-level (unit → subunit)
+  // Words without → flat (subunit || category || '')
+  const byUnit = {};
+  const flat   = {};
   for (const item of words) {
-    const cat = item.word.subunit || item.word.unit || item.word.category || '';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(item);
+    if (item.word.unit) {
+      const u = item.word.unit;
+      const s = item.word.subunit || '';
+      if (!byUnit[u]) byUnit[u] = {};
+      if (!byUnit[u][s]) byUnit[u][s] = [];
+      byUnit[u][s].push(item);
+    } else {
+      const c = item.word.subunit || item.word.category || '';
+      if (!flat[c]) flat[c] = [];
+      flat[c].push(item);
+    }
   }
-  const cats = Object.keys(grouped).sort((a, b) =>
-    !a && b ? 1 : a && !b ? -1 : a.localeCompare(b)
-  );
-  const showHeaders = cats.length > 1 || cats[0] !== '';
 
   let orderIdx = 0;
-  for (const cat of cats) {
-    const catWords   = grouped[cat];
-    const catPending = catWords.filter(w => !w.introduced && w.status !== 'never');
 
-    if (showHeaders) {
+  function makeSelectAllCb(ids, size) {
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.style.cssText = `width:${size}px;height:${size}px;flex-shrink:0;cursor:pointer;accent-color:var(--brand)`;
+    cb.addEventListener('click', () => {
+      for (const wid of ids) {
+        const rowEl = list.querySelector(`[data-word-id="${wid}"]`);
+        const c = rowEl?.querySelector('.word-cb');
+        if (c) c.checked = cb.checked;
+        if (cb.checked) selectedIds.add(wid); else selectedIds.delete(wid);
+      }
+      updateSelectionBar();
+    });
+    return cb;
+  }
+
+  function makeAskPendingBtn(pendingItems, label) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = 'font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--correct);background:none;color:var(--correct)';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Marking…';
+      await bulkSetWordStatus(uid, currentDeckId, pendingItems.map(w => w.id), 'ask_soon');
+      await loadWordList();
+    });
+    return btn;
+  }
+
+  // ── Unit-grouped ──────────────────────────────────────────────────────────
+  for (const unit of Object.keys(byUnit).sort()) {
+    const subMap      = byUnit[unit];
+    const unitItems   = Object.values(subMap).flat();
+    const unitIds     = unitItems.map(w => w.id);
+    const unitPending = unitItems.filter(w => !w.introduced && w.status !== 'never');
+
+    const uHead = document.createElement('div');
+    uHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:20px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--brand)';
+    const uLeft = document.createElement('div');
+    uLeft.style.cssText = 'display:flex;align-items:center;gap:8px';
+    uLeft.appendChild(makeSelectAllCb(unitIds, 18));
+    const uTitle = document.createElement('span');
+    uTitle.textContent = unit;
+    uTitle.style.cssText = 'font-size:.85rem;font-weight:700;color:var(--brand)';
+    uLeft.appendChild(uTitle);
+    uHead.appendChild(uLeft);
+    if (unitPending.length > 0) uHead.appendChild(makeAskPendingBtn(unitPending, `Ask all ${unitPending.length} pending`));
+    list.appendChild(uHead);
+
+    for (const sub of Object.keys(subMap).sort()) {
+      const subItems   = subMap[sub];
+      const subIds     = subItems.map(w => w.id);
+      const subPending = subItems.filter(w => !w.introduced && w.status !== 'never');
+
+      if (sub) {
+        const sHead = document.createElement('div');
+        sHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:12px 0 2px 8px;padding-bottom:3px;border-bottom:1px solid var(--border)';
+        const sLeft = document.createElement('div');
+        sLeft.style.cssText = 'display:flex;align-items:center;gap:8px';
+        sLeft.appendChild(makeSelectAllCb(subIds, 16));
+        const sTitle = document.createElement('span');
+        sTitle.textContent = sub;
+        sTitle.style.cssText = 'font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em';
+        sLeft.appendChild(sTitle);
+        sHead.appendChild(sLeft);
+        if (subPending.length > 0) sHead.appendChild(makeAskPendingBtn(subPending, `Ask all ${subPending.length}`));
+        list.appendChild(sHead);
+      }
+
+      for (const item of subItems) list.appendChild(renderWordRow(item, orderIdx++));
+    }
+  }
+
+  // ── Flat / legacy (no unit field) ─────────────────────────────────────────
+  const flatCats = Object.keys(flat).sort((a, b) => !a && b ? 1 : a && !b ? -1 : a.localeCompare(b));
+  const showFlatHeaders = flatCats.length > 1 || (flatCats.length === 1 && flatCats[0] !== '') || Object.keys(byUnit).length > 0;
+
+  for (const cat of flatCats) {
+    const catItems   = flat[cat];
+    const catIds     = catItems.map(w => w.id);
+    const catPending = catItems.filter(w => !w.introduced && w.status !== 'never');
+
+    if (showFlatHeaders) {
       const header = document.createElement('div');
       header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:16px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--border)';
-
       const left = document.createElement('div');
       left.style.cssText = 'display:flex;align-items:center;gap:8px';
-
-      const catCb = document.createElement('input');
-      catCb.type = 'checkbox';
-      catCb.title = 'Select all in this category';
-      catCb.style.cssText = 'width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--brand)';
-      const catIds = catWords.map(w => w.id);
-      catCb.addEventListener('click', () => {
-        const check = catCb.checked;
-        for (const wid of catIds) {
-          const rowEl = list.querySelector(`[data-word-id="${wid}"]`);
-          const c = rowEl?.querySelector('.word-cb');
-          if (c) c.checked = check;
-          if (check) selectedIds.add(wid); else selectedIds.delete(wid);
-        }
-        updateSelectionBar();
-      });
-      left.appendChild(catCb);
-
+      left.appendChild(makeSelectAllCb(catIds, 18));
       const title = document.createElement('span');
       title.textContent = cat || 'Uncategorised';
       title.style.cssText = 'font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em';
       left.appendChild(title);
-
       header.appendChild(left);
-      if (catPending.length > 0) {
-        const catBtn = document.createElement('button');
-        catBtn.textContent = `Ask all ${catPending.length} pending`;
-        catBtn.style.cssText = 'font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--correct);background:none;color:var(--correct)';
-        catBtn.addEventListener('click', async () => {
-          catBtn.disabled = true; catBtn.textContent = 'Marking…';
-          await bulkSetWordStatus(uid, currentDeckId, catPending.map(w => w.id), 'ask_soon');
-          await loadWordList();
-        });
-        header.appendChild(catBtn);
-      }
+      if (catPending.length > 0) header.appendChild(makeAskPendingBtn(catPending, `Ask all ${catPending.length} pending`));
       list.appendChild(header);
     }
 
-    for (const item of catWords) {
-      list.appendChild(renderWordRow(item, orderIdx++));
-    }
+    for (const item of catItems) list.appendChild(renderWordRow(item, orderIdx++));
   }
 }
 
