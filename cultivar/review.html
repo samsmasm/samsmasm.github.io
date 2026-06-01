@@ -8,6 +8,8 @@
   <link rel="icon" type="image/png" href="cultivarlogo.png">
   <title>Review — Cultivar</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="cultivarlogo.png">
 </head>
 <body>
 
@@ -107,8 +109,10 @@ let mastered = 0;
 let uid = null;
 let flipped = false;
 let settings = { daily_new: 12, session_max: 36 };
-let wrongInSession = new Set(); // progressIds answered wrong this session (SRS)
-let cramRatings    = new Map(); // cardKey → 'known'|'partial'|'soon' (cram)
+let wrongInSession  = new Set(); // progressIds answered wrong this session (SRS)
+let cramRatings     = new Map(); // cardKey → 'known'|'partial'|'soon' (cram)
+let cramFirstRating = new Map(); // cardKey → first rating given this session
+let preKnownCount   = 0;         // cards already known before session started
 
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
@@ -127,6 +131,7 @@ onAuthStateChanged(auth, async user => {
     cards = pool.filter(c => !known[cardKey(c)]);
     totalUnique = pool.length;
     mastered = pool.length - cards.length;
+    preKnownCount = mastered;
   } else {
     // Review-only sessions never introduce new words.
     if (!reviewOnly) await autoIntroduceDailyForDeck(uid, deckId);
@@ -304,6 +309,8 @@ function cramAnswer(rating) {
   const card = queue.shift();
   const key = cardKey(card);
 
+  if (!cramFirstRating.has(key)) cramFirstRating.set(key, rating);
+
   if (rating === 'known') {
     cramRatings.set(key, 'known');
     setCramKnown(uid, key, true).catch(console.error);
@@ -327,10 +334,25 @@ function cramAnswer(rating) {
 function showCramDone(noneLeft) {
   document.getElementById('review-view').classList.add('hidden');
   updateBar();
-  document.getElementById('done-title').textContent = 'All words known! 🎉';
-  document.getElementById('done-msg').textContent = noneLeft
-    ? 'Every word in these decks is already marked known. Reset to go through them again.'
-    : 'You have worked through every word. Reset to revise them all again.';
+
+  if (noneLeft) {
+    document.getElementById('done-title').textContent = 'All words known! 🎉';
+    document.getElementById('done-msg').textContent =
+      'Every word was already marked known. Reset to go through them again.';
+  } else {
+    const fr = [...cramFirstRating.values()];
+    const knownFirst   = fr.filter(v => v === 'known').length;
+    const partialFirst = fr.filter(v => v === 'partial').length;
+    const soonFirst    = fr.filter(v => v === 'soon').length;
+    const parts = [];
+    if (preKnownCount > 0)  parts.push(`${preKnownCount} already known`);
+    if (knownFirst > 0)     parts.push(`${knownFirst} got it first try`);
+    if (partialFirst > 0)   parts.push(`${partialFirst} needed a couple of goes`);
+    if (soonFirst > 0)      parts.push(`${soonFirst} needed lots of practice`);
+    document.getElementById('done-title').textContent = 'Session complete! 🎉';
+    document.getElementById('done-msg').textContent = parts.join(' · ');
+  }
+
   document.getElementById('cram-reset-btn').classList.remove('hidden');
   document.getElementById('done-view').classList.remove('hidden');
 }
@@ -339,6 +361,8 @@ document.getElementById('cram-reset-btn').addEventListener('click', async () => 
   const btn = document.getElementById('cram-reset-btn');
   btn.disabled = true; btn.textContent = 'Resetting…';
   await resetCram(uid);
+  cramFirstRating.clear();
+  preKnownCount = 0;
   queue = shuffle([...cramCards]);
   totalUnique = cramCards.length;
   mastered = 0;
@@ -397,5 +421,6 @@ function shuffle(arr) {
   <a href="revise.html" class="nav-item"><span class="nav-icon">🎯</span><span class="nav-label">Cram</span></a>
   <a href="dash.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dash</span></a>
 </nav>
+<script>if("serviceWorker"in navigator)navigator.serviceWorker.register("/cultivar/sw.js");</script>
 </body>
 </html>

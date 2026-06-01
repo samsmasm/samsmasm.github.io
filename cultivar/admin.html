@@ -8,6 +8,8 @@
   <link rel="icon" type="image/png" href="cultivarlogo.png">
   <title>Admin — Cultivar</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="cultivarlogo.png">
 </head>
 <body>
 
@@ -177,7 +179,7 @@
 import { auth } from './js/config.js';
 import {
   getUser, getAllDecks, createDeck, findOrCreateDeck, findOrCreateDeckByName,
-  addWordToDeck, bulkAddWordsToDeck, getDeckWords, deleteDeck
+  addWordToDeck, bulkAddWordsToDeck, getDeckWords, updateWord, deleteDeck
 } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -442,19 +444,66 @@ async function loadWords() {
     return;
   }
 
-  for (const w of words) {
-    const el = document.createElement('div');
-    el.className = 'list-card';
-    el.innerHTML = `
-      <div class="list-card-body">
-        <div class="list-card-title">${esc(w.vietnamese)} — ${esc(w.english)}</div>
-        ${w.example_vn ? `<div class="list-card-sub">${esc(w.example_vn)}</div>` : ''}
-        ${w.notes ? `<div class="list-card-sub" style="font-style:italic">${esc(w.notes)}</div>` : ''}
-      </div>
-    `;
-    list.appendChild(el);
-  }
+  for (const w of words) list.appendChild(renderWordCard(w));
   list.classList.remove('hidden');
+}
+
+function renderWordCard(w) {
+  const el = document.createElement('div');
+  el.className = 'list-card';
+  el.style.flexDirection = 'column';
+
+  function showView() {
+    el.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div class="list-card-body">
+          <div class="list-card-title">${esc(w.vietnamese)} — ${esc(w.english)}</div>
+          ${w.example_vn ? `<div class="list-card-sub">${esc(w.example_vn)}</div>` : ''}
+          ${w.notes ? `<div class="list-card-sub" style="font-style:italic">${esc(w.notes)}</div>` : ''}
+        </div>
+        <button class="edit-btn" style="background:none;border:none;color:var(--muted);font-size:.78rem;cursor:pointer;padding:2px 6px;flex-shrink:0;text-decoration:underline">Edit</button>
+      </div>`;
+    el.querySelector('.edit-btn').addEventListener('click', showEdit);
+  }
+
+  function showEdit() {
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="form-group"><label>Term</label><input class="e-vn" type="text" value="${esc(w.vietnamese)}"></div>
+          <div class="form-group"><label>Definition</label><input class="e-en" type="text" value="${esc(w.english)}"></div>
+        </div>
+        <div class="form-group"><label>Example</label><input class="e-ex" type="text" value="${esc(w.example_vn || '')}"></div>
+        <div class="form-group"><label>Notes</label><input class="e-notes" type="text" value="${esc(w.notes || '')}"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary save-btn" style="padding:6px 16px;min-height:34px;font-size:.85rem">Save</button>
+          <button class="btn btn-secondary cancel-btn" style="padding:6px 16px;min-height:34px;font-size:.85rem">Cancel</button>
+        </div>
+      </div>`;
+    el.querySelector('.cancel-btn').addEventListener('click', showView);
+    el.querySelector('.save-btn').addEventListener('click', async () => {
+      const vn    = el.querySelector('.e-vn').value.trim();
+      const en    = el.querySelector('.e-en').value.trim();
+      const ex    = el.querySelector('.e-ex').value.trim();
+      const notes = el.querySelector('.e-notes').value.trim();
+      if (!vn || !en) return;
+      const btn = el.querySelector('.save-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        await updateWord(selectedDeckId, w.id, { vietnamese: vn, english: en, example_vn: ex, notes });
+        w.vietnamese = vn; w.english = en; w.example_vn = ex; w.notes = notes;
+        showView();
+        showToast('Word updated.');
+      } catch (err) {
+        console.error(err);
+        showToast('Save failed.');
+        btn.disabled = false; btn.textContent = 'Save';
+      }
+    });
+  }
+
+  showView();
+  return el;
 }
 
 function parseCSV(text) {
@@ -493,5 +542,6 @@ function esc(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
+<script>if("serviceWorker"in navigator)navigator.serviceWorker.register("/cultivar/sw.js");</script>
 </body>
 </html>

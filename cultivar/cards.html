@@ -8,6 +8,8 @@
   <link rel="icon" type="image/png" href="cultivarlogo.png">
   <title>My Cards — Cultivar</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="cultivarlogo.png">
 </head>
 <body>
 
@@ -338,23 +340,41 @@ document.getElementById('csv-btn').addEventListener('click', async () => {
   try {
     if (isAdmin) {
       // Admin: Subject,Unit,Subunit,Word/Term,Translation/Definition,Notes/Example
-      const cardType = activeTab === 'subject' ? 'subject' : 'language';
-      const groups = {};
-      for (const r of rows) {
-        const subject = (r[0] || '').trim();
-        const unit    = (r[1] || '').trim();
-        const subunit = (r[2] || '').trim();
-        const col4    = (r[3] || '').trim();
-        const col5    = (r[4] || '').trim();
-        const col6    = (r[5] || '').trim();
-        if (!subject || !unit || !col4 || !col5) continue;
-        const key = `${subject}||${unit}||${subunit}`;
-        if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
-        groups[key].words.push({ card_type: cardType, vietnamese: col4, english: col5, example_vn: col6, notes: '' });
-      }
-      for (const { subject, unit, subunit, words } of Object.values(groups)) {
-        const deckId = await findOrCreateDeck(subject, unit, subunit);
-        added += await bulkAddWordsToDeck(deckId, words);
+      const cardType     = activeTab === 'subject' ? 'subject' : 'language';
+      const targetDeckId = document.getElementById('target-deck')?.value || '';
+
+      if (targetDeckId) {
+        // Specific deck selected — all rows go there, unit/subunit stored on each word
+        const words = [];
+        for (const r of rows) {
+          const unit    = (r[1] || '').trim();
+          const subunit = (r[2] || '').trim();
+          const col4    = (r[3] || '').trim();
+          const col5    = (r[4] || '').trim();
+          const col6    = (r[5] || '').trim();
+          if (!col4 || !col5) continue;
+          words.push({ card_type: cardType, vietnamese: col4, english: col5, example_vn: col6, notes: '', unit, subunit });
+        }
+        added = await bulkAddWordsToDeck(targetDeckId, words);
+      } else {
+        // No deck selected — legacy routing by subject/unit/subunit
+        const groups = {};
+        for (const r of rows) {
+          const subject = (r[0] || '').trim();
+          const unit    = (r[1] || '').trim();
+          const subunit = (r[2] || '').trim();
+          const col4    = (r[3] || '').trim();
+          const col5    = (r[4] || '').trim();
+          const col6    = (r[5] || '').trim();
+          if (!subject || !unit || !col4 || !col5) continue;
+          const key = `${subject}||${unit}||${subunit}`;
+          if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
+          groups[key].words.push({ card_type: cardType, vietnamese: col4, english: col5, example_vn: col6, notes: '', unit, subunit });
+        }
+        for (const { subject, unit, subunit, words } of Object.values(groups)) {
+          const did = await findOrCreateDeck(subject, unit, subunit);
+          added += await bulkAddWordsToDeck(did, words);
+        }
       }
     } else if (activeTab === 'subject') {
       // Student subject vocab: Term,Definition,Example
@@ -431,5 +451,6 @@ function esc(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
+<script>if("serviceWorker"in navigator)navigator.serviceWorker.register("/cultivar/sw.js");</script>
 </body>
 </html>
