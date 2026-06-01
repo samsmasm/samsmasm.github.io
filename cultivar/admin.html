@@ -126,21 +126,39 @@
 
   </div>
 
-  <!-- Bulk CSV import (auto-routes to deck by subject/unit/subunit) -->
+  <!-- Bulk CSV import -->
   <div class="panel">
     <div class="panel-title">📥 Bulk import CSV</div>
     <div class="panel-body">
+      <div class="form-group" style="margin-bottom:10px">
+        <label for="bulk-deck-name">Deck name</label>
+        <input type="text" id="bulk-deck-name" placeholder="Business Management — Unit 5" required>
+      </div>
       <div class="csv-hint">
         Format: <code>Subject,Unit,Subunit,Vietnamese,English,Notes</code><br>
-        Subunit and Notes can be blank. Decks are created automatically if they don't exist.<br>
+        All rows go into the deck above. Unit/Subunit are saved on each word for future grouping. Notes can be blank.<br>
         Header row auto-detected and skipped.
       </div>
       <div class="form-group" style="margin-top:10px">
         <label for="bulk-csv">Paste CSV</label>
-        <textarea id="bulk-csv" rows="6" placeholder="Vietnamese,At home,Beginner,rửa,wash,e.g. rửa tay&#10;Vietnamese,At home,Beginner,lau,wipe or clean,lau bàn"></textarea>
+        <textarea id="bulk-csv" rows="6" placeholder="Business,Unit 5,Investment Appraisal,NPV,Net Present Value,&#10;Business,Unit 5,Investment Appraisal,IRR,Internal Rate of Return,"></textarea>
       </div>
       <p class="error-msg hidden" id="bulk-error"></p>
       <button class="btn btn-primary btn-full" id="bulk-btn">Import words</button>
+    </div>
+  </div>
+
+  <!-- Mass delete decks -->
+  <div class="panel">
+    <div class="panel-title">🗑️ Mass delete decks</div>
+    <div class="panel-body">
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px">Select decks to permanently delete.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-secondary" id="mass-sel-all" style="font-size:.8rem;padding:5px 12px;min-height:32px">Select all</button>
+        <button class="btn btn-secondary" id="mass-sel-none" style="font-size:.8rem;padding:5px 12px;min-height:32px">None</button>
+      </div>
+      <div id="mass-deck-list" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px;margin-bottom:12px"></div>
+      <button class="btn btn-full" id="mass-delete-btn" style="background:var(--incorrect);border-color:var(--incorrect);color:#fff" disabled>Delete selected (0)</button>
     </div>
   </div>
 
@@ -158,13 +176,15 @@
 <script type="module">
 import { auth } from './js/config.js';
 import {
-  getUser, getAllDecks, createDeck, findOrCreateDeck,
+  getUser, getAllDecks, createDeck, findOrCreateDeck, findOrCreateDeckByName,
   addWordToDeck, bulkAddWordsToDeck, getDeckWords, deleteDeck
 } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 let uid = null;
 let selectedDeckId = null;
+let massDecks = [];
+let massSelected = new Set();
 
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
@@ -177,11 +197,12 @@ onAuthStateChanged(auth, async user => {
   }
 
   document.getElementById('admin-view').classList.remove('hidden');
-  await refreshDeckList();
+  await refreshAllDeckViews();
 });
 
-async function refreshDeckList() {
+async function refreshAllDeckViews() {
   const decks = await getAllDecks();
+  // Dropdown
   const sel = document.getElementById('deck-select');
   const prev = sel.value;
   sel.innerHTML = '<option value="">— choose a deck —</option>';
@@ -192,6 +213,39 @@ async function refreshDeckList() {
     sel.appendChild(opt);
   }
   if (prev) sel.value = prev;
+  // Mass delete list
+  massDecks = decks;
+  renderMassDecks();
+}
+
+function renderMassDecks() {
+  const list = document.getElementById('mass-deck-list');
+  list.innerHTML = '';
+  for (const d of massDecks) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;border-radius:6px';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = massSelected.has(d.id);
+    cb.style.flexShrink = '0';
+    cb.addEventListener('change', () => {
+      if (cb.checked) massSelected.add(d.id); else massSelected.delete(d.id);
+      updateMassDeleteBtn();
+    });
+    const text = document.createElement('span');
+    text.style.fontSize = '.9rem';
+    text.textContent = `${d.name} (${d.word_count ?? 0} words)`;
+    row.appendChild(cb);
+    row.appendChild(text);
+    list.appendChild(row);
+  }
+  updateMassDeleteBtn();
+}
+
+function updateMassDeleteBtn() {
+  const btn = document.getElementById('mass-delete-btn');
+  btn.textContent = `Delete selected (${massSelected.size})`;
+  btn.disabled = massSelected.size === 0;
 }
 
 // Create deck
@@ -208,7 +262,7 @@ document.getElementById('deck-form').addEventListener('submit', async e => {
       document.getElementById('deck-subunit').value.trim()
     );
     e.target.reset();
-    await refreshDeckList();
+    await refreshAllDeckViews();
     document.getElementById('deck-select').value = id;
     document.getElementById('deck-select').dispatchEvent(new Event('change'));
     showToast('Deck created!');
@@ -234,7 +288,7 @@ document.getElementById('delete-deck-btn').addEventListener('click', async () =>
     await deleteDeck(selectedDeckId);
     selectedDeckId = null;
     document.getElementById('word-section').classList.add('hidden');
-    await refreshDeckList();
+    await refreshAllDeckViews();
     showToast('Deck deleted.');
   } catch (err) {
     console.error(err);
@@ -269,7 +323,7 @@ document.getElementById('word-form').addEventListener('submit', async e => {
     e.target.reset();
     showToast('Word added!');
     await loadWords();
-    await refreshDeckList();
+    await refreshAllDeckViews();
   } catch (err) {
     console.error(err);
     showToast('Failed to add word.');
@@ -277,47 +331,48 @@ document.getElementById('word-form').addEventListener('submit', async e => {
   btn.disabled = false; btn.textContent = 'Add word';
 });
 
-// Bulk CSV import — auto-routes rows to decks by subject/unit/subunit
+// Bulk CSV import — all rows go into one named deck
 document.getElementById('bulk-btn').addEventListener('click', async () => {
+  const deckName = document.getElementById('bulk-deck-name').value.trim();
   const raw = document.getElementById('bulk-csv').value.trim();
   const errEl = document.getElementById('bulk-error');
   errEl.classList.add('hidden');
+
+  if (!deckName) {
+    errEl.textContent = 'Enter a deck name above.';
+    errEl.classList.remove('hidden');
+    return;
+  }
   if (!raw) return;
 
   const rows = parseCSV(raw);
-  const groups = {};
+  const words = [];
   for (const r of rows) {
-    const subject = (r[0] || '').trim();
     const unit    = (r[1] || '').trim();
     const subunit = (r[2] || '').trim();
     const vn      = (r[3] || '').trim();
     const en      = (r[4] || '').trim();
     const notes   = (r[5] || '').trim();
-    if (!subject || !unit || !vn || !en) continue;
-    const key = `${subject}||${unit}||${subunit}`;
-    if (!groups[key]) groups[key] = { subject, unit, subunit, words: [] };
-    groups[key].words.push({ vietnamese: vn, english: en, notes });
+    if (!vn || !en) continue;
+    words.push({ vietnamese: vn, english: en, notes, unit, subunit });
   }
 
-  const totalWords = Object.values(groups).reduce((n, g) => n + g.words.length, 0);
-  if (totalWords === 0) {
-    errEl.textContent = 'No valid rows found. Need Subject, Unit, Vietnamese, English at minimum.';
+  if (words.length === 0) {
+    errEl.textContent = 'No valid rows found. Need Vietnamese and English at minimum.';
     errEl.classList.remove('hidden');
     return;
   }
 
   const btn = document.getElementById('bulk-btn');
-  btn.disabled = true; btn.textContent = `Importing ${totalWords} words…`;
+  btn.disabled = true; btn.textContent = `Importing ${words.length} words…`;
 
   try {
-    let added = 0;
-    for (const { subject, unit, subunit, words } of Object.values(groups)) {
-      const deckId = await findOrCreateDeck(subject, unit, subunit);
-      added += await bulkAddWordsToDeck(deckId, words);
-    }
+    const deckId = await findOrCreateDeckByName(deckName);
+    const added = await bulkAddWordsToDeck(deckId, words);
     document.getElementById('bulk-csv').value = '';
-    showToast(`Imported ${added} words across ${Object.keys(groups).length} deck(s)`);
-    await refreshDeckList();
+    document.getElementById('bulk-deck-name').value = '';
+    showToast(`Imported ${added} words into "${deckName}"`);
+    await refreshAllDeckViews();
   } catch (err) {
     console.error(err);
     showToast('Import failed.');
@@ -326,6 +381,48 @@ document.getElementById('bulk-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('refresh-words-btn').addEventListener('click', loadWords);
+
+// Mass delete
+document.getElementById('mass-sel-all').addEventListener('click', () => {
+  massSelected = new Set(massDecks.map(d => d.id));
+  renderMassDecks();
+});
+
+document.getElementById('mass-sel-none').addEventListener('click', () => {
+  massSelected = new Set();
+  renderMassDecks();
+});
+
+document.getElementById('mass-delete-btn').addEventListener('click', async () => {
+  if (massSelected.size === 0) return;
+  const names = massDecks.filter(d => massSelected.has(d.id)).map(d => d.name);
+  const preview = names.slice(0, 10).join('\n') + (names.length > 10 ? `\n...and ${names.length - 10} more` : '');
+  if (!confirm(`Delete ${massSelected.size} deck(s)?\n\n${preview}\n\nThis is permanent and cannot be undone.`)) return;
+  if (!confirm(`Are you absolutely sure? ${massSelected.size} deck(s) will be permanently deleted.`)) return;
+
+  const btn = document.getElementById('mass-delete-btn');
+  btn.disabled = true;
+  const toDelete = new Set(massSelected);
+  let deleted = 0;
+  try {
+    for (const id of toDelete) {
+      await deleteDeck(id);
+      deleted++;
+      btn.textContent = `Deleting… (${deleted}/${toDelete.size})`;
+    }
+    massSelected = new Set();
+    showToast(`Deleted ${deleted} deck(s).`);
+    if (selectedDeckId && toDelete.has(selectedDeckId)) {
+      selectedDeckId = null;
+      document.getElementById('word-section').classList.add('hidden');
+    }
+    await refreshAllDeckViews();
+  } catch (err) {
+    console.error(err);
+    showToast('Delete failed.');
+    await refreshAllDeckViews();
+  }
+});
 
 async function loadWords() {
   if (!selectedDeckId) return;

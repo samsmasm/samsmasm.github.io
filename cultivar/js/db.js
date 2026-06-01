@@ -540,6 +540,13 @@ export async function findOrCreateDeck(subject, unit, subunit) {
   return createDeck(name, '', subject, unit, subunit);
 }
 
+export async function findOrCreateDeckByName(name) {
+  const decks = await getAllDecks();
+  const match = decks.find(d => d.name === name);
+  if (match) return match.id;
+  return createDeck(name, '', '', '', '');
+}
+
 export async function createDeck(name, description, subject = '', unit = '', subunit = '') {
   const ref = doc(collection(db, 'decks'));
   await setDoc(ref, {
