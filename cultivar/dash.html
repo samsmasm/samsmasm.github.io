@@ -96,7 +96,7 @@
 
 <script type="module">
 import { auth } from './js/config.js';
-import { getUser, getPublicDecks, resetDeckProgress, getUserSettings, updateUserSettings,
+import { getUser, getPublicDecks, getPersonalCards, resetDeckProgress, getUserSettings, updateUserSettings,
          getDeckWordsWithProgress, setWordStatus, bulkSetWordStatus, moveWordBox,
          bulkMoveWordBox, removeWordFromCycle, boxLabel } from './js/db.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
@@ -107,7 +107,18 @@ onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = 'index.html'; return; }
   uid = user.uid;
 
-  const [userData, decks, settings] = await Promise.all([getUser(uid), getPublicDecks(), getUserSettings(uid)]);
+  let userData, decks, settings, personalCards;
+  try {
+    [userData, decks, settings, personalCards] = await Promise.all([
+      getUser(uid), getPublicDecks(), getUserSettings(uid), getPersonalCards(uid)
+    ]);
+  } catch (e) {
+    console.error('dash load error', e);
+    document.getElementById('dash-deck-buttons').innerHTML =
+      '<p style="color:var(--muted);font-size:.9rem">Failed to load. Check your connection and reload.</p>';
+    return;
+  }
+
   document.getElementById('setting-daily-new').value = settings.daily_new;
   document.getElementById('setting-session-max').value = settings.session_max;
 
@@ -121,8 +132,10 @@ onAuthStateChanged(auth, async user => {
     btn.dataset.deckId = id;
     btn.textContent = name;
     btn.addEventListener('click', async () => {
-      btnContainer.querySelectorAll('button').forEach(b => b.className = 'btn btn-secondary btn-full');
-      btnContainer.querySelectorAll('button').forEach(b => b.style.cssText = 'text-align:left;justify-content:flex-start');
+      btnContainer.querySelectorAll('button').forEach(b => {
+        b.className = 'btn btn-secondary btn-full';
+        b.style.cssText = 'text-align:left;justify-content:flex-start';
+      });
       btn.className = 'btn btn-primary btn-full';
       currentDeckId = id;
       currentDeckName = name;
