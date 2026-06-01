@@ -1,4 +1,4 @@
-const CACHE = 'cultivar-v3';
+const CACHE = 'cultivar-v4';
 const PRECACHE = [
   '/cultivar/',
   '/cultivar/index.html',
@@ -17,7 +17,12 @@ const PRECACHE = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));
+  // cache:'reload' bypasses the browser HTTP cache so we always get fresh files
+  e.waitUntil(
+    caches.open(CACHE).then(c =>
+      c.addAll(PRECACHE.map(url => new Request(url, { cache: 'reload' })))
+    )
+  );
   self.skipWaiting();
 });
 
