@@ -23,12 +23,7 @@
 
 <main class="main-pad">
 
-  <div class="form-group" style="margin-bottom:24px">
-    <label for="dash-deck-select">Deck</label>
-    <select id="dash-deck-select">
-      <option value="">— choose a deck —</option>
-    </select>
-  </div>
+  <div id="dash-deck-buttons" style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px"></div>
 
   <div id="dash-content" class="hidden">
 
@@ -117,14 +112,29 @@ onAuthStateChanged(auth, async user => {
   document.getElementById('setting-session-max').value = settings.session_max;
 
   const subscribed = new Set(userData?.subscribed_decks || []);
-  const sel = document.getElementById('dash-deck-select');
+  const btnContainer = document.getElementById('dash-deck-buttons');
 
-  // Personal cards option
-  sel.appendChild(new Option('Personal cards', 'personal'));
+  const addDeckBtn = (id, name) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-full';
+    btn.style.cssText = 'text-align:left;justify-content:flex-start';
+    btn.dataset.deckId = id;
+    btn.textContent = name;
+    btn.addEventListener('click', async () => {
+      btnContainer.querySelectorAll('button').forEach(b => b.className = 'btn btn-secondary btn-full');
+      btnContainer.querySelectorAll('button').forEach(b => b.style.cssText = 'text-align:left;justify-content:flex-start');
+      btn.className = 'btn btn-primary btn-full';
+      currentDeckId = id;
+      currentDeckName = name;
+      document.getElementById('dash-content').classList.remove('hidden');
+      await loadWordList();
+    });
+    btnContainer.appendChild(btn);
+  };
 
-  // Subscribed decks
+  addDeckBtn('personal', 'Personal cards');
   for (const d of decks.filter(d => subscribed.has(d.id))) {
-    sel.appendChild(new Option(d.name, d.id));
+    addDeckBtn(d.id, d.name);
   }
 });
 
@@ -140,15 +150,10 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
   btn.disabled = false; btn.textContent = 'Save settings';
 });
 
-let currentDeckId = null;
-let selectedIds   = new Set();
-let lastCheckedIdx = -1;
-
-document.getElementById('dash-deck-select').addEventListener('change', async e => {
-  currentDeckId = e.target.value || null;
-  document.getElementById('dash-content').classList.toggle('hidden', !currentDeckId);
-  if (currentDeckId) await loadWordList();
-});
+let currentDeckId   = null;
+let currentDeckName = '';
+let selectedIds     = new Set();
+let lastCheckedIdx  = -1;
 
 // ── Selection bar ─────────────────────────────────────────────────────────────
 
@@ -514,8 +519,7 @@ function esc(str) {
 }
 
 document.getElementById('reset-deck-btn').addEventListener('click', async () => {
-  const sel = document.getElementById('dash-deck-select');
-  const deckName = sel.selectedOptions[0]?.text || 'this deck';
+  const deckName = currentDeckName || 'this deck';
 
   const first = confirm(`Reset progress for "${deckName}"?\n\nYour SRS history for all words in this deck will be permanently deleted. You'll start from scratch with this deck.`);
   if (!first) return;
@@ -527,7 +531,7 @@ document.getElementById('reset-deck-btn').addEventListener('click', async () => 
   btn.disabled = true;
 
   try {
-    await resetDeckProgress(uid, sel.value);
+    await resetDeckProgress(uid, currentDeckId);
     showToast(`Progress reset for "${deckName}"`);
     btn.textContent = 'Progress reset';
   } catch (err) {
