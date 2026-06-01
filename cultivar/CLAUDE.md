@@ -23,7 +23,7 @@ cards.html     - Add cards: Language vs Subject-vocab tabs; CSV import; admin ca
 dash.html      - Dashboard: per-deck word management (boxes, statuses, multi-select), daily-limit settings, per-deck reset
 revise.html    - Cram Mode setup: pick decks (grouped subject→unit), reset cram progress
 review.html    - Session player for ALL three modes (SRS, review-only, cram) via query params
-admin.html     - Admin only: create decks, bulk CSV import (auto-routes to decks), delete deck
+admin.html     - Admin only: create decks, bulk CSV import (single deck), mass delete decks
 firestore.rules - security rules (paste into console)
 SETUP.md       - Firebase setup steps for humans
 ```
@@ -32,12 +32,12 @@ Bottom nav (all pages): Home / Decks / Revise / Dash. `cards.html` is reached fr
 
 ## Data model
 
-A **deck = one (subject, unit, subunit) combination**. `findOrCreateDeck` makes a deck per combo; deck `name` defaults to the subunit. There is no category field on words - "units/subunits" ARE decks. (The dashboard groups words by `word.category`, which is currently unset, so everything sits under one group; the category UI is built but dormant.)
+A **deck = one named collection of words**. Decks no longer map 1:1 to subject/unit/subunit — instead, unit and subunit are stored on each word for grouping within a deck. `findOrCreateDeckByName` is used for bulk CSV import (finds by name or creates new). The old `findOrCreateDeck` (by subject/unit/subunit) still exists for legacy use.
 
 ```
 decks/{deckId}
   name, description
-  subject, unit, subunit
+  subject, unit, subunit      ← still present but no longer the primary grouping key
   is_public: true
   word_count                  ← denormalised, increment() on add
   created_by, created_at
@@ -45,6 +45,7 @@ decks/{deckId}
 decks/{deckId}/words/{wordId}
   vietnamese, english         ← generic front/back (also used for term/definition)
   notes                       ← optional
+  unit, subunit               ← set by bulk CSV import; used for grouping on the dashboard
   card_type                   ← optional 'subject' (personal subject-vocab cards)
   example_vn, example_en      ← optional (personal cards)
   created_at
@@ -88,6 +89,30 @@ Each word has TWO progress records (one per direction). `todayStr()` uses **loca
 
 **Review session player (review.html)** handles all three modes by branching on `mode` param. Tap card to flip (and tap back to unflip). Wrong/partial cards recycle within the session.
 
+## Admin page (admin.html)
+
+**Create deck:** manual form with name, description, subject/unit/subunit fields.
+
+**Bulk CSV import:** admin enters a deck name; all rows go into that one deck (creating it if the name is new, adding to it if it already exists). Format: `Subject,Unit,Subunit,Vietnamese,English,Notes`. Unit and Subunit are stored on each word for dashboard grouping; they do NOT create separate decks. Header row auto-detected and skipped.
+
+**Mass delete:** scrollable checklist of all decks with checkboxes. Select all / None buttons. "Delete selected (N)" runs two confirm dialogs then deletes in sequence.
+
+**Manage deck words:** dropdown to select a deck, then single-word add form and word list with refresh.
+
+## Dashboard (dash.html)
+
+Words are grouped in a two-level hierarchy:
+- **Unit header** (bold, brand colour): covers all words sharing `word.unit`. Has a select-all checkbox and "Ask all N pending" button.
+- **Subunit header** (indented, muted): groups words by `word.subunit` within a unit. Has its own select-all checkbox.
+- Legacy words without a `unit` field are grouped flat by `word.subunit || word.category || ''`.
+
+Both unit and subunit headers are **collapsible** (click header to toggle, chevron shows state). If a deck has more than 250 words and more than one top-level group, it loads with all groups collapsed by default.
+
+**Selection bar** (appears above nav when words are checked):
+- `← Earlier` / `Later →`: bulk move selected words between SRS boxes
+- `Ask soon` / `Skip` / `Never`: bulk set word status for selected words
+- Works on both introduced and non-introduced words
+
 ## Conventions
 
 - All Firestore access goes through `js/db.js`. Pages never call Firestore directly.
@@ -95,7 +120,7 @@ Each word has TWO progress records (one per direction). `todayStr()` uses **loca
 - Progress writes on answers are fire-and-forget (`updateProgress(...).catch(console.error)`).
 - `is_admin` can only be set manually in the console (Firestore rule blocks the app from setting it).
 - Firestore rules allow a user to update their own doc EXCEPT `is_admin`; deck words are admin-write, auth-read.
-- Bulk CSV import: admin format is `Subject,Unit,Subunit,Vietnamese,English,Notes` (auto-routes/creates decks). Personal cards: Language tab `Other,Your,ExampleOther,ExampleYours,Notes`; Subject tab `Term,Definition,Example`.
+- Bulk CSV import: admin format is `Subject,Unit,Subunit,Vietnamese,English,Notes` (all rows to one named deck). Personal cards: Language tab `Other,Your,ExampleOther,ExampleYours,Notes`; Subject tab `Term,Definition,Example`.
 - **No em dashes in user-facing copy** (project-wide writing rule).
 - Always `git push` immediately after committing.
 
