@@ -924,8 +924,27 @@ const OPENING_DOUBLE = {
 // Quality priority order for single-quality-in-opening selection
 const QUAL_PRIORITY = ['analytical','original','bold','critical','passionate','focused_questions','focused_questions_long'];
 
+function buildStepsText(n, p, pairs){
+  if(!pairs.length) return '';
+  const clauses   = pairs.map(x => x.clause);
+  const activeIds = pairs.map(x => x.id);
+  const needsSerial = clauses.slice(0,-1).some(c => /\band\b/.test(c));
+  let text;
+  if(clauses.length===1)      text = `${n} would benefit from ${clauses[0]}.`;
+  else if(clauses.length===2) text = `${n} would benefit from ${clauses[0]}${needsSerial?', and':' and'} ${clauses[1]}.`;
+  else                        text = `${n} would benefit from ${clauses.slice(0,-1).join(', ')}, and ${clauses[clauses.length-1]}.`;
+  const impacts=[];
+  if(activeIds.some(s=>['read','current'].includes(s)))         impacts.push(`deepen ${p.pos} understanding of the subject`);
+  if(activeIds.some(s=>['focus','prep'].includes(s)))           impacts.push(`strengthen ${p.pos} engagement`);
+  if(activeIds.some(s=>['questions','support'].includes(s)))    impacts.push(`refine ${p.pos} approach`);
+  if(activeIds.some(s=>['structure','assessment'].includes(s))) impacts.push(`communicate ${p.pos} ideas more effectively`);
+  if(activeIds.some(s=>['verbal','collab'].includes(s)))        impacts.push(`grow in confidence`);
+  if(impacts.length) text += ` This will help ${p.obj} ${impacts[0]}.`;
+  return text;
+}
+
 // ── Bank-driven generation (mirrors hardcoded logic but uses uploaded templates) ──
-function generateFromBank(student, bankEntry){
+function generateFromBank(student, bankEntry, trim = false){
   const bank = bankEntry.bank;
   const p    = P[student.gender] || P.N;
   const n    = student.first;
@@ -988,30 +1007,11 @@ function generateFromBank(student, bankEntry){
     .map(id => { const tmpl = bank.next_steps?.[id]; return tmpl ? {id, clause: tok(tmpl)} : null; })
     .filter(Boolean);
 
-  function buildStepsText(pairs){
-    if(!pairs.length) return '';
-    const clauses   = pairs.map(x => x.clause);
-    const activeIds = pairs.map(x => x.id);
-    const needsSerial = clauses.slice(0,-1).some(c => /\band\b/.test(c));
-    let text;
-    if(clauses.length===1)      text = `${n} would benefit from ${clauses[0]}.`;
-    else if(clauses.length===2) text = `${n} would benefit from ${clauses[0]}${needsSerial?', and':' and'} ${clauses[1]}.`;
-    else                        text = `${n} would benefit from ${clauses.slice(0,-1).join(', ')}, and ${clauses[clauses.length-1]}.`;
-    const impacts=[];
-    if(activeIds.some(s=>['read','current'].includes(s)))         impacts.push(`deepen ${p.pos} understanding of the subject`);
-    if(activeIds.some(s=>['focus','prep'].includes(s)))           impacts.push(`strengthen ${p.pos} engagement`);
-    if(activeIds.some(s=>['questions','support'].includes(s)))    impacts.push(`refine ${p.pos} approach`);
-    if(activeIds.some(s=>['structure','assessment'].includes(s))) impacts.push(`communicate ${p.pos} ideas more effectively`);
-    if(activeIds.some(s=>['verbal','collab'].includes(s)))        impacts.push(`grow in confidence`);
-    if(impacts.length) text += ` This will help ${p.obj} ${impacts[0]}.`;
-    return text;
-  }
-
   // Predicted grade
   const gradeText = (grade && bank.predicted_grade?.[grade]) ? tok(bank.predicted_grade[grade]) : '';
 
   // Full untrimmed assembly (order: opening, perf, qual, steps, closer, grade)
-  const fullComment = [openingText, perfText, qualText, buildStepsText(stepPairs), progressNote, gradeText].filter(Boolean).join(' ');
+  const fullComment = [openingText, perfText, qualText, buildStepsText(n, p, stepPairs), progressNote, gradeText].filter(Boolean).join(' ');
 
   if(!trim) return fullComment;
 
@@ -1019,7 +1019,7 @@ function generateFromBank(student, bankEntry){
   const dropped = [];
   let cur = {
     opening: openingText, perf: perfText, qual: qualText,
-    stepPairs: [...stepPairs], steps: buildStepsText(stepPairs),
+    stepPairs: [...stepPairs], steps: buildStepsText(n, p, stepPairs),
     closer: progressNote, grade: gradeText
   };
   const assemble = () =>
@@ -1030,7 +1030,7 @@ function generateFromBank(student, bankEntry){
     if(cur.stepPairs.length >= 2){
       dropped.push('second next step');
       cur.stepPairs = [cur.stepPairs[0]];
-      cur.steps = buildStepsText(cur.stepPairs);
+      cur.steps = buildStepsText(n, p, cur.stepPairs);
       comment = assemble();
     }
     if(comment.length > 500 && cur.qual){
