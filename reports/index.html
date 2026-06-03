@@ -288,6 +288,13 @@
   .version-pill.active { background: var(--primary); border-color: var(--primary); color: white; font-weight: 600; }
   .version-pill:not(.active):hover { border-color: var(--primary); color: var(--primary); }
 
+  /* ── Trim warning ── */
+  .trim-warn {
+    margin-top: 8px; padding: 6px 10px;
+    background: var(--warning-light); border: 1px solid var(--warning);
+    border-radius: 6px; font-size: 11.5px; color: #92400e; line-height: 1.5;
+  }
+
   /* ── Alt comment (bracketed version) ── */
   .alt-comment {
     margin-top: 10px; padding: 10px 14px;
@@ -933,7 +940,7 @@ function generateFromBank(student, bankEntry){
   const steps = t.nextSteps       || [];
   const grade = (t.predictedGrade || [])[0] || null;
 
-  if(!disp.length && !perf.length) return '';
+  if(!disp.length && !perf.length) return trim ? {comment:'', dropped:[]} : '';
 
   const dispForOpening = disp.length ? disp : ['quiet'];
   const qualsForElab   = quals.filter(q => q !== 'strong_progress');
@@ -957,12 +964,12 @@ function generateFromBank(student, bankEntry){
     perfText = tok(bank.performance?.[pr]?.[et] || '');
   }
 
-  // Strong-progress note
+  // Strong-progress note (closer)
   const progressNote = quals.includes('strong_progress')
     ? tok(bank.progress_note || '[THEIR_CAP] progress this year has been strong, showing resilience and a conscious commitment to [THEIR] own development.')
     : '';
 
-  // Quality elaboration (same threshold logic as hardcoded version)
+  // Quality elaboration
   const hasDoubleDisp  = disp.length >= 2;
   const qualElabNeeded = hasDoubleDisp ? qualsForElab.length >= 1 : qualsForElab.length >= 2;
   let qualText = '';
@@ -976,31 +983,80 @@ function generateFromBank(student, bankEntry){
     }
   }
 
-  // Next steps
-  let stepsText = '';
-  if(steps.length && bank.next_steps){
-    const clauses = steps.map(id => { const tmpl = bank.next_steps[id]; return tmpl ? tok(tmpl) : null; }).filter(Boolean);
-    if(clauses.length){
-      const needsSerial = clauses.slice(0,-1).some(c => /\band\b/.test(c));
-      if(clauses.length===1)      stepsText = `${n} would benefit from ${clauses[0]}.`;
-      else if(clauses.length===2) stepsText = `${n} would benefit from ${clauses[0]}${needsSerial?', and':' and'} ${clauses[1]}.`;
-      else                        stepsText = `${n} would benefit from ${clauses.slice(0,-1).join(', ')}, and ${clauses[clauses.length-1]}.`;
-      const impacts=[];
-      if(steps.some(s=>['read','current'].includes(s)))         impacts.push(`deepen ${p.pos} understanding of the subject`);
-      if(steps.some(s=>['focus','prep'].includes(s)))           impacts.push(`strengthen ${p.pos} engagement`);
-      if(steps.some(s=>['questions','support'].includes(s)))    impacts.push(`refine ${p.pos} approach`);
-      if(steps.some(s=>['structure','assessment'].includes(s))) impacts.push(`communicate ${p.pos} ideas more effectively`);
-      if(steps.some(s=>['verbal','collab'].includes(s)))        impacts.push(`grow in confidence`);
-      if(impacts.length) stepsText += ` This will help ${p.obj} ${impacts[0]}.`;
-    }
+  // Next steps — as pairs so trimming can drop the second independently
+  const stepPairs = steps
+    .map(id => { const tmpl = bank.next_steps?.[id]; return tmpl ? {id, clause: tok(tmpl)} : null; })
+    .filter(Boolean);
+
+  function buildStepsText(pairs){
+    if(!pairs.length) return '';
+    const clauses   = pairs.map(x => x.clause);
+    const activeIds = pairs.map(x => x.id);
+    const needsSerial = clauses.slice(0,-1).some(c => /\band\b/.test(c));
+    let text;
+    if(clauses.length===1)      text = `${n} would benefit from ${clauses[0]}.`;
+    else if(clauses.length===2) text = `${n} would benefit from ${clauses[0]}${needsSerial?', and':' and'} ${clauses[1]}.`;
+    else                        text = `${n} would benefit from ${clauses.slice(0,-1).join(', ')}, and ${clauses[clauses.length-1]}.`;
+    const impacts=[];
+    if(activeIds.some(s=>['read','current'].includes(s)))         impacts.push(`deepen ${p.pos} understanding of the subject`);
+    if(activeIds.some(s=>['focus','prep'].includes(s)))           impacts.push(`strengthen ${p.pos} engagement`);
+    if(activeIds.some(s=>['questions','support'].includes(s)))    impacts.push(`refine ${p.pos} approach`);
+    if(activeIds.some(s=>['structure','assessment'].includes(s))) impacts.push(`communicate ${p.pos} ideas more effectively`);
+    if(activeIds.some(s=>['verbal','collab'].includes(s)))        impacts.push(`grow in confidence`);
+    if(impacts.length) text += ` This will help ${p.obj} ${impacts[0]}.`;
+    return text;
   }
 
   // Predicted grade
-  const gradeText = (grade && bank.predicted_grade?.[grade])
-    ? tok(bank.predicted_grade[grade])
-    : '';
+  const gradeText = (grade && bank.predicted_grade?.[grade]) ? tok(bank.predicted_grade[grade]) : '';
 
-  return [openingText, perfText, progressNote, qualText, stepsText, gradeText].filter(Boolean).join(' ');
+  // Full untrimmed assembly (order: opening, perf, qual, steps, closer, grade)
+  const fullComment = [openingText, perfText, qualText, buildStepsText(stepPairs), progressNote, gradeText].filter(Boolean).join(' ');
+
+  if(!trim) return fullComment;
+
+  // ── Trimming (on request only — predicted grade is never dropped) ─────────
+  const dropped = [];
+  let cur = {
+    opening: openingText, perf: perfText, qual: qualText,
+    stepPairs: [...stepPairs], steps: buildStepsText(stepPairs),
+    closer: progressNote, grade: gradeText
+  };
+  const assemble = () =>
+    [cur.opening, cur.perf, cur.qual, cur.steps, cur.closer, cur.grade].filter(Boolean).join(' ');
+  let comment = assemble();
+
+  if(comment.length > 500){
+    if(cur.stepPairs.length >= 2){
+      dropped.push('second next step');
+      cur.stepPairs = [cur.stepPairs[0]];
+      cur.steps = buildStepsText(cur.stepPairs);
+      comment = assemble();
+    }
+    if(comment.length > 500 && cur.qual){
+      dropped.push('quality phrase');
+      cur.qual = '';
+      comment = assemble();
+    }
+    if(comment.length > 500 && cur.closer){
+      dropped.push('progress note');
+      cur.closer = '';
+      comment = assemble();
+    }
+    if(comment.length > 500 && cur.steps){
+      dropped.push('next step');
+      cur.steps = '';
+      comment = assemble();
+    }
+    if(comment.length > 500){
+      dropped.push('truncated');
+      const sub = comment.slice(0, 500);
+      const lastDot = sub.lastIndexOf('.');
+      comment = lastDot > 0 ? sub.slice(0, lastDot + 1) : sub;
+    }
+  }
+
+  return {comment, dropped};
 }
 
 function opening(name, disp, quals, p, subj){
@@ -1144,9 +1200,22 @@ function nextSteps(name, steps, p, subj){
 
 // ── Master generate ───────────────────────────────────────────────────────
 function generate(student){
-  const bankEntry = findBankForClass(student.cls);
-  if(!bankEntry) return '';
-  return generateFromBank(student, bankEntry);
+  const b = findBankForClass(student.cls);
+  return b ? generateFromBank(student, b) : '';
+}
+
+function autoShortenComment(id){
+  const s = load();
+  const st = (s.students||[]).find(x=>x.id===id);
+  if(!st) return;
+  const b = findBankForClass(st.cls);
+  if(!b) return;
+  const {comment, dropped} = generateFromBank(st, b, true);
+  update(s2=>{
+    const student = (s2.students||[]).find(x=>x.id===id);
+    if(student){ student.editedComment=comment; student.useEdited=true; }
+  });
+  renderComments();
 }
 
 function isStacked(t){ return (t.performance||[]).length>1 || (t.workEthic||[]).length>1; }
@@ -1822,6 +1891,7 @@ function renderComments(){
               <button class="review-btn ${st.reviewLater?'on':''}" onclick="toggleReview('${st.id}',event)" title="${st.reviewLater?'Remove flag':'Flag for review'}">★</button>
               ${versionPills}
               <button class="btn btn-ghost btn-sm" onclick="goToStudent('${st.id}')">Edit traits</button>
+              ${overCap && !useEdited && !isEditing ? `<button class="btn btn-ghost btn-sm" style="color:var(--warning)" onclick="autoShortenComment('${st.id}')">Auto shorten</button>` : ''}
               ${configured && !isEditing ? `<button class="btn btn-ghost btn-sm" onclick="startEdit('${st.id}')">✏ Edit</button>` : ''}
               ${isEditing ? `<button class="btn btn-primary btn-sm" onclick="saveEdit('${st.id}')">Save</button>
                              <button class="btn btn-ghost btn-sm" onclick="discardEdit('${st.id}')">Discard</button>` : ''}
