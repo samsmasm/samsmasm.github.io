@@ -463,8 +463,38 @@
       <div class="filter-pills" id="comment-filters"></div>
       <div class="row gap-8">
         <span id="export-progress" style="font-size:12px;color:var(--text-muted)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="toggleFindReplace()">Find &amp; Replace</button>
         <button class="btn btn-ghost btn-sm" onclick="exportAll()">⬇ Export configured</button>
       </div>
+    </div>
+    <div id="find-replace-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px">
+
+      <!-- LLM bulk edit -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--text)">Bulk edit with an LLM</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Export all comments as JSON, paste into an LLM with your instruction (e.g. "change all verbs to past tense"), paste the result back.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-ghost btn-sm" onclick="exportCommentsForLLM()">1. Export comments</button>
+          <span id="llm-msg" style="font-size:12px;color:var(--text-muted);align-self:center"></span>
+        </div>
+        <textarea id="llm-export-area" style="display:none;width:100%;height:120px;padding:8px 10px;font-size:11.5px;font-family:monospace;border:1px solid var(--border);border-radius:6px;resize:vertical;margin-bottom:10px;color:var(--text-muted)" readonly></textarea>
+        <textarea id="llm-import-area" placeholder="2. Paste transformed JSON here…" style="width:100%;height:100px;padding:8px 10px;font-size:12px;font-family:monospace;border:1px solid var(--border);border-radius:6px;resize:vertical;margin-bottom:8px"></textarea>
+        <button class="btn btn-primary btn-sm" onclick="importCommentsFromLLM()">3. Import &amp; apply</button>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">Find &amp; Replace</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="fr-find" type="text" placeholder="Find…" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+          <input id="fr-replace" type="text" placeholder="Replace with…" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+          <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="fr-case"> Case sensitive
+          </label>
+          <button class="btn btn-primary btn-sm" onclick="doFindReplace()">Replace all</button>
+          <span id="fr-msg" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
+      </div>
+
     </div>
     <div id="comment-list"></div>
   </div>
@@ -1734,6 +1764,88 @@ function renderComments(){
 }
 
 function setCommentFilter(f){ commentFilter=f; renderComments(); }
+
+// ── Find & Replace / Bulk LLM edit ───────────────────────────────────────
+function toggleFindReplace(){
+  const p = document.getElementById('find-replace-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function doFindReplace(){
+  const find    = document.getElementById('fr-find').value;
+  const replace = document.getElementById('fr-replace').value;
+  const caseSensitive = document.getElementById('fr-case').checked;
+  const msg = document.getElementById('fr-msg');
+  if(!find){ msg.textContent = 'Enter a search term.'; msg.style.color='var(--text-muted)'; return; }
+  const escaped = find.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re = new RegExp(escaped, caseSensitive ? 'g' : 'gi');
+  let count = 0;
+  update(s=>{
+    (s.students||[]).forEach(st=>{
+      const active = (st.useEdited && st.editedComment) ? st.editedComment : generate(st);
+      if(!active) return;
+      const matches = active.match(re);
+      if(matches){
+        count += matches.length;
+        st.editedComment = active.replace(re, replace);
+        st.useEdited = true;
+      }
+    });
+  });
+  msg.textContent = count ? `Replaced ${count} occurrence${count!==1?'s':''}.` : 'No matches found.';
+  msg.style.color = count ? 'var(--success)' : 'var(--text-muted)';
+  renderComments();
+}
+
+function exportCommentsForLLM(){
+  const s = load();
+  const data = (s.students||[])
+    .map(st=>({
+      id: st.id,
+      comment: (st.useEdited && st.editedComment) ? st.editedComment : generate(st)
+    }))
+    .filter(x=>x.comment);
+  const json = JSON.stringify(data, null, 2);
+  const ta = document.getElementById('llm-export-area');
+  ta.value = json;
+  ta.style.display = 'block';
+  ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  const msg = document.getElementById('llm-msg');
+  msg.textContent = `${data.length} comments exported — copied to clipboard. Paste into your LLM with your instruction, then paste the result below.`;
+  msg.style.color = 'var(--text-muted)';
+}
+
+function importCommentsFromLLM(){
+  const pasteArea = document.getElementById('llm-import-area');
+  const msg       = document.getElementById('llm-msg');
+  const text = pasteArea.value.trim();
+  if(!text){ msg.textContent='Paste the transformed JSON first.'; msg.style.color='var(--danger)'; return; }
+  let parsed;
+  try{ parsed = JSON.parse(text); }
+  catch{ msg.textContent='Invalid JSON — check for syntax errors.'; msg.style.color='var(--danger)'; return; }
+  if(!Array.isArray(parsed)){ msg.textContent='Expected a JSON array.'; msg.style.color='var(--danger)'; return; }
+  let count=0, notFound=0;
+  update(s=>{
+    parsed.forEach(entry=>{
+      if(!entry.id || typeof entry.comment !== 'string') return;
+      const st = (s.students||[]).find(x=>x.id===entry.id);
+      if(st){ st.editedComment=entry.comment.trim(); st.useEdited=true; count++; }
+      else notFound++;
+    });
+  });
+  if(count){
+    msg.textContent = `Updated ${count} comment${count!==1?'s':''}${notFound?` (${notFound} ID${notFound!==1?'s':''} not matched)`:''}.`;
+    msg.style.color='var(--success)';
+    pasteArea.value='';
+    document.getElementById('llm-export-area').style.display='none';
+    document.getElementById('llm-export-area').value='';
+  } else {
+    msg.textContent='No comments matched — check the IDs in your JSON.';
+    msg.style.color='var(--danger)';
+  }
+  renderComments();
+}
 
 // ── Review flag ───────────────────────────────────────────────────────────
 function toggleReview(id, e){
