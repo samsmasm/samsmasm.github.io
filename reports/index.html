@@ -420,6 +420,17 @@
     </div>
 
     <div class="card">
+      <div class="card-title">Saved Sets</div>
+      <p class="hint">Save a named snapshot of all students, comments, and banks. Load a different set any time — your active data is replaced.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="set-name-input" type="text" placeholder="Set name (e.g. June 2026)…" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+        <button class="btn btn-primary btn-sm" onclick="saveAsSet()">Save current</button>
+      </div>
+      <div id="sets-msg" style="font-size:12px;color:var(--danger);margin-bottom:8px"></div>
+      <div id="sets-list"></div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Save &amp; Restore</div>
       <p class="hint">Data saves automatically in this browser. Back it up before clearing your browser or switching computers.</p>
       <div class="row gap-8">
@@ -1139,13 +1150,82 @@ function isConfigured(s){ const t=s.traits||{}; return (t.disposition||[]).lengt
 //  STATE  (localStorage)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const KEY = 'rcg_exp_v1'; // separate from stable version
+const KEY      = 'rcg_exp_v1';       // separate from stable version
+const SETS_KEY = 'rcg_sets_exp_v1';
 
 function load(){
   try{ return JSON.parse(localStorage.getItem(KEY))||{}; } catch{ return {}; }
 }
 function save(state){ localStorage.setItem(KEY, JSON.stringify(state)); }
 function update(fn){ const s=load(); fn(s); save(s); }
+
+function loadSets(){ try{ return JSON.parse(localStorage.getItem(SETS_KEY))||[]; } catch{ return []; } }
+function saveSets(sets){ localStorage.setItem(SETS_KEY, JSON.stringify(sets)); }
+
+function saveAsSet(){
+  const input = document.getElementById('set-name-input');
+  const msg   = document.getElementById('sets-msg');
+  const name  = input?.value?.trim();
+  if(!name){ msg.textContent='Enter a name first.'; return; }
+  msg.textContent = '';
+  const sets = loadSets();
+  sets.push({ id: Date.now().toString(), name, savedAt: new Date().toISOString(), state: load(), banks: loadBanks() });
+  saveSets(sets);
+  input.value = '';
+  renderSetup();
+}
+
+function loadSet(id){
+  const set = loadSets().find(s=>s.id===id);
+  if(!set) return;
+  if(!confirm(`Load "${set.name}"?\n\nThis replaces your current working data.`)) return;
+  save(set.state);
+  saveBanks(set.banks||[]);
+  renderAll();
+}
+
+function downloadSet(id){
+  const set = loadSets().find(s=>s.id===id);
+  if(!set) return;
+  const blob = new Blob([JSON.stringify({state:set.state, banks:set.banks},null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = set.name.replace(/[^a-z0-9]/gi,'_')+'_backup.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function deleteSet(id){
+  if(!confirm('Delete this saved set? This cannot be undone.')) return;
+  saveSets(loadSets().filter(s=>s.id!==id));
+  renderSetup();
+}
+
+function renderSetsList(){
+  const el = document.getElementById('sets-list');
+  if(!el) return;
+  const sets = loadSets();
+  if(!sets.length){
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No saved sets yet.</p>';
+    return;
+  }
+  el.innerHTML = sets.map(s=>{
+    const d = new Date(s.savedAt);
+    const dateStr = d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+    const count = (s.state?.students||[]).length;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:7px;margin-bottom:8px;gap:10px">
+      <div>
+        <span style="font-weight:600;font-size:13px">${s.name}</span>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:10px">${count} students · saved ${dateStr}</span>
+      </div>
+      <div class="row gap-8">
+        <button class="btn btn-primary btn-sm" onclick="loadSet('${s.id}')">Load</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadSet('${s.id}')">⬇ Download</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteSet('${s.id}')" style="color:var(--danger)">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CSV
@@ -1319,6 +1399,7 @@ function renderSetup(){
   if(bankTa && !bankTa.value) bankTa.value = BANK_PROMPT;
   renderBankSetup();
   renderTraitConfig();
+  renderSetsList();
 
   const s = load();
   const students = s.students||[];
