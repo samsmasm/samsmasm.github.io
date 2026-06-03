@@ -1650,12 +1650,15 @@ function renderTraitPanel(){
     </div>
   `;
 
-  const comment = generate(student);
-  const clen = comment.length;
+  const comment  = generate(student);
+  const preamble = (load().preambles||{})[getSubjectKey(student.cls)]||'';
+  const clen  = comment.length;
+  const tlen  = preamble.length + (preamble && comment ? 1 : 0) + clen;
   const fillW = Math.min(100, Math.round(clen/5));
   const fillC = clen>500?'var(--danger)':clen>400?'var(--warning)':'var(--success)';
   const cClass = clen>500?'hard':clen>400?'soft':'';
   const cMsg   = clen>500?`⚠ ${clen} chars (over hard cap)`:clen>400?`~${clen} chars (approaching soft cap)`:clen>0?`${clen} chars`:'';
+  const tMsg   = tlen > clen ? `${tlen} with preamble` : '';
 
   panel.innerHTML = `
     <div class="row-between" style="margin-bottom:18px">
@@ -1682,6 +1685,7 @@ function renderTraitPanel(){
       <div class="char-bar">
         <div class="char-track"><div class="char-fill" style="width:${fillW}%;background:${fillC}"></div></div>
         <span class="char-count ${cClass}">${cMsg}</span>
+        ${tMsg?`<span class="char-count" style="color:var(--text-muted)">${tMsg}</span>`:''}
       </div>
     </div>
   `;
@@ -1780,10 +1784,12 @@ function renderComments(){
       const stacked       = isStacked(st.traits||{});
       const dd            = doubleDisp(st.traits||{});
       const clen          = activeComment.length;
+      const tlen          = preamble.length + (preamble && activeComment ? 1 : 0) + clen;
       const overCap       = clen>500;
       const nearCap       = clen>400 && !overCap;
       const charNote = overCap ? `⚠ ${clen} chars (over hard cap)` : nearCap ? `${clen} chars (near soft cap)` : clen ? `${clen} chars` : '';
       const charClass = overCap?'over':nearCap?'warn':'';
+      const totalNote = tlen > clen ? `${tlen} with preamble` : '';
 
       // Version pills (only shown when an edited version exists and not currently editing)
       const versionPills = (hasEdited && !isEditing) ? `
@@ -1826,6 +1832,7 @@ function renderComments(){
           ${bodyArea}
           <div class="comment-footer">
             ${charNote?`<span class="char-note ${charClass}" style="margin-left:auto">${charNote}</span>`:''}
+            ${totalNote?`<span class="char-note" style="color:var(--text-muted)">${totalNote}</span>`:''}
           </div>
         </div>
       `;
