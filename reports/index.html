@@ -482,7 +482,8 @@
       <div class="filter-pills" id="comment-filters"></div>
       <div class="row gap-8">
         <span id="export-progress" style="font-size:12px;color:var(--text-muted)"></span>
-        <button class="btn btn-ghost btn-sm" onclick="exportAll()">⬇ Export configured</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportCsv()">⬇ Export CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportAll()">⬇ Export .txt</button>
       </div>
     </div>
     <div id="comment-list"></div>
@@ -2103,6 +2104,55 @@ function exportAll(){
   const a = document.createElement('a');
   a.href=url; a.download=`report_comments_${new Date().toISOString().slice(0,10)}.txt`;
   a.click(); URL.revokeObjectURL(url);
+}
+
+function exportCsv(){
+  const s = load();
+  const preambles = s.preambles||{};
+
+  let pool = sortStudents(s.students||[]).filter(st=>{
+    if(commentFilter==='all')              return true;
+    if(commentFilter.startsWith('block:')) return st.block===(commentFilter.slice(6));
+    if(commentFilter.startsWith('cls:'))   return st.cls===(commentFilter.slice(4));
+    if(commentFilter==='flagged')          return !!st.reviewLater;
+    return true;
+  }).filter(isConfigured);
+
+  if(!pool.length){ alert('No configured students to export yet.'); return; }
+
+  const csvCell = v => {
+    const str = (v||'').replace(/"/g,'""');
+    return (str.includes(',') || str.includes('"') || str.includes('\n')) ? `"${str}"` : str;
+  };
+  const row = (...cells) => cells.map(csvCell).join(',');
+
+  // Determine if any student has an edited version (to decide whether to include that column)
+  const anyEdited = pool.some(st => st.editedComment);
+
+  const headers = ['Last Name','First Name','Class','Block','Preamble','Active Comment'];
+  if(anyEdited) headers.push('Edited / Shortened','Generated (raw)');
+
+  const rows = [headers.join(',')];
+
+  pool.forEach(st=>{
+    const preamble      = preambles[getSubjectKey(st.cls)]||'';
+    const generated     = generate(st);
+    const editedComment = st.editedComment||'';
+    const useEdited     = !!(st.useEdited && editedComment);
+    const active        = useEdited ? editedComment : generated;
+
+    const cells = [st.last, st.first, st.cls, st.block, preamble, active];
+    if(anyEdited) cells.push(editedComment, generated);
+    rows.push(row(...cells));
+  });
+
+  const csv  = rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `report_comments_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
