@@ -1825,39 +1825,141 @@ function toggleTrait(key, val){
 let commentFilter = 'all';
 let editingId = null;
 
+function findMultiClassGroups(students){
+  const byName = {};
+  students.forEach(st=>{
+    const key = `${(st.first||'').toLowerCase()}_${(st.last||'').toLowerCase()}`;
+    if(!byName[key]) byName[key]=[];
+    byName[key].push(st);
+  });
+  return Object.values(byName).filter(g => new Set(g.map(st=>st.cls)).size > 1);
+}
+
+function buildCommentCard(st, preamble){
+  const origComment   = generate(st);
+  const editedComment = st.editedComment||'';
+  const useEdited     = !!(st.useEdited && editedComment);
+  const activeComment = useEdited ? editedComment : origComment;
+  const altComment    = useEdited ? origComment   : editedComment;
+  const hasEdited     = !!editedComment;
+  const isEditing     = editingId === st.id;
+  const configured    = isConfigured(st);
+  const stacked       = isStacked(st.traits||{});
+  const dd            = doubleDisp(st.traits||{});
+  const clen          = activeComment.length;
+  const tlen          = preamble.length + (preamble && activeComment ? 1 : 0) + clen;
+  const overCap       = clen>500;
+  const nearCap       = clen>400 && !overCap;
+  const charNote      = overCap ? `⚠ ${clen} chars (over hard cap)` : nearCap ? `${clen} chars (near soft cap)` : clen ? `${clen} chars` : '';
+  const charClass     = overCap?'over':nearCap?'warn':'';
+  const totalNote     = tlen > clen ? `${tlen} with preamble` : '';
+
+  const versionPills = (hasEdited && !isEditing) ? `
+    <div class="version-pills">
+      <button class="version-pill ${!useEdited?'active':''}" onclick="setVersion('${st.id}',false)">Original</button>
+      <button class="version-pill ${useEdited?'active':''}" onclick="setVersion('${st.id}',true)">Edited</button>
+    </div>` : '';
+
+  const bodyArea = isEditing ? `
+    <textarea class="edit-textarea" id="edit-ta-${st.id}" oninput="updateEditCharCount('${st.id}',this.value)">${activeComment}</textarea>
+    <div class="char-bar" style="margin-top:6px">
+      <div class="char-track"><div class="char-fill" id="edit-fill-${st.id}" style="width:${Math.min(100,Math.round(activeComment.length/5))}%;background:${activeComment.length>500?'var(--danger)':activeComment.length>400?'var(--warning)':'var(--success)'}"></div></div>
+      <span class="char-count" id="edit-count-${st.id}">${activeComment.length} chars</span>
+    </div>` : `
+    <div class="comment-body" id="cb-${st.id}">
+      ${activeComment||'<em style="color:var(--text-muted)">No traits selected yet. Click Edit traits.</em>'}
+    </div>
+    ${hasEdited && altComment ? `<div class="alt-comment">[${altComment}]</div>` : ''}`;
+
+  return `
+    <div class="comment-card ${dd?'double-disp':''} ${overCap?'over-cap':''}">
+      <div class="comment-header">
+        <div>
+          ${stacked?'<div class="stacked-label">stacked</div>':''}
+          <div class="comment-student-name">${st.last}, ${st.first}${st.reviewLater?' <span style="color:var(--warning);font-size:13px" title="Flagged for review">★</span>':''}</div>
+          <div class="comment-meta">${getSubjectLabel(st.cls)} · Block ${st.block}</div>
+        </div>
+        <div class="row gap-8" style="flex-wrap:wrap;justify-content:flex-end">
+          <button class="review-btn ${st.reviewLater?'on':''}" onclick="toggleReview('${st.id}',event)" title="${st.reviewLater?'Remove flag':'Flag for review'}">★</button>
+          ${versionPills}
+          <button class="btn btn-ghost btn-sm" onclick="goToStudent('${st.id}')">Edit traits</button>
+          ${overCap && !useEdited && !isEditing ? `<button class="btn btn-ghost btn-sm" style="color:var(--warning)" onclick="autoShortenComment('${st.id}')">Auto shorten</button>` : ''}
+          ${configured && !isEditing ? `<button class="btn btn-ghost btn-sm" onclick="startEdit('${st.id}')">✏ Edit</button>` : ''}
+          ${isEditing ? `<button class="btn btn-primary btn-sm" onclick="saveEdit('${st.id}')">Save</button>
+                         <button class="btn btn-ghost btn-sm" onclick="discardEdit('${st.id}')">Discard</button>` : ''}
+          ${configured && !isEditing ? `<button class="btn btn-primary btn-sm" onclick="copyComment('${st.id}',this)">Copy</button>` : ''}
+        </div>
+      </div>
+      ${preamble?`<div class="preamble-block">${preamble}</div>`:''}
+      ${bodyArea}
+      <div class="comment-footer">
+        ${charNote?`<span class="char-note ${charClass}" style="margin-left:auto">${charNote}</span>`:''}
+        ${totalNote?`<span class="char-note" style="color:var(--text-muted)">${totalNote}</span>`:''}
+      </div>
+    </div>`;
+}
+
 function renderComments(){
   const s = load();
   const allStudents = sortStudents(s.students||[]);
   const preambles = s.preambles||{};
   const blocks = [...new Set(allStudents.map(x=>x.block||''))].sort();
   const classes = [...new Set(allStudents.map(x=>x.cls))].sort();
-  const flaggedCount = allStudents.filter(x=>x.reviewLater).length;
+  const flaggedCount  = allStudents.filter(x=>x.reviewLater).length;
+  const multiGroups   = findMultiClassGroups(allStudents);
 
   // Progress counter
   const configuredCount = allStudents.filter(isConfigured).length;
   const prog = document.getElementById('export-progress');
   if(prog) prog.textContent = `${configuredCount} / ${allStudents.length} configured`;
 
-  // Filter pills: all + blocks + classes + flagged
+  // Filter pills
   const allFilters = [
     {id:'all',     label:`All (${allStudents.length})`},
     ...blocks.map(b=>({ id:'block:'+b, label:`Block ${b}` })),
     ...classes.map(c=>({ id:'cls:'+c,  label:c })),
-    ...(flaggedCount ? [{id:'flagged', label:`★ Flagged (${flaggedCount})`}] : [])
+    ...(flaggedCount   ? [{id:'flagged', label:`★ Flagged (${flaggedCount})`}]          : []),
+    ...(multiGroups.length ? [{id:'multi', label:`⚑ Multi-class (${multiGroups.length})`}] : [])
   ];
   document.getElementById('comment-filters').innerHTML = allFilters
     .map(f=>`<button class="filter-pill ${commentFilter===f.id?'active':''}" onclick="setCommentFilter('${f.id}')">${f.label}</button>`)
     .join('');
 
+  const cl = document.getElementById('comment-list');
+
+  // ── Multi-class comparison view ───────────────────────────────────────────
+  if(commentFilter === 'multi'){
+    if(!multiGroups.length){
+      cl.innerHTML='<div class="empty"><h3>No multi-class students</h3><p>No students appear in more than one subject.</p></div>';
+      return;
+    }
+    let html = '<p class="hint" style="margin-bottom:16px">Students listed in more than one subject. Compare comments to ensure they differ.</p>';
+    multiGroups.forEach(group=>{
+      const name = `${group[0].last}, ${group[0].first}`;
+      html += `<div style="margin-bottom:32px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text)">${name}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+          ${group.map(st => buildCommentCard(st, preambles[getSubjectKey(st.cls)]||'')).join('')}
+        </div>
+      </div>`;
+    });
+    cl.innerHTML = html;
+    if(editingId){
+      const ta = document.getElementById('edit-ta-'+editingId);
+      if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }
+    return;
+  }
+
+  // ── Normal view ───────────────────────────────────────────────────────────
   let visible = allStudents.filter(st=>{
-    if(commentFilter==='all')           return true;
+    if(commentFilter==='all')              return true;
     if(commentFilter.startsWith('block:')) return st.block===(commentFilter.slice(6));
     if(commentFilter.startsWith('cls:'))   return st.cls===(commentFilter.slice(4));
-    if(commentFilter==='flagged')       return !!st.reviewLater;
+    if(commentFilter==='flagged')          return !!st.reviewLater;
     return true;
   });
 
-  const cl = document.getElementById('comment-list');
   if(!visible.length){
     cl.innerHTML='<div class="empty"><h3>No students loaded</h3><p>Upload a CSV in the Setup tab first.</p></div>';
     return;
@@ -1876,73 +1978,8 @@ function renderComments(){
         Block ${block} &nbsp;·&nbsp; ${group.length} students &nbsp;·&nbsp; ${group.filter(isConfigured).length} configured
       </div>
     </div>`;
-
     group.forEach(st=>{
-      const preamble = preambles[getSubjectKey(st.cls)]||'';
-      const origComment   = generate(st);
-      const editedComment = st.editedComment||'';
-      const useEdited     = !!(st.useEdited && editedComment);
-      const activeComment = useEdited ? editedComment : origComment;
-      const altComment    = useEdited ? origComment   : editedComment;
-      const hasEdited     = !!editedComment;
-      const isEditing     = editingId === st.id;
-      const configured    = isConfigured(st);
-      const stacked       = isStacked(st.traits||{});
-      const dd            = doubleDisp(st.traits||{});
-      const clen          = activeComment.length;
-      const tlen          = preamble.length + (preamble && activeComment ? 1 : 0) + clen;
-      const overCap       = clen>500;
-      const nearCap       = clen>400 && !overCap;
-      const charNote = overCap ? `⚠ ${clen} chars (over hard cap)` : nearCap ? `${clen} chars (near soft cap)` : clen ? `${clen} chars` : '';
-      const charClass = overCap?'over':nearCap?'warn':'';
-      const totalNote = tlen > clen ? `${tlen} with preamble` : '';
-
-      // Version pills (only shown when an edited version exists and not currently editing)
-      const versionPills = (hasEdited && !isEditing) ? `
-        <div class="version-pills">
-          <button class="version-pill ${!useEdited?'active':''}" onclick="setVersion('${st.id}',false)">Original</button>
-          <button class="version-pill ${useEdited?'active':''}" onclick="setVersion('${st.id}',true)">Edited</button>
-        </div>` : '';
-
-      // Body: textarea while editing, otherwise the comment + optional alt
-      const bodyArea = isEditing ? `
-        <textarea class="edit-textarea" id="edit-ta-${st.id}" oninput="updateEditCharCount('${st.id}',this.value)">${activeComment}</textarea>
-        <div class="char-bar" style="margin-top:6px">
-          <div class="char-track"><div class="char-fill" id="edit-fill-${st.id}" style="width:${Math.min(100,Math.round(activeComment.length/5))}%;background:${activeComment.length>500?'var(--danger)':activeComment.length>400?'var(--warning)':'var(--success)'}"></div></div>
-          <span class="char-count" id="edit-count-${st.id}">${activeComment.length} chars</span>
-        </div>` : `
-        <div class="comment-body" id="cb-${st.id}">
-          ${activeComment||'<em style="color:var(--text-muted)">No traits selected yet. Click Edit traits.</em>'}
-        </div>
-        ${hasEdited && altComment ? `<div class="alt-comment">[${altComment}]</div>` : ''}`;
-
-      html += `
-        <div class="comment-card ${dd?'double-disp':''} ${overCap?'over-cap':''}">
-          <div class="comment-header">
-            <div>
-              ${stacked?'<div class="stacked-label">stacked</div>':''}
-              <div class="comment-student-name">${st.last}, ${st.first}${st.reviewLater?' <span style="color:var(--warning);font-size:13px" title="Flagged for review">★</span>':''}</div>
-              <div class="comment-meta">${getSubjectLabel(st.cls)} · Block ${block}</div>
-            </div>
-            <div class="row gap-8" style="flex-wrap:wrap;justify-content:flex-end">
-              <button class="review-btn ${st.reviewLater?'on':''}" onclick="toggleReview('${st.id}',event)" title="${st.reviewLater?'Remove flag':'Flag for review'}">★</button>
-              ${versionPills}
-              <button class="btn btn-ghost btn-sm" onclick="goToStudent('${st.id}')">Edit traits</button>
-              ${overCap && !useEdited && !isEditing ? `<button class="btn btn-ghost btn-sm" style="color:var(--warning)" onclick="autoShortenComment('${st.id}')">Auto shorten</button>` : ''}
-              ${configured && !isEditing ? `<button class="btn btn-ghost btn-sm" onclick="startEdit('${st.id}')">✏ Edit</button>` : ''}
-              ${isEditing ? `<button class="btn btn-primary btn-sm" onclick="saveEdit('${st.id}')">Save</button>
-                             <button class="btn btn-ghost btn-sm" onclick="discardEdit('${st.id}')">Discard</button>` : ''}
-              ${configured && !isEditing ? `<button class="btn btn-primary btn-sm" onclick="copyComment('${st.id}',this)">Copy</button>` : ''}
-            </div>
-          </div>
-          ${preamble?`<div class="preamble-block">${preamble}</div>`:''}
-          ${bodyArea}
-          <div class="comment-footer">
-            ${charNote?`<span class="char-note ${charClass}" style="margin-left:auto">${charNote}</span>`:''}
-            ${totalNote?`<span class="char-note" style="color:var(--text-muted)">${totalNote}</span>`:''}
-          </div>
-        </div>
-      `;
+      html += buildCommentCard(st, preambles[getSubjectKey(st.cls)]||'');
     });
   });
 
