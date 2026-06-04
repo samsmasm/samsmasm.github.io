@@ -2124,6 +2124,41 @@ function saveTemplateEdit(bankId, path, el){
   saveBanks(banks);
 }
 
+let editingMetaId = null;
+
+function openMetaEdit(id){
+  editingMetaId = id;
+  renderTemplates();
+  document.getElementById('meta-label-'+id)?.focus();
+}
+
+function cancelMetaEdit(){
+  editingMetaId = null;
+  renderTemplates();
+}
+
+function saveMetaEdit(id){
+  const labelEl = document.getElementById('meta-label-'+id);
+  const skillsEl = document.getElementById('meta-skills-'+id);
+  const codesEl  = document.getElementById('meta-codes-'+id);
+  if(!labelEl || !skillsEl || !codesEl) return;
+  const newLabel  = labelEl.value.trim();
+  const newSkills = skillsEl.value.trim();
+  const newCodes  = codesEl.value.split(',').map(c=>c.trim()).filter(Boolean);
+  if(!newLabel){ labelEl.focus(); return; }
+  if(!newCodes.length){ codesEl.focus(); return; }
+  const banks = loadBanks();
+  const entry = banks.find(b=>b.id===id);
+  if(!entry) return;
+  entry.bank.meta.subject_label = newLabel;
+  if(newSkills) entry.bank.meta.skills_phrase = newSkills;
+  entry.class_codes = newCodes;
+  saveBanks(banks);
+  editingMetaId = null;
+  renderTemplates();
+  renderSetup(); // refresh preamble fields + bank list
+}
+
 function downloadBank(bankId){
   const banks = loadBanks();
   const entry = banks.find(b => b.id === bankId);
@@ -2177,9 +2212,37 @@ function renderTemplates(){
 
   banks.forEach(({id: bid, bank, class_codes}) => {
     const label = bank.meta?.subject_label || class_codes.join('/');
-    html += `<div style="display:flex;align-items:baseline;justify-content:space-between;margin:24px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--border)">
-      <h2 style="font-size:15px;font-weight:700;color:var(--text)">${label} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">${class_codes.join(', ')}</span></h2>
-      <button class="btn btn-ghost btn-sm" onclick="downloadBank('${bid}')">⬇ Download bank</button>
+    const isEditingMeta = editingMetaId === bid;
+
+    html += `<div style="margin:24px 0 12px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:8px;border-bottom:2px solid var(--border)">
+        <h2 style="font-size:15px;font-weight:700;color:var(--text)">${label} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">${class_codes.join(', ')}</span></h2>
+        <div class="row gap-8">
+          ${isEditingMeta
+            ? `<button class="btn btn-ghost btn-sm" onclick="cancelMetaEdit()">Cancel</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="openMetaEdit('${bid}')">Edit details</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="downloadBank('${bid}')">⬇ Download bank</button>
+        </div>
+      </div>
+      ${isEditingMeta ? `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 0 4px">
+          <div style="flex:2;min-width:160px">
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Subject label</div>
+            <input id="meta-label-${bid}" type="text" value="${esc(bank.meta?.subject_label||'')}"
+              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+          </div>
+          <div style="flex:2;min-width:160px">
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Skills phrase</div>
+            <input id="meta-skills-${bid}" type="text" value="${esc(bank.meta?.skills_phrase||'')}"
+              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+          </div>
+          <div style="flex:1;min-width:120px">
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Class codes (comma-separated)</div>
+            <input id="meta-codes-${bid}" type="text" value="${esc(class_codes.join(', '))}"
+              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveMetaEdit('${bid}')" style="flex-shrink:0;align-self:flex-end;margin-bottom:1px">Save</button>
+        </div>` : ''}
     </div>`;
 
     // Opening sentences
