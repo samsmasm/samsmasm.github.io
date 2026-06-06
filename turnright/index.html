@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>turnright</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0f14;
+  --panel: #13141e;
+  --panel2: #1a1b27;
+  --border: #252636;
+  --accent: #f5a623;
+  --blue: #61afef;
+  --green: #98c379;
+  --red: #e06c75;
+  --text: #c8cad8;
+  --dim: #555768;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; display:flex; }
+
+#map { flex:1; height:100vh; }
+
+/* ── Panel ── */
+#panel {
+  width:300px; min-width:300px; height:100vh;
+  background:var(--panel); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; overflow-y:auto; z-index:500;
+}
+
+.ph { padding:20px 18px 14px; border-bottom:1px solid var(--border); }
+.ph h1 { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; color:#fff; letter-spacing:-0.3px; line-height:1.25; }
+.ph p  { font-size:9px; color:var(--dim); margin-top:3px; letter-spacing:1.5px; text-transform:uppercase; }
+
+.sec { padding:14px 18px; border-bottom:1px solid var(--border); }
+.sec-lbl { font-size:8px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+
+/* status */
+.status { font-size:10px; padding:7px 10px; border-radius:3px; border:1px solid var(--border); color:var(--dim); }
+.status.run { color:var(--blue); border-color:rgba(97,175,239,.25); background:rgba(97,175,239,.04); }
+.status.ok  { color:var(--green); border-color:rgba(152,195,121,.25); background:rgba(152,195,121,.04); }
+.status.err { color:var(--red); border-color:rgba(224,108,117,.25); background:rgba(224,108,117,.04); }
+
+/* toggle */
+.tog { display:flex; gap:6px; }
+.tog-btn {
+  flex:1; padding:7px 0; background:transparent; border:1px solid var(--border);
+  color:var(--dim); font-family:'DM Mono',monospace; font-size:10px;
+  letter-spacing:1px; text-transform:uppercase; cursor:pointer; border-radius:3px;
+  transition:all .12s;
+}
+.tog-btn.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:500; }
+.tog-btn:hover:not(.on) { border-color:var(--text); color:var(--text); }
+
+/* compass */
+.compass-wrap { display:flex; align-items:center; gap:14px; }
+#compass { cursor:grab; user-select:none; }
+#compass:active { cursor:grabbing; }
+.bear-val { font-size:26px; font-weight:300; color:var(--accent); line-height:1; }
+.bear-card { font-size:10px; color:var(--dim); margin-top:3px; }
+.bear-hint { font-size:8px; color:var(--dim); margin-top:8px; }
+
+/* input */
+.inp {
+  width:100%; background:transparent; border:1px solid var(--border);
+  color:var(--text); font-family:'DM Mono',monospace; font-size:13px;
+  padding:8px 10px; border-radius:3px; outline:none; transition:border-color .12s;
+}
+.inp:focus { border-color:var(--accent); }
+.inp-sub { font-size:9px; color:var(--dim); margin-top:5px; }
+
+/* run btn */
+.run-btn {
+  width:100%; padding:11px; background:var(--accent); border:none;
+  color:#000; font-family:'Syne',sans-serif; font-size:12px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; cursor:pointer; border-radius:3px;
+  transition:all .12s;
+}
+.run-btn:hover:not(:disabled) { background:#ffb836; }
+.run-btn:active:not(:disabled) { transform:scale(.98); }
+.run-btn:disabled { background:var(--border); color:var(--dim); cursor:not-allowed; transform:none; }
+
+/* stats */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.stat { background:rgba(255,255,255,.02); border:1px solid var(--border); padding:10px; border-radius:3px; }
+.stat-v { font-size:20px; font-weight:300; color:#fff; }
+.stat-l { font-size:8px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
+/* scrubber */
+#scr-track {
+  width:100%; height:4px; background:var(--border); border-radius:2px;
+  position:relative; cursor:pointer;
+}
+#scr-fill {
+  height:100%; border-radius:2px; width:0%;
+  background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#80f);
+}
+#scr-thumb {
+  width:12px; height:12px; background:#fff; border:2px solid var(--accent);
+  border-radius:50%; position:absolute; top:-4px; left:0;
+  transform:translateX(-50%); cursor:grab;
+}
+.scr-pos { font-size:9px; color:var(--dim); text-align:right; margin-top:5px; }
+
+/* btn group */
+.btn-g { display:flex; gap:6px; }
+.btn {
+  flex:1; padding:7px; background:transparent; border:1px solid var(--border);
+  color:var(--text); font-family:'DM Mono',monospace; font-size:9px;
+  letter-spacing:1px; text-transform:uppercase; cursor:pointer; border-radius:3px;
+  transition:all .12s; text-align:center;
+}
+.btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.btn:disabled { opacity:.3; cursor:not-allowed; }
+.btn.active { border-color:var(--accent); color:var(--accent); }
+
+/* spinner */
+@keyframes spin { to { transform:rotate(360deg); } }
+.sp {
+  display:inline-block; width:8px; height:8px;
+  border:1.5px solid var(--border); border-top-color:var(--blue);
+  border-radius:50%; animation:spin .65s linear infinite;
+  vertical-align:middle; margin-right:5px;
+}
+
+/* map overlays */
+.map-badge {
+  position:absolute; z-index:999; background:rgba(13,14,20,.88);
+  border:1px solid var(--border); font-family:'DM Mono',monospace;
+  font-size:9px; letter-spacing:1px; text-transform:uppercase;
+  border-radius:3px; pointer-events:none;
+}
+#m-mode  { top:14px; left:14px; padding:5px 10px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+#m-coord { bottom:14px; left:14px; padding:4px 10px; color:var(--dim); }
+
+.mdot { width:6px; height:6px; border-radius:50%; background:var(--dim); }
+.mdot.on { background:var(--accent); }
+.mdot.run { background:var(--blue); animation:pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* leaflet dark popup */
+.leaflet-popup-content-wrapper {
+  background:#1a1b27; color:#c8cad8;
+  border:1px solid var(--border); border-radius:4px;
+  box-shadow:0 6px 24px rgba(0,0,0,.6);
+  font-family:'DM Mono',monospace;
+}
+.leaflet-popup-tip { background:#1a1b27; }
+.leaflet-popup-content { margin:12px 14px; font-size:11px; }
+
+.jp-title { font-family:'Syne',sans-serif; font-size:12px; color:#fff; margin-bottom:8px; }
+.jp-sub   { font-size:8px; color:var(--dim); margin-bottom:8px; letter-spacing:1px; text-transform:uppercase; }
+
+.jp-exit {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 8px; margin:3px 0;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+  border-radius:3px; cursor:pointer; transition:all .1s;
+}
+.jp-exit:hover { background:rgba(245,166,35,.1); border-color:rgba(245,166,35,.3); }
+.jp-exit.cur   { border-color:rgba(245,166,35,.5); color:var(--accent); }
+.jp-exit.ov    { border-color:rgba(97,175,239,.5); color:var(--blue); }
+.jp-badge { font-size:9px; padding:1px 5px; background:rgba(255,255,255,.06); border-radius:2px; }
+
+.jp-clear {
+  text-align:center; font-size:9px; color:var(--dim); cursor:pointer;
+  margin-top:6px; padding:5px; border-radius:3px;
+  border:1px dashed var(--border); transition:all .1s;
+}
+.jp-clear:hover { border-color:var(--red); color:var(--red); }
+
+/* scrollbar */
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<div id="map">
+  <div class="map-badge" id="m-mode">
+    <div class="mdot" id="mdot"></div>
+    <span id="mtext">ready</span>
+  </div>
+  <div class="map-badge" id="m-coord">click map to set start</div>
+</div>
+
+<div id="panel">
+  <div class="ph">
+    <h1>turnright</h1>
+    <p>OSM street traversal</p>
+  </div>
+
+  <div class="sec">
+    <div class="status" id="status">Drop a pin to begin</div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Hand Rule</div>
+    <div class="tog">
+      <button class="tog-btn" id="bl" onclick="setRule('left')">← Left</button>
+      <button class="tog-btn on" id="br" onclick="setRule('right')">Right →</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Initial Bearing</div>
+    <div class="compass-wrap">
+      <canvas id="compass" width="82" height="82"></canvas>
+      <div>
+        <div class="bear-val" id="bval">0°</div>
+        <div class="bear-card" id="bcard">North</div>
+        <div class="bear-hint">drag or click</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Target Distance</div>
+    <input class="inp" type="number" id="dist-inp" value="2" min="0.1" max="50" step="0.1">
+    <div class="inp-sub">kilometres</div>
+  </div>
+
+  <div class="sec">
+    <button class="run-btn" id="run-btn" onclick="run()" disabled>Generate Route</button>
+  </div>
+
+  <div class="sec" id="s-stats" style="display:none">
+    <div class="sec-lbl">Stats</div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-v" id="sv-dist">—</div><div class="stat-l">Distance km</div></div>
+      <div class="stat"><div class="stat-v" id="sv-junc">—</div><div class="stat-l">Junctions</div></div>
+    </div>
+  </div>
+
+  <div class="sec" id="s-scr" style="display:none">
+    <div class="sec-lbl">Scrubber</div>
+    <div id="scr-track"><div id="scr-fill"></div><div id="scr-thumb"></div></div>
+    <div class="scr-pos" id="scr-pos">0.00 km</div>
+  </div>
+
+  <div class="sec" id="s-ov" style="display:none">
+    <div class="sec-lbl">Override Tools</div>
+    <div style="font-size:9px;color:var(--dim);margin-bottom:10px;line-height:1.6">
+      Click an amber junction dot to reroute from that point.<br>
+      Use Bridge Gap to connect broken OSM paths.
+    </div>
+    <div class="btn-g">
+      <button class="btn" id="btn-gap" onclick="toggleGap()">Bridge Gap</button>
+      <button class="btn" onclick="clearOv()">Clear All</button>
+    </div>
+  </div>
+
+  <div class="sec" id="s-exp" style="display:none">
+    <div class="sec-lbl">Export &amp; Share</div>
+    <div class="btn-g">
+      <button class="btn" onclick="exportGPX()">GPX</button>
+      <button class="btn" onclick="shareLink()">Copy Link</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+const S = {
+  lat: null, lon: null, startNode: null,
+  bearing: 0, dist: 2, rule: 'right',
+  nodes: {}, graph: {},
+  route: [],        // [{nodeId,lat,lon,cumDist,isJunc}]
+  juncCount: 0, totalDist: 0,
+  overrides: {},    // nodeId -> toNode
+  gaps: [],         // [{from,to}]
+  gapMode: false, gapFrom: null,
+  scrT: 0,
+  mStart: null, mScrub: null,
+  lRoute: [], lJunc: [], lGaps: [],
+  compassDragging: false
+};
+
+// ─────────────────────────────────────────────
+// Map
+// ─────────────────────────────────────────────
+const map = L.map('map', { center:[51.505,-0.09], zoom:14, zoomControl:true, attributionControl:false });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19 }).addTo(map);
+L.control.attribution({ prefix:'&copy; OSM &amp; CARTO' }).addTo(map);
+
+map.on('click', e => {
+  if (S.gapMode) { handleGapClick(e.latlng.lat, e.latlng.lng); return; }
+  placePin(e.latlng.lat, e.latlng.lng);
+});
+map.on('mousemove', e => {
+  document.getElementById('m-coord').textContent =
+    e.latlng.lat.toFixed(5) + ', ' + e.latlng.lng.toFixed(5);
+});
+
+// ─────────────────────────────────────────────
+// Compass
+// ─────────────────────────────────────────────
+const cc = document.getElementById('compass');
+const cx2d = cc.getContext('2d');
+const CX = 41, CY = 41, CR = 37;
+
+function drawCompass() {
+  cx2d.clearRect(0, 0, 82, 82);
+  // ring
+  cx2d.beginPath(); cx2d.arc(CX,CY,CR,0,Math.PI*2);
+  cx2d.strokeStyle='#252636'; cx2d.lineWidth=1.5; cx2d.stroke();
+  cx2d.fillStyle='rgba(255,255,255,.015)'; cx2d.fill();
+  // ticks
+  for (let i=0;i<36;i++) {
+    const a = i*10*Math.PI/180 - Math.PI/2;
+    const len = i%9===0 ? 6 : 3;
+    cx2d.beginPath();
+    cx2d.moveTo(CX+(CR-1)*Math.cos(a), CY+(CR-1)*Math.sin(a));
+    cx2d.lineTo(CX+(CR-1-len)*Math.cos(a), CY+(CR-1-len)*Math.sin(a));
+    cx2d.strokeStyle='#353646'; cx2d.lineWidth=1; cx2d.stroke();
+  }
+  // cardinals
+  [['N',0,'#e06c75'],['E',90,'#555768'],['S',180,'#555768'],['W',270,'#555768']].forEach(([c,d,col]) => {
+    const a = d*Math.PI/180 - Math.PI/2;
+    cx2d.fillStyle=col; cx2d.font='7px DM Mono';
+    cx2d.textAlign='center'; cx2d.textBaseline='middle';
+    cx2d.fillText(c, CX+(CR-9)*Math.cos(a), CY+(CR-9)*Math.sin(a));
+  });
+  // arrow
+  const ar = S.bearing*Math.PI/180 - Math.PI/2;
+  const tipX=CX+28*Math.cos(ar), tipY=CY+28*Math.sin(ar);
+  const tailX=CX-10*Math.cos(ar), tailY=CY-10*Math.sin(ar);
+  cx2d.beginPath();
+  cx2d.moveTo(tipX,tipY);
+  cx2d.lineTo(CX+7*Math.cos(ar+Math.PI*.82), CY+7*Math.sin(ar+Math.PI*.82));
+  cx2d.lineTo(tailX,tailY);
+  cx2d.lineTo(CX+7*Math.cos(ar-Math.PI*.82), CY+7*Math.sin(ar-Math.PI*.82));
+  cx2d.closePath();
+  cx2d.fillStyle='#f5a623'; cx2d.fill();
+  // centre
+  cx2d.beginPath(); cx2d.arc(CX,CY,3,0,Math.PI*2);
+  cx2d.fillStyle='#fff'; cx2d.fill();
+}
+
+function bearingFromEvent(e) {
+  const r = cc.getBoundingClientRect();
+  const dx = e.clientX-(r.left+r.width/2), dy = e.clientY-(r.top+r.height/2);
+  return ((Math.atan2(dy,dx)*180/Math.PI+90)+360)%360;
+}
+
+cc.addEventListener('mousedown', e => { S.compassDragging=true; setBearing(Math.round(bearingFromEvent(e))); });
+document.addEventListener('mousemove', e => { if(S.compassDragging){ setBearing(Math.round(bearingFromEvent(e))); } });
+document.addEventListener('mouseup', () => { S.compassDragging=false; });
+
+function setBearing(b) {
+  S.bearing = b%360;
+  document.getElementById('bval').textContent = S.bearing+'°';
+  const cards=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  document.getElementById('bcard').textContent = cards[Math.round(S.bearing/22.5)%16];
+  drawCompass();
+}
+setBearing(0);
+
+// ─────────────────────────────────────────────
+// Rule toggle
+// ─────────────────────────────────────────────
+function setRule(r) {
+  S.rule = r;
+  document.getElementById('bl').classList.toggle('on', r==='left');
+  document.getElementById('br').classList.toggle('on', r==='right');
+}
+
+// ─────────────────────────────────────────────
+// Start pin
+// ─────────────────────────────────────────────
+const startIcon = L.divIcon({
+  html:`<div style="width:14px;height:14px;background:#f5a623;border:2px solid #fff;border-radius:50%;
+        box-shadow:0 0 0 3px rgba(245,166,35,.3),0 2px 8px rgba(0,0,0,.5)"></div>`,
+  className:'', iconSize:[14,14], iconAnchor:[7,7]
+});
+
+function placePin(lat, lon) {
+  S.lat=lat; S.lon=lon;
+  if (S.mStart) map.removeLayer(S.mStart);
+  S.mStart = L.marker([lat,lon],{icon:startIcon}).addTo(map);
+  document.getElementById('run-btn').disabled = false;
+  setStatus('Start set — adjust settings then generate','');
+  setMode('ready');
+}
+
+// ─────────────────────────────────────────────
+// Status / mode helpers
+// ─────────────────────────────────────────────
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.innerHTML = msg; el.className = 'status '+cls;
+}
+function setMode(m) {
+  const d=document.getElementById('mdot'), t=document.getElementById('mtext');
+  d.className='mdot'; t.textContent=m;
+  if(m==='ready') d.classList.add('on');
+  else if(m==='fetching'||m==='computing') d.classList.add('run');
+}
+
+// ─────────────────────────────────────────────
+// Geo math
+// ─────────────────────────────────────────────
+function hav(la1,lo1,la2,lo2) {
+  const R=6371, dLa=(la2-la1)*Math.PI/180, dLo=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;
+  return R*2*Math.asin(Math.sqrt(Math.max(0,a)));
+}
+function bear(la1,lo1,la2,lo2) {
+  const dLo=(lo2-lo1)*Math.PI/180, la1r=la1*Math.PI/180, la2r=la2*Math.PI/180;
+  return (Math.atan2(Math.sin(dLo)*Math.cos(la2r),
+    Math.cos(la1r)*Math.sin(la2r)-Math.sin(la1r)*Math.cos(la2r)*Math.cos(dLo))*180/Math.PI+360)%360;
+}
+function relAngle(inc, ex) {
+  let r=(ex-inc+360)%360; if(r>180) r-=360; return r;
+}
+function bearCard(b) {
+  return ['N','NE','E','SE','S','SW','W','NW'][Math.round(b/45)%8];
+}
+function nearestNode(la,lo,nodes) {
+  let best=null, bd=Infinity;
+  for(const id in nodes){
+    const d=hav(la,lo,nodes[id].lat,nodes[id].lon);
+    if(d<bd){bd=d;best=id;}
+  }
+  return best;
+}
+
+// ─────────────────────────────────────────────
+// Overpass fetch
+// ─────────────────────────────────────────────
+async function fetchOSM(la,lo,radiusKm) {
+  const r=Math.max(radiusKm*1.3,0.6);
+  const dLa=r/111, dLo=r/(111*Math.cos(la*Math.PI/180));
+  const bbox=`${la-dLa},${lo-dLo},${la+dLa},${lo+dLo}`;
+  const q=`[out:json][timeout:60];(way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|pedestrian|living_street|footway|path|track|cycleway|steps)$"](${bbox}););out body;>;out skel qt;`;
+  const res=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q));
+  if(!res.ok) throw new Error('Overpass error '+res.status);
+  return res.json();
+}
+
+function buildGraph(data) {
+  const nodes={}, ways=[];
+  for(const el of data.elements){
+    if(el.type==='node') nodes[el.id]={lat:el.lat,lon:el.lon};
+    else if(el.type==='way'&&el.nodes) ways.push({id:el.id,nodes:el.nodes,tags:el.tags||{}});
+  }
+  const graph={};
+  for(const w of ways){
+    const nl=w.nodes;
+    for(let i=0;i<nl.length-1;i++){
+      const aId=nl[i],bId=nl[i+1],a=nodes[aId],b=nodes[bId];
+      if(!a||!b) continue;
+      const d=hav(a.lat,a.lon,b.lat,b.lon);
+      if(d<0.00005) continue;
+      const bAB=bear(a.lat,a.lon,b.lat,b.lon);
+      if(!graph[aId]) graph[aId]=[];
+      if(!graph[bId]) graph[bId]=[];
+      graph[aId].push({to:bId,b:bAB,d,wid:w.id});
+      graph[bId].push({to:aId,b:(bAB+180)%360,d,wid:w.id});
+    }
+  }
+  return {nodes,graph};
+}
+
+// ─────────────────────────────────────────────
+// Traversal
+// ─────────────────────────────────────────────
+function traverse(startId, initBearing, maxDist, rule, overrides, gaps) {
+  // Augment graph with gap bridges
+  const g={};
+  for(const id in S.graph) g[id]=[...S.graph[id]];
+  for(const gap of gaps){
+    const fn=S.nodes[gap.from],tn=S.nodes[gap.to];
+    if(!fn||!tn) continue;
+    const d=hav(fn.lat,fn.lon,tn.lat,tn.lon);
+    const b=bear(fn.lat,fn.lon,tn.lat,tn.lon);
+    if(!g[gap.from]) g[gap.from]=[];
+    if(!g[gap.to])   g[gap.to]=[];
+    g[gap.from].push({to:gap.to,b,d,gap:true});
+    g[gap.to].push({to:gap.from,b:(b+180)%360,d,gap:true});
+  }
+
+  const nd=S.nodes[startId];
+  if(!nd) return {route:[],juncCount:0,totalDist:0};
+
+  const route=[{nodeId:startId,lat:nd.lat,lon:nd.lon,cumDist:0,isJunc:false}];
+  let cur=startId, prev=null, curBear=initBearing, cumDist=0, juncCount=0;
+  let steps=0, firstStep=true;
+
+  while(cumDist<maxDist&&steps++<8000){
+    const exits=g[cur]||[];
+    let avail=prev?exits.filter(e=>e.to!==prev):exits;
+    if(avail.length===0){
+      const ut=exits.find(e=>e.to===prev);
+      if(!ut) break;
+      avail=[ut];
+    }
+
+    let chosen;
+
+    // Check override
+    if(overrides[cur]!=null){
+      const ov=avail.find(e=>String(e.to)===String(overrides[cur]));
+      if(ov) chosen=ov;
+    }
+
+    if(!chosen){
+      if(avail.length===1){
+        chosen=avail[0];
+      } else if(firstStep){
+        // First step: go closest to initial bearing
+        const scored=avail.map(e=>({...e,diff:Math.abs(relAngle(initBearing,e.b))}));
+        scored.sort((a,b)=>a.diff-b.diff);
+        chosen=scored[0];
+        juncCount++;
+      } else {
+        juncCount++;
+        const scored=avail.map(e=>({...e,rel:relAngle(curBear,e.b)}));
+        // Prefer non-U-turns
+        const nonU=scored.filter(e=>Math.abs(e.rel)<160);
+        const pool=nonU.length?nonU:scored;
+        if(rule==='right') pool.sort((a,b)=>b.rel-a.rel);
+        else               pool.sort((a,b)=>a.rel-b.rel);
+        chosen=pool[0];
+      }
+    }
+
+    firstStep=false;
+    cumDist+=chosen.d;
+    prev=cur; cur=chosen.to; curBear=chosen.b;
+
+    const n=S.nodes[cur];
+    if(!n) break;
+
+    const deg=(g[cur]||[]).length;
+    route.push({
+      nodeId:cur, lat:n.lat, lon:n.lon, cumDist,
+      isJunc: deg>2&&avail.length>1&&!chosen.gap
+    });
+  }
+
+  return {route,juncCount,totalDist:cumDist};
+}
+
+// ─────────────────────────────────────────────
+// Main run
+// ─────────────────────────────────────────────
+async function run() {
+  if(!S.lat) return;
+  const dist=parseFloat(document.getElementById('dist-inp').value);
+  if(!dist||dist<=0){setStatus('Enter a valid distance','err');return;}
+  S.dist=dist;
+
+  clearDisplay();
+  document.getElementById('run-btn').disabled=true;
+  setStatus('<span class="sp"></span>Fetching OSM data…','run');
+  setMode('fetching');
+
+  try {
+    const data=await fetchOSM(S.lat,S.lon,dist);
+    setStatus('<span class="sp"></span>Building graph…','run');
+    setMode('computing');
+
+    const {nodes,graph}=buildGraph(data);
+    S.nodes=nodes; S.graph=graph;
+
+    S.startNode=nearestNode(S.lat,S.lon,nodes);
+    if(!S.startNode) throw new Error('No OSM nodes found near this point');
+
+    const res=traverse(S.startNode,S.bearing,dist,S.rule,S.overrides,S.gaps);
+    if(res.route.length<2) throw new Error('Route too short — try a different start or direction');
+
+    S.route=res.route; S.juncCount=res.juncCount; S.totalDist=res.totalDist;
+
+    drawRoute(); drawJunctionDots();
+    updateStats(); showSections();
+
+    setStatus('Route: '+res.totalDist.toFixed(2)+' km · '+res.juncCount+' junctions','ok');
+    setMode('done');
+    saveURL();
+  } catch(err) {
+    setStatus('Error: '+err.message,'err');
+    setMode('error');
+    console.error(err);
+  }
+  document.getElementById('run-btn').disabled=false;
+}
+
+// ─────────────────────────────────────────────
+// Draw helpers
+// ─────────────────────────────────────────────
+function routeColor(t) {
+  return `hsl(${t*270},88%,55%)`;
+}
+
+function clearDisplay() {
+  S.lRoute.forEach(l=>map.removeLayer(l)); S.lRoute=[];
+  S.lJunc.forEach(l=>map.removeLayer(l));  S.lJunc=[];
+  S.lGaps.forEach(l=>map.removeLayer(l));  S.lGaps=[];
+  if(S.mScrub){map.removeLayer(S.mScrub);S.mScrub=null;}
+}
+
+function drawRoute() {
+  const rt=S.route;
+  if(rt.length<2) return;
+  const td=rt[rt.length-1].cumDist;
+
+  for(let i=0;i<rt.length-1;i++){
+    const t=rt[i].cumDist/td;
+    const seg=L.polyline([[rt[i].lat,rt[i].lon],[rt[i+1].lat,rt[i+1].lon]],
+      {color:routeColor(t),weight:4,opacity:.9,lineJoin:'round',lineCap:'round'});
+    seg.addTo(map); S.lRoute.push(seg);
+  }
+
+  map.fitBounds(L.latLngBounds(rt.map(p=>[p.lat,p.lon])),{padding:[50,50]});
+  setupScrubber();
+}
+
+function drawJunctionDots() {
+  const seen=new Set();
+  S.route.forEach((pt,idx)=>{
+    if(!pt.isJunc||seen.has(pt.nodeId)) return;
+    seen.add(pt.nodeId);
+    const ico=L.divIcon({
+      html:`<div style="width:8px;height:8px;background:#f5a623;border:1.5px solid rgba(0,0,0,.5);border-radius:50%;opacity:.75;cursor:pointer"></div>`,
+      className:'',iconSize:[8,8],iconAnchor:[4,4]
+    });
+    const m=L.marker([pt.lat,pt.lon],{icon:ico,zIndexOffset:200});
+    m.on('click',e=>{L.DomEvent.stopPropagation(e);showJuncPopup(pt.nodeId,idx,[pt.lat,pt.lon]);});
+    m.addTo(map); S.lJunc.push(m);
+  });
+}
+
+function drawGaps() {
+  S.lGaps.forEach(l=>map.removeLayer(l)); S.lGaps=[];
+  for(const gap of S.gaps){
+    const fn=S.nodes[gap.from],tn=S.nodes[gap.to];
+    if(!fn||!tn) continue;
+    const l=L.polyline([[fn.lat,fn.lon],[tn.lat,tn.lon]],
+      {color:'#61afef',weight:2,dashArray:'5,4',opacity:.75});
+    l.addTo(map); S.lGaps.push(l);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Junction popup
+// ─────────────────────────────────────────────
+function showJuncPopup(nodeId, idx, latlng) {
+  const exits=S.graph[nodeId]||[];
+  const pt=S.route[idx], prevPt=S.route[idx-1], nextPt=S.route[idx+1];
+  const inc=prevPt?bear(prevPt.lat,prevPt.lon,pt.lat,pt.lon):S.bearing;
+  const curTo=nextPt?String(nextPt.nodeId):null;
+  const ovTo=S.overrides[nodeId]!=null?String(S.overrides[nodeId]):null;
+
+  const seen=new Set();
+  const uniq=exits.filter(e=>{if(seen.has(e.to)) return false;seen.add(e.to);return true;});
+
+  let html=`<div class="jp-title">Junction Override</div>
+  <div class="jp-sub">Select exit from ${uniq.length} options</div>`;
+
+  for(const e of uniq){
+    const rel=relAngle(inc,e.b);
+    const relStr=(rel>0?'+':'')+rel.toFixed(0)+'° '+(rel>0?'R':'L');
+    const isCur=String(e.to)===curTo;
+    const isOv=String(e.to)===ovTo;
+    html+=`<div class="jp-exit${isCur?' cur':''}${isOv?' ov':''}"
+      onclick="applyOv('${nodeId}','${e.to}',${idx})">
+      <span>${bearCard(e.b)} ${e.b.toFixed(0)}°</span>
+      <span class="jp-badge">${relStr}</span>
+    </div>`;
+  }
+
+  if(ovTo){
+    html+=`<div class="jp-clear" onclick="clearOvNode('${nodeId}',${idx})">clear override</div>`;
+  }
+
+  L.popup({closeButton:true,maxWidth:230}).setLatLng(latlng).setContent(html).openOn(map);
+}
+
+function applyOv(nodeId, toNode, idx) {
+  S.overrides[nodeId]=toNode;
+  map.closePopup();
+  rerunFrom(idx);
+}
+function clearOvNode(nodeId, idx) {
+  delete S.overrides[nodeId];
+  map.closePopup();
+  rerunFrom(idx);
+}
+
+function rerunFrom(idx) {
+  const partial=S.route.slice(0,idx+1);
+  const last=partial[partial.length-1];
+  const prev2=partial.length>1?partial[partial.length-2]:null;
+  const inc=prev2?bear(prev2.lat,prev2.lon,last.lat,last.lon):S.bearing;
+  const remDist=S.dist-last.cumDist;
+  if(remDist<=0){S.route=partial;redrawAll();return;}
+
+  const res=traverse(last.nodeId,inc,remDist,S.rule,S.overrides,S.gaps);
+  const off=last.cumDist;
+  res.route.forEach(p=>p.cumDist+=off);
+  S.route=[...partial,...res.route.slice(1)];
+  S.juncCount=res.juncCount; // approximate
+  S.totalDist=S.route[S.route.length-1]?.cumDist||0;
+  redrawAll();
+  saveURL();
+}
+
+function redrawAll() {
+  clearDisplay();
+  drawRoute(); drawJunctionDots(); drawGaps();
+  updateStats();
+}
+
+// ─────────────────────────────────────────────
+// Gap bridging
+// ─────────────────────────────────────────────
+function toggleGap() {
+  S.gapMode=!S.gapMode; S.gapFrom=null;
+  const btn=document.getElementById('btn-gap');
+  if(S.gapMode){
+    btn.textContent='Click gap start…'; btn.classList.add('active');
+    map.getContainer().style.cursor='crosshair';
+  } else {
+    btn.textContent='Bridge Gap'; btn.classList.remove('active');
+    map.getContainer().style.cursor='';
+  }
+}
+
+function handleGapClick(la,lo) {
+  const id=nearestNode(la,lo,S.nodes);
+  if(!id){setStatus('No nearby OSM node found','err');return;}
+  if(!S.gapFrom){
+    S.gapFrom=id;
+    document.getElementById('btn-gap').textContent='Click gap end…';
+    const n=S.nodes[id];
+    const m=L.circleMarker([n.lat,n.lon],{radius:7,color:'#f5a623',fillColor:'#f5a623',fillOpacity:.25,weight:2});
+    m.addTo(map); S.lGaps.push(m);
+  } else {
+    S.gaps.push({from:S.gapFrom,to:id});
+    S.gapFrom=null; toggleGap();
+    drawGaps();
+    run();
+  }
+}
+
+function clearOv() {
+  S.overrides={}; S.gaps=[];
+  if(S.route.length) run();
+}
+
+// ─────────────────────────────────────────────
+// Stats & sections
+// ─────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('sv-dist').textContent=S.totalDist.toFixed(2);
+  document.getElementById('sv-junc').textContent=S.juncCount;
+}
+function showSections() {
+  ['s-stats','s-scr','s-ov','s-exp'].forEach(id=>{
+    document.getElementById(id).style.display='block';
+  });
+}
+
+// ─────────────────────────────────────────────
+// Scrubber
+// ─────────────────────────────────────────────
+function setupScrubber() {
+  if(!S.route.length) return;
+  const scrIcon=L.divIcon({
+    html:`<div style="width:12px;height:12px;background:#fff;border:2px solid #f5a623;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>`,
+    className:'',iconSize:[12,12],iconAnchor:[6,6]
+  });
+  const p0=S.route[0];
+  S.mScrub=L.marker([p0.lat,p0.lon],{icon:scrIcon,zIndexOffset:1000}).addTo(map);
+
+  const track=document.getElementById('scr-track');
+  const thumb=document.getElementById('scr-thumb');
+  const fill=document.getElementById('scr-fill');
+  let dragging=false;
+
+  function moveScrubber(clientX){
+    const rect=track.getBoundingClientRect();
+    const t=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
+    S.scrT=t;
+    fill.style.width=(t*100)+'%';
+    thumb.style.left=(t*100)+'%';
+    const td=S.route[S.route.length-1].cumDist;
+    const target=t*td;
+    let best=S.route[0];
+    for(const p of S.route){ if(p.cumDist<=target) best=p; }
+    S.mScrub.setLatLng([best.lat,best.lon]);
+    document.getElementById('scr-pos').textContent=best.cumDist.toFixed(2)+' km';
+  }
+
+  track.addEventListener('mousedown',e=>{dragging=true;moveScrubber(e.clientX);});
+  document.addEventListener('mousemove',e=>{if(dragging)moveScrubber(e.clientX);});
+  document.addEventListener('mouseup',()=>dragging=false);
+  track.addEventListener('click',e=>moveScrubber(e.clientX));
+
+  fill.style.width='0%'; thumb.style.left='0%';
+  document.getElementById('scr-pos').textContent='0.00 km';
+}
+
+// ─────────────────────────────────────────────
+// GPX export
+// ─────────────────────────────────────────────
+function exportGPX() {
+  if(!S.route.length) return;
+  const pts=S.route.map(p=>`    <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"></trkpt>`).join('\n');
+  const gpx=`<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Hand Rule Walk Generator" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${S.rule==='right'?'Right':'Left'}-Hand Rule Walk</name>
+    <desc>Start: ${S.lat?.toFixed(5)}, ${S.lon?.toFixed(5)} | ${S.totalDist.toFixed(2)} km | ${S.juncCount} junctions</desc>
+    <trkseg>
+${pts}
+    </trkseg>
+  </trk>
+</gpx>`;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([gpx],{type:'application/gpx+xml'}));
+  a.download='hand-rule-walk.gpx'; a.click();
+}
+
+// ─────────────────────────────────────────────
+// URL state
+// ─────────────────────────────────────────────
+function saveURL() {
+  if(!S.lat) return;
+  const p={lat:S.lat.toFixed(6),lon:S.lon.toFixed(6),b:S.bearing,d:S.dist,r:S.rule};
+  if(Object.keys(S.overrides).length) p.ov=btoa(JSON.stringify(S.overrides));
+  if(S.gaps.length) p.gp=btoa(JSON.stringify(S.gaps));
+  history.replaceState(null,'','?'+new URLSearchParams(p));
+  return location.href;
+}
+
+function shareLink() {
+  const url=saveURL();
+  if(!url){setStatus('Generate a route first','err');return;}
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(()=>setStatus('Link copied!','ok'));
+  } else {
+    prompt('Share link:',url);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Load from URL
+// ─────────────────────────────────────────────
+(function loadURL(){
+  const p=new URLSearchParams(location.search);
+  if(!p.has('lat')) return;
+  const la=parseFloat(p.get('lat')), lo=parseFloat(p.get('lon'));
+  setBearing(parseInt(p.get('b')||'0'));
+  document.getElementById('dist-inp').value=p.get('d')||'2';
+  setRule(p.get('r')||'right');
+  if(p.has('ov')){try{S.overrides=JSON.parse(atob(p.get('ov')));}catch(e){}}
+  if(p.has('gp')){try{S.gaps=JSON.parse(atob(p.get('gp')));}catch(e){}}
+  placePin(la,lo);
+  map.setView([la,lo],15);
+  setTimeout(run,400);
+})();
+</script>
+</body>
+</html>
