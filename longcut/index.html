@@ -69,6 +69,13 @@ html,body{height:100%;font:14px/1.4 system-ui,sans-serif;color:var(--text);backg
 }
 .tbtn.active{background:var(--accent);color:white;border-color:var(--accent)}
 
+/* Preset buttons (path priority) */
+.pbtn{
+  flex:1;padding:6px 4px;border:1px solid var(--border);border-radius:6px;
+  background:var(--btn);cursor:pointer;font-size:11px;font-weight:500;text-align:center;line-height:1.2
+}
+.pbtn.active{background:var(--accent);color:white;border-color:var(--accent)}
+
 /* Select */
 select{
   width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
@@ -155,6 +162,16 @@ select{
       </select>
     </div>
 
+    <div class="sect">
+      <label>Path priority <span id="stretch-val" style="float:right;color:var(--text);font-weight:600">1.0×</span></label>
+      <input type="range" id="stretch" min="1" max="3" step="0.1" value="1" style="width:100%;cursor:pointer;accent-color:var(--accent)"/>
+      <div class="trow" style="margin-top:8px">
+        <button class="pbtn active" data-s="1">Balanced</button>
+        <button class="pbtn" data-s="2">Prefer quiet</button>
+        <button class="pbtn" data-s="3">Quiet at all costs</button>
+      </div>
+    </div>
+
     <div style="display:flex;gap:8px;margin:12px 14px 0">
       <button id="run-btn" disabled style="margin:0;flex:1">Find Route</button>
       <button id="clear-btn" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--btn);cursor:pointer;font-size:13px;white-space:nowrap">Clear</button>
@@ -168,7 +185,7 @@ select{
       <div class="sv"><span class="svl">Route distance</span><span class="svv" id="sv-dist">—</span></div>
       <div class="sv"><span class="svl">Estimated time</span><span class="svv" id="sv-time">—</span></div>
       <div class="sv"><span class="svl">Direct distance</span><span class="svv" id="sv-direct">—</span></div>
-      <div class="sv"><span class="svl">Quiet roads/paths</span><span class="svv" id="sv-quiet">—</span></div>
+      <div class="sv"><span class="svl">Quietness</span><span class="svv" id="sv-quiet">—</span></div>
     </div>
 
     <button id="gpx-btn">⬇ Export GPX</button>
@@ -205,7 +222,14 @@ const BIKE_COST = {
   cycleway:1,track:3,footway:25,path:5
 };
 
-const QUIET_HW = new Set(['path','footway','track','cycleway','living_street','pedestrian']);
+// Niceness scale for the quietness score (higher = nicer). This is a FIXED
+// yardstick: it never changes with the stretch slider, so the displayed
+// "Quietness X/10" is a stable way to compare routes.
+const NICE = {
+  motorway:0,trunk:0,primary:0,secondary:1,tertiary:3,
+  unclassified:5,residential:6,living_street:8,pedestrian:8,
+  track:9,cycleway:9,footway:10,path:10
+};
 
 // ── Map ────────────────────────────────────────────────────────────────────
 const map = L.map('map',{center:[-36.8509,174.7645],zoom:13,zoomControl:true});
@@ -219,7 +243,7 @@ const S = {
   mode:'walk', route:null,
   // Cached graph (built once per Find Route, reused by Regenerate / drag-edit)
   graph:null, nodes:null, mainComp:null,
-  startId:null, endId:null, detour:2,
+  startId:null, endId:null, detour:2, stretch:1,
   anchors:null,     // ordered node IDs: [start, ...waypoints, end]
   routePath:null,   // node IDs of the currently displayed route
   penalties:null,   // Map<edgeKey, multiplier> -- pushes Regenerate to new routes
@@ -349,6 +373,36 @@ document.getElementById('m-bike').onclick=()=>{
   invalidateRoute();
 };
 
+// ── Path-priority stretch (slider + presets) ───────────────────────────────
+const stretchEl=document.getElementById('stretch');
+const stretchVal=document.getElementById('stretch-val');
+function syncPresets(v){
+  document.querySelectorAll('.pbtn').forEach(b=>{
+    b.classList.toggle('active', parseFloat(b.dataset.s)===v);
+  });
+}
+function applyStretch(v, reroute){
+  S.stretch=v;
+  stretchEl.value=v;
+  stretchVal.textContent=v.toFixed(1)+'×';
+  syncPresets(v);
+  // Re-route on the cached graph -- stretch is applied at routing time, so no
+  // refetch or rebuild is needed.
+  if(reroute && S.graph && S.anchors){
+    if(computeAndRender(false)) setStatus(`Quietness ${S.quietness.toFixed(1)}/10 · ${S.totalDist.toFixed(2)} km`,'ok');
+    else setStatus('No route at this priority within the detour limit. Raise Max detour or lower Path priority.','err');
+  }
+}
+stretchEl.addEventListener('input',()=>{ // live label, no reroute mid-drag
+  const v=parseFloat(stretchEl.value);
+  stretchVal.textContent=v.toFixed(1)+'×';
+  syncPresets(v);
+});
+stretchEl.addEventListener('change',()=>applyStretch(parseFloat(stretchEl.value),true));
+document.querySelectorAll('.pbtn').forEach(b=>{
+  b.onclick=()=>applyStretch(parseFloat(b.dataset.s),true);
+});
+
 // ── Haversine ──────────────────────────────────────────────────────────────
 function hav(la,lo,lb,ob){
   const R=6371,dLa=(lb-la)*Math.PI/180,dLo=(ob-lo)*Math.PI/180;
@@ -386,59 +440,93 @@ async function fetchOSM(bbox) {
 }
 
 // ── Build graph ────────────────────────────────────────────────────────────
+// Each directed edge stores baseMult (cost multiplier for this mode, after any
+// parallel-path reclassification) and points (fixed niceness score). The stretch
+// slider is applied later, at routing time, so changing it never rebuilds the graph.
+const PATH_HW = new Set(['footway','path','track','cycleway']);
+const ROAD_HW = new Set(['primary','secondary','tertiary','unclassified','residential','living_street']);
+
 function buildGraph(data, mode) {
   const costs = mode==='walk' ? WALK_COST : BIKE_COST;
   const nodes = {};
-  const graph = {}; // nodeId -> [{to, d, hw, cost}]
+  const graph = {}; // nodeId -> [{to, d, hw, baseMult, points}]
 
   for(const el of data.elements) {
     if(el.type==='node') nodes[el.id]={lat:el.lat,lon:el.lon};
   }
 
-  // Build a spatial grid of road-type nodes so we can detect parallel paths.
-  // "Road" here = residential or better (not footway/path/cycleway/track).
-  const ROAD_HW = new Set(['primary','secondary','tertiary','unclassified','residential','living_street']);
+  // Spatial grid of road nodes (with their class) for proximity + adjacency,
+  // plus a set of road node IDs for counting genuine path/road connections.
   const CELL = 0.00022; // ~24 m per cell
   const roadGrid = new Map();
+  const roadNodeIds = new Set();
   const gridKey = (lat,lon)=>`${Math.floor(lat/CELL)},${Math.floor(lon/CELL)}`;
-  const addRoadNode = (lat,lon)=>{
-    const k=gridKey(lat,lon);
-    if(!roadGrid.has(k)) roadGrid.set(k,[]);
-    roadGrid.get(k).push({lat,lon});
-  };
 
   for(const el of data.elements) {
     if(el.type!=='way') continue;
     if(!ROAD_HW.has(el.tags?.highway)) continue;
+    const hw=el.tags.highway;
     for(const nid of el.nodes){
       const n=nodes[String(nid)];
-      if(n) addRoadNode(n.lat,n.lon);
+      if(!n) continue;
+      roadNodeIds.add(String(nid));
+      const k=gridKey(n.lat,n.lon);
+      if(!roadGrid.has(k)) roadGrid.set(k,[]);
+      roadGrid.get(k).push({lat:n.lat,lon:n.lon,hw});
     }
   }
 
-  // Is a lat/lon within ~30 m of any road node?
-  const nearRoad = (lat,lon)=>{
+  // Nearest road node within ~30 m, returning its class (or null if none near).
+  const nearestRoadHw = (lat,lon)=>{
     const gi=Math.floor(lat/CELL), gj=Math.floor(lon/CELL);
+    let best=null, bd=0.030;
     for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){
       for(const p of (roadGrid.get(`${gi+di},${gj+dj}`)||[])){
-        if(hav(lat,lon,p.lat,p.lon)<0.030) return true;
+        const dd=hav(lat,lon,p.lat,p.lon);
+        if(dd<bd){bd=dd;best=p.hw;}
       }
     }
-    return false;
+    return best;
   };
 
   for(const el of data.elements) {
     if(el.type!=='way') continue;
     const hw = el.tags?.highway||'unclassified';
-    let costMult = costs[hw] ?? 10;
+    let baseMult = costs[hw] ?? 10;
+    let points   = NICE[hw] ?? 4;
 
-    // Parallel-path detection: if this is a small path and >50% of its nodes
-    // are within 30 m of a road, treat it as road-grade (not a quiet shortcut).
-    if(['footway','path','track','cycleway'].includes(hw)) {
-      let near=0;
-      for(const nid of el.nodes){ const n=nodes[String(nid)]; if(n&&nearRoad(n.lat,n.lon)) near++; }
-      if(near > el.nodes.length*0.5) {
-        costMult = Math.max(costMult, 12);
+    // ── Parallel-path classification ──────────────────────────────────────
+    // A path that runs alongside a road can be one of two very different things:
+    //   1. The pavement / access path OF that road (joins it constantly).
+    //   2. A genuinely separate path that merely runs beside it, e.g. a
+    //      cycleway along a motorway (rarely joins the road network).
+    // We keep #2 at full path value, and demote #1 to the class of the road it
+    // hugs (honest cost + niceness). The discriminator is connections per km:
+    // pavements join the road every block; separated paths join rarely.
+    if(PATH_HW.has(hw)) {
+      let near=0, len=0;
+      const adjTally={};
+      for(let i=0;i<el.nodes.length;i++){
+        const n=nodes[String(el.nodes[i])];
+        if(!n) continue;
+        if(i>0){const p=nodes[String(el.nodes[i-1])]; if(p) len+=hav(p.lat,p.lon,n.lat,n.lon);}
+        const adj=nearestRoadHw(n.lat,n.lon);
+        if(adj){ near++; adjTally[adj]=(adjTally[adj]||0)+1; }
+      }
+      const proximityFrac = near/el.nodes.length;
+      if(proximityFrac>0.5 && len>0){
+        // Count shared junction nodes with the road network.
+        let conns=0;
+        for(const nid of el.nodes) if(roadNodeIds.has(String(nid))) conns++;
+        const connPerKm = conns/len;
+        if(connPerKm>=3){
+          // Pavement of a road -> demote to that road's class.
+          let adjHw='tertiary', bestN=-1;
+          for(const k in adjTally) if(adjTally[k]>bestN){bestN=adjTally[k];adjHw=k;}
+          baseMult = Math.max(baseMult, costs[adjHw] ?? 12);
+          points   = Math.min(points,   NICE[adjHw] ?? 3);
+        }
+        // else: separated path -> keep full path value.
       }
     }
 
@@ -454,8 +542,8 @@ function buildGraph(data, mode) {
       if(d===0) continue;
       if(!graph[aId]) graph[aId]=[];
       if(!graph[bId]) graph[bId]=[];
-      graph[aId].push({to:bId,d,hw,cost:d*costMult});
-      graph[bId].push({to:aId,d,hw,cost:d*costMult});
+      graph[aId].push({to:bId,d,hw,baseMult,points});
+      graph[bId].push({to:aId,d,hw,baseMult,points});
     }
   }
 
@@ -578,7 +666,10 @@ function aStar(graph, nodes, startId, endId, detourFactor, penalties) {
       if(!nodes[e.to]) continue;
       if(!inEllipse(e.to)) continue;
       const pen = penalties ? (penalties.get(ek(cur,e.to))||1) : 1;
-      const g=(gScore.get(cur)||0)+e.cost*pen;
+      // Linear stretch: mult = 1 + (base-1)*stretch. Paths (base 1) stay at 1,
+      // so the heuristic (min cost/km = 1) stays admissible at any stretch.
+      const mult = 1 + (e.baseMult-1)*(S.stretch||1);
+      const g=(gScore.get(cur)||0)+e.d*mult*pen;
       if(g<(gScore.get(e.to)??Infinity)){
         gScore.set(e.to,g);
         prev.set(e.to,cur);
@@ -651,23 +742,25 @@ function renderRoute(path, nodes, graph, fit=true) {
 
   routeLayer=group;
 
-  // Quiet road percentage
-  let quietD=0;
+  // Quietness score: length-weighted average niceness (fixed base scale, so it
+  // is comparable across stretch settings). 10 = all paths, 0 = all main road.
+  let pointsKm=0;
   for(let i=1;i<path.length;i++){
-    const edges=(graph[path[i-1]]||[]).filter(e=>String(e.to)===String(path[i]));
-    if(edges.length&&QUIET_HW.has(edges[0].hw)) quietD+=edges[0].d;
+    const e=(graph[path[i-1]]||[]).find(e=>String(e.to)===String(path[i]));
+    if(e) pointsKm+=e.d*(e.points??4);
   }
+  const quietness=totalD>0?pointsKm/totalD:0;
 
   const directD=hav(coords[0].lat,coords[0].lon,coords[coords.length-1].lat,coords[coords.length-1].lon);
   const detourActual=directD>0?totalD/directD:1;
-  const pct=totalD>0?Math.round(quietD/totalD*100):0;
   const speed=S.mode==='walk'?WALK_SPEED:BIKE_SPEED;
   const mins=Math.round(totalD/speed*60);
 
   document.getElementById('sv-dist').textContent=totalD.toFixed(2)+' km';
   document.getElementById('sv-time').textContent=mins>=60?`${Math.floor(mins/60)}h ${mins%60}m`:`${mins} min`;
   document.getElementById('sv-direct').textContent=directD.toFixed(2)+' km ('+detourActual.toFixed(1)+'× detour)';
-  document.getElementById('sv-quiet').textContent=pct+'%';
+  document.getElementById('sv-quiet').textContent=quietness.toFixed(1)+' / 10';
+  S.quietness=quietness;
   document.getElementById('stats').style.display='block';
   document.getElementById('gpx-btn').style.display='block';
   document.getElementById('regen-btn').style.display='block';
@@ -856,6 +949,7 @@ async function run() {
     // Cache everything so Regenerate / drag-edit reuse it without refetching.
     S.graph=graph; S.nodes=nodes; S.mainComp=mainComp;
     S.startId=startId; S.endId=endId; S.detour=detour;
+    S.stretch=parseFloat(document.getElementById('stretch').value);
     S.anchors=[startId,endId]; S.penalties=new Map();
 
     setStatus('Finding route…','info');
