@@ -62,7 +62,7 @@ CASE_STUDY_TOOL = {
             },
             "the_tension": {
                 "type": "string",
-                "description": "One tight paragraph, around 100-120 words. What is the core business problem? Name the IB BM concepts at work. No em dashes.",
+                "description": "One tight paragraph, around 100-120 words. What is the core business problem and the key tensions in the business decision? Apply IB BM concepts naturally through the analysis -- do not label them explicitly (e.g. do not write 'The IB concept of X'). No em dashes.",
             },
             "outside_view": {
                 "type": "string",

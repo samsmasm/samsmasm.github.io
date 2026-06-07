@@ -83,7 +83,7 @@ The key developments. Factual, clear, no editorialising.
 Key numbers -- revenue, growth rate, margins, market share, job cuts, whatever is relevant. Presented simply with context.
 
 ### 5. The Tension
-2-3 paragraphs of prose. What is the core business problem here? What competing pressures or interests are at play? This is the analytical heart. Name the IB BM concepts at work.
+2-3 paragraphs of prose. What is the core business problem here? What competing pressures or interests are at play? This is the analytical heart. Apply IB BM concepts naturally through the analysis -- do not label them explicitly (e.g. do not write "The IB concept of X").
 
 ### 6. Outside View (if available)
 One paragraph. How are journalists, analysts, or competitors interpreting this differently from how the company frames it?
