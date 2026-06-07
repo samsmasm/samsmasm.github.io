@@ -427,11 +427,14 @@ function buildGraph(data, mode) {
 
     for(let i=0;i<el.nodes.length-1;i++){
       // Normalise to strings so Map/Set lookups in A* use consistent types.
+      // NOTE: do not skip short segments here -- closely spaced nodes at
+      // junctions/curves are load-bearing for connectivity. Dropping them
+      // shatters the graph into thousands of disconnected islands.
       const aId=String(el.nodes[i]), bId=String(el.nodes[i+1]);
       const a=nodes[aId], b=nodes[bId];
       if(!a||!b) continue;
       const d=hav(a.lat,a.lon,b.lat,b.lon);
-      if(d<0.003) continue;
+      if(d===0) continue;
       if(!graph[aId]) graph[aId]=[];
       if(!graph[bId]) graph[bId]=[];
       graph[aId].push({to:bId,d,hw,cost:d*costMult});
@@ -442,14 +445,37 @@ function buildGraph(data, mode) {
   return {graph,nodes};
 }
 
-// ── Snap to nearest graph node ────────────────────────────────────────────
-// Must only snap to nodes that are in the graph (have edges).
-// OSM data includes isolated nodes (bus stops, POIs) that are not part of
-// any way -- snapping to one of those gives A* nothing to traverse.
-function snapNode(lat, lon, nodes, graph) {
+// ── Largest connected component ───────────────────────────────────────────
+// The graph naturally splits into pieces (bbox clipping, ways that don't
+// share junction nodes). Snapping start/end into the same large component
+// guarantees they're mutually reachable.
+function largestComponent(graph) {
+  const seen=new Set();
+  let best=new Set();
+  for(const start of Object.keys(graph)){
+    if(seen.has(start)) continue;
+    const comp=new Set([start]);
+    const queue=[start];
+    seen.add(start);
+    while(queue.length){
+      const c=queue.shift();
+      for(const e of (graph[c]||[])){
+        if(!seen.has(e.to)){seen.add(e.to);comp.add(e.to);queue.push(e.to);}
+      }
+    }
+    if(comp.size>best.size) best=comp;
+  }
+  return best;
+}
+
+// ── Snap to nearest routable node ─────────────────────────────────────────
+// Only considers nodes in `valid` (the main connected component), so the
+// snapped node always has a real network around it to traverse.
+function snapNode(lat, lon, nodes, valid) {
   let bestId=null, bestD=Infinity;
-  for(const [id,n] of Object.entries(nodes)){
-    if(!graph[id]||graph[id].length===0) continue;
+  for(const id of valid){
+    const n=nodes[id];
+    if(!n) continue;
     const d=hav(lat,lon,n.lat,n.lon);
     if(d<bestD){bestD=d;bestId=id;}
   }
@@ -635,8 +661,11 @@ async function run() {
     setStatus('Building graph…','info');
     const {graph,nodes}=buildGraph(data,S.mode);
 
-    const startId=snapNode(sLat,sLon,nodes,graph);
-    const endId=snapNode(eLat,eLon,nodes,graph);
+    const mainComp=largestComponent(graph);
+    if(mainComp.size===0){setStatus('No connected road network found here.','err');return;}
+
+    const startId=snapNode(sLat,sLon,nodes,mainComp);
+    const endId=snapNode(eLat,eLon,nodes,mainComp);
     if(!startId||!endId){setStatus('Could not snap to any road node.','err');return;}
 
     setStatus('Finding route…','info');
