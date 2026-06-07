@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Navigate – Quiet Routes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0ede7;--panel:#faf8f5;--border:#dbd7cf;
+  --start:#2d7a3c;--end:#b83232;--accent:#2570b5;
+  --text:#1e1c19;--dim:#8a8278;--btn:#e8e4df;--btn-h:#dbd7cf
+}
+html,body{height:100%;font:14px/1.4 system-ui,sans-serif;color:var(--text);background:var(--bg)}
+#wrap{display:flex;height:100%;overflow:hidden}
+#panel{
+  width:290px;min-width:290px;background:var(--panel);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;z-index:600
+}
+#map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%}
+#map-spinner{
+  display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(250,248,245,.95);border:1px solid var(--border);border-radius:8px;
+  padding:8px 16px;font-size:13px;z-index:500;white-space:nowrap
+}
+
+/* Panel parts */
+.p-head{padding:16px 16px 10px;border-bottom:1px solid var(--border)}
+.p-head h1{font-size:21px;font-weight:700;letter-spacing:-.5px}
+.p-head p{font-size:11px;color:var(--dim);margin-top:2px}
+.sect{padding:11px 14px;border-bottom:1px solid var(--border)}
+.sect label{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px}
+
+/* Search */
+.srow{display:flex;gap:5px;align-items:flex-start;position:relative}
+.swrap{flex:1;position:relative}
+.sinput{
+  width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+  background:white;font-size:13px;color:var(--text);outline:none;transition:border .15s,box-shadow .15s
+}
+.sinput:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,112,181,.12)}
+.sinput.placing-s{border-color:var(--start);box-shadow:0 0 0 2px rgba(45,122,60,.15)}
+.sinput.placing-e{border-color:var(--end);box-shadow:0 0 0 2px rgba(184,50,50,.15)}
+.sdrop{
+  position:absolute;top:calc(100% + 2px);left:0;right:0;
+  background:white;border:1px solid var(--border);border-radius:6px;
+  box-shadow:0 4px 14px rgba(0,0,0,.1);z-index:2000;overflow:hidden;display:none
+}
+.sdrop div{padding:7px 10px;font-size:12px;cursor:pointer;line-height:1.35;border-bottom:1px solid var(--bg)}
+.sdrop div:last-child{border-bottom:none}
+.sdrop div:hover{background:var(--bg)}
+.pin-btn{
+  flex-shrink:0;width:32px;height:32px;border:1px solid var(--border);border-radius:6px;
+  background:var(--btn);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center
+}
+.pin-btn:hover{background:var(--btn-h)}
+.pin-btn.act-s{background:var(--start);color:white;border-color:var(--start)}
+.pin-btn.act-e{background:var(--end);color:white;border-color:var(--end)}
+
+/* Mode toggle */
+.trow{display:flex;gap:6px}
+.tbtn{
+  flex:1;padding:7px;border:1px solid var(--border);border-radius:6px;
+  background:var(--btn);cursor:pointer;font-size:13px;font-weight:500;text-align:center
+}
+.tbtn.active{background:var(--accent);color:white;border-color:var(--accent)}
+
+/* Select */
+select{
+  width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+  background:white;font-size:13px;color:var(--text);cursor:pointer;outline:none
+}
+
+/* Run btn */
+#run-btn{
+  margin:12px 14px;padding:10px;border:none;border-radius:8px;
+  background:var(--accent);color:white;font-size:14px;font-weight:600;cursor:pointer
+}
+#run-btn:hover{opacity:.9}
+#run-btn:disabled{background:var(--dim);cursor:not-allowed}
+
+/* Status */
+#status{margin:0 14px 8px;padding:7px 10px;border-radius:6px;font-size:12px;display:none}
+#status.ok{background:#e8f4eb;color:#1e5c2a}
+#status.err{background:#fdecea;color:#8b1a1a}
+#status.info{background:#e8f0fb;color:#1a3f6f}
+
+/* Stats */
+#stats{margin:0 14px 8px;display:none}
+.sv{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
+.svl{color:var(--dim)}
+.svv{font-weight:600}
+
+/* GPX */
+#gpx-btn{
+  margin:0 14px 14px;padding:8px;border:1px solid var(--border);
+  border-radius:6px;background:var(--btn);cursor:pointer;font-size:12px;display:none
+}
+#gpx-btn:hover{background:var(--btn-h)}
+
+/* Hint */
+#hint{padding:10px 14px 14px;font-size:11px;color:var(--dim);line-height:1.5}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="panel">
+    <div class="p-head">
+      <h1>navigate</h1>
+      <p>Find the quiet way</p>
+    </div>
+
+    <div class="sect">
+      <label>Start</label>
+      <div class="srow">
+        <div class="swrap">
+          <input class="sinput" id="si" placeholder="Search start…" autocomplete="off"/>
+          <div class="sdrop" id="sr"></div>
+        </div>
+        <button class="pin-btn" id="s-pin" title="Click map to place start">📍</button>
+      </div>
+    </div>
+
+    <div class="sect">
+      <label>End</label>
+      <div class="srow">
+        <div class="swrap">
+          <input class="sinput" id="ei" placeholder="Search end…" autocomplete="off"/>
+          <div class="sdrop" id="er"></div>
+        </div>
+        <button class="pin-btn" id="e-pin" title="Click map to place end">🏁</button>
+      </div>
+    </div>
+
+    <div class="sect">
+      <label>Mode</label>
+      <div class="trow">
+        <button class="tbtn active" id="m-walk">🚶 Walk</button>
+        <button class="tbtn" id="m-bike">🚲 Bike</button>
+      </div>
+    </div>
+
+    <div class="sect">
+      <label>Max detour</label>
+      <select id="detour">
+        <option value="1.5">1.5× direct distance</option>
+        <option value="2" selected>2× direct distance</option>
+        <option value="3">3× direct distance</option>
+        <option value="4">4× direct distance</option>
+        <option value="5">5× direct distance</option>
+      </select>
+    </div>
+
+    <button id="run-btn" disabled>Find Route</button>
+
+    <div id="status"></div>
+
+    <div id="stats">
+      <div class="sv"><span class="svl">Route distance</span><span class="svv" id="sv-dist">—</span></div>
+      <div class="sv"><span class="svl">Estimated time</span><span class="svv" id="sv-time">—</span></div>
+      <div class="sv"><span class="svl">Direct distance</span><span class="svv" id="sv-direct">—</span></div>
+      <div class="sv"><span class="svl">Quiet roads/paths</span><span class="svv" id="sv-quiet">—</span></div>
+    </div>
+
+    <button id="gpx-btn">⬇ Export GPX</button>
+
+    <div id="hint">
+      Click the map to place start and end pins, or search above.
+      Drag pins to adjust. The route prefers small roads and standalone paths over main roads.
+    </div>
+  </div>
+
+  <div id="map-wrap">
+    <div id="map-spinner">Finding route…</div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const WALK_SPEED = 5;   // km/h
+const BIKE_SPEED = 15;  // km/h
+
+// Cost multipliers per highway type: lower = route prefers it.
+// footway/path = 1 (best for walking), primary = 80 (avoid).
+const WALK_COST = {
+  motorway:500,trunk:300,primary:80,secondary:35,tertiary:12,
+  unclassified:5,residential:4,living_street:2,pedestrian:2,
+  cycleway:1.5,track:2,footway:1,path:1
+};
+const BIKE_COST = {
+  motorway:500,trunk:300,primary:100,secondary:50,tertiary:15,
+  unclassified:5,residential:4,living_street:2,pedestrian:8,
+  cycleway:1,track:3,footway:25,path:5
+};
+
+const QUIET_HW = new Set(['path','footway','track','cycleway','living_street','pedestrian']);
+
+// ── Map ────────────────────────────────────────────────────────────────────
+const map = L.map('map',{center:[-36.8509,174.7645],zoom:13,zoomControl:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap contributors © CARTO',maxZoom:19
+}).addTo(map);
+
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  startLL:null, endLL:null,
+  mode:'walk', route:null,
+  graph:null, nodes:null, totalDist:0
+};
+let placing = null; // 'start'|'end'|null
+let sMarker = null, eMarker = null, routeLayer = null;
+
+// ── Icons ──────────────────────────────────────────────────────────────────
+function makeIcon(fill) {
+  return L.divIcon({
+    className:'',iconAnchor:[12,32],
+    html:`<svg viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" width="24" height="32">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20S24 21 24 12C24 5.4 18.6 0 12 0z"
+            fill="${fill}" stroke="rgba(0,0,0,.22)" stroke-width="1.2"/>
+      <circle cx="12" cy="12" r="5" fill="white" opacity=".9"/>
+    </svg>`
+  });
+}
+const ICON_S = makeIcon('#2d7a3c');
+const ICON_E = makeIcon('#b83232');
+
+// ── Place pins ─────────────────────────────────────────────────────────────
+function setStart(lat, lon, label) {
+  S.startLL = {lat,lon};
+  if(sMarker) map.removeLayer(sMarker);
+  sMarker = L.marker([lat,lon],{icon:ICON_S,draggable:true}).addTo(map);
+  sMarker.on('dragend',e=>{const p=e.target.getLatLng();S.startLL={lat:p.lat,lon:p.lng};document.getElementById('si').value='';checkRun();});
+  if(label) document.getElementById('si').value=label;
+  checkRun();
+}
+function setEnd(lat, lon, label) {
+  S.endLL = {lat,lon};
+  if(eMarker) map.removeLayer(eMarker);
+  eMarker = L.marker([lat,lon],{icon:ICON_E,draggable:true}).addTo(map);
+  eMarker.on('dragend',e=>{const p=e.target.getLatLng();S.endLL={lat:p.lat,lon:p.lng};document.getElementById('ei').value='';checkRun();});
+  if(label) document.getElementById('ei').value=label;
+  checkRun();
+}
+function checkRun() {
+  document.getElementById('run-btn').disabled=!(S.startLL&&S.endLL);
+}
+
+// ── Placing mode ───────────────────────────────────────────────────────────
+function setPlacing(mode) {
+  placing = mode;
+  const si=document.getElementById('si'), ei=document.getElementById('ei');
+  const sp=document.getElementById('s-pin'), ep=document.getElementById('e-pin');
+  si.classList.toggle('placing-s', mode==='start');
+  ei.classList.toggle('placing-e', mode==='end');
+  si.classList.remove('placing-e'); ei.classList.remove('placing-s');
+  sp.classList.toggle('act-s', mode==='start');
+  ep.classList.toggle('act-e', mode==='end');
+  sp.classList.remove('act-e'); ep.classList.remove('act-s');
+  map.getContainer().style.cursor = mode?'crosshair':'';
+}
+
+map.on('click',e=>{
+  // Auto-advance: if no placing mode set, guess what to place next
+  let mode = placing;
+  if(!mode) {
+    if(!S.startLL) mode='start';
+    else if(!S.endLL) mode='end';
+    else return;
+  }
+  if(mode==='start') {
+    setStart(e.latlng.lat,e.latlng.lng,'');
+    setPlacing(S.endLL?null:'end');
+  } else {
+    setEnd(e.latlng.lat,e.latlng.lng,'');
+    setPlacing(null);
+  }
+});
+
+document.getElementById('s-pin').onclick=()=>setPlacing(placing==='start'?null:'start');
+document.getElementById('e-pin').onclick=()=>setPlacing(placing==='end'?null:'end');
+
+// ── Nominatim search ───────────────────────────────────────────────────────
+function setupSearch(inputId, dropId, onSelect) {
+  const inp=document.getElementById(inputId), drop=document.getElementById(dropId);
+  let t;
+  inp.addEventListener('input',()=>{
+    clearTimeout(t);
+    const q=inp.value.trim();
+    if(q.length<3){drop.style.display='none';return;}
+    t=setTimeout(async()=>{
+      try{
+        const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(q),
+          {headers:{'Accept-Language':'en','User-Agent':'navigate-quiet-routes'}});
+        const data=await r.json();
+        drop.innerHTML='';
+        if(!data.length){drop.style.display='none';return;}
+        data.forEach(d=>{
+          const el=document.createElement('div');
+          el.textContent=d.display_name;
+          el.onclick=()=>{onSelect(+d.lat,+d.lon,d.display_name);drop.style.display='none';};
+          drop.appendChild(el);
+        });
+        drop.style.display='block';
+      }catch(e){}
+    },350);
+  });
+  inp.addEventListener('keydown',e=>{if(e.key==='Escape')drop.style.display='none';});
+  document.addEventListener('click',e=>{if(!inp.contains(e.target)&&!drop.contains(e.target))drop.style.display='none';});
+}
+
+setupSearch('si','sr',(lat,lon,name)=>{
+  setStart(lat,lon,name); map.setView([lat,lon],15); setPlacing(S.endLL?null:'end');
+});
+setupSearch('ei','er',(lat,lon,name)=>{
+  setEnd(lat,lon,name); map.setView([lat,lon],15); setPlacing(null);
+});
+
+// ── Mode toggle ────────────────────────────────────────────────────────────
+document.getElementById('m-walk').onclick=()=>{
+  S.mode='walk';
+  document.getElementById('m-walk').classList.add('active');
+  document.getElementById('m-bike').classList.remove('active');
+};
+document.getElementById('m-bike').onclick=()=>{
+  S.mode='bike';
+  document.getElementById('m-bike').classList.add('active');
+  document.getElementById('m-walk').classList.remove('active');
+};
+
+// ── Haversine ──────────────────────────────────────────────────────────────
+function hav(la,lo,lb,ob){
+  const R=6371,dLa=(lb-la)*Math.PI/180,dLo=(ob-lo)*Math.PI/180;
+  const a=Math.sin(dLa/2)**2+Math.cos(la*Math.PI/180)*Math.cos(lb*Math.PI/180)*Math.sin(dLo/2)**2;
+  return R*2*Math.asin(Math.sqrt(a));
+}
+
+// ── Overpass fetch ─────────────────────────────────────────────────────────
+async function fetchOSM(bbox) {
+  // Fetch roads + standalone footways/paths (exclude sidewalks tagged explicitly)
+  const q=`[out:json][timeout:90];(`+
+    `way["highway"~"^(primary|secondary|tertiary|unclassified|residential|living_street|pedestrian|track|cycleway)$"](${bbox});`+
+    `way["highway"~"^(footway|path)$"]["footway"!="sidewalk"](${bbox});`+
+  `);out body;>;out skel qt;`;
+  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+  if(!r.ok) throw new Error('Overpass error '+r.status);
+  return r.json();
+}
+
+// ── Build graph ────────────────────────────────────────────────────────────
+function buildGraph(data, mode) {
+  const costs = mode==='walk' ? WALK_COST : BIKE_COST;
+  const nodes = {};
+  const graph = {}; // nodeId -> [{to, d, hw, cost}]
+
+  for(const el of data.elements) {
+    if(el.type==='node') nodes[el.id]={lat:el.lat,lon:el.lon};
+  }
+
+  // Build a spatial grid of road-type nodes so we can detect parallel paths.
+  // "Road" here = residential or better (not footway/path/cycleway/track).
+  const ROAD_HW = new Set(['primary','secondary','tertiary','unclassified','residential','living_street']);
+  const CELL = 0.00022; // ~24 m per cell
+  const roadGrid = new Map();
+  const gridKey = (lat,lon)=>`${Math.floor(lat/CELL)},${Math.floor(lon/CELL)}`;
+  const addRoadNode = (lat,lon)=>{
+    const k=gridKey(lat,lon);
+    if(!roadGrid.has(k)) roadGrid.set(k,[]);
+    roadGrid.get(k).push({lat,lon});
+  };
+
+  for(const el of data.elements) {
+    if(el.type!=='way') continue;
+    if(!ROAD_HW.has(el.tags?.highway)) continue;
+    for(const nid of el.nodes){
+      const n=nodes[nid];
+      if(n) addRoadNode(n.lat,n.lon);
+    }
+  }
+
+  // Is a lat/lon within ~30 m of any road node?
+  const nearRoad = (lat,lon)=>{
+    const gi=Math.floor(lat/CELL), gj=Math.floor(lon/CELL);
+    for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){
+      for(const p of (roadGrid.get(`${gi+di},${gj+dj}`)||[])){
+        if(hav(lat,lon,p.lat,p.lon)<0.030) return true;
+      }
+    }
+    return false;
+  };
+
+  for(const el of data.elements) {
+    if(el.type!=='way') continue;
+    const hw = el.tags?.highway||'unclassified';
+    let costMult = costs[hw] ?? 10;
+
+    // Parallel-path detection: if this is a small path and >50% of its nodes
+    // are within 30 m of a road, treat it as road-grade (not a quiet shortcut).
+    if(['footway','path','track','cycleway'].includes(hw)) {
+      let near=0;
+      for(const nid of el.nodes){ const n=nodes[nid]; if(n&&nearRoad(n.lat,n.lon)) near++; }
+      if(near > el.nodes.length*0.5) {
+        // Parallel footpath: cost = tertiary equivalent at minimum
+        costMult = Math.max(costMult, 12);
+      }
+    }
+
+    for(let i=0;i<el.nodes.length-1;i++){
+      const aId=el.nodes[i], bId=el.nodes[i+1];
+      const a=nodes[aId], b=nodes[bId];
+      if(!a||!b) continue;
+      const d=hav(a.lat,a.lon,b.lat,b.lon);
+      if(d<0.003) continue; // skip tiny connector segments
+      if(!graph[aId]) graph[aId]=[];
+      if(!graph[bId]) graph[bId]=[];
+      graph[aId].push({to:bId,d,hw,cost:d*costMult});
+      graph[bId].push({to:aId,d,hw,cost:d*costMult});
+    }
+  }
+
+  return {graph,nodes};
+}
+
+// ── Snap to nearest node ───────────────────────────────────────────────────
+function snapNode(lat, lon, nodes) {
+  let bestId=null, bestD=Infinity;
+  for(const [id,n] of Object.entries(nodes)){
+    const d=hav(lat,lon,n.lat,n.lon);
+    if(d<bestD){bestD=d;bestId=id;}
+  }
+  return bestId;
+}
+
+// ── Min-heap ───────────────────────────────────────────────────────────────
+class MinHeap {
+  constructor(){this.d=[]}
+  push(item){this.d.push(item);this._up(this.d.length-1)}
+  pop(){
+    if(this.d.length===1) return this.d.pop();
+    const top=this.d[0];
+    this.d[0]=this.d.pop();
+    this._dn(0);
+    return top;
+  }
+  get size(){return this.d.length}
+  _up(i){
+    while(i>0){
+      const p=(i-1)>>1;
+      if(this.d[p].f<=this.d[i].f) break;
+      [this.d[p],this.d[i]]=[this.d[i],this.d[p]];
+      i=p;
+    }
+  }
+  _dn(i){
+    const n=this.d.length;
+    for(;;){
+      let b=i,l=2*i+1,r=2*i+2;
+      if(l<n&&this.d[l].f<this.d[b].f) b=l;
+      if(r<n&&this.d[r].f<this.d[b].f) b=r;
+      if(b===i) break;
+      [this.d[b],this.d[i]]=[this.d[i],this.d[b]];
+      i=b;
+    }
+  }
+}
+
+// ── A* routing ─────────────────────────────────────────────────────────────
+// Cost = sum(edge.distance * costMultiplier). Heuristic = haversine to goal
+// (admissible because minCostMult = 1). Ellipse bound prunes nodes that
+// can't be on any path shorter than crowFlies * detourFactor.
+function aStar(graph, nodes, startId, endId, detourFactor) {
+  const sn=nodes[startId], en=nodes[endId];
+  const crowKm = hav(sn.lat,sn.lon,en.lat,en.lon);
+  const maxSum = crowKm * detourFactor;
+
+  const h = id=>{const n=nodes[id];return n?hav(n.lat,n.lon,en.lat,en.lon):Infinity;};
+
+  const inEllipse = id=>{
+    const n=nodes[id];
+    if(!n) return false;
+    return hav(n.lat,n.lon,sn.lat,sn.lon)+hav(n.lat,n.lon,en.lat,en.lon)<=maxSum;
+  };
+
+  const gScore = new Map([[startId,0]]);
+  const prev   = new Map([[startId,null]]);
+  const closed = new Set();
+  const heap   = new MinHeap();
+  heap.push({id:startId,f:h(startId)});
+
+  while(heap.size>0){
+    const {id:cur}=heap.pop();
+    if(String(cur)===String(endId)){
+      // Reconstruct path
+      const path=[];
+      let c=String(cur);
+      while(c!==null){path.unshift(c);c=prev.get(c)??null;}
+      // Convert back: prev stores string keys from graph iteration
+      return path;
+    }
+    if(closed.has(cur)) continue;
+    closed.add(cur);
+
+    for(const e of (graph[cur]||[])){
+      if(closed.has(e.to)) continue;
+      if(!nodes[e.to]) continue;
+      if(!inEllipse(e.to)) continue;
+      const g=(gScore.get(cur)||0)+e.cost;
+      if(g<(gScore.get(e.to)??Infinity)){
+        gScore.set(e.to,g);
+        prev.set(e.to,cur);
+        heap.push({id:e.to,f:g+h(e.to)});
+      }
+    }
+  }
+  return null;
+}
+
+// ── Route colour ───────────────────────────────────────────────────────────
+function routeColor(t){return `hsl(${t*270},88%,48%)`;}
+
+// ── Render route ───────────────────────────────────────────────────────────
+function renderRoute(path, nodes, graph) {
+  if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}
+  if(!path||path.length<2) return;
+
+  const coords=path.map(id=>nodes[id]);
+
+  // Cumulative distances for rainbow gradient
+  let totalD=0;
+  const dists=[0];
+  for(let i=1;i<coords.length;i++){
+    totalD+=hav(coords[i-1].lat,coords[i-1].lon,coords[i].lat,coords[i].lon);
+    dists.push(totalD);
+  }
+
+  const group=L.layerGroup().addTo(map);
+  for(let i=1;i<coords.length;i++){
+    const t=totalD>0?(dists[i-1]+dists[i])/(2*totalD):0;
+    L.polyline([[coords[i-1].lat,coords[i-1].lon],[coords[i].lat,coords[i].lon]],
+      {color:routeColor(t),weight:5,opacity:.85}).addTo(group);
+  }
+  routeLayer=group;
+
+  // Quiet road percentage
+  let quietD=0;
+  for(let i=1;i<path.length;i++){
+    const edges=(graph[path[i-1]]||[]).filter(e=>String(e.to)===String(path[i]));
+    if(edges.length&&QUIET_HW.has(edges[0].hw)) quietD+=edges[0].d;
+  }
+
+  const directD=hav(coords[0].lat,coords[0].lon,coords[coords.length-1].lat,coords[coords.length-1].lon);
+  const detourActual=directD>0?totalD/directD:1;
+  const pct=totalD>0?Math.round(quietD/totalD*100):0;
+  const speed=S.mode==='walk'?WALK_SPEED:BIKE_SPEED;
+  const mins=Math.round(totalD/speed*60);
+
+  document.getElementById('sv-dist').textContent=totalD.toFixed(2)+' km';
+  document.getElementById('sv-time').textContent=mins>=60?`${Math.floor(mins/60)}h ${mins%60}m`:`${mins} min`;
+  document.getElementById('sv-direct').textContent=directD.toFixed(2)+' km ('+detourActual.toFixed(1)+'× detour)';
+  document.getElementById('sv-quiet').textContent=pct+'%';
+  document.getElementById('stats').style.display='block';
+  document.getElementById('gpx-btn').style.display='block';
+
+  S.route=coords; S.totalDist=totalD;
+  map.fitBounds(L.latLngBounds(coords.map(c=>[c.lat,c.lon])).pad(0.1));
+}
+
+// ── Status ─────────────────────────────────────────────────────────────────
+function setStatus(msg,type='info'){
+  const el=document.getElementById('status');
+  el.textContent=msg; el.className=type; el.style.display=msg?'block':'none';
+}
+
+// ── Main run ───────────────────────────────────────────────────────────────
+document.getElementById('run-btn').onclick=run;
+
+async function run() {
+  if(!S.startLL||!S.endLL) return;
+  const {lat:sLat,lon:sLon}=S.startLL;
+  const {lat:eLat,lon:eLon}=S.endLL;
+  const detour=parseFloat(document.getElementById('detour').value);
+  const crowKm=hav(sLat,sLon,eLat,eLon);
+
+  if(crowKm<0.02){setStatus('Start and end are too close.','err');return;}
+  if(crowKm>25){setStatus('Points are more than 25 km apart — try a shorter route.','err');return;}
+
+  document.getElementById('run-btn').disabled=true;
+  document.getElementById('stats').style.display='none';
+  document.getElementById('gpx-btn').style.display='none';
+  document.getElementById('map-spinner').style.display='block';
+  setStatus('Fetching map data…','info');
+
+  try{
+    // Bounding box: covers the ellipse exploration area
+    const padKm=crowKm*(detour-1)*0.65+0.4;
+    const padLat=padKm/111;
+    const padLon=padKm/(111*Math.cos((sLat+eLat)/2*Math.PI/180));
+    const minLat=Math.min(sLat,eLat)-padLat, maxLat=Math.max(sLat,eLat)+padLat;
+    const minLon=Math.min(sLon,eLon)-padLon, maxLon=Math.max(sLon,eLon)+padLon;
+    const bbox=`${minLat},${minLon},${maxLat},${maxLon}`;
+
+    const data=await fetchOSM(bbox);
+    const elementCount=data.elements?.length||0;
+    if(elementCount===0){setStatus('No roads found in this area.','err');return;}
+
+    setStatus('Building graph…','info');
+    const {graph,nodes}=buildGraph(data,S.mode);
+
+    const startId=snapNode(sLat,sLon,nodes);
+    const endId=snapNode(eLat,eLon,nodes);
+    if(!startId||!endId){setStatus('Could not snap to any road node.','err');return;}
+
+    setStatus('Finding route…','info');
+    const path=aStar(graph,nodes,startId,endId,detour);
+
+    if(!path){
+      setStatus('No route found within the detour limit. Try a higher detour factor.','err');
+      return;
+    }
+
+    renderRoute(path,nodes,graph);
+    setStatus(`Route found: ${S.totalDist.toFixed(2)} km`,'ok');
+  }catch(e){
+    setStatus('Error: '+e.message,'err');
+  }finally{
+    document.getElementById('run-btn').disabled=false;
+    document.getElementById('map-spinner').style.display='none';
+  }
+}
+
+// ── GPX export ─────────────────────────────────────────────────────────────
+document.getElementById('gpx-btn').onclick=()=>{
+  if(!S.route) return;
+  const pts=S.route.map(p=>`    <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"/>`).join('\n');
+  const gpx=`<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Navigate Quiet Routes" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Quiet Route</name><trkseg>
+${pts}
+  </trkseg></trk>
+</gpx>`;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([gpx],{type:'application/gpx+xml'}));
+  a.download='quiet-route.gpx';
+  a.click();
+};
+</script>
+</body>
+</html>
