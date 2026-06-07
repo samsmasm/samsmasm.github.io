@@ -570,8 +570,9 @@ function traverse(startId, initBearing, maxDist, rule, overrides, gaps) {
   let cur=startId, prev=null, curBear=initBearing, curHw='residential', cumDist=0, juncCount=0;
   let steps=0, firstStep=true;
 
-  const usedEdges = new Set();
-  const eKey = (a,b) => `${a}→${b}`;
+  const edgeCounts = new Map();
+  const eKey   = (a,b) => `${a}→${b}`;
+  const eCount = (a,b) => edgeCounts.get(eKey(a,b)) || 0;
 
   while(cumDist<maxDist&&steps++<10000){
     const exits=g[cur]||[];
@@ -604,17 +605,20 @@ function traverse(startId, initBearing, maxDist, rule, overrides, gaps) {
       } else {
         juncCount++;
 
-        // Prefer unused directed edges to avoid retracing
-        const unused=avail.filter(e=>!usedEdges.has(eKey(cur,e.to)));
-        const pool=unused.length>0?unused:avail;
-
         // Highway hierarchy filter: don't turn off a road onto a footpath
         // when road-grade exits are still available.
         const curHierVal = HIER[curHw] ?? 0;
-        const hierPool = pool.filter(e=>(HIER[e.hw]??0) >= Math.max(0, curHierVal-1));
-        const choicePool = hierPool.length>0 ? hierPool : pool;
+        const hierFiltered = avail.filter(e=>(HIER[e.hw]??0) >= Math.max(0, curHierVal-1));
+        const hierPool = hierFiltered.length>0 ? hierFiltered : avail;
 
-        const scored=choicePool.map(e=>({...e,rel:relAngle(curBear,e.b)}));
+        // Among hierarchy-OK exits prefer the least-traveled direction.
+        // Unused edges (count=0) are always preferred; when all are used
+        // the one(s) with the lowest count win -- this breaks oscillation
+        // instead of repeatedly picking the same hand-rule exit.
+        const minCount = Math.min(...hierPool.map(e=>eCount(cur,e.to)));
+        const pool = hierPool.filter(e=>eCount(cur,e.to)===minCount);
+
+        const scored=pool.map(e=>({...e,rel:relAngle(curBear,e.b)}));
         const nonU=scored.filter(e=>Math.abs(e.rel)<160);
         const final=nonU.length?nonU:scored;
         if(rule==='right') final.sort((a,b)=>b.rel-a.rel);
@@ -624,7 +628,8 @@ function traverse(startId, initBearing, maxDist, rule, overrides, gaps) {
     }
 
     firstStep=false;
-    usedEdges.add(eKey(cur,chosen.to));
+    const ek=eKey(cur,chosen.to);
+    edgeCounts.set(ek,(edgeCounts.get(ek)||0)+1);
     curHw = chosen.hw || curHw;
     cumDist+=chosen.d;
     prev=cur; cur=chosen.to; curBear=chosen.b;
