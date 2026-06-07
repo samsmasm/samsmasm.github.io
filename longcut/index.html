@@ -157,8 +157,9 @@ select{
 
     <div style="display:flex;gap:8px;margin:12px 14px 0">
       <button id="run-btn" disabled style="margin:0;flex:1">Find Route</button>
-      <button id="reset-btn" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--btn);cursor:pointer;font-size:13px;white-space:nowrap">Reset</button>
+      <button id="clear-btn" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--btn);cursor:pointer;font-size:13px;white-space:nowrap">Clear</button>
     </div>
+    <button id="regen-btn" style="display:none;width:calc(100% - 28px);margin:8px 14px 0;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--btn);cursor:pointer;font-size:13px;font-weight:500">↻ Regenerate route</button>
     <div style="height:12px"></div>
 
     <div id="status"></div>
@@ -175,6 +176,8 @@ select{
     <div id="hint">
       Click the map to place start and end pins, or search above.
       Drag pins to adjust. The route prefers small roads and standalone paths over main roads.
+      Once a route appears, <b>drag the route line</b> to bend it through a waypoint,
+      or hit <b>Regenerate</b> for a different quiet route.
     </div>
   </div>
 
@@ -214,10 +217,19 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
 const S = {
   startLL:null, endLL:null,
   mode:'walk', route:null,
-  graph:null, nodes:null, totalDist:0
+  // Cached graph (built once per Find Route, reused by Regenerate / drag-edit)
+  graph:null, nodes:null, mainComp:null,
+  startId:null, endId:null, detour:2,
+  anchors:null,     // ordered node IDs: [start, ...waypoints, end]
+  routePath:null,   // node IDs of the currently displayed route
+  penalties:null,   // Map<edgeKey, multiplier> -- pushes Regenerate to new routes
+  totalDist:0
 };
 let placing = null; // 'start'|'end'|null
 let sMarker = null, eMarker = null, routeLayer = null;
+
+// Undirected edge key for penalty lookups
+const ek = (a,b) => a<b ? a+'|'+b : b+'|'+a;
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const ICON_S = L.divIcon({
@@ -234,7 +246,7 @@ function setStart(lat, lon, label) {
   S.startLL = {lat,lon};
   if(sMarker) map.removeLayer(sMarker);
   sMarker = L.marker([lat,lon],{icon:ICON_S,draggable:true}).addTo(map);
-  sMarker.on('dragend',e=>{const p=e.target.getLatLng();S.startLL={lat:p.lat,lon:p.lng};document.getElementById('si').value='';checkRun();});
+  sMarker.on('dragend',e=>{const p=e.target.getLatLng();S.startLL={lat:p.lat,lon:p.lng};document.getElementById('si').value='';invalidateRoute();checkRun();});
   if(label) document.getElementById('si').value=label;
   checkRun();
 }
@@ -242,7 +254,7 @@ function setEnd(lat, lon, label) {
   S.endLL = {lat,lon};
   if(eMarker) map.removeLayer(eMarker);
   eMarker = L.marker([lat,lon],{icon:ICON_E,draggable:true}).addTo(map);
-  eMarker.on('dragend',e=>{const p=e.target.getLatLng();S.endLL={lat:p.lat,lon:p.lng};document.getElementById('ei').value='';checkRun();});
+  eMarker.on('dragend',e=>{const p=e.target.getLatLng();S.endLL={lat:p.lat,lon:p.lng};document.getElementById('ei').value='';invalidateRoute();checkRun();});
   if(label) document.getElementById('ei').value=label;
   checkRun();
 }
@@ -321,15 +333,20 @@ setupSearch('ei','er',(lat,lon,name)=>{
 });
 
 // ── Mode toggle ────────────────────────────────────────────────────────────
+// Mode changes the per-edge cost table, so the cached graph is stale.
 document.getElementById('m-walk').onclick=()=>{
-  S.mode='walk';
+  if(S.mode==='walk') return;
+  S.mode='walk'; S.graph=null;
   document.getElementById('m-walk').classList.add('active');
   document.getElementById('m-bike').classList.remove('active');
+  invalidateRoute();
 };
 document.getElementById('m-bike').onclick=()=>{
-  S.mode='bike';
+  if(S.mode==='bike') return;
+  S.mode='bike'; S.graph=null;
   document.getElementById('m-bike').classList.add('active');
   document.getElementById('m-walk').classList.remove('active');
+  invalidateRoute();
 };
 
 // ── Haversine ──────────────────────────────────────────────────────────────
@@ -516,26 +533,27 @@ class MinHeap {
 }
 
 // ── A* routing ─────────────────────────────────────────────────────────────
-// Cost = sum(edge.distance * costMultiplier). Heuristic = haversine to goal
-// (admissible because minCostMult = 1). Ellipse bound prunes nodes that
-// can't be on any path shorter than crowFlies * detourFactor.
-function aStar(graph, nodes, startId, endId, detourFactor) {
+// Cost = sum(edge.distance * costMultiplier * penalty). Heuristic = haversine
+// to goal (admissible because minCostMult >= 1). Ellipse bound prunes nodes
+// that can't be on any path shorter than crowFlies * detourFactor.
+// `penalties` (optional Map<edgeKey,mult>) raises the cost of specific edges
+// so Regenerate / local-repair can steer away from an existing route.
+function aStar(graph, nodes, startId, endId, detourFactor, penalties) {
   const sn=nodes[startId], en=nodes[endId];
   const crowKm = hav(sn.lat,sn.lon,en.lat,en.lon);
-
-  const h = id=>{const n=nodes[id];return n?hav(n.lat,n.lon,en.lat,en.lon):Infinity;};
-
-  const inEllipse = id=>{
-    const n=nodes[id];
-    if(!n) return false;
-    return hav(n.lat,n.lon,sn.lat,sn.lon)+hav(n.lat,n.lon,en.lat,en.lon)<=maxEllipse;
-  };
 
   // Ellipse bound: any node on the optimal path satisfies
   // dist(node,start)+dist(node,end) <= total_path_length.
   // Multiply detourFactor by 1.6 and add a flat 400 m buffer so the ellipse
   // has enough slack for curved roads (straight-line underestimates real paths).
   const maxEllipse = crowKm * detourFactor * 1.6 + 0.4;
+
+  const h = id=>{const n=nodes[id];return n?hav(n.lat,n.lon,en.lat,en.lon):Infinity;};
+  const inEllipse = id=>{
+    const n=nodes[id];
+    if(!n) return false;
+    return hav(n.lat,n.lon,sn.lat,sn.lon)+hav(n.lat,n.lon,en.lat,en.lon)<=maxEllipse;
+  };
 
   const gScore = new Map([[startId,0]]);
   const prev   = new Map([[startId,null]]);
@@ -559,7 +577,8 @@ function aStar(graph, nodes, startId, endId, detourFactor) {
       if(closed.has(e.to)) continue;
       if(!nodes[e.to]) continue;
       if(!inEllipse(e.to)) continue;
-      const g=(gScore.get(cur)||0)+e.cost;
+      const pen = penalties ? (penalties.get(ek(cur,e.to))||1) : 1;
+      const g=(gScore.get(cur)||0)+e.cost*pen;
       if(g<(gScore.get(e.to)??Infinity)){
         gScore.set(e.to,g);
         prev.set(e.to,cur);
@@ -570,15 +589,31 @@ function aStar(graph, nodes, startId, endId, detourFactor) {
   return null;
 }
 
+// ── Route through ordered anchors ──────────────────────────────────────────
+// Routes [start, ...waypoints, end] leg by leg and concatenates, sharing the
+// cached graph. Returns a flat array of node IDs, or null if any leg fails.
+function routeThrough(anchorIds, penalties, detour) {
+  const full=[];
+  for(let i=0;i<anchorIds.length-1;i++){
+    const leg=aStar(S.graph,S.nodes,anchorIds[i],anchorIds[i+1],detour,penalties);
+    if(!leg||leg.length<1) return null;
+    if(i===0) full.push(...leg);
+    else full.push(...leg.slice(1)); // drop the shared anchor node
+  }
+  return full;
+}
+
 // ── Route colour ───────────────────────────────────────────────────────────
 function routeColor(t){return `hsl(${t*270},88%,48%)`;}
 
 // ── Render route ───────────────────────────────────────────────────────────
-function renderRoute(path, nodes, graph) {
+function renderRoute(path, nodes, graph, fit=true) {
   if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}
   if(!path||path.length<2) return;
 
+  S.routePath = path;
   const coords=path.map(id=>nodes[id]);
+  const latlngs=coords.map(c=>[c.lat,c.lon]);
 
   // Cumulative distances for rainbow gradient
   let totalD=0;
@@ -591,9 +626,29 @@ function renderRoute(path, nodes, graph) {
   const group=L.layerGroup().addTo(map);
   for(let i=1;i<coords.length;i++){
     const t=totalD>0?(dists[i-1]+dists[i])/(2*totalD):0;
-    L.polyline([[coords[i-1].lat,coords[i-1].lon],[coords[i].lat,coords[i].lon]],
+    L.polyline([latlngs[i-1],latlngs[i]],
       {color:routeColor(t),weight:5,opacity:.85}).addTo(group);
   }
+
+  // Transparent wide "grab" line on top: drag it to bend the route through a
+  // waypoint (see attachDragEdit). Sits above the gradient so it catches drags.
+  const grab=L.polyline(latlngs,{color:'#000',weight:18,opacity:0,interactive:true}).addTo(group);
+  attachDragEdit(grab);
+
+  // Waypoint markers (click to remove). anchors = [start, ...waypoints, end].
+  if(S.anchors){
+    for(let k=1;k<S.anchors.length-1;k++){
+      const wn=nodes[S.anchors[k]];
+      if(!wn) continue;
+      const wm=L.circleMarker([wn.lat,wn.lon],
+        {radius:6,color:'#fff',weight:2,fillColor:'#7a3cb8',fillOpacity:1,interactive:true})
+        .addTo(group);
+      wm.bindTooltip('Click to remove waypoint',{direction:'top'});
+      const idx=k;
+      wm.on('click',ev=>{L.DomEvent.stop(ev);removeWaypoint(idx);});
+    }
+  }
+
   routeLayer=group;
 
   // Quiet road percentage
@@ -615,9 +670,10 @@ function renderRoute(path, nodes, graph) {
   document.getElementById('sv-quiet').textContent=pct+'%';
   document.getElementById('stats').style.display='block';
   document.getElementById('gpx-btn').style.display='block';
+  document.getElementById('regen-btn').style.display='block';
 
   S.route=coords; S.totalDist=totalD;
-  map.fitBounds(L.latLngBounds(coords.map(c=>[c.lat,c.lon])).pad(0.1));
+  if(fit) map.fitBounds(L.latLngBounds(latlngs).pad(0.1));
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────
@@ -626,21 +682,135 @@ function setStatus(msg,type='info'){
   el.textContent=msg; el.className=type; el.style.display=msg?'block':'none';
 }
 
-// ── Reset ──────────────────────────────────────────────────────────────────
-function reset() {
-  if(sMarker){map.removeLayer(sMarker);sMarker=null;}
-  if(eMarker){map.removeLayer(eMarker);eMarker=null;}
+// ── Invalidate / Clear ─────────────────────────────────────────────────────
+// invalidateRoute: drop the displayed route + edit state, but keep the pins.
+function invalidateRoute() {
   if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}
-  S.startLL=null; S.endLL=null; S.route=null; S.totalDist=0;
-  document.getElementById('si').value='';
-  document.getElementById('ei').value='';
+  S.route=null; S.routePath=null; S.anchors=null; S.penalties=null; S.totalDist=0;
   document.getElementById('stats').style.display='none';
   document.getElementById('gpx-btn').style.display='none';
+  document.getElementById('regen-btn').style.display='none';
+}
+
+// clearAll: full wipe so the user can click two fresh points.
+function clearAll() {
+  if(sMarker){map.removeLayer(sMarker);sMarker=null;}
+  if(eMarker){map.removeLayer(eMarker);eMarker=null;}
+  invalidateRoute();
+  S.startLL=null; S.endLL=null;
+  document.getElementById('si').value='';
+  document.getElementById('ei').value='';
   setStatus('','info');
   setPlacing(null);
   checkRun();
 }
-document.getElementById('reset-btn').onclick=reset;
+document.getElementById('clear-btn').onclick=clearAll;
+
+// ── Compute & render through current anchors ───────────────────────────────
+function computeAndRender(fit) {
+  const path=routeThrough(S.anchors,S.penalties,S.detour);
+  if(!path){setStatus('Could not route through all points. Try removing a waypoint.','err');return false;}
+  renderRoute(path,S.nodes,S.graph,fit);
+  return true;
+}
+
+// ── Regenerate: penalise the shown route, find a different quiet one ────────
+document.getElementById('regen-btn').onclick=()=>{
+  if(!S.routePath||!S.graph) return;
+  if(!S.penalties) S.penalties=new Map();
+  // Make every edge of the current route ~2.4x costlier (accumulates across
+  // clicks) so A* is pushed onto fresh streets while still preferring quiet.
+  for(let i=1;i<S.routePath.length;i++){
+    const k=ek(S.routePath[i-1],S.routePath[i]);
+    S.penalties.set(k,(S.penalties.get(k)||1)*2.4);
+  }
+  if(computeAndRender(false)) setStatus(`New route: ${S.totalDist.toFixed(2)} km`,'ok');
+};
+
+// ── Waypoint editing ───────────────────────────────────────────────────────
+function nearestRouteIndex(latlng){
+  let best=0,bd=Infinity;
+  for(let i=0;i<S.routePath.length;i++){
+    const n=S.nodes[S.routePath[i]];
+    const d=hav(latlng.lat,latlng.lng,n.lat,n.lon);
+    if(d<bd){bd=d;best=i;}
+  }
+  return best;
+}
+
+// Insert waypoint W into the ordered anchors list at the slot matching where
+// it was grabbed along the route (gi = index in routePath).
+function insertWaypoint(gi, W){
+  const pos=S.anchors.map(a=>S.routePath.indexOf(a));
+  let slot=S.anchors.length-1; // default: just before the end anchor
+  for(let k=1;k<S.anchors.length;k++){
+    if(pos[k]>gi){slot=k;break;}
+  }
+  S.anchors.splice(slot,0,W);
+}
+
+function removeWaypoint(idx){
+  if(!S.anchors||idx<=0||idx>=S.anchors.length-1) return;
+  S.anchors.splice(idx,1);
+  if(computeAndRender(false)) setStatus(`Waypoint removed: ${S.totalDist.toFixed(2)} km`,'ok');
+}
+
+// Drag the route line to bend it through a new waypoint. Uses *windowed local
+// repair*: only the stretch of route within `win` km of the grab point is
+// re-routed (through the dropped waypoint) and spliced back in -- the rest of
+// the route is untouched. Window grows with drag distance.
+function attachDragEdit(grabLine){
+  if(grabLine._path) grabLine._path.style.cursor='move';
+  grabLine.on('mousedown', e=>{
+    L.DomEvent.stop(e);
+    const grabLL=e.latlng;
+    const gi=nearestRouteIndex(grabLL);
+    map.dragging.disable();
+    const handle=L.circleMarker(grabLL,
+      {radius:7,color:'#fff',weight:2,fillColor:'#2570b5',fillOpacity:1}).addTo(map);
+
+    const onMove=ev=>handle.setLatLng(ev.latlng);
+    const onUp=ev=>{
+      map.off('mousemove',onMove);
+      map.off('mouseup',onUp);
+      map.dragging.enable();
+      map.removeLayer(handle);
+      finalizeDrag(grabLL, gi, ev.latlng);
+    };
+    map.on('mousemove',onMove);
+    map.on('mouseup',onUp);
+  });
+}
+
+function finalizeDrag(grabLL, gi, dropLL){
+  if(!S.graph||!S.routePath) return;
+  const W=snapNode(dropLL.lat,dropLL.lng,S.nodes,S.mainComp);
+  if(!W){setStatus('No road near where you dropped.','err');return;}
+
+  const dragKm=hav(grabLL.lat,grabLL.lng,dropLL.lat,dropLL.lng);
+  if(dragKm<0.02) return; // barely moved -- ignore
+  const win=Math.min(2.0, Math.max(0.25, dragKm*1.5));
+
+  // Walk outward from the grab index until `win` km is covered each way.
+  const coords=S.routePath.map(id=>S.nodes[id]);
+  let A=gi, accA=0;
+  while(A>0){accA+=hav(coords[A].lat,coords[A].lon,coords[A-1].lat,coords[A-1].lon);A--;if(accA>=win)break;}
+  let B=gi, accB=0;
+  while(B<coords.length-1){accB+=hav(coords[B].lat,coords[B].lon,coords[B+1].lat,coords[B+1].lon);B++;if(accB>=win)break;}
+  const Aid=S.routePath[A], Bid=S.routePath[B];
+
+  // Re-route the two short local legs through the waypoint. Generous detour
+  // because these legs are short and may need to bow out to reach W.
+  const local=Math.max(S.detour,4);
+  const legAW=aStar(S.graph,S.nodes,Aid,W,local,S.penalties);
+  const legWB=aStar(S.graph,S.nodes,W,Bid,local,S.penalties);
+  if(!legAW||!legWB){setStatus('Could not bend the route through there.','err');return;}
+
+  const newPath=S.routePath.slice(0,A).concat(legAW, legWB.slice(1), S.routePath.slice(B+1));
+  if(S.anchors) insertWaypoint(gi, W);
+  renderRoute(newPath,S.nodes,S.graph,false);
+  setStatus(`Route reshaped: ${S.totalDist.toFixed(2)} km`,'ok');
+}
 
 // ── Main run ───────────────────────────────────────────────────────────────
 document.getElementById('run-btn').onclick=run;
@@ -655,9 +825,8 @@ async function run() {
   if(crowKm<0.02){setStatus('Start and end are too close.','err');return;}
   if(crowKm>25){setStatus('Points are more than 25 km apart — try a shorter route.','err');return;}
 
+  invalidateRoute();
   document.getElementById('run-btn').disabled=true;
-  document.getElementById('stats').style.display='none';
-  document.getElementById('gpx-btn').style.display='none';
   document.getElementById('map-spinner').style.display='block';
   setStatus('Fetching map data…','info');
 
@@ -684,16 +853,14 @@ async function run() {
     const endId=snapNode(eLat,eLon,nodes,mainComp);
     if(!startId||!endId){setStatus('Could not snap to any road node.','err');return;}
 
+    // Cache everything so Regenerate / drag-edit reuse it without refetching.
+    S.graph=graph; S.nodes=nodes; S.mainComp=mainComp;
+    S.startId=startId; S.endId=endId; S.detour=detour;
+    S.anchors=[startId,endId]; S.penalties=new Map();
+
     setStatus('Finding route…','info');
-    const path=aStar(graph,nodes,startId,endId,detour);
-
-    if(!path){
-      setStatus('No route found within the detour limit. Try a higher detour factor.','err');
-      return;
-    }
-
-    renderRoute(path,nodes,graph);
-    setStatus(`Route found: ${S.totalDist.toFixed(2)} km`,'ok');
+    if(computeAndRender(true)) setStatus(`Route found: ${S.totalDist.toFixed(2)} km`,'ok');
+    else setStatus('No route found within the detour limit. Try a higher detour factor.','err');
   }catch(e){
     setStatus('Error: '+e.message,'err');
   }finally{
