@@ -442,10 +442,14 @@ function buildGraph(data, mode) {
   return {graph,nodes};
 }
 
-// ── Snap to nearest node ───────────────────────────────────────────────────
-function snapNode(lat, lon, nodes) {
+// ── Snap to nearest graph node ────────────────────────────────────────────
+// Must only snap to nodes that are in the graph (have edges).
+// OSM data includes isolated nodes (bus stops, POIs) that are not part of
+// any way -- snapping to one of those gives A* nothing to traverse.
+function snapNode(lat, lon, nodes, graph) {
   let bestId=null, bestD=Infinity;
   for(const [id,n] of Object.entries(nodes)){
+    if(!graph[id]||graph[id].length===0) continue;
     const d=hav(lat,lon,n.lat,n.lon);
     if(d<bestD){bestD=d;bestId=id;}
   }
@@ -492,15 +496,20 @@ class MinHeap {
 function aStar(graph, nodes, startId, endId, detourFactor) {
   const sn=nodes[startId], en=nodes[endId];
   const crowKm = hav(sn.lat,sn.lon,en.lat,en.lon);
-  const maxSum = crowKm * detourFactor;
 
   const h = id=>{const n=nodes[id];return n?hav(n.lat,n.lon,en.lat,en.lon):Infinity;};
 
   const inEllipse = id=>{
     const n=nodes[id];
     if(!n) return false;
-    return hav(n.lat,n.lon,sn.lat,sn.lon)+hav(n.lat,n.lon,en.lat,en.lon)<=maxSum;
+    return hav(n.lat,n.lon,sn.lat,sn.lon)+hav(n.lat,n.lon,en.lat,en.lon)<=maxEllipse;
   };
+
+  // Ellipse bound: any node on the optimal path satisfies
+  // dist(node,start)+dist(node,end) <= total_path_length.
+  // Multiply detourFactor by 1.6 and add a flat 400 m buffer so the ellipse
+  // has enough slack for curved roads (straight-line underestimates real paths).
+  const maxEllipse = crowKm * detourFactor * 1.6 + 0.4;
 
   const gScore = new Map([[startId,0]]);
   const prev   = new Map([[startId,null]]);
@@ -508,7 +517,8 @@ function aStar(graph, nodes, startId, endId, detourFactor) {
   const heap   = new MinHeap();
   heap.push({id:startId,f:h(startId)});
 
-  while(heap.size>0){
+  let iters=0;
+  while(heap.size>0&&iters++<500000){
     const {id:cur}=heap.pop();
     if(cur===endId){
       const path=[];
@@ -625,8 +635,8 @@ async function run() {
     setStatus('Building graph…','info');
     const {graph,nodes}=buildGraph(data,S.mode);
 
-    const startId=snapNode(sLat,sLon,nodes);
-    const endId=snapNode(eLat,eLon,nodes);
+    const startId=snapNode(sLat,sLon,nodes,graph);
+    const endId=snapNode(eLat,eLon,nodes,graph);
     if(!startId||!endId){setStatus('Could not snap to any road node.','err');return;}
 
     setStatus('Finding route…','info');
