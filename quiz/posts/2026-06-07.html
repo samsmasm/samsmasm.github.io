@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talkonomics &mdash; 7 June 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;
+  --surface:#fff;
+  --border:#111;
+  --text:#111;
+  --muted:#4a4540;
+  --light:#7a7268;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',system-ui,sans-serif}
+/* Slides */
+#slides{height:100vh;position:relative}
+.slide{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg);
+}
+.slide.active{display:flex}
+/* Category accent */
+.slide-top{
+  background:var(--cat-bg,#f0f5ff);
+  border-bottom:2px solid var(--cat-border,#b6cff5);
+  padding:0.55rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.category-badge{
+  font-family:'Inter',sans-serif;
+  font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--cat-fg,#1a3a7a);
+}
+.q-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.7rem;font-weight:600;
+  color:var(--cat-fg,#1a3a7a);
+  opacity:0.7;
+}
+/* Slide body */
+.slide-body{
+  flex:1;overflow-y:auto;
+  padding:2rem 2.5rem 1rem;
+  display:flex;flex-direction:column;
+  gap:1.4rem;
+  max-width:900px;width:100%;margin:0 auto;
+}
+/* Title slide */
+.title-body{
+  align-items:center;justify-content:center;text-align:center;
+  gap:1rem;
+  background:
+    radial-gradient(ellipse at 15% 50%, #ffd6e7 0%, transparent 50%),
+    radial-gradient(ellipse at 35% 20%, #d6f0ff 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+    #fff;
+}
+.title-wordmark{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4.5rem);
+  font-weight:900;
+  color:var(--text);
+  line-height:1;
+}
+.title-tagline{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.85rem,2vw,1.1rem);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.18em;
+  color:var(--light);
+}
+.title-date{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1rem,2.5vw,1.5rem);
+  color:var(--muted);
+  font-style:italic;
+}
+.title-meta{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;
+  color:var(--light);
+  letter-spacing:0.04em;
+}
+/* Question */
+.question-text{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1.1rem,2.8vw,1.55rem);
+  line-height:1.45;
+  color:var(--text);
+  font-weight:700;
+}
+/* Options */
+.options{display:flex;flex-direction:column;gap:0.65rem}
+.option{
+  display:flex;align-items:flex-start;gap:0.9rem;
+  background:var(--surface);
+  border:1.5px solid #ddd7cc;
+  border-radius:6px;
+  padding:0.75rem 1rem;
+  transition:background 0.2s,border-color 0.2s,opacity 0.25s;
+  cursor:default;
+}
+.option-letter{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--light);
+  flex-shrink:0;
+  margin-top:0.1rem;
+  min-width:1.1rem;
+}
+.option-text{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.9rem,2vw,1.05rem);
+  line-height:1.45;
+  color:var(--text);
+}
+/* Revealed state */
+.slide.revealed .option.correct{
+  background:#d6f5e8;
+  border-color:#145c34;
+}
+.slide.revealed .option.correct .option-letter{color:#145c34}
+.slide.revealed .option:not(.correct){opacity:0.32}
+.slide.revealed .explanation{display:block}
+.slide.revealed .btn-reveal{display:none}
+/* Explanation */
+.explanation{
+  display:none;
+  background:#f0f5ff;
+  border:1.5px solid #b6cff5;
+  border-radius:6px;
+  padding:0.9rem 1.1rem;
+}
+.explanation p{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.82rem,1.8vw,0.95rem);
+  line-height:1.6;
+  color:#1a3a7a;
+  font-style:italic;
+}
+/* Nav bar */
+.slide-nav{
+  flex-shrink:0;
+  border-top:1px solid #ddd7cc;
+  background:var(--surface);
+  padding:0.65rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0.75rem;
+}
+.slide-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--light);
+}
+/* Buttons */
+.btn-nav{
+  font-family:'Inter',sans-serif;
+  font-size:0.75rem;font-weight:600;
+  color:#1a3a7a;
+  background:none;border:1.5px solid #b6cff5;
+  border-radius:4px;padding:0.4rem 0.9rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s,border-color 0.12s;
+}
+.btn-nav:hover{background:#f0f5ff;border-color:#1a3a7a}
+.btn-reveal{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;border:none;
+  border-radius:4px;padding:0.45rem 1.2rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-reveal:hover{background:#2a4a9a}
+.btn-primary{
+  font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;
+  border:none;border-radius:4px;
+  padding:0.6rem 1.6rem;
+  cursor:pointer;text-decoration:none;
+  display:inline-block;
+  letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-primary:hover{background:#2a4a9a}
+/* Mode buttons on title slide */
+.mode-buttons{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}
+.btn-mode{
+  background:var(--surface);
+  border:2px solid #b6cff5;border-radius:8px;
+  padding:0.9rem 1.4rem;cursor:pointer;text-align:center;
+  min-width:190px;transition:border-color 0.15s,background 0.15s;
+}
+.btn-mode:hover{border-color:#1a3a7a;background:#f0f5ff}
+.btn-mode-title{display:block;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:700;color:#1a3a7a;margin-bottom:0.3rem}
+.btn-mode-desc{display:block;font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--light);line-height:1.4}
+/* Hide reveal button in at-end mode on question slides */
+body[data-mode="atend"] .q-slide .btn-reveal{display:none}
+/* Print */
+@media print{
+  html,body{overflow:visible;height:auto}
+  #slides{height:auto;position:static}
+  .slide{position:static;display:flex!important;page-break-before:always;min-height:100vh}
+  .slide:first-child{page-break-before:avoid}
+  .slide-nav{display:none}
+  .btn-reveal{display:none!important}
+  .slide.revealed .option{opacity:1!important}
+  .explanation{display:block!important}
+}
+</style>
+</head>
+<body>
+<div id="slides">
+
+  <div class="slide active" id="slide-0">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
+      <div class="title-date">Weekly Quiz &mdash; 7 June 2026</div>
+      <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
+      <div class="mode-buttons">
+        <button class="btn-mode" onclick="selectMode('asgo')">
+          <span class="btn-mode-title">Answers as we go</span>
+          <span class="btn-mode-desc">Reveal each answer before moving on</span>
+        </button>
+        <button class="btn-mode" onclick="selectMode('atend')">
+          <span class="btn-mode-title">Answers at the end</span>
+          <span class="btn-mode-desc">All 10 questions first, then all answers</span>
+        </button>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <span></span>
+      <span class="slide-counter">Talkonomics</span>
+      <span></span>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Broadcom just reported a 48% jump in revenues and a 143% surge in AI chip sales. Yet its share price fell more than 12% in after-hours trading. Why did investors punish such a strong set of results?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The CEO resigned unexpectedly mid-call</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The company didn&#x27;t raise its long-term sales target</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Regulators blocked its biggest AI contract</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Broadcom left its long-term sales target unchanged, and that was enough to disappoint. When expectations are sky-high, merely beating today&#x27;s numbers isn&#x27;t enough — investors need to see the ceiling raised too. It&#x27;s a reminder that in markets, sentiment about the future often matters more than the present scorecard.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The OECD recently warned that the global steel industry is in deepening crisis. Which country&#x27;s state-backed production is most responsible for the oversupply flooding world markets?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">India</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Russia</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">China</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. China is the dominant force behind the steel glut. Heavily subsidised Chinese mills keep producing even when global prices fall, because the state absorbs losses that a private firm couldn&#x27;t. This undercuts steelmakers in Europe and elsewhere who have to actually turn a profit — and it&#x27;s why the OECD is sounding the alarm now.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Google recently signed one of the most eye-watering computing deals in tech history, committing to lease AI supercomputer power through June 2029 from a company it doesn&#x27;t own. What is the monthly price tag on that deal?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">$290 million a month</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">$920 million a month</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">$1.4 billion a month</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Google is paying $920 million per month — roughly $30 billion over the life of the contract — to lease computing power from SpaceX, which acquired the AI firm xAI in early 2026 and gained massive data centres in the process. At that rate, Google is spending more on rented compute each month than most countries spend on their entire technology budgets.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Starbucks recently triggered a mass boycott in South Korea after a tumbler promotion went badly wrong. What exactly did they do to cause such fury?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">They accidentally priced a drink in Japanese yen during a trade dispute</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">They launched the promotion on the anniversary of a pro-democracy massacre</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">They misspelled the Korean word for freedom on 10,000 cups</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Starbucks ran a tumbler giveaway that landed on the anniversary of a pro-democracy massacre — a catastrophically tone-deaf scheduling error in a country where that date carries enormous historical weight. Customers smashed branded merchandise, deleted loyalty apps and cashed out prepaid balances. It&#x27;s a masterclass in why local cultural calendars matter in global marketing.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The US labour market added 172,000 jobs in May, continuing a solid run of hiring. But one measure of worker wellbeing is still going in the wrong direction. What is it?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The unemployment rate (share of workers without jobs) is rising</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Wage growth (pay rises) is not keeping up with inflation (rising prices)</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Part-time work has overtaken full-time employment for the first time</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. More Americans are in work, but their pay packets aren&#x27;t stretching as far. Wage growth is being outpaced by inflation, meaning workers are effectively getting poorer in real terms even as the headline jobs number looks healthy. This is why consumer sentiment — how confident people feel about their finances — remains pessimistic despite the strong hiring figures.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">New EU rules requiring companies to publish salary information — to help close the gender pay gap — were supposed to take effect across member states by 7 June. What actually happened at the deadline?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">All 27 member states implemented the rules on time</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Most member states missed the deadline and haven&#x27;t passed the rules into national law</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The European Court of Justice suspended the rules pending a legal challenge</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Most EU member states failed to transpose the pay transparency rules into national law by the June 7 deadline. Transposing an EU directive means each country must pass its own matching legislation — and that process often slips. The gender pay gap across the EU currently sits around 13%, which is part of what made these rules feel urgent in the first place.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Azerbaijan&#x27;s state energy company SOCAR just locked in a long-term gas supply deal involving TotalEnergies and Abu Dhabi&#x27;s XRG, with exports due to begin in 2029. Which energy route does this deal reinforce, and why does Europe care?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The Northern Sea Route, as Arctic shipping opens up with climate change</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The Southern Gas Corridor, a pipeline network Europe has leaned on to reduce Russian gas dependency</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The Trans-Saharan Pipeline, a proposed link from Nigeria to the Mediterranean</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The Southern Gas Corridor is a network of pipelines running from the Caspian Sea through Turkey and into southern Europe — and it has become strategically vital since Europe began cutting its dependence on Russian gas after 2022. Locking in Azerbaijani supply from the Absheron offshore field from 2029 gives European importers a longer-term alternative to Russian energy.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">According to the Capgemini World Wealth Report, the number of millionaires (people with investable assets over $1 million) around the world grew sharply last year, driven largely by soaring stock markets. How many millionaires now exist globally?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Around 14 million</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Around 19 million</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Around 25 million</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. There are now 25.3 million millionaires worldwide, up 7.9% in a single year — that&#x27;s roughly 2 million new millionaires created in 2025 alone. To put that in context, 25 million is larger than the entire population of Australia. The surge is almost entirely explained by equity markets: when stock prices rise, so do the portfolios that push people over the million-dollar threshold.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of lithium — the metal that sits inside almost every electric vehicle battery and smartphone on the planet?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Chile</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Australia</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Argentina</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Australia is the world&#x27;s largest lithium producer, accounting for roughly half of global mine output. Chile holds the largest known reserves and is the second-biggest producer, while Argentina is a fast-growing third. The three countries together — sometimes called the Lithium Triangle plus Australia — control the vast majority of the world&#x27;s supply of a metal that is central to the energy transition.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which economist, born in 1723, argued in his most famous book that the wealth of nations comes not from stockpiling gold but from productive labour and free trade — effectively founding modern economics?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Ricardo</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Thomas Malthus</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith published The Wealth of Nations in 1776 — the same year as American independence — and it remains one of the most influential books ever written. His idea that markets, guided by what he called the &#x27;invisible hand&#x27;, allocate resources more efficiently than governments could is still the starting point for almost every economics course in the world today.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Broadcom just reported a 48% jump in revenues and a 143% surge in AI chip sales. Yet its share price fell more than 12% in after-hours trading. Why did investors punish such a strong set of results?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The CEO resigned unexpectedly mid-call</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The company didn&#x27;t raise its long-term sales target</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Regulators blocked its biggest AI contract</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Broadcom left its long-term sales target unchanged, and that was enough to disappoint. When expectations are sky-high, merely beating today&#x27;s numbers isn&#x27;t enough — investors need to see the ceiling raised too. It&#x27;s a reminder that in markets, sentiment about the future often matters more than the present scorecard.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A1 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The OECD recently warned that the global steel industry is in deepening crisis. Which country&#x27;s state-backed production is most responsible for the oversupply flooding world markets?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">India</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Russia</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">China</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. China is the dominant force behind the steel glut. Heavily subsidised Chinese mills keep producing even when global prices fall, because the state absorbs losses that a private firm couldn&#x27;t. This undercuts steelmakers in Europe and elsewhere who have to actually turn a profit — and it&#x27;s why the OECD is sounding the alarm now.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A2 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Google recently signed one of the most eye-watering computing deals in tech history, committing to lease AI supercomputer power through June 2029 from a company it doesn&#x27;t own. What is the monthly price tag on that deal?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">$290 million a month</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">$920 million a month</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">$1.4 billion a month</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Google is paying $920 million per month — roughly $30 billion over the life of the contract — to lease computing power from SpaceX, which acquired the AI firm xAI in early 2026 and gained massive data centres in the process. At that rate, Google is spending more on rented compute each month than most countries spend on their entire technology budgets.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A3 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Starbucks recently triggered a mass boycott in South Korea after a tumbler promotion went badly wrong. What exactly did they do to cause such fury?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">They accidentally priced a drink in Japanese yen during a trade dispute</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">They launched the promotion on the anniversary of a pro-democracy massacre</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">They misspelled the Korean word for freedom on 10,000 cups</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Starbucks ran a tumbler giveaway that landed on the anniversary of a pro-democracy massacre — a catastrophically tone-deaf scheduling error in a country where that date carries enormous historical weight. Customers smashed branded merchandise, deleted loyalty apps and cashed out prepaid balances. It&#x27;s a masterclass in why local cultural calendars matter in global marketing.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A4 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The US labour market added 172,000 jobs in May, continuing a solid run of hiring. But one measure of worker wellbeing is still going in the wrong direction. What is it?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The unemployment rate (share of workers without jobs) is rising</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Wage growth (pay rises) is not keeping up with inflation (rising prices)</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Part-time work has overtaken full-time employment for the first time</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. More Americans are in work, but their pay packets aren&#x27;t stretching as far. Wage growth is being outpaced by inflation, meaning workers are effectively getting poorer in real terms even as the headline jobs number looks healthy. This is why consumer sentiment — how confident people feel about their finances — remains pessimistic despite the strong hiring figures.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A5 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">New EU rules requiring companies to publish salary information — to help close the gender pay gap — were supposed to take effect across member states by 7 June. What actually happened at the deadline?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">All 27 member states implemented the rules on time</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Most member states missed the deadline and haven&#x27;t passed the rules into national law</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The European Court of Justice suspended the rules pending a legal challenge</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Most EU member states failed to transpose the pay transparency rules into national law by the June 7 deadline. Transposing an EU directive means each country must pass its own matching legislation — and that process often slips. The gender pay gap across the EU currently sits around 13%, which is part of what made these rules feel urgent in the first place.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A6 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Azerbaijan&#x27;s state energy company SOCAR just locked in a long-term gas supply deal involving TotalEnergies and Abu Dhabi&#x27;s XRG, with exports due to begin in 2029. Which energy route does this deal reinforce, and why does Europe care?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The Northern Sea Route, as Arctic shipping opens up with climate change</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The Southern Gas Corridor, a pipeline network Europe has leaned on to reduce Russian gas dependency</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The Trans-Saharan Pipeline, a proposed link from Nigeria to the Mediterranean</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The Southern Gas Corridor is a network of pipelines running from the Caspian Sea through Turkey and into southern Europe — and it has become strategically vital since Europe began cutting its dependence on Russian gas after 2022. Locking in Azerbaijani supply from the Absheron offshore field from 2029 gives European importers a longer-term alternative to Russian energy.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A7 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">According to the Capgemini World Wealth Report, the number of millionaires (people with investable assets over $1 million) around the world grew sharply last year, driven largely by soaring stock markets. How many millionaires now exist globally?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Around 14 million</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Around 19 million</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Around 25 million</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. There are now 25.3 million millionaires worldwide, up 7.9% in a single year — that&#x27;s roughly 2 million new millionaires created in 2025 alone. To put that in context, 25 million is larger than the entire population of Australia. The surge is almost entirely explained by equity markets: when stock prices rise, so do the portfolios that push people over the million-dollar threshold.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A8 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of lithium — the metal that sits inside almost every electric vehicle battery and smartphone on the planet?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Chile</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Australia</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Argentina</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Australia is the world&#x27;s largest lithium producer, accounting for roughly half of global mine output. Chile holds the largest known reserves and is the second-biggest producer, while Argentina is a fast-growing third. The three countries together — sometimes called the Lithium Triangle plus Australia — control the vast majority of the world&#x27;s supply of a metal that is central to the energy transition.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A9 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which economist, born in 1723, argued in his most famous book that the wealth of nations comes not from stockpiling gold but from productive labour and free trade — effectively founding modern economics?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Ricardo</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Thomas Malthus</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith published The Wealth of Nations in 1776 — the same year as American independence — and it remains one of the most influential books ever written. His idea that markets, guided by what he called the &#x27;invisible hand&#x27;, allocate resources more efficiently than governments could is still the starting point for almost every economics course in the world today.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A10 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-end">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">That&#8217;s all 10!</div>
+      <div class="title-date">7 June 2026</div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+        <button class="btn-primary" onclick="goTo(0)">&#8592; Start again</button>
+        <a class="btn-primary" href="../index.html">All editions</a>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">End</span>
+      <span></span>
+    </div>
+  </div>
+</div>
+<script>
+var TOTAL = document.querySelectorAll('.q-slide').length;
+var pos = 0;
+var SEQ = [];
+
+function buildSeq(m) {
+  var s = ['slide-0'];
+  for (var i = 1; i <= TOTAL; i++) s.push('slide-' + i);
+  if (m === 'atend') {
+    for (var i = 1; i <= TOTAL; i++) s.push('slide-a' + i);
+  }
+  s.push('slide-end');
+  return s;
+}
+
+function selectMode(m) {
+  SEQ = buildSeq(m);
+  document.body.setAttribute('data-mode', m);
+  showAt(1);
+}
+
+function showAt(p) {
+  pos = p;
+  document.querySelectorAll('.slide').forEach(function(s) { s.classList.remove('active'); });
+  var el = document.getElementById(SEQ[p]);
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+}
+
+function goTo(p) { showAt(p); }
+
+function nextSlide() {
+  if (pos < SEQ.length - 1) showAt(pos + 1);
+}
+
+function prevSlide() {
+  if (pos > 0) showAt(pos - 1);
+}
+
+function revealSlide(btn) {
+  var slide = btn.closest('.slide');
+  slide.classList.add('revealed');
+  var exp = slide.querySelector('.explanation');
+  if (exp) exp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextSlide(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { prevSlide(); e.preventDefault(); }
+  else if (e.key === ' ' || e.key === 'Enter') {
+    var slide = document.querySelector('.slide.active');
+    if (slide && !slide.classList.contains('revealed')) {
+      var btn = slide.querySelector('.btn-reveal');
+      if (btn) { revealSlide(btn); e.preventDefault(); return; }
+    }
+    nextSlide();
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
