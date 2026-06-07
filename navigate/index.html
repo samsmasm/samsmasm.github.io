@@ -340,15 +340,32 @@ function hav(la,lo,lb,ob){
 }
 
 // ── Overpass fetch ─────────────────────────────────────────────────────────
+// Tries multiple mirrors in order; moves on after a 429 (rate-limit).
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+
 async function fetchOSM(bbox) {
-  // Fetch roads + standalone footways/paths (exclude sidewalks tagged explicitly)
   const q=`[out:json][timeout:90];(`+
     `way["highway"~"^(primary|secondary|tertiary|unclassified|residential|living_street|pedestrian|track|cycleway)$"](${bbox});`+
     `way["highway"~"^(footway|path)$"]["footway"!="sidewalk"](${bbox});`+
   `);out body;>;out skel qt;`;
-  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
-  if(!r.ok) throw new Error('Overpass error '+r.status);
-  return r.json();
+
+  for(let i=0;i<OVERPASS_ENDPOINTS.length;i++){
+    const ep=OVERPASS_ENDPOINTS[i];
+    try{
+      if(i>0) setStatus(`Server busy, trying mirror ${i}…`,'info');
+      const r=await fetch(ep,{method:'POST',body:'data='+encodeURIComponent(q)});
+      if(r.status===429) continue; // rate-limited, try next mirror
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }catch(e){
+      if(i===OVERPASS_ENDPOINTS.length-1) throw e; // all mirrors failed
+    }
+  }
+  throw new Error('All map servers are busy (rate limited). Wait a moment and try again.');
 }
 
 // ── Build graph ────────────────────────────────────────────────────────────
@@ -377,7 +394,7 @@ function buildGraph(data, mode) {
     if(el.type!=='way') continue;
     if(!ROAD_HW.has(el.tags?.highway)) continue;
     for(const nid of el.nodes){
-      const n=nodes[nid];
+      const n=nodes[String(nid)];
       if(n) addRoadNode(n.lat,n.lon);
     }
   }
@@ -402,19 +419,19 @@ function buildGraph(data, mode) {
     // are within 30 m of a road, treat it as road-grade (not a quiet shortcut).
     if(['footway','path','track','cycleway'].includes(hw)) {
       let near=0;
-      for(const nid of el.nodes){ const n=nodes[nid]; if(n&&nearRoad(n.lat,n.lon)) near++; }
+      for(const nid of el.nodes){ const n=nodes[String(nid)]; if(n&&nearRoad(n.lat,n.lon)) near++; }
       if(near > el.nodes.length*0.5) {
-        // Parallel footpath: cost = tertiary equivalent at minimum
         costMult = Math.max(costMult, 12);
       }
     }
 
     for(let i=0;i<el.nodes.length-1;i++){
-      const aId=el.nodes[i], bId=el.nodes[i+1];
+      // Normalise to strings so Map/Set lookups in A* use consistent types.
+      const aId=String(el.nodes[i]), bId=String(el.nodes[i+1]);
       const a=nodes[aId], b=nodes[bId];
       if(!a||!b) continue;
       const d=hav(a.lat,a.lon,b.lat,b.lon);
-      if(d<0.003) continue; // skip tiny connector segments
+      if(d<0.003) continue;
       if(!graph[aId]) graph[aId]=[];
       if(!graph[bId]) graph[bId]=[];
       graph[aId].push({to:bId,d,hw,cost:d*costMult});
@@ -493,12 +510,10 @@ function aStar(graph, nodes, startId, endId, detourFactor) {
 
   while(heap.size>0){
     const {id:cur}=heap.pop();
-    if(String(cur)===String(endId)){
-      // Reconstruct path
+    if(cur===endId){
       const path=[];
-      let c=String(cur);
+      let c=cur;
       while(c!==null){path.unshift(c);c=prev.get(c)??null;}
-      // Convert back: prev stores string keys from graph iteration
       return path;
     }
     if(closed.has(cur)) continue;
