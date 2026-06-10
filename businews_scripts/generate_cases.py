@@ -26,6 +26,22 @@ Target length: the total body of the case study (all sections combined) should b
 
 You may draw on your own knowledge of the company and story to add depth, but stay factually grounded. Do not invent specific numbers or quotes.
 
+IB STRUCTURED QUESTIONS
+Generate 5 to 7 IB Business Management structured questions anchored in this specific case.
+
+Mark level rules:
+- 2 marks (AO1 — Define, Identify, State, List): Knowledge only, no case application needed. "Identify two X" = two separate 1-mark answers. "Define" = 1 mark for core definition + 1 mark for development.
+- 4 marks (AO2 — Explain, Suggest): One point with mechanism explained and applied to the case. Must require WHY or HOW, not just naming or classifying. Structure: point (2 marks) + explanation applied to the specific case (2 marks).
+- 6 marks, two options:
+  (a) AO2 breadth: "Explain two [things]" = 3 marks per point (identify + explain mechanism + apply to case).
+  (b) AO3: Examine, Evaluate, To what extent, Discuss. Two-sided analysis required plus a supported conclusion. Only use AO3 command terms when there are genuinely two defensible sides.
+
+Requirements:
+- Include at least one 2-mark question, at least two 4-mark questions, and at least one 6-mark question.
+- Questions must reference specific details from this case (company names, the specific decision, the specific tension). AO2 and AO3 questions cannot be answered without engaging with the case.
+- Marking notes: 2-3 sentences specifying what a full-marks answer must contain. For AO1: what the definition or identification must include. For AO2: the point and the applied explanation required. For AO3: the two sides and what a valid conclusion looks like.
+- Never use em dashes.
+
 The story:
 Title: {title}
 Source: {source}
@@ -91,8 +107,30 @@ CASE_STUDY_TOOL = {
                 },
                 "description": "IB BM unit areas this case study connects to.",
             },
+            "ib_questions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "description": "Full question text including mark allocation in brackets, e.g. 'Define the term private equity. [2]'",
+                        },
+                        "marks": {
+                            "type": "integer",
+                            "description": "Mark allocation: 2, 4, or 6.",
+                        },
+                        "marking_notes": {
+                            "type": "string",
+                            "description": "2-3 sentences of marking guidance: what a full-marks answer must contain.",
+                        },
+                    },
+                    "required": ["question", "marks", "marking_notes"],
+                },
+                "description": "5-7 IB BM structured questions spanning AO1 (2-mark define/identify), AO2 (4-mark explain, 6-mark explain two), and AO3 (6-mark examine/evaluate). All anchored in the specific case.",
+            },
         },
-        "required": ["title", "hook", "background", "what_happened", "the_tension", "reflection_questions", "curriculum_links"],
+        "required": ["title", "hook", "background", "what_happened", "the_tension", "reflection_questions", "curriculum_links", "ib_questions"],
     },
 }
 

@@ -64,6 +64,38 @@ def render_html(case):
           <p>{case["extension"]}</p>
         </div>"""
 
+    if case.get("ib_questions"):
+        ib_items = "\n".join(
+            f'<li class="ib-q-item">'
+            f'<p class="ib-q-text">{q["question"]}</p>'
+            f'<p class="ib-q-notes">{q["marking_notes"]}</p>'
+            f'</li>'
+            for q in case["ib_questions"]
+        )
+        questions_section_inner = f"""        <div class="questions-tabs">
+          <button class="questions-tab-btn active" onclick="switchQTab(this,'panel-reflection')">Reflection</button>
+          <button class="questions-tab-btn" onclick="switchQTab(this,'panel-ib')">IB Questions</button>
+        </div>
+        <div id="panel-reflection" class="questions-panel active">
+          <ol class="reflection-list">{questions_html}</ol>
+{extension_html}
+        </div>
+        <div id="panel-ib" class="questions-panel">
+          <ol class="ib-list">{ib_items}</ol>
+        </div>
+        <script>
+        function switchQTab(btn,id){{
+          document.querySelectorAll('.questions-tab-btn').forEach(b=>b.classList.remove('active'));
+          document.querySelectorAll('.questions-panel').forEach(p=>p.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(id).classList.add('active');
+        }}
+        </script>"""
+    else:
+        questions_section_inner = f"""        <h2>Reflection Questions</h2>
+        <ol class="reflection-list">{questions_html}</ol>
+{extension_html}"""
+
     source_domain = case.get("source", "")
     src_url = case.get("source_url", "#")
     src_title = case.get("source_title", "Original article")
@@ -111,9 +143,7 @@ def render_html(case):
       </section>
 {outside_view_html}
       <section class="questions-section">
-        <h2>Reflection Questions</h2>
-        <ol class="reflection-list">{questions_html}</ol>
-{extension_html}
+{questions_section_inner}
       </section>
 
       <section class="sources-section">
