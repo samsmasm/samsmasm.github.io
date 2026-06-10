@@ -82,6 +82,8 @@ def render_html(case):
         </div>
         <div id="panel-ib" class="questions-panel">
           <ol class="ib-list">{ib_items}</ol>
+          <button class="ib-answers-btn" onclick="toggleIBAnswers(this)">Show answers</button>
+          <p class="ib-disclaimer">These questions and marking notes are AI-generated, based primarily on IB Business Management terminology and assessment framework. They are indicative only. Refer to official IB materials and your teacher for authoritative guidance.</p>
         </div>
         <script>
         function switchQTab(btn,id){{
@@ -89,6 +91,11 @@ def render_html(case):
           document.querySelectorAll('.questions-panel').forEach(p=>p.classList.remove('active'));
           btn.classList.add('active');
           document.getElementById(id).classList.add('active');
+        }}
+        function toggleIBAnswers(btn){{
+          var panel=document.getElementById('panel-ib');
+          var showing=panel.classList.toggle('ib-panel-answers-visible');
+          btn.textContent=showing?'Hide answers':'Show answers';
         }}
         </script>"""
     else:
