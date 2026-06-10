@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/unisamicon2.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolutionary Car Simulator — Arena Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/planck-js@0.3.31/dist/planck.js" onerror="alert('Network Error: Failed to load planck.js. Please check your internet connection.')"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #f0f0f0; }
+        canvas#canvas { width: 100vw; height: 100vh; display: block; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
+            background: #2563eb; cursor: pointer; margin-top: -4px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer; background: #d1d5db; border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Start Screen Overlay -->
+    <div id="startScreen" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-90">
+        <div class="bg-white p-8 rounded-lg shadow-2xl text-center max-w-md w-full">
+            <h1 class="text-3xl font-bold text-gray-800 mb-1">Evolutionary Cars</h1>
+            <p class="text-gray-500 mb-1 text-sm">Arena Edition — the whole population races at once.</p>
+            <p class="text-gray-400 mb-6 text-xs">Tournament selection · crossover · evolvable drivetrain</p>
+
+            <div class="space-y-3">
+                <button onclick="selectTrack('flat')" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    🏁 Flat Sprint
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Fastest Time to 100m</div>
+                </button>
+
+                <button onclick="selectTrack('hill')" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    ⛰️ Hill Climb
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Furthest Distance (Infinite)</div>
+                </button>
+
+                <button onclick="selectTrack('jump')" class="w-full py-3 px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    ⛷️ Ski Jump
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Max Distance (Air Time)</div>
+                </button>
+
+                <button onclick="selectTrack('rough')" class="w-full py-3 px-6 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow transition transform hover:-translate-y-1">
+                    🪨 Rough Terrain
+                    <div class="text-xs font-normal opacity-80 mt-1">Goal: Furthest over the bumps — suspension matters</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Left UI: Controls & Live Info -->
+    <div class="absolute top-4 left-4 z-10 space-y-4 max-h-[calc(100vh-2rem)] flex flex-col w-72">
+        <div class="bg-white p-4 rounded shadow-lg border border-gray-300 shrink-0">
+            <h1 class="font-bold text-lg mb-2 text-gray-800">Evolution Arena</h1>
+
+            <!-- Live Stats -->
+            <div class="mb-2 text-sm border-b pb-2 space-y-1">
+                <div class="flex justify-between">
+                    <span>Gen:</span>
+                    <span class="font-bold"><span id="dispGen">1</span></span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Alive:</span>
+                    <span><span id="dispIndex">20</span> / <span id="dispPop">20</span></span>
+                </div>
+                <div class="flex justify-between bg-gray-100 p-1 rounded">
+                    <span>Time / Leader:</span>
+                    <span id="dispTime" class="font-mono font-bold">0.0s / 0.0m</span>
+                </div>
+                <div class="flex justify-between text-xs text-purple-600 hidden" id="rowHeight">
+                    <span>Leader Height:</span>
+                    <span id="dispHeight">0.0m</span>
+                </div>
+                 <div class="flex justify-between text-xs text-gray-400">
+                    <span>Leader Stuck:</span>
+                    <span id="dispStuck">0.0s</span>
+                </div>
+            </div>
+
+            <!-- Leader Genome Readout -->
+            <div class="text-[11px] border-b pb-2 mb-2 space-y-0.5">
+                <div class="font-bold text-gray-600 mb-1">🏆 Leader Genome</div>
+                <div class="flex justify-between text-blue-600"><span>Body Power:</span><span id="dispPower">-</span></div>
+                <div class="flex justify-between text-blue-600"><span>Total Mass:</span><span id="dispMass">-</span></div>
+                <div class="flex justify-between text-emerald-700"><span>Motor (gearing):</span><span id="dispMotor">-</span></div>
+                <div class="flex justify-between text-emerald-700"><span>Density:</span><span id="dispDensity">-</span></div>
+                <div class="flex justify-between text-emerald-700"><span>Suspension:</span><span id="dispSusp">-</span></div>
+                <div class="flex justify-between text-gray-600"><span>Wheels / Verts:</span><span id="dispWheels">-</span></div>
+                <div class="flex justify-between text-rose-600"><span>Sliding:</span><span id="dispSlide">-</span></div>
+            </div>
+
+            <!-- Fitness graph -->
+            <canvas id="fitnessGraph" width="240" height="64" class="w-full rounded border border-gray-200 mb-2"></canvas>
+
+            <!-- Scrollable Log -->
+            <div id="status" class="text-xs font-mono bg-black text-green-400 p-2 rounded h-20 overflow-y-auto whitespace-pre-wrap">
+                Select Track...
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white p-3 rounded shadow border border-gray-300 space-y-3 overflow-y-auto flex-1 min-h-0">
+
+            <a href="designer.html" target="_blank" class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-2 rounded text-xs text-center transition shadow">
+                Open Car Designer 🛠️
+            </a>
+
+            <div class="flex gap-2">
+                <button id="btnSpeed" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-2 rounded text-xs transition">
+                    Speed: Normal (4x)
+                </button>
+                <button id="btnMainMenu" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs transition">
+                    Main Menu
+                </button>
+            </div>
+
+            <button id="btnSkip" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-2 rounded text-xs transition">
+                Skip Generation (Evolve Now)
+            </button>
+
+            <!-- Mutation Slider -->
+            <div class="border-t pt-2 space-y-2">
+                <div>
+                    <label class="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                        <span>Mutation Rate</span>
+                        <span id="valMutation" class="text-blue-600">50%</span>
+                    </label>
+                    <input type="range" id="inputMutation" min="0" max="100" value="50" class="w-full">
+                </div>
+
+                <div>
+                    <label class="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                        <span>Rate Decay</span>
+                        <span id="valDecay" class="text-blue-600">5%</span>
+                    </label>
+                    <input type="range" id="inputDecay" min="-5" max="20" value="5" class="w-full">
+                    <div class="text-[9px] text-gray-400 text-right">Negative = Rate Grows · floored at 3%</div>
+                </div>
+            </div>
+
+            <!-- Config Sliders -->
+            <div class="border-t pt-2 space-y-3">
+                <h3 class="text-xs font-bold text-gray-700">Car Configuration</h3>
+
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                        <span>Max Time Limit</span>
+                        <span id="txtMaxTime" class="font-bold text-blue-600">60s</span>
+                    </label>
+                    <input type="range" id="inputMaxTime" min="10" max="300" step="5" value="60" class="w-full">
+                </div>
+
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                        <span>Wheels (Min/Max)</span>
+                        <span class="font-bold text-blue-600"><span id="txtMinWheels">2</span> - <span id="txtMaxWheels">4</span></span>
+                    </label>
+                    <div class="flex gap-1">
+                        <input type="range" id="inputMinWheels" min="0" max="8" step="1" value="2" class="w-1/2">
+                        <input type="range" id="inputMaxWheels" min="0" max="8" step="1" value="4" class="w-1/2">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                        <span>Vertices (Min/Max)</span>
+                        <span class="font-bold text-blue-600"><span id="txtMinPoints">3</span> - <span id="txtMaxPoints">14</span></span>
+                    </label>
+                    <div class="flex gap-1">
+                        <input type="range" id="inputMinPoints" min="3" max="20" step="1" value="3" class="w-1/2">
+                        <input type="range" id="inputMaxPoints" min="3" max="20" step="1" value="14" class="w-1/2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nudge Sliders -->
+            <div class="border-t pt-2 space-y-2">
+                <h3 class="text-xs font-bold text-gray-700">Mutation Bias (Nudge)</h3>
+
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-500">
+                        <span>Less Wheels</span><span>More Wheels</span>
+                    </label>
+                    <input type="range" id="nudgeWheels" min="-1" max="1" step="0.1" value="0" class="w-full">
+                </div>
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-500">
+                        <span>Smaller Wheels</span><span>Bigger Wheels</span>
+                    </label>
+                    <input type="range" id="nudgeWheelSize" min="-1" max="1" step="0.1" value="0" class="w-full">
+                </div>
+                <div>
+                    <label class="flex justify-between text-[10px] text-gray-500">
+                        <span>Smaller Body</span><span>Bigger Body</span>
+                    </label>
+                    <input type="range" id="nudgeBodySize" min="-1" max="1" step="0.1" value="0" class="w-full">
+                </div>
+            </div>
+
+            <!-- Import / Export -->
+            <div class="border-t pt-2 space-y-2">
+                <h3 class="text-xs font-bold text-gray-700">Import / Export</h3>
+                <textarea id="ioTextarea" class="w-full h-12 text-[10px] border rounded p-1 font-mono text-gray-600 resize-none" placeholder="Paste car JSON here..."></textarea>
+                <div class="flex gap-2">
+                    <button id="btnCopyBest" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 py-1 px-2 rounded text-[10px] font-bold transition">
+                        Copy Best
+                    </button>
+                    <button id="btnLoad" class="flex-1 bg-green-100 hover:bg-green-200 text-green-800 py-1 px-2 rounded text-[10px] font-bold transition">
+                        Load
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right UI: Results Lists -->
+    <div class="absolute top-4 right-4 z-10 space-y-4 w-64 flex flex-col h-[calc(100vh-2rem)] pointer-events-none">
+        <div class="bg-white/90 p-3 rounded shadow-lg border border-gray-300 flex flex-col max-h-[55%] pointer-events-auto">
+            <h2 class="font-bold text-sm text-gray-700 mb-2 border-b pb-1">Live Leaderboard</h2>
+            <div id="listCurrentGen" class="flex-1 overflow-y-auto text-xs space-y-0.5">
+            </div>
+        </div>
+
+        <div class="bg-white/90 p-3 rounded shadow-lg border border-gray-300 flex flex-col flex-1 pointer-events-auto">
+            <h2 class="font-bold text-sm text-gray-700 mb-2 border-b pb-1">Hall of Fame (Best per Gen)</h2>
+            <div id="listHistory" class="flex-1 overflow-y-auto text-xs space-y-1">
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+    /* =====================================================================
+       EVOLUTIONARY CAR SIMULATOR — ARENA EDITION  (racecar2/index.html)
+       =====================================================================
+
+       WHAT WAS DIAGNOSED IN THE ORIGINAL
+       -----------------------------------
+       1. Selection was single-parent hill-climbing: the champion was cloned
+          and every other car was a mutation of that ONE genome. No crossover,
+          so traits found in different lineages could never combine; no
+          diversity, so the gene pool was near-identical each generation.
+          MUTATION_RATE *= 0.95 decayed toward zero with no floor, so once the
+          run found a local optimum it could never climb out — the steps kept
+          shrinking. Classic premature convergence.
+       2. Cars were evaluated one at a time, so a generation took up to
+          POPULATION * MAX_TIME seconds and you never saw the pack compete.
+          The per-track stuck logic was a pile of special cases.
+       3. Fitness rewarded a big static body for free (getFrontX measures the
+          rightmost vertex) and could not tell a rolling car from a skidding
+          blob — sliding scored exactly like driving.
+       4. The genome was thin: only geometry + wheel radius were heritable.
+          Motor speed (-15), body density (2.0) and suspension (4Hz/0.7) were
+          hard-coded constants — three whole strategy axes that never evolved.
+       5. Latent bug: every resetSimulation() called requestAnimationFrame(loop)
+          again while loop() also re-queued itself, stacking render loops on
+          repeated track selection.
+
+       WHAT CHANGED
+       ------------
+       * PARALLEL ARENA. The whole population now races simultaneously in one
+         shared world (collision-filtered, so cars pass through each other).
+         The camera tracks the current leader; the rest are ghosted; cars are
+         destroyed as they fail so survivors visibly pull ahead. A generation
+         now costs ONE MAX_TIME window instead of POPULATION x MAX_TIME.
+       * REAL GENETICS. evolve() now does: tournament selection (k=3),
+         crossover (chassis of one parent + drivetrain of the other + blended
+         tuning genes), 2 unchanged elites, 2 fresh random "immigrants" for
+         diversity, and the rest are crossover+mutation offspring. Mutation
+         rate still decays but is floored at MUTATION_FLOOR so exploration
+         never fully dies.
+       * EXPANDED GENOME. New evolvable genes: motorSpeed (gearing / top speed),
+         density (power-to-weight vs traction — lighter accelerates harder but
+         grips less), suspHz + suspDamp (suspension stiffness/damping).
+       * FITNESS FIX. Each car accumulates how far it ROLLED (wheel rotation x
+         radius) vs how far it MOVED; the slide fraction penalises skidding
+         blobs by up to 50% of distance. Flat finishers are tie-broken by mass
+         (efficiency reward). The static-body free-distance bias is unchanged
+         in measurement but no longer wins, because a body that doesn't roll is
+         penalised and can't reach the line anyway.
+       * NEW TRACK. "Rough Terrain" — deterministic bumpy ground (same for all
+         cars, every gen) that rewards suspension tuning and stable, multi-wheel
+         layouts and punishes fragile single-wheel / tiny-wheel designs.
+       * VISUALISATION. Live leaderboard of every racing car, a fitness-per-
+         generation graph (best + average), a leader genome readout (power,
+         mass, gearing, density, suspension, slide %), and a gold-highlighted
+         leader against ghosted rivals.
+       * Fixed the double-loop bug: the render loop is started exactly once and
+         is gated on menu visibility / population existence.
+
+       WHAT TO EXPECT TO BE DIFFERENT
+       ------------------------------
+       Generations resolve in seconds and you watch ~20 cars fan out and
+       compete. Because of crossover + immigrants + the mutation floor, the
+       population stays diverse and keeps improving instead of freezing after
+       ~30 gens. Distinct niches should emerge per track: flat favours light,
+       high-gearing sprinters; hill favours big-area (high torque) cars with
+       grippy wheels; rough favours soft suspension and a low, stable wheelbase;
+       jump favours a fast run-up and an aerodynamically lucky launch shape.
+       Skidding "cheese" strategies are now actively selected against.
+       ===================================================================== */
+
+    // --- UTILS ---
+    function log(msg) {
+        const el = document.getElementById('status');
+        if(!el) return;
+        el.innerText += '\n' + msg;
+        const lines = el.innerText.split('\n');
+        if (lines.length > 120) el.innerText = lines.slice(-120).join('\n');
+        el.scrollTop = el.scrollHeight;
+    }
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    // --- CONFIG ---
+    const CONFIG = {
+        POPULATION_SIZE: 20,
+        MUTATION_RATE: 0.5,
+        MUTATION_DECAY: 0.95,
+        MUTATION_FLOOR: 0.03,   // exploration never fully dies
+        ELITE_COUNT: 2,         // unchanged champions carried over
+        IMMIGRANT_COUNT: 2,     // fresh random genomes injected for diversity
+        TOURNAMENT_K: 3,
+
+        TRACK_LENGTH: 100,
+        HILL_LENGTH: 2000,
+        ROUGH_LENGTH: 2000,
+        SCALE: 40,
+        MAX_TIME: 60,
+        STUCK_TIME: 3,
+        GRAVITY: -10,
+
+        MIN_WHEELS: 2,
+        MAX_WHEELS: 4,
+        MIN_POINTS: 3,
+        MAX_POINTS: 14,
+
+        POWER_DENSITY: 80.0,
+
+        NUDGE_WHEELS: 0,
+        NUDGE_WHEEL_SIZE: 0,
+        NUDGE_BODY_SIZE: 0,
+
+        TRACK_TYPE: 'flat',
+
+        // --- evolvable gene ranges ---
+        MOTOR_MIN: 4,   MOTOR_MAX: 45,
+        DENSITY_MIN: 0.4, DENSITY_MAX: 4.0,
+        SUSPHZ_MIN: 1,  SUSPHZ_MAX: 12,
+        SUSPDAMP_MIN: 0.1, SUSPDAMP_MAX: 1.0
+    };
+
+    window.selectTrack = (type) => {
+        CONFIG.TRACK_TYPE = type;
+        document.getElementById('startScreen').classList.add('hidden');
+        if (type === 'jump') document.getElementById('rowHeight').classList.remove('hidden');
+        else document.getElementById('rowHeight').classList.add('hidden');
+        resetSimulation();
+    };
+
+    // Deterministic bump height for the Rough Terrain track (same for everyone).
+    function bumpHeight(x) {
+        if (x < 5) return 0; // gentle run-up
+        return Math.sin(x * 0.6) * 0.4 + Math.sin(x * 0.23) * 0.7 + Math.sin(x * 1.31) * 0.25;
+    }
+
+    // --- GENOME CLASS ---
+    class Genome {
+        constructor() {
+            this.points = []; // {angle, radius}
+            this.wheels = []; // {vertexIndex, radius}
+            this.hue = Math.floor(Math.random() * 360);
+
+            // evolvable drivetrain / tuning genes
+            this.motorSpeed = 15;
+            this.density = 2.0;
+            this.suspHz = 4;
+            this.suspDamp = 0.7;
+
+            // results (filled after a run)
+            this.fitness = 0;
+            this.finished = false;
+            this.time = 0;
+            this.distance = 0;
+            this.slideFrac = 0;
+            this.totalMass = 0;
+            this.maxHeight = 0;
+            this._fit = -Infinity;
+        }
+
+        clone() {
+            const g = new Genome();
+            g.points = this.points.map(p => ({...p}));
+            g.wheels = this.wheels.map(w => ({...w}));
+            g.hue = this.hue;
+            g.motorSpeed = this.motorSpeed;
+            g.density = this.density;
+            g.suspHz = this.suspHz;
+            g.suspDamp = this.suspDamp;
+            return g;
+        }
+
+        static fromData(d) {
+            const g = new Genome();
+            g.points = d.points;
+            g.wheels = d.wheels;
+            g.hue = d.hue || 0;
+            // graceful defaults so designer.html exports (which lack these) still load
+            g.motorSpeed = d.motorSpeed ?? 15;
+            g.density    = d.density    ?? 2.0;
+            g.suspHz     = d.suspHz     ?? 4;
+            g.suspDamp   = d.suspDamp   ?? 0.7;
+            return g;
+        }
+
+        static pickFreeVertex(g) {
+            const used = new Set(g.wheels.map(w => w.vertexIndex));
+            const free = [];
+            for (let i = 0; i < g.points.length; i++) if (!used.has(i)) free.push(i);
+            if (free.length > 0) return free[Math.floor(Math.random() * free.length)];
+            return Math.floor(Math.random() * g.points.length);
+        }
+
+        static random() {
+            const g = new Genome();
+
+            const minP = Math.min(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+            const maxP = Math.max(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+            const numPoints = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+
+            let angles = [];
+            let total = 0;
+            for(let i=0; i<numPoints; i++) { let r = Math.random() + 0.2; angles.push(r); total += r; }
+            let currentAngle = 0;
+            for(let i=0; i<numPoints; i++) {
+                currentAngle += (angles[i] / total) * (Math.PI * 2);
+                g.points.push({ angle: currentAngle, radius: 0.3 + Math.random() * 1.5 });
+            }
+
+            const minW = Math.min(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            const maxW = Math.max(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            let targetWheels = Math.floor(Math.random() * (maxW - minW + 1)) + minW;
+            if (targetWheels > numPoints) targetWheels = numPoints;
+            const indices = [];
+            while(indices.length < targetWheels) {
+                let idx = Math.floor(Math.random() * numPoints);
+                if(!indices.includes(idx)) indices.push(idx);
+            }
+            indices.forEach(idx => g.wheels.push({ vertexIndex: idx, radius: 0.2 + Math.random() * 0.4 }));
+
+            // random tuning genes
+            g.motorSpeed = CONFIG.MOTOR_MIN + Math.random() * (CONFIG.MOTOR_MAX - CONFIG.MOTOR_MIN);
+            g.density    = CONFIG.DENSITY_MIN + Math.random() * (CONFIG.DENSITY_MAX - CONFIG.DENSITY_MIN);
+            g.suspHz     = CONFIG.SUSPHZ_MIN + Math.random() * (CONFIG.SUSPHZ_MAX - CONFIG.SUSPHZ_MIN);
+            g.suspDamp   = CONFIG.SUSPDAMP_MIN + Math.random() * (CONFIG.SUSPDAMP_MAX - CONFIG.SUSPDAMP_MIN);
+
+            return g;
+        }
+
+        // Recombine two parents: chassis from one, drivetrain layout from the
+        // other, blended scalar tuning genes. This lets a good body and a good
+        // wheel layout discovered in separate lineages finally combine.
+        static crossover(a, b) {
+            const c = new Genome();
+            const bodyParent  = Math.random() < 0.5 ? a : b;
+            const wheelParent = Math.random() < 0.5 ? a : b;
+
+            c.points = bodyParent.points.map(p => ({...p}));
+            c.wheels = wheelParent.wheels.map(w => ({...w}));
+            // wheels referenced into the body must stay in range
+            c.wheels.forEach(w => { if (w.vertexIndex >= c.points.length) w.vertexIndex = c.points.length - 1; });
+
+            const mix = (x, y) => x + (y - x) * Math.random();
+            c.motorSpeed = mix(a.motorSpeed, b.motorSpeed);
+            c.density    = mix(a.density,    b.density);
+            c.suspHz     = mix(a.suspHz,     b.suspHz);
+            c.suspDamp   = mix(a.suspDamp,   b.suspDamp);
+            c.hue = Math.random() < 0.5 ? a.hue : b.hue;
+            return c;
+        }
+
+        static mutate(parent) {
+            const child = parent.clone();
+            const m = CONFIG.MUTATION_RATE;
+
+            const minP = Math.min(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+            const maxP = Math.max(CONFIG.MIN_POINTS, CONFIG.MAX_POINTS);
+
+            // Range compliance + occasional add/remove of vertices
+            if (child.points.length < minP) {
+                while(child.points.length < minP) child.points.push({ angle: Math.random() * Math.PI * 2, radius: 1.0 });
+            } else if (child.points.length > maxP) {
+                while(child.points.length > maxP) child.points.pop();
+            } else if (Math.random() < m * 0.5) {
+                if (Math.random() < 0.5 && child.points.length < maxP) {
+                    child.points.push({ angle: Math.random() * Math.PI * 2, radius: 1.0 });
+                } else if (child.points.length > minP) {
+                    child.points.pop();
+                }
+            }
+
+            child.points.sort((a,b) => a.angle - b.angle);
+            child.wheels.forEach(w => { if (w.vertexIndex >= child.points.length) w.vertexIndex = child.points.length - 1; });
+
+            // Body shape
+            child.points.forEach(p => {
+                if(Math.random() < m) {
+                    let shift = (Math.random() - 0.5) + (CONFIG.NUDGE_BODY_SIZE * 0.5);
+                    p.radius = clamp(p.radius + shift * m * 3, 0.2, 3.5);
+                }
+                if(Math.random() < m) p.angle += (Math.random() - 0.5) * m;
+            });
+            child.points.sort((a,b) => a.angle - b.angle);
+
+            // Wheel size
+            child.wheels.forEach(w => {
+                if(Math.random() < m) {
+                    let shift = (Math.random() - 0.5) + (CONFIG.NUDGE_WHEEL_SIZE * 0.5);
+                    w.radius = clamp(w.radius + shift * m, 0.1, 1.2);
+                }
+            });
+
+            // Wheel count
+            const minW = Math.min(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            const maxW = Math.max(CONFIG.MIN_WHEELS, CONFIG.MAX_WHEELS);
+            if (child.wheels.length < minW) {
+                while(child.wheels.length < minW) child.wheels.push({ vertexIndex: Genome.pickFreeVertex(child), radius: 0.3 });
+            } else if (child.wheels.length > maxW) {
+                while(child.wheels.length > maxW) child.wheels.splice(Math.floor(Math.random() * child.wheels.length), 1);
+            } else if (Math.random() < m * 0.5) {
+                let addProb = 0.5 + (CONFIG.NUDGE_WHEELS * 0.4);
+                if (Math.random() < addProb) {
+                    if (child.wheels.length < maxW && child.wheels.length < child.points.length) {
+                        child.wheels.push({ vertexIndex: Genome.pickFreeVertex(child), radius: 0.3 });
+                    }
+                } else if (child.wheels.length > minW) {
+                    child.wheels.splice(Math.floor(Math.random() * child.wheels.length), 1);
+                }
+            }
+
+            // Move a wheel to a different vertex
+            if(Math.random() < (m * 0.5) && child.wheels.length > 0) {
+                child.wheels[Math.floor(Math.random() * child.wheels.length)].vertexIndex = Genome.pickFreeVertex(child);
+            }
+
+            // --- Tuning genes ---
+            if(Math.random() < m) child.motorSpeed = clamp(child.motorSpeed + (Math.random()-0.5) * m * 30, CONFIG.MOTOR_MIN, CONFIG.MOTOR_MAX);
+            if(Math.random() < m) child.density    = clamp(child.density    + (Math.random()-0.5) * m * 2,  CONFIG.DENSITY_MIN, CONFIG.DENSITY_MAX);
+            if(Math.random() < m) child.suspHz      = clamp(child.suspHz     + (Math.random()-0.5) * m * 6,  CONFIG.SUSPHZ_MIN, CONFIG.SUSPHZ_MAX);
+            if(Math.random() < m) child.suspDamp    = clamp(child.suspDamp   + (Math.random()-0.5) * m * 0.6, CONFIG.SUSPDAMP_MIN, CONFIG.SUSPDAMP_MAX);
+
+            // Colour drift
+            if(Math.random() < 0.1) child.hue = (child.hue + Math.floor((Math.random()-0.5)*20) + 360) % 360;
+
+            return child;
+        }
+    }
+
+    // --- GLOBALS ---
+    let world = null;
+    let canvas, ctx;
+
+    let population = [];   // array of Genome (current gen)
+    let cars = [];         // array of runtime car objects (parallel)
+    let leaderCar = null;
+    let generation = 1;
+
+    let simTime = 0;       // seconds elapsed in the current generation
+    let simSpeed = 4;
+    let frameCount = 0;
+    let camX = 0, camY = 4;
+    let fitnessHistory = []; // [{gen, best, avg, str}]
+
+    // --- INIT ---
+    window.onload = function() {
+        if (typeof planck === 'undefined') {
+            if (typeof Planck !== 'undefined') window.planck = Planck;
+            else { alert("Physics Engine Failed to Load"); return; }
+        }
+
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+        window.onresize();
+
+        document.getElementById('btnMainMenu').onclick = showMainMenu;
+        document.getElementById('btnSpeed').onclick = toggleSpeed;
+        document.getElementById('btnSkip').onclick = skipGeneration;
+        document.getElementById('btnCopyBest').onclick = copyBestGenome;
+        document.getElementById('btnLoad').onclick = loadGenome;
+
+        document.getElementById('inputMutation').oninput = (e) => {
+            CONFIG.MUTATION_RATE = parseInt(e.target.value) / 100;
+            document.getElementById('valMutation').innerText = e.target.value + "%";
+        };
+        document.getElementById('inputDecay').oninput = (e) => {
+            const val = parseInt(e.target.value);
+            CONFIG.MUTATION_DECAY = 1 - (val / 100);
+            document.getElementById('valDecay').innerText = val + "%";
+        };
+
+        const bindNudge = (id, key) => {
+            document.getElementById(id).oninput = (e) => { CONFIG[key] = parseFloat(e.target.value); };
+        };
+        bindNudge('nudgeWheels', 'NUDGE_WHEELS');
+        bindNudge('nudgeWheelSize', 'NUDGE_WHEEL_SIZE');
+        bindNudge('nudgeBodySize', 'NUDGE_BODY_SIZE');
+
+        const bindRange = (id, key, displayId) => {
+            document.getElementById(id).oninput = (e) => {
+                CONFIG[key] = parseInt(e.target.value);
+                document.getElementById(displayId).innerText = CONFIG[key];
+            };
+        };
+        bindRange('inputMinWheels', 'MIN_WHEELS', 'txtMinWheels');
+        bindRange('inputMaxWheels', 'MAX_WHEELS', 'txtMaxWheels');
+        bindRange('inputMinPoints', 'MIN_POINTS', 'txtMinPoints');
+        bindRange('inputMaxPoints', 'MAX_POINTS', 'txtMaxPoints');
+
+        document.getElementById('inputMaxTime').oninput = (e) => {
+            CONFIG.MAX_TIME = parseInt(e.target.value);
+            document.getElementById('txtMaxTime').innerText = CONFIG.MAX_TIME + "s";
+        };
+
+        document.getElementById('inputMaxTime').value = CONFIG.MAX_TIME;
+        document.getElementById('txtMaxTime').innerText = CONFIG.MAX_TIME + "s";
+        document.getElementById('inputMinWheels').value = CONFIG.MIN_WHEELS;
+        document.getElementById('inputMaxWheels').value = CONFIG.MAX_WHEELS;
+
+        world = planck.World(planck.Vec2(0, CONFIG.GRAVITY));
+
+        // Jump-landing detection (per car). Cars' bodies carry {carIndex}; the
+        // ground body carries the string 'ground'.
+        world.on('begin-contact', (contact) => {
+            if (CONFIG.TRACK_TYPE !== 'jump') return;
+            const bA = contact.getFixtureA().getBody();
+            const bB = contact.getFixtureB().getBody();
+            const uA = bA.getUserData(), uB = bB.getUserData();
+
+            let carBody = null;
+            if (uA === 'ground') carBody = bB;
+            else if (uB === 'ground') carBody = bA;
+            if (!carBody) return;
+
+            const ud = carBody.getUserData();
+            if (ud && typeof ud === 'object' && ud.carIndex != null) {
+                const car = cars[ud.carIndex];
+                if (car && !car.done && car.body && !car.hasLanded && car.body.getPosition().x > 60) {
+                    car.hasLanded = true;
+                }
+            }
+        });
+
+        // Start the single, persistent render loop. It idles while the menu is
+        // up or the population is empty. (Original bug: loop was started on
+        // every resetSimulation, stacking multiple loops.)
+        requestAnimationFrame(loop);
+    };
+
+    function skipGeneration() {
+        if (cars.length === 0) return;
+        cars.forEach(c => { if (!c.done) finalizeCar(c, 'Skipped'); });
+        // evolve happens naturally next loop iteration when all are done
+    }
+
+    function showMainMenu() {
+        document.getElementById('startScreen').classList.remove('hidden');
+    }
+
+    function toggleSpeed() {
+        if(simSpeed === 4) { simSpeed = 12; document.getElementById('btnSpeed').innerText = `Speed: Fast (12x)`; }
+        else if(simSpeed === 12) { simSpeed = 1; document.getElementById('btnSpeed').innerText = `Speed: Realtime (1x)`; }
+        else { simSpeed = 4; document.getElementById('btnSpeed').innerText = `Speed: Normal (4x)`; }
+    }
+
+    function clearWorld() {
+        let bodies = [];
+        for (let b = world.getBodyList(); b; b = b.getNext()) bodies.push(b);
+        bodies.forEach(b => world.destroyBody(b));
+    }
+
+    function resetSimulation(seedGenome = null) {
+        generation = 1;
+        population = [];
+        CONFIG.MUTATION_RATE = 0.5;
+        updateSlider();
+        fitnessHistory = [];
+        drawFitnessGraph();
+
+        document.getElementById('listCurrentGen').innerHTML = '';
+        document.getElementById('listHistory').innerHTML = '';
+        log("Creating Gen 1...");
+
+        if (seedGenome) { log("Loaded imported car!"); population.push(seedGenome); }
+        while(population.length < CONFIG.POPULATION_SIZE) population.push(Genome.random());
+
+        startGeneration();
+        updateUI();
+    }
+
+    function copyBestGenome() {
+        const sorted = [...cars].sort((a, b) => liveRank(a) - liveRank(b));
+        const best = (sorted[0] && sorted[0].genome) || population[0];
+        if (!best) return;
+        const clean = {
+            points: best.points, wheels: best.wheels, hue: best.hue,
+            motorSpeed: best.motorSpeed, density: best.density,
+            suspHz: best.suspHz, suspDamp: best.suspDamp
+        };
+        const json = JSON.stringify(clean);
+        document.getElementById('ioTextarea').value = json;
+        navigator.clipboard.writeText(json).then(() => {
+            log("Best Genome copied to clipboard!");
+            alert("Best Car JSON copied to clipboard!");
+        }).catch(() => { log("Best Genome ready in textarea (clipboard blocked)."); });
+    }
+
+    function loadGenome() {
+        const text = document.getElementById('ioTextarea').value;
+        try {
+            const data = JSON.parse(text);
+            if (!data.points || !data.wheels) throw new Error("Invalid format");
+            const g = Genome.fromData(data);
+            document.getElementById('startScreen').classList.add('hidden');
+            resetSimulation(g);
+        } catch(e) {
+            alert("Error loading car: " + e.message);
+        }
+    }
+
+    function updateSlider() {
+        const val = Math.round(CONFIG.MUTATION_RATE * 100);
+        document.getElementById('inputMutation').value = val;
+        document.getElementById('valMutation').innerText = val + "%";
+    }
+
+    // --- BUILD A GENERATION (all cars at once) ---
+    function startGeneration() {
+        clearWorld();
+        cars = [];
+        leaderCar = null;
+        simTime = 0;
+        camX = 0; camY = (CONFIG.TRACK_TYPE === 'jump') ? 33 : 2.5;
+
+        createTrack();
+        for (let i = 0; i < population.length; i++) {
+            // reset results on the genome before its run
+            population[i].finished = false;
+            population[i].distance = 0;
+            population[i].time = 0;
+            cars.push(createCar(population[i], i));
+        }
+        updateUI();
+    }
+
+    function createTrack() {
+        const ground = world.createBody({ type: 'static' });
+        ground.setUserData('ground');
+        const fr = { friction: 2.0 };
+
+        if (CONFIG.TRACK_TYPE === 'flat') {
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), fr);
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 0), planck.Vec2(CONFIG.TRACK_LENGTH + 50, 0)), fr);
+        }
+        else if (CONFIG.TRACK_TYPE === 'hill') {
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), fr);
+            let x = -20, y = 0;
+            const segment = 5;
+            while(x < CONFIG.HILL_LENGTH) {
+                const nextX = x + segment;
+                let nextY = nextX > 0 ? (nextX * nextX) / 1000 : 0;
+                ground.createFixture(planck.Edge(planck.Vec2(x, y), planck.Vec2(nextX, nextY)), fr);
+                x = nextX; y = nextY;
+            }
+        }
+        else if (CONFIG.TRACK_TYPE === 'rough') {
+            ground.createFixture(planck.Edge(planck.Vec2(-20, 10), planck.Vec2(-20, 0)), fr);
+            let x = -20, y = 0;
+            const segment = 1.0; // fine segments so bumps read sharply
+            while(x < CONFIG.ROUGH_LENGTH) {
+                const nextX = x + segment;
+                const nextY = bumpHeight(nextX);
+                ground.createFixture(planck.Edge(planck.Vec2(x, y), planck.Vec2(nextX, nextY)), fr);
+                x = nextX; y = nextY;
+            }
+        }
+        else if (CONFIG.TRACK_TYPE === 'jump') {
+            ground.createFixture(planck.Edge(planck.Vec2(-10, 30), planck.Vec2(0, 30)), fr);
+            ground.createFixture(planck.Edge(planck.Vec2(-10, 40), planck.Vec2(-10, 30)), fr);
+            ground.createFixture(planck.Edge(planck.Vec2(0, 30), planck.Vec2(30, 5)), fr);
+            let currX = 30, currY = 5;
+            const step = 2;
+            while (currX < 50) {
+                const nextX = currX + step;
+                const nextY = 0.035 * (nextX*nextX) - 2.93 * nextX + 61.4;
+                ground.createFixture(planck.Edge(planck.Vec2(currX, currY), planck.Vec2(nextX, nextY)), fr);
+                currX = nextX; currY = nextY;
+            }
+            ground.createFixture(planck.Edge(planck.Vec2(65, -15), planck.Vec2(500, -30)), fr);
+        }
+    }
+
+    function createCar(genome, index) {
+        const dens  = genome.density   ?? 2.0;
+        const motor = genome.motorSpeed ?? 15;
+        const hz    = genome.suspHz    ?? 4;
+        const damp  = genome.suspDamp  ?? 0.7;
+
+        const vertices = genome.points.map(p =>
+            planck.Vec2(p.radius * Math.cos(p.angle), p.radius * Math.sin(p.angle)));
+
+        let startPos = planck.Vec2(0, 2.5);
+        if (CONFIG.TRACK_TYPE === 'jump') startPos = planck.Vec2(0, 33);
+
+        const body = world.createBody({ type: 'dynamic', position: startPos, angularDamping: 0.5 });
+        body.setUserData({ carIndex: index });
+
+        let bodyArea = 0;
+        const center = planck.Vec2(0,0);
+        for(let i=0; i<vertices.length; i++) {
+            const p1 = vertices[i];
+            const p2 = vertices[(i + 1) % vertices.length];
+            bodyArea += 0.5 * Math.abs(p1.x * p2.y - p1.y * p2.x);
+            const fixture = body.createFixture(planck.Polygon([center, p1, p2]), {
+                density: dens, friction: 2.0,
+                filterCategoryBits: 0x0002, filterMaskBits: 0x0001
+            });
+            const lightness = 50 + (i % 2) * 10;
+            fixture.setUserData({ color: `hsl(${genome.hue}, 70%, ${lightness}%)` });
+        }
+
+        const totalTorque = bodyArea * CONFIG.POWER_DENSITY;
+        const numWheels = Math.max(1, genome.wheels.length);
+        const torquePerWheel = totalTorque / numWheels;
+
+        let totalWheelMass = 0;
+        const wheelData = [];
+        const bodies = [body];
+        genome.wheels.forEach(w => {
+            const idx = Math.min(w.vertexIndex, vertices.length - 1);
+            const localPos = vertices[idx];
+            const worldPos = body.getPosition().clone().add(localPos);
+
+            const wb = world.createBody({ type: 'dynamic', position: worldPos });
+            wb.setUserData({ carIndex: index });
+            wb.createFixture(planck.Circle(w.radius), {
+                density: 1.0, friction: 3.0, restitution: 0.1,
+                filterCategoryBits: 0x0002, filterMaskBits: 0x0001
+            });
+            totalWheelMass += Math.PI * w.radius * w.radius * 1.0;
+
+            const joint = world.createJoint(planck.WheelJoint({
+                motorSpeed: -motor,
+                maxMotorTorque: torquePerWheel,
+                enableMotor: true,
+                frequencyHz: hz,
+                dampingRatio: damp
+            }, body, wb, wb.getPosition(), planck.Vec2(0, 1)));
+
+            wheelData.push({ body: wb, joint, radius: w.radius });
+            bodies.push(wb);
+        });
+
+        const totalMass = (bodyArea * dens) + totalWheelMass;
+
+        return {
+            genome, index, body, bodies, wheelData, bodyArea, totalMass,
+            done: false, finished: false, distance: 0, time: 0,
+            stuckTimer: 0, backTimer: 0,
+            hasLanded: false, postRunTimer: 0, maxHeight: startPos.y,
+            prevX: startPos.x, movedDist: 0, rolledDist: 0,
+            prevWheelAngles: wheelData.map(wd => wd.body.getAngle()),
+            slideFrac: 0, doneReason: ''
+        };
+    }
+
+    function carFrontX(car) {
+        let fx = -Infinity;
+        for (const b of car.bodies) {
+            if (!b) continue;
+            const xf = b.getTransform();
+            for (let f = b.getFixtureList(); f; f = f.getNext()) {
+                const shape = f.getShape();
+                if (shape.getType() === 'circle') {
+                    fx = Math.max(fx, planck.Transform.mul(xf, shape.m_p).x + shape.m_radius);
+                } else if (shape.getType() === 'polygon') {
+                    shape.m_vertices.forEach(v => { fx = Math.max(fx, planck.Transform.mul(xf, v).x); });
+                }
+            }
+        }
+        return fx;
+    }
+
+    function finalizeCar(car, reason) {
+        if (car.done) return;
+        car.done = true;
+        car.doneReason = reason;
+        car.slideFrac = car.movedDist > 0.5 ? clamp(1 - car.rolledDist / car.movedDist, 0, 1) : 0;
+
+        const g = car.genome;
+        g.distance  = car.distance;
+        g.finished  = car.finished;
+        g.time      = car.time;
+        g.slideFrac = car.slideFrac;
+        g.totalMass = car.totalMass;
+        g.maxHeight = car.maxHeight;
+
+        log(`Car ${car.index+1}: ${reason}`);
+
+        // destroy bodies so the arena declutters and survivors stand out
+        car.bodies.forEach(b => { try { world.destroyBody(b); } catch(e) {} });
+        car.bodies = [];
+        car.body = null;
+        if (leaderCar === car) leaderCar = null;
+    }
+
+    function updateCar(car) {
+        const body = car.body;
+        const pos = body.getPosition();
+        const vel = body.getLinearVelocity();
+        const speed = vel.length();
+
+        const frontX = carFrontX(car);
+        if (frontX > car.distance) car.distance = frontX;
+
+        // rolling vs sliding accounting
+        const dx = pos.x - car.prevX;
+        if (dx > 0) car.movedDist += dx;
+        let maxRoll = 0;
+        car.wheelData.forEach((wd, i) => {
+            const a = wd.body.getAngle();
+            const da = Math.abs(a - car.prevWheelAngles[i]);
+            car.prevWheelAngles[i] = a;
+            const roll = da * wd.radius;
+            if (roll > maxRoll) maxRoll = roll;
+        });
+        car.rolledDist += maxRoll;
+        car.prevX = pos.x;
+
+        if (CONFIG.TRACK_TYPE === 'jump') {
+            if (pos.y > car.maxHeight) car.maxHeight = pos.y;
+            if (car.hasLanded) car.postRunTimer += (1/60);
+        }
+
+        // stationary stuck timer
+        if (speed < 0.1) car.stuckTimer += (1/60); else car.stuckTimer = 0;
+
+        let done = false, reason = '';
+
+        if (CONFIG.TRACK_TYPE === 'flat' && frontX >= CONFIG.TRACK_LENGTH) {
+            car.finished = true;
+            car.time = simTime;
+            done = true; reason = `Finished ${simTime.toFixed(2)}s`;
+        }
+        if (!done && pos.y < -50) { done = true; reason = 'Fell off'; }
+        if (!done && car.stuckTimer > CONFIG.STUCK_TIME) { done = true; reason = 'Stuck'; }
+
+        // distance tracks: disqualify sustained backward sliding
+        if (!done && (CONFIG.TRACK_TYPE === 'hill' || CONFIG.TRACK_TYPE === 'rough')) {
+            if (vel.x < -0.5) {
+                car.backTimer += (1/60);
+                if (car.backTimer > 3.0) { done = true; reason = 'Slid backwards'; }
+            } else car.backTimer = 0;
+        }
+
+        if (!done && CONFIG.TRACK_TYPE === 'jump') {
+            if (car.hasLanded && car.postRunTimer > 3.0) { done = true; reason = 'Jump complete'; }
+            else if (car.hasLanded && speed < 0.1 && car.postRunTimer > 1.0) { done = true; reason = 'Stopped'; }
+        }
+
+        if (done) finalizeCar(car, reason);
+    }
+
+    // live ranking comparator (lower = better) for leaderboard / copy-best
+    function liveRank(c) {
+        if (CONFIG.TRACK_TYPE === 'flat' && c.finished) return c.time;          // finishers: by time
+        if (CONFIG.TRACK_TYPE === 'flat') return 1000 - c.distance;             // non-finishers behind finishers
+        return -c.distance;                                                     // distance tracks
+    }
+
+    function pickLeader() {
+        let best = null;
+        for (const c of cars) {
+            if (c.done || !c.body) continue;
+            if (!best || c.distance > best.distance) best = c;
+        }
+        return best;
+    }
+
+    function metricStr(g) {
+        if (CONFIG.TRACK_TYPE === 'flat') return g.finished ? `${g.time.toFixed(2)}s` : `${g.distance.toFixed(1)}m`;
+        return `${g.distance.toFixed(1)}m`;
+    }
+
+    function computeFitness(g) {
+        const slideMult = 1 - 0.5 * clamp(g.slideFrac, 0, 1);
+        if (CONFIG.TRACK_TYPE === 'flat') {
+            // finishers always beat non-finishers; faster + lighter wins
+            if (g.finished) return 100000 - g.time * 1000 - g.totalMass;
+            return g.distance * slideMult;
+        }
+        return g.distance * slideMult;
+    }
+
+    // --- EVOLUTION ---
+    function evolve() {
+        log(`--- Gen ${generation} Complete ---`);
+        cars.forEach(c => { if (!c.done) finalizeCar(c, 'Time limit'); });
+
+        population.forEach(g => g._fit = computeFitness(g));
+        population.sort((a, b) => b._fit - a._fit);
+
+        const best = population[0];
+        addListRow('listHistory', `Gen ${generation}: ${metricStr(best)}`, best.finished);
+        fitnessHistory.push({
+            gen: generation,
+            best: best._fit,
+            avg: population.reduce((s, g) => s + g._fit, 0) / population.length,
+            str: metricStr(best)
+        });
+        drawFitnessGraph();
+
+        CONFIG.MUTATION_RATE = Math.max(CONFIG.MUTATION_FLOOR, CONFIG.MUTATION_RATE * CONFIG.MUTATION_DECAY);
+        updateSlider();
+
+        const tournament = () => {
+            let pick = null;
+            for (let i = 0; i < CONFIG.TOURNAMENT_K; i++) {
+                const c = population[Math.floor(Math.random() * population.length)];
+                if (!pick || c._fit > pick._fit) pick = c;
+            }
+            return pick;
+        };
+
+        const newPop = [];
+        for (let i = 0; i < CONFIG.ELITE_COUNT && i < population.length; i++) newPop.push(population[i].clone());
+        for (let i = 0; i < CONFIG.IMMIGRANT_COUNT; i++) newPop.push(Genome.random());
+        while (newPop.length < CONFIG.POPULATION_SIZE) {
+            const child = Genome.mutate(Genome.crossover(tournament(), tournament()));
+            newPop.push(child);
+        }
+
+        population = newPop;
+        generation++;
+        document.getElementById('listCurrentGen').innerHTML = '';
+        startGeneration();
+    }
+
+    function updateUI() {
+        document.getElementById('dispGen').innerText = generation;
+        document.getElementById('dispPop').innerText = CONFIG.POPULATION_SIZE;
+    }
+
+    function addListRow(containerId, text, isHighlight) {
+        const div = document.createElement('div');
+        div.className = `flex justify-between px-2 py-1 rounded ${isHighlight ? 'bg-green-100 text-green-800 font-bold' : 'bg-gray-50 text-gray-600'}`;
+        div.innerText = text;
+        document.getElementById(containerId).prepend(div);
+    }
+
+    function updateLeaderboard() {
+        const sorted = [...cars].sort((a, b) => liveRank(a) - liveRank(b));
+        const cont = document.getElementById('listCurrentGen');
+        cont.innerHTML = '';
+        sorted.slice(0, 14).forEach((c, rank) => {
+            let txt = `#${rank+1} Car ${c.index+1}: `;
+            if (CONFIG.TRACK_TYPE === 'flat' && c.finished) txt += `${c.time.toFixed(2)}s`;
+            else txt += `${Math.max(0, c.distance).toFixed(1)}m`;
+            if (c.done) txt += ' ✓';
+            const div = document.createElement('div');
+            const hl = rank === 0;
+            div.className = `flex justify-between px-2 py-0.5 rounded ${hl ? 'bg-amber-100 text-amber-800 font-bold' : (c.done ? 'bg-gray-100 text-gray-400' : 'bg-gray-50 text-gray-700')}`;
+            div.innerText = txt;
+            cont.appendChild(div);
+        });
+    }
+
+    function updateLeaderHUD(leader) {
+        const aliveCount = cars.filter(c => !c.done).length;
+        document.getElementById('dispIndex').innerText = aliveCount;
+        document.getElementById('dispPop').innerText = CONFIG.POPULATION_SIZE;
+        const ld = leader ? Math.max(0, leader.distance) : 0;
+        document.getElementById('dispTime').innerText = `${simTime.toFixed(1)}s / ${ld.toFixed(1)}m`;
+        document.getElementById('dispStuck').innerText = (leader ? leader.stuckTimer : 0).toFixed(1) + "s";
+        document.getElementById('dispHeight').innerText = (leader ? leader.maxHeight : 0).toFixed(1) + "m";
+
+        if (leader) {
+            const g = leader.genome;
+            document.getElementById('dispPower').innerText = (leader.bodyArea * CONFIG.POWER_DENSITY).toFixed(0) + " Nm";
+            document.getElementById('dispMass').innerText = leader.totalMass.toFixed(1) + " kg";
+            document.getElementById('dispMotor').innerText = (g.motorSpeed ?? 15).toFixed(1) + " rad/s";
+            document.getElementById('dispDensity').innerText = (g.density ?? 2).toFixed(2);
+            document.getElementById('dispSusp').innerText = (g.suspHz ?? 4).toFixed(1) + "Hz / " + (g.suspDamp ?? 0.7).toFixed(2);
+            document.getElementById('dispWheels').innerText = g.wheels.length + " / " + g.points.length + "v";
+            const slide = leader.movedDist > 0.5 ? clamp(1 - leader.rolledDist / leader.movedDist, 0, 1) : 0;
+            document.getElementById('dispSlide').innerText = (slide * 100).toFixed(0) + "%";
+        }
+    }
+
+    // --- MAIN LOOP ---
+    function loop() {
+        requestAnimationFrame(loop);
+
+        if(!document.getElementById('startScreen').classList.contains('hidden')) return;
+        if(!world || cars.length === 0) return;
+
+        let evolved = false;
+        for(let s = 0; s < simSpeed; s++) {
+            world.step(1/60);
+            simTime += (1/60);
+
+            for (const c of cars) if (!c.done && c.body) updateCar(c);
+
+            if (simTime > CONFIG.MAX_TIME) {
+                cars.forEach(c => { if (!c.done) finalizeCar(c, 'Time limit'); });
+            }
+            if (cars.every(c => c.done)) { evolve(); evolved = true; break; }
+        }
+        if (evolved) return;
+
+        const leader = pickLeader();
+        if (leader) { leaderCar = leader; camX = leader.body.getPosition().x; camY = leader.body.getPosition().y; }
+        const leaderIndex = leaderCar ? leaderCar.index : -1;
+
+        frameCount++;
+        updateLeaderHUD(leaderCar);
+        if (frameCount % 12 === 0) updateLeaderboard();
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.translate(canvas.width/2 - camX * CONFIG.SCALE, canvas.height/2 + camY * CONFIG.SCALE);
+        ctx.scale(1, -1);
+
+        drawWorld(leaderIndex);
+        drawOverlay();
+    }
+
+    function drawFitnessGraph() {
+        const c = document.getElementById('fitnessGraph');
+        if (!c) return;
+        const g = c.getContext('2d');
+        const W = c.width, H = c.height;
+        g.clearRect(0, 0, W, H);
+        g.fillStyle = '#0b1220';
+        g.fillRect(0, 0, W, H);
+
+        g.fillStyle = '#64748b';
+        g.font = '9px monospace';
+        g.fillText('best / avg fitness per gen', 6, 11);
+
+        if (fitnessHistory.length < 1) return;
+        const vals = fitnessHistory.flatMap(h => [h.best, h.avg]);
+        const min = Math.min(...vals), max = Math.max(...vals);
+        const range = (max - min) || 1;
+        const xAt = (i) => fitnessHistory.length > 1 ? (i / (fitnessHistory.length - 1)) * (W - 8) + 4 : W / 2;
+        const yAt = (v) => H - 5 - ((v - min) / range) * (H - 20);
+
+        // average (faint)
+        g.strokeStyle = '#475569'; g.lineWidth = 1; g.beginPath();
+        fitnessHistory.forEach((h, i) => { const x = xAt(i), y = yAt(h.avg); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+        g.stroke();
+
+        // best (bright)
+        g.strokeStyle = '#22d3ee'; g.lineWidth = 2; g.beginPath();
+        fitnessHistory.forEach((h, i) => { const x = xAt(i), y = yAt(h.best); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+        g.stroke();
+    }
+
+    function drawOverlay() {
+        ctx.save();
+        ctx.scale(1, -1);
+
+        const currentX = camX;
+        const startM = Math.floor((currentX - 50) / 10) * 10;
+        const endM = startM + 150;
+        const drawStart = Math.max(0, startM);
+        const drawEnd = Math.max(100, endM);
+
+        for(let x = drawStart; x <= drawEnd; x += 10) {
+            let y = 0;
+            if (CONFIG.TRACK_TYPE === 'hill' && x > 0) {
+                y = (x * x) / 1000;
+            } else if (CONFIG.TRACK_TYPE === 'rough') {
+                y = bumpHeight(x);
+            } else if (CONFIG.TRACK_TYPE === 'jump') {
+                if (x > 65) y = -15 - (x - 65) * 0.05;
+                else if (x > 55) y = -100;
+                else if (x > 50) y = 0.035*(x*x) - 2.93*x + 61.4;
+                else if (x > 0) y = 30 - (x * 0.8333);
+                else y = 30;
+            }
+
+            const isFinish = (CONFIG.TRACK_TYPE === 'flat' && x === CONFIG.TRACK_LENGTH);
+            ctx.fillStyle = isFinish ? 'red' : '#aaa';
+            ctx.fillRect(x*CONFIG.SCALE - 2, y*CONFIG.SCALE, 4, -100);
+
+            ctx.fillStyle = '#666';
+            ctx.font = "12px sans-serif";
+            ctx.save();
+            ctx.translate(x*CONFIG.SCALE, y*CONFIG.SCALE + 20);
+            ctx.scale(1, -1);
+            ctx.fillText(isFinish ? "FINISH" : `${x}m`, 0, 0);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    function drawWorld(leaderIndex) {
+        for (let b = world.getBodyList(); b; b = b.getNext()) {
+            const ud = b.getUserData();
+            const isCar = ud && typeof ud === 'object' && ud.carIndex != null;
+            const isLeader = isCar && ud.carIndex === leaderIndex;
+            ctx.globalAlpha = isCar ? (isLeader ? 1.0 : 0.28) : 1.0;
+
+            const pos = b.getPosition();
+            const angle = b.getAngle();
+            ctx.save();
+            ctx.translate(pos.x * CONFIG.SCALE, pos.y * CONFIG.SCALE);
+            ctx.rotate(angle);
+
+            for (let f = b.getFixtureList(); f; f = f.getNext()) {
+                const shape = f.getShape();
+                const userData = f.getUserData();
+
+                if (shape.getType() === 'polygon') {
+                    ctx.fillStyle = (userData && userData.color) ? userData.color
+                        : (b.getType() === 'dynamic') ? '#3b82f6' : '#999';
+                    ctx.beginPath();
+                    shape.m_vertices.forEach((v, i) => {
+                        const X = v.x * CONFIG.SCALE, Y = v.y * CONFIG.SCALE;
+                        if(i===0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+                    });
+                    ctx.closePath();
+                    ctx.fill();
+                    if (isLeader) { ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5; }
+                    else { ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; }
+                    ctx.stroke();
+                } else if (shape.getType() === 'circle') {
+                    ctx.fillStyle = isLeader ? '#1f2937' : '#444';
+                    const r = shape.m_radius * CONFIG.SCALE;
+                    const cx = shape.m_p.x * CONFIG.SCALE;
+                    const cy = shape.m_p.y * CONFIG.SCALE;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, 2*Math.PI);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = isLeader ? 2 : 1;
+                    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + r, cy); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + r); ctx.stroke();
+                } else if (shape.getType() === 'edge') {
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#555';
+                    ctx.beginPath();
+                    ctx.moveTo(shape.m_vertex1.x * CONFIG.SCALE, shape.m_vertex1.y * CONFIG.SCALE);
+                    ctx.lineTo(shape.m_vertex2.x * CONFIG.SCALE, shape.m_vertex2.y * CONFIG.SCALE);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+</script>
+</body>
+</html>
