@@ -73,7 +73,7 @@ def render_html(case):
             for q in case["ib_questions"]
         )
         questions_section_inner = f"""        <div class="questions-tabs">
-          <button class="questions-tab-btn active" onclick="switchQTab(this,'panel-reflection')">Reflection</button>
+          <button class="questions-tab-btn active" onclick="switchQTab(this,'panel-reflection')">General</button>
           <button class="questions-tab-btn" onclick="switchQTab(this,'panel-ib')">IB Questions</button>
         </div>
         <div id="panel-reflection" class="questions-panel active">
@@ -99,7 +99,7 @@ def render_html(case):
         }}
         </script>"""
     else:
-        questions_section_inner = f"""        <h2>Reflection Questions</h2>
+        questions_section_inner = f"""        <h2>General Questions</h2>
         <ol class="reflection-list">{questions_html}</ol>
 {extension_html}"""
 
