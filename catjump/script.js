@@ -7,6 +7,9 @@ const catSvg = document.getElementById('cat-svg');
 const timerEl = document.getElementById('timer');
 const starCountEl = document.getElementById('star-count');
 const starBadgeEl = document.getElementById('star-badge');
+const fishCountEl = document.getElementById('fish-count');
+const fishBadgeEl = document.getElementById('fish-badge');
+const overFishEl = document.getElementById('over-fish');
 const soundBtn = document.getElementById('sound-btn');
 const timerBtn = document.getElementById('timer-btn');
 const timerPicker = document.getElementById('timer-picker');
@@ -52,6 +55,13 @@ let worldTime = 0;            // keeps ticking across runs, drives day/night
 let starsThisRun = 0;
 let nextStarAt = STAR_EVERY;
 let obstacles = [];
+let items = [];               // fish and yarn balls
+let fishThisRun = 0;
+let invincibleUntil = 0;      // playTime seconds when yarn power ends
+let fishTimer = 0;
+let nextFishIn = 2.5;
+let yarnTimer = 0;
+let nextYarnIn = 14;
 let groundX = 0;
 let lastFrame = 0;
 let spawnTimer = 0;
@@ -61,6 +71,7 @@ let lastSparkleAt = 0;
 
 let best = parseFloat(localStorage.getItem('catjump2-best') || '0');
 let totalStars = parseInt(localStorage.getItem('catjump2-stars') || '0', 10);
+let totalFish = parseInt(localStorage.getItem('catjump2-fish') || '0', 10);
 let muted = localStorage.getItem('catjump2-muted') === '1';
 
 // ---------- session timer ----------
@@ -99,6 +110,9 @@ const sfx = {
   doubleJump: () => tone(480, 960, 0.2, 'triangle', 0.25),
   star: () => { tone(880, 880, 0.1, 'sine', 0.2); tone(1320, 1320, 0.16, 'sine', 0.2, 0.09); },
   bump: () => tone(170, 55, 0.35, 'sawtooth', 0.22),
+  bloop: () => { tone(520, 880, 0.12, 'sine', 0.22); tone(780, 1240, 0.14, 'sine', 0.18, 0.08); },
+  power: () => { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.14, 'square', 0.12, i * 0.09)); },
+  smash: () => { tone(300, 60, 0.2, 'square', 0.2); tone(150, 40, 0.25, 'sawtooth', 0.15, 0.02); },
   fanfare: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.22, i * 0.13)); },
 };
 
@@ -114,19 +128,15 @@ soundBtn.addEventListener('pointerdown', (e) => {
 });
 
 // ---------- session leaderboard ----------
-function renderLeaderboard(lastRunTime) {
+function renderLeaderboard(lastEntry) {
   if (sessionScores.length === 0) return;
   leaderboardEl.classList.remove('hidden');
-  const top = [...sessionScores].sort((a, b) => b - a).slice(0, 5);
+  const top = [...sessionScores].sort((a, b) => b.time - a.time).slice(0, 5);
   const ranks = ['🥇', '🥈', '🥉', '4.', '5.'];
-  let marked = false;
   lbListEl.innerHTML = top.map((s, i) => {
-    let cls = 'lb-row';
-    if (!marked && s === lastRunTime) {
-      cls += ' current';
-      marked = true;
-    }
-    return `<div class="${cls}">${ranks[i]} ${s.toFixed(1)} s</div>`;
+    const cls = s === lastEntry ? 'lb-row current' : 'lb-row';
+    const fish = s.fish > 0 ? ` · 🐟${s.fish}` : '';
+    return `<div class="${cls}">${ranks[i]} ${s.time.toFixed(1)} s${fish}</div>`;
   }).join('');
 }
 
@@ -390,7 +400,114 @@ function scheduleNextSpawn() {
   spawnTimer = 0;
 }
 
+// ---------- collectibles ----------
+const FISH_COLORS = [
+  ['#ff9e4f', '#e07a3f'],
+  ['#5fa8e8', '#3a7fc0'],
+  ['#ff8fab', '#e0648f'],
+];
+
+function fishSvg(body, dark) {
+  return `<svg width="48" height="32" viewBox="0 0 48 32">
+    <path d="M14 16 L2 5 Q7 16 2 27 Z" fill="${dark}"/>
+    <ellipse cx="28" cy="16" rx="17" ry="11" fill="${body}"/>
+    <path d="M22 7 q-3 9 0 18 M29 6 q-3 10 0 20" stroke="${dark}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M26 5 q5 -5 9 0" stroke="${dark}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="37" cy="13" r="3.4" fill="#fff"/>
+    <circle cx="38" cy="13" r="1.8" fill="#3a2c20"/>
+    <path d="M40 20 q-3 2 -6 1" stroke="${dark}" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+const YARN_SVG = `<svg width="44" height="44" viewBox="0 0 44 44">
+  <circle cx="22" cy="22" r="20" fill="#ff8fab"/>
+  <path d="M4 16 Q22 8 40 16 M4 28 Q22 20 40 28 M8 36 Q24 30 38 33 M8 8 Q22 16 36 8" stroke="#e0648f" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="22" cy="22" r="6" fill="#ffb3c6"/>
+</svg>`;
+
+// keep new items clear of obstacles so fish never lure the cat into a crash
+function clearOfObstacles(x) {
+  let moved = true;
+  while (moved) {
+    moved = false;
+    for (const ob of obstacles) {
+      if (Math.abs(x - ob.x) < 320) { x = ob.x + 380; moved = true; }
+    }
+  }
+  return x;
+}
+
+function spawnFish() {
+  const [body, dark] = FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)];
+  const el = document.createElement('div');
+  el.className = 'item fish';
+  el.innerHTML = fishSvg(body, dark);
+  const x = clearOfObstacles(container.clientWidth + 60);
+  // low = little hop, mid = full jump, high = needs a double jump
+  const heights = [170, 240, 330];
+  const y = heights[Math.floor(Math.random() * heights.length)] + Math.random() * 25;
+  el.style.bottom = y + 'px';
+  el.style.transform = `translateX(${x}px)`;
+  container.appendChild(el);
+  items.push({ el, x, kind: 'fish' });
+}
+
+function spawnYarn() {
+  const el = document.createElement('div');
+  el.className = 'item yarn';
+  el.innerHTML = YARN_SVG;
+  const x = clearOfObstacles(container.clientWidth + 60);
+  el.style.bottom = '74px';
+  el.style.transform = `translateX(${x}px)`;
+  container.appendChild(el);
+  items.push({ el, x, kind: 'yarn' });
+}
+
+function touchingCat(el) {
+  const c = catEl.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  return c.right + 8 > r.left && c.left - 8 < r.right &&
+         c.bottom + 8 > r.top && c.top - 8 < r.bottom;
+}
+
+function collectFish(it) {
+  fishThisRun++;
+  fishCountEl.textContent = fishThisRun;
+  fishBadgeEl.classList.remove('bump');
+  void fishBadgeEl.offsetWidth;
+  fishBadgeEl.classList.add('bump');
+  ringAt(it.x + 20, parseFloat(it.el.style.bottom) + 10);
+  sfx.bloop();
+}
+
+function collectYarn(it) {
+  invincibleUntil = playTime + 3;
+  catEl.classList.add('power');
+  ringAt(it.x + 16, 90);
+  for (let i = 0; i < 8; i++) sparkle();
+  sfx.power();
+}
+
+function smashObstacle(ob) {
+  const idx = obstacles.indexOf(ob);
+  if (idx >= 0) obstacles.splice(idx, 1);
+  puff(ob.x, 90);
+  puff(ob.x + 24, 110);
+  ringAt(ob.x + 24, 100);
+  ob.el.remove();
+  sfx.smash();
+}
+
 // ---------- little effects ----------
+function ringAt(x, bottomY) {
+  const r = document.createElement('div');
+  r.className = 'burst-ring';
+  r.style.left = x + 'px';
+  r.style.bottom = bottomY + 'px';
+  container.appendChild(r);
+  setTimeout(() => r.remove(), 650);
+}
+
 function puff(x, y) {
   for (let i = 0; i < 3; i++) {
     const p = document.createElement('div');
@@ -418,7 +535,8 @@ function starPop() {
   s.style.left = (catEl.offsetLeft + 50) + 'px';
   s.style.bottom = (catY + 110) + 'px';
   container.appendChild(s);
-  setTimeout(() => s.remove(), 950);
+  ringAt(catEl.offsetLeft + 75, catY + 130);
+  setTimeout(() => s.remove(), 1450);
 }
 
 function confettiBurst() {
@@ -444,26 +562,36 @@ function hitSomething() {
     const obBox = { left: o.left + 14, right: o.right - 14, top: o.top + 12, bottom: o.bottom };
     if (catBox.right > obBox.left && catBox.left < obBox.right &&
         catBox.bottom > obBox.top && catBox.top < obBox.bottom) {
-      return true;
+      return ob;
     }
   }
-  return false;
+  return null;
 }
 
 // ---------- game flow ----------
 function startRun() {
   obstacles.forEach(o => o.el.remove());
   obstacles = [];
+  items.forEach(it => it.el.remove());
+  items = [];
   catY = GROUND_Y;
   velocity = 0;
   airborne = false;
   speed = START_SPEED;
   playTime = 0;
   starsThisRun = 0;
+  fishThisRun = 0;
+  invincibleUntil = 0;
+  fishTimer = 0;
+  nextFishIn = 2.5 + Math.random() * 2;
+  yarnTimer = 0;
+  nextYarnIn = 12 + Math.random() * 10;
+  catEl.classList.remove('power', 'power-ending');
   nextStarAt = STAR_EVERY;
   scheduleNextSpawn();
   nextSpawnIn = 1.8; // a moment to get ready
   starCountEl.textContent = '0';
+  fishCountEl.textContent = '0';
   timerEl.textContent = '0.0';
   catSvg.classList.remove('oops');
   catSvg.classList.add('running');
@@ -479,11 +607,15 @@ function endRun() {
   catSvg.classList.add('oops');
   sfx.bump();
 
-  sessionScores.push(playTime);
-  renderLeaderboard(playTime);
+  const entry = { time: playTime, fish: fishThisRun };
+  sessionScores.push(entry);
+  renderLeaderboard(entry);
 
   totalStars += starsThisRun;
   localStorage.setItem('catjump2-stars', String(totalStars));
+  totalFish += fishThisRun;
+  localStorage.setItem('catjump2-fish', String(totalFish));
+  catEl.classList.remove('power', 'power-ending');
 
   const isNewBest = playTime > best;
   if (isNewBest) {
@@ -493,6 +625,7 @@ function endRun() {
 
   overTimeEl.textContent = playTime.toFixed(1) + ' seconds';
   overStarsEl.textContent = starsThisRun > 0 ? '★'.repeat(Math.min(starsThisRun, 12)) : 'Jump longer to win stars!';
+  overFishEl.textContent = fishThisRun > 0 ? `🐟 × ${fishThisRun}` : '';
   if (isNewBest) {
     bestLineEl.textContent = '🎉 NEW BEST! 🎉';
     bestLineEl.classList.add('new-best');
@@ -571,6 +704,50 @@ function frame(now) {
       scheduleNextSpawn();
     }
 
+    // spawn collectibles
+    fishTimer += dt / 60;
+    if (fishTimer >= nextFishIn) {
+      spawnFish();
+      fishTimer = 0;
+      nextFishIn = 2.5 + Math.random() * 3;
+    }
+    yarnTimer += dt / 60;
+    if (yarnTimer >= nextYarnIn) {
+      spawnYarn();
+      yarnTimer = 0;
+      nextYarnIn = 20 + Math.random() * 15;
+    }
+
+    // move items, collect on touch
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      it.x -= speed * dt;
+      it.el.style.transform = `translateX(${it.x}px)`;
+      if (it.x < -100) {
+        it.el.remove();
+        items.splice(i, 1);
+        continue;
+      }
+      if (touchingCat(it.el)) {
+        if (it.kind === 'fish') collectFish(it);
+        else collectYarn(it);
+        it.el.remove();
+        items.splice(i, 1);
+      }
+    }
+
+    // yarn power countdown
+    const invincible = playTime < invincibleUntil;
+    if (invincible) {
+      catEl.classList.toggle('power-ending', invincibleUntil - playTime < 1);
+      if (now - lastSparkleAt > 60) {
+        lastSparkleAt = now;
+        sparkle();
+      }
+    } else if (catEl.classList.contains('power')) {
+      catEl.classList.remove('power', 'power-ending');
+    }
+
     // move obstacles
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const ob = obstacles[i];
@@ -626,7 +803,12 @@ function frame(now) {
       sfx.star();
     }
 
-    if (hitSomething()) endRun();
+    // collect / dodge
+    const hit = hitSomething();
+    if (hit) {
+      if (playTime < invincibleUntil) smashObstacle(hit);
+      else endRun();
+    }
   }
 
   checkSessionTimer();
@@ -639,8 +821,8 @@ titleEl.innerHTML = 'Cat Jump!'.split('').map((ch, i) =>
   ch === ' ' ? ' ' : `<span style="animation-delay:${i * 0.07}s">${ch}</span>`
 ).join('');
 
-if (totalStars > 0) {
-  totalStarsStartEl.textContent = `You have ${totalStars} ★ so far!`;
+if (totalStars > 0 || totalFish > 0) {
+  totalStarsStartEl.textContent = `You have ${totalStars} ★ and ${totalFish} 🐟 so far!`;
 }
 
 updateSoundBtn();
