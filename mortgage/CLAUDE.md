@@ -19,7 +19,7 @@ Baseline parameters from the spreadsheet:
 
 ## Architecture
 
-Single file, `index.html`. Vanilla JS, hand-written CSS, hand-rolled SVG chart. Zero dependencies, zero CDNs, fully client-side. Logo and favicon reference `/unisamsq.png` at the repo root, so test via a server from the repo root, not file://.
+Single file, `index.html`. Vanilla JS, hand-written CSS, hand-rolled SVG chart. Zero dependencies, zero CDNs, fully client-side. Logo and favicon reference `/geocornsmall.png` at the repo root (the 1MB `/geocorn.png` is the full-size original; do not use it inline), so test via a server from the repo root, not file://.
 
 Key functions in the inline script:
 
@@ -30,7 +30,8 @@ Key functions in the inline script:
 
 ## Implemented features
 
-- Slider + numeric input pairs for all six inputs, kept in sync
+- Slider + numeric input pairs for all six numeric inputs, kept in sync
+- Next payment date picker anchoring every displayed date (stats, milestones, tooltip, CSV)
 - Frequency switching (weekly/fortnightly/monthly) with mathematical scaling
 - Validation guard: repayment below first-period interest shows an alert and dims stale results (`.has-error`)
 - Extra per payment and one-off lump sum with timing in years; note shows the landing date, or warns if it lands after payoff
@@ -43,7 +44,7 @@ Key functions in the inline script:
 ## Conventions
 
 - Follow `AESTHETIC.md` at the repo root for any visual change. Accent is classroom-tools purple (`#4a1a7a` / `#d0b6f5` / `#f5f0ff`); green (`#145c34` family) is reserved for savings, orange (`#7a2d0a` family) for interest/cost.
-- Dates assume the first payment is one period from today and use `en-NZ` formatting.
+- All dates are anchored to the "Next payment date" input (payment 1 lands on it; defaults to one period from today) and use `en-NZ` formatting.
 - Copy is dry and human: no exclamation marks, no em dashes.
 - Keep it dependency-free and single-file.
 

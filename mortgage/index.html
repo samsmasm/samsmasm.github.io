@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mortgage Payoff · unisam.nz</title>
-<link rel="icon" href="/unisamsq.png">
+<link rel="icon" href="/geocornsmall.png">
 <style>
   :root {
     --accent: #4a1a7a;
@@ -96,7 +96,7 @@
   }
   .field { margin-bottom: 1rem; }
   .field:last-child { margin-bottom: 0.2rem; }
-  .field input[type="number"] {
+  .field input[type="number"], .field input[type="date"] {
     width: 100%;
     padding: 7px 10px;
     border: 1px solid var(--accent-border);
@@ -106,7 +106,7 @@
     color: #2a2a2a;
     font-family: inherit;
   }
-  .field input[type="number"]:focus { outline: 2px solid var(--accent-mid); outline-offset: 0; border-color: transparent; }
+  .field input[type="number"]:focus, .field input[type="date"]:focus { outline: 2px solid var(--accent-mid); outline-offset: 0; border-color: transparent; }
   .field input[type="range"] {
     width: 100%;
     margin-top: 7px;
@@ -275,7 +275,7 @@
 
 <header class="masthead">
   <div class="masthead-inner">
-    <img src="/unisamsq.png" alt="unisam logo">
+    <img src="/geocornsmall.png" alt="unisam logo">
     <div>
       <h1>Mortgage Payoff</h1>
       <p class="tagline">See what paying a little extra does to the life of a loan.</p>
@@ -317,6 +317,12 @@
           <label class="section-label" for="repaymentAmount">Base repayment ($ per <span id="freqWord">fortnight</span>)</label>
           <input type="number" id="repaymentAmount" value="1000" min="0" step="10">
           <input type="range" id="repaymentAmountRange" min="0" max="6000" step="10" value="1000">
+        </div>
+
+        <div class="field">
+          <label class="section-label" for="nextPayment">Next payment date</label>
+          <input type="date" id="nextPayment">
+          <p class="field-note">All dates below count from this payment.</p>
         </div>
       </section>
 
@@ -426,7 +432,7 @@ const FREQ = {
 };
 let freq = 'fortnightly';
 const MAX_YEARS = 50;
-const startDate = new Date();
+const now = new Date();
 
 const $ = id => document.getElementById(id);
 
@@ -434,8 +440,12 @@ const $ = id => document.getElementById(id);
 const fmtMoney0 = v => '$' + Math.round(v).toLocaleString('en-NZ');
 const fmtMoney2 = v => '$' + v.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+function anchorDate(ppy) {
+  const d = $('nextPayment').valueAsDate;
+  return d && !isNaN(d.getTime()) ? d : new Date(now.getTime() + (365.25 / ppy) * 86400000);
+}
 function dateAtPeriod(n, ppy) {
-  return new Date(startDate.getTime() + n * (365.25 / ppy) * 86400000);
+  return new Date(anchorDate(ppy).getTime() + (n - 1) * (365.25 / ppy) * 86400000);
 }
 function fmtDateAtPeriod(n, ppy) {
   return dateAtPeriod(n, ppy).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' });
@@ -482,6 +492,10 @@ function pairSlider(numberId) {
 document.querySelectorAll('.freq-tab').forEach(btn => {
   btn.addEventListener('click', () => setFrequency(btn.dataset.freq));
 });
+
+// default next payment: one period from today
+$('nextPayment').valueAsDate = new Date(now.getTime() + (365.25 / FREQ[freq].ppy) * 86400000);
+$('nextPayment').addEventListener('input', recalc);
 
 function setFrequency(next) {
   if (next === freq) return;
