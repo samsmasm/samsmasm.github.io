@@ -22,6 +22,8 @@ const hillsBack = document.getElementById('hills-back');
 const hillsFront = document.getElementById('hills-front');
 const ground = document.getElementById('ground');
 const starsLayer = document.getElementById('stars-layer');
+const leaderboardEl = document.getElementById('leaderboard');
+const lbListEl = document.getElementById('lb-list');
 
 // ---------- tuning ----------
 const GROUND_Y = 70;          // cat's resting bottom, px
@@ -31,6 +33,7 @@ const START_SPEED = 4.5;
 const MAX_SPEED = 6.8;
 const SPEED_RAMP = 0.0015;    // per frame
 const STAR_EVERY = 6;         // seconds per star
+const DOUBLE_JUMP_STRENGTH = 13;
 const JUMP_BUFFER_MS = 160;   // pressing just before landing still jumps
 const RESTART_LOCKOUT_MS = 700;
 const DAY_CYCLE = 90;         // seconds for a full day->night->day
@@ -40,7 +43,9 @@ let state = 'start';          // 'start' | 'playing' | 'over'
 let catY = GROUND_Y;
 let velocity = 0;
 let airborne = false;
+let jumpsUsed = 0;
 let bufferedJumpAt = 0;
+let sessionScores = [];       // this session's run times, cleared on refresh
 let speed = START_SPEED;
 let playTime = 0;             // seconds survived this run
 let worldTime = 0;            // keeps ticking across runs, drives day/night
@@ -91,6 +96,7 @@ function tone(freqFrom, freqTo, duration, type, volume, when = 0) {
 
 const sfx = {
   jump: () => tone(280, 560, 0.18, 'triangle', 0.25),
+  doubleJump: () => tone(480, 960, 0.2, 'triangle', 0.25),
   star: () => { tone(880, 880, 0.1, 'sine', 0.2); tone(1320, 1320, 0.16, 'sine', 0.2, 0.09); },
   bump: () => tone(170, 55, 0.35, 'sawtooth', 0.22),
   fanfare: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.22, i * 0.13)); },
@@ -106,6 +112,23 @@ soundBtn.addEventListener('pointerdown', (e) => {
   localStorage.setItem('catjump2-muted', muted ? '1' : '0');
   updateSoundBtn();
 });
+
+// ---------- session leaderboard ----------
+function renderLeaderboard(lastRunTime) {
+  if (sessionScores.length === 0) return;
+  leaderboardEl.classList.remove('hidden');
+  const top = [...sessionScores].sort((a, b) => b - a).slice(0, 5);
+  const ranks = ['🥇', '🥈', '🥉', '4.', '5.'];
+  let marked = false;
+  lbListEl.innerHTML = top.map((s, i) => {
+    let cls = 'lb-row';
+    if (!marked && s === lastRunTime) {
+      cls += ' current';
+      marked = true;
+    }
+    return `<div class="${cls}">${ranks[i]} ${s.toFixed(1)} s</div>`;
+  }).join('');
+}
 
 // ---------- timer UI ----------
 function updateTimerBtn() {
@@ -248,8 +271,11 @@ for (let i = 0; i < 36; i++) {
 }
 
 // ---------- obstacles ----------
+// each type lists the sky phases it appears in, so the scenery
+// changes as day turns to sunset and night
 const OBSTACLE_TYPES = [
   { // friendly potted cactus
+    phases: ['day', 'gold', 'sunset', 'dawn'],
     w: 64, h: 86,
     svg: `<svg width="64" height="86" viewBox="0 0 64 86">
       <ellipse cx="32" cy="40" rx="15" ry="26" fill="#69b35e"/>
@@ -262,6 +288,7 @@ const OBSTACLE_TYPES = [
       <rect x="11" y="58" width="42" height="9" rx="4.5" fill="#c4593a"/>
     </svg>` },
   { // spotty mushroom
+    phases: ['day', 'gold', 'dawn'],
     w: 62, h: 58,
     svg: `<svg width="62" height="58" viewBox="0 0 62 58">
       <rect x="22" y="28" width="18" height="28" rx="8" fill="#fdf3e3"/>
@@ -271,6 +298,7 @@ const OBSTACLE_TYPES = [
       <circle cx="46" cy="22" r="3.2" fill="#fdf3e3"/>
     </svg>` },
   { // berry bush
+    phases: ['day', 'gold', 'sunset', 'dawn'],
     w: 80, h: 48,
     svg: `<svg width="80" height="48" viewBox="0 0 80 48">
       <ellipse cx="24" cy="32" rx="22" ry="16" fill="#5da356"/>
@@ -282,6 +310,7 @@ const OBSTACLE_TYPES = [
       <circle cx="60" cy="32" r="4" fill="#e0573f"/>
     </svg>` },
   { // little wooden fence
+    phases: ['day', 'gold', 'dawn', 'night'],
     w: 66, h: 54,
     svg: `<svg width="66" height="54" viewBox="0 0 66 54">
       <rect x="6" y="6" width="10" height="48" rx="5" fill="#c89564"/>
@@ -290,10 +319,61 @@ const OBSTACLE_TYPES = [
       <rect x="0" y="14" width="66" height="8" rx="4" fill="#d9a872"/>
       <rect x="0" y="34" width="66" height="8" rx="4" fill="#d9a872"/>
     </svg>` },
+  { // tall daisies
+    phases: ['day', 'dawn'],
+    w: 70, h: 64,
+    svg: `<svg width="70" height="64" viewBox="0 0 70 64">
+      <path d="M16 64 Q14 40 18 24 M35 64 Q35 36 33 14 M54 64 Q56 42 52 28" stroke="#6db463" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <g><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(-7,0)"/><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(7,0)"/><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(0,-7)"/><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(0,7)"/><circle cx="18" cy="18" r="5.5" fill="#ffd166"/></g>
+      <g><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(-7,0)"/><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(7,0)"/><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(0,-7)"/><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(0,7)"/><circle cx="33" cy="9" r="5.5" fill="#fff3b0"/></g>
+      <g><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(-7,0)"/><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(7,0)"/><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(0,-7)"/><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(0,7)"/><circle cx="52" cy="22" r="5.5" fill="#e0573f"/></g>
+    </svg>` },
+  { // big sunset mushroom (same drawing, rendered larger)
+    phases: ['gold', 'sunset'],
+    w: 84, h: 78,
+    svg: `<svg width="84" height="78" viewBox="0 0 62 58">
+      <rect x="22" y="28" width="18" height="28" rx="8" fill="#fdf3e3"/>
+      <path d="M3 30 Q31 -14 59 30 Q31 40 3 30 Z" fill="#c4538a"/>
+      <circle cx="20" cy="18" r="4.5" fill="#fdf3e3"/>
+      <circle cx="38" cy="11" r="3.6" fill="#fdf3e3"/>
+      <circle cx="46" cy="22" r="3.2" fill="#fdf3e3"/>
+    </svg>` },
+  { // firefly bush
+    phases: ['night'],
+    w: 78, h: 56,
+    svg: `<svg width="78" height="56" viewBox="0 0 78 56">
+      <ellipse cx="39" cy="40" rx="36" ry="16" fill="#26403a"/>
+      <ellipse cx="39" cy="28" rx="26" ry="16" fill="#33524a"/>
+      <circle class="ff" cx="20" cy="24" r="4" fill="#ffe97a"/>
+      <circle class="ff ff2" cx="46" cy="14" r="3.5" fill="#fff3a8"/>
+      <circle class="ff ff3" cx="60" cy="32" r="4" fill="#ffe97a"/>
+      <circle class="ff ff4" cx="34" cy="34" r="3" fill="#fff3a8"/>
+    </svg>` },
+  { // glowing night mushroom
+    phases: ['night'],
+    w: 62, h: 58,
+    svg: `<svg width="62" height="58" viewBox="0 0 62 58">
+      <rect x="22" y="28" width="18" height="28" rx="8" fill="#cfe8e0"/>
+      <path d="M3 30 Q31 -14 59 30 Q31 40 3 30 Z" fill="#4ec9b0"/>
+      <circle class="ff" cx="20" cy="18" r="4.5" fill="#eafff8"/>
+      <circle class="ff ff3" cx="38" cy="11" r="3.6" fill="#eafff8"/>
+      <circle class="ff ff2" cx="46" cy="22" r="3.2" fill="#eafff8"/>
+    </svg>` },
 ];
 
+// which palette dominates the sky right now
+function phaseNow() {
+  const frac = (worldTime % DAY_CYCLE) / DAY_CYCLE;
+  let i = 0;
+  while (i < CYCLE.length - 2 && frac >= CYCLE[i + 1][0]) i++;
+  const t = (frac - CYCLE[i][0]) / (CYCLE[i + 1][0] - CYCLE[i][0]);
+  return t < 0.5 ? CYCLE[i][1] : CYCLE[i + 1][1];
+}
+
 function spawnObstacle() {
-  const type = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+  const phase = phaseNow();
+  const pool = OBSTACLE_TYPES.filter(t => t.phases.includes(phase));
+  const type = pool[Math.floor(Math.random() * pool.length)];
   const el = document.createElement('div');
   el.className = 'obstacle';
   el.innerHTML = type.svg;
@@ -395,9 +475,12 @@ function startRun() {
 function endRun() {
   state = 'over';
   gameOverAt = performance.now();
-  catSvg.classList.remove('running', 'jumping');
+  catSvg.classList.remove('running', 'jumping', 'flip');
   catSvg.classList.add('oops');
   sfx.bump();
+
+  sessionScores.push(playTime);
+  renderLeaderboard(playTime);
 
   totalStars += starsThisRun;
   localStorage.setItem('catjump2-stars', String(totalStars));
@@ -425,10 +508,18 @@ function endRun() {
 function tryJump() {
   if (!airborne) {
     airborne = true;
+    jumpsUsed = 1;
     velocity = JUMP_STRENGTH;
     catSvg.classList.remove('running');
     catSvg.classList.add('jumping');
     sfx.jump();
+  } else if (jumpsUsed === 1) {
+    // double jump: smaller boost plus a somersault
+    jumpsUsed = 2;
+    velocity = DOUBLE_JUMP_STRENGTH;
+    catSvg.classList.add('flip');
+    for (let i = 0; i < 5; i++) sparkle();
+    sfx.doubleJump();
   } else {
     bufferedJumpAt = performance.now();
   }
@@ -498,7 +589,8 @@ function frame(now) {
       if (catY <= GROUND_Y) {
         catY = GROUND_Y;
         airborne = false;
-        catSvg.classList.remove('jumping');
+        jumpsUsed = 0;
+        catSvg.classList.remove('jumping', 'flip');
         catSvg.classList.add('running');
         catEl.classList.remove('landed');
         void catEl.offsetWidth; // restart squash animation
