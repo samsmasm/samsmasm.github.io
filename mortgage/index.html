@@ -402,6 +402,7 @@
           <h3>Payment schedule</h3>
           <span class="badge" id="totalPeriods">0 payments</span>
           <div class="panel-actions">
+            <button class="text-btn" id="shareBtn">Copy link to this plan</button>
             <button class="text-btn" id="csvBtn">Download CSV</button>
             <button class="text-btn" onclick="window.print()">Print</button>
           </div>
@@ -497,6 +498,58 @@ document.querySelectorAll('.freq-tab').forEach(btn => {
 $('nextPayment').valueAsDate = new Date(now.getTime() + (365.25 / FREQ[freq].ppy) * 86400000);
 $('nextPayment').addEventListener('input', recalc);
 
+// ---------- shareable URL state ----------
+const PARAM_MAP = [
+  ['b', 'loanAmount'], ['r', 'interestRate'], ['p', 'repaymentAmount'],
+  ['e', 'extraAmount'], ['l', 'lumpAmount'], ['y', 'lumpYears'],
+];
+
+function applyUrlState() {
+  const q = new URLSearchParams(location.search);
+  if (![...q.keys()].length) return;
+  const f = { w: 'weekly', f: 'fortnightly', m: 'monthly' }[q.get('f')];
+  if (f) {
+    freq = f;
+    $('repaymentAmountRange').max = FREQ[f].payMax;
+    $('extraAmountRange').max = FREQ[f].extraMax;
+    $('freqWord').innerText = FREQ[f].word;
+    document.querySelectorAll('.freq-tab').forEach(b => b.classList.toggle('active', b.dataset.freq === f));
+  }
+  for (const [k, id] of PARAM_MAP) {
+    if (q.has(k) && isFinite(parseFloat(q.get(k)))) {
+      $(id).value = q.get(k);
+      $(id + 'Range').value = q.get(k);
+    }
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(q.get('d') || '')) $('nextPayment').value = q.get('d');
+}
+
+function writeUrl() {
+  const q = new URLSearchParams();
+  q.set('f', freq[0]);
+  for (const [k, id] of PARAM_MAP) q.set(k, $(id).value);
+  q.set('d', $('nextPayment').value);
+  history.replaceState(null, '', location.pathname + '?' + q.toString());
+}
+
+let urlTimer = null;
+function syncUrl() {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(writeUrl, 250);
+}
+
+$('shareBtn').addEventListener('click', async () => {
+  clearTimeout(urlTimer);
+  writeUrl();
+  try {
+    await navigator.clipboard.writeText(location.href);
+    $('shareBtn').innerText = 'Copied';
+  } catch {
+    $('shareBtn').innerText = 'Copy failed, copy the address bar';
+  }
+  setTimeout(() => { $('shareBtn').innerText = 'Copy link to this plan'; }, 1800);
+});
+
 function setFrequency(next) {
   if (next === freq) return;
   const oldPpy = FREQ[freq].ppy, newPpy = FREQ[next].ppy;
@@ -586,6 +639,7 @@ function recalc() {
 
   clearTimeout(tableTimer);
   tableTimer = setTimeout(() => renderTable(optimized, ppy), 120);
+  syncUrl();
 }
 
 // ---------- chart (hand-rolled SVG, no dependencies) ----------
@@ -753,6 +807,7 @@ $('csvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 
+applyUrlState();
 recalc();
 </script>
 </body>
