@@ -56,6 +56,10 @@ let starsThisRun = 0;
 let nextStarAt = STAR_EVERY;
 let obstacles = [];
 let items = [];               // fish and yarn balls
+let platforms = [];           // rideable clouds
+let standingOn = null;        // cloud the cat is standing on, or null = ground
+let cloudTimer = 0;
+let nextCloudIn = 7;
 let fishThisRun = 0;
 let invincibleUntil = 0;      // playTime seconds when yarn power ends
 let fishTimer = 0;
@@ -113,6 +117,7 @@ const sfx = {
   bloop: () => { tone(520, 880, 0.12, 'sine', 0.22); tone(780, 1240, 0.14, 'sine', 0.18, 0.08); },
   power: () => { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.14, 'square', 0.12, i * 0.09)); },
   smash: () => { tone(300, 60, 0.2, 'square', 0.2); tone(150, 40, 0.25, 'sawtooth', 0.15, 0.02); },
+  poff: () => tone(260, 150, 0.16, 'sine', 0.2),
   fanfare: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.22, i * 0.13)); },
 };
 
@@ -437,19 +442,58 @@ function clearOfObstacles(x) {
   return x;
 }
 
-function spawnFish() {
+function spawnFishAt(x, y) {
   const [body, dark] = FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)];
   const el = document.createElement('div');
   el.className = 'item fish';
   el.innerHTML = fishSvg(body, dark);
-  const x = clearOfObstacles(container.clientWidth + 60);
-  // low = little hop, mid = full jump, high = needs a double jump
-  const heights = [170, 240, 330];
-  const y = heights[Math.floor(Math.random() * heights.length)] + Math.random() * 25;
   el.style.bottom = y + 'px';
   el.style.transform = `translateX(${x}px)`;
   container.appendChild(el);
   items.push({ el, x, kind: 'fish' });
+}
+
+function spawnFish() {
+  const x = clearOfObstacles(container.clientWidth + 60);
+  // low = little hop, mid = full jump, high = needs a double jump
+  const heights = [170, 240, 330];
+  const y = heights[Math.floor(Math.random() * heights.length)] + Math.random() * 25;
+  spawnFishAt(x, y);
+}
+
+// ---------- cloud platforms ----------
+const CLOUD_W = 200;
+
+const CLOUD_SVG = `<svg width="200" height="64" viewBox="0 0 200 64">
+  <ellipse cx="100" cy="46" rx="94" ry="17" fill="#ffffff"/>
+  <circle cx="42" cy="36" r="21" fill="#ffffff"/>
+  <circle cx="86" cy="27" r="27" fill="#ffffff"/>
+  <circle cx="134" cy="31" r="23" fill="#ffffff"/>
+  <circle cx="169" cy="40" r="16" fill="#ffffff"/>
+  <ellipse cx="100" cy="54" rx="84" ry="9" fill="#dce8f5"/>
+  <circle class="ff" cx="40" cy="12" r="3" fill="#ffd166"/>
+  <circle class="ff ff2" cx="100" cy="4" r="3.5" fill="#ffd166"/>
+  <circle class="ff ff3" cx="158" cy="14" r="3" fill="#ffd166"/>
+</svg>`;
+
+function spawnCloud() {
+  const el = document.createElement('div');
+  el.className = 'platform';
+  el.innerHTML = CLOUD_SVG;
+  const surfaceY = 215 + Math.random() * 65; // cat's feet height when standing
+  const x = container.clientWidth + 80;
+  el.style.bottom = (surfaceY - 36) + 'px';  // feet sink a little into the fluff
+  el.style.transform = `translateX(${x}px)`;
+  container.appendChild(el);
+  platforms.push({ el, x, w: CLOUD_W, top: surfaceY });
+  // a fish above most clouds makes them worth visiting
+  if (Math.random() < 0.65) spawnFishAt(x + CLOUD_W / 2 - 24, surfaceY + 105);
+}
+
+// is the cat far enough over this cloud to stand on it (forgiving edges)
+function catOverCloud(p) {
+  const left = catEl.offsetLeft;
+  return p.x < left + 92 && p.x + p.w > left + 22;
 }
 
 function spawnYarn() {
@@ -574,6 +618,11 @@ function startRun() {
   obstacles = [];
   items.forEach(it => it.el.remove());
   items = [];
+  platforms.forEach(p => p.el.remove());
+  platforms = [];
+  standingOn = null;
+  cloudTimer = 0;
+  nextCloudIn = 6 + Math.random() * 4;
   catY = GROUND_Y;
   velocity = 0;
   airborne = false;
@@ -638,9 +687,29 @@ function endRun() {
   overScreen.classList.remove('hidden');
 }
 
+// land on the ground (platform = null) or on a cloud
+function landAt(y, platform) {
+  catY = y;
+  airborne = false;
+  jumpsUsed = 0;
+  standingOn = platform;
+  catSvg.classList.remove('jumping', 'flip');
+  catSvg.classList.add('running');
+  catEl.classList.remove('landed');
+  void catEl.offsetWidth; // restart squash animation
+  catEl.classList.add('landed');
+  puff(catEl.offsetLeft + 20, y - 6);
+  if (platform) sfx.poff();
+  if (performance.now() - bufferedJumpAt < JUMP_BUFFER_MS) {
+    bufferedJumpAt = 0;
+    tryJump();
+  }
+}
+
 function tryJump() {
   if (!airborne) {
     airborne = true;
+    standingOn = null;
     jumpsUsed = 1;
     velocity = JUMP_STRENGTH;
     catSvg.classList.remove('running');
@@ -717,6 +786,12 @@ function frame(now) {
       yarnTimer = 0;
       nextYarnIn = 20 + Math.random() * 15;
     }
+    cloudTimer += dt / 60;
+    if (cloudTimer >= nextCloudIn) {
+      spawnCloud();
+      cloudTimer = 0;
+      nextCloudIn = 8 + Math.random() * 6;
+    }
 
     // move items, collect on touch
     for (let i = items.length - 1; i >= 0; i--) {
@@ -759,35 +834,60 @@ function frame(now) {
       }
     }
 
+    // move cloud platforms
+    for (let i = platforms.length - 1; i >= 0; i--) {
+      const p = platforms[i];
+      p.x -= speed * dt;
+      p.el.style.transform = `translateX(${p.x}px)`;
+      if (p.x < -260) {
+        if (standingOn === p) {
+          standingOn = null;
+          airborne = true;
+          velocity = 0;
+        }
+        p.el.remove();
+        platforms.splice(i, 1);
+      }
+    }
+
     // jump physics
     if (airborne) {
+      const prevY = catY;
       catY += velocity * dt;
       velocity -= GRAVITY * dt;
-      if (catY <= GROUND_Y) {
-        catY = GROUND_Y;
-        airborne = false;
-        jumpsUsed = 0;
-        catSvg.classList.remove('jumping', 'flip');
-        catSvg.classList.add('running');
-        catEl.classList.remove('landed');
-        void catEl.offsetWidth; // restart squash animation
-        catEl.classList.add('landed');
-        puff(catEl.offsetLeft + 20, 64);
-        if (performance.now() - bufferedJumpAt < JUMP_BUFFER_MS) {
-          bufferedJumpAt = 0;
-          tryJump();
+      // falling onto a cloud? (one-way platforms: pass through from below)
+      if (velocity < 0) {
+        for (const p of platforms) {
+          if (catOverCloud(p) && prevY >= p.top && catY <= p.top) {
+            landAt(p.top, p);
+            break;
+          }
         }
       }
+      if (airborne && catY <= GROUND_Y) landAt(GROUND_Y, null);
       catEl.style.bottom = catY + 'px';
-      // sparkle trail while flying
-      if (now - lastSparkleAt > 80) {
-        lastSparkleAt = now;
-        sparkle();
+      if (airborne) {
+        // sparkle trail while flying
+        if (now - lastSparkleAt > 80) {
+          lastSparkleAt = now;
+          sparkle();
+        }
+        // tilt with the jump arc
+        catEl.style.transform = `rotate(${-velocity * 0.8}deg)`;
+      } else {
+        catEl.style.transform = '';
       }
-      // tilt with the jump arc
-      catEl.style.transform = `rotate(${-velocity * 0.8}deg)`;
+    } else if (standingOn && !catOverCloud(standingOn)) {
+      // the cloud drifted out from under the cat
+      standingOn = null;
+      airborne = true;
+      velocity = 0;
+      jumpsUsed = 0; // falling is free: a full jump is still available
+      catSvg.classList.remove('running');
+      catSvg.classList.add('jumping');
     } else {
-      catEl.style.bottom = GROUND_Y + 'px';
+      catY = standingOn ? standingOn.top : GROUND_Y;
+      catEl.style.bottom = catY + 'px';
       catEl.style.transform = '';
     }
 
