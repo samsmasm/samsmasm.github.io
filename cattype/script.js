@@ -25,6 +25,12 @@ const againBtn = document.getElementById('again-btn');
 const pickBtn = document.getElementById('pick-btn');
 const overAgainBtn = document.getElementById('over-again-btn');
 const overPickBtn = document.getElementById('over-pick-btn');
+const userBar = document.getElementById('user-bar');
+const userDialog = document.getElementById('user-dialog');
+const userNameInput = document.getElementById('user-name');
+const iconGrid = document.getElementById('icon-grid');
+const userSaveBtn = document.getElementById('user-save');
+const userCancelBtn = document.getElementById('user-cancel');
 const titleEl = document.getElementById('title');
 const totalFishStartEl = document.getElementById('total-fish-start');
 const hillsBack = document.getElementById('hills-back');
@@ -312,6 +318,9 @@ let speed = 4;
 let worldTime = 0;            // keeps ticking, drives day/night
 let obstacles = [];
 let craters = [];
+let finishing = false;        // last obstacle cleared; finish line is rolling in
+let finishEl = null;
+let finishX = 0;
 let items = [];               // fish
 let spawnedCount = 0;
 let clearedCount = 0;
@@ -328,7 +337,20 @@ let nextFishIn = 3;
 let lastSparkleAt = 0;
 let lastWord = '';
 
-let totalFish = parseInt(localStorage.getItem('cattype-fish') || '0', 10);
+// ---------- players (local profiles) ----------
+// 'guest' = the shared "Everyone" profile, kept on the original (unprefixed) keys
+const ICON_CHOICES = ['🐱','🐶','🦊','🐰','🐼','🦁','🐯','🐸','🐵','🦄','🐧','🐨','🐢','🐙','🦖','🐝'];
+let users = [];
+try { users = JSON.parse(localStorage.getItem('cattype-users') || '[]'); } catch (e) { users = []; }
+let currentUserId = localStorage.getItem('cattype-current') || 'guest';
+if (currentUserId !== 'guest' && !users.find(u => u.id === currentUserId)) currentUserId = 'guest';
+
+// progress key for the current player (guest keeps the legacy unprefixed keys)
+function ukey(suffix) {
+  return currentUserId === 'guest' ? `cattype-${suffix}` : `cattype-u-${currentUserId}-${suffix}`;
+}
+
+let totalFish = parseInt(localStorage.getItem(ukey('fish')) || '0', 10);
 let muted = localStorage.getItem('cattype-muted') === '1';
 // 'keep' = wrong letters ignored; 'accuracy' = a slip restarts the word
 let mistakeMode = localStorage.getItem('cattype-mistake') || 'keep';
@@ -336,13 +358,13 @@ let mistakeMode = localStorage.getItem('cattype-mistake') || 'keep';
 let trackLength = parseInt(localStorage.getItem('cattype-track') || '12', 10);
 if (!TRACK_LENGTHS.includes(trackLength)) trackLength = 12;
 
-// best stars per level cell, keyed "rowId-speedId"
+// best stars per level cell, keyed "rowId-speedId" (per player)
 function bestStars(rowId, speedId) {
-  return parseInt(localStorage.getItem(`cattype-stars-${rowId}-${speedId}`) || '0', 10);
+  return parseInt(localStorage.getItem(ukey(`stars-${rowId}-${speedId}`)) || '0', 10);
 }
 function saveStars(rowId, speedId, stars) {
   if (stars > bestStars(rowId, speedId)) {
-    localStorage.setItem(`cattype-stars-${rowId}-${speedId}`, String(stars));
+    localStorage.setItem(ukey(`stars-${rowId}-${speedId}`), String(stars));
   }
 }
 
@@ -818,7 +840,41 @@ function typeLetter(letter) {
 function markCleared() {
   clearedCount++;
   updateProgress();
-  if (clearedCount >= levelCount) winLevel();
+  if (clearedCount >= levelCount && !finishing) startFinish();
+}
+
+// a checkered finish line that rolls in once the last obstacle is cleared
+function finishSvg() {
+  const sq = 13, cols = 4, rows = 3, fx = 22, fy = 16;
+  let checks = '';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if ((r + c) % 2 === 0) checks += `<rect x="${fx + c * sq}" y="${fy + r * sq}" width="${sq}" height="${sq}" fill="#2e2e2e"/>`;
+  }
+  let band = '';
+  for (let c = 0; c < 6; c++) band += `<rect x="${16 + c * 10}" y="204" width="10" height="12" fill="${c % 2 ? '#fff' : '#2e2e2e'}"/>`;
+  return `<svg width="80" height="220" viewBox="0 0 80 220">
+    <rect x="13" y="2" width="7" height="216" rx="3" fill="#9a6e48"/>
+    <circle cx="16" cy="4" r="5" fill="#ffd166"/>
+    <rect x="${fx}" y="${fy}" width="${cols * sq}" height="${rows * sq}" fill="#fff" stroke="#2e2e2e" stroke-width="2"/>
+    ${checks}
+    <rect x="14" y="202" width="62" height="16" rx="2" fill="#fff" stroke="#2e2e2e" stroke-width="1.5"/>
+    ${band}
+  </svg>`;
+}
+
+function startFinish() {
+  finishing = true;
+  finishEl = document.createElement('div');
+  finishEl.className = 'finish';
+  finishEl.innerHTML = finishSvg();
+  finishX = catEl.offsetLeft + 720;
+  finishEl.style.transform = `translateX(${finishX}px)`;
+  container.appendChild(finishEl);
+}
+
+function clearFinish() {
+  finishing = false;
+  if (finishEl) { finishEl.remove(); finishEl = null; }
 }
 
 function updateProgress() {
@@ -911,6 +967,8 @@ function handleTap() {
 container.addEventListener('pointerdown', handleTap);
 
 document.addEventListener('keydown', (e) => {
+  // let typing flow normally into the name input (don't jump / don't block backspace)
+  if (e.target && e.target.tagName === 'INPUT') return;
   // never let Backspace navigate the browser back during the game
   if (e.code === 'Backspace') { e.preventDefault(); return; }
   if (e.repeat) return;
@@ -967,6 +1025,7 @@ function startLevel(rowId, speedId) {
   // reset world
   obstacles.forEach(o => o.el.remove()); obstacles = [];
   craters.forEach(c => c.el.remove()); craters = [];
+  clearFinish();
   items.forEach(it => it.el.remove()); items = [];
   catY = GROUND_Y;
   velocity = 0;
@@ -1001,7 +1060,7 @@ function failLevel() {
   catSvg.classList.add('oops');
   sfx.bump();
   totalFish += fishThisRun;
-  localStorage.setItem('cattype-fish', String(totalFish));
+  localStorage.setItem(ukey('fish'), String(totalFish));
   overProgressEl.textContent = `You smashed ${clearedCount} of ${levelCount}!`;
   overFishEl.textContent = fishThisRun > 0 ? `🐟 × ${fishThisRun}` : '';
   overScreen.classList.remove('hidden');
@@ -1009,6 +1068,7 @@ function failLevel() {
 
 function winLevel() {
   state = 'win';
+  clearFinish();
   // settle the cat on the ground and let it do a happy dance
   airborne = false;
   airJumps = 0;
@@ -1026,7 +1086,7 @@ function winLevel() {
   const prevBest = bestStars(level.rowId, level.speedId);
   saveStars(level.rowId, level.speedId, stars);
   totalFish += fishThisRun;
-  localStorage.setItem('cattype-fish', String(totalFish));
+  localStorage.setItem(ukey('fish'), String(totalFish));
 
   winStarsEl.innerHTML = '★★★☆☆☆'.slice(3 - stars, 6 - stars)
     .split('').map((c, i) => `<span style="animation-delay:${i * 0.18}s">${c}</span>`).join('');
@@ -1044,6 +1104,7 @@ function goToPicker() {
   state = 'picker';
   obstacles.forEach(o => o.el.remove()); obstacles = [];
   craters.forEach(c => c.el.remove()); craters = [];
+  clearFinish();
   items.forEach(it => it.el.remove()); items = [];
   catY = GROUND_Y;
   velocity = 0;
@@ -1058,6 +1119,7 @@ function goToPicker() {
   winScreen.classList.add('hidden');
   buildPicker();
   renderSettings();
+  renderUserBar();
   updateTotalFish();
   pickerScreen.classList.remove('hidden');
 }
@@ -1082,6 +1144,80 @@ pickBtn.addEventListener('pointerdown', (e) => {
 function updateTotalFish() {
   totalFishStartEl.textContent = totalFish > 0 ? `You have caught ${totalFish} 🐟 so far!` : '';
 }
+
+// ---------- players (local profiles) ----------
+function currentPlayer() {
+  if (currentUserId === 'guest') return { id: 'guest', name: 'Everyone', icon: '🌈' };
+  return users.find(u => u.id === currentUserId) || { id: 'guest', name: 'Everyone', icon: '🌈' };
+}
+
+function renderUserBar() {
+  const all = [{ id: 'guest', name: 'Everyone', icon: '🌈' }, ...users];
+  let html = '<span class="user-bar-label">Player</span>';
+  html += all.map(u =>
+    `<button class="user-chip${u.id === currentUserId ? ' selected' : ''}" data-id="${u.id}">
+      <span class="uc-icon">${u.icon}</span><span class="uc-name">${u.name}</span></button>`
+  ).join('');
+  html += `<button class="user-chip add" id="add-user-chip"><span class="uc-icon">＋</span><span class="uc-name">New</span></button>`;
+  userBar.innerHTML = html;
+  userBar.querySelectorAll('.user-chip[data-id]').forEach(btn => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      switchUser(btn.dataset.id);
+    });
+  });
+  document.getElementById('add-user-chip').addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    openUserDialog();
+  });
+}
+
+function switchUser(id) {
+  currentUserId = id;
+  localStorage.setItem('cattype-current', id);
+  totalFish = parseInt(localStorage.getItem(ukey('fish')) || '0', 10);
+  renderUserBar();
+  buildPicker();   // stars are per player
+  updateTotalFish();
+}
+
+let pendingIcon = ICON_CHOICES[0];
+function openUserDialog() {
+  pendingIcon = ICON_CHOICES[0];
+  userNameInput.value = '';
+  iconGrid.innerHTML = ICON_CHOICES.map((ic, i) =>
+    `<button class="icon-opt${i === 0 ? ' selected' : ''}" data-icon="${ic}">${ic}</button>`
+  ).join('');
+  iconGrid.querySelectorAll('.icon-opt').forEach(btn => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      pendingIcon = btn.dataset.icon;
+      iconGrid.querySelectorAll('.icon-opt').forEach(b => b.classList.toggle('selected', b === btn));
+    });
+  });
+  userDialog.classList.remove('hidden');
+  setTimeout(() => userNameInput.focus(), 50);
+}
+
+function closeUserDialog() {
+  userDialog.classList.add('hidden');
+}
+
+function addUser() {
+  const name = userNameInput.value.trim().slice(0, 12) || 'Player';
+  const id = 'u' + Date.now();
+  users.push({ id, name, icon: pendingIcon });
+  localStorage.setItem('cattype-users', JSON.stringify(users));
+  closeUserDialog();
+  switchUser(id);
+}
+
+userSaveBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); addUser(); });
+userCancelBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); closeUserDialog(); });
+userNameInput.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') addUser();
+});
 
 // ---------- home-screen settings (mistake mode + track length) ----------
 function renderSettings() {
@@ -1172,6 +1308,16 @@ function frame(now) {
       if (cr.x < -200) { cr.el.remove(); craters.splice(i, 1); }
     }
 
+    // roll the finish line in; crossing it wins the level
+    if (finishing && finishEl) {
+      finishX -= speed * dt;
+      finishEl.style.transform = `translateX(${finishX}px)`;
+      if (finishX <= catLeft + 40) {
+        clearFinish();
+        winLevel();
+      }
+    }
+
     // jump physics
     if (airborne) {
       catY += velocity * dt;
@@ -1201,6 +1347,7 @@ titleEl.innerHTML = 'Cat Type!'.split('').map((ch, i) =>
 
 buildPicker();
 renderSettings();
+renderUserBar();
 updateTotalFish();
 updateSoundBtn();
 catEl.style.bottom = GROUND_Y + 'px';
