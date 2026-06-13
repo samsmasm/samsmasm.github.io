@@ -66,22 +66,25 @@ function renderNav() {
     li.appendChild(a);
 
     if (stage.children && stage.children.length) {
-      const subUl = document.createElement('ul');
-      subUl.className = 'nav-sub';
-      stage.children.forEach(child => {
-        const childIsActive  = child.slug === current;
-        const childIsVisited = visited.includes(child.slug) && !childIsActive;
+      const inSection = stage.slug === current || stage.children.some(c => c.slug === current);
+      if (inSection) {
+        const subUl = document.createElement('ul');
+        subUl.className = 'nav-sub';
+        stage.children.forEach(child => {
+          const childIsActive  = child.slug === current;
+          const childIsVisited = visited.includes(child.slug) && !childIsActive;
 
-        const childLi = document.createElement('li');
-        const childA  = document.createElement('a');
-        childA.href = base + child.slug + '/';
-        if (childIsActive)  childA.classList.add('active');
-        if (childIsVisited) childA.classList.add('visited');
-        childA.innerHTML = `<span class="nav-num">${child.num}</span><span class="nav-label">${child.label}</span>`;
-        childLi.appendChild(childA);
-        subUl.appendChild(childLi);
-      });
-      li.appendChild(subUl);
+          const childLi = document.createElement('li');
+          const childA  = document.createElement('a');
+          childA.href = base + child.slug + '/';
+          if (childIsActive)  childA.classList.add('active');
+          if (childIsVisited) childA.classList.add('visited');
+          childA.innerHTML = `<span class="nav-num">${child.num}</span><span class="nav-label">${child.label}</span>`;
+          childLi.appendChild(childA);
+          subUl.appendChild(childLi);
+        });
+        li.appendChild(subUl);
+      }
     }
 
     ul.appendChild(li);
