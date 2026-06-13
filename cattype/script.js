@@ -49,30 +49,6 @@ const FREQ = {
   S: 6.3, T: 9.1, U: 2.8, V: 0.98, W: 2.4, X: 0.15, Y: 2.0, Z: 0.074,
 };
 
-// colour words: the letters AND the obstacle balloon are shown in this colour
-const COLOURS = [
-  { word: 'RED',    col: '#e23b2e' },
-  { word: 'ORANGE', col: '#f0851f' },
-  { word: 'YELLOW', col: '#f3c200' },
-  { word: 'GREEN',  col: '#36a64a' },
-  { word: 'BLUE',   col: '#2f74d0' },
-  { word: 'PURPLE', col: '#8a4bd0' },
-  { word: 'PINK',   col: '#ec6aa8' },
-  { word: 'WHITE',  col: '#ffffff' },
-];
-
-// each picker row: single-letter sets build outward from the commonest letters,
-// then two word themes (colours, animals)
-const ROWS = [
-  { type: 'letters', label: 'E T A O',       letters: 'ETAO' },
-  { type: 'letters', label: '+ I N',         letters: 'ETAOIN' },
-  { type: 'letters', label: '+ S H R L',     letters: 'ETAOINSHRL' },
-  { type: 'letters', label: '+ D C U M W F', letters: 'ETAOINSHRLDCUMWF' },
-  { type: 'letters', label: 'all 26',        letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' },
-  { type: 'colours', label: '🎨 Colours' },
-  { type: 'animals', label: '🦁 Animals' },
-];
-
 const SPEEDS = [
   { label: 'Slow',      icon: '🐢', speed: 2.6 },
   { label: 'Medium',    icon: '🐇', speed: 3.8 },
@@ -81,74 +57,7 @@ const SPEEDS = [
   { label: 'Lightning', icon: '⚡', speed: 11.0 },
 ];
 
-// ---------- fierce little animal obstacles ----------
-const ANIMALS = [
-  { word: 'LION', svg: `<svg width="72" height="70" viewBox="0 0 72 70">
-      <g fill="#cf8a3a"><circle cx="36" cy="38" r="31"/>
-      <circle cx="9" cy="30" r="8"/><circle cx="63" cy="30" r="8"/>
-      <circle cx="16" cy="13" r="8"/><circle cx="56" cy="13" r="8"/><circle cx="36" cy="7" r="8"/>
-      <circle cx="12" cy="50" r="8"/><circle cx="60" cy="50" r="8"/>
-      <circle cx="28" cy="65" r="7"/><circle cx="44" cy="65" r="7"/></g>
-      <circle cx="36" cy="40" r="21" fill="#f4cd84"/>
-      <path d="M22 32 L34 37 M50 32 L38 37" stroke="#7a4a18" stroke-width="3.5" stroke-linecap="round"/>
-      <circle cx="29" cy="40" r="3.2" fill="#3a2c20"/><circle cx="43" cy="40" r="3.2" fill="#3a2c20"/>
-      <path d="M33 47 L39 47 L36 51 Z" fill="#7a4a18"/>
-      <path d="M36 51 q-5 4 -9 2 M36 51 q5 4 9 2" stroke="#7a4a18" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <path d="M30 53 L33 58 L27 57 Z" fill="#fff"/><path d="M42 53 L45 57 L39 58 Z" fill="#fff"/>
-    </svg>` },
-  { word: 'BEAR', svg: `<svg width="68" height="70" viewBox="0 0 68 70">
-      <circle cx="16" cy="16" r="11" fill="#8a6240"/><circle cx="52" cy="16" r="11" fill="#8a6240"/>
-      <circle cx="16" cy="16" r="5" fill="#b88a5e"/><circle cx="52" cy="16" r="5" fill="#b88a5e"/>
-      <circle cx="34" cy="40" r="27" fill="#9a6e48"/>
-      <path d="M22 32 L31 36 M46 32 L37 36" stroke="#5a3a1e" stroke-width="3.5" stroke-linecap="round"/>
-      <circle cx="26" cy="39" r="3.2" fill="#3a2c20"/><circle cx="42" cy="39" r="3.2" fill="#3a2c20"/>
-      <ellipse cx="34" cy="48" rx="13" ry="10" fill="#e6cba6"/>
-      <ellipse cx="34" cy="45" rx="4" ry="3" fill="#3a2c20"/>
-      <path d="M34 48 q-5 5 -10 3 M34 48 q5 5 10 3" stroke="#5a3a1e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <path d="M28 51 L31 56 L25 55 Z" fill="#fff"/><path d="M40 51 L43 55 L37 56 Z" fill="#fff"/>
-    </svg>` },
-  { word: 'FOX', svg: `<svg width="66" height="68" viewBox="0 0 66 68">
-      <path d="M10 8 L26 26 L8 34 Z" fill="#e0712f"/><path d="M56 8 L40 26 L58 34 Z" fill="#e0712f"/>
-      <path d="M13 13 L23 24 L13 28 Z" fill="#3a2c20"/><path d="M53 13 L43 24 L53 28 Z" fill="#3a2c20"/>
-      <path d="M33 18 Q58 24 33 64 Q8 24 33 18 Z" fill="#e0712f"/>
-      <path d="M33 40 Q46 44 33 64 Q20 44 33 40 Z" fill="#f6e3cf"/>
-      <path d="M22 30 L31 34 M44 30 L35 34" stroke="#a04a14" stroke-width="3.5" stroke-linecap="round"/>
-      <circle cx="26" cy="37" r="3.2" fill="#3a2c20"/><circle cx="40" cy="37" r="3.2" fill="#3a2c20"/>
-      <path d="M30 49 L36 49 L33 54 Z" fill="#3a2c20"/>
-      <path d="M33 54 q-4 4 -8 3 M33 54 q4 4 8 3" stroke="#a04a14" stroke-width="2.3" fill="none" stroke-linecap="round"/>
-    </svg>` },
-  { word: 'FROG', svg: `<svg width="70" height="62" viewBox="0 0 70 62">
-      <circle cx="17" cy="16" r="13" fill="#6cbf52"/><circle cx="53" cy="16" r="13" fill="#6cbf52"/>
-      <circle cx="17" cy="14" r="6" fill="#fff"/><circle cx="53" cy="14" r="6" fill="#fff"/>
-      <circle cx="18" cy="15" r="3.2" fill="#1f3a1a"/><circle cx="54" cy="15" r="3.2" fill="#1f3a1a"/>
-      <path d="M8 8 L18 13 M62 8 L52 13" stroke="#3f7a30" stroke-width="3.5" stroke-linecap="round"/>
-      <path d="M6 30 Q35 14 64 30 Q60 56 35 56 Q10 56 6 30 Z" fill="#7fce63"/>
-      <path d="M16 42 Q35 56 54 42" stroke="#3f7a30" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <path d="M22 43 L26 48 L18 48 Z" fill="#fff"/><path d="M48 43 L52 48 L44 48 Z" fill="#fff"/>
-    </svg>` },
-  { word: 'OWL', svg: `<svg width="64" height="70" viewBox="0 0 64 70">
-      <path d="M8 6 L20 20 L6 24 Z" fill="#7a5a8a"/><path d="M56 6 L44 20 L58 24 Z" fill="#7a5a8a"/>
-      <ellipse cx="32" cy="40" rx="26" ry="28" fill="#8a6aa0"/>
-      <ellipse cx="32" cy="42" rx="18" ry="22" fill="#b89ec8"/>
-      <circle cx="22" cy="34" r="11" fill="#fff"/><circle cx="42" cy="34" r="11" fill="#fff"/>
-      <circle cx="23" cy="35" r="5" fill="#3a2c20"/><circle cx="41" cy="35" r="5" fill="#3a2c20"/>
-      <path d="M14 22 L26 28 M50 22 L38 28" stroke="#4a3458" stroke-width="3.5" stroke-linecap="round"/>
-      <path d="M28 42 L36 42 L32 50 Z" fill="#f0a83a"/>
-      <path d="M16 56 q8 8 16 0 q8 8 16 0" stroke="#6a4a7a" stroke-width="3" fill="none" stroke-linecap="round"/>
-    </svg>` },
-  { word: 'BEE', svg: `<svg width="66" height="62" viewBox="0 0 66 62">
-      <ellipse cx="20" cy="20" rx="16" ry="13" fill="#dfe7f2" opacity="0.85"/>
-      <ellipse cx="46" cy="20" rx="16" ry="13" fill="#dfe7f2" opacity="0.85"/>
-      <ellipse cx="33" cy="40" rx="22" ry="19" fill="#f3c200"/>
-      <path d="M20 30 q13 8 26 0 M16 42 q17 9 34 0 M22 53 q11 5 22 0" stroke="#3a2c20" stroke-width="5" fill="none"/>
-      <path d="M24 33 L31 36 M42 33 L35 36" stroke="#3a2c20" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="27" cy="39" r="3" fill="#3a2c20"/><circle cx="39" cy="39" r="3" fill="#3a2c20"/>
-      <path d="M28 46 q5 3 10 0" stroke="#3a2c20" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-      <path d="M29 8 L33 14 M37 8 L33 14" stroke="#3a2c20" stroke-width="2.5" stroke-linecap="round"/>
-      <circle cx="29" cy="7" r="2.5" fill="#3a2c20"/><circle cx="37" cy="7" r="2.5" fill="#3a2c20"/>
-    </svg>` },
-];
-
+// ---------- word-theme art helpers ----------
 // a coloured balloon for the colour level
 function balloonSvg(col) {
   return `<svg width="58" height="74" viewBox="0 0 58 74">
@@ -158,6 +67,202 @@ function balloonSvg(col) {
     <ellipse cx="20" cy="22" rx="6" ry="10" fill="rgba(255,255,255,0.5)"/>
   </svg>`;
 }
+
+// a counting card showing n coloured dots (for the numbers level)
+function numberSvg(n) {
+  const dotCol = ['#e23b2e', '#2f74d0', '#36a64a', '#f0851f', '#8a4bd0'];
+  const twoRows = n > 5;
+  let dots = '';
+  for (let i = 0; i < n; i++) {
+    const row = i < 5 ? 0 : 1;
+    const inRow = row === 0 ? Math.min(n, 5) : n - 5;
+    const idx = i < 5 ? i : i - 5;
+    const cx = 32 - (inRow - 1) * 5 + idx * 10;
+    const cy = twoRows ? (row === 0 ? 24 : 44) : 34;
+    dots += `<circle cx="${cx}" cy="${cy}" r="4" fill="${dotCol[i % 5]}"/>`;
+  }
+  return `<svg width="64" height="64" viewBox="0 0 64 64">
+    <rect x="4" y="6" width="56" height="52" rx="8" fill="#fff" stroke="#b9c2ec" stroke-width="3"/>${dots}</svg>`;
+}
+
+// a friendly round face wearing one expression (for the feelings level)
+function faceSvg(inner) {
+  return `<svg width="60" height="64" viewBox="0 0 64 64"><circle cx="32" cy="34" r="27" fill="#ffd24a"/>${inner}</svg>`;
+}
+const FEELING_FACES = {
+  HAPPY: `<circle cx="22" cy="28" r="3.4" fill="#3a2c20"/><circle cx="42" cy="28" r="3.4" fill="#3a2c20"/>
+    <path d="M20 40 q12 14 24 0" stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  SAD: `<path d="M16 24 q6 -3 11 0 M48 24 q-6 -3 -11 0" stroke="#3a2c20" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="22" cy="31" r="3.2" fill="#3a2c20"/><circle cx="42" cy="31" r="3.2" fill="#3a2c20"/>
+    <path d="M20 49 q12 -12 24 0" stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M23 35 q-2 6 0 9 q2 -3 0 -9Z" fill="#4a9be0"/>`,
+  MAD: `<path d="M16 22 L28 27 M48 22 L36 27" stroke="#3a2c20" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="23" cy="32" r="3.2" fill="#3a2c20"/><circle cx="41" cy="32" r="3.2" fill="#3a2c20"/>
+    <path d="M22 49 q10 -8 20 0" stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  SHY: `<circle cx="24" cy="30" r="2.6" fill="#3a2c20"/><circle cx="40" cy="30" r="2.6" fill="#3a2c20"/>
+    <ellipse cx="18" cy="39" rx="6" ry="3.5" fill="#ff9ec4"/><ellipse cx="46" cy="39" rx="6" ry="3.5" fill="#ff9ec4"/>
+    <path d="M26 43 q6 4 12 0" stroke="#3a2c20" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+  SILLY: `<circle cx="22" cy="28" r="3.2" fill="#3a2c20"/><path d="M37 28 q5 0 8 0" stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M24 40 q8 6 16 0" stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M30 44 q3 9 8 6 q2 -4 -1 -8Z" fill="#ff7a9a"/>`,
+  SLEEPY: `<path d="M16 30 q6 5 12 0 M36 30 q6 5 12 0" stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="32" cy="46" r="3" fill="#3a2c20"/>
+    <path d="M44 8 h8 l-8 8 h8" stroke="#5a6cc0" stroke-width="2.5" fill="none"/>
+    <path d="M53 2 h5 l-5 5 h5" stroke="#5a6cc0" stroke-width="2" fill="none"/>`,
+};
+
+// a blank wooden signpost (the sight word itself rides on the badge above)
+const SIGN_SVG = `<svg width="64" height="68" viewBox="0 0 64 68">
+  <rect x="29" y="20" width="6" height="46" fill="#a06a3a"/>
+  <rect x="8" y="12" width="48" height="24" rx="4" fill="#c89564" stroke="#a06a3a" stroke-width="3"/>
+  <circle cx="15" cy="24" r="2" fill="#a06a3a"/><circle cx="49" cy="24" r="2" fill="#a06a3a"/>
+</svg>`;
+
+// ---------- word themes ----------
+// kind 'colour' draws balloons + colours the letters; 'word' draws a picture
+// on a cream badge. Each item: { word, svg, w } (or { word, col } for colours).
+const WORD_THEMES = {
+  colours: { label: '🎨 Colours', kind: 'colour', items: [
+    { word: 'RED', col: '#e23b2e' }, { word: 'ORANGE', col: '#f0851f' },
+    { word: 'YELLOW', col: '#f3c200' }, { word: 'GREEN', col: '#36a64a' },
+    { word: 'BLUE', col: '#2f74d0' }, { word: 'PURPLE', col: '#8a4bd0' },
+    { word: 'PINK', col: '#ec6aa8' }, { word: 'WHITE', col: '#ffffff' },
+  ] },
+  animals: { label: '🦁 Animals', kind: 'word', items: [
+    { word: 'LION', w: 72, svg: `<svg width="72" height="70" viewBox="0 0 72 70">
+        <g fill="#cf8a3a"><circle cx="36" cy="38" r="31"/>
+        <circle cx="9" cy="30" r="8"/><circle cx="63" cy="30" r="8"/>
+        <circle cx="16" cy="13" r="8"/><circle cx="56" cy="13" r="8"/><circle cx="36" cy="7" r="8"/>
+        <circle cx="12" cy="50" r="8"/><circle cx="60" cy="50" r="8"/>
+        <circle cx="28" cy="65" r="7"/><circle cx="44" cy="65" r="7"/></g>
+        <circle cx="36" cy="40" r="21" fill="#f4cd84"/>
+        <path d="M22 32 L34 37 M50 32 L38 37" stroke="#7a4a18" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="29" cy="40" r="3.2" fill="#3a2c20"/><circle cx="43" cy="40" r="3.2" fill="#3a2c20"/>
+        <path d="M33 47 L39 47 L36 51 Z" fill="#7a4a18"/>
+        <path d="M36 51 q-5 4 -9 2 M36 51 q5 4 9 2" stroke="#7a4a18" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M30 53 L33 58 L27 57 Z" fill="#fff"/><path d="M42 53 L45 57 L39 58 Z" fill="#fff"/></svg>` },
+    { word: 'BEAR', w: 68, svg: `<svg width="68" height="70" viewBox="0 0 68 70">
+        <circle cx="16" cy="16" r="11" fill="#8a6240"/><circle cx="52" cy="16" r="11" fill="#8a6240"/>
+        <circle cx="16" cy="16" r="5" fill="#b88a5e"/><circle cx="52" cy="16" r="5" fill="#b88a5e"/>
+        <circle cx="34" cy="40" r="27" fill="#9a6e48"/>
+        <path d="M22 32 L31 36 M46 32 L37 36" stroke="#5a3a1e" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="26" cy="39" r="3.2" fill="#3a2c20"/><circle cx="42" cy="39" r="3.2" fill="#3a2c20"/>
+        <ellipse cx="34" cy="48" rx="13" ry="10" fill="#e6cba6"/>
+        <ellipse cx="34" cy="45" rx="4" ry="3" fill="#3a2c20"/>
+        <path d="M34 48 q-5 5 -10 3 M34 48 q5 5 10 3" stroke="#5a3a1e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M28 51 L31 56 L25 55 Z" fill="#fff"/><path d="M40 51 L43 55 L37 56 Z" fill="#fff"/></svg>` },
+    { word: 'FOX', w: 66, svg: `<svg width="66" height="68" viewBox="0 0 66 68">
+        <path d="M10 8 L26 26 L8 34 Z" fill="#e0712f"/><path d="M56 8 L40 26 L58 34 Z" fill="#e0712f"/>
+        <path d="M13 13 L23 24 L13 28 Z" fill="#3a2c20"/><path d="M53 13 L43 24 L53 28 Z" fill="#3a2c20"/>
+        <path d="M33 18 Q58 24 33 64 Q8 24 33 18 Z" fill="#e0712f"/>
+        <path d="M33 40 Q46 44 33 64 Q20 44 33 40 Z" fill="#f6e3cf"/>
+        <path d="M22 30 L31 34 M44 30 L35 34" stroke="#a04a14" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="26" cy="37" r="3.2" fill="#3a2c20"/><circle cx="40" cy="37" r="3.2" fill="#3a2c20"/>
+        <path d="M30 49 L36 49 L33 54 Z" fill="#3a2c20"/>
+        <path d="M33 54 q-4 4 -8 3 M33 54 q4 4 8 3" stroke="#a04a14" stroke-width="2.3" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'FROG', w: 70, svg: `<svg width="70" height="62" viewBox="0 0 70 62">
+        <circle cx="17" cy="16" r="13" fill="#6cbf52"/><circle cx="53" cy="16" r="13" fill="#6cbf52"/>
+        <circle cx="17" cy="14" r="6" fill="#fff"/><circle cx="53" cy="14" r="6" fill="#fff"/>
+        <circle cx="18" cy="15" r="3.2" fill="#1f3a1a"/><circle cx="54" cy="15" r="3.2" fill="#1f3a1a"/>
+        <path d="M8 8 L18 13 M62 8 L52 13" stroke="#3f7a30" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M6 30 Q35 14 64 30 Q60 56 35 56 Q10 56 6 30 Z" fill="#7fce63"/>
+        <path d="M16 42 Q35 56 54 42" stroke="#3f7a30" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M22 43 L26 48 L18 48 Z" fill="#fff"/><path d="M48 43 L52 48 L44 48 Z" fill="#fff"/></svg>` },
+    { word: 'OWL', w: 64, svg: `<svg width="64" height="70" viewBox="0 0 64 70">
+        <path d="M8 6 L20 20 L6 24 Z" fill="#7a5a8a"/><path d="M56 6 L44 20 L58 24 Z" fill="#7a5a8a"/>
+        <ellipse cx="32" cy="40" rx="26" ry="28" fill="#8a6aa0"/>
+        <ellipse cx="32" cy="42" rx="18" ry="22" fill="#b89ec8"/>
+        <circle cx="22" cy="34" r="11" fill="#fff"/><circle cx="42" cy="34" r="11" fill="#fff"/>
+        <circle cx="23" cy="35" r="5" fill="#3a2c20"/><circle cx="41" cy="35" r="5" fill="#3a2c20"/>
+        <path d="M14 22 L26 28 M50 22 L38 28" stroke="#4a3458" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M28 42 L36 42 L32 50 Z" fill="#f0a83a"/>
+        <path d="M16 56 q8 8 16 0 q8 8 16 0" stroke="#6a4a7a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'BEE', w: 66, svg: `<svg width="66" height="62" viewBox="0 0 66 62">
+        <ellipse cx="20" cy="20" rx="16" ry="13" fill="#dfe7f2" opacity="0.85"/>
+        <ellipse cx="46" cy="20" rx="16" ry="13" fill="#dfe7f2" opacity="0.85"/>
+        <ellipse cx="33" cy="40" rx="22" ry="19" fill="#f3c200"/>
+        <path d="M20 30 q13 8 26 0 M16 42 q17 9 34 0 M22 53 q11 5 22 0" stroke="#3a2c20" stroke-width="5" fill="none"/>
+        <path d="M24 33 L31 36 M42 33 L35 36" stroke="#3a2c20" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="27" cy="39" r="3" fill="#3a2c20"/><circle cx="39" cy="39" r="3" fill="#3a2c20"/>
+        <path d="M28 46 q5 3 10 0" stroke="#3a2c20" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+        <path d="M29 8 L33 14 M37 8 L33 14" stroke="#3a2c20" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="29" cy="7" r="2.5" fill="#3a2c20"/><circle cx="37" cy="7" r="2.5" fill="#3a2c20"/></svg>` },
+  ] },
+  shapes: { label: '🔺 Shapes', kind: 'word', items: [
+    { word: 'CIRCLE', w: 62, svg: `<svg width="62" height="64" viewBox="0 0 62 64"><circle cx="31" cy="34" r="28" fill="#2f74d0"/></svg>` },
+    { word: 'SQUARE', w: 60, svg: `<svg width="60" height="64" viewBox="0 0 60 64"><rect x="4" y="8" width="52" height="52" rx="6" fill="#e23b2e"/></svg>` },
+    { word: 'STAR', w: 64, svg: `<svg width="64" height="64" viewBox="0 0 64 66"><polygon points="32,8 39,26 59,27 43,40 48,59 32,48 16,59 21,40 5,27 25,26" fill="#f3c200"/></svg>` },
+    { word: 'HEART', w: 64, svg: `<svg width="64" height="62" viewBox="0 0 64 64"><path d="M32 60 C 2 38 10 10 32 26 C 54 10 62 38 32 60 Z" fill="#ec6aa8"/></svg>` },
+    { word: 'OVAL', w: 64, svg: `<svg width="64" height="56" viewBox="0 0 64 56"><ellipse cx="32" cy="30" rx="30" ry="22" fill="#36a64a"/></svg>` },
+    { word: 'DIAMOND', w: 60, svg: `<svg width="60" height="68" viewBox="0 0 60 68"><polygon points="30,4 58,34 30,64 2,34" fill="#8a4bd0"/></svg>` },
+  ] },
+  fruit: { label: '🍎 Fruit', kind: 'word', items: [
+    { word: 'APPLE', w: 60, svg: `<svg width="60" height="66" viewBox="0 0 60 66"><path d="M30 18 C 16 6 2 20 10 40 C 14 58 26 64 30 64 C 34 64 46 58 50 40 C 58 20 44 6 30 18 Z" fill="#e23b2e"/><path d="M30 20 q1 -10 7 -13" stroke="#7a4a1a" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="40" cy="9" rx="7" ry="4" fill="#5da356" transform="rotate(-20 40 9)"/></svg>` },
+    { word: 'PEAR', w: 56, svg: `<svg width="56" height="66" viewBox="0 0 56 66"><path d="M28 14 C 22 14 21 23 24 29 C 14 35 12 54 28 63 C 44 54 42 35 32 29 C 35 23 34 14 28 14 Z" fill="#9acb3c"/><path d="M28 15 q1 -8 5 -10" stroke="#7a4a1a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'PLUM', w: 58, svg: `<svg width="58" height="64" viewBox="0 0 58 64"><ellipse cx="29" cy="36" rx="25" ry="26" fill="#8a4bd0"/><path d="M29 12 q-3 26 0 50" stroke="#6a3aa0" stroke-width="3" fill="none"/><path d="M29 12 q2 -8 8 -9" stroke="#5a8a2a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'GRAPE', w: 58, svg: `<svg width="58" height="68" viewBox="0 0 58 68"><g fill="#8a4bd0"><circle cx="29" cy="20" r="9"/><circle cx="18" cy="32" r="9"/><circle cx="40" cy="32" r="9"/><circle cx="29" cy="38" r="9"/><circle cx="22" cy="50" r="9"/><circle cx="36" cy="50" r="9"/><circle cx="29" cy="60" r="8"/></g><path d="M29 12 q2 -8 9 -9" stroke="#5a8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="40" cy="6" rx="7" ry="4" fill="#5da356"/></svg>` },
+    { word: 'LEMON', w: 64, svg: `<svg width="64" height="52" viewBox="0 0 64 52"><ellipse cx="32" cy="28" rx="28" ry="20" fill="#f3c200"/><circle cx="6" cy="28" r="3" fill="#e0b000"/><circle cx="58" cy="28" r="3" fill="#e0b000"/></svg>` },
+    { word: 'KIWI', w: 60, svg: `<svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="32" r="27" fill="#8a6a3a"/><circle cx="30" cy="32" r="22" fill="#9acb3c"/><circle cx="30" cy="32" r="7" fill="#f2f6ea"/><g fill="#3a2c20"><circle cx="30" cy="16" r="1.6"/><circle cx="42" cy="22" r="1.6"/><circle cx="46" cy="34" r="1.6"/><circle cx="40" cy="46" r="1.6"/><circle cx="30" cy="50" r="1.6"/><circle cx="20" cy="46" r="1.6"/><circle cx="14" cy="34" r="1.6"/><circle cx="18" cy="22" r="1.6"/></g></svg>` },
+  ] },
+  vehicles: { label: '🚗 Vehicles', kind: 'word', items: [
+    { word: 'CAR', w: 74, svg: `<svg width="74" height="50" viewBox="0 0 74 50"><path d="M6 38 L10 24 L24 24 L32 14 L52 14 L58 24 L68 26 L68 38 Z" fill="#e23b2e"/><rect x="26" y="17" width="10" height="8" fill="#bfe0f0"/><rect x="40" y="17" width="12" height="8" fill="#bfe0f0"/><circle cx="20" cy="40" r="8" fill="#333"/><circle cx="20" cy="40" r="3.5" fill="#bbb"/><circle cx="56" cy="40" r="8" fill="#333"/><circle cx="56" cy="40" r="3.5" fill="#bbb"/></svg>` },
+    { word: 'BUS', w: 68, svg: `<svg width="68" height="60" viewBox="0 0 68 60"><rect x="6" y="8" width="56" height="40" rx="6" fill="#f0851f"/><rect x="11" y="14" width="11" height="11" fill="#bfe0f0"/><rect x="28" y="14" width="11" height="11" fill="#bfe0f0"/><rect x="45" y="14" width="11" height="11" fill="#bfe0f0"/><rect x="6" y="32" width="56" height="6" fill="#d96a10"/><circle cx="20" cy="50" r="7" fill="#333"/><circle cx="48" cy="50" r="7" fill="#333"/></svg>` },
+    { word: 'VAN', w: 70, svg: `<svg width="70" height="54" viewBox="0 0 70 54"><path d="M6 14 L44 14 L62 28 L62 42 L6 42 Z" fill="#36a64a"/><rect x="46" y="20" width="12" height="9" fill="#bfe0f0"/><circle cx="20" cy="44" r="7" fill="#333"/><circle cx="50" cy="44" r="7" fill="#333"/></svg>` },
+    { word: 'BOAT', w: 68, svg: `<svg width="68" height="62" viewBox="0 0 68 62"><path d="M34 6 L34 38 L14 38 Z" fill="#e23b2e"/><path d="M38 10 L38 38 L56 38 Z" fill="#f3c200"/><rect x="33" y="6" width="3" height="34" fill="#7a4a1a"/><path d="M6 42 L62 42 L54 58 L14 58 Z" fill="#8a5a2a"/></svg>` },
+    { word: 'BIKE', w: 72, svg: `<svg width="72" height="52" viewBox="0 0 72 52"><circle cx="16" cy="36" r="13" fill="none" stroke="#333" stroke-width="3"/><circle cx="56" cy="36" r="13" fill="none" stroke="#333" stroke-width="3"/><path d="M16 36 L34 36 L46 18 L56 36 M34 36 L46 18 M30 18 L40 18" stroke="#2f74d0" stroke-width="3" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'TRAIN', w: 70, svg: `<svg width="70" height="58" viewBox="0 0 70 58"><rect x="8" y="20" width="40" height="26" rx="4" fill="#2f74d0"/><rect x="48" y="10" width="14" height="36" rx="3" fill="#1a5aa0"/><rect x="16" y="10" width="10" height="12" fill="#444"/><circle cx="21" cy="11" r="5" fill="#777"/><rect x="14" y="26" width="10" height="10" fill="#bfe0f0"/><rect x="30" y="26" width="12" height="10" fill="#bfe0f0"/><circle cx="20" cy="50" r="6" fill="#333"/><circle cx="40" cy="50" r="6" fill="#333"/><circle cx="55" cy="50" r="6" fill="#333"/></svg>` },
+    { word: 'PLANE', w: 74, svg: `<svg width="74" height="52" viewBox="0 0 74 52"><path d="M4 28 L52 22 L68 24 Q72 26 68 28 L52 30 L40 40 L34 40 L40 30 L20 31 L14 38 L9 38 L12 29 L4 28 Z" fill="#dfe7f2" stroke="#9bb0c8" stroke-width="1.5"/><circle cx="56" cy="26" r="2.5" fill="#2f74d0"/></svg>` },
+  ] },
+  sealife: { label: '🐠 Sea life', kind: 'word', items: [
+    { word: 'CRAB', w: 70, svg: `<svg width="70" height="50" viewBox="0 0 70 50"><ellipse cx="35" cy="32" rx="22" ry="14" fill="#e23b2e"/><circle cx="27" cy="26" r="3" fill="#fff"/><circle cx="27" cy="26" r="1.6" fill="#3a2c20"/><circle cx="43" cy="26" r="3" fill="#fff"/><circle cx="43" cy="26" r="1.6" fill="#3a2c20"/><path d="M14 30 q-10 -2 -10 -12 M56 30 q10 -2 10 -12" stroke="#e23b2e" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="4" cy="16" r="5" fill="#e23b2e"/><circle cx="66" cy="16" r="5" fill="#e23b2e"/><path d="M16 42 l-8 6 M24 44 l-5 6 M54 42 l8 6 M46 44 l5 6" stroke="#e23b2e" stroke-width="3" stroke-linecap="round"/></svg>` },
+    { word: 'FISH', w: 64, svg: `<svg width="64" height="44" viewBox="0 0 64 44"><path d="M50 22 L62 8 Q58 22 62 36 Z" fill="#e0883e"/><ellipse cx="28" cy="22" rx="24" ry="15" fill="#f4a259"/><circle cx="16" cy="18" r="4" fill="#fff"/><circle cx="15" cy="18" r="2" fill="#3a2c20"/><path d="M30 9 q-4 13 0 26" stroke="#e0883e" stroke-width="2.5" fill="none"/></svg>` },
+    { word: 'SEAL', w: 64, svg: `<svg width="64" height="56" viewBox="0 0 64 56"><ellipse cx="28" cy="40" rx="24" ry="14" fill="#8a99a8"/><circle cx="46" cy="24" r="14" fill="#9aa9b8"/><circle cx="42" cy="22" r="2.4" fill="#3a2c20"/><circle cx="51" cy="22" r="2.4" fill="#3a2c20"/><ellipse cx="47" cy="28" rx="3" ry="2" fill="#3a2c20"/><path d="M8 42 q-6 4 -4 10 M12 48 q-2 4 2 6" stroke="#8a99a8" stroke-width="4" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'WHALE', w: 70, svg: `<svg width="70" height="50" viewBox="0 0 70 50"><path d="M8 30 Q8 14 32 14 Q56 14 56 30 Q56 42 32 42 Q18 42 12 38 L4 44 Q8 36 8 30 Z" fill="#2f74d0"/><path d="M56 24 L68 16 L66 30 Z" fill="#2f74d0"/><circle cx="20" cy="26" r="2.4" fill="#fff"/><path d="M32 10 q-3 -6 0 -8 q3 6 6 4" stroke="#bfe0f0" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'SHELL', w: 62, svg: `<svg width="62" height="58" viewBox="0 0 62 58"><path d="M31 54 L4 22 Q31 -2 58 22 Z" fill="#ff9ec4"/><path d="M31 54 L31 16 M31 54 L18 20 M31 54 L44 20 M31 54 L8 26 M31 54 L54 26" stroke="#e0648f" stroke-width="2.5" fill="none"/></svg>` },
+    { word: 'OCTOPUS', w: 64, svg: `<svg width="64" height="62" viewBox="0 0 64 62"><path d="M32 6 Q54 6 54 30 L54 38 Q44 34 44 44 Q36 38 32 48 Q28 38 20 44 Q20 34 10 38 L10 30 Q10 6 32 6 Z" fill="#8a4bd0"/><circle cx="25" cy="26" r="3" fill="#fff"/><circle cx="25" cy="26" r="1.6" fill="#3a2c20"/><circle cx="39" cy="26" r="3" fill="#fff"/><circle cx="39" cy="26" r="1.6" fill="#3a2c20"/></svg>` },
+  ] },
+  numbers: { label: '🔢 Numbers', kind: 'word', items:
+    ['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN']
+      .map((w, i) => ({ word: w, w: 64, svg: numberSvg(i + 1) })) },
+  feelings: { label: '😊 Feelings', kind: 'word', items:
+    Object.keys(FEELING_FACES).map(w => ({ word: w, w: 60, svg: faceSvg(FEELING_FACES[w]) })) },
+  sight: { label: '📖 Sight words', kind: 'word', items:
+    ['THE','AND','CAT','DOG','SEE','GO','YOU','ARE'].map(w => ({ word: w, w: 64, svg: SIGN_SVG })) },
+  weather: { label: '☀️ Weather', kind: 'word', items: [
+    { word: 'SUN', w: 60, svg: `<svg width="60" height="60" viewBox="0 0 60 60"><g stroke="#f3a200" stroke-width="4" stroke-linecap="round"><path d="M30 4 V14 M30 46 V56 M4 30 H14 M46 30 H56 M11 11 L18 18 M42 42 L49 49 M49 11 L42 18 M18 42 L11 49"/></g><circle cx="30" cy="30" r="15" fill="#ffd24a"/></svg>` },
+    { word: 'RAIN', w: 64, svg: `<svg width="64" height="60" viewBox="0 0 64 60"><ellipse cx="32" cy="24" rx="26" ry="14" fill="#cfd8e2"/><circle cx="20" cy="22" r="11" fill="#cfd8e2"/><circle cx="42" cy="20" r="13" fill="#cfd8e2"/><g fill="#4a9be0"><path d="M18 40 q-3 5 0 8 q3 -3 0 -8Z"/><path d="M32 42 q-3 5 0 8 q3 -3 0 -8Z"/><path d="M46 40 q-3 5 0 8 q3 -3 0 -8Z"/></g></svg>` },
+    { word: 'CLOUD', w: 66, svg: `<svg width="66" height="46" viewBox="0 0 66 46"><ellipse cx="33" cy="36" rx="28" ry="6" fill="#dce8f5"/><ellipse cx="33" cy="30" rx="30" ry="13" fill="#fff"/><circle cx="20" cy="26" r="13" fill="#fff"/><circle cx="40" cy="22" r="16" fill="#fff"/><circle cx="52" cy="28" r="11" fill="#fff"/></svg>` },
+    { word: 'STAR', w: 60, svg: `<svg width="60" height="60" viewBox="0 0 64 66"><polygon points="32,8 39,26 59,27 43,40 48,59 32,48 16,59 21,40 5,27 25,26" fill="#ffd24a"/></svg>` },
+    { word: 'MOON', w: 56, svg: `<svg width="56" height="60" viewBox="0 0 56 60"><path d="M40 8 A24 24 0 1 0 40 52 A18 18 0 1 1 40 8 Z" fill="#fde98a"/></svg>` },
+    { word: 'SNOW', w: 58, svg: `<svg width="58" height="58" viewBox="0 0 58 58"><g stroke="#7fb8e8" stroke-width="3" stroke-linecap="round"><path d="M29 6 V52 M9 18 L49 40 M49 18 L9 40"/><path d="M29 14 l-5 -5 M29 14 l5 -5 M29 44 l-5 5 M29 44 l5 5"/></g></svg>` },
+    { word: 'WIND', w: 64, svg: `<svg width="64" height="50" viewBox="0 0 64 50"><g stroke="#9ab4c8" stroke-width="4" fill="none" stroke-linecap="round"><path d="M6 16 H40 a7 7 0 1 0 -7 -7"/><path d="M6 28 H50 a8 8 0 1 1 -8 8"/><path d="M6 40 H32 a6 6 0 1 0 -6 6"/></g></svg>` },
+  ] },
+  toys: { label: '🧸 Toys', kind: 'word', items: [
+    { word: 'BALL', w: 58, svg: `<svg width="58" height="58" viewBox="0 0 58 58"><circle cx="29" cy="29" r="27" fill="#f3c200"/><path d="M5 20 Q29 30 53 20" stroke="#e23b2e" stroke-width="7" fill="none"/><path d="M5 38 Q29 28 53 38" stroke="#2f74d0" stroke-width="7" fill="none"/></svg>` },
+    { word: 'KITE', w: 56, svg: `<svg width="56" height="68" viewBox="0 0 56 68"><polygon points="28,2 50,26 28,50 6,26" fill="#ec6aa8"/><path d="M28 2 L28 50 M6 26 L50 26" stroke="#fff" stroke-width="2"/><path d="M28 50 q-4 8 2 12 q-6 2 -2 6" stroke="#7a4a1a" stroke-width="2" fill="none"/></svg>` },
+    { word: 'DRUM', w: 64, svg: `<svg width="64" height="54" viewBox="0 0 64 54"><rect x="12" y="18" width="40" height="26" rx="3" fill="#e23b2e"/><ellipse cx="32" cy="18" rx="20" ry="7" fill="#f6e3cf"/><path d="M12 22 L52 40 M52 22 L12 40" stroke="#f3c200" stroke-width="2.5"/><path d="M40 16 L58 4 M44 18 L62 8" stroke="#a06a3a" stroke-width="3" stroke-linecap="round"/></svg>` },
+    { word: 'DOLL', w: 48, svg: `<svg width="48" height="66" viewBox="0 0 48 66"><circle cx="24" cy="14" r="12" fill="#ffe0bd"/><path d="M12 12 a12 12 0 0 1 24 0 q-12 -6 -24 0Z" fill="#a05a2a"/><circle cx="20" cy="14" r="1.6" fill="#3a2c20"/><circle cx="28" cy="14" r="1.6" fill="#3a2c20"/><path d="M21 19 q3 2 6 0" stroke="#c4577a" stroke-width="1.6" fill="none"/><path d="M14 28 L34 28 L30 60 L18 60 Z" fill="#ec6aa8"/></svg>` },
+    { word: 'BLOCKS', w: 60, svg: `<svg width="60" height="60" viewBox="0 0 60 60"><rect x="6" y="32" width="24" height="24" rx="3" fill="#e23b2e"/><rect x="32" y="32" width="24" height="24" rx="3" fill="#2f74d0"/><rect x="18" y="8" width="24" height="24" rx="3" fill="#36a64a"/><g fill="#fff" font-family="Fredoka,sans-serif" font-size="15" font-weight="700" text-anchor="middle"><text x="18" y="50">A</text><text x="44" y="50">B</text><text x="30" y="26">C</text></g></svg>` },
+  ] },
+  minibeasts: { label: '🐛 Minibeasts', kind: 'word', items: [
+    { word: 'ANT', w: 68, svg: `<svg width="68" height="44" viewBox="0 0 68 44"><g fill="#7a3a1a"><circle cx="50" cy="24" r="11"/><circle cx="34" cy="24" r="7"/><circle cx="16" cy="24" r="9"/></g><path d="M34 24 L24 36 M34 24 L44 38 M30 24 L20 38 M40 24 L48 38 M34 22 L26 12 M34 22 L44 12" stroke="#7a3a1a" stroke-width="2.5" stroke-linecap="round"/><path d="M12 18 L4 8 M16 16 L12 6" stroke="#7a3a1a" stroke-width="2" stroke-linecap="round"/><circle cx="13" cy="22" r="1.6" fill="#fff"/></svg>` },
+    { word: 'BUG', w: 58, svg: `<svg width="58" height="50" viewBox="0 0 58 50"><path d="M14 16 Q30 4 46 16 Z" fill="#3a2c20"/><ellipse cx="30" cy="30" rx="24" ry="18" fill="#e23b2e"/><path d="M30 12 L30 48" stroke="#3a2c20" stroke-width="2.5"/><circle cx="18" cy="26" r="3.5" fill="#3a2c20"/><circle cx="42" cy="26" r="3.5" fill="#3a2c20"/><circle cx="22" cy="38" r="3" fill="#3a2c20"/><circle cx="40" cy="38" r="3" fill="#3a2c20"/><circle cx="22" cy="13" r="2" fill="#fff"/><circle cx="38" cy="13" r="2" fill="#fff"/></svg>` },
+    { word: 'WORM', w: 68, svg: `<svg width="68" height="40" viewBox="0 0 68 40"><path d="M6 30 Q16 14 26 30 Q36 46 46 30 Q54 18 60 26" stroke="#7fce63" stroke-width="11" fill="none" stroke-linecap="round"/><circle cx="60" cy="24" r="8" fill="#6cbf52"/><circle cx="62" cy="22" r="1.8" fill="#3a2c20"/><path d="M60 18 l-2 -6 M64 18 l2 -6" stroke="#3a8a30" stroke-width="2" stroke-linecap="round"/></svg>` },
+    { word: 'SNAIL', w: 66, svg: `<svg width="66" height="50" viewBox="0 0 66 50"><path d="M6 42 Q6 30 20 30 L40 30" stroke="#d9a872" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="40" cy="28" r="18" fill="#e0883e"/><circle cx="40" cy="28" r="11" fill="none" stroke="#a05a2a" stroke-width="3"/><circle cx="40" cy="28" r="4" fill="none" stroke="#a05a2a" stroke-width="3"/><circle cx="10" cy="40" r="6" fill="#d9a872"/><path d="M8 36 L5 26 M13 36 L16 26" stroke="#d9a872" stroke-width="2.5" stroke-linecap="round"/><circle cx="5" cy="25" r="1.6" fill="#3a2c20"/><circle cx="16" cy="25" r="1.6" fill="#3a2c20"/></svg>` },
+    { word: 'SPIDER', w: 66, svg: `<svg width="66" height="56" viewBox="0 0 66 56"><g stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"><path d="M26 30 L8 20 M26 34 L6 32 M26 38 L8 46 M40 30 L58 20 M40 34 L60 32 M40 38 L58 46"/></g><ellipse cx="33" cy="34" rx="15" ry="13" fill="#3a2c20"/><circle cx="33" cy="20" r="8" fill="#3a2c20"/><circle cx="30" cy="19" r="2.4" fill="#fff"/><circle cx="36" cy="19" r="2.4" fill="#fff"/><circle cx="30" cy="19" r="1.1" fill="#3a2c20"/><circle cx="36" cy="19" r="1.1" fill="#3a2c20"/></svg>` },
+  ] },
+};
+
+// picker rows: 5 single-letter sets, then every word theme in order
+const WORD_ORDER = ['colours', 'animals', 'shapes', 'fruit', 'vehicles', 'sealife', 'numbers', 'feelings', 'sight', 'weather', 'toys', 'minibeasts'];
+const ROWS = [
+  { type: 'letters', label: 'E T A O',       letters: 'ETAO' },
+  { type: 'letters', label: '+ I N',         letters: 'ETAOIN' },
+  { type: 'letters', label: '+ S H R L',     letters: 'ETAOINSHRL' },
+  { type: 'letters', label: '+ D C U M W F', letters: 'ETAOINSHRLDCUMWF' },
+  { type: 'letters', label: 'all 26',        letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+  ...WORD_ORDER.map(k => ({ type: 'word', theme: k, label: WORD_THEMES[k].label })),
+];
 
 // ---------- state ----------
 let state = 'picker';         // 'picker' | 'playing' | 'over' | 'win'
@@ -414,21 +519,17 @@ function pickObstacle() {
     const phase = phaseNow();
     const pool = OBSTACLE_TYPES.filter(t => t.phases.includes(phase));
     const type = pool[Math.floor(Math.random() * pool.length)];
-    return { word: pickLetter(), svg: type.svg, w: type.w, theme: 'letter' };
+    return { word: pickLetter(), svg: type.svg, w: type.w, badge: 'letter' };
   }
-  if (level.type === 'colours') {
-    let c;
-    do { c = COLOURS[Math.floor(Math.random() * COLOURS.length)]; }
-    while (c.word === lastWord && COLOURS.length > 1);
-    lastWord = c.word;
-    return { word: c.word, svg: balloonSvg(c.col), w: 58, theme: 'colour', col: c.col };
+  const theme = WORD_THEMES[level.theme];
+  let item;
+  do { item = theme.items[Math.floor(Math.random() * theme.items.length)]; }
+  while (item.word === lastWord && theme.items.length > 1);
+  lastWord = item.word;
+  if (theme.kind === 'colour') {
+    return { word: item.word, svg: balloonSvg(item.col), w: 58, badge: 'colour', col: item.col };
   }
-  // animals
-  let a;
-  do { a = ANIMALS[Math.floor(Math.random() * ANIMALS.length)]; }
-  while (a.word === lastWord && ANIMALS.length > 1);
-  lastWord = a.word;
-  return { word: a.word, svg: a.svg, w: 68, theme: 'animal' };
+  return { word: item.word, svg: item.svg, w: item.w || 64, badge: 'word' };
 }
 
 // build the floating badge: a single circle for letters, spans for words
@@ -440,13 +541,13 @@ function buildBadge(spec) {
     return { badgeEl: el, spanEls: null };
   }
   const el = document.createElement('div');
-  el.className = 'ob-word theme-' + spec.theme;
+  el.className = 'ob-word theme-' + (spec.badge === 'colour' ? 'colour' : 'word');
   const spanEls = [];
   for (const ch of spec.word) {
     const s = document.createElement('span');
     s.className = 'wl';
     s.textContent = ch;
-    if (spec.theme === 'colour') s.style.color = spec.col;
+    if (spec.badge === 'colour') s.style.color = spec.col;
     el.appendChild(s);
     spanEls.push(s);
   }
@@ -783,6 +884,7 @@ function startLevel(rowId, speedId) {
   level = {
     rowId, speedId,
     type: row.type,
+    theme: row.theme,
     letters: row.letters,
     speed: SPEEDS[speedId].speed,
   };
