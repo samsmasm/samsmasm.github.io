@@ -23,6 +23,8 @@ const winLineEl = document.getElementById('win-line');
 const winFishEl = document.getElementById('win-fish');
 const againBtn = document.getElementById('again-btn');
 const pickBtn = document.getElementById('pick-btn');
+const overAgainBtn = document.getElementById('over-again-btn');
+const overPickBtn = document.getElementById('over-pick-btn');
 const titleEl = document.getElementById('title');
 const totalFishStartEl = document.getElementById('total-fish-start');
 const hillsBack = document.getElementById('hills-back');
@@ -32,8 +34,9 @@ const starsLayer = document.getElementById('stars-layer');
 
 // ---------- tuning ----------
 const GROUND_Y = 70;          // cat's resting bottom, px
-const GRAVITY = 0.5;          // floaty = forgiving for little fingers
+const GRAVITY = 0.4;          // gentle = long, easy-to-time hang time
 const JUMP_STRENGTH = 17;     // SPACE jump (clears any obstacle)
+const DOUBLE_JUMP_STRENGTH = 13; // second tap in the air = extra lift + flip
 const AUTO_HOP_STRENGTH = 13; // little leap over a smashed crater
 const JUMP_BUDGET = 5;        // SPACE jumps allowed per level
 const TRACK_LENGTHS = [12, 20, 40]; // Standard / Long / Longer (obstacles per level)
@@ -49,10 +52,10 @@ const FREQ = {
 };
 
 const SPEEDS = [
-  { label: 'Slow',      icon: '🐢', speed: 2.6 },
-  { label: 'Medium',    icon: '🐇', speed: 3.8 },
-  { label: 'Fast',      icon: '🐎', speed: 5.4 },
-  { label: 'Super',     icon: '🚀', speed: 7.6 },
+  { label: 'Slow',      icon: '🐢', speed: 1.5 },
+  { label: 'Medium',    icon: '🐇', speed: 3.9 },
+  { label: 'Fast',      icon: '🐎', speed: 6.3 },
+  { label: 'Super',     icon: '🚀', speed: 8.6 },
   { label: 'Lightning', icon: '⚡', speed: 11.0 },
 ];
 
@@ -304,6 +307,7 @@ let level = null;             // { rowId, speedId, type, ... }
 let catY = GROUND_Y;
 let velocity = 0;
 let airborne = false;
+let airJumps = 0;             // jumps used in the current airborne sequence (for double jump)
 let speed = 4;
 let worldTime = 0;            // keeps ticking, drives day/night
 let obstacles = [];
@@ -369,6 +373,7 @@ function tone(freqFrom, freqTo, duration, type, volume, when = 0) {
 
 const sfx = {
   jump: () => tone(280, 560, 0.18, 'triangle', 0.25),
+  doubleJump: () => tone(480, 960, 0.2, 'triangle', 0.25),
   hop: () => tone(360, 620, 0.14, 'triangle', 0.2),
   tick: () => tone(660, 880, 0.06, 'sine', 0.16),       // correct letter within a word
   ding: () => { tone(880, 880, 0.09, 'sine', 0.22); tone(1320, 1320, 0.16, 'sine', 0.2, 0.07); },
@@ -831,27 +836,38 @@ function renderPaws() {
 }
 
 // ---------- jumping ----------
+// airJumps: 0 on the ground, 1 after a first jump/hop, 2 after a double jump
 function spaceJump() {
-  if (airborne) return;
-  if (jumpsLeft <= 0) {
-    pawsBadgeEl.classList.remove('shake');
-    void pawsBadgeEl.offsetWidth;
-    pawsBadgeEl.classList.add('shake');
-    return;
+  if (!airborne) {
+    if (jumpsLeft <= 0) {
+      pawsBadgeEl.classList.remove('shake');
+      void pawsBadgeEl.offsetWidth;
+      pawsBadgeEl.classList.add('shake');
+      return;
+    }
+    jumpsLeft--;
+    jumpsUsedThisLevel++;
+    renderPaws();
+    airborne = true;
+    airJumps = 1;
+    velocity = JUMP_STRENGTH;
+    catSvg.classList.remove('running');
+    catSvg.classList.add('jumping');
+    sfx.jump();
+  } else if (airJumps === 1) {
+    // a second tap in the air: free double jump with a somersault
+    airJumps = 2;
+    velocity = DOUBLE_JUMP_STRENGTH;
+    catSvg.classList.add('flip');
+    for (let i = 0; i < 5; i++) sparkle();
+    sfx.doubleJump();
   }
-  jumpsLeft--;
-  jumpsUsedThisLevel++;
-  renderPaws();
-  airborne = true;
-  velocity = JUMP_STRENGTH;
-  catSvg.classList.remove('running');
-  catSvg.classList.add('jumping');
-  sfx.jump();
 }
 
 function autoHop() {
   if (airborne) return;
   airborne = true;
+  airJumps = 1; // a double jump is still available after a hop
   velocity = AUTO_HOP_STRENGTH;
   catSvg.classList.remove('running');
   catSvg.classList.add('jumping');
@@ -861,8 +877,9 @@ function autoHop() {
 function land() {
   catY = GROUND_Y;
   airborne = false;
+  airJumps = 0;
   velocity = 0;
-  catSvg.classList.remove('jumping');
+  catSvg.classList.remove('jumping', 'flip');
   catSvg.classList.add('running');
   catEl.classList.remove('landed');
   void catEl.offsetWidth;
@@ -894,6 +911,8 @@ function handleTap() {
 container.addEventListener('pointerdown', handleTap);
 
 document.addEventListener('keydown', (e) => {
+  // never let Backspace navigate the browser back during the game
+  if (e.code === 'Backspace') { e.preventDefault(); return; }
   if (e.repeat) return;
   ensureAudio();
   if (e.code === 'Space') {
@@ -952,6 +971,7 @@ function startLevel(rowId, speedId) {
   catY = GROUND_Y;
   velocity = 0;
   airborne = false;
+  airJumps = 0;
   spawnedCount = 0;
   clearedCount = 0;
   jumpsLeft = JUMP_BUDGET;
@@ -991,6 +1011,7 @@ function winLevel() {
   state = 'win';
   // settle the cat on the ground and let it do a happy dance
   airborne = false;
+  airJumps = 0;
   velocity = 0;
   catY = GROUND_Y;
   catEl.style.bottom = GROUND_Y + 'px';
@@ -1027,10 +1048,11 @@ function goToPicker() {
   catY = GROUND_Y;
   velocity = 0;
   airborne = false;
+  airJumps = 0;
   catEl.style.bottom = GROUND_Y + 'px';
   catEl.style.transform = '';
   catEl.classList.remove('dancing');
-  catSvg.classList.remove('oops', 'jumping');
+  catSvg.classList.remove('oops', 'jumping', 'flip');
   catSvg.classList.add('running');
   overScreen.classList.add('hidden');
   winScreen.classList.add('hidden');
@@ -1040,8 +1062,13 @@ function goToPicker() {
   pickerScreen.classList.remove('hidden');
 }
 
-overScreen.addEventListener('pointerdown', () => {
-  if (state === 'over' && level) startLevel(level.rowId, level.speedId);
+overAgainBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  if (level) startLevel(level.rowId, level.speedId);
+});
+overPickBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  goToPicker();
 });
 againBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
