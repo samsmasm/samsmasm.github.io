@@ -46,8 +46,9 @@ const GROUND_Y = 70;          // cat's resting bottom, px
 const GRAVITY = 0.4;          // gentle = long, easy-to-time hang time
 const JUMP_STRENGTH = 17;     // SPACE jump (clears any obstacle)
 const DOUBLE_JUMP_STRENGTH = 13; // second tap in the air = extra lift + flip
-const LEAP_VX = 2.4;          // forward speed of a jump (px/frame, same at every level speed)
-const RETURN_EASE = 0.16;     // how fast the cat glides back to home after a leap
+const BASE_LEAP_VX = 4.8;     // world-advance rate during a jump; screen-forward = this minus
+                              // the level speed, so fast levels barely lunge (the ground clears it)
+const RETURN_MAX_TIME = 1.4;  // seconds to gently ease all the way back from a big leap
 const JUMP_BUDGET = 5;        // SPACE jumps allowed per level
 const TRACK_LENGTHS = [12, 20, 40]; // Standard / Long / Longer (obstacles per level)
 const LETTER_GAP = 560;       // px between single-letter obstacles
@@ -319,6 +320,9 @@ let catX = 0;                 // forward offset from home (px) during a leap
 let velocity = 0;
 let leapVx = 0;               // current forward speed while airborne
 let returning = false;        // gliding back to home after landing a leap
+let returnFrom = 0;           // catX at the moment of landing
+let returnElapsed = 0;        // seconds into the return glide
+let returnDur = 0;            // seconds the return glide should take
 let airborne = false;
 let airJumps = 0;             // jumps used in the current airborne sequence (for double jump)
 let speed = 4;
@@ -1062,7 +1066,9 @@ function spaceJump() {
     returning = false;
     airJumps = 1;
     velocity = JUMP_STRENGTH;
-    leapVx = LEAP_VX;        // carry Ty forward a fixed distance, any level speed
+    // advance through the world at a steady rate; on fast levels the ground
+    // already does that, so the cat barely lunges forward on screen
+    leapVx = Math.max(0, BASE_LEAP_VX - speed);
     catSvg.classList.remove('running');
     catSvg.classList.add('jumping');
     sfx.jump();
@@ -1081,7 +1087,13 @@ function land() {
   airborne = false;
   airJumps = 0;
   leapVx = 0;
-  returning = catX > 2;   // glide back to home if Ty leapt forward
+  // glide gently back to home; longer leaps take longer, short ones are quick
+  returning = catX > 2;
+  if (returning) {
+    returnFrom = catX;
+    returnElapsed = 0;
+    returnDur = Math.min(RETURN_MAX_TIME, Math.max(0.4, catX / 180));
+  }
   jumpUncredited = false; // jump arc ended; no fish means it stays counted
   velocity = 0;
   catSvg.classList.remove('jumping', 'flip');
@@ -1511,8 +1523,13 @@ function frame(now) {
         lastSparkleAt = now; sparkle();
       }
     } else if (returning) {
-      catX += (0 - catX) * Math.min(RETURN_EASE * dt, 1);
-      if (catX < 2) { catX = 0; returning = false; }
+      // ease-in-out back to home; the ground keeps scrolling so it looks like
+      // Ty slows down and the background gently catches up to him
+      returnElapsed += dt / 60;
+      const p = Math.min(returnElapsed / returnDur, 1);
+      const eased = p * p * (3 - 2 * p);
+      catX = returnFrom * (1 - eased);
+      if (p >= 1) { catX = 0; returning = false; }
     }
     catEl.style.bottom = catY + 'px';
     catEl.style.transform = `translateX(${catX}px)` + (airborne ? ` rotate(${-velocity * 0.8}deg)` : '');
