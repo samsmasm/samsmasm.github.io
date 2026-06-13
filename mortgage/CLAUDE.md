@@ -39,7 +39,8 @@ Key functions in the inline script:
 - Hover tooltip on the chart showing balances at any point in time
 - Milestone timeline: principal-beats-interest crossover, $50k/$100k thresholds, halfway, debt-free date
 - CSV download of the schedule and a print stylesheet (print hides controls and chart, expands the table)
-- Shareable URL state: all inputs sync to query params (`f,b,r,p,e,l,y,d`) via debounced `history.replaceState`, restored on load by `applyUrlState()`; "Copy link to this plan" button copies the URL
+- Shareable URL state: all inputs sync to query params (`f,b,r,p,e,l,y,nr,ny,d`) via debounced `history.replaceState`, restored on load by `applyUrlState()`; "Copy link to this plan" button copies the URL
+- Rate-change scenario: "New rate (% p.a.)" plus "Kicks in after (years)" (0 = no change) applies to both baseline and plan, draws a dashed marker on the chart, and shows a note with the change date; a guard catches loans that never clear inside 50 years after the change
 - Lump-sum rows highlighted green in the schedule table
 
 ## Conventions
@@ -51,6 +52,5 @@ Key functions in the inline script:
 
 ## Possible next steps (not started)
 
-- Rate-change scenarios (what if rates rise 1% in year 3)
 - Multiple lump sums
 - Offset account simulation (balance that reduces interest but stays withdrawable)

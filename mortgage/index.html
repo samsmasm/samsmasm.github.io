@@ -327,6 +327,24 @@
       </section>
 
       <section class="card">
+        <h2>Rate change</h2>
+
+        <div class="field">
+          <label class="section-label" for="newRate">New rate (% p.a.)</label>
+          <input type="number" id="newRate" value="0" min="0" max="25" step="0.01">
+          <input type="range" id="newRateRange" min="0" max="12" step="0.01" value="0">
+          <p class="field-note">What the rate becomes when your fixed term ends. Leave at 0 for no change.</p>
+        </div>
+
+        <div class="field">
+          <label class="section-label" for="newRateYears">Kicks in after (years)</label>
+          <input type="number" id="newRateYears" value="3" min="0" max="40" step="0.5">
+          <input type="range" id="newRateYearsRange" min="0" max="20" step="0.5" value="3">
+          <p class="field-note" id="rateNote"></p>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Pay it down faster</h2>
 
         <div class="field">
@@ -460,14 +478,15 @@ function fmtDuration(periods, ppy) {
 }
 
 // ---------- core engine ----------
-function amortize(principal, annualRate, ppy, payment, lumpAmount, lumpPeriod) {
-  const r = annualRate / 100 / ppy;
+function amortize(principal, annualRate, ppy, payment, lumpAmount, lumpPeriod, rate2, rate2Period) {
+  const r1 = annualRate / 100 / ppy;
+  const r2 = rate2Period ? rate2 / 100 / ppy : r1;
   const cap = ppy * MAX_YEARS;
   const rows = [];
   let bal = principal, totalInterest = 0;
   while (bal > 0.005 && rows.length < cap) {
     const n = rows.length + 1;
-    const interest = bal * r;
+    const interest = bal * (rate2Period && n >= rate2Period ? r2 : r1);
     let pay = payment + (n === lumpPeriod ? lumpAmount : 0);
     let principalPaid = pay - interest;
     if (principalPaid > bal) { principalPaid = bal; pay = interest + bal; }
@@ -488,7 +507,7 @@ function pairSlider(numberId) {
   box.addEventListener('input', () => { range.value = box.value; recalc(); });
   range.addEventListener('input', () => { box.value = range.value; recalc(); });
 }
-['loanAmount', 'interestRate', 'repaymentAmount', 'extraAmount', 'lumpAmount', 'lumpYears'].forEach(pairSlider);
+['loanAmount', 'interestRate', 'repaymentAmount', 'extraAmount', 'lumpAmount', 'lumpYears', 'newRate', 'newRateYears'].forEach(pairSlider);
 
 document.querySelectorAll('.freq-tab').forEach(btn => {
   btn.addEventListener('click', () => setFrequency(btn.dataset.freq));
@@ -502,6 +521,7 @@ $('nextPayment').addEventListener('input', recalc);
 const PARAM_MAP = [
   ['b', 'loanAmount'], ['r', 'interestRate'], ['p', 'repaymentAmount'],
   ['e', 'extraAmount'], ['l', 'lumpAmount'], ['y', 'lumpYears'],
+  ['nr', 'newRate'], ['ny', 'newRateYears'],
 ];
 
 function applyUrlState() {
@@ -602,10 +622,28 @@ function recalc() {
     return;
   }
 
-  const baseline = amortize(principal, rate, ppy, payment, 0, 0);
+  const newRate = num('newRate');
+  const ratePeriod = newRate > 0 ? Math.max(1, Math.round(num('newRateYears') * ppy)) : 0;
+
+  const baseline = amortize(principal, rate, ppy, payment, 0, 0, newRate, ratePeriod);
   const hasExtras = extra > 0 || lumpAmount > 0;
-  const optimized = hasExtras ? amortize(principal, rate, ppy, payment + extra, lumpAmount, lumpPeriod) : baseline;
+  const optimized = hasExtras ? amortize(principal, rate, ppy, payment + extra, lumpAmount, lumpPeriod, newRate, ratePeriod) : baseline;
   lastOptimized = optimized;
+
+  if (!baseline.finished) {
+    fail('These repayments never clear the loan inside 50 years. Raise the base repayment.');
+    return;
+  }
+
+  // rate change note
+  const rateNote = $('rateNote');
+  if (ratePeriod) {
+    rateNote.innerText = ratePeriod > optimized.periods
+      ? 'The loan is paid off before the new rate starts.'
+      : `From around ${fmtDateAtPeriod(ratePeriod, ppy)}, interest runs at ${newRate}%.`;
+  } else {
+    rateNote.innerText = '';
+  }
 
   // lump sum timing note
   const lumpNote = $('lumpNote');
@@ -634,7 +672,7 @@ function recalc() {
 
   $('totalPeriods').innerText = `${optimized.periods} payments`;
 
-  renderChart(baseline, optimized, principal, ppy, hasExtras);
+  renderChart(baseline, optimized, principal, ppy, hasExtras, ratePeriod && ratePeriod <= baseline.periods ? { period: ratePeriod, rate: newRate } : null);
   renderMilestones(optimized, baseline, principal, ppy, hasExtras);
 
   clearTimeout(tableTimer);
@@ -655,7 +693,7 @@ function sampleSeries(rows, principal, ppy) {
   return pts;
 }
 
-function renderChart(baseline, optimized, principal, ppy, hasExtras) {
+function renderChart(baseline, optimized, principal, ppy, hasExtras, rateChange) {
   const xMax = Math.max(baseline.periods / ppy, 0.5);
   const yMax = principal;
   const px = x => M.l + x / xMax * (CW - M.l - M.r);
@@ -675,6 +713,12 @@ function renderChart(baseline, optimized, principal, ppy, hasExtras) {
   const xStep = [1, 2, 5, 10][[1, 2, 5, 10].findIndex(s => xMax / s <= 10)] || 10;
   for (let yr = 0; yr <= xMax; yr += xStep) {
     svg += `<text x="${px(yr).toFixed(1)}" y="${CH - 10}" text-anchor="middle" font-size="10.5" fill="#999" font-family="sans-serif">${yr}yr</text>`;
+  }
+
+  if (rateChange) {
+    const rx = px(rateChange.period / ppy).toFixed(1);
+    svg += `<line x1="${rx}" x2="${rx}" y1="${M.t}" y2="${CH - M.b}" stroke="#f5c9b0" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    svg += `<text x="${+rx + 5}" y="${M.t + 11}" font-size="10.5" fill="#7a2d0a" font-family="sans-serif">rate ${rateChange.rate}%</text>`;
   }
 
   if (hasExtras) {
