@@ -10,9 +10,20 @@ const fishCountEl = document.getElementById('fish-count');
 const fishBadgeEl = document.getElementById('fish-badge');
 const pawsEl = document.getElementById('paws');
 const pawsBadgeEl = document.getElementById('paws-badge');
-const soundBtn = document.getElementById('sound-btn');
 const homeBtn = document.getElementById('home-btn');
-const timerBtn = document.getElementById('timer-btn');
+const gearBtn = document.getElementById('gear-btn');
+const timerDisplay = document.getElementById('timer-display');
+const settingsMenu = document.getElementById('settings-menu');
+const settingsTimerBtn = document.getElementById('settings-timer');
+const settingsHelpBtn = document.getElementById('settings-help');
+const settingsSoundBtn = document.getElementById('settings-sound');
+const settingsResetBtn = document.getElementById('settings-reset');
+const settingsCloseBtn = document.getElementById('settings-close');
+const helpScreen = document.getElementById('help-screen');
+const helpCloseBtn = document.getElementById('help-close');
+const resetBanner = document.getElementById('reset-banner');
+const resetBannerText = document.getElementById('reset-banner-text');
+const resetDoneBtn = document.getElementById('reset-done');
 const timerPicker = document.getElementById('timer-picker');
 const timesupScreen = document.getElementById('timesup-screen');
 const pickerScreen = document.getElementById('picker-screen');
@@ -392,6 +403,9 @@ let sessionLimitMs = 0;       // 0 = off
 let sessionStartMs = 0;       // wall-clock ms when the limit was set
 let sessionExpired = false;
 let timerPickerOpen = false;
+let settingsOpen = false;
+let helpOpen = false;
+let resetMode = false;        // tapping a level cycles its stars instead of playing
 
 // best stars per level cell, keyed "rowId-speedId" (per player)
 function bestStars(rowId, speedId) {
@@ -444,10 +458,10 @@ const sfx = {
 };
 
 function updateSoundBtn() {
-  soundBtn.textContent = muted ? '🔇' : '🔊';
+  settingsSoundBtn.textContent = muted ? '🔇 Sound: Off' : '🔊 Sound: On';
 }
 
-soundBtn.addEventListener('pointerdown', (e) => {
+settingsSoundBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   muted = !muted;
   localStorage.setItem('typurr-muted', muted ? '1' : '0');
@@ -459,19 +473,68 @@ homeBtn.addEventListener('pointerdown', (e) => {
   goToPicker();
 });
 
+// ---------- settings menu ----------
+function openSettings() {
+  if (sessionExpired) return;
+  settingsOpen = true;
+  settingsMenu.classList.remove('hidden');
+}
+function closeSettings() {
+  settingsOpen = false;
+  settingsMenu.classList.add('hidden');
+}
+
+gearBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  ensureAudio();
+  settingsOpen ? closeSettings() : openSettings();
+});
+settingsCloseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); closeSettings(); });
+settingsMenu.addEventListener('pointerdown', (e) => { if (e.target === settingsMenu) closeSettings(); });
+
+settingsTimerBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); closeSettings(); openTimerPicker(); });
+settingsHelpBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); closeSettings(); openHelp(); });
+settingsResetBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); closeSettings(); enterResetMode(); });
+
+// ---------- how to play ----------
+function openHelp() { helpOpen = true; helpScreen.classList.remove('hidden'); }
+function closeHelp() { helpOpen = false; helpScreen.classList.add('hidden'); }
+helpCloseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); closeHelp(); });
+helpScreen.addEventListener('pointerdown', (e) => { if (e.target === helpScreen) closeHelp(); });
+
+// ---------- change-stars (reset) mode ----------
+function setStarsExact(rowId, speedId, n) {
+  const key = ukey(`stars-${rowId}-${speedId}`);
+  if (n <= 0) localStorage.removeItem(key);
+  else localStorage.setItem(key, String(n));
+}
+
+function enterResetMode() {
+  goToPicker();
+  resetMode = true;
+  resetBannerText.textContent = `Tap a level to change ${currentPlayer().name}'s stars (3 → 2 → 1 → 0)`;
+  resetBanner.classList.remove('hidden');
+  lvGrid.classList.add('reset-mode');
+}
+function exitResetMode() {
+  resetMode = false;
+  resetBanner.classList.add('hidden');
+  lvGrid.classList.remove('reset-mode');
+}
+resetDoneBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); exitResetMode(); });
+
 // ---------- play timer ----------
-function updateTimerBtn() {
+function updateTimerDisplay() {
   if (!sessionLimitMs) {
-    timerBtn.textContent = '⏱';
-    timerBtn.classList.remove('active', 'warning');
+    timerDisplay.classList.add('hidden');
     return;
   }
+  timerDisplay.classList.remove('hidden');
   const remaining = Math.max(0, sessionLimitMs - (Date.now() - sessionStartMs));
   const mins = Math.floor(remaining / 60000);
   const secs = Math.floor((remaining % 60000) / 1000);
-  timerBtn.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
-  timerBtn.classList.toggle('warning', remaining < 60000);
-  timerBtn.classList.toggle('active', remaining >= 60000);
+  timerDisplay.textContent = `⏱ ${mins}:${String(secs).padStart(2, '0')}`;
+  timerDisplay.classList.toggle('warning', remaining < 60000);
 }
 
 function openTimerPicker() {
@@ -496,16 +559,13 @@ function checkSessionTimer() {
     catSvg.classList.remove('running', 'jumping', 'flip', 'tumbling');
     catSvg.classList.add('oops');
     catEl.classList.remove('dancing');
+    settingsMenu.classList.add('hidden');
+    helpScreen.classList.add('hidden');
     timerPicker.classList.add('hidden');
     timesupScreen.classList.remove('hidden');
   }
-  updateTimerBtn();
+  updateTimerDisplay();
 }
-
-timerBtn.addEventListener('pointerdown', (e) => {
-  e.stopPropagation();
-  timerPickerOpen ? closeTimerPicker() : openTimerPicker();
-});
 
 timerPicker.querySelectorAll('.timer-opt').forEach(btn => {
   btn.addEventListener('pointerdown', (e) => {
@@ -518,7 +578,7 @@ timerPicker.querySelectorAll('.timer-opt').forEach(btn => {
       sessionLimitMs = mins * 60000;
       sessionStartMs = Date.now();
     }
-    updateTimerBtn();
+    updateTimerDisplay();
     closeTimerPicker();
   });
 });
@@ -1142,8 +1202,12 @@ function handleHit(ob, now) {
 }
 
 // ---------- input ----------
+function modalOpen() {
+  return sessionExpired || timerPickerOpen || settingsOpen || helpOpen;
+}
+
 function handleTap() {
-  if (sessionExpired || timerPickerOpen) return;
+  if (modalOpen()) return;
   ensureAudio();
   if (state === 'playing') spaceJump();
 }
@@ -1155,7 +1219,7 @@ document.addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'INPUT') return;
   // never let Backspace navigate the browser back during the game
   if (e.code === 'Backspace') { e.preventDefault(); return; }
-  if (sessionExpired || timerPickerOpen) return;
+  if (modalOpen()) return;
   if (e.repeat) return;
   ensureAudio();
   if (e.code === 'Space') {
@@ -1189,8 +1253,18 @@ function buildPicker() {
   lvGrid.querySelectorAll('.lv-cell').forEach(btn => {
     btn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
+      const row = parseInt(btn.dataset.row, 10);
+      const sp = parseInt(btn.dataset.speed, 10);
+      if (resetMode) {
+        // cycle this cell's stars: 3 -> 2 -> 1 -> 0 -> 3
+        const cur = bestStars(row, sp);
+        const next = cur === 0 ? 3 : cur - 1;
+        setStarsExact(row, sp, next);
+        btn.querySelector('.lv-stars').textContent = '★★★☆☆☆'.slice(3 - next, 6 - next);
+        return;
+      }
       ensureAudio();
-      startLevel(parseInt(btn.dataset.row, 10), parseInt(btn.dataset.speed, 10));
+      startLevel(row, sp);
     });
   });
 }
@@ -1556,7 +1630,7 @@ renderSettings();
 renderUserBar();
 updateTotalFish();
 updateSoundBtn();
-updateTimerBtn();
+updateTimerDisplay();
 catEl.style.bottom = GROUND_Y + 'px';
 catEl.classList.add('intro');
 catSvg.classList.add('running');
