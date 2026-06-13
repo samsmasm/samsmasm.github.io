@@ -993,7 +993,6 @@ function typeLetter(letter) {
 function markCleared() {
   clearedCount++;
   updateProgress();
-  if (clearedCount >= levelCount && !finishing) startFinish();
 }
 
 // a checkered finish line that rolls in once the last obstacle is cleared
@@ -1020,7 +1019,8 @@ function startFinish() {
   finishEl = document.createElement('div');
   finishEl.className = 'finish';
   finishEl.innerHTML = finishSvg();
-  finishX = catEl.offsetLeft + 720;
+  // enter from the right edge, one gap behind the last obstacle
+  finishX = container.clientWidth + 40;
   finishEl.style.transform = `translateX(${finishX}px)`;
   container.appendChild(finishEl);
 }
@@ -1445,11 +1445,12 @@ function frame(now) {
     hillsFront.style.transform = `translateX(${-((groundX * 0.4) % 800)}px)`;
     hillsBack.style.transform = `translateX(${-((groundX * 0.15) % 800)}px)`;
 
-    // spawn obstacles at constant pixel spacing, until the level's quota is met
+    // spawn obstacles at constant pixel spacing; the finish line follows one
+    // gap behind the last obstacle so it always arrives after it
     scrollSinceSpawn += speed * dt;
-    if (spawnedCount < levelCount && scrollSinceSpawn >= levelGap) {
-      spawnObstacle();
-      scrollSinceSpawn = 0;
+    if (scrollSinceSpawn >= levelGap) {
+      if (spawnedCount < levelCount) { spawnObstacle(); scrollSinceSpawn = 0; }
+      else if (!finishing) { startFinish(); scrollSinceSpawn = 0; }
     }
 
     // spawn fish
