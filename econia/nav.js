@@ -1,6 +1,10 @@
 const STAGES = [
   { slug: '',            label: 'Overview',            num: 1  },
-  { slug: 'article',    label: 'Article',              num: 2  },
+  { slug: 'article',    label: 'Article',              num: 2, children: [
+    { slug: 'article/micro',  label: 'Microeconomics', num: '2a' },
+    { slug: 'article/macro',  label: 'Macroeconomics', num: '2b' },
+    { slug: 'article/global', label: 'Global Economy', num: '2c' },
+  ]},
   { slug: 'plan',       label: 'Plan',                 num: 3  },
   { slug: 'structure',  label: 'Structure',            num: 4  },
   { slug: 'diagrams',   label: 'Diagrams & Analysis',  num: 5  },
@@ -10,10 +14,10 @@ const STAGES = [
   { slug: 'weaving',    label: 'Check Your Commentary', num: 9  },
   { slug: 'submit',     label: 'Submitting It',        num: 10 },
   { slug: 'example',    label: 'Example',              num: 'e'},
-
 ];
 
 function getCurrentSlug() {
+  if (typeof ECONIA_STAGE !== 'undefined') return ECONIA_STAGE;
   const path = window.location.pathname;
   // Match /econia/slug/ or /econia/slug
   const match = path.match(/\/econia\/([^/]+)\/?$/);
@@ -60,6 +64,26 @@ function renderNav() {
 
     a.innerHTML = `<span class="nav-num">${stage.num}</span><span class="nav-label">${stage.label}</span>`;
     li.appendChild(a);
+
+    if (stage.children && stage.children.length) {
+      const subUl = document.createElement('ul');
+      subUl.className = 'nav-sub';
+      stage.children.forEach(child => {
+        const childIsActive  = child.slug === current;
+        const childIsVisited = visited.includes(child.slug) && !childIsActive;
+
+        const childLi = document.createElement('li');
+        const childA  = document.createElement('a');
+        childA.href = base + child.slug + '/';
+        if (childIsActive)  childA.classList.add('active');
+        if (childIsVisited) childA.classList.add('visited');
+        childA.innerHTML = `<span class="nav-num">${child.num}</span><span class="nav-label">${child.label}</span>`;
+        childLi.appendChild(childA);
+        subUl.appendChild(childLi);
+      });
+      li.appendChild(subUl);
+    }
+
     ul.appendChild(li);
   });
 
