@@ -46,7 +46,8 @@ const GROUND_Y = 70;          // cat's resting bottom, px
 const GRAVITY = 0.4;          // gentle = long, easy-to-time hang time
 const JUMP_STRENGTH = 17;     // SPACE jump (clears any obstacle)
 const DOUBLE_JUMP_STRENGTH = 13; // second tap in the air = extra lift + flip
-const AUTO_HOP_STRENGTH = 13; // little leap over a smashed crater
+const LEAP_VX = 2.4;          // forward speed of a jump (px/frame, same at every level speed)
+const RETURN_EASE = 0.16;     // how fast the cat glides back to home after a leap
 const JUMP_BUDGET = 5;        // SPACE jumps allowed per level
 const TRACK_LENGTHS = [12, 20, 40]; // Standard / Long / Longer (obstacles per level)
 const LETTER_GAP = 560;       // px between single-letter obstacles
@@ -314,13 +315,16 @@ const ROWS = [
 let state = 'picker';         // 'picker' | 'playing' | 'over' | 'win'
 let level = null;             // { rowId, speedId, type, ... }
 let catY = GROUND_Y;
+let catX = 0;                 // forward offset from home (px) during a leap
 let velocity = 0;
+let leapVx = 0;               // current forward speed while airborne
+let returning = false;        // gliding back to home after landing a leap
 let airborne = false;
 let airJumps = 0;             // jumps used in the current airborne sequence (for double jump)
 let speed = 4;
 let worldTime = 0;            // keeps ticking, drives day/night
 let obstacles = [];
-let craters = [];
+let patches = [];             // rough dirt left where an obstacle was zapped
 let finishing = false;        // last obstacle cleared; finish line is rolling in
 let finishEl = null;
 let finishX = 0;
@@ -732,22 +736,54 @@ function spawnObstacle() {
   spawnedCount++;
 }
 
-// ---------- crater (left after a smash, the cat auto-hops it) ----------
-const CRATER_SVG = `<svg width="90" height="42" viewBox="0 0 90 42">
-  <ellipse cx="45" cy="26" rx="42" ry="15" fill="#3a2a1a" opacity="0.5"/>
-  <ellipse cx="45" cy="22" rx="35" ry="11" fill="#2a1d10"/>
-  <ellipse cx="45" cy="19" rx="26" ry="7" fill="#1d140b"/>
-  <path d="M7 24 q-4 -9 7 -8 M83 24 q4 -9 -7 -8" stroke="#c89564" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <circle cx="16" cy="11" r="3" fill="#d9a872"/><circle cx="74" cy="10" r="2.6" fill="#d9a872"/>
-</svg>`;
+// ---------- dirt patch (left where an obstacle was zapped; just scrolls by) ----------
+function patchSvg(w) {
+  const cx = w / 2;
+  return `<svg width="${w}" height="20" viewBox="0 0 ${w} 20">
+    <ellipse cx="${cx}" cy="13" rx="${cx - 2}" ry="6.5" fill="#b1814e"/>
+    <ellipse cx="${cx}" cy="11" rx="${cx - 9}" ry="4.5" fill="#9c6f40"/>
+    <circle cx="${cx - 14}" cy="9" r="2" fill="#85602f"/>
+    <circle cx="${cx + 10}" cy="12" r="1.8" fill="#85602f"/>
+    <circle cx="${cx + 2}" cy="8" r="1.6" fill="#c89564"/>
+    <circle cx="${cx - 4}" cy="13" r="1.5" fill="#c89564"/>
+  </svg>`;
+}
 
-function spawnCrater(x) {
+function spawnPatch(x, w) {
   const el = document.createElement('div');
-  el.className = 'crater';
-  el.innerHTML = CRATER_SVG;
+  el.className = 'patch';
+  el.innerHTML = patchSvg(w);
   el.style.transform = `translateX(${x}px)`;
   container.appendChild(el);
-  craters.push({ el, x, w: 90, hopped: false });
+  patches.push({ el, x, w });
+}
+
+// Ty flicks a paw and sparkly stars streak across to zap the obstacle
+function pawSwipe() {
+  catSvg.classList.remove('swiping');
+  void catSvg.offsetWidth;
+  catSvg.classList.add('swiping');
+  setTimeout(() => catSvg.classList.remove('swiping'), 260);
+}
+
+function zapStars(targetX, targetBottom) {
+  const startX = catEl.offsetLeft + 92;
+  for (let i = 0; i < 6; i++) {
+    const s = document.createElement('div');
+    s.className = 'zap-star';
+    const sb = 96 + (Math.random() * 30 - 15);
+    s.style.left = startX + 'px';
+    s.style.bottom = sb + 'px';
+    container.appendChild(s);
+    const dx = targetX - startX + (Math.random() * 26 - 13);
+    const dy = targetBottom - sb + (Math.random() * 20 - 10);
+    requestAnimationFrame(() => {
+      s.style.transitionDelay = (i * 0.022) + 's';
+      s.style.transform = `translate(${dx}px, ${-dy}px) scale(0.4) rotate(200deg)`;
+      s.style.opacity = '0';
+    });
+    setTimeout(() => s.remove(), 420 + i * 25);
+  }
 }
 
 // ---------- fish collectibles ----------
@@ -877,13 +913,18 @@ function confettiBurst() {
 function smashObstacle(ob) {
   const idx = obstacles.indexOf(ob);
   if (idx >= 0) obstacles.splice(idx, 1);
-  letterPop(ob.word, ob.x + ob.w / 2 - ob.word.length * 9, 120);
+  const cx = ob.x + ob.w / 2;
+  // Ty swipes a paw and fires sparkly stars across to the obstacle
+  pawSwipe();
+  zapStars(cx, 100);
+  letterPop(ob.word, cx - ob.word.length * 9, 120);
   puff(ob.x, 90);
   puff(ob.x + 24, 110);
-  ringAt(ob.x + ob.w / 2, 100);
+  ringAt(cx, 100);
   ob.el.classList.add('smashing');
   setTimeout(() => ob.el.remove(), 420);
-  spawnCrater(ob.x + ob.w / 2 - 45);
+  // leave a rough patch of unsettled dirt where it stood
+  spawnPatch(ob.x + ob.w / 2 - ob.w / 2, ob.w + 18);
   sfx.smash();
   sfx.ding();
   markCleared();
@@ -1005,13 +1046,15 @@ function spaceJump() {
     jumpUncredited = true;
     renderPaws();
     airborne = true;
+    returning = false;
     airJumps = 1;
     velocity = JUMP_STRENGTH;
+    leapVx = LEAP_VX;        // carry Ty forward a fixed distance, any level speed
     catSvg.classList.remove('running');
     catSvg.classList.add('jumping');
     sfx.jump();
   } else if (airJumps === 1) {
-    // a second tap in the air: free double jump with a somersault
+    // a second tap in the air: free double jump with a somersault (more distance)
     airJumps = 2;
     velocity = DOUBLE_JUMP_STRENGTH;
     catSvg.classList.add('flip');
@@ -1020,20 +1063,12 @@ function spaceJump() {
   }
 }
 
-function autoHop() {
-  if (airborne) return;
-  airborne = true;
-  airJumps = 1; // a double jump is still available after a hop
-  velocity = AUTO_HOP_STRENGTH;
-  catSvg.classList.remove('running');
-  catSvg.classList.add('jumping');
-  sfx.hop();
-}
-
 function land() {
   catY = GROUND_Y;
   airborne = false;
   airJumps = 0;
+  leapVx = 0;
+  returning = catX > 2;   // glide back to home if Ty leapt forward
   jumpUncredited = false; // jump arc ended; no fish means it stays counted
   velocity = 0;
   catSvg.classList.remove('jumping', 'flip');
@@ -1041,7 +1076,6 @@ function land() {
   catEl.classList.remove('landed');
   void catEl.offsetWidth;
   catEl.classList.add('landed');
-  catEl.style.transform = '';
 }
 
 // ---------- collision (forgiving hitboxes) ----------
@@ -1150,11 +1184,14 @@ function startLevel(rowId, speedId) {
   levelGap = row.type === 'letters' ? LETTER_GAP : WORD_GAP;
   // reset world
   obstacles.forEach(o => o.el.remove()); obstacles = [];
-  craters.forEach(c => c.el.remove()); craters = [];
+  patches.forEach(p => p.el.remove()); patches = [];
   clearFinish();
   items.forEach(it => it.el.remove()); items = [];
   catY = GROUND_Y;
+  catX = 0;
   velocity = 0;
+  leapVx = 0;
+  returning = false;
   airborne = false;
   airJumps = 0;
   spawnedCount = 0;
@@ -1201,6 +1238,8 @@ function winLevel() {
   // settle the cat on the ground and let it do a happy dance
   airborne = false;
   airJumps = 0;
+  returning = false;
+  catX = 0;
   velocity = 0;
   catY = GROUND_Y;
   catEl.style.bottom = GROUND_Y + 'px';
@@ -1234,11 +1273,14 @@ function winLevel() {
 function goToPicker() {
   state = 'picker';
   obstacles.forEach(o => o.el.remove()); obstacles = [];
-  craters.forEach(c => c.el.remove()); craters = [];
+  patches.forEach(p => p.el.remove()); patches = [];
   clearFinish();
   items.forEach(it => it.el.remove()); items = [];
   catY = GROUND_Y;
+  catX = 0;
   velocity = 0;
+  leapVx = 0;
+  returning = false;
   airborne = false;
   airJumps = 0;
   catEl.style.bottom = GROUND_Y + 'px';
@@ -1426,18 +1468,12 @@ function frame(now) {
       if (ob.x < -200) { ob.el.remove(); obstacles.splice(i, 1); }
     }
 
-    // move craters; auto-hop as each one reaches the cat
-    for (let i = craters.length - 1; i >= 0; i--) {
-      const cr = craters[i];
-      cr.x -= speed * dt;
-      cr.el.style.transform = `translateX(${cr.x}px)`;
-      const crCenter = cr.x + cr.w / 2;
-      const catCenter = catLeft + 55;
-      if (!cr.hopped && crCenter <= catCenter + 80 && crCenter >= catCenter - 20) {
-        cr.hopped = true;
-        autoHop();
-      }
-      if (cr.x < -200) { cr.el.remove(); craters.splice(i, 1); }
+    // scroll the dirt patches left and clean them up
+    for (let i = patches.length - 1; i >= 0; i--) {
+      const p = patches[i];
+      p.x -= speed * dt;
+      p.el.style.transform = `translateX(${p.x}px)`;
+      if (p.x < -200) { p.el.remove(); patches.splice(i, 1); }
     }
 
     // roll the finish line in; crossing it wins the level
@@ -1450,21 +1486,25 @@ function frame(now) {
       }
     }
 
-    // jump physics
+    // jump physics: arc up while leaping forward, then glide back to home
     if (airborne) {
       catY += velocity * dt;
       velocity -= GRAVITY * dt;
+      catX += leapVx * dt;
       if (catY <= GROUND_Y) {
         land();
-      } else {
-        catEl.style.bottom = catY + 'px';
-        if (now - lastSparkleAt > 80) { lastSparkleAt = now; sparkle(); }
-        catEl.style.transform = `rotate(${-velocity * 0.8}deg)`;
+      } else if (now - lastSparkleAt > 80) {
+        lastSparkleAt = now; sparkle();
       }
+    } else if (returning) {
+      catX += (0 - catX) * Math.min(RETURN_EASE * dt, 1);
+      if (catX < 2) { catX = 0; returning = false; }
     }
+    catEl.style.bottom = catY + 'px';
+    catEl.style.transform = `translateX(${catX}px)` + (airborne ? ` rotate(${-velocity * 0.8}deg)` : '');
 
-    // crash? (ignored briefly while recovering from a tumble)
-    if (now >= invulnUntil) {
+    // crash? (skipped mid-leap, during the glide back, and just after a tumble)
+    if (!airborne && !returning && now >= invulnUntil) {
       const hit = hitObstacle();
       if (hit) handleHit(hit, now);
     }
