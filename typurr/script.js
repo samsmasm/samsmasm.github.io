@@ -1158,9 +1158,11 @@ function land() {
   velocity = 0;
   catSvg.classList.remove('jumping', 'flip');
   catSvg.classList.add('running');
-  catEl.classList.remove('landed');
-  void catEl.offsetWidth;
-  catEl.classList.add('landed');
+  // squash on the inner svg, not #cat, so it doesn't override the leap's translateX
+  catSvg.classList.remove('landed');
+  void catSvg.offsetWidth;
+  catSvg.classList.add('landed');
+  setTimeout(() => catSvg.classList.remove('landed'), 200);
 }
 
 // ---------- collision (forgiving hitboxes) ----------
