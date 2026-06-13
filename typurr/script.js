@@ -759,30 +759,43 @@ function spawnPatch(x, w) {
 }
 
 // Ty flicks a paw and sparkly stars streak across to zap the obstacle
+const SWOOSH_SVG = `<svg width="58" height="66" viewBox="0 0 58 66">
+  <path d="M8 10 Q48 22 22 58" stroke="#ffffff" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <path d="M22 6 Q56 22 36 60" stroke="#ffe9a8" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>`;
+
 function pawSwipe() {
   catSvg.classList.remove('swiping');
   void catSvg.offsetWidth;
   catSvg.classList.add('swiping');
-  setTimeout(() => catSvg.classList.remove('swiping'), 260);
+  setTimeout(() => catSvg.classList.remove('swiping'), 340);
+  // a bold whoosh arc in front of Ty so the swipe reads clearly
+  const sw = document.createElement('div');
+  sw.className = 'swoosh';
+  sw.innerHTML = SWOOSH_SVG;
+  sw.style.left = (catEl.offsetLeft + 96) + 'px';
+  sw.style.bottom = '86px';
+  container.appendChild(sw);
+  setTimeout(() => sw.remove(), 400);
 }
 
 function zapStars(targetX, targetBottom) {
-  const startX = catEl.offsetLeft + 92;
-  for (let i = 0; i < 6; i++) {
+  const startX = catEl.offsetLeft + 96;
+  for (let i = 0; i < 9; i++) {
     const s = document.createElement('div');
     s.className = 'zap-star';
-    const sb = 96 + (Math.random() * 30 - 15);
+    const sb = 100 + (Math.random() * 36 - 18);
     s.style.left = startX + 'px';
     s.style.bottom = sb + 'px';
     container.appendChild(s);
-    const dx = targetX - startX + (Math.random() * 26 - 13);
-    const dy = targetBottom - sb + (Math.random() * 20 - 10);
+    const dx = targetX - startX + (Math.random() * 28 - 14);
+    const dy = targetBottom - sb + (Math.random() * 24 - 12);
     requestAnimationFrame(() => {
-      s.style.transitionDelay = (i * 0.022) + 's';
-      s.style.transform = `translate(${dx}px, ${-dy}px) scale(0.4) rotate(200deg)`;
+      s.style.transitionDelay = (i * 0.035) + 's';
+      s.style.transform = `translate(${dx}px, ${-dy}px) scale(0.7) rotate(220deg)`;
       s.style.opacity = '0';
     });
-    setTimeout(() => s.remove(), 420 + i * 25);
+    setTimeout(() => s.remove(), 1000 + i * 40);
   }
 }
 
