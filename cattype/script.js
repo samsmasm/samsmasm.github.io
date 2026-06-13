@@ -36,8 +36,7 @@ const GRAVITY = 0.5;          // floaty = forgiving for little fingers
 const JUMP_STRENGTH = 17;     // SPACE jump (clears any obstacle)
 const AUTO_HOP_STRENGTH = 13; // little leap over a smashed crater
 const JUMP_BUDGET = 5;        // SPACE jumps allowed per level
-const LETTER_COUNT = 16;      // obstacles to clear in a single-letter level
-const WORD_COUNT = 12;        // obstacles to clear in a word level
+const TRACK_LENGTHS = [12, 20, 40]; // Standard / Long / Longer (obstacles per level)
 const LETTER_GAP = 560;       // px between single-letter obstacles
 const WORD_GAP = 700;         // px between word obstacles (more reading room)
 const DAY_CYCLE = 90;         // seconds for a full day->night->day
@@ -109,6 +108,11 @@ const FEELING_FACES = {
     <circle cx="32" cy="46" r="3" fill="#3a2c20"/>
     <path d="M44 8 h8 l-8 8 h8" stroke="#5a6cc0" stroke-width="2.5" fill="none"/>
     <path d="M53 2 h5 l-5 5 h5" stroke="#5a6cc0" stroke-width="2" fill="none"/>`,
+  SCARED: `<path d="M16 22 q5 -4 11 -2 M48 22 q-5 -4 -11 -2" stroke="#3a2c20" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="23" cy="31" r="5" fill="#fff"/><circle cx="41" cy="31" r="5" fill="#fff"/>
+    <circle cx="23" cy="31" r="2.4" fill="#3a2c20"/><circle cx="41" cy="31" r="2.4" fill="#3a2c20"/>
+    <ellipse cx="32" cy="46" rx="5" ry="7" fill="#3a2c20"/>
+    <path d="M50 24 q5 2 4 8 q4 -4 0 -10Z" fill="#7fc8e8"/>`,
 };
 
 // a blank wooden signpost (the sight word itself rides on the badge above)
@@ -187,6 +191,28 @@ const WORD_THEMES = {
         <path d="M28 46 q5 3 10 0" stroke="#3a2c20" stroke-width="2.4" fill="none" stroke-linecap="round"/>
         <path d="M29 8 L33 14 M37 8 L33 14" stroke="#3a2c20" stroke-width="2.5" stroke-linecap="round"/>
         <circle cx="29" cy="7" r="2.5" fill="#3a2c20"/><circle cx="37" cy="7" r="2.5" fill="#3a2c20"/></svg>` },
+    { word: 'WOLF', w: 66, svg: `<svg width="66" height="66" viewBox="0 0 66 66">
+        <path d="M8 8 L22 26 L6 30 Z" fill="#8a93a0"/><path d="M58 8 L44 26 L60 30 Z" fill="#8a93a0"/>
+        <path d="M13 13 L21 24 L12 27 Z" fill="#5a626e"/><path d="M53 13 L45 24 L54 27 Z" fill="#5a626e"/>
+        <circle cx="33" cy="38" r="26" fill="#9aa3b0"/>
+        <path d="M33 38 L20 56 Q33 64 46 56 Z" fill="#9aa3b0"/>
+        <ellipse cx="33" cy="50" rx="12" ry="9" fill="#d3dae2"/>
+        <path d="M22 32 L31 36 M44 32 L35 36" stroke="#4a525e" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="26" cy="38" r="3.2" fill="#3a2c20"/><circle cx="40" cy="38" r="3.2" fill="#3a2c20"/>
+        <path d="M29 48 L37 48 L33 53 Z" fill="#3a2c20"/>
+        <path d="M33 53 q-5 4 -9 2 M33 53 q5 4 9 2" stroke="#4a525e" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+        <path d="M27 55 L30 60 L24 59 Z" fill="#fff"/><path d="M39 55 L42 59 L36 60 Z" fill="#fff"/></svg>` },
+    { word: 'TIGER', w: 68, svg: `<svg width="68" height="68" viewBox="0 0 68 68">
+        <circle cx="14" cy="16" r="9" fill="#e0883e"/><circle cx="54" cy="16" r="9" fill="#e0883e"/>
+        <circle cx="14" cy="16" r="4" fill="#7a4a18"/><circle cx="54" cy="16" r="4" fill="#7a4a18"/>
+        <circle cx="34" cy="38" r="27" fill="#f0953a"/>
+        <ellipse cx="34" cy="46" rx="16" ry="13" fill="#fde3c0"/>
+        <path d="M20 18 L24 30 M48 18 L44 30 M13 34 L22 36 M55 34 L46 36 M15 46 L24 46 M53 46 L44 46" stroke="#3a2c20" stroke-width="3" stroke-linecap="round"/>
+        <path d="M22 32 L31 36 M46 32 L37 36" stroke="#7a4a18" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="27" cy="38" r="3.2" fill="#3a2c20"/><circle cx="41" cy="38" r="3.2" fill="#3a2c20"/>
+        <path d="M31 46 L37 46 L34 50 Z" fill="#c4577a"/>
+        <path d="M34 50 q-5 4 -9 2 M34 50 q5 4 9 2" stroke="#7a4a18" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+        <path d="M29 52 L32 57 L26 56 Z" fill="#fff"/><path d="M39 52 L42 56 L36 57 Z" fill="#fff"/></svg>` },
   ] },
   shapes: { label: '🔺 Shapes', kind: 'word', items: [
     { word: 'CIRCLE', w: 62, svg: `<svg width="62" height="64" viewBox="0 0 62 64"><circle cx="31" cy="34" r="28" fill="#2f74d0"/></svg>` },
@@ -195,6 +221,7 @@ const WORD_THEMES = {
     { word: 'HEART', w: 64, svg: `<svg width="64" height="62" viewBox="0 0 64 64"><path d="M32 60 C 2 38 10 10 32 26 C 54 10 62 38 32 60 Z" fill="#ec6aa8"/></svg>` },
     { word: 'OVAL', w: 64, svg: `<svg width="64" height="56" viewBox="0 0 64 56"><ellipse cx="32" cy="30" rx="30" ry="22" fill="#36a64a"/></svg>` },
     { word: 'DIAMOND', w: 60, svg: `<svg width="60" height="68" viewBox="0 0 60 68"><polygon points="30,4 58,34 30,64 2,34" fill="#8a4bd0"/></svg>` },
+    { word: 'TRIANGLE', w: 64, svg: `<svg width="64" height="60" viewBox="0 0 64 60"><polygon points="32,4 60,56 4,56" fill="#f0851f"/></svg>` },
   ] },
   fruit: { label: '🍎 Fruit', kind: 'word', items: [
     { word: 'APPLE', w: 60, svg: `<svg width="60" height="66" viewBox="0 0 60 66"><path d="M30 18 C 16 6 2 20 10 40 C 14 58 26 64 30 64 C 34 64 46 58 50 40 C 58 20 44 6 30 18 Z" fill="#e23b2e"/><path d="M30 20 q1 -10 7 -13" stroke="#7a4a1a" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="40" cy="9" rx="7" ry="4" fill="#5da356" transform="rotate(-20 40 9)"/></svg>` },
@@ -203,6 +230,8 @@ const WORD_THEMES = {
     { word: 'GRAPE', w: 58, svg: `<svg width="58" height="68" viewBox="0 0 58 68"><g fill="#8a4bd0"><circle cx="29" cy="20" r="9"/><circle cx="18" cy="32" r="9"/><circle cx="40" cy="32" r="9"/><circle cx="29" cy="38" r="9"/><circle cx="22" cy="50" r="9"/><circle cx="36" cy="50" r="9"/><circle cx="29" cy="60" r="8"/></g><path d="M29 12 q2 -8 9 -9" stroke="#5a8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="40" cy="6" rx="7" ry="4" fill="#5da356"/></svg>` },
     { word: 'LEMON', w: 64, svg: `<svg width="64" height="52" viewBox="0 0 64 52"><ellipse cx="32" cy="28" rx="28" ry="20" fill="#f3c200"/><circle cx="6" cy="28" r="3" fill="#e0b000"/><circle cx="58" cy="28" r="3" fill="#e0b000"/></svg>` },
     { word: 'KIWI', w: 60, svg: `<svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="32" r="27" fill="#8a6a3a"/><circle cx="30" cy="32" r="22" fill="#9acb3c"/><circle cx="30" cy="32" r="7" fill="#f2f6ea"/><g fill="#3a2c20"><circle cx="30" cy="16" r="1.6"/><circle cx="42" cy="22" r="1.6"/><circle cx="46" cy="34" r="1.6"/><circle cx="40" cy="46" r="1.6"/><circle cx="30" cy="50" r="1.6"/><circle cx="20" cy="46" r="1.6"/><circle cx="14" cy="34" r="1.6"/><circle cx="18" cy="22" r="1.6"/></g></svg>` },
+    { word: 'BANANA', w: 64, svg: `<svg width="64" height="56" viewBox="0 0 64 56"><path d="M12 14 Q14 42 40 50 Q58 55 61 46 Q61 50 55 50 Q31 48 21 28 Q15 20 18 12 Z" fill="#f3c200" stroke="#d9b000" stroke-width="2"/><path d="M18 12 q-2 -7 3 -9" stroke="#7a6a1a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>` },
+    { word: 'CHERRY', w: 56, svg: `<svg width="56" height="64" viewBox="0 0 56 64"><path d="M28 8 Q20 28 16 42 M28 8 Q36 28 40 40" stroke="#5a8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M28 8 q5 -4 10 -3" stroke="#5a8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="16" cy="50" r="11" fill="#e23b2e"/><circle cx="40" cy="48" r="11" fill="#c41f1f"/><ellipse cx="12" cy="46" rx="3" ry="2" fill="#ff8a7a"/></svg>` },
   ] },
   vehicles: { label: '🚗 Vehicles', kind: 'word', items: [
     { word: 'CAR', w: 74, svg: `<svg width="74" height="50" viewBox="0 0 74 50"><path d="M6 38 L10 24 L24 24 L32 14 L52 14 L58 24 L68 26 L68 38 Z" fill="#e23b2e"/><rect x="26" y="17" width="10" height="8" fill="#bfe0f0"/><rect x="40" y="17" width="12" height="8" fill="#bfe0f0"/><circle cx="20" cy="40" r="8" fill="#333"/><circle cx="20" cy="40" r="3.5" fill="#bbb"/><circle cx="56" cy="40" r="8" fill="#333"/><circle cx="56" cy="40" r="3.5" fill="#bbb"/></svg>` },
@@ -220,6 +249,7 @@ const WORD_THEMES = {
     { word: 'WHALE', w: 70, svg: `<svg width="70" height="50" viewBox="0 0 70 50"><path d="M8 30 Q8 14 32 14 Q56 14 56 30 Q56 42 32 42 Q18 42 12 38 L4 44 Q8 36 8 30 Z" fill="#2f74d0"/><path d="M56 24 L68 16 L66 30 Z" fill="#2f74d0"/><circle cx="20" cy="26" r="2.4" fill="#fff"/><path d="M32 10 q-3 -6 0 -8 q3 6 6 4" stroke="#bfe0f0" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>` },
     { word: 'SHELL', w: 62, svg: `<svg width="62" height="58" viewBox="0 0 62 58"><path d="M31 54 L4 22 Q31 -2 58 22 Z" fill="#ff9ec4"/><path d="M31 54 L31 16 M31 54 L18 20 M31 54 L44 20 M31 54 L8 26 M31 54 L54 26" stroke="#e0648f" stroke-width="2.5" fill="none"/></svg>` },
     { word: 'OCTOPUS', w: 64, svg: `<svg width="64" height="62" viewBox="0 0 64 62"><path d="M32 6 Q54 6 54 30 L54 38 Q44 34 44 44 Q36 38 32 48 Q28 38 20 44 Q20 34 10 38 L10 30 Q10 6 32 6 Z" fill="#8a4bd0"/><circle cx="25" cy="26" r="3" fill="#fff"/><circle cx="25" cy="26" r="1.6" fill="#3a2c20"/><circle cx="39" cy="26" r="3" fill="#fff"/><circle cx="39" cy="26" r="1.6" fill="#3a2c20"/></svg>` },
+    { word: 'SHARK', w: 70, svg: `<svg width="70" height="50" viewBox="0 0 70 50"><path d="M6 30 Q14 16 40 18 L64 12 Q66 26 56 30 Q66 34 64 44 L40 38 Q14 42 6 30 Z" fill="#7f93a6"/><path d="M34 14 L40 2 L46 18 Z" fill="#6a7e90"/><circle cx="18" cy="26" r="2.6" fill="#3a2c20"/><path d="M10 32 L20 32 L14 38 Z" fill="#fff"/><path d="M22 34 L30 34 L26 40 Z" fill="#fff"/></svg>` },
   ] },
   numbers: { label: '🔢 Numbers', kind: 'word', items:
     ['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN']
@@ -243,6 +273,8 @@ const WORD_THEMES = {
     { word: 'DRUM', w: 64, svg: `<svg width="64" height="54" viewBox="0 0 64 54"><rect x="12" y="18" width="40" height="26" rx="3" fill="#e23b2e"/><ellipse cx="32" cy="18" rx="20" ry="7" fill="#f6e3cf"/><path d="M12 22 L52 40 M52 22 L12 40" stroke="#f3c200" stroke-width="2.5"/><path d="M40 16 L58 4 M44 18 L62 8" stroke="#a06a3a" stroke-width="3" stroke-linecap="round"/></svg>` },
     { word: 'DOLL', w: 48, svg: `<svg width="48" height="66" viewBox="0 0 48 66"><circle cx="24" cy="14" r="12" fill="#ffe0bd"/><path d="M12 12 a12 12 0 0 1 24 0 q-12 -6 -24 0Z" fill="#a05a2a"/><circle cx="20" cy="14" r="1.6" fill="#3a2c20"/><circle cx="28" cy="14" r="1.6" fill="#3a2c20"/><path d="M21 19 q3 2 6 0" stroke="#c4577a" stroke-width="1.6" fill="none"/><path d="M14 28 L34 28 L30 60 L18 60 Z" fill="#ec6aa8"/></svg>` },
     { word: 'BLOCKS', w: 60, svg: `<svg width="60" height="60" viewBox="0 0 60 60"><rect x="6" y="32" width="24" height="24" rx="3" fill="#e23b2e"/><rect x="32" y="32" width="24" height="24" rx="3" fill="#2f74d0"/><rect x="18" y="8" width="24" height="24" rx="3" fill="#36a64a"/><g fill="#fff" font-family="Fredoka,sans-serif" font-size="15" font-weight="700" text-anchor="middle"><text x="18" y="50">A</text><text x="44" y="50">B</text><text x="30" y="26">C</text></g></svg>` },
+    { word: 'TOP', w: 56, svg: `<svg width="56" height="64" viewBox="0 0 56 64"><rect x="25" y="4" width="6" height="12" rx="2" fill="#a06a3a"/><path d="M12 16 L44 16 L28 44 Z" fill="#e23b2e"/><path d="M12 16 L44 16 L37 28 L19 28 Z" fill="#f3c200"/><path d="M28 44 L28 58" stroke="#7a4a1a" stroke-width="3" stroke-linecap="round"/></svg>` },
+    { word: 'ROBOT', w: 56, svg: `<svg width="56" height="68" viewBox="0 0 56 68"><rect x="26" y="2" width="3" height="8" fill="#7a8694"/><circle cx="27" cy="2" r="3" fill="#e23b2e"/><rect x="14" y="9" width="28" height="22" rx="4" fill="#9aa9b8"/><circle cx="22" cy="19" r="3.5" fill="#3a2c20"/><circle cx="34" cy="19" r="3.5" fill="#3a2c20"/><path d="M22 26 h12" stroke="#3a2c20" stroke-width="2" stroke-linecap="round"/><rect x="10" y="33" width="36" height="26" rx="4" fill="#7f8c9b"/><rect x="20" y="39" width="16" height="10" rx="2" fill="#bfe0f0"/><rect x="2" y="35" width="8" height="16" rx="3" fill="#9aa9b8"/><rect x="46" y="35" width="8" height="16" rx="3" fill="#9aa9b8"/><rect x="16" y="59" width="9" height="9" fill="#5a626e"/><rect x="31" y="59" width="9" height="9" fill="#5a626e"/></svg>` },
   ] },
   minibeasts: { label: '🐛 Minibeasts', kind: 'word', items: [
     { word: 'ANT', w: 68, svg: `<svg width="68" height="44" viewBox="0 0 68 44"><g fill="#7a3a1a"><circle cx="50" cy="24" r="11"/><circle cx="34" cy="24" r="7"/><circle cx="16" cy="24" r="9"/></g><path d="M34 24 L24 36 M34 24 L44 38 M30 24 L20 38 M40 24 L48 38 M34 22 L26 12 M34 22 L44 12" stroke="#7a3a1a" stroke-width="2.5" stroke-linecap="round"/><path d="M12 18 L4 8 M16 16 L12 6" stroke="#7a3a1a" stroke-width="2" stroke-linecap="round"/><circle cx="13" cy="22" r="1.6" fill="#fff"/></svg>` },
@@ -250,6 +282,8 @@ const WORD_THEMES = {
     { word: 'WORM', w: 68, svg: `<svg width="68" height="40" viewBox="0 0 68 40"><path d="M6 30 Q16 14 26 30 Q36 46 46 30 Q54 18 60 26" stroke="#7fce63" stroke-width="11" fill="none" stroke-linecap="round"/><circle cx="60" cy="24" r="8" fill="#6cbf52"/><circle cx="62" cy="22" r="1.8" fill="#3a2c20"/><path d="M60 18 l-2 -6 M64 18 l2 -6" stroke="#3a8a30" stroke-width="2" stroke-linecap="round"/></svg>` },
     { word: 'SNAIL', w: 66, svg: `<svg width="66" height="50" viewBox="0 0 66 50"><path d="M6 42 Q6 30 20 30 L40 30" stroke="#d9a872" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="40" cy="28" r="18" fill="#e0883e"/><circle cx="40" cy="28" r="11" fill="none" stroke="#a05a2a" stroke-width="3"/><circle cx="40" cy="28" r="4" fill="none" stroke="#a05a2a" stroke-width="3"/><circle cx="10" cy="40" r="6" fill="#d9a872"/><path d="M8 36 L5 26 M13 36 L16 26" stroke="#d9a872" stroke-width="2.5" stroke-linecap="round"/><circle cx="5" cy="25" r="1.6" fill="#3a2c20"/><circle cx="16" cy="25" r="1.6" fill="#3a2c20"/></svg>` },
     { word: 'SPIDER', w: 66, svg: `<svg width="66" height="56" viewBox="0 0 66 56"><g stroke="#3a2c20" stroke-width="3" fill="none" stroke-linecap="round"><path d="M26 30 L8 20 M26 34 L6 32 M26 38 L8 46 M40 30 L58 20 M40 34 L60 32 M40 38 L58 46"/></g><ellipse cx="33" cy="34" rx="15" ry="13" fill="#3a2c20"/><circle cx="33" cy="20" r="8" fill="#3a2c20"/><circle cx="30" cy="19" r="2.4" fill="#fff"/><circle cx="36" cy="19" r="2.4" fill="#fff"/><circle cx="30" cy="19" r="1.1" fill="#3a2c20"/><circle cx="36" cy="19" r="1.1" fill="#3a2c20"/></svg>` },
+    { word: 'FLY', w: 62, svg: `<svg width="62" height="46" viewBox="0 0 62 46"><ellipse cx="18" cy="16" rx="15" ry="10" fill="#cfe0ee" opacity="0.85"/><ellipse cx="44" cy="16" rx="15" ry="10" fill="#cfe0ee" opacity="0.85"/><ellipse cx="31" cy="28" rx="14" ry="11" fill="#3a4250"/><circle cx="31" cy="15" r="8" fill="#4a5260"/><circle cx="28" cy="14" r="3" fill="#e23b2e"/><circle cx="34" cy="14" r="3" fill="#e23b2e"/><path d="M28 8 L25 2 M34 8 L37 2" stroke="#3a2c20" stroke-width="2" stroke-linecap="round"/></svg>` },
+    { word: 'BEETLE', w: 56, svg: `<svg width="56" height="50" viewBox="0 0 56 50"><circle cx="28" cy="14" r="8" fill="#3a5a2a"/><ellipse cx="28" cy="30" rx="18" ry="16" fill="#4a7a32"/><path d="M28 16 L28 46" stroke="#2a4a1a" stroke-width="2.5"/><path d="M10 24 L2 18 M10 32 L2 34 M46 24 L54 18 M46 32 L54 34 M14 42 L8 48 M42 42 L48 48" stroke="#2a4a1a" stroke-width="2.5" stroke-linecap="round"/><path d="M24 8 L20 2 M32 8 L36 2" stroke="#2a4a1a" stroke-width="2" stroke-linecap="round"/><circle cx="24" cy="13" r="1.6" fill="#fff"/><circle cx="32" cy="13" r="1.6" fill="#fff"/></svg>` },
   ] },
 };
 
@@ -277,7 +311,7 @@ let craters = [];
 let items = [];               // fish
 let spawnedCount = 0;
 let clearedCount = 0;
-let levelCount = LETTER_COUNT;
+let levelCount = 12;
 let levelGap = LETTER_GAP;
 let jumpsLeft = JUMP_BUDGET;
 let jumpsUsedThisLevel = 0;
@@ -292,6 +326,11 @@ let lastWord = '';
 
 let totalFish = parseInt(localStorage.getItem('cattype-fish') || '0', 10);
 let muted = localStorage.getItem('cattype-muted') === '1';
+// 'keep' = wrong letters ignored; 'accuracy' = a slip restarts the word
+let mistakeMode = localStorage.getItem('cattype-mistake') || 'keep';
+// obstacles per level: 12 / 20 / 40
+let trackLength = parseInt(localStorage.getItem('cattype-track') || '12', 10);
+if (!TRACK_LENGTHS.includes(trackLength)) trackLength = 12;
 
 // best stars per level cell, keyed "rowId-speedId"
 function bestStars(rowId, speedId) {
@@ -742,10 +781,25 @@ function frontObstacle() {
   return best;
 }
 
+function resetWord(ob) {
+  ob.typed = 0;
+  if (ob.spanEls) {
+    ob.spanEls.forEach((s, i) => {
+      s.classList.remove('done', 'next');
+      if (i === 0) s.classList.add('next');
+    });
+  }
+}
+
 function typeLetter(letter) {
   const ob = frontObstacle();
   if (!ob) return;
-  if (ob.word[ob.typed] !== letter) { flashWrong(ob); return; }
+  if (ob.word[ob.typed] !== letter) {
+    flashWrong(ob);
+    // accuracy mode: a slip mid-word sends you back to the start of that word
+    if (mistakeMode === 'accuracy' && ob.typed > 0) resetWord(ob);
+    return;
+  }
   ob.typed++;
   if (ob.spanEls) {
     ob.spanEls[ob.typed - 1].classList.remove('next');
@@ -889,7 +943,7 @@ function startLevel(rowId, speedId) {
     speed: SPEEDS[speedId].speed,
   };
   speed = level.speed;
-  levelCount = row.type === 'letters' ? LETTER_COUNT : WORD_COUNT;
+  levelCount = trackLength;
   levelGap = row.type === 'letters' ? LETTER_GAP : WORD_GAP;
   // reset world
   obstacles.forEach(o => o.el.remove()); obstacles = [];
@@ -912,6 +966,7 @@ function startLevel(rowId, speedId) {
   fishCountEl.textContent = '0';
   catEl.style.bottom = GROUND_Y + 'px';
   catEl.style.transform = '';
+  catEl.classList.remove('dancing');
   catSvg.classList.remove('oops', 'jumping');
   catSvg.classList.add('running');
   pickerScreen.classList.add('hidden');
@@ -934,8 +989,15 @@ function failLevel() {
 
 function winLevel() {
   state = 'win';
+  // settle the cat on the ground and let it do a happy dance
+  airborne = false;
+  velocity = 0;
+  catY = GROUND_Y;
+  catEl.style.bottom = GROUND_Y + 'px';
+  catEl.style.transform = '';
   catSvg.classList.remove('jumping');
   catSvg.classList.add('running');
+  catEl.classList.add('dancing');
   // star rating from jumps used
   let stars = 3;
   if (jumpsUsedThisLevel >= 4) stars = 1;
@@ -967,11 +1029,13 @@ function goToPicker() {
   airborne = false;
   catEl.style.bottom = GROUND_Y + 'px';
   catEl.style.transform = '';
+  catEl.classList.remove('dancing');
   catSvg.classList.remove('oops', 'jumping');
   catSvg.classList.add('running');
   overScreen.classList.add('hidden');
   winScreen.classList.add('hidden');
   buildPicker();
+  renderSettings();
   updateTotalFish();
   pickerScreen.classList.remove('hidden');
 }
@@ -991,6 +1055,30 @@ pickBtn.addEventListener('pointerdown', (e) => {
 function updateTotalFish() {
   totalFishStartEl.textContent = totalFish > 0 ? `You have caught ${totalFish} 🐟 so far!` : '';
 }
+
+// ---------- home-screen settings (mistake mode + track length) ----------
+function renderSettings() {
+  document.querySelectorAll('#settings-bar .set-opt').forEach(btn => {
+    const active = btn.dataset.set === 'mistake'
+      ? btn.dataset.val === mistakeMode
+      : parseInt(btn.dataset.val, 10) === trackLength;
+    btn.classList.toggle('selected', active);
+  });
+}
+
+document.querySelectorAll('#settings-bar .set-opt').forEach(btn => {
+  btn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    if (btn.dataset.set === 'mistake') {
+      mistakeMode = btn.dataset.val;
+      localStorage.setItem('cattype-mistake', mistakeMode);
+    } else {
+      trackLength = parseInt(btn.dataset.val, 10);
+      localStorage.setItem('cattype-track', String(trackLength));
+    }
+    renderSettings();
+  });
+});
 
 // ---------- main loop ----------
 function frame(now) {
@@ -1085,6 +1173,7 @@ titleEl.innerHTML = 'Cat Type!'.split('').map((ch, i) =>
 ).join('');
 
 buildPicker();
+renderSettings();
 updateTotalFish();
 updateSoundBtn();
 catEl.style.bottom = GROUND_Y + 'px';
