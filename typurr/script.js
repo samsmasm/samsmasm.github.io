@@ -12,6 +12,9 @@ const pawsEl = document.getElementById('paws');
 const pawsBadgeEl = document.getElementById('paws-badge');
 const soundBtn = document.getElementById('sound-btn');
 const homeBtn = document.getElementById('home-btn');
+const timerBtn = document.getElementById('timer-btn');
+const timerPicker = document.getElementById('timer-picker');
+const timesupScreen = document.getElementById('timesup-screen');
 const pickerScreen = document.getElementById('picker-screen');
 const lvGrid = document.getElementById('lv-grid');
 const overScreen = document.getElementById('over-screen');
@@ -376,6 +379,12 @@ let mistakeMode = localStorage.getItem('typurr-mistake') || 'keep';
 let trackLength = parseInt(localStorage.getItem('typurr-track') || '12', 10);
 if (!TRACK_LENGTHS.includes(trackLength)) trackLength = 12;
 
+// ---------- play timer (grown-up control, in-memory: refresh resets it) ----------
+let sessionLimitMs = 0;       // 0 = off
+let sessionStartMs = 0;       // wall-clock ms when the limit was set
+let sessionExpired = false;
+let timerPickerOpen = false;
+
 // best stars per level cell, keyed "rowId-speedId" (per player)
 function bestStars(rowId, speedId) {
   return parseInt(localStorage.getItem(ukey(`stars-${rowId}-${speedId}`)) || '0', 10);
@@ -440,6 +449,75 @@ soundBtn.addEventListener('pointerdown', (e) => {
 homeBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   goToPicker();
+});
+
+// ---------- play timer ----------
+function updateTimerBtn() {
+  if (!sessionLimitMs) {
+    timerBtn.textContent = '⏱';
+    timerBtn.classList.remove('active', 'warning');
+    return;
+  }
+  const remaining = Math.max(0, sessionLimitMs - (Date.now() - sessionStartMs));
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  timerBtn.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+  timerBtn.classList.toggle('warning', remaining < 60000);
+  timerBtn.classList.toggle('active', remaining >= 60000);
+}
+
+function openTimerPicker() {
+  if (sessionExpired) return;
+  timerPickerOpen = true;
+  timerPicker.classList.remove('hidden');
+  timerPicker.querySelectorAll('.timer-opt').forEach(btn => {
+    const mins = parseInt(btn.dataset.mins, 10);
+    btn.classList.toggle('selected', sessionLimitMs === mins * 60000);
+  });
+}
+
+function closeTimerPicker() {
+  timerPickerOpen = false;
+  timerPicker.classList.add('hidden');
+}
+
+function checkSessionTimer() {
+  if (sessionLimitMs && !sessionExpired && Date.now() - sessionStartMs >= sessionLimitMs) {
+    sessionExpired = true;
+    state = 'timesup';
+    catSvg.classList.remove('running', 'jumping', 'flip', 'tumbling');
+    catSvg.classList.add('oops');
+    catEl.classList.remove('dancing');
+    timerPicker.classList.add('hidden');
+    timesupScreen.classList.remove('hidden');
+  }
+  updateTimerBtn();
+}
+
+timerBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  timerPickerOpen ? closeTimerPicker() : openTimerPicker();
+});
+
+timerPicker.querySelectorAll('.timer-opt').forEach(btn => {
+  btn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    const mins = parseInt(btn.dataset.mins, 10);
+    if (mins === 0) {
+      sessionLimitMs = 0;
+      sessionStartMs = 0;
+    } else {
+      sessionLimitMs = mins * 60000;
+      sessionStartMs = Date.now();
+    }
+    updateTimerBtn();
+    closeTimerPicker();
+  });
+});
+
+// tap outside the card to dismiss the picker
+timerPicker.addEventListener('pointerdown', (e) => {
+  if (e.target === timerPicker) closeTimerPicker();
 });
 
 // ---------- day / night palette ----------
@@ -1006,6 +1084,7 @@ function handleHit(ob, now) {
 
 // ---------- input ----------
 function handleTap() {
+  if (sessionExpired || timerPickerOpen) return;
   ensureAudio();
   if (state === 'playing') spaceJump();
 }
@@ -1017,6 +1096,7 @@ document.addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'INPUT') return;
   // never let Backspace navigate the browser back during the game
   if (e.code === 'Backspace') { e.preventDefault(); return; }
+  if (sessionExpired || timerPickerOpen) return;
   if (e.repeat) return;
   ensureAudio();
   if (e.code === 'Space') {
@@ -1094,7 +1174,7 @@ function startLevel(rowId, speedId) {
   fishCountEl.textContent = '0';
   catEl.style.bottom = GROUND_Y + 'px';
   catEl.style.transform = '';
-  catEl.classList.remove('dancing');
+  catEl.classList.remove('dancing', 'intro');
   catSvg.classList.remove('oops', 'jumping');
   catSvg.classList.add('running');
   pickerScreen.classList.add('hidden');
@@ -1164,6 +1244,7 @@ function goToPicker() {
   catEl.style.bottom = GROUND_Y + 'px';
   catEl.style.transform = '';
   catEl.classList.remove('dancing');
+  catEl.classList.add('intro');
   catSvg.classList.remove('oops', 'jumping', 'flip');
   catSvg.classList.add('running');
   overScreen.classList.add('hidden');
@@ -1389,6 +1470,7 @@ function frame(now) {
     }
   }
 
+  checkSessionTimer();
   applySky();
   requestAnimationFrame(frame);
 }
@@ -1403,7 +1485,9 @@ renderSettings();
 renderUserBar();
 updateTotalFish();
 updateSoundBtn();
+updateTimerBtn();
 catEl.style.bottom = GROUND_Y + 'px';
+catEl.classList.add('intro');
 catSvg.classList.add('running');
 lastFrame = performance.now();
 requestAnimationFrame(frame);
