@@ -1,6 +1,6 @@
 // Cat Type — a friendly typing runner for small people.
-// Type the letter on each obstacle to SMASH it; the cat auto-hops the crater.
-// Out of letters? Press SPACE to jump (limited jumps per level).
+// Type the letter (or whole word) on each obstacle to SMASH it; the cat
+// auto-hops the crater. Out of letters? Press SPACE to jump (limited per level).
 
 const container = document.getElementById('game-container');
 const catEl = document.getElementById('cat');
@@ -36,8 +36,10 @@ const GRAVITY = 0.5;          // floaty = forgiving for little fingers
 const JUMP_STRENGTH = 17;     // SPACE jump (clears any obstacle)
 const AUTO_HOP_STRENGTH = 13; // little leap over a smashed crater
 const JUMP_BUDGET = 5;        // SPACE jumps allowed per level
-const OBSTACLE_COUNT = 16;    // obstacles to clear to finish a level
-const SPAWN_GAP = 560;        // px between obstacles (constant on-screen spacing)
+const LETTER_COUNT = 16;      // obstacles to clear in a single-letter level
+const WORD_COUNT = 12;        // obstacles to clear in a word level
+const LETTER_GAP = 560;       // px between single-letter obstacles
+const WORD_GAP = 700;         // px between word obstacles (more reading room)
 const DAY_CYCLE = 90;         // seconds for a full day->night->day
 
 // ---------- letter frequencies (English text %) ----------
@@ -47,24 +49,119 @@ const FREQ = {
   S: 6.3, T: 9.1, U: 2.8, V: 0.98, W: 2.4, X: 0.15, Y: 2.0, Z: 0.074,
 };
 
-// letter sets build up from the most common letters outward
-const LETTER_SETS = [
-  { label: 'E T A O',         letters: 'ETAO' },
-  { label: '+ I N',           letters: 'ETAOIN' },
-  { label: '+ S H R L',       letters: 'ETAOINSHRL' },
-  { label: '+ D C U M W F',   letters: 'ETAOINSHRLDCUMWF' },
-  { label: 'all 26',          letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+// colour words: the letters AND the obstacle balloon are shown in this colour
+const COLOURS = [
+  { word: 'RED',    col: '#e23b2e' },
+  { word: 'ORANGE', col: '#f0851f' },
+  { word: 'YELLOW', col: '#f3c200' },
+  { word: 'GREEN',  col: '#36a64a' },
+  { word: 'BLUE',   col: '#2f74d0' },
+  { word: 'PURPLE', col: '#8a4bd0' },
+  { word: 'PINK',   col: '#ec6aa8' },
+  { word: 'WHITE',  col: '#ffffff' },
+];
+
+// each picker row: single-letter sets build outward from the commonest letters,
+// then two word themes (colours, animals)
+const ROWS = [
+  { type: 'letters', label: 'E T A O',       letters: 'ETAO' },
+  { type: 'letters', label: '+ I N',         letters: 'ETAOIN' },
+  { type: 'letters', label: '+ S H R L',     letters: 'ETAOINSHRL' },
+  { type: 'letters', label: '+ D C U M W F', letters: 'ETAOINSHRLDCUMWF' },
+  { type: 'letters', label: 'all 26',        letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+  { type: 'colours', label: '🎨 Colours' },
+  { type: 'animals', label: '🦁 Animals' },
 ];
 
 const SPEEDS = [
-  { label: 'Slow',   icon: '🐢', speed: 3.2 },
-  { label: 'Medium', icon: '🐇', speed: 4.4 },
-  { label: 'Fast',   icon: '🚀', speed: 5.8 },
+  { label: 'Slow',      icon: '🐢', speed: 2.6 },
+  { label: 'Medium',    icon: '🐇', speed: 3.8 },
+  { label: 'Fast',      icon: '🐎', speed: 5.4 },
+  { label: 'Super',     icon: '🚀', speed: 7.6 },
+  { label: 'Lightning', icon: '⚡', speed: 11.0 },
 ];
+
+// ---------- fierce little animal obstacles ----------
+const ANIMALS = [
+  { word: 'LION', svg: `<svg width="72" height="70" viewBox="0 0 72 70">
+      <g fill="#cf8a3a"><circle cx="36" cy="38" r="31"/>
+      <circle cx="9" cy="30" r="8"/><circle cx="63" cy="30" r="8"/>
+      <circle cx="16" cy="13" r="8"/><circle cx="56" cy="13" r="8"/><circle cx="36" cy="7" r="8"/>
+      <circle cx="12" cy="50" r="8"/><circle cx="60" cy="50" r="8"/>
+      <circle cx="28" cy="65" r="7"/><circle cx="44" cy="65" r="7"/></g>
+      <circle cx="36" cy="40" r="21" fill="#f4cd84"/>
+      <path d="M22 32 L34 37 M50 32 L38 37" stroke="#7a4a18" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="29" cy="40" r="3.2" fill="#3a2c20"/><circle cx="43" cy="40" r="3.2" fill="#3a2c20"/>
+      <path d="M33 47 L39 47 L36 51 Z" fill="#7a4a18"/>
+      <path d="M36 51 q-5 4 -9 2 M36 51 q5 4 9 2" stroke="#7a4a18" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M30 53 L33 58 L27 57 Z" fill="#fff"/><path d="M42 53 L45 57 L39 58 Z" fill="#fff"/>
+    </svg>` },
+  { word: 'BEAR', svg: `<svg width="68" height="70" viewBox="0 0 68 70">
+      <circle cx="16" cy="16" r="11" fill="#8a6240"/><circle cx="52" cy="16" r="11" fill="#8a6240"/>
+      <circle cx="16" cy="16" r="5" fill="#b88a5e"/><circle cx="52" cy="16" r="5" fill="#b88a5e"/>
+      <circle cx="34" cy="40" r="27" fill="#9a6e48"/>
+      <path d="M22 32 L31 36 M46 32 L37 36" stroke="#5a3a1e" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="26" cy="39" r="3.2" fill="#3a2c20"/><circle cx="42" cy="39" r="3.2" fill="#3a2c20"/>
+      <ellipse cx="34" cy="48" rx="13" ry="10" fill="#e6cba6"/>
+      <ellipse cx="34" cy="45" rx="4" ry="3" fill="#3a2c20"/>
+      <path d="M34 48 q-5 5 -10 3 M34 48 q5 5 10 3" stroke="#5a3a1e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M28 51 L31 56 L25 55 Z" fill="#fff"/><path d="M40 51 L43 55 L37 56 Z" fill="#fff"/>
+    </svg>` },
+  { word: 'FOX', svg: `<svg width="66" height="68" viewBox="0 0 66 68">
+      <path d="M10 8 L26 26 L8 34 Z" fill="#e0712f"/><path d="M56 8 L40 26 L58 34 Z" fill="#e0712f"/>
+      <path d="M13 13 L23 24 L13 28 Z" fill="#3a2c20"/><path d="M53 13 L43 24 L53 28 Z" fill="#3a2c20"/>
+      <path d="M33 18 Q58 24 33 64 Q8 24 33 18 Z" fill="#e0712f"/>
+      <path d="M33 40 Q46 44 33 64 Q20 44 33 40 Z" fill="#f6e3cf"/>
+      <path d="M22 30 L31 34 M44 30 L35 34" stroke="#a04a14" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="26" cy="37" r="3.2" fill="#3a2c20"/><circle cx="40" cy="37" r="3.2" fill="#3a2c20"/>
+      <path d="M30 49 L36 49 L33 54 Z" fill="#3a2c20"/>
+      <path d="M33 54 q-4 4 -8 3 M33 54 q4 4 8 3" stroke="#a04a14" stroke-width="2.3" fill="none" stroke-linecap="round"/>
+    </svg>` },
+  { word: 'FROG', svg: `<svg width="70" height="62" viewBox="0 0 70 62">
+      <circle cx="17" cy="16" r="13" fill="#6cbf52"/><circle cx="53" cy="16" r="13" fill="#6cbf52"/>
+      <circle cx="17" cy="14" r="6" fill="#fff"/><circle cx="53" cy="14" r="6" fill="#fff"/>
+      <circle cx="18" cy="15" r="3.2" fill="#1f3a1a"/><circle cx="54" cy="15" r="3.2" fill="#1f3a1a"/>
+      <path d="M8 8 L18 13 M62 8 L52 13" stroke="#3f7a30" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M6 30 Q35 14 64 30 Q60 56 35 56 Q10 56 6 30 Z" fill="#7fce63"/>
+      <path d="M16 42 Q35 56 54 42" stroke="#3f7a30" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M22 43 L26 48 L18 48 Z" fill="#fff"/><path d="M48 43 L52 48 L44 48 Z" fill="#fff"/>
+    </svg>` },
+  { word: 'OWL', svg: `<svg width="64" height="70" viewBox="0 0 64 70">
+      <path d="M8 6 L20 20 L6 24 Z" fill="#7a5a8a"/><path d="M56 6 L44 20 L58 24 Z" fill="#7a5a8a"/>
+      <ellipse cx="32" cy="40" rx="26" ry="28" fill="#8a6aa0"/>
+      <ellipse cx="32" cy="42" rx="18" ry="22" fill="#b89ec8"/>
+      <circle cx="22" cy="34" r="11" fill="#fff"/><circle cx="42" cy="34" r="11" fill="#fff"/>
+      <circle cx="23" cy="35" r="5" fill="#3a2c20"/><circle cx="41" cy="35" r="5" fill="#3a2c20"/>
+      <path d="M14 22 L26 28 M50 22 L38 28" stroke="#4a3458" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M28 42 L36 42 L32 50 Z" fill="#f0a83a"/>
+      <path d="M16 56 q8 8 16 0 q8 8 16 0" stroke="#6a4a7a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </svg>` },
+  { word: 'BEE', svg: `<svg width="66" height="62" viewBox="0 0 66 62">
+      <ellipse cx="20" cy="20" rx="16" ry="13" fill="#dfe7f2" opacity="0.85"/>
+      <ellipse cx="46" cy="20" rx="16" ry="13" fill="#dfe7f2" opacity="0.85"/>
+      <ellipse cx="33" cy="40" rx="22" ry="19" fill="#f3c200"/>
+      <path d="M20 30 q13 8 26 0 M16 42 q17 9 34 0 M22 53 q11 5 22 0" stroke="#3a2c20" stroke-width="5" fill="none"/>
+      <path d="M24 33 L31 36 M42 33 L35 36" stroke="#3a2c20" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="27" cy="39" r="3" fill="#3a2c20"/><circle cx="39" cy="39" r="3" fill="#3a2c20"/>
+      <path d="M28 46 q5 3 10 0" stroke="#3a2c20" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M29 8 L33 14 M37 8 L33 14" stroke="#3a2c20" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="29" cy="7" r="2.5" fill="#3a2c20"/><circle cx="37" cy="7" r="2.5" fill="#3a2c20"/>
+    </svg>` },
+];
+
+// a coloured balloon for the colour level
+function balloonSvg(col) {
+  return `<svg width="58" height="74" viewBox="0 0 58 74">
+    <ellipse cx="29" cy="30" rx="25" ry="29" fill="${col}" stroke="rgba(0,0,0,0.16)" stroke-width="2"/>
+    <path d="M25 57 L33 57 L29 65 Z" fill="${col}"/>
+    <path d="M29 65 q-5 5 -2 9" stroke="#9a8a78" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <ellipse cx="20" cy="22" rx="6" ry="10" fill="rgba(255,255,255,0.5)"/>
+  </svg>`;
+}
 
 // ---------- state ----------
 let state = 'picker';         // 'picker' | 'playing' | 'over' | 'win'
-let level = null;             // { setId, speedId, letters, speed }
+let level = null;             // { rowId, speedId, type, ... }
 let catY = GROUND_Y;
 let velocity = 0;
 let airborne = false;
@@ -75,27 +172,29 @@ let craters = [];
 let items = [];               // fish
 let spawnedCount = 0;
 let clearedCount = 0;
+let levelCount = LETTER_COUNT;
+let levelGap = LETTER_GAP;
 let jumpsLeft = JUMP_BUDGET;
 let jumpsUsedThisLevel = 0;
 let fishThisRun = 0;
-let scrollSinceSpawn = SPAWN_GAP; // spawn the first obstacle promptly
+let scrollSinceSpawn = 0;
 let groundX = 0;
 let lastFrame = 0;
 let fishTimer = 0;
 let nextFishIn = 3;
 let lastSparkleAt = 0;
-let lastLetter = '';
+let lastWord = '';
 
 let totalFish = parseInt(localStorage.getItem('cattype-fish') || '0', 10);
 let muted = localStorage.getItem('cattype-muted') === '1';
 
-// best stars per level cell, keyed "setId-speedId"
-function bestStars(setId, speedId) {
-  return parseInt(localStorage.getItem(`cattype-stars-${setId}-${speedId}`) || '0', 10);
+// best stars per level cell, keyed "rowId-speedId"
+function bestStars(rowId, speedId) {
+  return parseInt(localStorage.getItem(`cattype-stars-${rowId}-${speedId}`) || '0', 10);
 }
-function saveStars(setId, speedId, stars) {
-  if (stars > bestStars(setId, speedId)) {
-    localStorage.setItem(`cattype-stars-${setId}-${speedId}`, String(stars));
+function saveStars(rowId, speedId, stars) {
+  if (stars > bestStars(rowId, speedId)) {
+    localStorage.setItem(`cattype-stars-${rowId}-${speedId}`, String(stars));
   }
 }
 
@@ -127,6 +226,7 @@ function tone(freqFrom, freqTo, duration, type, volume, when = 0) {
 const sfx = {
   jump: () => tone(280, 560, 0.18, 'triangle', 0.25),
   hop: () => tone(360, 620, 0.14, 'triangle', 0.2),
+  tick: () => tone(660, 880, 0.06, 'sine', 0.16),       // correct letter within a word
   ding: () => { tone(880, 880, 0.09, 'sine', 0.22); tone(1320, 1320, 0.16, 'sine', 0.2, 0.07); },
   nope: () => tone(200, 150, 0.16, 'sawtooth', 0.16),
   smash: () => { tone(300, 60, 0.2, 'square', 0.2); tone(150, 40, 0.25, 'sawtooth', 0.15, 0.02); },
@@ -220,20 +320,18 @@ for (let i = 0; i < 36; i++) {
   starsLayer.appendChild(star);
 }
 
-// ---------- obstacle art (cosmetic; varies with the sky) ----------
+// ---------- single-letter obstacle art (cosmetic; varies with the sky) ----------
 const OBSTACLE_TYPES = [
-  { phases: ['day', 'gold', 'sunset', 'dawn'], w: 64, h: 86,
+  { phases: ['day', 'gold', 'sunset', 'dawn'], w: 64,
     svg: `<svg width="64" height="86" viewBox="0 0 64 86">
       <ellipse cx="32" cy="40" rx="15" ry="26" fill="#69b35e"/>
       <path d="M17 36 q-12 -2 -10 -14" stroke="#69b35e" stroke-width="10" fill="none" stroke-linecap="round"/>
       <path d="M47 30 q12 -3 11 -16" stroke="#69b35e" stroke-width="10" fill="none" stroke-linecap="round"/>
-      <circle cx="27" cy="34" r="2" fill="#4e8c46"/><circle cx="37" cy="44" r="2" fill="#4e8c46"/>
-      <circle cx="30" cy="50" r="2" fill="#4e8c46"/>
       <circle cx="32" cy="14" r="7" fill="#ff8fab"/><circle cx="32" cy="14" r="3" fill="#fff3b0"/>
       <path d="M14 62 L50 62 L46 84 L18 84 Z" fill="#d9714e"/>
       <rect x="11" y="58" width="42" height="9" rx="4.5" fill="#c4593a"/>
     </svg>` },
-  { phases: ['day', 'gold', 'dawn'], w: 62, h: 58,
+  { phases: ['day', 'gold', 'dawn'], w: 62,
     svg: `<svg width="62" height="58" viewBox="0 0 62 58">
       <rect x="22" y="28" width="18" height="28" rx="8" fill="#fdf3e3"/>
       <path d="M3 30 Q31 -14 59 30 Q31 40 3 30 Z" fill="#e0573f"/>
@@ -241,17 +339,15 @@ const OBSTACLE_TYPES = [
       <circle cx="38" cy="11" r="3.6" fill="#fdf3e3"/>
       <circle cx="46" cy="22" r="3.2" fill="#fdf3e3"/>
     </svg>` },
-  { phases: ['day', 'gold', 'sunset', 'dawn'], w: 80, h: 48,
+  { phases: ['day', 'gold', 'sunset', 'dawn'], w: 80,
     svg: `<svg width="80" height="48" viewBox="0 0 80 48">
       <ellipse cx="24" cy="32" rx="22" ry="16" fill="#5da356"/>
       <ellipse cx="54" cy="30" rx="24" ry="18" fill="#6db463"/>
       <ellipse cx="40" cy="22" rx="18" ry="14" fill="#7cc46f"/>
-      <circle cx="30" cy="24" r="4" fill="#e0573f"/>
-      <circle cx="50" cy="20" r="4" fill="#e0573f"/>
-      <circle cx="42" cy="34" r="4" fill="#e0573f"/>
-      <circle cx="60" cy="32" r="4" fill="#e0573f"/>
+      <circle cx="30" cy="24" r="4" fill="#e0573f"/><circle cx="50" cy="20" r="4" fill="#e0573f"/>
+      <circle cx="42" cy="34" r="4" fill="#e0573f"/><circle cx="60" cy="32" r="4" fill="#e0573f"/>
     </svg>` },
-  { phases: ['day', 'gold', 'dawn', 'night'], w: 66, h: 54,
+  { phases: ['day', 'gold', 'dawn', 'night'], w: 66,
     svg: `<svg width="66" height="54" viewBox="0 0 66 54">
       <rect x="6" y="6" width="10" height="48" rx="5" fill="#c89564"/>
       <rect x="28" y="2" width="10" height="52" rx="5" fill="#b9854f"/>
@@ -259,14 +355,14 @@ const OBSTACLE_TYPES = [
       <rect x="0" y="14" width="66" height="8" rx="4" fill="#d9a872"/>
       <rect x="0" y="34" width="66" height="8" rx="4" fill="#d9a872"/>
     </svg>` },
-  { phases: ['day', 'dawn'], w: 70, h: 64,
+  { phases: ['day', 'dawn'], w: 70,
     svg: `<svg width="70" height="64" viewBox="0 0 70 64">
       <path d="M16 64 Q14 40 18 24 M35 64 Q35 36 33 14 M54 64 Q56 42 52 28" stroke="#6db463" stroke-width="5" fill="none" stroke-linecap="round"/>
       <g><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(-7,0)"/><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(7,0)"/><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(0,-7)"/><circle cx="18" cy="18" r="6" fill="#fff" transform="translate(0,7)"/><circle cx="18" cy="18" r="5.5" fill="#ffd166"/></g>
       <g><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(-7,0)"/><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(7,0)"/><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(0,-7)"/><circle cx="33" cy="9" r="6" fill="#ff9ec4" transform="translate(0,7)"/><circle cx="33" cy="9" r="5.5" fill="#fff3b0"/></g>
       <g><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(-7,0)"/><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(7,0)"/><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(0,-7)"/><circle cx="52" cy="22" r="6" fill="#ffd166" transform="translate(0,7)"/><circle cx="52" cy="22" r="5.5" fill="#e0573f"/></g>
     </svg>` },
-  { phases: ['gold', 'sunset'], w: 84, h: 78,
+  { phases: ['gold', 'sunset'], w: 84,
     svg: `<svg width="84" height="78" viewBox="0 0 62 58">
       <rect x="22" y="28" width="18" height="28" rx="8" fill="#fdf3e3"/>
       <path d="M3 30 Q31 -14 59 30 Q31 40 3 30 Z" fill="#c4538a"/>
@@ -274,7 +370,7 @@ const OBSTACLE_TYPES = [
       <circle cx="38" cy="11" r="3.6" fill="#fdf3e3"/>
       <circle cx="46" cy="22" r="3.2" fill="#fdf3e3"/>
     </svg>` },
-  { phases: ['night'], w: 78, h: 56,
+  { phases: ['night'], w: 78,
     svg: `<svg width="78" height="56" viewBox="0 0 78 56">
       <ellipse cx="39" cy="40" rx="36" ry="16" fill="#26403a"/>
       <ellipse cx="39" cy="28" rx="26" ry="16" fill="#33524a"/>
@@ -283,7 +379,7 @@ const OBSTACLE_TYPES = [
       <circle class="ff ff3" cx="60" cy="32" r="4" fill="#ffe97a"/>
       <circle class="ff ff4" cx="34" cy="34" r="3" fill="#fff3a8"/>
     </svg>` },
-  { phases: ['night'], w: 62, h: 58,
+  { phases: ['night'], w: 62,
     svg: `<svg width="62" height="58" viewBox="0 0 62 58">
       <rect x="22" y="28" width="18" height="28" rx="8" fill="#cfe8e0"/>
       <path d="M3 30 Q31 -14 59 30 Q31 40 3 30 Z" fill="#4ec9b0"/>
@@ -306,29 +402,69 @@ function pickLetter() {
   const set = level.letters;
   let total = 0;
   for (const ch of set) total += FREQ[ch];
-  let letter;
-  // avoid repeating the previous letter when the set is big enough to allow it
-  do {
-    let r = Math.random() * total;
-    letter = set[set.length - 1];
-    for (const ch of set) { r -= FREQ[ch]; if (r <= 0) { letter = ch; break; } }
-  } while (letter === lastLetter && set.length > 1 && Math.random() < 0.8);
-  lastLetter = letter;
+  let r = Math.random() * total;
+  let letter = set[set.length - 1];
+  for (const ch of set) { r -= FREQ[ch]; if (r <= 0) { letter = ch; break; } }
   return letter;
 }
 
+// pick the next obstacle's word + art, depending on the level type
+function pickObstacle() {
+  if (level.type === 'letters') {
+    const phase = phaseNow();
+    const pool = OBSTACLE_TYPES.filter(t => t.phases.includes(phase));
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    return { word: pickLetter(), svg: type.svg, w: type.w, theme: 'letter' };
+  }
+  if (level.type === 'colours') {
+    let c;
+    do { c = COLOURS[Math.floor(Math.random() * COLOURS.length)]; }
+    while (c.word === lastWord && COLOURS.length > 1);
+    lastWord = c.word;
+    return { word: c.word, svg: balloonSvg(c.col), w: 58, theme: 'colour', col: c.col };
+  }
+  // animals
+  let a;
+  do { a = ANIMALS[Math.floor(Math.random() * ANIMALS.length)]; }
+  while (a.word === lastWord && ANIMALS.length > 1);
+  lastWord = a.word;
+  return { word: a.word, svg: a.svg, w: 68, theme: 'animal' };
+}
+
+// build the floating badge: a single circle for letters, spans for words
+function buildBadge(spec) {
+  if (spec.word.length === 1) {
+    const el = document.createElement('div');
+    el.className = 'ob-letter';
+    el.textContent = spec.word;
+    return { badgeEl: el, spanEls: null };
+  }
+  const el = document.createElement('div');
+  el.className = 'ob-word theme-' + spec.theme;
+  const spanEls = [];
+  for (const ch of spec.word) {
+    const s = document.createElement('span');
+    s.className = 'wl';
+    s.textContent = ch;
+    if (spec.theme === 'colour') s.style.color = spec.col;
+    el.appendChild(s);
+    spanEls.push(s);
+  }
+  spanEls[0].classList.add('next');
+  return { badgeEl: el, spanEls };
+}
+
 function spawnObstacle() {
-  const phase = phaseNow();
-  const pool = OBSTACLE_TYPES.filter(t => t.phases.includes(phase));
-  const type = pool[Math.floor(Math.random() * pool.length)];
-  const letter = pickLetter();
+  const spec = pickObstacle();
   const el = document.createElement('div');
   el.className = 'obstacle';
-  el.innerHTML = type.svg + `<div class="ob-letter">${letter}</div>`;
+  el.innerHTML = spec.svg;
+  const { badgeEl, spanEls } = buildBadge(spec);
+  el.appendChild(badgeEl);
   const x = container.clientWidth + 40;
   el.style.transform = `translateX(${x}px)`;
   container.appendChild(el);
-  obstacles.push({ el, x, w: type.w, letter, letterEl: el.querySelector('.ob-letter'), cleared: false });
+  obstacles.push({ el, x, w: spec.w, word: spec.word, typed: 0, badgeEl, spanEls, cleared: false });
   spawnedCount++;
 }
 
@@ -441,10 +577,10 @@ function sparkle() {
   setTimeout(() => s.remove(), 750);
 }
 
-function letterPop(letter, x, bottomY) {
+function letterPop(text, x, bottomY) {
   const s = document.createElement('div');
   s.className = 'letter-pop';
-  s.textContent = letter;
+  s.textContent = text;
   s.style.left = x + 'px';
   s.style.bottom = bottomY + 'px';
   container.appendChild(s);
@@ -469,8 +605,7 @@ function confettiBurst() {
 function smashObstacle(ob) {
   const idx = obstacles.indexOf(ob);
   if (idx >= 0) obstacles.splice(idx, 1);
-  const bottomPx = 74 + ob.w / 2;
-  letterPop(ob.letter, ob.x + ob.w / 2 - 18, 120);
+  letterPop(ob.word, ob.x + ob.w / 2 - ob.word.length * 9, 120);
   puff(ob.x, 90);
   puff(ob.x + 24, 110);
   ringAt(ob.x + ob.w / 2, 100);
@@ -483,10 +618,10 @@ function smashObstacle(ob) {
 }
 
 function flashWrong(ob) {
-  ob.letterEl.classList.remove('wrong');
-  void ob.letterEl.offsetWidth;
-  ob.letterEl.classList.add('wrong');
-  setTimeout(() => ob.letterEl.classList.remove('wrong'), 400);
+  ob.badgeEl.classList.remove('wrong');
+  void ob.badgeEl.offsetWidth;
+  ob.badgeEl.classList.add('wrong');
+  setTimeout(() => ob.badgeEl.classList.remove('wrong'), 400);
   sfx.nope();
 }
 
@@ -503,18 +638,25 @@ function frontObstacle() {
 function typeLetter(letter) {
   const ob = frontObstacle();
   if (!ob) return;
-  if (ob.letter === letter) smashObstacle(ob);
-  else flashWrong(ob);
+  if (ob.word[ob.typed] !== letter) { flashWrong(ob); return; }
+  ob.typed++;
+  if (ob.spanEls) {
+    ob.spanEls[ob.typed - 1].classList.remove('next');
+    ob.spanEls[ob.typed - 1].classList.add('done');
+    if (ob.spanEls[ob.typed]) ob.spanEls[ob.typed].classList.add('next');
+  }
+  if (ob.typed >= ob.word.length) smashObstacle(ob);
+  else sfx.tick();
 }
 
 function markCleared() {
   clearedCount++;
   updateProgress();
-  if (clearedCount >= OBSTACLE_COUNT) winLevel();
+  if (clearedCount >= levelCount) winLevel();
 }
 
 function updateProgress() {
-  progressEl.textContent = `${clearedCount}/${OBSTACLE_COUNT}`;
+  progressEl.textContent = `${clearedCount}/${levelCount}`;
 }
 
 function renderPaws() {
@@ -607,12 +749,13 @@ function buildPicker() {
   let html = '<div class="lv-head"><div class="lv-corner"></div>';
   for (const sp of SPEEDS) html += `<div class="lv-col">${sp.icon}<span>${sp.label}</span></div>`;
   html += '</div>';
-  LETTER_SETS.forEach((set, si) => {
-    html += `<div class="lv-row-wrap"><div class="lv-rowlabel">${set.label}</div>`;
+  ROWS.forEach((row, ri) => {
+    const wordRow = row.type !== 'letters';
+    html += `<div class="lv-row-wrap${wordRow ? ' word-row' : ''}"><div class="lv-rowlabel">${row.label}</div>`;
     SPEEDS.forEach((sp, pi) => {
-      const stars = bestStars(si, pi);
+      const stars = bestStars(ri, pi);
       const dots = '★★★☆☆☆'.slice(3 - stars, 6 - stars);
-      html += `<button class="lv-cell" data-set="${si}" data-speed="${pi}">
+      html += `<button class="lv-cell" data-row="${ri}" data-speed="${pi}">
         <span class="lv-stars">${dots}</span></button>`;
     });
     html += '</div>';
@@ -622,18 +765,22 @@ function buildPicker() {
     btn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       ensureAudio();
-      startLevel(parseInt(btn.dataset.set, 10), parseInt(btn.dataset.speed, 10));
+      startLevel(parseInt(btn.dataset.row, 10), parseInt(btn.dataset.speed, 10));
     });
   });
 }
 
-function startLevel(setId, speedId) {
+function startLevel(rowId, speedId) {
+  const row = ROWS[rowId];
   level = {
-    setId, speedId,
-    letters: LETTER_SETS[setId].letters,
+    rowId, speedId,
+    type: row.type,
+    letters: row.letters,
     speed: SPEEDS[speedId].speed,
   };
   speed = level.speed;
+  levelCount = row.type === 'letters' ? LETTER_COUNT : WORD_COUNT;
+  levelGap = row.type === 'letters' ? LETTER_GAP : WORD_GAP;
   // reset world
   obstacles.forEach(o => o.el.remove()); obstacles = [];
   craters.forEach(c => c.el.remove()); craters = [];
@@ -646,10 +793,10 @@ function startLevel(setId, speedId) {
   jumpsLeft = JUMP_BUDGET;
   jumpsUsedThisLevel = 0;
   fishThisRun = 0;
-  scrollSinceSpawn = SPAWN_GAP;
+  scrollSinceSpawn = levelGap; // spawn the first obstacle promptly
   fishTimer = 0;
   nextFishIn = 3 + Math.random() * 2;
-  lastLetter = '';
+  lastWord = '';
   updateProgress();
   renderPaws();
   fishCountEl.textContent = '0';
@@ -670,7 +817,7 @@ function failLevel() {
   sfx.bump();
   totalFish += fishThisRun;
   localStorage.setItem('cattype-fish', String(totalFish));
-  overProgressEl.textContent = `You smashed ${clearedCount} of ${OBSTACLE_COUNT}!`;
+  overProgressEl.textContent = `You smashed ${clearedCount} of ${levelCount}!`;
   overFishEl.textContent = fishThisRun > 0 ? `🐟 × ${fishThisRun}` : '';
   overScreen.classList.remove('hidden');
 }
@@ -683,8 +830,8 @@ function winLevel() {
   let stars = 3;
   if (jumpsUsedThisLevel >= 4) stars = 1;
   else if (jumpsUsedThisLevel >= 2) stars = 2;
-  const prevBest = bestStars(level.setId, level.speedId);
-  saveStars(level.setId, level.speedId, stars);
+  const prevBest = bestStars(level.rowId, level.speedId);
+  saveStars(level.rowId, level.speedId, stars);
   totalFish += fishThisRun;
   localStorage.setItem('cattype-fish', String(totalFish));
 
@@ -720,11 +867,11 @@ function goToPicker() {
 }
 
 overScreen.addEventListener('pointerdown', () => {
-  if (state === 'over' && level) startLevel(level.setId, level.speedId);
+  if (state === 'over' && level) startLevel(level.rowId, level.speedId);
 });
 againBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
-  startLevel(level.setId, level.speedId);
+  startLevel(level.rowId, level.speedId);
 });
 pickBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
@@ -752,7 +899,7 @@ function frame(now) {
 
     // spawn obstacles at constant pixel spacing, until the level's quota is met
     scrollSinceSpawn += speed * dt;
-    if (spawnedCount < OBSTACLE_COUNT && scrollSinceSpawn >= SPAWN_GAP) {
+    if (spawnedCount < levelCount && scrollSinceSpawn >= levelGap) {
       spawnObstacle();
       scrollSinceSpawn = 0;
     }
@@ -783,7 +930,7 @@ function frame(now) {
         ob.cleared = true;
         markCleared();
       }
-      if (ob.x < -160) { ob.el.remove(); obstacles.splice(i, 1); }
+      if (ob.x < -200) { ob.el.remove(); obstacles.splice(i, 1); }
     }
 
     // move craters; auto-hop as each one reaches the cat
@@ -797,7 +944,7 @@ function frame(now) {
         cr.hopped = true;
         autoHop();
       }
-      if (cr.x < -160) { cr.el.remove(); craters.splice(i, 1); }
+      if (cr.x < -200) { cr.el.remove(); craters.splice(i, 1); }
     }
 
     // jump physics
