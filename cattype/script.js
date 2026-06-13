@@ -327,7 +327,10 @@ let clearedCount = 0;
 let levelCount = 12;
 let levelGap = LETTER_GAP;
 let jumpsLeft = JUMP_BUDGET;
-let jumpsUsedThisLevel = 0;
+let wastedJumps = 0;          // SPACE jumps that did NOT catch a fish (drives 2-star)
+let jumpUncredited = false;   // current jump counted as wasted, not yet refunded by a fish
+let tumbled = false;          // hit an obstacle at least once this level (drives 1-star)
+let invulnUntil = 0;          // ms timestamp: no collisions while recovering from a tumble
 let fishThisRun = 0;
 let scrollSinceSpawn = 0;
 let groundX = 0;
@@ -402,6 +405,7 @@ const sfx = {
   nope: () => tone(200, 150, 0.16, 'sawtooth', 0.16),
   smash: () => { tone(300, 60, 0.2, 'square', 0.2); tone(150, 40, 0.25, 'sawtooth', 0.15, 0.02); },
   bump: () => tone(170, 55, 0.35, 'sawtooth', 0.22),
+  tumble: () => { tone(440, 150, 0.22, 'square', 0.18); tone(240, 90, 0.3, 'sawtooth', 0.14, 0.05); },
   bloop: () => { tone(520, 880, 0.12, 'sine', 0.22); tone(780, 1240, 0.14, 'sine', 0.18, 0.08); },
   poff: () => tone(260, 150, 0.16, 'sine', 0.2),
   fanfare: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.22, i * 0.13)); },
@@ -713,6 +717,8 @@ function collectFish(it) {
   // a fish gives back a jump: leaping to catch one costs nothing on balance
   jumpsLeft++;
   renderPaws();
+  // if this fish was caught during a counted jump, that jump no longer counts
+  if (jumpUncredited) { wastedJumps = Math.max(0, wastedJumps - 1); jumpUncredited = false; }
   pawsBadgeEl.classList.remove('bump');
   void pawsBadgeEl.offsetWidth;
   pawsBadgeEl.classList.add('bump');
@@ -902,7 +908,8 @@ function spaceJump() {
       return;
     }
     jumpsLeft--;
-    jumpsUsedThisLevel++;
+    wastedJumps++;          // counts against stars unless a fish is caught this jump
+    jumpUncredited = true;
     renderPaws();
     airborne = true;
     airJumps = 1;
@@ -934,6 +941,7 @@ function land() {
   catY = GROUND_Y;
   airborne = false;
   airJumps = 0;
+  jumpUncredited = false; // jump arc ended; no fish means it stays counted
   velocity = 0;
   catSvg.classList.remove('jumping', 'flip');
   catSvg.classList.add('running');
@@ -956,6 +964,29 @@ function hitObstacle() {
     }
   }
   return null;
+}
+
+// hitting an obstacle: tumble over it (costs 3 jumps) if you can afford it,
+// otherwise the run ends
+function handleHit(ob, now) {
+  if (jumpsLeft >= 3) {
+    jumpsLeft -= 3;
+    renderPaws();
+    tumbled = true;
+    invulnUntil = now + 1000;
+    // the obstacle is knocked aside but still counts as cleared
+    const idx = obstacles.indexOf(ob);
+    if (idx >= 0) obstacles.splice(idx, 1);
+    puff(ob.x, 96);
+    puff(ob.x + 20, 116);
+    ob.el.remove();
+    catSvg.classList.add('tumbling');
+    setTimeout(() => catSvg.classList.remove('tumbling'), 700);
+    sfx.tumble();
+    if (!ob.cleared) { ob.cleared = true; markCleared(); }
+  } else {
+    failLevel();
+  }
 }
 
 // ---------- input ----------
@@ -1034,7 +1065,10 @@ function startLevel(rowId, speedId) {
   spawnedCount = 0;
   clearedCount = 0;
   jumpsLeft = JUMP_BUDGET;
-  jumpsUsedThisLevel = 0;
+  wastedJumps = 0;
+  jumpUncredited = false;
+  tumbled = false;
+  invulnUntil = 0;
   fishThisRun = 0;
   scrollSinceSpawn = levelGap; // spawn the first obstacle promptly
   fishTimer = 0;
@@ -1079,10 +1113,10 @@ function winLevel() {
   catSvg.classList.remove('jumping');
   catSvg.classList.add('running');
   catEl.classList.add('dancing');
-  // star rating from jumps used
+  // star rating: 3 = typing (and fish-jumps) only, 2 = a non-fish jump, 1 = a tumble
   let stars = 3;
-  if (jumpsUsedThisLevel >= 4) stars = 1;
-  else if (jumpsUsedThisLevel >= 2) stars = 2;
+  if (tumbled) stars = 1;
+  else if (wastedJumps > 0) stars = 2;
   const prevBest = bestStars(level.rowId, level.speedId);
   saveStars(level.rowId, level.speedId, stars);
   totalFish += fishThisRun;
@@ -1090,9 +1124,11 @@ function winLevel() {
 
   winStarsEl.innerHTML = '★★★☆☆☆'.slice(3 - stars, 6 - stars)
     .split('').map((c, i) => `<span style="animation-delay:${i * 0.18}s">${c}</span>`).join('');
-  winLineEl.textContent = jumpsUsedThisLevel === 0
-    ? 'No jumps used. Super typing!'
-    : `You used ${jumpsUsedThisLevel} jump${jumpsUsedThisLevel === 1 ? '' : 's'}.`;
+  winLineEl.textContent = tumbled
+    ? 'You took a tumble. Keep practising!'
+    : wastedJumps > 0
+      ? `You used ${wastedJumps} jump${wastedJumps === 1 ? '' : 's'}.`
+      : 'No jumps needed. Super typing!';
   winLineEl.classList.toggle('new-best', stars > prevBest);
   winFishEl.textContent = fishThisRun > 0 ? `🐟 × ${fishThisRun}` : '';
   winScreen.classList.remove('hidden');
@@ -1331,9 +1367,11 @@ function frame(now) {
       }
     }
 
-    // crash?
-    const hit = hitObstacle();
-    if (hit) failLevel();
+    // crash? (ignored briefly while recovering from a tumble)
+    if (now >= invulnUntil) {
+      const hit = hitObstacle();
+      if (hit) handleHit(hit, now);
+    }
   }
 
   applySky();
