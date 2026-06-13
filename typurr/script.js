@@ -1,4 +1,4 @@
-// Cat Type — a friendly typing runner for small people.
+// Typurr — a friendly typing runner for small people, starring Ty the cat.
 // Type the letter (or whole word) on each obstacle to SMASH it; the cat
 // auto-hops the crater. Out of letters? Press SPACE to jump (limited per level).
 
@@ -340,25 +340,40 @@ let nextFishIn = 3;
 let lastSparkleAt = 0;
 let lastWord = '';
 
+// one-time migration: carry any saved progress over from the old "cattype-" keys
+(function migrateFromCattype() {
+  if (localStorage.getItem('typurr-migrated')) return;
+  const oldKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('cattype-')) oldKeys.push(k);
+  }
+  oldKeys.forEach(k => {
+    const nk = 'typurr-' + k.slice('cattype-'.length);
+    if (localStorage.getItem(nk) === null) localStorage.setItem(nk, localStorage.getItem(k));
+  });
+  localStorage.setItem('typurr-migrated', '1');
+})();
+
 // ---------- players (local profiles) ----------
 // 'guest' = the shared "Everyone" profile, kept on the original (unprefixed) keys
 const ICON_CHOICES = ['🐱','🐶','🦊','🐰','🐼','🦁','🐯','🐸','🐵','🦄','🐧','🐨','🐢','🐙','🦖','🐝'];
 let users = [];
-try { users = JSON.parse(localStorage.getItem('cattype-users') || '[]'); } catch (e) { users = []; }
-let currentUserId = localStorage.getItem('cattype-current') || 'guest';
+try { users = JSON.parse(localStorage.getItem('typurr-users') || '[]'); } catch (e) { users = []; }
+let currentUserId = localStorage.getItem('typurr-current') || 'guest';
 if (currentUserId !== 'guest' && !users.find(u => u.id === currentUserId)) currentUserId = 'guest';
 
 // progress key for the current player (guest keeps the legacy unprefixed keys)
 function ukey(suffix) {
-  return currentUserId === 'guest' ? `cattype-${suffix}` : `cattype-u-${currentUserId}-${suffix}`;
+  return currentUserId === 'guest' ? `typurr-${suffix}` : `typurr-u-${currentUserId}-${suffix}`;
 }
 
 let totalFish = parseInt(localStorage.getItem(ukey('fish')) || '0', 10);
-let muted = localStorage.getItem('cattype-muted') === '1';
+let muted = localStorage.getItem('typurr-muted') === '1';
 // 'keep' = wrong letters ignored; 'accuracy' = a slip restarts the word
-let mistakeMode = localStorage.getItem('cattype-mistake') || 'keep';
+let mistakeMode = localStorage.getItem('typurr-mistake') || 'keep';
 // obstacles per level: 12 / 20 / 40
-let trackLength = parseInt(localStorage.getItem('cattype-track') || '12', 10);
+let trackLength = parseInt(localStorage.getItem('typurr-track') || '12', 10);
 if (!TRACK_LENGTHS.includes(trackLength)) trackLength = 12;
 
 // best stars per level cell, keyed "rowId-speedId" (per player)
@@ -418,7 +433,7 @@ function updateSoundBtn() {
 soundBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   muted = !muted;
-  localStorage.setItem('cattype-muted', muted ? '1' : '0');
+  localStorage.setItem('typurr-muted', muted ? '1' : '0');
   updateSoundBtn();
 });
 
@@ -1210,7 +1225,7 @@ function renderUserBar() {
 
 function switchUser(id) {
   currentUserId = id;
-  localStorage.setItem('cattype-current', id);
+  localStorage.setItem('typurr-current', id);
   totalFish = parseInt(localStorage.getItem(ukey('fish')) || '0', 10);
   renderUserBar();
   buildPicker();   // stars are per player
@@ -1243,7 +1258,7 @@ function addUser() {
   const name = userNameInput.value.trim().slice(0, 12) || 'Player';
   const id = 'u' + Date.now();
   users.push({ id, name, icon: pendingIcon });
-  localStorage.setItem('cattype-users', JSON.stringify(users));
+  localStorage.setItem('typurr-users', JSON.stringify(users));
   closeUserDialog();
   switchUser(id);
 }
@@ -1270,10 +1285,10 @@ document.querySelectorAll('#settings-bar .set-opt').forEach(btn => {
     e.stopPropagation();
     if (btn.dataset.set === 'mistake') {
       mistakeMode = btn.dataset.val;
-      localStorage.setItem('cattype-mistake', mistakeMode);
+      localStorage.setItem('typurr-mistake', mistakeMode);
     } else {
       trackLength = parseInt(btn.dataset.val, 10);
-      localStorage.setItem('cattype-track', String(trackLength));
+      localStorage.setItem('typurr-track', String(trackLength));
     }
     renderSettings();
   });
@@ -1379,7 +1394,7 @@ function frame(now) {
 }
 
 // ---------- boot ----------
-titleEl.innerHTML = 'Cat Type!'.split('').map((ch, i) =>
+titleEl.innerHTML = 'Typurr!'.split('').map((ch, i) =>
   ch === ' ' ? ' ' : `<span style="animation-delay:${i * 0.07}s">${ch}</span>`
 ).join('');
 
