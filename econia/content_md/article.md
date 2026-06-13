@@ -1,77 +1,50 @@
 ---
 name: Pick Your Article
-description: Stage 2 — article selection criteria, checklist
+description: Stage 2 — general guidance on choosing an article, admin checklist, links to unit sub-pages
 type: page
 source_page: article/index.html
 ---
 
 # Pick your article
 
-Stage 2 | This is the most important decision you'll make. Get this right and the rest flows.
+Stage 2 | The most important decision you will make. Get this right and the rest flows.
 
-A good article makes the commentary almost write itself. A bad one makes every sentence a struggle. So spend real time here: it's worth it.
+A good article describes a real economic issue clearly enough for you to analyse, evaluate, and draw two diagrams from, without pulling you in five directions at once. What you are looking for is an article that focuses on a recognisable part of your unit's syllabus, gives you specific enough detail to work with, and links naturally to one of the nine key concepts.
 
-## What you're looking for
+Before you commit to an article, check these three things.
 
-### The absolute must-haves
+**You can only analyse what the article actually says.** This matters more than it sounds. If the article does not explain why something is happening, you cannot invent a cause. If it does not mention a consequence or a trade-off, you cannot add one. So choose an article that contains enough: specific figures, causes, policy context, stakeholder reactions. A thin article will leave you with nothing to work with.
 
-- **Recent:** published within 12 months of when you write the commentary. Six months is even better.
-- **Unique source:** different news outlet for each of your three commentaries.
-- **Real news media:** newspapers, journals, reputable news sites. Not blogs, opinion pieces, social media, or government reports.
-- **Right unit:** clearly micro, macro, or global economy.
+**Check there is enough in it for two diagrams.** Your commentary requires two diagrams, which means two distinct economic moments in the article. The clearest structure is an initial event and a response: a shock and a policy reaction, a market failure and an intervention. If the article only describes one thing with no follow-through, there is not enough there.
 
-### Strategically smart
+**Simple is better, but this refers to the economic issue, not the article.** A long, detailed article about a clear, focused issue is fine: highlight the relevant parts and work from those. What to avoid is an article where the underlying economic situation is complicated or multi-layered. A familiar intervention in a clear market or a straightforward macroeconomic story gives you everything you need, and causes far fewer problems at every stage that follows.
 
-- **Neutral reportage** (BBC, CNN, Al Jazeera, The Guardian) over expert analysis (The Economist, FT): if they've already done the economics for you, there's nothing left to show the examiner.
-- **Short and focused:** one to two pages, one clear issue. Long articles that wander across five topics are a nightmare to stay within 800 words.
+## Go to your unit
 
-### The economic "meat"
+For specific guidance on what to look for in your unit, go to the relevant page:
 
-- A specific economic problem, policy change, or market failure.
-- Real numbers: prices, percentages, quantities. These end up on your diagram axes.
-- Room to evaluate: a policy solution mentioned, or a situation you can analyse well beyond simple supply and demand.
-- A clear link to one of the nine key concepts.
+- **2a Microeconomics** — markets, externalities, price controls, indirect taxes and subsidies → `article/micro/`
+- **2b Macroeconomics** — inflation, unemployment, monetary policy, fiscal policy, AD/AS → `article/macro/`
+- **2c Global Economy** — trade, tariffs, exchange rates, development → `article/global/`
 
-### Unit-specific tips
+## The admin checklist
 
-- **Micro:** indirect taxes, subsidies, price controls, externalities (carbon taxes, sugar taxes, etc.).
-- **Macro:** monetary policy (interest rate changes), fiscal policy (stimulus, government spending), unemployment or inflation.
-- **Global:** tariffs, quotas, exchange rate moves, trade agreements.
+Run every article you are seriously considering through this list. The unit-specific content checks are on each unit page.
 
-> **The final test.** Before you commit: could you write two definitions, draw two diagrams, and answer one evaluation question based on this article? If yes, you're onto something good.
+### The Must-Haves
 
-## Use the checklist
-
-Go through this for every article you're seriously considering. Tick as you go: your progress is saved in this browser. When you're done, hit "Save my checklist" to download a summary you can share with Sam.
-
-### The Administrative "Must-Haves"
-
-- [ ] **Is it recent?** Published within 12 months of when you write the commentary: even better if 6 months.
-- [ ] **Is it from a unique source?** You must use a different news outlet for each of your three commentaries (e.g., you cannot use the BBC twice).
-- [ ] **Is it published news media?** Acceptable sources include print or online newspapers, journals, and reputable news sites.
-- [ ] **Is it the right syllabus unit?** Each commentary must focus on a different unit: Microeconomics (Unit 2), Macroeconomics (Unit 3), or The Global Economy (Unit 4). Unit 1 is excluded.
-- [ ] **Is it an actual news item?** Avoid opinion pieces, blog entries, social media posts, lifestyle blogs, advertisements, or government reports.
+- [ ] **Is it recent?** Published within 12 months of when you write the commentary. Six months is even better.
+- [ ] **Is it from a unique source?** You must use a different news outlet for each of your three commentaries.
+- [ ] **Is it published news media?** Newspapers, journals, reputable news sites. Not blogs, opinion pieces, social media posts, or government reports.
+- [ ] **Is it the right syllabus unit?** Each commentary must cover a different unit: Microeconomics (Unit 2), Macroeconomics (Unit 3), or The Global Economy (Unit 4).
+- [ ] **Is it an actual news item?** Avoid opinion pieces, blog entries, lifestyle content, advertisements, or government reports.
 
 ### Strategic Source Selection
 
-- [ ] **Is it "neutral reportage"?** Choose sources like the BBC, CNN, Al Jazeera, or The Guardian that report facts and stakeholder reactions.
-- [ ] **Does it avoid "expert analysis"?** Avoid publications like The Economist or the FT when possible: they often provide the economic analysis for you, leaving you little room to show your own insight. (This is the only one you want a "no" for!)
-- [ ] **Is it manageable?** Ideal length is one to two pages. Shorter, focused articles are easier to analyse deeply within the 800-word limit.
+- [ ] **Is it neutral reportage?** Sources like BBC, CNN, Al Jazeera, or The Guardian report facts and stakeholder reactions without doing the economic analysis for you.
+- [ ] **Does it avoid expert analysis?** (The only item where you want a "no") Publications like The Economist or the FT often provide the economic analysis themselves, leaving you little room to show your own insight.
+- [ ] **Is it a manageable length?** One to two pages is ideal. Shorter and focused is better than long and wandering.
 
-### Content and Depth (The "Economic Meat")
+### The Two-Diagram Test
 
-- [ ] **Does it connect to one of the concepts?** Be aware that you'll need to use a different concept for each commentary.
-- [ ] **Does it describe a problem?** There should be a specific economic event, policy change, or market failure described.
-- [ ] **Does it have quantitative data?** Look for specific names, numbers, or prices. This data is essential for non-generic labelling of your diagram axes and intercepts.
-- [ ] **Is there room for evaluation?** Does the article mention a policy solution (like a tax or subsidy)? Or an issue you can analyse well beyond simple supply and demand?
-- [ ] **Can you link it to a key concept?** You must be able to view the article through the lens of one of the nine key concepts (e.g., Intervention, Sustainability, or Equity).
-
-### Unit-Specific Checks
-
-- [ ] **Microeconomics:** Look for articles on indirect taxes, subsidies, price controls, or externalities (e.g., carbon taxes or sugar taxes). Others may be OK: check with Sam.
-- [ ] **Macroeconomics:** Look for monetary policy (interest rate changes), fiscal policy (stimulus packages, government spending), or unemployment/inflation trends.
-- [ ] **Global Economy:** Look for tariffs, quotas, exchange rate fluctuations, or trade agreements.
-
-### Final Big-Picture Check
-
-- [ ] **Can you turn it into a data response question?** A great way to test an article: could you write two definitions, one diagram, and one evaluation question based on its text?
+- [ ] **Can you identify two separate moments to diagram?** The first is usually the event or problem. The second is the response or consequence. Both must be present in the article. See your unit page for what this looks like in practice.
