@@ -9,25 +9,43 @@ source_page: article/index.html
 
 Stage 2 | The most important decision you will make. Get this right and the rest flows.
 
-A good article describes a real economic issue clearly enough for you to analyse, evaluate, and draw two diagrams from, without pulling you in five directions at once. What you are looking for is an article that focuses on a recognisable part of your unit's syllabus, gives you specific enough detail to work with, and links naturally to one of the nine key concepts.
+A good article makes the commentary almost write itself. A bad one makes every sentence a struggle. Spend real time here. It is worth it.
 
-Before you commit to an article, check these three things.
+## What you are looking for
+
+### The must-haves
+
+- **Recent:** published within 12 months of when you write the commentary. Six months is even better.
+- **Unique source:** different news outlet for each of your three commentaries.
+- **Real news media:** newspapers, journals, reputable news sites. Not blogs, opinion pieces, social media, or government reports.
+- **Right unit:** clearly micro, macro, or global economy.
+
+### Strategically smart
+
+- **Neutral reportage** (BBC, CNN, Al Jazeera, The Guardian) is generally better than expert analysis. The Economist and the FT are fine as sources as long as they have not done the economic analysis for you. If they have, there is nothing left to show the examiner.
+
+### What the article needs to contain
+
+- A specific economic problem, policy change, or market failure.
+- Real numbers: prices, percentages, quantities. These end up on your diagram axes.
+
+## Three things to check before you commit
 
 **You can only analyse what the article actually says.** This matters more than it sounds. If the article does not explain why something is happening, you cannot invent a cause. If it does not mention a consequence or a trade-off, you cannot add one. So choose an article that contains enough: specific figures, causes, policy context, stakeholder reactions. A thin article will leave you with nothing to work with.
 
 **Check there is enough in it for two diagrams.** Your commentary requires two diagrams, which means two distinct economic moments in the article. The clearest structure is an initial event and a response: a shock and a policy reaction, a market failure and an intervention. If the article only describes one thing with no follow-through, there is not enough there.
 
-**Simple is better, but this refers to the economic issue, not the article.** A long, detailed article about a clear, focused issue is fine: highlight the relevant parts and work from those. What to avoid is an article where the underlying economic situation is complicated or multi-layered. A familiar intervention in a clear market or a straightforward macroeconomic story gives you everything you need, and causes far fewer problems at every stage that follows.
+**A simple issue is better.** Complex or novel issues can throw a spanner in the works. If you find that you are having to be imaginative about how to apply the models you have learned to the issue in the article, it is best to avoid it. If it takes more than a few seconds to work out what exactly the market is that you are analysing, ditch it.
 
 ## Go to your unit
 
 For specific guidance on what to look for in your unit, go to the relevant page:
 
-- **2a Microeconomics** — markets, externalities, price controls, indirect taxes and subsidies → `article/micro/`
-- **2b Macroeconomics** — inflation, unemployment, monetary policy, fiscal policy, AD/AS → `article/macro/`
-- **2c Global Economy** — trade, tariffs, exchange rates, development → `article/global/`
+- **Micro** — markets, externalities, price controls, indirect taxes and subsidies → `article/micro/`
+- **Macro** — inflation, unemployment, monetary policy, fiscal policy, AD/AS → `article/macro/`
+- **Global** — trade, tariffs, exchange rates, development → `article/global/`
 
-## The admin checklist
+## The checklist
 
 Run every article you are seriously considering through this list. The unit-specific content checks are on each unit page.
 
@@ -41,9 +59,8 @@ Run every article you are seriously considering through this list. The unit-spec
 
 ### Strategic Source Selection
 
-- [ ] **Is it neutral reportage?** Sources like BBC, CNN, Al Jazeera, or The Guardian report facts and stakeholder reactions without doing the economic analysis for you.
-- [ ] **Does it avoid expert analysis?** (The only item where you want a "no") Publications like The Economist or the FT often provide the economic analysis themselves, leaving you little room to show your own insight.
-- [ ] **Is it a manageable length?** One to two pages is ideal. Shorter and focused is better than long and wandering.
+- [ ] **Has the source left the economic analysis to you?** BBC, CNN, Al Jazeera, The Guardian and similar outlets report facts without drawing economic conclusions. The Economist and the FT are usable, but check: if they have already explained the economics and drawn the policy conclusions, there is nothing left for you to show the examiner.
+- [ ] **Is it a Goldilocks length?** Long enough to contain specific details worth analysing, short enough to stay focused. One to two pages is usually the sweet spot.
 
 ### The Two-Diagram Test
 
