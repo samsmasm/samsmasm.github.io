@@ -543,6 +543,12 @@ function collectFish(it) {
   fishBadgeEl.classList.remove('bump');
   void fishBadgeEl.offsetWidth;
   fishBadgeEl.classList.add('bump');
+  // a fish gives back a jump: leaping to catch one costs nothing on balance
+  jumpsLeft++;
+  renderPaws();
+  pawsBadgeEl.classList.remove('bump');
+  void pawsBadgeEl.offsetWidth;
+  pawsBadgeEl.classList.add('bump');
   ringAt(it.x + 20, parseFloat(it.el.style.bottom) + 10);
   sfx.bloop();
 }
@@ -660,8 +666,10 @@ function updateProgress() {
 }
 
 function renderPaws() {
+  // always show at least the base budget; grow if fish have topped it up
+  const slots = Math.max(JUMP_BUDGET, jumpsLeft);
   let html = '';
-  for (let i = 0; i < JUMP_BUDGET; i++) {
+  for (let i = 0; i < slots; i++) {
     html += `<span class="paw${i < jumpsLeft ? '' : ' used'}">🐾</span>`;
   }
   pawsEl.innerHTML = html;
