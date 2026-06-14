@@ -30,19 +30,28 @@ function parseCSV(text) {
 const rows = parseCSV(raw).filter(r => r.length > 4);
 const header = rows.shift();
 
-// Column indexes (fixed layout of this form export)
+// The question order is fixed, but the export may or may not include leading
+// Timestamp/Email/Score columns. Anchor everything to the first match column
+// ("Mexico vs South Africa") and shift the original layout to suit.
+const baseCol = header.findIndex(h => /mexico\s*vs\s*south africa/i.test(h));
+if (baseCol < 0) throw new Error('Could not locate the first match column in the CSV header.');
+const SHIFT = baseCol - 4; // original layout had this column at index 4
+const at = i => i + SHIFT;
+
 const COL = {
-  name: 3,
+  name: at(3),
   matches: [ // [colIndex, fixtureId]
     [4, 'A1'], [5, 'A2'], [7, 'B1'], [8, 'B2'], [10, 'C1'], [11, 'C2'],
     [13, 'D1'], [14, 'D2'], [16, 'E1'], [17, 'E2'], [19, 'F1'], [20, 'F2'],
     [22, 'G1'], [23, 'G2'], [25, 'H1'], [26, 'H2'], [28, 'I1'], [29, 'I2'],
     [31, 'J1'], [32, 'J2'], [34, 'K1'], [35, 'K2'], [37, 'L1'], [38, 'L2'],
-  ],
-  groupWinner: { A: 6, B: 9, C: 12, D: 15, E: 18, F: 21, G: 24, H: 27, I: 30, J: 33, K: 36, L: 39 },
-  doubleGroup: 40,
-  r32: 41, r16: 42, qf: 43, sf: 44, final: 45,
-  thirdPlace: 46, champion: 47, finalScore: 48,
+  ].map(([i, id]) => [at(i), id]),
+  groupWinner: Object.fromEntries(
+    [['A', 6], ['B', 9], ['C', 12], ['D', 15], ['E', 18], ['F', 21],
+     ['G', 24], ['H', 27], ['I', 30], ['J', 33], ['K', 36], ['L', 39]].map(([g, i]) => [g, at(i)])),
+  doubleGroup: at(40),
+  r32: at(41), r16: at(42), qf: at(43), sf: at(44), final: at(45),
+  thirdPlace: at(46), champion: at(47), finalScore: at(48),
 };
 
 const splitTeams = s => (s || '').split(',').map(x => x.trim()).filter(Boolean);
