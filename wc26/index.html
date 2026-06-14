@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>World Cup 2026 Sweepstake</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="gate" class="gate" hidden>
+  <form id="gate-form" class="gate-card" autocomplete="off">
+    <div class="badge">2026</div>
+    <h2>World Cup Sweepstake</h2>
+    <label for="gate-input">What's our animal?</label>
+    <input id="gate-input" type="password" autocomplete="off" autofocus>
+    <button type="submit">Enter</button>
+    <p id="gate-err" class="gate-err" hidden>Nope, try again.</p>
+  </form>
+</div>
+<script>
+// Low-security entry gate. Password is intentionally simple ("dragon").
+(function () {
+  var KEY = 'wc26-gate';
+  var gate = document.getElementById('gate');
+  if (sessionStorage.getItem(KEY) === 'ok') return; // already in this session
+  gate.hidden = false;
+  document.documentElement.style.overflow = 'hidden';
+  document.getElementById('gate-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var val = document.getElementById('gate-input').value.trim().toLowerCase();
+    if (val === 'dragon') {
+      sessionStorage.setItem(KEY, 'ok');
+      gate.hidden = true;
+      document.documentElement.style.overflow = '';
+    } else {
+      document.getElementById('gate-err').hidden = false;
+      document.getElementById('gate-input').value = '';
+      document.getElementById('gate-input').focus();
+    }
+  });
+})();
+</script>
+<header class="masthead">
+  <div class="wrap">
+    <div class="badge">2026</div>
+    <div>
+      <h1>World Cup Sweepstake</h1>
+      <p class="sub">Live standings · auto-scored from match results</p>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="status" class="status">Loading…</div>
+  <div class="bar">
+    <div class="toggle" role="group" aria-label="View mode">
+      <button id="t-all" class="seg active" type="button">All results</button>
+      <button id="t-standings" class="seg" type="button">Standings only</button>
+    </div>
+    <button id="refresh" class="refresh" title="Re-fetch the latest scores from ESPN">↻ Refresh now</button>
+  </div>
+  <p id="meta" class="meta"></p>
+  <script>
+  // View toggle: "All results" (expandable) vs "Standings only" (names + points).
+  (function () {
+    var MKEY = 'wc26-mode';
+    var all = document.getElementById('t-all'), st = document.getElementById('t-standings');
+    function apply(mode) {
+      var standings = mode === 'standings';
+      document.body.classList.toggle('standings-only', standings);
+      all.classList.toggle('active', !standings);
+      st.classList.toggle('active', standings);
+      if (standings) { // collapse anything already open
+        document.querySelectorAll('.detail-row').forEach(function (r) { r.style.display = 'none'; });
+        document.querySelectorAll('.row .exp').forEach(function (e) { e.textContent = '▸'; });
+      }
+      try { localStorage.setItem(MKEY, mode); } catch (e) {}
+    }
+    all.addEventListener('click', function () { apply('all'); });
+    st.addEventListener('click', function () { apply('standings'); });
+    apply(localStorage.getItem(MKEY) || 'all');
+  })();
+  </script>
+
+  <table class="board">
+    <thead>
+      <tr><th class="rank">#</th><th class="name">Player</th><th class="pts">Pts</th><th class="exp"></th></tr>
+    </thead>
+    <tbody id="board"></tbody>
+  </table>
+
+  <details class="legend">
+    <summary>How scoring works</summary>
+    <ul>
+      <li>Group matches: <b>1 pt</b> for the right result (win / draw / win).</li>
+      <li>Group winners: <b>2 pts</b> each.</li>
+      <li>Your chosen double-points group doubles its group-stage points (matches + winner).</li>
+      <li>Knockout progression: Round of 32 <b>1</b>, Round of 16 <b>1</b>, Quarterfinals <b>2</b>, Semifinals <b>3</b>, Final <b>4</b> per correct team.</li>
+      <li>3rd-place playoff winner <b>5</b>, Champion <b>10</b>.</li>
+      <li>Final score is a tiebreaker (★), then alphabetical.</li>
+      <li><span class="key correct"></span> correct &nbsp; <span class="key wrong"></span> wrong &nbsp; <span class="key pending"></span> not played yet</li>
+    </ul>
+  </details>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
