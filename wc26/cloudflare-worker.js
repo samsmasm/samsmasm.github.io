@@ -79,7 +79,7 @@ button:hover{background:#0a3d91}
 <form class="card" method="POST" action="/wc26/login" autocomplete="off">
   <div class="badge">2026</div>
   <h2>World Cup Sweepstake</h2>
-  <label for="p">What's our animal?</label>
+  <label for="p">Gooooooooooo.....</label>
   <input id="p" name="password" type="password" autofocus autocomplete="off">
   <button type="submit">Enter</button>
   ${message ? `<p class="err">${message}</p>` : ''}
