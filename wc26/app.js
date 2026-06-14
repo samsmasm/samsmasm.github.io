@@ -255,67 +255,99 @@ function scorePlayer(p, R, fixtures) {
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
-const pill = (txt, cls) => `<span class="pill ${cls}">${txt}</span>`;
-const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function detailHTML(d, p) {
-  const matchRows = d.matches.map(m =>
-    `<div class="d-row ${m.status}"><span class="d-fx">${esc(m.fx.home)} v ${esc(m.fx.away)}${m.doubled ? ' <b class="dbl">2×</b>' : ''}</span>`
-    + `<span class="d-pick">picked ${esc(m.pick) || '-'}</span>`
-    + `<span class="d-pts">${m.status === 'pending' ? '·' : '+' + m.pts}</span></div>`).join('');
+// Three-letter team codes for the grid (keyed by canonical name). Falls back to
+// the first three letters for anything unmapped.
+const CODES = {
+  mexico: 'MEX', southafrica: 'RSA', southkorea: 'KOR', czechia: 'CZE', canada: 'CAN', qatar: 'QAT',
+  bosnia: 'BIH', switzerland: 'SUI', brazil: 'BRA', scotland: 'SCO', morocco: 'MAR', haiti: 'HAI',
+  unitedstates: 'USA', paraguay: 'PAR', australia: 'AUS', turkiye: 'TUR', germany: 'GER', ivorycoast: 'CIV',
+  curacao: 'CUW', ecuador: 'ECU', netherlands: 'NED', tunisia: 'TUN', japan: 'JPN', sweden: 'SWE',
+  belgium: 'BEL', egypt: 'EGY', iran: 'IRN', newzealand: 'NZL', spain: 'ESP', saudiarabia: 'KSA',
+  capeverde: 'CPV', uruguay: 'URU', france: 'FRA', norway: 'NOR', senegal: 'SEN', iraq: 'IRQ',
+  argentina: 'ARG', algeria: 'ALG', austria: 'AUT', jordan: 'JOR', portugal: 'POR', uzbekistan: 'UZB',
+  drcongo: 'COD', colombia: 'COL', england: 'ENG', panama: 'PAN', croatia: 'CRO', ghana: 'GHA',
+};
+function abbr(name) {
+  if (!name) return '–';
+  if (/draw/i.test(name)) return 'DRW';
+  return CODES[canon(name)] || name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || '–';
+}
+const cell = (text, status, extra, title) =>
+  `<td class="mx ${status} ${extra || ''}" title="${esc(title)}">${text}</td>`;
 
-  const gwRows = d.groupWinners.map(g =>
-    `<div class="d-row ${g.status}"><span class="d-fx">Group ${g.group} winner${g.doubled ? ' <b class="dbl">2×</b>' : ''}</span>`
-    + `<span class="d-pick">picked ${esc(g.pick) || '-'}${g.winner ? ' · actual ' + esc(g.winner) : ''}</span>`
-    + `<span class="d-pts">${g.status === 'pending' ? '·' : '+' + g.pts}</span></div>`).join('');
+// Simple ranked list (names + points).
+function renderStandings(scored) {
+  const tbody = document.getElementById('board');
+  tbody.innerHTML = scored.map((s, i) =>
+    `<tr class="row"><td class="rank">${i + 1}</td>`
+    + `<td class="name">${esc(s.p.name)}${s.tiebreak ? ' <span class="tb" title="Correct final score (tiebreak)">★</span>' : ''}</td>`
+    + `<td class="pts">${s.total}</td></tr>`).join('');
+}
 
-  const roundNames = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarterfinals', sf: 'Semifinals', final: 'Final' };
-  const roundBlocks = ['r32', 'r16', 'qf', 'sf', 'final'].map(rd => {
-    const r = d.rounds[rd];
-    const chips = r.picks.map(x => `<span class="chip ${x.status}">${esc(x.team)}</span>`).join('');
-    return `<div class="d-round"><div class="d-round-h">${roundNames[rd]} <small>(${r.per}pt each)</small>`
-      + `<span class="d-pts">${r.resolved ? '+' + r.pts : 'pending'}</span></div><div class="chips">${chips}</div></div>`;
+// Wide colour-coded grid: every player against every pick (like the entry CSV).
+const GROUPS = 'ABCDEFGHIJKL'.split('');
+const ROUND_LABEL = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarterfinals', sf: 'Semifinals', final: 'Final' };
+
+function renderMatrix(scored) {
+  if (!scored.length) return;
+
+  // Header (single sticky row). Matchups read off any player's fixtures.
+  const fxByGroup = {};
+  scored[0].detail.matches.forEach(m => (fxByGroup[m.fx.group] = fxByGroup[m.fx.group] || []).push(m.fx));
+  let head = '<th class="cName gstart">Player</th><th class="cPts">Pts</th>';
+  for (const g of GROUPS) {
+    (fxByGroup[g] || []).forEach((fx, idx) => {
+      head += `<th class="${idx === 0 ? 'gstart' : ''}" title="Group ${g}: ${esc(fx.home)} v ${esc(fx.away)}">${abbr(fx.home)}·${abbr(fx.away)}</th>`;
+    });
+    head += `<th title="Group ${g} winner">🏆${g}</th>`;
+  }
+  head += '<th class="gstart" title="Double-points group">2×</th>';
+  ['r32', 'r16', 'qf', 'sf', 'final'].forEach((rd, i) =>
+    head += `<th class="${i === 0 ? 'gstart' : ''}" title="${ROUND_LABEL[rd]} progression (points earned)">${rd === 'final' ? 'Fin' : rd.toUpperCase()}</th>`);
+  head += '<th class="gstart" title="3rd-place playoff winner (5)">3rd</th>'
+    + '<th title="Champion (10)">Champ</th><th title="Final score (tiebreak)">Score</th>';
+
+  const rows = scored.map(s => {
+    const d = s.detail, p = s.p;
+    const mByG = {}; d.matches.forEach(m => (mByG[m.fx.group] = mByG[m.fx.group] || []).push(m));
+    const wByG = {}; d.groupWinners.forEach(w => (wByG[w.group] = w));
+    let r = `<td class="cName gstart">${esc(p.name)}${s.tiebreak ? ' <span class="tb">★</span>' : ''}</td>`
+      + `<td class="cPts">${s.total}</td>`;
+    for (const g of GROUPS) {
+      (mByG[g] || []).forEach((m, idx) =>
+        r += cell(abbr(m.pick), m.status, (idx === 0 ? 'gstart ' : '') + (m.doubled ? 'dbl' : ''),
+          `${m.pick || '-'} · ${m.fx.home} v ${m.fx.away}`));
+      const w = wByG[g];
+      r += cell(abbr(w.pick), w.status, w.doubled ? 'dbl' : '',
+        `Group ${g} winner: ${w.pick || '-'}${w.winner ? ' · actual ' + w.winner : ''}`);
+    }
+    r += cell(p.doubleGroup || '–', 'none', 'dblcol gstart', `Double-points group: ${p.doubleGroup || 'none'}`);
+    ['r32', 'r16', 'qf', 'sf', 'final'].forEach((rd, i) => {
+      const rr = d.rounds[rd];
+      const correct = rr.picks.filter(x => x.status === 'correct').length;
+      const cls = rr.resolved ? (correct > 0 ? 'correct' : 'wrong') : 'pending';
+      const tip = `${ROUND_LABEL[rd]}: ${rr.resolved ? correct + '/' + rr.picks.length + ' correct' : 'not resolved'} · `
+        + rr.picks.map(x => (x.status === 'correct' ? '✓' : x.status === 'wrong' ? '✗' : '·') + abbr(x.team)).join(' ');
+      r += cell(rr.resolved ? '+' + rr.pts : '·', cls, i === 0 ? 'gstart' : '', tip);
+    });
+    const champ = d.special[0], third = d.special[1], score = d.special[2];
+    r += cell(abbr(third.pick), third.status, 'gstart',
+      `3rd place: ${third.pick || '-'}${third.actual && third.actual !== '-' ? ' · actual ' + third.actual : ''}`);
+    r += cell(abbr(champ.pick), champ.status, '',
+      `Champion: ${champ.pick || '-'}${champ.actual && champ.actual !== '-' ? ' · actual ' + champ.actual : ''}`);
+    r += cell(esc(score.pick || '–'), score.status, '',
+      `Final score: ${score.pick || '-'}${score.actual && score.actual !== '-' ? ' · actual ' + score.actual : ''}`);
+    return `<tr>${r}</tr>`;
   }).join('');
 
-  const specRows = d.special.map(s =>
-    `<div class="d-row ${s.status}"><span class="d-fx">${s.label}</span>`
-    + `<span class="d-pick">picked ${esc(s.pick)}${s.actual && s.actual !== '-' ? ' · actual ' + esc(s.actual) : ''}</span>`
-    + `<span class="d-pts">${s.tiebreak ? '' : (s.status === 'pending' ? '·' : '+' + s.pts)}</span></div>`).join('');
-
-  return `<div class="detail">
-    <div class="d-sec"><h4>Group matches</h4>${matchRows}</div>
-    <div class="d-sec"><h4>Group winners</h4>${gwRows}</div>
-    <div class="d-sec"><h4>Knockout progression</h4>${roundBlocks}</div>
-    <div class="d-sec"><h4>Finals</h4>${specRows}</div>
-  </div>`;
+  document.getElementById('matrix').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${rows}</tbody>`;
 }
 
 function render(scored, meta) {
-  const tbody = document.getElementById('board');
-  tbody.innerHTML = '';
-  scored.forEach((s, i) => {
-    const rank = i + 1;
-    const tr = document.createElement('tr');
-    tr.className = 'row';
-    tr.innerHTML = `<td class="rank">${rank}</td><td class="name">${esc(s.p.name)}`
-      + `${s.tiebreak ? ' <span class="tb" title="Correct final score (tiebreak)">★</span>' : ''}</td>`
-      + `<td class="pts">${s.total}</td><td class="exp">▸</td>`;
-    const det = document.createElement('tr');
-    det.className = 'detail-row';
-    det.style.display = 'none';
-    det.innerHTML = `<td colspan="4"></td>`;
-    tr.addEventListener('click', () => {
-      const open = det.style.display !== 'none';
-      if (!open && !det.dataset.built) {
-        det.firstChild.innerHTML = detailHTML(s.detail, s.p);
-        det.dataset.built = '1';
-      }
-      det.style.display = open ? 'none' : 'table-row';
-      tr.querySelector('.exp').textContent = open ? '▸' : '▾';
-    });
-    tbody.appendChild(tr);
-    tbody.appendChild(det);
-  });
+  renderStandings(scored);
+  renderMatrix(scored);
   document.getElementById('meta').textContent = meta;
 }
 
