@@ -57,7 +57,7 @@ function parseCookies(header) {
 function loginPage(message, status) {
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow"><title>World Cup Sweepstake</title>
+<meta name="robots" content="noindex, nofollow"><title>WC predictions</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;
@@ -78,7 +78,7 @@ button:hover{background:#0a3d91}
 </style></head><body>
 <form class="card" method="POST" action="/wc26/login" autocomplete="off">
   <div class="badge">2026</div>
-  <h2>World Cup Sweepstake</h2>
+  <h2>World Cup Predictions</h2>
   <label for="p">Gooooooooooo.....</label>
   <input id="p" name="password" type="password" autofocus autocomplete="off">
   <button type="submit">Enter</button>
