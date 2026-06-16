@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>typeit — handwriting to text</title>
+<style>
+  :root{
+    --purple:#4a1a7a; --purple-dark:#3a1361; --ink:#1d1430; --muted:#6b5f80;
+    --line:#e4ddef; --bg:#f4f1f8; --card:#ffffff; --ok:#1f7a4a; --err:#c62a30;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.5;
+  }
+  .wrap{max-width:840px; margin:0 auto; padding:28px 20px 80px}
+  header{display:flex; align-items:baseline; gap:12px; margin-bottom:6px}
+  h1{font-family:Georgia,serif; color:var(--purple); font-size:30px; margin:0; font-weight:700}
+  .tag{color:var(--muted); font-size:14px}
+  .lead{color:var(--muted); font-size:14px; margin:0 0 22px}
+
+  /* drop zone */
+  .drop{
+    border:2px dashed #cdbfe6; border-radius:14px; background:var(--card);
+    padding:34px 20px; text-align:center; cursor:pointer; transition:border-color .15s,background .15s;
+  }
+  .drop:hover{border-color:var(--purple)}
+  .drop.over{border-color:var(--purple); background:#efe8f8}
+  .drop strong{color:var(--purple)}
+  .drop small{display:block; color:var(--muted); margin-top:6px; font-size:13px}
+  input[type=file]{display:none}
+
+  /* file list */
+  .files{list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; gap:8px}
+  .file{
+    display:flex; align-items:center; gap:12px; background:var(--card);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  }
+  .file .num{
+    flex:none; width:26px; height:26px; border-radius:7px; background:#efe8f8; color:var(--purple);
+    font-weight:700; font-size:13px; display:grid; place-items:center;
+  }
+  .file .meta{flex:1; min-width:0}
+  .file .name{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .file .sub{font-size:12px; color:var(--muted)}
+  .file .status{font-size:12px; font-weight:600}
+  .file .status.pending{color:var(--muted)}
+  .file .status.working{color:var(--purple)}
+  .file .status.done{color:var(--ok)}
+  .file .status.error{color:var(--err)}
+  .file .x{
+    flex:none; border:0; background:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 6px;
+  }
+  .file .x:hover{color:var(--err)}
+
+  /* controls */
+  .row{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:18px}
+  button.btn{
+    border:0; border-radius:10px; padding:11px 18px; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  button.primary{background:var(--purple); color:#fff}
+  button.primary:hover{background:var(--purple-dark)}
+  button.primary:disabled{background:#cdbfe6; cursor:not-allowed}
+  button.ghost{background:#fff; color:var(--purple); border:1px solid var(--line)}
+  button.ghost:hover{border-color:var(--purple)}
+  .spacer{flex:1}
+  .clear{background:none;border:0;color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline}
+
+  .progress{margin-top:14px; font-size:13px; color:var(--muted)}
+  .bar{height:6px; background:#e4ddef; border-radius:4px; overflow:hidden; margin-top:6px}
+  .bar > i{display:block; height:100%; width:0; background:var(--purple); transition:width .2s}
+
+  /* output */
+  .out{margin-top:26px; display:none}
+  .out.show{display:block}
+  .out-head{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px}
+  .out-head h2{font-family:Georgia,serif; font-size:20px; margin:0; color:var(--ink); flex:1}
+  .toggle{display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden}
+  .toggle button{border:0;background:#fff;color:var(--muted);font-size:13px;font-weight:600;padding:7px 12px;cursor:pointer}
+  .toggle button.active{background:var(--purple); color:#fff}
+  .result{
+    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px;
+    white-space:pre-wrap; word-wrap:break-word; font-size:15px; max-height:60vh; overflow:auto;
+  }
+  .result .page-head{
+    font-family:Georgia,serif; font-weight:700; color:var(--purple); margin:18px 0 6px;
+    padding-top:14px; border-top:1px solid var(--line);
+  }
+  .result .page-head:first-child{border-top:0; padding-top:0; margin-top:0}
+  .result .perr{color:var(--err)}
+  .copied{color:var(--ok); font-size:13px; font-weight:600; margin-left:4px}
+  footer{margin-top:30px; color:var(--muted); font-size:12px; text-align:center}
+  footer a{color:var(--purple)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>typeit</h1>
+    <span class="tag">handwriting &rarr; text</span>
+  </header>
+  <p class="lead">Drop in photos or PDFs of handwriting. Each page is transcribed verbatim, with unreadable words marked <code>[?]</code>. Nothing is stored.</p>
+
+  <label class="drop" id="drop" for="picker">
+    <strong>Click to choose files</strong> or drag them here
+    <small>Images (JPG, PNG, HEIC&hellip;) and PDFs &middot; processed in the order shown</small>
+  </label>
+  <input type="file" id="picker" multiple accept="image/*,application/pdf">
+
+  <ul class="files" id="files"></ul>
+
+  <div class="row" id="controls" style="display:none">
+    <button class="btn primary" id="go">Transcribe</button>
+    <button class="clear" id="clear">Clear all</button>
+  </div>
+
+  <div class="progress" id="progress" style="display:none">
+    <span id="progress-text"></span>
+    <div class="bar"><i id="progress-bar"></i></div>
+  </div>
+
+  <section class="out" id="out">
+    <div class="out-head">
+      <h2>Result</h2>
+      <div class="toggle">
+        <button id="t-combined" class="active">Combined</button>
+        <button id="t-pages">Per page</button>
+      </div>
+    </div>
+    <div class="result" id="result"></div>
+    <div class="row">
+      <button class="btn ghost" id="copy">Copy</button>
+      <button class="btn ghost" id="dl-md">Download .md</button>
+      <button class="btn ghost" id="dl-txt">Download .txt</button>
+      <span class="copied" id="copied" style="display:none">Copied</span>
+    </div>
+  </section>
+
+  <footer>typeit &middot; on <a href="/">unisam.nz</a></footer>
+</div>
+
+<script>
+'use strict';
+
+const CONCURRENCY = 3;
+const API = '/typeit/api/transcribe';
+
+// Each item: { id, file, name, mime, status:'pending'|'working'|'done'|'error', text, error }
+let items = [];
+let running = false;
+let nextId = 1;
+let view = 'combined';
+
+const $ = id => document.getElementById(id);
+const filesEl = $('files'), controls = $('controls'), out = $('out'), resultEl = $('result');
+
+// ---- file intake ---------------------------------------------------------
+function accept(fileList){
+  for (const f of fileList){
+    const isImg = f.type.startsWith('image/');
+    const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    if (!isImg && !isPdf) continue;
+    items.push({ id: nextId++, file: f, name: f.name || ('page-' + nextId),
+                 mime: f.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+                 status: 'pending', text: '', error: '' });
+  }
+  render();
+}
+
+$('picker').addEventListener('change', e => { accept(e.target.files); e.target.value = ''; });
+
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { if (e.dataTransfer?.files) accept(e.dataTransfer.files); });
+
+$('clear').addEventListener('click', () => {
+  if (running) return;
+  items = []; render(); out.classList.remove('show'); $('progress').style.display = 'none';
+});
+
+function humanSize(n){
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(0) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
+}
+
+function render(){
+  filesEl.innerHTML = '';
+  items.forEach((it, i) => {
+    const li = document.createElement('li');
+    li.className = 'file';
+    const statusText = { pending:'ready', working:'transcribing&hellip;', done:'done', error: it.error || 'error' }[it.status];
+    li.innerHTML =
+      `<span class="num">${i+1}</span>
+       <div class="meta">
+         <div class="name"></div>
+         <div class="sub">${it.mime.includes('pdf') ? 'PDF' : 'Image'} &middot; ${humanSize(it.file.size)}</div>
+       </div>
+       <span class="status ${it.status}">${statusText}</span>`;
+    li.querySelector('.name').textContent = it.name;
+    if (!running){
+      const x = document.createElement('button');
+      x.className = 'x'; x.title = 'Remove'; x.innerHTML = '&times;';
+      x.addEventListener('click', () => { items = items.filter(o => o.id !== it.id); render(); });
+      li.appendChild(x);
+    }
+    filesEl.appendChild(li);
+  });
+  controls.style.display = items.length ? 'flex' : 'none';
+  $('go').disabled = running || items.length === 0;
+}
+
+// ---- transcription -------------------------------------------------------
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1]); // strip data: prefix
+    r.onerror = () => reject(new Error('Could not read file'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function transcribeOne(it){
+  it.status = 'working'; render();
+  try {
+    const data = await fileToBase64(it.file);
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mimeType: it.mime, data }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+    it.text = body.text || '';
+    it.status = 'done';
+  } catch (e) {
+    it.status = 'error';
+    it.error = String(e.message || e).slice(0, 80);
+  }
+  done++;
+  updateProgress();
+  render();
+}
+
+let done = 0;
+function updateProgress(){
+  const total = items.length;
+  $('progress-text').textContent = `Transcribing… ${done} of ${total} page${total===1?'':'s'} done`;
+  $('progress-bar').style.width = total ? (done/total*100) + '%' : '0';
+}
+
+async function run(){
+  if (running || !items.length) return;
+  running = true; done = 0;
+  out.classList.remove('show');
+  $('progress').style.display = 'block';
+  updateProgress();
+  render();
+
+  // simple concurrency pool, preserving array order for output
+  let cursor = 0;
+  async function worker(){
+    while (cursor < items.length){
+      const it = items[cursor++];
+      await transcribeOne(it);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, worker));
+
+  running = false;
+  render();
+  $('progress-text').textContent = `Done — ${items.filter(i=>i.status==='done').length} of ${items.length} page${items.length===1?'':'s'} transcribed`;
+  renderResult();
+  out.classList.add('show');
+  out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+$('go').addEventListener('click', run);
+
+// ---- output --------------------------------------------------------------
+function combinedText(){
+  // app-added separators only; transcribed text itself stays verbatim
+  return items.map((it, i) => {
+    const head = `----- ${i+1}. ${it.name} -----`;
+    const body = it.status === 'done' ? (it.text || '[no text on this page]')
+               : `[not transcribed: ${it.error || it.status}]`;
+    return head + '\n\n' + body;
+  }).join('\n\n');
+}
+
+function renderResult(){
+  resultEl.innerHTML = '';
+  if (view === 'combined'){
+    items.forEach((it, i) => {
+      const h = document.createElement('div');
+      h.className = 'page-head';
+      h.textContent = `${i+1}. ${it.name}`;
+      resultEl.appendChild(h);
+      const p = document.createElement('div');
+      if (it.status === 'done'){ p.textContent = it.text || '[no text on this page]'; }
+      else { p.className = 'perr'; p.textContent = `[not transcribed: ${it.error || it.status}]`; }
+      resultEl.appendChild(p);
+    });
+  } else {
+    items.forEach((it, i) => {
+      const h = document.createElement('div');
+      h.className = 'page-head';
+      h.textContent = `Page ${i+1} — ${it.name}`;
+      resultEl.appendChild(h);
+      const p = document.createElement('div');
+      if (it.status === 'done'){ p.textContent = it.text || '[no text on this page]'; }
+      else { p.className = 'perr'; p.textContent = `[not transcribed: ${it.error || it.status}]`; }
+      resultEl.appendChild(p);
+    });
+  }
+}
+
+$('t-combined').addEventListener('click', () => setView('combined'));
+$('t-pages').addEventListener('click', () => setView('pages'));
+function setView(v){
+  view = v;
+  $('t-combined').classList.toggle('active', v==='combined');
+  $('t-pages').classList.toggle('active', v==='pages');
+  renderResult();
+}
+
+$('copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(combinedText());
+    const c = $('copied'); c.style.display = 'inline'; setTimeout(() => c.style.display = 'none', 1500);
+  } catch { alert('Copy failed — select the text manually.'); }
+});
+
+function download(ext){
+  const blob = new Blob([combinedText()], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `transcription-${new Date().toISOString().slice(0,10)}.${ext}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('dl-md').addEventListener('click', () => download('md'));
+$('dl-txt').addEventListener('click', () => download('txt'));
+</script>
+</body>
+</html>
