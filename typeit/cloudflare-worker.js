@@ -108,6 +108,10 @@ const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
 // --- Gemini call ----------------------------------------------------------
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 524/408 = timeout, 429 = rate limit, 5xx = transient server errors. Worth a retry.
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 524]);
+
 async function transcribe(env, mimeType, dataB64) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
   const body = {
@@ -117,23 +121,30 @@ async function transcribe(env, mimeType, dataB64) {
         { inlineData: { mimeType, data: dataB64 } },
       ],
     }],
-    generationConfig: { temperature: 0 },
+    // temperature 0 for fidelity; low thinking keeps OCR fast and avoids timeouts.
+    generationConfig: { temperature: 0, thinkingConfig: { thinkingLevel: 'low' } },
   };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
+
+  let lastErr = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await sleep(800 * attempt); // 0.8s, 1.6s backoff
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const cand = data?.candidates?.[0];
+      if (cand?.finishReason === 'SAFETY') throw new Error('Blocked by Gemini safety filters.');
+      return (cand?.content?.parts || []).map(p => p.text || '').join('').trim();
+    }
     let detail = '';
-    try { detail = (await res.json())?.error?.message || ''; } catch { /* ignore */ }
-    throw new Error(`Gemini ${res.status}${detail ? ': ' + detail : ''}`);
+    try { detail = (await res.json())?.error?.message || ''; } catch { /* non-JSON body */ }
+    lastErr = `Gemini ${res.status}${detail ? ': ' + detail : ''}`;
+    if (!RETRYABLE.has(res.status)) break; // permanent error -> stop retrying
   }
-  const data = await res.json();
-  const cand = data?.candidates?.[0];
-  if (cand?.finishReason === 'SAFETY') throw new Error('Blocked by Gemini safety filters.');
-  const text = (cand?.content?.parts || []).map(p => p.text || '').join('').trim();
-  return text;
+  throw new Error(lastErr || 'Gemini request failed');
 }
 
 export default {
