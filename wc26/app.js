@@ -351,6 +351,102 @@ function render(scored, meta) {
   document.getElementById('meta').textContent = meta;
 }
 
+// ---------------------------------------------------------------------------
+// Schedule + upcoming games (from window.WC_SCHEDULE, scores from ESPN events)
+// ---------------------------------------------------------------------------
+const VNZ = 'Asia/Ho_Chi_Minh', ETZ = 'America/New_York';
+const schedKey = m => [canon(m.t1), canon(m.t2)].sort().join('|');
+const fmtVN = ts => ts ? new Date(ts).toLocaleString('en-GB', { timeZone: VNZ, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'TBC';
+const fmtVNTime = ts => ts ? new Date(ts).toLocaleTimeString('en-GB', { timeZone: VNZ, hour: '2-digit', minute: '2-digit', hour12: false }) : 'TBC';
+const fmtETTime = ts => ts ? new Date(ts).toLocaleTimeString('en-US', { timeZone: ETZ, hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+const fmtVNDay = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { timeZone: VNZ, weekday: 'long', day: 'numeric', month: 'long' }) : 'Date TBC';
+
+function relTime(ts, now) {
+  let s = Math.floor((ts - now) / 1000);
+  if (s <= 0) return 'now';
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60);
+  if (d > 0) return `in ${d}d ${h}h`;
+  if (h > 0) return `in ${h}h ${m}m`;
+  return `in ${m}m`;
+}
+
+// Build a lookup of played/in-progress results keyed by canonical team pair.
+function buildScheduleScores(events) {
+  const map = new Map();
+  for (const ev of (events || [])) {
+    const c = competitors(ev);
+    if (!c || (c.state !== 'in' && c.state !== 'post')) continue;
+    if (Number.isNaN(c.hs) || Number.isNaN(c.as)) continue;
+    map.set([canon(c.home), canon(c.away)].sort().join('|'), c);
+  }
+  return map;
+}
+
+// Score badge for a schedule row, orienting the score to t1–t2 order.
+function scoreBadge(m, scores) {
+  const c = scores.get(schedKey(m));
+  if (!c) return '';
+  const t1Home = canon(m.t1) === canon(c.home);
+  const a = t1Home ? c.hs : c.as, b = t1Home ? c.as : c.hs;
+  const live = c.state === 'in';
+  return `<span class="sch-score${live ? ' live' : ''}">${a}–${b}${live ? ' <b>LIVE</b>' : ''}</span>`;
+}
+
+function renderUpcoming(now, scores) {
+  const el = document.getElementById('upcoming');
+  if (!el) return;
+  const next = (window.WC_SCHEDULE || []).filter(m => m.ours && m.ts && m.ts > now).slice(0, 2);
+  if (!next.length) { el.innerHTML = '<div class="up-empty">No more of our games scheduled.</div>'; return; }
+  el.innerHTML = next.map(m => `<div class="up-card">
+      <div class="up-top"><span class="up-stage">${esc(m.stage)} · #${m.no}</span><span class="up-rel">${relTime(m.ts, now)}</span></div>
+      <div class="up-teams">${esc(m.t1)} <span class="up-v">v</span> ${esc(m.t2)}</div>
+      <div class="up-time">${fmtVN(m.ts)} <span class="up-tz">VN</span></div>
+      <div class="up-time2">${fmtETTime(m.ts)} ET · ${esc(m.loc)}</div>
+    </div>`).join('');
+}
+
+let SCHED_NOW = Date.now(), SCHED_SCORES = new Map();
+
+function buildScheduleBody(viewAll) {
+  const list = (window.WC_SCHEDULE || []).filter(m => viewAll || m.ours);
+  let lastDay = '', html = '', firstUpcomingId = '';
+  list.forEach((m, i) => {
+    const day = fmtVNDay(m.ts);
+    if (day !== lastDay) { lastDay = day; html += `<div class="sch-day">${esc(day)} <span>VN</span></div>`; }
+    const past = m.ts && m.ts < SCHED_NOW;
+    if (!past && !firstUpcomingId) firstUpcomingId = `sch-${m.no}`;
+    html += `<div class="sch-row${past ? ' past' : ''}${m.ours ? ' ours' : ''}" id="sch-${m.no}">
+        <div class="sch-time"><b>${fmtVNTime(m.ts)}</b><small>${fmtETTime(m.ts)} ET</small></div>
+        <div class="sch-match"><span class="sch-stage">${esc(m.stage)}</span>${esc(m.t1)} <span class="sch-v">v</span> ${esc(m.t2)} ${scoreBadge(m, SCHED_SCORES)}</div>
+        ${m.ours ? '<div class="sch-flag" title="One of our games">★</div>' : '<div class="sch-flag"></div>'}
+      </div>`;
+  });
+  const body = document.getElementById('schedule-body');
+  body.innerHTML = html || '<p class="up-empty">No matches.</p>';
+  const target = firstUpcomingId && document.getElementById(firstUpcomingId);
+  if (target) target.scrollIntoView({ block: 'start' });
+}
+
+function wireSchedule() {
+  const modal = document.getElementById('schedule-modal');
+  const open = document.getElementById('open-schedule');
+  const close = document.getElementById('close-schedule');
+  const ours = document.getElementById('sch-ours'), all = document.getElementById('sch-all');
+  if (!modal || !open) return;
+  let viewAll = false;
+  const show = () => { buildScheduleBody(viewAll); modal.hidden = false; document.documentElement.style.overflow = 'hidden'; };
+  const hide = () => { modal.hidden = true; document.documentElement.style.overflow = ''; };
+  open.addEventListener('click', show);
+  close.addEventListener('click', hide);
+  modal.addEventListener('click', e => { if (e.target === modal) hide(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) hide(); });
+  ours.addEventListener('click', () => { viewAll = false; ours.classList.add('active'); all.classList.remove('active'); buildScheduleBody(false); });
+  all.addEventListener('click', () => { viewAll = true; all.classList.add('active'); ours.classList.remove('active'); buildScheduleBody(true); });
+}
+wireSchedule();
+
 // Short per-browser cache of the (large) ESPN payloads, so rapid re-refreshes
 // by the same person don't re-hit ESPN, while keeping worst-case staleness to a
 // couple of minutes. The "Refresh now" button bypasses it for instant results
@@ -386,6 +482,12 @@ async function main(force) {
     const decidedGroups = Object.keys(R.groupWinners).length;
     const when = new Date(ts).toLocaleString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
     render(scored, `${finishedMatches}/${fixtures.length} group matches scored · ${decidedGroups}/12 groups decided · Last updated ${when} Vietnam time${cached ? ' (cached)' : ''}`);
+
+    // Upcoming games + schedule scores (refresh alongside the leaderboard).
+    SCHED_NOW = Date.now();
+    SCHED_SCORES = buildScheduleScores(events);
+    renderUpcoming(SCHED_NOW, SCHED_SCORES);
+
     status.style.display = 'none';
   } catch (e) {
     status.textContent = 'Could not load live scores (' + e.message + '). The leaderboard needs an internet connection to ESPN.';
