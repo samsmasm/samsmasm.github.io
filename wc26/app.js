@@ -394,17 +394,26 @@ function scoreBadge(m, scores) {
   return `<span class="sch-score${live ? ' live' : ''}">${a}–${b}${live ? ' <b>LIVE</b>' : ''}</span>`;
 }
 
-function renderUpcoming(now, scores) {
+function renderUpcoming(now) {
   const el = document.getElementById('upcoming');
   if (!el) return;
-  const next = (window.WC_SCHEDULE || []).filter(m => m.ours && m.ts && m.ts > now).slice(0, 2);
+  const WINDOW = 2 * 60 * 60 * 1000; // keep a just-kicked-off game visible (~match length)
+  const next = (window.WC_SCHEDULE || []).filter(m => m.ours && m.ts && m.ts > now - WINDOW).slice(0, 2);
   if (!next.length) { el.innerHTML = '<div class="up-empty">No more of our games scheduled.</div>'; return; }
-  el.innerHTML = next.map(m => `<div class="up-card">
-      <div class="up-top"><span class="up-stage">${esc(m.stage)} · #${m.no}</span><span class="up-rel">${relTime(m.ts, now)}</span></div>
-      <div class="up-teams">${esc(m.t1)} <span class="up-v">v</span> ${esc(m.t2)}</div>
-      <div class="up-time">${fmtVN(m.ts)} <span class="up-tz">VN</span></div>
-      <div class="up-time2">${fmtETTime(m.ts)} ET · ${esc(m.loc)}</div>
-    </div>`).join('');
+  el.innerHTML = next.map(m => {
+    const started = m.ts <= now;
+    let rel;
+    if (started) {
+      const mins = Math.max(0, Math.floor((now - m.ts) / 60000));
+      rel = `Started ${mins} minute${mins === 1 ? '' : 's'} ago`;
+    } else {
+      rel = relTime(m.ts, now);
+    }
+    return `<div class="up-card${started ? ' started' : ''}">
+        <div class="up-teams">${esc(m.t1)} <span class="up-v">vs</span> ${esc(m.t2)}</div>
+        <div class="up-rel">${rel}</div>
+      </div>`;
+  }).join('');
 }
 
 let SCHED_NOW = Date.now(), SCHED_SCORES = new Map();
@@ -486,7 +495,7 @@ async function main(force) {
     // Upcoming games + schedule scores (refresh alongside the leaderboard).
     SCHED_NOW = Date.now();
     SCHED_SCORES = buildScheduleScores(events);
-    renderUpcoming(SCHED_NOW, SCHED_SCORES);
+    renderUpcoming(SCHED_NOW);
 
     status.style.display = 'none';
   } catch (e) {
