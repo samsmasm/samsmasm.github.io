@@ -66,6 +66,7 @@
   button.primary:disabled{background:#cdbfe6; cursor:not-allowed}
   button.ghost{background:#fff; color:var(--purple); border:1px solid var(--line)}
   button.ghost:hover{border-color:var(--purple)}
+  button.ghost.active{background:var(--purple); color:#fff; border-color:var(--purple)}
   .spacer{flex:1}
   .clear{background:none;border:0;color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline}
 
@@ -132,6 +133,8 @@
     </div>
     <div class="result" id="result"></div>
     <div class="row">
+      <button class="btn ghost" id="unwrap" title="Join lines within each page into running text">Remove line breaks</button>
+      <span class="spacer"></span>
       <button class="btn ghost" id="copy">Copy</button>
       <button class="btn ghost" id="dl-md">Download .md</button>
       <button class="btn ghost" id="dl-txt">Download .txt</button>
@@ -153,6 +156,15 @@ let items = [];
 let running = false;
 let nextId = 1;
 let view = 'combined';
+let unwrap = false; // when on, collapse line breaks within each page into spaces
+
+// Pure text transform, no AI. Turns every run of whitespace containing a
+// newline into a single space, so a page becomes one flowing line. The stored
+// transcription (it.text) is never changed — toggling off restores it exactly.
+function present(text){
+  if (!unwrap) return text;
+  return text.replace(/[ \t]*\n[ \t]*/g, ' ').replace(/ {2,}/g, ' ').trim();
+}
 
 const $ = id => document.getElementById(id);
 const filesEl = $('files'), controls = $('controls'), out = $('out'), resultEl = $('result');
@@ -313,7 +325,7 @@ function combinedText(){
   // app-added separators only; transcribed text itself stays verbatim
   return items.map((it, i) => {
     const head = `----- ${i+1}. ${it.name} -----`;
-    const body = it.status === 'done' ? (it.text || '[no text on this page]')
+    const body = it.status === 'done' ? present(it.text || '[no text on this page]')
                : `[not transcribed: ${it.error || it.status}]`;
     return head + '\n\n' + body;
   }).join('\n\n');
@@ -328,7 +340,7 @@ function renderResult(){
       h.textContent = `${i+1}. ${it.name}`;
       resultEl.appendChild(h);
       const p = document.createElement('div');
-      if (it.status === 'done'){ p.textContent = it.text || '[no text on this page]'; }
+      if (it.status === 'done'){ p.textContent = present(it.text || '[no text on this page]'); }
       else { p.className = 'perr'; p.textContent = `[not transcribed: ${it.error || it.status}]`; }
       resultEl.appendChild(p);
     });
@@ -339,7 +351,7 @@ function renderResult(){
       h.textContent = `Page ${i+1} — ${it.name}`;
       resultEl.appendChild(h);
       const p = document.createElement('div');
-      if (it.status === 'done'){ p.textContent = it.text || '[no text on this page]'; }
+      if (it.status === 'done'){ p.textContent = present(it.text || '[no text on this page]'); }
       else { p.className = 'perr'; p.textContent = `[not transcribed: ${it.error || it.status}]`; }
       resultEl.appendChild(p);
     });
@@ -354,6 +366,13 @@ function setView(v){
   $('t-pages').classList.toggle('active', v==='pages');
   renderResult();
 }
+
+$('unwrap').addEventListener('click', () => {
+  unwrap = !unwrap;
+  $('unwrap').classList.toggle('active', unwrap);
+  $('unwrap').textContent = unwrap ? 'Keep line breaks' : 'Remove line breaks';
+  renderResult();
+});
 
 $('copy').addEventListener('click', async () => {
   try {
