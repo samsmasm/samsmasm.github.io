@@ -215,6 +215,8 @@ function render(){
 }
 
 // ---- transcription -------------------------------------------------------
+const MAX_EDGE = 2200; // px on the longest side — plenty for handwriting OCR
+
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -224,14 +226,39 @@ function fileToBase64(file){
   });
 }
 
+// Shrink big camera photos in the browser before upload: faster, cheaper, and
+// can't hit the size cap. Best-effort — if the browser can't decode the image
+// (e.g. HEIC), we silently fall back to sending the original bytes.
+async function prepareImage(file){
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    if (scale >= 1 && file.size < 2 * 1024 * 1024) { bitmap.close?.(); return null; } // already small
+    const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    return { mime: 'image/jpeg', data: dataUrl.split(',')[1] };
+  } catch {
+    return null; // decode failed -> caller sends the original file
+  }
+}
+
 async function transcribeOne(it){
   it.status = 'working'; render();
   try {
-    const data = await fileToBase64(it.file);
+    let mimeType = it.mime, data;
+    if (it.mime.startsWith('image/')) {
+      const shrunk = await prepareImage(it.file);
+      if (shrunk) { mimeType = shrunk.mime; data = shrunk.data; }
+    }
+    if (data === undefined) data = await fileToBase64(it.file);
     const res = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mimeType: it.mime, data }),
+      body: JSON.stringify({ mimeType, data }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
