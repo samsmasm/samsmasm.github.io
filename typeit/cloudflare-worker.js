@@ -33,6 +33,11 @@ const TRANSCRIBE_PROMPT = [
   'Output ONLY the transcribed text. No commentary, no headings, no markdown code fences.',
 ].join(' ');
 
+// Appended when the client sends { ignoreTyped: true }.
+const HANDWRITTEN_ONLY =
+  'IMPORTANT: If most of the text on the page is handwritten, transcribe ONLY the handwriting '
+  + 'and ignore any typed or printed text (such as letterhead, form labels, or printed questions).';
+
 // --- auth helpers (shared shape with the wc26 worker) ---------------------
 const enc = s => new TextEncoder().encode(s);
 function b64url(bytes) {
@@ -112,12 +117,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 524/408 = timeout, 429 = rate limit, 5xx = transient server errors. Worth a retry.
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 524]);
 
-async function transcribe(env, mimeType, dataB64) {
+async function transcribe(env, mimeType, dataB64, ignoreTyped) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+  const prompt = ignoreTyped ? `${TRANSCRIBE_PROMPT} ${HANDWRITTEN_ONLY}` : TRANSCRIBE_PROMPT;
   const body = {
     contents: [{
       parts: [
-        { text: TRANSCRIBE_PROMPT },
+        { text: prompt },
         { inlineData: { mimeType, data: dataB64 } },
       ],
     }],
@@ -178,13 +184,13 @@ export default {
       if (!env.GEMINI_API_KEY) return json({ error: 'Server is missing GEMINI_API_KEY' }, 500);
       let payload;
       try { payload = await request.json(); } catch { return json({ error: 'Bad JSON' }, 400); }
-      const { mimeType, data } = payload || {};
+      const { mimeType, data, ignoreTyped } = payload || {};
       if (!mimeType || !data) return json({ error: 'mimeType and data are required' }, 400);
       if (!/^(image\/|application\/pdf)/.test(mimeType)) return json({ error: 'Unsupported file type' }, 415);
       // base64 length ~ 4/3 of byte length; cheap size guard
       if (data.length * 3 / 4 > MAX_BYTES) return json({ error: 'Page too large (max 25MB)' }, 413);
       try {
-        const text = await transcribe(env, mimeType, data);
+        const text = await transcribe(env, mimeType, data, ignoreTyped === true);
         return json({ text });
       } catch (e) {
         return json({ error: String(e.message || e) }, 502);
