@@ -203,12 +203,32 @@
       <button class="btn ghost" id="copy">Copy</button>
       <button class="btn ghost" id="dl-md">Download .md</button>
       <button class="btn ghost" id="dl-txt">Download .txt</button>
+      <button class="btn ghost" id="tote">Save to Tote</button>
+      <a class="copied" id="tote-open" href="/tote" target="_blank" rel="noopener" style="display:none">Open Tote ↗</a>
       <span class="copied" id="copied" style="display:none">Copied</span>
     </div>
   </section>
 
   <footer>typeit &middot; on <a href="/">unisam.nz</a></footer>
 </div>
+
+<!-- Tote integration: writes a note into the same Firebase Realtime DB that
+     samsmasm.github.io/tote reads from. Public config, same as the Tote app. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getDatabase, ref, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+  const firebaseConfig = {
+    apiKey:            "AIzaSyCOSkL0C9_P8VeqpefXJbGCeOfXYwMMegE",
+    authDomain:        "notes-ff975.firebaseapp.com",
+    databaseURL:       "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "notes-ff975",
+    storageBucket:     "notes-ff975.firebasestorage.app",
+    messagingSenderId: "977644569179",
+    appId:             "1:977644569179:web:5c23a086bb411bd1dfb57e",
+  };
+  const db = getDatabase(initializeApp(firebaseConfig));
+  window.saveToTote = (content) => push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
+</script>
 
 <script>
 'use strict';
@@ -559,6 +579,29 @@ $('unwrap').addEventListener('click', () => {
   $('unwrap').classList.toggle('active', unwrap);
   $('unwrap').textContent = unwrap ? 'Keep line breaks' : 'Remove line breaks';
   renderResult();
+});
+
+// Tote note body: drop the page separator when there's just one page.
+function noteText(){
+  if (items.length === 1 && items[0].status === 'done') return present(items[0].text || '');
+  return combinedText();
+}
+
+$('tote').addEventListener('click', async () => {
+  const text = noteText();
+  if (!text.trim()) return;
+  if (!window.saveToTote){ alert('Tote isn’t ready yet — try again in a second.'); return; }
+  const b = $('tote'), label = b.textContent;
+  b.disabled = true; b.textContent = 'Saving…';
+  try {
+    await window.saveToTote(text);
+    b.textContent = 'Saved ✓';
+    $('tote-open').style.display = 'inline';
+    setTimeout(() => { b.textContent = label; b.disabled = false; }, 2500);
+  } catch (e){
+    b.textContent = label; b.disabled = false;
+    alert('Could not save to Tote: ' + (e.message || e));
+  }
 });
 
 $('copy').addEventListener('click', async () => {
