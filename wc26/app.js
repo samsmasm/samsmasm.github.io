@@ -1,29 +1,9 @@
 'use strict';
 
-// ---------------------------------------------------------------------------
-// Team-name normalisation. CSV spellings and ESPN spellings differ; collapse
-// both to a canonical key so comparisons are reliable.
-// ---------------------------------------------------------------------------
-function strip(name) {
-  return (name || '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // drop diacritics
-    .toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-const ALIAS = {
-  korearepublic: 'southkorea', republicofkorea: 'southkorea', southkorea: 'southkorea',
-  iriran: 'iran', iran: 'iran',
-  turkiye: 'turkiye', turkey: 'turkiye',
-  cotedivoire: 'ivorycoast', ivorycoast: 'ivorycoast',
-  caboverde: 'capeverde', capeverde: 'capeverde',
-  congodr: 'drcongo', drcongo: 'drcongo', democraticrepublicofcongo: 'drcongo',
-  bosniaandherzegovina: 'bosnia', bosniaherzegovina: 'bosnia',
-  usa: 'unitedstates', unitedstates: 'unitedstates', unitedstatesofamerica: 'unitedstates',
-};
-function canon(name) {
-  const s = strip(name);
-  return ALIAS[s] || s;
-}
-const same = (a, b) => canon(a) === canon(b);
+// Team-name normalisation and result orientation live in wc-core.js (window.WC)
+// so this page and the schedule page resolve results identically. wc-core.js
+// MUST be loaded before this script.
+const { canon, same, pairKey, esc, competitors, orient } = WC;
 
 // ---------------------------------------------------------------------------
 // ESPN endpoints
@@ -84,26 +64,12 @@ function classifyRound(note) {
   return null;
 }
 
-function competitors(ev) {
-  const c = ev.competitions && ev.competitions[0];
-  if (!c) return null;
-  const home = c.competitors.find(x => x.homeAway === 'home') || c.competitors[0];
-  const away = c.competitors.find(x => x.homeAway === 'away') || c.competitors[1];
-  return {
-    note: c.altGameNote || '',
-    state: c.status && c.status.type && c.status.type.state, // pre | in | post
-    completed: !!(c.status && c.status.type && c.status.type.completed),
-    home: home.team.displayName, hs: parseInt(home.score, 10),
-    away: away.team.displayName, as: parseInt(away.score, 10),
-  };
-}
-
 function buildResults(events, standings, ov) {
   ov = ov || {};
   const parsed = events.map(competitors).filter(Boolean);
 
-  // --- group-stage match results, keyed by canonical "home|away" (order-free) ---
-  const matchKey = (a, b) => [canon(a), canon(b)].sort().join('|');
+  // --- group-stage match results, keyed by canonical pair (order-free) ---
+  const matchKey = pairKey;
   const matches = new Map(); // key -> {hs,as,home,away,completed}
   const groupDone = {};      // group letter -> completed match count
   for (const m of parsed) {
@@ -120,15 +86,15 @@ function buildResults(events, standings, ov) {
   function fixtureOutcome(fx) {
     const o = ov.matches && ov.matches[`${fx.home}|${fx.away}`];
     let hs, as;
-    if (Array.isArray(o)) { [hs, as] = o; }
-    else {
-      const m = matches.get(matchKey(fx.home, fx.away));
-      if (!m) return null;
-      // The lookup key is order-free, so ESPN's home/away may be reversed
-      // relative to the fixture. Orient the scores to fx.home before judging.
-      const fxHomeIsEspnHome = same(fx.home, m.home);
-      hs = fxHomeIsEspnHome ? m.hs : m.as;
-      as = fxHomeIsEspnHome ? m.as : m.hs;
+    if (Array.isArray(o)) {
+      // Override is authored in fixture order: [home goals, away goals].
+      [hs, as] = o;
+    } else {
+      // Read the live score oriented to fx.home (the order-free key means
+      // ESPN's home/away may be reversed). orient() is the only sanctioned read.
+      const res = orient(fx.home, fx.away, matches.get(matchKey(fx.home, fx.away)));
+      if (!res) return null;
+      hs = res.a; as = res.b;
     }
     if (hs > as) return 'home';
     if (as > hs) return 'away';
@@ -259,8 +225,6 @@ function scorePlayer(p, R, fixtures) {
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
-const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
 // Three-letter team codes for the grid (keyed by canonical name). Falls back to
 // the first three letters for anything unmapped.
 const CODES = {
