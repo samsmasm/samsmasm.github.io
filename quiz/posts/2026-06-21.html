@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talkonomics &mdash; 21 June 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;
+  --surface:#fff;
+  --border:#111;
+  --text:#111;
+  --muted:#4a4540;
+  --light:#7a7268;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',system-ui,sans-serif}
+/* Slides */
+#slides{height:100vh;position:relative}
+.slide{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg);
+}
+.slide.active{display:flex}
+/* Category accent */
+.slide-top{
+  background:var(--cat-bg,#f0f5ff);
+  border-bottom:2px solid var(--cat-border,#b6cff5);
+  padding:0.55rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.category-badge{
+  font-family:'Inter',sans-serif;
+  font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--cat-fg,#1a3a7a);
+}
+.q-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.7rem;font-weight:600;
+  color:var(--cat-fg,#1a3a7a);
+  opacity:0.7;
+}
+/* Slide body */
+.slide-body{
+  flex:1;overflow-y:auto;
+  padding:2rem 2.5rem 1rem;
+  display:flex;flex-direction:column;
+  gap:1.4rem;
+  max-width:900px;width:100%;margin:0 auto;
+}
+/* Title slide */
+.title-body{
+  align-items:center;justify-content:center;text-align:center;
+  gap:1rem;
+  background:
+    radial-gradient(ellipse at 15% 50%, #ffd6e7 0%, transparent 50%),
+    radial-gradient(ellipse at 35% 20%, #d6f0ff 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+    #fff;
+}
+.title-wordmark{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4.5rem);
+  font-weight:900;
+  color:var(--text);
+  line-height:1;
+}
+.title-tagline{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.85rem,2vw,1.1rem);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.18em;
+  color:var(--light);
+}
+.title-date{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1rem,2.5vw,1.5rem);
+  color:var(--muted);
+  font-style:italic;
+}
+.title-meta{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;
+  color:var(--light);
+  letter-spacing:0.04em;
+}
+/* Question */
+.question-text{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1.1rem,2.8vw,1.55rem);
+  line-height:1.45;
+  color:var(--text);
+  font-weight:700;
+}
+/* Options */
+.options{display:flex;flex-direction:column;gap:0.65rem}
+.option{
+  display:flex;align-items:flex-start;gap:0.9rem;
+  background:var(--surface);
+  border:1.5px solid #ddd7cc;
+  border-radius:6px;
+  padding:0.75rem 1rem;
+  transition:background 0.2s,border-color 0.2s,opacity 0.25s;
+  cursor:default;
+}
+.option-letter{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--light);
+  flex-shrink:0;
+  margin-top:0.1rem;
+  min-width:1.1rem;
+}
+.option-text{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.9rem,2vw,1.05rem);
+  line-height:1.45;
+  color:var(--text);
+}
+/* Revealed state */
+.slide.revealed .option.correct{
+  background:#d6f5e8;
+  border-color:#145c34;
+}
+.slide.revealed .option.correct .option-letter{color:#145c34}
+.slide.revealed .option:not(.correct){opacity:0.32}
+.slide.revealed .explanation{display:block}
+.slide.revealed .btn-reveal{display:none}
+/* Explanation */
+.explanation{
+  display:none;
+  background:#f0f5ff;
+  border:1.5px solid #b6cff5;
+  border-radius:6px;
+  padding:0.9rem 1.1rem;
+}
+.explanation p{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.82rem,1.8vw,0.95rem);
+  line-height:1.6;
+  color:#1a3a7a;
+  font-style:italic;
+}
+/* Nav bar */
+.slide-nav{
+  flex-shrink:0;
+  border-top:1px solid #ddd7cc;
+  background:var(--surface);
+  padding:0.65rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0.75rem;
+}
+.slide-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--light);
+}
+/* Buttons */
+.btn-nav{
+  font-family:'Inter',sans-serif;
+  font-size:0.75rem;font-weight:600;
+  color:#1a3a7a;
+  background:none;border:1.5px solid #b6cff5;
+  border-radius:4px;padding:0.4rem 0.9rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s,border-color 0.12s;
+}
+.btn-nav:hover{background:#f0f5ff;border-color:#1a3a7a}
+.btn-reveal{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;border:none;
+  border-radius:4px;padding:0.45rem 1.2rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-reveal:hover{background:#2a4a9a}
+.btn-primary{
+  font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;
+  border:none;border-radius:4px;
+  padding:0.6rem 1.6rem;
+  cursor:pointer;text-decoration:none;
+  display:inline-block;
+  letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-primary:hover{background:#2a4a9a}
+/* Mode buttons on title slide */
+.mode-buttons{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}
+.btn-mode{
+  background:var(--surface);
+  border:2px solid #b6cff5;border-radius:8px;
+  padding:0.9rem 1.4rem;cursor:pointer;text-align:center;
+  min-width:190px;transition:border-color 0.15s,background 0.15s;
+}
+.btn-mode:hover{border-color:#1a3a7a;background:#f0f5ff}
+.btn-mode-title{display:block;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:700;color:#1a3a7a;margin-bottom:0.3rem}
+.btn-mode-desc{display:block;font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--light);line-height:1.4}
+/* Hide reveal button in at-end mode on question slides */
+body[data-mode="atend"] .q-slide .btn-reveal{display:none}
+/* Print */
+@media print{
+  html,body{overflow:visible;height:auto}
+  #slides{height:auto;position:static}
+  .slide{position:static;display:flex!important;page-break-before:always;min-height:100vh}
+  .slide:first-child{page-break-before:avoid}
+  .slide-nav{display:none}
+  .btn-reveal{display:none!important}
+  .slide.revealed .option{opacity:1!important}
+  .explanation{display:block!important}
+}
+</style>
+</head>
+<body>
+<div id="slides">
+
+  <div class="slide active" id="slide-0">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
+      <div class="title-date">Weekly Quiz &mdash; 21 June 2026</div>
+      <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
+      <div class="mode-buttons">
+        <button class="btn-mode" onclick="selectMode('asgo')">
+          <span class="btn-mode-title">Answers as we go</span>
+          <span class="btn-mode-desc">Reveal each answer before moving on</span>
+        </button>
+        <button class="btn-mode" onclick="selectMode('atend')">
+          <span class="btn-mode-title">Answers at the end</span>
+          <span class="btn-mode-desc">All 10 questions first, then all answers</span>
+        </button>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <span></span>
+      <span class="slide-counter">Talkonomics</span>
+      <span></span>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">CarMax, the US used-car giant, recently reported earnings that beat what analysts had expected. So why did its share price fall?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Investors were spooked by concerns about the company&#x27;s ability to grow and cut costs</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The CEO announced a surprise resignation on the earnings call</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">A recall affecting millions of its vehicles was disclosed at the same time</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. CarMax beat earnings expectations but shares fell anyway because investors weren&#x27;t convinced the company could grow revenues and cut costs at the same time. This is a classic &#x27;sell the news&#x27; moment — beating a target matters less if the forward story looks shaky. Margin pressure in used cars has been building as financing costs remain high and consumers stay cautious.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Several US states have recently moved to restrict what shoppers can buy using SNAP (food stamp benefits for low-income households). Which food categories are most commonly being targeted for removal from SNAP eligibility?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Organic produce and premium dairy</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Soda, candy, and processed snack foods</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Imported foods and non-English-labelled products</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The restrictions spreading across states are aimed at soda, candy, and processed foods. The political argument is that taxpayer-funded benefits shouldn&#x27;t cover items with low nutritional value. Food and beverage giants are watching closely — SNAP accounts for a significant chunk of sales in convenience and grocery channels, and a nationwide shift in eligibility could meaningfully dent revenues for snack and drinks companies.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Carvana built its name selling used cars entirely online, but it has just made a dramatic strategic pivot. Since last year, Carvana has acquired seven new-vehicle franchises selling Chrysler, Dodge, Jeep, and Ram brands through Stellantis dealerships. What is the core idea behind using those physical locations?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">To comply with state laws requiring a physical presence for all car sales</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">To use the dealerships as showrooms and test-drive centres while completing sales online</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">To convert them into vehicle reconditioning hubs for its used-car inventory</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Carvana&#x27;s plan is to keep its digital-first model intact but let customers visit physical sites to see and test new vehicles before completing the purchase online. It is a hybrid model that sidesteps the traditional dealership experience while solving the obvious problem: most people want to sit in a car before buying it. Moving into new vehicles is a significant expansion beyond the used-only market Carvana was built on.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Japan&#x27;s vending machine market is shrinking overall — fewer machines, fewer customers. One major operator has recently decided the answer is to lean in harder to a very specific type of customer. Who are they targeting?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Elderly commuters, with machines stocked exclusively with medication and warm drinks</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Anime and pop idol superfans, with machines selling themed merchandise and collectibles</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Remote office workers, with machines that double as parcel collection lockers</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. While the overall vending machine market contracts, this operator is betting that passionate anime and pop idol fans will spend freely on themed merchandise from dedicated machines. It is a smart niche play — superfans are less price-sensitive and more likely to seek out specific products. Japan still has more vending machines per capita than almost any other country, but operators are having to work harder to justify every square metre of floor space.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The Bank of England recently held its key interest rate (the benchmark rate it uses to influence borrowing costs across the economy) unchanged at 3.75% for the fourth consecutive meeting. What does the data that justified that decision show?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Inflation is holding steady and the labour market is continuing to cool</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">GDP growth (the total output of the economy) has rebounded strongly above trend</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Wage growth has accelerated sharply, threatening a new inflation surge</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The Bank of England held at 3.75% because inflation has steadied and the jobs market is softening — exactly the conditions that argue for patience rather than action. Holding rates four meetings in a row reflects genuine uncertainty: cut too soon and inflation could tick back up; hold too long and a cooling labour market tips into something worse. The Bank is threading a needle.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The US Federal Reserve (America&#x27;s central bank) recently held interest rates unchanged at its first meeting under new chair Kevin Warsh. The surprising detail: nearly half of policymakers signalled they could support a rate hike (an increase in borrowing costs) later this year. Which of these is NOT one of the risks that would justify raising rates?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Inflation remaining persistently above the Fed&#x27;s 2% target</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Wage growth pushing up costs for businesses and feeding through to prices</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Unemployment falling so fast that the economy risks overheating</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Unemployment falling quickly is not currently the concern — the worry is that inflation is staying stubbornly high even as the economy slows. Policymakers are focused on price pressures, not an overheating jobs market. The fact that nearly half the committee is still open to a hike is a reminder that the battle against inflation is not yet declared won, whatever markets might hope.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Washington has recently launched a trade investigation into Germany, accusing it of keeping medicine prices too low. This might sound backwards — why would the US object to another country paying less for drugs?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Because US pharmaceutical companies make far higher profits in America and see German price controls as unfair competition that undercuts their global pricing power</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Because cheap German drugs are being reimported into the US illegally, undercutting American pharmacies</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Because the World Trade Organization rules require all countries to pay the same price for patented medicines</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The US argument is that German price controls (government-set limits on what the state pays for medicines) effectively mean American patients and insurers subsidise the rest of the world&#x27;s drug costs — companies charge more in the US to make up the profit they lose elsewhere. If the investigation finds unfair practices, the US could impose punitive tariffs (extra taxes on imports) on German goods. It is a novel and aggressive use of trade law.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">New data from Realtor.com has just revealed a record high in the share of US adults under 35 living with their parents. What does the data say is the primary driver — and roughly what share of under-35s are living at home?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Weak job prospects; about 1 in 5 under-35s live with parents</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">High housing costs; about 1 in 3 under-35s live with parents</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Lifestyle preference; about 1 in 10 under-35s live with parents</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Around one in three US adults under 35 are now living with their parents — a record high — and the data points clearly to housing costs rather than unemployment as the main cause. This matters for the broader economy: young adults living at home buy fewer appliances, take out fewer mortgages, and start fewer households. It is one of the clearest signs of how sustained housing unaffordability reshapes behaviour well beyond the property market.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of cobalt, the metal essential for the lithium-ion batteries that power electric vehicles and smartphones?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The Democratic Republic of Congo</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Australia</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Chile</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The Democratic Republic of Congo produces roughly 70% of the world&#x27;s cobalt, making it one of the most strategically important countries in the global clean energy supply chain. Australia and the Philippines are distant second and third. Congo&#x27;s dominance means that political instability, labour conditions, or export policy changes there can ripple through EV manufacturers worldwide almost immediately.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">This Scottish economist published a landmark book in 1776 — the same year as American independence — which argued that national wealth comes from labour and free exchange, not from hoarding gold. He is now considered the father of modern economics. Who was he?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Ricardo</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">John Stuart Mill</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith published The Wealth of Nations in 1776, laying out the case for free markets and the division of labour (specialising tasks to boost productivity). His image appeared on the British £20 note. David Ricardo came later and developed trade theory; Mill was a generation later still. Smith&#x27;s core insight — that individuals pursuing self-interest can produce collective prosperity — remains one of the most influential ideas in economics.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">CarMax, the US used-car giant, recently reported earnings that beat what analysts had expected. So why did its share price fall?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Investors were spooked by concerns about the company&#x27;s ability to grow and cut costs</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The CEO announced a surprise resignation on the earnings call</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">A recall affecting millions of its vehicles was disclosed at the same time</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. CarMax beat earnings expectations but shares fell anyway because investors weren&#x27;t convinced the company could grow revenues and cut costs at the same time. This is a classic &#x27;sell the news&#x27; moment — beating a target matters less if the forward story looks shaky. Margin pressure in used cars has been building as financing costs remain high and consumers stay cautious.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A1 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Several US states have recently moved to restrict what shoppers can buy using SNAP (food stamp benefits for low-income households). Which food categories are most commonly being targeted for removal from SNAP eligibility?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Organic produce and premium dairy</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Soda, candy, and processed snack foods</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Imported foods and non-English-labelled products</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The restrictions spreading across states are aimed at soda, candy, and processed foods. The political argument is that taxpayer-funded benefits shouldn&#x27;t cover items with low nutritional value. Food and beverage giants are watching closely — SNAP accounts for a significant chunk of sales in convenience and grocery channels, and a nationwide shift in eligibility could meaningfully dent revenues for snack and drinks companies.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A2 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Carvana built its name selling used cars entirely online, but it has just made a dramatic strategic pivot. Since last year, Carvana has acquired seven new-vehicle franchises selling Chrysler, Dodge, Jeep, and Ram brands through Stellantis dealerships. What is the core idea behind using those physical locations?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">To comply with state laws requiring a physical presence for all car sales</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">To use the dealerships as showrooms and test-drive centres while completing sales online</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">To convert them into vehicle reconditioning hubs for its used-car inventory</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Carvana&#x27;s plan is to keep its digital-first model intact but let customers visit physical sites to see and test new vehicles before completing the purchase online. It is a hybrid model that sidesteps the traditional dealership experience while solving the obvious problem: most people want to sit in a car before buying it. Moving into new vehicles is a significant expansion beyond the used-only market Carvana was built on.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A3 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Japan&#x27;s vending machine market is shrinking overall — fewer machines, fewer customers. One major operator has recently decided the answer is to lean in harder to a very specific type of customer. Who are they targeting?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Elderly commuters, with machines stocked exclusively with medication and warm drinks</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Anime and pop idol superfans, with machines selling themed merchandise and collectibles</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Remote office workers, with machines that double as parcel collection lockers</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. While the overall vending machine market contracts, this operator is betting that passionate anime and pop idol fans will spend freely on themed merchandise from dedicated machines. It is a smart niche play — superfans are less price-sensitive and more likely to seek out specific products. Japan still has more vending machines per capita than almost any other country, but operators are having to work harder to justify every square metre of floor space.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A4 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The Bank of England recently held its key interest rate (the benchmark rate it uses to influence borrowing costs across the economy) unchanged at 3.75% for the fourth consecutive meeting. What does the data that justified that decision show?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Inflation is holding steady and the labour market is continuing to cool</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">GDP growth (the total output of the economy) has rebounded strongly above trend</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Wage growth has accelerated sharply, threatening a new inflation surge</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The Bank of England held at 3.75% because inflation has steadied and the jobs market is softening — exactly the conditions that argue for patience rather than action. Holding rates four meetings in a row reflects genuine uncertainty: cut too soon and inflation could tick back up; hold too long and a cooling labour market tips into something worse. The Bank is threading a needle.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A5 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The US Federal Reserve (America&#x27;s central bank) recently held interest rates unchanged at its first meeting under new chair Kevin Warsh. The surprising detail: nearly half of policymakers signalled they could support a rate hike (an increase in borrowing costs) later this year. Which of these is NOT one of the risks that would justify raising rates?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Inflation remaining persistently above the Fed&#x27;s 2% target</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Wage growth pushing up costs for businesses and feeding through to prices</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Unemployment falling so fast that the economy risks overheating</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Unemployment falling quickly is not currently the concern — the worry is that inflation is staying stubbornly high even as the economy slows. Policymakers are focused on price pressures, not an overheating jobs market. The fact that nearly half the committee is still open to a hike is a reminder that the battle against inflation is not yet declared won, whatever markets might hope.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A6 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Washington has recently launched a trade investigation into Germany, accusing it of keeping medicine prices too low. This might sound backwards — why would the US object to another country paying less for drugs?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Because US pharmaceutical companies make far higher profits in America and see German price controls as unfair competition that undercuts their global pricing power</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Because cheap German drugs are being reimported into the US illegally, undercutting American pharmacies</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Because the World Trade Organization rules require all countries to pay the same price for patented medicines</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The US argument is that German price controls (government-set limits on what the state pays for medicines) effectively mean American patients and insurers subsidise the rest of the world&#x27;s drug costs — companies charge more in the US to make up the profit they lose elsewhere. If the investigation finds unfair practices, the US could impose punitive tariffs (extra taxes on imports) on German goods. It is a novel and aggressive use of trade law.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A7 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">New data from Realtor.com has just revealed a record high in the share of US adults under 35 living with their parents. What does the data say is the primary driver — and roughly what share of under-35s are living at home?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Weak job prospects; about 1 in 5 under-35s live with parents</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">High housing costs; about 1 in 3 under-35s live with parents</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Lifestyle preference; about 1 in 10 under-35s live with parents</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Around one in three US adults under 35 are now living with their parents — a record high — and the data points clearly to housing costs rather than unemployment as the main cause. This matters for the broader economy: young adults living at home buy fewer appliances, take out fewer mortgages, and start fewer households. It is one of the clearest signs of how sustained housing unaffordability reshapes behaviour well beyond the property market.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A8 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of cobalt, the metal essential for the lithium-ion batteries that power electric vehicles and smartphones?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The Democratic Republic of Congo</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Australia</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Chile</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The Democratic Republic of Congo produces roughly 70% of the world&#x27;s cobalt, making it one of the most strategically important countries in the global clean energy supply chain. Australia and the Philippines are distant second and third. Congo&#x27;s dominance means that political instability, labour conditions, or export policy changes there can ripple through EV manufacturers worldwide almost immediately.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A9 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">This Scottish economist published a landmark book in 1776 — the same year as American independence — which argued that national wealth comes from labour and free exchange, not from hoarding gold. He is now considered the father of modern economics. Who was he?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Ricardo</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">John Stuart Mill</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith published The Wealth of Nations in 1776, laying out the case for free markets and the division of labour (specialising tasks to boost productivity). His image appeared on the British £20 note. David Ricardo came later and developed trade theory; Mill was a generation later still. Smith&#x27;s core insight — that individuals pursuing self-interest can produce collective prosperity — remains one of the most influential ideas in economics.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A10 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-end">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">That&#8217;s all 10!</div>
+      <div class="title-date">21 June 2026</div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+        <button class="btn-primary" onclick="goTo(0)">&#8592; Start again</button>
+        <a class="btn-primary" href="../index.html">All editions</a>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">End</span>
+      <span></span>
+    </div>
+  </div>
+</div>
+<script>
+var TOTAL = document.querySelectorAll('.q-slide').length;
+var pos = 0;
+var SEQ = [];
+
+function buildSeq(m) {
+  var s = ['slide-0'];
+  for (var i = 1; i <= TOTAL; i++) s.push('slide-' + i);
+  if (m === 'atend') {
+    for (var i = 1; i <= TOTAL; i++) s.push('slide-a' + i);
+  }
+  s.push('slide-end');
+  return s;
+}
+
+function selectMode(m) {
+  SEQ = buildSeq(m);
+  document.body.setAttribute('data-mode', m);
+  showAt(1);
+}
+
+function showAt(p) {
+  pos = p;
+  document.querySelectorAll('.slide').forEach(function(s) { s.classList.remove('active'); });
+  var el = document.getElementById(SEQ[p]);
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+}
+
+function goTo(p) { showAt(p); }
+
+function nextSlide() {
+  if (pos < SEQ.length - 1) showAt(pos + 1);
+}
+
+function prevSlide() {
+  if (pos > 0) showAt(pos - 1);
+}
+
+function revealSlide(btn) {
+  var slide = btn.closest('.slide');
+  slide.classList.add('revealed');
+  var exp = slide.querySelector('.explanation');
+  if (exp) exp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextSlide(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { prevSlide(); e.preventDefault(); }
+  else if (e.key === ' ' || e.key === 'Enter') {
+    var slide = document.querySelector('.slide.active');
+    if (slide && !slide.classList.contains('revealed')) {
+      var btn = slide.querySelector('.btn-reveal');
+      if (btn) { revealSlide(btn); e.preventDefault(); return; }
+    }
+    nextSlide();
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
