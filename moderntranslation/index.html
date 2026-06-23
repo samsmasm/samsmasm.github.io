@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Plainspeak</title>
+<title>Modern Translation</title>
 <style>
   :root {
     --purple: #4a1a7a;
@@ -19,6 +19,9 @@
     --flag-bg: #fff0f6;
     --flag-border: #f5b6d4;
     --flag-text: #7a1a4a;
+    --done-bg: #f0faf4;
+    --done-border: #b6e8cb;
+    --done-text: #145c34;
   }
   * { box-sizing: border-box; }
   body {
@@ -56,7 +59,19 @@
 
   main { max-width: 920px; margin: 0 auto; padding: 24px; }
 
-  /* ---- controls ---- */
+  /* ---- nav row ---- */
+  .nav-row {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 18px; font-size: 13px;
+  }
+  .nav-link {
+    background: none; border: 0; color: var(--purple-mid);
+    font-size: 13px; font-weight: 600; cursor: pointer; padding: 0;
+  }
+  .nav-link:hover { color: var(--purple); text-decoration: underline; }
+  .nav-spacer { margin-left: auto; }
+
+  /* ---- panels / fields ---- */
   .panel {
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -80,6 +95,9 @@
   }
   input[type="text"]:focus, textarea:focus { border-color: var(--purple); }
   textarea { resize: vertical; min-height: 200px; line-height: 1.55; }
+  textarea.ctx { min-height: 70px; font-size: 13px; color: var(--muted); }
+  textarea.ctx.filled { color: var(--ink); }
+  textarea.short { min-height: 90px; }
 
   .input-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
   .input-tab {
@@ -133,14 +151,26 @@
   }
   button.ghost:hover { background: var(--purple-pale); }
   button.ghost:disabled { color: #c9bbe0; border-color: #ece4f7; cursor: default; }
+  button.ghost.sm { padding: 6px 12px; font-size: 13px; }
+  button.danger { color: var(--flag-text); border-color: var(--flag-border); }
+  button.danger:hover { background: var(--flag-bg); }
 
   .progress { font-size: 14px; color: var(--muted); }
   .progress .count { color: var(--purple); font-weight: 600; }
   .warn { color: var(--flag-text); font-size: 13px; margin-top: 10px; }
   .err { color: #c62a30; font-size: 13px; margin-top: 10px; }
 
-  /* ---- output ---- */
-  #output { margin-top: 8px; }
+  /* ---- view toggle ---- */
+  .view-bar {
+    display: none; align-items: center; justify-content: flex-end;
+    gap: 8px; margin: 4px 0 6px; font-size: 13px; color: var(--muted);
+  }
+  .view-bar.show { display: flex; }
+  .view-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .view-toggle input { accent-color: var(--purple); width: 15px; height: 15px; }
+
+  /* ---- translation output ---- */
+  .txt-output { margin-top: 8px; }
   .para {
     position: relative;
     padding: 14px 16px 14px 18px;
@@ -148,19 +178,32 @@
     border-radius: 9px;
     border: 1px solid transparent;
   }
+  .para-original { display: none; }
+  .txt-output.dual .para {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start;
+  }
+  .txt-output.dual .para-original {
+    display: block;
+    font-size: 15px; line-height: 1.6; color: var(--muted);
+    white-space: pre-wrap;
+    padding-right: 26px;
+    border-right: 1px solid var(--divider);
+  }
+  @media (max-width: 640px) {
+    .txt-output.dual .para { grid-template-columns: 1fr; gap: 12px; }
+    .txt-output.dual .para-original {
+      padding-right: 0; padding-bottom: 12px;
+      border-right: 0; border-bottom: 1px solid var(--divider);
+    }
+  }
   .para:hover { background: #fbfaff; }
   .para.flagged { background: var(--flag-bg); border-color: var(--flag-border); }
   .para.pending { color: var(--muted); font-style: italic; }
-  .para-text {
-    font-size: 16px; line-height: 1.65; white-space: pre-wrap;
-    outline: none;
-  }
+  .para-text { font-size: 16px; line-height: 1.65; white-space: pre-wrap; outline: none; }
   .para-text[contenteditable="true"] { cursor: text; }
-  .para.edited .para-text { /* nothing loud, just track in state */ }
   .flag-note {
     display: block; margin-top: 8px;
-    font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-    color: var(--flag-text);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--flag-text);
   }
   .para-tools {
     display: flex; gap: 10px; align-items: center;
@@ -181,6 +224,84 @@
   }
   .download-bar.show { display: flex; }
 
+  /* ---- projects list ---- */
+  .proj-list { display: flex; flex-direction: column; gap: 10px; }
+  .proj-item {
+    display: flex; align-items: center; gap: 14px;
+    border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  }
+  .proj-item:hover { background: #fbfaff; }
+  .proj-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .proj-title { font-weight: 600; font-size: 15px; color: var(--purple); }
+  .proj-sub { font-size: 12px; color: var(--muted); }
+  .proj-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .empty-note { color: var(--muted); font-size: 14px; padding: 20px 0; }
+
+  /* ---- project workspace ---- */
+  .ws-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .ws-title-input {
+    font-family: Georgia, serif; font-size: 22px; font-weight: 700; color: var(--purple);
+    border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; flex: 1; min-width: 200px;
+  }
+  .ws-title-input:hover { border-color: var(--border); }
+  .ws-title-input:focus { border-color: var(--purple); outline: none; }
+  .ws-export { display: flex; gap: 8px; }
+
+  .meta-box summary {
+    cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); list-style: none;
+  }
+  .meta-box summary::-webkit-details-marker { display: none; }
+  .meta-box summary::before { content: '▸ '; }
+  .meta-box[open] summary::before { content: '▾ '; }
+
+  .section-list { display: flex; flex-direction: column; gap: 8px; }
+  .section-item {
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid var(--border); border-radius: 9px; padding: 11px 14px;
+  }
+  .section-item.done { background: var(--done-bg); border-color: var(--done-border); }
+  .section-item.active { box-shadow: 0 0 0 2px var(--purple-soft); }
+  .section-label { font-weight: 600; font-size: 14px; }
+  .section-sub { font-size: 12px; color: var(--muted); }
+  .section-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 4px;
+  }
+  .badge.done { background: #d6f5e8; color: var(--done-text); }
+  .badge.pending { background: #ece0ff; color: var(--purple); }
+  .badge.norange { background: var(--flag-bg); color: var(--flag-text); }
+
+  /* ---- source view ---- */
+  .coverage { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .coverage b { color: var(--done-text); }
+  .src-view {
+    border: 1px solid var(--border); border-radius: 10px;
+    max-height: 460px; overflow-y: auto; padding: 4px;
+  }
+  .src-para {
+    display: flex; gap: 10px; padding: 7px 9px; border-radius: 7px;
+    cursor: pointer; font-size: 13px; line-height: 1.5;
+  }
+  .src-para:hover { background: var(--purple-pale); }
+  .src-para.sel { background: #e6d8fb; }
+  .src-para.translated { color: var(--done-text); background: var(--done-bg); }
+  .src-para.translated.sel { background: #cdeed8; }
+  .src-idx { flex: 0 0 auto; width: 40px; color: var(--muted); font-variant-numeric: tabular-nums; user-select: none; }
+  .src-tick { flex: 0 0 auto; width: 14px; color: var(--done-text); user-select: none; }
+  .src-text { flex: 1; white-space: pre-wrap; }
+
+  .sel-bar {
+    position: sticky; bottom: 0; z-index: 5;
+    display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #fff; border: 1px solid var(--purple-soft); border-radius: 10px;
+    padding: 12px 14px; margin-top: 12px;
+  }
+  .sel-bar.show { display: flex; }
+  .sel-bar .sel-info { font-size: 13px; color: var(--ink); }
+  .sel-bar input[type="text"] { width: 200px; }
+
   footer {
     max-width: 920px; margin: 40px auto 24px; padding: 16px 24px 0;
     border-top: 1px solid var(--divider);
@@ -194,7 +315,7 @@
   <div class="header-inner">
     <img src="/unisamsq.png" alt="unisam.nz">
     <div>
-      <div class="wordmark">Plainspeak</div>
+      <div class="wordmark">Modern Translation</div>
       <div class="tagline">Classic texts, translated into plain modern English</div>
     </div>
     <a class="back" href="/">← unisam.nz</a>
@@ -202,66 +323,213 @@
 </header>
 
 <main>
-  <!-- Controls -->
-  <section class="panel" id="controls">
-    <div class="field">
-      <label class="label" for="work-summary">What is this text? (optional, helps continuity)</label>
-      <input type="text" id="work-summary" placeholder="e.g. Mill's On Liberty, defending individual freedom against social and political control">
+  <!-- ============================ QUICK SCREEN ============================ -->
+  <div id="screen-quick">
+    <div class="nav-row">
+      <span style="color:var(--muted)">Quick translate</span>
+      <span class="nav-spacer"></span>
+      <button class="nav-link" id="go-projects">Work on a whole book → Projects</button>
     </div>
 
-    <div class="field">
-      <label class="label">Source text</label>
-      <div class="input-tabs">
-        <button class="input-tab active" data-mode="paste" type="button">Paste text</button>
-        <button class="input-tab" data-mode="pdf" type="button">Upload PDF</button>
-      </div>
-      <div id="paste-pane">
-        <textarea id="source-text" placeholder="Paste the passage you want translated. Separate paragraphs with a blank line."></textarea>
-      </div>
-      <div id="pdf-pane" class="hidden">
-        <div class="drop" id="drop">
-          <strong>Choose a PDF</strong> or drop one here. Text is extracted in your browser.
-          <input type="file" id="pdf-input" accept="application/pdf" class="hidden">
+    <section class="panel" id="controls">
+      <div class="row">
+        <div class="field">
+          <label class="label" for="book-title">Book title (used for the download filename)</label>
+          <input type="text" id="book-title" placeholder="e.g. On Liberty">
         </div>
-        <div class="pdf-status" id="pdf-status"></div>
+        <div class="field">
+          <label class="label" for="work-summary">What is this text? (optional, helps continuity)</label>
+          <input type="text" id="work-summary" placeholder="e.g. Mill's On Liberty, defending individual freedom against control">
+        </div>
       </div>
-    </div>
 
-    <div class="row">
       <div class="field">
-        <label class="label" for="level">Reading level</label>
-        <div class="level-row">
-          <input type="range" id="level" min="8" max="18" value="8" step="1">
-          <span class="level-val" id="level-val">8</span>
-        </div>
-        <div class="level-hint" id="level-hint"></div>
+        <label class="label" for="prev-context">Continuing from an earlier batch? Paste the carry-over context here (optional)</label>
+        <textarea id="prev-context" class="ctx" placeholder="Leave blank for the first batch. After each run finishes, the context to carry into the next batch appears here automatically."></textarea>
       </div>
+
       <div class="field">
-        <label class="label">Effort (chunk size)</label>
-        <div class="effort" id="effort">
-          <label class="sel"><input type="radio" name="effort" value="high" checked>High<span class="sub">~1 paragraph</span></label>
-          <label><input type="radio" name="effort" value="standard">Standard<span class="sub">~2–3 paras</span></label>
-          <label><input type="radio" name="effort" value="low">Low<span class="sub">~5–6 paras</span></label>
+        <label class="label">Source text</label>
+        <div class="input-tabs">
+          <button class="input-tab active" data-mode="paste" type="button">Paste text</button>
+          <button class="input-tab" data-mode="pdf" type="button">Upload PDF</button>
         </div>
+        <div id="paste-pane">
+          <textarea id="source-text" placeholder="Paste the passage you want translated. Separate paragraphs with a blank line."></textarea>
+        </div>
+        <div id="pdf-pane" class="hidden">
+          <div class="drop" id="drop">
+            <strong>Choose a PDF</strong> or drop one here. Text is extracted in your browser.
+            <input type="file" id="pdf-input" accept="application/pdf" class="hidden">
+          </div>
+          <div class="pdf-status" id="pdf-status"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label class="label" for="level">Reading level</label>
+          <div class="level-row">
+            <input type="range" id="level" min="8" max="18" value="8" step="1">
+            <span class="level-val" id="level-val">8</span>
+          </div>
+          <div class="level-hint" id="level-hint"></div>
+        </div>
+        <div class="field">
+          <label class="label">Effort (chunk size)</label>
+          <div class="effort" id="effort">
+            <label class="sel"><input type="radio" name="effort" value="high" checked>High<span class="sub">~1 paragraph</span></label>
+            <label><input type="radio" name="effort" value="standard">Standard<span class="sub">~2–3 paras</span></label>
+            <label><input type="radio" name="effort" value="low">Low<span class="sub">~5–6 paras</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:4px">
+        <div class="actions">
+          <button class="primary" id="translate-btn">Translate</button>
+          <span class="progress" id="progress"></span>
+        </div>
+        <div class="warn hidden" id="warn"></div>
+        <div class="err hidden" id="error"></div>
+      </div>
+    </section>
+
+    <div class="view-bar" id="view-bar">
+      <label class="view-toggle"><input type="checkbox" id="dual-toggle"> Show original alongside</label>
+    </div>
+    <section id="output" class="txt-output"></section>
+
+    <div class="download-bar" id="download-bar">
+      <button class="ghost" id="dl-md">Download .md</button>
+      <button class="ghost" id="dl-txt">Download .txt</button>
+    </div>
+  </div>
+
+  <!-- ============================ PROJECTS LIST ============================ -->
+  <div id="screen-projects" class="hidden">
+    <div class="nav-row">
+      <button class="nav-link" id="back-quick">← Quick translate</button>
+      <span class="nav-spacer"></span>
+      <button class="ghost sm" id="new-project">+ New project</button>
+    </div>
+    <h2 style="font-family:Georgia,serif;color:var(--purple);font-weight:700;margin:0 0 16px">Your books</h2>
+    <div class="proj-list" id="proj-list"></div>
+  </div>
+
+  <!-- ============================ PROJECT WORKSPACE ============================ -->
+  <div id="screen-project" class="hidden">
+    <div class="nav-row">
+      <button class="nav-link" id="back-projects">← All projects</button>
+      <span class="nav-spacer"></span>
+    </div>
+
+    <div class="ws-head">
+      <input type="text" class="ws-title-input" id="ws-title" placeholder="Untitled book">
+      <div class="ws-export">
+        <button class="ghost sm" id="ws-md">Export .md</button>
+        <button class="ghost sm" id="ws-txt">Export .txt</button>
+        <button class="ghost sm danger" id="ws-delete">Delete project</button>
       </div>
     </div>
 
-    <div class="field" style="margin-top:4px">
+    <details class="panel meta-box" id="meta-box">
+      <summary>Story so far (carry-over context for the next section)</summary>
+      <textarea id="ws-rolling" class="short" style="margin-top:12px" placeholder="Builds up automatically as you translate sections. You can edit it."></textarea>
+      <div class="row" style="margin-top:14px">
+        <div class="field">
+          <label class="label" for="ws-work-summary">What is this book? (optional)</label>
+          <input type="text" id="ws-work-summary" placeholder="e.g. Mill's On Liberty">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label class="label" for="ws-level">Reading level</label>
+          <div class="level-row">
+            <input type="range" id="ws-level" min="8" max="18" value="8" step="1">
+            <span class="level-val" id="ws-level-val">8</span>
+          </div>
+          <div class="level-hint" id="ws-level-hint"></div>
+        </div>
+        <div class="field">
+          <label class="label">Effort (chunk size)</label>
+          <div class="effort" id="ws-effort">
+            <label class="sel"><input type="radio" name="ws-effort" value="high" checked>High<span class="sub">~1 paragraph</span></label>
+            <label><input type="radio" name="ws-effort" value="standard">Standard<span class="sub">~2–3 paras</span></label>
+            <label><input type="radio" name="ws-effort" value="low">Low<span class="sub">~5–6 paras</span></label>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Source loading (shown when no source yet) -->
+    <section class="panel" id="ws-load">
+      <div class="field">
+        <label class="label">Full book text</label>
+        <div class="input-tabs">
+          <button class="input-tab active" data-wsmode="paste" type="button">Paste text</button>
+          <button class="input-tab" data-wsmode="pdf" type="button">Upload PDF</button>
+        </div>
+        <div id="ws-paste-pane">
+          <textarea id="ws-source-text" placeholder="Paste the whole book (or as much as you have). Separate paragraphs with blank lines."></textarea>
+        </div>
+        <div id="ws-pdf-pane" class="hidden">
+          <div class="drop" id="ws-drop">
+            <strong>Choose a PDF</strong> or drop one here. Text is extracted in your browser.
+            <input type="file" id="ws-pdf-input" accept="application/pdf" class="hidden">
+          </div>
+          <div class="pdf-status" id="ws-pdf-status"></div>
+        </div>
+      </div>
       <div class="actions">
-        <button class="primary" id="translate-btn">Translate</button>
-        <span class="progress" id="progress"></span>
+        <button class="primary" id="ws-load-btn">Load book</button>
+        <span class="progress" id="ws-load-progress"></span>
       </div>
-      <div class="warn hidden" id="warn"></div>
-      <div class="err hidden" id="error"></div>
-    </div>
-  </section>
+      <div class="err hidden" id="ws-load-err"></div>
+    </section>
 
-  <!-- Output -->
-  <section id="output"></section>
+    <!-- Workspace body (shown when source is loaded) -->
+    <section id="ws-body" class="hidden">
+      <!-- Contents page -->
+      <details class="panel" id="toc-box">
+        <summary class="label" style="cursor:pointer">Paste a contents page to carve the book into sections</summary>
+        <textarea id="toc-text" class="short" style="margin-top:12px" placeholder="Paste the table of contents, one chapter per line. Each line becomes a section, located in the book by matching the heading."></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="ghost sm" id="toc-apply">Create sections from contents</button>
+          <span class="progress" id="toc-status"></span>
+        </div>
+      </details>
 
-  <div class="download-bar" id="download-bar">
-    <button class="ghost" id="dl-md">Download .md</button>
-    <button class="ghost" id="dl-txt">Download .txt</button>
+      <h3 style="margin:18px 0 8px;color:var(--purple)">Sections</h3>
+      <div class="coverage" id="coverage"></div>
+      <div class="section-list" id="section-list"></div>
+
+      <h3 style="margin:24px 0 8px;color:var(--purple)">The book</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 10px">
+        Click a paragraph to start a selection, shift-click another to extend it. Green = already translated.
+      </p>
+      <div class="src-view" id="src-view"></div>
+      <div class="sel-bar" id="sel-bar">
+        <span class="sel-info" id="sel-info"></span>
+        <input type="text" id="sel-label" placeholder="Section name (optional)">
+        <button class="primary" id="sel-translate" style="padding:9px 18px;font-size:14px">Translate selection</button>
+        <button class="ghost sm" id="sel-pending">Save as pending</button>
+        <button class="nav-link" id="sel-clear">Clear</button>
+      </div>
+
+      <!-- Section detail / translation output -->
+      <div id="ws-detail" class="hidden" style="margin-top:24px">
+        <div class="ws-head">
+          <h3 style="margin:0;color:var(--purple)" id="detail-title">Section</h3>
+          <span class="progress" id="ws-progress" style="margin-left:8px"></span>
+          <div class="ws-export">
+            <label class="view-toggle" style="font-size:13px;color:var(--muted)"><input type="checkbox" id="ws-dual-toggle"> Show original alongside</label>
+          </div>
+        </div>
+        <div class="err hidden" id="ws-detail-err"></div>
+        <section id="p-output" class="txt-output"></section>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -270,8 +538,16 @@
 </footer>
 
 <script type="module">
-import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+// pdf.js is loaded lazily (only when a PDF is actually uploaded), so the rest
+// of the app works even if the CDN is slow or unreachable.
+let _pdfjs = null;
+async function loadPdfjs() {
+  if (_pdfjs) return _pdfjs;
+  const lib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+  lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+  _pdfjs = lib;
+  return lib;
+}
 
 // ====================================================================
 // Config
@@ -282,51 +558,34 @@ const EFFORT_MIN_WORDS = { high: 150, standard: 400, low: 800 };
 const WORD_WARN_LIMIT = 60000;
 
 // ====================================================================
-// State (the source of truth for display + export)
-// ====================================================================
-// paragraphs: [{ id, original, translation, flag, edited, summaryBefore }]
-let paragraphs = [];
-let running = false;
-
-// ====================================================================
-// Text + chunking (pure, unit-testable)
+// Text + chunking (pure)
 // ====================================================================
 function splitParagraphs(text) {
-  return text
-    .replace(/\r\n/g, '\n')
-    .split(/\n\s*\n+/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
+  return text.replace(/\r\n/g, '\n').split(/\n\s*\n+/).map(p => p.trim()).filter(p => p.length > 0);
 }
+function wordCount(s) { const m = s.trim().match(/\S+/g); return m ? m.length : 0; }
 
-function wordCount(s) {
-  const m = s.trim().match(/\S+/g);
-  return m ? m.length : 0;
-}
-
-// Group paragraphs into chunks by minimum word count. Paragraphs are never
-// split. A trailing chunk that is too small is merged into the previous one.
 function buildChunks(paras, targetMinWords) {
-  const chunks = [];
-  let current = [];
-  let currentWords = 0;
+  const chunks = []; let current = []; let currentWords = 0;
   for (const p of paras) {
-    current.push(p);
-    currentWords += wordCount(p.original);
-    if (currentWords >= targetMinWords) {
-      chunks.push(current);
-      current = [];
-      currentWords = 0;
-    }
+    current.push(p); currentWords += wordCount(p.original);
+    if (currentWords >= targetMinWords) { chunks.push(current); current = []; currentWords = 0; }
   }
   if (current.length) {
-    if (chunks.length && currentWords < targetMinWords * 0.5) {
-      chunks[chunks.length - 1].push(...current);
-    } else {
-      chunks.push(current);
-    }
+    if (chunks.length && currentWords < targetMinWords * 0.5) chunks[chunks.length - 1].push(...current);
+    else chunks.push(current);
   }
   return chunks;
+}
+
+// If the model returns the wrong number of paragraphs, fit the array to size.
+function reconcile(arr, n) {
+  if (arr.length > n) {
+    const head = arr.slice(0, n - 1);
+    const tail = arr.slice(n - 1).join('\n\n');
+    return [...head, tail];
+  }
+  return [...arr, ...Array(n - arr.length).fill('')];
 }
 
 // ====================================================================
@@ -369,12 +628,9 @@ Translation: "Once the division of labour is fully established, a person can no 
 function buildUserMessage({ workSummary, rollingSummary, prevTranslation, chunkParas }) {
   const numbered = chunkParas.map((p, i) => `[${i + 1}] ${p.original}`).join('\n\n');
   return [
-    `WORK SUMMARY: ${workSummary || '(none provided)'}`,
-    ``,
-    `ROLLING SUMMARY SO FAR: ${rollingSummary || '(nothing translated yet)'}`,
-    ``,
-    `PREVIOUS TRANSLATED PARAGRAPH (for tone and continuity): ${prevTranslation || '(this is the first passage)'}`,
-    ``,
+    `WORK SUMMARY: ${workSummary || '(none provided)'}`, ``,
+    `ROLLING SUMMARY SO FAR: ${rollingSummary || '(nothing translated yet)'}`, ``,
+    `PREVIOUS TRANSLATED PARAGRAPH (for tone and continuity): ${prevTranslation || '(this is the first passage)'}`, ``,
     `SOURCE PARAGRAPHS TO TRANSLATE NOW (return exactly ${chunkParas.length}, aligned one-to-one, in order):`,
     numbered,
   ].join('\n');
@@ -403,22 +659,18 @@ function extractJson(text) {
   if (!m) throw new Error('No JSON in response');
   return JSON.parse(m[0]);
 }
-
 async function callTranslate(system, user) {
   const res = await fetch(TRANSLATE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ system, user }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Translate failed (${res.status})`);
   return extractJson(data.text);
 }
-
 async function callVerify(prompt) {
   const res = await fetch(VERIFY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt }),
   });
   const data = await res.json().catch(() => ({}));
@@ -427,19 +679,30 @@ async function callVerify(prompt) {
 }
 
 // ====================================================================
-// Rendering
+// Active translation context (shared by quick mode + project mode)
 // ====================================================================
-const output = document.getElementById('output');
+// active.paragraphs: [{ id, original, translation, flag, edited, summaryBefore }]
+const active = {
+  paragraphs: [],
+  outputEl: null,
+  workSummary: '',
+  readingLevel: 8,
+  effort: 'high',
+  onChange: null,   // called after an edit/regenerate so callers can persist
+};
+let running = false;
 
-function paraEl(id) { return document.getElementById('para-' + id); }
+function paraEl(id) {
+  return active.outputEl ? active.outputEl.querySelector(`[data-id="${id}"]`) : null;
+}
 
 function renderParagraph(p) {
   let el = paraEl(p.id);
   if (!el) {
     el = document.createElement('div');
     el.className = 'para';
-    el.id = 'para-' + p.id;
-    output.appendChild(el);
+    el.dataset.id = p.id;
+    active.outputEl.appendChild(el);
   }
   el.classList.toggle('flagged', !!p.flag);
   el.classList.toggle('edited', !!p.edited);
@@ -447,6 +710,14 @@ function renderParagraph(p) {
 
   const text = p.translation === null ? 'translating…' : p.translation;
   el.innerHTML = '';
+
+  const origEl = document.createElement('div');
+  origEl.className = 'para-original';
+  origEl.textContent = p.original;
+  el.appendChild(origEl);
+
+  const trans = document.createElement('div');
+  trans.className = 'para-trans';
 
   const textEl = document.createElement('div');
   textEl.className = 'para-text';
@@ -459,18 +730,19 @@ function renderParagraph(p) {
       if (v !== p.translation) {
         p.translation = v;
         p.edited = true;
-        p.flag = null; // user took responsibility
+        p.flag = null;
         renderParagraph(p);
+        active.onChange && active.onChange();
       }
     });
   }
-  el.appendChild(textEl);
+  trans.appendChild(textEl);
 
   if (p.flag) {
     const note = document.createElement('span');
     note.className = 'flag-note';
     note.textContent = '[' + p.flag + ']';
-    el.appendChild(note);
+    trans.appendChild(note);
   }
 
   if (p.translation !== null) {
@@ -486,14 +758,16 @@ function renderParagraph(p) {
       tag.textContent = 'edited';
       tools.appendChild(tag);
     }
-    el.appendChild(tools);
+    trans.appendChild(tools);
   }
+
+  el.appendChild(trans);
 }
 
 function setVerifying(p, on) {
   const el = paraEl(p.id);
   if (!el) return;
-  let tools = el.querySelector('.para-tools');
+  const tools = el.querySelector('.para-tools');
   if (!tools) return;
   let v = tools.querySelector('.verifying');
   if (on && !v) {
@@ -501,41 +775,31 @@ function setVerifying(p, on) {
     v.className = 'verifying';
     v.textContent = 'checking…';
     tools.appendChild(v);
-  } else if (!on && v) {
-    v.remove();
-  }
+  } else if (!on && v) { v.remove(); }
 }
 
-// ====================================================================
-// Verification (async, non-blocking)
-// ====================================================================
 async function verifyParagraph(p) {
   setVerifying(p, true);
   try {
     const result = await callVerify(buildVerifyPrompt(p.original, p.translation));
     p.flag = result.flag || null;
     renderParagraph(p);
+    active.onChange && active.onChange();
   } catch (e) {
-    // A failed verification shouldn't block or alarm; just skip the flag.
     console.warn('verify failed for', p.id, e);
     renderParagraph(p);
-  } finally {
-    setVerifying(p, false);
-  }
+  } finally { setVerifying(p, false); }
 }
 
-// ====================================================================
-// Regeneration (single paragraph)
-// ====================================================================
 async function regenerateParagraph(p) {
   const el = paraEl(p.id);
   const btn = el && el.querySelector('.para-tools button');
   if (btn) { btn.disabled = true; btn.textContent = 'Regenerating…'; }
-  const prev = paragraphs.find(q => q.id === p.id - 1);
+  const prev = active.paragraphs.find(q => q.id === p.id - 1);
   try {
-    const system = buildSystemPrompt(currentReadingLevel());
+    const system = buildSystemPrompt(active.readingLevel);
     const user = buildUserMessage({
-      workSummary: document.getElementById('work-summary').value.trim(),
+      workSummary: active.workSummary,
       rollingSummary: p.summaryBefore || '',
       prevTranslation: prev ? prev.translation : '',
       chunkParas: [p],
@@ -546,185 +810,110 @@ async function regenerateParagraph(p) {
     p.edited = false;
     p.flag = null;
     renderParagraph(p);
+    active.onChange && active.onChange();
     verifyParagraph(p);
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Regenerate'; }
-    showError('Regenerate failed: ' + e.message);
+    alert('Regenerate failed: ' + e.message);
   }
 }
 
-// ====================================================================
-// Main translation pass
-// ====================================================================
-function currentReadingLevel() {
-  return parseInt(document.getElementById('level').value, 10);
-}
-function currentEffort() {
-  return document.querySelector('input[name="effort"]:checked').value;
-}
-
-const progressEl = document.getElementById('progress');
-const errorEl = document.getElementById('error');
-const warnEl = document.getElementById('warn');
-const translateBtn = document.getElementById('translate-btn');
-const downloadBar = document.getElementById('download-bar');
-
-function showError(msg) { errorEl.textContent = msg; errorEl.classList.remove('hidden'); }
-function clearError() { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
-
-async function runTranslation() {
-  if (running) return;
-  clearError();
-  warnEl.classList.add('hidden');
-
-  const text = getSourceText();
-  if (!text.trim()) { showError('Add some text to translate first.'); return; }
-
-  const rawParas = splitParagraphs(text);
-  if (!rawParas.length) { showError('Could not find any paragraphs in that text.'); return; }
-
-  const totalWords = rawParas.reduce((n, p) => n + wordCount(p), 0);
-  if (totalWords > WORD_WARN_LIMIT) {
-    warnEl.textContent = `Heads up: that's about ${totalWords.toLocaleString()} words. This will use a lot of API credit and take a while.`;
-    warnEl.classList.remove('hidden');
-  }
-
-  // Build state
-  paragraphs = rawParas.map((original, i) => ({
+// The shared translation pass. Returns { paragraphs, rollingSummary }.
+async function translateParagraphs(opts) {
+  active.paragraphs = opts.rawParas.map((original, i) => ({
     id: i, original, translation: null, flag: null, edited: false, summaryBefore: '',
   }));
-  output.innerHTML = '';
-  downloadBar.classList.remove('show');
-  paragraphs.forEach(renderParagraph);
+  active.outputEl = opts.outputEl;
+  active.workSummary = opts.workSummary || '';
+  active.readingLevel = opts.readingLevel;
+  active.effort = opts.effort;
+  active.onChange = opts.onChange || null;
 
-  const chunks = buildChunks(paragraphs, EFFORT_MIN_WORDS[currentEffort()]);
-  const system = buildSystemPrompt(currentReadingLevel());
-  const workSummary = document.getElementById('work-summary').value.trim();
+  opts.outputEl.innerHTML = '';
+  active.paragraphs.forEach(renderParagraph);
 
-  running = true;
-  translateBtn.disabled = true;
-  translateBtn.textContent = 'Translating…';
+  const chunks = buildChunks(active.paragraphs, EFFORT_MIN_WORDS[opts.effort]);
+  const system = buildSystemPrompt(opts.readingLevel);
+  const total = active.paragraphs.length;
 
-  let rollingSummary = '';
+  let rollingSummary = opts.seedSummary || '';
   let prevTranslation = '';
   let done = 0;
 
-  try {
-    for (const chunk of chunks) {
-      progressEl.innerHTML = `<span class="count">${done}</span> of ${paragraphs.length} paragraphs`;
-      // record the summary state each paragraph in this chunk starts from
-      chunk.forEach(p => { p.summaryBefore = rollingSummary; });
+  for (const chunk of chunks) {
+    opts.onProgress && opts.onProgress(done, total);
+    chunk.forEach(p => { p.summaryBefore = rollingSummary; });
 
-      const user = buildUserMessage({ workSummary, rollingSummary, prevTranslation, chunkParas: chunk });
-      const result = await callTranslate(system, user);
+    const user = buildUserMessage({ workSummary: active.workSummary, rollingSummary, prevTranslation, chunkParas: chunk });
+    const result = await callTranslate(system, user);
 
-      let arr = result.paragraphs;
-      if (!Array.isArray(arr)) throw new Error('Model did not return a paragraphs array.');
-      // Defensive: align lengths if the model miscounts.
-      if (arr.length !== chunk.length) {
-        arr = reconcile(arr, chunk.length);
-      }
+    let arr = result.paragraphs;
+    if (!Array.isArray(arr)) throw new Error('Model did not return a paragraphs array.');
+    if (arr.length !== chunk.length) arr = reconcile(arr, chunk.length);
 
-      chunk.forEach((p, i) => {
-        p.translation = (arr[i] || '').trim();
-        renderParagraph(p);
-        verifyParagraph(p); // fire and forget
-      });
+    chunk.forEach((p, i) => {
+      p.translation = (arr[i] || '').trim();
+      renderParagraph(p);
+      verifyParagraph(p); // fire and forget
+    });
 
-      rollingSummary = result.rolling_summary || rollingSummary;
-      prevTranslation = chunk[chunk.length - 1].translation;
-      done += chunk.length;
-      progressEl.innerHTML = `<span class="count">${done}</span> of ${paragraphs.length} paragraphs`;
-    }
-    progressEl.innerHTML = `Done. <span class="count">${paragraphs.length}</span> paragraphs translated.`;
-    downloadBar.classList.add('show');
-  } catch (e) {
-    showError('Translation stopped: ' + e.message);
-  } finally {
-    running = false;
-    translateBtn.disabled = false;
-    translateBtn.textContent = 'Translate';
+    rollingSummary = result.rolling_summary || rollingSummary;
+    prevTranslation = chunk[chunk.length - 1].translation;
+    done += chunk.length;
+    opts.onProgress && opts.onProgress(done, total);
   }
-}
-
-// If the model returns the wrong number of paragraphs, fit the array to the
-// expected count rather than throwing away a whole chunk's work.
-function reconcile(arr, n) {
-  if (arr.length > n) {
-    // merge the surplus tail into the last expected slot
-    const head = arr.slice(0, n - 1);
-    const tail = arr.slice(n - 1).join('\n\n');
-    return [...head, tail];
-  }
-  // pad short arrays so indices line up; missing ones can be regenerated
-  return [...arr, ...Array(n - arr.length).fill('')];
+  return { paragraphs: active.paragraphs, rollingSummary };
 }
 
 // ====================================================================
-// Input handling (paste / PDF)
+// Shared UI helpers: reading-level + effort wiring
 // ====================================================================
-let pdfText = '';
-let inputMode = 'paste';
-
-function getSourceText() {
-  return inputMode === 'pdf' ? pdfText : document.getElementById('source-text').value;
+function describeLevel(n) {
+  if (n <= 9) return 'Simple, direct words and short sentences. Brief glosses allowed for hard ideas.';
+  if (n <= 11) return 'Plain and clear, a little more vocabulary. Glosses only when truly needed.';
+  if (n <= 14) return 'Accessible but can use precise words a teenager would know.';
+  return 'Plain modern English, but keeps richer vocabulary and structure.';
 }
-
-document.querySelectorAll('.input-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.input-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    inputMode = tab.dataset.mode;
-    document.getElementById('paste-pane').classList.toggle('hidden', inputMode !== 'paste');
-    document.getElementById('pdf-pane').classList.toggle('hidden', inputMode !== 'pdf');
+function wireLevel(sliderId, valId, hintId, onChange) {
+  const s = document.getElementById(sliderId), v = document.getElementById(valId), h = document.getElementById(hintId);
+  const update = () => { v.textContent = s.value; h.textContent = describeLevel(parseInt(s.value, 10)); onChange && onChange(); };
+  s.addEventListener('input', update);
+  update();
+}
+function wireEffort(containerId, onChange) {
+  const c = document.getElementById(containerId);
+  c.addEventListener('change', () => {
+    c.querySelectorAll('label').forEach(l => l.classList.toggle('sel', l.querySelector('input').checked));
+    onChange && onChange();
   });
-});
-
-const drop = document.getElementById('drop');
-const pdfInput = document.getElementById('pdf-input');
-const pdfStatus = document.getElementById('pdf-status');
-
-drop.addEventListener('click', () => pdfInput.click());
-drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
-drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
-drop.addEventListener('drop', e => {
-  e.preventDefault(); drop.classList.remove('drag');
-  if (e.dataTransfer.files[0]) handlePdf(e.dataTransfer.files[0]);
-});
-pdfInput.addEventListener('change', () => { if (pdfInput.files[0]) handlePdf(pdfInput.files[0]); });
-
-async function handlePdf(file) {
-  if (file.type !== 'application/pdf') { pdfStatus.textContent = 'That is not a PDF.'; return; }
-  pdfStatus.textContent = 'Extracting text…';
-  try {
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    const pages = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      pages.push(linesFromItems(content.items));
-      pdfStatus.textContent = `Extracting text… page ${i} of ${pdf.numPages}`;
-    }
-    pdfText = cleanupPdf(pages);
-    const words = wordCount(pdfText);
-    const paras = splitParagraphs(pdfText).length;
-    pdfStatus.textContent = `Extracted ${pdf.numPages} pages, ${words.toLocaleString()} words, ${paras} paragraphs. Ready to translate.`;
-  } catch (e) {
-    pdfStatus.textContent = 'Could not read that PDF: ' + e.message;
-    pdfText = '';
-  }
+}
+function readEffort(name) { return document.querySelector(`input[name="${name}"]:checked`).value; }
+function setEffort(name, value) {
+  const el = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  if (el) { el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); }
 }
 
-// Reconstruct lines from pdf.js text items using their y-position.
+// ====================================================================
+// PDF extraction (shared)
+// ====================================================================
+async function extractPdf(file, onProgress) {
+  const pdfjsLib = await loadPdfjs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    pages.push(linesFromItems(content.items));
+    onProgress && onProgress(i, pdf.numPages);
+  }
+  return { text: cleanupPdf(pages), numPages: pdf.numPages };
+}
 function linesFromItems(items) {
-  const lines = [];
-  let lastY = null, cur = '';
+  const lines = []; let lastY = null, cur = '';
   for (const it of items) {
     const y = Math.round(it.transform[5]);
-    if (lastY !== null && Math.abs(y - lastY) > 2) {
-      lines.push(cur); cur = '';
-    }
+    if (lastY !== null && Math.abs(y - lastY) > 2) { lines.push(cur); cur = ''; }
     cur += it.str;
     if (it.hasEOL) { lines.push(cur); cur = ''; lastY = null; continue; }
     lastY = y;
@@ -732,11 +921,7 @@ function linesFromItems(items) {
   if (cur.trim()) lines.push(cur);
   return lines.map(l => l.replace(/\s+/g, ' ').trim());
 }
-
-// Non-AI cleanup: strip headers/footers/page numbers, de-hyphenate, rejoin
-// wrapped lines, preserve paragraph breaks (blank lines).
 function cleanupPdf(pages) {
-  // 1. Find repeated short lines (likely running headers/footers) across pages.
   const freq = {};
   for (const lines of pages) {
     const seen = new Set();
@@ -747,73 +932,38 @@ function cleanupPdf(pages) {
   }
   const threshold = Math.max(3, Math.ceil(pages.length * 0.5));
   const headers = new Set(Object.keys(freq).filter(k => freq[k] >= threshold));
-
-  // 2. Flatten, dropping page numbers and detected headers.
   const kept = [];
   for (const lines of pages) {
     for (const l of lines) {
       const t = l.trim();
       if (!t) { kept.push(''); continue; }
-      if (/^\d{1,4}$/.test(t)) continue;            // bare page number
-      if (/^[ivxlcdm]+$/i.test(t) && t.length <= 6) continue; // roman numeral page no.
-      if (headers.has(t)) continue;                 // running header/footer
+      if (/^\d{1,4}$/.test(t)) continue;
+      if (/^[ivxlcdm]+$/i.test(t) && t.length <= 6) continue;
+      if (headers.has(t)) continue;
       kept.push(t);
     }
-    kept.push(''); // page break acts as a soft paragraph boundary
+    kept.push('');
   }
-
-  // 3. Join into paragraphs. Blank line = paragraph break; otherwise join lines
-  //    with spaces, healing hyphenation at line ends.
-  const paras = [];
-  let cur = '';
+  const paras = []; let cur = '';
   for (const line of kept) {
-    if (line === '') {
-      if (cur.trim()) { paras.push(cur.trim()); cur = ''; }
-      continue;
-    }
+    if (line === '') { if (cur.trim()) { paras.push(cur.trim()); cur = ''; } continue; }
     if (!cur) { cur = line; continue; }
-    if (/[A-Za-z]-$/.test(cur)) {
-      cur = cur.slice(0, -1) + line; // de-hyphenate across line break
-    } else {
-      cur += ' ' + line;
-    }
+    if (/[A-Za-z]-$/.test(cur)) cur = cur.slice(0, -1) + line;
+    else cur += ' ' + line;
   }
   if (cur.trim()) paras.push(cur.trim());
-
   return paras.join('\n\n');
 }
 
 // ====================================================================
-// Reading-level hint
+// Download helpers (shared)
 // ====================================================================
-const levelEl = document.getElementById('level');
-const levelVal = document.getElementById('level-val');
-const levelHint = document.getElementById('level-hint');
-function describeLevel(n) {
-  if (n <= 9) return 'Simple, direct words and short sentences. Brief glosses allowed for hard ideas.';
-  if (n <= 11) return 'Plain and clear, a little more vocabulary. Glosses only when truly needed.';
-  if (n <= 14) return 'Accessible but can use precise words a teenager would know.';
-  return 'Plain modern English, but keeps richer vocabulary and structure.';
-}
-function updateLevel() {
-  levelVal.textContent = levelEl.value;
-  levelHint.textContent = describeLevel(parseInt(levelEl.value, 10));
-}
-levelEl.addEventListener('input', updateLevel);
-updateLevel();
-
-// effort selection styling
-document.getElementById('effort').addEventListener('change', () => {
-  document.querySelectorAll('#effort label').forEach(l => {
-    l.classList.toggle('sel', l.querySelector('input').checked);
-  });
-});
-
-// ====================================================================
-// Download
-// ====================================================================
-function assembleDoc() {
-  return paragraphs.map(p => p.translation || p.original).join('\n\n').trim() + '\n';
+function downloadName(ext, title) {
+  const t = (title || 'modern translation').replace(/[\/\\:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim() || 'modern translation';
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}${pad(d.getMinutes())}`;
+  return `${t} ${stamp}.${ext}`;
 }
 function download(filename, text) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -823,10 +973,566 @@ function download(filename, text) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
-document.getElementById('dl-md').addEventListener('click', () => download('plainspeak.md', assembleDoc()));
-document.getElementById('dl-txt').addEventListener('click', () => download('plainspeak.txt', assembleDoc()));
 
-translateBtn.addEventListener('click', runTranslation);
+// ====================================================================
+// IndexedDB layer
+// ====================================================================
+const DB_NAME = 'moderntranslation';
+let _db = null;
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('projects')) db.createObjectStore('projects', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('sources')) db.createObjectStore('sources', { keyPath: 'projectId' });
+      if (!db.objectStoreNames.contains('sections')) {
+        const s = db.createObjectStore('sections', { keyPath: 'id' });
+        s.createIndex('byProject', 'projectId', { unique: false });
+      }
+    };
+    req.onsuccess = () => { _db = req.result; resolve(_db); };
+    req.onerror = () => reject(req.error);
+  });
+}
+function tx(store, mode) { return openDB().then(db => db.transaction(store, mode).objectStore(store)); }
+function reqProm(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function dbPut(store, value) { return reqProm((await tx(store, 'readwrite')).put(value)); }
+async function dbGet(store, key) { return reqProm((await tx(store, 'readonly')).get(key)); }
+async function dbDelete(store, key) { return reqProm((await tx(store, 'readwrite')).delete(key)); }
+async function dbGetAll(store) { return reqProm((await tx(store, 'readonly')).getAll()); }
+async function dbGetByIndex(store, indexName, key) {
+  const os = await tx(store, 'readonly');
+  return reqProm(os.index(indexName).getAll(key));
+}
+
+// Project record helpers
+function newId() { return (crypto.randomUUID && crypto.randomUUID()) || ('id' + Date.now() + Math.random().toString(16).slice(2)); }
+async function listProjects() { return (await dbGetAll('projects')).sort((a, b) => b.updatedAt - a.updatedAt); }
+async function createProject(title) {
+  const now = Date.now();
+  const project = { id: newId(), title: title || 'Untitled book', workSummary: '', rollingSummary: '', readingLevel: 8, effort: 'high', createdAt: now, updatedAt: now };
+  await dbPut('projects', project);
+  return project;
+}
+async function saveProject(p) { p.updatedAt = Date.now(); await dbPut('projects', p); }
+async function saveSource(projectId, paragraphs) { await dbPut('sources', { projectId, paragraphs }); }
+async function getSource(projectId) { return dbGet('sources', projectId); }
+async function saveSection(s) { s.updatedAt = Date.now(); await dbPut('sections', s); }
+async function getSections(projectId) {
+  return (await dbGetByIndex('sections', 'byProject', projectId)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+async function deleteProjectAll(projectId) {
+  const secs = await getSections(projectId);
+  for (const s of secs) await dbDelete('sections', s.id);
+  await dbDelete('sources', projectId);
+  await dbDelete('projects', projectId);
+}
+
+// ====================================================================
+// Screen management
+// ====================================================================
+const screens = { quick: document.getElementById('screen-quick'), projects: document.getElementById('screen-projects'), project: document.getElementById('screen-project') };
+function showScreen(name) {
+  for (const k in screens) screens[k].classList.toggle('hidden', k !== name);
+  window.scrollTo(0, 0);
+}
+
+document.getElementById('go-projects').addEventListener('click', () => { renderProjectsList(); showScreen('projects'); });
+document.getElementById('back-quick').addEventListener('click', () => showScreen('quick'));
+document.getElementById('back-projects').addEventListener('click', () => { renderProjectsList(); showScreen('projects'); });
+document.getElementById('new-project').addEventListener('click', async () => {
+  const title = prompt('Book title?', '');
+  if (title === null) return;
+  const p = await createProject(title.trim() || 'Untitled book');
+  await openProject(p.id);
+});
+
+async function renderProjectsList() {
+  const list = document.getElementById('proj-list');
+  const projects = await listProjects();
+  list.innerHTML = '';
+  if (!projects.length) {
+    list.innerHTML = '<div class="empty-note">No projects yet. Create one to work through a whole book, section by section.</div>';
+    return;
+  }
+  for (const p of projects) {
+    const secs = await getSections(p.id);
+    const done = secs.filter(s => s.status === 'done').length;
+    const item = document.createElement('div');
+    item.className = 'proj-item';
+    const meta = document.createElement('div');
+    meta.className = 'proj-meta';
+    const sub = secs.length ? `${done} of ${secs.length} sections done` : 'no sections yet';
+    meta.innerHTML = `<span class="proj-title"></span><span class="proj-sub">${sub} · updated ${new Date(p.updatedAt).toLocaleDateString()}</span>`;
+    meta.querySelector('.proj-title').textContent = p.title;
+    const acts = document.createElement('div');
+    acts.className = 'proj-actions';
+    const open = mkBtn('Open', 'ghost sm', () => openProject(p.id));
+    const del = mkBtn('Delete', 'ghost sm danger', async () => {
+      if (confirm(`Delete "${p.title}" and all its sections? This cannot be undone.`)) {
+        await deleteProjectAll(p.id); renderProjectsList();
+      }
+    });
+    acts.append(open, del);
+    item.append(meta, acts);
+    list.appendChild(item);
+  }
+}
+function mkBtn(label, cls, onClick) {
+  const b = document.createElement('button');
+  b.className = cls; b.textContent = label; b.addEventListener('click', onClick);
+  return b;
+}
+
+// ====================================================================
+// Project workspace
+// ====================================================================
+let curProject = null;
+let curSource = [];      // array of source paragraph strings
+let curSections = [];    // section records
+let activeSection = null;
+
+const wsTitle = document.getElementById('ws-title');
+const wsRolling = document.getElementById('ws-rolling');
+const wsWorkSummary = document.getElementById('ws-work-summary');
+const wsBody = document.getElementById('ws-body');
+const wsLoad = document.getElementById('ws-load');
+const pOutput = document.getElementById('p-output');
+const wsDetail = document.getElementById('ws-detail');
+
+async function openProject(id) {
+  curProject = await dbGet('projects', id);
+  const src = await getSource(id);
+  curSource = src ? src.paragraphs : [];
+  curSections = await getSections(id);
+  activeSection = null;
+
+  wsTitle.value = curProject.title;
+  wsRolling.value = curProject.rollingSummary || '';
+  wsWorkSummary.value = curProject.workSummary || '';
+  document.getElementById('ws-level').value = curProject.readingLevel || 8;
+  document.getElementById('ws-level').dispatchEvent(new Event('input'));
+  setEffort('ws-effort', curProject.effort || 'high');
+
+  wsDetail.classList.add('hidden');
+  pOutput.innerHTML = '';
+  const hasSource = curSource.length > 0;
+  wsLoad.classList.toggle('hidden', hasSource);
+  wsBody.classList.toggle('hidden', !hasSource);
+  if (hasSource) { renderSectionsList(); renderSourceView(); }
+  showScreen('project');
+}
+
+// --- workspace settings persistence ---
+wsTitle.addEventListener('input', () => { curProject.title = wsTitle.value.trim() || 'Untitled book'; saveProject(curProject); });
+wsWorkSummary.addEventListener('input', () => { curProject.workSummary = wsWorkSummary.value.trim(); saveProject(curProject); });
+wsRolling.addEventListener('input', () => { curProject.rollingSummary = wsRolling.value; saveProject(curProject); });
+wireLevel('ws-level', 'ws-level-val', 'ws-level-hint', () => {
+  if (curProject) { curProject.readingLevel = parseInt(document.getElementById('ws-level').value, 10); saveProject(curProject); }
+});
+wireEffort('ws-effort', () => { if (curProject) { curProject.effort = readEffort('ws-effort'); saveProject(curProject); } });
+
+// --- source loading ---
+let wsMode = 'paste', wsPdfText = '';
+document.querySelectorAll('[data-wsmode]').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('[data-wsmode]').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    wsMode = tab.dataset.wsmode;
+    document.getElementById('ws-paste-pane').classList.toggle('hidden', wsMode !== 'paste');
+    document.getElementById('ws-pdf-pane').classList.toggle('hidden', wsMode !== 'pdf');
+  });
+});
+const wsDrop = document.getElementById('ws-drop'), wsPdfInput = document.getElementById('ws-pdf-input'), wsPdfStatus = document.getElementById('ws-pdf-status');
+wsDrop.addEventListener('click', () => wsPdfInput.click());
+wsDrop.addEventListener('dragover', e => { e.preventDefault(); wsDrop.classList.add('drag'); });
+wsDrop.addEventListener('dragleave', () => wsDrop.classList.remove('drag'));
+wsDrop.addEventListener('drop', e => { e.preventDefault(); wsDrop.classList.remove('drag'); if (e.dataTransfer.files[0]) wsHandlePdf(e.dataTransfer.files[0]); });
+wsPdfInput.addEventListener('change', () => { if (wsPdfInput.files[0]) wsHandlePdf(wsPdfInput.files[0]); });
+async function wsHandlePdf(file) {
+  if (file.type !== 'application/pdf') { wsPdfStatus.textContent = 'That is not a PDF.'; return; }
+  wsPdfStatus.textContent = 'Extracting text…';
+  try {
+    const { text, numPages } = await extractPdf(file, (i, n) => wsPdfStatus.textContent = `Extracting… page ${i} of ${n}`);
+    wsPdfText = text;
+    wsPdfStatus.textContent = `Extracted ${numPages} pages, ${splitParagraphs(text).length} paragraphs. Click "Load book".`;
+  } catch (e) { wsPdfStatus.textContent = 'Could not read that PDF: ' + e.message; wsPdfText = ''; }
+}
+document.getElementById('ws-load-btn').addEventListener('click', async () => {
+  const err = document.getElementById('ws-load-err');
+  err.classList.add('hidden');
+  const text = wsMode === 'pdf' ? wsPdfText : document.getElementById('ws-source-text').value;
+  const paras = splitParagraphs(text);
+  if (!paras.length) { err.textContent = 'No paragraphs found. Paste the book text or load a PDF first.'; err.classList.remove('hidden'); return; }
+  curSource = paras;
+  await saveSource(curProject.id, paras);
+  await saveProject(curProject);
+  wsLoad.classList.add('hidden');
+  wsBody.classList.remove('hidden');
+  renderSectionsList();
+  renderSourceView();
+});
+
+// --- contents page -> sections ---
+function normalizeHeading(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+document.getElementById('toc-apply').addEventListener('click', async () => {
+  const status = document.getElementById('toc-status');
+  const raw = document.getElementById('toc-text').value;
+  const lines = raw.split('\n')
+    .map(l => l.replace(/\.{2,}\s*[\divxlcdm]+\s*$/i, '').replace(/\s+[\divxlcdm]+\s*$/i, '').trim())
+    .filter(Boolean);
+  if (!lines.length) { status.textContent = 'Paste a contents page first.'; return; }
+
+  // Match each heading to a source paragraph, scanning forward.
+  const matches = [];
+  let from = 0;
+  for (const line of lines) {
+    const norm = normalizeHeading(line);
+    if (!norm) continue;
+    let idx = -1;
+    for (let i = from; i < curSource.length; i++) {
+      const pn = normalizeHeading(curSource[i]);
+      if (pn === norm || pn.startsWith(norm) || (norm.length > 6 && pn.includes(norm))) { idx = i; break; }
+    }
+    matches.push({ label: line, idx });
+    if (idx >= 0) from = idx + 1;
+  }
+
+  // Build ranges: a matched heading runs until the next matched heading.
+  const matchedIdxs = matches.filter(m => m.idx >= 0).map(m => m.idx);
+  let order = curSections.length;
+  let created = 0, located = 0;
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    let startIdx = null, endIdx = null;
+    if (m.idx >= 0) {
+      startIdx = m.idx;
+      const nextBigger = matchedIdxs.filter(x => x > m.idx).sort((a, b) => a - b)[0];
+      endIdx = (nextBigger != null ? nextBigger - 1 : curSource.length - 1);
+      located++;
+    }
+    const sec = {
+      id: newId(), projectId: curProject.id, order: order++, label: m.label,
+      status: 'pending', startIdx, endIdx, original: '', paragraphs: [],
+      createdAt: Date.now(), updatedAt: Date.now(),
+    };
+    await saveSection(sec);
+    curSections.push(sec);
+    created++;
+  }
+  status.textContent = `Created ${created} sections, located ${located} in the text.` + (created - located > 0 ? ` ${created - located} need a range set manually.` : '');
+  renderSectionsList();
+  renderSourceView();
+});
+
+// --- coverage + sections list ---
+function coveredSet() {
+  const set = new Set();
+  for (const s of curSections) {
+    if (s.status === 'done' && s.startIdx != null && s.endIdx != null) {
+      for (let i = s.startIdx; i <= s.endIdx; i++) set.add(i);
+    }
+  }
+  return set;
+}
+function renderSectionsList() {
+  const list = document.getElementById('section-list');
+  const cov = coveredSet();
+  document.getElementById('coverage').innerHTML =
+    `<b>${cov.size}</b> of ${curSource.length} paragraphs translated (${curSource.length ? Math.round(cov.size / curSource.length * 100) : 0}%).`;
+  list.innerHTML = '';
+  if (!curSections.length) {
+    list.innerHTML = '<div class="empty-note">No sections yet. Paste a contents page above, or select paragraphs in the book below.</div>';
+    return;
+  }
+  for (const s of [...curSections].sort((a, b) => (a.startIdx ?? a.order) - (b.startIdx ?? b.order))) {
+    const item = document.createElement('div');
+    item.className = 'section-item' + (s.status === 'done' ? ' done' : '') + (activeSection && activeSection.id === s.id ? ' active' : '');
+    const hasRange = s.startIdx != null && s.endIdx != null;
+    const meta = document.createElement('div');
+    const badge = s.status === 'done' ? '<span class="badge done">done</span>' : (hasRange ? '<span class="badge pending">pending</span>' : '<span class="badge norange">no range</span>');
+    const range = hasRange ? `paras ${s.startIdx}–${s.endIdx} (${s.endIdx - s.startIdx + 1})` : 'range not set';
+    meta.innerHTML = `<div class="section-label"></div><div class="section-sub">${badge} &nbsp; ${range}</div>`;
+    meta.querySelector('.section-label').textContent = s.label;
+    const acts = document.createElement('div');
+    acts.className = 'section-actions';
+    if (s.status === 'done') {
+      acts.appendChild(mkBtn('Open', 'ghost sm', () => openSection(s)));
+      acts.appendChild(mkBtn('Re-translate', 'ghost sm', () => translateSection(s)));
+    } else if (hasRange) {
+      acts.appendChild(mkBtn('Translate', 'ghost sm', () => translateSection(s)));
+    } else {
+      acts.appendChild(mkBtn('Set range from selection', 'ghost sm', () => assignRange(s)));
+    }
+    acts.appendChild(mkBtn('Delete', 'ghost sm danger', async () => {
+      if (confirm(`Delete section "${s.label}"?`)) {
+        await dbDelete('sections', s.id);
+        curSections = curSections.filter(x => x.id !== s.id);
+        if (activeSection && activeSection.id === s.id) { activeSection = null; wsDetail.classList.add('hidden'); }
+        renderSectionsList(); renderSourceView();
+      }
+    }));
+    item.append(meta, acts);
+    list.appendChild(item);
+  }
+}
+
+// --- source view + selection ---
+let selStart = null, selEnd = null;
+function selRange() { if (selStart == null) return null; return [Math.min(selStart, selEnd), Math.max(selStart, selEnd)]; }
+function renderSourceView() {
+  const view = document.getElementById('src-view');
+  const cov = coveredSet();
+  const frag = document.createDocumentFragment();
+  curSource.forEach((text, i) => {
+    const row = document.createElement('div');
+    row.className = 'src-para' + (cov.has(i) ? ' translated' : '');
+    row.dataset.idx = i;
+    const idx = document.createElement('span'); idx.className = 'src-idx'; idx.textContent = i;
+    const tick = document.createElement('span'); tick.className = 'src-tick'; tick.textContent = cov.has(i) ? '✓' : '';
+    const t = document.createElement('span'); t.className = 'src-text'; t.textContent = text;
+    row.append(idx, tick, t);
+    row.addEventListener('click', e => onSrcClick(i, e.shiftKey));
+    frag.appendChild(row);
+  });
+  view.innerHTML = '';
+  view.appendChild(frag);
+  paintSelection();
+}
+function onSrcClick(i, shift) {
+  if (shift && selStart != null) selEnd = i;
+  else { selStart = i; selEnd = i; }
+  paintSelection();
+}
+function paintSelection() {
+  const r = selRange();
+  document.querySelectorAll('#src-view .src-para').forEach(row => {
+    const i = +row.dataset.idx;
+    row.classList.toggle('sel', r != null && i >= r[0] && i <= r[1]);
+  });
+  const bar = document.getElementById('sel-bar');
+  if (!r) { bar.classList.remove('show'); return; }
+  const n = r[1] - r[0] + 1;
+  const words = curSource.slice(r[0], r[1] + 1).reduce((a, p) => a + wordCount(p), 0);
+  document.getElementById('sel-info').textContent = `Selected paragraphs ${r[0]}–${r[1]} (${n} paragraph${n > 1 ? 's' : ''}, ~${words.toLocaleString()} words)`;
+  bar.classList.add('show');
+}
+document.getElementById('sel-clear').addEventListener('click', () => { selStart = selEnd = null; paintSelection(); });
+document.getElementById('sel-pending').addEventListener('click', async () => {
+  const r = selRange(); if (!r) return;
+  const label = document.getElementById('sel-label').value.trim() || `Section ${curSections.length + 1}`;
+  const sec = { id: newId(), projectId: curProject.id, order: curSections.length, label, status: 'pending', startIdx: r[0], endIdx: r[1], original: '', paragraphs: [], createdAt: Date.now(), updatedAt: Date.now() };
+  await saveSection(sec); curSections.push(sec);
+  document.getElementById('sel-label').value = '';
+  selStart = selEnd = null; paintSelection();
+  renderSectionsList();
+});
+document.getElementById('sel-translate').addEventListener('click', async () => {
+  const r = selRange(); if (!r) return;
+  const label = document.getElementById('sel-label').value.trim() || `Section ${curSections.length + 1}`;
+  const sec = { id: newId(), projectId: curProject.id, order: curSections.length, label, status: 'pending', startIdx: r[0], endIdx: r[1], original: '', paragraphs: [], createdAt: Date.now(), updatedAt: Date.now() };
+  await saveSection(sec); curSections.push(sec);
+  document.getElementById('sel-label').value = '';
+  selStart = selEnd = null; paintSelection();
+  translateSection(sec);
+});
+async function assignRange(section) {
+  const r = selRange();
+  if (!r) { alert('Select a range of paragraphs in the book first, then click this.'); return; }
+  section.startIdx = r[0]; section.endIdx = r[1];
+  await saveSection(section);
+  selStart = selEnd = null; paintSelection();
+  renderSectionsList();
+}
+
+// --- translating / opening a section ---
+const debouncedPersistSection = debounce(() => { if (activeSection) saveSection(activeSection); }, 500);
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+function openSection(section) {
+  activeSection = section;
+  active.paragraphs = section.paragraphs;
+  active.outputEl = pOutput;
+  active.workSummary = curProject.workSummary || '';
+  active.readingLevel = curProject.readingLevel || 8;
+  active.effort = curProject.effort || 'high';
+  active.onChange = debouncedPersistSection;
+  document.getElementById('detail-title').textContent = section.label;
+  document.getElementById('ws-progress').textContent = '';
+  document.getElementById('ws-detail-err').classList.add('hidden');
+  pOutput.innerHTML = '';
+  section.paragraphs.forEach(renderParagraph);
+  wsDetail.classList.remove('hidden');
+  renderSectionsList();
+  wsDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function translateSection(section) {
+  if (running) { alert('A translation is already running. Let it finish first.'); return; }
+  if (section.startIdx == null || section.endIdx == null) { alert('This section has no paragraph range yet.'); return; }
+  activeSection = section;
+  const slice = curSource.slice(section.startIdx, section.endIdx + 1);
+  const prog = document.getElementById('ws-progress');
+  const errEl = document.getElementById('ws-detail-err');
+  errEl.classList.add('hidden');
+  document.getElementById('detail-title').textContent = section.label;
+  wsDetail.classList.remove('hidden');
+  renderSectionsList();
+  wsDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  running = true;
+  try {
+    const { paragraphs: ps, rollingSummary } = await translateParagraphs({
+      rawParas: slice,
+      workSummary: curProject.workSummary,
+      readingLevel: curProject.readingLevel,
+      effort: curProject.effort,
+      seedSummary: curProject.rollingSummary,
+      outputEl: pOutput,
+      onChange: debouncedPersistSection,
+      onProgress: (d, t) => prog.innerHTML = d < t ? `<span class="count">${d}</span> of ${t} paragraphs` : `Done. ${t} paragraphs.`,
+    });
+    section.paragraphs = ps;
+    section.original = slice.join('\n\n');
+    section.status = 'done';
+    await saveSection(section);
+    curProject.rollingSummary = rollingSummary;
+    wsRolling.value = rollingSummary;
+    await saveProject(curProject);
+    renderSectionsList();
+    renderSourceView();
+  } catch (e) {
+    errEl.textContent = 'Translation stopped: ' + e.message;
+    errEl.classList.remove('hidden');
+  } finally { running = false; }
+}
+
+// project export
+function exportProject(ext) {
+  const done = curSections.filter(s => s.status === 'done' && s.paragraphs && s.paragraphs.length)
+    .sort((a, b) => (a.startIdx ?? a.order) - (b.startIdx ?? b.order));
+  if (!done.length) { alert('Nothing translated yet to export.'); return; }
+  const body = done.map(s => s.paragraphs.map(p => p.translation || p.original).join('\n\n')).join('\n\n');
+  download(downloadName(ext, curProject.title), body.trim() + '\n');
+}
+document.getElementById('ws-md').addEventListener('click', () => exportProject('md'));
+document.getElementById('ws-txt').addEventListener('click', () => exportProject('txt'));
+document.getElementById('ws-delete').addEventListener('click', async () => {
+  if (confirm(`Delete "${curProject.title}" and all its sections? This cannot be undone.`)) {
+    await deleteProjectAll(curProject.id);
+    renderProjectsList(); showScreen('projects');
+  }
+});
+document.getElementById('ws-dual-toggle').addEventListener('change', e => pOutput.classList.toggle('dual', e.target.checked));
+
+// ====================================================================
+// QUICK MODE
+// ====================================================================
+const output = document.getElementById('output');
+const progressEl = document.getElementById('progress');
+const errorEl = document.getElementById('error');
+const warnEl = document.getElementById('warn');
+const translateBtn = document.getElementById('translate-btn');
+const downloadBar = document.getElementById('download-bar');
+const viewBar = document.getElementById('view-bar');
+const titleEl = document.getElementById('book-title');
+const ctxEl = document.getElementById('prev-context');
+
+document.getElementById('dual-toggle').addEventListener('change', e => output.classList.toggle('dual', e.target.checked));
+function showError(msg) { errorEl.textContent = msg; errorEl.classList.remove('hidden'); }
+function clearError() { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
+
+wireLevel('level', 'level-val', 'level-hint');
+wireEffort('effort');
+function quickLevel() { return parseInt(document.getElementById('level').value, 10); }
+function quickEffort() { return readEffort('effort'); }
+
+// quick input (paste / pdf)
+let pdfText = '', inputMode = 'paste';
+function getSourceText() { return inputMode === 'pdf' ? pdfText : document.getElementById('source-text').value; }
+document.querySelectorAll('#controls .input-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#controls .input-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    inputMode = tab.dataset.mode;
+    document.getElementById('paste-pane').classList.toggle('hidden', inputMode !== 'paste');
+    document.getElementById('pdf-pane').classList.toggle('hidden', inputMode !== 'pdf');
+  });
+});
+const drop = document.getElementById('drop'), pdfInput = document.getElementById('pdf-input'), pdfStatus = document.getElementById('pdf-status');
+drop.addEventListener('click', () => pdfInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); if (e.dataTransfer.files[0]) quickHandlePdf(e.dataTransfer.files[0]); });
+pdfInput.addEventListener('change', () => { if (pdfInput.files[0]) quickHandlePdf(pdfInput.files[0]); });
+async function quickHandlePdf(file) {
+  if (file.type !== 'application/pdf') { pdfStatus.textContent = 'That is not a PDF.'; return; }
+  pdfStatus.textContent = 'Extracting text…';
+  try {
+    const { text, numPages } = await extractPdf(file, (i, n) => pdfStatus.textContent = `Extracting text… page ${i} of ${n}`);
+    pdfText = text;
+    pdfStatus.textContent = `Extracted ${numPages} pages, ${wordCount(text).toLocaleString()} words, ${splitParagraphs(text).length} paragraphs. Ready to translate.`;
+  } catch (e) { pdfStatus.textContent = 'Could not read that PDF: ' + e.message; pdfText = ''; }
+}
+
+function saveContext(summary) {
+  ctxEl.value = summary || '';
+  ctxEl.classList.toggle('filled', !!summary);
+  try { localStorage.setItem('mt_ctx', summary || ''); localStorage.setItem('mt_title', titleEl.value || ''); } catch {}
+}
+try {
+  const savedCtx = localStorage.getItem('mt_ctx'), savedTitle = localStorage.getItem('mt_title');
+  if (savedCtx) { ctxEl.value = savedCtx; ctxEl.classList.add('filled'); }
+  if (savedTitle && !titleEl.value) titleEl.value = savedTitle;
+} catch {}
+titleEl.addEventListener('input', () => { try { localStorage.setItem('mt_title', titleEl.value || ''); } catch {} });
+ctxEl.addEventListener('input', () => ctxEl.classList.toggle('filled', !!ctxEl.value.trim()));
+
+function assembleDoc() { return active.paragraphs.map(p => p.translation || p.original).join('\n\n').trim() + '\n'; }
+document.getElementById('dl-md').addEventListener('click', () => download(downloadName('md', titleEl.value), assembleDoc()));
+document.getElementById('dl-txt').addEventListener('click', () => download(downloadName('txt', titleEl.value), assembleDoc()));
+
+async function runQuick() {
+  if (running) return;
+  clearError();
+  warnEl.classList.add('hidden');
+  const text = getSourceText();
+  if (!text.trim()) { showError('Add some text to translate first.'); return; }
+  const rawParas = splitParagraphs(text);
+  if (!rawParas.length) { showError('Could not find any paragraphs in that text.'); return; }
+  const totalWords = rawParas.reduce((n, p) => n + wordCount(p), 0);
+  if (totalWords > WORD_WARN_LIMIT) {
+    warnEl.textContent = `Heads up: that's about ${totalWords.toLocaleString()} words. This will use a lot of API credit and take a while.`;
+    warnEl.classList.remove('hidden');
+  }
+  downloadBar.classList.remove('show');
+  viewBar.classList.add('show');
+  running = true;
+  translateBtn.disabled = true; translateBtn.textContent = 'Translating…';
+  try {
+    const { rollingSummary } = await translateParagraphs({
+      rawParas,
+      workSummary: document.getElementById('work-summary').value.trim(),
+      readingLevel: quickLevel(),
+      effort: quickEffort(),
+      seedSummary: ctxEl.value.trim(),
+      outputEl: output,
+      onChange: null,
+      onProgress: (d, t) => progressEl.innerHTML = d < t
+        ? `<span class="count">${d}</span> of ${t} paragraphs`
+        : `Done. <span class="count">${t}</span> paragraphs translated. Carry-over context for the next batch is ready above.`,
+    });
+    saveContext(rollingSummary);
+    downloadBar.classList.add('show');
+  } catch (e) {
+    showError('Translation stopped: ' + e.message);
+  } finally {
+    running = false; translateBtn.disabled = false; translateBtn.textContent = 'Translate';
+  }
+}
+translateBtn.addEventListener('click', runQuick);
 </script>
 </body>
 </html>
