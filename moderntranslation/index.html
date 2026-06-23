@@ -496,6 +496,7 @@
         <textarea id="toc-text" class="short" style="margin-top:12px" placeholder="Paste the table of contents, one chapter per line. Each line becomes a section, located in the book by matching the heading."></textarea>
         <div class="actions" style="margin-top:10px">
           <button class="ghost sm" id="toc-apply">Create sections from contents</button>
+          <button class="ghost sm danger" id="toc-clear">Clear all sections</button>
           <span class="progress" id="toc-status"></span>
         </div>
       </details>
@@ -1223,6 +1224,25 @@ document.getElementById('toc-apply').addEventListener('click', async () => {
     created++;
   }
   status.textContent = `Created ${created} sections, located ${located} in the text.` + (created - located > 0 ? ` ${created - located} need a range set manually.` : '');
+  renderSectionsList();
+  renderSourceView();
+});
+
+// Clear all sections for this project (the book text itself is kept).
+document.getElementById('toc-clear').addEventListener('click', async () => {
+  if (!curSections.length) { document.getElementById('toc-status').textContent = 'No sections to clear.'; return; }
+  const n = curSections.length;
+  const anyDone = curSections.some(s => s.status === 'done');
+  const msg = anyDone
+    ? `Delete all ${n} sections, including translated ones? The book text stays; translations are removed. This cannot be undone.`
+    : `Delete all ${n} sections? The book text stays. This cannot be undone.`;
+  if (!confirm(msg)) return;
+  for (const s of curSections) await dbDelete('sections', s.id);
+  curSections = [];
+  activeSection = null;
+  wsDetail.classList.add('hidden');
+  pOutput.innerHTML = '';
+  document.getElementById('toc-status').textContent = `Cleared ${n} sections.`;
   renderSectionsList();
   renderSourceView();
 });
