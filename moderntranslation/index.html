@@ -462,10 +462,25 @@
       </div>
     </details>
 
+    <!-- Import already-finished translations (always available) -->
+    <details class="panel" id="import-box">
+      <summary class="label" style="cursor:pointer">Import finished translations (work done before projects)</summary>
+      <p style="font-size:13px;color:var(--muted);margin:12px 0 8px">
+        Paste or load a .md / .txt file of already-translated text. It is split into sections at the chapter headings and added as completed sections. These have no original text linked, so they will not tag the book view, but they export and carry continuity normally.
+      </p>
+      <textarea id="import-text" class="short" placeholder="Paste the finished translation here, or use the file button below."></textarea>
+      <div class="actions" style="margin-top:10px">
+        <button class="ghost sm" id="import-file-btn">Load .md / .txt file</button>
+        <input type="file" id="import-file" accept=".md,.txt,text/markdown,text/plain" class="hidden">
+        <button class="ghost sm" id="import-apply">Import as sections</button>
+        <span class="progress" id="import-status"></span>
+      </div>
+    </details>
+
     <!-- Source loading (shown when no source yet) -->
     <section class="panel" id="ws-load">
       <div class="field">
-        <label class="label">Full book text</label>
+        <label class="label">Full book text (optional, enables the book view and contents-page carving)</label>
         <div class="input-tabs">
           <button class="input-tab active" data-wsmode="paste" type="button">Paste text</button>
           <button class="input-tab" data-wsmode="pdf" type="button">Upload PDF</button>
@@ -488,10 +503,14 @@
       <div class="err hidden" id="ws-load-err"></div>
     </section>
 
-    <!-- Workspace body (shown when source is loaded) -->
-    <section id="ws-body" class="hidden">
-      <!-- Contents page -->
-      <details class="panel" id="toc-box">
+    <!-- Sections (always visible) -->
+    <h3 style="margin:18px 0 8px;color:var(--purple)">Sections</h3>
+    <div class="coverage" id="coverage"></div>
+    <div class="section-list" id="section-list"></div>
+
+    <!-- Source-dependent: contents page + the book view -->
+    <section id="ws-source-block" class="hidden">
+      <details class="panel" id="toc-box" style="margin-top:18px">
         <summary class="label" style="cursor:pointer">Paste a contents page to carve the book into sections</summary>
         <textarea id="toc-text" class="short" style="margin-top:12px" placeholder="Paste the table of contents, one chapter per line. Each line becomes a section, located in the book by matching the heading."></textarea>
         <div class="actions" style="margin-top:10px">
@@ -500,10 +519,6 @@
           <span class="progress" id="toc-status"></span>
         </div>
       </details>
-
-      <h3 style="margin:18px 0 8px;color:var(--purple)">Sections</h3>
-      <div class="coverage" id="coverage"></div>
-      <div class="section-list" id="section-list"></div>
 
       <h3 style="margin:24px 0 8px;color:var(--purple)">The book</h3>
       <p style="font-size:13px;color:var(--muted);margin:0 0 10px">
@@ -517,20 +532,20 @@
         <button class="ghost sm" id="sel-pending">Save as pending</button>
         <button class="nav-link" id="sel-clear">Clear</button>
       </div>
-
-      <!-- Section detail / translation output -->
-      <div id="ws-detail" class="hidden" style="margin-top:24px">
-        <div class="ws-head">
-          <h3 style="margin:0;color:var(--purple)" id="detail-title">Section</h3>
-          <span class="progress" id="ws-progress" style="margin-left:8px"></span>
-          <div class="ws-export">
-            <label class="view-toggle" style="font-size:13px;color:var(--muted)"><input type="checkbox" id="ws-dual-toggle"> Show original alongside</label>
-          </div>
-        </div>
-        <div class="err hidden" id="ws-detail-err"></div>
-        <section id="p-output" class="txt-output"></section>
-      </div>
     </section>
+
+    <!-- Section detail / translation output -->
+    <div id="ws-detail" class="hidden" style="margin-top:24px">
+      <div class="ws-head">
+        <h3 style="margin:0;color:var(--purple)" id="detail-title">Section</h3>
+        <span class="progress" id="ws-progress" style="margin-left:8px"></span>
+        <div class="ws-export">
+          <label class="view-toggle" style="font-size:13px;color:var(--muted)"><input type="checkbox" id="ws-dual-toggle"> Show original alongside</label>
+        </div>
+      </div>
+      <div class="err hidden" id="ws-detail-err"></div>
+      <section id="p-output" class="txt-output"></section>
+    </div>
   </div>
 </main>
 
@@ -1098,7 +1113,7 @@ let activeSection = null;
 const wsTitle = document.getElementById('ws-title');
 const wsRolling = document.getElementById('ws-rolling');
 const wsWorkSummary = document.getElementById('ws-work-summary');
-const wsBody = document.getElementById('ws-body');
+const wsSourceBlock = document.getElementById('ws-source-block');
 const wsLoad = document.getElementById('ws-load');
 const pOutput = document.getElementById('p-output');
 const wsDetail = document.getElementById('ws-detail');
@@ -1121,8 +1136,9 @@ async function openProject(id) {
   pOutput.innerHTML = '';
   const hasSource = curSource.length > 0;
   wsLoad.classList.toggle('hidden', hasSource);
-  wsBody.classList.toggle('hidden', !hasSource);
-  if (hasSource) { renderSectionsList(); renderSourceView(); }
+  wsSourceBlock.classList.toggle('hidden', !hasSource);
+  renderSectionsList();
+  if (hasSource) renderSourceView();
   showScreen('project');
 }
 
@@ -1171,7 +1187,7 @@ document.getElementById('ws-load-btn').addEventListener('click', async () => {
   await saveSource(curProject.id, paras);
   await saveProject(curProject);
   wsLoad.classList.add('hidden');
-  wsBody.classList.remove('hidden');
+  wsSourceBlock.classList.remove('hidden');
   renderSectionsList();
   renderSourceView();
 });
@@ -1247,6 +1263,70 @@ document.getElementById('toc-clear').addEventListener('click', async () => {
   renderSourceView();
 });
 
+// --- import finished translations -> done sections ---
+// Splits pasted text into sections at heading lines (mostly-uppercase short
+// lines). A line starting chapter/book/introduction/etc. begins a new heading;
+// book-level headings with no body of their own are dropped.
+function isHeadingLine(l) {
+  const t = l.trim();
+  const letters = t.replace(/[^A-Za-z]/g, '');
+  if (letters.length < 2) return false;
+  const upper = t.replace(/[^A-Z]/g, '').length;
+  return upper / letters.length > 0.85; // mostly uppercase
+}
+// A block is a heading if every non-empty line in it is heading-like. This
+// catches multi-line headings (e.g. "CHAPTER THREE" above its subtitle) and
+// long all-caps subtitles, both of which appear in real books.
+function isHeadingBlock(b) {
+  const lines = b.split('\n').map(l => l.trim()).filter(Boolean);
+  return lines.length > 0 && lines.every(isHeadingLine);
+}
+function parseImport(text) {
+  const blocks = text.replace(/\r\n/g, '\n').split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean);
+  const sections = [];
+  let pending = [], cur = null;
+  const startsNew = l => /^(chapter|book|introduction|conclusion|part|section|appendix|preface|prologue|epilogue)\b/i.test(l);
+  for (const b of blocks) {
+    if (isHeadingBlock(b)) {
+      for (const line of b.split('\n').map(l => l.trim()).filter(Boolean)) {
+        if (startsNew(line)) pending = [line]; else pending.push(line);
+      }
+      cur = null;
+    } else {
+      if (!cur) { cur = { label: pending.join(' / ') || `Section ${sections.length + 1}`, paras: [] }; sections.push(cur); pending = []; }
+      cur.paras.push(b);
+    }
+  }
+  return sections.filter(s => s.paras.length);
+}
+document.getElementById('import-file-btn').addEventListener('click', () => document.getElementById('import-file').click());
+document.getElementById('import-file').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('import-text').value = await f.text();
+  document.getElementById('import-status').textContent = `Loaded ${f.name}. Click "Import as sections".`;
+});
+document.getElementById('import-apply').addEventListener('click', async () => {
+  const status = document.getElementById('import-status');
+  const text = document.getElementById('import-text').value;
+  const parsed = parseImport(text);
+  if (!parsed.length) { status.textContent = 'Could not find any sections. Check that chapter headings are on their own lines.'; return; }
+  let order = curSections.length;
+  for (const sec of parsed) {
+    const record = {
+      id: newId(), projectId: curProject.id, order: order++, label: sec.label,
+      status: 'done', startIdx: null, endIdx: null, original: '',
+      paragraphs: sec.paras.map((t, i) => ({ id: i, original: '', translation: t, flag: null, edited: false, summaryBefore: '' })),
+      createdAt: Date.now(), updatedAt: Date.now(),
+    };
+    await saveSection(record);
+    curSections.push(record);
+  }
+  document.getElementById('import-text').value = '';
+  status.textContent = `Imported ${parsed.length} sections (${parsed.reduce((n, s) => n + s.paras.length, 0)} paragraphs).`;
+  renderSectionsList();
+});
+
 // --- coverage + sections list ---
 function coveredSet() {
   const set = new Set();
@@ -1260,11 +1340,13 @@ function coveredSet() {
 function renderSectionsList() {
   const list = document.getElementById('section-list');
   const cov = coveredSet();
-  document.getElementById('coverage').innerHTML =
-    `<b>${cov.size}</b> of ${curSource.length} paragraphs translated (${curSource.length ? Math.round(cov.size / curSource.length * 100) : 0}%).`;
+  const doneCount = curSections.filter(s => s.status === 'done').length;
+  document.getElementById('coverage').innerHTML = curSource.length
+    ? `<b>${cov.size}</b> of ${curSource.length} book paragraphs translated (${Math.round(cov.size / curSource.length * 100)}%).`
+    : (curSections.length ? `<b>${doneCount}</b> of ${curSections.length} sections done. No book text loaded.` : '');
   list.innerHTML = '';
   if (!curSections.length) {
-    list.innerHTML = '<div class="empty-note">No sections yet. Paste a contents page above, or select paragraphs in the book below.</div>';
+    list.innerHTML = '<div class="empty-note">No sections yet. Import finished translations, paste a contents page, or load a book and select paragraphs.</div>';
     return;
   }
   for (const s of [...curSections].sort((a, b) => (a.startIdx ?? a.order) - (b.startIdx ?? b.order))) {
