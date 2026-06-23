@@ -262,6 +262,10 @@
   }
   .section-item.done { background: var(--done-bg); border-color: var(--done-border); }
   .section-item.active { box-shadow: 0 0 0 2px var(--purple-soft); }
+  .section-item.dragging { opacity: 0.45; }
+  .section-item.drag-over { box-shadow: inset 0 3px 0 var(--purple); }
+  .drag-grip { cursor: grab; color: var(--muted); user-select: none; font-size: 15px; line-height: 1; }
+  .drag-grip:active { cursor: grabbing; }
   .section-label { font-weight: 600; font-size: 14px; }
   .section-sub { font-size: 12px; color: var(--muted); }
   .section-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -364,6 +368,9 @@
           </div>
           <div class="pdf-status" id="pdf-status"></div>
         </div>
+        <label class="view-toggle" style="font-size:13px;color:var(--muted);margin-top:10px">
+          <input type="checkbox" id="fix-breaks"> Join hard-wrapped lines (for text with a line break on every line)
+        </label>
       </div>
 
       <div class="row">
@@ -433,14 +440,11 @@
       </div>
     </div>
 
-    <details class="panel meta-box" id="meta-box">
-      <summary>Story so far (carry-over context for the next section)</summary>
-      <textarea id="ws-rolling" class="short" style="margin-top:12px" placeholder="Builds up automatically as you translate sections. You can edit it."></textarea>
-      <div class="row" style="margin-top:14px">
-        <div class="field">
-          <label class="label" for="ws-work-summary">What is this book? (optional)</label>
-          <input type="text" id="ws-work-summary" placeholder="e.g. Mill's On Liberty">
-        </div>
+    <!-- Translation settings (always visible) -->
+    <section class="panel">
+      <div class="field">
+        <label class="label" for="ws-work-summary">What is this book? (optional)</label>
+        <input type="text" id="ws-work-summary" placeholder="e.g. Mill's On Liberty">
       </div>
       <div class="row">
         <div class="field">
@@ -460,6 +464,11 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <details class="panel meta-box" id="meta-box">
+      <summary>Story so far (carry-over context for the next section)</summary>
+      <textarea id="ws-rolling" class="short" style="margin-top:12px" placeholder="Builds up automatically as you translate sections. You can edit it."></textarea>
     </details>
 
     <!-- Import already-finished translations (always available) -->
@@ -495,6 +504,9 @@
           </div>
           <div class="pdf-status" id="ws-pdf-status"></div>
         </div>
+        <label class="view-toggle" style="font-size:13px;color:var(--muted);margin-top:10px">
+          <input type="checkbox" id="ws-fix-breaks"> Join hard-wrapped lines (for text with a line break on every line)
+        </label>
       </div>
       <div class="actions">
         <button class="primary" id="ws-load-btn">Load book</button>
@@ -580,6 +592,17 @@ function splitParagraphs(text) {
   return text.replace(/\r\n/g, '\n').split(/\n\s*\n+/).map(p => p.trim()).filter(p => p.length > 0);
 }
 function wordCount(s) { const m = s.trim().match(/\S+/g); return m ? m.length : 0; }
+
+// Join hard-wrapped lines within paragraphs (single newline -> space), keeping
+// blank-line paragraph breaks. De-hyphenates words split across a line end.
+// For text files that have a line break on every line and a blank line between
+// paragraphs. Pure string work, no AI.
+function fixLineBreaks(text) {
+  return text.replace(/\r\n/g, '\n')
+    .replace(/([A-Za-z])-\n(?=[a-z])/g, '$1') // "exam-\nple" -> "example"
+    .replace(/([^\n])\n(?!\n)/g, '$1 ')        // a lone newline becomes a space
+    .replace(/[ \t]{2,}/g, ' ');               // tidy any doubled spaces
+}
 
 function buildChunks(paras, targetMinWords) {
   const chunks = []; let current = []; let currentWords = 0;
@@ -1180,7 +1203,8 @@ async function wsHandlePdf(file) {
 document.getElementById('ws-load-btn').addEventListener('click', async () => {
   const err = document.getElementById('ws-load-err');
   err.classList.add('hidden');
-  const text = wsMode === 'pdf' ? wsPdfText : document.getElementById('ws-source-text').value;
+  let text = wsMode === 'pdf' ? wsPdfText : document.getElementById('ws-source-text').value;
+  if (document.getElementById('ws-fix-breaks').checked) text = fixLineBreaks(text);
   const paras = splitParagraphs(text);
   if (!paras.length) { err.textContent = 'No paragraphs found. Paste the book text or load a PDF first.'; err.classList.remove('hidden'); return; }
   curSource = paras;
@@ -1349,9 +1373,17 @@ function renderSectionsList() {
     list.innerHTML = '<div class="empty-note">No sections yet. Import finished translations, paste a contents page, or load a book and select paragraphs.</div>';
     return;
   }
-  for (const s of [...curSections].sort((a, b) => (a.startIdx ?? a.order) - (b.startIdx ?? b.order))) {
+  for (const s of [...curSections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
     const item = document.createElement('div');
     item.className = 'section-item' + (s.status === 'done' ? ' done' : '') + (activeSection && activeSection.id === s.id ? ' active' : '');
+    item.draggable = true;
+    item.dataset.id = s.id;
+    wireSectionDrag(item, s.id);
+    const grip = document.createElement('span');
+    grip.className = 'drag-grip';
+    grip.textContent = '⠿'; // braille grip glyph
+    grip.title = 'Drag to reorder';
+    item.appendChild(grip);
     const hasRange = s.startIdx != null && s.endIdx != null;
     const meta = document.createElement('div');
     const badge = s.status === 'done' ? '<span class="badge done">done</span>' : (hasRange ? '<span class="badge pending">pending</span>' : '<span class="badge norange">no range</span>');
@@ -1379,6 +1411,50 @@ function renderSectionsList() {
     item.append(meta, acts);
     list.appendChild(item);
   }
+}
+
+// --- drag to reorder sections (list + export order only) ---
+let draggingId = null;
+function wireSectionDrag(item, id) {
+  item.addEventListener('dragstart', e => {
+    draggingId = id;
+    item.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', id); } catch {}
+  });
+  item.addEventListener('dragend', () => {
+    draggingId = null;
+    document.querySelectorAll('.section-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+  });
+  item.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== draggingId) item.classList.add('drag-over');
+  });
+  item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+  item.addEventListener('drop', async e => {
+    e.preventDefault();
+    item.classList.remove('drag-over');
+    if (!draggingId || draggingId === id) return;
+    const r = item.getBoundingClientRect();
+    const after = e.clientY > r.top + r.height / 2; // dropped on lower half -> place after
+    await reorderSections(draggingId, id, after);
+  });
+}
+// Move the dragged section relative to the target, renumber order, persist.
+async function reorderSections(draggedId, targetId, after) {
+  const ordered = [...curSections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const dragged = ordered.find(s => s.id === draggedId);
+  if (!dragged) return;
+  const without = ordered.filter(s => s.id !== draggedId);
+  let targetPos = without.findIndex(s => s.id === targetId);
+  if (targetPos < 0) return;
+  if (after) targetPos += 1;
+  without.splice(targetPos, 0, dragged);
+  const changed = [];
+  without.forEach((s, i) => { if (s.order !== i) { s.order = i; changed.push(s); } });
+  for (const s of changed) await saveSection(s);
+  renderSectionsList();
 }
 
 // --- source view + selection ---
@@ -1514,7 +1590,7 @@ async function translateSection(section) {
 // project export
 function exportProject(ext) {
   const done = curSections.filter(s => s.status === 'done' && s.paragraphs && s.paragraphs.length)
-    .sort((a, b) => (a.startIdx ?? a.order) - (b.startIdx ?? b.order));
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   if (!done.length) { alert('Nothing translated yet to export.'); return; }
   const body = done.map(s => s.paragraphs.map(p => p.translation || p.original).join('\n\n')).join('\n\n');
   download(downloadName(ext, curProject.title), body.trim() + '\n');
@@ -1553,7 +1629,10 @@ function quickEffort() { return readEffort('effort'); }
 
 // quick input (paste / pdf)
 let pdfText = '', inputMode = 'paste';
-function getSourceText() { return inputMode === 'pdf' ? pdfText : document.getElementById('source-text').value; }
+function getSourceText() {
+  const raw = inputMode === 'pdf' ? pdfText : document.getElementById('source-text').value;
+  return document.getElementById('fix-breaks').checked ? fixLineBreaks(raw) : raw;
+}
 document.querySelectorAll('#controls .input-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('#controls .input-tab').forEach(t => t.classList.remove('active'));
