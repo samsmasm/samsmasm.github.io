@@ -792,7 +792,7 @@ footer{{margin-top:48px;padding-top:12px;border-top:1px solid #ddd7cc;font-size:
     <ul>
 {editions_html}    </ul>
   </section>
-  <footer>Built by Sam G &middot; SSIS Ho Chi Minh City &middot; <a href="mailto:samgetsstuffdone@gmail.com" style="color:inherit">found a problem? tell Sam</a></footer>
+  <footer>Built by Sam G &middot; <a href="mailto:samgetsstuffdone@gmail.com" style="color:inherit">found a problem? tell Sam</a></footer>
 </div>
 </body>
 </html>"""

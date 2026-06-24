@@ -20,7 +20,7 @@ const googleProvider = new GoogleAuthProvider();
 
 // === Auth ===
 
-const TEACHER_EMAILS = ['samgetsstuffdone@gmail.com', 'cgoussard@ssis.edu.vn'];
+const TEACHER_EMAILS = ['samgetsstuffdone@gmail.com'];
 
 async function loginWithGoogle() {
   const cred = await signInWithPopup(auth, googleProvider);

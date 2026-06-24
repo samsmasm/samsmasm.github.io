@@ -169,7 +169,7 @@ Source labels are plain coloured text, no background, no border, no radius:
 
 Plain, small, muted. No elaborate footer. Something like:
 
-> Built by Sam G · SSIS Ho Chi Minh City · all vibe coded · found a problem? tell Sam.
+> Built by Sam G · all vibe coded · found a problem? tell Sam.
 
 Font size 11px, colour `#bbb`, sans-serif. A thin top border in `#f0e8ff`.
 
