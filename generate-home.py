@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake the latest econnews/businews content into newhome/index.html.
+"""Bake the latest econnews/businews content into index.html.
 
 The homepage tiles are also populated client-side at runtime, but that causes
 a brief flash of stale fallback text on load. Running this at publish time
@@ -18,7 +18,7 @@ import pathlib
 from datetime import datetime
 
 ROOT = pathlib.Path(__file__).parent
-HOME = ROOT / "newhome" / "index.html"
+HOME = ROOT / "index.html"
 
 
 def fmt_date(s):
@@ -114,7 +114,7 @@ def main():
         if econ["read"]:  content = set_href(content, "econ-read", econ["read"])
 
     HOME.write_text(content, encoding="utf-8")
-    print("generate-home: baked newhome/index.html")
+    print("generate-home: baked index.html")
 
 
 if __name__ == "__main__":
