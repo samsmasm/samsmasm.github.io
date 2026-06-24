@@ -169,16 +169,16 @@
             <div class="card__body">
               <div class="meta">
                 <span class="badge badge-bm">New this week</span>
-                <span>&middot;</span><span>Dec 20, 2025</span>
+                <span>&middot;</span><span id="bm-date">Dec 20, 2025</span>
                 <span>&middot;</span><a href="/businews">business management</a>
               </div>
-              <h2 class="card__heading">No Room for Roomba</h2>
-              <p class="card__excerpt">After three decades at the forefront of consumer robotics, iRobot filed for bankruptcy and was taken over by its Chinese supplier, rich territory for strategy, growth and crisis management.</p>
+              <h2 class="card__heading" id="bm-title">No Room for Roomba</h2>
+              <p class="card__excerpt" id="bm-excerpt">After three decades at the forefront of consumer robotics, iRobot filed for bankruptcy and was taken over by its Chinese supplier, rich territory for strategy, growth and crisis management.</p>
             </div>
             <div class="card__panel">
-              <div class="tags"><span class="tag tag-bm">bankruptcy</span><span class="tag tag-bm">growth</span></div>
+              <div class="tags" id="bm-tags"><span class="tag tag-bm">bankruptcy</span><span class="tag tag-bm">growth</span></div>
               <div class="card__actions">
-                <a class="cta cta-bm" href="/businews">Read &#8594;</a>
+                <a class="cta cta-bm" id="bm-read" href="/businews">Read &#8594;</a>
                 <a class="card__archive" href="/businews">archive</a>
               </div>
             </div>
@@ -274,6 +274,44 @@
       if (text) ledeEl.textContent = text;
     } catch (e) {
       /* keep the fallback text already in the tile */
+    }
+  })();
+
+  // Populate the BM Case tile from the most recent businews case.
+  // cases.json is newest-first with title, hook (excerpt), date, filename,
+  // and curriculum_links. On any failure we keep the tile's existing content.
+  (async function loadBusinews() {
+    const titleEl   = document.getElementById('bm-title');
+    const excerptEl = document.getElementById('bm-excerpt');
+    const dateEl    = document.getElementById('bm-date');
+    const readEl    = document.getElementById('bm-read');
+    const tagsEl    = document.getElementById('bm-tags');
+    if (!titleEl) return;
+    try {
+      const cases = await fetch('/businews/cases.json').then(r => r.json());
+      if (!Array.isArray(cases) || !cases.length) return;
+      const latest = cases[0];
+
+      if (latest.title) titleEl.textContent = latest.title;
+      if (latest.hook)  excerptEl.textContent = latest.hook;
+
+      const m = (latest.date || latest.filename || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (dateEl && m) {
+        const d = new Date(+m[1], +m[2] - 1, +m[3]);
+        dateEl.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      if (readEl && latest.filename) readEl.href = '/businews/cases/' + latest.filename;
+
+      // Curriculum links like "Unit 4: Marketing" -> short "unit 4" tags.
+      if (tagsEl && Array.isArray(latest.curriculum_links) && latest.curriculum_links.length) {
+        const tags = latest.curriculum_links
+          .map(s => (s.match(/Unit\s+\d+/i) || [s])[0].toLowerCase())
+          .slice(0, 2);
+        tagsEl.innerHTML = tags.map(t => `<span class="tag tag-bm">${t}</span>`).join('');
+      }
+    } catch (e) {
+      /* keep the fallback content already in the tile */
     }
   })();
   </script>
