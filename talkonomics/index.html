@@ -74,11 +74,11 @@
             <div class="card__body">
               <div class="meta">
                 <span class="badge">New this week</span>
-                <span>&middot;</span><span>Jun 23, 2026</span>
+                <span>&middot;</span><span id="econ-date">Jun 23, 2026</span>
                 <span>&middot;</span><a href="/econnews">economics</a>
               </div>
               <h2 class="card__heading">Econ News and Econ Talk</h2>
-              <p class="card__excerpt">In this issue: Datacenters driving US clean energy growth while still threatening climate &middot; Not so empty nesters: record-high number of US adults under 35 live at home, new data says &middot; Federal Reserve holds rates steady but signals possible hike before year's end &middot; Oil and gas unlikely to return to prewar prices for months even if Hormuz reopens &middot; 'It's a scam': Americans express unease over SpaceX's influence on retirement savings &middot; Europe's ultra-rich: Which countries are adding the most $30m+ millionaires?</p>
+              <p class="card__excerpt" id="econ-lede">In this issue: Datacenters driving US clean energy growth while still threatening climate &middot; Not so empty nesters: record-high number of US adults under 35 live at home, new data says &middot; Federal Reserve holds rates steady but signals possible hike before year's end &middot; Oil and gas unlikely to return to prewar prices for months even if Hormuz reopens &middot; 'It's a scam': Americans express unease over SpaceX's influence on retirement savings &middot; Europe's ultra-rich: Which countries are adding the most $30m+ millionaires?</p>
             </div>
             <div class="card__panel">
               <div class="tags"><span class="tag">macro</span><span class="tag">global</span></div>
@@ -138,6 +138,38 @@
       <a class="site-footer__email" href="mailto:talkonomicsteaching@gmail.com">talkonomicsteaching@gmail.com</a>
     </div>
   </footer>
+
+  <script>
+  // Populate the Econ News tile from the latest econnews issue.
+  // posts.json is newest-first; each post has a `filename` (e.g. 2026-06-25.html).
+  // The lede lives in .issue-lede inside /econnews/posts/<filename>. Older
+  // issues may lack it, so we fall back to whatever is already in the tile.
+  (async function loadEconLede() {
+    const ledeEl = document.getElementById('econ-lede');
+    const dateEl = document.getElementById('econ-date');
+    if (!ledeEl) return;
+    try {
+      const posts = await fetch('/econnews/posts.json').then(r => r.json());
+      if (!Array.isArray(posts) || !posts.length) return;
+      const latest = posts[0];
+      if (!latest || !latest.filename) return;
+
+      // Update the tile date from the issue filename (YYYY-MM-DD).
+      const m = latest.filename.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (dateEl && m) {
+        const d = new Date(+m[1], +m[2] - 1, +m[3]);
+        dateEl.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      const html = await fetch('/econnews/posts/' + latest.filename).then(r => r.text());
+      const lede = new DOMParser().parseFromString(html, 'text/html').querySelector('.issue-lede');
+      const text = lede && lede.textContent.trim();
+      if (text) ledeEl.textContent = text;
+    } catch (e) {
+      /* keep the fallback text already in the tile */
+    }
+  })();
+  </script>
 
 </body>
 </html>
