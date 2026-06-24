@@ -143,26 +143,24 @@ Card descriptions use a mid-tone of the same hue, weight 400, 12px, line-height 
 ## Feed items (home page)
 
 Feed items on the home page are editorial in style — closer to a blog index than a card grid. They use:
-- A small coloured source tag (pill-shaped, soft background, dark text in the same hue)
+- A small coloured source label in the same hue (plain uppercase text, **not** a filled pill — see the no-pills hard rule)
 - A serif or near-serif title (Georgia or system serif)
 - A sans-serif excerpt in muted grey
 - A small date in light grey
 - Dividers between items: `1px solid #f0e8ff`
 
-Source tags:
+Source labels are plain coloured text, no background, no border, no radius:
 ```css
 .feed-source {
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 3px 9px;
-  border-radius: 4px;
   font-family: sans-serif;
 }
-/* econnews */ background: #d6f5e8; color: #145c34;
-/* bm/business content */ background: #d6e8ff; color: #1a3a7a;
-/* quiz */ background: #ead6ff; color: #4a1a7a;
+/* econnews */ color: #145c34;
+/* bm/business content */ color: #1a3a7a;
+/* quiz */ color: #4a1a7a;
 ```
 
 ---
@@ -188,6 +186,7 @@ Font size 11px, colour `#bbb`, sans-serif. A thin top border in `#f0e8ff`.
 - No AI-kit pill buttons for navigation — use underline tabs or plain text links
 - No neutral grey card backgrounds — every card should have a hue
 - No `font-weight: 700` in body text — 600 maximum for card titles, 500 for nav
+- **No pill tags or pill labels.** Filled, rounded-rectangle chips for tags, badges, categories, or metadata are banned outright. They are the single most recognisable "AI / Tailwind starter-kit" tell, and a row of them reads as visual noise — decorative em dashes that add nothing. Render tags and metadata as **plain text** in the relevant subject colour, separated by a middot (`·`) when there are several. Status labels (e.g. "New this week") are plain uppercase letter-spaced text in the subject colour, never a filled pill. This supersedes any pill styling described elsewhere in this document or already shipped on older pages.
 
 ---
 
