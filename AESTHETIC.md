@@ -138,6 +138,8 @@ Card descriptions use a mid-tone of the same hue, weight 400, 12px, line-height 
 - Accent dots or left-border stripes (these read as design-system artefacts)
 - Identical card sizes forced by a rigid grid — `auto-fill` with `minmax` is fine
 
+**Directory / listing pages (many items, e.g. `/tools`, `/experiments`):** do not use a grid of filled cards — a wall of identical coloured rounded rectangles reads as a generic component grid (the "giant pills" look). Instead use a **ruled editorial index**: each category is a section under its coloured top-rule label, and each item is a row with the name in Georgia in the subject colour on the left, a muted-grey one-line description on the right, and a `1px solid #f0e8ff` hairline between rows. No fills, no borders around items, no rounded boxes.
+
 ---
 
 ## Feed items (home page)
