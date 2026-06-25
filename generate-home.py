@@ -9,16 +9,26 @@ page renders correct from first paint and the JS just confirms it.
 Targets elements by id (bm-date, bm-title, bm-excerpt, bm-tags, bm-read,
 econ-date, econ-title, econ-read). Replacement is done with scoped regex so
 the rest of the hand-written file is left byte-for-byte intact.
+
+This script is intentionally best-effort: it runs inside the econnews and
+businews publish workflows, so it must never raise and block a content
+publish. Any problem is logged to stderr and the relevant field is skipped;
+the runtime JS still corrects the tile on load.
 """
 
 import json
 import re
 import html
+import sys
 import pathlib
 from datetime import datetime
 
 ROOT = pathlib.Path(__file__).parent
 HOME = ROOT / "index.html"
+
+
+def warn(msg):
+    sys.stderr.write(f"generate-home: {msg}\n")
 
 
 def fmt_date(s):
@@ -37,7 +47,8 @@ def set_text(content, tag, elem_id, text):
     repl = lambda m: m.group(1) + html.escape(text, quote=False) + m.group(3)
     new, n = pattern.subn(repl, content, count=1)
     if n != 1:
-        raise SystemExit(f"generate-home: could not find {tag}#{elem_id}")
+        warn(f"warning: could not find {tag}#{elem_id}, skipping")
+        return content
     return new
 
 
@@ -48,7 +59,8 @@ def set_href(content, elem_id, href):
     repl = lambda m: m.group(1) + html.escape(href, quote=True) + m.group(2)
     new, n = pattern.subn(repl, content, count=1)
     if n != 1:
-        raise SystemExit(f"generate-home: could not find a#{elem_id} href")
+        warn(f"warning: could not find a#{elem_id} href, skipping")
+        return content
     return new
 
 
@@ -97,9 +109,17 @@ def latest_econnews():
 
 
 def main():
-    content = HOME.read_text(encoding="utf-8")
+    try:
+        content = HOME.read_text(encoding="utf-8")
+    except Exception as e:
+        warn(f"cannot read {HOME}: {e}; nothing baked")
+        return
 
-    bm = latest_businews()
+    try:
+        bm = latest_businews()
+    except Exception as e:
+        warn(f"businews skipped: {e}")
+        bm = None
     if bm:
         if bm["date"]:    content = set_text(content, "span", "bm-date", bm["date"])
         if bm["title"]:   content = set_text(content, "h2", "bm-title", bm["title"])
@@ -107,15 +127,25 @@ def main():
         if bm["tags"]:    content = set_text(content, "div", "bm-tags", bm["tags"])
         if bm["read"]:    content = set_href(content, "bm-read", bm["read"])
 
-    econ = latest_econnews()
+    try:
+        econ = latest_econnews()
+    except Exception as e:
+        warn(f"econnews skipped: {e}")
+        econ = None
     if econ:
         if econ["date"]:  content = set_text(content, "span", "econ-date", econ["date"])
         if econ["title"]: content = set_text(content, "h2", "econ-title", econ["title"])
         if econ["read"]:  content = set_href(content, "econ-read", econ["read"])
 
-    HOME.write_text(content, encoding="utf-8")
-    print("generate-home: baked index.html")
+    try:
+        HOME.write_text(content, encoding="utf-8")
+        print("generate-home: baked index.html")
+    except Exception as e:
+        warn(f"cannot write {HOME}: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:  # last-resort guard: never fail the publish job
+        warn(f"unexpected error, homepage not baked: {e}")
