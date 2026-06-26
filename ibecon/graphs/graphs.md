@@ -16,6 +16,10 @@ Served from `unisam.nz/ibecon/graphs/<name>.svg` (Astro copies `public/` as-is a
 - Dashed reference lines grey (`#888` primary, `#aaa` secondary). Equilibrium uses plain `Pe`/`Qe`; shifts use subscripts `₁`/`₂` (`&#8321;`/`&#8322;`).
 - `originals/` holds the user's hand-drawn JPG references — not used on the site.
 
+## Foundations
+
+- **ppc.svg** — production possibilities curve, concave to the origin. Axes: **Capital goods** (y) vs **Consumer goods** (x). Points A and B sit on the curve (efficient, showing the trade-off / opportunity cost), X is inside (inefficient, unemployed resources), Z is outside (unattainable). Used in Unit 1 (scarcity, opportunity cost, efficiency) and Unit 3 (potential output / growth).
+
 ## Demand & supply basics
 
 - **demand-curve.svg** — single downward-sloping demand curve (green). Illustrates the law of demand.
