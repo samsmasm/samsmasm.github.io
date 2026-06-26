@@ -75,11 +75,11 @@ Status: [x] done, [ ] to do.
 - [x] **inflation-nc-deflation.svg** — AD&#8321; → AD&#8322; left; PL falls (deflation)
 
 ### Unemployment / labour (3.3)
-- [ ] **unemp-minimum-wage.svg** — labour market, binding minimum wage (ref: minimum wage.png)
+- [x] **unemp-minimum-wage.svg** — labour market, binding minimum wage above W*; L_D &lt; L_S gives unemployment (surplus)
 
 ### Phillips curves (3.3, HL)
-- [ ] **phillips-sr.svg** — short-run Phillips curve
-- [ ] **phillips-lr.svg** — long-run (vertical at NRU) + stagflation shift
+- [x] **phillips-sr.svg** — short-run Phillips curve (downward, convex; inflation–unemployment trade-off)
+- [x] **phillips-lr.svg** — vertical LRPC at NRU; SRPC&#8321;/SRPC&#8322; with A→B→C expectations adjustment
 
 ### Inequality, poverty & tax (3.4)
 - [ ] **inequality-lorenz.svg** — Lorenz curve with plotted points (ref: gini.png)
