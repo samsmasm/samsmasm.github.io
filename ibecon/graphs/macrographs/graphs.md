@@ -56,11 +56,11 @@ Status: [x] done, [ ] to do.
 - [ ] **adas-nc-self-correction.svg** — SRAS slides to restore Y_fe
 
 ### AD/AS Keynesian (reverse-L AS)
-- [ ] **adas-kn-as.svg** — Keynesian AS alone (flat → rising → vertical)
-- [ ] **adas-kn-equilibrium.svg** — equilibrium (with the three regions)
-- [ ] **adas-kn-recessionary-gap.svg**
-- [ ] **adas-kn-inflationary-gap.svg**
-- [ ] **adas-kn-ad-increase.svg** — AD rising across the three regions
+- [x] **adas-kn-as.svg** — Keynesian AS alone (flat → rising → vertical), Y_fe marked
+- [x] **adas-kn-equilibrium.svg** — equilibrium in the intermediate region; three regions labelled
+- [x] **adas-kn-recessionary-gap.svg** — AD&#8322; left of Y_fe; gap Y&#8321; → Y_fe below axis
+- [x] **adas-kn-inflationary-gap.svg** — AD&#8322; raises PL only (output stays Y_fe); gap shown horizontally at PL&#8321;
+- [x] **adas-kn-ad-increase.svg** — AD&#8321;/AD&#8322;/AD&#8323; across the three regions, with PL&#8321;/&#8322;/&#8323; and Y&#8321;/&#8322;/fe
 
 ### Growth (3.3)
 - [ ] **growth-nc-actual.svg** — AD shift right
