@@ -69,10 +69,10 @@ Status: [x] done, [ ] to do.
 - [x] **growth-ppc.svg** — PPC outward shift (capital vs consumer goods), macro-styled
 
 ### Inflation & deflation (3.3)
-- [ ] **inflation-nc-demand-pull.svg**
-- [ ] **inflation-nc-cost-push.svg**
-- [ ] **inflation-kn-demand-pull.svg**
-- [ ] **inflation-nc-deflation.svg**
+- [x] **inflation-nc-demand-pull.svg** — AD&#8321; → AD&#8322; right; PL and Y rise
+- [x] **inflation-nc-cost-push.svg** — SRAS&#8321; → SRAS&#8322; left; PL rises, Y falls (stagflation)
+- [x] **inflation-kn-demand-pull.svg** — AD&#8321; → AD&#8322; in the steep region; mostly price rise
+- [x] **inflation-nc-deflation.svg** — AD&#8321; → AD&#8322; left; PL falls (deflation)
 
 ### Unemployment / labour (3.3)
 - [ ] **unemp-minimum-wage.svg** — labour market, binding minimum wage (ref: minimum wage.png)
