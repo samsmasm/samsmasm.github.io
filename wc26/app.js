@@ -3,7 +3,7 @@
 // Team-name normalisation and result orientation live in wc-core.js (window.WC)
 // so this page and the schedule page resolve results identically. wc-core.js
 // MUST be loaded before this script.
-const { canon, same, pairKey, esc, competitors, orient } = WC;
+const { canon, same, pairKey, esc, competitors, orient, isPlaceholderTeam } = WC;
 
 // ---------------------------------------------------------------------------
 // ESPN endpoints
@@ -52,6 +52,10 @@ async function fetchOverrides() {
 // Build a results model from ESPN data, then layer overrides on top.
 // ---------------------------------------------------------------------------
 const ROUND_PTS = { r32: 1, r16: 1, qf: 2, sf: 3, final: 4 };
+// How many real teams a round holds once fully determined. A knockout column is
+// only "resolved" (and so scored) when every slot is a known team — this is what
+// keeps R32 from showing as decided while groups are still being played.
+const ROUND_FULL = { r32: 32, r16: 16, qf: 8, sf: 4, final: 2 };
 
 function classifyRound(note) {
   const n = (note || '').toLowerCase();
@@ -130,11 +134,15 @@ function buildResults(events, standings, ov) {
     }
   }
   // From knockout fixtures: participants of a round reached that round; final winner = champion.
+  // ESPN lists future bracket fixtures with placeholder slots ("Group I Winner",
+  // "Third Place Group A/B/C/D/F", ...); skip those so a round is only counted
+  // once it holds real, determined teams.
   for (const m of parsed) {
     const rd = classifyRound(m.note);
     if (!rd) continue;
     if (rd === 'third') { if (m.completed) thirdWinner = m.hs > m.as ? m.home : m.away; continue; }
-    rounds[rd].add(canon(m.home)); rounds[rd].add(canon(m.away));
+    if (!isPlaceholderTeam(m.home)) rounds[rd].add(canon(m.home));
+    if (!isPlaceholderTeam(m.away)) rounds[rd].add(canon(m.away));
     if (rd === 'final' && m.completed) champion = m.hs > m.as ? m.home : m.away;
   }
   // Overrides for rounds / champion / third place.
@@ -192,7 +200,7 @@ function scorePlayer(p, R, fixtures) {
 
   for (const rd of ['r32', 'r16', 'qf', 'sf', 'final']) {
     const set = R.rounds[rd];
-    const resolved = set.size > 0;
+    const resolved = set.size >= ROUND_FULL[rd];
     const picks = p[rd].map(team => {
       const ok = set.has(canon(team));
       return { team, status: resolved ? (ok ? 'correct' : 'wrong') : 'pending', pts: ok ? ROUND_PTS[rd] : 0 };

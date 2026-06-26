@@ -75,6 +75,14 @@
     };
   }
 
+  // ESPN publishes knockout fixtures early with placeholder "teams" for slots
+  // not yet filled (e.g. "Group I Winner", "Third Place Group A/B/C/D/F",
+  // "Group J 2nd Place"). These are bracket positions, not countries, and must
+  // never be treated as a team that reached a round. No real nation's name
+  // contains these words, so a keyword test is safe.
+  const PLACEHOLDER = /\b(group|winner|runner|place|loser|tbd)\b/i;
+  const isPlaceholderTeam = name => PLACEHOLDER.test(name || '');
+
   // Outcome from a's perspective: 'a' | 'b' | 'draw' | null (no result yet).
   function outcome(a, b, m) {
     const o = orient(a, b, m);
@@ -84,5 +92,5 @@
     return 'draw';
   }
 
-  global.WC = { strip, ALIAS, canon, same, pairKey, esc, competitors, buildMatchMap, orient, outcome };
+  global.WC = { strip, ALIAS, canon, same, pairKey, esc, competitors, buildMatchMap, orient, outcome, isPlaceholderTeam };
 })(typeof window !== 'undefined' ? window : globalThis);
