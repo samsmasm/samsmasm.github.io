@@ -82,11 +82,11 @@ Status: [x] done, [ ] to do.
 - [x] **phillips-lr.svg** — vertical LRPC at NRU; SRPC&#8321;/SRPC&#8322; with A→B→C expectations adjustment
 
 ### Inequality, poverty & tax (3.4)
-- [ ] **inequality-lorenz.svg** — Lorenz curve with plotted points (ref: gini.png)
-- [ ] **inequality-gini.svg** — Lorenz with Gini areas A/B shaded (ref: gini2.png)
-- [ ] **inequality-lorenz-compare.svg** — two Lorenz curves compared
-- [ ] **inequality-tax-structures.svg** — progressive / proportional / regressive
-- [ ] **inequality-laffer.svg** — Laffer curve (ref: laffercurve.png)
+- [x] **inequality-lorenz.svg** — Lorenz curve (blue) with quintile points A–E vs the line of equality
+- [x] **inequality-gini.svg** — Lorenz (magenta) vs equality line (blue); area A (gold) and B (blue) shaded; Gini = A/(A+B)
+- [x] **inequality-lorenz-compare.svg** — more equal (blue) vs less equal (magenta) Lorenz curves
+- [x] **inequality-tax-structures.svg** — progressive (blue, up), proportional (gold, flat), regressive (magenta, down)
+- [x] **inequality-laffer.svg** — inverted-U revenue vs tax rate; R_B at optimal rate T*
 
 ### Monetary policy (3.5)
 - [ ] **money-market.svg** — money demand + supply → interest rate (HL)
