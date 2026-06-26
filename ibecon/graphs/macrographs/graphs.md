@@ -89,9 +89,9 @@ Status: [x] done, [ ] to do.
 - [x] **inequality-laffer.svg** — inverted-U revenue vs tax rate; R_B at optimal rate T*
 
 ### Monetary policy (3.5)
-- [ ] **money-market.svg** — money demand + supply → interest rate (HL)
-- [ ] **money-transmission-nc.svg** — interest rate → investment → AD shift
-- [ ] **money-policy-nc.svg** — expansionary / contractionary on AD/AS
+- [x] **money-market.svg** — MD (blue) + vertical MS (magenta) → r*, Q*
+- [x] **money-policy-nc.svg** — expansionary: MS&#8321; → MS&#8322; right, interest rate r&#8321; → r&#8322; falls
+- [x] **money-transmission-nc.svg** — two-panel: MS shift lowers r (money market) → AD&#8321; → AD&#8322; right (goods market)
 
 ### Fiscal policy (3.6)
 - [ ] **fiscal-nc-expansionary.svg**
