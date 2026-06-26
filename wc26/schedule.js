@@ -30,14 +30,21 @@ async function fetchEvents() {
   }
   return [...all.values()];
 }
-async function getEvents() {
+async function fetchStandings() {
+  try { return await getJSON(`${BASE}/v2/sports/soccer/fifa.world/standings`); }
+  catch { return null; }
+}
+// Returns { events, standings }, shared with app.js via the 'wc26-espn' cache.
+async function getData() {
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { /* ignore */ }
-  if (cached && cached.events && Date.now() - cached.ts < CACHE_TTL) return cached.events;
-  const events = await fetchEvents();
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ events, standings: cached ? cached.standings : null, ts: Date.now() })); }
+  if (cached && cached.events && cached.standings && Date.now() - cached.ts < CACHE_TTL) {
+    return { events: cached.events, standings: cached.standings };
+  }
+  const [events, standings] = await Promise.all([fetchEvents(), fetchStandings()]);
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ events, standings, ts: Date.now() })); }
   catch { /* quota */ }
-  return events;
+  return { events, standings };
 }
 // Live or finished games carry a usable score.
 const buildScores = events => WC.buildMatchMap(events, m => m.state === 'in' || m.state === 'post');
@@ -50,9 +57,89 @@ const fmtDay = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { timeZone: V
 
 let SCORES = new Map(), NOW = Date.now(), SCROLLED = false;
 
-function resultCell(m) {
+// --- knockout slot resolution -------------------------------------------------
+// Knockout rows in WC_SCHEDULE carry placeholder codes, not teams:
+//   "1A"/"2A" = winner / runner-up of group A,
+//   "3EFGIJ"  = a best-third-place slot (one of those groups),
+//   "W73"     = winner of match 73.
+// Resolve to real teams where known (from standings + the ESPN bracket),
+// otherwise keep the code so the matchup still reads.
+let POS = {};         // "1A".."2L" -> team name (only for completed groups)
+let OPP = new Map();  // canon(team) -> its R32 opponent's name (for 3rd-place slots)
+let WINNER = new Map(); // pairKey -> canon(winner) for finished knockout games
+const SLOT_RE = /^(?:[12][A-L]|3[A-L]{3,6}|W\d+)$/;
+const isSlot = s => SLOT_RE.test(s || '');
+
+function buildPositions(standings) {
+  const pos = {};
+  for (const ch of (standings && standings.children) || []) {
+    const g = (ch.name.match(/group ([a-l])/i) || [])[1];
+    if (!g) continue;
+    const ents = (ch.standings && ch.standings.entries) || [];
+    const stat = (e, n) => { const s = (e.stats || []).find(x => x.name === n); return s ? s.value : undefined; };
+    // Only resolve once the group is complete (every team has played 3).
+    if (!ents.length || !ents.every(e => (stat(e, 'gamesPlayed') || 0) >= 3)) continue;
+    const ord = [...ents].sort((a, b) => (stat(a, 'rank') ?? 99) - (stat(b, 'rank') ?? 99));
+    pos['1' + g.toUpperCase()] = ord[0].team.displayName;
+    pos['2' + g.toUpperCase()] = ord[1].team.displayName;
+  }
+  return pos;
+}
+
+function buildBracket(events) {
+  const opp = new Map(), win = new Map();
+  for (const ev of events || []) {
+    const c = ev.competitions && ev.competitions[0];
+    if (!c || (c.competitors || []).length !== 2) continue;
+    const note = c.altGameNote || '';
+    if (!/round of \d+|quarter|semi|final/i.test(note)) continue;
+    const [x, y] = c.competitors;
+    const xn = x.team.displayName, yn = y.team.displayName;
+    if (/round of 32/i.test(note)) { opp.set(canon(xn), yn); opp.set(canon(yn), xn); }
+    if (c.status && c.status.type && c.status.type.completed) {
+      const w = x.winner ? xn : (y.winner ? yn : null); // ESPN flag is correct even on penalties
+      if (w) win.set(pairKey(xn, yn), canon(w));
+    }
+  }
+  return { opp, win };
+}
+
+// Resolve a single slot code to a real team name, or null if not yet known.
+function resolveSlot(code, depth) {
+  if (!isSlot(code)) return code; // already a real team (group stage)
+  if (POS[code]) return POS[code];
+  const w = /^W(\d+)$/.exec(code);
+  if (w && depth < 6) {
+    const row = (window.WC_SCHEDULE || []).find(r => r.no === +w[1]);
+    if (!row) return null;
+    const a = resolveSlot(row.t1, depth + 1), b = resolveSlot(row.t2, depth + 1);
+    if (!a || !b) return null;
+    const wc = WINNER.get(pairKey(a, b));
+    return wc ? (canon(a) === wc ? a : b) : null;
+  }
+  return null; // 3rd-place slots are filled in via the sibling below
+}
+
+// Resolve both sides of a fixture, using the ESPN bracket to fill a best-third
+// slot once its already-known opponent has a real team in the bracket.
+function resolveFixture(m) {
+  let a = resolveSlot(m.t1, 0), b = resolveSlot(m.t2, 0);
+  if (a && !b && /^3/.test(m.t2)) { const o = OPP.get(canon(a)); if (o && !WC.isPlaceholderTeam(o)) b = o; }
+  if (b && !a && /^3/.test(m.t1)) { const o = OPP.get(canon(b)); if (o && !WC.isPlaceholderTeam(o)) a = o; }
+  return [a, b];
+}
+
+// Render one team: real name plus its slot code as a small tag; bare code if unresolved.
+function teamLabel(code, name) {
+  if (!isSlot(code)) return esc(code);
+  if (name) return `${esc(name)} <span class="slot">${esc(code)}</span>`;
+  return `<span class="slot solo">${esc(code)}</span>`;
+}
+
+function resultCell(m, a, b) {
+  const t1 = a || m.t1, t2 = b || m.t2;
   // orient() guarantees a/b are in t1/t2 order regardless of ESPN's home/away.
-  const o = orient(m.t1, m.t2, SCORES.get(pairKey(m.t1, m.t2)));
+  const o = orient(t1, t2, SCORES.get(pairKey(t1, t2)));
   if (o) {
     const live = o.state === 'in';
     return `<span class="r-score${live ? ' live' : ''}">${o.a}–${o.b}${live ? ' <em>LIVE</em>' : ''}</span>`;
@@ -70,11 +157,12 @@ function render(viewAll) {
     const past = m.ts && m.ts < NOW;
     const id = `m${m.no}`;
     if (!past && !firstUpcoming) firstUpcoming = id;
+    const [a, b] = resolveFixture(m);
     html += `<tr id="${id}" class="m${past ? ' past' : ''}${m.ours ? ' ours' : ''}">
         <td class="c-time"><b>${fmtVNTime(m.ts)}</b><span>${fmtETTime(m.ts)} ET</span></td>
         <td class="c-stage">${esc(m.stage)}</td>
-        <td class="c-match">${esc(m.t1)} <i>v</i> ${esc(m.t2)}${m.ours && viewAll ? ' <span class="star" title="One of our games">★</span>' : ''}</td>
-        <td class="c-result">${resultCell(m)}</td>
+        <td class="c-match">${teamLabel(m.t1, a)} <i>v</i> ${teamLabel(m.t2, b)}${m.ours && viewAll ? ' <span class="star" title="One of our games">★</span>' : ''}</td>
+        <td class="c-result">${resultCell(m, a, b)}</td>
       </tr>`;
   }
   document.getElementById('sched-body').innerHTML = html || '<tr><td colspan="4" style="padding:18px;text-align:center;color:#7d8aa0;">No matches.</td></tr>';
@@ -106,7 +194,11 @@ async function main() {
   wire(); // render immediately from schedule data (times always available)
   try {
     NOW = Date.now();
-    SCORES = buildScores(await getEvents());
+    const { events, standings } = await getData();
+    SCORES = buildScores(events);
+    POS = buildPositions(standings);
+    const bracket = buildBracket(events);
+    OPP = bracket.opp; WINNER = bracket.win;
     status.style.display = 'none';
     SCROLLED = false;
     render(document.getElementById('t-all').classList.contains('active'));
