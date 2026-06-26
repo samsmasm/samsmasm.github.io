@@ -99,9 +99,9 @@ Status: [x] done, [ ] to do.
 - [x] **fiscal-crowding-out.svg** — loanable funds: govt borrowing shifts D&#8321; → D&#8322; right, r rises (crowds out investment)
 
 ### Supply-side policies (3.7)
-- [ ] **supply-nc.svg** — LRAS (and SRAS) shift right
-- [ ] **supply-kn.svg** — supply-side on a Keynesian diagram
+- [x] **supply-nc.svg** — LRAS&#8321; → LRAS&#8322; and SRAS&#8321; → SRAS&#8322; shift right; output up, price down
+- [x] **supply-kn.svg** — Keynesian AS&#8321; → AS&#8322; shifts right (Y_fe rightward); output up, price down
 
 ### Time-series / models (3.1)
-- [ ] **cycle-business.svg** — real GDP around trend (ref: business cycle.png)
-- [ ] **cycle-circular-flow.svg** — circular flow of income (optional)
+- [x] **cycle-business.svg** — real GDP cycle (blue) around the rising long-term trend (magenta); peak/trough/recovery/recession
+- [x] **cycle-circular-flow.svg** — 2-sector circular flow; money flows (magenta) and real flows (blue) between households and firms
