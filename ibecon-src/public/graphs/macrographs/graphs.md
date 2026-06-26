@@ -94,9 +94,9 @@ Status: [x] done, [ ] to do.
 - [x] **money-transmission-nc.svg** — two-panel: MS shift lowers r (money market) → AD&#8321; → AD&#8322; right (goods market)
 
 ### Fiscal policy (3.6)
-- [ ] **fiscal-nc-expansionary.svg**
-- [ ] **fiscal-kn-expansionary.svg**
-- [ ] **fiscal-crowding-out.svg** — loanable funds / money market (HL)
+- [x] **fiscal-nc-expansionary.svg** — AD&#8321; → AD&#8322; right closing a recessionary gap to Y_fe; PL rises
+- [x] **fiscal-kn-expansionary.svg** — AD&#8321; (flat) → AD&#8322; (intermediate); large output rise, small price rise
+- [x] **fiscal-crowding-out.svg** — loanable funds: govt borrowing shifts D&#8321; → D&#8322; right, r rises (crowds out investment)
 
 ### Supply-side policies (3.7)
 - [ ] **supply-nc.svg** — LRAS (and SRAS) shift right
