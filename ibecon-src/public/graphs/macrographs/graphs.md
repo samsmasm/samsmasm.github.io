@@ -53,7 +53,7 @@ Status: [x] done, [ ] to do.
 - [x] **adas-nc-equilibrium.svg** — AD + SRAS + LRAS long-run equilibrium at Y_fe
 - [x] **adas-nc-recessionary-gap.svg** — AD&#8321; left of LRAS; recessionary/deflationary gap
 - [x] **adas-nc-inflationary-gap.svg** — AD&#8321; right of LRAS; inflationary/expansionary gap
-- [ ] **adas-nc-self-correction.svg** — SRAS slides to restore Y_fe
+- [x] **adas-nc-self-correction.svg** — recession self-corrects: SRAS&#8321; → SRAS&#8322; (rightward) restores Y_fe at a lower price
 
 ### AD/AS Keynesian (reverse-L AS)
 - [x] **adas-kn-as.svg** — Keynesian AS alone (flat → rising → vertical), Y_fe marked
@@ -63,10 +63,10 @@ Status: [x] done, [ ] to do.
 - [x] **adas-kn-ad-increase.svg** — AD&#8321;/AD&#8322;/AD&#8323; across the three regions, with PL&#8321;/&#8322;/&#8323; and Y&#8321;/&#8322;/fe
 
 ### Growth (3.3)
-- [ ] **growth-nc-actual.svg** — AD shift right
-- [ ] **growth-nc-potential.svg** — LRAS shift right
-- [ ] **growth-kn.svg** — growth on a Keynesian diagram
-- [ ] **growth-ppc.svg** — PPC outward shift (macro-styled)
+- [x] **growth-nc-actual.svg** — actual growth: AD&#8321; → AD&#8322; right, both eq below Y_fe (using spare capacity)
+- [x] **growth-nc-potential.svg** — potential growth: LRAS&#8321; → LRAS&#8322; (and SRAS) shift right, output up / price down
+- [x] **growth-kn.svg** — Keynesian demand-led growth: AD&#8321; → AD&#8322; in the flat region, output up with no inflation
+- [x] **growth-ppc.svg** — PPC outward shift (capital vs consumer goods), macro-styled
 
 ### Inflation & deflation (3.3)
 - [ ] **inflation-nc-demand-pull.svg**
