@@ -18,7 +18,8 @@ Different from the micro set. Match the reference PNGs:
   - dashed projection lines: grey `#777`
 - **Axes have arrowheads** on both ends; **origin labelled "0"**.
 - Subscripts via `&#8321;`/`&#8322;`; `Y_fe` for full-employment output.
-- Curve labels at the line ends; **shift arrows** show movement; filled dots at key points; dashed projection lines to the axes.
+- Curve labels at the line ends; **shift arrows** show movement (centred in the gap between the curves); filled dots at key points; dashed projection lines to the axes.
+- **Shifts label the original curve `₁` and the new curve `₂`** (e.g. AD₁ → AD₂, SRAS₁ → SRAS₂), not AD → AD₁.
 
 ## Naming convention
 
@@ -43,8 +44,8 @@ Status: [x] done, [ ] to do.
 
 ### AD/AS building blocks (shared)
 - [x] **adas-ad.svg** — AD curve alone
-- [x] **adas-ad-increase.svg** — AD shifts right (AD → AD&#8321;)
-- [x] **adas-ad-decrease.svg** — AD shifts left (AD → AD&#8321;)
+- [x] **adas-ad-increase.svg** — AD shifts right (AD&#8321; → AD&#8322;)
+- [x] **adas-ad-decrease.svg** — AD shifts left (AD&#8321; → AD&#8322;)
 
 ### AD/AS neoclassical (straight SRAS, vertical LRAS)
 - [x] **adas-nc-sras.svg** — straight SRAS alone
