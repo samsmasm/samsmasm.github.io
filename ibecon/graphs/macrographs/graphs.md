@@ -57,16 +57,16 @@ Status: [x] done, [ ] to do.
 
 ### AD/AS Keynesian (reverse-L AS)
 - [x] **adas-kn-as.svg** — Keynesian AS alone (flat → rising → vertical), Y_fe marked
-- [x] **adas-kn-equilibrium.svg** — equilibrium in the intermediate region; three regions labelled
-- [x] **adas-kn-recessionary-gap.svg** — AD&#8322; left of Y_fe; gap Y&#8321; → Y_fe below axis
-- [x] **adas-kn-inflationary-gap.svg** — AD&#8322; raises PL only (output stays Y_fe); gap shown horizontally at PL&#8321;
+- [x] **adas-kn-equilibrium.svg** — equilibrium (Ye) below full employment (Yf); spare-capacity double-arrow between Ye and Yf
 - [x] **adas-kn-ad-increase.svg** — AD&#8321;/AD&#8322;/AD&#8323; across the three regions, with PL&#8321;/&#8322;/&#8323; and Y&#8321;/&#8322;/fe
 
 ### Growth (3.3)
 - [x] **growth-nc-actual.svg** — actual growth: AD&#8321; → AD&#8322; right, both eq below Y_fe (using spare capacity)
 - [x] **growth-nc-potential.svg** — potential growth: LRAS&#8321; → LRAS&#8322; (and SRAS) shift right, output up / price down
 - [x] **growth-kn.svg** — Keynesian demand-led growth: AD&#8321; → AD&#8322; in the flat region, output up with no inflation
-- [x] **growth-ppc.svg** — PPC outward shift (capital vs consumer goods), macro-styled
+- [x] **growth-ppc.svg** — PPC outward shift (curved, capital vs consumer goods); curves touch axes, one arrow
+- [x] **growth-ppc-straight.svg** — straight-line PPCs (constant opportunity cost) shifting outward
+- [x] **growth-ppc-allocations.svg** — one curved PPC; allocations a/b/c on the curve, d outside (unattainable), e inside (inefficient)
 
 ### Inflation & deflation (3.3)
 - [x] **inflation-nc-demand-pull.svg** — AD&#8321; → AD&#8322; right; PL and Y rise
@@ -95,6 +95,7 @@ Status: [x] done, [ ] to do.
 
 ### Fiscal policy (3.6)
 - [x] **fiscal-nc-expansionary.svg** — AD&#8321; → AD&#8322; right closing a recessionary gap to Y_fe; PL rises
+- [x] **fiscal-nc-expansionary-fe.svg** — expansionary from full-employment equilibrium (on LRAS); AD&#8321; → AD&#8322; mainly raises PL
 - [x] **fiscal-kn-expansionary.svg** — AD&#8321; (flat) → AD&#8322; (intermediate); large output rise, small price rise
 - [x] **fiscal-crowding-out.svg** — loanable funds: govt borrowing shifts D&#8321; → D&#8322; right, r rises (crowds out investment)
 
@@ -105,3 +106,4 @@ Status: [x] done, [ ] to do.
 ### Time-series / models (3.1)
 - [x] **cycle-business.svg** — real GDP cycle (blue) around the rising long-term trend (magenta); peak/trough/recovery/recession
 - [x] **cycle-circular-flow.svg** — 2-sector circular flow; money flows (magenta) and real flows (blue) between households and firms
+- [x] **cycle-circular-flow-extended.svg** — 5-sector circular flow; adds financial, government and overseas sectors with leakages (S/T/M) and injections (I/G/X)
