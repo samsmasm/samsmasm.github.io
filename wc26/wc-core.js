@@ -92,5 +92,63 @@
     return 'draw';
   }
 
-  global.WC = { strip, ALIAS, canon, same, pairKey, esc, competitors, buildMatchMap, orient, outcome, isPlaceholderTeam };
+  // Resolve knockout bracket slot codes to real teams. Codes come from
+  // WC_SCHEDULE: "1A"/"2A" (group A winner / runner-up), "3EFGIJ" (a best
+  // third-place slot from one of those groups), "W73" (winner of match 73).
+  // Returns helpers used by BOTH the schedule and the "next games" box, so they
+  // resolve identically. Sources: group standings (positions) + ESPN's own
+  // bracket (best-third allocation and shootout-aware winners).
+  const SLOT_RE = /^(?:[12][A-L]|3[A-L]{3,6}|W\d+)$/;
+  const isSlot = s => SLOT_RE.test(s || '');
+  function makeBracket(standings, events, schedule) {
+    schedule = schedule || [];
+    const POS = {};
+    for (const ch of (standings && standings.children) || []) {
+      const g = (ch.name.match(/group ([a-l])/i) || [])[1];
+      if (!g) continue;
+      const ents = (ch.standings && ch.standings.entries) || [];
+      const stat = (e, n) => { const s = (e.stats || []).find(x => x.name === n); return s ? s.value : undefined; };
+      if (!ents.length || !ents.every(e => (stat(e, 'gamesPlayed') || 0) >= 3)) continue; // group incomplete
+      const ord = [...ents].sort((a, b) => (stat(a, 'rank') ?? 99) - (stat(b, 'rank') ?? 99));
+      POS['1' + g.toUpperCase()] = ord[0].team.displayName;
+      POS['2' + g.toUpperCase()] = ord[1].team.displayName;
+    }
+    const OPP = new Map(), WIN = new Map();
+    for (const ev of events || []) {
+      const c = ev.competitions && ev.competitions[0];
+      if (!c || (c.competitors || []).length !== 2) continue;
+      const note = c.altGameNote || '';
+      if (!/round of \d+|quarter|semi|final/i.test(note)) continue;
+      const [x, y] = c.competitors;
+      const xn = x.team.displayName, yn = y.team.displayName;
+      if (/round of 32/i.test(note)) { OPP.set(canon(xn), yn); OPP.set(canon(yn), xn); }
+      if (c.status && c.status.type && c.status.type.completed) {
+        const w = x.winner ? xn : (y.winner ? yn : null); // ESPN flag is correct on penalties
+        if (w) WIN.set(pairKey(xn, yn), canon(w));
+      }
+    }
+    function resolveSlot(code, depth) {
+      if (!isSlot(code)) return code;        // already a real team (group stage)
+      if (POS[code]) return POS[code];
+      const w = /^W(\d+)$/.exec(code);
+      if (w && depth < 6) {
+        const row = schedule.find(r => r.no === +w[1]);
+        if (!row) return null;
+        const a = resolveSlot(row.t1, depth + 1), b = resolveSlot(row.t2, depth + 1);
+        if (!a || !b) return null;
+        const wc = WIN.get(pairKey(a, b));
+        return wc ? (canon(a) === wc ? a : b) : null;
+      }
+      return null;                            // 3rd-place slots filled via sibling below
+    }
+    function resolveFixture(m) {
+      let a = resolveSlot(m.t1, 0), b = resolveSlot(m.t2, 0);
+      if (a && !b && /^3/.test(m.t2)) { const o = OPP.get(canon(a)); if (o && !isPlaceholderTeam(o)) b = o; }
+      if (b && !a && /^3/.test(m.t1)) { const o = OPP.get(canon(b)); if (o && !isPlaceholderTeam(o)) a = o; }
+      return [a, b];
+    }
+    return { resolveSlot, resolveFixture };
+  }
+
+  global.WC = { strip, ALIAS, canon, same, pairKey, esc, competitors, buildMatchMap, orient, outcome, isPlaceholderTeam, isSlot, makeBracket };
 })(typeof window !== 'undefined' ? window : globalThis);

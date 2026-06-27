@@ -342,6 +342,10 @@ function relTime(ts, now) {
   return `in ${m}m`;
 }
 
+// Resolve a knockout slot to a real team name where known, else show the code
+// (e.g. "2A"). Built from standings + ESPN bracket via the shared resolver.
+let BRACKET = { resolveFixture: m => [null, null] };
+
 function renderUpcoming(now) {
   const el = document.getElementById('upcoming');
   if (!el) return;
@@ -357,8 +361,9 @@ function renderUpcoming(now) {
     } else {
       rel = relTime(m.ts, now);
     }
+    const [a, b] = BRACKET.resolveFixture(m); // knockout rows carry slot codes (2A, W73)
     return `<div class="up-card${started ? ' started' : ''}">
-        <div class="up-teams">${esc(m.t1)} <span class="up-v">vs</span> ${esc(m.t2)}</div>
+        <div class="up-teams">${esc(a || m.t1)} <span class="up-v">vs</span> ${esc(b || m.t2)}</div>
         <div class="up-rel">${rel}</div>
       </div>`;
   }).join('');
@@ -400,7 +405,9 @@ async function main(force) {
     const when = new Date(ts).toLocaleString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
     render(scored, `${finishedMatches}/${fixtures.length} group matches scored · ${decidedGroups}/12 groups decided · Last updated ${when} Vietnam time${cached ? ' (cached)' : ''}`);
 
-    // Upcoming games (refresh alongside the leaderboard).
+    // Upcoming games (refresh alongside the leaderboard). Resolve knockout slot
+    // codes to real teams the same way the schedule page does.
+    BRACKET = WC.makeBracket(standings, events, window.WC_SCHEDULE);
     renderUpcoming(Date.now());
 
     status.style.display = 'none';
