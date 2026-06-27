@@ -65,8 +65,8 @@ Status: [x] done, [ ] to do.
 - [x] **growth-nc-potential.svg** — potential growth: LRAS&#8321; → LRAS&#8322; (and SRAS) shift right, output up / price down
 - [x] **growth-kn.svg** — Keynesian demand-led growth: AD&#8321; → AD&#8322; in the flat region, output up with no inflation
 - [x] **growth-ppc.svg** — PPC outward shift (curved, capital vs consumer goods); curves touch axes, one arrow
-- [x] **growth-ppc-straight.svg** — straight-line PPCs (constant opportunity cost) shifting outward
-- [x] **growth-ppc-allocations.svg** — one curved PPC; allocations a/b/c on the curve, d outside (unattainable), e inside (inefficient)
+- [x] **growth-ppc-straight.svg** — single straight-line PPC (constant opportunity cost)
+- [x] **growth-ppc-allocations.svg** — one symmetric curved PPC; allocations a/b/c on the curve, d outside (unattainable), e inside (inefficient)
 
 ### Inflation & deflation (3.3)
 - [x] **inflation-nc-demand-pull.svg** — AD&#8321; → AD&#8322; right; PL and Y rise
@@ -75,7 +75,7 @@ Status: [x] done, [ ] to do.
 - [x] **inflation-nc-deflation.svg** — AD&#8321; → AD&#8322; left; PL falls (deflation)
 
 ### Unemployment / labour (3.3)
-- [x] **unemp-minimum-wage.svg** — labour market, binding minimum wage above W*; L_D &lt; L_S gives unemployment (surplus)
+- [x] **unemp-minimum-wage.svg** — labour market (SL/DL), binding minimum wage W_min above W*; QL_D &lt; QL_S gives unemployment (surplus)
 
 ### Phillips curves (3.3, HL)
 - [x] **phillips-sr.svg** — short-run Phillips curve (downward, convex; inflation–unemployment trade-off)
@@ -106,4 +106,4 @@ Status: [x] done, [ ] to do.
 ### Time-series / models (3.1)
 - [x] **cycle-business.svg** — real GDP cycle (blue) around the rising long-term trend (magenta); peak/trough/recovery/recession
 - [x] **cycle-circular-flow.svg** — 2-sector circular flow; money flows (magenta) and real flows (blue) between households and firms
-- [x] **cycle-circular-flow-extended.svg** — 5-sector circular flow; adds financial, government and overseas sectors with leakages (S/T/M) and injections (I/G/X)
+- [ ] **cycle-circular-flow-extended.svg** — WIP, NOT on the site (held in `ibecon-src/graphs-wip/`); 5-sector version, to be fixed later
