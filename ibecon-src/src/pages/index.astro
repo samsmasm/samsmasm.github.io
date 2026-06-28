@@ -215,6 +215,21 @@ import Layout from '../layouts/Layout.astro';
   line-height: 1.4;
 }
 .econ-adm-tool:hover { background: var(--accent); color: #fff; }
+.econ-date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.econ-date-input {
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 0.82rem;
+  background: #f0faf4;
+  color: var(--text);
+  outline: none;
+}
 .econ-adm-textarea {
   width: 100%;
   box-sizing: border-box;
@@ -283,7 +298,7 @@ import Layout from '../layouts/Layout.astro';
 </style>
 
 <div style="padding: 2rem 0 0.25rem;">
-  <h1 id="today-trigger">Today in class</h1>
+  <h1 id="today-trigger">Today</h1>
   <p id="today-loading" class="econ-today-loading">Loading&hellip;</p>
   <div id="today-card" class="econ-today-card" style="display:none;">
     <div id="today-body"></div>
@@ -296,7 +311,7 @@ import Layout from '../layouts/Layout.astro';
 
 <div id="archive-section" class="econ-arch-wrap" style="display:none;">
   <div class="econ-arch-hdr">
-    <span class="econ-arch-lbl">Previous lessons</span>
+    <span class="econ-arch-lbl">Previous</span>
     <button id="show-all-btn" class="econ-show-all">Show all</button>
   </div>
   <div id="archive-list"></div>
@@ -347,6 +362,10 @@ import Layout from '../layouts/Layout.astro';
         <button class="econ-adm-tool" id="tool-italic"><i>I</i></button>
         <button class="econ-adm-tool" id="tool-link">Link</button>
         <button class="econ-adm-tool" id="tool-bullet">&bull; List</button>
+      </div>
+      <div class="econ-date-row">
+        <input type="date" id="tool-date-input" class="econ-date-input">
+        <button class="econ-adm-tool" id="tool-date-insert">Insert date</button>
       </div>
       <textarea class="econ-adm-textarea" id="adm-edit-textarea"
         placeholder="e.g. Today we&#39;re on **3.2 AD/AS** — open the [notes](/ibecon/unit3/3-2/) and work through the AD section.&#10;&#10;- Do Now: three questions on the board&#10;- Activity: Changes in AD worksheet"></textarea>
@@ -454,12 +473,13 @@ function makeArchItem(item, tier) {
   el.dataset.fullText = item.text;
   el.dataset.archKey  = item._key;
 
-  // always-visible row: date + peek + admin edit btn
+  // always-visible row: date (+ peek for minimal only) + admin edit btn
   const row = document.createElement('div');
   row.className = 'econ-arch-row';
-  row.innerHTML =
-    '<span class="econ-arch-date">' + dateStr + '</span>' +
-    '<span class="econ-arch-peek">' + peekText(item.text) + '</span>';
+  row.innerHTML = '<span class="econ-arch-date">' + dateStr + '</span>' +
+    (tier === 'minimal'
+      ? '<span class="econ-arch-peek">' + peekText(item.text) + '</span>'
+      : '');
 
   const editBtn = document.createElement('button');
   editBtn.className = 'econ-arch-edit-btn';
@@ -510,6 +530,12 @@ function openArchiveEdit(key, text, ts) {
   ta.value = text;
   document.getElementById('adm-edit-title').textContent = 'Edit archived post';
   document.getElementById('adm-clear-btn').textContent  = 'Delete post';
+  // set date picker to the archive entry's original date
+  const d = new Date(ts);
+  document.getElementById('tool-date-input').value =
+    d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
   setTimeout(() => ta.focus(), 50);
@@ -584,6 +610,13 @@ document.getElementById('adm-choice-cancel').addEventListener('click', () => {
   document.getElementById('adm-choice-modal').classList.remove('visible');
 });
 
+function todayDateValue() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
 function openEdit(isNew) {
   isNewPost      = isNew;
   editingArchKey = null;
@@ -592,6 +625,7 @@ function openEdit(isNew) {
   document.getElementById('adm-edit-title').textContent =
     isNew ? 'New post' : 'Edit current post';
   document.getElementById('adm-clear-btn').textContent = 'Clear board';
+  document.getElementById('tool-date-input').value = todayDateValue();
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
   setTimeout(() => ta.focus(), 50);
@@ -624,6 +658,23 @@ document.getElementById('tool-link').addEventListener('click', () => {
   const lbl = ta.value.slice(s, e) || 'link text';
   ta.value  = ta.value.slice(0, s) + '[' + lbl + '](' + url + ')' + ta.value.slice(e);
   ta.focus(); updatePreview();
+});
+document.getElementById('tool-date-insert').addEventListener('click', () => {
+  const val = document.getElementById('tool-date-input').value;
+  if (!val) return;
+  // parse as local date to avoid timezone shift
+  const [y, m, dd] = val.split('-').map(Number);
+  const d = new Date(y, m - 1, dd);
+  const month   = d.toLocaleDateString('en', { month: 'long' });
+  const day     = d.getDate();
+  const weekday = d.toLocaleDateString('en', { weekday: 'long' });
+  const line    = '**' + month + ' ' + day + ', ' + weekday + '**\n\n';
+  const ta      = document.getElementById('adm-edit-textarea');
+  const s       = ta.selectionStart;
+  ta.value      = ta.value.slice(0, s) + line + ta.value.slice(s);
+  ta.focus();
+  ta.setSelectionRange(s + line.length, s + line.length);
+  updatePreview();
 });
 function updatePreview() {
   const text = document.getElementById('adm-edit-textarea').value;
