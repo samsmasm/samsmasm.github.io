@@ -35,6 +35,12 @@ import Layout from '../layouts/Layout.astro';
 .econ-today-card li { margin-bottom: 0.15em; }
 .econ-today-card a  { color: var(--accent); }
 .econ-today-card strong { font-weight: 700; }
+.econ-post-title { font-size: 1.4em; font-weight: 700; margin: 0.05em 0 0.35em; }
+.econ-post-hw { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px solid #dff0e7; }
+.econ-post-hw p { margin: 0 0 0.45em; }
+.econ-post-hw p:last-child { margin-bottom: 0; }
+.econ-arch-content .econ-post-title { font-size: 1.2em; }
+.econ-arch-content .econ-post-hw { margin-top: 0.6rem; padding-top: 0.5rem; }
 
 .econ-today-empty {
   color: var(--text-muted);
@@ -373,7 +379,12 @@ import Layout from '../layouts/Layout.astro';
           <button class="econ-adm-tool" id="tool-bullet">&bull; List</button>
         </div>
         <textarea class="econ-adm-textarea" id="adm-edit-textarea"
-          placeholder="Links, activities, homework... (markdown supported)"></textarea>
+          placeholder="Links, activities, what we did... (markdown supported)"></textarea>
+      </div>
+      <div class="econ-adm-field">
+        <label class="econ-adm-label" for="adm-hw-textarea">Homework <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">optional</span></label>
+        <textarea class="econ-adm-textarea" id="adm-hw-textarea" style="min-height:70px;"
+          placeholder="e.g. Read 3.2 notes p.4–6. Quiz next lesson."></textarea>
       </div>
       <span class="econ-adm-preview-label">Preview</span>
       <div class="econ-adm-preview" id="adm-preview"></div>
@@ -430,11 +441,17 @@ function formatDateStr(dateStr) {
     ', ' + dt.toLocaleDateString('en', { weekday: 'long' });
 }
 
+function hwHtml(item) {
+  if (!item.homework) return '';
+  return '<div class="econ-post-hw"><strong>Homework</strong>' + marked.parse(item.homework) + '</div>';
+}
+
 function renderItemHtml(item) {
   if (item.date) {
     let html = '<p><em>' + escapeHtml(formatDateStr(item.date)) + '</em></p>';
-    if (item.title) html += '<p><strong>' + escapeHtml(item.title) + '</strong></p>';
+    if (item.title) html += '<p class="econ-post-title">' + escapeHtml(item.title) + '</p>';
     if (item.body)  html += marked.parse(item.body);
+    html += hwHtml(item);
     return html;
   }
   return marked.parse(item.text || '');
@@ -443,11 +460,12 @@ function renderItemHtml(item) {
 function briefHtml(item) {
   if (item.date) {
     let html = '<p><em>' + escapeHtml(formatDateStr(item.date)) + '</em></p>';
-    if (item.title) html += '<p><strong>' + escapeHtml(item.title) + '</strong></p>';
+    if (item.title) html += '<p class="econ-post-title">' + escapeHtml(item.title) + '</p>';
     if (item.body) {
       const lines = item.body.split('\n').filter(l => l.trim());
       html += marked.parse(lines.slice(0, 3).join('\n\n'));
     }
+    html += hwHtml(item);
     return html;
   }
   const lines = (item.text || '').split('\n').filter(l => l.trim());
@@ -554,9 +572,10 @@ function openArchiveEdit(item) {
   isNewPost      = false;
   document.getElementById('adm-edit-title').textContent = 'Edit archived post';
   document.getElementById('adm-clear-btn').textContent  = 'Delete post';
-  document.getElementById('adm-date-input').value  = item.date || dateInputValue(new Date(item.ts));
-  document.getElementById('adm-title-input').value = item.title || '';
+  document.getElementById('adm-date-input').value    = item.date || dateInputValue(new Date(item.ts));
+  document.getElementById('adm-title-input').value   = item.title || '';
   document.getElementById('adm-edit-textarea').value = item.body || item.text || '';
+  document.getElementById('adm-hw-textarea').value   = item.homework || '';
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
   setTimeout(() => document.getElementById('adm-edit-textarea').focus(), 50);
@@ -639,10 +658,12 @@ function openEdit(isNew) {
     document.getElementById('adm-date-input').value    = dateInputValue(new Date());
     document.getElementById('adm-title-input').value   = '';
     document.getElementById('adm-edit-textarea').value = '';
+    document.getElementById('adm-hw-textarea').value   = '';
   } else {
     document.getElementById('adm-date-input').value    = currentPost?.date || dateInputValue(new Date(currentPost?.ts || Date.now()));
     document.getElementById('adm-title-input').value   = currentPost?.title || '';
     document.getElementById('adm-edit-textarea').value = currentPost?.body || currentPost?.text || '';
+    document.getElementById('adm-hw-textarea').value   = currentPost?.homework || '';
   }
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
@@ -686,15 +707,18 @@ function updatePreview() {
   const dateVal  = document.getElementById('adm-date-input').value;
   const titleVal = document.getElementById('adm-title-input').value.trim();
   const bodyVal  = document.getElementById('adm-edit-textarea').value;
+  const hwVal    = document.getElementById('adm-hw-textarea').value.trim();
   let html = '';
   if (dateVal)  html += '<p><em>' + escapeHtml(formatDateStr(dateVal)) + '</em></p>';
-  if (titleVal) html += '<p><strong>' + escapeHtml(titleVal) + '</strong></p>';
+  if (titleVal) html += '<p class="econ-post-title">' + escapeHtml(titleVal) + '</p>';
   if (bodyVal)  html += marked.parse(bodyVal);
+  if (hwVal)    html += '<div class="econ-post-hw"><strong>Homework</strong>' + marked.parse(hwVal) + '</div>';
   document.getElementById('adm-preview').innerHTML = html;
 }
 document.getElementById('adm-date-input').addEventListener('input', updatePreview);
 document.getElementById('adm-title-input').addEventListener('input', updatePreview);
 document.getElementById('adm-edit-textarea').addEventListener('input', updatePreview);
+document.getElementById('adm-hw-textarea').addEventListener('input', updatePreview);
 
 /* ── Save / Clear / Cancel ───────────────────── */
 document.getElementById('adm-save-btn').addEventListener('click', async () => {
@@ -703,9 +727,10 @@ document.getElementById('adm-save-btn').addEventListener('click', async () => {
   const [y, m, d] = dateVal.split('-').map(Number);
   const ts = new Date(y, m - 1, d, 12, 0, 0).getTime();
   const postData = {
-    date:  dateVal,
-    title: document.getElementById('adm-title-input').value.trim(),
-    body:  document.getElementById('adm-edit-textarea').value.trim(),
+    date:     dateVal,
+    title:    document.getElementById('adm-title-input').value.trim(),
+    body:     document.getElementById('adm-edit-textarea').value.trim(),
+    homework: document.getElementById('adm-hw-textarea').value.trim(),
     ts,
   };
   if (editingArchKey) {
