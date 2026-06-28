@@ -105,7 +105,12 @@ function buildResults(events, standings, ov) {
     return 'draw';
   }
 
-  // --- group winners from standings (entries[0] = leader), only when group complete ---
+  // --- group winners from standings (the rank-1 team), only when group complete ---
+  // ESPN does NOT return entries in rank order, so the winner is the entry whose
+  // 'rank' stat is 1, NOT entries[0] (which ESPN orders some other way). Reading
+  // entries[0] silently credited the wrong team (e.g. Canada over group B's real
+  // winner Switzerland). wc-core's makeBracket already sorts by rank; match it.
+  const rankOf = e => { const s = (e.stats || []).find(x => x.name === 'rank'); return s ? s.value : 99; };
   const groupWinners = {}; // letter -> team name | undefined
   if (standings && standings.children) {
     for (const child of standings.children) {
@@ -113,7 +118,9 @@ function buildResults(events, standings, ov) {
       if (!g) continue;
       const L = g.toUpperCase();
       const entries = (child.standings && child.standings.entries) || [];
-      if (entries.length && groupDone[L] >= 6) groupWinners[L] = entries[0].team.displayName;
+      if (entries.length && groupDone[L] >= 6) {
+        groupWinners[L] = [...entries].sort((a, b) => rankOf(a) - rankOf(b))[0].team.displayName;
+      }
     }
   }
   if (ov.groupWinners) for (const g of Object.keys(ov.groupWinners)) groupWinners[g] = ov.groupWinners[g];
@@ -121,18 +128,11 @@ function buildResults(events, standings, ov) {
   // --- knockout round membership (set of teams that reached each round) ---
   const rounds = { r32: new Set(), r16: new Set(), qf: new Set(), sf: new Set(), final: new Set() };
   let champion = null, thirdWinner = null;
-  // R32 qualifiers come from the standings advance/best-8 flags, but those are
-  // provisional mid-tournament. Only trust them once EVERY group is complete
-  // (all 12 groups x 6 matches), per the agreed "locks at end of group stage" rule.
-  const groupStageComplete = Object.values(groupDone).filter(n => n >= 6).length === 12;
-  if (groupStageComplete && standings && standings.children) {
-    for (const child of standings.children) {
-      for (const e of ((child.standings && child.standings.entries) || [])) {
-        const d = (e.note && e.note.description || '').toLowerCase();
-        if (d.includes('advance') || d.includes('best')) rounds.r32.add(canon(e.team.displayName));
-      }
-    }
-  }
+  // R32 membership comes solely from the published R32 fixtures (loop below). We
+  // deliberately do NOT use the standings "advance/best" notes: ESPN tags ALL 12
+  // third-placed teams as best-third candidates (24 + 12 = 36) even though only 8
+  // actually go through, which over-counted the round. The knockout fixtures name
+  // the real 32 once the bracket is drawn; before then R32 simply stays pending.
   // From knockout fixtures: participants of a round reached that round; final winner = champion.
   // ESPN lists future bracket fixtures with placeholder slots ("Group I Winner",
   // "Third Place Group A/B/C/D/F", ...); skip those so a round is only counted
