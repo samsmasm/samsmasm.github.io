@@ -129,6 +129,19 @@ import Layout from '../layouts/Layout.astro';
   text-decoration: underline;
 }
 .econ-arch-more:hover { opacity: 0.7; }
+.econ-arch-edit-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 1px 7px;
+  opacity: 0.7;
+}
+.econ-arch-edit-btn:hover { opacity: 1; background: #f0faf4; }
 
 /* ── Admin modals ─────────────────────────────────────── */
 .econ-adm-overlay {
@@ -368,9 +381,12 @@ const ARCHIVE  = ref(db, 'ibecon/archive');
 const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000;
 const PASSCODE  = '0987';
 
-let currentText = '';
-let currentTs   = 0;
-let isNewPost   = false;
+let currentText      = '';
+let currentTs        = 0;
+let isNewPost        = false;
+let adminUnlocked    = false;
+let editingArchKey   = null;
+let editingArchTs    = 0;
 
 /* ── helpers ─────────────────────────────────── */
 function peekText(text) {
@@ -414,7 +430,7 @@ onValue(TODAY, snap => {
 onValue(ARCHIVE, snap => {
   const data  = snap.val();
   const items = data
-    ? Object.values(data).sort((a, b) => b.ts - a.ts)
+    ? Object.entries(data).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => b.ts - a.ts)
     : [];
   const section = document.getElementById('archive-section');
   const list    = document.getElementById('archive-list');
@@ -422,7 +438,6 @@ onValue(ARCHIVE, snap => {
   section.style.display = 'block';
   list.innerHTML = '';
   items.forEach((item, i) => {
-    // first 3 previous = brief (3 lines), rest = minimal (1-line peek only)
     list.appendChild(makeArchItem(item, i < 3 ? 'brief' : 'minimal'));
   });
 });
@@ -436,13 +451,24 @@ function makeArchItem(item, tier) {
   const el = document.createElement('div');
   el.className = 'econ-arch-item';
   el.dataset.fullText = item.text;
+  el.dataset.archKey  = item._key;
 
-  // always-visible row: date + peek
+  // always-visible row: date + peek + admin edit btn
   const row = document.createElement('div');
   row.className = 'econ-arch-row';
   row.innerHTML =
     '<span class="econ-arch-date">' + dateStr + '</span>' +
     '<span class="econ-arch-peek">' + peekText(item.text) + '</span>';
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'econ-arch-edit-btn';
+  editBtn.textContent = 'Edit';
+  editBtn.style.display = adminUnlocked ? 'inline' : 'none';
+  editBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    openArchiveEdit(item._key, item.text, item.ts);
+  });
+  row.appendChild(editBtn);
   el.appendChild(row);
 
   const more = document.createElement('button');
@@ -450,7 +476,6 @@ function makeArchItem(item, tier) {
   more.textContent = 'More…';
 
   if (tier === 'brief') {
-    // show first 3 meaningful lines
     const content = document.createElement('div');
     content.className = 'econ-arch-content';
     content.innerHTML = marked.parse(truncateMd(item.text, 3));
@@ -462,7 +487,6 @@ function makeArchItem(item, tier) {
       el.dataset.expanded = '1';
     });
   } else {
-    // minimal: row only until More is clicked
     el.appendChild(more);
     more.addEventListener('click', () => {
       const content = document.createElement('div');
@@ -475,6 +499,19 @@ function makeArchItem(item, tier) {
   }
 
   return el;
+}
+
+function openArchiveEdit(key, text, ts) {
+  editingArchKey = key;
+  editingArchTs  = ts;
+  isNewPost      = false;
+  const ta = document.getElementById('adm-edit-textarea');
+  ta.value = text;
+  document.getElementById('adm-edit-title').textContent = 'Edit archived post';
+  document.getElementById('adm-clear-btn').textContent  = 'Delete post';
+  updatePreview();
+  document.getElementById('adm-edit-modal').classList.add('visible');
+  setTimeout(() => ta.focus(), 50);
 }
 
 /* ── Show all ────────────────────────────────── */
@@ -508,6 +545,8 @@ document.getElementById('today-trigger').addEventListener('click', () => {
 function tryPasscode() {
   if (document.getElementById('adm-pass-input').value === PASSCODE) {
     document.getElementById('adm-pass-modal').classList.remove('visible');
+    adminUnlocked = true;
+    document.querySelectorAll('.econ-arch-edit-btn').forEach(b => b.style.display = 'inline');
     if (currentText.trim()) {
       document.getElementById('adm-choice-modal').classList.add('visible');
     } else {
@@ -541,11 +580,13 @@ document.getElementById('adm-choice-cancel').addEventListener('click', () => {
 });
 
 function openEdit(isNew) {
-  isNewPost = isNew;
+  isNewPost      = isNew;
+  editingArchKey = null;
   const ta  = document.getElementById('adm-edit-textarea');
   ta.value  = isNew ? '' : currentText;
   document.getElementById('adm-edit-title').textContent =
     isNew ? 'New post' : 'Edit current post';
+  document.getElementById('adm-clear-btn').textContent = 'Clear board';
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
   setTimeout(() => ta.focus(), 50);
@@ -589,15 +630,24 @@ document.getElementById('adm-edit-textarea').addEventListener('input', updatePre
 document.getElementById('adm-save-btn').addEventListener('click', async () => {
   const text = document.getElementById('adm-edit-textarea').value.trim();
   if (!text) return;
-  if (isNewPost && currentText.trim()) {
-    await push(ARCHIVE, { text: currentText, ts: currentTs });
+  if (editingArchKey) {
+    await set(ref(db, 'ibecon/archive/' + editingArchKey), { text, ts: editingArchTs });
+  } else {
+    if (isNewPost && currentText.trim()) {
+      await push(ARCHIVE, { text: currentText, ts: currentTs });
+    }
+    await set(TODAY, { text, ts: Date.now() });
   }
-  await set(TODAY, { text, ts: Date.now() });
   document.getElementById('adm-edit-modal').classList.remove('visible');
 });
 document.getElementById('adm-clear-btn').addEventListener('click', async () => {
-  if (!confirm('Clear the board? Students will see "nothing posted today".')) return;
-  await remove(TODAY);
+  if (editingArchKey) {
+    if (!confirm('Delete this archived post? This cannot be undone.')) return;
+    await remove(ref(db, 'ibecon/archive/' + editingArchKey));
+  } else {
+    if (!confirm('Clear the board? Students will see "nothing posted today".')) return;
+    await remove(TODAY);
+  }
   document.getElementById('adm-edit-modal').classList.remove('visible');
 });
 document.getElementById('adm-edit-cancel').addEventListener('click', () => {
