@@ -610,25 +610,34 @@ document.getElementById('adm-choice-cancel').addEventListener('click', () => {
   document.getElementById('adm-choice-modal').classList.remove('visible');
 });
 
-function todayDateValue() {
-  const d = new Date();
+function dateInputValue(d) {
   return d.getFullYear() + '-' +
     String(d.getMonth() + 1).padStart(2, '0') + '-' +
     String(d.getDate()).padStart(2, '0');
+}
+
+function formatDateLine(d) {
+  const month   = d.toLocaleDateString('en', { month: 'long' });
+  const weekday = d.toLocaleDateString('en', { weekday: 'long' });
+  return '**' + month + ' ' + d.getDate() + ', ' + weekday + '**\n\n';
 }
 
 function openEdit(isNew) {
   isNewPost      = isNew;
   editingArchKey = null;
   const ta  = document.getElementById('adm-edit-textarea');
-  ta.value  = isNew ? '' : currentText;
+  document.getElementById('tool-date-input').value = dateInputValue(new Date());
+  if (isNew) {
+    ta.value = formatDateLine(new Date());
+  } else {
+    ta.value = currentText;
+  }
   document.getElementById('adm-edit-title').textContent =
     isNew ? 'New post' : 'Edit current post';
   document.getElementById('adm-clear-btn').textContent = 'Clear board';
-  document.getElementById('tool-date-input').value = todayDateValue();
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
-  setTimeout(() => ta.focus(), 50);
+  setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 50);
 }
 
 /* ── Toolbar ─────────────────────────────────── */
@@ -662,16 +671,11 @@ document.getElementById('tool-link').addEventListener('click', () => {
 document.getElementById('tool-date-insert').addEventListener('click', () => {
   const val = document.getElementById('tool-date-input').value;
   if (!val) return;
-  // parse as local date to avoid timezone shift
   const [y, m, dd] = val.split('-').map(Number);
-  const d = new Date(y, m - 1, dd);
-  const month   = d.toLocaleDateString('en', { month: 'long' });
-  const day     = d.getDate();
-  const weekday = d.toLocaleDateString('en', { weekday: 'long' });
-  const line    = '**' + month + ' ' + day + ', ' + weekday + '**\n\n';
-  const ta      = document.getElementById('adm-edit-textarea');
-  const s       = ta.selectionStart;
-  ta.value      = ta.value.slice(0, s) + line + ta.value.slice(s);
+  const line = formatDateLine(new Date(y, m - 1, dd));
+  const ta   = document.getElementById('adm-edit-textarea');
+  const s    = ta.selectionStart;
+  ta.value   = ta.value.slice(0, s) + line + ta.value.slice(s);
   ta.focus();
   ta.setSelectionRange(s + line.length, s + line.length);
   updatePreview();
