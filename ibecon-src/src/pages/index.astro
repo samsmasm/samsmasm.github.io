@@ -36,12 +36,6 @@ import Layout from '../layouts/Layout.astro';
 .econ-today-card a  { color: var(--accent); }
 .econ-today-card strong { font-weight: 700; }
 
-.econ-today-ts {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  font-style: italic;
-  margin-bottom: 1.5rem;
-}
 .econ-today-empty {
   color: var(--text-muted);
   font-style: italic;
@@ -197,6 +191,28 @@ import Layout from '../layouts/Layout.astro';
   font-size: 0.78rem;
   margin-top: 0.4rem;
 }
+.econ-adm-field { margin-bottom: 0.65rem; }
+.econ-adm-date-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.95rem;
+  background: #f0faf4;
+  outline: none;
+}
+.econ-adm-title-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.45rem 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #f0faf4;
+  outline: none;
+}
 .econ-adm-toolbar {
   display: flex;
   gap: 4px;
@@ -215,21 +231,6 @@ import Layout from '../layouts/Layout.astro';
   line-height: 1.4;
 }
 .econ-adm-tool:hover { background: var(--accent); color: #fff; }
-.econ-date-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 5px;
-}
-.econ-date-input {
-  border: 1.5px solid var(--accent);
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-size: 0.82rem;
-  background: #f0faf4;
-  color: var(--text);
-  outline: none;
-}
 .econ-adm-textarea {
   width: 100%;
   box-sizing: border-box;
@@ -303,7 +304,6 @@ import Layout from '../layouts/Layout.astro';
   <div id="today-card" class="econ-today-card" style="display:none;">
     <div id="today-body"></div>
   </div>
-  <div id="today-ts" class="econ-today-ts" style="display:none;"></div>
   <p id="today-empty" class="econ-today-empty" style="display:none;">
     It&rsquo;s been a while! Have an explore through the menu above, or go to the <a href="#archive-section">archive of Today messages</a>.
   </p>
@@ -356,19 +356,25 @@ import Layout from '../layouts/Layout.astro';
   <div class="econ-adm-win wide">
     <div class="econ-adm-titlebar" id="adm-edit-title">Today&rsquo;s post</div>
     <div class="econ-adm-body">
-      <label class="econ-adm-label" for="adm-edit-textarea">Write what students should see. Supports markdown.</label>
-      <div class="econ-adm-toolbar">
-        <button class="econ-adm-tool" id="tool-bold"><b>B</b></button>
-        <button class="econ-adm-tool" id="tool-italic"><i>I</i></button>
-        <button class="econ-adm-tool" id="tool-link">Link</button>
-        <button class="econ-adm-tool" id="tool-bullet">&bull; List</button>
+      <div class="econ-adm-field">
+        <label class="econ-adm-label" for="adm-date-input">Date <span style="color:#c00">*</span></label>
+        <input type="date" id="adm-date-input" class="econ-adm-date-input" required>
       </div>
-      <div class="econ-date-row">
-        <input type="date" id="tool-date-input" class="econ-date-input">
-        <button class="econ-adm-tool" id="tool-date-insert">Insert date</button>
+      <div class="econ-adm-field">
+        <label class="econ-adm-label" for="adm-title-input">Title <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">optional</span></label>
+        <input type="text" id="adm-title-input" class="econ-adm-title-input" placeholder="e.g. 3.2 AD/AS">
       </div>
-      <textarea class="econ-adm-textarea" id="adm-edit-textarea"
-        placeholder="e.g. Today we&#39;re on **3.2 AD/AS** — open the [notes](/ibecon/unit3/3-2/) and work through the AD section.&#10;&#10;- Do Now: three questions on the board&#10;- Activity: Changes in AD worksheet"></textarea>
+      <div class="econ-adm-field">
+        <label class="econ-adm-label" for="adm-edit-textarea">Body <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">optional</span></label>
+        <div class="econ-adm-toolbar">
+          <button class="econ-adm-tool" id="tool-bold"><b>B</b></button>
+          <button class="econ-adm-tool" id="tool-italic"><i>I</i></button>
+          <button class="econ-adm-tool" id="tool-link">Link</button>
+          <button class="econ-adm-tool" id="tool-bullet">&bull; List</button>
+        </div>
+        <textarea class="econ-adm-textarea" id="adm-edit-textarea"
+          placeholder="Links, activities, homework... (markdown supported)"></textarea>
+      </div>
       <span class="econ-adm-preview-label">Preview</span>
       <div class="econ-adm-preview" id="adm-preview"></div>
     </div>
@@ -395,52 +401,81 @@ const app = initializeApp({
   appId:             '1:1032600748722:web:1584c7508fbbca617cbfab',
 }, 'ibecon-today');
 
-const db       = getDatabase(app);
-const TODAY    = ref(db, 'ibecon/today');
-const ARCHIVE  = ref(db, 'ibecon/archive');
+const db        = getDatabase(app);
+const TODAY     = ref(db, 'ibecon/today');
+const ARCHIVE   = ref(db, 'ibecon/archive');
 const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000;
 const PASSCODE  = '0987';
 
-let currentText      = '';
-let currentTs        = 0;
-let isNewPost        = false;
-let adminUnlocked    = false;
-let editingArchKey   = null;
-let editingArchTs    = 0;
+let currentPost    = null;   // full Firebase Today object
+let isNewPost      = false;
+let adminUnlocked  = false;
+let editingArchKey = null;
 
 /* ── helpers ─────────────────────────────────── */
-function peekText(text) {
-  const first = text.split('\n').find(l => l.trim()) || '';
-  return first.replace(/[#*_[\]()]/g, '').trim().slice(0, 110);
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function truncateMd(text, nLines) {
-  const lines = text.split('\n').filter(l => l.trim());
-  return lines.slice(0, nLines).join('\n\n');
+function dateInputValue(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function formatDateStr(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en', { month: 'long' }) + ' ' + d +
+    ', ' + dt.toLocaleDateString('en', { weekday: 'long' });
+}
+
+function renderItemHtml(item) {
+  if (item.date) {
+    let html = '<p><em>' + escapeHtml(formatDateStr(item.date)) + '</em></p>';
+    if (item.title) html += '<p><strong>' + escapeHtml(item.title) + '</strong></p>';
+    if (item.body)  html += marked.parse(item.body);
+    return html;
+  }
+  return marked.parse(item.text || '');
+}
+
+function briefHtml(item) {
+  if (item.date) {
+    let html = '<p><em>' + escapeHtml(formatDateStr(item.date)) + '</em></p>';
+    if (item.title) html += '<p><strong>' + escapeHtml(item.title) + '</strong></p>';
+    if (item.body) {
+      const lines = item.body.split('\n').filter(l => l.trim());
+      html += marked.parse(lines.slice(0, 3).join('\n\n'));
+    }
+    return html;
+  }
+  const lines = (item.text || '').split('\n').filter(l => l.trim());
+  return marked.parse(lines.slice(0, 3).join('\n\n'));
+}
+
+function peekItem(item) {
+  if (item.date) {
+    if (item.title) return item.title;
+    return (item.body || '').split('\n').find(l => l.trim())?.replace(/[#*_[\]()]/g,'').trim().slice(0,110) || '';
+  }
+  return (item.text || '').split('\n').find(l => l.trim())?.replace(/[#*_[\]()]/g,'').trim().slice(0,110) || '';
 }
 
 /* ── Today listener ──────────────────────────── */
 onValue(TODAY, snap => {
   document.getElementById('today-loading').style.display = 'none';
-  const data  = snap.val();
-  const stale = !data?.text?.trim() || (Date.now() - (data.ts || 0) > TWO_WEEKS);
+  const data = snap.val();
+  const hasContent = data && (data.date || data.text?.trim());
+  const stale = !hasContent || (Date.now() - (data.ts || 0) > TWO_WEEKS);
 
   if (stale) {
     document.getElementById('today-card').style.display  = 'none';
-    document.getElementById('today-ts').style.display    = 'none';
     document.getElementById('today-empty').style.display = 'block';
-    currentText = '';
-    currentTs   = 0;
+    currentPost = null;
   } else {
-    currentText = data.text;
-    currentTs   = data.ts;
-    document.getElementById('today-body').innerHTML = marked.parse(data.text);
-    const d = new Date(data.ts);
-    const tsEl = document.getElementById('today-ts');
-    tsEl.textContent =
-      'Posted ' + d.toLocaleDateString() + ' at ' +
-      d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    tsEl.style.display = 'block';
+    currentPost = data;
+    document.getElementById('today-body').innerHTML = renderItemHtml(data);
     document.getElementById('today-card').style.display  = 'block';
     document.getElementById('today-empty').style.display = 'none';
   }
@@ -470,25 +505,18 @@ function makeArchItem(item, tier) {
 
   const el = document.createElement('div');
   el.className = 'econ-arch-item';
-  el.dataset.fullText = item.text;
-  el.dataset.archKey  = item._key;
+  el.dataset.itemJson = JSON.stringify(item);
 
-  // always-visible row: date (+ peek for minimal only) + admin edit btn
   const row = document.createElement('div');
   row.className = 'econ-arch-row';
   row.innerHTML = '<span class="econ-arch-date">' + dateStr + '</span>' +
-    (tier === 'minimal'
-      ? '<span class="econ-arch-peek">' + peekText(item.text) + '</span>'
-      : '');
+    (tier === 'minimal' ? '<span class="econ-arch-peek">' + peekItem(item) + '</span>' : '');
 
   const editBtn = document.createElement('button');
   editBtn.className = 'econ-arch-edit-btn';
   editBtn.textContent = 'Edit';
   editBtn.style.display = adminUnlocked ? 'inline' : 'none';
-  editBtn.addEventListener('click', e => {
-    e.stopPropagation();
-    openArchiveEdit(item._key, item.text, item.ts);
-  });
+  editBtn.addEventListener('click', e => { e.stopPropagation(); openArchiveEdit(item); });
   row.appendChild(editBtn);
   el.appendChild(row);
 
@@ -499,11 +527,11 @@ function makeArchItem(item, tier) {
   if (tier === 'brief') {
     const content = document.createElement('div');
     content.className = 'econ-arch-content';
-    content.innerHTML = marked.parse(truncateMd(item.text, 3));
+    content.innerHTML = briefHtml(item);
     el.appendChild(content);
     el.appendChild(more);
     more.addEventListener('click', () => {
-      content.innerHTML = marked.parse(item.text);
+      content.innerHTML = renderItemHtml(item);
       more.style.display = 'none';
       el.dataset.expanded = '1';
     });
@@ -512,52 +540,46 @@ function makeArchItem(item, tier) {
     more.addEventListener('click', () => {
       const content = document.createElement('div');
       content.className = 'econ-arch-content';
-      content.innerHTML = marked.parse(item.text);
+      content.innerHTML = renderItemHtml(item);
       el.insertBefore(content, more);
       more.style.display = 'none';
       el.dataset.expanded = '1';
     });
   }
-
   return el;
 }
 
-function openArchiveEdit(key, text, ts) {
-  editingArchKey = key;
-  editingArchTs  = ts;
+function openArchiveEdit(item) {
+  editingArchKey = item._key;
   isNewPost      = false;
-  const ta = document.getElementById('adm-edit-textarea');
-  ta.value = text;
   document.getElementById('adm-edit-title').textContent = 'Edit archived post';
   document.getElementById('adm-clear-btn').textContent  = 'Delete post';
-  // set date picker to the archive entry's original date
-  const d = new Date(ts);
-  document.getElementById('tool-date-input').value =
-    d.getFullYear() + '-' +
-    String(d.getMonth() + 1).padStart(2, '0') + '-' +
-    String(d.getDate()).padStart(2, '0');
+  document.getElementById('adm-date-input').value  = item.date || dateInputValue(new Date(item.ts));
+  document.getElementById('adm-title-input').value = item.title || '';
+  document.getElementById('adm-edit-textarea').value = item.body || item.text || '';
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
-  setTimeout(() => ta.focus(), 50);
+  setTimeout(() => document.getElementById('adm-edit-textarea').focus(), 50);
 }
 
 /* ── Show all ────────────────────────────────── */
 document.getElementById('show-all-btn').addEventListener('click', () => {
-  document.querySelectorAll('.econ-arch-item').forEach(item => {
-    if (item.dataset.expanded === '1') return;
-    const more    = item.querySelector('.econ-arch-more');
-    const content = item.querySelector('.econ-arch-content');
-    const full    = marked.parse(item.dataset.fullText);
+  document.querySelectorAll('.econ-arch-item').forEach(el => {
+    if (el.dataset.expanded === '1') return;
+    const item    = JSON.parse(el.dataset.itemJson);
+    const more    = el.querySelector('.econ-arch-more');
+    const content = el.querySelector('.econ-arch-content');
+    const html    = renderItemHtml(item);
     if (content) {
-      content.innerHTML = full;
+      content.innerHTML = html;
     } else {
       const c = document.createElement('div');
       c.className = 'econ-arch-content';
-      c.innerHTML = full;
-      item.insertBefore(c, more);
+      c.innerHTML = html;
+      el.insertBefore(c, more);
     }
     if (more) more.style.display = 'none';
-    item.dataset.expanded = '1';
+    el.dataset.expanded = '1';
   });
 });
 
@@ -574,10 +596,10 @@ function tryPasscode() {
     document.getElementById('adm-pass-modal').classList.remove('visible');
     adminUnlocked = true;
     document.querySelectorAll('.econ-arch-edit-btn').forEach(b => b.style.display = 'inline');
-    if (currentText.trim()) {
+    if (currentPost) {
       document.getElementById('adm-choice-modal').classList.add('visible');
     } else {
-      openEdit(false);
+      openEdit(true);
     }
   } else {
     document.getElementById('adm-pass-error').style.display = 'block';
@@ -586,9 +608,7 @@ function tryPasscode() {
   }
 }
 document.getElementById('adm-pass-btn').addEventListener('click', tryPasscode);
-document.getElementById('adm-pass-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') tryPasscode();
-});
+document.getElementById('adm-pass-input').addEventListener('keydown', e => { if (e.key === 'Enter') tryPasscode(); });
 document.getElementById('adm-pass-cancel').addEventListener('click', () => {
   document.getElementById('adm-pass-modal').classList.remove('visible');
 });
@@ -610,37 +630,30 @@ document.getElementById('adm-choice-cancel').addEventListener('click', () => {
   document.getElementById('adm-choice-modal').classList.remove('visible');
 });
 
-function dateInputValue(d) {
-  return d.getFullYear() + '-' +
-    String(d.getMonth() + 1).padStart(2, '0') + '-' +
-    String(d.getDate()).padStart(2, '0');
-}
-
-function formatDateLine(d) {
-  const month   = d.toLocaleDateString('en', { month: 'long' });
-  const weekday = d.toLocaleDateString('en', { weekday: 'long' });
-  return '**' + month + ' ' + d.getDate() + ', ' + weekday + '**\n\n';
-}
-
 function openEdit(isNew) {
   isNewPost      = isNew;
   editingArchKey = null;
-  const ta  = document.getElementById('adm-edit-textarea');
-  document.getElementById('tool-date-input').value = dateInputValue(new Date());
+  document.getElementById('adm-edit-title').textContent = isNew ? 'New post' : 'Edit current post';
+  document.getElementById('adm-clear-btn').textContent  = 'Clear board';
   if (isNew) {
-    ta.value = formatDateLine(new Date());
+    document.getElementById('adm-date-input').value    = dateInputValue(new Date());
+    document.getElementById('adm-title-input').value   = '';
+    document.getElementById('adm-edit-textarea').value = '';
   } else {
-    ta.value = currentText;
+    document.getElementById('adm-date-input').value    = currentPost?.date || dateInputValue(new Date(currentPost?.ts || Date.now()));
+    document.getElementById('adm-title-input').value   = currentPost?.title || '';
+    document.getElementById('adm-edit-textarea').value = currentPost?.body || currentPost?.text || '';
   }
-  document.getElementById('adm-edit-title').textContent =
-    isNew ? 'New post' : 'Edit current post';
-  document.getElementById('adm-clear-btn').textContent = 'Clear board';
   updatePreview();
   document.getElementById('adm-edit-modal').classList.add('visible');
-  setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 50);
+  setTimeout(() => {
+    const ta = document.getElementById('adm-edit-textarea');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }, 50);
 }
 
-/* ── Toolbar ─────────────────────────────────── */
+/* ── Toolbar (applies to body textarea) ─────── */
 function wrap(before, after) {
   const ta  = document.getElementById('adm-edit-textarea');
   const s   = ta.selectionStart, e = ta.selectionEnd;
@@ -668,35 +681,40 @@ document.getElementById('tool-link').addEventListener('click', () => {
   ta.value  = ta.value.slice(0, s) + '[' + lbl + '](' + url + ')' + ta.value.slice(e);
   ta.focus(); updatePreview();
 });
-document.getElementById('tool-date-insert').addEventListener('click', () => {
-  const val = document.getElementById('tool-date-input').value;
-  if (!val) return;
-  const [y, m, dd] = val.split('-').map(Number);
-  const line = formatDateLine(new Date(y, m - 1, dd));
-  const ta   = document.getElementById('adm-edit-textarea');
-  const s    = ta.selectionStart;
-  ta.value   = ta.value.slice(0, s) + line + ta.value.slice(s);
-  ta.focus();
-  ta.setSelectionRange(s + line.length, s + line.length);
-  updatePreview();
-});
+
 function updatePreview() {
-  const text = document.getElementById('adm-edit-textarea').value;
-  document.getElementById('adm-preview').innerHTML = text ? marked.parse(text) : '';
+  const dateVal  = document.getElementById('adm-date-input').value;
+  const titleVal = document.getElementById('adm-title-input').value.trim();
+  const bodyVal  = document.getElementById('adm-edit-textarea').value;
+  let html = '';
+  if (dateVal)  html += '<p><em>' + escapeHtml(formatDateStr(dateVal)) + '</em></p>';
+  if (titleVal) html += '<p><strong>' + escapeHtml(titleVal) + '</strong></p>';
+  if (bodyVal)  html += marked.parse(bodyVal);
+  document.getElementById('adm-preview').innerHTML = html;
 }
+document.getElementById('adm-date-input').addEventListener('input', updatePreview);
+document.getElementById('adm-title-input').addEventListener('input', updatePreview);
 document.getElementById('adm-edit-textarea').addEventListener('input', updatePreview);
 
 /* ── Save / Clear / Cancel ───────────────────── */
 document.getElementById('adm-save-btn').addEventListener('click', async () => {
-  const text = document.getElementById('adm-edit-textarea').value.trim();
-  if (!text) return;
+  const dateVal = document.getElementById('adm-date-input').value;
+  if (!dateVal) { document.getElementById('adm-date-input').focus(); return; }
+  const [y, m, d] = dateVal.split('-').map(Number);
+  const ts = new Date(y, m - 1, d, 12, 0, 0).getTime();
+  const postData = {
+    date:  dateVal,
+    title: document.getElementById('adm-title-input').value.trim(),
+    body:  document.getElementById('adm-edit-textarea').value.trim(),
+    ts,
+  };
   if (editingArchKey) {
-    await set(ref(db, 'ibecon/archive/' + editingArchKey), { text, ts: editingArchTs });
+    await set(ref(db, 'ibecon/archive/' + editingArchKey), postData);
   } else {
-    if (isNewPost && currentText.trim()) {
-      await push(ARCHIVE, { text: currentText, ts: currentTs });
+    if (isNewPost && currentPost) {
+      await push(ARCHIVE, currentPost);
     }
-    await set(TODAY, { text, ts: Date.now() });
+    await set(TODAY, postData);
   }
   document.getElementById('adm-edit-modal').classList.remove('visible');
 });
