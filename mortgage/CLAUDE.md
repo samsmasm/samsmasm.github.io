@@ -54,3 +54,13 @@ Key functions in the inline script:
 
 - Multiple lump sums
 - Offset account simulation (balance that reduces interest but stays withdrawable)
+
+---
+
+## Current status
+
+Fully built. All roadmap features shipped in one pass. Working correctly against the source spreadsheet (216 fortnights to payoff baseline).
+
+**Deferred ideas:** multiple lump sums, offset account simulation. Neither was started.
+
+**No known bugs.**

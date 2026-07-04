@@ -304,3 +304,11 @@ Two tabs: **Language** and **Subject vocab**. Behaviour differs for admins vs st
 Lives in `samsmasm.github.io` under `/cultivar/`. No build step. Must be served over HTTPS. Firebase project: `cultivar-d3add`. Authorized domains: `unisam.nz`, `www.unisam.nz`, `samsmasm.github.io`, `localhost`.
 
 For local dev: `npx serve .` from the `cultivar/` directory.
+
+---
+
+## Current status
+
+Full SRS app, mature and stable. All pages built: home, decks, cards, cram, review, dash, admin. Both language and subject-vocab card types working. No known bugs.
+
+**Known inconsistency (low priority):** `cards.html` admin CSV import uses `findOrCreateDeck(subject, unit, subunit)` while `admin.html` bulk import uses `findOrCreateDeckByName` — creates separate decks per subunit vs one deck by name.

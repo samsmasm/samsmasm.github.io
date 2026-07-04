@@ -26,3 +26,9 @@ Headless puppeteer-core against a local server (system Chrome at `/usr/bin/googl
 - Never use em dashes in user-facing text (project-wide rule for this site).
 - Keep obstacle art as inline SVG; new word themes go in the `WORD_THEMES` table.
 - Use absolute paths for shell commands; the working directory can reset between calls.
+
+---
+
+## Current status
+
+Working. All letter rows and 12 word themes working across 5 speeds. Player profiles, star tracking, and puppeteer test suite all functional. No known bugs or planned features.

@@ -108,3 +108,13 @@ If running Year 1 and Year 2 simultaneously, the simplest path is two side-by-si
 ## Key constraints
 
 Same as `ibbm-src`: Inter from Google Fonts, `switchTab` is inline in layout, `base: '/ibecon'` handles all links.
+
+---
+
+## Current status
+
+Units 1, 2, and 3 fully built (all pages complete). Unit 4 (The Global Economy, topics 4.1-4.10) is a single stub page showing "To come" — no content exists. No resource files in `myres/` for Unit 4 either.
+
+**Not built:** All 10 Unit 4 topics. Today page multi-year/IB1-IB2 expansion (documented above but not started).
+
+**No bugs in built content.**

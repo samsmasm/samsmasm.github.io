@@ -153,3 +153,9 @@ Three-column flex layout: left sidebar → `.canvas-wrap` → right panel.
 - **`renderCurveList()` is not called automatically**: you must call it whenever regions are mutated or their labels change.
 - **Line label positions**: vertical lines get labels at the top by default. The exception is YFE-style labels — use `mkText(xn, 1.05, label)` to place below the x-axis instead.
 - **`saveUndo()` before every mutation**: undo/redo depends on this being called before `state.elements` or `state.curves` is changed.
+
+---
+
+## Current status
+
+Working at v1.7. Actively used for IB Economics diagrams. No known bugs or planned features.

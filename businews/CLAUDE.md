@@ -136,3 +136,13 @@ Optional future step: when a specific company is the subject, fetch their most r
 - Direct scraping of non-RSS sources
 - LMS integration
 - PDF output
+
+---
+
+## Current status
+
+Pipeline steps 1-5 working: RSS ingest, keyword filter, Claude Haiku scoring, story selection, Claude Sonnet case study generation. Output is `case_study.json`.
+
+**Not built:** Step 6 — the HTML publishing frontend. `case_study.json` is generated but there is no student-facing page to display it. This is the clear next task.
+
+**No known bugs in the pipeline itself.**

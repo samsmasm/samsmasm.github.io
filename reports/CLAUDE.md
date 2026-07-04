@@ -166,3 +166,11 @@ Gender: `M` (he/him) · `F` (she/her) · `N` (they/them). Class is case-insensit
 ## Deployment
 
 GitHub Pages: `samsmasm.github.io/reports`. Always `git push` after every commit.
+
+---
+
+## Current status
+
+Working and stable. Used for generating student report comments. Complex internals but all known bugs fixed.
+
+**Critical reminder:** `buildStepsText` must remain a top-level function — if nested inside `generateFromBank`, Chrome silently fails (blank Templates tab, missing data in Comments tab). This has burned a commit before.

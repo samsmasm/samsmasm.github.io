@@ -1,7 +1,4 @@
-# Plainspeak — Classic Text Modernizer
-
-*(Working name. Rename to whatever fits the unisam.nz naming convention — see other
-tools like Question Mark, Dowser, ShiftWork for tone.)*
+# Modern Translation — Classic Text Modernizer
 
 ## What this is
 
@@ -407,6 +404,20 @@ Given this sits behind a password but still spends real API credits, add a simpl
 limit: warn (don't hard-block) if the total input exceeds roughly 60,000 words (a full
 book's worth), so an accidental huge upload doesn't run unnoticed. No need for anything
 more elaborate — this is a single-user tool.
+
+---
+
+## Current status
+
+Fully built and working. Both modes operational: Quick translate (paste/PDF, no persistence) and Projects (whole-book work with IndexedDB per device). Claude translates, Gemini verifies per paragraph.
+
+**Model:** claude-sonnet-4-6 (translation), gemini-3-flash-preview (verification).
+
+**Unresolved:** `ibeconinequality/cloudflare-worker.js` had a hardcoded Anthropic API key that was replaced but the git history was not scrubbed. Deferred.
+
+**No known functional bugs.**
+
+---
 
 ## Build order suggestion for Claude Code
 
