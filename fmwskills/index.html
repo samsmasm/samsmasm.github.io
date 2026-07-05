@@ -1,0 +1,626 @@
+<title>FMW Skills Sequencing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --purple: #4a1a7a;
+    --purple-bg: #f5f0ff;
+    --purple-border: #d0b6f5;
+    --skill-bg: #fff5f0;    --skill-border: #f5c9b0; --skill-text: #7a2d0a;
+    --activity-bg: #f5f0ff; --activity-border: #d0b6f5; --activity-text: #4a1a7a;
+    --assess-bg: #f0f5ff;   --assess-border: #b6cff5; --assess-text: #1a3a7a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #333;
+  }
+  header {
+    background:
+      radial-gradient(ellipse at 10% 50%, #ffd6e7 0%, transparent 50%),
+      radial-gradient(ellipse at 30% 20%, #d6f0ff 0%, transparent 45%),
+      radial-gradient(ellipse at 55% 80%, #e8d6ff 0%, transparent 40%),
+      radial-gradient(ellipse at 75% 30%, #d6ffe8 0%, transparent 45%),
+      radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+      radial-gradient(ellipse at 50% 50%, #ffd6d6 0%, transparent 60%),
+      #f9f0ff;
+    padding: 1.1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  header img { width: 60px; height: 60px; border-radius: 14px; background: rgba(255,255,255,0.6); }
+  header .htext h1 { font-family: Georgia, serif; font-size: 1.3rem; margin: 0; color: #3a2a4a; }
+  header .htext a { font-size: 12px; color: #6a5a7a; text-decoration: none; }
+  header .htext a:hover { text-decoration: underline; }
+
+  nav.tabs {
+    display: flex;
+    gap: 0.2rem;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid #f0e8ff;
+    overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none; border: none; cursor: pointer;
+    padding: 0.7rem 0.9rem;
+    font-size: 13px; font-weight: 500; color: #888;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  nav.tabs button.active { color: var(--purple); border-bottom-color: var(--purple); }
+
+  .subhead {
+    padding: 0.7rem 1.5rem 0;
+    font-size: 12px;
+    color: #999;
+  }
+  .subhead b { color: #6a5a7a; }
+
+  main { padding: 1rem 1.5rem 3rem; }
+
+  .board-row {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    align-items: flex-start;
+  }
+  .col {
+    flex: 0 0 250px;
+    border-radius: 10px;
+    border: 1.5px solid #f0e8ff;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 200px);
+  }
+  .col-head {
+    padding: 0.6rem 0.7rem 0.5rem;
+    border-radius: 9px 9px 0 0;
+    border-bottom: 3px solid;
+  }
+  .col-head .col-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.4rem; }
+  .col-head h3 { margin: 0; font-family: Georgia, serif; font-size: 14px; color: #3a2a4a; cursor: text; }
+  .col-head .col-meta { font-size: 10px; color: #888; margin-top: 2px; }
+  .col-head .col-count { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+  .col-head .col-count.warn { color: #b8402a; }
+  .col-actions { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
+  .col-actions button {
+    font-size: 10px; background: none; border: 1px solid #e8e0f0; border-radius: 5px;
+    color: #999; cursor: pointer; padding: 2px 6px; font-family: inherit;
+  }
+  .col-actions button:hover { color: var(--purple); border-color: var(--purple-border); }
+
+  .card-list { flex: 1; overflow-y: auto; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 40px; }
+  .card {
+    border-radius: 10px;
+    border: 1.5px solid;
+    padding: 0.55rem 0.65rem;
+    cursor: grab;
+    transition: transform 0.1s;
+  }
+  .card:active { cursor: grabbing; }
+  .card.sortable-ghost { opacity: 0.35; }
+  .card .card-type {
+    font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    display: block; margin-bottom: 3px;
+  }
+  .card .card-label { font-size: 13px; font-weight: 500; color: #2a2a2a; line-height: 1.35; }
+  .card .card-note { font-size: 11px; color: #777; margin-top: 3px; line-height: 1.4; }
+  .card .card-btns { margin-top: 0.4rem; display: flex; gap: 0.5rem; }
+  .card .card-btns span { font-size: 10px; color: #999; cursor: pointer; text-decoration: underline; }
+  .card .card-btns span:hover { color: var(--purple); }
+  .card.type-skill    { background: var(--skill-bg);    border-color: var(--skill-border); }
+  .card.type-skill .card-type { color: var(--skill-text); }
+  .card.type-activity { background: var(--activity-bg); border-color: var(--activity-border); }
+  .card.type-activity .card-type { color: var(--activity-text); }
+  .card.type-assessment { background: var(--assess-bg); border-color: var(--assess-border); }
+  .card.type-assessment .card-type { color: var(--assess-text); }
+
+  .add-card-btn {
+    margin: 0 0.6rem 0.6rem; padding: 0.4rem; text-align: center;
+    font-size: 12px; color: #999; border: 1.5px dashed #e8e0f0; border-radius: 8px;
+    cursor: pointer; background: none; font-family: inherit;
+  }
+  .add-card-btn:hover { color: var(--purple); border-color: var(--purple-border); }
+
+  .add-col {
+    flex: 0 0 160px;
+    border-radius: 10px;
+    border: 1.5px dashed #e0d0f0;
+    background: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 13px;
+    min-height: 80px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+  .add-col:hover { color: var(--purple); border-color: var(--purple-border); }
+
+  .legend { display: flex; gap: 1.2rem; padding: 0 1.5rem 0.6rem; font-size: 11px; color: #888; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+
+  table.compare { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.compare th, table.compare td { border-bottom: 1px solid #f0e8ff; padding: 0.5rem 0.6rem; text-align: left; vertical-align: top; }
+  table.compare th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; font-weight: 600; }
+  table.compare td.label-cell { font-weight: 500; color: #2a2a2a; }
+  table.compare td.label-cell .t { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; display: block; }
+  table.compare tr.contested td.label-cell { border-left: 3px solid #f0a04a; padding-left: calc(0.6rem - 3px); }
+  .compare-controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.8rem; font-size: 12px; }
+  .compare-controls label { color: #666; }
+  .compare-extra { margin-top: 1.5rem; }
+  .compare-extra h4 { font-family: Georgia, serif; font-size: 13px; color: #3a2a4a; margin-bottom: 0.4rem; }
+  #compare-loading { font-size: 12px; color: #999; }
+
+  footer { padding: 1.2rem 1.5rem; font-size: 11px; color: #bbb; border-top: 1px solid #f0e8ff; }
+</style>
+
+<header>
+  <img src="/unisamsq.png" alt="">
+  <div class="htext">
+    <h1>FMW Skills Sequencing</h1>
+    <a href="https://www.unisam.nz">← unisam.nz</a>
+  </div>
+</header>
+
+<div class="subhead">
+  Drag cards between units to re-plan the sequence. <b>Baseline</b> is locked (this year's proposed redesign). Each teacher's board starts as a copy of Baseline and evolves independently — nobody edits anyone else's board. Use <b>Compare</b> to see where you agree and disagree.
+</div>
+
+<nav class="tabs" id="tabs"></nav>
+
+<div class="legend">
+  <span><i style="background:var(--skill-border)"></i> Skill</span>
+  <span><i style="background:var(--activity-border)"></i> Activity</span>
+  <span><i style="background:var(--assess-border)"></i> Assessment</span>
+</div>
+
+<main id="main"></main>
+
+<footer>Built by Sam G · all vibe coded · found a problem? tell Sam.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, get, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+const app = initializeApp({
+  apiKey:            'AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0',
+  authDomain:        'dowserboard.firebaseapp.com',
+  projectId:         'dowserboard',
+  databaseURL:       'https://dowserboard-default-rtdb.firebaseio.com',
+  storageBucket:     'dowserboard.firebasestorage.app',
+  messagingSenderId: '1032600748722',
+  appId:             '1:1032600748722:web:1584c7508fbbca617cbfab',
+}, 'fmwskills');
+const db = getDatabase(app);
+const boardRef = id => ref(db, `fmwskills/boards/${id}`);
+
+/* ───────────────────────── Seed data (from skills-redesign.md) ───────────────────────── */
+const SEED_UNITS = [
+  { id:'u1', name:'Atlantic Revolutions',   dates:'26 Aug – 17 Sept', color:'#ffd6e7', order:0 },
+  { id:'u2', name:'Industrial Revolution',  dates:'19 Sept – 6 Oct',  color:'#d6f0ff', order:1 },
+  { id:'u3', name:'Imperialism in Africa',  dates:'6–20 Oct',         color:'#e8d6ff', order:2 },
+  { id:'u4', name:'WWI',                    dates:'4 Nov – 15 Dec',   color:'#d6ffe8', order:3 },
+  { id:'u5', name:'Imperialism in Asia',    dates:'19 Nov – 9 Dec',   color:'#fff3d6', order:4 },
+  { id:'u6', name:'Interwar Period',        dates:'7 Jan – 2 Mar',    color:'#ffe0d6', order:5 },
+  { id:'u7', name:'WWII & Cold War',        dates:'4 Mar – 23 Apr',   color:'#d6e0ff', order:6 },
+  { id:'u8', name:'Research Project',       dates:'4 May – 11 June',  color:'#f0d6ff', order:7 },
+];
+
+const SEED_CARDS = [
+  // Unit 1
+  ['u1','skill','Set up Drive/NoodleTools as a habit','Location & Access — first real research-organisation system used all year.'],
+  ['u1','skill','OPCVL on primary sources only','Use of Information — one source type at a time, kept simple for the first unit.'],
+  ['u1','skill','Basic claim + evidence paragraph','Communicating Conclusions — topic sentence states the claim, closing sentence ties to thesis.'],
+  ['u1','skill','Is this a question or a topic? (seed)','Light, informal seed for the Historian vs Reporter distinction — don’t formalise yet.'],
+  ['u1','activity','Argument-mapping practice','Plan the essay before writing it: thesis, reasons, evidence, counterclaims mapped out.'],
+  ['u1','assessment','Argument Map of an essay','Research + plan a full essay on their chosen revolution — no full write-up required.'],
+  // Unit 2
+  ['u2','skill','Compare multiple source types on one phenomenon','Information Seeking Strategies.'],
+  ['u2','skill','Track one theme across a whole period','Synthesis — longitudinal thinking, not just a single moment.'],
+  ['u2','skill','For/against argument + fallacy-spotting drill','Moved here from Unit 1 to spread the load.'],
+  ['u2','skill','AI tool use framed as source evaluation','Evaluation — OPCVL an AI answer like any other source.'],
+  ['u2','activity','Urbanization game','Experiential simulation before the formal analysis questions.'],
+  ['u2','activity','Mayor/builder role-play reasoning','Reason through practical consequences of a policy, in role.'],
+  ['u2','assessment','30-minute timed mini-essay','How one theme changed across the Industrial Revolution, max ⅔ page.'],
+  // Unit 3
+  ['u3','skill','Visual/media subtext analysis','Use of Information — reading an image for symbols and emotion, not just content.'],
+  ['u3','skill','Presentism check','Evaluation — does this source’s message read differently today?'],
+  ['u3','skill','Whose story is this? (seed)','Light, informal precursor to Unit 7’s formal historiography.'],
+  ['u3','skill','Public presentation format','Synthesis — gallery walk, a real audience instead of just the teacher.'],
+  ['u3','activity','Primary source image analysis','Describe, then explain symbols/emotion, then analyse the message.'],
+  ['u3','activity','Reading jigsaw with AI comprehension check','Each student reads one article, checks understanding with AI, reports back.'],
+  ['u3','assessment','Primary-source poster/analysis project','Presented as a gallery walk, like an exhibition.'],
+  // Unit 4
+  ['u4','skill','Named propaganda/persuasion vocabulary','Use of Information — bandwagon, transfer, card stacking, etc.'],
+  ['u4','skill','Time-boxed live presentation','Communicating Conclusions — 2 minutes, no slides to lean on.'],
+  ['u4','activity','Propaganda technique matching activity','Match named techniques to real ad examples.'],
+  ['u4','activity','Rehearsal / practice of the ad presentation','Practice practice practice, before performing live.'],
+  ['u4','assessment','Propaganda Deconstruction','2-minute live presentation analysing a real ad.'],
+  // Unit 5
+  ['u5','skill','Name the framework: Big6 introduced explicitly','Task Definition — revealed as the name for what’s already been practiced since Unit 1.'],
+  ['u5','skill','RQ vs Report distinction','Task Definition — taught before the first owned RQ, not five months after.'],
+  ['u5','skill','Scoping/feasibility of a research angle','Information Seeking Strategies.'],
+  ['u5','activity','Big6 introduction lesson','Explicit staged research model, mapped onto the whole project timeline.'],
+  ['u5','activity','RQ checklist, self- and peer-assessed','Sentence-structure guide plus a checklist before submitting the question.'],
+  ['u5','assessment','Imperialism in Asia Documentary','Recorded voiced Slides presentation, documentary style, no bullet points.'],
+  // Unit 6
+  ['u6','skill','Hold multiple simultaneous narratives together','Synthesis — resisting the urge to flatten a decade into one story.'],
+  ['u6','skill','One analytic model, applied twice, named as reusable','Circular flow taught for the Depression, then reapplied to AI’s economic effects.'],
+  ['u6','skill','Choose-your-own-format synthesis','Communicating Conclusions — paragraph, diagram, table, or mindmap.'],
+  ['u6','activity','Stock market game','Enrichment, not a tagged new core skill.'],
+  ['u6','activity','Family interview homework','Linked forward explicitly to Unit 8’s ‘start from a personal source.’'],
+  ['u6','assessment','Unit test','Causes/events of the interwar period, circular flow and the Depression.'],
+  // Unit 7
+  ['u7','skill','Named historiographical schools','Evaluation — traditionalist / revisionist / post-revisionist / post-1991.'],
+  ['u7','skill','Turn narrative into a spatial/dated map','Use of Information — annotated maps of Europe and the Pacific.'],
+  ['u7','skill','Self-marking against a rubric','Evaluation — explicitly taught as a skill, not just a grading mechanic.'],
+  ['u7','activity','SQ3R reading method','Survey, Question, Read, Recall, Review — reused across multiple readings.'],
+  ['u7','activity','Yalta negotiation simulation','Negotiate in role, then compare to what was actually agreed.'],
+  ['u7','activity','Cold War country-role simulation game','Sustained across several weeks, not just one lesson.'],
+  ['u7','assessment','WWII summative','~25 MCQs plus a DBQ on a photo’s use as propaganda.'],
+  ['u7','assessment','Cold War test','Self-marked essay, argued through the historiographical lenses above.'],
+  // Unit 8
+  ['u8','skill','Genre-switching across three word-capped registers','Part A/B/C — source evaluation, investigation, reflection each need different writing.'],
+  ['u8','skill','Peer RQ diagnosis','Reuses the Task Definition skill from Unit 5 diagnostically, on real peer examples.'],
+  ['u8','skill','Mandatory graded reflection','Part C — methodology and challenges, not just content, formally assessed.'],
+  ['u8','activity','Historian vs Reporter sorting activity','Drag-and-drop distinguishing RQ types from report topics.'],
+  ['u8','activity','Rapid Fire 10-in-5 / Wheel of History','Fast idea generation under time pressure, then narrowing down.'],
+  ['u8','activity','Argument mapping: hunches to thesis','Sketch hunches, map how each connects to the thesis, before researching in depth.'],
+  ['u8','assessment','History IA','Part A 300w OPCVL / Part B 1000w investigation / Part C 300w reflection. 1600 words, 3 checkpoints.'],
+].map((c,i) => ({ id:'c'+i, unit:c[0], type:c[1], label:c[2], note:c[3], order:i }));
+
+function cloneSeed() {
+  const units = {}; SEED_UNITS.forEach(u => units[u.id] = {...u});
+  const cards = {}; SEED_CARDS.forEach(c => cards[c.id] = {...c});
+  return { units, cards };
+}
+
+/* ───────────────────────── State ───────────────────────── */
+const PEOPLE = ['sam','thomas','dan','diana','others'];
+const PEOPLE_LABEL = { sam:'Sam', thomas:'Thomas', dan:'Dan', diana:'Diana', others:'Others' };
+let currentTab = 'baseline';
+let state = { units:{}, cards:{} };
+let liveRef = null;
+
+function isEditable() { return PEOPLE.includes(currentTab); }
+
+function ensureAuth() {
+  if (sessionStorage.getItem('fmwskills_auth') === '1') return true;
+  const pass = prompt('Passcode to edit this board:');
+  if (pass === '0987') { sessionStorage.setItem('fmwskills_auth','1'); return true; }
+  if (pass !== null) alert('Incorrect passcode.');
+  return false;
+}
+
+/* ───────────────────────── Tabs ───────────────────────── */
+function renderTabs() {
+  const nav = document.getElementById('tabs');
+  const all = [['baseline','Baseline'], ...PEOPLE.map(p => [p, PEOPLE_LABEL[p]]), ['compare','Compare']];
+  nav.innerHTML = '';
+  all.forEach(([id,label]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (id === currentTab) b.classList.add('active');
+    b.onclick = () => switchTab(id);
+    nav.appendChild(b);
+  });
+}
+
+function switchTab(id) {
+  currentTab = id;
+  renderTabs();
+  if (liveRef) { off(liveRef); liveRef = null; }
+  if (id === 'baseline') {
+    state = cloneSeed();
+    renderBoard();
+  } else if (id === 'compare') {
+    renderCompare();
+  } else {
+    loadPersonBoard(id);
+  }
+}
+
+async function loadPersonBoard(id) {
+  document.getElementById('main').innerHTML = '<p style="font-size:12px;color:#999;">Loading…</p>';
+  liveRef = boardRef(id);
+  const snap = await get(liveRef);
+  if (!snap.exists()) {
+    await set(liveRef, cloneSeed());
+  }
+  onValue(liveRef, snap => {
+    const val = snap.val() || { units:{}, cards:{} };
+    state = { units: val.units || {}, cards: val.cards || {} };
+    if (currentTab === id) renderBoard();
+  });
+}
+
+/* ───────────────────────── Board rendering ───────────────────────── */
+const TYPE_LABEL = { skill:'Skill', activity:'Activity', assessment:'Assessment' };
+
+function renderBoard() {
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'board-row';
+
+  const units = Object.values(state.units).sort((a,b) => a.order - b.order);
+  units.forEach(u => row.appendChild(renderColumn(u)));
+
+  if (isEditable()) {
+    const addCol = document.createElement('div');
+    addCol.className = 'add-col';
+    addCol.textContent = '+ Add box';
+    addCol.onclick = addUnit;
+    row.appendChild(addCol);
+  }
+  main.appendChild(row);
+}
+
+function renderColumn(u) {
+  const col = document.createElement('div');
+  col.className = 'col';
+
+  const cardsInUnit = Object.values(state.cards).filter(c => c.unit === u.id).sort((a,b) => a.order - b.order);
+  const skillCount = cardsInUnit.filter(c => c.type === 'skill').length;
+
+  const head = document.createElement('div');
+  head.className = 'col-head';
+  head.style.background = u.color + '35';
+  head.style.borderBottomColor = u.color;
+  head.innerHTML = `
+    <div class="col-title-row">
+      <h3 title="click to rename">${escapeHtml(u.name)}</h3>
+      <span class="col-count ${skillCount > 5 ? 'warn' : ''}">${skillCount} skill${skillCount===1?'':'s'}</span>
+    </div>
+    <div class="col-meta">${escapeHtml(u.dates || '')}</div>
+  `;
+  if (isEditable()) {
+    head.querySelector('h3').onclick = () => renameUnit(u.id, u.name);
+    const actions = document.createElement('div');
+    actions.className = 'col-actions';
+    actions.innerHTML = `<button data-a="color">colour</button><button data-a="del">delete box</button>`;
+    actions.querySelector('[data-a=color]').onclick = () => recolorUnit(u.id, u.color);
+    actions.querySelector('[data-a=del]').onclick = () => deleteUnit(u.id);
+    head.appendChild(actions);
+  }
+  col.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'card-list';
+  list.dataset.unit = u.id;
+  cardsInUnit.forEach(c => list.appendChild(renderCard(c)));
+  col.appendChild(list);
+
+  if (isEditable()) {
+    Sortable.create(list, {
+      group: 'fmwskills-' + currentTab,
+      animation: 150,
+      onEnd: handleDragEnd,
+    });
+    const addBtn = document.createElement('div');
+    addBtn.className = 'add-card-btn';
+    addBtn.textContent = '+ add card';
+    addBtn.onclick = () => addCard(u.id);
+    col.appendChild(addBtn);
+  }
+
+  return col;
+}
+
+function renderCard(c) {
+  const el = document.createElement('div');
+  el.className = 'card type-' + c.type;
+  el.dataset.id = c.id;
+  el.innerHTML = `
+    <span class="card-type">${TYPE_LABEL[c.type]}</span>
+    <div class="card-label">${escapeHtml(c.label)}</div>
+    ${c.note ? `<div class="card-note">${escapeHtml(c.note)}</div>` : ''}
+  `;
+  if (isEditable()) {
+    const btns = document.createElement('div');
+    btns.className = 'card-btns';
+    btns.innerHTML = `<span data-a="edit">edit</span><span data-a="del">delete</span>`;
+    btns.querySelector('[data-a=edit]').onclick = () => editCard(c.id);
+    btns.querySelector('[data-a=del]').onclick = () => deleteCard(c.id);
+    el.appendChild(btns);
+  }
+  return el;
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+
+/* ───────────────────────── Mutations (editable boards only) ───────────────────────── */
+function saveState() {
+  if (!isEditable()) return;
+  set(boardRef(currentTab), state);
+}
+
+function handleDragEnd(evt) {
+  if (!ensureAuth()) { renderBoard(); return; }
+  document.querySelectorAll('.card-list').forEach(list => {
+    const unitId = list.dataset.unit;
+    [...list.children].forEach((el, i) => {
+      const c = state.cards[el.dataset.id];
+      if (c) { c.unit = unitId; c.order = i; }
+    });
+  });
+  saveState();
+}
+
+function addCard(unitId) {
+  if (!ensureAuth()) return;
+  const type = prompt('Card type: skill / activity / assessment', 'skill');
+  if (!type || !['skill','activity','assessment'].includes(type.trim().toLowerCase())) { alert('Type must be: skill, activity, or assessment'); return; }
+  const label = prompt('Card label:');
+  if (!label) return;
+  const note = prompt('Note (optional):', '') || '';
+  const id = 'c_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+  const order = Object.values(state.cards).filter(c => c.unit === unitId).length;
+  state.cards[id] = { id, unit: unitId, type: type.trim().toLowerCase(), label, note, order };
+  saveState();
+  renderBoard();
+}
+
+function editCard(id) {
+  if (!ensureAuth()) return;
+  const c = state.cards[id];
+  const label = prompt('Edit label:', c.label);
+  if (label === null) return;
+  const note = prompt('Edit note:', c.note || '');
+  c.label = label; c.note = note === null ? c.note : note;
+  saveState();
+  renderBoard();
+}
+
+function deleteCard(id) {
+  if (!ensureAuth()) return;
+  if (!confirm('Delete this card?')) return;
+  delete state.cards[id];
+  saveState();
+  renderBoard();
+}
+
+function addUnit() {
+  if (!ensureAuth()) return;
+  const name = prompt('New box name:');
+  if (!name) return;
+  const color = prompt('Colour (hex, e.g. #ffd6e7):', '#e0e0e0') || '#e0e0e0';
+  const id = 'u_' + Date.now();
+  const order = Object.values(state.units).length;
+  state.units[id] = { id, name, dates:'', color, order };
+  saveState();
+  renderBoard();
+}
+
+function renameUnit(id, current) {
+  if (!ensureAuth()) return;
+  const name = prompt('Rename box:', current);
+  if (!name) return;
+  state.units[id].name = name;
+  saveState();
+  renderBoard();
+}
+
+function recolorUnit(id, current) {
+  if (!ensureAuth()) return;
+  const color = prompt('New colour (hex):', current);
+  if (!color) return;
+  state.units[id].color = color;
+  saveState();
+  renderBoard();
+}
+
+function deleteUnit(id) {
+  if (!ensureAuth()) return;
+  const cardsIn = Object.values(state.cards).filter(c => c.unit === id);
+  if (cardsIn.length && !confirm(`This box has ${cardsIn.length} card(s) in it. Delete the box and all its cards?`)) return;
+  cardsIn.forEach(c => delete state.cards[c.id]);
+  delete state.units[id];
+  saveState();
+  renderBoard();
+}
+
+/* ───────────────────────── Compare view ───────────────────────── */
+async function renderCompare() {
+  const main = document.getElementById('main');
+  main.innerHTML = '<p id="compare-loading">Loading all boards…</p>';
+
+  const boardsData = { baseline: cloneSeed() };
+  await Promise.all(PEOPLE.map(async p => {
+    const snap = await get(boardRef(p));
+    boardsData[p] = snap.exists() ? snap.val() : cloneSeed();
+  }));
+
+  const cols = ['baseline', ...PEOPLE];
+
+  // Rows keyed by original seed card id (only cards that exist in baseline can be aligned across boards)
+  const rows = SEED_CARDS.map(seed => {
+    const placements = cols.map(col => {
+      const b = boardsData[col];
+      const c = b.cards && b.cards[seed.id];
+      if (!c) return null;
+      const u = b.units && b.units[c.unit];
+      return u ? u.name : '(unknown box)';
+    });
+    const distinctUnits = new Set(placements.filter(Boolean));
+    return { seed, placements, contested: distinctUnits.size > 1 };
+  });
+
+  document.getElementById('compare-loading') && (document.getElementById('compare-loading').style.display = 'none');
+
+  const controls = document.createElement('div');
+  controls.className = 'compare-controls';
+  controls.innerHTML = `
+    <label><input type="checkbox" id="cmp-hide-unanimous"> Hide unanimous (only show disagreements)</label>
+    <label><input type="checkbox" id="cmp-sort-contested"> Sort most-contested first</label>
+  `;
+  main.innerHTML = '';
+  main.appendChild(controls);
+
+  const tableWrap = document.createElement('div');
+  main.appendChild(tableWrap);
+
+  function draw() {
+    const hideUnanimous = document.getElementById('cmp-hide-unanimous').checked;
+    const sortContested = document.getElementById('cmp-sort-contested').checked;
+    let visible = rows.filter(r => !hideUnanimous || r.contested);
+    if (sortContested) {
+      visible = [...visible].sort((a,b) => {
+        const da = new Set(a.placements.filter(Boolean)).size;
+        const db = new Set(b.placements.filter(Boolean)).size;
+        return db - da;
+      });
+    }
+    let html = '<table class="compare"><thead><tr><th>Skill / activity / assessment</th>';
+    cols.forEach(c => html += `<th>${c === 'baseline' ? 'Baseline' : PEOPLE_LABEL[c]}</th>`);
+    html += '</tr></thead><tbody>';
+    visible.forEach(r => {
+      html += `<tr class="${r.contested ? 'contested' : ''}"><td class="label-cell"><span class="t">${TYPE_LABEL[r.seed.type]}</span>${escapeHtml(r.seed.label)}</td>`;
+      r.placements.forEach(p => html += `<td>${p ? escapeHtml(p) : '<span style="color:#ccc">—</span>'}</td>`);
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    tableWrap.innerHTML = html;
+  }
+  draw();
+  document.getElementById('cmp-hide-unanimous').onchange = draw;
+  document.getElementById('cmp-sort-contested').onchange = draw;
+
+  // Cards each board added beyond the original seed
+  const extraSection = document.createElement('div');
+  extraSection.className = 'compare-extra';
+  let extraHtml = '<h4>New cards added beyond Baseline</h4>';
+  let anyExtra = false;
+  PEOPLE.forEach(p => {
+    const b = boardsData[p];
+    const extras = Object.values(b.cards || {}).filter(c => !c.id.startsWith('c') || !SEED_CARDS.find(s => s.id === c.id));
+    const realExtras = extras.filter(c => !SEED_CARDS.find(s => s.id === c.id));
+    if (realExtras.length) {
+      anyExtra = true;
+      extraHtml += `<p style="font-size:12px;"><b>${PEOPLE_LABEL[p]}:</b> `;
+      extraHtml += realExtras.map(c => {
+        const u = b.units[c.unit];
+        return `${escapeHtml(c.label)} <span style="color:#999">(${TYPE_LABEL[c.type]}, in ${u ? escapeHtml(u.name) : '?'})</span>`;
+      }).join(' · ');
+      extraHtml += '</p>';
+    }
+  });
+  if (!anyExtra) extraHtml += '<p style="font-size:12px;color:#999;">None yet.</p>';
+  extraSection.innerHTML = extraHtml;
+  main.appendChild(extraSection);
+}
+
+/* ───────────────────────── Init ───────────────────────── */
+renderTabs();
+state = cloneSeed();
+renderBoard();
+</script>
