@@ -227,22 +227,40 @@ function scorePlayer(p, R, fixtures) {
     detail.rounds[rd] = { picks, pts, resolved, per: ROUND_PTS[rd] };
   }
 
-  // Specials
+  // Specials. Even before the champion/3rd-place is actually decided, a pick
+  // already eliminated from the tournament is provably wrong now — used below
+  // for the "Max" column so a Brazil-as-champion pick isn't shown as still live.
   const champOk = R.champion && same(p.champion, R.champion);
+  const champOut = !R.champion && p.champion && R.eliminated.has(canon(p.champion));
   if (R.champion) total += champOk ? 10 : 0;
   detail.special.push({ label: 'Champion (10)', pick: p.champion, actual: R.champion,
-    status: R.champion ? (champOk ? 'correct' : 'wrong') : 'pending', pts: champOk ? 10 : 0 });
+    status: R.champion ? (champOk ? 'correct' : 'wrong') : (champOut ? 'wrong' : 'pending'), pts: champOk ? 10 : 0 });
 
   const thirdOk = R.thirdWinner && same(p.thirdPlace, R.thirdWinner);
+  const thirdOut = !R.thirdWinner && p.thirdPlace && R.eliminated.has(canon(p.thirdPlace));
   if (R.thirdWinner) total += thirdOk ? 5 : 0;
   detail.special.push({ label: '3rd-place playoff (5)', pick: p.thirdPlace, actual: R.thirdWinner,
-    status: R.thirdWinner ? (thirdOk ? 'correct' : 'wrong') : 'pending', pts: thirdOk ? 5 : 0 });
+    status: R.thirdWinner ? (thirdOk ? 'correct' : 'wrong') : (thirdOut ? 'wrong' : 'pending'), pts: thirdOk ? 5 : 0 });
 
   // Final-score: tiebreaker only (not added to total).
   const fsNorm = s => (s || '').replace(/[^0-9]/g, '').slice(0, 2);
   const finalScoreOk = R.finalScore && fsNorm(p.finalScore) === fsNorm(R.finalScore) && fsNorm(p.finalScore).length === 2;
   detail.special.push({ label: 'Final score (tiebreak)', pick: p.finalScore || '-', actual: R.finalScore || '-',
     status: R.finalScore ? (finalScoreOk ? 'correct' : 'wrong') : 'pending', pts: 0, tiebreak: true });
+
+  // Theoretical max: points already locked in, plus full credit for every pick
+  // that isn't yet provably impossible (still pending). Not bracket-aware —
+  // it doesn't check whether a player's own pending picks are mutually
+  // consistent, just whether each one individually still has a live shot.
+  let maxPts = total;
+  for (const m of detail.matches) if (m.status === 'pending') maxPts += m.doubled ? 2 : 1;
+  for (const w of detail.groupWinners) if (w.status === 'pending') maxPts += w.doubled ? 4 : 2;
+  for (const rd of ['r32', 'r16', 'qf', 'sf', 'final']) {
+    for (const pk of detail.rounds[rd].picks) if (pk.status === 'pending') maxPts += ROUND_PTS[rd];
+  }
+  if (detail.special[0].status === 'pending') maxPts += 10; // champion
+  if (detail.special[1].status === 'pending') maxPts += 5;  // 3rd place
+  detail.maxPts = maxPts;
 
   return { total, tiebreak: finalScoreOk ? 1 : 0, detail };
 }
@@ -301,7 +319,9 @@ function renderMatrix(scored) {
   ['r32', 'r16', 'qf', 'sf', 'final'].forEach((rd, i) =>
     head += `<th class="${i === 0 ? 'gstart' : ''}" title="${ROUND_LABEL[rd]} progression (points earned)">${rd === 'final' ? 'Fin' : rd.toUpperCase()}</th>`);
   head += '<th class="gstart" title="3rd-place playoff winner (5)">3rd</th>'
-    + '<th title="Champion (10)">Champ</th><th title="Final score (tiebreak)">Score</th>';
+    + '<th title="Champion (10)">Champ</th>'
+    + '<th class="gstart" title="Theoretical max points still achievable (already-locked-in picks eliminated from contention count for nothing further)">Max</th>'
+    + '<th title="Final score (tiebreak)">Score</th>';
 
   const rows = scored.map(s => {
     const d = s.detail, p = s.p;
@@ -333,6 +353,7 @@ function renderMatrix(scored) {
       `3rd place: ${third.pick || '-'}${third.actual && third.actual !== '-' ? ' · actual ' + third.actual : ''}`);
     r += cell(abbr(champ.pick), champ.status, '',
       `Champion: ${champ.pick || '-'}${champ.actual && champ.actual !== '-' ? ' · actual ' + champ.actual : ''}`);
+    r += cell(String(d.maxPts), 'none', 'gstart', `Theoretical max: ${d.maxPts} pts (current ${s.total} + everything not yet eliminated)`);
     r += cell(esc(score.pick || '–'), score.status, '',
       `Final score: ${score.pick || '-'}${score.actual && score.actual !== '-' ? ' · actual ' + score.actual : ''}`);
     return `<tr>${r}</tr>`;
