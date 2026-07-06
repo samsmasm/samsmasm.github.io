@@ -55,6 +55,8 @@ Key exports: `WC.orient(a, b, matchRecord)`, `WC.outcome()`, `WC.isPlaceholderTe
 
 **R32 is gated** to end of group stage — do not award R32 points from provisional ESPN "advance" flags.
 
+Each knockout pick scores as soon as its own fate is known, not once the whole round is filled: a pick already named in the round's published bracket is correct immediately; a pick already eliminated in an earlier round is wrong immediately; everything else stays pending. See `eliminated` tracking in `app.js`.
+
 ---
 
 ## Critical gotchas (each cost a wrong commit)
@@ -104,6 +106,6 @@ Run after editing `scheduleall.csv`. Reports slot-code problems, team mismatches
 
 Active — World Cup 2026 runs through mid-July 2026. Knockout rounds in progress.
 
-All known scoring bugs fixed (standings order, placeholder teams, R32 over-counting, orient() correctness). App is at `?v=10`.
+All known scoring bugs fixed (standings order, placeholder teams, R32 over-counting, orient() correctness). Knockout rounds now score per-pick as results come in rather than waiting for the whole round to fill. App is at `?v=11`.
 
 **Ongoing:** update `overrides.json` for any disputed results. No code changes expected unless a new ESPN data anomaly appears.

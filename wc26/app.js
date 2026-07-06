@@ -52,10 +52,6 @@ async function fetchOverrides() {
 // Build a results model from ESPN data, then layer overrides on top.
 // ---------------------------------------------------------------------------
 const ROUND_PTS = { r32: 1, r16: 1, qf: 2, sf: 3, final: 4 };
-// How many real teams a round holds once fully determined. A knockout column is
-// only "resolved" (and so scored) when every slot is a known team — this is what
-// keeps R32 from showing as decided while groups are still being played.
-const ROUND_FULL = { r32: 32, r16: 16, qf: 8, sf: 4, final: 2 };
 
 function classifyRound(note) {
   const n = (note || '').toLowerCase();
@@ -127,6 +123,10 @@ function buildResults(events, standings, ov) {
 
   // --- knockout round membership (set of teams that reached each round) ---
   const rounds = { r32: new Set(), r16: new Set(), qf: new Set(), sf: new Set(), final: new Set() };
+  // Teams knocked out of a completed knockout match — used to mark a pick "wrong"
+  // for a later round the moment their exit is known, rather than waiting for
+  // every slot in that round to be filled (see per-pick scoring below).
+  const eliminated = new Set();
   let champion = null, thirdWinner = null;
   // R32 membership comes solely from the published R32 fixtures (loop below). We
   // deliberately do NOT use the standings "advance/best" notes: ESPN tags ALL 12
@@ -144,6 +144,9 @@ function buildResults(events, standings, ov) {
     if (!isPlaceholderTeam(m.home)) rounds[rd].add(canon(m.home));
     if (!isPlaceholderTeam(m.away)) rounds[rd].add(canon(m.away));
     if (rd === 'final' && m.completed) champion = m.hs > m.as ? m.home : m.away;
+    if (m.completed && !isPlaceholderTeam(m.home) && !isPlaceholderTeam(m.away) && m.hs !== m.as) {
+      eliminated.add(canon(m.hs > m.as ? m.away : m.home));
+    }
   }
   // Overrides for rounds / champion / third place.
   if (ov.rounds) for (const rd of Object.keys(rounds)) {
@@ -153,7 +156,7 @@ function buildResults(events, standings, ov) {
   if (ov.thirdPlaceWinner) thirdWinner = ov.thirdPlaceWinner;
   const finalScore = ov.finalScore || null;
 
-  return { fixtureOutcome, groupWinners, groupDone, rounds, champion, thirdWinner, finalScore };
+  return { fixtureOutcome, groupWinners, groupDone, rounds, eliminated, champion, thirdWinner, finalScore };
 }
 
 // ---------------------------------------------------------------------------
@@ -200,12 +203,19 @@ function scorePlayer(p, R, fixtures) {
 
   for (const rd of ['r32', 'r16', 'qf', 'sf', 'final']) {
     const set = R.rounds[rd];
-    const resolved = set.size >= ROUND_FULL[rd];
+    // Score each pick as soon as its own fate is known, rather than waiting for
+    // every slot in the round to be filled: a picked team already named in the
+    // round's real bracket is correct now; one already eliminated in an earlier
+    // round is wrong now; anything else is still pending.
     const picks = p[rd].map(team => {
-      const ok = set.has(canon(team));
-      return { team, status: resolved ? (ok ? 'correct' : 'wrong') : 'pending', pts: ok ? ROUND_PTS[rd] : 0 };
+      const c = canon(team);
+      const known = set.has(c);
+      const out = R.eliminated.has(c);
+      const status = known ? 'correct' : out ? 'wrong' : 'pending';
+      return { team, status, pts: known ? ROUND_PTS[rd] : 0 };
     });
-    const pts = resolved ? picks.reduce((s, x) => s + x.pts, 0) : 0;
+    const resolved = picks.some(x => x.status !== 'pending');
+    const pts = picks.reduce((s, x) => s + x.pts, 0);
     total += pts;
     detail.rounds[rd] = { picks, pts, resolved, per: ROUND_PTS[rd] };
   }
@@ -303,8 +313,9 @@ function renderMatrix(scored) {
     ['r32', 'r16', 'qf', 'sf', 'final'].forEach((rd, i) => {
       const rr = d.rounds[rd];
       const correct = rr.picks.filter(x => x.status === 'correct').length;
+      const known = rr.picks.filter(x => x.status !== 'pending').length;
       const cls = rr.resolved ? (correct > 0 ? 'correct' : 'wrong') : 'pending';
-      const tip = `${ROUND_LABEL[rd]}: ${rr.resolved ? correct + '/' + rr.picks.length + ' correct' : 'not resolved'} · `
+      const tip = `${ROUND_LABEL[rd]}: ${rr.resolved ? correct + '/' + known + ' known so far correct' : 'not resolved'} · `
         + rr.picks.map(x => (x.status === 'correct' ? '✓' : x.status === 'wrong' ? '✗' : '·') + abbr(x.team)).join(' ');
       r += cell(rr.resolved ? '+' + rr.pts : '·', cls, i === 0 ? 'gstart' : '', tip);
     });
