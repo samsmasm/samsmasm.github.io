@@ -52,6 +52,9 @@ async function fetchOverrides() {
 // Build a results model from ESPN data, then layer overrides on top.
 // ---------------------------------------------------------------------------
 const ROUND_PTS = { r32: 1, r16: 1, qf: 2, sf: 3, final: 4 };
+// Fixed bracket sizes, used only for the odds-weighted prediction below (not
+// for round-resolution gating, which is derived from actual fixtures instead).
+const BRACKET_SIZE = { r32: 32, r16: 16, qf: 8, sf: 4, final: 2 };
 
 function classifyRound(note) {
   const n = (note || '').toLowerCase();
@@ -262,6 +265,35 @@ function scorePlayer(p, R, fixtures) {
   if (detail.special[1].status === 'pending') maxPts += 5;  // 3rd place
   detail.maxPts = maxPts;
 
+  // Two simple "predicted final score" estimates, each a different balance of
+  // current vs. max:
+  //
+  // predFlat — plain midpoint: current + half of whatever's still open.
+  // No opinion on which pending picks are more likely; easy to explain, but
+  // treats a heavy favourite pick the same as a long-shot one.
+  detail.predFlat = (total + maxPts) / 2;
+
+  // predOdds — for pending knockout-round picks, credit survival odds instead
+  // of a flat half: (slots still open in that round) ÷ (teams still alive and
+  // not yet placed in it). E.g. if 16 teams remain alive and 8 reach the next
+  // round, an undetermined pick there is credited 8/16 of its point value, not
+  // 0 or 100%. Group-stage picks and champion/3rd-place still get flat full
+  // credit if pending — modelling their odds accurately needs bracket
+  // structure (who plays whom) this simple version doesn't track.
+  const aliveCount = BRACKET_SIZE.r32 - R.eliminated.size;
+  const survivalRatio = (remaining, pool) => (pool <= 0 ? (remaining > 0 ? 1 : 0) : Math.min(1, Math.max(0, remaining / pool)));
+  let predOdds = total;
+  for (const m of detail.matches) if (m.status === 'pending') predOdds += m.doubled ? 2 : 1;
+  for (const w of detail.groupWinners) if (w.status === 'pending') predOdds += w.doubled ? 4 : 2;
+  for (const rd of ['r32', 'r16', 'qf', 'sf', 'final']) {
+    const known = R.rounds[rd].size;
+    const ratio = survivalRatio(BRACKET_SIZE[rd] - known, aliveCount - known);
+    for (const pk of detail.rounds[rd].picks) if (pk.status === 'pending') predOdds += ROUND_PTS[rd] * ratio;
+  }
+  if (detail.special[0].status === 'pending') predOdds += 10;
+  if (detail.special[1].status === 'pending') predOdds += 5;
+  detail.predOdds = predOdds;
+
   return { total, tiebreak: finalScoreOk ? 1 : 0, detail };
 }
 
@@ -307,7 +339,9 @@ function renderMatrix(scored) {
   // Header (single sticky row). Matchups read off any player's fixtures.
   const fxByGroup = {};
   scored[0].detail.matches.forEach(m => (fxByGroup[m.fx.group] = fxByGroup[m.fx.group] || []).push(m.fx));
-  let head = '<th class="cName gstart">Player</th><th class="cPts">Pts</th>';
+  const sortTh = (key, label, cls, title) =>
+    `<th class="${cls || ''} sortcol${sortKey === key ? ' sorted' : ''}" data-sort="${key}" title="${esc(title)} · click to sort by this">${label}</th>`;
+  let head = `<th class="cName gstart">Player</th>${sortTh('pts', 'Pts', 'cPts', 'Current points')}`;
   for (const g of GROUPS) {
     (fxByGroup[g] || []).forEach((fx, idx) => {
       head += `<th class="${idx === 0 ? 'gstart' : ''}" title="Group ${g}: ${esc(fx.home)} v ${esc(fx.away)}">${abbr(fx.home)}·${abbr(fx.away)}</th>`;
@@ -320,7 +354,12 @@ function renderMatrix(scored) {
     head += `<th class="${i === 0 ? 'gstart' : ''}" title="${ROUND_LABEL[rd]} progression (points earned)">${rd === 'final' ? 'Fin' : rd.toUpperCase()}</th>`);
   head += '<th class="gstart" title="3rd-place playoff winner (5)">3rd</th>'
     + '<th title="Champion (10)">Champ</th>'
-    + '<th class="gstart" title="Theoretical max points still achievable (already-locked-in picks eliminated from contention count for nothing further)">Max</th>'
+    + sortTh('max', 'Max', 'gstart',
+      'Theoretical max points still achievable (already-eliminated picks count for nothing further)')
+    + sortTh('predFlat', 'PredF', '',
+      'Predicted final score (flat): midpoint between current points and theoretical max — assumes half of remaining potential converts, with no opinion on which picks are more likely')
+    + sortTh('predOdds', 'PredO', '',
+      'Predicted final score (odds): like current points, but each still-open knockout pick is credited by survival odds — round slots remaining ÷ teams still alive and undecided for it — instead of full or zero credit')
     + '<th title="Final score (tiebreak)">Score</th>';
 
   const rows = scored.map(s => {
@@ -354,6 +393,8 @@ function renderMatrix(scored) {
     r += cell(abbr(champ.pick), champ.status, '',
       `Champion: ${champ.pick || '-'}${champ.actual && champ.actual !== '-' ? ' · actual ' + champ.actual : ''}`);
     r += cell(String(d.maxPts), 'none', 'gstart', `Theoretical max: ${d.maxPts} pts (current ${s.total} + everything not yet eliminated)`);
+    r += cell(d.predFlat.toFixed(1), 'none', '', `Predicted (flat): ${d.predFlat.toFixed(1)} pts — midpoint of current (${s.total}) and max (${d.maxPts})`);
+    r += cell(d.predOdds.toFixed(1), 'none', '', `Predicted (odds): ${d.predOdds.toFixed(1)} pts — current (${s.total}) plus survival-odds-weighted credit for still-open knockout picks`);
     r += cell(esc(score.pick || '–'), score.status, '',
       `Final score: ${score.pick || '-'}${score.actual && score.actual !== '-' ? ' · actual ' + score.actual : ''}`);
     return `<tr>${r}</tr>`;
@@ -367,6 +408,27 @@ function render(scored, meta) {
   renderMatrix(scored);
   document.getElementById('meta').textContent = meta;
 }
+
+// Sortable matrix: click a Pts/Max/PredF/PredO header to reorder both tables
+// by that metric. Re-sorts the already-fetched data — no refetch needed.
+const SORT_VAL = {
+  pts: s => s.total, max: s => s.detail.maxPts,
+  predFlat: s => s.detail.predFlat, predOdds: s => s.detail.predOdds,
+};
+let sortKey = 'pts';
+let lastScored = null, lastMeta = '';
+
+function sortScored(scored) {
+  const val = SORT_VAL[sortKey];
+  return [...scored].sort((a, b) => val(b) - val(a) || b.total - a.total || b.tiebreak - a.tiebreak || a.p.name.localeCompare(b.p.name));
+}
+
+document.getElementById('matrix').addEventListener('click', e => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th || !lastScored) return;
+  sortKey = th.dataset.sort;
+  render(sortScored(lastScored), lastMeta);
+});
 
 // ---------------------------------------------------------------------------
 // Upcoming games (from window.WC_SCHEDULE). The full schedule lives on its own
@@ -439,12 +501,13 @@ async function main(force) {
     const R = buildResults(events, standings, ov);
     const fixtures = window.WC_FIXTURES;
     const scored = window.WC_PLAYERS.map(p => ({ p, ...scorePlayer(p, R, fixtures) }));
-    scored.sort((a, b) => b.total - a.total || b.tiebreak - a.tiebreak || a.p.name.localeCompare(b.p.name));
 
     const finishedMatches = fixtures.filter(fx => R.fixtureOutcome(fx)).length;
     const decidedGroups = Object.keys(R.groupWinners).length;
     const when = new Date(ts).toLocaleString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
-    render(scored, `${finishedMatches}/${fixtures.length} group matches scored · ${decidedGroups}/12 groups decided · Last updated ${when} Vietnam time${cached ? ' (cached)' : ''}`);
+    lastScored = scored;
+    lastMeta = `${finishedMatches}/${fixtures.length} group matches scored · ${decidedGroups}/12 groups decided · Last updated ${when} Vietnam time${cached ? ' (cached)' : ''}`;
+    render(sortScored(lastScored), lastMeta);
 
     // Upcoming games (refresh alongside the leaderboard). Resolve knockout slot
     // codes to real teams the same way the schedule page does.
