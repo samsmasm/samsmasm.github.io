@@ -214,7 +214,11 @@ function scorePlayer(p, R, fixtures) {
       const status = known ? 'correct' : out ? 'wrong' : 'pending';
       return { team, status, pts: known ? ROUND_PTS[rd] : 0 };
     });
-    const resolved = picks.some(x => x.status !== 'pending');
+    // Gate the cell display on the round itself having started (at least one
+    // real team confirmed in it), not on whether a pick merely got eliminated
+    // earlier — otherwise everyone shows a hollow "+0" for SF/Final the moment
+    // one QF loser is known, before any team has actually reached that round.
+    const resolved = set.size > 0;
     const pts = picks.reduce((s, x) => s + x.pts, 0);
     total += pts;
     detail.rounds[rd] = { picks, pts, resolved, per: ROUND_PTS[rd] };
@@ -429,4 +433,36 @@ async function main(force) {
 }
 
 document.getElementById('refresh').addEventListener('click', () => main(true));
+
+// Mobile-friendly pick detail: touch devices don't reliably surface the
+// `title` attribute on tap, so tapping a matrix cell shows the same text in a
+// small popover instead. Delegated on `document` (not `#matrix`, which gets
+// its innerHTML replaced on every refresh) so it only needs binding once.
+const tipPop = document.createElement('div');
+tipPop.className = 'tip-pop';
+tipPop.hidden = true;
+document.body.appendChild(tipPop);
+
+function hideTip() { tipPop.hidden = true; tipPop._cell = null; }
+
+function showTip(td) {
+  tipPop.textContent = td.getAttribute('title') || '';
+  tipPop.hidden = false;
+  tipPop._cell = td;
+  const r = td.getBoundingClientRect();
+  tipPop.style.left = '0px'; tipPop.style.top = '0px'; // reset before measuring
+  const w = tipPop.offsetWidth, h = tipPop.offsetHeight;
+  const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+  const top = Math.min(Math.max(8, r.bottom + 6), window.innerHeight - h - 8);
+  tipPop.style.left = `${left}px`;
+  tipPop.style.top = `${top}px`;
+}
+
+document.addEventListener('click', e => {
+  const td = e.target.closest('#matrix td[title]');
+  if (!td) { hideTip(); return; }
+  if (tipPop._cell === td && !tipPop.hidden) { hideTip(); return; }
+  showTip(td);
+});
+
 main();
