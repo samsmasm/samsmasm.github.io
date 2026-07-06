@@ -201,6 +201,9 @@ function scorePlayer(p, R, fixtures) {
     detail.groupWinners.push({ group: g, pick, winner, status, pts, doubled: mult === 2 });
   }
 
+  detail.groupPts = detail.matches.reduce((s, x) => s + x.pts, 0)
+    + detail.groupWinners.reduce((s, x) => s + x.pts, 0);
+
   for (const rd of ['r32', 'r16', 'qf', 'sf', 'final']) {
     const set = R.rounds[rd];
     // Score each pick as soon as its own fate is known, rather than waiting for
@@ -294,6 +297,7 @@ function renderMatrix(scored) {
     head += `<th title="Group ${g} winner">🏆${g}</th>`;
   }
   head += '<th class="gstart" title="Double-points group">2×</th>';
+  head += '<th class="gstart" title="Total group-stage points (all matches + group winner bonuses, doubled group included)">Grp</th>';
   ['r32', 'r16', 'qf', 'sf', 'final'].forEach((rd, i) =>
     head += `<th class="${i === 0 ? 'gstart' : ''}" title="${ROUND_LABEL[rd]} progression (points earned)">${rd === 'final' ? 'Fin' : rd.toUpperCase()}</th>`);
   head += '<th class="gstart" title="3rd-place playoff winner (5)">3rd</th>'
@@ -314,6 +318,7 @@ function renderMatrix(scored) {
         `Group ${g} winner: ${w.pick || '-'}${w.winner ? ' · actual ' + w.winner : ''}`);
     }
     r += cell(p.doubleGroup || '–', 'none', 'dblcol gstart', `Double-points group: ${p.doubleGroup || 'none'}`);
+    r += cell(String(d.groupPts), 'none', 'gstart', `Group stage total: ${d.groupPts} pts`);
     ['r32', 'r16', 'qf', 'sf', 'final'].forEach((rd, i) => {
       const rr = d.rounds[rd];
       const correct = rr.picks.filter(x => x.status === 'correct').length;
