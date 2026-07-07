@@ -87,7 +87,7 @@ function rowHtml(nightId, idx, entry) {
     <tr class="${entry.flagged ? "flagged" : ""}" data-night="${nightId}" data-idx="${idx}">
       <td><input type="checkbox" class="row-include" ${entry.skip ? "" : "checked"}></td>
       <td><input type="checkbox" class="row-break" ${entry.isBreak ? "checked" : ""}></td>
-      <td><input type="text" class="row-names" value="${names.replace(/"/g, "&quot;")}" ${entry.isBreak ? "disabled" : ""}></td>
+      <td><input type="text" class="row-names" value="${names.replace(/"/g, "&quot;")}" autocomplete="fnl-no-suggest" autocorrect="off" autocapitalize="off" spellcheck="false" ${entry.isBreak ? "disabled" : ""}></td>
       <td><input type="number" min="1" class="row-pieces" value="${entry.pieces || 1}" style="width:60px" ${entry.isBreak ? "disabled" : ""}></td>
       <td><input type="text" class="row-time" value="${entry.explicitTime || ""}" style="width:70px" placeholder="auto"></td>
       <td class="muted">${entry.flagged ? (entry.notes || "check") : ""}</td>
@@ -102,7 +102,7 @@ function renderNight(night) {
       <div class="night-head">
         <label><input type="checkbox" class="night-include" ${night.include ? "checked" : ""}> Import this night</label>
         <label>Date: <input type="text" class="night-date" value="${night.dateIso || ""}" placeholder="YYYY-MM-DD" style="width:120px"></label>
-        <label>MC: <input type="text" class="night-mc" value="${night.mc || ""}" style="width:100px"></label>
+        <label>MC: <input type="text" class="night-mc" value="${night.mc || ""}" style="width:100px" autocomplete="fnl-no-suggest" autocorrect="off" autocapitalize="off" spellcheck="false"></label>
         <span class="muted">from column "${night.dateRaw}"</span>
         ${!night.dateValid ? '<span class="pill draft">date needs fixing</span>' : ""}
         ${flaggedCount ? `<span class="pill draft">${flaggedCount} flagged row${flaggedCount === 1 ? "" : "s"}</span>` : ""}
