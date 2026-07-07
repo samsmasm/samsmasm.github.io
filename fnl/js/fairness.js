@@ -1,4 +1,4 @@
-import { db, collection, getDocs, query, where } from "./firebase.js";
+import { db, collection, getDocs, query, where, loadPerformers } from "./firebase.js";
 
 const WINDOW_DAYS = 28;
 
@@ -12,9 +12,15 @@ export async function renderFairnessPanel(container) {
   container.innerHTML = `<p class="muted">Loading…</p>`;
   try {
     const cutoff = isoDaysAgo(WINDOW_DAYS);
-    const nightsSnap = await getDocs(query(collection(db, "nights"), where("date", ">=", cutoff)));
+    const [nightsSnap, performers] = await Promise.all([
+      getDocs(query(collection(db, "nights"), where("date", ">=", cutoff))),
+      loadPerformers()
+    ]);
+    const nameBySlug = new Map(performers.map(p => [p.slug, p.displayName]));
 
-    const counts = new Map(); // slug -> { name, count, dates: [] }
+    // Aggregate per individual person (slug), not per slot text — a duo slot
+    // credits each named performer separately.
+    const counts = new Map(); // slug -> { name, count, dates: Set }
     for (const nightDoc of nightsSnap.docs) {
       const date = nightDoc.id;
       const slotsSnap = await getDocs(collection(db, "nights", date, "slots"));
@@ -23,9 +29,9 @@ export async function renderFairnessPanel(container) {
         if (s.isBreak || !s.performerSlugs) continue;
         for (const slug of s.performerSlugs) {
           if (!slug) continue;
-          const entry = counts.get(slug) || { name: s.performerText, count: 0, dates: [] };
+          const entry = counts.get(slug) || { name: nameBySlug.get(slug) || slug, count: 0, dates: new Set() };
           entry.count++;
-          entry.dates.push(date);
+          entry.dates.add(date);
           counts.set(slug, entry);
         }
       }
@@ -38,7 +44,7 @@ export async function renderFairnessPanel(container) {
     }
     container.innerHTML = rows.map(r => `
       <div class="fairness-item">
-        <span>${r.name}<br><small class="muted">${r.dates.slice().sort().reverse().join(", ")}</small></span>
+        <span>${r.name}<br><small class="muted">${[...r.dates].sort().reverse().join(", ")}</small></span>
         <span class="fairness-count${r.count >= 3 ? " high" : ""}">${r.count}×</span>
       </div>
     `).join("");
