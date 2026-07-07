@@ -102,3 +102,28 @@ plus CSV junk fragments "M"/"Ji"/"Suzi H").
    display-only), some form of data export/backup before more real data accumulates (merges and
    deletes are permanent), and adding the admin as a Firebase project member when handing over
    ownership (Project settings → Users and permissions — no code change needed).
+
+## Possible future rework: performer-facing signup form
+
+**Not being attempted yet — noted for later, would be a major rework.** Idea: instead of the
+admin typing every name in manually, participants fill in a public form themselves (name,
+pieces, maybe early/mid/late) that writes straight into a night's slot list (as unordered
+"pending" entries); the admin then just orders/arranges what's already there rather than
+transcribing it. Would need: a public-facing form page separate from the gated admin tool
+(can't sit behind the Cloudflare password, so needs its own abuse/spam consideration — rate
+limiting, maybe a simple per-night open/closed toggle so it only accepts entries during a
+signup window), a "pending/unordered" slot state distinct from the scheduled list, and matching
+against the existing performer list so participants don't fragment their own name into a new
+duplicate (harder for a stranger to get right than it is for the admin using autocomplete).
+
+**Also needs deciding alongside this: over-capacity handling.** Right now the schedule has no
+concept of a hard end time — it will happily compute times past 10pm if enough
+performers/pieces are added. Two directions once this becomes a real problem (more relevant
+once signups are self-serve and volume is less controlled by the admin doing the typing):
+- Let it run long and give the admin an easy way to trim — surface total pieces/end time
+  prominently (already shown in the Schedule heading) and make cutting pieces or removing
+  people from the list as low-friction as possible so bringing the night back to time is a
+  quick trim pass, not a fight.
+- Or add an explicit capacity model (a target end time or max total pieces) with a warning
+  once the auto-arranged schedule would run over, leaving the actual decision of who gets cut
+  to the admin either way — this tool should never auto-reject a signup on its own.
