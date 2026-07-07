@@ -24,7 +24,6 @@ fnl/
   js/fairness.js           — "recently played" panel (trailing 4-week window)
   js/history.js            — history.html logic
   js/import-review.js      — tools/import-review.html logic
-  cloudflare-worker.js     — password-gate Worker source (see Auth below)
 ```
 
 ## Data model (Firestore)
@@ -47,14 +46,12 @@ Worker password gate is the actual access control, same trust model as `wc26/`).
 
 ## Auth
 
-Cloudflare Worker gate, same pattern as `wc26/cloudflare-worker.js`: shared password, signed
-session cookie (`fnlauth`), route `unisam.nz/fnl/*`. **The Worker itself must be created and
-deployed by hand** (Cloudflare dashboard or `wrangler`) — this repo only holds the source:
-
-1. Create a Worker, paste in `cloudflare-worker.js`.
-2. Add route `unisam.nz/fnl/*` (zone must be proxied).
-3. Set secrets `SITE_PASSWORD` and `AUTH_SECRET` (random string) via the dashboard or
-   `wrangler secret put`.
+Shared Cloudflare Worker with wc26 — source lives in `wc26/cloudflare-worker.js` (worker name
+`wc26-auth`), which handles both `/wc26/*` and `/fnl/*` sections via its `SECTIONS` map. Same
+shared password for both; per-section signed session cookie (`fnlauth`). To activate the fnl
+gate: update the deployed worker code from `wc26/cloudflare-worker.js` and add route
+`unisam.nz/fnl/*` to it in the Cloudflare dashboard (secrets `SITE_PASSWORD`/`AUTH_SECRET`
+are already set on that worker).
 
 ## Historical import
 

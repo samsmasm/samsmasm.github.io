@@ -80,7 +80,7 @@ ESPN uses non-standard names. Always go through `WC.canon()` / `WC.same()`. Know
 
 ## Auth
 
-Cloudflare Worker `wc26-auth` on route `unisam.nz/wc26/*`. Password: `dragons` (stored as Worker secret `SITE_PASSWORD`). Session cookie signed with `AUTH_SECRET`. Login prompt: "Gooooooooooo....." (answer: dragons).
+Cloudflare Worker `wc26-auth` on route `unisam.nz/wc26/*` — and it also gates `unisam.nz/fnl/*` (see the `SECTIONS` map in `cloudflare-worker.js`; per-section cookies and login branding, one shared password). Password: `dragons` (stored as Worker secret `SITE_PASSWORD`). Session cookie signed with `AUTH_SECRET`. Login prompt: "Gooooooooooo....." (answer: dragons).
 
 The old client-side gate password (`dragon`) is burned in git history — low risk, already superseded.
 

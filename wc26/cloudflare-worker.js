@@ -1,20 +1,30 @@
 /**
- * wc26 auth gate — Cloudflare Worker.
+ * Shared auth gate — Cloudflare Worker (worker name: wc26-auth).
  *
- * Route: unisam.nz/wc26/*  (zone must be proxied / orange-cloud).
+ * Routes: unisam.nz/wc26/*  AND  unisam.nz/fnl/*  (zone must be proxied / orange-cloud).
+ * One shared password for all gated sections.
  * Secrets (set via `wrangler secret` or the API, NOT in this file):
  *   SITE_PASSWORD  - the shared password people type.
  *   AUTH_SECRET    - random string used to sign the session cookie.
  *
+ * The worker derives the section ("wc26" or "fnl") from the request path, so the
+ * login POST, redirect, and cookie scope are all per-section. Cookie names are
+ * per-section too (wc26auth / fnlauth) so existing wc26 sessions keep working.
+ *
  * Once a visitor enters the right password we set a signed, HttpOnly cookie
  * and then simply pass the request through to the origin (GitHub Pages). A
  * Worker's fetch() to its own zone goes to the origin, not back through the
- * Worker, so there is no loop. Unauthenticated requests (including data.js)
- * never reach the origin — they get the login page instead.
+ * Worker, so there is no loop. Unauthenticated requests never reach the origin.
  */
 
-const COOKIE = 'wc26auth';
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+// Per-section login page branding. Add a section here + a route in Cloudflare
+// to gate another directory with the same password.
+const SECTIONS = {
+  wc26: { cookie: 'wc26auth', title: 'World Cup Predictions', badge: '2026', label: 'Gooooooooooo.....' },
+  fnl:  { cookie: 'fnlauth',  title: 'Friday Night Live Scheduler', badge: 'FNL', label: 'Password' },
+};
 
 const enc = s => new TextEncoder().encode(s);
 function b64url(bytes) {
@@ -54,10 +64,10 @@ function parseCookies(header) {
   return out;
 }
 
-function loginPage(message, status) {
+function loginPage(section, name, message, status) {
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow"><title>WC predictions</title>
+<meta name="robots" content="noindex, nofollow"><title>${section.title}</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;
@@ -76,10 +86,10 @@ button{margin-top:14px;width:100%;background:#1565d8;color:#fff;border:0;font-we
 button:hover{background:#0a3d91}
 .err{color:#c62a30;font-weight:700;font-size:13px;margin:12px 0 0}
 </style></head><body>
-<form class="card" method="POST" action="/wc26/login" autocomplete="off">
-  <div class="badge">2026</div>
-  <h2>World Cup Predictions</h2>
-  <label for="p">Gooooooooooo.....</label>
+<form class="card" method="POST" action="/${name}/login" autocomplete="off">
+  <div class="badge">${section.badge}</div>
+  <h2>${section.title}</h2>
+  <label for="p">${section.label}</label>
   <input id="p" name="password" type="password" autofocus autocomplete="off">
   <button type="submit">Enter</button>
   ${message ? `<p class="err">${message}</p>` : ''}
@@ -90,8 +100,11 @@ button:hover{background:#0a3d91}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const name = url.pathname.split('/')[1];
+    const section = SECTIONS[name];
+    if (!section) return fetch(request); // route not in our map: pass through
 
-    if (request.method === 'POST' && url.pathname === '/wc26/login') {
+    if (request.method === 'POST' && url.pathname === `/${name}/login`) {
       const form = await request.formData();
       const pw = String(form.get('password') || '');
       if (env.SITE_PASSWORD && timingEq(pw, env.SITE_PASSWORD)) {
@@ -99,18 +112,18 @@ export default {
         return new Response(null, {
           status: 303,
           headers: {
-            'Location': '/wc26/',
-            'Set-Cookie': `${COOKIE}=${cookie}; Path=/wc26; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAX_AGE}`,
+            'Location': `/${name}/`,
+            'Set-Cookie': `${section.cookie}=${cookie}; Path=/${name}; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAX_AGE}`,
           },
         });
       }
-      return loginPage('Nope, try again.', 401);
+      return loginPage(section, name, 'Nope, try again.', 401);
     }
 
     const cookies = parseCookies(request.headers.get('Cookie') || '');
-    if (await verifyCookie(cookies[COOKIE], env.AUTH_SECRET)) {
+    if (await verifyCookie(cookies[section.cookie], env.AUTH_SECRET)) {
       return fetch(request); // authenticated -> origin (GitHub Pages)
     }
-    return loginPage('', 401);
+    return loginPage(section, name, '', 401);
   },
 };
