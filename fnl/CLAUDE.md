@@ -17,14 +17,19 @@ fnl/
   index.html              — main schedule editor for "tonight"
   history.html             — read-only browse of past nights, searchable by performer
   tools/import-review.html — one-off CSV → Firestore import tool (see below)
+  tools/performers.html    — "Tidy names": list all performers, merge/rename/delete duplicates
   css/style.css            — shared styles + print stylesheet
   js/firebase.js           — Firebase init + shared Firestore helpers (slugify, upsertPerformer...)
   js/parse.js              — free-text entry parsing heuristics (names/pieces/annotations)
   js/app.js                — schedule editor: add/arrange/drag/save/print
-  js/fairness.js           — "recently played" panel (trailing 4-week window)
+  js/fairness.js           — "recently played" panel (trailing 4-week window), per-person not per-slot
   js/history.js            — history.html logic
   js/import-review.js      — tools/import-review.html logic
+  js/performers-admin.js   — tools/performers.html logic
 ```
+
+Script tags use `?v=N` cache-busting query params (GitHub Pages caches ~10 min) — bump the
+version when editing a JS file that isn't picking up live.
 
 ## Data model (Firestore)
 
@@ -36,6 +41,10 @@ Times are derived from `startTime` + cumulative `minutes` (pieces × 5, or a bre
 length). A slot with `timeMode: 'manual'` pins the clock to its `manualTime` (set by editing
 the time inline; shown locked 🔒 in the UI) and later auto slots flow on from it; unlocking
 returns the slot to the auto flow. Editing a time also repositions the card chronologically.
+
+Duo/group entries in the add form ("Roy & Joop", also `/`, `+`, `,`, "and") become one shared
+slot with `performerSlugs` containing each person individually — each gets their own fairness
+credit, autocomplete completes whichever name segment is currently being typed.
 
 ## Firebase project
 
@@ -66,3 +75,30 @@ named performer gets one "appearance" credited that night for fairness tracking.
 
 Re-run the tool any time there's another batch of historical data to backfill — it's additive
 (uses `setDoc` with merge on the night doc, replaces that night's slots wholesale).
+
+## Current status (2026-07-07)
+
+Feature-complete and verified end-to-end against the live `fnl-scheduler` Firestore project:
+add/auto-arrange/drag-reorder/piece-steppers/manual time pinning/print/save/load, history
+browse, fairness panel, historical CSV import, and the Tidy names merge/rename/delete tool.
+Real historical data has been imported and the obvious duplicate performer names cleaned up
+(109 → 78 records); some ambiguous ones deliberately left for the admin to resolve (bare
+"Steve"/"Chris"/"David"/"Richard"/"Tom"/"Ian"/"Jim"/"Brian", "Alan" vs "Alan Forsyth", "Bryan",
+plus CSV junk fragments "M"/"Ji"/"Suzi H").
+
+**Not yet done — next steps:**
+
+1. **Deploy the Cloudflare Worker gate.** This is the one real blocker before sharing the URL
+   widely: until the `unisam.nz/fnl/*` route is added to the `wc26-auth` worker (source already
+   updated in `wc26/cloudflare-worker.js`), the site and the wide-open Firestore rules are
+   reachable by anyone with the link. Steps are in the Auth section above.
+2. Real print test on the actual printer, and a run-through on whatever device the admin uses
+   at the venue (phone/tablet touch-drag hasn't been tested outside the preview browser).
+3. Recommend running it alongside the spreadsheet for the first week or two rather than a cold
+   switch.
+4. Finish the ambiguous performer-name merges above, ideally with the admin present since they
+   know who's who.
+5. Nice-to-haves, not blockers: a draft→final toggle for the status pill (currently
+   display-only), some form of data export/backup before more real data accumulates (merges and
+   deletes are permanent), and adding the admin as a Firebase project member when handing over
+   ownership (Project settings → Users and permissions — no code change needed).
