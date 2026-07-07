@@ -143,12 +143,16 @@ function buildResults(events, standings, ov) {
   for (const m of parsed) {
     const rd = classifyRound(m.note);
     if (!rd) continue;
-    if (rd === 'third') { if (m.completed) thirdWinner = m.hs > m.as ? m.home : m.away; continue; }
+    // Knockout games decided on penalties finish level in regulation (hs === as),
+    // so the winner must come from ESPN's own winner flag, not a score compare —
+    // that flag is set correctly on shootouts. Fall back to hs/as for safety.
+    const winnerTeam = m.hw ? m.home : m.aw ? m.away : (m.hs > m.as ? m.home : m.hs < m.as ? m.away : null);
+    if (rd === 'third') { if (m.completed && winnerTeam) thirdWinner = winnerTeam; continue; }
     if (!isPlaceholderTeam(m.home)) rounds[rd].add(canon(m.home));
     if (!isPlaceholderTeam(m.away)) rounds[rd].add(canon(m.away));
-    if (rd === 'final' && m.completed) champion = m.hs > m.as ? m.home : m.away;
-    if (m.completed && !isPlaceholderTeam(m.home) && !isPlaceholderTeam(m.away) && m.hs !== m.as) {
-      eliminated.add(canon(m.hs > m.as ? m.away : m.home));
+    if (rd === 'final' && m.completed && winnerTeam) champion = winnerTeam;
+    if (m.completed && !isPlaceholderTeam(m.home) && !isPlaceholderTeam(m.away) && winnerTeam) {
+      eliminated.add(canon(winnerTeam === m.home ? m.away : m.home));
     }
   }
   // Overrides for rounds / champion / third place.

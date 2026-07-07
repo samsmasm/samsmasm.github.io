@@ -42,8 +42,8 @@
       note: c.altGameNote || '',
       state: st && st.state,           // pre | in | post
       completed: !!(st && st.completed),
-      home: home.team.displayName, hs: parseInt(home.score, 10),
-      away: away.team.displayName, as: parseInt(away.score, 10),
+      home: home.team.displayName, hs: parseInt(home.score, 10), hw: !!home.winner,
+      away: away.team.displayName, as: parseInt(away.score, 10), aw: !!away.winner,
     };
   }
 
