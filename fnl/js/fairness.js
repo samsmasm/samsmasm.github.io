@@ -1,4 +1,4 @@
-import { db, collection, getDocs, query, where, loadPerformers } from "./firebase.js";
+import { db, collection, getDocs, query, where, loadPerformers } from "./firebase.js?v=2";
 
 const WINDOW_DAYS = 28;
 

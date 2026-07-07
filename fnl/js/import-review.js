@@ -1,6 +1,6 @@
 import {
   db, doc, collection, setDoc, writeBatch, serverTimestamp, slugify, upsertPerformer
-} from "./firebase.js";
+} from "./firebase.js?v=2";
 import { parseEntry, minutesToTime, timeToMinutes } from "./parse.js";
 
 const $ = (id) => document.getElementById(id);

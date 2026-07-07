@@ -1,4 +1,4 @@
-import { db, collection, getDocs, query, orderBy } from "./firebase.js";
+import { db, collection, getDocs, query, orderBy } from "./firebase.js?v=2";
 
 const $ = (id) => document.getElementById(id);
 let nights = []; // [{date, mc, status, slots: [...]}]

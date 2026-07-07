@@ -46,6 +46,35 @@ Duo/group entries in the add form ("Roy & Joop", also `/`, `+`, `,`, "and") beco
 slot with `performerSlugs` containing each person individually — each gets their own fairness
 credit, autocomplete completes whichever name segment is currently being typed.
 
+## Loading, saving, and multi-computer use
+
+The users are elderly and not confident with computers, so `index.html` deliberately has no
+Save/Load buttons for daily use:
+
+- **Auto-loads the upcoming Friday** on open (`defaultNextFriday()` in `js/app.js` — computes
+  the local date string manually rather than via `toISOString()`, which converts to UTC first
+  and rolls back a day in timezones ahead of UTC like NZ). The date/heading is shown as plain
+  text ("Friday 10 July"); the raw date picker + a "Switch" button are tucked behind a
+  "Different night?" toggle for the rare case of planning ahead or fixing an older week.
+- **Autosaves** ~1.2s after any change (add/remove/reorder/pieces/time edits/MC/start time),
+  with a plain-language status line (`#saveStatus`): "Saving…" / "✓ All changes saved" /
+  "⚠️ Save failed". No explicit save step to forget.
+- **Live change detection across computers**: each browser tab has a random `sessionId`
+  (`js/firebase.js`, stored in sessionStorage) written as `updatedBySession` on every save. An
+  `onSnapshot` listener on the current night doc (`subscribeToNight` in `js/app.js`) shows a
+  "this was just changed on another computer — Reload now" banner when a *different* session's
+  write lands, while ignoring the snapshot echo of the tab's own pending write
+  (`snap.metadata.hasPendingWrites`). This is a warning only, not a live merge — reloading is
+  the recovery path, intentionally simple rather than trying to reconcile two edited slot lists
+  (there is no real-time collaborative merge of the schedule itself, by design: reordering a
+  card while someone else is dragging it would be far worse than an occasional warning banner).
+
+## History.js pill / `status` field
+
+`nights.status` (`draft`/`final`) is still written on every save but has no UI control anymore
+— it's a leftover from before autosave replaced the explicit save/pill toolbar. `history.html`
+still displays it. Harmless as-is; revisit if a real draft→final concept is wanted later.
+
 ## Firebase project
 
 Dedicated project `fnl-scheduler` (config in `js/firebase.js`). To hand ownership to the FNL
@@ -98,10 +127,10 @@ plus CSV junk fragments "M"/"Ji"/"Suzi H").
    switch.
 4. Finish the ambiguous performer-name merges above, ideally with the admin present since they
    know who's who.
-5. Nice-to-haves, not blockers: a draft→final toggle for the status pill (currently
-   display-only), some form of data export/backup before more real data accumulates (merges and
-   deletes are permanent), and adding the admin as a Firebase project member when handing over
-   ownership (Project settings → Users and permissions — no code change needed).
+5. Nice-to-haves, not blockers: some form of data export/backup before more real data
+   accumulates (merges and deletes are permanent), and adding the admin as a Firebase project
+   member when handing over ownership (Project settings → Users and permissions — no code
+   change needed).
 
 ## Possible future rework: performer-facing signup form
 

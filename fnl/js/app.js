@@ -1,16 +1,17 @@
 import {
-  db, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch,
-  serverTimestamp, slugify, upsertPerformer, loadPerformers
-} from "./firebase.js";
+  db, collection, doc, getDoc, getDocs, setDoc, writeBatch,
+  serverTimestamp, slugify, upsertPerformer, loadPerformers, onSnapshot, sessionId
+} from "./firebase.js?v=2";
 import { timeToMinutes, minutesToTime } from "./parse.js";
-import { renderFairnessPanel } from "./fairness.js";
+import { renderFairnessPanel } from "./fairness.js?v=2";
 
 const PIECE_MINUTES = 5;
 const BREAK_MINUTES = 15;
+const AUTOSAVE_DELAY_MS = 1200;
 
 let performers = [];       // [{slug, displayName}]
 let slots = [];            // working schedule state
-let nightDate = null;
+let currentDate = null;    // the night currently loaded/subscribed to
 let nightStatus = "draft";
 let nextSlotId = 1;
 
@@ -21,7 +22,18 @@ function defaultNextFriday() {
   const day = d.getDay();
   const add = (5 - day + 7) % 7 || 7;
   d.setDate(d.getDate() + add);
-  return d.toISOString().slice(0, 10);
+  // build the local date string directly — toISOString() converts to UTC first,
+  // which rolls back a day in timezones ahead of UTC (e.g. NZ, UTC+12/+13)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day2 = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day2}`;
+}
+
+function formatNightHeading(dateStr) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
+    weekday: "long", day: "numeric", month: "long"
+  });
 }
 
 // ---------- rendering ----------
@@ -112,6 +124,7 @@ $("scheduleList").addEventListener("click", (e) => {
     slot.manualTime = null;
   }
   renderSchedule();
+  scheduleAutosave();
 });
 
 $("scheduleList").addEventListener("change", (e) => {
@@ -129,6 +142,7 @@ $("scheduleList").addEventListener("change", (e) => {
   slot.timeMode = "manual";
   autoPlaceByTime(slot);
   renderSchedule();
+  scheduleAutosave();
 });
 
 new Sortable($("scheduleList"), {
@@ -138,6 +152,7 @@ new Sortable($("scheduleList"), {
     const ids = [...$("scheduleList").children].map(li => Number(li.dataset.id));
     slots.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
     renderSchedule();
+    scheduleAutosave();
   }
 });
 
@@ -201,11 +216,13 @@ $("addBtn").addEventListener("click", () => {
   piecesVal = 1;
   $("piecesVal").textContent = "1";
   renderSchedule();
+  scheduleAutosave();
 });
 
 $("addBreakBtn").addEventListener("click", () => {
   slots.push({ id: nextSlotId++, isBreak: true, minutes: BREAK_MINUTES, names: [] });
   renderSchedule();
+  scheduleAutosave();
 });
 
 // ---------- auto-arrange ----------
@@ -230,6 +247,7 @@ $("autoArrangeBtn").addEventListener("click", () => {
   }
   slots = ordered;
   renderSchedule();
+  scheduleAutosave();
 });
 
 // ---------- save / load ----------
@@ -251,17 +269,40 @@ function slotToDoc(s, i) {
   };
 }
 
-$("saveBtn").addEventListener("click", async () => {
-  const date = $("nightDate").value;
-  if (!date) { alert("Pick a date first."); return; }
+// ---------- autosave ----------
+
+let saveTimer = null;
+let saveInFlight = false;
+let dirtyDuringSave = false;
+
+function setSaveStatus(state) {
+  const el = $("saveStatus");
+  el.className = "save-status " + state;
+  el.textContent = state === "saving" ? "Saving…"
+    : state === "error" ? "⚠️ Save failed — check your connection"
+    : "✓ All changes saved";
+}
+
+function scheduleAutosave() {
+  if (!currentDate) return;
+  setSaveStatus("saving");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNight, AUTOSAVE_DELAY_MS);
+}
+
+async function saveNight() {
+  if (saveInFlight) { dirtyDuringSave = true; return; }
+  const date = currentDate;
+  if (!date) return;
+  saveInFlight = true;
   recomputeTimes();
-  $("saveBtn").disabled = true;
   try {
     await setDoc(doc(db, "nights", date), {
       date,
       mc: $("mcName").value.trim(),
       startTime: $("startTime").value || "19:00",
       status: nightStatus,
+      updatedBySession: sessionId,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
@@ -278,17 +319,64 @@ $("saveBtn").addEventListener("click", async () => {
       for (const n of (s.names || [])) await upsertPerformer(n);
     }
     performers = await loadPerformers();
-    nightDate = date;
-    alert("Saved.");
+    setSaveStatus("saved");
   } catch (err) {
     console.error(err);
-    alert("Save failed — see console.");
+    setSaveStatus("error");
   } finally {
-    $("saveBtn").disabled = false;
+    saveInFlight = false;
+    if (dirtyDuringSave) {
+      dirtyDuringSave = false;
+      scheduleAutosave();
+    }
   }
+}
+
+// ---------- load / switch night ----------
+
+let unsubscribeNight = null;
+let sawInitialSnapshot = false;
+
+function subscribeToNight(date) {
+  if (unsubscribeNight) unsubscribeNight();
+  sawInitialSnapshot = false;
+  $("remoteChangeBanner").hidden = true;
+  unsubscribeNight = onSnapshot(doc(db, "nights", date), (snap) => {
+    // skip the snapshot that just reflects what we loaded/are loading
+    if (!sawInitialSnapshot) { sawInitialSnapshot = true; return; }
+    // skip our own optimistic write echoing back before server confirmation
+    if (snap.metadata.hasPendingWrites) return;
+    const data = snap.data();
+    if (data && data.updatedBySession && data.updatedBySession !== sessionId) {
+      $("remoteChangeBanner").hidden = false;
+    }
+  });
+}
+
+$("reloadBannerBtn").addEventListener("click", () => window.location.reload());
+
+$("differentNightToggle").addEventListener("click", () => {
+  const panel = $("differentNightPanel");
+  panel.hidden = !panel.hidden;
+  $("differentNightToggle").textContent = panel.hidden ? "Different night?" : "Hide";
 });
 
-$("loadNightBtn").addEventListener("click", () => loadNight($("nightDate").value));
+$("loadNightBtn").addEventListener("click", async () => {
+  const date = $("nightDate").value;
+  if (!date) return;
+  await switchNight(date);
+  $("differentNightPanel").hidden = true;
+  $("differentNightToggle").textContent = "Different night?";
+});
+
+async function switchNight(date) {
+  clearTimeout(saveTimer);
+  await loadNight(date);
+  currentDate = date;
+  $("nightHeading").textContent = formatNightHeading(date);
+  setSaveStatus("saved");
+  subscribeToNight(date);
+}
 
 async function loadNight(date) {
   if (!date) return;
@@ -296,7 +384,6 @@ async function loadNight(date) {
   if (!nightSnap.exists()) {
     slots = [];
     nightStatus = "draft";
-    $("statusPill").textContent = "draft";
     renderSchedule();
     return;
   }
@@ -304,8 +391,6 @@ async function loadNight(date) {
   $("mcName").value = data.mc || "";
   $("startTime").value = data.startTime || "19:00";
   nightStatus = data.status || "draft";
-  $("statusPill").textContent = nightStatus;
-  $("statusPill").className = "pill " + nightStatus;
 
   const slotsSnap = await getDocs(collection(db, "nights", date, "slots"));
   slots = slotsSnap.docs
@@ -326,11 +411,14 @@ async function loadNight(date) {
   renderSchedule();
 }
 
+$("mcName").addEventListener("input", scheduleAutosave);
+$("startTime").addEventListener("input", () => { renderSchedule(); scheduleAutosave(); });
+
 // ---------- print ----------
 
 $("printBtn").addEventListener("click", () => {
-  $("printDate").textContent = $("nightDate").value
-    ? new Date($("nightDate").value + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+  $("printDate").textContent = currentDate
+    ? new Date(currentDate + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })
     : "";
   $("printMc").textContent = $("mcName").value ? `MC: ${$("mcName").value}` : "";
   window.print();
@@ -353,9 +441,10 @@ if (localStorage.getItem("fnl_fairness_hidden") === "1") {
 // ---------- init ----------
 
 (async function init() {
-  $("nightDate").value = defaultNextFriday();
+  const today = defaultNextFriday();
+  $("nightDate").value = today;
   performers = await loadPerformers();
   renderSchedule();
-  await loadNight($("nightDate").value);
+  await switchNight(today);
   renderFairnessPanel($("fairnessList"));
 })();

@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
   initializeFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, serverTimestamp, writeBatch
+  query, where, orderBy, serverTimestamp, writeBatch, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -21,8 +21,20 @@ export const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: 
 
 export {
   collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, serverTimestamp, writeBatch
+  query, where, orderBy, serverTimestamp, writeBatch, onSnapshot
 };
+
+// One random id per browser tab — lets us tell "my own save echoing back"
+// apart from "someone else changed this on another computer."
+const SESSION_KEY = "fnl_session_id";
+export const sessionId = (() => {
+  let id = sessionStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
+})();
 
 export function slugify(name) {
   return String(name || "")

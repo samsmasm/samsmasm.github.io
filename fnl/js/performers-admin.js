@@ -1,7 +1,7 @@
 import {
   db, collection, doc, getDocs, setDoc, deleteDoc, writeBatch,
   serverTimestamp, slugify, loadPerformers
-} from "./firebase.js";
+} from "./firebase.js?v=2";
 
 const $ = (id) => document.getElementById(id);
 
