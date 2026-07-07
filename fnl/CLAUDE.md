@@ -33,7 +33,9 @@ fnl/
   - `nights/{date}/slots/{order}` — `{ order, isBreak, performerText, performerSlugs[], pieces, minutes, computedTime, flagged, raw, notes }`
 
 Times are derived from `startTime` + cumulative `minutes` (pieces × 5, or a break's fixed
-length) unless a slot has an explicit `computedTime` from historical import data.
+length). A slot with `timeMode: 'manual'` pins the clock to its `manualTime` (set by editing
+the time inline; shown locked 🔒 in the UI) and later auto slots flow on from it; unlocking
+returns the slot to the auto flow. Editing a time also repositions the card chronologically.
 
 ## Firebase project
 

@@ -29,9 +29,21 @@ function defaultNextFriday() {
 function recomputeTimes() {
   let mins = timeToMinutes($("startTime").value || "19:00");
   for (const s of slots) {
+    // a manual-time slot pins the clock; auto slots flow on from wherever it left off
+    if (s.timeMode === "manual" && s.manualTime) mins = timeToMinutes(s.manualTime);
     s.computedTime = minutesToTime(mins);
     mins += s.isBreak ? (s.minutes || BREAK_MINUTES) : (s.pieces || 1) * PIECE_MINUTES;
   }
+}
+
+// Move a slot to its chronological position after its time was manually set.
+function autoPlaceByTime(slot) {
+  slots = slots.filter(s => s.id !== slot.id);
+  recomputeTimes();
+  const t = timeToMinutes(slot.manualTime);
+  let idx = slots.findIndex(s => timeToMinutes(s.computedTime) > t);
+  if (idx === -1) idx = slots.length;
+  slots.splice(idx, 0, slot);
 }
 
 function renderSchedule() {
@@ -46,10 +58,17 @@ function renderSchedule() {
     li.className = "slot" + (s.isBreak ? " break-row" : "") + (s.flagged ? " flagged" : "");
     li.dataset.id = s.id;
 
+    const manual = s.timeMode === "manual";
+    const timeCell = `
+      <span class="time${manual ? " manual" : ""}">
+        <input type="text" class="time-input" value="${s.computedTime}" size="5">
+        ${manual ? `<button type="button" class="lock-btn no-print" data-action="unlock" title="Locked to ${s.manualTime} — click to return to auto">🔒</button>` : ""}
+      </span>`;
+
     if (s.isBreak) {
       li.innerHTML = `
         <span class="handle no-print">⠿</span>
-        <span class="time">${s.computedTime}</span>
+        ${timeCell}
         <span class="name">Break<small>${s.minutes} min</small></span>
         <span class="actions no-print">
           <button type="button" class="remove-btn" data-action="remove">✕</button>
@@ -59,7 +78,7 @@ function renderSchedule() {
       const names = s.names.join(" & ") || "(unnamed)";
       li.innerHTML = `
         <span class="handle no-print">⠿</span>
-        <span class="time">${s.computedTime}</span>
+        ${timeCell}
         <span class="name">${names}<small>${s.pieces} piece${s.pieces === 1 ? "" : "s"}${s.notes ? " — " + s.notes : ""}</small></span>
         <span class="actions no-print">
           <span class="stepper">
@@ -88,7 +107,27 @@ $("scheduleList").addEventListener("click", (e) => {
     slot.pieces++;
   } else if (btn.dataset.action === "dec") {
     slot.pieces = Math.max(1, slot.pieces - 1);
+  } else if (btn.dataset.action === "unlock") {
+    slot.timeMode = "auto";
+    slot.manualTime = null;
   }
+  renderSchedule();
+});
+
+$("scheduleList").addEventListener("change", (e) => {
+  const input = e.target.closest("input.time-input");
+  if (!input) return;
+  const li = input.closest("li.slot");
+  const slot = slots.find(s => s.id === Number(li.dataset.id));
+  if (!slot) return;
+  const m = input.value.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!m || +m[1] > 23 || +m[2] > 59) {
+    renderSchedule(); // invalid — revert to computed time
+    return;
+  }
+  slot.manualTime = `${m[1].padStart(2, "0")}:${m[2]}`;
+  slot.timeMode = "manual";
+  autoPlaceByTime(slot);
   renderSchedule();
 });
 
@@ -186,6 +225,8 @@ function slotToDoc(s, i) {
     pieces: s.isBreak ? null : (s.pieces || 1),
     minutes: s.isBreak ? (s.minutes || BREAK_MINUTES) : (s.pieces || 1) * PIECE_MINUTES,
     computedTime: s.computedTime || null,
+    timeMode: s.timeMode === "manual" ? "manual" : "auto",
+    manualTime: s.timeMode === "manual" ? (s.manualTime || null) : null,
     flagged: !!s.flagged,
     raw: s.raw || null,
     notes: s.notes || ""
@@ -258,6 +299,8 @@ async function loadNight(date) {
       names: d.performerText ? d.performerText.split(" & ") : [],
       pieces: d.pieces || 1,
       minutes: d.minutes,
+      timeMode: d.timeMode === "manual" ? "manual" : "auto",
+      manualTime: d.timeMode === "manual" ? d.manualTime : null,
       flagged: d.flagged,
       raw: d.raw,
       notes: d.notes || ""
