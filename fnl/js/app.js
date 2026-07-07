@@ -147,10 +147,26 @@ let piecesVal = 1;
 $("piecesPlus").addEventListener("click", () => { piecesVal++; $("piecesVal").textContent = piecesVal; });
 $("piecesMinus").addEventListener("click", () => { piecesVal = Math.max(1, piecesVal - 1); $("piecesVal").textContent = piecesVal; });
 
+// Duo/group entry: "Roy & Joop", "Roy / Joop", "Roy + Joop" — each person is
+// stored individually on one shared slot.
+const NAME_SEP = /\s*(?:&|\/|,|\+|\band\b)\s*/i;
+const splitEntryNames = (text) => text.split(NAME_SEP).map(n => n.trim()).filter(Boolean);
+
 const nameInput = $("nameInput");
 const acList = $("autocompleteList");
+
+// autocomplete only the segment currently being typed (after the last separator)
+function currentSegment() {
+  const val = nameInput.value;
+  let idx = -1, m;
+  const re = new RegExp(NAME_SEP.source, "gi");
+  while ((m = re.exec(val)) !== null) idx = m.index + m[0].length;
+  return { prefix: val.slice(0, idx + 1 > 0 ? idx : 0), segment: val.slice(idx + 1 > 0 ? idx : 0) };
+}
+
 nameInput.addEventListener("input", () => {
-  const q = nameInput.value.trim().toLowerCase();
+  const { segment } = currentSegment();
+  const q = segment.trim().toLowerCase();
   if (!q) { acList.hidden = true; return; }
   const matches = performers.filter(p => p.displayName.toLowerCase().includes(q)).slice(0, 8);
   if (!matches.length) { acList.hidden = true; return; }
@@ -160,8 +176,10 @@ nameInput.addEventListener("input", () => {
 acList.addEventListener("click", (e) => {
   const div = e.target.closest("div[data-name]");
   if (!div) return;
-  nameInput.value = div.dataset.name;
+  const { prefix } = currentSegment();
+  nameInput.value = prefix + div.dataset.name;
   acList.hidden = true;
+  nameInput.focus();
 });
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".autocomplete-wrap")) acList.hidden = true;
@@ -173,7 +191,7 @@ $("addBtn").addEventListener("click", () => {
   slots.push({
     id: nextSlotId++,
     isBreak: false,
-    names: [name],
+    names: splitEntryNames(name),
     pieces: piecesVal,
     pref: $("slotPref").value,
     flagged: false,
