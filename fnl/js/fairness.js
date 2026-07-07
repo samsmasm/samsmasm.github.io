@@ -44,7 +44,7 @@ export async function renderFairnessPanel(container) {
     }
     container.innerHTML = rows.map(r => `
       <div class="fairness-item">
-        <span>${r.name}<br><small class="muted">${[...r.dates].sort().reverse().join(", ")}</small></span>
+        <span>${r.name}<br><small class="muted">${[...r.dates].sort().reverse().map(d => d.slice(5)).join(", ")}</small></span>
         <span class="fairness-count${r.count >= 3 ? " high" : ""}">${r.count}×</span>
       </div>
     `).join("");

@@ -56,7 +56,11 @@ function render() {
       <td>${r.count}</td>
       <td>${r.first}</td>
       <td>${r.last}</td>
-    </tr>`).join("") || `<tr><td colspan="5" class="muted">No matches.</td></tr>`;
+      <td>
+        <button type="button" class="secondary" data-rename="${r.slug}" title="Rename everywhere">✎</button>
+        <button type="button" class="remove-btn" data-delete="${r.slug}" title="Delete performer">✕</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="6" class="muted">No matches.</td></tr>`;
   updateBar();
 }
 
@@ -78,61 +82,93 @@ $("performerRows").addEventListener("change", (e) => {
 $("filterInput").addEventListener("input", render);
 $("canonicalName").addEventListener("input", updateBar);
 
-$("mergeBtn").addEventListener("click", async () => {
-  const canonicalName = $("canonicalName").value.trim();
-  const canonSlug = slugify(canonicalName);
-  if (!canonSlug || !selected.size) return;
-
-  const mergeSlugs = new Set(selected);
+// Rewrite every slot referencing any of `slugs`: replaced by canonSlug, or removed
+// entirely when canonSlug is null (delete). Slots left with no performers are deleted.
+async function rewriteSlots(slugs, canonSlug, canonicalName, status) {
+  const mergeSlugs = new Set(slugs);
   const affected = allSlots.filter(s => s.data.performerSlugs.some(slug => mergeSlugs.has(slug)));
-  const oldNames = [...mergeSlugs].map(s => nameBySlug.get(s) || s).join(", ");
-  if (!confirm(`Merge ${oldNames} → "${canonicalName}"?\nThis rewrites ${affected.length} schedule slot(s) and cannot be undone.`)) return;
+  if (canonSlug) nameBySlug.set(canonSlug, canonicalName);
 
-  $("mergeBtn").disabled = true;
-  const status = $("mergeStatus");
-  status.textContent = "Merging…";
-  try {
-    // update the name lookup first so rewritten slot text uses the new name
-    nameBySlug.set(canonSlug, canonicalName);
-
-    // Firestore batches max out at 500 ops — chunk the slot rewrites
-    for (let i = 0; i < affected.length; i += 400) {
-      const batch = writeBatch(db);
-      for (const s of affected.slice(i, i + 400)) {
-        const newSlugs = [];
-        for (const slug of s.data.performerSlugs) {
-          const mapped = mergeSlugs.has(slug) ? canonSlug : slug;
-          if (!newSlugs.includes(mapped)) newSlugs.push(mapped);
-        }
+  // Firestore batches max out at 500 ops — chunk the slot rewrites
+  for (let i = 0; i < affected.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const s of affected.slice(i, i + 400)) {
+      const newSlugs = [];
+      for (const slug of s.data.performerSlugs) {
+        const mapped = mergeSlugs.has(slug) ? canonSlug : slug;
+        if (mapped && !newSlugs.includes(mapped)) newSlugs.push(mapped);
+      }
+      const ref = doc(db, "nights", s.nightId, "slots", s.slotId);
+      if (!newSlugs.length) {
+        batch.delete(ref);
+      } else {
         const newText = newSlugs.map(slug => nameBySlug.get(slug) || slug).join(" & ");
-        batch.update(doc(db, "nights", s.nightId, "slots", s.slotId), {
-          performerSlugs: newSlugs,
-          performerText: newText
-        });
+        batch.update(ref, { performerSlugs: newSlugs, performerText: newText });
         s.data.performerSlugs = newSlugs;
         s.data.performerText = newText;
       }
-      await batch.commit();
-      status.textContent = `Merging… ${Math.min(i + 400, affected.length)}/${affected.length} slots`;
     }
+    await batch.commit();
+    status.textContent = `Rewriting… ${Math.min(i + 400, affected.length)}/${affected.length} slots`;
+  }
 
+  if (canonSlug) {
     await setDoc(doc(db, "performers", canonSlug), {
       displayName: canonicalName, createdAt: serverTimestamp()
     }, { merge: true });
-    for (const slug of mergeSlugs) {
-      if (slug !== canonSlug) await deleteDoc(doc(db, "performers", slug));
-    }
+  }
+  for (const slug of mergeSlugs) {
+    if (slug !== canonSlug) await deleteDoc(doc(db, "performers", slug));
+  }
+  return affected.length;
+}
 
-    status.textContent = `Done — ${affected.length} slot(s) rewritten to "${canonicalName}".`;
+async function runRewrite(slugs, canonSlug, canonicalName, doneMsg) {
+  const status = $("mergeStatus");
+  $("mergeBtn").disabled = true;
+  try {
+    const n = await rewriteSlots(slugs, canonSlug, canonicalName, status);
+    status.textContent = doneMsg(n);
     selected.clear();
     $("canonicalName").value = "";
     await loadAll();
     render();
   } catch (err) {
     console.error(err);
-    status.textContent = "Merge failed — see console.";
+    status.textContent = "Update failed — see console.";
   } finally {
     $("mergeBtn").disabled = false;
+  }
+}
+
+$("mergeBtn").addEventListener("click", () => {
+  const canonicalName = $("canonicalName").value.trim();
+  const canonSlug = slugify(canonicalName);
+  if (!canonSlug || !selected.size) return;
+  const affected = allSlots.filter(s => s.data.performerSlugs.some(slug => selected.has(slug)));
+  const oldNames = [...selected].map(s => nameBySlug.get(s) || s).join(", ");
+  if (!confirm(`Merge ${oldNames} → "${canonicalName}"?\nThis rewrites ${affected.length} schedule slot(s) and cannot be undone.`)) return;
+  runRewrite([...selected], canonSlug, canonicalName,
+    n => `Done — ${n} slot(s) rewritten to "${canonicalName}".`);
+});
+
+$("performerRows").addEventListener("click", (e) => {
+  const renameBtn = e.target.closest("button[data-rename]");
+  const deleteBtn = e.target.closest("button[data-delete]");
+  if (renameBtn) {
+    const slug = renameBtn.dataset.rename;
+    const oldName = nameBySlug.get(slug) || slug;
+    const newName = prompt(`Rename "${oldName}" everywhere to:`, oldName);
+    if (!newName || !newName.trim() || newName.trim() === oldName) return;
+    runRewrite([slug], slugify(newName.trim()), newName.trim(),
+      n => `Done — renamed to "${newName.trim()}" in ${n} slot(s).`);
+  } else if (deleteBtn) {
+    const slug = deleteBtn.dataset.delete;
+    const name = nameBySlug.get(slug) || slug;
+    const affected = allSlots.filter(s => s.data.performerSlugs.includes(slug));
+    if (!confirm(`Delete "${name}"?\nThey'll be removed from ${affected.length} schedule slot(s); slots with nobody left are deleted. This cannot be undone.`)) return;
+    runRewrite([slug], null, null,
+      n => `Done — "${name}" removed from ${n} slot(s).`);
   }
 });
 
