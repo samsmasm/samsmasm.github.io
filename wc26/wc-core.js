@@ -127,6 +127,17 @@
         if (w) WIN.set(pairKey(xn, yn), canon(w));
       }
     }
+    // Resolve both sides of a t1/t2 pair, filling a 3rd-place slot from its
+    // known Round-of-32 opponent when the other side is already known. Shared
+    // by resolveFixture (top-level) and resolveSlot (recursing into a W\d+
+    // feeder game), so a 3rd-place team on either side of a feeder game
+    // resolves the same way no matter how deep in the bracket it's needed.
+    function resolvePair(t1, t2, depth) {
+      let a = resolveSlot(t1, depth), b = resolveSlot(t2, depth);
+      if (a && !b && /^3/.test(t2)) { const o = OPP.get(canon(a)); if (o && !isPlaceholderTeam(o)) b = o; }
+      if (b && !a && /^3/.test(t1)) { const o = OPP.get(canon(b)); if (o && !isPlaceholderTeam(o)) a = o; }
+      return [a, b];
+    }
     function resolveSlot(code, depth) {
       if (!isSlot(code)) return code;        // already a real team (group stage)
       if (POS[code]) return POS[code];
@@ -134,18 +145,15 @@
       if (w && depth < 6) {
         const row = schedule.find(r => r.no === +w[1]);
         if (!row) return null;
-        const a = resolveSlot(row.t1, depth + 1), b = resolveSlot(row.t2, depth + 1);
+        const [a, b] = resolvePair(row.t1, row.t2, depth + 1);
         if (!a || !b) return null;
         const wc = WIN.get(pairKey(a, b));
         return wc ? (canon(a) === wc ? a : b) : null;
       }
-      return null;                            // 3rd-place slots filled via sibling below
+      return null;                            // 3rd-place slots filled via resolvePair above
     }
     function resolveFixture(m) {
-      let a = resolveSlot(m.t1, 0), b = resolveSlot(m.t2, 0);
-      if (a && !b && /^3/.test(m.t2)) { const o = OPP.get(canon(a)); if (o && !isPlaceholderTeam(o)) b = o; }
-      if (b && !a && /^3/.test(m.t1)) { const o = OPP.get(canon(b)); if (o && !isPlaceholderTeam(o)) a = o; }
-      return [a, b];
+      return resolvePair(m.t1, m.t2, 0);
     }
     return { resolveSlot, resolveFixture };
   }
