@@ -219,8 +219,18 @@ body.wild-mode .route-only{display:none}
       </div>
       <div class="sect">
         <label>Options</label>
-        <label class="chk"><input type="checkbox" id="w-paths"> Count paths &amp; tracks as roads</label>
+        <label class="chk"><input type="checkbox" id="w-lakes" checked> Ignore lakes &amp; rivers (sea always ignored)</label>
+        <label class="chk" style="margin-top:6px"><input type="checkbox" id="w-service"> Count driveways &amp; service roads</label>
+        <label class="chk" style="margin-top:6px"><input type="checkbox" id="w-paths"> Count paths &amp; tracks as roads</label>
         <label class="chk" style="margin-top:6px"><input type="checkbox" id="w-heat" checked> Show distance heatmap</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="font-size:12px;color:var(--dim);white-space:nowrap">Heatmap colour</span>
+          <select id="w-heatcol" style="flex:1;width:auto;padding:5px 8px;font-size:12px">
+            <option value="green">Forest green</option>
+            <option value="blue">Deep blue</option>
+            <option value="ember">Ember red</option>
+          </select>
+        </div>
       </div>
       <button id="wild-run" disabled>Find the wild spot</button>
       <div style="height:12px"></div>
@@ -258,6 +268,16 @@ body.wild-mode .route-only{display:none}
         “Roads” means drivable ways — tick the option to also count paths, tracks and footways.
       </div>
     </div>
+
+    <div class="sect" style="border-top:1px solid var(--border);border-bottom:none;margin-top:auto">
+      <label>Map style</label>
+      <select id="basemap">
+        <option value="light">Light (Carto)</option>
+        <option value="voyager">Voyager (Carto)</option>
+        <option value="osm">Classic OSM</option>
+        <option value="dark">Dark (Carto)</option>
+      </select>
+    </div>
   </div>
 
   <div id="map-wrap">
@@ -293,11 +313,29 @@ const NICE = {
   track:9,cycleway:9,footway:10,path:10
 };
 
+// ── Preferences (persisted across visits) ──────────────────────────────────
+let prefs={};
+try{prefs=JSON.parse(localStorage.getItem('longcut-prefs'))||{};}catch(e){}
+function savePref(k,v){prefs[k]=v;try{localStorage.setItem('longcut-prefs',JSON.stringify(prefs));}catch(e){}}
+
 // ── Map ────────────────────────────────────────────────────────────────────
 const map = L.map('map',{center:[-36.8509,174.7645],zoom:13,zoomControl:true});
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
-  attribution:'© OpenStreetMap contributors © CARTO',maxZoom:19
-}).addTo(map);
+
+const BASEMAPS={
+  light:  {url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr:'© OpenStreetMap contributors © CARTO'},
+  voyager:{url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr:'© OpenStreetMap contributors © CARTO'},
+  osm:    {url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr:'© OpenStreetMap contributors'},
+  dark:   {url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr:'© OpenStreetMap contributors © CARTO'},
+};
+let baseLayer=null;
+function setBasemap(key){
+  if(!BASEMAPS[key]) key='light';
+  if(baseLayer) map.removeLayer(baseLayer);
+  baseLayer=L.tileLayer(BASEMAPS[key].url,{attribution:BASEMAPS[key].attr,maxZoom:19}).addTo(map);
+  document.getElementById('basemap').value=key;
+}
+setBasemap(prefs.basemap||'light');
+document.getElementById('basemap').onchange=e=>{setBasemap(e.target.value);savePref('basemap',e.target.value);};
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -1057,8 +1095,9 @@ ${pts}
 // If the winning distance exceeds the fetch padding, the answer could be
 // limited by unfetched roads, so we refetch with a wider pad and redo.
 
-// Drivable ways. Paths/tracks are added only when the checkbox is ticked.
-const WILD_ROAD_RE='motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service';
+// Drivable ways. Service roads (driveways, parking aisles) and paths/tracks
+// are each added only when their checkbox is ticked.
+const WILD_ROAD_RE='motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street';
 const WILD_PATH_RE='footway|path|track|cycleway|bridleway|pedestrian|steps';
 
 const WILD_STYLE={color:'#2d7a3c',weight:2,fillColor:'#2d7a3c',fillOpacity:.06};
@@ -1220,10 +1259,12 @@ function insideArea(x,y,area,box){
   return dx*dx+dy*dy<=area.rKm*area.rKm;
 }
 
-// ── Road fetch ─────────────────────────────────────────────────────────────
+// ── Road + water fetch ─────────────────────────────────────────────────────
 // `out geom` returns way geometry inline — no child-node resolution needed.
 // The bbox is padded so roads just outside the area still count as "nearest".
-async function fetchRoadSegs(area,padKm,includePaths,proj){
+// Also fetches natural=coastline (always — sea is never a candidate) and,
+// when opts.lakes is on, natural=water / riverbank polygons.
+async function fetchWildData(area,padKm,opts,proj){
   let s,w,n,e;
   if(area.type==='rect'){({s,w,n,e}=area);}
   else{
@@ -1232,19 +1273,194 @@ async function fetchRoadSegs(area,padKm,includePaths,proj){
   }
   const pLat=padKm/110.574, pLon=padKm/(111.32*Math.cos((s+n)/2*Math.PI/180));
   const bbox=`${s-pLat},${w-pLon},${n+pLat},${e+pLon}`;
-  const re=includePaths?WILD_ROAD_RE+'|'+WILD_PATH_RE:WILD_ROAD_RE;
-  const q=`[out:json][timeout:180];way["highway"~"^(${re})$"](${bbox});out geom;`;
+  let re=WILD_ROAD_RE;
+  if(opts.service) re+='|service';
+  if(opts.paths) re+='|'+WILD_PATH_RE;
+  let q=`[out:json][timeout:180];(way["highway"~"^(${re})$"](${bbox});way["natural"="coastline"](${bbox});`;
+  if(opts.lakes) q+=`way["natural"="water"](${bbox});relation["natural"="water"](${bbox});way["waterway"="riverbank"](${bbox});`;
+  q+=`);out geom;`;
   const data=await overpassFetch(q);
-  const segs=[];
+
+  const segs=[], coastSegs=[], parts=[];
   for(const el of data.elements||[]){
-    if(el.type!=='way'||!el.geometry) continue;
-    for(let i=1;i<el.geometry.length;i++){
-      const [ax,ay]=proj.toKm(el.geometry[i-1].lat,el.geometry[i-1].lon);
-      const [bx,by]=proj.toKm(el.geometry[i].lat,el.geometry[i].lon);
-      segs.push({ax,ay,bx,by});
+    if(el.type==='way'&&el.geometry){
+      const t=el.tags||{}, g=el.geometry;
+      if(t.natural==='coastline'){
+        // Direction matters: OSM convention puts water on the RIGHT of the way.
+        for(let i=1;i<g.length;i++){
+          const [ax,ay]=proj.toKm(g[i-1].lat,g[i-1].lon);
+          const [bx,by]=proj.toKm(g[i].lat,g[i].lon);
+          coastSegs.push({ax,ay,bx,by});
+        }
+      }else if(t.natural==='water'||t.waterway==='riverbank'){
+        parts.push(g.map(p=>proj.toKm(p.lat,p.lon)));
+      }else{
+        for(let i=1;i<g.length;i++){
+          const [ax,ay]=proj.toKm(g[i-1].lat,g[i-1].lon);
+          const [bx,by]=proj.toKm(g[i].lat,g[i].lon);
+          segs.push({ax,ay,bx,by});
+        }
+      }
+    }else if(el.type==='relation'&&el.members&&(el.tags||{}).natural==='water'){
+      // Multipolygon lake: outer AND inner rings both go in — even-odd
+      // point-in-polygon makes islands (inner rings) count as land again.
+      for(const m of el.members){
+        if(m.type==='way'&&m.geometry) parts.push(m.geometry.map(p=>proj.toKm(p.lat,p.lon)));
+      }
     }
   }
-  return segs;
+
+  // Stitch water way-fragments into closed rings (multipolygon outers are
+  // often split across several ways). Unclosable fragments are dropped.
+  const rings=assembleRings(parts).map(pts=>{
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const [x,y] of pts){
+      if(x<minX)minX=x; if(x>maxX)maxX=x;
+      if(y<minY)minY=y; if(y>maxY)maxY=y;
+    }
+    return {pts,minX,minY,maxX,maxY};
+  });
+  return {segs,coastSegs,rings};
+}
+
+function assembleRings(parts){
+  const eq=(a,b)=>Math.abs(a[0]-b[0])<1e-6&&Math.abs(a[1]-b[1])<1e-6; // ~1 mm
+  const rings=[], open=[];
+  for(const p of parts){
+    if(p.length<2) continue;
+    if(eq(p[0],p[p.length-1])){if(p.length>3)rings.push(p);}
+    else open.push(p.slice());
+  }
+  while(open.length){
+    let cur=open.pop(), progress=true;
+    while(!eq(cur[0],cur[cur.length-1])&&progress){
+      progress=false;
+      const tail=cur[cur.length-1];
+      for(let i=0;i<open.length;i++){
+        const o=open[i];
+        if(eq(o[0],tail)){cur=cur.concat(o.slice(1));open.splice(i,1);progress=true;break;}
+        if(eq(o[o.length-1],tail)){cur=cur.concat(o.slice(0,-1).reverse());open.splice(i,1);progress=true;break;}
+      }
+    }
+    if(eq(cur[0],cur[cur.length-1])&&cur.length>3) rings.push(cur);
+  }
+  return rings;
+}
+
+// Even-odd ray cast across all water rings (outer + inner together).
+function pointInRings(x,y,rings){
+  let inside=false;
+  for(const r of rings){
+    if(x<r.minX||x>r.maxX||y<r.minY||y>r.maxY) continue;
+    const pts=r.pts;
+    for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+      const yi=pts[i][1], yj=pts[j][1];
+      if((yi>y)!==(yj>y)){
+        const xi=pts[i][0], xj=pts[j][0];
+        if(x<(xj-xi)*(y-yi)/(yj-yi)+xi) inside=!inside;
+      }
+    }
+  }
+  return inside;
+}
+
+// ── Water exclusion mask ───────────────────────────────────────────────────
+// Classifying every grid point against the coastline directly would be slow
+// (inland points would ring-search forever), so: rasterize all water boundary
+// segments onto the scan grid (thickened 3×3 so flood fill can't leak through
+// corner clips), flood-fill the remaining cells into connected regions, and
+// classify each REGION with one representative test — sea via the side-of-
+// nearest-coastline-segment rule (water right of way direction), lakes via
+// even-odd point-in-polygon. Boundary cells get an exact per-point test.
+// Returns null when there's no water data; else {test(x,y) → excluded?}.
+function buildExclusion(box,nx,ny,coastSegs,rings,useLakes){
+  const lakes=useLakes&&rings.length>0;
+  if(!coastSegs.length&&!lakes) return null;
+  const wKm=box.x1-box.x0, hKm=box.y1-box.y0;
+  const cw=wKm/nx, ch=hKm/ny;
+  const mask=new Int8Array(nx*ny); // 0 unknown, 1 land, 2 water, 3 boundary
+  const cellSegs=new Map();        // exact boundary cell -> coastline segs in it
+  const ci=x=>Math.min(nx-1,Math.max(0,Math.floor((x-box.x0)/cw)));
+  const cj=y=>Math.min(ny-1,Math.max(0,Math.floor((y-box.y0)/ch)));
+
+  const markSeg=(s,isCoast)=>{
+    const len=Math.hypot(s.bx-s.ax,s.by-s.ay);
+    const steps=Math.max(1,Math.ceil(len/(Math.min(cw,ch)*0.5)));
+    for(let k=0;k<=steps;k++){
+      const x=s.ax+(s.bx-s.ax)*k/steps, y=s.ay+(s.by-s.ay)*k/steps;
+      if(x<box.x0-cw||x>box.x1+cw||y<box.y0-ch||y>box.y1+ch) continue;
+      const i0=ci(x), j0=cj(y);
+      for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){
+        const i=i0+di, j=j0+dj;
+        if(i>=0&&j>=0&&i<nx&&j<ny) mask[j*nx+i]=3;
+      }
+      if(isCoast){
+        const key=j0*nx+i0;
+        let a=cellSegs.get(key);
+        if(!a) cellSegs.set(key,a=[]);
+        if(!a.includes(s)) a.push(s);
+      }
+    }
+  };
+  for(const s of coastSegs) markSeg(s,true);
+  if(lakes) for(const r of rings) for(let i=1;i<r.pts.length;i++)
+    markSeg({ax:r.pts[i-1][0],ay:r.pts[i-1][1],bx:r.pts[i][0],by:r.pts[i][1]},false);
+
+  // Side-of-coastline test: nearest segment among `segs`, water on its right.
+  const seaAt=(x,y,segs)=>{
+    if(!segs||!segs.length) return false;
+    let bd2=Infinity, best=null;
+    for(const s of segs){
+      const r=segDistSq(x,y,s);
+      if(r.d2<bd2){bd2=r.d2;best=s;}
+    }
+    const cross=(best.bx-best.ax)*(y-best.ay)-(best.by-best.ay)*(x-best.ax);
+    return cross<0;
+  };
+  const waterAt=(x,y)=>seaAt(x,y,coastSegs)||(lakes&&pointInRings(x,y,rings));
+
+  // Flood-fill unknown cells into regions; one representative test per region.
+  const stack=[];
+  for(let j0=0;j0<ny;j0++) for(let i0=0;i0<nx;i0++){
+    if(mask[j0*nx+i0]!==0) continue;
+    const cells=[];
+    mask[j0*nx+i0]=9;
+    stack.push(i0,j0);
+    while(stack.length){
+      const b=stack.pop(), a=stack.pop();
+      cells.push(a,b);
+      if(a>0&&mask[b*nx+a-1]===0){mask[b*nx+a-1]=9;stack.push(a-1,b);}
+      if(a<nx-1&&mask[b*nx+a+1]===0){mask[b*nx+a+1]=9;stack.push(a+1,b);}
+      if(b>0&&mask[(b-1)*nx+a]===0){mask[(b-1)*nx+a]=9;stack.push(a,b-1);}
+      if(b<ny-1&&mask[(b+1)*nx+a]===0){mask[(b+1)*nx+a]=9;stack.push(a,b+1);}
+    }
+    const mi=cells.length>>2<<1; // a middle-ish cell of the region
+    const rx=box.x0+(cells[mi]+0.5)*cw, ry=box.y0+(cells[mi+1]+0.5)*ch;
+    const v=waterAt(rx,ry)?2:1;
+    for(let k=0;k<cells.length;k+=2) mask[cells[k+1]*nx+cells[k]]=v;
+  }
+
+  const test=(x,y)=>{
+    const i=ci(x), j=cj(y), m=mask[j*nx+i];
+    if(m===1) return false;
+    if(m===2) return true;
+    // Boundary cell: exact test. Gather coastline segs from a 5×5 window
+    // (thickened cells sit within 1 cell of a true seg cell); fall back to
+    // the full list if the window is empty.
+    let local=null;
+    if(coastSegs.length){
+      local=[];
+      for(let dj=-2;dj<=2;dj++) for(let di=-2;di<=2;di++){
+        const jj=j+dj, ii=i+di;
+        if(ii<0||jj<0||ii>=nx||jj>=ny) continue;
+        const a=cellSegs.get(jj*nx+ii);
+        if(a) local.push(...a);
+      }
+      if(!local.length) local=coastSegs;
+    }
+    return seaAt(x,y,local)||(lakes&&pointInRings(x,y,rings));
+  };
+  return {test};
 }
 
 // ── Spatial hash of segments ───────────────────────────────────────────────
@@ -1291,17 +1507,16 @@ function nearestRoad(px,py,idx,bk,maxKm){
 // ── Grid scan ──────────────────────────────────────────────────────────────
 // Resolution auto-scales: always ~22.5k samples, so big areas stay fast at the
 // cost of a coarser first pass (refinement recovers the precision).
-async function scanGrid(area,box,proj,idx,bk,maxKm){
+async function scanGrid(area,box,idx,bk,maxKm,nx,ny,cell,excl){
   const wKm=box.x1-box.x0, hKm=box.y1-box.y0;
-  const cell=Math.max(Math.sqrt(wKm*hKm/22500),0.008);
-  const nx=Math.max(2,Math.round(wKm/cell)), ny=Math.max(2,Math.round(hKm/cell));
-  const dist=new Float32Array(nx*ny).fill(-1); // -1 = outside the area
+  const dist=new Float32Array(nx*ny).fill(-1); // -1 = outside area / water
   const cands=[];
   for(let j=0;j<ny;j++){
     const y=box.y0+(j+0.5)*hKm/ny;
     for(let i=0;i<nx;i++){
       const x=box.x0+(i+0.5)*wKm/nx;
       if(!insideArea(x,y,area,box)) continue;
+      if(excl&&excl.test(x,y)) continue;
       const n=nearestRoad(x,y,idx,bk,maxKm);
       if(!n) continue;
       dist[j*nx+i]=n.d;
@@ -1328,13 +1543,14 @@ function topCandidates(cands,cell,n=5){
 }
 
 // Three zoom passes of a 13×13 local grid: final precision ~cell/50.
-function refinePoint(c,span,area,box,idx,bk,maxKm){
+function refinePoint(c,span,area,box,idx,bk,maxKm,excl){
   let bx=c.x, by=c.y, bd=c.d, s=span;
   for(let pass=0;pass<3;pass++){
     const cx=bx, cy=by, step=s/6;
     for(let i=-6;i<=6;i++) for(let j=-6;j<=6;j++){
       const x=cx+i*step, y=cy+j*step;
       if(!insideArea(x,y,area,box)) continue;
+      if(excl&&excl.test(x,y)) continue;
       const n=nearestRoad(x,y,idx,bk,maxKm);
       if(n&&n.d>bd){bd=n.d;bx=x;by=y;}
     }
@@ -1357,32 +1573,42 @@ async function runWild(){
   clearWildResult();
   try{
     const area=W.area;
-    const includePaths=document.getElementById('w-paths').checked;
+    const opts={
+      paths:document.getElementById('w-paths').checked,
+      service:document.getElementById('w-service').checked,
+      lakes:document.getElementById('w-lakes').checked,
+    };
     const lat0=area.type==='rect'?(area.s+area.n)/2:area.lat;
     const proj=makeProj(lat0);
     const box=areaBoxKm(area,proj);
     const wKm=box.x1-box.x0, hKm=box.y1-box.y0;
+    const cell=Math.max(Math.sqrt(wKm*hKm/22500),0.008);
+    const nx=Math.max(2,Math.round(wKm/cell)), ny=Math.max(2,Math.round(hKm/cell));
     let pad=Math.min(Math.max(Math.min(wKm,hKm)*0.35,1),12);
     let result=null;
     // If the best distance reaches the fetch padding, roads beyond the fetched
     // bbox could be nearer than we think — refetch wider and redo.
     for(let attempt=0;attempt<3;attempt++){
-      setStatus(attempt?'Answer near the search boundary — fetching a wider road net…':'Fetching roads…','info');
-      const segs=await fetchRoadSegs(area,pad,includePaths,proj);
+      setStatus(attempt?'Answer near the search boundary — fetching a wider road net…':'Fetching roads & water…','info');
+      const {segs,coastSegs,rings}=await fetchWildData(area,pad,opts,proj);
       if(!segs.length){
         setStatus('No roads found in or near this area — it is all wild. Try a bigger area to find a meaningful maximum.','err');
         return;
       }
-      const cell=Math.max(Math.sqrt(wKm*hKm/22500),0.008);
       const bk=Math.max(0.25,cell*2);
       const idx=buildSegIndex(segs,bk);
       const maxKm=Math.hypot(wKm,hKm)+pad;
-      const grid=await scanGrid(area,box,proj,idx,bk,maxKm);
-      if(!grid.cands.length){setStatus('Area too small to scan — draw a bigger one.','err');return;}
+      setStatus('Mapping water…','info');
+      const excl=buildExclusion(box,nx,ny,coastSegs,rings,opts.lakes);
+      const grid=await scanGrid(area,box,idx,bk,maxKm,nx,ny,cell,excl);
+      if(!grid.cands.length){
+        setStatus(excl?'No dry land found in this area — everything is water (or it is too small to scan).':'Area too small to scan — draw a bigger one.','err');
+        return;
+      }
       setStatus('Refining…','info');
       let best=null;
       for(const c of topCandidates(grid.cands,grid.cell)){
-        const r=refinePoint(c,grid.cell,area,box,idx,bk,maxKm);
+        const r=refinePoint(c,grid.cell,area,box,idx,bk,maxKm,excl);
         if(!best||r.d>best.d) best=r;
       }
       const near=nearestRoad(best.x,best.y,idx,bk,maxKm);
@@ -1430,18 +1656,21 @@ function showWildResult(res){
   setStatus(`Wildest spot found: ${fmtDist(best.d)} from the nearest road.`,'ok');
 }
 
+const HEAT_COLS={green:[20,110,60],blue:[35,75,190],ember:[195,65,15]};
+
 function renderHeatmap(grid,box,proj,maxD){
   const {nx,ny,dist}=grid;
+  const col=HEAT_COLS[document.getElementById('w-heatcol').value]||HEAT_COLS.green;
   const cv=document.createElement('canvas');
   cv.width=nx; cv.height=ny;
   const ctx=cv.getContext('2d');
   const img=ctx.createImageData(nx,ny);
   for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
     const d=dist[j*nx+i];
-    if(d<0) continue; // outside area → transparent
+    if(d<0) continue; // outside area / water → transparent
     const t=maxD>0?Math.min(d/maxD,1):0;
     const p=((ny-1-j)*nx+i)*4; // canvas row 0 = north, grid row 0 = south
-    img.data[p]=20; img.data[p+1]=110; img.data[p+2]=60;
+    img.data[p]=col[0]; img.data[p+1]=col[1]; img.data[p+2]=col[2];
     img.data[p+3]=Math.round(t*160);
   }
   ctx.putImageData(img,0,0);
@@ -1450,13 +1679,24 @@ function renderHeatmap(grid,box,proj,maxD){
   W.heatLayer=L.imageOverlay(cv.toDataURL(),[[sLat,wLon],[nLat,eLon]],{opacity:.85,interactive:false}).addTo(map);
 }
 
-document.getElementById('w-heat').onchange=()=>{
+function refreshHeatmap(){
   if(W.heatLayer){map.removeLayer(W.heatLayer);W.heatLayer=null;}
   if(document.getElementById('w-heat').checked&&W.lastResult){
     const r=W.lastResult;
     renderHeatmap(r.grid,r.box,r.proj,r.best.d);
   }
-};
+}
+document.getElementById('w-heat').onchange=()=>{savePref('heatOn',document.getElementById('w-heat').checked);refreshHeatmap();};
+document.getElementById('w-heatcol').onchange=()=>{savePref('heatcol',document.getElementById('w-heatcol').value);refreshHeatmap();};
+
+// Restore saved wild options
+for(const [id,key] of [['w-lakes','lakes'],['w-service','service'],['w-paths','paths'],['w-heat','heatOn']]){
+  if(prefs[key]!==undefined) document.getElementById(id).checked=prefs[key];
+}
+if(prefs.heatcol) document.getElementById('w-heatcol').value=prefs.heatcol;
+for(const [id,key] of [['w-lakes','lakes'],['w-service','service'],['w-paths','paths']]){
+  document.getElementById(id).onchange=e=>savePref(key,e.target.checked);
+}
 </script>
 </body>
 </html>

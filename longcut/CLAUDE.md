@@ -92,16 +92,24 @@ UI: `#mode-tabs` switches `body.wild-mode`, which shows `.wild-only` panel secti
 ### Pipeline (per run, `runWild`)
 
 1. User draws a **box** (mousedown-drag, map panning disabled while armed) or **circle** (click centre, mousemove preview, click to fix radius). Esc cancels.
-2. `fetchRoadSegs` — Overpass `out geom` query (no child-node resolution) for drivable highway classes (`WILD_ROAD_RE`; paths/tracks/footways added only via checkbox → `WILD_PATH_RE`). Bbox is **padded** so roads just outside the area still count.
-3. Segments projected to local equirectangular km coords (`makeProj`) and bucketed into a spatial hash (`buildSegIndex`).
-4. `scanGrid` — coarse grid over the area, ~22.5k samples regardless of area size (resolution auto-coarsens for big areas, min cell 8 m). Point→road distance via `nearestRoad`: expanding ring search over hash buckets, walking ring perimeters only, early exit once no farther ring can beat the best.
-5. `topCandidates` + `refinePoint` — top 5 mutually-separated candidates, each refined by three zoom passes of a 13×13 local grid (final precision ~cell/50).
-6. **Boundary-correctness loop:** if the winning distance exceeds the fetch pad, roads outside the fetched bbox could invalidate it → refetch with `pad = best*1.5` and redo (max 3 attempts).
-7. Render: 🏕 marker, dashed line to the nearest road point, canvas-based `L.imageOverlay` heatmap (transparent outside the area; canvas rows are flipped — row 0 is north, grid row 0 is south).
+2. `fetchWildData` — one Overpass `out geom` query (no child-node resolution) for: drivable highways (`WILD_ROAD_RE`; `service` and paths/tracks each opt-in via checkbox), `natural=coastline` (always), and `natural=water` ways/relations + `waterway=riverbank` (when "Ignore lakes & rivers" is ticked). Bbox is **padded** so roads just outside the area still count.
+3. Segments projected to local equirectangular km coords (`makeProj`); road segs bucketed into a spatial hash (`buildSegIndex`); water way-fragments stitched into closed rings (`assembleRings` — multipolygon outers are often split across ways; inner rings included so even-odd PIP makes islands land again).
+4. `buildExclusion` — water mask on the scan grid. Rasterize water-boundary segments onto grid cells (thickened 3×3 so flood fill can't leak through corner clips), flood-fill remaining cells into regions, classify each region with ONE representative test: **sea** = point is right of the nearest coastline segment (OSM: water on the right of way direction), **lake** = even-odd point-in-polygon. Boundary cells get exact per-point tests. Region trick avoids per-point coastline ring searches, which would be quadratic-slow inland.
+5. `scanGrid` — coarse grid, ~22.5k samples regardless of area size (auto-coarsens, min cell 8 m), skipping excluded cells. Point→road distance via `nearestRoad`: expanding ring search over hash buckets, ring perimeters only, early exit.
+6. `topCandidates` + `refinePoint` — top 5 mutually-separated candidates, three zoom passes of a 13×13 local grid each (final precision ~cell/50), also skipping excluded points.
+7. **Boundary-correctness loop:** if the winning distance exceeds the fetch pad, refetch with `pad = best*1.5` and redo (max 3 attempts).
+8. Render: 🏕 marker, dashed line to the nearest road point, canvas-based `L.imageOverlay` heatmap in the chosen colour (`HEAT_COLS`; transparent for water/outside; canvas rows flipped — row 0 north, grid row 0 south).
+
+### Options & preferences
+
+- Sea is **always** excluded; "Ignore lakes & rivers" (default on), "Count driveways & service roads" (default off), "Count paths & tracks" (default off).
+- Heatmap colour: green/blue/ember select.
+- **Map style** select (both modes, bottom of panel): Carto light (default), Carto voyager, classic OSM, Carto dark — `BASEMAPS` + `setBasemap()`.
+- All of the above persist in `localStorage` key `longcut-prefs` (`prefs` / `savePref()`).
 
 ### Gotchas
 
-- The result is honest about water: an area including harbour/sea will put the wild spot in the water, because water genuinely is far from roads.
+- Coastline side-test uses the nearest segment only — fine in practice, but an area drawn entirely offshore with no coastline in the padded bbox is unknowable and treated as land.
 - Overpass mirror fallback is shared with route mode via `overpassFetch(q)` — `fetchOSM` is now a thin wrapper over it.
 - `.sect label.chk` needs that full selector: plain `.chk` loses specificity to `.sect label`'s uppercase styling.
 - The map spinner text is set per-mode (`run()` and `runWild()` each set `textContent` before showing it).
