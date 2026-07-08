@@ -4,6 +4,8 @@
 
 **Longcut** is a quiet-route A* pathfinder. Given a start and end point on a map, it finds the most pedestrian/cyclist-friendly route (preferring footpaths, avoiding main roads) while staying within a user-set detour factor. Built on Leaflet + OpenStreetMap data via the Overpass API.
 
+It also has a second mode, **Wild spot** (🏕 tab): pick an area (box or circle) and it finds the point in that area farthest from any road, with a distance heatmap.
+
 Live at: `unisam.nz/longcut/`
 
 ---
@@ -83,10 +85,33 @@ Drag the route line to pull it through a new waypoint. Uses a **windowed local r
 
 ---
 
+## Wild spot mode
+
+UI: `#mode-tabs` switches `body.wild-mode`, which shows `.wild-only` panel sections and hides `.route-only`. A `uiMode` guard on the shared map `click` handler keeps route pin-placing out of wild mode. All wild state lives in a second global `W = {}`.
+
+### Pipeline (per run, `runWild`)
+
+1. User draws a **box** (mousedown-drag, map panning disabled while armed) or **circle** (click centre, mousemove preview, click to fix radius). Esc cancels.
+2. `fetchRoadSegs` — Overpass `out geom` query (no child-node resolution) for drivable highway classes (`WILD_ROAD_RE`; paths/tracks/footways added only via checkbox → `WILD_PATH_RE`). Bbox is **padded** so roads just outside the area still count.
+3. Segments projected to local equirectangular km coords (`makeProj`) and bucketed into a spatial hash (`buildSegIndex`).
+4. `scanGrid` — coarse grid over the area, ~22.5k samples regardless of area size (resolution auto-coarsens for big areas, min cell 8 m). Point→road distance via `nearestRoad`: expanding ring search over hash buckets, walking ring perimeters only, early exit once no farther ring can beat the best.
+5. `topCandidates` + `refinePoint` — top 5 mutually-separated candidates, each refined by three zoom passes of a 13×13 local grid (final precision ~cell/50).
+6. **Boundary-correctness loop:** if the winning distance exceeds the fetch pad, roads outside the fetched bbox could invalidate it → refetch with `pad = best*1.5` and redo (max 3 attempts).
+7. Render: 🏕 marker, dashed line to the nearest road point, canvas-based `L.imageOverlay` heatmap (transparent outside the area; canvas rows are flipped — row 0 is north, grid row 0 is south).
+
+### Gotchas
+
+- The result is honest about water: an area including harbour/sea will put the wild spot in the water, because water genuinely is far from roads.
+- Overpass mirror fallback is shared with route mode via `overpassFetch(q)` — `fetchOSM` is now a thin wrapper over it.
+- `.sect label.chk` needs that full selector: plain `.chk` loses specificity to `.sect label`'s uppercase styling.
+- The map spinner text is set per-mode (`run()` and `runWild()` each set `textContent` before showing it).
+
+---
+
 ## Current status
 
-Working and stable. All core features shipped: A* routing, quiet-preference cost model, parallel-path reclassification, waypoint drag editing, Regenerate, walk/bike modes, detour/stretch sliders, quietness score.
+Working and stable. All core features shipped: A* routing, quiet-preference cost model, parallel-path reclassification, waypoint drag editing, Regenerate, walk/bike modes, detour/stretch sliders, quietness score, Wild spot mode (farthest point from a road).
 
-**Not built:** Touch/mobile drag support for waypoints (drag-the-route editing is mouse-only).
+**Not built:** Touch/mobile drag support for waypoints (drag-the-route editing is mouse-only). Wild spot box-drawing is also mouse-only (circle mode works with taps).
 
 **No known bugs.**

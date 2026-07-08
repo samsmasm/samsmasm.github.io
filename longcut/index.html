@@ -111,6 +111,27 @@ select{
 
 /* Hint */
 #hint{padding:10px 14px 14px;font-size:11px;color:var(--dim);line-height:1.5}
+
+/* Mode tabs */
+#mode-tabs{display:flex;border-bottom:1px solid var(--border)}
+.mtab{flex:1;padding:9px 4px;border:none;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:var(--dim);border-bottom:2px solid transparent}
+.mtab:hover{color:var(--text)}
+.mtab.active{color:var(--text);border-bottom-color:var(--accent)}
+
+/* Wild mode */
+.wild-only{display:none}
+body.wild-mode .wild-only{display:block}
+body.wild-mode .route-only{display:none}
+.abtn{flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:6px;background:var(--btn);cursor:pointer;font-size:12px;font-weight:500;text-align:center}
+.abtn:hover{background:var(--btn-h)}
+.abtn.active{background:var(--start);color:white;border-color:var(--start)}
+.sect label.chk{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--text);cursor:pointer;margin-bottom:0}
+.chk input{accent-color:var(--start);cursor:pointer}
+#wild-run{display:block;width:calc(100% - 28px);margin:12px 14px 0;padding:10px;border:none;border-radius:8px;background:var(--start);color:white;font-size:14px;font-weight:600;cursor:pointer}
+#wild-run:hover{opacity:.9}
+#wild-run:disabled{background:var(--dim);cursor:not-allowed}
+#w-stats a{color:var(--accent);text-decoration:none}
+#w-stats a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -121,6 +142,12 @@ select{
       <p>Find the quiet way</p>
     </div>
 
+    <div id="mode-tabs">
+      <button class="mtab active" id="tab-route">🧭 Route</button>
+      <button class="mtab" id="tab-wild">🏕 Wild spot</button>
+    </div>
+
+    <div class="route-only">
     <div class="sect">
       <label>Start</label>
       <div class="srow">
@@ -178,9 +205,30 @@ select{
     </div>
     <button id="regen-btn" style="display:none;width:calc(100% - 28px);margin:8px 14px 0;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--btn);cursor:pointer;font-size:13px;font-weight:500">↻ Regenerate route</button>
     <div style="height:12px"></div>
+    </div><!-- /route-only -->
+
+    <div class="wild-only">
+      <div class="sect">
+        <label>Search area</label>
+        <div class="trow">
+          <button class="abtn" id="w-rect">▭ Box</button>
+          <button class="abtn" id="w-circ">◯ Circle</button>
+          <button class="abtn" id="w-clear">✕ Clear</button>
+        </div>
+        <div id="w-area-info" style="font-size:11.5px;color:var(--dim);margin-top:8px">No area selected.</div>
+      </div>
+      <div class="sect">
+        <label>Options</label>
+        <label class="chk"><input type="checkbox" id="w-paths"> Count paths &amp; tracks as roads</label>
+        <label class="chk" style="margin-top:6px"><input type="checkbox" id="w-heat" checked> Show distance heatmap</label>
+      </div>
+      <button id="wild-run" disabled>Find the wild spot</button>
+      <div style="height:12px"></div>
+    </div>
 
     <div id="status"></div>
 
+    <div class="route-only">
     <div id="stats">
       <div class="sv"><span class="svl">Route distance</span><span class="svv" id="sv-dist">—</span></div>
       <div class="sv"><span class="svl">Estimated time</span><span class="svv" id="sv-time">—</span></div>
@@ -195,6 +243,20 @@ select{
       Drag pins to adjust. The route prefers small roads and standalone paths over main roads.
       Once a route appears, <b>drag the route line</b> to bend it through a waypoint,
       or hit <b>Regenerate</b> for a different quiet route.
+    </div>
+    </div><!-- /route-only -->
+
+    <div class="wild-only">
+      <div id="w-stats" style="margin:0 14px 8px;display:none">
+        <div class="sv"><span class="svl">Distance to road</span><span class="svv" id="wv-dist">—</span></div>
+        <div class="sv"><span class="svl">Location</span><span class="svv" id="wv-loc" style="font-size:11px">—</span></div>
+        <div class="sv"><span class="svl">Open in</span><span class="svv"><a id="wv-osm" href="#" target="_blank" rel="noopener">OSM</a> · <a id="wv-gmap" href="#" target="_blank" rel="noopener">Google Maps</a></span></div>
+      </div>
+      <div style="padding:10px 14px 14px;font-size:11px;color:var(--dim);line-height:1.5">
+        Draw a <b>box</b> or <b>circle</b> on the map, then hit <b>Find the wild spot</b> to locate
+        the point farthest from any road. Darker green on the heatmap = farther from roads.
+        “Roads” means drivable ways — tick the option to also count paths, tracks and footways.
+      </div>
     </div>
   </div>
 
@@ -301,6 +363,7 @@ function setPlacing(mode) {
 }
 
 map.on('click',e=>{
+  if(uiMode!=='route') return; // wild mode has its own click handling
   // Auto-advance: if no placing mode set, guess what to place next
   let mode = placing;
   if(!mode) {
@@ -423,7 +486,11 @@ async function fetchOSM(bbox) {
     `way["highway"~"^(primary|secondary|tertiary|unclassified|residential|living_street|pedestrian|track|cycleway)$"](${bbox});`+
     `way["highway"~"^(footway|path)$"]["footway"!="sidewalk"](${bbox});`+
   `);out body;>;out skel qt;`;
+  return overpassFetch(q);
+}
 
+// Generic Overpass POST with mirror fallback (shared by route + wild modes).
+async function overpassFetch(q) {
   for(let i=0;i<OVERPASS_ENDPOINTS.length;i++){
     const ep=OVERPASS_ENDPOINTS[i];
     try{
@@ -920,6 +987,7 @@ async function run() {
 
   invalidateRoute();
   document.getElementById('run-btn').disabled=true;
+  document.getElementById('map-spinner').textContent='Finding route…';
   document.getElementById('map-spinner').style.display='block';
   setStatus('Fetching map data…','info');
 
@@ -977,6 +1045,417 @@ ${pts}
   a.href=URL.createObjectURL(new Blob([gpx],{type:'application/gpx+xml'}));
   a.download='quiet-route.gpx';
   a.click();
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WILD SPOT MODE — find the point in an area that is farthest from any road
+// ═══════════════════════════════════════════════════════════════════════════
+// Pipeline: draw area → fetch road geometry (Overpass `out geom`, bbox padded
+// so roads just OUTSIDE the area still count) → bucket segments into a spatial
+// hash → coarse grid scan (auto resolution, ~22.5k samples regardless of area
+// size) → refine the top candidates on progressively finer local grids.
+// If the winning distance exceeds the fetch padding, the answer could be
+// limited by unfetched roads, so we refetch with a wider pad and redo.
+
+// Drivable ways. Paths/tracks are added only when the checkbox is ticked.
+const WILD_ROAD_RE='motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service';
+const WILD_PATH_RE='footway|path|track|cycleway|bridleway|pedestrian|steps';
+
+const WILD_STYLE={color:'#2d7a3c',weight:2,fillColor:'#2d7a3c',fillOpacity:.06};
+
+const W = {
+  area:null,        // {type:'rect',s,w,n,e} | {type:'circle',lat,lon,rKm}
+  drawing:null,     // 'rect'|'circle'|null
+  drawState:null,   // circle centre latlng while drawing
+  tempLayer:null, areaLayer:null, resultLayer:null, heatLayer:null,
+  lastResult:null, running:false,
+};
+
+// ── Mode tabs ──────────────────────────────────────────────────────────────
+let uiMode='route';
+function setUiMode(m){
+  if(uiMode===m) return;
+  uiMode=m;
+  document.body.classList.toggle('wild-mode',m==='wild');
+  document.getElementById('tab-route').classList.toggle('active',m==='route');
+  document.getElementById('tab-wild').classList.toggle('active',m==='wild');
+  setPlacing(null);
+  cancelWildDraw();
+  setStatus('','info');
+}
+document.getElementById('tab-route').onclick=()=>setUiMode('route');
+document.getElementById('tab-wild').onclick=()=>setUiMode('wild');
+
+// ── Area drawing ───────────────────────────────────────────────────────────
+function armWildDraw(kind){
+  if(W.drawing===kind){cancelWildDraw();return;}
+  cancelWildDraw();
+  W.drawing=kind;
+  document.getElementById(kind==='rect'?'w-rect':'w-circ').classList.add('active');
+  map.getContainer().style.cursor='crosshair';
+  if(kind==='rect') map.dragging.disable(); // corner-drag would otherwise pan
+  setStatus(kind==='rect'
+    ?'Drag on the map to draw a box. Esc cancels.'
+    :'Click the centre, then click again to set the radius. Esc cancels.','info');
+}
+function cancelWildDraw(){
+  W.drawing=null; W.drawState=null;
+  if(W.tempLayer){map.removeLayer(W.tempLayer);W.tempLayer=null;}
+  map.off('mousemove',wildCircPreview);
+  document.getElementById('w-rect').classList.remove('active');
+  document.getElementById('w-circ').classList.remove('active');
+  map.getContainer().style.cursor='';
+  map.dragging.enable();
+}
+document.getElementById('w-rect').onclick=()=>armWildDraw('rect');
+document.getElementById('w-circ').onclick=()=>armWildDraw('circle');
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&W.drawing)cancelWildDraw();});
+
+// Box: drag corner to corner
+map.on('mousedown',e=>{
+  if(uiMode!=='wild'||W.drawing!=='rect') return;
+  L.DomEvent.stop(e);
+  const a=e.latlng;
+  if(W.tempLayer) map.removeLayer(W.tempLayer);
+  W.tempLayer=L.rectangle(L.latLngBounds(a,a),{...WILD_STYLE,dashArray:'6 4'}).addTo(map);
+  const onMove=ev=>W.tempLayer.setBounds(L.latLngBounds(a,ev.latlng));
+  const onUp=ev=>{
+    map.off('mousemove',onMove); map.off('mouseup',onUp);
+    const b=L.latLngBounds(a,ev.latlng);
+    const wKm=hav(b.getSouth(),b.getWest(),b.getSouth(),b.getEast());
+    const hKm=hav(b.getSouth(),b.getWest(),b.getNorth(),b.getWest());
+    if(wKm<0.1||hKm<0.1){cancelWildDraw();setStatus('Box too small — drag a bigger one.','err');return;}
+    setWildArea({type:'rect',s:b.getSouth(),w:b.getWest(),n:b.getNorth(),e:b.getEast()});
+  };
+  map.on('mousemove',onMove); map.on('mouseup',onUp);
+});
+
+// Circle: click centre, move to preview, click again to fix the radius
+function wildCircPreview(ev){
+  if(W.tempLayer&&W.drawState){
+    const r=hav(W.drawState.lat,W.drawState.lng,ev.latlng.lat,ev.latlng.lng)*1000;
+    W.tempLayer.setRadius(Math.max(r,50));
+  }
+}
+map.on('click',e=>{
+  if(uiMode!=='wild'||W.drawing!=='circle') return;
+  if(!W.drawState){
+    W.drawState=e.latlng;
+    W.tempLayer=L.circle(e.latlng,{...WILD_STYLE,dashArray:'6 4',radius:100}).addTo(map);
+    map.on('mousemove',wildCircPreview);
+  }else{
+    const rKm=hav(W.drawState.lat,W.drawState.lng,e.latlng.lat,e.latlng.lng);
+    if(rKm<0.05){setStatus('Circle too small — click further from the centre.','err');return;}
+    setWildArea({type:'circle',lat:W.drawState.lat,lon:W.drawState.lng,rKm});
+  }
+});
+
+function setWildArea(area){
+  cancelWildDraw();
+  W.area=area;
+  clearWildResult();
+  if(W.areaLayer) map.removeLayer(W.areaLayer);
+  W.areaLayer = area.type==='rect'
+    ? L.rectangle([[area.s,area.w],[area.n,area.e]],WILD_STYLE)
+    : L.circle([area.lat,area.lon],{...WILD_STYLE,radius:area.rKm*1000});
+  W.areaLayer.addTo(map);
+  let info;
+  if(area.type==='rect'){
+    const wKm=hav(area.s,area.w,area.s,area.e), hKm=hav(area.s,area.w,area.n,area.w);
+    info=`Box ${wKm.toFixed(1)} × ${hKm.toFixed(1)} km.`;
+  }else info=`Circle, radius ${area.rKm.toFixed(1)} km.`;
+  document.getElementById('w-area-info').textContent=info+' Redraw to change it.';
+  document.getElementById('wild-run').disabled=false;
+  setStatus('','info');
+}
+
+function clearWildArea(){
+  cancelWildDraw();
+  W.area=null;
+  if(W.areaLayer){map.removeLayer(W.areaLayer);W.areaLayer=null;}
+  clearWildResult();
+  document.getElementById('w-area-info').textContent='No area selected.';
+  document.getElementById('wild-run').disabled=true;
+  setStatus('','info');
+}
+document.getElementById('w-clear').onclick=clearWildArea;
+
+function clearWildResult(){
+  if(W.resultLayer){map.removeLayer(W.resultLayer);W.resultLayer=null;}
+  if(W.heatLayer){map.removeLayer(W.heatLayer);W.heatLayer=null;}
+  W.lastResult=null;
+  document.getElementById('w-stats').style.display='none';
+}
+
+// ── Geometry ───────────────────────────────────────────────────────────────
+// Local equirectangular km projection — accurate to well under grid resolution
+// at the scales involved (tens of km).
+function makeProj(lat0){
+  const kx=111.32*Math.cos(lat0*Math.PI/180), ky=110.574;
+  return {toKm:(lat,lon)=>[lon*kx,lat*ky], toLL:(x,y)=>[y/ky,x/kx]};
+}
+
+// Squared distance from point to segment, plus the closest point on it.
+function segDistSq(px,py,s){
+  const dx=s.bx-s.ax, dy=s.by-s.ay;
+  const l2=dx*dx+dy*dy;
+  let t=l2>0?((px-s.ax)*dx+(py-s.ay)*dy)/l2:0;
+  t=t<0?0:(t>1?1:t);
+  const qx=s.ax+t*dx, qy=s.ay+t*dy;
+  const ddx=px-qx, ddy=py-qy;
+  return {d2:ddx*ddx+ddy*ddy,qx,qy};
+}
+
+function areaBoxKm(area,proj){
+  if(area.type==='rect'){
+    const [x0,y0]=proj.toKm(area.s,area.w), [x1,y1]=proj.toKm(area.n,area.e);
+    return {x0,y0,x1,y1};
+  }
+  const [cx,cy]=proj.toKm(area.lat,area.lon);
+  return {x0:cx-area.rKm,y0:cy-area.rKm,x1:cx+area.rKm,y1:cy+area.rKm,cx,cy};
+}
+function insideArea(x,y,area,box){
+  if(area.type==='rect') return x>=box.x0&&x<=box.x1&&y>=box.y0&&y<=box.y1;
+  const dx=x-box.cx, dy=y-box.cy;
+  return dx*dx+dy*dy<=area.rKm*area.rKm;
+}
+
+// ── Road fetch ─────────────────────────────────────────────────────────────
+// `out geom` returns way geometry inline — no child-node resolution needed.
+// The bbox is padded so roads just outside the area still count as "nearest".
+async function fetchRoadSegs(area,padKm,includePaths,proj){
+  let s,w,n,e;
+  if(area.type==='rect'){({s,w,n,e}=area);}
+  else{
+    const dLat=area.rKm/110.574, dLon=area.rKm/(111.32*Math.cos(area.lat*Math.PI/180));
+    s=area.lat-dLat; n=area.lat+dLat; w=area.lon-dLon; e=area.lon+dLon;
+  }
+  const pLat=padKm/110.574, pLon=padKm/(111.32*Math.cos((s+n)/2*Math.PI/180));
+  const bbox=`${s-pLat},${w-pLon},${n+pLat},${e+pLon}`;
+  const re=includePaths?WILD_ROAD_RE+'|'+WILD_PATH_RE:WILD_ROAD_RE;
+  const q=`[out:json][timeout:180];way["highway"~"^(${re})$"](${bbox});out geom;`;
+  const data=await overpassFetch(q);
+  const segs=[];
+  for(const el of data.elements||[]){
+    if(el.type!=='way'||!el.geometry) continue;
+    for(let i=1;i<el.geometry.length;i++){
+      const [ax,ay]=proj.toKm(el.geometry[i-1].lat,el.geometry[i-1].lon);
+      const [bx,by]=proj.toKm(el.geometry[i].lat,el.geometry[i].lon);
+      segs.push({ax,ay,bx,by});
+    }
+  }
+  return segs;
+}
+
+// ── Spatial hash of segments ───────────────────────────────────────────────
+function buildSegIndex(segs,bk){
+  const idx=new Map();
+  for(const s of segs){
+    const i0=Math.floor(Math.min(s.ax,s.bx)/bk), i1=Math.floor(Math.max(s.ax,s.bx)/bk);
+    const j0=Math.floor(Math.min(s.ay,s.by)/bk), j1=Math.floor(Math.max(s.ay,s.by)/bk);
+    for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+      const k=i+','+j;
+      let a=idx.get(k);
+      if(!a) idx.set(k,a=[]);
+      a.push(s);
+    }
+  }
+  return idx;
+}
+
+// Nearest road via expanding ring search over the bucket grid. Walks ring
+// perimeters only (O(r) cells per ring) and stops once no farther ring can
+// possibly beat the best distance found.
+function nearestRoad(px,py,idx,bk,maxKm){
+  const ci=Math.floor(px/bk), cj=Math.floor(py/bk);
+  let bestD2=Infinity, bqx=0, bqy=0;
+  const maxR=Math.ceil(maxKm/bk)+1;
+  for(let r=0;r<=maxR;r++){
+    if(bestD2<Infinity&&(r-1)*bk>Math.sqrt(bestD2)) break;
+    const scan=cell=>{
+      if(!cell) return;
+      for(const s of cell){
+        const {d2,qx,qy}=segDistSq(px,py,s);
+        if(d2<bestD2){bestD2=d2;bqx=qx;bqy=qy;}
+      }
+    };
+    if(r===0) scan(idx.get(ci+','+cj));
+    else{
+      for(let i=ci-r;i<=ci+r;i++){scan(idx.get(i+','+(cj-r)));scan(idx.get(i+','+(cj+r)));}
+      for(let j=cj-r+1;j<=cj+r-1;j++){scan(idx.get((ci-r)+','+j));scan(idx.get((ci+r)+','+j));}
+    }
+  }
+  return bestD2===Infinity?null:{d:Math.sqrt(bestD2),qx:bqx,qy:bqy};
+}
+
+// ── Grid scan ──────────────────────────────────────────────────────────────
+// Resolution auto-scales: always ~22.5k samples, so big areas stay fast at the
+// cost of a coarser first pass (refinement recovers the precision).
+async function scanGrid(area,box,proj,idx,bk,maxKm){
+  const wKm=box.x1-box.x0, hKm=box.y1-box.y0;
+  const cell=Math.max(Math.sqrt(wKm*hKm/22500),0.008);
+  const nx=Math.max(2,Math.round(wKm/cell)), ny=Math.max(2,Math.round(hKm/cell));
+  const dist=new Float32Array(nx*ny).fill(-1); // -1 = outside the area
+  const cands=[];
+  for(let j=0;j<ny;j++){
+    const y=box.y0+(j+0.5)*hKm/ny;
+    for(let i=0;i<nx;i++){
+      const x=box.x0+(i+0.5)*wKm/nx;
+      if(!insideArea(x,y,area,box)) continue;
+      const n=nearestRoad(x,y,idx,bk,maxKm);
+      if(!n) continue;
+      dist[j*nx+i]=n.d;
+      cands.push({x,y,d:n.d});
+    }
+    if(j%25===24){
+      setStatus(`Scanning… ${Math.round((j+1)/ny*100)}%`,'info');
+      await new Promise(r=>setTimeout(r,0)); // let the UI breathe
+    }
+  }
+  return {nx,ny,dist,cands,cell};
+}
+
+// Top N coarse candidates, mutually separated so refinement explores distinct
+// basins rather than five neighbours of the same maximum.
+function topCandidates(cands,cell,n=5){
+  cands.sort((a,b)=>b.d-a.d);
+  const picked=[];
+  for(const c of cands){
+    if(picked.length>=n) break;
+    if(picked.every(p=>Math.hypot(p.x-c.x,p.y-c.y)>cell*3)) picked.push(c);
+  }
+  return picked;
+}
+
+// Three zoom passes of a 13×13 local grid: final precision ~cell/50.
+function refinePoint(c,span,area,box,idx,bk,maxKm){
+  let bx=c.x, by=c.y, bd=c.d, s=span;
+  for(let pass=0;pass<3;pass++){
+    const cx=bx, cy=by, step=s/6;
+    for(let i=-6;i<=6;i++) for(let j=-6;j<=6;j++){
+      const x=cx+i*step, y=cy+j*step;
+      if(!insideArea(x,y,area,box)) continue;
+      const n=nearestRoad(x,y,idx,bk,maxKm);
+      if(n&&n.d>bd){bd=n.d;bx=x;by=y;}
+    }
+    s=step*2;
+  }
+  return {x:bx,y:by,d:bd};
+}
+
+// ── Run ────────────────────────────────────────────────────────────────────
+document.getElementById('wild-run').onclick=runWild;
+
+async function runWild(){
+  if(!W.area||W.running) return;
+  W.running=true;
+  const btn=document.getElementById('wild-run');
+  const spin=document.getElementById('map-spinner');
+  btn.disabled=true;
+  spin.textContent='Searching for the wild spot…';
+  spin.style.display='block';
+  clearWildResult();
+  try{
+    const area=W.area;
+    const includePaths=document.getElementById('w-paths').checked;
+    const lat0=area.type==='rect'?(area.s+area.n)/2:area.lat;
+    const proj=makeProj(lat0);
+    const box=areaBoxKm(area,proj);
+    const wKm=box.x1-box.x0, hKm=box.y1-box.y0;
+    let pad=Math.min(Math.max(Math.min(wKm,hKm)*0.35,1),12);
+    let result=null;
+    // If the best distance reaches the fetch padding, roads beyond the fetched
+    // bbox could be nearer than we think — refetch wider and redo.
+    for(let attempt=0;attempt<3;attempt++){
+      setStatus(attempt?'Answer near the search boundary — fetching a wider road net…':'Fetching roads…','info');
+      const segs=await fetchRoadSegs(area,pad,includePaths,proj);
+      if(!segs.length){
+        setStatus('No roads found in or near this area — it is all wild. Try a bigger area to find a meaningful maximum.','err');
+        return;
+      }
+      const cell=Math.max(Math.sqrt(wKm*hKm/22500),0.008);
+      const bk=Math.max(0.25,cell*2);
+      const idx=buildSegIndex(segs,bk);
+      const maxKm=Math.hypot(wKm,hKm)+pad;
+      const grid=await scanGrid(area,box,proj,idx,bk,maxKm);
+      if(!grid.cands.length){setStatus('Area too small to scan — draw a bigger one.','err');return;}
+      setStatus('Refining…','info');
+      let best=null;
+      for(const c of topCandidates(grid.cands,grid.cell)){
+        const r=refinePoint(c,grid.cell,area,box,idx,bk,maxKm);
+        if(!best||r.d>best.d) best=r;
+      }
+      const near=nearestRoad(best.x,best.y,idx,bk,maxKm);
+      result={best,near,proj,grid,box};
+      if(best.d<=pad*0.95) break;
+      pad=best.d*1.5;
+    }
+    showWildResult(result);
+  }catch(e){
+    setStatus('Error: '+e.message,'err');
+  }finally{
+    W.running=false;
+    btn.disabled=!W.area;
+    spin.style.display='none';
+  }
+}
+
+// ── Render result ──────────────────────────────────────────────────────────
+function fmtDist(km){return km<1?Math.round(km*1000)+' m':km.toFixed(2)+' km';}
+
+function showWildResult(res){
+  const {best,near,proj,grid,box}=res;
+  W.lastResult=res;
+  const [lat,lon]=proj.toLL(best.x,best.y);
+
+  const group=L.layerGroup().addTo(map);
+  if(near){
+    const [nlat,nlon]=proj.toLL(near.qx,near.qy);
+    L.polyline([[lat,lon],[nlat,nlon]],{color:'#b83232',weight:2,dashArray:'5 6',opacity:.8}).addTo(group);
+    L.circleMarker([nlat,nlon],{radius:4,color:'#b83232',fillColor:'#fff',fillOpacity:1,weight:2})
+      .bindTooltip('Nearest road',{direction:'top'}).addTo(group);
+  }
+  L.marker([lat,lon],{icon:L.divIcon({className:'',iconAnchor:[16,30],
+    html:'<span style="font-size:32px;line-height:1;display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))">🏕</span>'})})
+    .bindTooltip(`${fmtDist(best.d)} from the nearest road`,{direction:'top'}).addTo(group);
+  W.resultLayer=group;
+
+  if(document.getElementById('w-heat').checked) renderHeatmap(grid,box,proj,best.d);
+
+  document.getElementById('wv-dist').textContent=fmtDist(best.d);
+  document.getElementById('wv-loc').textContent=lat.toFixed(5)+', '+lon.toFixed(5);
+  document.getElementById('wv-osm').href=`https://www.openstreetmap.org/?mlat=${lat.toFixed(6)}&mlon=${lon.toFixed(6)}#map=15/${lat.toFixed(5)}/${lon.toFixed(5)}`;
+  document.getElementById('wv-gmap').href=`https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
+  document.getElementById('w-stats').style.display='block';
+  setStatus(`Wildest spot found: ${fmtDist(best.d)} from the nearest road.`,'ok');
+}
+
+function renderHeatmap(grid,box,proj,maxD){
+  const {nx,ny,dist}=grid;
+  const cv=document.createElement('canvas');
+  cv.width=nx; cv.height=ny;
+  const ctx=cv.getContext('2d');
+  const img=ctx.createImageData(nx,ny);
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    const d=dist[j*nx+i];
+    if(d<0) continue; // outside area → transparent
+    const t=maxD>0?Math.min(d/maxD,1):0;
+    const p=((ny-1-j)*nx+i)*4; // canvas row 0 = north, grid row 0 = south
+    img.data[p]=20; img.data[p+1]=110; img.data[p+2]=60;
+    img.data[p+3]=Math.round(t*160);
+  }
+  ctx.putImageData(img,0,0);
+  const [sLat,wLon]=proj.toLL(box.x0,box.y0);
+  const [nLat,eLon]=proj.toLL(box.x1,box.y1);
+  W.heatLayer=L.imageOverlay(cv.toDataURL(),[[sLat,wLon],[nLat,eLon]],{opacity:.85,interactive:false}).addTo(map);
+}
+
+document.getElementById('w-heat').onchange=()=>{
+  if(W.heatLayer){map.removeLayer(W.heatLayer);W.heatLayer=null;}
+  if(document.getElementById('w-heat').checked&&W.lastResult){
+    const r=W.lastResult;
+    renderHeatmap(r.grid,r.box,r.proj,r.best.d);
+  }
 };
 </script>
 </body>
