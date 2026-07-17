@@ -130,6 +130,13 @@ function buildResults(events, standings, ov) {
   // for a later round the moment their exit is known, rather than waiting for
   // every slot in that round to be filled (see per-pick scoring below).
   const eliminated = new Set();
+  // The two real 3rd-place playoff participants (the SF losers). Tracked
+  // separately from `eliminated` because an SF loser is NOT out of the
+  // tournament — they still play the 3rd-place match — while an SF winner
+  // (now in the Final) is exactly who's ineligible for that match. Confusing
+  // the two: a correct 3rd-place pick (an SF loser) got shown "wrong" via
+  // `eliminated`, while a Final-bound pick (SF winner) never got flagged.
+  const thirdCandidates = new Set();
   let champion = null, thirdWinner = null;
   // R32 membership comes solely from the published R32 fixtures (loop below). We
   // deliberately do NOT use the standings "advance/best" notes: ESPN tags ALL 12
@@ -152,18 +159,21 @@ function buildResults(events, standings, ov) {
     if (!isPlaceholderTeam(m.away)) rounds[rd].add(canon(m.away));
     if (rd === 'final' && m.completed && winnerTeam) champion = winnerTeam;
     if (m.completed && !isPlaceholderTeam(m.home) && !isPlaceholderTeam(m.away) && winnerTeam) {
-      eliminated.add(canon(winnerTeam === m.home ? m.away : m.home));
+      const loser = canon(winnerTeam === m.home ? m.away : m.home);
+      eliminated.add(loser);
+      if (rd === 'sf') thirdCandidates.add(loser);
     }
   }
   // Overrides for rounds / champion / third place.
   if (ov.rounds) for (const rd of Object.keys(rounds)) {
     if (Array.isArray(ov.rounds[rd])) rounds[rd] = new Set(ov.rounds[rd].map(canon));
   }
+  if (Array.isArray(ov.thirdCandidates)) { thirdCandidates.clear(); ov.thirdCandidates.forEach(t => thirdCandidates.add(canon(t))); }
   if (ov.champion) champion = ov.champion;
   if (ov.thirdPlaceWinner) thirdWinner = ov.thirdPlaceWinner;
   const finalScore = ov.finalScore || null;
 
-  return { fixtureOutcome, groupWinners, groupDone, rounds, eliminated, champion, thirdWinner, finalScore };
+  return { fixtureOutcome, groupWinners, groupDone, rounds, eliminated, thirdCandidates, champion, thirdWinner, finalScore };
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +254,15 @@ function scorePlayer(p, R, fixtures) {
     status: R.champion ? (champOk ? 'correct' : 'wrong') : (champOut ? 'wrong' : 'pending'), pts: champOk ? 10 : 0 });
 
   const thirdOk = R.thirdWinner && same(p.thirdPlace, R.thirdWinner);
-  const thirdOut = !R.thirdWinner && p.thirdPlace && R.eliminated.has(canon(p.thirdPlace));
+  // A 3rd-place pick is provably wrong if: the team was knocked out before the
+  // SF (in `eliminated` but never an SF loser), OR both real 3rd-place
+  // participants are now known (both SF losers) and this pick isn't one of
+  // them — which is exactly what catches an SF *winner* (Final-bound team)
+  // picked for 3rd place.
+  const p3 = p.thirdPlace ? canon(p.thirdPlace) : null;
+  const thirdKnown = R.thirdCandidates.size >= 2;
+  const thirdOut = !R.thirdWinner && p3 && !R.thirdCandidates.has(p3)
+    && (R.eliminated.has(p3) || thirdKnown);
   if (R.thirdWinner) total += thirdOk ? 5 : 0;
   detail.special.push({ label: '3rd-place playoff (5)', pick: p.thirdPlace, actual: R.thirdWinner,
     status: R.thirdWinner ? (thirdOk ? 'correct' : 'wrong') : (thirdOut ? 'wrong' : 'pending'), pts: thirdOk ? 5 : 0 });
