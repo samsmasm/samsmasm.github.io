@@ -98,7 +98,7 @@
   // Returns helpers used by BOTH the schedule and the "next games" box, so they
   // resolve identically. Sources: group standings (positions) + ESPN's own
   // bracket (best-third allocation and shootout-aware winners).
-  const SLOT_RE = /^(?:[12][A-L]|3[A-L]{3,6}|W\d+)$/;
+  const SLOT_RE = /^(?:[12][A-L]|3[A-L]{3,6}|W\d+|L\d+)$/;
   const isSlot = s => SLOT_RE.test(s || '');
   function makeBracket(standings, events, schedule) {
     schedule = schedule || [];
@@ -149,6 +149,17 @@
         if (!a || !b) return null;
         const wc = WIN.get(pairKey(a, b));
         return wc ? (canon(a) === wc ? a : b) : null;
+      }
+      // "L\d+" (loser of match N) feeds the 3rd-place match — same feeder-game
+      // resolution as W\d+, but return the side that did NOT win.
+      const l = /^L(\d+)$/.exec(code);
+      if (l && depth < 6) {
+        const row = schedule.find(r => r.no === +l[1]);
+        if (!row) return null;
+        const [a, b] = resolvePair(row.t1, row.t2, depth + 1);
+        if (!a || !b) return null;
+        const wc = WIN.get(pairKey(a, b));
+        return wc ? (canon(a) === wc ? b : a) : null;
       }
       return null;                            // 3rd-place slots filled via resolvePair above
     }

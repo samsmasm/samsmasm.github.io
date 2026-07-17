@@ -67,7 +67,7 @@ function classifyRound(note) {
   return null;
 }
 
-function buildResults(events, standings, ov) {
+function buildResults(events, standings, ov, fixtures) {
   ov = ov || {};
   const parsed = events.map(competitors).filter(Boolean);
 
@@ -169,6 +169,20 @@ function buildResults(events, standings, ov) {
     if (Array.isArray(ov.rounds[rd])) rounds[rd] = new Set(ov.rounds[rd].map(canon));
   }
   if (Array.isArray(ov.thirdCandidates) && ov.thirdCandidates.length) { thirdCandidates.clear(); ov.thirdCandidates.forEach(t => thirdCandidates.add(canon(t))); }
+  // Teams knocked out in the GROUP STAGE (bottom of their group, or one of the
+  // 4 third-placed teams that missed the best-third cutoff) never appear as a
+  // loser in any knockout fixture, so the loop above never adds them to
+  // `eliminated`. Without this, a pick naming one of them for R32-or-later
+  // shows "pending" forever instead of "wrong" — it can never resolve, but
+  // also never dies, quietly inflating max/predicted points. Only safe to
+  // derive once the round of 32 is fully known (all 32 real names in).
+  if (fixtures && rounds.r32.size >= BRACKET_SIZE.r32) {
+    for (const fx of fixtures) {
+      const h = canon(fx.home), a = canon(fx.away);
+      if (!rounds.r32.has(h)) eliminated.add(h);
+      if (!rounds.r32.has(a)) eliminated.add(a);
+    }
+  }
   if (ov.champion) champion = ov.champion;
   if (ov.thirdPlaceWinner) thirdWinner = ov.thirdPlaceWinner;
   const finalScore = ov.finalScore || null;
@@ -520,8 +534,8 @@ async function main(force) {
     status.className = 'status';
     status.textContent = 'Loading live scores…';
     const [{ events, standings, ts, cached }, ov] = await Promise.all([getEspn(force), fetchOverrides()]);
-    const R = buildResults(events, standings, ov);
     const fixtures = window.WC_FIXTURES;
+    const R = buildResults(events, standings, ov, fixtures);
     const scored = window.WC_PLAYERS.map(p => ({ p, ...scorePlayer(p, R, fixtures) }));
 
     const finishedMatches = fixtures.filter(fx => R.fixtureOutcome(fx)).length;
