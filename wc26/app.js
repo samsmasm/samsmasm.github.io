@@ -168,7 +168,7 @@ function buildResults(events, standings, ov) {
   if (ov.rounds) for (const rd of Object.keys(rounds)) {
     if (Array.isArray(ov.rounds[rd])) rounds[rd] = new Set(ov.rounds[rd].map(canon));
   }
-  if (Array.isArray(ov.thirdCandidates)) { thirdCandidates.clear(); ov.thirdCandidates.forEach(t => thirdCandidates.add(canon(t))); }
+  if (Array.isArray(ov.thirdCandidates) && ov.thirdCandidates.length) { thirdCandidates.clear(); ov.thirdCandidates.forEach(t => thirdCandidates.add(canon(t))); }
   if (ov.champion) champion = ov.champion;
   if (ov.thirdPlaceWinner) thirdWinner = ov.thirdPlaceWinner;
   const finalScore = ov.finalScore || null;
