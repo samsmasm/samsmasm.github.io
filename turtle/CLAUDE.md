@@ -62,6 +62,9 @@ The engine and program model are decoupled from the DOM so they can be reused.
     `repeat` block, but only if they are **one contiguous run of siblings**
     (`locateSelection()` enforces this; the "Repeat selected" button disables otherwise).
     Selecting a run that already contains a repeat block nests it → hierarchical loops.
+  - **Duplicate** — `duplicateSelection()` deep-copies a contiguous selected run
+    (`cloneNode` reassigns fresh ids, recursing into loop bodies) and inserts the copies
+    right after it, then selects the copies. Same contiguous-run rule as grouping.
   - **Reorder** — `moveNode(path, ±1)` swaps a node with its adjacent sibling (up/down
     arrows; bounds disabled). Reordering is within a sibling list only.
   - **Delete** — two intentional behaviours: the per-row **✕ unwraps** a repeat block

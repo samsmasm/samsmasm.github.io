@@ -200,6 +200,13 @@
   }
   .del-selected:hover:not(:disabled) { background: #fff0f0; color: #c23b3b; border-color: #f5c9c0; }
   .del-selected:disabled { opacity: 0.45; cursor: default; }
+  .dup-selected {
+    padding: 10px 16px; border: 2px solid var(--accent-border); border-radius: 14px;
+    background: #fff; color: var(--accent-text);
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .dup-selected:hover:not(:disabled) { background: var(--accent-bg); }
+  .dup-selected:disabled { opacity: 0.45; cursor: default; }
 
   /* ---- program list ---- */
   /* ---- selection action bar ---- */
@@ -455,8 +462,9 @@
         <p class="sec-label">Program</p>
         <div class="sel-bar">
           <button class="add-btn" id="btn-repeat" disabled>🔁 Repeat selected</button>
+          <button class="dup-selected" id="btn-duplicate" disabled>⧉ Duplicate</button>
           <button class="del-selected" id="btn-del-selected" disabled>🗑 Delete selected</button>
-          <span class="sel-hint" id="sel-hint">Tap steps to select, then loop or delete them</span>
+          <span class="sel-hint" id="sel-hint">Tap steps to select, then loop, duplicate, or delete them</span>
         </div>
         <div class="program" id="program"></div>
         <div class="run-row">
@@ -863,6 +871,28 @@ function wrapSelection() {
   afterEdit();
 }
 
+// deep copy of a node (and any nested loop body) with fresh ids
+function cloneNode(node) {
+  const c = { ...node, id: nid() };
+  if (node.type === 'repeat') c.body = node.body.map(cloneNode);
+  return c;
+}
+
+// duplicate a contiguous selected run: insert copies right after it, and
+// leave the copies selected so you can duplicate/move them again
+function duplicateSelection() {
+  const loc = locateSelection();
+  if (!loc) return;
+  snapshot();
+  const { parent, start, end } = loc;
+  const clones = [];
+  for (let i = start; i <= end; i++) clones.push(cloneNode(parent[i]));
+  parent.splice(end + 1, 0, ...clones);
+  selected.clear();
+  for (const c of clones) selected.add(c.id);
+  afterEdit();
+}
+
 function moveNode(path, dir) {
   const { parent, index } = resolvePath(path);
   const j = index + dir;
@@ -947,14 +977,16 @@ function afterEdit() { pruneSelection(); runAll(); renderProgram(); updateSelBar
 
 function updateSelBar() {
   const repeatBtn = document.getElementById('btn-repeat');
+  const dupBtn = document.getElementById('btn-duplicate');
   const delBtn = document.getElementById('btn-del-selected');
   const hint = document.getElementById('sel-hint');
-  const canRepeat = locateSelection() !== null;
-  repeatBtn.disabled = !canRepeat;
+  const canRun = locateSelection() !== null;   // a contiguous run: loop or duplicate
+  repeatBtn.disabled = !canRun;
+  dupBtn.disabled = !canRun;
   delBtn.disabled = selected.size === 0;
-  if (selected.size === 0) hint.textContent = 'Tap steps to select, then loop or delete them';
-  else if (canRepeat) hint.textContent = selected.size + ' selected';
-  else hint.textContent = selected.size + ' selected — pick a run next to each other to loop';
+  if (selected.size === 0) hint.textContent = 'Tap steps to select, then loop, duplicate, or delete them';
+  else if (canRun) hint.textContent = selected.size + ' selected';
+  else hint.textContent = selected.size + ' selected — pick a run next to each other to loop or duplicate';
 }
 
 /* ------------------------------------------------------------
@@ -1169,6 +1201,7 @@ COLORS.forEach((c, i) => {
 
 // selection actions
 document.getElementById('btn-repeat').addEventListener('click', wrapSelection);
+document.getElementById('btn-duplicate').addEventListener('click', duplicateSelection);
 document.getElementById('btn-del-selected').addEventListener('click', deleteSelected);
 
 // run controls
