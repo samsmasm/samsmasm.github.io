@@ -23,6 +23,7 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   moa/                    ← MOA: Modern Origin Archive (retro Windows 9x aesthetic)
   fmwskills/              ← FMW skills-sequencing planning docs + collaborative Kanban tool (Firebase, see CLAUDE.md inside)
   longcut/                ← Quiet-route A* pathfinder (Leaflet + OSM, single HTML)
+  turtle/                 ← Turtle Artist: kids' turtle-graphics tool (single HTML, see CLAUDE.md inside)
   graphs/                 ← Economics Graph Drawer (see CLAUDE.md inside)
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
   qreview/                ← IB continual revision / flashcard tool
