@@ -133,7 +133,8 @@
     font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1; cursor: pointer;
   }
   .zoom-btn:hover { background: var(--accent-bg); }
-  .zoom-toggle { display: flex; align-items: center; gap: 10px; }
+  .toggles { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .toggle-item { display: inline-flex; align-items: center; gap: 7px; }
   .switch-label { font-size: 13px; color: var(--muted); }
   .switch {
     position: relative; width: 46px; height: 26px; flex-shrink: 0;
@@ -261,15 +262,27 @@
     margin: 8px 8px 8px 0;
     overflow: hidden;
   }
-  .repeat-head { background: var(--accent-bg); }
+  .repeat-head { background: var(--accent-bg); flex-wrap: wrap; }
   .rep-badge { font-size: 18px; }
-  .rep-count { font-weight: 700; color: var(--accent-text); min-width: 40px; }
+  .rep-count-label { font-weight: 700; color: var(--accent-text); }
+  .rep-count-input {
+    width: 48px; padding: 5px 6px; text-align: center;
+    font-family: inherit; font-size: 15px; font-weight: 700; color: var(--accent-text);
+    border: 2px solid var(--accent-border); border-radius: 8px; background: #fff; outline: none;
+  }
+  .rep-count-input:focus { border-color: var(--accent); }
   .cnt {
     width: 28px; height: 28px; border-radius: 8px;
     border: 1px solid var(--accent-border); background: #fff; color: var(--accent-text);
     font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; padding: 0;
   }
   .cnt:hover { background: var(--accent-bg-hover); }
+  .rep-sum {
+    padding: 5px 12px 5px 14px; font-size: 12px; color: var(--accent-text);
+    background: var(--accent-bg); border-top: 1px solid var(--accent-warm-divider);
+    letter-spacing: 0.02em;
+  }
+  .rep-sum b { font-weight: 700; }
   .repeat-body {
     background: #fff; margin: 0 0 0 10px;
     border-left: 2px dashed var(--accent-border);
@@ -335,9 +348,15 @@
           <button class="zoom-btn" id="zoom-in" aria-label="Zoom in">+</button>
           <button class="zoom-btn" id="zoom-fit" aria-label="Fit drawing to view">Fit</button>
         </div>
-        <div class="zoom-toggle">
-          <span class="switch-label" id="draw-label">Drawing preview</span>
-          <button class="switch on" id="toggle-draw" role="switch" aria-checked="true" aria-labelledby="draw-label"><span class="knob"></span></button>
+        <div class="toggles">
+          <span class="toggle-item">
+            <span class="switch-label" id="draw-label">Drawing</span>
+            <button class="switch on" id="toggle-draw" role="switch" aria-checked="true" aria-labelledby="draw-label"><span class="knob"></span></button>
+          </span>
+          <span class="toggle-item">
+            <span class="switch-label" id="turtle-label">Turtle</span>
+            <button class="switch on" id="toggle-turtle" role="switch" aria-checked="true" aria-labelledby="turtle-label"><span class="knob"></span></button>
+          </span>
         </div>
       </div>
       <div class="canvas-box">
@@ -456,7 +475,7 @@ const STEP_DIST = 40;            // default px per Forward / Backward
 const DEFAULT_COLOR = '#333333';
 const COLORS = ['#e23b3b', '#f0842a', '#f5c518', '#3aa64a',
                 '#2b7fd6', '#7b4fd0', '#e35aa8', '#8a5a2b', '#333333'];
-const REPEAT_MIN = 1, REPEAT_MAX = 20;
+const REPEAT_MIN = 1, REPEAT_MAX = 100;
 // advanced ranges (still clamped so no invalid state is reachable)
 const ANGLE_MIN = 1, ANGLE_MAX = 359;
 const LEN_MIN = 1, LEN_MAX = 300;
@@ -573,11 +592,12 @@ function turtleMarker() {
        + `<ellipse cx="0" cy="-1" rx="5" ry="4.5" fill="#2c7d38" opacity="0.4"/>`
        + `</g>`;
 }
-// The preview toggle hides the DRAWING (so the result is a surprise); the
-// turtle itself always shows so you can still see where it is.
+// Two independent toggles: the drawing (segments) and the turtle marker.
+// Hiding the drawing makes the result a surprise; the turtle can be hidden too.
 let showDrawing = true;
+let showTurtle = true;
 function render() {
-  drawLayer.innerHTML = (showDrawing ? segmentsSVG() : '') + turtleMarker();
+  drawLayer.innerHTML = (showDrawing ? segmentsSVG() : '') + (showTurtle ? turtleMarker() : '');
 }
 function round(n) { return Math.round(n * 100) / 100; }
 
@@ -704,10 +724,37 @@ function snapshot() { undoStack.push(JSON.stringify(program)); if (undoStack.len
 
 function addCommand(cmd) { snapshot(); cmd.id = nid(); insertTarget().push(cmd); afterEdit(); }
 
-function toggleSelect(path) {
-  const { node } = resolvePath(path);
-  if (selected.has(node.id)) selected.delete(node.id); else selected.add(node.id);
+// ids in the order rows are drawn (pre-order: a loop's header then its body)
+function nodeOrder(nodes = program, out = []) {
+  for (const n of nodes) { out.push(n.id); if (n.type === 'repeat') nodeOrder(n.body, out); }
+  return out;
+}
+
+let selAnchor = null;   // last plainly-clicked row, for shift-range selection
+function toggleSelect(path, shift) {
+  const id = resolvePath(path).node.id;
+  if (shift && selAnchor != null && locate(selAnchor)) {
+    // extend: select every row between the anchor and this one (visual order)
+    const order = nodeOrder();
+    const i = order.indexOf(selAnchor), j = order.indexOf(id);
+    if (i > -1 && j > -1) {
+      for (let k = Math.min(i, j); k <= Math.max(i, j); k++) selected.add(order[k]);
+    }
+  } else {
+    if (selected.has(id)) selected.delete(id); else selected.add(id);
+    selAnchor = id;
+  }
   renderProgram(); updateSelBar();
+}
+
+// net heading change (deg, right +) for one pass of a loop body, incl. nesting
+function bodyNetTurn(nodes) {
+  let sum = 0;
+  for (const n of nodes) {
+    if (n.type === 'turn') sum += (n.dir === 'right' ? n.value : -n.value);
+    else if (n.type === 'repeat') sum += bodyNetTurn(n.body) * n.count;
+  }
+  return sum;
 }
 
 function wrapSelection() {
@@ -758,7 +805,13 @@ function deleteSelected() {
 function changeCount(path, delta) {
   const { node } = resolvePath(path);
   if (node.type !== 'repeat') return;
-  const c = Math.max(REPEAT_MIN, Math.min(REPEAT_MAX, node.count + delta));
+  setCount(path, node.count + delta);
+}
+// set an exact loop count (from the number input), clamped 1..REPEAT_MAX
+function setCount(path, value) {
+  const { node } = resolvePath(path);
+  if (node.type !== 'repeat') return;
+  const c = Math.max(REPEAT_MIN, Math.min(REPEAT_MAX, Math.round(value) || REPEAT_MIN));
   if (c === node.count) return;
   snapshot(); node.count = c; afterEdit();
 }
@@ -822,6 +875,17 @@ function rowTools(path, first, last) {
        + `</span>`;
 }
 
+// the "sum of turns" strip under a loop's header: how far it turns per pass
+// and across all its repeats (right +, left −; includes nested loops)
+function turnSumHTML(node) {
+  const per = bodyNetTurn(node.body);
+  const total = per * node.count;
+  if (per === 0) return `<div class="rep-sum">No net turn each time round</div>`;
+  const dir = per > 0 ? '↻ right' : '↺ left';
+  return `<div class="rep-sum">Turns <b>${Math.abs(per)}°</b> ${dir} each time · `
+       + `<b>${Math.abs(total)}°</b> in total</div>`;
+}
+
 // recursively render a sibling list of nodes into HTML.
 // The whole row (data-act="sel") toggles selection — a big, multi-select-friendly
 // target; the nested tool buttons take precedence via closest('[data-act]').
@@ -839,11 +903,14 @@ function renderNodes(nodes, prefix) {
       html += `<div class="repeat-block"><div class="repeat-head${on ? ' sel' : ''}" data-act="sel" data-path="${path}" role="button" aria-pressed="${on}">`
             + box
             + `<span class="rep-badge">🔁</span>`
-            + `<span class="rep-count">× ${node.count}</span>`
+            + `<span class="rep-count-label">×</span>`
             + `<button class="cnt" data-act="cminus" data-path="${path}" aria-label="Fewer repeats">−</button>`
+            + `<input class="rep-count-input" data-path="${path}" type="number" min="${REPEAT_MIN}" max="${REPEAT_MAX}" value="${node.count}" inputmode="numeric" aria-label="Repeat count">`
             + `<button class="cnt" data-act="cplus" data-path="${path}" aria-label="More repeats">+</button>`
             + tools
-            + `</div><div class="repeat-body">${body}</div></div>`;
+            + `</div>`
+            + turnSumHTML(node)
+            + `<div class="repeat-body">${body}</div></div>`;
     } else {
       const l = labelFor(node);
       html += `<div class="node-row${on ? ' sel' : ''}" data-act="sel" data-path="${path}" role="button" aria-pressed="${on}">`
@@ -935,14 +1002,19 @@ advLength.addEventListener('change', () => setStepDist(advLength.value));
 document.getElementById('adv-turn-left').addEventListener('click',  () => addCommand({ type: 'turn', dir: 'left',  value: turnAngle }));
 document.getElementById('adv-turn-right').addEventListener('click', () => addCommand({ type: 'turn', dir: 'right', value: turnAngle }));
 
-// drawing-preview toggle — hides the drawing (surprise!); turtle stays visible
-const toggleDraw = document.getElementById('toggle-draw');
-toggleDraw.addEventListener('click', () => {
-  showDrawing = !showDrawing;
-  toggleDraw.classList.toggle('on', showDrawing);
-  toggleDraw.setAttribute('aria-checked', String(showDrawing));
-  render();
-});
+// canvas toggles — drawing (surprise mode) and the turtle marker, independently
+function wireToggle(id, get, set) {
+  const el = document.getElementById(id);
+  el.addEventListener('click', () => {
+    const v = !get();
+    set(v);
+    el.classList.toggle('on', v);
+    el.setAttribute('aria-checked', String(v));
+    render();
+  });
+}
+wireToggle('toggle-draw',   () => showDrawing, v => showDrawing = v);
+wireToggle('toggle-turtle', () => showTurtle,  v => showTurtle  = v);
 
 // zoom controls
 document.getElementById('zoom-in').addEventListener('click',  () => zoomBy(1.25));
@@ -978,17 +1050,24 @@ document.getElementById('btn-export').addEventListener('click', exportSVG);
 // program list actions (select / reorder / delete / count) — delegated;
 // the innermost data-act wins, so tool buttons beat the row's select target
 programEl.addEventListener('click', e => {
+  if (e.target.tagName === 'INPUT') return;   // don't select when using the count field
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const path = b.dataset.path;
   switch (b.dataset.act) {
-    case 'sel':      toggleSelect(path); break;
+    case 'sel':      toggleSelect(path, e.shiftKey); break;
     case 'up':       moveNode(path, -1); break;
     case 'down':     moveNode(path, 1); break;
     case 'del':      deleteNode(path); break;
     case 'cminus':   changeCount(path, -1); break;
     case 'cplus':    changeCount(path, 1); break;
   }
+});
+
+// typed loop count (commit on blur / Enter, so we don't re-render mid-keystroke)
+programEl.addEventListener('change', e => {
+  const inp = e.target.closest('.rep-count-input');
+  if (inp) setCount(inp.dataset.path, parseInt(inp.value, 10));
 });
 
 // initial paint

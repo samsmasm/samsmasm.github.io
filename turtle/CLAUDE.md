@@ -50,7 +50,9 @@ The engine and program model are decoupled from the DOM so they can be reused.
   reverses *any* action — add/group/reorder/delete/count):
   - **Selection** — `selected` is a `Set` of node ids. The **whole row** (`data-act="sel"`)
     toggles selection — a big, multi-select-friendly target; nested tool buttons win via
-    `closest('[data-act]')`. Selected rows get a `.sel` highlight.
+    `closest('[data-act]')`. Selected rows get a `.sel` highlight. **Shift-click** extends
+    from the `selAnchor` (last plain click): every row between anchor and target in visual
+    order (`nodeOrder`, a pre-order id list) is added.
   - **Group into repeat** — `wrapSelection()` wraps the selected nodes into a new
     `repeat` block, but only if they are **one contiguous run of siblings**
     (`locateSelection()` enforces this; the "Repeat selected" button disables otherwise).
@@ -61,6 +63,13 @@ The engine and program model are decoupled from the DOM so they can be reused.
     (removes the loop, *keeps* its steps — `deleteNode`), while **Delete selected**
     (`deleteSelected`) removes selected nodes outright, including a loop *and* its contents.
     Deleting a leaf just removes it; deleting an emptied loop removes it.
+  - **Loop count** — 1..`REPEAT_MAX` (**100**). Each block has `−`/`+` buttons
+    (`changeCount`) and an editable number field (`setCount`, committed on `change` so it
+    doesn't re-render mid-keystroke). The list `click` handler ignores `INPUT` targets so
+    typing in the field doesn't also toggle row selection.
+  - **Turn sum** — under each loop header, `turnSumHTML` shows how far the loop turns:
+    `bodyNetTurn(body)` (right +, left −, recursing into nested loops × their count) per
+    pass, and ×count as the total. Lets kids see e.g. 90°×4 = 360° closes the shape.
   - **Add target** — new commands append to root, *unless exactly one repeat block is
     selected*, in which case they append inside that block's `body` (`insertTarget()`).
   - **Paths** — the DOM uses dotted index paths (`"1.0"`); `resolvePath()` maps a path
@@ -76,10 +85,10 @@ The engine and program model are decoupled from the DOM so they can be reused.
 - **Rendering** — `renderNodes(nodes, prefix)` recurses to build the list; repeat blocks
   render as an accent-bracketed container with the count stepper and their body indented.
   `segmentsSVG()` builds `<line>` elements (concrete hex colours, so export is trivial).
-  `turtleMarker()` is a small green turtle SVG drawn facing north and rotated by heading;
-  it's on-screen only (excluded from export) and is **always shown**. `render()` reads
-  `showDrawing`: the preview toggle hides the **drawing** (segments) — not the turtle — so
-  the result is a surprise while the turtle still shows where it is.
+  `turtleMarker()` is a small green turtle SVG drawn facing north and rotated by heading
+  (on-screen only, excluded from export). `render()` reads two independent toggles:
+  `showDrawing` (hide the segments for a surprise) and `showTurtle` (hide the turtle) —
+  the two switches above the canvas.
   `Run` replays all; `Step` walks one primitive op at a time via a cursor that resets on
   any edit; `Undo` restores the previous tree snapshot.
 
@@ -93,10 +102,10 @@ The engine and program model are decoupled from the DOM so they can be reused.
 
 ## Guardrails
 
-Every reachable state is valid by construction: repeat count clamped 1–20 (buttons only),
-turns come from fixed angle buttons (15/30/45/60/90/120) or the clamped Advanced angle
-(1–359), and travel length is the clamped Advanced field (1–300). Grouping is restricted to
-contiguous siblings, so the tree stays well-formed.
+Every reachable state is valid by construction: repeat count clamped 1–100 (buttons and a
+clamped number field), turns come from fixed angle buttons (15/30/45/60/90/120) or the
+clamped Advanced angle (1–359), and travel length is the clamped Advanced field (1–300).
+Grouping is restricted to contiguous siblings, so the tree stays well-formed.
 
 ## Linked from
 
