@@ -129,6 +129,22 @@
   .swatch:hover { transform: translateY(-2px); }
   .swatch.on { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+  /* "Next colour" — cycles through the bright hues (no brown / black) */
+  .nextcolor-btn {
+    display: inline-flex; align-items: center; gap: 9px; margin-top: 12px;
+    padding: 9px 15px; border: 2px solid var(--accent-border); border-radius: 12px;
+    background: #fff; color: var(--accent-text);
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .nextcolor-btn:hover { background: var(--accent-bg); }
+  .nextcolor-chip {
+    width: 30px; height: 20px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.15);
+    background: linear-gradient(90deg, #e23b3b, #f0842a, #f5c518, #3aa64a, #2b7fd6, #7b4fd0, #e35aa8);
+  }
+  .prog-swatch--cycle {
+    background: linear-gradient(90deg, #e23b3b, #f0842a, #f5c518, #3aa64a, #2b7fd6, #7b4fd0, #e35aa8);
+  }
+
   /* ---- canvas tools row: zoom (left) + preview toggle (right) ---- */
   .canvas-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
   .zoom-group { display: flex; align-items: center; gap: 6px; }
@@ -440,6 +456,7 @@
       <div class="sec">
         <p class="sec-label">Pen colour</p>
         <div class="swatch-row" id="swatch-row"></div>
+        <button class="nextcolor-btn" id="btn-nextcolor"><span class="nextcolor-chip"></span>Next colour</button>
       </div>
 
       <div class="sec">
@@ -524,6 +541,8 @@ const STEP_DIST = 40;            // default px per Forward / Backward
 const DEFAULT_COLOR = '#333333';
 const COLORS = ['#e23b3b', '#f0842a', '#f5c518', '#3aa64a',
                 '#2b7fd6', '#7b4fd0', '#e35aa8', '#8a5a2b', '#333333'];
+// the "next colour" step cycles through the bright hues only (no brown / black)
+const CYCLE_COLORS = ['#e23b3b', '#f0842a', '#f5c518', '#3aa64a', '#2b7fd6', '#7b4fd0', '#e35aa8'];
 const REPEAT_MIN = 1, REPEAT_MAX = 100;
 // advanced ranges (still clamped so no invalid state is reachable)
 const ANGLE_MIN = 1, ANGLE_MAX = 359;
@@ -557,15 +576,22 @@ class TurtleEngine {
   penUp()   { this.penDown = false; }
   penDownFn(){ this.penDown = true; }
   setColor(c) { this.color = c; }
+  // advance to the next bright hue; if the current colour isn't in the cycle
+  // (default black, brown, etc.) start at the first one
+  nextColor() {
+    const i = CYCLE_COLORS.indexOf(this.color);
+    this.color = CYCLE_COLORS[i >= 0 ? (i + 1) % CYCLE_COLORS.length : 0];
+  }
 
   // execute a single primitive command (no 'repeat' here — flattened away)
   exec(cmd) {
     switch (cmd.type) {
-      case 'forward':  this.forward(cmd.value != null ? cmd.value : STEP_DIST); break;
-      case 'backward': this.backward(cmd.value != null ? cmd.value : STEP_DIST); break;
-      case 'turn':     cmd.dir === 'left' ? this.turnLeft(cmd.value) : this.turnRight(cmd.value); break;
-      case 'pen':      cmd.state === 'up' ? this.penUp() : this.penDownFn(); break;
-      case 'color':    this.setColor(cmd.value); break;
+      case 'forward':   this.forward(cmd.value != null ? cmd.value : STEP_DIST); break;
+      case 'backward':  this.backward(cmd.value != null ? cmd.value : STEP_DIST); break;
+      case 'turn':      cmd.dir === 'left' ? this.turnLeft(cmd.value) : this.turnRight(cmd.value); break;
+      case 'pen':       cmd.state === 'up' ? this.penUp() : this.penDownFn(); break;
+      case 'color':     this.setColor(cmd.value); break;
+      case 'nextcolor': this.nextColor(); break;
     }
   }
   // run the first `upto` primitives from a clean reset (deterministic; no drift)
@@ -1023,8 +1049,9 @@ function stepIcon(node) {
     case 'forward':  return '↑';
     case 'backward': return '↓';
     case 'turn':     return node.dir === 'left' ? '↺' : '↻';
-    case 'pen':      return node.state === 'up' ? '✎↑' : '✎↓';
-    case 'color':    return '🎨';
+    case 'pen':       return node.state === 'up' ? '✎↑' : '✎↓';
+    case 'color':     return '🎨';
+    case 'nextcolor': return '🌈';
   }
   return '?';
 }
@@ -1041,8 +1068,9 @@ function stepText(node, path) {
     case 'backward': return 'Backward ' + numInput(path, 'len', node.value != null ? node.value : STEP_DIST, LEN_MIN, LEN_MAX);
     case 'turn':     return (node.dir === 'left' ? 'Turn left ' : 'Turn right ')
                           + numInput(path, 'angle', node.value, ANGLE_MIN, ANGLE_MAX) + '°';
-    case 'pen':      return node.state === 'up' ? 'Pen up' : 'Pen down';
-    case 'color':    return `<span class="prog-swatch" style="background:${node.value}"></span>Colour`;
+    case 'pen':       return node.state === 'up' ? 'Pen up' : 'Pen down';
+    case 'color':     return `<span class="prog-swatch" style="background:${node.value}"></span>Colour`;
+    case 'nextcolor': return `<span class="prog-swatch prog-swatch--cycle"></span>Next colour`;
   }
   return '?';
 }
@@ -1230,6 +1258,8 @@ COLORS.forEach((c, i) => {
   });
   swatchRow.appendChild(b);
 });
+// "next colour" step — cycles through the bright hues at run time
+document.getElementById('btn-nextcolor').addEventListener('click', () => addCommand({ type: 'nextcolor' }));
 
 // selection actions
 document.getElementById('btn-repeat').addEventListener('click', wrapSelection);

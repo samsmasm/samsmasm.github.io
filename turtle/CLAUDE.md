@@ -41,7 +41,10 @@ The engine and program model are decoupled from the DOM so they can be reused.
 - **Program model** — a **tree** of command nodes, each with a stable `id` (used for
   selection across re-renders). Leaves: `{id,type:'forward',value:px}`,
   `{id,type:'backward',value:px}`, `{id,type:'turn',dir:'left'|'right',value:deg}`,
-  `{id,type:'pen',state:'up'|'down'}`, `{id,type:'color',value:hex}`. A repeat is a
+  `{id,type:'pen',state:'up'|'down'}`, `{id,type:'color',value:hex}`,
+  `{id,type:'nextcolor'}` (advances the pen through `CYCLE_COLORS` — the bright hues only,
+  no brown/black; `engine.nextColor()` picks the next after the current colour, or the
+  first if the current isn't in the cycle). A repeat is a
   **container node** that can nest: `{id,type:'repeat',count:N,body:[...children...]}`.
   `program` is the root list. (This replaced the original flat-array / "repeat wraps
   everything before it" model when reorder + selectable + hierarchical repeats were added.)
