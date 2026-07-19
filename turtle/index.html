@@ -309,6 +309,20 @@
   .rep-empty { padding: 9px 12px; color: var(--muted); font-size: 13px; }
 
   /* ---- run controls ---- */
+  /* ---- Run speed selector ---- */
+  .speed-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .speed-lead {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin-right: 2px;
+  }
+  .speed-btn {
+    padding: 8px 14px; border: 2px solid var(--accent-border); border-radius: 12px;
+    background: #fff; color: var(--accent-text);
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .speed-btn:hover { background: var(--accent-bg); }
+  .speed-btn.on { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+
   .run-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
   .run-btn {
     flex: 1 1 auto; min-width: 84px;
@@ -467,6 +481,13 @@
           <span class="sel-hint" id="sel-hint">Tap steps to select, then loop, duplicate, or delete them</span>
         </div>
         <div class="program" id="program"></div>
+        <div class="speed-row" id="speed-row">
+          <span class="speed-lead">Speed</span>
+          <button class="speed-btn" data-speed="0.35">Slow</button>
+          <button class="speed-btn on" data-speed="1">Normal</button>
+          <button class="speed-btn" data-speed="3">Fast</button>
+          <button class="speed-btn" data-speed="instant">Instant</button>
+        </div>
         <div class="run-row">
           <button class="run-btn primary" id="btn-run">▶ Run</button>
           <button class="run-btn" id="btn-step">Step</button>
@@ -700,14 +721,16 @@ function stepOnce() {
 }
 
 // Run = watch the turtle walk the route, drawing as it goes.
-const RUN_SPEED_PX = 300;    // travel speed (px/sec)
-const RUN_SPEED_DEG = 360;   // turn speed (deg/sec)
+const RUN_SPEED_PX = 300;    // travel speed (px/sec) at Normal
+const RUN_SPEED_DEG = 360;   // turn speed (deg/sec) at Normal
 const RUN_MIN_MS = 40;       // floor so tiny ops are still visible
-const RUN_CAP_MS = 9000;     // total animation is scaled to stay under this
+const RUN_CAP_MS = 20000;    // safety: even Slow won't run longer than this
+let runSpeed = 1;            // multiplier set by the Speed buttons ('instant' = no walk)
 function opDuration(cmd) {
+  const mul = typeof runSpeed === 'number' ? runSpeed : 1;
   if (cmd.type === 'forward' || cmd.type === 'backward')
-    return Math.max(RUN_MIN_MS, ((cmd.value != null ? cmd.value : STEP_DIST) / RUN_SPEED_PX) * 1000);
-  if (cmd.type === 'turn') return Math.max(RUN_MIN_MS, (cmd.value / RUN_SPEED_DEG) * 1000);
+    return Math.max(RUN_MIN_MS, ((cmd.value != null ? cmd.value : STEP_DIST) / RUN_SPEED_PX) * 1000 / mul);
+  if (cmd.type === 'turn') return Math.max(RUN_MIN_MS, (cmd.value / RUN_SPEED_DEG) * 1000 / mul);
   return 0;                  // pen / colour are instant
 }
 
@@ -720,6 +743,7 @@ function runAnimated() {
 
   engine.runOps(ops);                             // compute the full route...
   fitView();                                      // ...frame it so the whole walk is visible
+  if (runSpeed === 'instant') { render(); return; }   // instant finish: skip the walk
   engine.reset();                                 // ...then walk it from the start
 
   let total = 0; for (const op of ops) total += opDuration(op);
@@ -1183,6 +1207,14 @@ function setDrawOn() {
 document.getElementById('zoom-in').addEventListener('click',  () => zoomBy(1.25));
 document.getElementById('zoom-out').addEventListener('click', () => zoomBy(0.8));
 document.getElementById('zoom-fit').addEventListener('click', fitView);
+
+// Run speed selector (Slow / Normal / Fast / Instant)
+document.getElementById('speed-row').addEventListener('click', e => {
+  const btn = e.target.closest('.speed-btn');
+  if (!btn) return;
+  runSpeed = btn.dataset.speed === 'instant' ? 'instant' : parseFloat(btn.dataset.speed);
+  document.querySelectorAll('#speed-row .speed-btn').forEach(b => b.classList.toggle('on', b === btn));
+});
 
 // colour swatches
 const swatchRow = document.getElementById('swatch-row');

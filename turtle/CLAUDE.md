@@ -106,9 +106,12 @@ The engine and program model are decoupled from the DOM so they can be reused.
   frame it, then walks the flattened ops via `requestAnimationFrame`, interpolating each
   forward (a growing partial line) and turn (rotating in place) and committing ops with
   `engine.exec` as they finish. Speeds `RUN_SPEED_PX`/`RUN_SPEED_DEG`, floored per op and
-  scaled so total ≤ `RUN_CAP_MS`. Run forces the drawing visible (`setDrawOn`) and always
-  shows the turtle while walking. `cancelAnimation()` (called by any edit / Step / Clear /
-  re-Run) stops it. `runAll()` is the instant version used after edits.
+  scaled so total ≤ `RUN_CAP_MS`. The **Speed** buttons set `runSpeed` — a multiplier
+  (Slow 0.35 / Normal 1 / Fast 3) that divides each op's duration, or the string
+  `'instant'`, which draws the whole route at once (still fits + reveals, just no walk).
+  Run forces the drawing visible (`setDrawOn`) and always shows the turtle while walking.
+  `cancelAnimation()` (called by any edit / Step / Clear / re-Run) stops it. `runAll()` is
+  the instant version used after edits.
   `Step` walks one primitive op at a time via a cursor that resets on any edit; `Undo`
   restores the previous tree snapshot.
 
