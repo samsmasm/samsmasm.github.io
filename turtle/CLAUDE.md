@@ -22,6 +22,11 @@ Icon+label command buttons use glyphs/emoji (🎨 🔁 ↑ ↺). This is the one
 sanctioned place for symbols: `AESTHETIC.md`'s "no emoji in nav/chrome" rule is
 about site chrome, and the header/footer here stay emoji-free.
 
+**Layout**: three columns on desktop — `.tools-pane` (command buttons) | `.canvas-pane`
+(drawing) | `.steps-pane` (program list + run/export). They're placed with flex `order`
+(canvas is first in the DOM but `order:2`). Below 1040px they stack: canvas, then
+buttons, then steps.
+
 ## Extension points for Phase 2 (mandala / pattern painter)
 
 The engine and program model are decoupled from the DOM so they can be reused.
@@ -96,6 +101,10 @@ The engine and program model are decoupled from the DOM so they can be reused.
   (`applyView`). `zoomBy(factor)` scales `size` (in→smaller, clamped `VIEW_MIN..MAX`),
   `fitView()` frames the whole drawing + turtle with padding, `resetView()` restores the
   default 600 box (also on Clear / init). The canvas pane is larger and `sticky` on desktop.
+
+- **Coordinate readout** — `updateCoords()` (called from `render()`) prints the turtle's
+  position under the canvas with the **start point as origin (0,0)** and **y pointing up**
+  (`x = engine.x − CX`, `y = CY − engine.y`), so Forward is +y and negatives are normal.
 
 - **Export** — serializes a clean copy (segments only, no turtle) framed to the drawing's
   bounding box + padding, via a Blob + temporary `<a download>`. No PNG.

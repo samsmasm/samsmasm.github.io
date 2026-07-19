@@ -54,14 +54,15 @@
   .back { margin-left: auto; font-size: 13px; color: var(--accent-text); text-decoration: none; }
   .back:hover { text-decoration: underline; }
 
-  main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+  main { max-width: 1360px; margin: 0 auto; padding: 24px; }
 
-  /* ---- two-pane layout (canvas gets the larger share) ---- */
+  /* ---- three-pane layout: buttons | drawing | steps ---- */
   .stage {
-    display: flex; gap: 24px; align-items: flex-start;
+    display: flex; gap: 22px; align-items: flex-start;
   }
-  .canvas-pane { flex: 1.55 1 540px; min-width: 0; position: sticky; top: 16px; }
-  .control-pane { flex: 1 1 360px; min-width: 0; }
+  .tools-pane  { flex: 1 1 300px; min-width: 0; order: 1; }
+  .canvas-pane { flex: 1.35 1 460px; min-width: 0; order: 2; position: sticky; top: 16px; }
+  .steps-pane  { flex: 1 1 320px; min-width: 0; order: 3; }
 
   /* ---- canvas ---- */
   .canvas-box {
@@ -71,6 +72,11 @@
     padding: 10px;
   }
   .canvas-box svg { display: block; width: 100%; height: auto; border-radius: 10px; }
+  .coords {
+    margin-top: 8px; text-align: center;
+    font-size: 12px; color: var(--muted); letter-spacing: 0.02em;
+  }
+  .coords b { color: var(--accent-text); font-weight: 700; }
 
   /* ---- section headings in play surface ---- */
   .sec { margin-bottom: 22px; }
@@ -317,11 +323,13 @@
     font-size: 11px; color: #bbb;
   }
 
-  /* ---- responsive: stack ---- */
-  @media (max-width: 780px) {
+  /* ---- responsive: stack (canvas first, then buttons, then steps) ---- */
+  @media (max-width: 1040px) {
     .stage { flex-direction: column; }
-    .canvas-pane, .control-pane { flex: 1 1 auto; width: 100%; }
-    .canvas-pane { position: static; }
+    .tools-pane, .canvas-pane, .steps-pane { flex: 1 1 auto; width: 100%; }
+    .canvas-pane { position: static; order: 0; }
+    .tools-pane { order: 1; }
+    .steps-pane { order: 2; }
     .cmd-grid { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
@@ -364,10 +372,11 @@
           <g id="draw-layer"></g>
         </svg>
       </div>
+      <div class="coords" id="coords"></div>
     </div>
 
-    <!-- ============ CONTROLS ============ -->
-    <div class="control-pane">
+    <!-- ============ LEFT: command buttons ============ -->
+    <div class="tools-pane">
 
       <div class="sec">
         <p class="sec-label">Move</p>
@@ -430,6 +439,11 @@
           </div>
         </details>
       </div>
+
+    </div>
+
+    <!-- ============ RIGHT: the steps ============ -->
+    <div class="steps-pane">
 
       <div class="sec">
         <p class="sec-label">Program</p>
@@ -562,6 +576,15 @@ function flatten(nodes) {
 const engine = new TurtleEngine();
 const drawLayer = document.getElementById('draw-layer');
 const canvasEl  = document.getElementById('canvas');
+const coordsEl  = document.getElementById('coords');
+
+// turtle position with the START point as the origin (0,0), y pointing up so
+// forward is +y — matches maths intuition, and negatives are expected.
+function updateCoords() {
+  const x = Math.round(engine.x - CX);
+  const y = Math.round(CY - engine.y);
+  coordsEl.innerHTML = `turtle at <b>x ${x}</b>, <b>y ${y}</b> &nbsp;·&nbsp; start is 0, 0`;
+}
 
 function segmentsSVG() {
   let s = '';
@@ -598,6 +621,7 @@ let showDrawing = true;
 let showTurtle = true;
 function render() {
   drawLayer.innerHTML = (showDrawing ? segmentsSVG() : '') + (showTurtle ? turtleMarker() : '');
+  updateCoords();
 }
 function round(n) { return Math.round(n * 100) / 100; }
 
