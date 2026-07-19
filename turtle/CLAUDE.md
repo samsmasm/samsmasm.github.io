@@ -47,45 +47,56 @@ The engine and program model are decoupled from the DOM so they can be reused.
   outer `Repeat(3)` = a 3-square rosette. Deterministic; re-run from scratch each time.
 
 - **Editing / interaction** (all operate on the tree, each snapshots first so `Undo`
-  reverses *any* action — add/group/reorder/delete/ungroup/count):
-  - **Selection** — `selected` is a `Set` of node ids; each row has a tick box.
+  reverses *any* action — add/group/reorder/delete/count):
+  - **Selection** — `selected` is a `Set` of node ids. The **whole row** (`data-act="sel"`)
+    toggles selection — a big, multi-select-friendly target; nested tool buttons win via
+    `closest('[data-act]')`. Selected rows get a `.sel` highlight.
   - **Group into repeat** — `wrapSelection()` wraps the selected nodes into a new
     `repeat` block, but only if they are **one contiguous run of siblings**
     (`locateSelection()` enforces this; the "Repeat selected" button disables otherwise).
     Selecting a run that already contains a repeat block nests it → hierarchical loops.
   - **Reorder** — `moveNode(path, ±1)` swaps a node with its adjacent sibling (up/down
     arrows; bounds disabled). Reordering is within a sibling list only.
-  - **Ungroup** — `ungroupNode(path)` removes a repeat block but lifts its children into
-    the parent. **Delete** removes the node (and its subtree).
+  - **Delete** — two intentional behaviours: the per-row **✕ unwraps** a repeat block
+    (removes the loop, *keeps* its steps — `deleteNode`), while **Delete selected**
+    (`deleteSelected`) removes selected nodes outright, including a loop *and* its contents.
+    Deleting a leaf just removes it; deleting an emptied loop removes it.
   - **Add target** — new commands append to root, *unless exactly one repeat block is
     selected*, in which case they append inside that block's `body` (`insertTarget()`).
   - **Paths** — the DOM uses dotted index paths (`"1.0"`); `resolvePath()` maps a path
     to `{parent, index, node}`; `locate(id)` finds a node anywhere by id.
 
-- **Inputs** — `turnAngle` (current turn amount) and `stepDist` (current travel length)
-  are the live values stamped onto new turn / forward-backward commands. Quick-select
-  chips set `turnAngle`; the **Advanced** `<details>` menu exposes number inputs for both
-  (`setTurnAngle`/`setStepDist`, clamped to `ANGLE_MIN..MAX` / `LEN_MIN..MAX`), kept in
-  sync with the chips. Existing command nodes keep the value they were created with.
+- **Inputs** — `turnAngle` and `stepDist` are the live values stamped onto new turn /
+  forward-backward commands. The **Turn** section is two rows of angle buttons (left/right);
+  tapping one **adds that turn immediately** (no separate "add" step). `stepDist` comes from
+  the **Advanced** `<details>` menu's Travel-length input; `turnAngle` from its Turn-angle
+  input, whose **Left / Right** buttons add a custom-angle turn. Both inputs clamp to
+  `ANGLE_MIN..MAX` / `LEN_MIN..MAX`. Existing command nodes keep the value they were made with.
 
 - **Rendering** — `renderNodes(nodes, prefix)` recurses to build the list; repeat blocks
   render as an accent-bracketed container with the count stepper and their body indented.
   `segmentsSVG()` builds `<line>` elements (concrete hex colours, so export is trivial).
   `turtleMarker()` is a small green turtle SVG drawn facing north and rotated by heading;
-  it's on-screen only (excluded from export) and gated by the `showTurtle` preview toggle
-  (the switch above the canvas). `render()` reads `showTurtle` — no argument.
+  it's on-screen only (excluded from export) and is **always shown**. `render()` reads
+  `showDrawing`: the preview toggle hides the **drawing** (segments) — not the turtle — so
+  the result is a surprise while the turtle still shows where it is.
   `Run` replays all; `Step` walks one primitive op at a time via a cursor that resets on
   any edit; `Undo` restores the previous tree snapshot.
 
-- **Export** — serializes a clean copy (white bg rect + segments only, no turtle) via
-  a Blob + temporary `<a download>`. No PNG in Phase 1.
+- **Zoom / view** — the SVG `viewBox` is centered on `view.{cx,cy}` with side `view.size`
+  (`applyView`). `zoomBy(factor)` scales `size` (in→smaller, clamped `VIEW_MIN..MAX`),
+  `fitView()` frames the whole drawing + turtle with padding, `resetView()` restores the
+  default 600 box (also on Clear / init). The canvas pane is larger and `sticky` on desktop.
+
+- **Export** — serializes a clean copy (segments only, no turtle) framed to the drawing's
+  bounding box + padding, via a Blob + temporary `<a download>`. No PNG.
 
 ## Guardrails
 
-Every reachable state is valid by construction: repeat count clamped 1–20 (buttons
-only), quick angles are chips (30/45/60/90/120), and the only free numeric entry is in
-the opt-in **Advanced** menu, where both fields are clamped (angle 1–359, length 1–300).
-Grouping is restricted to contiguous siblings, so the tree stays well-formed.
+Every reachable state is valid by construction: repeat count clamped 1–20 (buttons only),
+turns come from fixed angle buttons (15/30/45/60/90/120) or the clamped Advanced angle
+(1–359), and travel length is the clamped Advanced field (1–300). Grouping is restricted to
+contiguous siblings, so the tree stays well-formed.
 
 ## Linked from
 
