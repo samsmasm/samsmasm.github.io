@@ -75,6 +75,11 @@ The engine and program model are decoupled from the DOM so they can be reused.
   - **Turn sum** — under each loop header, `turnSumHTML` shows how far the loop turns:
     `bodyNetTurn(body)` (right +, left −, recursing into nested loops × their count) per
     pass, and ×count as the total. Lets kids see e.g. 90°×4 = 360° closes the shape.
+  - **Edit a step in place** — a leaf row's distance / angle is an editable `.step-num`
+    number input (`stepText`/`numInput`); `setStepValue(path, kind, value)` clamps and
+    writes `node.value` (kind `'len'` → `LEN_*`, `'angle'` → `ANGLE_*`). Committed on the
+    delegated `change` handler. The list `click` handler ignores `INPUT` targets so editing
+    a value never toggles row selection.
   - **Add target** — new commands append to root, *unless exactly one repeat block is
     selected*, in which case they append inside that block's `body` (`insertTarget()`).
   - **Paths** — the DOM uses dotted index paths (`"1.0"`); `resolvePath()` maps a path
@@ -94,8 +99,15 @@ The engine and program model are decoupled from the DOM so they can be reused.
   (on-screen only, excluded from export). `render()` reads two independent toggles:
   `showDrawing` (hide the segments for a surprise) and `showTurtle` (hide the turtle) —
   the two switches above the canvas.
-  `Run` replays all; `Step` walks one primitive op at a time via a cursor that resets on
-  any edit; `Undo` restores the previous tree snapshot.
+  **Run is animated** (`runAnimated`): it first computes the full route and `fitView()`s to
+  frame it, then walks the flattened ops via `requestAnimationFrame`, interpolating each
+  forward (a growing partial line) and turn (rotating in place) and committing ops with
+  `engine.exec` as they finish. Speeds `RUN_SPEED_PX`/`RUN_SPEED_DEG`, floored per op and
+  scaled so total ≤ `RUN_CAP_MS`. Run forces the drawing visible (`setDrawOn`) and always
+  shows the turtle while walking. `cancelAnimation()` (called by any edit / Step / Clear /
+  re-Run) stops it. `runAll()` is the instant version used after edits.
+  `Step` walks one primitive op at a time via a cursor that resets on any edit; `Undo`
+  restores the previous tree snapshot.
 
 - **Zoom / view** — the SVG `viewBox` is centered on `view.{cx,cy}` with side `view.size`
   (`applyView`). `zoomBy(factor)` scales `size` (in→smaller, clamped `VIEW_MIN..MAX`),

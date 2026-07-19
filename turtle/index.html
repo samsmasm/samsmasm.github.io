@@ -225,6 +225,12 @@
   .node-row.sel, .repeat-head.sel { background: var(--accent-bg-hover); }
   .prog-ico { font-size: 20px; width: 24px; text-align: center; flex-shrink: 0; }
   .prog-txt { flex: 1; color: var(--ink); }
+  .step-num {
+    width: 54px; margin: 0 3px; padding: 4px 6px; text-align: center;
+    font-family: inherit; font-size: 14px; font-weight: 600; color: var(--accent-text);
+    border: 2px solid var(--accent-border); border-radius: 8px; background: #fff; outline: none;
+  }
+  .step-num:focus { border-color: var(--accent); }
   .prog-swatch {
     display: inline-block; width: 16px; height: 16px; border-radius: 4px;
     vertical-align: -2px; margin-right: 6px; border: 1px solid rgba(0,0,0,0.15);
@@ -580,9 +586,9 @@ const coordsEl  = document.getElementById('coords');
 
 // turtle position with the START point as the origin (0,0), y pointing up so
 // forward is +y — matches maths intuition, and negatives are expected.
-function updateCoords() {
-  const x = Math.round(engine.x - CX);
-  const y = Math.round(CY - engine.y);
+function updateCoords(px = engine.x, py = engine.y) {
+  const x = Math.round(px - CX);
+  const y = Math.round(CY - py);
   coordsEl.innerHTML = `turtle at <b>x ${x}</b>, <b>y ${y}</b> &nbsp;·&nbsp; start is 0, 0`;
 }
 
@@ -595,8 +601,8 @@ function segmentsSVG() {
   return s;
 }
 // a little green turtle, drawn facing north (up); rotate() aims it along heading
-function turtleMarker() {
-  const x = round(engine.x), y = round(engine.y), h = round(engine.heading);
+function turtleMarker(px = engine.x, py = engine.y, ph = engine.heading) {
+  const x = round(px), y = round(py), h = round(ph);
   return `<g transform="translate(${x},${y}) rotate(${h})" stroke-linejoin="round">`
        // legs
        + `<ellipse cx="-11" cy="-8" rx="4.2" ry="5.6" fill="#57c06a" stroke="#2c7d38" stroke-width="1" transform="rotate(40 -11 -8)"/>`
@@ -657,13 +663,15 @@ function fitView() {
 }
 
 /* ------------------------------------------------------------
-   Execution — Run / Step
+   Execution — Run (animated) / Step
    ------------------------------------------------------------ */
 let stepOps = null, stepIdx = 0;
+let animId = null;                       // rAF handle while the turtle walks
+function cancelAnimation() { if (animId !== null) { cancelAnimationFrame(animId); animId = null; } }
 
-// re-run the whole program from scratch and show result (the turtle
-// always reflects the current program after any edit)
+// instant full render (used after edits, Undo, etc.)
 function runAll() {
+  cancelAnimation();
   const ops = flatten(program);
   engine.runOps(ops);
   render();
@@ -671,6 +679,7 @@ function runAll() {
 }
 
 function stepOnce() {
+  cancelAnimation();
   const ops = flatten(program);
   if (ops.length === 0) { engine.reset(); render(); return; }
   // (re)start stepping if the program changed or we've reached the end
@@ -680,6 +689,68 @@ function stepOnce() {
   engine.runOps(stepOps, stepIdx + 1);
   stepIdx++;
   render();
+}
+
+// Run = watch the turtle walk the route, drawing as it goes.
+const RUN_SPEED_PX = 300;    // travel speed (px/sec)
+const RUN_SPEED_DEG = 360;   // turn speed (deg/sec)
+const RUN_MIN_MS = 40;       // floor so tiny ops are still visible
+const RUN_CAP_MS = 9000;     // total animation is scaled to stay under this
+function opDuration(cmd) {
+  if (cmd.type === 'forward' || cmd.type === 'backward')
+    return Math.max(RUN_MIN_MS, ((cmd.value != null ? cmd.value : STEP_DIST) / RUN_SPEED_PX) * 1000);
+  if (cmd.type === 'turn') return Math.max(RUN_MIN_MS, (cmd.value / RUN_SPEED_DEG) * 1000);
+  return 0;                  // pen / colour are instant
+}
+
+function runAnimated() {
+  cancelAnimation();
+  stepOps = null; stepIdx = 0;
+  const ops = flatten(program);
+  setDrawOn();                                    // Run reveals the drawing
+  if (ops.length === 0) { engine.reset(); render(); return; }
+
+  engine.runOps(ops);                             // compute the full route...
+  fitView();                                      // ...frame it so the whole walk is visible
+  engine.reset();                                 // ...then walk it from the start
+
+  let total = 0; for (const op of ops) total += opDuration(op);
+  const speedup = total > RUN_CAP_MS ? total / RUN_CAP_MS : 1;
+
+  let ai = 0, opStart = null, opDur = 0, from = null;
+  function beginOp() {
+    from = { x: engine.x, y: engine.y, heading: engine.heading };
+    opDur = opDuration(ops[ai]) / speedup;
+    opStart = null;
+  }
+  function frame(ts) {
+    if (opStart === null) opStart = ts;
+    const cmd = ops[ai];
+    const t = opDur === 0 ? 1 : Math.min(1, (ts - opStart) / opDur);
+    // interpolate the in-progress op for a smooth walk / turn
+    let tx = engine.x, ty = engine.y, th = engine.heading, extra = '';
+    if (cmd.type === 'forward' || cmd.type === 'backward') {
+      const dist = (cmd.value != null ? cmd.value : STEP_DIST) * (cmd.type === 'backward' ? -1 : 1);
+      const r = from.heading * Math.PI / 180;
+      const ex = from.x + dist * Math.sin(r), ey = from.y - dist * Math.cos(r);
+      tx = from.x + (ex - from.x) * t; ty = from.y + (ey - from.y) * t; th = from.heading;
+      if (engine.penDown)
+        extra = `<line x1="${round(from.x)}" y1="${round(from.y)}" x2="${round(tx)}" y2="${round(ty)}" stroke="${engine.color}" stroke-width="3" stroke-linecap="round"/>`;
+    } else if (cmd.type === 'turn') {
+      const delta = cmd.dir === 'right' ? cmd.value : -cmd.value;
+      th = from.heading + delta * t; tx = from.x; ty = from.y;
+    }
+    drawLayer.innerHTML = segmentsSVG() + extra + turtleMarker(tx, ty, th);   // turtle always shown while walking
+    updateCoords(tx, ty);
+    if (t >= 1) {
+      engine.exec(cmd); ai++;
+      if (ai >= ops.length) { animId = null; render(); return; }   // done
+      beginOp();
+    }
+    animId = requestAnimationFrame(frame);
+  }
+  beginOp();
+  animId = requestAnimationFrame(frame);
 }
 
 /* ------------------------------------------------------------
@@ -839,6 +910,20 @@ function setCount(path, value) {
   if (c === node.count) return;
   snapshot(); node.count = c; afterEdit();
 }
+// edit a step's value in place: kind 'angle' (turn) or 'len' (forward/backward)
+function setStepValue(path, kind, value) {
+  const { node } = resolvePath(path);
+  let v;
+  if (kind === 'angle') {
+    if (node.type !== 'turn') return;
+    v = Math.max(ANGLE_MIN, Math.min(ANGLE_MAX, Math.round(value) || ANGLE_MIN));
+  } else {
+    if (node.type !== 'forward' && node.type !== 'backward') return;
+    v = Math.max(LEN_MIN, Math.min(LEN_MAX, Math.round(value) || LEN_MIN));
+  }
+  if (v === node.value) return;
+  snapshot(); node.value = v; afterEdit();
+}
 
 function undo() {
   if (!undoStack.length) return;
@@ -849,6 +934,7 @@ function undo() {
 }
 
 function clearAll() {
+  cancelAnimation();
   snapshot();
   program.length = 0; selected.clear();
   engine.reset(); stepOps = null; stepIdx = 0;
@@ -876,18 +962,33 @@ function updateSelBar() {
    ------------------------------------------------------------ */
 const programEl = document.getElementById('program');
 
-function labelFor(cmd) {
-  switch (cmd.type) {
-    case 'forward':  return { ico: '↑', txt: 'Forward ' + (cmd.value != null ? cmd.value : STEP_DIST) };
-    case 'backward': return { ico: '↓', txt: 'Backward ' + (cmd.value != null ? cmd.value : STEP_DIST) };
-    case 'turn':     return { ico: cmd.dir === 'left' ? '↺' : '↻',
-                              txt: (cmd.dir === 'left' ? 'Turn left ' : 'Turn right ') + cmd.value + '°' };
-    case 'pen':      return { ico: cmd.state === 'up' ? '✎↑' : '✎↓',
-                              txt: cmd.state === 'up' ? 'Pen up' : 'Pen down' };
-    case 'color':    return { ico: '🎨',
-                              txt: `<span class="prog-swatch" style="background:${cmd.value}"></span>Colour` };
+function stepIcon(node) {
+  switch (node.type) {
+    case 'forward':  return '↑';
+    case 'backward': return '↓';
+    case 'turn':     return node.dir === 'left' ? '↺' : '↻';
+    case 'pen':      return node.state === 'up' ? '✎↑' : '✎↓';
+    case 'color':    return '🎨';
   }
-  return { ico: '?', txt: '?' };
+  return '?';
+}
+// leaf label — distance / angle are editable number inputs so a step can be
+// tweaked in place (see the `.step-num` change handler)
+function numInput(path, kind, value, min, max) {
+  return `<input class="step-num" data-path="${path}" data-kind="${kind}" type="number" `
+       + `min="${min}" max="${max}" value="${value}" inputmode="numeric" `
+       + `aria-label="${kind === 'angle' ? 'Angle' : 'Distance'}">`;
+}
+function stepText(node, path) {
+  switch (node.type) {
+    case 'forward':  return 'Forward ' + numInput(path, 'len', node.value != null ? node.value : STEP_DIST, LEN_MIN, LEN_MAX);
+    case 'backward': return 'Backward ' + numInput(path, 'len', node.value != null ? node.value : STEP_DIST, LEN_MIN, LEN_MAX);
+    case 'turn':     return (node.dir === 'left' ? 'Turn left ' : 'Turn right ')
+                          + numInput(path, 'angle', node.value, ANGLE_MIN, ANGLE_MAX) + '°';
+    case 'pen':      return node.state === 'up' ? 'Pen up' : 'Pen down';
+    case 'color':    return `<span class="prog-swatch" style="background:${node.value}"></span>Colour`;
+  }
+  return '?';
 }
 
 // reorder + delete controls (the ✕ on a loop unwraps it — see deleteNode)
@@ -936,11 +1037,10 @@ function renderNodes(nodes, prefix) {
             + turnSumHTML(node)
             + `<div class="repeat-body">${body}</div></div>`;
     } else {
-      const l = labelFor(node);
       html += `<div class="node-row${on ? ' sel' : ''}" data-act="sel" data-path="${path}" role="button" aria-pressed="${on}">`
             + box
-            + `<span class="prog-ico">${l.ico}</span>`
-            + `<span class="prog-txt">${l.txt}</span>`
+            + `<span class="prog-ico">${stepIcon(node)}</span>`
+            + `<span class="prog-txt">${stepText(node, path)}</span>`
             + tools
             + `</div>`;
     }
@@ -1039,6 +1139,13 @@ function wireToggle(id, get, set) {
 }
 wireToggle('toggle-draw',   () => showDrawing, v => showDrawing = v);
 wireToggle('toggle-turtle', () => showTurtle,  v => showTurtle  = v);
+// force the drawing visible (used by Run so the walk is always watchable)
+function setDrawOn() {
+  if (showDrawing) return;
+  showDrawing = true;
+  const el = document.getElementById('toggle-draw');
+  el.classList.add('on'); el.setAttribute('aria-checked', 'true');
+}
 
 // zoom controls
 document.getElementById('zoom-in').addEventListener('click',  () => zoomBy(1.25));
@@ -1065,7 +1172,7 @@ document.getElementById('btn-repeat').addEventListener('click', wrapSelection);
 document.getElementById('btn-del-selected').addEventListener('click', deleteSelected);
 
 // run controls
-document.getElementById('btn-run').addEventListener('click', runAll);
+document.getElementById('btn-run').addEventListener('click', runAnimated);
 document.getElementById('btn-step').addEventListener('click', stepOnce);
 document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-clear').addEventListener('click', clearAll);
@@ -1088,10 +1195,12 @@ programEl.addEventListener('click', e => {
   }
 });
 
-// typed loop count (commit on blur / Enter, so we don't re-render mid-keystroke)
+// typed loop count / step values (commit on blur or Enter, not mid-keystroke)
 programEl.addEventListener('change', e => {
-  const inp = e.target.closest('.rep-count-input');
-  if (inp) setCount(inp.dataset.path, parseInt(inp.value, 10));
+  const rep = e.target.closest('.rep-count-input');
+  if (rep) { setCount(rep.dataset.path, parseInt(rep.value, 10)); return; }
+  const step = e.target.closest('.step-num');
+  if (step) setStepValue(step.dataset.path, step.dataset.kind, parseInt(step.value, 10));
 });
 
 // initial paint
