@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turtle Artist</title>
+<style>
+  :root {
+    /* ---- warm sunny accent (swap here to re-theme the play surface) ---- */
+    --accent:        #e8912d;   /* primary warm orange — buttons, turtle */
+    --accent-dark:   #a85e0e;   /* deeper amber — borders / pressed */
+    --accent-text:   #7a4a08;   /* dark amber — button labels, headings */
+    --accent-border: #f0cf95;   /* soft amber — button + panel borders */
+    --accent-bg:     #fff6e3;   /* pale amber — button + panel fills */
+    --accent-bg-hover:#ffedc7;  /* hover fill */
+    --accent-warm-divider:#f2e4c8; /* warm hairline inside play surface */
+
+    /* ---- site chrome (follows AESTHETIC.md exactly) ---- */
+    --divider: #f0e8ff;
+    --ink: #2a2118;
+    --muted: #7a6f60;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    color: var(--ink);
+    background: #fff;
+    line-height: 1.55;
+  }
+
+  /* ---- header (site convention) ---- */
+  header {
+    background:
+      radial-gradient(ellipse at 12% 50%, #fff3d6 0%, transparent 50%),
+      radial-gradient(ellipse at 35% 18%, #d6ffe8 0%, transparent 45%),
+      radial-gradient(ellipse at 60% 80%, #ffe3c2 0%, transparent 42%),
+      radial-gradient(ellipse at 82% 28%, #d6f0ff 0%, transparent 45%),
+      radial-gradient(ellipse at 92% 72%, #ffd6e7 0%, transparent 40%),
+      #fff6e3;
+    border-bottom: 1px solid var(--divider);
+    padding: 22px 24px;
+  }
+  .header-inner {
+    max-width: 1040px; margin: 0 auto;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .header-inner img {
+    width: 60px; height: 60px; border-radius: 14px;
+    background: rgba(255,255,255,0.45);
+  }
+  .wordmark { font-family: Georgia, serif; font-weight: 700; font-size: 30px; color: var(--accent-text); }
+  .tagline { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .back { margin-left: auto; font-size: 13px; color: var(--accent-text); text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+
+  main { max-width: 1040px; margin: 0 auto; padding: 24px; }
+
+  /* ---- two-pane layout ---- */
+  .stage {
+    display: flex; gap: 24px; align-items: flex-start;
+  }
+  .canvas-pane { flex: 1 1 460px; min-width: 0; }
+  .control-pane { flex: 1 1 400px; min-width: 0; }
+
+  /* ---- canvas ---- */
+  .canvas-box {
+    border: 2px solid var(--accent-border);
+    border-radius: 18px;
+    background: #fff;
+    padding: 10px;
+  }
+  .canvas-box svg { display: block; width: 100%; height: auto; border-radius: 10px; }
+
+  /* ---- section headings in play surface ---- */
+  .sec { margin-bottom: 22px; }
+  .sec-label {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 0 0 10px 2px;
+  }
+
+  /* ---- big command buttons ---- */
+  .cmd-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  }
+  .cmd-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; min-height: 74px; padding: 8px 4px;
+    border: 2px solid var(--accent-border); border-radius: 16px;
+    background: var(--accent-bg); color: var(--accent-text);
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: transform 0.08s, background 0.12s;
+  }
+  .cmd-btn:hover { background: var(--accent-bg-hover); transform: translateY(-2px); }
+  .cmd-btn:active { transform: translateY(0); background: var(--accent-border); }
+  .cmd-ico { font-size: 26px; line-height: 1; }
+
+  /* ---- small quick-select chips (turn angle) ---- */
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+  .chip-lead { font-size: 13px; color: var(--muted); margin-right: 2px; }
+  .chip {
+    min-width: 52px; padding: 8px 12px;
+    border: 2px solid var(--accent-border); border-radius: 12px;
+    background: #fff; color: var(--accent-text);
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .chip:hover { background: var(--accent-bg); }
+  .chip.on { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+
+  /* ---- colour swatches ---- */
+  .swatch-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .swatch {
+    width: 40px; height: 40px; border-radius: 12px;
+    border: 2px solid rgba(0,0,0,0.12); cursor: pointer; padding: 0;
+    transition: transform 0.08s;
+  }
+  .swatch:hover { transform: translateY(-2px); }
+  .swatch.on { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- repeat stepper ---- */
+  .stepper { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .step-btn {
+    width: 44px; height: 44px; font-size: 24px; line-height: 1;
+    border: 2px solid var(--accent-border); border-radius: 12px;
+    background: var(--accent-bg); color: var(--accent-text);
+    font-family: inherit; font-weight: 700; cursor: pointer;
+  }
+  .step-btn:hover { background: var(--accent-bg-hover); }
+  .step-val {
+    min-width: 56px; text-align: center;
+    font-size: 20px; font-weight: 700; color: var(--accent-text);
+  }
+  .add-btn {
+    padding: 10px 18px; border: 2px solid var(--accent-dark); border-radius: 14px;
+    background: var(--accent); color: #fff;
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .add-btn:hover { background: var(--accent-dark); }
+
+  /* ---- program list ---- */
+  .program {
+    border: 2px solid var(--accent-border); border-radius: 16px;
+    background: #fff; overflow: hidden;
+    min-height: 60px;
+  }
+  .prog-empty {
+    padding: 18px 16px; color: var(--muted); font-size: 14px; text-align: center;
+  }
+  .prog-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--accent-warm-divider);
+    font-size: 15px;
+  }
+  .prog-row:last-child { border-bottom: none; }
+  .prog-num {
+    flex-shrink: 0; width: 24px; text-align: right;
+    font-size: 12px; color: var(--muted);
+  }
+  .prog-ico { font-size: 20px; width: 24px; text-align: center; }
+  .prog-txt { flex: 1; color: var(--ink); }
+  .prog-txt.repeat { color: var(--accent-text); font-weight: 600; }
+  .prog-swatch {
+    display: inline-block; width: 16px; height: 16px; border-radius: 4px;
+    vertical-align: -2px; margin-right: 6px; border: 1px solid rgba(0,0,0,0.15);
+  }
+  .del-btn {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px;
+    border: none; background: transparent; color: var(--muted);
+    font-size: 17px; cursor: pointer; line-height: 1;
+  }
+  .del-btn:hover { background: #fff0f0; color: #c23b3b; }
+
+  /* ---- run controls ---- */
+  .run-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .run-btn {
+    flex: 1 1 auto; min-width: 84px;
+    padding: 12px 14px; border-radius: 14px;
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+    border: 2px solid var(--accent-border); background: var(--accent-bg); color: var(--accent-text);
+    transition: transform 0.08s, background 0.12s;
+  }
+  .run-btn:hover { background: var(--accent-bg-hover); transform: translateY(-1px); }
+  .run-btn.primary { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+  .run-btn.primary:hover { background: var(--accent-dark); }
+
+  .export-row { margin-top: 14px; }
+  .export-btn {
+    width: 100%; padding: 12px; border-radius: 14px;
+    border: 2px solid var(--accent-border); background: #fff; color: var(--accent-text);
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .export-btn:hover { background: var(--accent-bg); }
+
+  /* ---- footer (site convention) ---- */
+  footer {
+    max-width: 1040px; margin: 40px auto 24px; padding: 16px 24px 0;
+    border-top: 1px solid var(--divider);
+    font-size: 11px; color: #bbb;
+  }
+
+  /* ---- responsive: stack ---- */
+  @media (max-width: 780px) {
+    .stage { flex-direction: column; }
+    .canvas-pane, .control-pane { flex: 1 1 auto; width: 100%; }
+    .cmd-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <img src="/unisamsq.png" alt="unisam.nz">
+    <div>
+      <div class="wordmark">Turtle Artist</div>
+      <div class="tagline">Give the turtle steps and turns, and watch it draw</div>
+    </div>
+    <a class="back" href="/">← unisam.nz</a>
+  </div>
+</header>
+
+<main>
+  <div class="stage">
+    <!-- ============ CANVAS ============ -->
+    <div class="canvas-pane">
+      <div class="canvas-box">
+        <svg id="canvas" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" aria-label="Turtle drawing canvas">
+          <g id="draw-layer"></g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ============ CONTROLS ============ -->
+    <div class="control-pane">
+
+      <div class="sec">
+        <p class="sec-label">Commands</p>
+        <div class="cmd-grid">
+          <button class="cmd-btn" data-cmd="forward"><span class="cmd-ico">↑</span>Forward</button>
+          <button class="cmd-btn" data-cmd="backward"><span class="cmd-ico">↓</span>Backward</button>
+          <button class="cmd-btn" data-cmd="penup"><span class="cmd-ico">✎↑</span>Pen up</button>
+          <button class="cmd-btn" data-cmd="turnleft"><span class="cmd-ico">↺</span>Turn left</button>
+          <button class="cmd-btn" data-cmd="turnright"><span class="cmd-ico">↻</span>Turn right</button>
+          <button class="cmd-btn" data-cmd="pendown"><span class="cmd-ico">✎↓</span>Pen down</button>
+        </div>
+        <div class="chip-row" id="angle-row">
+          <span class="chip-lead">Turn by</span>
+          <button class="chip" data-angle="30">30°</button>
+          <button class="chip" data-angle="45">45°</button>
+          <button class="chip" data-angle="60">60°</button>
+          <button class="chip on" data-angle="90">90°</button>
+          <button class="chip" data-angle="120">120°</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <p class="sec-label">Pen colour</p>
+        <div class="swatch-row" id="swatch-row"></div>
+      </div>
+
+      <div class="sec">
+        <p class="sec-label">Repeat</p>
+        <div class="stepper">
+          <button class="step-btn" id="rep-minus">−</button>
+          <span class="step-val" id="rep-val">4</span>
+          <button class="step-btn" id="rep-plus">+</button>
+          <button class="add-btn" id="rep-add">🔁 Add repeat</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <p class="sec-label">Program</p>
+        <div class="program" id="program"></div>
+        <div class="run-row">
+          <button class="run-btn primary" id="btn-run">▶ Run</button>
+          <button class="run-btn" id="btn-step">Step</button>
+          <button class="run-btn" id="btn-undo">Undo</button>
+          <button class="run-btn" id="btn-clear">Clear</button>
+        </div>
+        <div class="export-row">
+          <button class="export-btn" id="btn-export">⭳ Export SVG</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  Built by Sam G · all vibe coded · found a problem? tell Sam.
+</footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Turtle Artist — Phase 1 MVP
+   Single-file, framework-agnostic. The engine + program model
+   are deliberately decoupled from the DOM so Phase 2 (mandala
+   / pattern painter) can reuse them. See turtle/CLAUDE.md.
+   ============================================================ */
+
+// ---- fixed constants (no invalid state reachable through the UI) ----
+const CANVAS = 600;
+const CX = CANVAS / 2, CY = CANVAS / 2;
+const STEP_DIST = 40;            // px per Forward / Backward
+const DEFAULT_COLOR = '#333333';
+const COLORS = ['#e23b3b', '#f0842a', '#f5c518', '#3aa64a',
+                '#2b7fd6', '#7b4fd0', '#e35aa8', '#8a5a2b', '#333333'];
+const REPEAT_MIN = 1, REPEAT_MAX = 20;
+
+/* ------------------------------------------------------------
+   TurtleEngine — pure geometry, emits coloured line segments.
+   Heading 0 = north (up); positive turn = clockwise (Turn right).
+   ------------------------------------------------------------ */
+class TurtleEngine {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = CX; this.y = CY;
+    this.heading = 0;
+    this.penDown = true;
+    this.color = DEFAULT_COLOR;
+    this.segments = [];
+  }
+  forward(steps) {
+    const r = this.heading * Math.PI / 180;
+    const nx = this.x + steps * Math.sin(r);
+    const ny = this.y - steps * Math.cos(r);
+    if (this.penDown) {
+      this.segments.push({ x1: this.x, y1: this.y, x2: nx, y2: ny, color: this.color });
+    }
+    this.x = nx; this.y = ny;
+  }
+  backward(steps) { this.forward(-steps); }
+  turnLeft(deg)  { this.heading = (this.heading - deg) % 360; }
+  turnRight(deg) { this.heading = (this.heading + deg) % 360; }
+  penUp()   { this.penDown = false; }
+  penDownFn(){ this.penDown = true; }
+  setColor(c) { this.color = c; }
+
+  // execute a single primitive command (no 'repeat' here — flattened away)
+  exec(cmd) {
+    switch (cmd.type) {
+      case 'forward':  this.forward(STEP_DIST); break;
+      case 'backward': this.backward(STEP_DIST); break;
+      case 'turn':     cmd.dir === 'left' ? this.turnLeft(cmd.value) : this.turnRight(cmd.value); break;
+      case 'pen':      cmd.state === 'up' ? this.penUp() : this.penDownFn(); break;
+      case 'color':    this.setColor(cmd.value); break;
+    }
+  }
+  // run the first `upto` primitives from a clean reset (deterministic; no drift)
+  runOps(ops, upto) {
+    this.reset();
+    const n = (upto == null) ? ops.length : Math.min(upto, ops.length);
+    for (let i = 0; i < n; i++) this.exec(ops[i]);
+  }
+}
+
+/* ------------------------------------------------------------
+   Program model — an ordered array of command objects.
+   A 'repeat' command re-runs the whole program built so far,
+   `count` times total (wraps everything before it).
+   ------------------------------------------------------------ */
+const program = [];   // e.g. {type:'forward'} {type:'turn',dir:'right',value:90}
+                      //      {type:'pen',state:'up'} {type:'color',value:'#e23b3b'}
+                      //      {type:'repeat',count:4}
+
+// Expand the program into a flat list of primitive ops (no repeats).
+// repeat(count) appends (count-1) more copies of everything accumulated
+// so far, so [Forward, Turn, Repeat(4)] => 4 iterations => a square.
+function flatten(prog) {
+  const ops = [];
+  for (const cmd of prog) {
+    if (cmd.type === 'repeat') {
+      const body = ops.slice();
+      for (let k = 1; k < cmd.count; k++) {
+        for (const b of body) ops.push(b);
+      }
+    } else {
+      ops.push(cmd);
+    }
+  }
+  return ops;
+}
+
+/* ------------------------------------------------------------
+   Rendering
+   ------------------------------------------------------------ */
+const engine = new TurtleEngine();
+const drawLayer = document.getElementById('draw-layer');
+const canvasEl  = document.getElementById('canvas');
+
+function segmentsSVG() {
+  let s = '';
+  for (const seg of engine.segments) {
+    s += `<line x1="${round(seg.x1)}" y1="${round(seg.y1)}" x2="${round(seg.x2)}" y2="${round(seg.y2)}" `
+       + `stroke="${seg.color}" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  return s;
+}
+function turtleMarker() {
+  const x = round(engine.x), y = round(engine.y), h = round(engine.heading);
+  return `<g transform="translate(${x},${y}) rotate(${h})">`
+       + `<polygon points="0,-13 9,11 -9,11" fill="var(--accent)" stroke="${'#8a4a08'}" stroke-width="1.5"/>`
+       + `<circle cx="0" cy="-2" r="3" fill="#fff"/></g>`;
+}
+function render(showTurtle) {
+  drawLayer.innerHTML = segmentsSVG() + (showTurtle === false ? '' : turtleMarker());
+}
+function round(n) { return Math.round(n * 100) / 100; }
+
+/* ------------------------------------------------------------
+   Execution — Run / Step
+   ------------------------------------------------------------ */
+let stepOps = null, stepIdx = 0;
+
+// re-run the whole program from scratch and show result (the turtle
+// always reflects the current program after any edit)
+function runAll() {
+  const ops = flatten(program);
+  engine.runOps(ops);
+  render(true);
+  stepOps = null; stepIdx = 0;   // editing / running resets stepping
+}
+
+function stepOnce() {
+  const ops = flatten(program);
+  if (ops.length === 0) { engine.reset(); render(true); return; }
+  // (re)start stepping if the program changed or we've reached the end
+  if (stepOps === null || stepIdx >= ops.length) {
+    stepOps = ops; stepIdx = 0;
+  }
+  engine.runOps(stepOps, stepIdx + 1);
+  stepIdx++;
+  render(true);
+}
+
+/* ------------------------------------------------------------
+   Program editing
+   ------------------------------------------------------------ */
+function addCommand(cmd) { program.push(cmd); afterEdit(); }
+
+function undo() { if (program.length) { program.pop(); afterEdit(); } }
+
+function clearAll() {
+  program.length = 0;
+  engine.reset();
+  stepOps = null; stepIdx = 0;
+  render(true);
+  renderProgram();
+}
+
+function deleteAt(i) {
+  if (i >= 0 && i < program.length) { program.splice(i, 1); afterEdit(); }
+}
+
+// after any edit: redraw canvas from scratch + refresh the list
+function afterEdit() { runAll(); renderProgram(); }
+
+/* ------------------------------------------------------------
+   Program list rendering
+   ------------------------------------------------------------ */
+const programEl = document.getElementById('program');
+
+function labelFor(cmd) {
+  switch (cmd.type) {
+    case 'forward':  return { ico: '↑', txt: 'Forward' };
+    case 'backward': return { ico: '↓', txt: 'Backward' };
+    case 'turn':     return { ico: cmd.dir === 'left' ? '↺' : '↻',
+                              txt: (cmd.dir === 'left' ? 'Turn left ' : 'Turn right ') + cmd.value + '°' };
+    case 'pen':      return { ico: cmd.state === 'up' ? '✎↑' : '✎↓',
+                              txt: cmd.state === 'up' ? 'Pen up' : 'Pen down' };
+    case 'color':    return { ico: '🎨',
+                              txt: `<span class="prog-swatch" style="background:${cmd.value}"></span>Colour` };
+    case 'repeat':   return { ico: '🔁', txt: 'Repeat × ' + cmd.count, repeat: true };
+  }
+  return { ico: '?', txt: '?' };
+}
+
+function renderProgram() {
+  if (program.length === 0) {
+    programEl.innerHTML = '<div class="prog-empty">No commands yet — tap a button above to start.</div>';
+    return;
+  }
+  let html = '';
+  program.forEach((cmd, i) => {
+    const l = labelFor(cmd);
+    html += `<div class="prog-row">`
+          + `<span class="prog-num">${i + 1}</span>`
+          + `<span class="prog-ico">${l.ico}</span>`
+          + `<span class="prog-txt${l.repeat ? ' repeat' : ''}">${l.txt}</span>`
+          + `<button class="del-btn" data-del="${i}" aria-label="Delete step ${i + 1}">✕</button>`
+          + `</div>`;
+  });
+  programEl.innerHTML = html;
+}
+
+/* ------------------------------------------------------------
+   SVG export — serialize a clean copy (segments only, no turtle)
+   ------------------------------------------------------------ */
+function exportSVG() {
+  engine.runOps(flatten(program));                 // ensure full drawing
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS} ${CANVAS}" `
+            + `width="${CANVAS}" height="${CANVAS}">`
+            + `<rect width="${CANVAS}" height="${CANVAS}" fill="#ffffff"/>`
+            + segmentsSVG()
+            + `</svg>`;
+  render(true);                                    // restore turtle on screen
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'turtle-drawing.svg';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ------------------------------------------------------------
+   UI wiring
+   ------------------------------------------------------------ */
+let turnAngle = 90;
+let repeatCount = 4;
+
+// command buttons
+document.querySelectorAll('.cmd-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    switch (btn.dataset.cmd) {
+      case 'forward':   addCommand({ type: 'forward' }); break;
+      case 'backward':  addCommand({ type: 'backward' }); break;
+      case 'turnleft':  addCommand({ type: 'turn', dir: 'left',  value: turnAngle }); break;
+      case 'turnright': addCommand({ type: 'turn', dir: 'right', value: turnAngle }); break;
+      case 'penup':     addCommand({ type: 'pen', state: 'up' }); break;
+      case 'pendown':   addCommand({ type: 'pen', state: 'down' }); break;
+    }
+  });
+});
+
+// turn-angle quick select
+document.getElementById('angle-row').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  turnAngle = parseInt(chip.dataset.angle, 10);
+  document.querySelectorAll('#angle-row .chip').forEach(c => c.classList.remove('on'));
+  chip.classList.add('on');
+});
+
+// colour swatches
+const swatchRow = document.getElementById('swatch-row');
+COLORS.forEach((c, i) => {
+  const b = document.createElement('button');
+  b.className = 'swatch' + (c === DEFAULT_COLOR ? ' on' : '');
+  b.style.background = c;
+  b.setAttribute('aria-label', 'Pen colour ' + c);
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('on'));
+    b.classList.add('on');
+    addCommand({ type: 'color', value: c });
+  });
+  swatchRow.appendChild(b);
+});
+
+// repeat stepper (clamped 1–20, buttons only)
+const repVal = document.getElementById('rep-val');
+function setRepeat(n) {
+  repeatCount = Math.max(REPEAT_MIN, Math.min(REPEAT_MAX, n));
+  repVal.textContent = repeatCount;
+}
+document.getElementById('rep-minus').addEventListener('click', () => setRepeat(repeatCount - 1));
+document.getElementById('rep-plus').addEventListener('click',  () => setRepeat(repeatCount + 1));
+document.getElementById('rep-add').addEventListener('click',   () => addCommand({ type: 'repeat', count: repeatCount }));
+
+// run controls
+document.getElementById('btn-run').addEventListener('click', runAll);
+document.getElementById('btn-step').addEventListener('click', stepOnce);
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-clear').addEventListener('click', clearAll);
+document.getElementById('btn-export').addEventListener('click', exportSVG);
+
+// per-step delete (event delegation)
+programEl.addEventListener('click', e => {
+  const del = e.target.closest('.del-btn');
+  if (del) deleteAt(parseInt(del.dataset.del, 10));
+});
+
+// initial paint
+render(true);
+renderProgram();
+</script>
+</body>
+</html>
