@@ -41,7 +41,8 @@ window.addEventListener("load", () => {
   const userSaveBtn  = document.getElementById("user-save");
   const userCancelBtn = document.getElementById("user-cancel");
 
-  const catEl   = document.getElementById("cat");
+  const mascotEl = document.getElementById("mascot");
+  const buntingEl = document.getElementById("bunting");
   const titleEl = document.getElementById("title");
 
   // ---------- audio ----------
@@ -272,12 +273,12 @@ window.addEventListener("load", () => {
   function showWin(text) {
     sfx.fanfare();
     confettiBurst();
-    tyDance(true);
+    mascotDance(true);
     winText.textContent = text;
     winScreen.classList.remove("hidden");
   }
-  winAgainBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); tyDance(false); showGame(); });
-  winMenuBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); tyDance(false); showPicker(); });
+  winAgainBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); mascotDance(false); showGame(); });
+  winMenuBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); mascotDance(false); showPicker(); });
 
   function confettiBurst() {
     const colors = ["#ffd166", "#ff8fab", "#7cc46f", "#6ec5e9", "#e0573f", "#b89ae0"];
@@ -368,14 +369,14 @@ window.addEventListener("load", () => {
     sparkleBurst(x, y);
   }
 
-  // ---------- Ty the cat reactions ----------
-  function tyNom() {
-    catEl.classList.remove("nom");
-    void catEl.offsetWidth;
-    catEl.classList.add("nom");
+  // ---------- Mr. Pizza reactions ----------
+  function mascotNom() {
+    mascotEl.classList.remove("nom");
+    void mascotEl.offsetWidth;
+    mascotEl.classList.add("nom");
   }
-  function tyDance(on) {
-    catEl.classList.toggle("dancing", on);
+  function mascotDance(on) {
+    mascotEl.classList.toggle("dancing", on);
   }
 
   // ==================================================================
@@ -466,7 +467,7 @@ window.addEventListener("load", () => {
     if (firstBadIdx === -1) {
       sfx.correct();
       cheer();
-      tyNom();
+      mascotNom();
       updateProgressRow();
       message.textContent = tieFound
         ? "Correct! And nice spot, two of those pizzas are the same size!"
@@ -477,7 +478,7 @@ window.addEventListener("load", () => {
         awardStar();
         checkAnswersButton.disabled = true;
         checkPizzasButton.disabled = true;
-        setTimeout(() => showWin("You fed the cat by ordering every pizza correctly!"), 500);
+        setTimeout(() => showWin("You ordered every pizza correctly!"), 500);
       } else {
         setTimeout(() => buildOrderRound(TIER_CFG[tier]), 700);
       }
@@ -735,7 +736,7 @@ window.addEventListener("load", () => {
     if (shadedCount === buildNum) {
       sfx.correct();
       cheer();
-      tyNom();
+      mascotNom();
       buildRound++;
       message.textContent = "Correct! That's exactly the right amount.";
       message.style.color = "#3a8a3a";
@@ -761,6 +762,16 @@ window.addEventListener("load", () => {
     "Pizza Fractions".split("").map((ch, i) =>
       ch === " " ? " " : `<span style="animation-delay:${((i + 1) * 0.06).toFixed(2)}s">${ch}</span>`
     ).join("");
+
+  // Festive bunting across the top (Italian-festa colours)
+  const flagColors = ["#e0573f", "#f7f3e8", "#7cbc60", "#ffd166"];
+  for (let i = 0; i < 20; i++) {
+    const f = document.createElement("div");
+    f.className = "flag";
+    f.style.background = flagColors[i % flagColors.length];
+    f.style.animationDelay = (i * 0.12).toFixed(2) + "s";
+    buntingEl.appendChild(f);
+  }
   renderUserBar();
   loadTierAndMode();
   showPicker();
