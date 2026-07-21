@@ -198,10 +198,21 @@ window.addEventListener("load", () => {
   }
 
   const TIER_CFG = {
-    A: { minDen: 2, maxDen: 4,  showPizza: true,  matchPairs: 3, buildRounds: 3, matchMaxDen: 6,  buildMaxDen: 6 },
-    B: { minDen: 2, maxDen: 6,  showPizza: false, matchPairs: 4, buildRounds: 4, matchMaxDen: 9,  buildMaxDen: 8 },
-    C: { minDen: 2, maxDen: 10, showPizza: false, matchPairs: 5, buildRounds: 5, matchMaxDen: 12, buildMaxDen: 10 },
+    A: { minDen: 2, maxDen: 4,  showPizza: true,  matchPairs: 3, buildRounds: 3, matchMaxDen: 6,  buildMaxDen: 6,  showPizzaMatch: true },
+    B: { minDen: 2, maxDen: 6,  showPizza: false, matchPairs: 4, buildRounds: 4, matchMaxDen: 9,  buildMaxDen: 8,  showPizzaMatch: true },
+    C: { minDen: 2, maxDen: 10, showPizza: false, matchPairs: 5, buildRounds: 5, matchMaxDen: 12, buildMaxDen: 10, showPizzaMatch: false },
   };
+
+  // Pick a column count that evenly divides `n`, closest to a square layout,
+  // so the match grid is always a clean rectangle (never a ragged last row).
+  function gridCols(n) {
+    let best = n;
+    for (let c = 1; c <= n; c++) {
+      if (n % c !== 0) continue;
+      if (Math.abs(c - Math.sqrt(n)) < Math.abs(best - Math.sqrt(n))) best = c;
+    }
+    return Math.max(best, n / best); // wider than tall (or square)
+  }
 
   function getRandomFractions(count, cfg) {
     const seen = new Set();
@@ -520,13 +531,15 @@ window.addEventListener("load", () => {
     }
 
     matchGrid.innerHTML = "";
-    matchGrid.style.setProperty("--cols", Math.min(4, Math.ceil(Math.sqrt(cards.length))));
+    matchGrid.style.setProperty("--cols", gridCols(cards.length));
     cards.forEach((cData, idx) => {
       const el = document.createElement("button");
-      el.className = "match-card";
+      el.className = "match-card" + (cfg.showPizzaMatch ? "" : " numbers-only");
       el.dataset.idx = idx;
-      el.innerHTML = `<div class="match-back">?</div><div class="match-front"><div class="pizza"></div><div class="fraction-label"></div></div>`;
-      setPizzaBackground(el.querySelector(".pizza"), cData.label);
+      el.innerHTML = cfg.showPizzaMatch
+        ? `<div class="match-back">?</div><div class="match-front"><div class="pizza"></div><div class="fraction-label"></div></div>`
+        : `<div class="match-back">?</div><div class="match-front"><div class="fraction-label"></div></div>`;
+      if (cfg.showPizzaMatch) setPizzaBackground(el.querySelector(".pizza"), cData.label);
       el.querySelector(".fraction-label").textContent = cData.label;
       el.addEventListener("click", () => flipMatchCard(el, cData));
       matchGrid.appendChild(el);
@@ -586,15 +599,34 @@ window.addEventListener("load", () => {
     const cfg = TIER_CFG[tier];
     buildRound = 0;
     buildTotal = cfg.buildRounds;
-    nextBuildTarget(cfg);
+    nextBuildTarget();
   }
 
-  function nextBuildTarget(cfg) {
-    buildDen = Math.floor(Math.random() * (Math.min(cfg.buildMaxDen, 8) - 2 + 1)) + 2;
-    buildNum = Math.floor(Math.random() * (buildDen - 1)) + 1;
+  function nextBuildTarget() {
+    buildShaded = null; // set below once buildDen is known
+
+    if (tier === "C") {
+      // Show a reduced target (e.g. "1/3") but cut the pizza into a multiple
+      // of that denominator (e.g. 6 or 12 slices), so the kid has to work
+      // out the equivalent slice count herself instead of just counting.
+      const tDen = Math.floor(Math.random() * 4) + 2; // 2..5
+      const tNum = Math.floor(Math.random() * (tDen - 1)) + 1;
+      const kOptions = [2, 3, 4].filter(k => tDen * k <= 12 && tDen * k !== tDen);
+      const k = kOptions[Math.floor(Math.random() * kOptions.length)];
+      buildDen = tDen * k;
+      buildNum = tNum * k;
+      buildTargetEl.textContent = `${tNum}/${tDen}`;
+      message.textContent = `Round ${buildRound + 1} of ${buildTotal}: this pizza is cut into ${buildDen} slices. Shade ${tNum}/${tDen} of it!`;
+    } else {
+      // Tier A: simple halves/quarters/thirds. Tier B: a bit wider a range.
+      const minDen = 2, maxDen = tier === "A" ? 4 : 6;
+      buildDen = Math.floor(Math.random() * (maxDen - minDen + 1)) + minDen;
+      buildNum = Math.floor(Math.random() * (buildDen - 1)) + 1;
+      buildTargetEl.textContent = `${buildNum}/${buildDen}`;
+      message.textContent = `Round ${buildRound + 1} of ${buildTotal}: shade ${buildNum} out of ${buildDen} slices.`;
+    }
+
     buildShaded = new Array(buildDen).fill(false);
-    buildTargetEl.textContent = `${buildNum}/${buildDen}`;
-    message.textContent = `Round ${buildRound + 1} of ${buildTotal}: shade ${buildNum} out of ${buildDen} slices.`;
     message.style.color = "#333";
     drawBuildPizza();
   }
@@ -639,7 +671,7 @@ window.addEventListener("load", () => {
         awardStar();
         setTimeout(() => showWin("You built every fraction perfectly!"), 500);
       } else {
-        setTimeout(() => nextBuildTarget(TIER_CFG[tier]), 700);
+        setTimeout(() => nextBuildTarget(), 700);
       }
     } else {
       sfx.wrong();
