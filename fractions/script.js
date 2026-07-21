@@ -763,13 +763,15 @@ window.addEventListener("load", () => {
       ch === " " ? " " : `<span style="animation-delay:${((i + 1) * 0.06).toFixed(2)}s">${ch}</span>`
     ).join("");
 
-  // Festive bunting across the top (Italian-festa colours)
-  const flagColors = ["#e0573f", "#f7f3e8", "#7cbc60", "#ffd166"];
+  // "PIZZA" pennant string across the top (Italian-festa colours)
+  const flagColors = ["#e0573f", "#4a8f3c", "#e8a13a", "#c23a2a"];
+  const pennantWord = "PIZZA";
   for (let i = 0; i < 20; i++) {
     const f = document.createElement("div");
     f.className = "flag";
     f.style.background = flagColors[i % flagColors.length];
     f.style.animationDelay = (i * 0.12).toFixed(2) + "s";
+    f.textContent = pennantWord[i % pennantWord.length];
     buntingEl.appendChild(f);
   }
   renderUserBar();
