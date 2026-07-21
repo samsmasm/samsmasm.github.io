@@ -41,9 +41,6 @@ window.addEventListener("load", () => {
   const userSaveBtn  = document.getElementById("user-save");
   const userCancelBtn = document.getElementById("user-cancel");
 
-  const catEl   = document.getElementById("cat");
-  const titleEl = document.getElementById("title");
-
   // ---------- audio ----------
   let audioCtx = null;
   let muted = localStorage.getItem("fractions-muted") === "1";
@@ -272,12 +269,11 @@ window.addEventListener("load", () => {
   function showWin(text) {
     sfx.fanfare();
     confettiBurst();
-    tyDance(true);
     winText.textContent = text;
     winScreen.classList.remove("hidden");
   }
-  winAgainBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); tyDance(false); showGame(); });
-  winMenuBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); tyDance(false); showPicker(); });
+  winAgainBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); showGame(); });
+  winMenuBtn.addEventListener("click", () => { winScreen.classList.add("hidden"); showPicker(); });
 
   function confettiBurst() {
     const colors = ["#ffd166", "#ff8fab", "#7cc46f", "#6ec5e9", "#e0573f", "#b89ae0"];
@@ -293,91 +289,6 @@ window.addEventListener("load", () => {
     }
   }
 
-  // ---------- pizza artwork (SVG) ----------
-  // Draw a round pizza cut into `den` slices. `on` is either a count (first N
-  // slices topped) or a boolean array (per-slice, for Build mode).
-  function pizzaSVG(den, on, size = "100%") {
-    const cx = 50, cy = 50, r = 42;
-    const onArr = Array.isArray(on) ? on : Array.from({ length: den }, (_, i) => i < on);
-    const P = (a) => {
-      const rad = (a * Math.PI) / 180;
-      return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
-    };
-    let wedges = "", pep = "", lines = "";
-    for (let i = 0; i < den; i++) {
-      const a0 = (i * 360) / den, a1 = ((i + 1) * 360) / den;
-      const [x0, y0] = P(a0), [x1, y1] = P(a1);
-      const large = a1 - a0 > 180 ? 1 : 0;
-      const d = `M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
-      wedges += `<path class="slice ${onArr[i] ? "on" : "off"}" d="${d}"/>`;
-      if (onArr[i]) {
-        const rad = (((a0 + a1) / 2) * Math.PI) / 180;
-        const dot = (pr, rr) => {
-          const px = cx + rr * Math.sin(rad), py = cy - rr * Math.cos(rad);
-          pep += `<circle class="pep-b" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${pr.toFixed(2)}"/>` +
-                 `<circle class="pep-t" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(pr * 0.62).toFixed(2)}"/>`;
-        };
-        dot(Math.max(2.4, r * 0.12), r * 0.6);
-        if (den <= 6) dot(Math.max(1.9, r * 0.09), r * 0.28);
-      }
-    }
-    for (let i = 0; i < den; i++) {
-      const [x, y] = P((i * 360) / den);
-      lines += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}" class="slice-line"/>`;
-    }
-    return `<svg class="pizza-svg" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">` +
-      `<circle cx="${cx}" cy="${cy}" r="46" class="crust"/>${wedges}${pep}${lines}` +
-      `<circle cx="${cx}" cy="${cy}" r="46" class="crust-ring"/></svg>`;
-  }
-
-  function mysteryPizzaSVG(size = "100%") {
-    return `<svg class="pizza-svg" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">` +
-      `<circle cx="50" cy="50" r="46" class="crust"/>` +
-      `<circle cx="50" cy="50" r="42" class="mystery"/>` +
-      `<text x="50" y="65" text-anchor="middle" class="mystery-q">?</text></svg>`;
-  }
-
-  // ---------- celebration effects ----------
-  function starPopAt(x, y) {
-    const s = document.createElement("div");
-    s.className = "star-pop";
-    s.textContent = "⭐";
-    s.style.left = x + "px";
-    s.style.top = y + "px";
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 1400);
-  }
-  function sparkleBurst(x, y) {
-    const colors = ["#fff", "#ffd166", "#ff8fab"];
-    for (let i = 0; i < 8; i++) {
-      const s = document.createElement("div");
-      s.className = "spark";
-      s.style.left = (x + (Math.random() - 0.5) * 90) + "px";
-      s.style.top = (y + (Math.random() - 0.5) * 70) + "px";
-      s.style.background = colors[i % colors.length];
-      s.style.animationDelay = (Math.random() * 0.15) + "s";
-      document.body.appendChild(s);
-      setTimeout(() => s.remove(), 850);
-    }
-  }
-  // small "well done" burst near the top-centre of the play area
-  function cheer() {
-    const x = window.innerWidth / 2;
-    const y = window.innerHeight * 0.34;
-    starPopAt(x, y);
-    sparkleBurst(x, y);
-  }
-
-  // ---------- Ty the cat reactions ----------
-  function tyNom() {
-    catEl.classList.remove("nom");
-    void catEl.offsetWidth;
-    catEl.classList.add("nom");
-  }
-  function tyDance(on) {
-    catEl.classList.toggle("dancing", on);
-  }
-
   // ==================================================================
   // MODE 1: ORDER THE PIZZAS
   // ==================================================================
@@ -386,12 +297,14 @@ window.addEventListener("load", () => {
 
   function initProgressRow() {
     progressRow.innerHTML = "";
-    for (let i = 0; i < 6; i++) {
-      const pip = document.createElement("span");
-      pip.className = "prog-pip";
-      pip.textContent = "🍕";
-      progressRow.appendChild(pip);
-    }
+    const initialImages = ["eating.jpg","pizza.jpg","pizza.jpg","pizza.jpg","pizza.jpg","pizza.jpg","pizza.jpg"];
+    initialImages.forEach((imgSrc, idx) => {
+      const img = document.createElement("img");
+      img.src = `./images/${imgSrc}`;
+      img.alt = `Progress ${idx + 1}`;
+      img.classList.add("progress-image");
+      progressRow.appendChild(img);
+    });
     progressSteps = 0;
   }
 
@@ -422,7 +335,7 @@ window.addEventListener("load", () => {
     if (cfg.showPizza) {
       setPizzaBackground(pizza, fr);
     } else {
-      pizza.innerHTML = mysteryPizzaSVG();
+      pizza.style.background = "none";
     }
 
     const label = document.createElement("div");
@@ -436,7 +349,17 @@ window.addEventListener("load", () => {
 
   function setPizzaBackground(pizzaElement, fractionStr) {
     const [num, den] = fractionStr.split("/").map(Number);
-    pizzaElement.innerHTML = pizzaSVG(den, num);
+    const fractionVal = num / den;
+    pizzaElement.style.background = `
+      conic-gradient(
+        rgba(255, 209, 102, 0.9) 0% ${fractionVal * 100}%,
+        rgba(200, 200, 200, 0.6) ${fractionVal * 100}% 100%
+      ),
+      repeating-conic-gradient(
+        rgba(0,0,0,0.6) 0deg 3deg,
+        transparent 3deg ${360 / den}deg
+      )
+    `;
   }
 
   checkPizzasButton.addEventListener("click", () => {
@@ -465,8 +388,6 @@ window.addEventListener("load", () => {
 
     if (firstBadIdx === -1) {
       sfx.correct();
-      cheer();
-      tyNom();
       updateProgressRow();
       message.textContent = tieFound
         ? "Correct! And nice spot, two of those pizzas are the same size!"
@@ -492,11 +413,11 @@ window.addEventListener("load", () => {
 
   function updateProgressRow() {
     if (progressSteps < 6) {
-      const pip = progressRow.children[progressSteps];
-      pip.textContent = "⭐";
-      pip.classList.remove("done");
-      void pip.offsetWidth;
-      pip.classList.add("done");
+      progressRow.children[progressSteps].src = "./images/poop.jpg";
+      if (progressSteps + 1 < progressRow.children.length) {
+        const nextImg = progressRow.children[progressSteps + 1];
+        nextImg.src = (progressSteps + 1 === progressRow.children.length - 1) ? "./images/pop.jpg" : "./images/eating.jpg";
+      }
       progressSteps++;
     }
   }
@@ -639,7 +560,6 @@ window.addEventListener("load", () => {
       if (Math.abs(a.cData.value - b.cData.value) < 1e-9) {
         setTimeout(() => {
           sfx.match();
-          sparkleBurst(window.innerWidth / 2, window.innerHeight * 0.4);
           a.el.classList.add("matched");
           b.el.classList.add("matched");
           a.cData.matched = true;
@@ -712,7 +632,17 @@ window.addEventListener("load", () => {
   }
 
   function drawBuildPizza() {
-    buildPizza.innerHTML = pizzaSVG(buildDen, buildShaded);
+    const stops = [];
+    const step = 360 / buildDen;
+    for (let i = 0; i < buildDen; i++) {
+      const from = i * step, to = (i + 1) * step;
+      const color = buildShaded[i] ? "rgba(255,209,102,0.95)" : (i % 2 === 0 ? "rgba(245,245,245,0.9)" : "rgba(224,224,224,0.9)");
+      stops.push(`${color} ${from}deg ${to}deg`);
+    }
+    buildPizza.style.background = `
+      repeating-conic-gradient(rgba(0,0,0,0.65) 0deg 2deg, transparent 2deg ${step}deg),
+      conic-gradient(${stops.join(",")})
+    `;
   }
 
   buildPizza.addEventListener("pointerdown", (e) => {
@@ -734,8 +664,6 @@ window.addEventListener("load", () => {
     const shadedCount = buildShaded.filter(Boolean).length;
     if (shadedCount === buildNum) {
       sfx.correct();
-      cheer();
-      tyNom();
       buildRound++;
       message.textContent = "Correct! That's exactly the right amount.";
       message.style.color = "#3a8a3a";
@@ -755,12 +683,6 @@ window.addEventListener("load", () => {
   });
 
   // ---------- init ----------
-  // Split only the letters into bouncing spans; keep the pizza emoji whole
-  // (splitting by "" would break its surrogate pair into broken glyphs).
-  titleEl.innerHTML = '<span style="animation-delay:0s">🍕</span> ' +
-    "Pizza Fractions".split("").map((ch, i) =>
-      ch === " " ? " " : `<span style="animation-delay:${((i + 1) * 0.06).toFixed(2)}s">${ch}</span>`
-    ).join("");
   renderUserBar();
   loadTierAndMode();
   showPicker();
