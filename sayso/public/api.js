@@ -6,7 +6,8 @@ export async function apiJson(path, method = "GET", body) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(`/api${path}`, opts);
+  // Relative path so the app works under the /sayso base (page URL ends in /sayso/).
+  const res = await fetch(`api${path}`, opts);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`);
@@ -25,7 +26,7 @@ export async function transcribeBlob(blob, { prompt, language = "en", filename }
   form.append("language", language);
   if (filename) form.append("filename", filename);
 
-  const res = await fetch("/api/transcribe", {
+  const res = await fetch("api/transcribe", {
     method: "POST",
     credentials: "same-origin",
     body: form,

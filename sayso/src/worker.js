@@ -14,25 +14,39 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const RATE_LIMIT = 25; // transcription requests …
 const RATE_WINDOW = 60; // … per this many seconds, per session
 
+const BASE = "/sayso"; // app is served under unisam.nz/sayso
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    let path = url.pathname;
 
-    if (url.pathname.startsWith("/api/")) {
+    // Normalise the /sayso base path away, so internal routing sees "/", "/api/…".
+    if (path === BASE) {
+      return Response.redirect(`${url.origin}${BASE}/`, 301);
+    }
+    if (path.startsWith(`${BASE}/`)) {
+      path = path.slice(BASE.length) || "/";
+    }
+
+    if (path.startsWith("/api/")) {
       try {
-        return await handleApi(request, env, url);
+        return await handleApi(request, env, path, url);
       } catch (err) {
         return json({ error: err.message || "Internal error" }, 500);
       }
     }
 
-    // Everything else is a static asset (SPA fallback serves index.html).
-    return env.ASSETS.fetch(request);
+    // Static asset — rewrite the URL to the base-stripped path so ASSETS resolves
+    // it (SPA fallback serves index.html for unknown paths).
+    const assetUrl = new URL(url);
+    assetUrl.pathname = path;
+    return env.ASSETS.fetch(new Request(assetUrl, request));
   },
 };
 
-async function handleApi(request, env, url) {
-  const route = url.pathname.slice("/api".length); // e.g. "/login"
+async function handleApi(request, env, path, url) {
+  const route = path.slice("/api".length); // e.g. "/login"
 
   // --- Public routes -------------------------------------------------------
   if (route === "/login" && request.method === "POST") {

@@ -13,11 +13,6 @@ const loginError = document.getElementById("login-error");
 
 let settings = { silenceThreshold: 5, retentionDays: 14, mode: "hold" };
 
-// ?preview=1 skips the login gate so the UI can be viewed without a live backend.
-// Safe on the deployed Worker too: the server still enforces auth on every paid
-// call, so this only affects what the client draws — it grants no API access.
-const PREVIEW = new URLSearchParams(location.search).get("preview") === "1";
-
 // ---------------------------------------------------------------------------
 // Toast (used across modules via window.saysoToast)
 // ---------------------------------------------------------------------------

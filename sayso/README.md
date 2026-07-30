@@ -42,7 +42,10 @@ npx wrangler secret put SESSION_SECRET   # any long random string, e.g. `openssl
 npx wrangler deploy
 ```
 
-Then open the printed `*.workers.dev` URL (or add a custom route/domain).
+Live at **https://unisam.nz/sayso** — the Worker is routed to that path
+(`routes` in `wrangler.jsonc`) while the rest of unisam.nz stays on GitHub Pages.
+The Worker serves under the `/sayso` base: it strips that prefix internally, and
+the frontend uses relative API paths so everything resolves under `/sayso/`.
 
 ## ⚠️ Set an OpenAI spend cap
 
