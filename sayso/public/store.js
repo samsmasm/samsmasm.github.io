@@ -4,7 +4,7 @@
 // Audio never lives here. A failed segment's blob is held transiently inside its
 // retry closure (in the recording/upload controller) and released on success.
 
-import { apiJson } from "./api.js?v=3";
+import { apiJson } from "./api.js?v=4";
 
 const segmentsEl = document.getElementById("segments");
 const emptyNote = document.getElementById("empty-note");
@@ -71,10 +71,11 @@ export function setText(sequence, text) {
   scheduleSave();
 }
 
-export function fail(sequence) {
+export function fail(sequence, message) {
   const seg = state?.segments.get(sequence);
   if (!seg) return;
   seg.status = "failed";
+  seg.error = message || "";
   render();
 }
 
@@ -163,6 +164,13 @@ function render() {
     }
 
     el.appendChild(meta);
+
+    if (seg.status === "failed" && seg.error) {
+      const errLine = document.createElement("div");
+      errLine.className = "seg-error";
+      errLine.textContent = seg.error;
+      el.appendChild(errLine);
+    }
     segmentsEl.appendChild(el);
   }
   segmentsEl.scrollTop = segmentsEl.scrollHeight;

@@ -3,8 +3,8 @@
 // SharedArrayBuffer / COEP needed) into small speech-optimised mp3 chunks.
 // Audio is only ever read locally and POSTed once per chunk for transcription.
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=3";
-import * as store from "./store.js?v=3";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=4";
+import * as store from "./store.js?v=4";
 
 const dropEl = document.getElementById("drop");
 const fileInput = document.getElementById("file-input");
@@ -97,7 +97,7 @@ async function doSend(blob, filename, prompt, seq) {
     store.setText(seq, text);
     return text;
   } catch (err) {
-    store.fail(seq);
+    store.fail(seq, err.detail ? `${err.message} — ${err.detail}` : err.message);
     if (err.status === 429) window.saysoToast?.("Rate limit reached — wait a moment.");
     return "";
   }

@@ -35,6 +35,7 @@ export async function transcribeBlob(blob, { prompt, language = "en", filename }
   if (!res.ok) {
     const err = new Error(data.error || `Transcription failed (${res.status})`);
     err.status = res.status;
+    err.detail = data.detail;
     throw err;
   }
   return data.text || "";

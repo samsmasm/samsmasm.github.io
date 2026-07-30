@@ -5,8 +5,8 @@
 // assembles one blob, and sends it. Audio stays in memory only until its
 // transcript returns (or is discarded on a fresh capture).
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=3";
-import * as store from "./store.js?v=3";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=4";
+import * as store from "./store.js?v=4";
 
 const recordBtn = document.getElementById("record-btn");
 const recordLabel = document.getElementById("record-label");
@@ -186,7 +186,7 @@ async function doSend(blob, seq, filename) {
     });
     store.setText(seq, text); // also releases the blob (retry cleared)
   } catch (err) {
-    store.fail(seq);
+    store.fail(seq, err.detail ? `${err.message} — ${err.detail}` : err.message);
     if (err.status === 429) toast("Rate limit reached — wait a moment.");
   }
 }
