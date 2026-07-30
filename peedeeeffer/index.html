@@ -145,6 +145,8 @@
                     <div id="epubDownloadArea" class="hidden pt-4 border-t space-y-3">
                         <button onclick="downloadEpubParts()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download Individual Parts</button>
                         <button onclick="downloadEpubAsZip()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Download All as ZIP</button>
+                        <button onclick="downloadEpubBlocksAsZip()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">One File Per Block (ZIP)</button>
+                        <p class="text-[10px] text-slate-400 leading-relaxed">Each block becomes its own .txt file — ideal for NotebookLM sources. Uses your selection if any blocks are selected, otherwise all blocks.</p>
                     </div>
 
                     <div id="epubPreviewArea" class="hidden pt-4 border-t space-y-3">
@@ -675,6 +677,52 @@
             a.download = `${baseName}_parts.zip`;
             a.click();
             setStatus('Done', 'green');
+        }
+
+        async function downloadEpubBlocksAsZip() {
+            if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
+
+            const selected = parseEpubAllRanges();
+            const indices = selected.size > 0
+                ? Array.from(selected).sort((a, b) => a - b)
+                : epubBlocks.map((_, i) => i + 1);
+
+            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
+            setStatus('Building block files…', 'blue');
+
+            const zip = new JSZip();
+            const usedNames = {};
+            let written = 0;
+
+            for (const idx of indices) {
+                const block = epubBlocks[idx - 1];
+                if (!block) continue;
+                const text = buildEpubText(new Set([idx]));
+                if (!text.trim()) continue;
+
+                const titleSlug = (block.title || `block${idx}`)
+                    .replace(/[\/\\?%*:|"<>]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .substring(0, 60) || `block${idx}`;
+                let fileName = `${String(idx).padStart(3, '0')}_${titleSlug}.txt`;
+                if (usedNames[fileName]) {
+                    fileName = `${String(idx).padStart(3, '0')}_${titleSlug}_${usedNames[fileName]}.txt`;
+                }
+                usedNames[fileName] = (usedNames[fileName] || 0) + 1;
+
+                zip.file(fileName, text);
+                written++;
+            }
+
+            if (!written) { setStatus('No text in selected blocks', 'amber'); return; }
+
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${baseName}_blocks.zip`;
+            a.click();
+            setStatus(`Done — ${written} file${written !== 1 ? 's' : ''}`, 'green');
         }
 
         function runEpubPreview() {
