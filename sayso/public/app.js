@@ -1,9 +1,9 @@
 // Bootstrap: auth gate, tab switching, settings, and wiring the two controllers.
 
-import { apiJson } from "./api.js";
-import * as store from "./store.js";
-import { initRecord, setMode } from "./record.js";
-import { initUpload } from "./upload.js";
+import { apiJson } from "./api.js?v=2";
+import * as store from "./store.js?v=2";
+import { initRecord, setMode } from "./record.js?v=2";
+import { initUpload } from "./upload.js?v=2";
 
 const loginEl = document.getElementById("login");
 const appEl = document.getElementById("app");
