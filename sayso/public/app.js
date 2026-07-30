@@ -1,9 +1,9 @@
 // Bootstrap: auth gate, tab switching, settings, and wiring the two controllers.
 
-import { apiJson } from "./api.js?v=2";
-import * as store from "./store.js?v=2";
-import { initRecord, setMode } from "./record.js?v=2";
-import { initUpload } from "./upload.js?v=2";
+import { apiJson } from "./api.js?v=3";
+import * as store from "./store.js?v=3";
+import { initRecord, setMode } from "./record.js?v=3";
+import { initUpload } from "./upload.js?v=3";
 
 const loginEl = document.getElementById("login");
 const appEl = document.getElementById("app");
@@ -30,11 +30,6 @@ window.saysoToast = (msg) => {
 // ---------------------------------------------------------------------------
 
 async function boot() {
-  if (PREVIEW) {
-    await enterApp();
-    window.saysoToast("Preview mode — backend not connected. Transcribing will fail.");
-    return;
-  }
   let authed = false;
   try {
     const me = await apiJson("/me");

@@ -4,7 +4,7 @@
 // Audio never lives here. A failed segment's blob is held transiently inside its
 // retry closure (in the recording/upload controller) and released on success.
 
-import { apiJson } from "./api.js?v=2";
+import { apiJson } from "./api.js?v=3";
 
 const segmentsEl = document.getElementById("segments");
 const emptyNote = document.getElementById("empty-note");
