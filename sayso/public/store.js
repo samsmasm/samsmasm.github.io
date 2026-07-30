@@ -4,7 +4,7 @@
 // Audio never lives here. A failed segment's blob is held transiently inside its
 // retry closure (in the recording/upload controller) and released on success.
 
-import { apiJson } from "./api.js?v=7";
+import { apiJson } from "./api.js?v=8";
 
 const segmentsEl = document.getElementById("segments");
 const emptyNote = document.getElementById("empty-note");
@@ -18,6 +18,7 @@ export function configureStore(opts) {
 }
 
 let deletedExpanded = false;
+const LAST_ID_KEY = "sayso_last_session";
 
 export function newSession(type) {
   state = {
@@ -28,7 +29,66 @@ export function newSession(type) {
     segments: new Map(), // sequence -> { sequence, text, status, capturedAt, retry }
     deleted: [], // { sequence, text, status, capturedAt, deletedAt }
   };
+  rememberId(state.sessionId);
   render();
+}
+
+// On load, reopen the last session from KV (persists for the retention period)
+// so a refresh doesn't lose the transcript. Falls back to a fresh session.
+export async function resumeOrNew(type) {
+  let id = null;
+  try {
+    id = localStorage.getItem(LAST_ID_KEY);
+  } catch {
+    id = null;
+  }
+  if (id) {
+    try {
+      const rec = await apiJson(`/session?id=${encodeURIComponent(id)}`);
+      if (rec && rec.sessionId) {
+        rebuildFrom(rec);
+        return;
+      }
+    } catch {
+      // expired or missing — fall through to a new session
+    }
+  }
+  newSession(type);
+}
+
+function rebuildFrom(rec) {
+  const segments = new Map();
+  let maxSeq = 0;
+  for (const s of rec.segments || []) {
+    if (s.sequence > maxSeq) maxSeq = s.sequence;
+    if (s.status === "complete" && String(s.text || "").trim()) {
+      segments.set(s.sequence, {
+        sequence: s.sequence,
+        text: s.text,
+        status: "complete",
+        capturedAt: s.capturedAt || null,
+        retry: null,
+      });
+    }
+  }
+  state = {
+    sessionId: rec.sessionId,
+    createdAt: rec.createdAt || new Date().toISOString(),
+    type: rec.type || "live",
+    seq: maxSeq,
+    segments,
+    deleted: [],
+  };
+  rememberId(state.sessionId);
+  render();
+}
+
+function rememberId(id) {
+  try {
+    localStorage.setItem(LAST_ID_KEY, id);
+  } catch {
+    /* private mode / quota — ignore */
+  }
 }
 
 export function ensureSession(type) {

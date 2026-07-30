@@ -1,10 +1,10 @@
 // Bootstrap: auth gate, tab switching, settings, and wiring the two controllers.
 
-import { apiJson } from "./api.js?v=7";
-import * as store from "./store.js?v=7";
-import { initRecord, setMode } from "./record.js?v=7";
-import { initUpload } from "./upload.js?v=7";
-import { initCost } from "./cost.js?v=7";
+import { apiJson } from "./api.js?v=8";
+import * as store from "./store.js?v=8";
+import { initRecord, setMode } from "./record.js?v=8";
+import { initUpload } from "./upload.js?v=8";
+import { initCost } from "./cost.js?v=8";
 
 const loginEl = document.getElementById("login");
 const appEl = document.getElementById("app");
@@ -67,7 +67,7 @@ async function enterApp() {
 
   await loadSettings();
   store.configureStore({ getRetentionDays: () => settings.retentionDays });
-  store.newSession("live");
+  await store.resumeOrNew("live"); // reopen the last session from KV if it exists
 
   initRecord({
     getSilenceThreshold: () => settings.silenceThreshold,

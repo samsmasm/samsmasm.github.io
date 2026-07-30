@@ -3,9 +3,9 @@
 // SharedArrayBuffer / COEP needed) into small speech-optimised mp3 chunks.
 // Audio is only ever read locally and POSTed once per chunk for transcription.
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=7";
-import * as store from "./store.js?v=7";
-import { addUsage } from "./cost.js?v=7";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=8";
+import * as store from "./store.js?v=8";
+import { addUsage } from "./cost.js?v=8";
 
 const dropEl = document.getElementById("drop");
 const fileInput = document.getElementById("file-input");
