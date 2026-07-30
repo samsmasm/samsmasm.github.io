@@ -5,9 +5,9 @@
 // assembles one blob, and sends it. Audio stays in memory only until its
 // transcript returns (or is discarded on a fresh capture).
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=5";
-import * as store from "./store.js?v=5";
-import { addUsage } from "./cost.js?v=5";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=6";
+import * as store from "./store.js?v=6";
+import { addUsage } from "./cost.js?v=6";
 
 const recordBtn = document.getElementById("record-btn");
 const recordLabel = document.getElementById("record-label");
@@ -292,8 +292,23 @@ function flyAwayAndSend() {
   recordBtn.style.transition = "transform 0.28s cubic-bezier(.4,0,.6,1), opacity 0.28s";
   recordBtn.style.transform = "translateY(-260px) scale(0.08)";
   recordBtn.style.opacity = "0";
-  setTimeout(clearButtonDrag, 320);
+  setTimeout(reappear, 300);
   closeAndSend();
+}
+
+// After the button flings away, grow it back in from the centre so it's clearly
+// a fresh button re-emerging (not a failed send that never left).
+function reappear() {
+  // Snap back to centre, tiny and invisible, with no transition…
+  recordBtn.style.transition = "none";
+  recordBtn.style.transform = "translateY(0) scale(0.15)";
+  recordBtn.style.opacity = "0";
+  void recordBtn.offsetWidth; // force reflow so the next change animates
+  // …then pop back to full size with a slight overshoot.
+  recordBtn.style.transition = "transform 0.36s cubic-bezier(.34,1.45,.5,1), opacity 0.3s ease";
+  recordBtn.style.transform = "translateY(0) scale(1)";
+  recordBtn.style.opacity = "1";
+  setTimeout(clearButtonDrag, 380);
 }
 
 function springBack() {
