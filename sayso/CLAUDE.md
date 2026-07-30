@@ -1,4 +1,33 @@
-# Project Brief: Marking Transcription Site (working title: "Verbatim")
+# Project Brief: Marking Transcription Site ("Sayso")
+
+> **The sections below are the ORIGINAL brief.** Read the status block first —
+> the app is built and live; the brief is kept for design intent/context.
+
+## Implementation status (updated 2026-07-30)
+
+- **Live and deployed** at **https://unisam.nz/sayso** — a single Cloudflare
+  Worker (`sayso`) serves the frontend (`public/`) and the API (`/api/*`). The
+  rest of unisam.nz stays on GitHub Pages. Source lives in this folder inside the
+  `samsmasm.github.io` repo; the running app is the deployed Worker, not Pages.
+- **Serving under `/sayso`:** `wrangler.jsonc` routes `unisam.nz/sayso` +
+  `/sayso/*` to the Worker; `assets.run_worker_first: true` is REQUIRED so the
+  asset layer doesn't bypass the Worker's prefix-stripping. Frontend uses
+  relative paths; the HTML shell is served `no-cache`; every CSS/JS URL carries a
+  `?v=N` cache-buster — **bump N on every frontend change**.
+- **Model:** `gpt-transcribe` ($0.0045/min). Multi-speaker requests instead use
+  `gpt-4o-transcribe-diarize` ($0.006/min, `diarized_json` → "Speaker N:" text).
+- **Secrets/bindings:** KV `SAYSO_KV`; secrets `OPENAI_API_KEY`, `SITE_PASSWORD`
+  (the single shared login), `SESSION_SECRET` (signs the session cookie).
+- **Built beyond the brief:** per-block delete → collapsible "Deleted sections"
+  (24h purge); "Multiple speakers" setting; distance-based swipe-to-send with
+  drag/fly-away/grow-back animation; running **cost estimate** (audio time × rate,
+  per model, persisted in localStorage, resettable); **session restore on reload**
+  (last session reopened from KV for the retention period).
+- **Known operational note:** the Worker runs at the Cloudflare edge nearest the
+  user, so from an OpenAI-geo-blocked region transcription fails — the owner uses
+  a **NZ VPN** to relocate the edge. No simple Worker egress-region pin exists.
+- **Owner TODO:** hard OpenAI spend cap; remove leftover `sayso.unisam.nz`
+  custom-domain subdomain (dashboard → Workers & Pages → sayso → Domains & Routes).
 
 ## 1. Purpose
 
@@ -183,3 +212,53 @@ Settings should persist across visits — simplest approach is a small settings 
 - Exact wording of the `prompt` context string sent with each transcription call (a starting suggestion is given in Section 5.4, but this is easy to tune once real output is seen).
 - Whether a "view individual segments" mode is worth adding beyond the single "Copy all" block.
 - Visual/UI styling — no specific design direction has been given yet; default to something clean and readable, thumb-friendly given the primary use case is one-handed operation while marking papers.
+
+---
+
+## 12. Future development ideas (not yet built)
+
+### Accounts with usage allowances + a shared "guest" account
+
+Goal: move beyond the single shared password so the owner can (a) hand out
+accounts that each get a set free allowance (e.g. 1 hour, or 30 min, one-off),
+and/or (b) run a shared "guest" account for other people that **caps at, say,
+20 min per day** — and the owner must be able to **see how much each account is
+actually using**.
+
+This stays within the existing Worker + KV stack (no Firebase needed).
+
+**Approach sketch:**
+
+- **Users store (KV):** `user:{username}` → `{ passwordHash, role: "owner"|"user",
+  quotaType: "oneoff"|"daily", quotaSeconds }`. Keep a `users:index` key (array of
+  usernames) so the admin view can enumerate them.
+- **Auth:** extend the current login to take username + password; the existing
+  HMAC-signed session cookie just carries `username` instead of nothing. Minimal
+  change to the current scheme in `worker.js`.
+- **Usage counters (KV):**
+  - Daily cap: `usage:{username}:{YYYY-MM-DD}` (seconds used today, TTL ~2 days).
+  - One-off allowance: `usage:{username}:total` (seconds used lifetime).
+  - Increment by the request's audio duration on each successful transcription;
+    **reject at `/transcribe` when over quota** (check before calling OpenAI so
+    an over-quota user can't spend money).
+
+- **⚠️ The key technical gap — authoritative duration.** Quotas must be enforced
+  **server-side**; the current cost estimate uses a *client-reported* duration
+  (see `record.js` / `upload.js` → `addUsage`), which is display-only and easily
+  spoofed. The Worker does **not** currently measure audio length. Before building
+  quotas, decide how the Worker gets a trustworthy duration per request. Options:
+  - Request a `response_format` that returns duration (whisper `verbose_json` has
+    a `duration` field; `diarized_json` segments carry `end` times you can `max()`).
+    Confirm what `gpt-transcribe` exposes — may need a format change or a probe.
+  - Derive from the response `usage` (audio tokens → seconds) if provided.
+  - Fallback: trust client-reported seconds but treat as advisory only (not
+    suitable for a hard cap).
+
+- **Owner visibility:** an owner-only `GET /api/usage` that reads the `usage:*`
+  keys (via `SAYSO_KV.list({ prefix: "usage:" })`) and returns per-user totals;
+  render a small admin panel. Gate it behind `role === "owner"` on the session.
+
+- **Simplest first step:** just add ONE extra "guest" account with
+  `quotaType: "daily"`, `quotaSeconds: 1200` (20 min). That exercises the whole
+  path (accounts, per-day counter, enforcement, admin readout) before generalising
+  to arbitrary per-user allowances.
