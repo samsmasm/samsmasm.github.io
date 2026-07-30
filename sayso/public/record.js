@@ -5,9 +5,9 @@
 // assembles one blob, and sends it. Audio stays in memory only until its
 // transcript returns (or is discarded on a fresh capture).
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=6";
-import * as store from "./store.js?v=6";
-import { addUsage } from "./cost.js?v=6";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=7";
+import * as store from "./store.js?v=7";
+import { addUsage } from "./cost.js?v=7";
 
 const recordBtn = document.getElementById("record-btn");
 const recordLabel = document.getElementById("record-label");
@@ -305,10 +305,10 @@ function reappear() {
   recordBtn.style.opacity = "0";
   void recordBtn.offsetWidth; // force reflow so the next change animates
   // …then pop back to full size with a slight overshoot.
-  recordBtn.style.transition = "transform 0.36s cubic-bezier(.34,1.45,.5,1), opacity 0.3s ease";
+  recordBtn.style.transition = "transform 0.65s cubic-bezier(.34,1.35,.5,1), opacity 0.5s ease";
   recordBtn.style.transform = "translateY(0) scale(1)";
   recordBtn.style.opacity = "1";
-  setTimeout(clearButtonDrag, 380);
+  setTimeout(clearButtonDrag, 680);
 }
 
 function springBack() {
