@@ -143,10 +143,9 @@
                     </div>
 
                     <div id="epubDownloadArea" class="hidden pt-4 border-t space-y-3">
-                        <button onclick="downloadEpubParts()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download Individual Parts</button>
-                        <button onclick="downloadEpubAsZip()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Download All as ZIP</button>
+                        <button onclick="downloadEpubAllAsTxt()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download All as One .txt</button>
                         <button onclick="downloadEpubBlocksAsZip()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">One File Per Block (ZIP)</button>
-                        <p class="text-[10px] text-slate-400 leading-relaxed">Each block becomes its own .txt file — ideal for NotebookLM sources. Uses your selection if any blocks are selected, otherwise all blocks.</p>
+                        <p class="text-[10px] text-slate-400 leading-relaxed">Uses your selection if any blocks are selected, otherwise all blocks. One-file-per-block is ideal for NotebookLM sources.</p>
                     </div>
 
                     <div id="epubPreviewArea" class="hidden pt-4 border-t space-y-3">
@@ -631,61 +630,30 @@
             return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
         }
 
-        async function downloadEpubParts() {
-            if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
-
-            const inputs = Array.from(document.querySelectorAll('.epub-range-field')).filter(i => i.value.trim());
-            if (!inputs.length) { setStatus('Define at least one range first', 'amber'); return; }
-
-            const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
-            setStatus('Exporting parts…', 'blue');
-
-            for (let i = 0; i < inputs.length; i++) {
-                const blockSet = parseRange(inputs[i].value);
-                if (!blockSet.size) continue;
-                const text = buildEpubText(blockSet);
-                const rangeLabel = inputs[i].value.trim().replace(/\s/g, '');
-                await saveText(text, `${baseName}_part${i + 1}_blocks${rangeLabel}.txt`);
-                await new Promise(r => setTimeout(r, 800));
-            }
-
-            setStatus(`Done — ${inputs.length} part${inputs.length !== 1 ? 's' : ''}`, 'green');
+        function epubSelectedIndices() {
+            const selected = parseEpubAllRanges();
+            return selected.size > 0
+                ? Array.from(selected).sort((a, b) => a - b)
+                : epubBlocks.map((_, i) => i + 1);
         }
 
-        async function downloadEpubAsZip() {
+        async function downloadEpubAllAsTxt() {
             if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
 
-            const inputs = Array.from(document.querySelectorAll('.epub-range-field')).filter(i => i.value.trim());
-            if (!inputs.length) { setStatus('Define at least one range first', 'amber'); return; }
+            const indices = epubSelectedIndices();
+            const text = buildEpubText(new Set(indices));
+            if (!text.trim()) { setStatus('No text in selected blocks', 'amber'); return; }
 
             const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
-            setStatus('Building ZIP…', 'blue');
-
-            const zip = new JSZip();
-            for (let i = 0; i < inputs.length; i++) {
-                setStatus(`Building part ${i + 1} of ${inputs.length}…`, 'blue');
-                const blockSet = parseRange(inputs[i].value);
-                if (!blockSet.size) continue;
-                const text = buildEpubText(blockSet);
-                const rangeLabel = inputs[i].value.trim().replace(/\s/g, '');
-                zip.file(`${baseName}_part${i + 1}_blocks${rangeLabel}.txt`, text);
-            }
-
-            const blob = await zip.generateAsync({ type: 'blob' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${baseName}_parts.zip`;
-            a.click();
+            setStatus('Exporting…', 'blue');
+            await saveText(text, `${baseName}.txt`);
             setStatus('Done', 'green');
         }
 
         async function downloadEpubBlocksAsZip() {
             if (!epubBlocks.length) { setStatus('No EPUB loaded', 'amber'); return; }
 
-            const selected = parseEpubAllRanges();
-            const indices = selected.size > 0
-                ? Array.from(selected).sort((a, b) => a - b)
-                : epubBlocks.map((_, i) => i + 1);
+            const indices = epubSelectedIndices();
 
             const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
             setStatus('Building block files…', 'blue');
