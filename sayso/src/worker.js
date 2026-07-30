@@ -9,6 +9,7 @@
 
 const OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 const MODEL = "gpt-transcribe";
+const DIARIZE_MODEL = "gpt-4o-transcribe-diarize"; // used only when multi-speaker is on
 const COOKIE = "sayso_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const RATE_LIMIT = 25; // transcription requests …
@@ -180,15 +181,24 @@ async function transcribe(request, env, session) {
 
   const prompt = inForm.get("prompt") || "";
   const language = inForm.get("language") || "en";
+  const multiSpeaker = inForm.get("multiSpeaker") === "1";
 
   const out = new FormData();
-  out.append("model", MODEL);
   // Give the file a name+type so OpenAI infers the format correctly.
   const filename = inForm.get("filename") || fileNameFor(audio);
   out.append("file", audio, filename);
-  if (prompt) out.append("prompt", String(prompt));
-  out.append("languages[]", String(language));
-  out.append("response_format", "text");
+
+  if (multiSpeaker) {
+    // Real speaker diarization uses a different, specialised model.
+    out.append("model", DIARIZE_MODEL);
+    out.append("response_format", "diarized_json");
+    out.append("chunking_strategy", "auto"); // required for audio over ~30s
+  } else {
+    out.append("model", MODEL);
+    if (prompt) out.append("prompt", String(prompt));
+    out.append("languages[]", String(language));
+    out.append("response_format", "text");
+  }
 
   const resp = await fetch(OPENAI_URL, {
     method: "POST",
@@ -204,8 +214,45 @@ async function transcribe(request, env, session) {
     );
   }
 
-  const text = (await resp.text()).trim();
-  return json({ text });
+  let text;
+  if (multiSpeaker) {
+    const data = await resp.json().catch(() => ({}));
+    text = formatDiarized(data);
+  } else {
+    text = (await resp.text()).trim();
+  }
+  return json({ text, model: multiSpeaker ? DIARIZE_MODEL : MODEL });
+}
+
+// Turn a diarized_json response into readable "Speaker N: …" text. Speaker ids
+// from the API (letters/indices) are relabelled to Speaker 1, Speaker 2, … in
+// order of first appearance, and consecutive turns by the same speaker merge.
+function formatDiarized(data) {
+  const segs = data.segments || data.output || data.results || [];
+  if (!Array.isArray(segs) || !segs.length) {
+    return String(data.text || "").trim();
+  }
+  const labels = new Map();
+  let n = 0;
+  const lines = [];
+  let lastLabel = null;
+  let buf = "";
+  for (const s of segs) {
+    const spk = s.speaker ?? s.speaker_id ?? s.speaker_label ?? "?";
+    if (!labels.has(spk)) labels.set(spk, `Speaker ${++n}`);
+    const label = labels.get(spk);
+    const t = String(s.text || s.transcript || "").trim();
+    if (!t) continue;
+    if (label === lastLabel) {
+      buf += " " + t;
+    } else {
+      if (lastLabel) lines.push(`${lastLabel}: ${buf}`);
+      lastLabel = label;
+      buf = t;
+    }
+  }
+  if (lastLabel) lines.push(`${lastLabel}: ${buf}`);
+  return lines.join("\n\n");
 }
 
 // Fixed-window per-session counter in KV. Single user => single writer, so this
@@ -270,7 +317,12 @@ async function getSession(request, env, url) {
 // ---------------------------------------------------------------------------
 
 const SETTINGS_KEY = "settings:global";
-const DEFAULT_SETTINGS = { silenceThreshold: 5, retentionDays: 14, mode: "hold" };
+const DEFAULT_SETTINGS = {
+  silenceThreshold: 5,
+  retentionDays: 14,
+  mode: "hold",
+  multiSpeaker: false,
+};
 
 async function getSettings(env) {
   const raw = await env.SAYSO_KV.get(SETTINGS_KEY);
@@ -284,6 +336,7 @@ async function putSettings(request, env) {
     silenceThreshold: clampInt(body.silenceThreshold, 2, 15, 5),
     retentionDays: clampInt(body.retentionDays, 1, 3650, 14),
     mode: body.mode === "auto" ? "auto" : "hold",
+    multiSpeaker: body.multiSpeaker === true || body.multiSpeaker === "true",
   };
   await env.SAYSO_KV.put(SETTINGS_KEY, JSON.stringify(s));
   return json(s);

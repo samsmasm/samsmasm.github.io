@@ -3,12 +3,15 @@
 // SharedArrayBuffer / COEP needed) into small speech-optimised mp3 chunks.
 // Audio is only ever read locally and POSTed once per chunk for transcription.
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=4";
-import * as store from "./store.js?v=4";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=5";
+import * as store from "./store.js?v=5";
+import { addUsage } from "./cost.js?v=5";
 
 const dropEl = document.getElementById("drop");
 const fileInput = document.getElementById("file-input");
 const progressEl = document.getElementById("upload-progress");
+
+let getMultiSpeaker = () => false;
 
 // Keep chunks comfortably under the 25MB API limit. 64kbps mono @ ~1500s ≈ 12MB.
 const DIRECT_LIMIT = 24 * 1024 * 1024;
@@ -20,7 +23,8 @@ const UTIL_VER = "0.12.1";
 
 let ffmpeg = null;
 
-export function initUpload() {
+export function initUpload(opts = {}) {
+  getMultiSpeaker = opts.getMultiSpeaker || getMultiSpeaker;
   dropEl.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", () => {
     if (fileInput.files[0]) handleFile(fileInput.files[0]);
@@ -50,10 +54,12 @@ async function handleFile(file) {
   progressEl.hidden = false;
   progressEl.innerHTML = "";
 
+  const totalDuration = await getDuration(file); // seconds, for the cost estimate
+
   try {
     if (file.size <= DIRECT_LIMIT) {
       setStatus(`Uploading ${file.name}…`);
-      await sendChunk(file, file.name, "");
+      await sendChunk(file, file.name, "", totalDuration);
       setStatus("Done.");
       return;
     }
@@ -70,7 +76,11 @@ async function handleFile(file) {
       const prompt = prevTail
         ? `${PROMPT_CONTEXT} Continuing from: …${prevTail}`
         : PROMPT_CONTEXT;
-      const text = await sendChunk(chunks[i], `chunk_${i}.mp3`, prompt);
+      const chunkDur =
+        i < chunks.length - 1
+          ? SEGMENT_SECONDS
+          : Math.max(0, totalDuration - SEGMENT_SECONDS * (chunks.length - 1));
+      const text = await sendChunk(chunks[i], `chunk_${i}.mp3`, prompt, chunkDur);
       prevTail = lastWords(text, 200);
     }
     setStatus("Done.");
@@ -80,27 +90,52 @@ async function handleFile(file) {
 }
 
 // Send one blob; returns its transcript text (or "" on failure).
-async function sendChunk(blob, filename, prompt) {
+async function sendChunk(blob, filename, prompt, durationSec) {
   const seq = store.createSegment({ status: "sending" });
-  store.setRetry(seq, () => doSend(blob, filename, prompt, seq));
-  return doSend(blob, filename, prompt, seq);
+  store.setRetry(seq, () => doSend(blob, filename, prompt, seq, durationSec));
+  return doSend(blob, filename, prompt, seq, durationSec);
 }
 
-async function doSend(blob, filename, prompt, seq) {
+async function doSend(blob, filename, prompt, seq, durationSec) {
   store.setStatus(seq, "sending");
+  const multiSpeaker = getMultiSpeaker();
   try {
     const text = await transcribeBlob(blob, {
       prompt: prompt || PROMPT_CONTEXT,
       language: "en",
       filename,
+      multiSpeaker,
     });
     store.setText(seq, text);
+    addUsage(durationSec, multiSpeaker);
     return text;
   } catch (err) {
     store.fail(seq, err.detail ? `${err.message} — ${err.detail}` : err.message);
     if (err.status === 429) window.saysoToast?.("Rate limit reached — wait a moment.");
     return "";
   }
+}
+
+// Read an audio file's duration (seconds) via a throwaway <audio> element.
+function getDuration(file) {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const audio = document.createElement("audio");
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve(isFinite(audio.duration) ? audio.duration : 0);
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(0);
+      };
+      audio.src = url;
+    } catch {
+      resolve(0);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

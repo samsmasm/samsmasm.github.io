@@ -1,9 +1,10 @@
 // Bootstrap: auth gate, tab switching, settings, and wiring the two controllers.
 
-import { apiJson } from "./api.js?v=4";
-import * as store from "./store.js?v=4";
-import { initRecord, setMode } from "./record.js?v=4";
-import { initUpload } from "./upload.js?v=4";
+import { apiJson } from "./api.js?v=5";
+import * as store from "./store.js?v=5";
+import { initRecord, setMode } from "./record.js?v=5";
+import { initUpload } from "./upload.js?v=5";
+import { initCost } from "./cost.js?v=5";
 
 const loginEl = document.getElementById("login");
 const appEl = document.getElementById("app");
@@ -11,7 +12,7 @@ const loginForm = document.getElementById("login-form");
 const passwordInput = document.getElementById("password");
 const loginError = document.getElementById("login-error");
 
-let settings = { silenceThreshold: 5, retentionDays: 14, mode: "hold" };
+let settings = { silenceThreshold: 5, retentionDays: 14, mode: "hold", multiSpeaker: false };
 
 // ---------------------------------------------------------------------------
 // Toast (used across modules via window.saysoToast)
@@ -68,8 +69,12 @@ async function enterApp() {
   store.configureStore({ getRetentionDays: () => settings.retentionDays });
   store.newSession("live");
 
-  initRecord({ getSilenceThreshold: () => settings.silenceThreshold });
-  initUpload();
+  initRecord({
+    getSilenceThreshold: () => settings.silenceThreshold,
+    getMultiSpeaker: () => settings.multiSpeaker,
+  });
+  initUpload({ getMultiSpeaker: () => settings.multiSpeaker });
+  initCost();
 
   setupTabs();
   setupModeButtons();
@@ -120,6 +125,7 @@ const closeBtn = document.getElementById("settings-close");
 const silenceSlider = document.getElementById("silence-slider");
 const silenceValue = document.getElementById("silence-value");
 const retentionInput = document.getElementById("retention-input");
+const multiSpeakerCheckbox = document.getElementById("multi-speaker");
 const logoutBtn = document.getElementById("logout-btn");
 
 async function loadSettings() {
@@ -131,6 +137,7 @@ async function loadSettings() {
   silenceSlider.value = settings.silenceThreshold;
   silenceValue.textContent = `${settings.silenceThreshold}s`;
   retentionInput.value = settings.retentionDays;
+  multiSpeakerCheckbox.checked = !!settings.multiSpeaker;
 }
 
 let settingsSaveTimer = null;
@@ -157,6 +164,10 @@ function setupSettingsSheet() {
     const v = Math.min(3650, Math.max(1, parseInt(retentionInput.value, 10) || 14));
     settings.retentionDays = v;
     retentionInput.value = v;
+    saveSettings();
+  });
+  multiSpeakerCheckbox.addEventListener("change", () => {
+    settings.multiSpeaker = multiSpeakerCheckbox.checked;
     saveSettings();
   });
 

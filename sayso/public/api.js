@@ -19,12 +19,16 @@ export async function apiJson(path, method = "GET", body) {
 }
 
 // Send one audio blob for transcription. Returns the transcript text.
-export async function transcribeBlob(blob, { prompt, language = "en", filename } = {}) {
+export async function transcribeBlob(
+  blob,
+  { prompt, language = "en", filename, multiSpeaker = false } = {}
+) {
   const form = new FormData();
   form.append("audio", blob, filename || "audio.webm");
   if (prompt) form.append("prompt", prompt);
   form.append("language", language);
   if (filename) form.append("filename", filename);
+  if (multiSpeaker) form.append("multiSpeaker", "1");
 
   const res = await fetch("api/transcribe", {
     method: "POST",

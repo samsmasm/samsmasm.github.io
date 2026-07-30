@@ -5,8 +5,9 @@
 // assembles one blob, and sends it. Audio stays in memory only until its
 // transcript returns (or is discarded on a fresh capture).
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=4";
-import * as store from "./store.js?v=4";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=5";
+import * as store from "./store.js?v=5";
+import { addUsage } from "./cost.js?v=5";
 
 const recordBtn = document.getElementById("record-btn");
 const recordLabel = document.getElementById("record-label");
@@ -14,14 +15,21 @@ const sendBtn = document.getElementById("send-btn");
 const hint = document.getElementById("record-hint");
 const levelFill = document.getElementById("level-fill");
 
-// Gesture tuning for Hold mode.
-const FLICK_PX = 70; // vertical travel that counts as a flick-to-send
-const FLICK_MS = 700; // …if it happens within this window
+// Gesture tuning for Hold mode. The swipe-to-send is distance-based (no time
+// window), so you can hold and talk for as long as you like, then swipe up.
+const SEND_DISTANCE = 100; // px of upward travel that commits a send
+const DRAG_DEAD_ZONE = 12; // ignore small wobble while talking
+const DRAG_MAX = 150; // px over which the button shrinks to its smallest
 // Voice activity: amplitude below this (RMS, 0–1) counts as silence.
 const SILENCE_RMS = 0.014;
 
 let mode = "hold";
 let getSilenceThreshold = () => 5;
+let getMultiSpeaker = () => false;
+
+// Duration accounting for the open segment (sum of active recording intervals).
+let segmentMs = 0;
+let recStartAt = 0;
 
 // Audio graph (created lazily on first use, then reused).
 let stream = null;
@@ -37,7 +45,6 @@ let openSeq = null; // sequence of the currently-open segment, or null
 let phase = "idle"; // idle | recording | paused | sending
 
 // Hold-gesture bookkeeping.
-let pressStartTime = 0;
 let pressStartY = 0;
 let flicked = false;
 
@@ -45,6 +52,7 @@ let silenceTimer = null;
 
 export function initRecord(opts) {
   getSilenceThreshold = opts.getSilenceThreshold || getSilenceThreshold;
+  getMultiSpeaker = opts.getMultiSpeaker || getMultiSpeaker;
   setMode(mode);
 
   // Hold-mode pointer gestures.
@@ -128,6 +136,8 @@ async function startRecording() {
   };
   recorder.start();
 
+  segmentMs = 0;
+  recStartAt = Date.now();
   openSeq = store.createSegment({ status: "recording" });
   phase = "recording";
   paintPhase();
@@ -137,6 +147,10 @@ async function startRecording() {
 function pauseRecording() {
   if (!recorder || phase !== "recording") return;
   recorder.pause();
+  if (recStartAt) {
+    segmentMs += Date.now() - recStartAt;
+    recStartAt = 0;
+  }
   phase = "paused";
   cancelSilenceTimer();
   paintPhase();
@@ -145,6 +159,7 @@ function pauseRecording() {
 function resumeRecording() {
   if (!recorder || phase !== "paused") return;
   recorder.resume();
+  recStartAt = Date.now();
   phase = "recording";
   paintPhase();
 }
@@ -154,6 +169,11 @@ function closeAndSend() {
   if (!recorder || (phase !== "recording" && phase !== "paused")) return;
   const seq = openSeq;
   const usedMime = mime;
+  if (phase === "recording" && recStartAt) {
+    segmentMs += Date.now() - recStartAt;
+    recStartAt = 0;
+  }
+  const durationSec = segmentMs / 1000;
   phase = "sending";
   cancelSilenceTimer();
   paintPhase();
@@ -165,26 +185,29 @@ function closeAndSend() {
     openSeq = null;
     phase = "idle";
     paintPhase();
-    sendSegment(blob, seq, filenameForMime(usedMime));
+    sendSegment(blob, seq, filenameForMime(usedMime), durationSec);
   };
   recorder.stop();
 }
 
-async function sendSegment(blob, seq, filename) {
+async function sendSegment(blob, seq, filename, durationSec) {
   store.setStatus(seq, "sending");
   // Hold the blob in this closure so a failed segment can be retried.
-  store.setRetry(seq, () => doSend(blob, seq, filename));
-  await doSend(blob, seq, filename);
+  store.setRetry(seq, () => doSend(blob, seq, filename, durationSec));
+  await doSend(blob, seq, filename, durationSec);
 }
 
-async function doSend(blob, seq, filename) {
+async function doSend(blob, seq, filename, durationSec) {
+  const multiSpeaker = getMultiSpeaker();
   try {
     const text = await transcribeBlob(blob, {
       prompt: PROMPT_CONTEXT,
       language: "en",
       filename,
+      multiSpeaker,
     });
     store.setText(seq, text); // also releases the blob (retry cleared)
+    addUsage(durationSec, multiSpeaker);
   } catch (err) {
     store.fail(seq, err.detail ? `${err.message} — ${err.detail}` : err.message);
     if (err.status === 429) toast("Rate limit reached — wait a moment.");
@@ -204,6 +227,9 @@ function hardReset() {
   openSeq = null;
   phase = "idle";
   flicked = false;
+  segmentMs = 0;
+  recStartAt = 0;
+  clearButtonDrag();
   paintPhase();
 }
 
@@ -216,8 +242,8 @@ function onPointerDown(e) {
   e.preventDefault();
   recordBtn.setPointerCapture?.(e.pointerId);
   flicked = false;
-  pressStartTime = Date.now();
   pressStartY = e.clientY;
+  clearButtonDrag(); // start from rest
 
   if (phase === "idle") startRecording();
   else if (phase === "paused") resumeRecording();
@@ -227,10 +253,15 @@ function onPointerMove(e) {
   if (mode !== "hold" || flicked) return;
   if (phase !== "recording") return;
   const dy = pressStartY - e.clientY; // upward is positive
-  const dt = Date.now() - pressStartTime;
-  if (dy >= FLICK_PX && dt <= FLICK_MS) {
+  const up = dy - DRAG_DEAD_ZONE;
+  if (up <= 0) {
+    setButtonDrag(0);
+    return;
+  }
+  setButtonDrag(up); // button follows the finger, shrinking as it rises
+  if (up >= SEND_DISTANCE) {
     flicked = true;
-    closeAndSend(); // flick up = send immediately
+    flyAwayAndSend(); // committed swipe — fling it off and send
   }
 }
 
@@ -239,9 +270,43 @@ function onPointerUp(e) {
   recordBtn.releasePointerCapture?.(e.pointerId);
   if (flicked) {
     flicked = false;
-    return; // the flick already sent
+    return; // the swipe already sent; fly-away handles the button
   }
-  if (phase === "recording") pauseRecording(); // a plain lift = pause
+  springBack(); // a plain lift = pause; ease the button back to rest
+  if (phase === "recording") pauseRecording();
+}
+
+// ---------------------------------------------------------------------------
+// Swipe animation: button follows the finger, then flings away on send.
+// ---------------------------------------------------------------------------
+
+function setButtonDrag(up) {
+  const clamped = Math.min(up, DRAG_MAX);
+  const t = clamped / DRAG_MAX;
+  recordBtn.style.transition = "none";
+  recordBtn.style.transform = `translateY(${-clamped}px) scale(${1 - t * 0.55})`;
+  recordBtn.style.opacity = String(1 - t * 0.4);
+}
+
+function flyAwayAndSend() {
+  recordBtn.style.transition = "transform 0.28s cubic-bezier(.4,0,.6,1), opacity 0.28s";
+  recordBtn.style.transform = "translateY(-260px) scale(0.08)";
+  recordBtn.style.opacity = "0";
+  setTimeout(clearButtonDrag, 320);
+  closeAndSend();
+}
+
+function springBack() {
+  recordBtn.style.transition = "transform 0.18s ease, opacity 0.18s ease";
+  recordBtn.style.transform = "";
+  recordBtn.style.opacity = "";
+  setTimeout(clearButtonDrag, 220);
+}
+
+function clearButtonDrag() {
+  recordBtn.style.transition = "";
+  recordBtn.style.transform = "";
+  recordBtn.style.opacity = "";
 }
 
 // ---------------------------------------------------------------------------
