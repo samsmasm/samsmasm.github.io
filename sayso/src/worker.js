@@ -41,7 +41,16 @@ export default {
     // it (SPA fallback serves index.html for unknown paths).
     const assetUrl = new URL(url);
     assetUrl.pathname = path;
-    return env.ASSETS.fetch(new Request(assetUrl, request));
+    const resp = await env.ASSETS.fetch(new Request(assetUrl, request));
+
+    // Never let the HTML shell be cached, so index.html updates always reach the
+    // browser (versioned assets it references are safe to cache).
+    if ((resp.headers.get("content-type") || "").includes("text/html")) {
+      const fresh = new Response(resp.body, resp);
+      fresh.headers.set("Cache-Control", "no-cache, must-revalidate");
+      return fresh;
+    }
+    return resp;
   },
 };
 
