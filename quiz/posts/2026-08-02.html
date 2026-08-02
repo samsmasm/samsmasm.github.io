@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talkonomics &mdash; 2 August 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;
+  --surface:#fff;
+  --border:#111;
+  --text:#111;
+  --muted:#4a4540;
+  --light:#7a7268;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',system-ui,sans-serif}
+/* Slides */
+#slides{height:100vh;position:relative}
+.slide{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg);
+}
+.slide.active{display:flex}
+/* Category accent */
+.slide-top{
+  background:var(--cat-bg,#f0f5ff);
+  border-bottom:2px solid var(--cat-border,#b6cff5);
+  padding:0.55rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.category-badge{
+  font-family:'Inter',sans-serif;
+  font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--cat-fg,#1a3a7a);
+}
+.q-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.7rem;font-weight:600;
+  color:var(--cat-fg,#1a3a7a);
+  opacity:0.7;
+}
+/* Slide body */
+.slide-body{
+  flex:1;overflow-y:auto;
+  padding:2rem 2.5rem 1rem;
+  display:flex;flex-direction:column;
+  gap:1.4rem;
+  max-width:900px;width:100%;margin:0 auto;
+}
+/* Title slide */
+.title-body{
+  align-items:center;justify-content:center;text-align:center;
+  gap:1rem;
+  background:
+    radial-gradient(ellipse at 15% 50%, #ffd6e7 0%, transparent 50%),
+    radial-gradient(ellipse at 35% 20%, #d6f0ff 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+    #fff;
+}
+.title-wordmark{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4.5rem);
+  font-weight:900;
+  color:var(--text);
+  line-height:1;
+}
+.title-tagline{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.85rem,2vw,1.1rem);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.18em;
+  color:var(--light);
+}
+.title-date{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1rem,2.5vw,1.5rem);
+  color:var(--muted);
+  font-style:italic;
+}
+.title-meta{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;
+  color:var(--light);
+  letter-spacing:0.04em;
+}
+/* Question */
+.question-text{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1.1rem,2.8vw,1.55rem);
+  line-height:1.45;
+  color:var(--text);
+  font-weight:700;
+}
+/* Options */
+.options{display:flex;flex-direction:column;gap:0.65rem}
+.option{
+  display:flex;align-items:flex-start;gap:0.9rem;
+  background:var(--surface);
+  border:1.5px solid #ddd7cc;
+  border-radius:6px;
+  padding:0.75rem 1rem;
+  transition:background 0.2s,border-color 0.2s,opacity 0.25s;
+  cursor:default;
+}
+.option-letter{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--light);
+  flex-shrink:0;
+  margin-top:0.1rem;
+  min-width:1.1rem;
+}
+.option-text{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.9rem,2vw,1.05rem);
+  line-height:1.45;
+  color:var(--text);
+}
+/* Revealed state */
+.slide.revealed .option.correct{
+  background:#d6f5e8;
+  border-color:#145c34;
+}
+.slide.revealed .option.correct .option-letter{color:#145c34}
+.slide.revealed .option:not(.correct){opacity:0.32}
+.slide.revealed .explanation{display:block}
+.slide.revealed .btn-reveal{display:none}
+/* Explanation */
+.explanation{
+  display:none;
+  background:#f0f5ff;
+  border:1.5px solid #b6cff5;
+  border-radius:6px;
+  padding:0.9rem 1.1rem;
+}
+.explanation p{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.82rem,1.8vw,0.95rem);
+  line-height:1.6;
+  color:#1a3a7a;
+  font-style:italic;
+}
+/* Nav bar */
+.slide-nav{
+  flex-shrink:0;
+  border-top:1px solid #ddd7cc;
+  background:var(--surface);
+  padding:0.65rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0.75rem;
+}
+.slide-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--light);
+}
+/* Buttons */
+.btn-nav{
+  font-family:'Inter',sans-serif;
+  font-size:0.75rem;font-weight:600;
+  color:#1a3a7a;
+  background:none;border:1.5px solid #b6cff5;
+  border-radius:4px;padding:0.4rem 0.9rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s,border-color 0.12s;
+}
+.btn-nav:hover{background:#f0f5ff;border-color:#1a3a7a}
+.btn-reveal{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;border:none;
+  border-radius:4px;padding:0.45rem 1.2rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-reveal:hover{background:#2a4a9a}
+.btn-primary{
+  font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;
+  border:none;border-radius:4px;
+  padding:0.6rem 1.6rem;
+  cursor:pointer;text-decoration:none;
+  display:inline-block;
+  letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-primary:hover{background:#2a4a9a}
+/* Mode buttons on title slide */
+.mode-buttons{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}
+.btn-mode{
+  background:var(--surface);
+  border:2px solid #b6cff5;border-radius:8px;
+  padding:0.9rem 1.4rem;cursor:pointer;text-align:center;
+  min-width:190px;transition:border-color 0.15s,background 0.15s;
+}
+.btn-mode:hover{border-color:#1a3a7a;background:#f0f5ff}
+.btn-mode-title{display:block;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:700;color:#1a3a7a;margin-bottom:0.3rem}
+.btn-mode-desc{display:block;font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--light);line-height:1.4}
+/* Hide reveal button in at-end mode on question slides */
+body[data-mode="atend"] .q-slide .btn-reveal{display:none}
+/* Print */
+@media print{
+  html,body{overflow:visible;height:auto}
+  #slides{height:auto;position:static}
+  .slide{position:static;display:flex!important;page-break-before:always;min-height:100vh}
+  .slide:first-child{page-break-before:avoid}
+  .slide-nav{display:none}
+  .btn-reveal{display:none!important}
+  .slide.revealed .option{opacity:1!important}
+  .explanation{display:block!important}
+}
+</style>
+</head>
+<body>
+<div id="slides">
+
+  <div class="slide active" id="slide-0">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
+      <div class="title-date">Weekly Quiz &mdash; 2 August 2026</div>
+      <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
+      <div class="mode-buttons">
+        <button class="btn-mode" onclick="selectMode('asgo')">
+          <span class="btn-mode-title">Answers as we go</span>
+          <span class="btn-mode-desc">Reveal each answer before moving on</span>
+        </button>
+        <button class="btn-mode" onclick="selectMode('atend')">
+          <span class="btn-mode-title">Answers at the end</span>
+          <span class="btn-mode-desc">All 10 questions first, then all answers</span>
+        </button>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <span></span>
+      <span class="slide-counter">Talkonomics</span>
+      <span></span>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Starbucks has been fighting to win back customers after a rough few years. The chain recently posted its fourth straight quarter of same-store sales growth under CEO Brian Niccol. What did Starbucks do with its full-year outlook as a result?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Raised it, signalling confidence the turnaround is holding</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Left it unchanged, warning that tariffs could dent coffee prices</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Cut it, blaming a slowdown in afternoon drink orders</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Starbucks raised its full-year outlook, a sign that its turnaround under Brian Niccol is gaining real traction. Four consecutive quarters of same-store sales growth (revenue from locations open at least a year, a key retail health check) is meaningful momentum. Niccol, who was poached from Chipotle in 2024, has focused on fixing mobile ordering queues and restoring the in-store experience.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Germany&#x27;s car industry is having a rough time. BMW has recently joined Volkswagen, Porsche and Mercedes-Benz in announcing major job cuts. What is the main force driving this wave of layoffs across German automakers?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Rising steel costs caused by EU import tariffs on raw materials</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Chinese electric vehicle rivals eating into their market share</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">A Europe-wide ban on diesel engines taking effect ahead of schedule</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Chinese EV makers have aggressively undercut German brands on price, especially in the crucial Chinese domestic market where VW and BMW once dominated. German automakers are now cutting thousands of jobs and restructuring to survive. Germany&#x27;s car industry employs around 800,000 people directly, so the ripple effects on the broader economy are significant.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Oprah Winfrey founded a prestigious girls&#x27; school in South Africa nearly two decades ago. She has just announced a major change of direction — closing the campus after the 2027 academic year. What will she do instead of running a physical school?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Donate the campus buildings to the South African government to run</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Expand her scholarship programme to support more students at existing schools</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Convert the site into a leadership retreat centre for African women executives</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Oprah will close the Oprah Winfrey Leadership Academy for Girls after 2027 but expand her scholarship programme, shifting from bricks-and-mortar to funding students at other institutions. The school opened in 2007 and Oprah invested heavily in it personally. The move reflects a broader debate about whether endowed schools or scalable scholarships deliver better long-term impact in education philanthropy.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">McDonald&#x27;s Korea recently launched a burger featuring locally grown Chungju corn. Sales were halted nationwide almost immediately. Why?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The burger was so popular it sold out in under 48 hours, crashing the supply chain</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Multiple customers reported biting into small stones hidden in the corn filling</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">A rival fast-food chain filed a trademark claim over the word &#x27;Chungju&#x27;</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The Chungju corn cheese croquette burger was pulled after customers reported finding small stones in the filling — not the kind of crunch you want. McDonald&#x27;s Korea pulled it nationwide almost immediately. The incident is a reminder that locally sourced ingredients, while great for marketing, can introduce supply chain quality risks that global sourcing networks are specifically designed to avoid.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Eurozone inflation (the rate at which prices across the euro currency area are rising) recently hit 2.9% in July — above the European Central Bank&#x27;s 2% target. Price pressures varied widely between member states. Which of the following best explains why inflation rates differ so much across countries sharing the same currency?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Countries with faster wage growth tend to see higher services inflation locally</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Countries with smaller economies automatically import more inflation from abroad</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Countries with newer euro membership are exempt from ECB interest rate decisions</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Within a currency union, countries cannot adjust exchange rates or set their own interest rates, so local wage growth becomes a key driver of differing inflation rates — especially in services like restaurants and hairdressers, where labour costs dominate. Countries with tight labour markets and strong pay deals tend to run hotter than the eurozone average. This is a structural tension the ECB has to manage with a single interest rate for 20 very different economies.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The IMF (International Monetary Fund, the global lender of last resort) recently completed a review of Egypt&#x27;s economy, unlocking $1.8 billion in new funding. Egypt&#x27;s prime minister called it a &#x27;vote of confidence&#x27;. Which of these is NOT typically a condition the IMF attaches to this kind of support?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Reducing government budget deficits by cutting spending or raising taxes</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Allowing the currency to weaken toward its market value rather than fixing it artificially</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Requiring the recipient country to run a trade surplus within one calendar year</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. The IMF does not typically demand a trade surplus on a fixed timeline — that would be unrealistic and counterproductive. Standard IMF conditions focus on fiscal discipline (cutting deficits), currency reform (moving toward market exchange rates), and structural reforms like reducing energy subsidies. Egypt has been through a painful adjustment including a sharp devaluation of the Egyptian pound, which has hit ordinary households hard.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Renewed attacks on shipping in the Gulf and the Red Sea have recently pushed the price of crude oil past $100 a barrel. The Strait of Hormuz is one of the world&#x27;s most critical chokepoints for oil. Roughly what share of global oil supply passes through it?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Around one fifth of the world&#x27;s oil supply</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Around one third of the world&#x27;s oil supply</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Around half of the world&#x27;s oil supply</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Roughly 20% of global oil supply — about one barrel in five — passes through the Strait of Hormuz, making it the single most important oil chokepoint on earth. The strait is only 33 kilometres wide at its narrowest. Combined with disruptions in the Red Sea, where Houthi attacks have rerouted dozens of tankers around Africa, the double pressure has been enough to push crude through the $100 barrier.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">A recent Euronews study compared how long workers in different European countries need to work to afford a scoop of ice cream. Greece came out worst. How much longer does a Greek worker have to work for one scoop compared to a German worker?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">About 50% longer</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">About twice as long</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Nearly three times as long</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. A Greek worker needs nearly three times as much working time to afford a single scoop of ice cream as a German worker — a striking illustration of the gap between wages and prices across Europe. Greece has one of the EU&#x27;s lower minimum wages, while ice cream is priced for tourists in many popular spots. It is a neat reminder that the &#x27;cost of living&#x27; debate is really about two moving parts: prices AND wages.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of cut flowers, supplying the majority of blooms sold in Europe and a significant share of global exports?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The Netherlands</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Kenya</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Colombia</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Kenya is the world&#x27;s largest exporter of cut flowers by volume, supplying around 35–40% of all flowers sold in the EU. The Rift Valley&#x27;s altitude, consistent sunlight, and cheap labour make it ideal for growing roses year-round. The Netherlands is the world&#x27;s largest trading and auction hub for flowers — nearly half of Kenya&#x27;s exports fly through Schiphol — but Kenya does the growing.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which Scottish economist, born in 1723, argued that the wealth of nations came not from gold and silver but from the productive labour of ordinary people — a radical idea at the time?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Hume</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">John Locke</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith, born in Kirkcaldy in 1723, published The Wealth of Nations in 1776 — the same year as American independence. His argument that free markets and the division of labour, not hoarded precious metals, created prosperity was genuinely revolutionary. He also gave us the concept of the &#x27;invisible hand&#x27; — the idea that individuals pursuing self-interest can inadvertently benefit society as a whole.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Starbucks has been fighting to win back customers after a rough few years. The chain recently posted its fourth straight quarter of same-store sales growth under CEO Brian Niccol. What did Starbucks do with its full-year outlook as a result?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Raised it, signalling confidence the turnaround is holding</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Left it unchanged, warning that tariffs could dent coffee prices</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Cut it, blaming a slowdown in afternoon drink orders</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Starbucks raised its full-year outlook, a sign that its turnaround under Brian Niccol is gaining real traction. Four consecutive quarters of same-store sales growth (revenue from locations open at least a year, a key retail health check) is meaningful momentum. Niccol, who was poached from Chipotle in 2024, has focused on fixing mobile ordering queues and restoring the in-store experience.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A1 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Germany&#x27;s car industry is having a rough time. BMW has recently joined Volkswagen, Porsche and Mercedes-Benz in announcing major job cuts. What is the main force driving this wave of layoffs across German automakers?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Rising steel costs caused by EU import tariffs on raw materials</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Chinese electric vehicle rivals eating into their market share</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">A Europe-wide ban on diesel engines taking effect ahead of schedule</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Chinese EV makers have aggressively undercut German brands on price, especially in the crucial Chinese domestic market where VW and BMW once dominated. German automakers are now cutting thousands of jobs and restructuring to survive. Germany&#x27;s car industry employs around 800,000 people directly, so the ripple effects on the broader economy are significant.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A2 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Oprah Winfrey founded a prestigious girls&#x27; school in South Africa nearly two decades ago. She has just announced a major change of direction — closing the campus after the 2027 academic year. What will she do instead of running a physical school?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Donate the campus buildings to the South African government to run</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Expand her scholarship programme to support more students at existing schools</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Convert the site into a leadership retreat centre for African women executives</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Oprah will close the Oprah Winfrey Leadership Academy for Girls after 2027 but expand her scholarship programme, shifting from bricks-and-mortar to funding students at other institutions. The school opened in 2007 and Oprah invested heavily in it personally. The move reflects a broader debate about whether endowed schools or scalable scholarships deliver better long-term impact in education philanthropy.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A3 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">McDonald&#x27;s Korea recently launched a burger featuring locally grown Chungju corn. Sales were halted nationwide almost immediately. Why?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The burger was so popular it sold out in under 48 hours, crashing the supply chain</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Multiple customers reported biting into small stones hidden in the corn filling</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">A rival fast-food chain filed a trademark claim over the word &#x27;Chungju&#x27;</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The Chungju corn cheese croquette burger was pulled after customers reported finding small stones in the filling — not the kind of crunch you want. McDonald&#x27;s Korea pulled it nationwide almost immediately. The incident is a reminder that locally sourced ingredients, while great for marketing, can introduce supply chain quality risks that global sourcing networks are specifically designed to avoid.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A4 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Eurozone inflation (the rate at which prices across the euro currency area are rising) recently hit 2.9% in July — above the European Central Bank&#x27;s 2% target. Price pressures varied widely between member states. Which of the following best explains why inflation rates differ so much across countries sharing the same currency?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Countries with faster wage growth tend to see higher services inflation locally</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Countries with smaller economies automatically import more inflation from abroad</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Countries with newer euro membership are exempt from ECB interest rate decisions</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Within a currency union, countries cannot adjust exchange rates or set their own interest rates, so local wage growth becomes a key driver of differing inflation rates — especially in services like restaurants and hairdressers, where labour costs dominate. Countries with tight labour markets and strong pay deals tend to run hotter than the eurozone average. This is a structural tension the ECB has to manage with a single interest rate for 20 very different economies.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A5 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The IMF (International Monetary Fund, the global lender of last resort) recently completed a review of Egypt&#x27;s economy, unlocking $1.8 billion in new funding. Egypt&#x27;s prime minister called it a &#x27;vote of confidence&#x27;. Which of these is NOT typically a condition the IMF attaches to this kind of support?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Reducing government budget deficits by cutting spending or raising taxes</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Allowing the currency to weaken toward its market value rather than fixing it artificially</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Requiring the recipient country to run a trade surplus within one calendar year</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. The IMF does not typically demand a trade surplus on a fixed timeline — that would be unrealistic and counterproductive. Standard IMF conditions focus on fiscal discipline (cutting deficits), currency reform (moving toward market exchange rates), and structural reforms like reducing energy subsidies. Egypt has been through a painful adjustment including a sharp devaluation of the Egyptian pound, which has hit ordinary households hard.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A6 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Renewed attacks on shipping in the Gulf and the Red Sea have recently pushed the price of crude oil past $100 a barrel. The Strait of Hormuz is one of the world&#x27;s most critical chokepoints for oil. Roughly what share of global oil supply passes through it?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Around one fifth of the world&#x27;s oil supply</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Around one third of the world&#x27;s oil supply</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Around half of the world&#x27;s oil supply</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Roughly 20% of global oil supply — about one barrel in five — passes through the Strait of Hormuz, making it the single most important oil chokepoint on earth. The strait is only 33 kilometres wide at its narrowest. Combined with disruptions in the Red Sea, where Houthi attacks have rerouted dozens of tankers around Africa, the double pressure has been enough to push crude through the $100 barrier.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A7 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">A recent Euronews study compared how long workers in different European countries need to work to afford a scoop of ice cream. Greece came out worst. How much longer does a Greek worker have to work for one scoop compared to a German worker?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">About 50% longer</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">About twice as long</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Nearly three times as long</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. A Greek worker needs nearly three times as much working time to afford a single scoop of ice cream as a German worker — a striking illustration of the gap between wages and prices across Europe. Greece has one of the EU&#x27;s lower minimum wages, while ice cream is priced for tourists in many popular spots. It is a neat reminder that the &#x27;cost of living&#x27; debate is really about two moving parts: prices AND wages.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A8 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of cut flowers, supplying the majority of blooms sold in Europe and a significant share of global exports?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The Netherlands</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Kenya</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Colombia</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Kenya is the world&#x27;s largest exporter of cut flowers by volume, supplying around 35–40% of all flowers sold in the EU. The Rift Valley&#x27;s altitude, consistent sunlight, and cheap labour make it ideal for growing roses year-round. The Netherlands is the world&#x27;s largest trading and auction hub for flowers — nearly half of Kenya&#x27;s exports fly through Schiphol — but Kenya does the growing.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A9 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which Scottish economist, born in 1723, argued that the wealth of nations came not from gold and silver but from the productive labour of ordinary people — a radical idea at the time?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">David Hume</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Adam Smith</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">John Locke</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Adam Smith, born in Kirkcaldy in 1723, published The Wealth of Nations in 1776 — the same year as American independence. His argument that free markets and the division of labour, not hoarded precious metals, created prosperity was genuinely revolutionary. He also gave us the concept of the &#x27;invisible hand&#x27; — the idea that individuals pursuing self-interest can inadvertently benefit society as a whole.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A10 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-end">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">That&#8217;s all 10!</div>
+      <div class="title-date">2 August 2026</div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+        <button class="btn-primary" onclick="goTo(0)">&#8592; Start again</button>
+        <a class="btn-primary" href="../index.html">All editions</a>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">End</span>
+      <span></span>
+    </div>
+  </div>
+</div>
+<script>
+var TOTAL = document.querySelectorAll('.q-slide').length;
+var pos = 0;
+var SEQ = [];
+
+function buildSeq(m) {
+  var s = ['slide-0'];
+  for (var i = 1; i <= TOTAL; i++) s.push('slide-' + i);
+  if (m === 'atend') {
+    for (var i = 1; i <= TOTAL; i++) s.push('slide-a' + i);
+  }
+  s.push('slide-end');
+  return s;
+}
+
+function selectMode(m) {
+  SEQ = buildSeq(m);
+  document.body.setAttribute('data-mode', m);
+  showAt(1);
+}
+
+function showAt(p) {
+  pos = p;
+  document.querySelectorAll('.slide').forEach(function(s) { s.classList.remove('active'); });
+  var el = document.getElementById(SEQ[p]);
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+}
+
+function goTo(p) { showAt(p); }
+
+function nextSlide() {
+  if (pos < SEQ.length - 1) showAt(pos + 1);
+}
+
+function prevSlide() {
+  if (pos > 0) showAt(pos - 1);
+}
+
+function revealSlide(btn) {
+  var slide = btn.closest('.slide');
+  slide.classList.add('revealed');
+  var exp = slide.querySelector('.explanation');
+  if (exp) exp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextSlide(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { prevSlide(); e.preventDefault(); }
+  else if (e.key === ' ' || e.key === 'Enter') {
+    var slide = document.querySelector('.slide.active');
+    if (slide && !slide.classList.contains('revealed')) {
+      var btn = slide.querySelector('.btn-reveal');
+      if (btn) { revealSlide(btn); e.preventDefault(); return; }
+    }
+    nextSlide();
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
