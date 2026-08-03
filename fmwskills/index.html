@@ -5,9 +5,9 @@
     --purple: #4a1a7a;
     --purple-bg: #f5f0ff;
     --purple-border: #d0b6f5;
-    --skill-bg: #fff5f0;    --skill-border: #f5c9b0; --skill-text: #7a2d0a;
-    --activity-bg: #f5f0ff; --activity-border: #d0b6f5; --activity-text: #4a1a7a;
-    --assess-bg: #f0f5ff;   --assess-border: #b6cff5; --assess-text: #1a3a7a;
+    --skill-bg: #fff5f0;      --skill-border: #f5c9b0;      --skill-text: #7a2d0a;
+    --prevassess-bg: #f0f5ff; --prevassess-border: #b6cff5; --prevassess-text: #1a3a7a;
+    --newassess-bg: #f0faf4;  --newassess-border: #b6e8cb;  --newassess-text: #145c34;
   }
   * { box-sizing: border-box; }
   body {
@@ -61,6 +61,14 @@
 
   main { padding: 1rem 1.5rem 3rem; }
 
+  .view-toggle-wrap { display: flex; justify-content: flex-end; margin-bottom: 0.6rem; }
+  .view-toggle-btn {
+    font-size: 12px; background: none; border: 1.5px solid var(--purple-border);
+    border-radius: 8px; color: var(--purple); cursor: pointer; padding: 0.35rem 0.8rem;
+    font-family: inherit;
+  }
+  .view-toggle-btn:hover { background: var(--purple-bg); }
+
   .board-row {
     display: flex;
     gap: 1rem;
@@ -84,7 +92,6 @@
   }
   .col-head .col-title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.4rem; }
   .col-head h3 { margin: 0; font-family: Georgia, serif; font-size: 14px; color: #3a2a4a; cursor: text; }
-  .col-head .col-meta { font-size: 10px; color: #888; margin-top: 2px; }
   .col-head .col-count { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
   .col-head .col-count.warn { color: #b8402a; }
   .col-actions { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
@@ -113,12 +120,20 @@
   .card .card-btns { margin-top: 0.4rem; display: flex; gap: 0.5rem; }
   .card .card-btns span { font-size: 10px; color: #999; cursor: pointer; text-decoration: underline; }
   .card .card-btns span:hover { color: var(--purple); }
-  .card.type-skill    { background: var(--skill-bg);    border-color: var(--skill-border); }
+  .card.type-skill        { background: var(--skill-bg);      border-color: var(--skill-border); cursor: grab; }
   .card.type-skill .card-type { color: var(--skill-text); }
-  .card.type-activity { background: var(--activity-bg); border-color: var(--activity-border); }
-  .card.type-activity .card-type { color: var(--activity-text); }
-  .card.type-assessment { background: var(--assess-bg); border-color: var(--assess-border); }
-  .card.type-assessment .card-type { color: var(--assess-text); }
+  .card.type-prevassessment { background: var(--prevassess-bg); border-color: var(--prevassess-border); cursor: default; }
+  .card.type-prevassessment .card-type { color: var(--prevassess-text); }
+  .card.type-newassessment  { background: var(--newassess-bg);  border-color: var(--newassess-border); cursor: default; }
+  .card.type-newassessment .card-type { color: var(--newassess-text); }
+
+  .assess-pinned {
+    border-top: 1px dashed #f0e8ff;
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 
   .add-card-btn {
     margin: 0 0.6rem 0.6rem; padding: 0.4rem; text-align: center;
@@ -145,6 +160,24 @@
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
 
+  .skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.6rem;
+    align-items: start;
+  }
+  .unit-divider {
+    grid-column: 1 / -1;
+    font-family: Georgia, serif;
+    font-size: 13px;
+    color: #3a2a4a;
+    padding: 0.5rem 0 0.3rem 0.6rem;
+    margin-top: 0.6rem;
+    border-left: 4px solid #ccc;
+    cursor: default;
+  }
+  .unit-divider:first-child { margin-top: 0; }
+
   table.compare { border-collapse: collapse; width: 100%; font-size: 12px; }
   table.compare th, table.compare td { border-bottom: 1px solid #f0e8ff; padding: 0.5rem 0.6rem; text-align: left; vertical-align: top; }
   table.compare th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; font-weight: 600; }
@@ -161,7 +194,7 @@
 </style>
 
 <header>
-  <img src="/unisamsq.png" alt="">
+  <img src="unisamsq.png" alt="">
   <div class="htext">
     <h1>FMW Skills Sequencing</h1>
     <a href="https://www.unisam.nz">← unisam.nz</a>
@@ -169,15 +202,16 @@
 </header>
 
 <div class="subhead">
-  Drag cards between units to re-plan the sequence. <b>Baseline</b> is locked (this year's proposed redesign). Each teacher's board starts as a copy of Baseline and evolves independently — nobody edits anyone else's board. Use <b>Compare</b> to see where you agree and disagree.
+  Drag skill cards between units to re-plan the sequence. Every unit has a locked <b>Previous assessment</b> card (last year's actual assessment) and an editable <b>New assessment</b> card. <b>Baseline</b> is locked (this year's proposed redesign). Each teacher's board starts as a copy of Baseline and evolves independently — nobody edits anyone else's board. Use <b>Compare</b> to see where you agree and disagree, or toggle to <b>Just the skills</b> for a flat, reorderable list across the whole year.
 </div>
 
 <nav class="tabs" id="tabs"></nav>
 
 <div class="legend">
   <span><i style="background:var(--skill-border)"></i> Skill</span>
-  <span><i style="background:var(--activity-border)"></i> Activity</span>
-  <span><i style="background:var(--assess-border)"></i> Assessment</span>
+  <span><i style="background:var(--prevassess-border)"></i> Previous assessment</span>
+  <span><i style="background:var(--newassess-border)"></i> New assessment</span>
+  <span style="margin-left:0.6rem;color:#999;">Skill categories: Research · Communication · History/Geo/Econ</span>
 </div>
 
 <main id="main"></main>
@@ -203,78 +237,82 @@ const boardRef = id => ref(db, `fmwskills/boards/${id}`);
 
 /* ───────────────────────── Seed data (from skills-redesign.md) ───────────────────────── */
 const SEED_UNITS = [
-  { id:'u1', name:'Atlantic Revolutions',   dates:'26 Aug – 17 Sept', color:'#ffd6e7', order:0 },
-  { id:'u2', name:'Industrial Revolution',  dates:'19 Sept – 6 Oct',  color:'#d6f0ff', order:1 },
-  { id:'u3', name:'Imperialism in Africa',  dates:'6–20 Oct',         color:'#e8d6ff', order:2 },
-  { id:'u4', name:'WWI',                    dates:'4 Nov – 15 Dec',   color:'#d6ffe8', order:3 },
-  { id:'u5', name:'Imperialism in Asia',    dates:'19 Nov – 9 Dec',   color:'#fff3d6', order:4 },
-  { id:'u6', name:'Interwar Period',        dates:'7 Jan – 2 Mar',    color:'#ffe0d6', order:5 },
-  { id:'u7', name:'WWII & Cold War',        dates:'4 Mar – 23 Apr',   color:'#d6e0ff', order:6 },
-  { id:'u8', name:'Research Project',       dates:'4 May – 11 June',  color:'#f0d6ff', order:7 },
+  { id:'u1', name:'Atlantic Revolutions',   color:'#ffd6e7', order:0 },
+  { id:'u2', name:'Industrial Revolution',  color:'#d6f0ff', order:1 },
+  { id:'u3', name:'Imperialism in Africa',  color:'#e8d6ff', order:2 },
+  { id:'u4', name:'WWI',                    color:'#d6ffe8', order:3 },
+  { id:'u5', name:'Imperialism in Asia',    color:'#fff3d6', order:4 },
+  { id:'u6', name:'Interwar Period',        color:'#ffe0d6', order:5 },
+  { id:'u7', name:'WWII',                   color:'#d6e0ff', order:6 },
+  { id:'u8', name:'Cold War',               color:'#d0fff5', order:7 },
+  { id:'u9', name:'Research Project',       color:'#f0d6ff', order:8 },
 ];
 
+const NEW_ASSESS_PLACEHOLDER = 'Click edit to add this unit’s new assessment';
+
 const SEED_CARDS = [
-  // Unit 1
-  ['u1','skill','Set up Drive/NoodleTools as a habit','Location & Access — first real research-organisation system used all year.'],
-  ['u1','skill','OPCVL on primary sources only','Use of Information — one source type at a time, kept simple for the first unit.'],
-  ['u1','skill','Basic claim + evidence paragraph','Communicating Conclusions — topic sentence states the claim, closing sentence ties to thesis.'],
-  ['u1','skill','Is this a question or a topic? (seed)','Light, informal seed for the Historian vs Reporter distinction — don’t formalise yet.'],
-  ['u1','activity','Argument-mapping practice','Plan the essay before writing it: thesis, reasons, evidence, counterclaims mapped out.'],
-  ['u1','assessment','Argument Map of an essay','Research + plan a full essay on their chosen revolution — no full write-up required.'],
-  // Unit 2
-  ['u2','skill','Compare multiple source types on one phenomenon','Information Seeking Strategies.'],
-  ['u2','skill','Track one theme across a whole period','Synthesis — longitudinal thinking, not just a single moment.'],
-  ['u2','skill','For/against argument + fallacy-spotting drill','Moved here from Unit 1 to spread the load.'],
-  ['u2','skill','AI tool use framed as source evaluation','Evaluation — OPCVL an AI answer like any other source.'],
-  ['u2','activity','Urbanization game','Experiential simulation before the formal analysis questions.'],
-  ['u2','activity','Mayor/builder role-play reasoning','Reason through practical consequences of a policy, in role.'],
-  ['u2','assessment','30-minute timed mini-essay','How one theme changed across the Industrial Revolution, max ⅔ page.'],
-  // Unit 3
-  ['u3','skill','Visual/media subtext analysis','Use of Information — reading an image for symbols and emotion, not just content.'],
-  ['u3','skill','Presentism check','Evaluation — does this source’s message read differently today?'],
-  ['u3','skill','Whose story is this? (seed)','Light, informal precursor to Unit 7’s formal historiography.'],
-  ['u3','skill','Public presentation format','Synthesis — gallery walk, a real audience instead of just the teacher.'],
-  ['u3','activity','Primary source image analysis','Describe, then explain symbols/emotion, then analyse the message.'],
-  ['u3','activity','Reading jigsaw with AI comprehension check','Each student reads one article, checks understanding with AI, reports back.'],
-  ['u3','assessment','Primary-source poster/analysis project','Presented as a gallery walk, like an exhibition.'],
-  // Unit 4
-  ['u4','skill','Named propaganda/persuasion vocabulary','Use of Information — bandwagon, transfer, card stacking, etc.'],
-  ['u4','skill','Time-boxed live presentation','Communicating Conclusions — 2 minutes, no slides to lean on.'],
-  ['u4','activity','Propaganda technique matching activity','Match named techniques to real ad examples.'],
-  ['u4','activity','Rehearsal / practice of the ad presentation','Practice practice practice, before performing live.'],
-  ['u4','assessment','Propaganda Deconstruction','2-minute live presentation analysing a real ad.'],
-  // Unit 5
-  ['u5','skill','Name the framework: Big6 introduced explicitly','Task Definition — revealed as the name for what’s already been practiced since Unit 1.'],
-  ['u5','skill','RQ vs Report distinction','Task Definition — taught before the first owned RQ, not five months after.'],
-  ['u5','skill','Scoping/feasibility of a research angle','Information Seeking Strategies.'],
-  ['u5','activity','Big6 introduction lesson','Explicit staged research model, mapped onto the whole project timeline.'],
-  ['u5','activity','RQ checklist, self- and peer-assessed','Sentence-structure guide plus a checklist before submitting the question.'],
-  ['u5','assessment','Imperialism in Asia Documentary','Recorded voiced Slides presentation, documentary style, no bullet points.'],
-  // Unit 6
-  ['u6','skill','Hold multiple simultaneous narratives together','Synthesis — resisting the urge to flatten a decade into one story.'],
-  ['u6','skill','One analytic model, applied twice, named as reusable','Circular flow taught for the Depression, then reapplied to AI’s economic effects.'],
-  ['u6','skill','Choose-your-own-format synthesis','Communicating Conclusions — paragraph, diagram, table, or mindmap.'],
-  ['u6','activity','Stock market game','Enrichment, not a tagged new core skill.'],
-  ['u6','activity','Family interview homework','Linked forward explicitly to Unit 8’s ‘start from a personal source.’'],
-  ['u6','assessment','Unit test','Causes/events of the interwar period, circular flow and the Depression.'],
-  // Unit 7
-  ['u7','skill','Named historiographical schools','Evaluation — traditionalist / revisionist / post-revisionist / post-1991.'],
-  ['u7','skill','Turn narrative into a spatial/dated map','Use of Information — annotated maps of Europe and the Pacific.'],
-  ['u7','skill','Self-marking against a rubric','Evaluation — explicitly taught as a skill, not just a grading mechanic.'],
-  ['u7','activity','SQ3R reading method','Survey, Question, Read, Recall, Review — reused across multiple readings.'],
-  ['u7','activity','Yalta negotiation simulation','Negotiate in role, then compare to what was actually agreed.'],
-  ['u7','activity','Cold War country-role simulation game','Sustained across several weeks, not just one lesson.'],
-  ['u7','assessment','WWII summative','~25 MCQs plus a DBQ on a photo’s use as propaganda.'],
-  ['u7','assessment','Cold War test','Self-marked essay, argued through the historiographical lenses above.'],
-  // Unit 8
-  ['u8','skill','Genre-switching across three word-capped registers','Part A/B/C — source evaluation, investigation, reflection each need different writing.'],
-  ['u8','skill','Peer RQ diagnosis','Reuses the Task Definition skill from Unit 5 diagnostically, on real peer examples.'],
-  ['u8','skill','Mandatory graded reflection','Part C — methodology and challenges, not just content, formally assessed.'],
-  ['u8','activity','Historian vs Reporter sorting activity','Drag-and-drop distinguishing RQ types from report topics.'],
-  ['u8','activity','Rapid Fire 10-in-5 / Wheel of History','Fast idea generation under time pressure, then narrowing down.'],
-  ['u8','activity','Argument mapping: hunches to thesis','Sketch hunches, map how each connects to the thesis, before researching in depth.'],
-  ['u8','assessment','History IA','Part A 300w OPCVL / Part B 1000w investigation / Part C 300w reflection. 1600 words, 3 checkpoints.'],
-].map((c,i) => ({ id:'c'+i, unit:c[0], type:c[1], label:c[2], note:c[3], order:i }));
+  // Unit 1 — Atlantic Revolutions
+  ['u1','skill','Keep sources organised as you go','Set up Drive/NoodleTools as a habit — first real research-organisation system used all year.','research'],
+  ['u1','skill','Judge whether a source can be trusted and used','OPCVL on primary sources only — one source type at a time, kept simple for the first unit.','research'],
+  ['u1','skill','Write a claim, back it with evidence','Topic sentence states the claim, closing sentence ties back to the thesis.','communication'],
+  ['u1','skill','Notice the difference between a question and a topic','Light, informal seed for the Historian vs Reporter distinction, formalised later in Imperialism in Asia — don’t push for more than a gut sense yet.','research'],
+  ['u1','skill','Structure a multi-part argument','Thesis, reasons, evidence, counterclaims, rebuttal — planned out before writing, using the Argument Mapper tool. Pairs with the Argument Map new assessment below.','communication'],
+  ['u1','prevassessment','1500 word essay, fully researched and referenced.',''],
+  ['u1','newassessment','Argument Map of an essay','Research + plan a full essay on their chosen revolution — no full write-up required.'],
+  // Unit 2 — Industrial Revolution
+  ['u2','skill','Compare different types of sources on one topic','Primary vs secondary, image vs text — noticing that source type changes what you can learn.','research'],
+  ['u2','skill','Follow one idea across a whole time period','Longitudinal thinking — tracking change in a single theme, not just a single moment.','communication'],
+  ['u2','skill','Build a for/against argument, and spot weak reasoning','Practice constructing both sides of an argument and catching common fallacies.','communication'],
+  ['u2','skill','Treat an AI answer like any other source','Evaluate it the same way you’d OPCVL a website or book — don’t just copy it.','research'],
+  ['u2','skill','Explain how new technology changes a society','Science, Technology & Society — what changes, who benefits, what the tradeoffs are.','history'],
+  ['u2','prevassessment','30-minute timed mini-essay','How one theme changed across the Industrial Revolution, max ⅔ page.'],
+  ['u2','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 3 — Imperialism in Africa
+  ['u3','skill','Read an image for symbols and emotion, not just content','Visual/media subtext analysis — what’s implied, not just what’s shown.','research'],
+  ['u3','skill','Check whether an old source’s message still holds up today','Presentism check — does this source read differently now than it did then?','research'],
+  ['u3','skill','Explain how geography shapes what happens to a society','Geography lens — resources, terrain, and trade routes shaping imperial outcomes.','history'],
+  ['u3','skill','Present your work to a real audience','Public presentation format — gallery walk, not just handed to the teacher.','communication'],
+  ['u3','skill','Whose story is this? (seed)','Light, informal precursor to the Cold War unit’s formal historiography — don’t formalise yet.','history'],
+  ['u3','prevassessment','Primary-source poster/analysis project','Presented as a gallery walk, like an exhibition.'],
+  ['u3','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 4 — WWI
+  ['u4','skill','Name and recognise persuasion techniques','Bandwagon, transfer, card stacking, etc. — vocabulary for spotting propaganda in a source.','research'],
+  ['u4','skill','Give a tightly time-boxed live presentation','2 minutes, no slides to lean on.','communication'],
+  ['u4','skill','Explain how an ad or message targets identity or social groups','Society & Identity — how propaganda reflects and reinforces group belonging.','history'],
+  ['u4','skill','Explain how contact between societies leads to both cooperation and conflict','Connections & Conflict — alliances, diplomacy, and trade that tip into war.','history'],
+  ['u4','prevassessment','Propaganda Deconstruction','2-minute live presentation analysing a real ad.'],
+  ['u4','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 5 — Imperialism in Asia
+  ['u5','skill','Turn a topic into a real, researchable question','Compelling question — formalised here after being seeded since Unit 1.','research'],
+  ['u5','skill','Tell the difference between a research question and a report topic','Taught before the first owned RQ, not five months after.','research'],
+  ['u5','skill','Name the framework you’ve been using all year: the Big6','Revealed as the name for what’s already been practiced since Unit 1.','research'],
+  ['u5','skill','Judge whether your research question is realistic to answer','Scoping/feasibility of a research angle.','research'],
+  ['u5','skill','Compare how different governments try to meet people’s needs','Government lens — rights, order, and representation under colonial rule.','history'],
+  ['u5','prevassessment','Imperialism in Asia Documentary','Recorded voiced Slides presentation, documentary style, no bullet points.'],
+  ['u5','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 6 — Interwar Period
+  ['u6','skill','Hold two or more storylines in your head at once','Resisting the urge to flatten a whole decade into one simple story.','communication'],
+  ['u6','skill','Explain how an economic system affects people’s lives','Circular flow taught for the Depression, then reapplied to AI’s economic effects — one model, used twice.','history'],
+  ['u6','skill','Choose the right format for what you’re trying to say','Paragraph, diagram, table, or mindmap.','communication'],
+  ['u6','prevassessment','Unit test','Causes/events of the interwar period, circular flow and the Depression.'],
+  ['u6','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 7 — WWII
+  ['u7','skill','Turn a written narrative into a labelled map','Annotated maps of Europe and the Pacific.','research'],
+  ['u7','prevassessment','WWII summative','~25 MCQs plus a photo interpretation task, referencing back to WWI propaganda techniques.'],
+  ['u7','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 8 — Cold War
+  ['u8','skill','Compare different historians’ interpretations of the same event','Traditionalist / revisionist / post-revisionist / post-1991 — named historiographical schools.','history'],
+  ['u8','skill','Check your own work against a rubric before it’s marked','Self-marking — explicitly taught as a skill, not just a grading mechanic.','communication'],
+  ['u8','prevassessment','Cold War test','Self-marked essay, argued through the historiographical lenses above.'],
+  ['u8','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+  // Unit 9 — Research Project
+  ['u9','skill','Switch your writing style across different sections','Part A/B/C — source evaluation, investigation, reflection each need a different register.','communication'],
+  ['u9','skill','Diagnose what’s wrong with someone else’s research question','Reuses the Task Definition skill from Unit 5 diagnostically, on real peer examples.','research'],
+  ['u9','skill','Reflect on how you did the work, not just what you found','Part C — methodology and challenges, formally assessed.','communication'],
+  ['u9','skill','Do something with your conclusion, not just state it','Taking informed action — new this year, closing the loop on the year’s research.','communication'],
+  ['u9','prevassessment','History IA','Part A 300w OPCVL / Part B 1000w investigation / Part C 300w reflection. 1600 words, 3 checkpoints.'],
+  ['u9','newassessment',NEW_ASSESS_PLACEHOLDER,''],
+].map((c,i) => ({ id:'c'+i, unit:c[0], type:c[1], label:c[2], note:c[3], order:i, category:c[4] }));
 
 function cloneSeed() {
   const units = {}; SEED_UNITS.forEach(u => units[u.id] = {...u});
@@ -288,6 +326,7 @@ const PEOPLE_LABEL = { sam:'Sam', thomas:'Thomas', dan:'Dan', diana:'Diana', oth
 let currentTab = 'baseline';
 let state = { units:{}, cards:{} };
 let liveRef = null;
+let skillsView = false;
 
 function isEditable() { return PEOPLE.includes(currentTab); }
 
@@ -315,6 +354,7 @@ function renderTabs() {
 
 function switchTab(id) {
   currentTab = id;
+  skillsView = false;
   renderTabs();
   if (liveRef) { off(liveRef); liveRef = null; }
   if (id === 'baseline') {
@@ -337,16 +377,37 @@ async function loadPersonBoard(id) {
   onValue(liveRef, snap => {
     const val = snap.val() || { units:{}, cards:{} };
     state = { units: val.units || {}, cards: val.cards || {} };
-    if (currentTab === id) renderBoard();
+    if (currentTab === id) renderCurrentView();
   });
 }
 
-/* ───────────────────────── Board rendering ───────────────────────── */
-const TYPE_LABEL = { skill:'Skill', activity:'Activity', assessment:'Assessment' };
+/* ───────────────────────── View dispatch ───────────────────────── */
+const TYPE_LABEL = { skill:'Skill', prevassessment:'Previous assessment', newassessment:'New assessment' };
+const CATEGORY_LABEL = { research:'Research', communication:'Communication', history:'History/Geo/Econ' };
 
+function renderCurrentView() {
+  if (skillsView && isEditable()) renderSkillsView();
+  else renderBoard();
+}
+
+function renderViewToggle() {
+  const wrap = document.createElement('div');
+  wrap.className = 'view-toggle-wrap';
+  const btn = document.createElement('button');
+  btn.className = 'view-toggle-btn';
+  btn.textContent = skillsView ? '← Board view' : 'Just the skills →';
+  btn.onclick = () => { skillsView = !skillsView; renderCurrentView(); };
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+/* ───────────────────────── Board view ───────────────────────── */
 function renderBoard() {
   const main = document.getElementById('main');
   main.innerHTML = '';
+
+  if (isEditable()) main.appendChild(renderViewToggle());
+
   const row = document.createElement('div');
   row.className = 'board-row';
 
@@ -367,8 +428,10 @@ function renderColumn(u) {
   const col = document.createElement('div');
   col.className = 'col';
 
-  const cardsInUnit = Object.values(state.cards).filter(c => c.unit === u.id).sort((a,b) => a.order - b.order);
-  const skillCount = cardsInUnit.filter(c => c.type === 'skill').length;
+  const cardsInUnit = Object.values(state.cards).filter(c => c.unit === u.id);
+  const skillCards = cardsInUnit.filter(c => c.type === 'skill').sort((a,b) => a.order - b.order);
+  const prevCard = cardsInUnit.find(c => c.type === 'prevassessment');
+  const newCard = cardsInUnit.find(c => c.type === 'newassessment');
 
   const head = document.createElement('div');
   head.className = 'col-head';
@@ -377,9 +440,8 @@ function renderColumn(u) {
   head.innerHTML = `
     <div class="col-title-row">
       <h3 title="click to rename">${escapeHtml(u.name)}</h3>
-      <span class="col-count ${skillCount > 5 ? 'warn' : ''}">${skillCount} skill${skillCount===1?'':'s'}</span>
+      <span class="col-count ${skillCards.length > 5 ? 'warn' : ''}">${skillCards.length} skill${skillCards.length===1?'':'s'}</span>
     </div>
-    <div class="col-meta">${escapeHtml(u.dates || '')}</div>
   `;
   if (isEditable()) {
     head.querySelector('h3').onclick = () => renameUnit(u.id, u.name);
@@ -395,7 +457,7 @@ function renderColumn(u) {
   const list = document.createElement('div');
   list.className = 'card-list';
   list.dataset.unit = u.id;
-  cardsInUnit.forEach(c => list.appendChild(renderCard(c)));
+  skillCards.forEach(c => list.appendChild(renderCard(c)));
   col.appendChild(list);
 
   if (isEditable()) {
@@ -406,10 +468,16 @@ function renderColumn(u) {
     });
     const addBtn = document.createElement('div');
     addBtn.className = 'add-card-btn';
-    addBtn.textContent = '+ add card';
+    addBtn.textContent = '+ add skill';
     addBtn.onclick = () => addCard(u.id);
     col.appendChild(addBtn);
   }
+
+  const pinned = document.createElement('div');
+  pinned.className = 'assess-pinned';
+  if (prevCard) pinned.appendChild(renderCard(prevCard));
+  if (newCard) pinned.appendChild(renderCard(newCard));
+  col.appendChild(pinned);
 
   return col;
 }
@@ -418,17 +486,20 @@ function renderCard(c) {
   const el = document.createElement('div');
   el.className = 'card type-' + c.type;
   el.dataset.id = c.id;
+  const typeText = TYPE_LABEL[c.type] + (c.category ? ' · ' + CATEGORY_LABEL[c.category] : '');
   el.innerHTML = `
-    <span class="card-type">${TYPE_LABEL[c.type]}</span>
+    <span class="card-type">${typeText}</span>
     <div class="card-label">${escapeHtml(c.label)}</div>
     ${c.note ? `<div class="card-note">${escapeHtml(c.note)}</div>` : ''}
   `;
-  if (isEditable()) {
+  const canEdit = isEditable() && c.type !== 'prevassessment';
+  const canDelete = isEditable() && c.type === 'skill';
+  if (canEdit || canDelete) {
     const btns = document.createElement('div');
     btns.className = 'card-btns';
-    btns.innerHTML = `<span data-a="edit">edit</span><span data-a="del">delete</span>`;
-    btns.querySelector('[data-a=edit]').onclick = () => editCard(c.id);
-    btns.querySelector('[data-a=del]').onclick = () => deleteCard(c.id);
+    btns.innerHTML = (canEdit ? `<span data-a="edit">edit</span>` : '') + (canDelete ? `<span data-a="del">delete</span>` : '');
+    if (canEdit) btns.querySelector('[data-a=edit]').onclick = () => editCard(c.id);
+    if (canDelete) btns.querySelector('[data-a=del]').onclick = () => deleteCard(c.id);
     el.appendChild(btns);
   }
   return el;
@@ -438,14 +509,67 @@ function escapeHtml(s) {
   return (s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 }
 
+/* ───────────────────────── Just the skills view ───────────────────────── */
+function renderSkillsView() {
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  main.appendChild(renderViewToggle());
+
+  const grid = document.createElement('div');
+  grid.className = 'skills-grid';
+
+  const units = Object.values(state.units).sort((a,b) => a.order - b.order);
+  units.forEach(u => {
+    const divider = document.createElement('div');
+    divider.className = 'unit-divider';
+    divider.dataset.unit = u.id;
+    divider.style.borderLeftColor = u.color;
+    divider.textContent = u.name;
+    grid.appendChild(divider);
+
+    const skillCards = Object.values(state.cards)
+      .filter(c => c.unit === u.id && c.type === 'skill')
+      .sort((a,b) => a.order - b.order);
+    skillCards.forEach(c => grid.appendChild(renderCard(c)));
+  });
+
+  main.appendChild(grid);
+
+  if (isEditable()) {
+    Sortable.create(grid, {
+      animation: 150,
+      filter: '.unit-divider',
+      preventOnFilter: false,
+      onEnd: handleSkillsDragEnd,
+    });
+  }
+}
+
+function handleSkillsDragEnd() {
+  if (!ensureAuth()) { renderCurrentView(); return; }
+  const grid = document.querySelector('.skills-grid');
+  let unitId = null;
+  let order = 0;
+  [...grid.children].forEach(el => {
+    if (el.classList.contains('unit-divider')) {
+      unitId = el.dataset.unit;
+      order = 0;
+      return;
+    }
+    const c = state.cards[el.dataset.id];
+    if (c && unitId) { c.unit = unitId; c.order = order; order++; }
+  });
+  saveState();
+}
+
 /* ───────────────────────── Mutations (editable boards only) ───────────────────────── */
 function saveState() {
   if (!isEditable()) return;
   set(boardRef(currentTab), state);
 }
 
-function handleDragEnd(evt) {
-  if (!ensureAuth()) { renderBoard(); return; }
+function handleDragEnd() {
+  if (!ensureAuth()) { renderCurrentView(); return; }
   document.querySelectorAll('.card-list').forEach(list => {
     const unitId = list.dataset.unit;
     [...list.children].forEach((el, i) => {
@@ -458,16 +582,16 @@ function handleDragEnd(evt) {
 
 function addCard(unitId) {
   if (!ensureAuth()) return;
-  const type = prompt('Card type: skill / activity / assessment', 'skill');
-  if (!type || !['skill','activity','assessment'].includes(type.trim().toLowerCase())) { alert('Type must be: skill, activity, or assessment'); return; }
-  const label = prompt('Card label:');
+  const label = prompt('Skill label:');
   if (!label) return;
   const note = prompt('Note (optional):', '') || '';
+  let category = (prompt('Category: research / communication / history', 'research') || 'research').trim().toLowerCase();
+  if (!CATEGORY_LABEL[category]) category = 'research';
   const id = 'c_' + Date.now() + '_' + Math.floor(Math.random()*1000);
-  const order = Object.values(state.cards).filter(c => c.unit === unitId).length;
-  state.cards[id] = { id, unit: unitId, type: type.trim().toLowerCase(), label, note, order };
+  const order = Object.values(state.cards).filter(c => c.unit === unitId && c.type === 'skill').length;
+  state.cards[id] = { id, unit: unitId, type: 'skill', label, note, order, category };
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 function editCard(id) {
@@ -477,16 +601,25 @@ function editCard(id) {
   if (label === null) return;
   const note = prompt('Edit note:', c.note || '');
   c.label = label; c.note = note === null ? c.note : note;
+  if (c.type === 'skill') {
+    let category = prompt('Category: research / communication / history', c.category || 'research');
+    if (category !== null) {
+      category = category.trim().toLowerCase();
+      c.category = CATEGORY_LABEL[category] ? category : c.category;
+    }
+  }
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 function deleteCard(id) {
   if (!ensureAuth()) return;
+  const c = state.cards[id];
+  if (!c || c.type !== 'skill') return;
   if (!confirm('Delete this card?')) return;
   delete state.cards[id];
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 function addUnit() {
@@ -496,9 +629,9 @@ function addUnit() {
   const color = prompt('Colour (hex, e.g. #ffd6e7):', '#e0e0e0') || '#e0e0e0';
   const id = 'u_' + Date.now();
   const order = Object.values(state.units).length;
-  state.units[id] = { id, name, dates:'', color, order };
+  state.units[id] = { id, name, color, order };
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 function renameUnit(id, current) {
@@ -507,7 +640,7 @@ function renameUnit(id, current) {
   if (!name) return;
   state.units[id].name = name;
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 function recolorUnit(id, current) {
@@ -516,7 +649,7 @@ function recolorUnit(id, current) {
   if (!color) return;
   state.units[id].color = color;
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 function deleteUnit(id) {
@@ -526,7 +659,7 @@ function deleteUnit(id) {
   cardsIn.forEach(c => delete state.cards[c.id]);
   delete state.units[id];
   saveState();
-  renderBoard();
+  renderCurrentView();
 }
 
 /* ───────────────────────── Compare view ───────────────────────── */
@@ -580,7 +713,7 @@ async function renderCompare() {
         return db - da;
       });
     }
-    let html = '<table class="compare"><thead><tr><th>Skill / activity / assessment</th>';
+    let html = '<table class="compare"><thead><tr><th>Skill / assessment</th>';
     cols.forEach(c => html += `<th>${c === 'baseline' ? 'Baseline' : PEOPLE_LABEL[c]}</th>`);
     html += '</tr></thead><tbody>';
     visible.forEach(r => {
@@ -602,12 +735,11 @@ async function renderCompare() {
   let anyExtra = false;
   PEOPLE.forEach(p => {
     const b = boardsData[p];
-    const extras = Object.values(b.cards || {}).filter(c => !c.id.startsWith('c') || !SEED_CARDS.find(s => s.id === c.id));
-    const realExtras = extras.filter(c => !SEED_CARDS.find(s => s.id === c.id));
-    if (realExtras.length) {
+    const extras = Object.values(b.cards || {}).filter(c => !SEED_CARDS.find(s => s.id === c.id));
+    if (extras.length) {
       anyExtra = true;
       extraHtml += `<p style="font-size:12px;"><b>${PEOPLE_LABEL[p]}:</b> `;
-      extraHtml += realExtras.map(c => {
+      extraHtml += extras.map(c => {
         const u = b.units[c.unit];
         return `${escapeHtml(c.label)} <span style="color:#999">(${TYPE_LABEL[c.type]}, in ${u ? escapeHtml(u.name) : '?'})</span>`;
       }).join(' · ');
