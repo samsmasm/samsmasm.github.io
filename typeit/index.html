@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>typeit — handwriting to text</title>
+<title>typeit — pages to text</title>
 <style>
   :root{
     --purple:#4a1a7a; --purple-dark:#3a1361; --ink:#1d1430; --muted:#6b5f80;
@@ -62,6 +62,16 @@
   .flip{border:1px solid var(--line); background:#fff; color:var(--purple); border-radius:50%;
     width:46px; height:46px; font-size:20px; cursor:pointer}
   .cam-note{text-align:center; color:var(--muted); font-size:13px; margin-top:10px}
+
+  /* source selector */
+  .source-row{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:22px}
+  .source-label{font-size:14px; font-weight:700; color:var(--ink)}
+  .seg{display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:#fff}
+  .seg button{border:0; background:#fff; color:var(--muted); font-size:13.5px; font-weight:600;
+    padding:8px 14px; cursor:pointer}
+  .seg button + button{border-left:1px solid var(--line)}
+  .seg button.active{background:var(--purple); color:#fff}
+  .source-note{margin:8px 0 0; font-size:12.5px; color:var(--muted)}
 
   /* options */
   .opt{display:flex; align-items:flex-start; gap:10px; margin-top:16px; cursor:pointer;
@@ -143,9 +153,9 @@
 <div class="wrap">
   <header>
     <h1>typeit</h1>
-    <span class="tag">handwriting &rarr; text</span>
+    <span class="tag">pages &rarr; text</span>
   </header>
-  <p class="lead">Transcribed verbatim, unreadable words marked <code>[?]</code>. Nothing is stored.</p>
+  <p class="lead">Transcribed faithfully, unreadable words marked <code>[?]</code>. Nothing is stored.</p>
 
   <!-- mode switcher -->
   <div class="modes" id="modes">
@@ -185,10 +195,21 @@
     <p class="cam-note">Take all your photos, reorder them below if needed, then send them all together.</p>
   </section>
 
-  <!-- transcription options -->
+  <!-- what's on the page: this picks the prompt the worker uses -->
+  <div class="source-row">
+    <span class="source-label">What&rsquo;s on the page?</span>
+    <div class="seg" id="source">
+      <button data-src="handwriting" class="active">Handwriting</button>
+      <button data-src="printed">Printed</button>
+      <button data-src="mixed">Both</button>
+    </div>
+  </div>
+  <p class="source-note" id="source-note"></p>
+
+  <!-- one option, relabelled to suit the chosen source -->
   <label class="opt">
-    <input type="checkbox" id="opt-handwriting">
-    <span>Handwriting only <small>ignore typed / printed text on the page</small></span>
+    <input type="checkbox" id="opt-extra">
+    <span><span id="opt-title">Handwriting only</span> <small id="opt-sub">ignore typed / printed text on the page</small></span>
   </label>
 
   <!-- shared file list -->
@@ -252,7 +273,31 @@
 
 const CONCURRENCY = 3;
 const API = '/typeit/api/transcribe';
-const MAX_EDGE = 2200; // px on the longest side — plenty for handwriting OCR
+const SOURCE_KEY = 'typeit.source';
+
+// Per-source settings. maxEdge is the longest side we downscale to before
+// upload: handwriting is big and forgiving, print can be 9pt with footnotes,
+// so it needs the extra pixels.
+const SOURCES = {
+  handwriting: {
+    maxEdge: 2200,
+    note: 'Line breaks kept exactly as written. Plain text out.',
+    optTitle: 'Handwriting only',
+    optSub: 'ignore typed / printed text on the page',
+  },
+  printed: {
+    maxEdge: 3200,
+    note: 'Wrapped lines rejoined into paragraphs, split words repaired, columns read in order. Headings, lists and tables come back as Markdown.',
+    optTitle: 'Printed text only',
+    optSub: 'ignore handwritten notes, marginalia and highlighting',
+  },
+  mixed: {
+    maxEdge: 3200,
+    note: 'Printed layout followed, handwriting transcribed where it sits, so answers stay with their questions.',
+    optTitle: 'Mark the handwriting',
+    optSub: 'wrap handwritten passages as [hw: …] so you can tell them apart',
+  },
+};
 
 // Each item: { id, name, mime, file(Blob), thumb(url|null), status, text, error }
 let items = [];
@@ -261,16 +306,42 @@ let nextId = 1;
 let view = 'combined';
 let unwrap = false;
 let mode = 'upload';
+let source = 'handwriting';
 let done = 0;
 
 const $ = id => document.getElementById(id);
 const filesEl = $('files'), controls = $('controls'), out = $('out'), resultEl = $('result');
 
 // ---- text transform (no AI) ---------------------------------------------
+// Joins the lines *within* each paragraph but keeps the blank lines between
+// them. Collapsing those too would run the whole page into one block.
 function present(text){
   if (!unwrap) return text;
-  return text.replace(/[ \t]*\n[ \t]*/g, ' ').replace(/ {2,}/g, ' ').trim();
+  return text
+    .split(/\n[ \t]*\n/)
+    .map(p => p.replace(/[ \t]*\n[ \t]*/g, ' ').replace(/ {2,}/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n');
 }
+
+// ---- source selector -----------------------------------------------------
+$('source').addEventListener('click', e => {
+  const b = e.target.closest('button[data-src]');
+  if (b && !running) setSource(b.dataset.src);
+});
+
+function setSource(s){
+  source = SOURCES[s] ? s : 'handwriting';
+  const cfg = SOURCES[source];
+  for (const b of $('source').children) b.classList.toggle('active', b.dataset.src === source);
+  $('source-note').textContent = cfg.note;
+  $('opt-title').textContent = cfg.optTitle;
+  $('opt-sub').textContent = cfg.optSub;
+  $('opt-extra').checked = false; // the box means something different now
+  try { localStorage.setItem(SOURCE_KEY, source); } catch { /* private mode */ }
+}
+try { setSource(localStorage.getItem(SOURCE_KEY) || 'handwriting'); }
+catch { setSource('handwriting'); }
 
 // ---- mode switching ------------------------------------------------------
 $('modes').addEventListener('click', e => {
@@ -505,7 +576,8 @@ function fileToBase64(file){
 async function prepareImage(file){
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const maxEdge = SOURCES[source].maxEdge;
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     if (scale >= 1 && file.size < 2 * 1024 * 1024) { bitmap.close?.(); return null; }
     const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
     const canvas = document.createElement('canvas');
@@ -525,10 +597,9 @@ async function transcribeOne(it){
       if (shrunk) { mimeType = shrunk.mime; data = shrunk.data; }
     }
     if (data === undefined) data = await fileToBase64(it.file);
-    const ignoreTyped = $('opt-handwriting').checked;
     const res = await fetch(API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mimeType, data, ignoreTyped }),
+      body: JSON.stringify({ mimeType, data, source, option: $('opt-extra').checked }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
@@ -576,12 +647,19 @@ async function run(){
 $('go').addEventListener('click', run);
 
 // ---- output --------------------------------------------------------------
-function combinedText(){
+function pageBody(it){
+  return it.status === 'done' ? present(it.text || '[no text on this page]')
+       : `[not transcribed: ${it.error || it.status}]`;
+}
+
+// A single page is the common case now, and it doesn't need a page separator
+// bolted on top of it. `md` switches the separators to Markdown headings so a
+// downloaded .md stays valid Markdown.
+function combinedText(md){
+  if (items.length === 1) return pageBody(items[0]);
   return items.map((it, i) => {
-    const head = `----- ${i+1}. ${it.name} -----`;
-    const body = it.status === 'done' ? present(it.text || '[no text on this page]')
-               : `[not transcribed: ${it.error || it.status}]`;
-    return head + '\n\n' + body;
+    const head = md ? `## ${i+1}. ${it.name}` : `----- ${i+1}. ${it.name} -----`;
+    return head + '\n\n' + pageBody(it);
   }).join('\n\n');
 }
 
@@ -615,14 +693,8 @@ $('unwrap').addEventListener('click', () => {
   renderResult();
 });
 
-// Tote note body: drop the page separator when there's just one page.
-function noteText(){
-  if (items.length === 1 && items[0].status === 'done') return present(items[0].text || '');
-  return combinedText();
-}
-
 $('tote').addEventListener('click', async () => {
-  const text = noteText();
+  const text = combinedText(true);
   if (!text.trim()) return;
   if (!window.saveToTote){ alert('Tote isn’t ready yet — try again in a second.'); return; }
   const b = $('tote'), label = b.textContent;
@@ -646,7 +718,7 @@ $('copy').addEventListener('click', async () => {
 });
 
 function download(ext){
-  const blob = new Blob([combinedText()], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([combinedText(ext === 'md')], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `transcription-${new Date().toISOString().slice(0,10)}.${ext}`;

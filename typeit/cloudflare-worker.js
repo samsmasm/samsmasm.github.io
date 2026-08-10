@@ -1,5 +1,5 @@
 /**
- * typeit — handwriting -> text. Cloudflare Worker.
+ * typeit — pages -> text. Cloudflare Worker.
  *
  * Route: unisam.nz/typeit/*  (zone must be proxied / orange-cloud).
  *
@@ -22,21 +22,77 @@ const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const MODEL = 'gemini-3-flash-preview';
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB per page, after base64 decode
 
-const TRANSCRIBE_PROMPT = [
-  'You are transcribing handwritten notes for a careful archivist.',
-  'Transcribe the text in this image or document VERBATIM.',
-  'Preserve the original wording, spelling, punctuation, capitalisation, and the paragraph and line breaks exactly as written.',
+// --- prompts --------------------------------------------------------------
+// Three source types, because handwriting and print want opposite things.
+// Handwriting: preserve the line breaks, they carry meaning. Print: the line
+// breaks are an artefact of the column width, so reflow them and keep the
+// visible structure (headings, lists, tables) as Markdown instead.
+
+// Fidelity rules that apply whatever the source is.
+const COMMON_RULES = [
+  'Reproduce the wording, spelling, punctuation and capitalisation exactly.',
   'Do not correct, paraphrase, summarise, translate, or add anything.',
-  'For any word or character you cannot read with confidence, write [?] in its place.',
+  'For any word or character you genuinely cannot read, write [?] in its place.',
   'If a whole passage is illegible, write [illegible].',
-  'If the page contains no handwriting or text, output exactly: [no text on this page]',
-  'Output ONLY the transcribed text. No commentary, no headings, no markdown code fences.',
+  'If the page contains no text at all, output exactly: [no text on this page]',
+  'Output ONLY the transcription. No commentary, no preamble, no markdown code fences.',
 ].join(' ');
 
-// Appended when the client sends { ignoreTyped: true }.
-const HANDWRITTEN_ONLY =
-  'IMPORTANT: If most of the text on the page is handwritten, transcribe ONLY the handwriting '
-  + 'and ignore any typed or printed text (such as letterhead, form labels, or printed questions).';
+// Shared by the two printed-layout prompts.
+const LAYOUT_RULES = [
+  'Read the page in natural reading order. If the layout has multiple columns,',
+  'transcribe each column in full before moving to the next; never interleave them.',
+  'Rejoin lines that the layout wrapped into flowing paragraphs, and repair words',
+  'split by a hyphen at a line break. Keep genuine paragraph breaks as blank lines.',
+  'Use Markdown for structure that is visibly present on the page: headings, bold and',
+  'italic, bulleted and numbered lists, block quotes, and tables.',
+  'Ignore running heads, footers and page numbers.',
+].join(' ');
+
+const PROMPTS = {
+  handwriting: [
+    'You are transcribing handwritten notes for a careful archivist.',
+    'Transcribe the text in this image or document VERBATIM.',
+    'Preserve the paragraph and line breaks exactly as written.',
+    'Use plain text only, no Markdown formatting.',
+    COMMON_RULES,
+  ].join(' '),
+
+  printed: [
+    'You are transcribing a printed or typed document.',
+    LAYOUT_RULES,
+    'Put any footnotes at the end, under a "Notes" heading.',
+    COMMON_RULES,
+  ].join(' '),
+
+  mixed: [
+    'You are transcribing a page that contains both printed and handwritten text,',
+    'such as a completed form or an annotated handout.',
+    LAYOUT_RULES,
+    'Transcribe handwriting in the place it appears on the page, so that written answers',
+    'stay with the printed questions they belong to.',
+    COMMON_RULES,
+  ].join(' '),
+};
+
+// One optional modifier per source type, appended when the client sends
+// { option: true }. The UI shows exactly one checkbox, relabelled per source.
+const MODIFIERS = {
+  handwriting:
+    'IMPORTANT: If most of the text on the page is handwritten, transcribe ONLY the handwriting '
+    + 'and ignore any typed or printed text (such as letterhead, form labels, or printed questions).',
+  printed:
+    'IMPORTANT: Ignore anything added by hand, such as handwritten notes, marginalia, underlining, '
+    + 'highlighting, ticks and crosses. Transcribe only the printed or typed text.',
+  mixed:
+    'IMPORTANT: Mark every handwritten passage by wrapping it as [hw: ...] so that printed and '
+    + 'handwritten content can be told apart. Leave printed text unmarked.',
+};
+
+function buildPrompt(source, option) {
+  const base = PROMPTS[source] || PROMPTS.handwriting;
+  return option ? `${base} ${MODIFIERS[source] || MODIFIERS.handwriting}` : base;
+}
 
 // --- auth helpers (shared shape with the wc26 worker) ---------------------
 const enc = s => new TextEncoder().encode(s);
@@ -100,7 +156,7 @@ button:hover{background:#3a1361}
 </style></head><body>
 <form class="card" method="POST" action="/typeit/login" autocomplete="off">
   <p class="mark">typeit</p>
-  <p class="sub">Handwriting to text</p>
+  <p class="sub">Pages to text</p>
   <label for="p">Password</label>
   <input id="p" name="password" type="password" autofocus autocomplete="off">
   <button type="submit">Enter</button>
@@ -117,9 +173,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 524/408 = timeout, 429 = rate limit, 5xx = transient server errors. Worth a retry.
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 524]);
 
-async function transcribe(env, mimeType, dataB64, ignoreTyped) {
+async function transcribe(env, mimeType, dataB64, source, option) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-  const prompt = ignoreTyped ? `${TRANSCRIBE_PROMPT} ${HANDWRITTEN_ONLY}` : TRANSCRIBE_PROMPT;
+  const prompt = buildPrompt(source, option);
   const body = {
     contents: [{
       parts: [
@@ -184,13 +240,16 @@ export default {
       if (!env.GEMINI_API_KEY) return json({ error: 'Server is missing GEMINI_API_KEY' }, 500);
       let payload;
       try { payload = await request.json(); } catch { return json({ error: 'Bad JSON' }, 400); }
-      const { mimeType, data, ignoreTyped } = payload || {};
+      const { mimeType, data, source, option, ignoreTyped } = payload || {};
       if (!mimeType || !data) return json({ error: 'mimeType and data are required' }, 400);
       if (!/^(image\/|application\/pdf)/.test(mimeType)) return json({ error: 'Unsupported file type' }, 415);
       // base64 length ~ 4/3 of byte length; cheap size guard
       if (data.length * 3 / 4 > MAX_BYTES) return json({ error: 'Page too large (max 25MB)' }, 413);
+      // `ignoreTyped` is the pre-source-selector field name; still honoured so an
+      // old cached page keeps working.
+      const src = Object.hasOwn(PROMPTS, source) ? source : 'handwriting';
       try {
-        const text = await transcribe(env, mimeType, data, ignoreTyped === true);
+        const text = await transcribe(env, mimeType, data, src, option === true || ignoreTyped === true);
         return json({ text });
       } catch (e) {
         return json({ error: String(e.message || e) }, 502);
