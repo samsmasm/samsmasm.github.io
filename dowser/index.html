@@ -95,6 +95,16 @@
         /* STUDENT VIEW */
         #student-view { max-width: 500px; margin: 40px auto; padding: 20px; font-family: sans-serif; text-align: center; }
         .error-msg { color: #ef4444; background: #fee2e2; padding: 15px; border-radius: 12px; margin-bottom: 20px; }
+
+        /* COLOUR PICKER */
+        #colour-picker { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; }
+        .swatch {
+            width: 44px; height: 44px; border-radius: 8px; cursor: pointer;
+            border: 3px solid transparent; box-sizing: border-box;
+            border-bottom-right-radius: 16px 4px;
+        }
+        .swatch.selected { border-color: #1e293b; }
+        .picker-label { font-size: 0.9rem; color: #64748b; margin-top: 20px; }
         
         input, textarea { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid #cbd5e1; font-size: 1.2rem; box-sizing: border-box; }
         button { background: var(--accent); color: white; border: none; padding: 15px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
@@ -166,6 +176,8 @@
     </div>
     <h2 id="student-q">...</h2>
     <textarea id="ans-input" rows="5" placeholder="Your answer..."></textarea>
+    <div class="picker-label">Pick a colour for your note</div>
+    <div id="colour-picker"></div>
     <button onclick="submitAns()">SEND TO BOARD</button>
     <p id="feedback" style="color:green; display:none; margin-top:10px;">✔ SENT!</p>
 </div>
@@ -189,6 +201,18 @@
     const role = params.get('role');
     const room = window.location.hash.substring(1);
     let highestZ = 100;
+
+    const COLOURS = [
+        { name: 'Yellow', hex: '#fef08a' },
+        { name: 'Orange', hex: '#fed7aa' },
+        { name: 'Pink',   hex: '#fbcfe8' },
+        { name: 'Red',    hex: '#fecaca' },
+        { name: 'Green',  hex: '#bbf7d0' },
+        { name: 'Mint',   hex: '#99f6e4' },
+        { name: 'Blue',   hex: '#bfdbfe' },
+        { name: 'Purple', hex: '#ddd6fe' }
+    ];
+    let chosenColour = COLOURS[0].hex;
 
     window.launch = (mode) => {
         const r = document.getElementById('room-input').value.trim().toLowerCase();
@@ -219,27 +243,30 @@
             const newNotes = [];
             snap.forEach(child => {
                 if (!document.getElementById(child.key))
-                    newNotes.push({ key: child.key, text: child.val().text });
+                    newNotes.push({ key: child.key, text: child.val().text, colour: child.val().colour });
             });
             if (newNotes.length === 0) return;
 
             if (!boardInitialized) {
                 // Initial load: create all elements, then lay them out in one pass
                 boardInitialized = true;
-                newNotes.forEach(n => createPostItElement(n.key, n.text));
+                newNotes.forEach(n => createPostItElement(n.key, n.text, n.colour));
                 layoutNotes();
             } else {
                 // Live additions: place each new note into a gap
-                newNotes.forEach(n => createPostIt(n.key, n.text));
+                newNotes.forEach(n => createPostIt(n.key, n.text, n.colour));
             }
         });
     }
 
     // Shared element factory (no positioning)
-    function createPostItElement(id, text) {
+    function createPostItElement(id, text, colour) {
         const div = document.createElement('div');
         div.id = id;
         div.className = 'post-it';
+        // Notes posted before colours existed fall back to the default yellow
+        const noteColour = COLOURS.some(c => c.hex === colour) ? colour : '#fef08a';
+        div.style.background = noteColour;
         div.style.zIndex = highestZ++;
         div.style.left = '-9999px';
         div.style.top = '-9999px';
@@ -260,7 +287,7 @@
         });
         div.addEventListener('mouseup', (e) => {
             if (e.target.closest('.del-x, .font-controls, .font-btn')) return;
-            if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < 5) openNoteZoom(text);
+            if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < 5) openNoteZoom(text, noteColour);
         });
         return div;
     }
@@ -343,8 +370,8 @@
     }
 
     // Incremental add: create element then find a gap
-    function createPostIt(id, text) {
-        createPostItElement(id, text);
+    function createPostIt(id, text, colour) {
+        createPostItElement(id, text, colour);
         const count = document.querySelectorAll('.post-it').length;
         const scale = Math.max(0.45, Math.min(1, Math.sqrt(6 / count)));
         document.documentElement.style.setProperty('--note-scale', scale);
@@ -374,6 +401,7 @@
 
     async function setupStudent() {
         document.getElementById('student-view').classList.remove('hidden');
+        buildColourPicker();
         const snap = await get(ref(db, `rooms/${room}/q`));
         if (!snap.exists()) document.getElementById('invalid-room-msg').classList.remove('hidden');
         onValue(ref(db, `rooms/${room}/q`), snap => {
@@ -381,11 +409,27 @@
         });
     }
 
+    function buildColourPicker() {
+        const picker = document.getElementById('colour-picker');
+        COLOURS.forEach((c, i) => {
+            const sw = document.createElement('div');
+            sw.className = 'swatch' + (i === 0 ? ' selected' : '');
+            sw.style.background = c.hex;
+            sw.title = c.name;
+            sw.onclick = () => {
+                chosenColour = c.hex;
+                picker.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+                sw.classList.add('selected');
+            };
+            picker.appendChild(sw);
+        });
+    }
+
     window.toggleModal = (id) => document.getElementById('modal-'+id).classList.toggle('hidden');
     window.promptNewQ = () => { const n = prompt("New Question:"); if(n) set(ref(db, `rooms/${room}/q`), n); };
     window.submitAns = () => {
         const t = document.getElementById('ans-input').value;
-        if(t) push(ref(db, `rooms/${room}/answers`), { text: t });
+        if(t) push(ref(db, `rooms/${room}/answers`), { text: t, colour: chosenColour });
         document.getElementById('ans-input').value = "";
         document.getElementById('feedback').style.display = "block";
         setTimeout(() => document.getElementById('feedback').style.display = "none", 2000);
@@ -402,8 +446,10 @@
         document.getElementById('board-canvas').innerHTML = "";
         updateNoteScale();
     };
-    window.openNoteZoom = (text) => {
-        document.getElementById('note-zoom-content').textContent = text;
+    window.openNoteZoom = (text, colour) => {
+        const box = document.getElementById('note-zoom-content');
+        box.textContent = text;
+        box.style.background = colour || 'var(--postit)';
         document.getElementById('note-zoom-overlay').classList.remove('hidden');
     };
     window.closeNoteZoom = () => document.getElementById('note-zoom-overlay').classList.add('hidden');
