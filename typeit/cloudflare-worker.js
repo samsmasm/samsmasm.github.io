@@ -173,6 +173,31 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 524/408 = timeout, 429 = rate limit, 5xx = transient server errors. Worth a retry.
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 524]);
 
+// Gemini can answer 200 with a candidate that carries no text at all. Returning
+// '' for that case made the page print "[no text on this page]", which reads as
+// "the page was blank" when the real cause is a refusal or a truncation. Name it
+// instead. finishReason values are from the v1beta discovery spec.
+function noTextReason(data, cand) {
+  const blocked = data?.promptFeedback?.blockReason;
+  if (blocked) return `Gemini blocked the request (${blocked}).`;
+  switch (cand?.finishReason) {
+    case 'SAFETY':
+      return 'Blocked by Gemini safety filters.';
+    case 'RECITATION':
+      return 'Gemini withheld the text because it matched published material (RECITATION). '
+        + 'Common on book and article pages.';
+    case 'MAX_TOKENS':
+      return 'Hit the output token limit before producing any text (MAX_TOKENS).';
+    case 'PROHIBITED_CONTENT':
+    case 'BLOCKLIST':
+    case 'SPII':
+    case 'LANGUAGE':
+      return `Gemini refused this page (${cand.finishReason}).`;
+    default:
+      return `Gemini returned no text (finishReason: ${cand?.finishReason || 'none'}).`;
+  }
+}
+
 async function transcribe(env, mimeType, dataB64, source, option) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
   const prompt = buildPrompt(source, option);
@@ -198,8 +223,14 @@ async function transcribe(env, mimeType, dataB64, source, option) {
     if (res.ok) {
       const data = await res.json();
       const cand = data?.candidates?.[0];
-      if (cand?.finishReason === 'SAFETY') throw new Error('Blocked by Gemini safety filters.');
-      return (cand?.content?.parts || []).map(p => p.text || '').join('').trim();
+      // `thought` parts are the model's reasoning, not the transcription.
+      const text = (cand?.content?.parts || [])
+        .filter(p => !p.thought)
+        .map(p => p.text || '')
+        .join('')
+        .trim();
+      if (text) return text;
+      throw new Error(noTextReason(data, cand));
     }
     let detail = '';
     try { detail = (await res.json())?.error?.message || ''; } catch { /* non-JSON body */ }

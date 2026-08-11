@@ -495,7 +495,8 @@ function render(){
   items.forEach((it, i) => {
     const li = document.createElement('li');
     li.className = 'file';
-    const statusText = { pending:'ready', working:'transcribing…', done:'done', error: it.error || 'error' }[it.status];
+    const statusText = { pending:'ready', working:'transcribing…', done:'done',
+                         error: (it.error || 'error').slice(0, 40) }[it.status];
     const thumb = it.thumb
       ? `<img class="thumb" src="${it.thumb}" alt="">`
       : `<span class="thumb">PDF</span>`;
@@ -607,7 +608,9 @@ async function transcribeOne(it){
     it.status = 'done';
   } catch (e) {
     it.status = 'error';
-    it.error = String(e.message || e).slice(0, 80);
+    // Kept long: the reason Gemini gives is the whole diagnostic. The narrow
+    // status chip truncates its own copy in render().
+    it.error = String(e.message || e).slice(0, 300);
   }
   render();
 }
@@ -648,7 +651,7 @@ $('go').addEventListener('click', run);
 
 // ---- output --------------------------------------------------------------
 function pageBody(it){
-  return it.status === 'done' ? present(it.text || '[no text on this page]')
+  return it.status === 'done' ? present(it.text || '[empty response from the model]')
        : `[not transcribed: ${it.error || it.status}]`;
 }
 
@@ -671,7 +674,7 @@ function renderResult(){
     h.textContent = view === 'combined' ? `${i+1}. ${it.name}` : `Page ${i+1} — ${it.name}`;
     resultEl.appendChild(h);
     const p = document.createElement('div');
-    if (it.status === 'done'){ p.textContent = present(it.text || '[no text on this page]'); }
+    if (it.status === 'done'){ p.textContent = present(it.text || '[empty response from the model]'); }
     else { p.className = 'perr'; p.textContent = `[${it.status==='working'?'transcribing…':'not transcribed: ' + (it.error || it.status)}]`; }
     resultEl.appendChild(p);
   });
