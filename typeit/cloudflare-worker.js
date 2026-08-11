@@ -17,6 +17,11 @@
  *   GEMINI_API_KEY  - your Google AI Studio / Gemini API key.
  */
 
+// Bump on every paste-deploy. Readable without the password at
+// /typeit/api/version, so "is the new worker actually live?" is one curl away
+// rather than guesswork. This worker is deployed by hand, so the answer matters.
+const VERSION = '2026-08-11.diagnostics';
+
 const COOKIE = 'typeitauth';
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const MODEL = 'gemini-3-flash-preview';
@@ -230,6 +235,16 @@ async function transcribe(env, mimeType, dataB64, source, option) {
         .join('')
         .trim();
       if (text) return text;
+      // Observability is on for this Worker, so leave a breadcrumb in the
+      // dashboard. Metadata only, no page content.
+      console.log('typeit: no text returned', JSON.stringify({
+        source, option,
+        finishReason: cand?.finishReason,
+        blockReason: data?.promptFeedback?.blockReason,
+        safetyRatings: cand?.safetyRatings,
+        partCount: (cand?.content?.parts || []).length,
+        usage: data?.usageMetadata,
+      }));
       throw new Error(noTextReason(data, cand));
     }
     let detail = '';
@@ -260,6 +275,10 @@ export default {
       }
       return loginPage('Nope, try again.', 401);
     }
+
+    // Build marker. Deliberately unauthenticated: it reveals nothing but the
+    // version string, and it has to work before you can log in to be useful.
+    if (url.pathname === '/typeit/api/version') return json({ version: VERSION, model: MODEL });
 
     const cookies = parseCookies(request.headers.get('Cookie') || '');
     const authed = await verifyCookie(cookies[COOKIE], env.AUTH_SECRET);
