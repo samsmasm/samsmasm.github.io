@@ -265,8 +265,10 @@
         div.id = id;
         div.className = 'post-it';
         // Notes posted before colours existed fall back to the default yellow
-        const noteColour = COLOURS.some(c => c.hex === colour) ? colour : '#fef08a';
+        const match = COLOURS.find(c => c.hex === colour) || COLOURS[0];
+        const noteColour = match.hex;
         div.style.background = noteColour;
+        div.dataset.colourName = match.name;
         div.style.zIndex = highestZ++;
         div.style.left = '-9999px';
         div.style.top = '-9999px';
@@ -456,8 +458,12 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNoteZoom(); });
     window.toggleQR = () => document.getElementById('qr-overlay').classList.toggle('hidden');
     window.downloadCSV = () => {
-        let c = "Response\n";
-        document.querySelectorAll('.post-it .text-content').forEach(n => c += `"${n.innerText.replace(/"/g, '""')}"\n`);
+        const esc = s => `"${s.replace(/"/g, '""')}"`;
+        let c = "Response,Colour\n";
+        document.querySelectorAll('.post-it').forEach(note => {
+            const text = note.querySelector('.text-content').innerText;
+            c += `${esc(text)},${esc(note.dataset.colourName || '')}\n`;
+        });
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c], {type:'text/csv'}));
         a.download = `dowser-${room}.csv`; a.click();
     };
