@@ -32,7 +32,8 @@ ibecon-src/
     components/
       Nav.astro           ← top nav
     pages/
-      index.astro         ← homepage
+      index.astro         ← homepage (four unit cards)
+      today.astro         ← Today in class board — UNLISTED, see below
       unit1/              ← 1-1, 1-2 + index
       unit2/              ← 2-1 through 2-12 + index (Microeconomics)
       unit3/              ← 3-1 through 3-7 + index (Macroeconomics)
@@ -85,6 +86,19 @@ Unit 4 (Global Economy) has no content pages yet. The `myres/` folder inside `ib
 
 ---
 
+## Today board — currently hidden
+
+The Firebase-backed "Today in class" board used to be the homepage. It is now parked at
+`src/pages/today.astro` → `/ibecon/today/`: still fully working (same Firebase paths
+`ibecon/today` and `ibecon/archive`, same passcode admin via clicking the heading), but not
+linked from the homepage or nav, and served with `noindex, nofollow` via the Layout's
+`noindex` prop.
+
+To reinstate as the homepage: copy `today.astro` back over `index.astro`, drop the `noindex`
+prop, and change the first nav link's label in `Nav.astro` from "Home" back to "Today".
+
+---
+
 ## Future: Today page multi-year / multi-class expansion
 
 Two planned but not yet built features for the Today system (Firebase paths `ibecon/today` and `ibecon/archive`):
@@ -114,6 +128,8 @@ Same as `ibbm-src`: Inter from Google Fonts, `switchTab` is inline in layout, `b
 ## Current status
 
 Units 1, 2, and 3 fully built (all pages complete). Unit 4 (The Global Economy, topics 4.1-4.10) is a single stub page showing "To come" — no content exists. No resource files in `myres/` for Unit 4 either.
+
+The homepage is the four-unit card grid. The Today board is hidden at `/ibecon/today/` (see above).
 
 **Not built:** All 10 Unit 4 topics. Today page multi-year/IB1-IB2 expansion (documented above but not started).
 
