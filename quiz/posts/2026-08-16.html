@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talkonomics &mdash; 16 August 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;
+  --surface:#fff;
+  --border:#111;
+  --text:#111;
+  --muted:#4a4540;
+  --light:#7a7268;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',system-ui,sans-serif}
+/* Slides */
+#slides{height:100vh;position:relative}
+.slide{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg);
+}
+.slide.active{display:flex}
+/* Category accent */
+.slide-top{
+  background:var(--cat-bg,#f0f5ff);
+  border-bottom:2px solid var(--cat-border,#b6cff5);
+  padding:0.55rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.category-badge{
+  font-family:'Inter',sans-serif;
+  font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--cat-fg,#1a3a7a);
+}
+.q-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.7rem;font-weight:600;
+  color:var(--cat-fg,#1a3a7a);
+  opacity:0.7;
+}
+/* Slide body */
+.slide-body{
+  flex:1;overflow-y:auto;
+  padding:2rem 2.5rem 1rem;
+  display:flex;flex-direction:column;
+  gap:1.4rem;
+  max-width:900px;width:100%;margin:0 auto;
+}
+/* Title slide */
+.title-body{
+  align-items:center;justify-content:center;text-align:center;
+  gap:1rem;
+  background:
+    radial-gradient(ellipse at 15% 50%, #ffd6e7 0%, transparent 50%),
+    radial-gradient(ellipse at 35% 20%, #d6f0ff 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+    #fff;
+}
+.title-wordmark{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4.5rem);
+  font-weight:900;
+  color:var(--text);
+  line-height:1;
+}
+.title-tagline{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.85rem,2vw,1.1rem);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.18em;
+  color:var(--light);
+}
+.title-date{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1rem,2.5vw,1.5rem);
+  color:var(--muted);
+  font-style:italic;
+}
+.title-meta{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;
+  color:var(--light);
+  letter-spacing:0.04em;
+}
+/* Question */
+.question-text{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1.1rem,2.8vw,1.55rem);
+  line-height:1.45;
+  color:var(--text);
+  font-weight:700;
+}
+/* Options */
+.options{display:flex;flex-direction:column;gap:0.65rem}
+.option{
+  display:flex;align-items:flex-start;gap:0.9rem;
+  background:var(--surface);
+  border:1.5px solid #ddd7cc;
+  border-radius:6px;
+  padding:0.75rem 1rem;
+  transition:background 0.2s,border-color 0.2s,opacity 0.25s;
+  cursor:default;
+}
+.option-letter{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--light);
+  flex-shrink:0;
+  margin-top:0.1rem;
+  min-width:1.1rem;
+}
+.option-text{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.9rem,2vw,1.05rem);
+  line-height:1.45;
+  color:var(--text);
+}
+/* Revealed state */
+.slide.revealed .option.correct{
+  background:#d6f5e8;
+  border-color:#145c34;
+}
+.slide.revealed .option.correct .option-letter{color:#145c34}
+.slide.revealed .option:not(.correct){opacity:0.32}
+.slide.revealed .explanation{display:block}
+.slide.revealed .btn-reveal{display:none}
+/* Explanation */
+.explanation{
+  display:none;
+  background:#f0f5ff;
+  border:1.5px solid #b6cff5;
+  border-radius:6px;
+  padding:0.9rem 1.1rem;
+}
+.explanation p{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.82rem,1.8vw,0.95rem);
+  line-height:1.6;
+  color:#1a3a7a;
+  font-style:italic;
+}
+/* Nav bar */
+.slide-nav{
+  flex-shrink:0;
+  border-top:1px solid #ddd7cc;
+  background:var(--surface);
+  padding:0.65rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0.75rem;
+}
+.slide-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--light);
+}
+/* Buttons */
+.btn-nav{
+  font-family:'Inter',sans-serif;
+  font-size:0.75rem;font-weight:600;
+  color:#1a3a7a;
+  background:none;border:1.5px solid #b6cff5;
+  border-radius:4px;padding:0.4rem 0.9rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s,border-color 0.12s;
+}
+.btn-nav:hover{background:#f0f5ff;border-color:#1a3a7a}
+.btn-reveal{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;border:none;
+  border-radius:4px;padding:0.45rem 1.2rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-reveal:hover{background:#2a4a9a}
+.btn-primary{
+  font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;
+  border:none;border-radius:4px;
+  padding:0.6rem 1.6rem;
+  cursor:pointer;text-decoration:none;
+  display:inline-block;
+  letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-primary:hover{background:#2a4a9a}
+/* Mode buttons on title slide */
+.mode-buttons{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}
+.btn-mode{
+  background:var(--surface);
+  border:2px solid #b6cff5;border-radius:8px;
+  padding:0.9rem 1.4rem;cursor:pointer;text-align:center;
+  min-width:190px;transition:border-color 0.15s,background 0.15s;
+}
+.btn-mode:hover{border-color:#1a3a7a;background:#f0f5ff}
+.btn-mode-title{display:block;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:700;color:#1a3a7a;margin-bottom:0.3rem}
+.btn-mode-desc{display:block;font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--light);line-height:1.4}
+/* Hide reveal button in at-end mode on question slides */
+body[data-mode="atend"] .q-slide .btn-reveal{display:none}
+/* Print */
+@media print{
+  html,body{overflow:visible;height:auto}
+  #slides{height:auto;position:static}
+  .slide{position:static;display:flex!important;page-break-before:always;min-height:100vh}
+  .slide:first-child{page-break-before:avoid}
+  .slide-nav{display:none}
+  .btn-reveal{display:none!important}
+  .slide.revealed .option{opacity:1!important}
+  .explanation{display:block!important}
+}
+</style>
+</head>
+<body>
+<div id="slides">
+
+  <div class="slide active" id="slide-0">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
+      <div class="title-date">Weekly Quiz &mdash; 16 August 2026</div>
+      <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
+      <div class="mode-buttons">
+        <button class="btn-mode" onclick="selectMode('asgo')">
+          <span class="btn-mode-title">Answers as we go</span>
+          <span class="btn-mode-desc">Reveal each answer before moving on</span>
+        </button>
+        <button class="btn-mode" onclick="selectMode('atend')">
+          <span class="btn-mode-title">Answers at the end</span>
+          <span class="btn-mode-desc">All 10 questions first, then all answers</span>
+        </button>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <span></span>
+      <span class="slide-counter">Talkonomics</span>
+      <span></span>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Nexon, the South Korean gaming giant, just posted its first-half results. Its MapleStory franchise kept growing and its new shooter ARC Raiders found fans in Western markets. What did Nexon&#x27;s first-half sales reach?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">2.56 trillion won, up 17% year-on-year</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">1.89 trillion won, up 4% year-on-year</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">3.1 trillion won, down 6% year-on-year</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Nexon&#x27;s first-half sales hit 2.56 trillion won, up 17% on the same period last year. The result was driven by the enduring popularity of MapleStory — a side-scrolling RPG that has been running since 2003 — and by ARC Raiders breaking through in Europe and North America. It is a reminder that Asia&#x27;s games industry increasingly sets global trends rather than following them.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Europe&#x27;s car industry is going electric, but slowly. The share of newly registered battery-only electric cars has been rising across the continent recently. Which of these best describes their share of the total cars actually on European roads right now?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Around a quarter of all cars on the road are now electric</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Electric cars remain a small fraction of the total fleet despite rising new registrations</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Electric cars now outsell petrol cars in new registrations across the EU</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Even as electric vehicles (battery-powered cars) take a growing slice of new car sales, they remain a tiny proportion of the total fleet — all the cars actually being driven. Cars last 10 to 15 years on average, so the existing stock turns over very slowly. This gap between &#x27;new sales share&#x27; and &#x27;total fleet share&#x27; is one reason the energy transition in transport takes decades, not years.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Venezuela&#x27;s energy sector has been cautiously reopening to foreign investors following recent political changes. BP has just been awarded a licence to develop the offshore Loran gas field there. Who are BP&#x27;s partners in the deal?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">State-backed energy firms from the UAE and Qatar</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">ExxonMobil and a Brazilian state energy company</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Shell and a Chinese national oil company</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. BP is developing the Loran gas field alongside state-backed partners from the UAE and Qatar, marking its return to a country it left under earlier sanctions pressure. Venezuela holds some of the largest proven oil and gas reserves on Earth but decades of mismanagement and sanctions left output a fraction of its peak. The involvement of Gulf sovereign energy firms signals how post-Maduro Venezuela is being repositioned as an investment frontier.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Italy has &#x27;cheese banks&#x27; — climate-controlled vaults where hundreds of thousands of Parmigiano Reggiano wheels sit as collateral (security against a loan) for farm loans. Extreme heat has been causing them problems recently. What is going wrong?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Rising energy bills to cool the vaults and a thinner milk supply to fill them</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The cheese is maturing too fast, cutting its value before loans are repaid</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">EU food regulators have ruled that cheese cannot legally count as financial collateral</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The heat is squeezing the cheese banks from both ends: it costs more electricity to keep the vaults cool, and the heat-stressed cows are producing less milk, meaning fewer wheels of Parmigiano are being made to back new loans. The scheme dates back decades — Credito Emiliano bank pioneered it — and a single wheel can be worth over €500, making it a surprisingly robust form of agricultural finance.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US inflation (the rate at which consumer prices are rising compared with a year ago) eased for a second straight month in July, coming in at exactly what economists had forecast. What was the July inflation reading, and where had it been the month before?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">3.4% in July, down from 3.5% in June</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">2.9% in July, down from 3.1% in June</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">4.1% in July, down from 4.4% in June</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. US inflation stood at 3.4% in July, a small step down from 3.5% in June. The Federal Reserve (the US central bank) targets 2% inflation, so prices are still rising faster than it would like, keeping a September interest rate cut uncertain. The fact that the number matched forecasts exactly is actually notable — inflation has repeatedly surprised economists on the upside over the past three years.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">President Trump recently imposed tariffs (import taxes) of up to 100% on drones and drone components imported into the US, with lower rates for some allies. Which countries received the most favourable treatment?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Canada and Mexico, reflecting the existing USMCA trade agreement</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">EU manufacturers at 15% and UK firms at 10%</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Japan and South Korea at 12%, reflecting defence partnership status</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. EU drone makers face a 15% tariff and British firms a preferential 10%, well below the 100% rate applied to many other suppliers, particularly China. The measure is designed to rebuild American drone manufacturing capacity, which the Pentagon considers a defence priority after lessons from recent conflicts. The tiered structure is a classic trade-policy tool: punish rivals, reward allies, and nudge production home.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">War in the Middle East has been rerouting air travel in dramatic ways recently. One airport has just overtaken Dubai and others to become the world&#x27;s busiest for international passengers. Which airport is it?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Tokyo Haneda, as Japanese tourism hits record levels</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Singapore Changi, after expanding its Terminal 5</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Seoul&#x27;s Incheon, as Middle Eastern hubs lose traffic due to the Iran conflict</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Incheon airport recorded 38.39 million international passengers in the first half of 2026, taking the top spot as conflict in the Middle East disrupted flights through traditional hubs like Dubai and Doha. Geography is doing a lot of work here: Seoul sits on major Asia-Europe and transpacific routes, making it a natural beneficiary when Middle Eastern connections become unreliable.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">A recent European analysis looked at how many years of salary it takes to buy a home, broken down by gender. The gender pay gap (the difference in average earnings between men and women) plays a big role. How many times their annual salary do women typically need to afford a home, compared with men?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Women need 9 times their salary; men need 7 times</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Women need 12 times their salary; men need 8 times</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Women need 10 times their salary; men need 9 times</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Women need 12 times their annual salary to buy a home on average, compared with 8 times for men — a gap that reflects both lower average pay and greater difficulty saving for deposits. The finding highlights how the housing affordability crisis does not hit everyone equally. A ratio above 8 times salary is generally considered severe unaffordability by housing researchers, meaning women are starting from a position of severe unaffordability almost everywhere.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Lithium is the key raw material inside the batteries that power electric cars and smartphones. Which country holds the world&#x27;s largest lithium reserves and is also its biggest producer?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Australia</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Chile</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">China</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Australia is both the largest producer and holds vast lithium reserves, accounting for roughly half of global mine output in recent years. Chile holds the largest known reserves in its Atacama salt flats but produces somewhat less. The concentration of a critical mineral in one country is exactly the kind of supply-chain vulnerability that governments have been scrambling to address as EV demand grows.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">One of history&#x27;s most influential economists argued in the 1930s that governments should spend money during recessions to boost demand — even if it meant borrowing. His ideas shaped economic policy for decades. Who was he?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Milton Friedman</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">John Maynard Keynes</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Friedrich Hayek</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. John Maynard Keynes published The General Theory of Employment, Interest and Money in 1936, arguing that private demand collapses in recessions and governments must fill the gap by spending. His ideas underpinned the New Deal in the US and post-war economic management across the West. Milton Friedman and Friedrich Hayek were his great intellectual rivals, both arguing that government intervention usually made things worse.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Nexon, the South Korean gaming giant, just posted its first-half results. Its MapleStory franchise kept growing and its new shooter ARC Raiders found fans in Western markets. What did Nexon&#x27;s first-half sales reach?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">2.56 trillion won, up 17% year-on-year</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">1.89 trillion won, up 4% year-on-year</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">3.1 trillion won, down 6% year-on-year</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Nexon&#x27;s first-half sales hit 2.56 trillion won, up 17% on the same period last year. The result was driven by the enduring popularity of MapleStory — a side-scrolling RPG that has been running since 2003 — and by ARC Raiders breaking through in Europe and North America. It is a reminder that Asia&#x27;s games industry increasingly sets global trends rather than following them.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A1 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Europe&#x27;s car industry is going electric, but slowly. The share of newly registered battery-only electric cars has been rising across the continent recently. Which of these best describes their share of the total cars actually on European roads right now?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Around a quarter of all cars on the road are now electric</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Electric cars remain a small fraction of the total fleet despite rising new registrations</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Electric cars now outsell petrol cars in new registrations across the EU</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Even as electric vehicles (battery-powered cars) take a growing slice of new car sales, they remain a tiny proportion of the total fleet — all the cars actually being driven. Cars last 10 to 15 years on average, so the existing stock turns over very slowly. This gap between &#x27;new sales share&#x27; and &#x27;total fleet share&#x27; is one reason the energy transition in transport takes decades, not years.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A2 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Venezuela&#x27;s energy sector has been cautiously reopening to foreign investors following recent political changes. BP has just been awarded a licence to develop the offshore Loran gas field there. Who are BP&#x27;s partners in the deal?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">State-backed energy firms from the UAE and Qatar</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">ExxonMobil and a Brazilian state energy company</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Shell and a Chinese national oil company</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. BP is developing the Loran gas field alongside state-backed partners from the UAE and Qatar, marking its return to a country it left under earlier sanctions pressure. Venezuela holds some of the largest proven oil and gas reserves on Earth but decades of mismanagement and sanctions left output a fraction of its peak. The involvement of Gulf sovereign energy firms signals how post-Maduro Venezuela is being repositioned as an investment frontier.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A3 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Italy has &#x27;cheese banks&#x27; — climate-controlled vaults where hundreds of thousands of Parmigiano Reggiano wheels sit as collateral (security against a loan) for farm loans. Extreme heat has been causing them problems recently. What is going wrong?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Rising energy bills to cool the vaults and a thinner milk supply to fill them</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The cheese is maturing too fast, cutting its value before loans are repaid</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">EU food regulators have ruled that cheese cannot legally count as financial collateral</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The heat is squeezing the cheese banks from both ends: it costs more electricity to keep the vaults cool, and the heat-stressed cows are producing less milk, meaning fewer wheels of Parmigiano are being made to back new loans. The scheme dates back decades — Credito Emiliano bank pioneered it — and a single wheel can be worth over €500, making it a surprisingly robust form of agricultural finance.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A4 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US inflation (the rate at which consumer prices are rising compared with a year ago) eased for a second straight month in July, coming in at exactly what economists had forecast. What was the July inflation reading, and where had it been the month before?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">3.4% in July, down from 3.5% in June</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">2.9% in July, down from 3.1% in June</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">4.1% in July, down from 4.4% in June</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. US inflation stood at 3.4% in July, a small step down from 3.5% in June. The Federal Reserve (the US central bank) targets 2% inflation, so prices are still rising faster than it would like, keeping a September interest rate cut uncertain. The fact that the number matched forecasts exactly is actually notable — inflation has repeatedly surprised economists on the upside over the past three years.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A5 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">President Trump recently imposed tariffs (import taxes) of up to 100% on drones and drone components imported into the US, with lower rates for some allies. Which countries received the most favourable treatment?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Canada and Mexico, reflecting the existing USMCA trade agreement</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">EU manufacturers at 15% and UK firms at 10%</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Japan and South Korea at 12%, reflecting defence partnership status</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. EU drone makers face a 15% tariff and British firms a preferential 10%, well below the 100% rate applied to many other suppliers, particularly China. The measure is designed to rebuild American drone manufacturing capacity, which the Pentagon considers a defence priority after lessons from recent conflicts. The tiered structure is a classic trade-policy tool: punish rivals, reward allies, and nudge production home.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A6 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">War in the Middle East has been rerouting air travel in dramatic ways recently. One airport has just overtaken Dubai and others to become the world&#x27;s busiest for international passengers. Which airport is it?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Tokyo Haneda, as Japanese tourism hits record levels</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Singapore Changi, after expanding its Terminal 5</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Seoul&#x27;s Incheon, as Middle Eastern hubs lose traffic due to the Iran conflict</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Incheon airport recorded 38.39 million international passengers in the first half of 2026, taking the top spot as conflict in the Middle East disrupted flights through traditional hubs like Dubai and Doha. Geography is doing a lot of work here: Seoul sits on major Asia-Europe and transpacific routes, making it a natural beneficiary when Middle Eastern connections become unreliable.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A7 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">A recent European analysis looked at how many years of salary it takes to buy a home, broken down by gender. The gender pay gap (the difference in average earnings between men and women) plays a big role. How many times their annual salary do women typically need to afford a home, compared with men?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Women need 9 times their salary; men need 7 times</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Women need 12 times their salary; men need 8 times</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Women need 10 times their salary; men need 9 times</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Women need 12 times their annual salary to buy a home on average, compared with 8 times for men — a gap that reflects both lower average pay and greater difficulty saving for deposits. The finding highlights how the housing affordability crisis does not hit everyone equally. A ratio above 8 times salary is generally considered severe unaffordability by housing researchers, meaning women are starting from a position of severe unaffordability almost everywhere.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A8 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Lithium is the key raw material inside the batteries that power electric cars and smartphones. Which country holds the world&#x27;s largest lithium reserves and is also its biggest producer?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Australia</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Chile</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">China</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Australia is both the largest producer and holds vast lithium reserves, accounting for roughly half of global mine output in recent years. Chile holds the largest known reserves in its Atacama salt flats but produces somewhat less. The concentration of a critical mineral in one country is exactly the kind of supply-chain vulnerability that governments have been scrambling to address as EV demand grows.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A9 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">One of history&#x27;s most influential economists argued in the 1930s that governments should spend money during recessions to boost demand — even if it meant borrowing. His ideas shaped economic policy for decades. Who was he?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Milton Friedman</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">John Maynard Keynes</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Friedrich Hayek</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. John Maynard Keynes published The General Theory of Employment, Interest and Money in 1936, arguing that private demand collapses in recessions and governments must fill the gap by spending. His ideas underpinned the New Deal in the US and post-war economic management across the West. Milton Friedman and Friedrich Hayek were his great intellectual rivals, both arguing that government intervention usually made things worse.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A10 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-end">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">That&#8217;s all 10!</div>
+      <div class="title-date">16 August 2026</div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+        <button class="btn-primary" onclick="goTo(0)">&#8592; Start again</button>
+        <a class="btn-primary" href="../index.html">All editions</a>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">End</span>
+      <span></span>
+    </div>
+  </div>
+</div>
+<script>
+var TOTAL = document.querySelectorAll('.q-slide').length;
+var pos = 0;
+var SEQ = [];
+
+function buildSeq(m) {
+  var s = ['slide-0'];
+  for (var i = 1; i <= TOTAL; i++) s.push('slide-' + i);
+  if (m === 'atend') {
+    for (var i = 1; i <= TOTAL; i++) s.push('slide-a' + i);
+  }
+  s.push('slide-end');
+  return s;
+}
+
+function selectMode(m) {
+  SEQ = buildSeq(m);
+  document.body.setAttribute('data-mode', m);
+  showAt(1);
+}
+
+function showAt(p) {
+  pos = p;
+  document.querySelectorAll('.slide').forEach(function(s) { s.classList.remove('active'); });
+  var el = document.getElementById(SEQ[p]);
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+}
+
+function goTo(p) { showAt(p); }
+
+function nextSlide() {
+  if (pos < SEQ.length - 1) showAt(pos + 1);
+}
+
+function prevSlide() {
+  if (pos > 0) showAt(pos - 1);
+}
+
+function revealSlide(btn) {
+  var slide = btn.closest('.slide');
+  slide.classList.add('revealed');
+  var exp = slide.querySelector('.explanation');
+  if (exp) exp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextSlide(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { prevSlide(); e.preventDefault(); }
+  else if (e.key === ' ' || e.key === 'Enter') {
+    var slide = document.querySelector('.slide.active');
+    if (slide && !slide.classList.contains('revealed')) {
+      var btn = slide.querySelector('.btn-reveal');
+      if (btn) { revealSlide(btn); e.preventDefault(); return; }
+    }
+    nextSlide();
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
