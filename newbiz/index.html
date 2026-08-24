@@ -413,9 +413,18 @@
      flick at the start for wind-up. */
   function ease(t) {
     const body   = 1 - Math.pow(1 - t, 4);
-    const settle = Math.sin(t * Math.PI * 11) * Math.pow(1 - t, 7) * 0.05;
     const windup = t < 0.14 ? -Math.sin((t / 0.14) * Math.PI) * 0.015 : 0;
-    return body + settle + windup;
+    return body + windup;   // must be exactly 1 at t=1
+  }
+
+  /* The settle rides on top, in degrees rather than as a fraction of the
+     spin, so the rock is the same size however far the drum travelled. One
+     smooth excursion past the stop and back: zero at both ends, so it cannot
+     move where the drum finally lands. */
+  const OVERSHOOT = 6, SETTLE_FROM = 0.78;
+  function settleDeg(t) {
+    if (t < SETTLE_FROM) return 0;
+    return OVERSHOOT * Math.sin(Math.PI * (t - SETTLE_FROM) / (1 - SETTLE_FROM));
   }
 
   /* ── The spin ────────────────────────────────────────────────────────── */
@@ -437,8 +446,13 @@
     swap(cells[k], target);
     cells[k].classList.add('is-front');
 
+    /* The whole-number rotations MUST be a whole number. `total` has to be
+       congruent to (angle - want) modulo 360, or the animation finishes a
+       fraction of a turn away from the cell it is aiming at and the final
+       snap to `want` visibly jumps the drum by several words. */
     const want = -k * step;
-    const total = turns * 360 + mod360(angle - want);
+    const spins = Math.max(2, Math.round(turns));
+    const total = spins * 360 + mod360(angle - want);
 
     if (reduce) { spin3d(drum, want); onEnd(mod360(want)); return; }
 
@@ -449,7 +463,7 @@
     requestAnimationFrame(function frame(now) {
       const t = Math.min(1, (now - t0) / duration);
       const p = ease(t);
-      const a = angle - total * p;
+      const a = angle - total * p - settleDeg(t);
       spin3d(drum, a);
 
       // Blur tracks real surface speed, so it builds and bleeds off naturally.
