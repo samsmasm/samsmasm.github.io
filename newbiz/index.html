@@ -3,497 +3,574 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Spin two or three unrelated words and build a business case out of whatever lands.">
-<title>Newbiz — unisam.nz</title>
+<meta name="description" content="Spin unrelated words and build a business case out of what lands.">
+<title>Newbiz</title>
 <link rel="icon" type="image/jpeg" href="/unisamicon.jpg">
 <style>
-  /* unisam.nz — Newbiz (see AESTHETIC.md). Business Management blue. */
+  /* newbiz — bare spinner. No site chrome by request.
+     Each reel is a real 3D drum: cells sit on the surface of a cylinder, so
+     perspective does the work a flat scrolling strip never can.
+
+     Layering matters here. `filter` and `mask` are grouping properties: they
+     force transform-style:flat on the element that carries them. So the blur
+     and the fade live on .veil, and .drum (a child) opens its own 3D context
+     with perspective() inside its own transform. Putting the filter on .drum
+     collapses the cylinder into flipped 2D. */
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: #fff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
-  a { color: inherit; text-decoration: none; }
 
   :root {
-    --bm: #1a3a7a;
-    --bm-mid: #3a4a6a;
-    --bm-light: #5a7298;
-    --border-mid: #b6cff5;
-    --border-soft: #dce8f8;
-    --border-pale: #eef4ff;
-    --item-h: 68px;
-    --con-h: 46px;
+    --item: clamp(58px, 9.5vh, 104px);
+    --con-item: clamp(34px, 5.2vh, 56px);
+    --paper: #fdfdfe;
+    --ghost: #c3c7d4;
   }
 
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+  html, body { height: 100%; }
 
-  /* ── Header (watercolour gradient, blue-leaning for BM) ── */
-  .site-header {
+  body {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: clamp(14px, 3.4vh, 40px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #1b1b22;
     background:
-      radial-gradient(ellipse at 14% 50%, #d6e8ff 0%, transparent 50%),
-      radial-gradient(ellipse at 34% 18%, #d6f0ff 0%, transparent 45%),
-      radial-gradient(ellipse at 56% 82%, #e8d6ff 0%, transparent 42%),
-      radial-gradient(ellipse at 78% 28%, #ffd6e7 0%, transparent 45%),
-      radial-gradient(ellipse at 93% 72%, #d6ffe8 0%, transparent 40%),
-      radial-gradient(ellipse at 50% 50%, #dce8ff 0%, transparent 60%),
-      #f0f5ff;
-  }
-  .site-header .wrap { padding-top: 22px; padding-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-  .logo { display: flex; align-items: center; gap: 14px; }
-  .logo img { width: 60px; height: 60px; border-radius: 14px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.55); border: 1.5px solid rgba(255,255,255,0.85); }
-  .logo__name { font-family: Georgia, 'Times New Roman', serif; font-size: 25px; letter-spacing: -0.5px; color: #14294a; line-height: 1.1; }
-  .logo__tagline { font-size: 12.5px; color: #4a6396; margin-top: 3px; }
-
-  .nav { display: flex; align-items: stretch; flex-wrap: wrap; }
-  .nav a { padding: 0.7rem 1.05rem; font-size: 13px; font-weight: 500; color: #666; border-bottom: 3px solid transparent; white-space: nowrap; }
-  .nav a:hover { color: #14294a; }
-  .nav a.is-active { color: var(--bm); border-bottom-color: var(--bm); }
-
-  /* ── Page head ── */
-  .main { padding-top: 36px; padding-bottom: 64px; }
-  .page-label { border-top: 3px solid var(--bm); padding-top: 8px; margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--bm); display: inline-block; }
-  .page-title { font-family: Georgia, 'Times New Roman', serif; font-size: 28px; color: #14294a; margin-bottom: 6px; }
-  .page-intro { font-size: 14px; color: #6b6b6b; line-height: 1.6; max-width: 620px; }
-
-  /* ── Controls ── */
-  .controls { margin-top: 26px; padding-bottom: 16px; border-bottom: 1px solid var(--border-pale); display: flex; align-items: center; flex-wrap: wrap; gap: 26px; }
-  .ctrl-group { display: flex; align-items: center; gap: 10px; }
-  .ctrl-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bm-light); }
-
-  .seg { display: flex; }
-  .seg button {
-    font: inherit; font-size: 13px; font-weight: 500; color: #666;
-    background: none; border: none; border-bottom: 2px solid transparent;
-    padding: 4px 10px; cursor: pointer;
-  }
-  .seg button:hover { color: #14294a; }
-  .seg button[aria-pressed="true"] { color: var(--bm); border-bottom-color: var(--bm); }
-
-  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--bm-mid); cursor: pointer; }
-  .check input { width: 15px; height: 15px; accent-color: var(--bm); cursor: pointer; }
-
-  .spin-btn {
-    font: inherit; font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
-    color: #fff; background: var(--bm); border: none; border-radius: 8px;
-    padding: 11px 30px; cursor: pointer; margin-left: auto;
-  }
-  .spin-btn:hover { background: #0d2255; }
-  .spin-btn:disabled { background: var(--border-mid); cursor: default; }
-
-  /* ── Reels ── */
-  .machine { margin-top: 36px; }
-  .reels { display: flex; justify-content: center; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
-
-  .reel-col { flex: 1 1 0; min-width: 190px; max-width: 320px; }
-  .reel-bucket {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
-    color: var(--bm-light); text-align: center; margin-bottom: 8px; height: 13px;
+      radial-gradient(ellipse 62% 52% at 14% 18%, #fdeff7 0%, transparent 62%),
+      radial-gradient(ellipse 58% 46% at 86% 24%, #ecf3ff 0%, transparent 62%),
+      radial-gradient(ellipse 54% 44% at 50% 88%, #edfff5 0%, transparent 62%),
+      radial-gradient(ellipse 40% 34% at 74% 74%, #fffaea 0%, transparent 62%),
+      var(--paper);
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
+  /* ── Stage ────────────────────────────────────────────────────────── */
+
+  .stage { position: relative; display: flex; justify-content: center; width: 100%; }
+
+  /* Hairlines mark the landing slot. No boxes — the curve is the frame. */
+  .stage::before, .stage::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 1px; z-index: 4;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(120,128,150,0.22) 16%,
+      rgba(120,128,150,0.22) 84%, transparent);
+  }
+  .stage::before { top: calc(50% - var(--item) / 2); }
+  .stage::after  { top: calc(50% + var(--item) / 2); }
+
+  .reels {
+    display: flex; align-items: center; justify-content: center;
+    width: min(96vw, 1280px);
+    gap: clamp(8px, 3vw, 56px);
+  }
+
+  /* max-width keeps two reels as a pair rather than flinging them to the
+     far edges of a wide screen. */
   .reel {
-    height: calc(var(--item-h) * 3);
-    overflow: hidden; position: relative;
-    background: #f7faff;
-    border: 1.5px solid var(--border-mid);
-    border-radius: 10px;
+    position: relative; flex: 1 1 0; min-width: 0; max-width: 400px;
+    height: calc(var(--item) * 3.7);
   }
-  /* The centre slot: a pair of hairlines rather than a filled highlight bar. */
-  .reel::before, .reel::after {
-    content: ''; position: absolute; left: 0; right: 0; height: 1px;
-    background: var(--border-mid); z-index: 2;
+
+  /* Carries the blur and the soft top/bottom fade. Masking beats clipping:
+     no hard edge, and it fades over the page wash rather than painting a
+     solid rectangle on top of it. */
+  .veil {
+    position: absolute; inset: 0;
+    -webkit-mask-image: linear-gradient(180deg, transparent 2%, #000 27%, #000 73%, transparent 98%);
+            mask-image: linear-gradient(180deg, transparent 2%, #000 27%, #000 73%, transparent 98%);
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+    will-change: filter;
   }
-  .reel::before { top: var(--item-h); }
-  .reel::after { top: calc(var(--item-h) * 2); }
 
-  /* Soft fade at top and bottom so words appear to come from somewhere. */
-  .reel-mask { position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    background: linear-gradient(#f7faff 0%, rgba(247,250,255,0) 26%, rgba(247,250,255,0) 74%, #f7faff 100%); }
+  .drum { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
 
-  .strip { will-change: transform; }
-  .strip.is-spinning { filter: blur(1.4px); }
-
-  .slot {
-    height: var(--item-h); display: flex; align-items: center; justify-content: center;
+  .cell {
+    position: absolute; left: 0; right: 0; top: 50%;
+    height: var(--item); margin-top: calc(var(--item) / -2);
+    display: flex; align-items: center; justify-content: center;
+    backface-visibility: hidden;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: clamp(17px, 2.5vw, 25px);
-    color: var(--bm-light);
-    white-space: nowrap; padding: 0 10px;
+    font-size: clamp(22px, 4vw, 54px);
+    letter-spacing: -0.015em;
+    white-space: nowrap;
   }
-  .strip .slot.is-target { color: var(--bm); }
 
-  .reel-foot { text-align: center; margin-top: 8px; height: 18px; }
-  .hold-btn {
-    font: inherit; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #aab6c8; background: none; border: none; border-bottom: 2px solid transparent;
-    padding: 1px 3px; cursor: pointer;
+  /* Order must match placeCells(): rotateX, then translateZ. */
+  .reel.is-settled .cell.is-front,
+  .constraint.is-settled .cell.is-front {
+    animation: land 700ms cubic-bezier(0.18, 1.6, 0.3, 1) both;
   }
-  .hold-btn:hover { color: var(--bm-mid); }
-  .hold-btn[aria-pressed="true"] { color: var(--bm); border-bottom-color: var(--bm); }
-
-  /* ── Constraint reel ── */
-  .constraint { margin-top: 26px; display: none; }
-  .constraint.is-on { display: block; }
-  .constraint-label {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
-    color: var(--bm-light); text-align: center; margin-bottom: 8px;
+  @keyframes land {
+    0%   { transform: rotateX(var(--rx)) translateZ(var(--z)) scale(1.09); }
+    100% { transform: rotateX(var(--rx)) translateZ(var(--z)) scale(1); }
   }
-  .constraint .reel { height: calc(var(--con-h) * 3); max-width: 700px; margin: 0 auto; }
-  .constraint .reel::before { top: var(--con-h); }
-  .constraint .reel::after { top: calc(var(--con-h) * 2); }
-  .constraint .slot { height: var(--con-h); font-size: clamp(13px, 2vw, 19px); font-style: italic; }
 
-  /* ── Prompt line under the machine ── */
-  .prompt {
-    margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-pale);
-    font-size: 13px; line-height: 1.7; color: #6b6b6b; max-width: 640px; margin-left: auto; margin-right: auto;
+  /* Held reels get a quiet dot, not a button. */
+  .pin {
+    position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px;
+    margin-left: -2.5px; border-radius: 50%; background: #9aa1b4;
+    opacity: 0; transform: scale(0.2); z-index: 5;
+    transition: opacity 240ms, transform 320ms cubic-bezier(0.2, 1.6, 0.3, 1);
   }
-  .prompt strong { color: var(--bm); font-weight: 600; }
-  .prompt ol { margin: 8px 0 0 18px; }
-  .prompt li { margin-bottom: 3px; }
+  .reel.is-held .pin { opacity: 1; transform: scale(1); }
 
-  /* ── Footer ── */
-  .site-footer { border-top: 1px solid var(--border-pale); padding: 16px 0 22px; margin-top: 8px; }
-  .site-footer .wrap { font-size: 11px; color: #bbb; }
+  /* ── Constraint ───────────────────────────────────────────────────── */
 
-  @media (max-width: 820px) {
-    .wrap { padding: 0 20px; }
-    .site-header .wrap { flex-direction: column; align-items: flex-start; gap: 14px; }
-    :root { --item-h: 52px; --con-h: 38px; }
-    .spin-btn { margin-left: 0; width: 100%; }
-    .reel-col { min-width: 140px; }
+  /* display:none rather than opacity, so it reserves no space when off and
+     the reels stay optically centred. */
+  .constraint {
+    display: none;
+    position: relative;
+    width: min(94vw, 900px);
+    height: calc(var(--con-item) * 2.8);
+  }
+  .constraint.is-on { display: block; animation: rise 460ms ease both; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .constraint .cell {
+    height: var(--con-item); margin-top: calc(var(--con-item) / -2);
+    font-size: clamp(13px, 2.1vw, 25px);
+    font-style: italic;
+    color: #79809a;
+  }
+
+  /* ── Controls ─────────────────────────────────────────────────────── */
+
+  .controls {
+    display: flex; align-items: center; gap: clamp(14px, 2.6vw, 30px);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .controls button {
+    font: inherit; letter-spacing: inherit; text-transform: inherit;
+    background: none; border: none; padding: 6px 2px; cursor: pointer;
+    color: var(--ghost); transition: color 200ms;
+  }
+  .controls button:hover { color: #6c7288; }
+  .count { display: flex; gap: 12px; }
+  .count button[aria-pressed="true"], #con-btn[aria-pressed="true"] { color: #4a5068; }
+
+  .spin { position: relative; color: #3a4054 !important; }
+  .spin::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+    background: currentColor; transform: scaleX(0.26); transform-origin: 50%;
+    transition: transform 320ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  }
+  .spin:hover::after { transform: scaleX(1); }
+  .spin:disabled { color: var(--ghost) !important; cursor: default; }
+  .spin:disabled::after { transform: scaleX(0.26); }
+
+  @media (max-width: 620px) {
+    :root { --item: clamp(46px, 7.6vh, 70px); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .strip.is-spinning { filter: none; }
+    .reel.is-settled .cell.is-front,
+    .constraint.is-settled .cell.is-front { animation: none; }
   }
 </style>
 </head>
 <body>
 
-  <header class="site-header">
-    <div class="wrap">
-      <a class="logo" href="/">
-        <img src="/geocornsmall.png" alt="unisam logo">
-        <span>
-          <span class="logo__name" style="display:block;">unisam.nz</span>
-          <span class="logo__tagline" style="display:block;">IB Economics &middot; Business Management &middot; Foundations of the Modern World</span>
-        </span>
-      </a>
-      <nav class="nav">
-        <a href="/">This week</a>
-        <a href="/ibecon">Economics</a>
-        <a href="/ibbm">Business</a>
-        <a href="/tools" class="is-active">Tools</a>
-        <a href="/experiments">Experiments</a>
-      </nav>
-    </div>
-  </header>
+  <div class="stage"><div class="reels" id="reels"></div></div>
 
-  <main class="main">
-    <div class="wrap">
-      <span class="page-label">Business Management</span>
-      <h1 class="page-title">Newbiz</h1>
-      <p class="page-intro">Spin two or three unrelated words and build a business case out of whatever lands. Every reel draws from a different category, so you never get two words that are basically the same idea. Add a constraint if you want a problem rather than just a product.</p>
+  <div class="constraint" id="constraint">
+    <div class="veil"><div class="drum" id="con-drum"></div></div>
+  </div>
 
-      <div class="controls">
-        <div class="ctrl-group">
-          <span class="ctrl-label">Words</span>
-          <div class="seg" id="count-seg">
-            <button type="button" data-count="2" aria-pressed="true">Two</button>
-            <button type="button" data-count="3" aria-pressed="false">Three</button>
-          </div>
-        </div>
-
-        <label class="check">
-          <input type="checkbox" id="constraint-toggle">
-          Add a constraint
-        </label>
-
-        <button type="button" class="spin-btn" id="spin">Spin</button>
-      </div>
-
-      <div class="machine">
-        <div class="reels" id="reels"></div>
-
-        <div class="constraint" id="constraint">
-          <div class="constraint-label">Constraint</div>
-          <div class="reel">
-            <div class="strip" id="constraint-strip"></div>
-            <div class="reel-mask"></div>
-          </div>
-        </div>
-
-        <div class="prompt">
-          <strong>What to do with it.</strong> Take the words at face value and force a connection. Then work through:
-          <ol>
-            <li>Who is the customer, specifically? Not "everyone".</li>
-            <li>What problem does this solve that something else does not?</li>
-            <li>What does one unit cost you, and what would someone pay?</li>
-            <li>What is the single biggest reason this fails?</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <footer class="site-footer">
-    <div class="wrap">Built by Sam G &middot; all vibe coded &middot; found a problem? tell Sam.</div>
-  </footer>
+  <div class="controls" id="controls">
+    <span class="count" id="count">
+      <button type="button" data-count="2" aria-pressed="true">Two</button>
+      <button type="button" data-count="3" aria-pressed="false">Three</button>
+    </span>
+    <button type="button" id="con-btn" aria-pressed="false">Constraint</button>
+    <button type="button" class="spin" id="spin">Spin</button>
+  </div>
 
 <script src="words.js"></script>
 <script>
 (() => {
   'use strict';
 
-  const MAX_REELS = 3;
-  const STRIP_LEN = 34;      // filler words per spin
-  const TARGET_AT = 30;      // where the landing word sits in the strip
-  const BASE_MS   = 2100;    // first reel's spin time
-  const STAGGER_MS = 520;    // each subsequent reel runs this much longer
-  const EASE = 'cubic-bezier(0.14, 0.76, 0.18, 1.03)';  // >1 for a slight settle-back
+  const CELLS = 18, STEP = 360 / CELLS;
+  const CON_CELLS = 14, CON_STEP = 360 / CON_CELLS;
+  const DEPTH = 1500;               // perspective, in px
 
   const reelsEl = document.getElementById('reels');
   const spinBtn = document.getElementById('spin');
-  const countSeg = document.getElementById('count-seg');
-  const constraintEl = document.getElementById('constraint');
-  const constraintToggle = document.getElementById('constraint-toggle');
-  const constraintStrip = document.getElementById('constraint-strip');
+  const countEl = document.getElementById('count');
+  const conBtn  = document.getElementById('con-btn');
+  const conEl   = document.getElementById('constraint');
+  const conDrum = document.getElementById('con-drum');
 
   const bucketKeys = Object.keys(BUCKETS);
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rand = a => a[Math.floor(Math.random() * a.length)];
+  const mod360 = d => ((d % 360) + 360) % 360;
 
-  let count = 2;
-  let spinning = false;
+  let count = 2, spinning = false;
 
-  /* One entry per reel. `bucket` and `word` are what is currently showing. */
-  const reels = Array.from({ length: MAX_REELS }, () => ({
-    bucket: null, word: null, held: false, el: null, strip: null, holdBtn: null, bucketEl: null
+  const reels = Array.from({ length: 3 }, () => ({
+    bucket: null, word: null, held: false,
+    el: null, veil: null, drum: null, cells: [], angle: 0, hue: Math.random() * 360
   }));
+  const con = { el: conEl, veil: conEl.querySelector('.veil'), drum: conDrum, cells: [], angle: 0, text: null };
 
-  let constraintText = null;
+  /* ── Text fitting ────────────────────────────────────────────────────
+     Words run from "bee" to "recycled plastic". Rather than clip the long
+     ones, measure each once and shrink only what does not fit. Cached, so a
+     relabel mid-spin costs nothing. */
+  const gauge = document.createElement('canvas').getContext('2d');
+  const fitCache = new Map();
 
-  const rand = arr => arr[Math.floor(Math.random() * arr.length)];
-
-  /* Pick a word from a bucket, avoiding one we already have on screen. */
-  function pickWord(bucketKey, avoid) {
-    const pool = BUCKETS[bucketKey].words;
-    if (pool.length < 2) return pool[0];
-    let w;
-    do { w = rand(pool); } while (w === avoid);
-    return w;
+  function fit(cell, text, box, base, family) {
+    cell.textContent = text;
+    if (!box || !base) return;
+    const key = text + '|' + base + '|' + box;
+    let px = fitCache.get(key);
+    if (px === undefined) {
+      gauge.font = `${base}px ${family}`;
+      const w = gauge.measureText(text).width;
+      const room = box * 0.94;
+      px = w > room ? Math.max(11, base * room / w) : base;
+      fitCache.set(key, px);
+    }
+    cell.style.fontSize = px === base ? '' : px.toFixed(1) + 'px';
   }
 
-  /* Give every active reel a bucket, and never the same one twice — that is
-     what stops "otter + badger".
-     reassign=true  (a spin) shuffles fresh buckets onto every unheld reel.
-     reassign=false (revealing a reel) fills only the gaps, so a reel that is
-     already showing a word keeps the label that word actually came from. */
+  /* Base font size and available width, read back from real layout.
+     The front cell is pushed toward the camera by translateZ, so perspective
+     scales it up by DEPTH/(DEPTH-r). Shrink the usable box by that factor or
+     the longest words render wider than the reel and the mask clips them. */
+  function metrics(cells, el, r) {
+    const cs = getComputedStyle(cells[0]);
+    const frontScale = DEPTH / (DEPTH - r);
+    return {
+      base: parseFloat(cs.fontSize),
+      family: cs.fontFamily,
+      box: el.clientWidth / frontScale
+    };
+  }
+
+  /* ── Drum geometry ───────────────────────────────────────────────────
+     Cells sit on a cylinder of radius R. For faces to meet edge to edge,
+     R is half a cell height over tan(half the angular step).
+
+     Note: measure a real cell rather than reading --item. An unregistered
+     custom property computes to its raw token stream, so getPropertyValue
+     hands back the literal "clamp(...)" text and parseFloat gives NaN. */
+  const radius = (px, cells) => (px / 2) / Math.tan(Math.PI / cells);
+  const cellPx = (cells, fb) => (cells[0] && cells[0].offsetHeight) || fb;
+  const reelRadius = () => radius(cellPx(reels[0].cells, 90), CELLS);
+  const conRadius  = () => radius(cellPx(con.cells, 46), CON_CELLS);
+
+  function placeCells(cells, step, r) {
+    cells.forEach((c, i) => {
+      const rx = i * step;
+      c.style.setProperty('--rx', rx + 'deg');
+      c.style.setProperty('--z', r + 'px');
+      c.style.transform = `rotateX(${rx}deg) translateZ(${r}px)`;
+    });
+  }
+
+  const spin3d = (drum, a) => { drum.style.transform = `perspective(${DEPTH}px) rotateX(${a}deg)`; };
+
+  function layout() {
+    const r = reelRadius();
+    for (let i = 0; i < count; i++) {
+      placeCells(reels[i].cells, STEP, r);
+      spin3d(reels[i].drum, reels[i].angle);
+      refit(reels[i]);
+    }
+    placeCells(con.cells, CON_STEP, conRadius());
+    spin3d(con.drum, con.angle);
+  }
+
+  function refit(r) {
+    const m = metrics(r.cells, r.el, reelRadius());
+    r.cells.forEach(c => fit(c, c.textContent, m.box, m.base, m.family));
+  }
+
+  /* ── Build ───────────────────────────────────────────────────────────── */
+
+  function buildReel(r) {
+    const el = document.createElement('div'); el.className = 'reel';
+    const veil = document.createElement('div'); veil.className = 'veil';
+    const drum = document.createElement('div'); drum.className = 'drum';
+    const pin = document.createElement('div'); pin.className = 'pin';
+
+    r.cells = [];
+    for (let i = 0; i < CELLS; i++) {
+      const c = document.createElement('div'); c.className = 'cell';
+      drum.appendChild(c); r.cells.push(c);
+    }
+    veil.appendChild(drum);
+    el.append(veil, pin);
+    r.el = el; r.veil = veil; r.drum = drum;
+
+    // The reel itself is the hold control. No extra chrome.
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      if (spinning) return;
+      r.held = !r.held;
+      el.classList.toggle('is-held', r.held);
+    });
+    return el;
+  }
+
+  function buildCon() {
+    con.cells = []; conDrum.innerHTML = '';
+    for (let i = 0; i < CON_CELLS; i++) {
+      const c = document.createElement('div'); c.className = 'cell';
+      conDrum.appendChild(c); con.cells.push(c);
+    }
+  }
+
+  function buildAll() {
+    reelsEl.innerHTML = '';
+    for (let i = 0; i < count; i++) reelsEl.appendChild(buildReel(reels[i]));
+    for (let i = 0; i < count; i++) dress(reels[i]);
+    layout();
+  }
+
+  /* Each cell takes its own slice of the spectrum, so a spinning drum reads
+     as a rainbow flowing past rather than a block of one colour. */
+  function paint(r) {
+    r.cells.forEach((c, i) => {
+      c.style.color = `hsl(${mod360(r.hue + (i / CELLS) * 360)} 64% 51%)`;
+    });
+  }
+
+  /* Fill a drum with words that are all different. Two cells showing the same
+     word are visible at once (the drum only hides its far side), so plain
+     random selection produces obvious twins. */
+  function fillUnique(cells, first, pool) {
+    const used = new Set([first]);
+    cells.forEach((c, i) => {
+      if (i === 0) { c.textContent = first; return; }
+      let w; do { w = rand(pool); } while (used.has(w));
+      used.add(w); c.textContent = w;
+    });
+    return used;
+  }
+
+  function dress(r) {
+    fillUnique(r.cells, r.word, BUCKETS[r.bucket].words);
+    r.cells.forEach(c => c.classList.remove('is-front'));
+    r.cells[0].classList.add('is-front');
+    paint(r);
+    r.angle = 0;
+    spin3d(r.drum, 0);
+  }
+
+  function dressCon(text) {
+    fillUnique(con.cells, text, CONSTRAINTS);
+    con.cells.forEach(c => c.classList.remove('is-front'));
+    con.cells[0].classList.add('is-front');
+    con.angle = 0;
+    // Cells could not be measured while the block was display:none, so place
+    // them now that it is visible.
+    placeCells(con.cells, CON_STEP, conRadius());
+    spin3d(con.drum, 0);
+    const m = metrics(con.cells, con.el, conRadius());
+    con.cells.forEach(c => fit(c, c.textContent, m.box, m.base, m.family));
+  }
+
+  /* ── Buckets: never two of the same category on screen ──────────────── */
+
   function assignBuckets(reassign) {
     const taken = new Set();
     for (let i = 0; i < count; i++) {
       const r = reels[i];
-      if (!r.bucket) continue;
-      if (r.held || !reassign) taken.add(r.bucket);
+      if (r.bucket && (r.held || !reassign)) taken.add(r.bucket);
     }
-
-    const available = bucketKeys.filter(k => !taken.has(k));
-    // Fisher-Yates over the available keys.
-    for (let i = available.length - 1; i > 0; i--) {
+    const pool = bucketKeys.filter(k => !taken.has(k));
+    for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [available[i], available[j]] = [available[j], available[i]];
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-
-    let next = 0;
+    let n = 0;
     for (let i = 0; i < count; i++) {
       const r = reels[i];
       if (r.bucket && (r.held || !reassign)) continue;
-      r.bucket = available[next++];
+      r.bucket = pool[n++];
     }
   }
 
-  /* ── Reel construction ──────────────────────────────────────────────── */
-
-  function buildReels() {
-    reelsEl.innerHTML = '';
-    for (let i = 0; i < count; i++) {
-      const r = reels[i];
-
-      const col = document.createElement('div');
-      col.className = 'reel-col';
-
-      const bucketEl = document.createElement('div');
-      bucketEl.className = 'reel-bucket';
-
-      const window_ = document.createElement('div');
-      window_.className = 'reel';
-      const strip = document.createElement('div');
-      strip.className = 'strip';
-      const mask = document.createElement('div');
-      mask.className = 'reel-mask';
-      window_.append(strip, mask);
-
-      const foot = document.createElement('div');
-      foot.className = 'reel-foot';
-      const holdBtn = document.createElement('button');
-      holdBtn.type = 'button';
-      holdBtn.className = 'hold-btn';
-      holdBtn.textContent = 'hold';
-      holdBtn.setAttribute('aria-pressed', String(r.held));
-      holdBtn.addEventListener('click', () => {
-        if (spinning) return;
-        r.held = !r.held;
-        holdBtn.setAttribute('aria-pressed', String(r.held));
-        holdBtn.textContent = r.held ? 'held' : 'hold';
-      });
-      foot.appendChild(holdBtn);
-
-      col.append(bucketEl, window_, foot);
-      reelsEl.appendChild(col);
-
-      r.el = window_; r.strip = strip; r.holdBtn = holdBtn; r.bucketEl = bucketEl;
-      holdBtn.textContent = r.held ? 'held' : 'hold';
-
-      // Restore whatever this reel was already showing.
-      if (r.word) setResting(r);
-    }
+  function pickWord(bucket, avoid) {
+    const pool = BUCKETS[bucket].words;
+    let w; do { w = rand(pool); } while (w === avoid && pool.length > 1);
+    return w;
   }
 
-  function itemHeight(el) {
-    const slot = el.querySelector('.slot');
-    return slot ? slot.getBoundingClientRect().height : 68;
+  /* ── Easing ──────────────────────────────────────────────────────────
+     Quart ease-out for the body of the spin, a fast-decaying ripple so the
+     drum rocks into place instead of stopping dead, and a small backward
+     flick at the start for wind-up. */
+  function ease(t) {
+    const body   = 1 - Math.pow(1 - t, 4);
+    const settle = Math.sin(t * Math.PI * 11) * Math.pow(1 - t, 7) * 0.05;
+    const windup = t < 0.14 ? -Math.sin((t / 0.14) * Math.PI) * 0.015 : 0;
+    return body + settle + windup;
   }
 
-  /* Park a reel on its current word with no animation. */
-  function setResting(r) {
-    r.strip.style.transition = 'none';
-    r.strip.innerHTML = '';
-    for (let k = 0; k < 3; k++) {
-      const s = document.createElement('div');
-      s.className = 'slot' + (k === 1 ? ' is-target' : '');
-      s.textContent = k === 1 ? r.word : pickWord(r.bucket, r.word);
-      r.strip.appendChild(s);
-    }
-    r.strip.style.transform = 'translateY(0)';
-    if (r.bucketEl) r.bucketEl.textContent = BUCKETS[r.bucket].label;
+  /* ── The spin ────────────────────────────────────────────────────────── */
+
+  function launch(o) {
+    const { target, veil, drum, cells, step, n, angle, turns, duration, r, pick, fitOpts, onEnd } = o;
+
+    // Everything currently on the drum, so recycling never creates a twin.
+    const used = new Set(cells.map(c => c.textContent));
+    const swap = (cell, text) => {
+      used.delete(cell.textContent);
+      used.add(text);
+      fit(cell, text, fitOpts.box, fitOpts.base, fitOpts.family);
+    };
+
+    // Land on a random cell, so the winning colour differs every time.
+    const k = Math.floor(Math.random() * n);
+    cells.forEach(c => c.classList.remove('is-front'));
+    swap(cells[k], target);
+    cells[k].classList.add('is-front');
+
+    const want = -k * step;
+    const total = turns * 360 + mod360(angle - want);
+
+    if (reduce) { spin3d(drum, want); onEnd(mod360(want)); return; }
+
+    const dirty = new Set();
+    const t0 = performance.now();
+    let prev = 0;
+
+    requestAnimationFrame(function frame(now) {
+      const t = Math.min(1, (now - t0) / duration);
+      const p = ease(t);
+      const a = angle - total * p;
+      spin3d(drum, a);
+
+      // Blur tracks real surface speed, so it builds and bleeds off naturally.
+      const px = (Math.abs(p - prev) * total * Math.PI / 180) * r;
+      prev = p;
+      veil.style.filter = px > 0.7 ? `blur(${Math.min(px * 0.4, 12).toFixed(2)}px)` : '';
+
+      // Cells on the far side are invisible, so recycle them into new words.
+      if (t < 0.8) {
+        for (let i = 0; i < n; i++) {
+          if (i === k) continue;
+          const world = mod360(i * step + a);
+          if (world > 106 && world < 254) {
+            if (!dirty.has(i)) {
+              dirty.add(i);
+              let w; do { w = pick(); } while (used.has(w));
+              swap(cells[i], w);
+            }
+          } else dirty.delete(i);
+        }
+      }
+
+      if (t < 1) requestAnimationFrame(frame);
+      else { veil.style.filter = ''; spin3d(drum, want); onEnd(mod360(want)); }
+    });
   }
 
-  /* ── Spinning ───────────────────────────────────────────────────────── */
-
-  /* Build a fresh strip: index 1 keeps the currently visible word so the reel
-     does not jump when we reset it, TARGET_AT holds the new word. */
-  function loadStrip(strip, words, currentWord, targetWord) {
-    strip.style.transition = 'none';
-    strip.style.transform = 'translateY(0)';
-    strip.innerHTML = '';
-    for (let k = 0; k < STRIP_LEN; k++) {
-      const s = document.createElement('div');
-      s.className = 'slot';
-      if (k === 1 && currentWord) { s.textContent = currentWord; s.classList.add('is-target'); }
-      else if (k === TARGET_AT) { s.textContent = targetWord; s.classList.add('is-target'); }
-      else s.textContent = rand(words);
-      strip.appendChild(s);
-    }
-    strip.getBoundingClientRect();  // force reflow so the reset takes effect
-  }
-
-  function runStrip(strip, duration) {
-    const h = itemHeight(strip.parentElement);
-    if (reduceMotion) {
-      strip.style.transition = 'none';
-      strip.style.transform = `translateY(${-(TARGET_AT - 1) * h}px)`;
-      return Promise.resolve();
-    }
-    strip.classList.add('is-spinning');
-    strip.style.transition = `transform ${duration}ms ${EASE}`;
-    strip.style.transform = `translateY(${-(TARGET_AT - 1) * h}px)`;
-    // Drop the blur before it stops, so the landing word is sharp as it settles.
-    setTimeout(() => strip.classList.remove('is-spinning'), Math.max(0, duration - 480));
-    return new Promise(resolve => setTimeout(resolve, duration));
-  }
-
-  async function spin() {
+  function spin() {
     if (spinning) return;
-    const active = reels.slice(0, count);
-    if (active.every(r => r.held) && !constraintToggle.checked) return;
+    const live = reels.slice(0, count);
+    const conOn = conBtn.getAttribute('aria-pressed') === 'true';
+    if (live.every(r => r.held) && !conOn) return;
 
     spinning = true;
     spinBtn.disabled = true;
+    live.forEach(r => r.el.classList.remove('is-settled'));
+    conEl.classList.remove('is-settled');
 
     assignBuckets(true);
+    const r18 = reelRadius();
+    let pending = 0, order = 0;
+    const done = () => { if (--pending === 0) { spinning = false; spinBtn.disabled = false; } };
 
-    const running = [];
-    let slotIndex = 0;
-
-    active.forEach(r => {
+    live.forEach(r => {
       if (r.held) return;
-      const target = pickWord(r.bucket, r.word);
-      r.bucketEl.textContent = BUCKETS[r.bucket].label;
-      loadStrip(r.strip, BUCKETS[r.bucket].words, r.word, target);
-      const duration = BASE_MS + slotIndex * STAGGER_MS;
-      slotIndex++;
-      running.push(runStrip(r.strip, duration).then(() => { r.word = target; }));
+      pending++;
+      const word = pickWord(r.bucket, r.word);
+      r.hue = Math.random() * 360;
+      paint(r);
+      launch({
+        target: word, veil: r.veil, drum: r.drum, cells: r.cells,
+        step: STEP, n: CELLS, angle: r.angle, r: r18,
+        turns: 5 + order * 1.1 + Math.random() * 0.7,
+        duration: 2600 + order * 640,
+        pick: () => rand(BUCKETS[r.bucket].words),
+        fitOpts: metrics(r.cells, r.el, r18),
+        onEnd: a => { r.angle = a; r.word = word; r.el.classList.add('is-settled'); done(); }
+      });
+      order++;
     });
 
-    if (constraintToggle.checked) {
-      let target;
-      do { target = rand(CONSTRAINTS); } while (CONSTRAINTS.length > 1 && target === constraintText);
-      loadStrip(constraintStrip, CONSTRAINTS, constraintText, target);
-      const duration = BASE_MS + slotIndex * STAGGER_MS;
-      running.push(runStrip(constraintStrip, duration).then(() => { constraintText = target; }));
+    if (conOn) {
+      pending++;
+      let text; do { text = rand(CONSTRAINTS); } while (text === con.text && CONSTRAINTS.length > 1);
+      launch({
+        target: text, veil: con.veil, drum: con.drum, cells: con.cells,
+        step: CON_STEP, n: CON_CELLS, angle: con.angle, r: conRadius(),
+        turns: 5 + order * 1.1 + Math.random() * 0.7,
+        duration: 2600 + order * 640,
+        pick: () => rand(CONSTRAINTS),
+        fitOpts: metrics(con.cells, con.el, conRadius()),
+        onEnd: a => { con.angle = a; con.text = text; conEl.classList.add('is-settled'); done(); }
+      });
     }
 
-    await Promise.all(running);
-    spinning = false;
-    spinBtn.disabled = false;
+    if (pending === 0) { spinning = false; spinBtn.disabled = false; }
   }
 
-  /* ── Controls ───────────────────────────────────────────────────────── */
+  /* ── Controls ────────────────────────────────────────────────────────── */
 
-  countSeg.addEventListener('click', e => {
-    const btn = e.target.closest('button');
-    if (!btn || spinning) return;
-    const n = Number(btn.dataset.count);
+  countEl.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || spinning) return;
+    e.stopPropagation();
+    const n = Number(b.dataset.count);
     if (n === count) return;
     count = n;
-    [...countSeg.children].forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.count) === count)));
-
-    // Give any newly revealed reel a bucket and a word before it is drawn.
+    [...countEl.children].forEach(x =>
+      x.setAttribute('aria-pressed', String(Number(x.dataset.count) === count)));
     assignBuckets(false);
-    for (let i = 0; i < count; i++) {
-      if (!reels[i].word) reels[i].word = pickWord(reels[i].bucket, null);
-    }
-    buildReels();
+    for (let i = 0; i < count; i++) if (!reels[i].word) reels[i].word = pickWord(reels[i].bucket, null);
+    buildAll();
   });
 
-  constraintToggle.addEventListener('change', () => {
-    constraintEl.classList.toggle('is-on', constraintToggle.checked);
-    if (constraintToggle.checked && !constraintText) {
-      constraintText = rand(CONSTRAINTS);
-      constraintStrip.innerHTML = '';
-      for (let k = 0; k < 3; k++) {
-        const s = document.createElement('div');
-        s.className = 'slot' + (k === 1 ? ' is-target' : '');
-        s.textContent = k === 1 ? constraintText : rand(CONSTRAINTS);
-        constraintStrip.appendChild(s);
-      }
-      constraintStrip.style.transition = 'none';
-      constraintStrip.style.transform = 'translateY(0)';
-    }
+  conBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const on = conBtn.getAttribute('aria-pressed') !== 'true';
+    conBtn.setAttribute('aria-pressed', String(on));
+    conEl.classList.toggle('is-on', on);
+    if (on && !con.text) { con.text = rand(CONSTRAINTS); dressCon(con.text); }
   });
 
-  spinBtn.addEventListener('click', spin);
+  spinBtn.addEventListener('click', e => { e.stopPropagation(); spin(); });
 
-  document.addEventListener('keydown', e => {
-    if (e.code !== 'Space') return;
-    const tag = document.activeElement && document.activeElement.tagName;
-    if (tag === 'INPUT' || tag === 'BUTTON') return;   // let space toggle controls
-    e.preventDefault();
-    spin();
+  // The whole page is the lever.
+  document.body.addEventListener('click', spin);
+  addEventListener('keydown', e => {
+    if (e.code !== 'Space' && e.code !== 'Enter') return;
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+    e.preventDefault(); spin();
   });
 
-  /* ── Boot ───────────────────────────────────────────────────────────── */
+  let rt;
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { fitCache.clear(); layout(); }, 120); });
+
+  /* ── Boot ────────────────────────────────────────────────────────────── */
 
   assignBuckets(false);
   for (let i = 0; i < count; i++) reels[i].word = pickWord(reels[i].bucket, null);
-  buildReels();
+  buildCon();
+  buildAll();
 })();
 </script>
 </body>
