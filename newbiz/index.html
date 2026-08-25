@@ -108,15 +108,6 @@
     100% { transform: rotateX(var(--rx)) translateZ(var(--z)) scale(1); }
   }
 
-  /* Held reels get a quiet dot, not a button. */
-  .pin {
-    position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px;
-    margin-left: -2.5px; border-radius: 50%; background: #9aa1b4;
-    opacity: 0; transform: scale(0.2); z-index: 5;
-    transition: opacity 240ms, transform 320ms cubic-bezier(0.2, 1.6, 0.3, 1);
-  }
-  .reel.is-held .pin { opacity: 1; transform: scale(1); }
-
   /* ── Constraint ───────────────────────────────────────────────────── */
 
   /* display:none rather than opacity, so it reserves no space when off and
@@ -141,6 +132,9 @@
 
   /* ── Controls ─────────────────────────────────────────────────────── */
 
+  /* Spin sits above its options, close to them, as one block. */
+  .deck { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+
   .controls {
     display: flex; align-items: center; gap: clamp(14px, 2.6vw, 30px);
     font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
@@ -154,15 +148,32 @@
   .count { display: flex; gap: 12px; }
   .count button[aria-pressed="true"], #con-btn[aria-pressed="true"] { color: #4a5068; }
 
-  .spin { position: relative; color: #3a4054 !important; }
-  .spin::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
-    background: currentColor; transform: scaleX(0.26); transform-origin: 50%;
-    transition: transform 320ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  /* Spin is the primary action, so it gets its own line above the options
+     and enough size to read as the thing you press. */
+  .spin {
+    position: relative;
+    font-family: inherit;
+    font-size: clamp(15px, 1.9vw, 21px);
+    font-weight: 500;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;          /* re-centre: tracking pads the right side */
+    text-transform: uppercase;
+    color: #2f3547;
+    background: none; border: none; cursor: pointer;
+    padding: 14px clamp(26px, 5vw, 52px);
+    transition: color 200ms, transform 200ms;
   }
+  .spin::after {
+    content: ''; position: absolute; left: clamp(26px, 5vw, 52px); right: clamp(26px, 5vw, 52px);
+    bottom: 8px; height: 1px; background: currentColor;
+    transform: scaleX(0.2); transform-origin: 50%;
+    transition: transform 340ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 200ms;
+  }
+  .spin:hover { color: #11141d; }
   .spin:hover::after { transform: scaleX(1); }
-  .spin:disabled { color: var(--ghost) !important; cursor: default; }
-  .spin:disabled::after { transform: scaleX(0.26); }
+  .spin:active { transform: translateY(1px); }
+  .spin:disabled { color: #c8ccd8; cursor: default; transform: none; }
+  .spin:disabled::after { transform: scaleX(0.2); opacity: 0.4; }
 
   @media (max-width: 620px) {
     :root { --item: clamp(46px, 7.6vh, 70px); }
@@ -182,13 +193,15 @@
     <div class="veil"><div class="drum" id="con-drum"></div></div>
   </div>
 
-  <div class="controls" id="controls">
-    <span class="count" id="count">
-      <button type="button" data-count="2" aria-pressed="true">Two</button>
-      <button type="button" data-count="3" aria-pressed="false">Three</button>
-    </span>
-    <button type="button" id="con-btn" aria-pressed="false">Constraint</button>
+  <div class="deck">
     <button type="button" class="spin" id="spin">Spin</button>
+    <div class="controls" id="controls">
+      <span class="count" id="count">
+        <button type="button" data-count="2" aria-pressed="true">Two</button>
+        <button type="button" data-count="3" aria-pressed="false">Three</button>
+      </span>
+      <button type="button" id="con-btn" aria-pressed="false">Constraint</button>
+    </div>
   </div>
 
 <script src="words.js"></script>
@@ -215,7 +228,7 @@
   let count = 2, spinning = false;
 
   const reels = Array.from({ length: 3 }, () => ({
-    bucket: null, word: null, held: false,
+    bucket: null, word: null,
     el: null, veil: null, drum: null, cells: [], angle: 0, hue: Math.random() * 360
   }));
   const con = { el: conEl, veil: conEl.querySelector('.veil'), drum: conDrum, cells: [], angle: 0, text: null };
@@ -301,7 +314,6 @@
     const el = document.createElement('div'); el.className = 'reel';
     const veil = document.createElement('div'); veil.className = 'veil';
     const drum = document.createElement('div'); drum.className = 'drum';
-    const pin = document.createElement('div'); pin.className = 'pin';
 
     r.cells = [];
     for (let i = 0; i < CELLS; i++) {
@@ -309,16 +321,11 @@
       drum.appendChild(c); r.cells.push(c);
     }
     veil.appendChild(drum);
-    el.append(veil, pin);
+    el.appendChild(veil);
     r.el = el; r.veil = veil; r.drum = drum;
 
-    // The reel itself is the hold control. No extra chrome.
-    el.addEventListener('click', e => {
-      e.stopPropagation();
-      if (spinning) return;
-      r.held = !r.held;
-      el.classList.toggle('is-held', r.held);
-    });
+    // No handler here on purpose: clicks bubble to the body, which spins.
+    // Every reel goes on every spin.
     return el;
   }
 
@@ -382,11 +389,13 @@
 
   /* ── Buckets: never two of the same category on screen ──────────────── */
 
+  /* reassign=true  (a spin) deals fresh buckets to every reel.
+     reassign=false (revealing a third reel) fills only the gaps, so a reel
+     already showing a word keeps the category that word came from. */
   function assignBuckets(reassign) {
     const taken = new Set();
-    for (let i = 0; i < count; i++) {
-      const r = reels[i];
-      if (r.bucket && (r.held || !reassign)) taken.add(r.bucket);
+    if (!reassign) {
+      for (let i = 0; i < count; i++) if (reels[i].bucket) taken.add(reels[i].bucket);
     }
     const pool = bucketKeys.filter(k => !taken.has(k));
     for (let i = pool.length - 1; i > 0; i--) {
@@ -395,9 +404,8 @@
     }
     let n = 0;
     for (let i = 0; i < count; i++) {
-      const r = reels[i];
-      if (r.bucket && (r.held || !reassign)) continue;
-      r.bucket = pool[n++];
+      if (!reassign && reels[i].bucket) continue;
+      reels[i].bucket = pool[n++];
     }
   }
 
@@ -440,8 +448,9 @@
       fit(cell, text, fitOpts.box, fitOpts.base, fitOpts.family);
     };
 
-    // Land on a random cell, so the winning colour differs every time.
-    const k = Math.floor(Math.random() * n);
+    // Which cell to stop on. The caller supplies it when it wants to control
+    // the landing colour; otherwise pick freely.
+    const k = o.landOn != null ? o.landOn : Math.floor(Math.random() * n);
     cells.forEach(c => c.classList.remove('is-front'));
     swap(cells[k], target);
     cells[k].classList.add('is-front');
@@ -495,7 +504,6 @@
     if (spinning) return;
     const live = reels.slice(0, count);
     const conOn = conBtn.getAttribute('aria-pressed') === 'true';
-    if (live.every(r => r.held) && !conOn) return;
 
     spinning = true;
     spinBtn.disabled = true;
@@ -507,15 +515,25 @@
     let pending = 0, order = 0;
     const done = () => { if (--pending === 0) { spinning = false; spinBtn.disabled = false; } };
 
+    /* Spread the landing colours around the wheel rather than leaving them to
+       chance, or three reels can all come up much the same purple. Each drum
+       still carries the full spectrum; this only fixes where each one stops
+       relative to the others. */
+    const baseHue = Math.random() * 360;
+
     live.forEach(r => {
-      if (r.held) return;
       pending++;
       const word = pickWord(r.bucket, r.word);
-      r.hue = Math.random() * 360;
+
+      // Choose the stopping cell first, then set the drum's hue offset so that
+      // this cell lands on the colour this reel has been allotted.
+      const landOn = Math.floor(Math.random() * CELLS);
+      r.hue = mod360(baseHue + order * (360 / live.length) - (landOn / CELLS) * 360);
       paint(r);
+
       launch({
         target: word, veil: r.veil, drum: r.drum, cells: r.cells,
-        step: STEP, n: CELLS, angle: r.angle, r: r18,
+        step: STEP, n: CELLS, angle: r.angle, r: r18, landOn,
         turns: 5 + order * 1.1 + Math.random() * 0.7,
         duration: 2600 + order * 640,
         pick: () => rand(BUCKETS[r.bucket].words),
