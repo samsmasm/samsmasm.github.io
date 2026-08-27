@@ -692,6 +692,7 @@ body {
       <button class="sp-btn" id="btn-new">New</button>
       <button class="sp-btn primary" id="btn-save">Save</button>
       <button class="sp-btn" id="btn-load">Load</button>
+      <button class="sp-btn" id="btn-share">Share</button>
       <button class="sp-btn" id="btn-my-maps" style="display:none">My Maps</button>
       <button class="sp-btn" id="btn-import">Import</button>
       <button class="sp-btn" id="btn-export">Export</button>
@@ -819,14 +820,14 @@ body {
 <div class="modal" id="code-modal">
   <div class="modal-title" id="code-modal-title">Share this map</div>
   <div class="share-row">
-    <div class="share-row-label"><b>Edit link</b> — they edit this same map; their changes save back to it</div>
+    <div class="share-row-label"><b>Edit link</b>: they edit this same map, and their changes save back to it</div>
     <div class="share-link-box">
       <input class="share-link-input" id="share-link-edit" type="text" readonly>
       <button class="btn-confirm" id="btn-copy-edit-link">Copy</button>
     </div>
   </div>
   <div class="share-row">
-    <div class="share-row-label"><b>Copy link</b> — they get their own copy; nothing they do affects your map</div>
+    <div class="share-row-label"><b>Copy link</b>: they get their own copy, and nothing they do affects your map</div>
     <div class="share-link-box">
       <input class="share-link-input" id="share-link-copy" type="text" readonly>
       <button class="btn-confirm" id="btn-copy-copy-link">Copy</button>
@@ -901,7 +902,8 @@ body {
     <div class="help-row"><div class="help-key">Co-premises</div><div class="help-val">Drag two sibling nodes close together — they snap with a shared bar · click <kbd>AND</kbd> / <kbd>OR</kbd> to toggle the relationship · drag apart to separate</div></div>
     <div class="help-row"><div class="help-key">Collapse</div><div class="help-val">Click <kbd>▾</kbd> on any node to hide its subtree · click <kbd>▸</kbd> to expand again</div></div>
     <div class="help-row"><div class="help-key">Tidy</div><div class="help-val">Auto-arranges the full tree neatly · dissolves any co-premise groups</div></div>
-    <div class="help-row"><div class="help-key">Save</div><div class="help-val">Signed in: saves silently to My Maps · Guest: shows a 6-char code to share or bookmark · use Share in My Maps for a shareable link</div></div>
+    <div class="help-row"><div class="help-key">Save</div><div class="help-val">Signed in: saves silently to My Maps · Guest: shows a 6-char code to bookmark or share</div></div>
+    <div class="help-row"><div class="help-key">Share</div><div class="help-val">Gives two links: an <b>edit link</b> (they change your map) and a <b>copy link</b> (they get their own copy, your map stays untouched) · saves first if the map is new</div></div>
     <div class="help-row"><div class="help-key">Import</div><div class="help-val">Copy the prompt, paste it with any text into an AI assistant, then paste the returned JSON to build a map automatically</div></div>
     <div class="help-row"><div class="help-key">Export</div><div class="help-val">Generates a structured plain-text outline — copy to clipboard or download as .md / .txt</div></div>
     <div class="help-row"><div class="help-key">Check</div><div class="help-val">Flags nodes with no evidence and objections with no rebuttal · summarises the top-level reasons for the contention</div></div>
@@ -2182,7 +2184,7 @@ function showShareModeModal(asCopy) {
     asCopy ? "You have your own copy" : "You're editing the original";
   document.getElementById('share-mode-sub').textContent = asCopy
     ? "Changes you make here won't affect the original map, and the person who shared it won't see them. Save to keep your own copy."
-    : "This is the shared map itself. If you save, your changes will update it for everyone else with this link.";
+    : "If you just refreshed your own map, carry on. If someone shared this link with you, your changes will update their map.";
   document.getElementById('share-mode-modal').classList.add('visible');
   document.getElementById('share-mode-backdrop').classList.add('visible');
 }
@@ -2204,7 +2206,7 @@ async function loadMap(code, opts={}) {
     uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
     nodes.forEach(buildNode);
     if (asCopy) {
-      // Not bound to the original's code — the next Save forks a brand-new map.
+      // Not bound to the original's code, so the next Save forks a brand-new map.
       currentCode = null;
       document.getElementById('status-chip').textContent = 'Copy';
     } else {
@@ -2223,6 +2225,18 @@ async function loadMap(code, opts={}) {
 }
 
 document.getElementById('btn-save').addEventListener('click', saveMap);
+
+// Share: a map needs a code before it can be shared, so save first if needed.
+// For a copy-link map currentCode is null, so this forks it to its own code.
+async function shareMap() {
+  if (!currentCode) {
+    await saveMap();
+    if (!currentCode) return; // save failed; saveMap already reported why
+  }
+  document.getElementById('code-modal-title').textContent = 'Share this map';
+  openShareModal(currentCode);
+}
+document.getElementById('btn-share').addEventListener('click', shareMap);
 
 const codeBackdrop = document.getElementById('code-backdrop');
 document.getElementById('btn-copy-code').addEventListener('click',()=>{
@@ -2524,6 +2538,7 @@ tracked('btn-import','import');   tracked('btn-export','export');
 tracked('btn-tidy','tidy');       tracked('btn-print','print');
 tracked('btn-check','check');     tracked('btn-save','save');
 tracked('btn-load','load');       tracked('btn-my-maps','my_maps');
+tracked('btn-share','share');
 tracked('btn-signin','signin');   tracked('btn-zoom-in','zoom_in');
 tracked('btn-zoom-out','zoom_out'); tracked('btn-zoom-fit','zoom_fit');
 tracked('btn-help','help');

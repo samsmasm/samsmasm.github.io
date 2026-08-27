@@ -61,10 +61,12 @@ Each type has a badge (small label) with a matching pastel background (`--badge-
 Firebase project `argmap-194a5` (Firestore). `saveMap()` writes to `argmap_maps/{6-char code}`; signed-in users also get an entry under `users/{uid}/maps/{code}` for the My Maps panel. `location.hash` mirrors the current code and is auto-loaded on page open.
 
 Share links come in two flavours off the same code:
-- `#CODE` — edit link, loads bound to that code; saving overwrites the original.
-- `#CODEcopy` — copy link, loads the same content but `currentCode` stays `null`, so the first Save forks a brand-new code instead of touching the original.
+- `#CODE`: edit link, loads bound to that code; saving overwrites the original.
+- `#CODEcopy`: copy link, loads the same content but `currentCode` stays `null`, so the first Save forks a brand-new code instead of touching the original.
 
-Opening either kind of link (via the initial-hash auto-load only, not internal Load-panel/My-Maps loads) shows a one-time modal stating which mode it is. Both link types are surfaced together in the Share modal (`#code-modal`), opened from Save (guest) or the My Maps "Share" button.
+Opening either kind of link (via the initial-hash auto-load only, not internal Load-panel/My-Maps loads) shows a one-time modal stating which mode it is. Because an edit link and your own bookmark are the same URL, that modal also fires on a plain refresh, so its wording covers both cases.
+
+Both link types are surfaced together in the Share modal (`#code-modal`), opened from the left-panel **Share** button, from Save (guest), or from the My Maps "Share" button. `shareMap()` saves first when the map has no code yet.
 
 ---
 
