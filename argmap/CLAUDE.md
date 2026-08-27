@@ -56,6 +56,24 @@ Each type has a badge (small label) with a matching pastel background (`--badge-
 
 ---
 
+## Save / share model
+
+Firebase project `argmap-194a5` (Firestore). `saveMap()` writes to `argmap_maps/{6-char code}`; signed-in users also get an entry under `users/{uid}/maps/{code}` for the My Maps panel. `location.hash` mirrors the current code and is auto-loaded on page open.
+
+Share links come in two flavours off the same code:
+- `#CODE` — edit link, loads bound to that code; saving overwrites the original.
+- `#CODEcopy` — copy link, loads the same content but `currentCode` stays `null`, so the first Save forks a brand-new code instead of touching the original.
+
+Opening either kind of link (via the initial-hash auto-load only, not internal Load-panel/My-Maps loads) shows a one-time modal stating which mode it is. Both link types are surfaced together in the Share modal (`#code-modal`), opened from Save (guest) or the My Maps "Share" button.
+
+---
+
+## Opening screen vs sample
+
+`INITIAL_NODES` (what a fresh page load shows) is just a blank contention + one reason. The full 7-node worked example lives in `SAMPLE_NODES` and only loads via the "Sample" button at the top of the Help modal (`loadSample()`).
+
+---
+
 ## Current status
 
-Working and stable. No known bugs or planned features.
+Working and stable. No known bugs.
