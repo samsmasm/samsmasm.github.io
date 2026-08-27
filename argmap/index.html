@@ -220,12 +220,29 @@ body {
 
 /* Code modal */
 .code-display {
-  font-size:32px; font-family:'Courier New',monospace; font-weight:700;
-  letter-spacing:.3em; color:#3a3a3a; text-align:center;
-  padding:18px; background:#f5f3ef; border-radius:6px;
-  border:1px solid #e0dbd3; user-select:all;
+  font-size:20px; font-family:'Courier New',monospace; font-weight:700;
+  letter-spacing:.2em; color:#3a3a3a;
 }
 .code-sub { font-size:12px; color:#999; font-style:italic; text-align:center; }
+
+/* Share modal */
+.share-row { display:flex; flex-direction:column; gap:6px; }
+.share-row-label { font-size:12px; color:#555; }
+.share-row-label b { color:#333; }
+.share-link-box { display:flex; gap:8px; }
+.share-link-input {
+  flex:1; border:1px solid #ddd; border-radius:4px; padding:6px 10px;
+  font-family:'Courier New',monospace; font-size:12px; color:#555;
+  background:#fafaf8; outline:none;
+}
+.share-row-code {
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  padding-top:4px; border-top:1px solid #eee;
+}
+
+/* Share-mode banner modal */
+#share-mode-modal { width:420px; }
+.share-mode-sub { font-size:13px; color:#444; line-height:1.5; }
 
 /* ── Viewport & Canvas ────────────────────────────────────────────────── */
 .viewport {
@@ -319,7 +336,6 @@ body {
 .btn-delete { font-size:16px; }
 .btn-delete:hover { color:#ef5350; background:#fff2f2; }
 .btn-collapse:hover { color:#888; background:#f5f3ef; }
-.node[data-collapsed] > .node-body { display:none; }
 .node[data-collapsed] { opacity:.85; }
 
 .node-body { padding:8px 10px 10px 9px; }
@@ -798,15 +814,40 @@ body {
   </div>
 </div>
 
-<!-- Code modal (shown after save) -->
+<!-- Share modal (shown after save, or via My Maps → Share) -->
 <div class="modal-backdrop" id="code-backdrop"></div>
 <div class="modal" id="code-modal">
-  <div class="modal-title" id="code-modal-title">Map saved</div>
-  <div class="code-display" id="code-display">------</div>
-  <div class="code-sub" id="code-sub">Write this code down to return to your map. Bookmark this page to save it automatically.</div>
+  <div class="modal-title" id="code-modal-title">Share this map</div>
+  <div class="share-row">
+    <div class="share-row-label"><b>Edit link</b> — they edit this same map; their changes save back to it</div>
+    <div class="share-link-box">
+      <input class="share-link-input" id="share-link-edit" type="text" readonly>
+      <button class="btn-confirm" id="btn-copy-edit-link">Copy</button>
+    </div>
+  </div>
+  <div class="share-row">
+    <div class="share-row-label"><b>Copy link</b> — they get their own copy; nothing they do affects your map</div>
+    <div class="share-link-box">
+      <input class="share-link-input" id="share-link-copy" type="text" readonly>
+      <button class="btn-confirm" id="btn-copy-copy-link">Copy</button>
+    </div>
+  </div>
+  <div class="share-row-code">
+    <div class="code-sub" id="code-sub">Or enter code <span class="code-display" id="code-display">------</span> in the Load panel</div>
+    <button class="btn-cancel" id="btn-copy-code">Copy code</button>
+  </div>
   <div class="modal-footer">
-    <button class="btn-confirm" id="btn-copy-code">Copy code</button>
     <button class="btn-cancel" id="btn-close-code">Close</button>
+  </div>
+</div>
+
+<!-- Share-mode banner (shown when opening a shared link) -->
+<div class="modal-backdrop" id="share-mode-backdrop"></div>
+<div class="modal" id="share-mode-modal">
+  <div class="modal-title" id="share-mode-title">You're editing the original</div>
+  <div class="share-mode-sub" id="share-mode-sub"></div>
+  <div class="modal-footer">
+    <button class="btn-confirm" id="btn-share-mode-ok">Got it</button>
   </div>
 </div>
 
@@ -847,7 +888,10 @@ body {
 <!-- Help modal -->
 <div class="modal-backdrop" id="help-backdrop"></div>
 <div class="modal" id="help-modal" style="width:640px">
-  <div class="modal-title">How to use Argument Mapper</div>
+  <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <span>How to use Argument Mapper</span>
+    <button class="btn-cancel" id="btn-load-sample" title="Load a filled-in example map">Sample</button>
+  </div>
   <div class="help-grid">
     <div class="help-row"><div class="help-key">Navigate</div><div class="help-val">Drag blank canvas to pan · scroll to zoom · <kbd>Ctrl Z</kbd> to undo</div></div>
     <div class="help-row"><div class="help-key">Add nodes</div><div class="help-val">Hover any node → click the coloured buttons that appear below it · or use <kbd>+ Node</kbd> in the toolbar for full options</div></div>
@@ -932,7 +976,14 @@ const auth = getAuth(fbApp);
 const googleProvider = new GoogleAuthProvider();
 
 // ── Initial data ───────────────────────────────────────────────────────
+// What a fresh, empty map opens with: just a contention and one reason.
 const INITIAL_NODES = [
+  { id:'n0', type:'contention', parentId:null, text:'', source:'', x:386, y:50 },
+  { id:'n1', type:'reason', parentId:'n0', text:'', source:'', x:386, y:280 },
+];
+
+// A filled-in example, loaded on demand from Help → Sample.
+const SAMPLE_NODES = [
   { id:'n0', type:'contention', parentId:null,
     text:'Governments should intervene in markets to correct market failures.', source:'', x:386, y:50 },
   { id:'n1', type:'reason', parentId:'n0',
@@ -1108,6 +1159,26 @@ function newMap() {
 }
 
 document.getElementById('btn-new').addEventListener('click', newMap);
+
+// ── Load sample map ──────────────────────────────────────────────────
+function loadSample() {
+  if (!confirm('Load the sample argument map? Unsaved work will be lost.')) return;
+  undoStack.length = 0;
+  coGroups = []; cgCounter = 1;
+  nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
+  nodes = SAMPLE_NODES.map(n => ({...n}));
+  uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
+  currentCode = null;
+  location.hash = '';
+  localStorage.removeItem('argmap_code');
+  document.getElementById('map-name').textContent = 'Sample argument map';
+  document.getElementById('status-chip').textContent = 'Draft';
+  nodes.forEach(buildNode);
+  requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+  document.getElementById('help-modal').classList.remove('visible');
+  document.getElementById('help-backdrop').classList.remove('visible');
+}
+document.getElementById('btn-load-sample').addEventListener('click', loadSample);
 
 // Map title editing
 const mapNameEl = document.getElementById('map-name');
@@ -2061,6 +2132,15 @@ function genCode() {
   let c=''; for (let i=0;i<6;i++) c+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]; return c;
 }
 
+function openShareModal(code) {
+  const base = location.href.split('#')[0];
+  document.getElementById('share-link-edit').value = base + '#' + code;
+  document.getElementById('share-link-copy').value = base + '#' + code + 'copy';
+  document.getElementById('code-display').textContent = code;
+  document.getElementById('code-modal').classList.add('visible');
+  document.getElementById('code-backdrop').classList.add('visible');
+}
+
 async function saveMap() {
   const btn = document.getElementById('btn-save');
   btn.textContent='Saving…'; btn.disabled=true;
@@ -2088,10 +2168,7 @@ async function saveMap() {
       showToast('Saved to My Maps');
     } else {
       document.getElementById('code-modal-title').textContent='Map saved';
-      document.getElementById('code-sub').textContent='Write this code down to return to your map. Bookmark this page to save it automatically.';
-      document.getElementById('code-display').textContent=code;
-      document.getElementById('code-modal').classList.add('visible');
-      document.getElementById('code-backdrop').classList.add('visible');
+      openShareModal(code);
     }
   } catch(err) {
     console.error(err); showToast('Save failed: '+err.message, 3500);
@@ -2100,7 +2177,18 @@ async function saveMap() {
   }
 }
 
-async function loadMap(code) {
+function showShareModeModal(asCopy) {
+  document.getElementById('share-mode-title').textContent =
+    asCopy ? "You have your own copy" : "You're editing the original";
+  document.getElementById('share-mode-sub').textContent = asCopy
+    ? "Changes you make here won't affect the original map, and the person who shared it won't see them. Save to keep your own copy."
+    : "This is the shared map itself. If you save, your changes will update it for everyone else with this link.";
+  document.getElementById('share-mode-modal').classList.add('visible');
+  document.getElementById('share-mode-backdrop').classList.add('visible');
+}
+
+async function loadMap(code, opts={}) {
+  const { asCopy=false, announceMode=false } = opts;
   const upper = code.trim().toUpperCase(); if (!upper) return;
   try {
     const snap = await getDoc(doc(db,'argmap_maps',upper));
@@ -2112,16 +2200,23 @@ async function loadMap(code) {
     nodes = (data.nodes||[]).map(n=>({...n}));
     coGroups = (data.coGroups||[]).map(cg=>({...cg, nodeIds:[...cg.nodeIds]}));
     cgCounter = coGroups.reduce((m,cg)=>Math.max(m,parseInt(cg.id.replace('cg',''))||0),0)+1;
-    if (data.title) document.getElementById('map-name').textContent = data.title;
+    if (data.title) document.getElementById('map-name').textContent = data.title + (asCopy ? ' (copy)' : '');
     uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
     nodes.forEach(buildNode);
-    currentCode=upper;
-    localStorage.setItem('argmap_code',upper);
-    location.hash='#'+upper;
-    document.getElementById('status-chip').textContent='Loaded';
+    if (asCopy) {
+      // Not bound to the original's code — the next Save forks a brand-new map.
+      currentCode = null;
+      document.getElementById('status-chip').textContent = 'Copy';
+    } else {
+      currentCode = upper;
+      localStorage.setItem('argmap_code',upper);
+      location.hash='#'+upper;
+      document.getElementById('status-chip').textContent='Loaded';
+    }
     requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
     closeLoadPanel();
-    showToast('Map loaded ('+upper+')');
+    if (announceMode) showShareModeModal(asCopy);
+    else showToast('Map loaded ('+upper+')');
   } catch(err) {
     console.error(err); showToast('Load failed: '+err.message, 3500);
   }
@@ -2134,6 +2229,14 @@ document.getElementById('btn-copy-code').addEventListener('click',()=>{
   const code = document.getElementById('code-display').textContent.trim();
   navigator.clipboard.writeText(code||'').then(()=>showToast('Code copied'));
 });
+document.getElementById('btn-copy-edit-link').addEventListener('click',()=>{
+  const link = document.getElementById('share-link-edit').value;
+  navigator.clipboard.writeText(link).then(()=>showToast('Edit link copied'));
+});
+document.getElementById('btn-copy-copy-link').addEventListener('click',()=>{
+  const link = document.getElementById('share-link-copy').value;
+  navigator.clipboard.writeText(link).then(()=>showToast('Copy link copied'));
+});
 document.getElementById('btn-close-code').addEventListener('click',()=>{
   document.getElementById('code-modal').classList.remove('visible');
   codeBackdrop.classList.remove('visible');
@@ -2142,6 +2245,14 @@ codeBackdrop.addEventListener('click',()=>{
   document.getElementById('code-modal').classList.remove('visible');
   codeBackdrop.classList.remove('visible');
 });
+
+const shareModeBackdrop = document.getElementById('share-mode-backdrop');
+function closeShareModeModal() {
+  document.getElementById('share-mode-modal').classList.remove('visible');
+  shareModeBackdrop.classList.remove('visible');
+}
+document.getElementById('btn-share-mode-ok').addEventListener('click', closeShareModeModal);
+shareModeBackdrop.addEventListener('click', closeShareModeModal);
 
 // Load panel
 const loadPanel = document.getElementById('load-panel');
@@ -2236,11 +2347,8 @@ async function loadMyMaps() {
       });
       row.querySelector('.mmp-item-share').addEventListener('click', e => {
         e.stopPropagation();
-        document.getElementById('code-modal-title').textContent='Share map';
-        document.getElementById('code-sub').textContent='Anyone with this code can load this map.';
-        document.getElementById('code-display').textContent=item.code;
-        document.getElementById('code-modal').classList.add('visible');
-        document.getElementById('code-backdrop').classList.add('visible');
+        document.getElementById('code-modal-title').textContent='Share this map';
+        openShareModal(item.code);
       });
       row.querySelector('.mmp-item-del').addEventListener('click', async e => {
         e.stopPropagation();
@@ -2573,9 +2681,13 @@ helpBackdrop.addEventListener('click', () => {
 
 // Auto-load from URL hash only — localStorage no longer silently restores the hash,
 // because deleting the hash and navigating to /argmap should give a clean slate.
-const hashCode = location.hash.replace('#','').trim().toUpperCase();
+// A trailing "copy" (e.g. #ABC123copy) means: load this map's contents, but
+// don't bind to its code, so the first Save forks a brand-new, independent map.
+const rawHash = location.hash.replace('#','').trim();
+const hashIsCopy = /copy$/i.test(rawHash);
+const hashCode = (hashIsCopy ? rawHash.slice(0, -4) : rawHash).toUpperCase();
 if (hashCode.length===6) {
-  loadMap(hashCode);
+  loadMap(hashCode, { asCopy: hashIsCopy, announceMode: true });
 }
 </script>
 </body>
