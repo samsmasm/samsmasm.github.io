@@ -618,22 +618,7 @@ body {
 }
 
 /* ── Import modal ─────────────────────────────────────────────────────── */
-.import-tabs { display:flex; gap:4px; padding-bottom:10px; border-bottom:1px solid #f0ece5; }
-.import-tab {
-  font-size:10px; font-family:'Courier New',monospace; font-weight:700;
-  letter-spacing:.07em; text-transform:uppercase; padding:5px 12px;
-  border:1px solid transparent; border-radius:4px; background:transparent;
-  color:#aaa; cursor:pointer; transition:all .1s;
-}
-.import-tab.active { background:#f5f3ef; color:#333; border-color:#ddd; }
-.import-tab:hover:not(.active) { color:#666; }
 .import-desc { font-size:12px; color:#999; line-height:1.55; margin:0; }
-.import-prompt-pre {
-  background:#fafaf8; border:1px solid #e8e4dc; border-radius:4px;
-  padding:12px 14px; font-family:'Courier New',monospace; font-size:11px;
-  line-height:1.65; color:#555; white-space:pre; overflow:auto;
-  max-height:36vh; flex:1;
-}
 .import-json-ta {
   width:100%; border:1px solid #ddd; border-radius:4px; padding:10px 12px;
   font-family:'Courier New',monospace; font-size:11.5px; line-height:1.6;
@@ -680,7 +665,7 @@ body {
 <header class="app-header">
   <div class="app-logo">Argmap</div>
   <div class="header-rule"></div>
-  <div class="map-name" id="map-name" contenteditable="true" spellcheck="false">Should governments intervene in markets to correct market failures?</div>
+  <div class="map-name" id="map-name" contenteditable="true" spellcheck="false">New argument map</div>
   <div class="status-chip" id="status-chip">Draft</div>
 </header>
 
@@ -694,7 +679,6 @@ body {
       <button class="sp-btn" id="btn-load">Load</button>
       <button class="sp-btn" id="btn-share">Share</button>
       <button class="sp-btn" id="btn-my-maps" style="display:none">My Maps</button>
-      <button class="sp-btn" id="btn-import">Import</button>
       <button class="sp-btn" id="btn-export">Export</button>
       <button class="sp-btn" id="btn-print">Print</button>
     </div>
@@ -866,22 +850,13 @@ body {
 <!-- Import modal -->
 <div class="modal-backdrop" id="import-backdrop"></div>
 <div class="modal" id="import-modal">
-  <div class="modal-title">Import from AI</div>
-  <div class="import-tabs">
-    <button class="import-tab active" id="import-tab-btn-prompt">1 · Get prompt</button>
-    <button class="import-tab" id="import-tab-btn-json">2 · Paste JSON</button>
-  </div>
-  <div id="import-pane-prompt" style="display:flex;flex-direction:column;gap:10px">
-    <p class="import-desc">Copy this prompt, paste it into Claude or ChatGPT along with your text, then switch to tab 2 and paste the result.</p>
-    <pre class="import-prompt-pre" id="import-prompt-pre"></pre>
-  </div>
-  <div id="import-pane-json" style="display:none;flex-direction:column;gap:10px">
-    <p class="import-desc">Paste the JSON returned by the AI below.</p>
+  <div class="modal-title">Import map from JSON</div>
+  <div id="import-pane-json" style="display:flex;flex-direction:column;gap:10px">
+    <p class="import-desc">Paste a JSON argument map below.</p>
     <textarea class="import-json-ta" id="import-json-ta" placeholder='{"title":"...","nodes":[{"id":1,"type":"contention","text":"...","parentId":null}]}'></textarea>
   </div>
   <div class="modal-footer">
-    <button class="btn-cancel" id="btn-import-copy-prompt">Copy prompt</button>
-    <button class="btn-confirm" id="btn-import-confirm" style="display:none">Import map</button>
+    <button class="btn-confirm" id="btn-import-confirm">Import map</button>
     <button class="btn-cancel" id="btn-import-close">Close</button>
   </div>
 </div>
@@ -904,12 +879,12 @@ body {
     <div class="help-row"><div class="help-key">Tidy</div><div class="help-val">Auto-arranges the full tree neatly · dissolves any co-premise groups</div></div>
     <div class="help-row"><div class="help-key">Save</div><div class="help-val">Signed in: saves silently to My Maps · Guest: shows a 6-char code to bookmark or share</div></div>
     <div class="help-row"><div class="help-key">Share</div><div class="help-val">Gives two links: an <b>edit link</b> (they change your map) and a <b>copy link</b> (they get their own copy, your map stays untouched) · saves first if the map is new</div></div>
-    <div class="help-row"><div class="help-key">Import</div><div class="help-val">Copy the prompt, paste it with any text into an AI assistant, then paste the returned JSON to build a map automatically</div></div>
     <div class="help-row"><div class="help-key">Export</div><div class="help-val">Generates a structured plain-text outline — copy to clipboard or download as .md / .txt</div></div>
     <div class="help-row"><div class="help-key">Check</div><div class="help-val">Flags nodes with no evidence and objections with no rebuttal · summarises the top-level reasons for the contention</div></div>
     <div class="help-row"><div class="help-key">Print</div><div class="help-val">Fits the whole map to the page and opens the print / PDF dialog</div></div>
   </div>
   <div class="modal-footer">
+    <button class="btn-cancel" id="btn-import" style="margin-right:auto" title="Build a map from pasted JSON">Import JSON</button>
     <button class="btn-cancel" id="btn-help-close">Close</button>
   </div>
 </div>
@@ -2544,68 +2519,29 @@ tracked('btn-zoom-out','zoom_out'); tracked('btn-zoom-fit','zoom_fit');
 tracked('btn-help','help');
 
 // ── Import modal ──────────────────────────────────────────────────────
-const IMPORT_PROMPT =
-`Analyse the following text and extract its argument structure as JSON.
-
-Return ONLY valid JSON -- no explanation, no markdown code fences. Do not use em dashes in any text fields; use a plain hyphen or rewrite the phrase instead.
-
-Schema:
-{
-  "title": "short descriptive title",
-  "nodes": [
-    { "id": 1, "type": "contention", "text": "...", "parentId": null },
-    { "id": 2, "type": "reason",     "text": "...", "parentId": 1    }
-  ]
-}
-
-Node type rules:
-  contention — the central claim or thesis. Exactly one. parentId must be null.
-  reason     — supports its parent (a contention or another reason).
-  objection  — challenges its parent (a contention or reason).
-  rebuttal   — defends against its parent objection.
-  evidence   — empirical grounding for its parent. Add optional "source": "Author (Year) — title".
-
-Every node needs: id (unique integer), type, text (1–2 sentences), parentId (integer or null).
-
-Text to analyse:
-[PASTE YOUR TEXT HERE]`;
-
+// The AI prompt that generates this JSON is deliberately not shown in the app,
+// so students do their own reasoning. It is kept in argmap/import-prompt.md.
 const importModal       = document.getElementById('import-modal');
 const importBackdrop    = document.getElementById('import-backdrop');
-const importPromptPre   = document.getElementById('import-prompt-pre');
 const importJsonTa      = document.getElementById('import-json-ta');
-const importPanePrompt  = document.getElementById('import-pane-prompt');
-const importPaneJson    = document.getElementById('import-pane-json');
 const btnImportConfirm  = document.getElementById('btn-import-confirm');
-const btnImportCopyPr   = document.getElementById('btn-import-copy-prompt');
 
 function openImportModal() {
-  importPromptPre.textContent = IMPORT_PROMPT;
   importJsonTa.value = '';
-  switchImportTab('prompt');
   importModal.classList.add('visible');
   importBackdrop.classList.add('visible');
+  importJsonTa.focus();
 }
 function closeImportModal() {
   importModal.classList.remove('visible');
   importBackdrop.classList.remove('visible');
 }
-function switchImportTab(tab) {
-  const onPrompt = tab === 'prompt';
-  importPanePrompt.style.display = onPrompt ? 'flex' : 'none';
-  importPaneJson.style.display   = onPrompt ? 'none' : 'flex';
-  btnImportConfirm.style.display = onPrompt ? 'none' : '';
-  btnImportCopyPr.style.display  = onPrompt ? '' : 'none';
-  document.getElementById('import-tab-btn-prompt').classList.toggle('active', onPrompt);
-  document.getElementById('import-tab-btn-json').classList.toggle('active', !onPrompt);
-}
 
-document.getElementById('btn-import').addEventListener('click', openImportModal);
-document.getElementById('import-tab-btn-prompt').addEventListener('click', () => switchImportTab('prompt'));
-document.getElementById('import-tab-btn-json').addEventListener('click', () => switchImportTab('json'));
-btnImportCopyPr.addEventListener('click', () =>
-  navigator.clipboard.writeText(IMPORT_PROMPT).then(() => showToast('Prompt copied'))
-);
+document.getElementById('btn-import').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.remove('visible');
+  document.getElementById('help-backdrop').classList.remove('visible');
+  openImportModal();
+});
 document.getElementById('btn-import-close').addEventListener('click', closeImportModal);
 importBackdrop.addEventListener('click', closeImportModal);
 

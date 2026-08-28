@@ -10,7 +10,9 @@ Live at: `unisam.nz/argmap/` (also embedded at `/moa/argmap/`)
 
 ## File structure
 
-Single file: **`index.html`** (~2582 lines). All HTML, CSS, and JS in one file. No dependencies.
+The app is a single file: **`index.html`**. All HTML, CSS, and JS in one file. No dependencies.
+
+`import-prompt.md` sits alongside it but is **documentation only**, never loaded at runtime. See "Import" below.
 
 ---
 
@@ -70,9 +72,24 @@ Both link types are surfaced together in the Share modal (`#code-modal`), opened
 
 ---
 
+## Import
+
+Deliberately de-emphasised so students do their own reasoning rather than having an AI do it.
+
+- The Import button is **not** in the left panel. It sits at the bottom-left of the Help modal footer (`#btn-import`), and there is no Import row in the help grid.
+- The modal accepts pasted JSON only. The old two-tab "Get prompt / Paste JSON" UI and the `IMPORT_PROMPT` constant are gone from `index.html`, so the prompt is not in the page source students load.
+- The prompt text is preserved verbatim in `import-prompt.md`. Note this repo has a `.nojekyll` file, so that `.md` is still publicly reachable at `unisam.nz/argmap/import-prompt.md`; it is unlinked, not hidden.
+- To restore prompt visibility, recover the `IMPORT_PROMPT` const, the `.import-tabs` / `.import-tab` / `.import-prompt-pre` CSS, and the tab markup from git history (the commit before `import-prompt.md` was added).
+
+Do not re-add the prompt to the UI without explicit instruction.
+
+---
+
 ## Opening screen vs sample
 
-`INITIAL_NODES` (what a fresh page load shows) is just a blank contention + one reason. The full 7-node worked example lives in `SAMPLE_NODES` and only loads via the "Sample" button at the top of the Help modal (`loadSample()`).
+`INITIAL_NODES` (what a fresh page load shows) is just a blank contention + one reason, titled "New argument map". The full 7-node worked example lives in `SAMPLE_NODES` and only loads via the "Sample" button at the top of the Help modal (`loadSample()`), which retitles the map "Sample argument map".
+
+Keep the hardcoded `#map-name` text in the markup in sync with `INITIAL_NODES`. It previously still read as the sample's contention after the opening screen was blanked.
 
 ---
 
