@@ -61,6 +61,14 @@ Every push to `main` deploys via GitHub Pages. The repo root is the site root. S
 
 ---
 
+## Homepage index — planned future changes
+
+The homepage nav (`index.html`) currently exposes: This week, Economics (IBecon, Samples), Business (IBBM, RatIBro, Slop Study), Tools dropdown, Experiments, Old site. A sweep in August 2026 found ~46 top-level directories with a working `index.html` that are not linked from `index.html`, `/tools`, or `/experiments`. Outstanding decisions:
+
+- **Games and toys.** A large batch of small games sits unlinked (`amoeba`, `walker`, `racecar2`, `spiral`, `flyswat`, `ipmemory`, `cookiejar-v2.0`, `findtreasure`, `mousechase-v2`, `flippinghard`, `turnright`, `spin`, `fnl`, `wc26`, `copythisone`, and old duplicates like `catjumpold`, `fractions-classic`, `treethree*`). Sam needs to go through these and check which are still live and worth surfacing before any get added to `/experiments`. Do not bulk-link them.
+- **Unlinked teaching resources** also pending review: `quiz` (Talkonomics weekly quiz), `ibeconinequality`, `inflation`, `supplyanddemand`, `stocksimulator`, `printergoesbrrr`, `causation`/`causation2`, `coldwar`, `hippiesandspies`, `heresy`, `mymaths`, `ask-v1.0`, `marketinghub`, `samples` sub-pages, `wingeometer`, `typeit`, `reports`, `ibnews`, `fmwskills`, `moa`, `mortgage`.
+- **Private resources page.** Sam may add a password-protected page for personal, non-public tools — `sayso`, `moderntranslation`, and `tote` are the intended contents. These should stay off the public index until that page exists.
+
 ## What to avoid at the root level
 
 - Never use `git add -A` or `git add .` — too many generated files in `ibbm/`, `ibecon/`, `node_modules` etc.
