@@ -111,6 +111,35 @@ Both link types are surfaced together in the Share modal (`#code-modal`), opened
 
 ---
 
+## Local drafts and the unsaved chip
+
+Every edit is mirrored to localStorage. Firestore is still written **only on explicit Save**, so this costs no database quota. Continuous Firestore autosave was considered and rejected on write-volume grounds.
+
+- `markDirty()` is called from `pushUndo()` (covering all 11 structural mutations at once) plus the three that bypass it: node text, evidence source, and the map title.
+- `pushUndo()` runs *before* its mutation, which is safe here only because `markDirty()` merely schedules a debounced write that reads live state when it fires.
+- `markDirty()` is a hint, not a verdict. `flushDraft()` compares against `savedSnapshot` and resolves back to clean if nothing actually changed, so a mousedown without a drag does not leave the map looking dirty.
+- Draft key is `argmap_draft:{code|'new'}`. `purgeOldDrafts()` drops anything over 14 days on load.
+
+**The chip counts from the oldest unsaved change, not from the last save.** Reading a saved map for ten minutes without editing must never escalate, or the warning becomes noise and students learn to ignore it.
+
+| Unsaved for | Chip | Class |
+|---|---|---|
+| clean | `Draft` / `Saved` / `Loaded` / `Copy` | none |
+| under 2 min | `Unsaved · 1 min` | `dirty-1` |
+| 2 to 5 | `Unsaved · 3 min` | `dirty-2` |
+| 5 to 10 | `Unsaved · 7 min` | `dirty-3` |
+| 10+ | `Unsaved · 12 min` | `dirty-4` (brick red) |
+
+The ramp deepens warm tones rather than shifting hue, because green/orange/red are already Reason/Rebuttal/Objection in the node grammar. Only the final step is red, and it is `#a83b26`, distinct from objection `#ef5350`.
+
+Never write `status-chip.textContent` directly. Set `chipMode` and call `updateChip()`, or use `baselineState()` / `clearDraft()`, otherwise the timer gets clobbered.
+
+**Drafts are offered, never applied silently**, via `#restore-modal`. `baselineState()` clears the stored draft, so callers must read it with `readDraft()` *before* baselining. On a shared link the restore prompt is queued behind the share banner through `afterShareModeModal` rather than stacking on it.
+
+No `beforeunload` guard: with the local mirror in place, closing the tab no longer loses work, so the prompt would be friction without benefit.
+
+---
+
 ## Import
 
 Deliberately de-emphasised so students do their own reasoning rather than having an AI do it.

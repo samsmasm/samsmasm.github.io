@@ -66,7 +66,15 @@ body {
   font-size:10px; font-family:'Courier New',monospace; font-weight:700;
   letter-spacing:.1em; text-transform:uppercase; padding:3px 8px;
   border-radius:3px; background:#f0ece4; color:#999; white-space:nowrap;
+  transition:background .4s, color .4s;
 }
+/* Unsaved escalation. A warm ramp that deepens with time, deliberately kept
+   clear of the node-type hues (green/orange/red are Reason/Rebuttal/Objection)
+   until the final step, which is a brick red distinct from objection #ef5350. */
+.status-chip.dirty-1 { background:#efe9de; color:#8a8378; }
+.status-chip.dirty-2 { background:#f3e7d2; color:#8a7040; }
+.status-chip.dirty-3 { background:#f0dcba; color:#8a5f20; }
+.status-chip.dirty-4 { background:#f2d5cd; color:#a83b26; }
 /* ── Side panel ───────────────────────────────────────────────────────── */
 .side-panel {
   position:fixed; top:48px; left:0; bottom:0; width:180px;
@@ -826,6 +834,17 @@ body {
   </div>
 </div>
 
+<!-- Unsaved-draft recovery (offered on load, never applied silently) -->
+<div class="modal-backdrop" id="restore-backdrop"></div>
+<div class="modal" id="restore-modal" style="width:440px">
+  <div class="modal-title">Unsaved changes found</div>
+  <div class="share-mode-sub" id="restore-sub"></div>
+  <div class="modal-footer">
+    <button class="btn-cancel" id="btn-restore-discard">Discard</button>
+    <button class="btn-confirm" id="btn-restore-ok">Restore</button>
+  </div>
+</div>
+
 <!-- Share-mode banner (shown when opening a shared link) -->
 <div class="modal-backdrop" id="share-mode-backdrop"></div>
 <div class="modal" id="share-mode-modal">
@@ -1033,6 +1052,9 @@ function pushUndo() {
     coGroups: coGroups.map(cg => ({...cg, nodeIds:[...cg.nodeIds]})),
   });
   if (undoStack.length > MAX_UNDO) undoStack.shift();
+  // pushUndo runs BEFORE the mutation, but markDirty only schedules a debounced
+  // write that reads live state when it fires, so this still captures the result.
+  markDirty();
 }
 
 function rebuildAll() {
@@ -1107,6 +1129,122 @@ function showToast(msg, ms=2200) {
   setTimeout(() => toastEl.classList.remove('visible'), ms);
 }
 
+// ── Local draft + unsaved-changes chip ────────────────────────────────
+// Every edit is mirrored to localStorage so a crash or closed tab cannot lose
+// work. Firestore is still only written on an explicit Save, so this costs no
+// database quota. The chip counts from the OLDEST unsaved change, not from the
+// last save, so reading a saved map without editing never escalates.
+const DRAFT_PREFIX   = 'argmap_draft:';
+const DRAFT_DEBOUNCE = 800;
+const DRAFT_MAX_AGE  = 14 * 24 * 60 * 60 * 1000; // drop abandoned drafts after 14 days
+
+let chipMode        = 'Draft';  // Draft | Saved | Loaded | Copy
+let dirtySince      = null;     // ms timestamp of the oldest unsaved change
+let savedSnapshot   = '';       // serialised state as of the last save/load
+let draftTimer      = null;
+
+const statusChip = document.getElementById('status-chip');
+
+function draftKey() { return DRAFT_PREFIX + (currentCode || 'new'); }
+
+function serialiseState() {
+  return JSON.stringify({
+    nodes, coGroups,
+    title: document.getElementById('map-name').textContent.trim(),
+  });
+}
+
+// Called from every mutation. Only a hint: flushDraft() settles the truth by
+// comparing against the last saved snapshot, so a click that changes nothing
+// (e.g. mousedown without a drag) resolves back to clean.
+function markDirty() {
+  if (dirtySince === null) dirtySince = Date.now();
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(flushDraft, DRAFT_DEBOUNCE);
+  updateChip();
+}
+
+function flushDraft() {
+  const state = serialiseState();
+  if (state === savedSnapshot) { clearDraft(); return; }
+  try {
+    localStorage.setItem(draftKey(), JSON.stringify({
+      state, ts: Date.now(), code: currentCode,
+      title: document.getElementById('map-name').textContent.trim(),
+    }));
+  } catch (err) {
+    console.warn('Draft save failed', err); // quota or private mode; chip still warns
+  }
+  updateChip();
+}
+
+// Marks the current state as the reference point: nothing is unsaved right now.
+function baselineState() {
+  clearTimeout(draftTimer);
+  savedSnapshot = serialiseState();
+  dirtySince = null;
+  clearDraft();
+  updateChip();
+}
+
+function clearDraft() {
+  dirtySince = null;
+  try { localStorage.removeItem(draftKey()); } catch {}
+  updateChip();
+}
+
+function setChipMode(mode) { chipMode = mode; updateChip(); }
+
+function updateChip() {
+  if (!statusChip) return;
+  statusChip.classList.remove('dirty-1','dirty-2','dirty-3','dirty-4');
+  if (dirtySince === null) {
+    statusChip.textContent = chipMode;
+    statusChip.title = '';
+    return;
+  }
+  const mins = Math.floor((Date.now() - dirtySince) / 60000);
+  const level = mins >= 10 ? 4 : mins >= 5 ? 3 : mins >= 2 ? 2 : 1;
+  statusChip.classList.add('dirty-' + level);
+  statusChip.textContent = mins < 1 ? 'Unsaved' : 'Unsaved · ' + mins + ' min';
+  statusChip.title = 'Kept in this browser, but not saved to your maps yet. Click Save.';
+}
+// Whole minutes only, so a 20s tick is enough and it never reads as a countdown.
+setInterval(updateChip, 20000);
+
+function readDraft(code) {
+  try {
+    const raw = localStorage.getItem(DRAFT_PREFIX + (code || 'new'));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function purgeOldDrafts() {
+  try {
+    const cutoff = Date.now() - DRAFT_MAX_AGE;
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith(DRAFT_PREFIX)) continue;
+      let ts = 0;
+      try { ts = JSON.parse(localStorage.getItem(k)).ts || 0; } catch {}
+      if (ts < cutoff) localStorage.removeItem(k);
+    }
+  } catch {}
+}
+
+// Rebuilds the canvas from a serialised draft payload.
+function applyState(stateJson) {
+  const data = JSON.parse(stateJson);
+  undoStack.length = 0;
+  nodes.forEach(n => { elOf[n.id]?.remove(); delete elOf[n.id]; });
+  nodes = (data.nodes || []).map(n => ({...n}));
+  coGroups = (data.coGroups || []).map(cg => ({...cg, nodeIds:[...cg.nodeIds]}));
+  cgCounter = coGroups.reduce((m,cg)=>Math.max(m,parseInt(cg.id.replace('cg',''))||0),0)+1;
+  uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
+  if (data.title) document.getElementById('map-name').textContent = data.title;
+  nodes.forEach(buildNode);
+  requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+}
+
 function viewportCenter() {
   const r = viewport.getBoundingClientRect();
   return { x:(r.width/2-tx)/sc - 117, y:(r.height/2-ty)/sc - 40 };
@@ -1123,15 +1261,17 @@ function newMap() {
   uidCounter = 1;
   currentCode = null;
   location.hash = '';
+  clearDraft();
   localStorage.removeItem('argmap_code');
   document.getElementById('map-name').textContent = 'New argument map';
-  document.getElementById('status-chip').textContent = 'Draft';
+  chipMode = 'Draft';
   // Add a single blank contention centered on screen
   const {x, y} = viewportCenter();
   const contention = { id:'n0', type:'contention', parentId:null, text:'', source:'', x, y:SNAP_LEVELS[0] };
   nodes.push(contention);
   const el = buildNode(contention);
   drawConnectors();
+  baselineState();
   el.querySelector('.node-text')?.focus();
 }
 
@@ -1147,11 +1287,14 @@ function loadSample() {
   uidCounter = nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
   currentCode = null;
   location.hash = '';
+  clearDraft();
   localStorage.removeItem('argmap_code');
   document.getElementById('map-name').textContent = 'Sample argument map';
-  document.getElementById('status-chip').textContent = 'Draft';
+  chipMode = 'Draft';
   nodes.forEach(buildNode);
   requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+  // Demo content, not the student's work, so it starts clean and only nags once edited.
+  baselineState();
   document.getElementById('help-modal').classList.remove('visible');
   document.getElementById('help-backdrop').classList.remove('visible');
 }
@@ -1159,6 +1302,7 @@ document.getElementById('btn-load-sample').addEventListener('click', loadSample)
 
 // Map title editing
 const mapNameEl = document.getElementById('map-name');
+mapNameEl.addEventListener('input', markDirty);
 mapNameEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); mapNameEl.blur(); }
 });
@@ -1329,7 +1473,7 @@ function buildNode(node) {
     </div>`;
 
   const ta = el.querySelector('.node-text');
-  ta.addEventListener('input', () => { node.text=ta.value; autoResize(ta); computeDynamicLevels(); drawConnectors(); });
+  ta.addEventListener('input', () => { node.text=ta.value; autoResize(ta); computeDynamicLevels(); drawConnectors(); markDirty(); });
 
   const resizeHandle = el.querySelector('.node-resize');
   resizeHandle.addEventListener('mousedown', e => {
@@ -1340,7 +1484,7 @@ function buildNode(node) {
 
   if (isEv) {
     const si = el.querySelector('.source-input');
-    si.addEventListener('input', () => { node.source=si.value; });
+    si.addEventListener('input', () => { node.source=si.value; markDirty(); });
   }
 
   if (isIsland) {
@@ -2136,10 +2280,13 @@ async function saveMap() {
     await setDoc(doc(db,'argmap_maps',code), {
       nodes: nodes.map(n=>({...n})), coGroups, title, savedAt,
     });
+    // Clear the pre-save draft slot before currentCode changes the key.
+    clearDraft();
     currentCode=code;
     localStorage.setItem('argmap_code',code);
     location.hash='#'+code;
-    document.getElementById('status-chip').textContent='Saved';
+    chipMode = 'Saved';
+    baselineState();
     if (currentUser) {
       await setDoc(doc(db,'users',currentUser.uid,'maps',code), { title, savedAt, code });
       showToast('Saved to My Maps');
@@ -2183,17 +2330,27 @@ async function loadMap(code, opts={}) {
     if (asCopy) {
       // Not bound to the original's code, so the next Save forks a brand-new map.
       currentCode = null;
-      document.getElementById('status-chip').textContent = 'Copy';
+      chipMode = 'Copy';
     } else {
       currentCode = upper;
       localStorage.setItem('argmap_code',upper);
       location.hash='#'+upper;
-      document.getElementById('status-chip').textContent='Loaded';
+      chipMode = 'Loaded';
     }
     requestAnimationFrame(()=>requestAnimationFrame(drawConnectors));
+    // Read before baselining, which clears the stored draft.
+    const preDraft = asCopy ? null : readDraft(upper);
+    baselineState();
     closeLoadPanel();
-    if (announceMode) showShareModeModal(asCopy);
-    else showToast('Map loaded ('+upper+')');
+    // A newer local draft for this map means the last session ended without saving.
+    const offerDraft = preDraft ? () => offerDraftRestore(preDraft, data.savedAt) : null;
+    if (announceMode) {
+      afterShareModeModal = offerDraft;
+      showShareModeModal(asCopy);
+    } else {
+      showToast('Map loaded ('+upper+')');
+      if (offerDraft) offerDraft();
+    }
   } catch(err) {
     console.error(err); showToast('Load failed: '+err.message, 3500);
   }
@@ -2236,9 +2393,14 @@ codeBackdrop.addEventListener('click',()=>{
 });
 
 const shareModeBackdrop = document.getElementById('share-mode-backdrop');
+// Queued so a draft-restore prompt follows the share banner instead of stacking on it.
+let afterShareModeModal = null;
 function closeShareModeModal() {
   document.getElementById('share-mode-modal').classList.remove('visible');
   shareModeBackdrop.classList.remove('visible');
+  const next = afterShareModeModal;
+  afterShareModeModal = null;
+  if (next) next();
 }
 document.getElementById('btn-share-mode-ok').addEventListener('click', closeShareModeModal);
 shareModeBackdrop.addEventListener('click', closeShareModeModal);
@@ -2582,8 +2744,12 @@ function doImport(jsonText) {
 
   if (data.title) document.getElementById('map-name').textContent = data.title;
   currentCode = null; location.hash = '';
-  document.getElementById('status-chip').textContent = 'Draft';
+  chipMode = 'Draft';
   undoStack.length = 0; // fresh start after import
+  // Imported content is real work, so treat it as unsaved from now.
+  savedSnapshot = '';
+  dirtySince = Date.now();
+  markDirty();
 
   nodes.forEach(buildNode);
 
@@ -2637,8 +2803,72 @@ helpBackdrop.addEventListener('click', () => {
 const rawHash = location.hash.replace('#','').trim();
 const hashIsCopy = /copy$/i.test(rawHash);
 const hashCode = (hashIsCopy ? rawHash.slice(0, -4) : rawHash).toUpperCase();
+
+// ── Draft recovery ────────────────────────────────────────────────────
+// Drafts are offered, never applied silently: navigating to /argmap with no
+// hash should still give a clean slate unless the student opts in.
+const restoreModal    = document.getElementById('restore-modal');
+const restoreBackdrop = document.getElementById('restore-backdrop');
+let pendingDraft = null;
+
+function closeRestore() {
+  restoreModal.classList.remove('visible');
+  restoreBackdrop.classList.remove('visible');
+  pendingDraft = null;
+}
+function agoText(ts) {
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 1)  return 'less than a minute ago';
+  if (mins < 60) return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24)  return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+  const days = Math.round(hrs / 24);
+  return days + (days === 1 ? ' day ago' : ' days ago');
+}
+
+// Takes an already-read draft, because baselineState() clears the stored copy.
+function offerDraftRestore(draft, serverSavedAt) {
+  if (!draft || !draft.state) return;
+  // Nothing to offer if the draft matches what is already on screen.
+  if (draft.state === serialiseState()) { clearDraft(); return; }
+  // For a saved map, only offer a draft that is newer than the stored version.
+  if (serverSavedAt && draft.ts <= Date.parse(serverSavedAt)) return;
+  pendingDraft = draft;
+  document.getElementById('restore-sub').textContent =
+    'You have unsaved changes to "' + (draft.title || 'this map') + '" from ' +
+    agoText(draft.ts) + ', kept in this browser. Restore them, or discard and keep what is saved?';
+  restoreModal.classList.add('visible');
+  restoreBackdrop.classList.add('visible');
+}
+
+document.getElementById('btn-restore-ok').addEventListener('click', () => {
+  if (!pendingDraft) return closeRestore();
+  const { state, ts } = pendingDraft;
+  closeRestore();
+  try {
+    applyState(state);
+    savedSnapshot = '';            // restored work is by definition not saved yet
+    dirtySince = ts || Date.now();
+    markDirty();
+    showToast('Unsaved changes restored');
+  } catch (err) {
+    console.error(err); showToast('Could not restore draft', 3000);
+  }
+});
+document.getElementById('btn-restore-discard').addEventListener('click', () => {
+  clearDraft();
+  closeRestore();
+});
+
+purgeOldDrafts();
+
 if (hashCode.length===6) {
   loadMap(hashCode, { asCopy: hashIsCopy, announceMode: true });
+} else {
+  // Fresh page: read the draft before baselining, since that clears it.
+  const pre = readDraft(null);
+  baselineState();
+  offerDraftRestore(pre, null);
 }
 </script>
 </body>
