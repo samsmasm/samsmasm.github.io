@@ -184,8 +184,8 @@ function initSidebarExtras() {
     { label: '🎵 Music Playlists',  href: getBase() + 'music/',         ext: false },
     { label: '🎧 Gibbons',          href: getBase() + 'gibbons/',       ext: false },
     { label: '📖 Sign Guestbook',   href: getBase() + 'guestbook/',     ext: false },
-    { label: '🐱 Kitty Maze!',      href: 'https://www.unisam.nz/kittymaze',      ext: true },
-    { label: '🔮 Mandelbrot',       href: 'https://www.unisam.nz/mandelbrot-v2',  ext: true },
+    { label: '🐱 Kitty Maze!',      href: 'https://unisam.nz/kittymaze/',      ext: true },
+    { label: '🔮 Mandelbrot',       href: 'https://unisam.nz/mandelbrot-v2/',  ext: true },
     { label: '📺 \'90s internet',   href: 'https://www.youtube.com/watch?v=cH8ihSlc9s4', ext: true },
     { label: '🖥️ More \'90s internet', href: 'https://www.webdesignmuseum.org/exhibitions/web-design-in-the-90s', ext: true },
     { label: '⛷️ SkiFree',            href: 'https://archive.org/details/win3_SKIFREE',                         ext: true },
@@ -268,7 +268,7 @@ function initArgmap() {
   const clock = document.getElementById('taskbar-clock');
   if (!clock) return;
   const a = document.createElement('a');
-  a.href = 'https://www.unisam.nz/argmap';
+  a.href = 'https://unisam.nz/argmap/';
   a.textContent = 'ArgMap';
   a.className = 'taskbar-link taskbar-link-argmap';
   a.target = '_blank';
