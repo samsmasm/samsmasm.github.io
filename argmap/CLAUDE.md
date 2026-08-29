@@ -1,4 +1,4 @@
-# CLAUDE.md — Argument Mapper
+# CLAUDE.md: Argument Mapper
 
 ## What this is
 
@@ -19,14 +19,26 @@ The app is a single file: **`index.html`**. All HTML, CSS, and JS in one file. N
 ## Node types and colours
 
 ```
-Contention  — #5c6bc0 (indigo)
-Reason      — #43a047 (green)
-Objection   — #ef5350 (red)
-Rebuttal    — #fb8c00 (orange)
-Evidence    — #1e88e5 (blue)
+Contention  #5c6bc0 (indigo)
+Reason      #43a047 (green)
+Objection   #ef5350 (red)
+Rebuttal    #fb8c00 (orange)
+Evidence    #1e88e5 (blue)
+Draft       #c8c4bc (grey) - unclassified floating note
 ```
 
 Each type has a badge (small label) with a matching pastel background (`--badge-{type}-bg/fg`).
+
+`VALID_CHILDREN` governs what can hang off what, and drives the hover strip's buttons:
+
+```
+contention -> reason, objection
+reason     -> reason, objection, evidence
+objection  -> rebuttal, evidence
+rebuttal   -> evidence
+evidence   -> (nothing)
+draft      -> (nothing)
+```
 
 ---
 
@@ -34,18 +46,43 @@ Each type has a badge (small label) with a matching pastel background (`--badge-
 
 - Nodes are `div` elements positioned absolutely on a `#canvas` element that itself is transformed for panning/zooming.
 - Connections are SVG `<path>` elements drawn from parent node to child node.
-- Design tokens are defined as CSS custom properties at `:root` — node width, radius, colours, connector stroke.
+- Design tokens are defined as CSS custom properties at `:root`: node width, radius, colours, connector stroke.
 
 ---
 
 ## Key interactions
 
-- **Add node** — button per type, or keyboard shortcut
-- **Connect nodes** — drag from one node's connect handle to another
-- **Delete node** — select + delete key or button
-- **Pan** — drag the canvas background
-- **Zoom** — scroll wheel
-- **Save/Load** — serialise node positions and connections to JSON, store in localStorage or export
+- **Add child node**: hover a node, then click a coloured button in the hover strip below it. The strip only offers types allowed by `VALID_CHILDREN`. `+ Node` in the left panel opens the full add panel.
+- **Drafts**: `+ Draft` makes a floating unparented node. Click its `Connect ->` button to enter connection mode, then click a parent and pick a type. Connection is click-based, not drag.
+- **Change type**: click a node's type badge (any type except contention).
+- **Delete node**: the `x` button in the node header. There is no delete-key shortcut.
+- **Detach**: hover a connector, click the `-` button to make the child a floating island.
+- **Collapse**: `▾` in the node header hides the subtree below. The node keeps showing its own text; only descendants hide.
+- **Co-premises**: drag two siblings close together to snap them into an AND/OR group; drag apart to split.
+- **Resize node**: drag the right edge handle. Width is per node, default `--node-width` 234px.
+- **Pan**: drag blank canvas. **Zoom**: scroll wheel, or the zoom panel bottom-right.
+- **Keyboard**: only `Esc` (close panels / exit connection mode) and `Ctrl/Cmd+Z` (undo). No other shortcuts exist.
+- **Save/Load**: Firestore, not localStorage. See "Save / share model".
+
+Nodes snap to vertical bands (`SNAP_LEVELS`, recomputed into `dynamicLevels` so tall nodes push later levels down).
+
+---
+
+## Left panel
+
+```
+Map        New · Save · Load · Share · My Maps (signed in only) · Export · Print
+Edit       Undo · Tidy
+Build      + Node · + Draft
+Analyse    Check
+(no label) ? Help
+```
+
+Below the groups: Google sign-in button, or the signed-in user area with Sign out.
+
+**Import is deliberately absent here.** It lives at the bottom of the Help modal. See "Import".
+
+Other UI: `Sample` button in the Help modal title row, zoom panel bottom-right, status chip top-left (`Draft` / `Saved` / `Loaded` / `Copy`), editable `#map-name` title.
 
 ---
 
@@ -54,7 +91,9 @@ Each type has a badge (small label) with a matching pastel background (`--badge-
 - Single file. Do not split into multiple files.
 - Font: Georgia for node text (maintains academic register).
 - Canvas background: `#f5f3ef` (warm off-white).
-- Do not change node type colours or badge styles without explicit instruction — these are part of the visual grammar that students learn to read.
+- Do not change node type colours or badge styles without explicit instruction. These are part of the visual grammar that students learn to read.
+- No em dashes in any UI text, comments, or docs in this project.
+- The audience is students. Default to making AI-assistance features less prominent, not more.
 
 ---
 
@@ -93,6 +132,30 @@ Keep the hardcoded `#map-name` text in the markup in sync with `INITIAL_NODES`. 
 
 ---
 
+## Testing
+
+No test suite. Chrome is installed, so verify UI changes by driving the real page rather than eyeballing the diff:
+
+```bash
+cd argmap && python3 -m http.server 8731 &
+# copy index.html to a temp name, inject a <script type="module"> test block
+# before </body> that clicks things and writes results into a div, then:
+google-chrome --headless --no-sandbox --disable-gpu \
+  --virtual-time-budget=25000 --dump-dom http://localhost:8731/__t.html
+```
+
+Gotchas learned the hard way:
+- Stub `window.confirm=()=>true` in a plain `<script>` before the module, or `newMap()` / `loadSample()` silently abort.
+- Build the harness in a **separate .js file**, not `node -e "..."` inside double quotes. Bash expands `$VAR` inside the injected JS and you get a passing-looking test that actually ran on empty input.
+- Do not click **Share** or **Save** in a test. Both write real documents to production Firestore.
+- Grepping the dumped DOM for a string finds your own test script too. Check `index.html` itself.
+
+---
+
 ## Current status
 
 Working and stable. No known bugs.
+
+Verified in headless Chrome as of the import change: opening screen renders 2 blank nodes with a connector, Sample loads 7, collapse keeps the collapsed node's own text visible, Import accepts JSON and builds the map.
+
+Untested end to end: the Share button's Firestore round trip, because exercising it writes live data.
