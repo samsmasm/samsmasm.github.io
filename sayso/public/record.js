@@ -5,9 +5,9 @@
 // assembles one blob, and sends it. Audio stays in memory only until its
 // transcript returns (or is discarded on a fresh capture).
 
-import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=8";
-import * as store from "./store.js?v=8";
-import { addUsage } from "./cost.js?v=8";
+import { transcribeBlob, PROMPT_CONTEXT } from "./api.js?v=9";
+import * as store from "./store.js?v=9";
+import { addUsage } from "./cost.js?v=9";
 
 const recordBtn = document.getElementById("record-btn");
 const recordLabel = document.getElementById("record-label");

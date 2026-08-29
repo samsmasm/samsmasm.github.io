@@ -22,7 +22,9 @@
   (24h purge); "Multiple speakers" setting; distance-based swipe-to-send with
   drag/fly-away/grow-back animation; running **cost estimate** (audio time × rate,
   per model, persisted in localStorage, resettable); **session restore on reload**
-  (last session reopened from KV for the retention period).
+  (last session reopened from KV for the retention period); **Send to Tote**
+  button (pushes `fullText` as one note into the same Firebase Realtime DB that
+  `unisam.nz/tote` reads, matching the integration in `typeit/`).
 - **Known operational note:** the Worker runs at the Cloudflare edge nearest the
   user, so from an OpenAI-geo-blocked region transcription fails — the owner uses
   a **NZ VPN** to relocate the edge. No simple Worker egress-region pin exists.

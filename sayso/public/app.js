@@ -1,10 +1,10 @@
 // Bootstrap: auth gate, tab switching, settings, and wiring the two controllers.
 
-import { apiJson } from "./api.js?v=8";
-import * as store from "./store.js?v=8";
-import { initRecord, setMode } from "./record.js?v=8";
-import { initUpload } from "./upload.js?v=8";
-import { initCost } from "./cost.js?v=8";
+import { apiJson } from "./api.js?v=9";
+import * as store from "./store.js?v=9";
+import { initRecord, setMode } from "./record.js?v=9";
+import { initUpload } from "./upload.js?v=9";
+import { initCost } from "./cost.js?v=9";
 
 const loginEl = document.getElementById("login");
 const appEl = document.getElementById("app");
@@ -193,6 +193,38 @@ function setupTranscriptActions() {
       window.saysoToast("Copied full transcript.");
     } catch {
       window.saysoToast("Copy failed — select and copy manually.");
+    }
+  });
+
+  // Send to Tote — pushes the full transcript as one note into the shared
+  // Firebase Realtime DB that unisam.nz/tote reads (see the module in index.html).
+  const toteBtn = document.getElementById("send-tote");
+  const toteOpen = document.getElementById("tote-open");
+  toteBtn.addEventListener("click", async () => {
+    const text = store.getFullText();
+    if (!text) {
+      window.saysoToast("Nothing to send yet.");
+      return;
+    }
+    if (!window.saveToTote) {
+      window.saysoToast("Tote isn’t ready yet — try again in a second.");
+      return;
+    }
+    const label = toteBtn.textContent;
+    toteBtn.disabled = true;
+    toteBtn.textContent = "Sending…";
+    try {
+      await window.saveToTote(text);
+      toteBtn.textContent = "Sent ✓";
+      toteOpen.hidden = false;
+      window.saysoToast("Sent to Tote.");
+    } catch (err) {
+      window.saysoToast("Could not send to Tote: " + (err.message || err));
+    } finally {
+      setTimeout(() => {
+        toteBtn.textContent = label;
+        toteBtn.disabled = false;
+      }, 2500);
     }
   });
 
