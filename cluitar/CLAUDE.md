@@ -67,15 +67,48 @@ laptop does the right thing.
 
 The warm-up shown alongside it is hardcoded to the chromatic warm-up video.
 
+## Layout
+
+Two-pane app shell, built for a laptop about a metre away with a guitar in your
+lap: lesson index on the left, the selected lesson filling the right. `body` is
+`height:100%; overflow:hidden` and each pane scrolls independently, so the video
+never scrolls off while you are playing. Below 900px the shell stacks and the
+page scrolls normally.
+
+Base font size is 17px with a 30px lesson title — deliberately large for reading
+at distance. Do not shrink these back to phone sizes.
+
 ## Rendering
 
-`build()` constructs the DOM once and `refreshAll()` does **targeted** updates.
-Do not replace this with a full re-render on status change — that collapses any
-open video panel and throws away scroll position on every click, which is
-exactly what the phone use case can least afford.
+`renderDetail()` rebuilds the right pane and is called **only when the selection
+changes**. Status changes go through `refreshDetailStatus()`, which touches the
+toggle and the prerequisite line and nothing else.
 
-Notation renders lazily the first time an item's details are opened, guarded on
-`window.ABCJS` so a CDN failure degrades rather than throws.
+This split is the important one: rebuilding the pane on a status click would
+tear down and reload the YouTube iframes mid-playback. There is a regression test
+for it — mark an iframe with a data attribute, change status, confirm the
+attribute survives.
+
+For the same reason, marking the open lesson complete moves the "today"
+recommendation on in the sidebar but deliberately does **not** navigate the pane
+away from what you are watching.
+
+Notation renders on selection, guarded on `window.ABCJS` so a CDN failure
+degrades rather than throws.
+
+## Why external links open in a new tab
+
+They are not framed, and cannot be. Measured 2026-09-06, by response header and
+by actually framing each one in Chrome:
+
+- **Blocked** (`X-Frame-Options: SAMEORIGIN`): thisisclassicalguitar.com (10 of
+  the 16 links), justinguitar.com, fender.com
+- **Frameable**: classicalguitarcorner.com, richterguitar.com, gumroad.com
+
+12 of 16 links refuse to be framed, including every link to the main source, and
+a frame refusal cannot be reliably detected from JavaScript to fall back on. So
+links are plain links marked "Opens in a new tab". Do not add an in-page browser
+pane for them; it would be an empty box three times out of four.
 
 ## Design
 
