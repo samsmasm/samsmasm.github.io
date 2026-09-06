@@ -1,8 +1,8 @@
-# CLAUDE.md — cluitar (`/cluitar`)
+# CLAUDE.md: cluitar (`/cluitar`)
 
 ## What this is
 
-**Cluitar** — a single-page classical guitar practice path at `unisam.nz/cluitar`.
+**Cluitar** is a single-page classical guitar practice path at `unisam.nz/cluitar`.
 Personal tool, not a teaching resource. Sam has a cello background (reads treble
 and bass clef, knows a few open chords, no scale or technique training), so the
 curriculum assumes music literacy and sequences guitar-specific technique, first
@@ -13,19 +13,32 @@ to practise today, the way a teacher would choose the day's focus.
 
 ## Structure
 
-Everything is in `index.html` — no build step, no dependencies to install.
+Everything is in `index.html`. No build step, no dependencies to install.
 External runtime deps, all from CDN: abcjs 6.4.4 (notation), Firebase 10.12.0
 modular SDK (auth + Firestore).
 
 ## Data model
 
 Curriculum item:
-`{ id, title, desc, prereqs: [ids], videos: [{id,title}], links: [{url,label}], notation?, fingeringNote? }`
+`{ id, title, desc, prereqs: [ids], terms?, videos: [{id,title,mins,blurb}], links: [{url,label,blurb}], notation?, fingeringNote? }`
+
+`terms` is `[[term, meaning], ...]`, rendered as the **In plain words** box under
+the description. It exists because the lesson titles are full of jargon (`i-m
+alternation`, `tirando`, `first position`, `alberti bass`) that means nothing to
+someone who has not been taught guitar. Every term is defined at the first
+lesson that uses it. Two items (2.3, 2.4) legitimately have none; the box just
+does not render.
+
+Every video and every link carries a `blurb`: one or two sentences on what it
+actually is, so you can tell a 4-minute exercise from a 34-minute reference
+without opening it. `mins` is the video runtime, shown next to the title, and is
+part of the same purpose. **These were written from the actual pages and video
+descriptions, not from the titles.** If you add a resource, read it first.
 
 Progress: `{ [itemId]: { status, updatedAt } }` where status is
 `not_started | ongoing | complete` and `updatedAt` is **epoch milliseconds**.
 
-Deliberately a plain number, not a Firestore `serverTimestamp()` — a pending
+Deliberately a plain number, not a Firestore `serverTimestamp()`, because a pending
 server timestamp reads back as `null` in the local snapshot, which made every
 just-touched item look infinitely stale and yanked the recommendation onto it.
 
@@ -44,7 +57,7 @@ Two constraints drove that placement, and both matter if you ever move it:
    **no rules change in the console**.
 2. It must **not** go in `users/{uid}/progress/*`, even though the rules would
    allow it. Cultivar's `getProgressStats()` does an unfiltered `getDocs()` over
-   that whole subcollection and does `counts[level]++` on every doc it finds — a
+   that whole subcollection and does `counts[level]++` on every doc it finds, so a
    cluitar doc in there has no `level` and would corrupt cultivar's SRS stats.
 
 Cultivar only ever `updateDoc()`s named fields on the user doc, so it will never
@@ -75,7 +88,7 @@ lap: lesson index on the left, the selected lesson filling the right. `body` is
 never scrolls off while you are playing. Below 900px the shell stacks and the
 page scrolls normally.
 
-Base font size is 17px with a 30px lesson title — deliberately large for reading
+Base font size is 17px with a 30px lesson title, deliberately large for reading
 at distance. Do not shrink these back to phone sizes.
 
 ## Rendering
@@ -85,9 +98,12 @@ changes**. Status changes go through `refreshDetailStatus()`, which touches the
 toggle and the prerequisite line and nothing else.
 
 This split is the important one: rebuilding the pane on a status click would
-tear down and reload the YouTube iframes mid-playback. There is a regression test
-for it — mark an iframe with a data attribute, change status, confirm the
-attribute survives.
+tear down and reload the YouTube iframes mid-playback.
+
+There is no test file in the repo (nothing here has a test runner). The check is
+manual, run under puppeteer-core against a local server: select a lesson with a
+video, set `iframe.dataset.marker`, click a status button, confirm the marker
+survives. Worth re-running after any change to the render path.
 
 For the same reason, marking the open lesson complete moves the "today"
 recommendation on in the sidebar but deliberately does **not** navigate the pane
@@ -122,9 +138,8 @@ than buttons or pills, per the no-pills hard rule.
 
 ## Known gaps / next steps
 
-- **Curriculum stops at Step 3.** Steps 4+ from the original planning
-  (two-voice reading, slurs, arpeggios, first repertoire piece) are not built
-  into the data yet.
+- Steps 1 to 7 are built (39 items). Nothing beyond Step 7 is planned; finishing
+  a grade 1 piece from memory is the intended end of the path.
 - Two dead links were repointed at pages verified live 2026-09-06; the
   JustinGuitar and Fender links return 403 to scripted checks but are fine in a
   browser (bot blocking), so leave them.
@@ -144,12 +159,17 @@ lesson pages rather than by guessing IDs:
 | 1.3 | Right hand position and technique lesson | `RDOqubQd9Jo` |
 | 1.4 | Q&A: rest and free stroke | `vi42Tlb_9VU` |
 | 1.6 | Left hand position and technique | `HTjwvwCZmRo` |
-| 1.6 | The spider — left hand independence exercise | `RHfzegyFTmI` |
+| 1.6 | The spider: a left hand independence exercise | `RHfzegyFTmI` |
+
+The 19 videos in Steps 4 to 7 were added later, all checked live on 2026-09-06
+(watch page returns 200 and reports a `lengthSeconds`). They are all from the
+same source except 4.2, which is Gohar Vardanyan via Strings By Mail, embedded on
+Werner's own lesson page for that topic.
 
 The spider exercise restores the drill the original 1.6 video taught, and its
 lesson page (linked on the item) carries the notation for it.
 
-**To re-check these later**, hit the oEmbed endpoint — a 403 means private,
+**To re-check these later**, hit the oEmbed endpoint. A 403 means private,
 removed, or embedding disabled, all of which break the iframe:
 
 ```
@@ -159,6 +179,6 @@ curl -s "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=<ID>
 Do not guess YouTube IDs. A wrong 11-character ID resolves to some unrelated
 video rather than failing, so replacements must come from a page that embeds
 them or from a verified search result.
-- Notation is two hardcoded ABC snippets (`ex1`, `ex2`). More means more entries
-  in `notationExamples` keyed from the item's `notation` field.
+- Notation is five hardcoded ABC snippets (`ex1` to `ex5`). More means more
+  entries in `notationExamples` keyed from the item's `notation` field.
 - No pitch detection or listening feedback. Out of scope, much larger project.
