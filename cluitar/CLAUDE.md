@@ -92,13 +92,40 @@ than buttons or pills, per the no-pills hard rule.
 - **Curriculum stops at Step 3.** Steps 4+ from the original planning
   (two-voice reading, slurs, arpeggios, first repertoire piece) are not built
   into the data yet.
-- **Four videos were removed as dead** (2026-09-06). `yqwxHYBD8iY`,
-  `Ur_Xb_GcmaI`, `4bE7Ixb0lss` and `X7pU3Ctrv2E` all return 403 (private or
-  removed), so items 1.1, 1.2, 1.3, 1.4 and 1.6 currently have links but no
-  video. Replacements need finding by hand — do not guess YouTube IDs.
-- Two dead links were repointed at pages verified live on the same date; the
+- Two dead links were repointed at pages verified live 2026-09-06; the
   JustinGuitar and Fender links return 403 to scripted checks but are fine in a
   browser (bot blocking), so leave them.
+
+## Video provenance
+
+Four IDs went private or were removed (`yqwxHYBD8iY`, `Ur_Xb_GcmaI`,
+`4bE7Ixb0lss`, `X7pU3Ctrv2E`) and were replaced on 2026-09-06. Every replacement
+came from **This is Classical Guitar** (Bradford Werner), the same source the
+text links already point at, found by scraping the YouTube embeds out of his
+lesson pages rather than by guessing IDs:
+
+| Item | Video | ID |
+|---|---|---|
+| 1.1 | Classical guitar position: how to sit, hold, position | `dYC9awwT_YQ` |
+| 1.2 | 6 common technique problems solved with a better position | `U-ZV_3rsyiw` |
+| 1.3 | Right hand position and technique lesson | `RDOqubQd9Jo` |
+| 1.4 | Q&A: rest and free stroke | `vi42Tlb_9VU` |
+| 1.6 | Left hand position and technique | `HTjwvwCZmRo` |
+| 1.6 | The spider — left hand independence exercise | `RHfzegyFTmI` |
+
+The spider exercise restores the drill the original 1.6 video taught, and its
+lesson page (linked on the item) carries the notation for it.
+
+**To re-check these later**, hit the oEmbed endpoint — a 403 means private,
+removed, or embedding disabled, all of which break the iframe:
+
+```
+curl -s "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=<ID>&format=json"
+```
+
+Do not guess YouTube IDs. A wrong 11-character ID resolves to some unrelated
+video rather than failing, so replacements must come from a page that embeds
+them or from a verified search result.
 - Notation is two hardcoded ABC snippets (`ex1`, `ex2`). More means more entries
   in `notationExamples` keyed from the item's `notation` field.
 - No pitch detection or listening feedback. Out of scope, much larger project.
