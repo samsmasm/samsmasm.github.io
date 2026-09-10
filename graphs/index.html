@@ -59,19 +59,35 @@
   header .spacer { flex: 1; }
   header button {
     font-family: var(--sans);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     background: #fff;
     color: var(--text);
     border: none;
-    padding: 6px 14px;
-    border-radius: var(--radius);
+    padding: 4px 10px;
+    border-radius: 4px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    white-space: nowrap;
   }
   header button:hover { background: #e8e6e0; }
+  header button.ghost {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+  }
+  header button.ghost:hover { background: rgba(255,255,255,0.28); }
+  .header-actions { display: flex; align-items: center; gap: 6px; }
+  #header-user {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(255,255,255,0.75);
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .app { display: flex; flex: 1; overflow: hidden; }
 
@@ -391,8 +407,13 @@
   <span class="tag">v1.9</span>
   <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
   <div class="spacer"></div>
-  <button onclick="downloadJPG(1)">⬇ Standard JPG</button>
-  <button onclick="downloadJPG(2)">⬇ High-res JPG</button>
+  <div class="header-actions">
+    <button onclick="openSaveModal()">Save / Load</button>
+    <button onclick="downloadJPG(1)">⬇ JPG</button>
+    <button onclick="downloadJPG(2)">⬇ Hi-res</button>
+    <span id="header-user"></span>
+    <button id="header-auth-btn" class="ghost" onclick="driveSignIn()">Sign in</button>
+  </div>
 </header>
 
 <div class="app">
@@ -521,19 +542,6 @@
       <button class="action-btn danger" onclick="clearAll()">Reset everything</button>
     </div>
 
-    <div class="section-head" style="margin-top:4px">Save / Load</div>
-    <div class="props-form">
-      <button class="action-btn secondary" onclick="openSaveModal()">Save / Load diagram</button>
-      <div style="font-size:12px;color:var(--text);font-family:var(--sans);line-height:1.5">Copy a code to save your diagram, paste it back to restore it later.</div>
-    </div>
-
-    <div class="section-head" style="margin-top:4px">Export</div>
-    <div class="props-form">
-      <button class="action-btn primary" onclick="downloadJPG(1)">Download JPG (standard)</button>
-      <div style="font-size:11px;color:var(--text);font-family:var(--sans);line-height:1.4;margin-bottom:6px">680×560px</div>
-      <button class="action-btn primary" onclick="downloadJPG(2)">Download JPG (high-res)</button>
-      <div style="font-size:11px;color:var(--text);font-family:var(--sans);line-height:1.4">1360×1120px</div>
-    </div>
   </div>
 </div>
 
@@ -720,6 +728,7 @@ function init() {
   canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keyup', onKeyUp);
   initStrokeDefaults();
+  driveRefreshUI();
 }
 
 // Dashed and dotted lines are nearly always annotation rather than curves, so
@@ -787,7 +796,7 @@ const TEMPLATES = {
       mkLine(0.4975, 0.4625, 0.4975, 1.0, '#aaa', 1.5, '5,4', ''),
       // P* and Q* axis labels
       mkText(0.4975, 1.02, 'Q*'),
-      mkText(-0.07, 0.4625, 'P*'),
+      mkText(-0.07, 0.4625, 'P'),
     ]
   },
   adas: {
@@ -809,7 +818,7 @@ const TEMPLATES = {
       mkLine(0, 0.4793, 0.5012, 0.4793, '#aaa', 1.5, '5,4', ''),
       mkLine(0.5012, 0.4793, 0.5012, 1.0, '#aaa', 1.5, '5,4', ''),
       mkText(0.5012, 1.02, 'Yfe'),
-      mkText(-0.07, 0.4793, 'PL*'),
+      mkText(-0.07, 0.4793, 'PL'),
     ]
   },
   keyn: {
@@ -1795,7 +1804,7 @@ function onMouseDown(e) {
     drawRegionPreview();
     ctx.restore();
   } else if (state.tool === 'equil') {
-    const pLbl = prompt('P* label (leave blank to skip):', 'P*');
+    const pLbl = prompt('Price label (leave blank to skip):', 'P');
     if (pLbl === null) return;
     const qLbl = prompt('Q* label (leave blank to skip):', 'Q*');
     if (qLbl === null) return;
@@ -2714,11 +2723,27 @@ async function driveTrash(id, name) {
 }
 
 function driveRefreshUI() {
+  const signedIn = driveSignedIn();
+
+  // Header button, which exists whether or not the modal is open.
+  const hBtn = document.getElementById('header-auth-btn');
+  const hUser = document.getElementById('header-user');
+  if (hBtn) {
+    if (!driveEnabled()) {
+      hBtn.style.display = 'none';
+      if (hUser) hUser.textContent = '';
+    } else {
+      hBtn.style.display = '';
+      hBtn.textContent = signedIn ? 'Sign out' : 'Sign in';
+      hBtn.onclick = signedIn ? driveSignOut : driveSignIn;
+      if (hUser) hUser.textContent = signedIn ? driveUser : '';
+    }
+  }
+
   const box = document.getElementById('drive-box');
   if (!box) return;
   if (!driveEnabled()) { box.style.display = 'none'; return; }
   box.style.display = '';
-  const signedIn = driveSignedIn();
   document.getElementById('drive-signed-in').style.display = signedIn ? '' : 'none';
   document.getElementById('drive-who').textContent = signedIn ? driveUser : 'Save diagrams to your own Google Drive';
   const btn = document.getElementById('drive-auth-btn');
