@@ -35,7 +35,8 @@ Served from `unisam.nz/ibecon/graphs/<name>.svg` (Astro copies `public/` as-is a
 - **decrease-in-price--movement-along-the-supply-curve.svg** — price falls → quantity supplied falls.
 - **increase-in-price--movement-along-the-supply-curve.svg** — price rises → quantity supplied rises.
 - **shift-in-demand.svg** — whole demand curve shifts (D₁ → D₂) with new equilibrium; non-price determinant change.
-- **shift-in-supply.svg** — whole supply curve shifts (S₁ → S₂) with new equilibrium.
+- **shift-in-supply.svg** — whole supply curve shifts (S₁ → S₂) on its own. No demand curve and no equilibrium: use it only to show what a non-price determinant does to the curve.
+- **increase-in-supply-new-equilibrium.svg** — the full adjustment story: D plus S₁ → S₂, original equilibrium P₁/Q₁ and new equilibrium P₂/Q₂ both marked with dashed reference lines, and the surplus at the original price P₁ marked in red across to S₂. Drawn to carry the 2.3 model answer on an increase in supply.
 
 ## Elasticity & revenue
 
