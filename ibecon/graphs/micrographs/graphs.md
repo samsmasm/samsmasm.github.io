@@ -66,14 +66,18 @@ Axis label is "Price / Cost / Benefit".
 - **subsidy.svg** — subsidy shifts supply down to dashed **S + subsidy**. Producers receive `Pp`, consumers pay `Pc`, quantity rises `Qe`→`Qs`. **Subsidy cost** box (teal) = subsidy × Qs; red **DWL** triangle (overprovision).
 - **tax-incidence-elasticity.svg** — two panels, same specific tax. Left = inelastic demand (consumer-burden box blue is large, producer-burden amber thin); right = elastic demand (reversed). `Pc`/`Pe`/`Pp`, `Qt` marked. Shows who bears the tax depends on PED. Canvas 960×560.
 
-## Price controls
+## Price and quantity controls
 
-Binding control line drawn in purple `#7D3C98`. Each comes in a basic and a welfare version.
+Binding control line drawn in purple `#7D3C98`. The price controls each come in a basic and a
+welfare version. Welfare versions share one convention: consumer surplus blue `#2E86C1`,
+producer surplus amber `#E67E22`, DWL red `#C0392B`, all at ~0.2 fill-opacity, drawn before
+the axes and curves so the lines sit on top.
 
 - **price-ceiling.svg** — ceiling `Pc` set **below** Pe. At Pc: `Qs` (supply, short side) < `Qd` (demand). Double-arrow under the axis labels the **Shortage** between Qs and Qd.
 - **price-floor.svg** — floor `Pf` set **above** Pe. At Pf: `Qd` (short side) < `Qs`. Double-arrow labels the **Surplus** (excess supply) between Qd and Qs.
 - **price-ceiling-welfare.svg** — traded quantity = Qs (= `Q₁`). Consumer surplus blue (now includes the transfer rectangle taken from producers), producer surplus amber, red **DWL** triangle between Q₁ and Qe. Title "Price ceiling: welfare effects".
 - **price-floor-welfare.svg** — traded quantity = Qd (= `Q₁`). Producer surplus amber (gains the transfer rectangle from consumers), consumer surplus blue, red **DWL** triangle between Q₁ and Qe.
+- **quota-welfare.svg** — a **quantity** control, not a price one: purple vertical line at `Q₁`, left of Qe, capping the quantity traded. Price rises to `P₁`, the demand price at Q₁. Consumer surplus blue (shrunk to the triangle above P₁), producer surplus amber (the trapezoid below P₁ and above supply up to Q₁, which absorbs the quota rent transferred from consumers), red **DWL** triangle between Q₁ and Qe. Same geometry as `price-floor-welfare.svg`, deliberately: a price floor and a quota that restrict quantity to the same Q₁ split welfare identically, and the pair can be shown side by side to make that point. Dots mark the demand price and the supply price at Q₁.
 
 ## Not yet drawn (candidates)
 
