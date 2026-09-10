@@ -152,6 +152,8 @@ Three-column flex layout: left sidebar → `.canvas-wrap` → right panel.
 - **Mouse coords use `W / r.width`, not `canvas.width / r.width`**: using canvas.width would give pixel coords (0–1360), but all code expects logical coords (0–680).
 - **`renderCurveList()` is not called automatically**: you must call it whenever regions are mutated or their labels change.
 - **Line label positions**: vertical lines get labels at the top by default. The exception is YFE-style labels — use `mkText(xn, 1.05, label)` to place below the x-axis instead.
+- **Property-panel text inputs must use `oninput` + `updatePropLive()`, never `onchange`**: `onchange` fires on blur, but clicking the canvas calls `renderProps()`, which replaces `form.innerHTML` and destroys the focused input before blur fires, silently discarding the edit. `updatePropLive()` collapses a run of keystrokes on one field into a single undo entry, reset by `renderProps()`.
+- **Template equilibria must be computed, not eyeballed**: dotted projection lines, axis labels and the LRAS position all have to sit on the true intersection of the curves, or they visibly miss. Solve the line pair algebraically and paste the exact values rather than estimating them.
 - **`saveUndo()` before every mutation**: undo/redo depends on this being called before `state.elements` or `state.curves` is changed.
 
 ---

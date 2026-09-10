@@ -719,6 +719,21 @@ function init() {
   document.addEventListener('keydown', onKeyDown);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keyup', onKeyUp);
+  initStrokeDefaults();
+}
+
+// Dashed and dotted lines are nearly always annotation rather than curves, so
+// default them to Thin to match the templates. Once the student picks a weight
+// themselves we stop overriding it.
+function initStrokeDefaults() {
+  const weightSel = document.getElementById('stroke-weight');
+  const dashSel = document.getElementById('stroke-dash');
+  let weightChosen = false;
+  weightSel.addEventListener('change', () => { weightChosen = true; });
+  dashSel.addEventListener('change', () => {
+    if (weightChosen) return;
+    weightSel.value = dashSel.value ? '1.5' : '2.5';
+  });
 }
 
 function buildColorRow() {
@@ -767,12 +782,12 @@ const TEMPLATES = {
       mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D'),
       // Supply: bottom-left to top-right
       mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S'),
-      // Equilibrium dotted lines ~intersection at (0.48, 0.46)
-      mkLine(0, 0.47, 0.49, 0.47, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.49, 0.47, 0.49, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Equilibrium dotted lines at the exact D x S intersection
+      mkLine(0, 0.4625, 0.4975, 0.4625, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.4975, 0.4625, 0.4975, 1.0, '#aaa', 1.5, '5,4', ''),
       // P* and Q* axis labels
-      mkText(0.49, 1.02, 'Q*'),
-      mkText(-0.07, 0.47, 'P*'),
+      mkText(0.4975, 1.02, 'Q*'),
+      mkText(-0.07, 0.4625, 'P*'),
     ]
   },
   adas: {
@@ -788,13 +803,13 @@ const TEMPLATES = {
       mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD'),
       // SRAS: upward sloping
       mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS'),
-      // LRAS: vertical at ~0.52
-      mkLine(0.52, 0.0, 0.52, 1.0, COLORS[1], 2.5, '', 'LRAS'),
-      // Dotted to axes from equilibrium ~(0.52, 0.47)
-      mkLine(0, 0.48, 0.52, 0.48, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.52, 0.48, 0.52, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.52, 1.02, 'Yfe'),
-      mkText(-0.07, 0.48, 'PL*'),
+      // LRAS: vertical through the AD x SRAS intersection
+      mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS'),
+      // Dotted to axes from the exact equilibrium
+      mkLine(0, 0.4793, 0.5012, 0.4793, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5012, 0.4793, 0.5012, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.5012, 1.02, 'Yfe'),
+      mkText(-0.07, 0.4793, 'PL*'),
     ]
   },
   keyn: {
@@ -837,16 +852,16 @@ const TEMPLATES = {
       mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
       // MSC above MPC (parallel, shifted up)
       mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC'),
-      // Market eq ~(0.5, 0.48)
-      mkLine(0, 0.48, 0.50, 0.48, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.50, 0.48, 0.50, 1.0, '#aaa', 1.5, '5,4', ''),
-      // Social optimum ~(0.38, 0.38)
-      mkLine(0, 0.39, 0.38, 0.39, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.38, 0.39, 0.38, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.50, 1.02, 'Qm'),
-      mkText(0.38, 1.02, 'Qs'),
-      mkText(-0.07, 0.48, 'Pm'),
-      mkText(-0.07, 0.39, 'Ps'),
+      // Market eq: exact D x MPC intersection
+      mkLine(0, 0.4805, 0.5005, 0.4805, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5005, 0.4805, 0.5005, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Social optimum: exact D x MSC intersection
+      mkLine(0, 0.3844, 0.3996, 0.3844, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.3996, 0.3844, 0.3996, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.5005, 1.02, 'Qm'),
+      mkText(0.3996, 1.02, 'Qs'),
+      mkText(-0.07, 0.4805, 'Pm'),
+      mkText(-0.07, 0.3844, 'Ps'),
     ]
   },
   ext_pos: {
@@ -862,16 +877,16 @@ const TEMPLATES = {
       mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
       // MSB shifted right of MPB
       mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB'),
-      // Market eq ~(0.5, 0.48)
-      mkLine(0, 0.48, 0.50, 0.48, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.50, 0.48, 0.50, 1.0, '#aaa', 1.5, '5,4', ''),
-      // Social opt ~(0.63, 0.37)
-      mkLine(0, 0.38, 0.62, 0.38, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.62, 0.38, 0.62, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.50, 1.02, 'Qm'),
-      mkText(0.62, 1.02, 'Qs'),
-      mkText(-0.07, 0.48, 'Pm'),
-      mkText(-0.07, 0.38, 'Ps'),
+      // Market eq: exact MPB x MPC intersection
+      mkLine(0, 0.4805, 0.5005, 0.4805, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5005, 0.4805, 0.5005, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Social optimum: exact MSB x MPC intersection
+      mkLine(0, 0.4133, 0.5713, 0.4133, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5713, 0.4133, 0.5713, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.5005, 1.02, 'Qm'),
+      mkText(0.5713, 1.02, 'Qs'),
+      mkText(-0.07, 0.4805, 'Pm'),
+      mkText(-0.07, 0.4133, 'Ps'),
     ]
   }
 };
@@ -2188,6 +2203,7 @@ function removeCurve(i) {
 
 // ─── PROPS PANEL ─────────────────────────────────────────────
 function renderProps() {
+  liveEditKey = null;
   const form = document.getElementById('props-form');
   const el = state.elements.find(e => e.id === state.selectedId);
   if (!el) {
@@ -2200,7 +2216,7 @@ function renderProps() {
     html += `<div class="prop-row">
       <label>Label</label>
       <input type="text" value="${el.label||''}" maxlength="20" placeholder="e.g. Consumer surplus"
-        onchange="updateProp('label',this.value)">
+        oninput="updatePropLive('label',this.value)">
     </div>`;
     if (bwMode) {
       html += `<div class="prop-row">
@@ -2242,11 +2258,11 @@ function renderProps() {
   } else if (el.type === 'dot') {
     html += `<div class="prop-row">
       <label>P* label</label>
-      <input type="text" value="${el.pLabel||''}" maxlength="10" onchange="updateProp('pLabel',this.value)">
+      <input type="text" value="${el.pLabel||''}" maxlength="10" oninput="updatePropLive('pLabel',this.value)">
     </div>
     <div class="prop-row">
       <label>Q* label</label>
-      <input type="text" value="${el.qLabel||''}" maxlength="10" onchange="updateProp('qLabel',this.value)">
+      <input type="text" value="${el.qLabel||''}" maxlength="10" oninput="updatePropLive('qLabel',this.value)">
     </div>
     <div class="prop-row">
       <label>Color</label>
@@ -2255,7 +2271,7 @@ function renderProps() {
   } else if (el.type !== 'text') {
     html += `<div class="prop-row">
       <label>Label</label>
-      <input type="text" value="${el.label || ''}" maxlength="16" onchange="updateProp('label', this.value)">
+      <input type="text" value="${el.label || ''}" maxlength="16" oninput="updatePropLive('label', this.value)">
     </div>
     <div class="prop-row">
       <label>Color</label>
@@ -2280,7 +2296,7 @@ function renderProps() {
   } else {
     html += `<div class="prop-row">
       <label>Text</label>
-      <input type="text" value="${el.text || ''}" maxlength="20" onchange="updateProp('text', this.value)">
+      <input type="text" value="${el.text || ''}" maxlength="20" oninput="updatePropLive('text', this.value)">
     </div>`;
   }
 
@@ -2293,6 +2309,20 @@ function renderProps() {
   html += `<button class="action-btn secondary" style="margin-top:4px" onclick="duplicateSelected()">Duplicate</button>`;
   html += `<button class="action-btn danger" style="margin-top:4px" onclick="deleteSelected()">Delete element</button>`;
   form.innerHTML = html;
+}
+
+// Text inputs commit on every keystroke: an `onchange` handler loses the edit
+// when clicking the canvas rebuilds the form before the blur event fires.
+// All keystrokes on one field collapse into a single undo entry.
+let liveEditKey = null;
+function updatePropLive(key, value) {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  const sig = el.id + ':' + key;
+  if (liveEditKey !== sig) { saveUndo(); liveEditKey = sig; }
+  el[key] = value;
+  if (key === 'label' || key === 'fillColor') renderCurveList();
+  redraw();
 }
 
 function updateProp(key, value) {
