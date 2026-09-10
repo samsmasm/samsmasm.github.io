@@ -16,11 +16,15 @@ Single file: **`index.html`** (~1880 lines). All HTML, CSS, and JS in one file. 
 
 ## Colour scheme
 
-Economics teal (distinct from the main site's green — this tool has its own colour identity):
-- `--teal: #0D5C57`
-- `--teal-dark: #094843`
+Economics teal. This is the **same** palette as the main IBecon site at `/ibecon/`
+(`ibecon-src/src/styles/global.css`), not a contrasting one, so the two read as siblings:
+- `--teal: #0D5C57`      (main site `--navy`)
+- `--teal-dark: #094843` (main site `--navy-dark`)
+- `--teal-mid: #14746F`  (main site `--blue`)
 - `--teal-light: #A7E8E4`
 - `--teal-pale: #E8F8F7`
+
+Keep them in step: if the main site's teal changes, change these to match.
 
 ---
 

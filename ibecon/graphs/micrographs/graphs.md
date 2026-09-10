@@ -4,7 +4,7 @@ Hand-authored SVG teaching diagrams in this folder. All share one house style so
 can be dropped into IBecon pages without redrawing. This file documents what each graph
 shows and its key labels, so future edits/usage need not open the image.
 
-Served from `unisam.nz/ibecon/graphs/<name>.svg` (Astro copies `public/` as-is at build).
+Served from `unisam.nz/ibecon/graphs/micrographs/<name>.svg` (Astro copies `public/` as-is at build).
 
 ## Shared style
 
