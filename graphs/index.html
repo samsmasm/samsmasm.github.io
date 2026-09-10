@@ -2484,6 +2484,12 @@ function driveRequestToken(silent) {
     if (!driveInitClient()) return reject(new Error('Google sign-in is still loading. Try again in a moment.'));
     driveTokenClient.callback = (resp) => {
       if (resp.error) return reject(new Error(resp.error_description || resp.error));
+      // Google lets users untick individual permissions, so confirm Drive was actually granted.
+      const need = 'https://www.googleapis.com/auth/drive.file';
+      if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(resp, need)) {
+        try { localStorage.removeItem('sw_drive_granted'); } catch(e) {}
+        return reject(new Error('Please leave the Google Drive permission ticked, or diagrams cannot be saved.'));
+      }
       driveToken = { access_token: resp.access_token, expires_at: Date.now() + ((resp.expires_in || 3600) - 60) * 1000 };
       try { localStorage.setItem('sw_drive_granted', '1'); } catch(e) {}
       resolve(driveToken);
@@ -2504,11 +2510,23 @@ async function driveApi(url, opts) {
     const t = await driveEnsureToken();
     const headers = Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t.access_token });
     const r = await fetch(url, Object.assign({}, opts, { headers }));
+    if (r.ok) return r;
     if (r.status === 401 && attempt === 0) { driveToken = null; continue; }
-    if (!r.ok) throw new Error('Drive error ' + r.status);
-    return r;
+    let detail = '';
+    try {
+      const body = await r.clone().json();
+      detail = (body.error && (body.error.message || body.error.error_description)) || '';
+    } catch(e) {}
+    console.error('[ShiftWork] Drive ' + r.status + ' on ' + url.split('?')[0] + ': ' + (detail || '(no detail)'));
+    // A scope-related 403 means the stored grant is missing drive.file: force a fresh consent screen.
+    if (r.status === 403 && attempt === 0 && /insufficient|scope|permission/i.test(detail)) {
+      driveToken = null;
+      try { localStorage.removeItem('sw_drive_granted'); } catch(e) {}
+      continue;
+    }
+    throw new Error(detail ? 'Drive: ' + detail : 'Drive error ' + r.status);
   }
-  throw new Error('Drive authorisation failed.');
+  throw new Error('Drive authorisation failed. Try Sign out, then sign in again.');
 }
 
 async function driveGetFolder() {
