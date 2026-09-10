@@ -3,7 +3,7 @@
 ## What this is
 A single self-contained HTML/CSS/JS file (`index.html`) that lets IB Economics students draw diagrams and export them as JPG. No build step, no dependencies, no separate CSS or JS files. Everything lives in `index.html`. Keep it that way.
 
-Current version: **v1.7** (tag shown in the header UI, line ~365).
+Current version: **v1.9** (tag shown in the header UI, in the `<header>` block).
 
 ## File structure
 ```
@@ -156,6 +156,28 @@ Three-column flex layout: left sidebar → `.canvas-wrap` → right panel.
 
 ---
 
+## Saving
+
+Two paths, both serialising the same object via `currentGraphData()` / `applyGraphData(data)`. Always go through these two helpers when adding a save target, rather than duplicating the field list.
+
+1. **Save code** (original): base64 of the JSON, copied out of a textarea in the save modal.
+2. **Google Drive** (v1.9): signs the student in with Google Identity Services and stores one JSON file per diagram in a `ShiftWork Diagrams` folder in *their own* Drive.
+
+### Drive implementation notes
+
+Config constants sit at the top of the Drive block: `GOOGLE_CLIENT_ID` (empty by default) and `GOOGLE_HOSTED_DOMAIN`. **When `GOOGLE_CLIENT_ID` is empty the whole Drive panel hides itself** and the app behaves exactly as v1.8 did, so the file is safe to ship unconfigured.
+
+- Scope is `openid email profile .../auth/drive.file`. All three are **non-sensitive**, so this needs only basic OAuth verification, not the sensitive-scope review. Do not widen to `drive` or `drive.readonly`, which are restricted and would trigger a security assessment.
+- `drive.file` only ever sees files this app created, so the folder lookup query reliably finds our own folder and nothing else in the student's Drive is visible to the app.
+- Uses the GIS **token model** (`initTokenClient`), not the ID-token/One Tap model. Tokens last ~1 hour; `driveEnsureToken()` refreshes silently using the `sw_drive_granted` localStorage flag to decide between `prompt:''` and `prompt:'consent'`.
+- `driveApi()` wraps fetch, attaching the bearer token and retrying once on a 401 after clearing the token.
+- Create uses a multipart upload; update uses `uploadType=media` PATCH; delete sets `trashed:true` rather than hard-deleting, so students can recover work from their Drive bin.
+- `GOOGLE_HOSTED_DOMAIN` maps to the `hosted_domain` param, which filters the account chooser only. It is **not** a security control. It does not need to be, because each student's data lives in their own Drive under their own credentials, so there is no shared store to protect.
+
+Deployment origins must be registered as Authorised JavaScript origins on the OAuth client: both `https://samsmasm.github.io` and `https://unisam.nz`.
+
+---
+
 ## Current status
 
-Working at v1.7. Actively used for IB Economics diagrams. No known bugs or planned features.
+Working at v1.9. Actively used for IB Economics diagrams. Drive sync is code-complete but **untested end to end** until a `GOOGLE_CLIENT_ID` is filled in.

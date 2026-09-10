@@ -352,6 +352,28 @@
   .modal-colors { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
   .modal-col { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; }
   .modal-col.active { border-color: var(--text); }
+  /* GOOGLE DRIVE */
+  #save-modal .modal { width: 420px; }
+  .drive-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 14px; background: var(--tag-bg); }
+  .drive-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .drive-who { font-size: 11px; font-family: var(--mono); color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drive-list { max-height: 190px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+  .drive-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-bottom: 1px solid var(--border2); cursor: pointer; font-size: 12px; }
+  .drive-item:last-child { border-bottom: none; }
+  .drive-item:hover { background: var(--tag-bg); }
+  .drive-item.current { background: #e8f0fa; }
+  .drive-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drive-date { font-family: var(--mono); font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .drive-del { opacity: 0; border: none; background: none; cursor: pointer; color: var(--accent2); font-size: 14px; padding: 0 2px; flex-shrink: 0; }
+  .drive-item:hover .drive-del { opacity: 1; }
+  .drive-empty { padding: 14px 10px; font-size: 12px; color: var(--muted); text-align: center; }
+  .drive-msg { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-top: 8px; min-height: 14px; }
+  .drive-msg.err { color: var(--accent2); }
+  .drive-btn { font-family: var(--sans); font-size: 12px; font-weight: 500; padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+  .drive-btn:hover { background: var(--border2); }
+  .drive-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .drive-btn.primary:hover { background: #143d72; }
+  .drive-btn:disabled { opacity: 0.5; cursor: default; }
   .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
   .modal-actions button { flex: 1; padding: 8px; font-family: var(--sans); font-size: 12px; font-weight: 600; border-radius: var(--radius); border: none; cursor: pointer; }
   .btn-confirm { background: var(--accent); color: #fff; }
@@ -359,13 +381,14 @@
   .btn-cancel { background: var(--tag-bg); color: var(--text); border: 1px solid var(--border); }
   .btn-cancel:hover { background: var(--border2); }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
 <header>
   <h1>ShiftWork</h1>
   <span style="font-family:var(--sans);font-size:13px;color:var(--text);opacity:0.7;margin-left:2px;margin-right:8px">economics graph maker</span>
-  <span class="tag">v1.8</span>
+  <span class="tag">v1.9</span>
   <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
   <div class="spacer"></div>
   <button onclick="downloadJPG(1)">⬇ Standard JPG</button>
@@ -537,9 +560,30 @@
 <div class="modal-overlay" id="save-modal">
   <div class="modal">
     <h2>Save / Load diagram</h2>
+
+    <div class="drive-box" id="drive-box">
+      <div class="drive-head">
+        <strong style="font-size:12px">Google Drive</strong>
+        <span class="drive-who" id="drive-who"></span>
+        <button class="drive-btn" id="drive-auth-btn" onclick="driveSignIn()">Sign in</button>
+      </div>
+      <div id="drive-signed-in" style="display:none">
+        <div class="field" style="margin-bottom:8px">
+          <label>Diagram name</label>
+          <input type="text" id="drive-name" placeholder="e.g. Negative externality" maxlength="60">
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <button class="drive-btn primary" style="flex:1" id="drive-save-btn" onclick="driveSave(false)">Save</button>
+          <button class="drive-btn" style="flex:1" onclick="driveSave(true)">Save as new</button>
+        </div>
+        <div class="drive-list" id="drive-list"></div>
+      </div>
+      <div class="drive-msg" id="drive-msg"></div>
+    </div>
+
     <div class="field">
-      <label>Copy this code to save · paste it back to restore</label>
-      <textarea id="save-code" rows="5" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;background:var(--tag-bg);border:1px solid var(--border);border-radius:4px;padding:8px;color:var(--text);margin-top:4px"></textarea>
+      <label>Or copy this code to save · paste it back to restore</label>
+      <textarea id="save-code" rows="4" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;background:var(--tag-bg);border:1px solid var(--border);border-radius:4px;padding:8px;color:var(--text);margin-top:4px"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="document.getElementById('save-modal').classList.remove('open')">Close</button>
@@ -2392,17 +2436,301 @@ function clearAll() {
   redraw();
 }
 
+
+// ─── GOOGLE DRIVE ────────────────────────────────────────────
+// SETUP: paste your OAuth client ID from Google Cloud Console below.
+// Leave it empty and the Drive panel simply hides itself.
+const GOOGLE_CLIENT_ID = '';
+// Optional: restrict the account chooser to one Workspace domain, e.g. 'myschool.school.nz'.
+// This is a convenience filter, not a security control. Leave '' to allow any Google account.
+const GOOGLE_HOSTED_DOMAIN = '';
+
+const DRIVE_SCOPES = 'openid email profile https://www.googleapis.com/auth/drive.file';
+const DRIVE_FOLDER = 'ShiftWork Diagrams';
+const DRIVE_EXT = '.shiftwork.json';
+
+let driveToken = null;        // { access_token, expires_at }
+let driveTokenClient = null;
+let driveFolderId = null;
+let driveCurrentFile = null;  // { id, name } currently open
+let driveUser = '';
+
+function driveEnabled() { return !!GOOGLE_CLIENT_ID; }
+
+function driveMsg(text, isErr) {
+  const el = document.getElementById('drive-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('err', !!isErr);
+}
+
+function driveGranted() {
+  try { return localStorage.getItem('sw_drive_granted') === '1'; } catch(e) { return false; }
+}
+
+function driveInitClient() {
+  if (driveTokenClient) return true;
+  if (!driveEnabled()) return false;
+  if (!window.google || !google.accounts || !google.accounts.oauth2) return false;
+  const cfg = { client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPES, callback: () => {} };
+  if (GOOGLE_HOSTED_DOMAIN) cfg.hosted_domain = GOOGLE_HOSTED_DOMAIN;
+  driveTokenClient = google.accounts.oauth2.initTokenClient(cfg);
+  return true;
+}
+
+// Requests an access token. `silent` reuses an existing grant without a popup.
+function driveRequestToken(silent) {
+  return new Promise((resolve, reject) => {
+    if (!driveInitClient()) return reject(new Error('Google sign-in is still loading. Try again in a moment.'));
+    driveTokenClient.callback = (resp) => {
+      if (resp.error) return reject(new Error(resp.error_description || resp.error));
+      driveToken = { access_token: resp.access_token, expires_at: Date.now() + ((resp.expires_in || 3600) - 60) * 1000 };
+      try { localStorage.setItem('sw_drive_granted', '1'); } catch(e) {}
+      resolve(driveToken);
+    };
+    driveTokenClient.error_callback = (err) => reject(new Error((err && err.type) === 'popup_closed' ? 'Sign-in cancelled.' : 'Sign-in failed.'));
+    driveTokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
+  });
+}
+
+async function driveEnsureToken() {
+  if (driveToken && Date.now() < driveToken.expires_at) return driveToken;
+  return driveRequestToken(driveGranted());
+}
+
+async function driveApi(url, opts) {
+  opts = opts || {};
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const t = await driveEnsureToken();
+    const headers = Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t.access_token });
+    const r = await fetch(url, Object.assign({}, opts, { headers }));
+    if (r.status === 401 && attempt === 0) { driveToken = null; continue; }
+    if (!r.ok) throw new Error('Drive error ' + r.status);
+    return r;
+  }
+  throw new Error('Drive authorisation failed.');
+}
+
+async function driveGetFolder() {
+  if (driveFolderId) return driveFolderId;
+  const q = encodeURIComponent("name='" + DRIVE_FOLDER + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const r = await driveApi('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id)&pageSize=1');
+  const d = await r.json();
+  if (d.files && d.files.length) { driveFolderId = d.files[0].id; return driveFolderId; }
+  const c = await driveApi('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FOLDER, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  driveFolderId = (await c.json()).id;
+  return driveFolderId;
+}
+
+async function driveSignIn() {
+  if (!driveEnabled()) return;
+  driveMsg('Signing in…');
+  try {
+    await driveRequestToken(driveGranted());
+    try {
+      const r = await driveApi('https://www.googleapis.com/oauth2/v3/userinfo');
+      driveUser = (await r.json()).email || '';
+    } catch(e) { driveUser = ''; }
+    driveMsg('');
+    await driveLoadList();
+  } catch(e) {
+    driveMsg(e.message, true);
+  }
+  driveRefreshUI();
+}
+
+function driveSignOut() {
+  if (driveToken && window.google && google.accounts && google.accounts.oauth2) {
+    try { google.accounts.oauth2.revoke(driveToken.access_token, () => {}); } catch(e) {}
+  }
+  driveToken = null; driveUser = ''; driveFolderId = null; driveCurrentFile = null;
+  try { localStorage.removeItem('sw_drive_granted'); } catch(e) {}
+  driveMsg('');
+  driveRefreshUI();
+}
+
+function driveSignedIn() { return !!(driveToken && Date.now() < driveToken.expires_at); }
+
+async function driveLoadList() {
+  const folder = await driveGetFolder();
+  const q = encodeURIComponent("'" + folder + "' in parents and trashed=false");
+  const order = encodeURIComponent('modifiedTime desc');
+  const r = await driveApi('https://www.googleapis.com/drive/v3/files?q=' + q +
+    '&fields=' + encodeURIComponent('files(id,name,modifiedTime)') + '&orderBy=' + order + '&pageSize=200');
+  const files = (await r.json()).files || [];
+  driveRenderList(files);
+}
+
+function driveRenderList(files) {
+  const box = document.getElementById('drive-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!files.length) {
+    box.innerHTML = '<div class="drive-empty">No saved diagrams yet.</div>';
+    return;
+  }
+  files.forEach(f => {
+    const name = f.name.endsWith(DRIVE_EXT) ? f.name.slice(0, -DRIVE_EXT.length) : f.name;
+    const row = document.createElement('div');
+    row.className = 'drive-item' + (driveCurrentFile && driveCurrentFile.id === f.id ? ' current' : '');
+    const d = new Date(f.modifiedTime);
+    const label = document.createElement('div');
+    label.className = 'drive-name';
+    label.textContent = name;
+    const date = document.createElement('div');
+    date.className = 'drive-date';
+    date.textContent = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const del = document.createElement('button');
+    del.className = 'drive-del';
+    del.title = 'Move to Drive bin';
+    del.textContent = '×';
+    del.onclick = (ev) => { ev.stopPropagation(); driveTrash(f.id, name); };
+    row.onclick = () => driveOpen(f.id, name);
+    row.appendChild(label); row.appendChild(date); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+async function driveOpen(id, name) {
+  driveMsg('Opening…');
+  try {
+    const r = await driveApi('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
+    const data = await r.json();
+    saveUndo();
+    applyGraphData(data);
+    driveCurrentFile = { id, name };
+    document.getElementById('drive-name').value = name;
+    driveMsg('Opened “' + name + '”.');
+    document.getElementById('save-modal').classList.remove('open');
+  } catch(e) {
+    driveMsg('Could not open that diagram.', true);
+  }
+}
+
+async function driveSave(asNew) {
+  const input = document.getElementById('drive-name');
+  let name = (input.value || '').trim();
+  if (!name) name = state.title || 'Untitled diagram';
+  name = name.replace(/[\\/]/g, '-');
+  input.value = name;
+  driveMsg('Saving…');
+  const body = JSON.stringify(currentGraphData(), null, 2);
+  try {
+    if (!asNew && driveCurrentFile) {
+      await driveApi('https://www.googleapis.com/upload/drive/v3/files/' + driveCurrentFile.id + '?uploadType=media',
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body });
+      if (name !== driveCurrentFile.name) {
+        await driveApi('https://www.googleapis.com/drive/v3/files/' + driveCurrentFile.id,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name + DRIVE_EXT }) });
+        driveCurrentFile.name = name;
+      }
+    } else {
+      const folder = await driveGetFolder();
+      const boundary = 'swb' + Math.random().toString(36).slice(2);
+      const meta = { name: name + DRIVE_EXT, parents: [folder], mimeType: 'application/json' };
+      const multipart =
+        '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n' +
+        '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + body + '\r\n' +
+        '--' + boundary + '--';
+      const r = await driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+        body: multipart
+      });
+      const f = await r.json();
+      driveCurrentFile = { id: f.id, name };
+    }
+    driveMsg('Saved to Drive at ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + '.');
+    await driveLoadList();
+  } catch(e) {
+    driveMsg('Could not save. Check your connection and try again.', true);
+  }
+}
+
+async function driveTrash(id, name) {
+  if (!confirm('Move “' + name + '” to your Drive bin?')) return;
+  driveMsg('Deleting…');
+  try {
+    await driveApi('https://www.googleapis.com/drive/v3/files/' + id,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+    if (driveCurrentFile && driveCurrentFile.id === id) driveCurrentFile = null;
+    driveMsg('Moved to your Drive bin.');
+    await driveLoadList();
+  } catch(e) {
+    driveMsg('Could not delete that diagram.', true);
+  }
+}
+
+function driveRefreshUI() {
+  const box = document.getElementById('drive-box');
+  if (!box) return;
+  if (!driveEnabled()) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const signedIn = driveSignedIn();
+  document.getElementById('drive-signed-in').style.display = signedIn ? '' : 'none';
+  document.getElementById('drive-who').textContent = signedIn ? driveUser : 'Save diagrams to your own Google Drive';
+  const btn = document.getElementById('drive-auth-btn');
+  btn.textContent = signedIn ? 'Sign out' : 'Sign in';
+  btn.onclick = signedIn ? driveSignOut : driveSignIn;
+  const saveBtn = document.getElementById('drive-save-btn');
+  if (saveBtn) saveBtn.textContent = driveCurrentFile ? 'Save' : 'Save to Drive';
+  if (signedIn) {
+    const input = document.getElementById('drive-name');
+    if (!input.value) input.value = driveCurrentFile ? driveCurrentFile.name : (state.title || '');
+  }
+}
+
+// Restore a previous grant silently so returning students land signed in.
+window.addEventListener('load', () => {
+  if (!driveEnabled() || !driveGranted()) return;
+  setTimeout(() => {
+    driveRequestToken(true)
+      .then(async () => {
+        try {
+          const r = await driveApi('https://www.googleapis.com/oauth2/v3/userinfo');
+          driveUser = (await r.json()).email || '';
+        } catch(e) {}
+        driveRefreshUI();
+      })
+      .catch(() => {});
+  }, 600);
+});
+
 // ─── DOWNLOAD ────────────────────────────────────────────────
-function openSaveModal() {
-  const data = {
+function currentGraphData() {
+  return {
     title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
     curves: state.curves, elements: state.elements,
     xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
     yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
   };
-  document.getElementById('save-code').value = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+}
+
+function applyGraphData(data) {
+  state.elements = data.elements || [];
+  state.curves = data.curves || [];
+  state.title = data.title || '';
+  state.yLabel = data.yLabel || 'Price ($/unit)';
+  state.xLabel = data.xLabel || 'Quantity (units/week)';
+  state.xLabelDx = data.xLabelDx || 0; state.xLabelDy = data.xLabelDy || 0;
+  state.yLabelDx = data.yLabelDx || 0; state.yLabelDy = data.yLabelDy || 0;
+  const maxId = state.elements.reduce((m, e) => Math.max(m, e.id || 0), 0);
+  nextId = maxId + 1;
+  document.getElementById('graph-title').value = state.title;
+  document.getElementById('y-label').value = state.yLabel;
+  document.getElementById('x-label').value = state.xLabel;
+  state.selectedId = null;
+  renderCurveList(); renderProps(); redraw();
+}
+
+function openSaveModal() {
+  document.getElementById('save-code').value = btoa(unescape(encodeURIComponent(JSON.stringify(currentGraphData()))));
   document.getElementById('save-modal').classList.add('open');
-  setTimeout(() => { document.getElementById('save-code').select(); }, 50);
+  driveRefreshUI();
 }
 
 function copySaveCode(btn) {
@@ -2417,21 +2745,9 @@ function copySaveCode(btn) {
 function loadFromSaveModal() {
   const str = document.getElementById('save-code').value.trim();
   try {
-    const data = JSON.parse(decodeURIComponent(escape(atob(str))));
-    state.elements = data.elements || [];
-    state.curves = data.curves || [];
-    state.title = data.title || '';
-    state.yLabel = data.yLabel || 'Price ($/unit)';
-    state.xLabel = data.xLabel || 'Quantity (units/week)';
-    state.xLabelDx = data.xLabelDx || 0; state.xLabelDy = data.xLabelDy || 0;
-    state.yLabelDx = data.yLabelDx || 0; state.yLabelDy = data.yLabelDy || 0;
-    const maxId = state.elements.reduce((m, e) => Math.max(m, e.id || 0), 0);
-    nextId = maxId + 1;
-    document.getElementById('graph-title').value = state.title;
-    document.getElementById('y-label').value = state.yLabel;
-    document.getElementById('x-label').value = state.xLabel;
-    state.selectedId = null;
-    renderCurveList(); renderProps(); redraw();
+    saveUndo();
+    applyGraphData(JSON.parse(decodeURIComponent(escape(atob(str)))));
+    driveCurrentFile = null;
     document.getElementById('save-modal').classList.remove('open');
   } catch(e) {
     alert('Could not load: please paste the complete save code without any changes.');
