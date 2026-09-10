@@ -176,6 +176,8 @@ Config constants sit at the top of the Drive block: `GOOGLE_CLIENT_ID` (empty by
 
 Deployment origins must be registered as Authorised JavaScript origins on the OAuth client: both `https://samsmasm.github.io` and `https://unisam.nz`.
 
+Because every scope used is non-sensitive, an **External** consent screen published to **Production** needs no verification, shows no "unverified app" warning, has no user cap, and does not require a privacy policy URL. The unverified-app warning is triggered only by sensitive or restricted scopes. The 100-user cap applies only to Testing publishing status, so remember to hit Publish.
+
 ---
 
 ## Current status
