@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talkonomics &mdash; 13 September 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;
+  --surface:#fff;
+  --border:#111;
+  --text:#111;
+  --muted:#4a4540;
+  --light:#7a7268;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',system-ui,sans-serif}
+/* Slides */
+#slides{height:100vh;position:relative}
+.slide{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg);
+}
+.slide.active{display:flex}
+/* Category accent */
+.slide-top{
+  background:var(--cat-bg,#f0f5ff);
+  border-bottom:2px solid var(--cat-border,#b6cff5);
+  padding:0.55rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.category-badge{
+  font-family:'Inter',sans-serif;
+  font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--cat-fg,#1a3a7a);
+}
+.q-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.7rem;font-weight:600;
+  color:var(--cat-fg,#1a3a7a);
+  opacity:0.7;
+}
+/* Slide body */
+.slide-body{
+  flex:1;overflow-y:auto;
+  padding:2rem 2.5rem 1rem;
+  display:flex;flex-direction:column;
+  gap:1.4rem;
+  max-width:900px;width:100%;margin:0 auto;
+}
+/* Title slide */
+.title-body{
+  align-items:center;justify-content:center;text-align:center;
+  gap:1rem;
+  background:
+    radial-gradient(ellipse at 15% 50%, #ffd6e7 0%, transparent 50%),
+    radial-gradient(ellipse at 35% 20%, #d6f0ff 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 80%, #e8d6ff 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 30%, #d6ffe8 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 70%, #fff3d6 0%, transparent 40%),
+    #fff;
+}
+.title-wordmark{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(2.4rem,6vw,4.5rem);
+  font-weight:900;
+  color:var(--text);
+  line-height:1;
+}
+.title-tagline{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.85rem,2vw,1.1rem);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.18em;
+  color:var(--light);
+}
+.title-date{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1rem,2.5vw,1.5rem);
+  color:var(--muted);
+  font-style:italic;
+}
+.title-meta{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;
+  color:var(--light);
+  letter-spacing:0.04em;
+}
+/* Question */
+.question-text{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(1.1rem,2.8vw,1.55rem);
+  line-height:1.45;
+  color:var(--text);
+  font-weight:700;
+}
+/* Options */
+.options{display:flex;flex-direction:column;gap:0.65rem}
+.option{
+  display:flex;align-items:flex-start;gap:0.9rem;
+  background:var(--surface);
+  border:1.5px solid #ddd7cc;
+  border-radius:6px;
+  padding:0.75rem 1rem;
+  transition:background 0.2s,border-color 0.2s,opacity 0.25s;
+  cursor:default;
+}
+.option-letter{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--light);
+  flex-shrink:0;
+  margin-top:0.1rem;
+  min-width:1.1rem;
+}
+.option-text{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.9rem,2vw,1.05rem);
+  line-height:1.45;
+  color:var(--text);
+}
+/* Revealed state */
+.slide.revealed .option.correct{
+  background:#d6f5e8;
+  border-color:#145c34;
+}
+.slide.revealed .option.correct .option-letter{color:#145c34}
+.slide.revealed .option:not(.correct){opacity:0.32}
+.slide.revealed .explanation{display:block}
+.slide.revealed .btn-reveal{display:none}
+/* Explanation */
+.explanation{
+  display:none;
+  background:#f0f5ff;
+  border:1.5px solid #b6cff5;
+  border-radius:6px;
+  padding:0.9rem 1.1rem;
+}
+.explanation p{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(0.82rem,1.8vw,0.95rem);
+  line-height:1.6;
+  color:#1a3a7a;
+  font-style:italic;
+}
+/* Nav bar */
+.slide-nav{
+  flex-shrink:0;
+  border-top:1px solid #ddd7cc;
+  background:var(--surface);
+  padding:0.65rem 1.4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0.75rem;
+}
+.slide-counter{
+  font-family:'Inter',sans-serif;
+  font-size:0.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--light);
+}
+/* Buttons */
+.btn-nav{
+  font-family:'Inter',sans-serif;
+  font-size:0.75rem;font-weight:600;
+  color:#1a3a7a;
+  background:none;border:1.5px solid #b6cff5;
+  border-radius:4px;padding:0.4rem 0.9rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s,border-color 0.12s;
+}
+.btn-nav:hover{background:#f0f5ff;border-color:#1a3a7a}
+.btn-reveal{
+  font-family:'Inter',sans-serif;
+  font-size:0.78rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;border:none;
+  border-radius:4px;padding:0.45rem 1.2rem;
+  cursor:pointer;letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-reveal:hover{background:#2a4a9a}
+.btn-primary{
+  font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;
+  color:#fff;
+  background:#1a3a7a;
+  border:none;border-radius:4px;
+  padding:0.6rem 1.6rem;
+  cursor:pointer;text-decoration:none;
+  display:inline-block;
+  letter-spacing:0.04em;
+  transition:background 0.12s;
+}
+.btn-primary:hover{background:#2a4a9a}
+/* Mode buttons on title slide */
+.mode-buttons{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}
+.btn-mode{
+  background:var(--surface);
+  border:2px solid #b6cff5;border-radius:8px;
+  padding:0.9rem 1.4rem;cursor:pointer;text-align:center;
+  min-width:190px;transition:border-color 0.15s,background 0.15s;
+}
+.btn-mode:hover{border-color:#1a3a7a;background:#f0f5ff}
+.btn-mode-title{display:block;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:700;color:#1a3a7a;margin-bottom:0.3rem}
+.btn-mode-desc{display:block;font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--light);line-height:1.4}
+/* Hide reveal button in at-end mode on question slides */
+body[data-mode="atend"] .q-slide .btn-reveal{display:none}
+/* Print */
+@media print{
+  html,body{overflow:visible;height:auto}
+  #slides{height:auto;position:static}
+  .slide{position:static;display:flex!important;page-break-before:always;min-height:100vh}
+  .slide:first-child{page-break-before:avoid}
+  .slide-nav{display:none}
+  .btn-reveal{display:none!important}
+  .slide.revealed .option{opacity:1!important}
+  .explanation{display:block!important}
+}
+</style>
+</head>
+<body>
+<div id="slides">
+
+  <div class="slide active" id="slide-0">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">Graphs are boring. Econ isn&#8217;t.</div>
+      <div class="title-date">Weekly Quiz &mdash; 13 September 2026</div>
+      <div class="title-meta">10 questions &nbsp;&middot;&nbsp; Business &nbsp;&middot;&nbsp; Economics &nbsp;&middot;&nbsp; General Knowledge</div>
+      <div class="mode-buttons">
+        <button class="btn-mode" onclick="selectMode('asgo')">
+          <span class="btn-mode-title">Answers as we go</span>
+          <span class="btn-mode-desc">Reveal each answer before moving on</span>
+        </button>
+        <button class="btn-mode" onclick="selectMode('atend')">
+          <span class="btn-mode-title">Answers at the end</span>
+          <span class="btn-mode-desc">All 10 questions first, then all answers</span>
+        </button>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <span></span>
+      <span class="slide-counter">Talkonomics</span>
+      <span></span>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Macy&#x27;s has had a rough few years, closing stores and fighting off the image of a retailer in terminal decline. But this month it surprised Wall Street. What did Macy&#x27;s just announce?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">It raised its full-year profit guidance despite a weak broader retail environment</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">It reported a loss but announced a major store reopening programme</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">It was acquired by a private equity firm at a premium to its share price</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Macy&#x27;s raised its full-year guidance after posting strong fiscal second-quarter results. That is notable because most of its retail peers are struggling — making Macy&#x27;s turnaround look like a genuine exception, not a sector-wide bounce. It suggests targeted store investment and a loyalty programme overhaul may actually be working.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US grocery stores are rapidly rolling out electronic shelf labels — the digital price tags that update automatically. A recent AFL-CIO report warns this technology has a hidden downside beyond the obvious job losses. What is it?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The labels can be hacked to display false prices at the checkout</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">They enable &#x27;surveillance pricing&#x27;, where stores charge different customers different prices in real time</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">They require so much electricity that they increase store running costs significantly</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The report warns that electronic shelf labels make &#x27;surveillance pricing&#x27; — adjusting prices dynamically based on who is shopping and when — far easier for retailers to implement. Combined with the potential loss of tens of thousands of shelf-stacking jobs, the technology could simultaneously cut wages and raise prices for the same low-income shoppers.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">LIV Golf launched in 2022 with Saudi sovereign wealth fund backing and hundreds of millions of dollars in player signing fees, positioning itself as a serious rival to the PGA Tour. It has just filed for Chapter 11 bankruptcy (a legal process allowing a company to restructure its debts while continuing to operate). What is unusual about the proposed restructuring deal?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The PGA Tour is set to acquire a controlling stake as part of a negotiated merger</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The Saudi Public Investment Fund has agreed to convert its loans into a permanent subsidy</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The tour&#x27;s players are expected to become majority owners of the restructured business</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Under the proposed bankruptcy deal, LIV Golf&#x27;s players — the same people who were paid enormous sums to join — would end up owning the majority of the business. It is a striking reversal: talent recruited as expensive assets becoming the landlords. Whether professional golfers make better business owners than sovereign wealth fund managers remains to be seen.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business</span>
+      <span class="q-counter">Q4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Japanese toy giant Bandai Namco recently announced a recycling initiative with cosmetics firm Kao and household goods maker Lion. What are they recycling used toothbrushes and product packaging into?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Biodegradable packaging for Bandai&#x27;s own toy range</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Gundam plastic model kits</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Promotional merchandise for a new sustainability awareness campaign</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Bandai is turning used toothbrushes and household packaging into Gundam model kits — the collectable plastic figures that are a multi-billion yen franchise in Japan. It is a neat piece of brand alchemy: transforming bathroom waste into premium hobbyist products. Gundam models (called &#x27;Gunpla&#x27;) sell tens of millions of units a year globally, so the recycled material will not go to waste.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US inflation (the rate at which prices across the economy are rising) held at 3.4% in the year to August, but the monthly increase of 0.4% was the sharpest since May. This matters because the Federal Reserve (the US central bank) was due to meet just four days later. What was the main driver of that monthly spike?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">A sharp rise in energy prices feeding through from an oil market shock</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">A surge in used car prices after a major cyber attack on car dealerships</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Grocery price inflation accelerating due to a poor domestic harvest</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The monthly price spike was driven primarily by rising energy costs as an oil market shock began feeding through to consumers. Annual inflation holding at 3.4% sounds stable, but the 0.4% monthly rise — if sustained — would annualise at nearly 5%, well above the Fed&#x27;s 2% target. Timing it four days before a rate decision made the data especially uncomfortable for policymakers.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The European Central Bank (ECB) recently raised its deposit rate (the interest it pays banks for holding money overnight) to 2.5%, its second hike in three months. The trigger was energy-driven inflation following the Iran war. Which of these is NOT a risk associated with the ECB raising rates in this environment?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Higher borrowing costs slow investment and push the eurozone into recession</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Rate rises cannot reduce energy prices caused by supply shocks, so they may cause pain without curing inflation</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Lower interest rates in Europe will cause the euro to appreciate sharply against the dollar</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Raising rates tends to attract foreign capital and strengthen a currency — the opposite of what option c describes. The genuine risks are the other two: rate rises are a blunt tool against supply-side energy shocks, and higher borrowing costs can tip a fragile economy into recession. The ECB is essentially trying to stop wage-price spirals from forming while hoping the energy shock fades on its own.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Canada&#x27;s Prime Minister Mark Carney recently refused to match US tariffs (import taxes) on Chinese goods, even after Washington imposed new penalties on Canadian exports in response. What is Canada&#x27;s core argument for not copying the US approach?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Canada imports far more from China than the US does, so matching tariffs would be economically catastrophic</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Independently setting trade policy — not mirroring a larger neighbour — is a matter of economic sovereignty</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Canada has a free trade agreement with China that legally prevents it from imposing new tariffs</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Carney&#x27;s position is fundamentally about sovereignty — Canada&#x27;s right to set its own trade policy rather than act as an extension of US foreign economic strategy. It is a significant moment because Canada and the US are deeply intertwined trading partners under the CUSMA agreement. The dispute reflects a broader tension: how much can a smaller economy diverge from its giant neighbour before the costs become unbearable?</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics</span>
+      <span class="q-counter">Q8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">AI company Anthropic recently published economic projections for how artificial intelligence might reshape the US economy by 2030. The most optimistic scenario is more extreme than almost anyone has publicly predicted. What does it project?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">GDP (total economic output) growth of 5% per year, with unemployment falling to historic lows</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">GDP growth of 15% per year, while nearly one in five office workers loses their job</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">GDP growth of 8% per year, concentrated entirely in the technology and finance sectors</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Anthropic&#x27;s bullish scenario pairs 15% annual GDP growth — a rate that would be historically unprecedented for a large economy — with nearly 20% of office workers losing their jobs. The two things happening simultaneously is the uncomfortable part: the economy as a whole could boom while a huge slice of white-collar workers are displaced. It is a reminder that aggregate growth statistics can mask very uneven human experiences.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of cobalt, the metal essential for electric vehicle batteries and a key battleground in the global clean energy supply chain?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Chile</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Democratic Republic of Congo</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Indonesia</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The Democratic Republic of Congo produces roughly 70% of the world&#x27;s cobalt — a staggering concentration for any single commodity. This gives the DRC enormous theoretical leverage over the EV industry, but chronic instability, infrastructure gaps, and concerns about artisanal mining conditions mean that leverage is rarely translated into economic benefit for its own population.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide q-slide" id="slide-10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge</span>
+      <span class="q-counter">Q10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The 1944 Bretton Woods conference established the post-war global financial order, including the International Monetary Fund and the World Bank. Which country hosted it, lending the system its name?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The United States, at a resort in New Hampshire</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The United Kingdom, at a country house in Oxfordshire</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Switzerland, at a hotel in Geneva</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Bretton Woods is a resort in New Hampshire, where 44 Allied nations gathered in July 1944 to design the post-war monetary system. The US dollar was placed at the centre, pegged to gold at $35 per ounce. That arrangement lasted until 1971, when President Nixon ended dollar-gold convertibility — an event economists still call the &#x27;Nixon Shock&#x27;.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <button class="btn-reveal" onclick="revealSlide(this)">Reveal Answer</button>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a1" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A1 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Macy&#x27;s has had a rough few years, closing stores and fighting off the image of a retailer in terminal decline. But this month it surprised Wall Street. What did Macy&#x27;s just announce?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">It raised its full-year profit guidance despite a weak broader retail environment</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">It reported a loss but announced a major store reopening programme</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">It was acquired by a private equity firm at a premium to its share price</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Macy&#x27;s raised its full-year guidance after posting strong fiscal second-quarter results. That is notable because most of its retail peers are struggling — making Macy&#x27;s turnaround look like a genuine exception, not a sector-wide bounce. It suggests targeted store investment and a loyalty programme overhaul may actually be working.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A1 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a2" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A2 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US grocery stores are rapidly rolling out electronic shelf labels — the digital price tags that update automatically. A recent AFL-CIO report warns this technology has a hidden downside beyond the obvious job losses. What is it?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The labels can be hacked to display false prices at the checkout</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">They enable &#x27;surveillance pricing&#x27;, where stores charge different customers different prices in real time</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">They require so much electricity that they increase store running costs significantly</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The report warns that electronic shelf labels make &#x27;surveillance pricing&#x27; — adjusting prices dynamically based on who is shopping and when — far easier for retailers to implement. Combined with the potential loss of tens of thousands of shelf-stacking jobs, the technology could simultaneously cut wages and raise prices for the same low-income shoppers.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A2 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a3" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A3 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">LIV Golf launched in 2022 with Saudi sovereign wealth fund backing and hundreds of millions of dollars in player signing fees, positioning itself as a serious rival to the PGA Tour. It has just filed for Chapter 11 bankruptcy (a legal process allowing a company to restructure its debts while continuing to operate). What is unusual about the proposed restructuring deal?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The PGA Tour is set to acquire a controlling stake as part of a negotiated merger</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The Saudi Public Investment Fund has agreed to convert its loans into a permanent subsidy</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">The tour&#x27;s players are expected to become majority owners of the restructured business</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Under the proposed bankruptcy deal, LIV Golf&#x27;s players — the same people who were paid enormous sums to join — would end up owning the majority of the business. It is a striking reversal: talent recruited as expensive assets becoming the landlords. Whether professional golfers make better business owners than sovereign wealth fund managers remains to be seen.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A3 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a4" style="--cat-bg:#f0f5ff;--cat-fg:#1a3a7a;--cat-border:#b6cff5">
+    <div class="slide-top">
+      <span class="category-badge">Business &mdash; Answer</span>
+      <span class="q-counter">A4 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Japanese toy giant Bandai Namco recently announced a recycling initiative with cosmetics firm Kao and household goods maker Lion. What are they recycling used toothbrushes and product packaging into?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Biodegradable packaging for Bandai&#x27;s own toy range</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Gundam plastic model kits</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Promotional merchandise for a new sustainability awareness campaign</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Bandai is turning used toothbrushes and household packaging into Gundam model kits — the collectable plastic figures that are a multi-billion yen franchise in Japan. It is a neat piece of brand alchemy: transforming bathroom waste into premium hobbyist products. Gundam models (called &#x27;Gunpla&#x27;) sell tens of millions of units a year globally, so the recycled material will not go to waste.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A4 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a5" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A5 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">US inflation (the rate at which prices across the economy are rising) held at 3.4% in the year to August, but the monthly increase of 0.4% was the sharpest since May. This matters because the Federal Reserve (the US central bank) was due to meet just four days later. What was the main driver of that monthly spike?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">A sharp rise in energy prices feeding through from an oil market shock</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">A surge in used car prices after a major cyber attack on car dealerships</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Grocery price inflation accelerating due to a poor domestic harvest</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. The monthly price spike was driven primarily by rising energy costs as an oil market shock began feeding through to consumers. Annual inflation holding at 3.4% sounds stable, but the 0.4% monthly rise — if sustained — would annualise at nearly 5%, well above the Fed&#x27;s 2% target. Timing it four days before a rate decision made the data especially uncomfortable for policymakers.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A5 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a6" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A6 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The European Central Bank (ECB) recently raised its deposit rate (the interest it pays banks for holding money overnight) to 2.5%, its second hike in three months. The trigger was energy-driven inflation following the Iran war. Which of these is NOT a risk associated with the ECB raising rates in this environment?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Higher borrowing costs slow investment and push the eurozone into recession</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Rate rises cannot reduce energy prices caused by supply shocks, so they may cause pain without curing inflation</span>
+      </div>
+      <div class="option correct" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Lower interest rates in Europe will cause the euro to appreciate sharply against the dollar</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>c. Raising rates tends to attract foreign capital and strengthen a currency — the opposite of what option c describes. The genuine risks are the other two: rate rises are a blunt tool against supply-side energy shocks, and higher borrowing costs can tip a fragile economy into recession. The ECB is essentially trying to stop wage-price spirals from forming while hoping the energy shock fades on its own.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A6 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a7" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A7 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Canada&#x27;s Prime Minister Mark Carney recently refused to match US tariffs (import taxes) on Chinese goods, even after Washington imposed new penalties on Canadian exports in response. What is Canada&#x27;s core argument for not copying the US approach?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Canada imports far more from China than the US does, so matching tariffs would be economically catastrophic</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Independently setting trade policy — not mirroring a larger neighbour — is a matter of economic sovereignty</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Canada has a free trade agreement with China that legally prevents it from imposing new tariffs</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Carney&#x27;s position is fundamentally about sovereignty — Canada&#x27;s right to set its own trade policy rather than act as an extension of US foreign economic strategy. It is a significant moment because Canada and the US are deeply intertwined trading partners under the CUSMA agreement. The dispute reflects a broader tension: how much can a smaller economy diverge from its giant neighbour before the costs become unbearable?</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A7 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a8" style="--cat-bg:#f0faf4;--cat-fg:#145c34;--cat-border:#b6e8cb">
+    <div class="slide-top">
+      <span class="category-badge">Economics &mdash; Answer</span>
+      <span class="q-counter">A8 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">AI company Anthropic recently published economic projections for how artificial intelligence might reshape the US economy by 2030. The most optimistic scenario is more extreme than almost anyone has publicly predicted. What does it project?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">GDP (total economic output) growth of 5% per year, with unemployment falling to historic lows</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">GDP growth of 15% per year, while nearly one in five office workers loses their job</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">GDP growth of 8% per year, concentrated entirely in the technology and finance sectors</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. Anthropic&#x27;s bullish scenario pairs 15% annual GDP growth — a rate that would be historically unprecedented for a large economy — with nearly 20% of office workers losing their jobs. The two things happening simultaneously is the uncomfortable part: the economy as a whole could boom while a huge slice of white-collar workers are displaced. It is a reminder that aggregate growth statistics can mask very uneven human experiences.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A8 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a9" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A9 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">Which country is the world&#x27;s largest producer of cobalt, the metal essential for electric vehicle batteries and a key battleground in the global clean energy supply chain?</p>
+      <div class="options">
+      <div class="option" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">Chile</span>
+      </div>
+      <div class="option correct" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">Democratic Republic of Congo</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Indonesia</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>b. The Democratic Republic of Congo produces roughly 70% of the world&#x27;s cobalt — a staggering concentration for any single commodity. This gives the DRC enormous theoretical leverage over the EV industry, but chronic instability, infrastructure gaps, and concerns about artisanal mining conditions mean that leverage is rarely translated into economic benefit for its own population.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A9 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide a-slide revealed" id="slide-a10" style="--cat-bg:#fff5f0;--cat-fg:#7a2d0a;--cat-border:#f5c9b0">
+    <div class="slide-top">
+      <span class="category-badge">General Knowledge &mdash; Answer</span>
+      <span class="q-counter">A10 / 10</span>
+    </div>
+    <div class="slide-body question-body">
+      <p class="question-text">The 1944 Bretton Woods conference established the post-war global financial order, including the International Monetary Fund and the World Bank. Which country hosted it, lending the system its name?</p>
+      <div class="options">
+      <div class="option correct" data-letter="a">
+        <span class="option-letter">a</span>
+        <span class="option-text">The United States, at a resort in New Hampshire</span>
+      </div>
+      <div class="option" data-letter="b">
+        <span class="option-letter">b</span>
+        <span class="option-text">The United Kingdom, at a country house in Oxfordshire</span>
+      </div>
+      <div class="option" data-letter="c">
+        <span class="option-letter">c</span>
+        <span class="option-text">Switzerland, at a hotel in Geneva</span>
+      </div>
+      </div>
+      <div class="explanation">
+        <p>a. Bretton Woods is a resort in New Hampshire, where 44 Allied nations gathered in July 1944 to design the post-war monetary system. The US dollar was placed at the centre, pegged to gold at $35 per ounce. That arrangement lasted until 1971, when President Nixon ended dollar-gold convertibility — an event economists still call the &#x27;Nixon Shock&#x27;.</p>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">A10 / 10</span>
+      <button class="btn-nav" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="slide" id="slide-end">
+    <div class="slide-body title-body">
+      <div class="title-wordmark">Talkonomics</div>
+      <div class="title-tagline">That&#8217;s all 10!</div>
+      <div class="title-date">13 September 2026</div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+        <button class="btn-primary" onclick="goTo(0)">&#8592; Start again</button>
+        <a class="btn-primary" href="../index.html">All editions</a>
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="btn-nav" onclick="prevSlide()">&#8592; Back</button>
+      <span class="slide-counter">End</span>
+      <span></span>
+    </div>
+  </div>
+</div>
+<script>
+var TOTAL = document.querySelectorAll('.q-slide').length;
+var pos = 0;
+var SEQ = [];
+
+function buildSeq(m) {
+  var s = ['slide-0'];
+  for (var i = 1; i <= TOTAL; i++) s.push('slide-' + i);
+  if (m === 'atend') {
+    for (var i = 1; i <= TOTAL; i++) s.push('slide-a' + i);
+  }
+  s.push('slide-end');
+  return s;
+}
+
+function selectMode(m) {
+  SEQ = buildSeq(m);
+  document.body.setAttribute('data-mode', m);
+  showAt(1);
+}
+
+function showAt(p) {
+  pos = p;
+  document.querySelectorAll('.slide').forEach(function(s) { s.classList.remove('active'); });
+  var el = document.getElementById(SEQ[p]);
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+}
+
+function goTo(p) { showAt(p); }
+
+function nextSlide() {
+  if (pos < SEQ.length - 1) showAt(pos + 1);
+}
+
+function prevSlide() {
+  if (pos > 0) showAt(pos - 1);
+}
+
+function revealSlide(btn) {
+  var slide = btn.closest('.slide');
+  slide.classList.add('revealed');
+  var exp = slide.querySelector('.explanation');
+  if (exp) exp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextSlide(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { prevSlide(); e.preventDefault(); }
+  else if (e.key === ' ' || e.key === 'Enter') {
+    var slide = document.querySelector('.slide.active');
+    if (slide && !slide.classList.contains('revealed')) {
+      var btn = slide.querySelector('.btn-reveal');
+      if (btn) { revealSlide(btn); e.preventDefault(); return; }
+    }
+    nextSlide();
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
