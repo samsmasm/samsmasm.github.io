@@ -4,7 +4,7 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
   removeMember, unblock, newJoinCode, renameClass, saveSet, deleteSet, getResponses,
   syncKeyVisibility, needsMarking, answeredCount, addShellLinks
-} from './core.js?v=5b36f56-2014';
+} from './core.js?v=b3faad3-2027';
 
 const classId = qp('c');
 let me = null, cls = null;
@@ -27,6 +27,7 @@ let me = null, cls = null;
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = 'You teach this class.';
   document.getElementById('new-set').href = 'set.html?c=' + encodeURIComponent(classId) + '&new=1';
+  document.getElementById('over-time').href = 'students.html?c=' + encodeURIComponent(classId);
   document.getElementById('code').textContent = cls.joinCode || '------';
   document.getElementById('rename').value = cls.name;
 

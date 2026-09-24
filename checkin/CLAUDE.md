@@ -58,8 +58,15 @@ Setup and migration steps are in `SETUP.md`.
 | `set.html` | teacher | Build or edit a question set, by hand or from CSV. |
 | `results.html` | teacher | One set: how they did, what they wrote, marking, live controls. |
 | `qr.html` | teacher | One question as a QR code big enough to scan from the back of the room. |
+| `students.html` | teacher | The whole roll with each student's most recent result and a trend line. |
+| `student.html` | teacher | One student: every set they have done and a percentage-over-time chart. |
 | `class.html` | student | The current question, large. Older sets behind "Previous questions". |
 | `answer.html` | student | One set: answer it, review it marked, or practise it. |
+
+`js/history.js` gathers how a class has done across all its sets and draws the
+sparklines and the percentage chart. It recomputes marks from each set's answer
+key rather than trusting stored scores, because a set whose responses page was
+never opened has no stored marks and would otherwise read as zero.
 
 `js/core.js` holds everything shared: auth guard, the sidebar shell, all
 Firestore access, CSV parsing and the marking maths. `js/answering.js` renders

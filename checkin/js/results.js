@@ -1,12 +1,13 @@
 // Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
+import { loadClassHistory, sparkline } from './history.js?v=b3faad3-2027';
 import {
   requireUser, qp, esc, fail, debounce, LETTERS,
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
   saveMarks, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=5b36f56-2014';
+} from './core.js?v=b3faad3-2027';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -15,6 +16,7 @@ let me = null, cls = null, set = null, key = {}, members = [];
 let responses = new Map();      // uid -> response
 let view = 'scores';
 let repaintQueued = false;
+let trendByStudent = null;   // filled in after the page is already usable
 
 (async function start() {
   me = await requireUser();
@@ -49,6 +51,12 @@ let repaintQueued = false;
 
   watchResponses();
   paintControls();
+
+  // The rest of the class history is only needed for the little trend lines, so
+  // it loads after the page is up rather than holding it back.
+  loadClassHistory(classId)
+    .then(history => { trendByStudent = history.byStudent; paintBody(); })
+    .catch(err => console.error('trend history', err));
 })();
 
 function qrLink(qid) {
@@ -239,7 +247,7 @@ function paintScores() {
     return;
   }
 
-  const head = '<tr><th>Student</th>' +
+  const head = '<tr><th>Student</th><th class="num">Before</th>' +
     qs.map((q, i) => '<th class="num" title="' + esc(q.prompt) + '">' +
       (i + 1) + (q.type === 'text' ? ' <span class="tiny">txt</span>' : '') + '</th>').join('') +
     '<th class="num">Total</th><th class="num">Out of</th></tr>';
@@ -275,9 +283,16 @@ function paintScores() {
         '</td>';
     }).join('');
     const total = r ? totalAwarded(set, marks) : 0;
+    // Everything this student did before this set, as a rough shape.
+    const earlier = (trendByStudent && trendByStudent.get(row.uid) || [])
+      .filter(p => p.setId !== setId);
+    const trend = trendByStudent
+      ? '<td class="num spark-cell">' + sparkline(earlier, { width: 54, height: 18 }) + '</td>'
+      : '<td class="num cell-none">.</td>';
+
     return '<tr><td>' + esc(row.name) +
       (r && needsMarking(set, r) ? ' <span class="state state-todo">to mark</span>' : '') +
-      '</td>' + cells +
+      '</td>' + trend + cells +
       '<td class="num"><b data-total="' + row.uid + '">' + (r ? total : '') + '</b></td>' +
       '<td class="num cell-none">' + maxScore(set) + '</td></tr>';
   }).join('');
@@ -302,7 +317,8 @@ function paintScores() {
     '<div class="scroller"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
     '<p class="tiny mt">Hover or tap any answered cell to read what they put. ' +
     'Written answers can be marked straight into the grid, and save as you type. ' +
-    'A dot means no answer, an empty box means a written answer still waiting on you.</p>' +
+    'A dot means no answer, an empty box means a written answer still waiting on you. ' +
+    'Before is how that student went on earlier sets, oldest on the left.</p>' +
     '<p class="rule-label">Question by question</p>' + perQuestion;
 
   wireGrid();

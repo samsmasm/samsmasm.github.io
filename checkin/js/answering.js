@@ -1,7 +1,7 @@
 // Checkin - the student's question view, shared by the class page and the
 // single set page. One question at a time, large, with dots to move between them.
 
-import { esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey } from './core.js?v=5b36f56-2014';
+import { esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey } from './core.js?v=b3faad3-2027';
 
 function isAnswered(v) {
   return v !== undefined && v !== null && String(v).trim() !== '';
