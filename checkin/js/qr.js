@@ -1,7 +1,8 @@
 // Checkin - a QR code big enough to scan from the back of the room. Each code
 // points at one question, so scanning lands a student on that question alone.
 
-import { requireUser, qp, esc, fail, getClass, getSet } from './core.js';
+import { requireUser, qp, esc, fail, getClass, getSet, addShellLinks
+} from './core.js';
 import { svgFor } from './qrsvg.js';
 
 const classId = qp('c');
@@ -24,6 +25,11 @@ let target = qp('q') || '';   // a question id, or empty for the whole set
   }
 
   document.title = (set.title || 'QR code') + ' - Checkin';
+  addShellLinks([
+    { label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId), icon: 'stack' },
+    { label: set.title || 'This set', icon: 'qr',
+      href: 'results.html?c=' + encodeURIComponent(classId) + '&s=' + setId }
+  ]);
   document.addEventListener('keydown', onKey);
   paint();
 })();

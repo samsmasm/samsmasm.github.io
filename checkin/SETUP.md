@@ -1,28 +1,31 @@
 # Checkin - setup
 
-Static pages on unisam.nz, with Google sign-in and Firestore in the existing
-**coldwar-d8109** Firebase project. The only other tool in that project is
-Operation: Shadow Protocol (`/coldwar`), which uses its Realtime Database and
-its own password scheme rather than Firebase Auth. Checkin uses Firestore, a
-separate database with a separate ruleset, so nothing here can break it.
+Static pages with Google sign-in and Firestore. No build step, no framework, no
+server: every page is plain HTML, CSS and ES modules, and every link inside it is
+relative, so the whole folder works from any domain or subfolder you drop it in.
 
-Live at `unisam.nz/checkin/`.
+Nothing outside this folder is referenced. The only things loaded from elsewhere
+are the Firebase SDK, Google Fonts and the QR library, all from public CDNs.
+
+It currently runs on a Firebase project called **coldwar-d8109**, which is a
+personal account used for trying it out.
 
 ## Console steps, once
 
-All of these are in the Firebase console for the **coldwar-d8109** project, and
-none of them can be done from here. That project has never had Authentication or
-Firestore switched on, so both start from nothing.
+All of these are in the Firebase console, and none of them can be done from a
+code editor. If you are setting this up on a new Firebase project, do all four;
+if you are moving it to a different project, also replace `firebaseConfig` in
+`js/firebase.js` with that project's web config.
 
 1. **Authentication**: press **Get started** first, because the project has no
    auth configuration at all and the sign-in method list does not appear until
    you do. Then **Sign-in method > Google > Enable**, and set the support email
    to your own address. Skipping the Get started step is what produces
    `auth/configuration-not-found` at sign-in.
-2. **Authentication > Settings > Authorized domains**: add `unisam.nz`, and
-   `samsmasm.github.io` too if you ever open the site on that address. Sign-in
-   fails with `auth/unauthorized-domain` on any address not listed.
-   `localhost` is already there by default for local testing.
+2. **Authentication > Settings > Authorized domains**: add every domain the site
+   will be opened on, including the GitHub Pages one. Sign-in fails with
+   `auth/unauthorized-domain` on any address not listed. `localhost` is already
+   there by default for local testing.
 3. **Firestore Database**: create a database if the project has none yet.
    Production mode, and pick a region near you (`australia-southeast1`).
    Do not use the default open test rules.
@@ -82,6 +85,17 @@ wins.
 
 The QR drawing library comes from cdnjs at page load. If it is blocked, the page
 says so and still shows the link in text.
+
+## Moving it to another host
+
+Copy the folder. Then:
+
+1. Replace `firebaseConfig` in `js/firebase.js` with the new project's web config.
+2. Do the four console steps above on that project.
+3. Add the new domain to the authorized domains list.
+
+Nothing else is tied to where it is served from. QR codes build their links from
+whatever address the page is open on, so they follow the move by themselves.
 
 ## Teacher or student
 

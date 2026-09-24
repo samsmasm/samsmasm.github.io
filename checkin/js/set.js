@@ -3,7 +3,7 @@
 import {
   requireUser, qp, esc, fail, newId, LETTERS, BLANK_SET,
   getClass, getSet, createSet, saveSet, saveKey, getKey, syncKeyVisibility,
-  csvToQuestions
+  csvToQuestions, addShellLinks
 } from './core.js';
 
 const classId = qp('c');
@@ -29,6 +29,8 @@ let me = null, cls = null, set = null, key = {};
     }
   } catch (err) { return fail('Loading the set', err); }
 
+  addShellLinks([{ label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId),
+                   icon: 'stack' }]);
   document.getElementById('head').textContent = isNew ? 'New question set' : 'Edit question set';
   document.getElementById('status-line').textContent = isNew
     ? cls.name

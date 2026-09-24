@@ -74,29 +74,111 @@ export function requireUser() {
         return;
       }
       profile = await ensureUserDoc(user);
-      paintUserChip(user);
+      shellUser = user;
+      paintShell();
       resolve(user);
     });
   });
 }
 
-function paintUserChip(user) {
-  const slot = document.getElementById('user-chip');
-  if (!slot) return;
-  // The thing this person does less of sits quietly up here rather than taking
-  // up room on their home page.
+/* ---------------- the sidebar shell ---------------- */
+
+const ICONS = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v4"/></svg>',
+  stack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>',
+  people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 8.5a3 3 0 0 1 0 5"/></svg>',
+  qr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 20h1"/></svg>'
+};
+
+const THEME_KEY = 'checkin_theme';
+
+function currentTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
+}
+
+function setTheme(theme) {
+  try { localStorage.setItem(THEME_KEY, theme); } catch { /* private browsing */ }
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.querySelector('.theme-icon').textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    btn.querySelector('.theme-label').textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+  }
+}
+
+let shellUser = null;
+let shellExtras = [];
+
+// Pages with a class or a set in view add their own links to the sidebar.
+export function addShellLinks(items) {
+  shellExtras = items || [];
+  paintShell();
+}
+
+function navLink(item, page) {
+  const active = item.match && item.match(page) ? ' active' : '';
+  return '<a class="nav-item' + active + '" href="' + item.href + '">' +
+    (ICONS[item.icon] || '') + '<span>' + esc(item.label) + '</span></a>';
+}
+
+function paintShell() {
+  const host = document.getElementById('sidebar');
+  if (!host || !shellUser) return;
+  const page = location.pathname.split('/').pop() || 'home.html';
   const role = myRole();
-  const other = role === 'student' ? '<a href="home.html?start=1">Start a class</a> &middot; '
-    : role === 'teacher' ? '<a href="home.html?join=1">Join a class</a> &middot; '
-    : '';
-  slot.innerHTML =
-    esc(user.displayName || user.email) +
-    '<br><a href="home.html">My classes</a> &middot; ' + other +
-    '<button class="linkish" id="signout-btn">Sign out</button>';
+
+  const items = [{ label: 'My classes', href: 'home.html', icon: 'home',
+                   match: p => p === 'home.html' && !location.search }];
+  if (role === 'student') {
+    items.push({ label: 'Start a class', href: 'home.html?start=1', icon: 'plus' });
+  } else if (role === 'teacher') {
+    items.push({ label: 'Join a class', href: 'home.html?join=1', icon: 'key' });
+  }
+
+  host.innerHTML =
+    '<aside class="sidebar" id="app-sidebar">' +
+      '<div class="sidebar-logo">' +
+        '<span class="logo-text">Check<span class="logo-accent">in</span></span>' +
+        '<span class="logo-tag">concept checks</span>' +
+      '</div>' +
+      '<nav class="sidebar-nav">' +
+        items.map(i => navLink(i, page)).join('') +
+        (shellExtras.length
+          ? '<div class="nav-group">This class</div>' + shellExtras.map(i => navLink(i, page)).join('')
+          : '') +
+      '</nav>' +
+      '<div class="sidebar-footer">' +
+        '<button class="nav-item" id="theme-toggle">' +
+          '<span class="theme-icon"></span><span class="theme-label"></span></button>' +
+        '<span class="sidebar-username">' + esc(shellUser.displayName || shellUser.email) + '</span>' +
+        '<button class="nav-item logout-btn" id="signout-btn">Sign out</button>' +
+      '</div>' +
+    '</aside>';
+
+  setTheme(currentTheme());
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+  });
+
   document.getElementById('signout-btn').addEventListener('click', async () => {
     await signOutNow();
     location.replace('index.html');
   });
+
+  const menu = document.getElementById('menu-btn');
+  if (menu && !menu.dataset.wired) {
+    menu.dataset.wired = '1';
+    menu.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
+    document.addEventListener('click', e => {
+      if (document.body.classList.contains('sidebar-open') &&
+          !e.target.closest('#app-sidebar') && !e.target.closest('#menu-btn')) {
+        document.body.classList.remove('sidebar-open');
+      }
+    });
+  }
 }
 
 export function fail(where, err) {

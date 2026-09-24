@@ -3,7 +3,7 @@
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
   removeMember, unblock, newJoinCode, renameClass, saveSet, deleteSet, getResponses,
-  syncKeyVisibility, needsMarking, answeredCount
+  syncKeyVisibility, needsMarking, answeredCount, addShellLinks
 } from './core.js';
 
 const classId = qp('c');
@@ -22,6 +22,8 @@ let me = null, cls = null;
   }
 
   document.title = cls.name + ' - Checkin';
+  addShellLinks([{ label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId),
+                   icon: 'stack', match: p => p === 'teach.html' }]);
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = 'You teach this class.';
   document.getElementById('new-set').href = 'set.html?c=' + encodeURIComponent(classId) + '&new=1';

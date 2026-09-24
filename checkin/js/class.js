@@ -4,7 +4,7 @@
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, amMember, getResponse,
   watchSet, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
-  practiceAllowed, myClasses, forgetClass, doc, db
+  practiceAllowed, myClasses, forgetClass, doc, db, addShellLinks
 } from './core.js';
 import { mountSet } from './answering.js';
 import { updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -38,6 +38,8 @@ let me = null, cls = null, view = null, stopWatch = null;
   }
 
   document.title = cls.name + ' - Checkin';
+  addShellLinks([{ label: cls.name, href: 'class.html?c=' + encodeURIComponent(classId),
+                   icon: 'stack', match: p => p === 'class.html' }]);
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = cls.ownerName ? 'Set by ' + cls.ownerName : '';
   await healCachedName();

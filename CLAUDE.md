@@ -27,6 +27,10 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   graphs/                 ← Economics Graph Drawer (see CLAUDE.md inside)
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
   checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore in coldwar-d8109, see SETUP.md inside)
+                             NOTE: deliberately does NOT follow AESTHETIC.md. It is styled after ratibro/
+                             (Fraunces + Nunito, amber on navy, sidebar shell, dark mode) because it is a
+                             standalone concept meant to be migrated to a school GitHub. Keep it self-contained:
+                             no site logo, no unisam.nz references, relative paths only.
   qreview/                ← IB continual revision / flashcard tool
   reports/                ← automated student report tools (see CLAUDE.md inside)
   cultivar/               ← genetics/cultivar tool (see CLAUDE.md inside)

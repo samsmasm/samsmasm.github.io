@@ -5,7 +5,7 @@ import {
   requireUser, qp, esc, fail, debounce, LETTERS,
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
   saveMarks, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
-  onSnapshot, collection, db
+  onSnapshot, collection, db, addShellLinks
 } from './core.js';
 
 const classId = qp('c');
@@ -31,6 +31,12 @@ let repaintQueued = false;
 
   document.title = (set.title || 'Responses') + ' - Checkin';
   document.getElementById('set-title').textContent = set.title || 'Untitled set';
+  addShellLinks([
+    { label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId), icon: 'stack' },
+    { label: set.title || 'This set', icon: 'people',
+      href: 'results.html?c=' + encodeURIComponent(classId) + '&s=' + setId,
+      match: p => p === 'results.html' }
+  ]);
   document.getElementById('set-sub').textContent = cls.name + ' · ' +
     (set.questions || []).length + ' questions · out of ' + maxScore(set);
 
