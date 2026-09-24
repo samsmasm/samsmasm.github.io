@@ -1,6 +1,6 @@
 // Checkin - sign-in page.
 
-import { signIn, onAuth, ensureUserDoc, qp, fail } from './core.js';
+import { signIn, onAuth, ensureUserDoc, qp, fail } from './core.js?v=20192f8-2011';
 
 const next = qp('next') || 'home.html';
 const btn = document.getElementById('signin');

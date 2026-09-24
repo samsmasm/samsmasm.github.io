@@ -4,7 +4,7 @@
 
 import {
   requireUser, myClasses, createClass, joinClass, esc, fail, qp, myRole, setMyRole
-} from './core.js';
+} from './core.js?v=20192f8-2011';
 
 let me = null, classes = [];
 

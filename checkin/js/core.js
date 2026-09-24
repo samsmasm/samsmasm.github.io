@@ -1,6 +1,6 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth } from './firebase.js';
+import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=20192f8-2011';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp

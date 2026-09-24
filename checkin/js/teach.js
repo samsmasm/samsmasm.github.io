@@ -4,7 +4,7 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
   removeMember, unblock, newJoinCode, renameClass, saveSet, deleteSet, getResponses,
   syncKeyVisibility, needsMarking, answeredCount, addShellLinks
-} from './core.js';
+} from './core.js?v=20192f8-2011';
 
 const classId = qp('c');
 let me = null, cls = null;

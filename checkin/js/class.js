@@ -5,8 +5,8 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, amMember, getResponse,
   watchSet, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
   practiceAllowed, myClasses, forgetClass, doc, db, addShellLinks
-} from './core.js';
-import { mountSet } from './answering.js';
+} from './core.js?v=20192f8-2011';
+import { mountSet } from './answering.js?v=20192f8-2011';
 import { updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const classId = qp('c');
