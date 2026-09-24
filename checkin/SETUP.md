@@ -83,6 +83,15 @@ wins.
 The QR drawing library comes from cdnjs at page load. If it is blocked, the page
 says so and still shows the link in text.
 
+## Teacher or student
+
+On a first visit everyone is asked whether they mostly teach or mostly study,
+and the answer is kept on their user document as `role`. It decides which half
+of the home page leads and nothing else. Both roles can still make a class and
+join a class: the other route moves to a plain link in the header and a quiet
+line at the foot of the home page. It is never a permission, so there is nothing
+in the rules about it, and anyone can switch at the bottom of their home page.
+
 ## Practice retakes
 
 A student who has done a set can press **Try again** for a private practice run.

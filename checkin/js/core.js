@@ -50,6 +50,20 @@ export function debounce(fn, ms = 600) {
 
 /* ---------------- page chrome ---------------- */
 
+let profile = null;
+
+// What this person said they are, teacher or student. It decides which page is
+// put in front of them and nothing else: both can make a class and both can join
+// one, so this is never a permission.
+export function myRole() {
+  return (profile && profile.role) || null;
+}
+
+export async function setMyRole(uid, role) {
+  await updateDoc(doc(db, 'users', uid), { role });
+  if (profile) profile.role = role;
+}
+
 // Waits for Firebase auth, then either hands back the user or sends them to sign in.
 export function requireUser() {
   return new Promise(resolve => {
@@ -59,7 +73,7 @@ export function requireUser() {
         location.replace('index.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search));
         return;
       }
-      await ensureUserDoc(user);
+      profile = await ensureUserDoc(user);
       paintUserChip(user);
       resolve(user);
     });
@@ -69,9 +83,16 @@ export function requireUser() {
 function paintUserChip(user) {
   const slot = document.getElementById('user-chip');
   if (!slot) return;
+  // The thing this person does less of sits quietly up here rather than taking
+  // up room on their home page.
+  const role = myRole();
+  const other = role === 'student' ? '<a href="home.html?start=1">Start a class</a> &middot; '
+    : role === 'teacher' ? '<a href="home.html?join=1">Join a class</a> &middot; '
+    : '';
   slot.innerHTML =
     esc(user.displayName || user.email) +
-    '<br><a href="home.html">My classes</a> &middot; <button class="linkish" id="signout-btn">Sign out</button>';
+    '<br><a href="home.html">My classes</a> &middot; ' + other +
+    '<button class="linkish" id="signout-btn">Sign out</button>';
   document.getElementById('signout-btn').addEventListener('click', async () => {
     await signOutNow();
     location.replace('index.html');
@@ -96,13 +117,15 @@ export async function ensureUserDoc(user) {
   const ref = doc(db, 'users', user.uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
-    await setDoc(ref, {
+    const fresh = {
       email: user.email,
       name: user.displayName || user.email,
       classes: {},
+      role: null,            // asked for on their first visit to the home page
       createdAt: serverTimestamp()
-    });
-    return { email: user.email, name: user.displayName || user.email, classes: {} };
+    };
+    await setDoc(ref, fresh);
+    return fresh;
   }
   return snap.data();
 }
