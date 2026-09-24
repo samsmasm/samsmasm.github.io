@@ -5,7 +5,7 @@
 import {
   requireUser, myClasses, createClass, joinClass, esc, fail, qp, myRole, setMyRole,
   addShellLinks
-} from './core.js?v=8faff7a-2110';
+} from './core.js?v=4baf2dd-2128';
 
 let me = null, classes = [];
 

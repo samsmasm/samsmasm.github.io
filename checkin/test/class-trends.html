@@ -1,0 +1,111 @@
+<!-- Checkin - a real browser test of the class roll and its trend lines.
+     Same idea as marking.html: the import map swaps Firebase for the fakes, so
+     this drives the real teach.js. It exists because teach.js used the history
+     helpers without importing them, which left every trend line missing with no
+     error anyone would see. -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkin - class trends test</title>
+<script type="importmap">
+{ "imports": {
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js": "./fake/app.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js": "./fake/auth.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js": "./fake/firestore.js"
+} }
+</script>
+</head>
+<body>
+<div class="app-shell"><div id="sidebar"></div><main class="main-content">
+<div id="page-error"></div>
+<div class="spread"><div><h1 id="class-name">Loading</h1><p class="sub" id="class-sub"></p></div>
+<a class="btn btn-go" id="new-set">New question set</a></div>
+<div class="tabs">
+  <button class="tab active" data-tab="sets">Question sets</button>
+  <button class="tab" data-tab="students">Students</button>
+  <button class="tab" data-tab="settings">Class settings</button>
+</div>
+<div id="tab-sets"><div id="sets"><p class="tiny">Loading.</p></div></div>
+<div id="tab-students" class="hidden">
+  <div class="panel"><span class="label">Join code</span>
+  <div class="row"><span class="joincode" id="code">------</span>
+  <button id="copy-link">Copy invite link</button><button id="rotate">New code</button></div>
+  <p class="tiny" id="code-note"></p></div>
+  <p class="rule-label">On the roll</p>
+  <div id="members"><p class="tiny">Loading.</p></div>
+</div>
+<div id="tab-settings" class="hidden">
+  <div class="panel panel-plain"><span class="label">Class name</span>
+  <div class="row"><input type="text" id="rename" class="grow" maxlength="80"><button id="rename-go">Save name</button></div>
+  <p class="tiny mt" id="rename-note"></p></div>
+  <div id="removal"><p class="tiny">Loading.</p></div>
+  <div id="blocked-wrap" class="hidden"><div id="blocked"></div></div>
+</div>
+</main></div>
+<pre id="RESULTS">running</pre>
+
+<script type="module">
+import { STORE } from './fake/firestore.js';
+
+const ERRS = [];
+window.addEventListener('error', e => ERRS.push('window.onerror: ' + e.message));
+window.addEventListener('unhandledrejection', e => ERRS.push('unhandled: ' + (e.reason && e.reason.message || e.reason)));
+
+STORE.set('classes/C1', { name: 'Test class', ownerUid: 'teacher1', ownerName: 'Teacher One', joinCode: 'ABC234' });
+for (const [uid, name] of [['s1','Ana Apple'],['s2','Bo Berry']]) {
+  STORE.set('classes/C1/members/' + uid, { name, email: uid + '@ex.com', role: 'student' });
+}
+const questions = [
+  { id: 'q1', type: 'mcq', prompt: 'Pick', maxMark: 1, options: ['a','b'] },
+  { id: 'q2', type: 'text', prompt: 'Write', maxMark: 3 }
+];
+// Three closed sets, so there is a trend to draw.
+[['S1', 1000, 1], ['S2', 2000, 2], ['S3', 3000, 3]].forEach(([sid, at, mark]) => {
+  STORE.set('classes/C1/sets/' + sid, {
+    title: 'Set ' + sid, status: 'closed', reveal: 'release', resultsReleased: true,
+    mode: 'self', createdAt: { seconds: at }, openedAt: { seconds: at }, questions
+  });
+  STORE.set('classes/C1/sets/' + sid + '/keys/key', { key: { q1: 'A' } });
+  STORE.set('classes/C1/sets/' + sid + '/responses/s1', {
+    name: 'Ana Apple', email: 's1@ex.com',
+    answers: { q1: 'A', q2: 'words' }, marks: { q2: { awarded: mark, auto: false } }
+  });
+  STORE.set('classes/C1/sets/' + sid + '/responses/s2', {
+    name: 'Bo Berry', email: 's2@ex.com',
+    answers: { q1: 'B', q2: 'words' }, marks: { q2: { awarded: 3, auto: false } }
+  });
+});
+
+const out = [];
+const log = s => { out.push(s); document.getElementById('RESULTS').textContent = out.join('\n'); };
+let pass = 0, failn = 0;
+const check = (name, cond, extra) => {
+  (cond ? pass++ : failn++);
+  log((cond ? 'PASS  ' : 'FAIL  ') + name + (cond || extra === undefined ? '' : '  <<' + extra + '>>'));
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+history.replaceState(null, '', location.pathname + '?c=C1');
+await import('../js/teach.js?v=test');
+await sleep(500);
+
+document.querySelector('.tab[data-tab="students"]').click();
+await sleep(900);
+
+const roll = document.getElementById('members');
+check('roll rendered', /Ana Apple/.test(roll.textContent), roll.textContent.slice(0, 80));
+check('a trend line is drawn', !!roll.querySelector('svg.spark'), roll.innerHTML.slice(0, 200));
+check('latest result is shown', /%/.test(roll.textContent), roll.textContent.slice(0, 160));
+
+document.querySelector('.tab[data-tab="settings"]').click();
+await sleep(300);
+check('removing a student lives in settings',
+  /Ana Apple/.test(document.getElementById('tab-settings').textContent),
+  document.getElementById('tab-settings').textContent.slice(0, 120));
+
+log('');
+log(pass + ' passed, ' + failn + ' failed');
+log('--- errors ---');
+(ERRS.length ? ERRS : ['none']).forEach(e => log('  ' + e));
+log('  page error box: ' + (document.getElementById('page-error').textContent || 'empty'));
+log('DONE');
+</script>
+</body></html>

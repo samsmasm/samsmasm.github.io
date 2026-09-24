@@ -1,13 +1,14 @@
 // Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
-import { loadClassHistory, sparkline } from './history.js?v=8faff7a-2110';
+import { loadClassHistory, sparkline } from './history.js?v=4baf2dd-2128';
+import { wireMarkInput } from './marking.js?v=4baf2dd-2128';
 import {
   requireUser, qp, esc, fail, debounce, LETTERS,
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
   saveOneMark, clearOneMark, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=8faff7a-2110';
+} from './core.js?v=4baf2dd-2128';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -410,6 +411,14 @@ function paintAnswers() {
 }
 
 function wireMarking() {
+  try { wireMarkingInner(); }
+  catch (err) { fail('Setting up marking', err); }
+}
+
+// Kept separate so the guard above catches anything that goes wrong here. A
+// throw in this wiring used to leave mark boxes looking normal but connected to
+// nothing, which reads as marks that quietly refuse to save.
+function wireMarkingInner() {
   const saveNow = async (scope, patchMark) => {
     const note = scope.querySelector('[data-note]');
     note.className = 'tiny';
@@ -550,6 +559,11 @@ window.addEventListener('scroll', hidePeek, true);
 /* ---------------- the grid ---------------- */
 
 function wireGrid() {
+  try { wireGridInner(); }
+  catch (err) { fail('Setting up the marking grid', err); }
+}
+
+function wireGridInner() {
   document.querySelectorAll('#body .cell-peek').forEach(cell => {
     cell.addEventListener('mouseenter', () => showPeek(cell));
     cell.addEventListener('mouseleave', hidePeek);

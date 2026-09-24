@@ -9,7 +9,7 @@ currently sits in.
 
 ---
 
-## Two rules that are easy to break by accident
+## Three rules that are easy to break by accident
 
 **1. It does NOT follow the repo's `AESTHETIC.md`.** That file is the unisam.nz
 house style and it does not apply here. Checkin is styled after `ratibro/`:
@@ -32,6 +32,23 @@ stacked menu above the page.
 A corollary: never use `location.reload()` or `location.replace()` as a step in a
 UI flow. If the page comes back from cache the flow silently appears to do
 nothing. Update the DOM in place instead.
+
+**3. Run `./test/run.sh` before committing anything in `js/`.** It is quick and it
+catches the failure this project is actually prone to: a page that looks entirely
+normal while a feature is wired to nothing.
+
+`results.js` used `wireMarkInput` and imported it from nowhere, so every mark box
+threw on wiring and no written mark was ever saved. `teach.js` did the same with
+the history helpers, so no trend line ever drew. Neither showed anything on the
+page, and `node --check` cannot see either, because both files are valid
+JavaScript. Marks looked as though they saved intermittently only because
+multiple choice is recomputed from the key on every load.
+
+`test/run.sh` does three things: it drives the real `results.js` and `teach.js` in
+headless Chrome against a fake Firestore (`test/fake/`, swapped in with an import
+map) and reads back what would truly have been written, then runs
+`test/undefined-calls.py`, which reports any function called but never defined or
+imported. Add a case to `test/marking.html` whenever marking changes.
 
 ---
 

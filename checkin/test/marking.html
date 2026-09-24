@@ -1,0 +1,205 @@
+<!-- Checkin - a real browser test of marking.
+     Run it: python3 -m http.server 8731 (from the checkin folder), then
+       google-chrome --headless=new --virtual-time-budget=12000 \
+         --dump-dom "http://localhost:8731/test/marking.html" | sed -n '/RESULTS/,/DONE/p'
+     The import map swaps the Firebase SDK for the fakes in test/fake/, so this
+     drives the real results.js against an in-memory store and reads back what
+     would actually have been written. It exists because a missing import left
+     every mark box unwired and marks silently unsaved: node --check cannot see
+     that, and only running the page can. -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkin - marking test</title>
+<script type="importmap">
+{ "imports": {
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js": "./fake/app.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js": "./fake/auth.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js": "./fake/firestore.js"
+} }
+</script>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar"></div>
+  <main class="main-content">
+  <div id="page-error"></div>
+  <p class="tiny"><a id="back" href="home.html">Back</a></p>
+  <div class="spread"><div><h1 id="set-title">Loading</h1><p class="sub" id="set-sub"></p></div>
+  <span class="row"><a class="btn btn-quiet" id="edit-link">Edit</a><button id="export">CSV</button></span></div>
+  <div class="panel mt" id="controls"></div>
+  <div class="tabs">
+    <button class="tab active" data-view="scores">How they did</button>
+    <button class="tab" data-view="answers">What they wrote</button>
+  </div>
+  <div id="body"><p class="tiny">Loading.</p></div>
+  </main>
+</div>
+<pre id="RESULTS">running</pre>
+
+<script type="module">
+import { STORE, LOG, CONFIG } from './fake/firestore.js';
+
+const q = new URLSearchParams(location.search);
+CONFIG.latency = Number(q.get('latency') || 30);
+
+STORE.set('classes/C1', { name: 'Test class', ownerUid: 'teacher1', ownerName: 'Teacher One' });
+for (const [uid, name] of [['s1','Ana Apple'],['s2','Bo Berry'],['s3','Cy Cherry']]) {
+  STORE.set('classes/C1/members/' + uid, { name, email: uid + '@ex.com', role: 'student' });
+}
+const questions = [
+  { id: 'q1', type: 'mcq',  prompt: 'Pick one',      maxMark: 1, options: ['aa','bb','cc'] },
+  { id: 'q2', type: 'text', prompt: 'Explain fully', maxMark: 3 },
+  { id: 'q3', type: 'text', prompt: 'One word',      maxMark: 1 },
+  { id: 'q4', type: 'text', prompt: 'Two marks',     maxMark: 2 }
+];
+STORE.set('classes/C1/sets/S1', {
+  title: 'Test set', status: 'open', reveal: 'release', mode: 'self',
+  createdAt: { seconds: 1000 }, openedAt: { seconds: 1000 }, questions
+});
+STORE.set('classes/C1/sets/S1/keys/key', { key: { q1: 'A', q2: 'a model answer' } });
+for (const uid of ['s1','s2','s3']) {
+  STORE.set('classes/C1/sets/S1/responses/' + uid, {
+    name: uid, email: uid + '@ex.com',
+    answers: { q1: 'A', q2: 'they wrote something here', q3: 'word', q4: 'two mark answer' }
+  });
+}
+
+
+const ERRS = [];
+window.addEventListener('error', e => ERRS.push('window.onerror: ' + e.message));
+window.addEventListener('unhandledrejection', e => ERRS.push('unhandled: ' + (e.reason && e.reason.message || e.reason)));
+const realErr = console.error;
+console.error = (...a) => { ERRS.push('console.error: ' + a.map(x => (x && x.message) || String(x)).join(' ')); realErr(...a); };
+
+const out = [];
+const log = s => { out.push(s); document.getElementById('RESULTS').textContent = out.join('\n'); };
+let pass = 0, failn = 0;
+const check = (name, cond, extra) => {
+  (cond ? pass++ : failn++);
+  log((cond ? 'PASS  ' : 'FAIL  ') + name + (cond || extra === undefined ? '' : '  <<' + extra + '>>'));
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const marksOf = uid => (STORE.get('classes/C1/sets/S1/responses/' + uid) || {}).marks || {};
+const cellInput = (uid, qid) => document.querySelector('td[data-uid="' + uid + '"][data-qid="' + qid + '"] input');
+
+function type(input, text) {
+  input.focus();
+  input.value = text;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function leave(input) {
+  input.blur();
+  input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+}
+
+history.replaceState(null, '', location.pathname + '?c=C1&s=S1');
+await import('../js/results.js?v=test');
+await sleep(400);
+
+const scenario = q.get('scenario') || 'all';
+try {
+  if (scenario === 'all' || scenario === 'grid') {
+    log('--- grid marking ---');
+    check('grid rendered', !!cellInput('s1', 'q2'));
+
+    // 1. type a mark and leave
+    const a = cellInput('s1', 'q2');
+    type(a, '2'); leave(a);
+    await sleep(300);
+    check('typed mark saved to store', marksOf('s1').q2 && marksOf('s1').q2.awarded === 2,
+      JSON.stringify(marksOf('s1')));
+
+    // 2. it survives the repaint the snapshot causes
+    await sleep(300);
+    const again = cellInput('s1', 'q2');
+    check('mark still in the box after repaint', again && String(again.value) === '2',
+      again ? again.value : 'no box');
+    check('mark still in store after repaint', marksOf('s1').q2 && marksOf('s1').q2.awarded === 2,
+      JSON.stringify(marksOf('s1')));
+
+    // 3. tab straight through three boxes without typing: full marks each
+    for (const qid of ['q2','q3','q4']) {
+      const box = cellInput('s2', qid);
+      box.focus();                       // focus fills in full marks
+      box.blur();
+    }
+    document.body.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    await sleep(400);
+    check('tabbing through awards full marks', marksOf('s2').q2 && marksOf('s2').q2.awarded === 3
+      && marksOf('s2').q3 && marksOf('s2').q3.awarded === 1
+      && marksOf('s2').q4 && marksOf('s2').q4.awarded === 2, JSON.stringify(marksOf('s2')));
+
+    // 4. rapid run down a column, each write landing mid-flight
+    const before = LOG.length;
+    for (const uid of ['s1','s2','s3']) {
+      const box = cellInput(uid, 'q4');
+      if (!box) { check('box present for ' + uid, false); continue; }
+      type(box, '1'); leave(box);
+      await sleep(60);                   // snapshot lands between students
+    }
+    await sleep(500);
+    check('all three saved in a rapid run',
+      marksOf('s1').q4 && marksOf('s1').q4.awarded === 1 &&
+      marksOf('s2').q4 && marksOf('s2').q4.awarded === 1 &&
+      marksOf('s3').q4 && marksOf('s3').q4.awarded === 1,
+      ['s1','s2','s3'].map(u => u + ':' + JSON.stringify(marksOf(u).q4)).join(' '));
+    check('rapid run wrote no more than one write per mark', LOG.length - before <= 4,
+      'writes=' + (LOG.length - before));
+  }
+
+  if (scenario === 'all' || scenario === 'written') {
+    log('--- written answers tab ---');
+    document.querySelector('.tab[data-view="answers"]').click();
+    await sleep(250);
+    const scope = document.querySelector('[data-mark-scope][data-uid="s3"][data-qid="q2"]');
+    check('written panel rendered', !!scope);
+    if (scope) {
+      const num = scope.querySelector('[data-mark]');
+      type(num, '2'); leave(num);
+      await sleep(700);
+      check('written mark saved', marksOf('s3').q2 && marksOf('s3').q2.awarded === 2,
+        JSON.stringify(marksOf('s3').q2));
+
+      const full = [...scope.querySelectorAll('[data-set-mark]')].find(b => b.dataset.setMark === '3');
+      if (full) { full.click(); await sleep(500); }
+      check('Full button saved', marksOf('s3').q2 && marksOf('s3').q2.awarded === 3,
+        JSON.stringify(marksOf('s3').q2));
+
+      const zero = [...scope.querySelectorAll('[data-set-mark]')].find(b => b.dataset.setMark === '0');
+      if (zero) { zero.click(); await sleep(500); }
+      check('Zero button saved', marksOf('s3').q2 && marksOf('s3').q2.awarded === 0,
+        JSON.stringify(marksOf('s3').q2));
+
+      const scope2 = document.querySelector('[data-mark-scope][data-uid="s3"][data-qid="q2"]');
+      const comment = scope2 && scope2.querySelector('[data-comment]');
+      if (comment) {
+        comment.focus();
+        comment.value = 'good effort';
+        comment.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(1200);
+      }
+      check('comment kept the mark', marksOf('s3').q2 && marksOf('s3').q2.awarded === 0
+        && marksOf('s3').q2.comment === 'good effort', JSON.stringify(marksOf('s3').q2));
+    }
+  }
+
+  if (scenario === 'all' || scenario === 'reload') {
+    log('--- what a reload would read ---');
+    for (const uid of ['s1','s2','s3']) log('  ' + uid + ': ' + JSON.stringify(marksOf(uid)));
+  }
+} catch (err) {
+  check('test run threw', false, err && err.message);
+}
+
+log('');
+log(pass + ' passed, ' + failn + ' failed');
+log('');
+log('--- writes to response docs ---');
+LOG.filter(w => w.path.includes('/responses/')).forEach(w => log('  ' + w.op + ' ' + w.path + ' ' + JSON.stringify(w.data)));
+log('--- errors ---');
+(ERRS.length ? ERRS : ['none']).forEach(e => log('  ' + e));
+log('--- page error box ---');
+log('  ' + (document.getElementById('page-error').textContent || 'empty'));
+log('DONE');
+
+</script>
+</body></html>
