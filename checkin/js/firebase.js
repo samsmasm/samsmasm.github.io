@@ -1,7 +1,8 @@
 // Checkin - Firebase app, auth and Firestore.
-// Reuses the existing "dowserboard" Firebase project. UniQuiz and FMW Skills use
-// that project's Realtime Database; this tool uses Firestore, which has its own
-// separate ruleset, so nothing here can affect those older tools.
+// Uses the "coldwar-d8109" Firebase project. The only other tool in it is
+// Operation: Shadow Protocol (/coldwar), which uses that project's Realtime
+// Database. Checkin uses Firestore, a separate database with a separate
+// ruleset, so nothing here can affect it.
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
@@ -9,14 +10,14 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
+// No databaseURL here on purpose: Checkin never touches the Realtime Database.
 const firebaseConfig = {
-  apiKey: "AIzaSyBGdNJgl1PG0IueYQk_jjn4cOg-sMFbHe0",
-  authDomain: "dowserboard.firebaseapp.com",
-  projectId: "dowserboard",
-  databaseURL: "https://dowserboard-default-rtdb.firebaseio.com",
-  storageBucket: "dowserboard.firebasestorage.app",
-  messagingSenderId: "1032600748722",
-  appId: "1:1032600748722:web:1584c7508fbbca617cbfab"
+  apiKey: "AIzaSyDMlxhx94WHh-nVOyLPDEfEIY-ohGX7KRY",
+  authDomain: "coldwar-d8109.firebaseapp.com",
+  projectId: "coldwar-d8109",
+  storageBucket: "coldwar-d8109.firebasestorage.app",
+  messagingSenderId: "329049097500",
+  appId: "1:329049097500:web:fd7184fb4c0ba011db66d9"
 };
 
 const app = initializeApp(firebaseConfig);

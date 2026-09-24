@@ -1,19 +1,24 @@
 # Checkin - setup
 
 Static pages on unisam.nz, with Google sign-in and Firestore in the existing
-**dowserboard** Firebase project. UniQuiz and FMW Skills use that project's
-Realtime Database; this tool uses Firestore, which has a completely separate
-ruleset, so nothing here can break those.
+**coldwar-d8109** Firebase project. The only other tool in that project is
+Operation: Shadow Protocol (`/coldwar`), which uses its Realtime Database and
+its own password scheme rather than Firebase Auth. Checkin uses Firestore, a
+separate database with a separate ruleset, so nothing here can break it.
 
 Live at `unisam.nz/checkin/`.
 
 ## Console steps, once
 
-All of these are in the Firebase console for the **dowserboard** project, and
-none of them can be done from here.
+All of these are in the Firebase console for the **coldwar-d8109** project, and
+none of them can be done from here. That project has never had Authentication or
+Firestore switched on, so both start from nothing.
 
-1. **Authentication > Sign-in method**: enable **Google**. Set the support email
-   to your own address.
+1. **Authentication**: press **Get started** first, because the project has no
+   auth configuration at all and the sign-in method list does not appear until
+   you do. Then **Sign-in method > Google > Enable**, and set the support email
+   to your own address. Skipping the Get started step is what produces
+   `auth/configuration-not-found` at sign-in.
 2. **Authentication > Settings > Authorized domains**: add `unisam.nz`, and
    `samsmasm.github.io` too if you ever open the site on that address. Sign-in
    fails with `auth/unauthorized-domain` on any address not listed.
@@ -23,6 +28,11 @@ none of them can be done from here.
    Do not use the default open test rules.
 4. **Firestore Database > Rules**: paste the contents of `firestore.rules`
    from this folder and publish.
+
+Take care to use the **Firestore Database > Rules** tab, not the similar looking
+**Realtime Database > Rules** tab. Overwriting the Realtime Database rules would
+break Operation: Shadow Protocol, which is the one realistic way this setup goes
+wrong.
 
 No indexes need creating: every query is a single collection ordered by one
 field, which Firestore indexes automatically.

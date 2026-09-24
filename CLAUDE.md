@@ -26,7 +26,7 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   turtle/                 ← Turtle Artist: kids' turtle-graphics tool (single HTML, see CLAUDE.md inside)
   graphs/                 ← Economics Graph Drawer (see CLAUDE.md inside)
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
-  checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore, see SETUP.md inside)
+  checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore in coldwar-d8109, see SETUP.md inside)
   qreview/                ← IB continual revision / flashcard tool
   reports/                ← automated student report tools (see CLAUDE.md inside)
   cultivar/               ← genetics/cultivar tool (see CLAUDE.md inside)
