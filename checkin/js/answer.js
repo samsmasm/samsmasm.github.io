@@ -4,15 +4,16 @@
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, getSet, getResponse, watchSet,
   computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
-  amMember, joinClass
+  amMember, joinClass, practiceAllowed, newAttemptId, startPractice, savePracticeAnswer
 } from './core.js';
 import { mountSet } from './answering.js';
 
 const classId = qp('c');
 const setId = qp('s');
-const focusQid = qp('q');      // set by a QR code pointing at one question
-const joinCode = qp('j');      // carried by a QR code so a new student gets in
-let me = null, cls = null, set = null, view = null;
+const focusQid = qp('q');            // set by a QR code pointing at one question
+const joinCode = qp('j');            // carried by a QR code so a new student gets in
+const practice = qp('practice') === '1';   // a private run at a set already done
+let me = null, cls = null, set = null, view = null, attemptId = null;
 
 (async function start() {
   me = await requireUser();
@@ -35,26 +36,60 @@ let me = null, cls = null, set = null, view = null;
     return;
   }
 
-  document.title = (set.title || 'Questions') + ' - Checkin';
+  if (practice && !practiceAllowed(set)) {
+    document.getElementById('set-title').textContent = set.title || 'Questions';
+    document.getElementById('set-view').innerHTML =
+      '<div class="panel"><p>This set is not open for practice at the moment. ' +
+      'Your teacher decides when a set can be redone.</p>' +
+      '<p class="mt"><a class="btn" href="class.html?c=' + encodeURIComponent(classId) +
+      '">Back to the class</a></p></div>';
+    return;
+  }
+
+  document.title = (practice ? 'Practice: ' : '') + (set.title || 'Questions') + ' - Checkin';
   document.getElementById('set-title').textContent = set.title || 'Questions';
 
   const marks = computeMarks(set, response, set.key || {});
   const done = answeredCount(set, response);
   const bits = [cls.name];
-  bits.push(set.status === 'open' ? 'open now' : 'closed ' + fmtDate(set.closedAt || set.openedAt));
-  if (done && studentsMaySeeKey(set)) {
-    bits.push(totalAwarded(set, marks) + ' out of ' + maxScore(set));
-  } else if (done && set.reveal === 'release' && !set.resultsReleased) {
-    bits.push('marks not released yet');
+  if (practice) {
+    bits.push('practice run');
+  } else {
+    bits.push(set.status === 'open' ? 'open now' : 'closed ' + fmtDate(set.closedAt || set.openedAt));
+    if (done && studentsMaySeeKey(set)) {
+      bits.push(totalAwarded(set, marks) + ' out of ' + maxScore(set));
+    } else if (done && set.reveal === 'release' && !set.resultsReleased) {
+      bits.push('marks not released yet');
+    }
   }
   document.getElementById('set-sub').textContent = bits.join(' · ');
 
+  if (practice) {
+    attemptId = newAttemptId();
+    try {
+      await startPractice(classId, setId, me.uid, attemptId);
+    } catch (err) { return fail('Starting a practice run', err); }
+    const banner = document.createElement('div');
+    banner.className = 'panel panel-green';
+    banner.innerHTML = '<p>Practice run. Your answers here are yours alone: they do not ' +
+      'change your marked work and your teacher does not see them. Multiple choice tells ' +
+      'you straight away whether you are right.</p>';
+    const host = document.getElementById('set-view');
+    host.parentNode.insertBefore(banner, host);
+  }
+
   view = mountSet({
     el: document.getElementById('set-view'),
-    classId, user: me, set, response, focusQid
+    classId, user: me, set,
+    response: practice ? null : response,
+    focusQid, practice,
+    onSaveAnswer: practice
+      ? (qid, value) => savePracticeAnswer(classId, setId, me.uid, attemptId, qid, value)
+      : null,
+    onRestart: practice ? () => location.reload() : null
   });
 
-  if (set.status === 'open') {
+  if (!practice && set.status === 'open') {
     watchSet(classId, setId, next => {
       if (next.status !== 'open') { location.reload(); return; }
       view.update(next);

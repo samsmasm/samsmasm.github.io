@@ -13,7 +13,8 @@ function firstUnanswered(set, answers) {
   return i === -1 ? 0 : i;
 }
 
-export function mountSet({ el, classId, user, set, key, response, onChange, focusQid }) {
+export function mountSet({ el, classId, user, set, key, response, onChange, focusQid,
+                           practice, onSaveAnswer, onRestart }) {
   let answers = { ...((response && response.answers) || {}) };
   let marks = { ...((response && response.marks) || {}) };
   let submitted = !!(response && response.submittedAt);
@@ -28,7 +29,34 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
   const savers = {};
 
   function editable() {
-    return set.status === 'open';
+    // A practice run is always answerable, which is the point: the set it is
+    // practising is usually closed.
+    return practice ? true : set.status === 'open';
+  }
+
+  function saveOne(qid, value) {
+    return onSaveAnswer
+      ? onSaveAnswer(qid, value)
+      : saveAnswer(classId, set.id, user, qid, value);
+  }
+
+  // How the multiple choice is going, worked out here rather than stored, since
+  // a practice run is never written to the marked record.
+  function practiceScore() {
+    const mcq = (set.questions || []).filter(q => q.type === 'mcq');
+    if (!mcq.length || !set.key) return 'No multiple choice in this one, so nothing marks itself.';
+    let got = 0, outOf = 0, done = 0;
+    for (const q of mcq) {
+      outOf += Number(q.maxMark) || 1;
+      const given = answers[q.id];
+      if (!isAnswered(given)) continue;
+      done++;
+      if (String(given).trim().toUpperCase() === String(set.key[q.id] || '').trim().toUpperCase()) {
+        got += Number(q.maxMark) || 1;
+      }
+    }
+    if (!done) return 'Multiple choice marks itself as you go.';
+    return got + ' of ' + outOf + ' on the multiple choice';
   }
 
   function visibleLimit() {
@@ -61,6 +89,27 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
     return bits.length ? '<p class="feedback">' + bits.join(' &middot; ') + '</p>' : '';
   }
 
+  // Typing must not re-render, or the textarea being typed in is destroyed and
+  // the cursor lost. So patch the few things that depend on how much is answered.
+  function refreshProgress() {
+    const qs = set.questions || [];
+    el.querySelectorAll('[data-go]').forEach(dot => {
+      const item = qs[Number(dot.dataset.go)];
+      if (item) dot.classList.toggle('done', isAnswered(answers[item.id]));
+    });
+    const done = qs.filter(item => isAnswered(answers[item.id])).length;
+    const counter = el.querySelector('[data-count]');
+    if (counter) counter.textContent = done + ' of ' + qs.length + ' answered';
+    const score = el.querySelector('[data-practice]');
+    if (score) score.textContent = practiceScore();
+    const hand = el.querySelector('[data-finish]');
+    if (hand) {
+      const all = done === qs.length;
+      hand.textContent = all ? 'Hand in' : 'Hand in anyway';
+      hand.className = all ? 'btn-go' : 'btn-quiet';
+    }
+  }
+
   function render() {
     const qs = set.questions || [];
     if (!qs.length) {
@@ -79,7 +128,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
     const keyLetter = showKey && q.type === 'mcq' ? String(set.key[q.id] || '').toUpperCase() : '';
 
     const kicker = (set.mode === 'live' ? 'Live' : 'Question') + ' ' + (idx + 1) + ' of ' + qs.length +
-      (set.status === 'closed' ? ' &middot; this set is closed' : '') +
+      (practice ? ' &middot; practice' : set.status === 'closed' ? ' &middot; this set is closed' : '') +
       ((Number(q.maxMark) || 1) > 1 ? ' &middot; ' + q.maxMark + ' marks' : '');
 
     let body;
@@ -123,13 +172,19 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
         '</div>';
 
     const answeredAll = qs.every(item => isAnswered(answers[item.id]));
-    const finish = (!focused && set.mode !== 'live' && editable())
+    const practiceRow = practice
+      ? '<div class="row mt">' +
+          '<button data-restart class="btn-quiet">Start again</button>' +
+          '<span class="tiny" data-practice>' + esc(practiceScore()) + '</span>' +
+        '</div>'
+      : '';
+    const finish = (!practice && !focused && set.mode !== 'live' && editable())
       ? '<div class="row mt">' +
           (submitted
             ? '<span class="saved">Handed in. You can still change your answers until the set closes.</span>'
             : '<button data-finish class="' + (answeredAll ? 'btn-go' : 'btn-quiet') + '">' +
               (answeredAll ? 'Hand in' : 'Hand in anyway') + '</button>' +
-              '<span class="tiny">' + qs.filter(item => isAnswered(answers[item.id])).length +
+              '<span class="tiny" data-count>' + qs.filter(item => isAnswered(answers[item.id])).length +
               ' of ' + qs.length + ' answered</span>') +
         '</div>'
       : '';
@@ -142,7 +197,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
         feedbackFor(q, showKey) +
         nav +
         (dots ? '<div class="dots">' + dots + '</div>' : '') +
-        finish +
+        finish + practiceRow +
       '</div>';
 
     wire(q);
@@ -158,7 +213,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
         savers[q.id] = debounce(async value => {
           const note = el.querySelector('[data-savenote]');
           try {
-            await saveAnswer(classId, set.id, user, q.id, value);
+            await saveOne(q.id, value);
             if (note) { note.className = 'saved'; note.textContent = 'Saved.'; }
             if (onChange) onChange();
           } catch (err) {
@@ -171,6 +226,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
         answers[q.id] = area.value;
         const note = el.querySelector('[data-savenote]');
         if (note) { note.className = 'tiny'; note.textContent = 'Saving.'; }
+        refreshProgress();
         savers[q.id](area.value);
       });
     }
@@ -182,6 +238,9 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
         idx = Math.max(0, Math.min(visibleLimit(), idx + Number(btn.dataset.step)));
         render();
       }));
+
+    const restart = el.querySelector('[data-restart]');
+    if (restart && onRestart) restart.addEventListener('click', onRestart);
 
     const hand = el.querySelector('[data-finish]');
     if (hand) hand.addEventListener('click', async () => {
@@ -200,7 +259,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
     answers[q.id] = letter;
     render();
     try {
-      await saveAnswer(classId, set.id, user, q.id, letter);
+      await saveOne(q.id, letter);
       if (onChange) onChange();
     } catch (err) {
       console.error(err);

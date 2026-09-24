@@ -90,19 +90,19 @@ function renderQuestions() {
       '<div data-part="mcq" class="' + (q.type === 'mcq' ? '' : 'hidden') + '">' +
         mcqBits +
         '<div class="row mt">' +
-          '<span class="label" style="margin:0">Correct</span>' +
+          '<span class="label" style="margin:0">Correct answer</span>' +
           '<select data-f="correct" style="width:auto">' +
             '<option value="">not set</option>' +
             LETTERS.slice(0, 4).map(l =>
               '<option value="' + l + '"' + (answer.toUpperCase() === l ? ' selected' : '') + '>' + l + '</option>').join('') +
           '</select>' +
-          '<span class="label" style="margin:0">Out of</span>' +
+          '<span class="label" style="margin:0">Marks for this question</span>' +
           '<input type="number" data-f="maxMark" min="1" max="100" value="' + (Number(q.maxMark) || 1) + '">' +
         '</div>' +
       '</div>' +
       '<div data-part="text" class="' + (q.type === 'text' ? '' : 'hidden') + '">' +
         '<div class="row mt">' +
-          '<span class="label" style="margin:0">Out of</span>' +
+          '<span class="label" style="margin:0">Marks for this question</span>' +
           '<input type="number" data-f="maxMark2" min="1" max="100" value="' + (Number(q.maxMark) || 1) + '">' +
           '<span class="tiny">1 mark gives you a right or wrong toggle when you mark.</span>' +
         '</div>' +
@@ -279,6 +279,14 @@ async function save(thenOpen) {
   if (blank >= 0) return note('save-note', 'Question ' + (blank + 1) + ' has no text.', 'savefail');
   const thinMcq = set.questions.findIndex(q => q.type === 'mcq' && (q.options || []).length < 2);
   if (thinMcq >= 0) return note('save-note', 'Question ' + (thinMcq + 1) + ' needs at least two options.', 'savefail');
+  // Without a correct answer a multiple choice question can never mark itself,
+  // and nothing downstream would tell you, so catch it here.
+  const noAnswer = set.questions.findIndex(q => q.type === 'mcq' && !key[q.id]);
+  if (noAnswer >= 0) {
+    return note('save-note',
+      'Question ' + (noAnswer + 1) + ' has no correct answer chosen, so it could never be marked.',
+      'savefail');
+  }
 
   btns.forEach(b => b.disabled = true);
   note('save-note', 'Saving.', 'tiny');

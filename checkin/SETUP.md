@@ -27,7 +27,8 @@ Firestore switched on, so both start from nothing.
    Production mode, and pick a region near you (`australia-southeast1`).
    Do not use the default open test rules.
 4. **Firestore Database > Rules**: paste the contents of `firestore.rules`
-   from this folder and publish.
+   from this folder and publish. Do this again whenever that file changes, since
+   the console holds its own copy: the rules are not deployed from this repo.
 
 Take care to use the **Firestore Database > Rules** tab, not the similar looking
 **Realtime Database > Rules** tab. Overwriting the Realtime Database rules would
@@ -82,6 +83,25 @@ wins.
 The QR drawing library comes from cdnjs at page load. If it is blocked, the page
 says so and still shows the link in text.
 
+## Practice retakes
+
+A student who has done a set can press **Try again** for a private practice run.
+Turn it on per set with **Allow practice retakes** on the responses page. The
+button only appears once results are released, because until then the student's
+browser holds no answer key and a retake could tell them nothing.
+
+Practice answers go to `responses/{uid}/retakes/{attemptId}`, which the rules
+make readable and writable by that student alone. The teacher is deliberately
+not given read access, so revising in private cannot become something a student
+is judged on. Nothing about a practice run touches the marked record: the grid,
+the totals and the CSV always show the original attempt.
+
+Multiple choice marks itself during a practice run. Written answers get no
+feedback, because nobody is reading them.
+
+Putting results back on hold also switches practice off, otherwise students
+would keep an answer key they are no longer meant to have.
+
 ## Known limits of the prototype
 
 - A student who knows a class id could add themselves to that class without the
@@ -95,6 +115,9 @@ says so and still shows the link in text.
   results. The interface respects the setting.
 - In live mode the interface stops a student running ahead of you, but the rules
   do not, so a determined student could answer a later question early.
+- The per-set practice switch is enforced in the interface, not in the rules, so
+  a determined student could store a practice run on a set you have not opened
+  for it. It stays private to them either way, so there is nothing to gain.
 - Editing questions in a set that students have already answered keeps the
   answers attached to the questions they belong to, because questions carry
   their own ids. Deleting a question does orphan any answers to it.

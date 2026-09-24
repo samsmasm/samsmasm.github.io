@@ -4,7 +4,7 @@
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, amMember, getResponse,
   watchSet, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
-  myClasses, forgetClass, doc, db
+  practiceAllowed, myClasses, forgetClass, doc, db
 } from './core.js';
 import { mountSet } from './answering.js';
 import { updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -129,14 +129,26 @@ async function paintPrevious(sets) {
     if (showScore) meta.push('<b>' + totalAwarded(set, marks) + ' out of ' + maxScore(set) + '</b>');
     else if (done && set.reveal === 'release') meta.push('marks not released yet');
 
+    const link = 'answer.html?c=' + encodeURIComponent(classId) + '&s=' + set.id;
+    const actions = [];
+    if (done) {
+      actions.push('<a class="btn btn-quiet" href="' + link + '">Review marked answers</a>');
+    } else {
+      actions.push('<a class="btn" href="' + link + '">' +
+        (set.status === 'open' ? 'Answer these' : 'See the questions') + '</a>');
+    }
+    if (practiceAllowed(set)) {
+      actions.push('<a class="btn" href="' + link + '&practice=1">Try again</a>');
+    }
+
     return '<div class="index-row">' +
       '<span class="grow">' +
-        '<a class="index-name" href="answer.html?c=' + encodeURIComponent(classId) + '&s=' + set.id + '">' +
-          esc(set.title || 'Untitled') + '</a>' +
+        '<a class="index-name" href="' + link + '">' + esc(set.title || 'Untitled') + '</a>' +
         ' <span class="state state-' + set.status + '">' + (set.status === 'open' ? 'still open' : 'closed') + '</span>' +
         '<br><span class="index-desc">' + total + (total === 1 ? ' question' : ' questions') + '</span>' +
       '</span>' +
       '<span class="index-meta">' + meta.join('<br>') + '<br>' + fmtDate(set.openedAt || set.createdAt) + '</span>' +
+      '<span class="row" style="flex-basis:100%">' + actions.join('') + '</span>' +
     '</div>';
   }));
 

@@ -147,6 +147,12 @@ function paintControls() {
         ? '<button data-act="hold" class="btn-on">Results released, hold them back</button>'
         : '<button data-act="release">Release results to students</button>') +
       '<a class="btn" target="_blank" href="' + qrLink() + '">Show QR code</a>' +
+      // Practice only makes sense once results are out, because until then a
+      // student's browser has no answer key and a retake could tell them nothing.
+      (set.resultsReleased
+        ? '<button data-act="retake" class="' + (set.allowRetake ? 'btn-on' : '') + '">' +
+          (set.allowRetake ? 'Practice retakes on' : 'Allow practice retakes') + '</button>'
+        : '') +
     '</div>' +
     '<p class="tiny">' +
       (set.reveal === 'now'
@@ -154,6 +160,10 @@ function paintControls() {
         : 'Students see nothing until you release results. ') +
       answered.length + ' of ' + members.length + ' students have answered something' +
       (toMark ? ', and ' + toMark + ' have written answers waiting for a mark' : '') + '.' +
+      (set.allowRetake
+        ? ' Students can redo this set for practice. Those runs are private to them, ' +
+          'so they never reach you or change anything you have marked.'
+        : '') +
     '</p>' +
     live;
 
@@ -181,9 +191,13 @@ async function onControl(btn) {
       set.key = await syncKeyVisibility(classId, set);
     } else if (act === 'hold') {
       set.resultsReleased = false;
-      await saveSet(classId, setId, { resultsReleased: false });
+      set.allowRetake = false;
+      await saveSet(classId, setId, { resultsReleased: false, allowRetake: false });
       await syncKeyVisibility(classId, set);
       delete set.key;
+    } else if (act === 'retake') {
+      set.allowRetake = !set.allowRetake;
+      await saveSet(classId, setId, { allowRetake: set.allowRetake });
     } else if (act === 'next' || act === 'prev') {
       const i = Math.max(0, Math.min((set.questions || []).length - 1,
         (Number(set.liveIndex) || 0) + (act === 'next' ? 1 : -1)));
@@ -232,20 +246,33 @@ function paintScores() {
       if (given === undefined || given === null || String(given).trim() === '') {
         return '<td class="num cell-none">.</td>';
       }
-      const m = marks[q.id];
-      if (!m || m.awarded === undefined || m.awarded === null || m.awarded === '') {
-        return '<td class="num cell-none" title="not marked yet">?</td>';
-      }
+      const m = marks[q.id] || {};
       const full = Number(q.maxMark) || 1;
-      const got = Number(m.awarded) || 0;
-      const cls = got >= full ? 'cell-right' : got === 0 ? 'cell-wrong' : '';
-      return '<td class="num ' + cls + '">' + (full === 1 ? (got >= 1 ? 'right' : 'wrong') : got) + '</td>';
+      const where = ' data-uid="' + row.uid + '" data-qid="' + q.id + '" data-max="' + full + '"';
+
+      // Multiple choice marks itself, so the cell only reports. Hovering it
+      // still shows which option they picked.
+      if (q.type === 'mcq') {
+        const known = m.correct !== undefined;
+        const cls = !known ? 'cell-none' : m.correct ? 'cell-right' : 'cell-wrong';
+        const label = !known ? '?' : full === 1 ? (m.correct ? 'right' : 'wrong') : (m.correct ? full : 0);
+        return '<td class="num cell-peek ' + cls + '" tabindex="0"' + where + '>' + label + '</td>';
+      }
+
+      // Written answers are marked here, in the cell, without leaving the grid.
+      const awarded = (m.awarded === undefined || m.awarded === null) ? '' : m.awarded;
+      const cls = awarded === '' ? 'cell-todo' : Number(awarded) >= full ? 'cell-right'
+        : Number(awarded) === 0 ? 'cell-wrong' : '';
+      return '<td class="num cell-peek cell-mark ' + cls + '" data-mark-scope' + where + '>' +
+        '<input type="number" data-gridmark min="0" max="' + full + '" step="0.5" ' +
+          'aria-label="Mark out of ' + full + '" value="' + awarded + '">' +
+        '</td>';
     }).join('');
     const total = r ? totalAwarded(set, marks) : 0;
     return '<tr><td>' + esc(row.name) +
       (r && needsMarking(set, r) ? ' <span class="state state-todo">to mark</span>' : '') +
       '</td>' + cells +
-      '<td class="num"><b>' + (r ? total : '') + '</b></td>' +
+      '<td class="num"><b data-total="' + row.uid + '">' + (r ? total : '') + '</b></td>' +
       '<td class="num cell-none">' + maxScore(set) + '</td></tr>';
   }).join('');
 
@@ -267,8 +294,12 @@ function paintScores() {
 
   document.getElementById('body').innerHTML =
     '<div class="scroller"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
-    '<p class="tiny mt">A dot means no answer. A question mark means a written answer still needs a mark from you.</p>' +
+    '<p class="tiny mt">Hover or tap any answered cell to read what they put. ' +
+    'Written answers can be marked straight into the grid, and save as you type. ' +
+    'A dot means no answer, an empty box means a written answer still waiting on you.</p>' +
     '<p class="rule-label">Question by question</p>' + perQuestion;
+
+  wireGrid();
 }
 
 function paintAnswers() {
@@ -345,21 +376,11 @@ function paintAnswers() {
 
 function wireMarking() {
   const saveNow = async (scope, patchMark) => {
-    const uid = scope.dataset.uid;
-    const qid = scope.dataset.qid;
     const note = scope.querySelector('[data-note]');
-    const r = responses.get(uid) || { uid, marks: {} };
-    const marks = { ...(r.marks || {}) };
-    marks[qid] = { ...(marks[qid] || {}), ...patchMark, auto: false };
-    if (marks[qid].awarded === '' || marks[qid].awarded === null) delete marks[qid].awarded;
-    r.marks = marks;
-    responses.set(uid, r);
-    const score = totalAwarded(set, marks);
-    r.score = score;
     note.className = 'tiny';
     note.textContent = 'Saving.';
     try {
-      await saveMarks(classId, setId, uid, { marks, score, maxScore: maxScore(set) });
+      await applyMark(scope.dataset.uid, scope.dataset.qid, patchMark);
       note.className = 'saved';
       note.textContent = 'Saved';
       paintControls();
@@ -404,6 +425,124 @@ function wireMarking() {
       const push = debounce(() => saveNow(scope, { comment: comment.value.trim() }), 700);
       comment.addEventListener('input', push);
     }
+  });
+}
+
+/* ---------------- marking, shared by the grid and the per-question view ---------------- */
+
+// The one place a mark is written, so both views cannot drift apart.
+async function applyMark(uid, qid, patch) {
+  const r = responses.get(uid) || { uid, marks: {} };
+  const marks = { ...(r.marks || {}) };
+  marks[qid] = { ...(marks[qid] || {}), ...patch, auto: false };
+  const blank = marks[qid].awarded === '' || marks[qid].awarded === null || marks[qid].awarded === undefined;
+  if (blank) { delete marks[qid].awarded; delete marks[qid].correct; }
+  r.marks = marks;
+  responses.set(uid, r);
+  const score = totalAwarded(set, marks);
+  r.score = score;
+  await saveMarks(classId, setId, uid, { marks, score, maxScore: maxScore(set) });
+  return score;
+}
+
+/* ---------------- the hover panel that shows an answer ---------------- */
+
+let peekBox = null;
+
+function peekBody(cell) {
+  const uid = cell.dataset.uid, qid = cell.dataset.qid;
+  const r = responses.get(uid);
+  const q = (set.questions || []).find(item => item.id === qid);
+  if (!r || !q) return '';
+  const given = (r.answers && r.answers[qid]) || '';
+  const answer = q.type === 'mcq'
+    ? (() => {
+        const letter = String(given).toUpperCase();
+        const text = (q.options || [])[LETTERS.indexOf(letter)] || '';
+        return esc(letter) + '. ' + esc(text);
+      })()
+    : esc(given);
+  const model = key[qid]
+    ? '<p class="tiny mt">' + (q.type === 'mcq'
+        ? 'Correct answer: ' + esc(String(key[qid]).toUpperCase())
+        : 'Model answer: ' + esc(key[qid])) + '</p>'
+    : '';
+  return '<p class="label" style="margin-bottom:.35rem">' + esc(r.name || '') + '</p>' +
+    '<p class="tiny" style="margin-bottom:.5rem">' + esc(q.prompt) + '</p>' +
+    '<div class="peek-answer">' + answer + '</div>' + model;
+}
+
+function showPeek(cell) {
+  const html = peekBody(cell);
+  if (!html) return;
+  if (!peekBox) {
+    peekBox = document.createElement('div');
+    peekBox.className = 'peek';
+    document.body.appendChild(peekBox);
+  }
+  peekBox.innerHTML = html;
+  peekBox.classList.add('on');
+
+  const box = cell.getBoundingClientRect();
+  const width = Math.min(360, window.innerWidth - 24);
+  peekBox.style.width = width + 'px';
+  peekBox.style.left = Math.max(12,
+    Math.min(box.left + box.width / 2 - width / 2, window.innerWidth - width - 12)) + 'px';
+  // Below the cell, unless that would run off the bottom.
+  const below = box.bottom + 8;
+  peekBox.style.top = below + 'px';
+  if (below + peekBox.offsetHeight > window.innerHeight - 8) {
+    peekBox.style.top = Math.max(8, box.top - peekBox.offsetHeight - 8) + 'px';
+  }
+}
+
+function hidePeek() {
+  if (peekBox) peekBox.classList.remove('on');
+}
+
+window.addEventListener('scroll', hidePeek, true);
+
+/* ---------------- the grid ---------------- */
+
+function wireGrid() {
+  document.querySelectorAll('#body .cell-peek').forEach(cell => {
+    cell.addEventListener('mouseenter', () => showPeek(cell));
+    cell.addEventListener('mouseleave', hidePeek);
+    cell.addEventListener('focusin', () => showPeek(cell));
+    cell.addEventListener('focusout', hidePeek);
+    // A tap has no hover, so tapping a cell reads it out and puts the cursor in
+    // the mark box if there is one.
+    cell.addEventListener('click', () => {
+      const input = cell.querySelector('input');
+      if (input) input.focus(); else showPeek(cell);
+    });
+  });
+
+  document.querySelectorAll('#body [data-gridmark]').forEach(input => {
+    const cell = input.closest('[data-uid]');
+    const max = Number(cell.dataset.max) || 1;
+    const push = debounce(async () => {
+      let value = input.value === '' ? '' : Number(input.value);
+      if (value !== '' && (!Number.isFinite(value) || value < 0)) value = 0;
+      if (value !== '' && value > max) value = max;
+      if (value !== '') input.value = value;
+      try {
+        const score = await applyMark(cell.dataset.uid, cell.dataset.qid, {
+          awarded: value, correct: value !== '' && value >= max
+        });
+        const total = document.querySelector('[data-total="' + cell.dataset.uid + '"]');
+        if (total) total.textContent = score;
+        cell.classList.remove('cell-right', 'cell-wrong', 'cell-todo');
+        cell.classList.add(value === '' ? 'cell-todo' : value >= max ? 'cell-right'
+          : value === 0 ? 'cell-wrong' : 'cell-part');
+        cell.classList.add('cell-saved');
+        setTimeout(() => cell.classList.remove('cell-saved'), 900);
+        paintControls();
+      } catch (err) {
+        fail('Saving a mark', err);
+      }
+    }, 500);
+    input.addEventListener('input', push);
   });
 }
 

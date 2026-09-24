@@ -353,6 +353,38 @@ export async function saveMarks(classId, setId, uid, patch) {
   await setDoc(doc(db, 'classes', classId, 'sets', setId, 'responses', uid), patch, { merge: true });
 }
 
+/* ---------------- practice retakes ----------------
+   A retake lives under the student's own response document and is readable only
+   by them. It never touches the real attempt, so nothing the teacher has marked
+   can be overwritten by a student revising later.
+-------------------------------------------------- */
+
+export function newAttemptId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+function retakeRef(classId, setId, uid, attemptId) {
+  return doc(db, 'classes', classId, 'sets', setId, 'responses', uid, 'retakes', attemptId);
+}
+
+export async function startPractice(classId, setId, uid, attemptId) {
+  await setDoc(retakeRef(classId, setId, uid, attemptId), {
+    startedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+export async function savePracticeAnswer(classId, setId, uid, attemptId, qid, value) {
+  await setDoc(retakeRef(classId, setId, uid, attemptId), {
+    answers: { [qid]: value },
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+export function practiceAllowed(set) {
+  return set.allowRetake === true && studentsMaySeeKey(set);
+}
+
 /* ---------------- marking maths ---------------- */
 
 export function maxScore(set) {
