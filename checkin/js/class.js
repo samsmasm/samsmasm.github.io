@@ -1,4 +1,4 @@
-// Concept Check - a student's class page. The current question is waiting, large,
+// Checkin - a student's class page. The current question is waiting, large,
 // with everything older tucked behind Previous questions.
 
 import {
@@ -37,7 +37,7 @@ let me = null, cls = null, view = null, stopWatch = null;
       '<a href="teach.html?c=' + encodeURIComponent(classId) + '">Go to the teacher view</a>.';
   }
 
-  document.title = cls.name + ' - Concept Check';
+  document.title = cls.name + ' - Checkin';
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = cls.ownerName ? 'Set by ' + cls.ownerName : '';
   await healCachedName();

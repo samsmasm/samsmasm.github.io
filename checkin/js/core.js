@@ -1,4 +1,4 @@
-// Concept Check - shared helpers: auth guard, page chrome, data access, CSV.
+// Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
 import { db, auth, signIn, signOutNow, onAuth } from './firebase.js';
 import {

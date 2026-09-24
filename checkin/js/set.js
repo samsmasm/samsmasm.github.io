@@ -1,4 +1,4 @@
-// Concept Check - question set builder: manual entry plus CSV import.
+// Checkin - question set builder: manual entry plus CSV import.
 
 import {
   requireUser, qp, esc, fail, newId, LETTERS, BLANK_SET,
@@ -205,7 +205,7 @@ function wire() {
     'text,"Explain why demand for insulin is price inelastic.",,,,,"Few substitutes; it is a necessity; a small share of income",3\n';
   const link = document.getElementById('template');
   link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(template);
-  link.download = 'concept-check-template.csv';
+  link.download = 'checkin-template.csv';
 
   document.getElementById('save').addEventListener('click', () => save(false));
   document.getElementById('save-open').addEventListener('click', () => save(true));

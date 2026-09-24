@@ -1,4 +1,4 @@
-// Concept Check - sign-in page.
+// Checkin - sign-in page.
 
 import { signIn, onAuth, ensureUserDoc, qp, fail } from './core.js';
 

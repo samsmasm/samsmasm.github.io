@@ -1,4 +1,4 @@
-// Concept Check - teacher view of one set: live controls, scores, and marking
+// Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
 import {
@@ -29,7 +29,7 @@ let repaintQueued = false;
     members = await listMembers(classId);
   } catch (err) { return fail('Loading the set', err); }
 
-  document.title = (set.title || 'Responses') + ' - Concept Check';
+  document.title = (set.title || 'Responses') + ' - Checkin';
   document.getElementById('set-title').textContent = set.title || 'Untitled set';
   document.getElementById('set-sub').textContent = cls.name + ' · ' +
     (set.questions || []).length + ' questions · out of ' + maxScore(set);
@@ -44,6 +44,11 @@ let repaintQueued = false;
   watchResponses();
   paintControls();
 })();
+
+function qrLink(qid) {
+  return 'qr.html?c=' + encodeURIComponent(classId) + '&s=' + encodeURIComponent(setId) +
+    (qid ? '&q=' + encodeURIComponent(qid) : '');
+}
 
 /* ---------------- live response feed ---------------- */
 
@@ -141,6 +146,7 @@ function paintControls() {
       (set.resultsReleased
         ? '<button data-act="hold" class="btn-on">Results released, hold them back</button>'
         : '<button data-act="release">Release results to students</button>') +
+      '<a class="btn" target="_blank" href="' + qrLink() + '">Show QR code</a>' +
     '</div>' +
     '<p class="tiny">' +
       (set.reveal === 'now'
@@ -255,6 +261,7 @@ function paintScores() {
     return '<div class="index-row">' +
       '<span class="grow"><span class="index-desc"><b>' + (i + 1) + '.</b> ' + esc(q.prompt) + '</span></span>' +
       '<span class="index-meta">' + right + ' of ' + attempts.length + ' full marks</span>' +
+      '<a class="btn btn-quiet" target="_blank" href="' + qrLink(q.id) + '">QR</a>' +
     '</div>';
   }).join('');
 
@@ -326,7 +333,8 @@ function paintAnswers() {
 
     return '<div class="mt2">' +
       '<p class="rule-label" style="margin-top:0">Question ' + (i + 1) + ' &middot; ' +
-        (q.type === 'mcq' ? 'multiple choice' : 'short text, out of ' + (Number(q.maxMark) || 1)) + '</p>' +
+        (q.type === 'mcq' ? 'multiple choice' : 'short text, out of ' + (Number(q.maxMark) || 1)) +
+        ' &middot; <a target="_blank" href="' + qrLink(q.id) + '">QR code</a></p>' +
       '<p class="prompt prompt-small">' + esc(q.prompt) + '</p>' + modelLine + answers +
     '</div>';
   }).join('');

@@ -1,4 +1,4 @@
-// Concept Check - teacher view of one class: its question sets and its students.
+// Checkin - teacher view of one class: its question sets and its students.
 
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
@@ -21,7 +21,7 @@ let me = null, cls = null;
     return;
   }
 
-  document.title = cls.name + ' - Concept Check';
+  document.title = cls.name + ' - Checkin';
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = 'You teach this class.';
   document.getElementById('new-set').href = 'set.html?c=' + encodeURIComponent(classId) + '&new=1';
@@ -99,6 +99,8 @@ async function paintSets() {
           ? '<button data-act="close">Close set</button>'
           : '<button data-act="open">' + (set.status === 'draft' ? 'Open to class' : 'Reopen') + '</button>') +
         '<a class="btn" href="results.html?c=' + encodeURIComponent(classId) + '&s=' + set.id + '">Responses</a>' +
+        (set.status === 'draft' ? '' :
+          '<a class="btn" target="_blank" href="qr.html?c=' + encodeURIComponent(classId) + '&s=' + set.id + '">QR code</a>') +
         '<a class="btn btn-quiet" href="set.html?c=' + encodeURIComponent(classId) + '&s=' + set.id + '">Edit questions</a>' +
         '<button class="btn-warn" data-act="del">Delete</button>' +
       '</span>' +
@@ -148,7 +150,7 @@ async function onSetAction(btn, sets) {
 function wireStudents() {
   document.getElementById('copy-link').addEventListener('click', async () => {
     const link = location.origin + location.pathname.replace(/teach\.html$/, 'home.html');
-    const text = 'Join my Concept Check class: ' + link + '  code ' + (cls.joinCode || '');
+    const text = 'Join my Checkin class: ' + link + '  code ' + (cls.joinCode || '');
     const note = document.getElementById('code-note');
     try {
       await navigator.clipboard.writeText(text);

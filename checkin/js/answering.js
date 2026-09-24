@@ -1,4 +1,4 @@
-// Concept Check - the student's question view, shared by the class page and the
+// Checkin - the student's question view, shared by the class page and the
 // single set page. One question at a time, large, with dots to move between them.
 
 import { esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey } from './core.js';
@@ -13,11 +13,17 @@ function firstUnanswered(set, answers) {
   return i === -1 ? 0 : i;
 }
 
-export function mountSet({ el, classId, user, set, key, response, onChange }) {
+export function mountSet({ el, classId, user, set, key, response, onChange, focusQid }) {
   let answers = { ...((response && response.answers) || {}) };
   let marks = { ...((response && response.marks) || {}) };
   let submitted = !!(response && response.submittedAt);
-  let idx = set.mode === 'live' ? (Number(set.liveIndex) || 0) : firstUnanswered(set, answers);
+  const focusIndex = focusQid
+    ? (set.questions || []).findIndex(q => q.id === focusQid)
+    : -1;
+  const focused = focusIndex >= 0;
+  let idx = focused
+    ? focusIndex
+    : (set.mode === 'live' ? (Number(set.liveIndex) || 0) : firstUnanswered(set, answers));
   let lastLive = Number(set.liveIndex) || 0;
   const savers = {};
 
@@ -26,8 +32,12 @@ export function mountSet({ el, classId, user, set, key, response, onChange }) {
   }
 
   function visibleLimit() {
-    // In live mode a student can look back, but not ahead of the teacher.
-    return set.mode === 'live' ? Math.min(Number(set.liveIndex) || 0, (set.questions || []).length - 1) : (set.questions || []).length - 1;
+    // In live mode a student can look back, but not ahead of the teacher. A QR
+    // code is the teacher pointing at one question, so it ignores that limit.
+    if (focused) return (set.questions || []).length - 1;
+    return set.mode === 'live'
+      ? Math.min(Number(set.liveIndex) || 0, (set.questions || []).length - 1)
+      : (set.questions || []).length - 1;
   }
 
   function markFor(q) {
@@ -58,7 +68,8 @@ export function mountSet({ el, classId, user, set, key, response, onChange }) {
       return;
     }
     const limit = visibleLimit();
-    if (idx > limit) idx = Math.max(0, limit);
+    if (focused) idx = focusIndex;
+    else if (idx > limit) idx = Math.max(0, limit);
     const q = qs[idx];
     const given = answers[q.id];
     // The answer is only shown once they have committed to one, or once the set
@@ -95,20 +106,24 @@ export function mountSet({ el, classId, user, set, key, response, onChange }) {
         : '<p class="tiny">You did not answer this one.</p>';
     }
 
-    const dots = qs.map((item, n) =>
+    const dots = focused ? '' : qs.map((item, n) =>
       '<button class="dot' + (isAnswered(answers[item.id]) ? ' done' : '') + (n === idx ? ' here' : '') + '"' +
         (n > limit ? ' disabled' : '') + ' data-go="' + n + '" title="Question ' + (n + 1) + '">' + (n + 1) + '</button>'
     ).join('');
 
-    const nav = '<div class="row mt">' +
-      '<button data-step="-1"' + (idx === 0 ? ' disabled' : '') + '>Back</button>' +
-      '<button data-step="1"' + (idx >= limit ? ' disabled' : '') + ' class="btn-go">Next question</button>' +
-      (set.mode === 'live' && idx >= limit && set.status === 'open'
-        ? '<span class="tiny">Waiting for your teacher to move on.</span>' : '') +
-      '</div>';
+    const nav = focused
+      ? '<p class="tiny mt">This link is just for this question. ' +
+        '<a href="answer.html?c=' + encodeURIComponent(classId) + '&s=' + set.id + '">' +
+        'See the whole set</a></p>'
+      : '<div class="row mt">' +
+        '<button data-step="-1"' + (idx === 0 ? ' disabled' : '') + '>Back</button>' +
+        '<button data-step="1"' + (idx >= limit ? ' disabled' : '') + ' class="btn-go">Next question</button>' +
+        (set.mode === 'live' && idx >= limit && set.status === 'open'
+          ? '<span class="tiny">Waiting for your teacher to move on.</span>' : '') +
+        '</div>';
 
     const answeredAll = qs.every(item => isAnswered(answers[item.id]));
-    const finish = (set.mode !== 'live' && editable())
+    const finish = (!focused && set.mode !== 'live' && editable())
       ? '<div class="row mt">' +
           (submitted
             ? '<span class="saved">Handed in. You can still change your answers until the set closes.</span>'
@@ -126,7 +141,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange }) {
         body +
         feedbackFor(q, showKey) +
         nav +
-        '<div class="dots">' + dots + '</div>' +
+        (dots ? '<div class="dots">' + dots + '</div>' : '') +
         finish +
       '</div>';
 
@@ -205,7 +220,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange }) {
       const wasLive = lastLive;
       set = nextSet;
       lastLive = Number(set.liveIndex) || 0;
-      if (set.mode === 'live' && lastLive !== wasLive) idx = lastLive;
+      if (!focused && set.mode === 'live' && lastLive !== wasLive) idx = lastLive;
       render();
     },
     refresh(nextResponse) {

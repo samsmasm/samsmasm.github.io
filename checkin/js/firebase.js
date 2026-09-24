@@ -1,4 +1,4 @@
-// Concept Check - Firebase app, auth and Firestore.
+// Checkin - Firebase app, auth and Firestore.
 // Reuses the existing "dowserboard" Firebase project. UniQuiz and FMW Skills use
 // that project's Realtime Database; this tool uses Firestore, which has its own
 // separate ruleset, so nothing here can affect those older tools.

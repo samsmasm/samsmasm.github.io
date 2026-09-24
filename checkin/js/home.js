@@ -1,4 +1,4 @@
-// Concept Check - home page: the classes you teach, the classes you are in.
+// Checkin - home page: the classes you teach, the classes you are in.
 
 import { requireUser, myClasses, createClass, joinClass, esc, fail } from './core.js';
 
