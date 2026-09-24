@@ -1,0 +1,114 @@
+// Concept Check - Firestore security rules.
+// Paste these into the Firebase console for the dowserboard project:
+// Firestore Database > Rules > Publish.
+//
+// These rules cover Firestore only. UniQuiz and FMW Skills use that project's
+// Realtime Database, which has a separate ruleset and is not touched here.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function classDoc(cid) {
+      return get(/databases/$(database)/documents/classes/$(cid)).data;
+    }
+
+    function isTeacher(cid) {
+      return signedIn() && classDoc(cid).ownerUid == uid();
+    }
+
+    function isStudent(cid) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/classes/$(cid)/members/$(uid()));
+    }
+
+    function inClass(cid) {
+      return isTeacher(cid) || isStudent(cid);
+    }
+
+    // Each person's own record, including the cached list of their classes.
+    match /users/{userId} {
+      allow read, write: if signedIn() && userId == uid();
+    }
+
+    // Join codes are looked up one at a time by code, never listed.
+    match /joinCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.ownerUid == uid();
+      allow update, delete: if signedIn() && resource.data.ownerUid == uid();
+    }
+
+    match /classes/{cid} {
+      allow get: if inClass(cid);
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.ownerUid == uid();
+      allow update, delete: if isTeacher(cid);
+
+      // The roll. A student writes only their own entry, with their real Google
+      // address, and only if the teacher has not removed them.
+      match /members/{memberId} {
+        allow get: if isTeacher(cid) || memberId == uid();
+        allow list: if isTeacher(cid);
+        allow create: if signedIn()
+          && memberId == uid()
+          && request.resource.data.role == 'student'
+          && request.resource.data.email == request.auth.token.email
+          && !exists(/databases/$(database)/documents/classes/$(cid)/blocked/$(uid()));
+        allow update: if isTeacher(cid) || memberId == uid();
+        allow delete: if isTeacher(cid) || memberId == uid();
+      }
+
+      // Removed students. Only the teacher ever reads or writes this.
+      match /blocked/{blockedId} {
+        allow read, write: if isTeacher(cid);
+      }
+
+      match /sets/{sid} {
+        allow read: if inClass(cid);
+        allow write: if isTeacher(cid);
+
+        // The answer key. Copied onto the set document by the app only when
+        // students are allowed to see it, so until then it is unreadable here.
+        match /keys/{keyId} {
+          allow read, write: if isTeacher(cid);
+        }
+
+        // One document per student per set.
+        match /responses/{studentId} {
+          allow get: if isTeacher(cid) || studentId == uid();
+          allow list: if isTeacher(cid);
+
+          // A student may write only their own answers, only while the set is
+          // open, and may never touch the marks.
+          allow create: if isTeacher(cid) || (
+            isStudent(cid)
+            && studentId == uid()
+            && get(/databases/$(database)/documents/classes/$(cid)/sets/$(sid)).data.status == 'open'
+            && !('marks' in request.resource.data)
+            && !('score' in request.resource.data)
+          );
+
+          allow update: if isTeacher(cid) || (
+            isStudent(cid)
+            && studentId == uid()
+            && get(/databases/$(database)/documents/classes/$(cid)/sets/$(sid)).data.status == 'open'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['answers', 'name', 'email', 'updatedAt', 'submittedAt'])
+          );
+
+          allow delete: if isTeacher(cid);
+        }
+      }
+    }
+  }
+}
