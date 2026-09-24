@@ -1,12 +1,12 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=34ec0b0-2138';
+import { db, auth, signIn, signOutNow, onAuth, signInAnon } from './firebase.js?v=28ba446-0639';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-export { signIn, signOutNow, onAuth, auth, db, onSnapshot, doc, collection };
+export { signIn, signOutNow, onAuth, signInAnon, auth, db, onSnapshot, doc, collection };
 
 /* ---------------- small utilities ---------------- */
 
@@ -90,6 +90,24 @@ export function requireUser() {
   });
 }
 
+// The guard for a one off test, where the person answering has no account and is
+// never asked for one. It does not paint the shell, does not write a user
+// document and never redirects to the sign-in page: an anonymous account is
+// made quietly if there is not one already. A teacher who happens to be signed
+// in keeps their own account, which is what makes previewing a test work.
+export function requireAnyUser() {
+  return new Promise((resolve, reject) => {
+    const stop = onAuth(async user => {
+      stop();
+      if (user) return resolve(user);
+      try {
+        const cred = await signInAnon();
+        resolve(cred.user);
+      } catch (err) { reject(err); }
+    });
+  });
+}
+
 /* ---------------- the sidebar shell ---------------- */
 
 const ICONS = {
@@ -98,7 +116,8 @@ const ICONS = {
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v4"/></svg>',
   stack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>',
   people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 8.5a3 3 0 0 1 0 5"/></svg>',
-  qr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 20h1"/></svg>'
+  qr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 20h1"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.5 2M9 2h6"/></svg>'
 };
 
 const THEME_KEY = 'checkin_theme';
@@ -120,9 +139,13 @@ function setTheme(theme) {
 let shellUser = null;
 let shellExtras = [];
 
-// Pages with a class or a set in view add their own links to the sidebar.
-export function addShellLinks(items) {
+// Pages with a class or a set in view add their own links to the sidebar. The
+// heading over them is passed in because not everything that has a page of its
+// own is a class.
+let shellGroup = 'This class';
+export function addShellLinks(items, group) {
   shellExtras = items || [];
+  shellGroup = group || 'This class';
   paintShell();
 }
 
@@ -145,6 +168,13 @@ function paintShell() {
   } else if (role === 'teacher') {
     items.push({ label: 'Join a class', href: 'home.html?join=1', icon: 'key' });
   }
+  // One off tests belong to nobody's class, so they get their own place rather
+  // than hiding inside one. Kept off a student's menu because it would do
+  // nothing for them, but the page itself turns nobody away.
+  if (role !== 'student') {
+    items.push({ label: 'One offs', href: 'checks.html', icon: 'clock',
+                 match: p => p === 'checks.html' || p === 'check.html' });
+  }
 
   host.innerHTML =
     '<header class="topbar">' +
@@ -162,7 +192,8 @@ function paintShell() {
       '<nav class="sidebar-nav">' +
         items.map(i => navLink(i, page)).join('') +
         (shellExtras.length
-          ? '<div class="nav-group">This class</div>' + shellExtras.map(i => navLink(i, page)).join('')
+          ? '<div class="nav-group">' + esc(shellGroup) + '</div>' +
+            shellExtras.map(i => navLink(i, page)).join('')
           : '') +
       '</nav>' +
       '<div class="sidebar-footer">' +
@@ -248,6 +279,145 @@ async function rememberClass(uid, classId, name, role) {
 
 export async function forgetClass(uid, classId) {
   await updateDoc(doc(db, 'users', uid), { ['classes.' + classId]: deleteField() });
+}
+
+/* ---------------- one off tests ----------------
+   A one off test is for a room that is not a class: no roll, no accounts, no
+   join code to keep. It is stored as a container with `kind: 'oneoff'` and its
+   runs are ordinary question sets inside it, which is what lets the builder, the
+   marking views, the QR page and the student question view all work on it
+   unchanged. Nothing here is a second implementation of any of those.
+
+   A run is a batch: start the test again for the next group and you get a new
+   run with its own code and its own responses, so last period's answers are not
+   mixed into this period's.
+-------------------------------------------------- */
+
+export async function myChecks(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const map = (snap.exists() && snap.data().checks) || {};
+  return Object.entries(map)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+
+async function rememberCheck(uid, checkId, name) {
+  await updateDoc(doc(db, 'users', uid), {
+    ['checks.' + checkId]: { name, at: Date.now() }
+  });
+}
+
+export async function forgetCheck(uid, checkId) {
+  await updateDoc(doc(db, 'users', uid), { ['checks.' + checkId]: deleteField() });
+}
+
+export async function createCheck(user, name) {
+  const ref = doc(collection(db, 'classes'));
+  await setDoc(ref, {
+    name,
+    kind: 'oneoff',
+    ownerUid: user.uid,
+    ownerName: user.displayName || user.email,
+    createdAt: serverTimestamp()
+  });
+  await rememberCheck(user.uid, ref.id, name);
+  return ref.id;
+}
+
+export async function renameCheck(user, checkId, name) {
+  await updateDoc(doc(db, 'classes', checkId), { name });
+  await rememberCheck(user.uid, checkId, name);
+}
+
+export function isOneOff(container) {
+  return !!container && container.kind === 'oneoff';
+}
+
+async function freeRunCode() {
+  let code = randomCode();
+  for (let tries = 0; tries < 8; tries++) {
+    const taken = await getDoc(doc(db, 'runCodes', code));
+    if (!taken.exists()) break;
+    code = randomCode();
+  }
+  return code;
+}
+
+// Start the test again for a new group. The questions and the answer key are
+// copied, so editing this run can never rewrite what an earlier group was asked.
+export async function startRun(check, user, source) {
+  const code = await freeRunCode();
+  const runs = await listSets(check.id);
+  const ref = doc(collection(db, 'classes', check.id, 'sets'));
+
+  const set = {
+    ...BLANK_SET(),
+    title: check.name,
+    mode: (source && source.mode) || 'self',
+    reveal: (source && source.reveal) || 'release',
+    questions: (source && source.questions) || [],
+    runCode: code,
+    runLabel: 'Run ' + (runs.length + 1),
+    createdAt: serverTimestamp()
+  };
+
+  const batch = writeBatch(db);
+  batch.set(ref, set);
+  batch.set(doc(db, 'runCodes', code), {
+    classId: check.id,
+    setId: ref.id,
+    title: check.name,
+    ownerUid: user.uid
+  });
+  await batch.commit();
+
+  // The key is a separate teacher-only document, so it is copied separately.
+  if (source && source.key && Object.keys(source.key).length) {
+    await saveKey(check.id, ref.id, source.key);
+  }
+  return { id: ref.id, ...set };
+}
+
+export async function lookupRunCode(code) {
+  const snap = await getDoc(doc(db, 'runCodes', String(code).trim().toUpperCase()));
+  return snap.exists() ? { code: snap.id, ...snap.data() } : null;
+}
+
+export async function deleteRun(classId, set) {
+  if (set.runCode) await deleteDoc(doc(db, 'runCodes', set.runCode)).catch(() => {});
+  const names = await getDocs(collection(db, 'classes', classId, 'sets', set.id, 'names'));
+  for (const d of names.docs) await deleteDoc(d.ref);
+  await deleteSet(classId, set.id);
+}
+
+export async function deleteCheck(user, checkId) {
+  for (const set of await listSets(checkId)) await deleteRun(checkId, set);
+  await deleteDoc(doc(db, 'classes', checkId));
+  await forgetCheck(user.uid, checkId);
+}
+
+/* -------- names, in a room with no accounts --------
+   Whoever is answering types a name. Two people in one room typing the same
+   name would give the teacher two identical rows to mark, so a name is claimed:
+   one document per name per run, which a second claimant cannot create. The
+   claim is read one at a time by id, never listed, so nobody can pull out the
+   list of who is in the room.
+---------------------------------------------------- */
+
+export function nameSlug(name) {
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+}
+
+export async function claimName(classId, setId, uid, name) {
+  const slug = nameSlug(name);
+  if (!slug) return { ok: false, reason: 'empty' };
+  const ref = doc(db, 'classes', classId, 'sets', setId, 'names', slug);
+  const snap = await getDoc(ref);
+  if (snap.exists() && snap.data().uid !== uid) return { ok: false, reason: 'taken' };
+  if (!snap.exists()) {
+    await setDoc(ref, { uid, name: String(name).trim(), at: serverTimestamp() });
+  }
+  return { ok: true, slug };
 }
 
 /* ---------------- classes ---------------- */

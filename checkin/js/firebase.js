@@ -6,7 +6,8 @@
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
-  getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged
+  getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
+  signInAnonymously
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -37,4 +38,12 @@ export function signOutNow() {
 
 export function onAuth(cb) {
   return onAuthStateChanged(auth, cb);
+}
+
+// One off tests are answered by people with no account at all. Firestore still
+// needs someone to attribute a write to, so the browser is given a throwaway
+// account it never sees. It is not a sign-in: no name, no email, nothing to
+// remember, and nothing that follows them anywhere.
+export function signInAnon() {
+  return signInAnonymously(auth);
 }

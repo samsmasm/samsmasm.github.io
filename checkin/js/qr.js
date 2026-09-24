@@ -1,9 +1,9 @@
 // Checkin - a QR code big enough to scan from the back of the room. Each code
 // points at one question, so scanning lands a student on that question alone.
 
-import { requireUser, qp, esc, fail, getClass, getSet, addShellLinks
-} from './core.js?v=34ec0b0-2138';
-import { svgFor } from './qrsvg.js?v=34ec0b0-2138';
+import { requireUser, qp, esc, fail, getClass, getSet, isOneOff, addShellLinks
+} from './core.js?v=28ba446-0639';
+import { svgFor } from './qrsvg.js?v=28ba446-0639';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -26,15 +26,27 @@ let target = qp('q') || '';   // a question id, or empty for the whole set
 
   document.title = (set.title || 'QR code') + ' - Checkin';
   addShellLinks([
-    { label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId), icon: 'stack' },
+    { label: cls.name,
+      href: isOneOff(cls)
+        ? 'check.html?k=' + encodeURIComponent(classId)
+        : 'teach.html?c=' + encodeURIComponent(classId),
+      icon: isOneOff(cls) ? 'clock' : 'stack' },
     { label: set.title || 'This set', icon: 'qr',
       href: 'results.html?c=' + encodeURIComponent(classId) + '&s=' + setId }
-  ]);
+  ], isOneOff(cls) ? 'This one off' : 'This class');
   document.addEventListener('keydown', onKey);
   paint();
 })();
 
 function linkFor(qid) {
+  // A one off test goes somewhere else entirely: no class, no account, and the
+  // run's own code is the whole of the identity, so the link carries only that.
+  if (isOneOff(cls)) {
+    const base = location.origin + location.pathname.replace(/qr\.html$/, 'go.html');
+    const params = new URLSearchParams({ code: set.runCode || '' });
+    if (qid) params.set('q', qid);
+    return base + '?' + params.toString();
+  }
   const base = location.origin + location.pathname.replace(/qr\.html$/, 'answer.html');
   const params = new URLSearchParams({ c: classId, s: setId });
   if (qid) params.set('q', qid);

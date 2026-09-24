@@ -11,13 +11,25 @@ export function getFirestore() { return { fake: true }; }
 export function serverTimestamp() { return { __ts: true, at: Date.now() }; }
 export function deleteField() { return { __delete: true }; }
 
+let autoId = 0;
+
 export function doc(dbOrRef, ...parts) {
   const base = dbOrRef && dbOrRef.path ? dbOrRef.path.split('/') : [];
-  return { path: base.concat(parts).join('/'), type: 'doc' };
+  // doc(collectionRef) with nothing else means "make me an id", which is how the
+  // app asks for a new document it can write to in a batch.
+  if (!parts.length && dbOrRef && dbOrRef.type === 'col') {
+    parts = ['auto' + (++autoId) + Math.random().toString(36).slice(2, 7)];
+  }
+  const path = base.concat(parts).join('/');
+  // Real Firestore hands back a reference carrying its own id, and the app uses
+  // that id straight after creating a document. Leaving it off made every
+  // newly created thing unfindable.
+  return { path, id: path.split('/').pop(), type: 'doc' };
 }
 export function collection(dbOrRef, ...parts) {
   const base = dbOrRef && dbOrRef.path ? dbOrRef.path.split('/') : [];
-  return { path: base.concat(parts).join('/'), type: 'col' };
+  const path = base.concat(parts).join('/');
+  return { path, id: path.split('/').pop(), type: 'col' };
 }
 export function query(ref) { return ref; }
 export function orderBy() { return {}; }
@@ -109,9 +121,21 @@ export async function getDocs(ref) {
 }
 
 export function onSnapshot(ref, next, error) {
+  // A listener on one document and a listener on a collection are different
+  // shapes, and the app uses both: watchSet takes a document, the responses feed
+  // takes a collection. A fake that only did collections made a live set look
+  // fine here while throwing in the browser.
+  const onDoc = ref.type === 'doc';
   const entry = {
-    path: ref.path,
-    fire: () => next({ docs: docsIn(ref.path), empty: !docsIn(ref.path).length })
+    path: onDoc ? parentPath(ref.path) : ref.path,
+    fire: () => {
+      if (onDoc) {
+        const data = STORE.get(ref.path);
+        next({ id: ref.id, exists: () => data !== undefined, data: () => clone(data) });
+      } else {
+        next({ docs: docsIn(ref.path), empty: !docsIn(ref.path).length });
+      }
+    }
   };
   listeners.push(entry);
   setTimeout(entry.fire, 0);

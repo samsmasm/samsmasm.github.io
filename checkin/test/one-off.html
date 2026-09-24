@@ -1,0 +1,174 @@
+<!-- Checkin - a real browser test of a one off test, both ends.
+     The teacher makes one and starts a run, then two people with no account at
+     all answer it: the second tries the first one's name and must be turned
+     back. Drives the real check.js and go.js against the fake Firestore. -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkin - one off test</title>
+<link rel="stylesheet" href="../css/style.css">
+<script type="importmap">
+{ "imports": {
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js": "./fake/app.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js": "./fake/auth.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js": "./fake/firestore.js"
+} }
+</script>
+</head>
+<body>
+<pre id="RESULTS">running</pre>
+
+<script type="module">
+import { STORE, LOG } from './fake/firestore.js';
+import { FAKE_USER } from './fake/auth.js';
+
+const ERRS = [];
+window.addEventListener('error', e => ERRS.push('window.onerror: ' + e.message));
+window.addEventListener('unhandledrejection', e => ERRS.push('unhandled: ' + (e.reason && e.reason.message || e.reason)));
+
+const out = [];
+const log = s => { out.push(s); document.getElementById('RESULTS').textContent = out.join('\n'); };
+let pass = 0, failn = 0;
+const check = (name, cond, extra) => {
+  (cond ? pass++ : failn++);
+  log((cond ? 'PASS  ' : 'FAIL  ') + name + (cond || extra === undefined ? '' : '  <<' + extra + '>>'));
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const teacher = { uid: 'teacher1', displayName: 'Teacher One', email: 't@example.com' };
+STORE.set('users/teacher1', { email: teacher.email, name: teacher.displayName, classes: {}, role: 'teacher' });
+
+// The data layer straight, rather than through a page: this is the part a one
+// off test adds, and it has to be right before any page can be.
+const core = await import('../js/core.js?v=test');
+
+log('--- the teacher makes one ---');
+const checkId = await core.createCheck(teacher, 'Relief lesson check');
+const container = await core.getClass(checkId);
+check('it is marked as a one off', core.isOneOff(container), JSON.stringify(container.kind));
+check('it has no join code', !container.joinCode);
+check('it is on the teacher’s list of one offs',
+  (await core.myChecks('teacher1')).some(c => c.id === checkId));
+check('it is NOT on the teacher’s list of classes',
+  !(await core.myClasses('teacher1')).some(c => c.id === checkId),
+  JSON.stringify(await core.myClasses('teacher1')));
+
+const questions = [
+  { id: 'q1', type: 'mcq',  prompt: 'Pick one', maxMark: 1, options: ['right','wrong'] },
+  { id: 'q2', type: 'text', prompt: 'Say why',  maxMark: 2 }
+];
+const run1 = await core.startRun(container, teacher,
+  { questions, key: { q1: 'A' }, mode: 'self', reveal: 'now' });
+check('the run has its own code', /^[A-Z0-9]{6}$/.test(run1.runCode || ''), run1.runCode);
+check('the run is labelled', run1.runLabel === 'Run 1', run1.runLabel);
+check('the code points back at the run', await (async () => {
+  const found = await core.lookupRunCode(run1.runCode);
+  return found && found.classId === checkId && found.setId === run1.id;
+})());
+check('the answer key was copied, and is not on the set itself',
+  JSON.stringify(await core.getKey(checkId, run1.id)) === JSON.stringify({ q1: 'A' }));
+
+log('--- the run opens ---');
+await core.saveSet(checkId, run1.id, { status: 'open' });
+await core.syncKeyVisibility(checkId, { id: run1.id, ...(await core.getSet(checkId, run1.id)) });
+
+log('--- two people with no account answer it ---');
+FAKE_USER.current = null;                       // nobody is signed in
+const anon1 = (await core.signInAnon()).user;
+check('an anonymous account is handed out', !!anon1.uid && anon1.isAnonymous, JSON.stringify(anon1));
+
+const claim1 = await core.claimName(checkId, run1.id, anon1.uid, 'Sam Smith');
+check('the first person takes a name', claim1.ok, JSON.stringify(claim1));
+
+const anon2 = (await core.signInAnon()).user;
+check('the second person is a different account', anon2.uid !== anon1.uid);
+const clash = await core.claimName(checkId, run1.id, anon2.uid, 'sam  smith');
+check('the same name is refused, however it is typed',
+  !clash.ok && clash.reason === 'taken', JSON.stringify(clash));
+const claim2 = await core.claimName(checkId, run1.id, anon2.uid, 'Sam Smithers');
+check('a different name is taken', claim2.ok, JSON.stringify(claim2));
+const again = await core.claimName(checkId, run1.id, anon1.uid, 'Sam Smith');
+check('the first person may reclaim their own name on a reload', again.ok, JSON.stringify(again));
+
+// Answering, through the same call the question view makes.
+await core.saveAnswer(checkId, run1.id, { uid: anon1.uid, displayName: 'Sam Smith', email: '' }, 'q1', 'A');
+await core.saveAnswer(checkId, run1.id, { uid: anon1.uid, displayName: 'Sam Smith', email: '' }, 'q2', 'because of the thing');
+await core.saveAnswer(checkId, run1.id, { uid: anon2.uid, displayName: 'Sam Smithers', email: '' }, 'q1', 'B');
+
+const responses = await core.getResponses(checkId, run1.id);
+check('both answer sheets are separate', responses.length === 2, responses.length + ' sheets');
+check('a typed name is carried onto the sheet',
+  responses.map(r => r.name).sort().join(', ') === 'Sam Smith, Sam Smithers',
+  responses.map(r => r.name).join(', '));
+
+log('--- marking it is the same as marking anything ---');
+const set1 = await core.getSet(checkId, run1.id);
+const key1 = await core.getKey(checkId, run1.id);
+const sheet = responses.find(r => r.name === 'Sam Smith');
+const marks = core.computeMarks(set1, sheet, key1);
+check('multiple choice still marks itself', marks.q1 && marks.q1.correct === true, JSON.stringify(marks));
+await core.saveOneMark(checkId, run1.id, sheet.uid, 'q2', { awarded: 2, auto: false });
+const marked = await core.getResponse(checkId, run1.id, sheet.uid);
+check('a written mark saves', marked.marks.q2.awarded === 2, JSON.stringify(marked.marks));
+check('the total counts both', core.totalAwarded(set1, core.computeMarks(set1, marked, key1)) === 3,
+  String(core.totalAwarded(set1, core.computeMarks(set1, marked, key1))));
+
+log('--- running it again for the next group ---');
+FAKE_USER.current = teacher;
+const run2 = await core.startRun(container, teacher,
+  { questions: set1.questions, key: key1, mode: set1.mode, reveal: set1.reveal });
+check('the new run has a different code', run2.runCode !== run1.runCode, run2.runCode);
+check('it is labelled as the second run', run2.runLabel === 'Run 2', run2.runLabel);
+check('it starts with nobody in it', (await core.getResponses(checkId, run2.id)).length === 0);
+check('last group’s answers are untouched', (await core.getResponses(checkId, run1.id)).length === 2);
+check('the questions came with it',
+  JSON.stringify((await core.getSet(checkId, run2.id)).questions) === JSON.stringify(set1.questions));
+check('so did the answer key',
+  JSON.stringify(await core.getKey(checkId, run2.id)) === JSON.stringify(key1));
+check('the old code still works for reading the old run',
+  !!(await core.lookupRunCode(run1.runCode)));
+
+log('--- deleting a run takes its code with it ---');
+await core.deleteRun(checkId, { id: run2.id, runCode: run2.runCode });
+check('the code stops working', !(await core.lookupRunCode(run2.runCode)));
+check('the other run survives', (await core.listSets(checkId)).length === 1);
+
+log('--- the student page ---');
+FAKE_USER.current = null;
+history.replaceState(null, '', location.pathname + '?code=' + run1.runCode);
+// The real go.html markup, not a copy of it, so the test cannot pass against a
+// page that no longer looks like this.
+const page = await (await fetch('../go.html')).text();
+document.body.insertAdjacentHTML('afterbegin',
+  page.slice(page.indexOf('<div class="plain-page">'), page.indexOf('<script type="module"')));
+await import('../js/go.js?v=test');
+await sleep(600);
+
+const nameStep = document.getElementById('step-name');
+check('a code in the link skips straight to the name step',
+  nameStep && !nameStep.classList.contains('hidden'),
+  [...document.querySelectorAll('[id^=step-]')].filter(e => !e.classList.contains('hidden')).map(e => e.id).join(','));
+
+document.getElementById('name').value = 'Sam Smith';
+document.getElementById('name-go').click();
+await sleep(500);
+check('a name somebody already took is refused, with a way forward',
+  !document.getElementById('step-name').classList.contains('hidden') &&
+  /already using that name/.test(document.getElementById('name-note').textContent),
+  document.getElementById('name-note').textContent);
+
+document.getElementById('name').value = 'Jo Jones';
+document.getElementById('name-go').click();
+await sleep(600);
+check('a free name gets them into the questions',
+  !document.getElementById('step-answer').classList.contains('hidden'),
+  document.getElementById('name-note').textContent);
+check('the questions are really there',
+  /Pick one|Say why/.test(document.getElementById('set-view').textContent),
+  document.getElementById('set-view').textContent.slice(0, 120));
+
+log('');
+log(pass + ' passed, ' + failn + ' failed');
+log('--- errors ---');
+(ERRS.length ? ERRS : ['none']).forEach(e => log('  ' + e));
+log('DONE');
+</script>
+</body></html>

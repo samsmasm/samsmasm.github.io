@@ -44,17 +44,25 @@ page, and `node --check` cannot see either, because both files are valid
 JavaScript. Marks looked as though they saved intermittently only because
 multiple choice is recomputed from the key on every load.
 
-`test/run.sh` does two things: it drives the real `results.js`, `teach.js` and
-`student.js` in headless Chrome against a fake Firestore (`test/fake/`, swapped in
+`test/run.sh` does two things: it drives the real `results.js`, `teach.js`,
+`student.js`, `check.js` and `go.js` in headless Chrome against a fake Firestore (`test/fake/`, swapped in
 with an import map) and reads back what would truly have been written, then runs
 `test/undefined-calls.py`, which reports any function called but never defined or
 imported. Add a case to the matching page whenever marking, the roll or the
 student view changes.
 
-Two traps when writing one of these harness pages: an import map value must be
-`./fake/x.js` and never a bare `fake/x.js`, and the theme comes from
-localStorage, so setting `data-theme` alone is undone the moment the shell
-paints.
+Traps when writing one of these harness pages: an import map value must be
+`./fake/x.js` and never a bare `fake/x.js`; the theme comes from localStorage, so
+setting `data-theme` alone is undone the moment the shell paints; and a harness
+page missing an element the real page has looks exactly like a real bug. Where a
+test needs a page's markup, fetch the real `.html` and slice it rather than
+pasting a copy that will drift.
+
+The fakes are only as honest as they are made to be. `test/fake/firestore.js` has
+had to learn that `doc(collectionRef)` mints an id, that a reference carries
+`.id`, and that a listener on one document is a different shape from a listener
+on a collection. Each of those gaps made a passing test meaningless until it was
+fixed. If something works in a test and not in the browser, suspect the fake.
 
 ---
 
@@ -83,6 +91,9 @@ Setup and migration steps are in `SETUP.md`.
 | `set.html` | teacher | Build or edit a question set, by hand or from CSV. |
 | `results.html` | teacher | One set: how they did, what they wrote, marking, live controls. |
 | `qr.html` | teacher | One question as a QR code big enough to scan from the back of the room. |
+| `checks.html` | teacher | One off tests: the list, and making a new one from scratch or from a set you already have. |
+| `check.html` | teacher | One one off test: its runs, the live code, and starting it again for the next group. |
+| `go.html` | anyone | Answering a one off test with **no account at all**: a code, a name, the questions. |
 | `student.html` | teacher | One student in detail: their line against the class average, where the marks went, and every set folded shut over the whole paper. |
 | `class.html` | student | The current question, large. Older sets behind "Previous questions". |
 | `answer.html` | student | One set: answer it, review it marked, or practise it. |
@@ -106,16 +117,66 @@ the student question view and is used by both `class.html` and `answer.html`.
 
 ---
 
+## One off tests
+
+For a room that is not a class: a relief lesson, a workshop, an open evening.
+Nobody signs in.
+
+**It is not a second implementation of anything.** A one off test is a container
+in `classes/` carrying `kind: 'oneoff'`, and each of its runs is an ordinary
+question set inside it. That is deliberate and load bearing: the builder, the
+marking grid, the written answer panels, the QR page and the student question
+view all work on it unchanged. Anything that special cases a one off should be a
+line or two about wording or a link, never a parallel copy of a feature. The two
+worst bugs this project has had both came from a second copy of something
+drifting from the first.
+
+A **run** is a batch of people. Starting the test again copies the questions and
+the key into a new run with a new code, so the group that sat it last period
+cannot turn up in this period's results, and an edit now cannot rewrite what an
+earlier group was asked. Settled with Sam: runs, not copies of the whole test.
+
+Identity, where there are no accounts:
+
+- The browser is given a **Firebase anonymous account** it never sees. Firestore
+  needs somebody to pin a write to; without this the rules would have to accept
+  writes from anyone at all. `requireAnyUser()` in core.js is the guard: it never
+  redirects to sign-in and never writes a user document.
+- The person types a **name**, which is claimed in
+  `classes/{cid}/sets/{sid}/names/{slug}`. A second person typing the same name
+  is turned back and asked to add a last name, which is what Sam chose over
+  letting duplicates through or renaming them silently. The claim is read one
+  document at a time by id, never listed, so checking a name cannot become a way
+  to pull out who is in the room.
+- The name is kept in `localStorage` per run, so a reload does not ask again and
+  does not start a second answer sheet.
+
+`realAccount()` in the rules keeps an anonymous visitor from creating classes,
+join codes or run codes: a throwaway account may answer, and nothing else.
+
+**The console needs Anonymous sign-in enabled** (Authentication > Sign-in method
+> Add new provider > Anonymous). Without it the name step fails with
+`auth/operation-not-allowed` and nothing else in Checkin is affected. Anonymous
+account auto clean-up is on; it deletes unused accounts after 30 days and does
+not touch Firestore, so results stay.
+
+---
+
 ## Data model
 
 ```
-users/{uid}                     email, name, role, and a cached list of classes
+users/{uid}                     email, name, role, and cached lists of classes and one offs
 joinCodes/{CODE}                points a six character code at one class
+runCodes/{CODE}                 points a six character code at one run of a one off test
 classes/{cid}                   name, ownerUid, joinCode
+                                a one off test is the same document with kind: 'oneoff',
+                                no joinCode and no members
   members/{uid}                 the roll, students only, teacher is not a member
   blocked/{uid}                 students the teacher removed
   sets/{sid}                    title, mode, status, reveal, questions[]
+                                a run of a one off test also carries runCode and runLabel
     keys/key                    the answer key, teacher only
+    names/{slug}                one off tests only: a name claimed in a room with no accounts
     responses/{uid}             one document per student per set
       retakes/{attemptId}       private practice runs, that student only
 ```

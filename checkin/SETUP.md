@@ -22,6 +22,14 @@ if you are moving it to a different project, also replace `firebaseConfig` in
    you do. Then **Sign-in method > Google > Enable**, and set the support email
    to your own address. Skipping the Get started step is what produces
    `auth/configuration-not-found` at sign-in.
+   Then, on the same tab, **Add new provider > Anonymous > Enable**. One off
+   tests are answered by people with no account, and Firestore still has to pin
+   every write to somebody, so their browser is handed a throwaway account it
+   never shows them. Without this, a one off test fails at the name step with
+   `auth/operation-not-allowed`, and nothing else is affected.
+   Anonymous account auto clean-up, on the same page, is worth turning on. It
+   deletes accounts nobody has used for 30 days. It does not touch Firestore, so
+   results already written stay exactly where they are.
 2. **Authentication > Settings > Authorized domains**: add every domain the site
    will be opened on, including the GitHub Pages one. Sign-in fails with
    `auth/unauthorized-domain` on any address not listed. `localhost` is already
@@ -44,8 +52,9 @@ field, which Firestore indexes automatically.
 ## How the data is shaped
 
 ```
-users/{uid}                        email, name, and a cached list of their classes
+users/{uid}                        email, name, cached lists of their classes and one off tests
 joinCodes/{CODE}                   points a six character code at one class
+runCodes/{CODE}                    points a six character code at one run of one off test
 classes/{cid}                      name, ownerUid, joinCode
   members/{uid}                    the roll, students only
   blocked/{uid}                    students removed by the teacher

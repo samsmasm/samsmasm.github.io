@@ -4,8 +4,8 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
   removeMember, unblock, newJoinCode, renameClass, saveSet, deleteSet, getResponses,
   syncKeyVisibility, needsMarking, answeredCount, addShellLinks
-} from './core.js?v=34ec0b0-2138';
-import { loadClassHistory, latestPoint, averagePct, sparkline } from './history.js?v=34ec0b0-2138';
+} from './core.js?v=28ba446-0639';
+import { loadClassHistory, latestPoint, averagePct, sparkline } from './history.js?v=28ba446-0639';
 
 const classId = qp('c');
 let me = null, cls = null;

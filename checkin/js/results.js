@@ -1,14 +1,14 @@
 // Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
-import { loadClassHistory, sparkline } from './history.js?v=34ec0b0-2138';
-import { wireMarkInput } from './marking.js?v=34ec0b0-2138';
+import { loadClassHistory, sparkline } from './history.js?v=28ba446-0639';
+import { wireMarkInput } from './marking.js?v=28ba446-0639';
 import {
   requireUser, qp, esc, fail, debounce, LETTERS,
-  getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
+  getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers, isOneOff,
   saveOneMark, clearOneMark, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=34ec0b0-2138';
+} from './core.js?v=28ba446-0639';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -22,6 +22,7 @@ let trendByStudent = null;   // filled in after the page is already usable
 (async function start() {
   me = await requireUser();
   document.getElementById('back').href = 'teach.html?c=' + encodeURIComponent(classId);
+  // Fixed up once the container is known: a one off test has no class page.
   document.getElementById('edit-link').href = 'set.html?c=' + encodeURIComponent(classId) + '&s=' + setId;
 
   try {
@@ -29,19 +30,29 @@ let trendByStudent = null;   // filled in after the page is already usable
     if (cls.ownerUid !== me.uid) { location.replace('class.html?c=' + encodeURIComponent(classId)); return; }
     set = await getSet(classId, setId);
     key = await getKey(classId, setId);
-    members = await listMembers(classId);
+    // A one off test has no roll. Whoever turns up and types a name is the roll,
+    // so it is built from the responses instead.
+    members = isOneOff(cls) ? [] : await listMembers(classId);
   } catch (err) { return fail('Loading the set', err); }
 
   document.title = (set.title || 'Responses') + ' - Checkin';
   document.getElementById('set-title').textContent = set.title || 'Untitled set';
+  const home = isOneOff(cls)
+    ? 'check.html?k=' + encodeURIComponent(classId)
+    : 'teach.html?c=' + encodeURIComponent(classId);
+  document.getElementById('back').href = home;
   addShellLinks([
-    { label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId), icon: 'stack' },
-    { label: set.title || 'This set', icon: 'people',
+    { label: cls.name, href: home, icon: isOneOff(cls) ? 'clock' : 'stack' },
+    { label: (isOneOff(cls) ? set.runLabel : set.title) || 'This set', icon: 'people',
       href: 'results.html?c=' + encodeURIComponent(classId) + '&s=' + setId,
       match: p => p === 'results.html' }
-  ]);
-  document.getElementById('set-sub').textContent = cls.name + ' · ' +
-    (set.questions || []).length + ' questions · out of ' + maxScore(set);
+  ], isOneOff(cls) ? 'This one off' : 'This class');
+  document.getElementById('set-sub').textContent = [
+    cls.name,
+    isOneOff(cls) ? (set.runLabel || 'a run') : null,
+    (set.questions || []).length + ' questions',
+    'out of ' + maxScore(set)
+  ].filter(Boolean).join(' · ');
 
   document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
     view = tab.dataset.view;
@@ -154,7 +165,8 @@ function paintControls() {
         '<button data-act="prev"' + (i === 0 ? ' disabled' : '') + '>Previous question</button>' +
         '<span class="mono">' + (i + 1) + ' of ' + qs.length + '</span>' +
         '<button data-act="next" class="btn-go"' + (i >= qs.length - 1 ? ' disabled' : '') + '>Next question</button>' +
-        '<span class="tiny">' + onThis + ' of ' + members.length + ' have answered this one</span>' +
+        '<span class="tiny">' + onThis + (isOneOff(cls) ? '' : ' of ' + members.length) +
+          ' have answered this one</span>' +
       '</div>' +
       '<p class="tiny">Students see only the question you are on, and can look back at earlier ones.</p>';
   }
@@ -181,7 +193,9 @@ function paintControls() {
       (set.reveal === 'now'
         ? 'Multiple choice marks itself in front of students as they answer. '
         : 'Students see nothing until you release results. ') +
-      answered.length + ' of ' + members.length + ' students have answered something' +
+      (isOneOff(cls)
+        ? answered.length + (answered.length === 1 ? ' person has' : ' people have') + ' answered something'
+        : answered.length + ' of ' + members.length + ' students have answered something') +
       (toMark ? ', and ' + toMark + ' have written answers waiting for a mark' : '') + '.' +
       (set.allowRetake
         ? ' Students can redo this set for practice. Those runs are private to them, ' +
@@ -239,6 +253,13 @@ function paintBody() {
 }
 
 function rosterRows() {
+  // A one off test has no roll to be missing from: the people who answered are
+  // the whole list, in the order they gave their names.
+  if (isOneOff(cls)) {
+    return [...responses.values()]
+      .map(r => ({ uid: r.uid, name: r.name || 'No name', email: '', response: r }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }
   // Everyone on the roll, plus anyone who answered and has since been removed.
   const rows = members.map(m => ({ ...m, response: responses.get(m.uid) || null }));
   const known = new Set(members.map(m => m.uid));
