@@ -3,8 +3,9 @@
 // the prominence, never what is allowed.
 
 import {
-  requireUser, myClasses, createClass, joinClass, esc, fail, qp, myRole, setMyRole
-} from './core.js?v=20192f8-2011';
+  requireUser, myClasses, createClass, joinClass, esc, fail, qp, myRole, setMyRole,
+  addShellLinks
+} from './core.js?v=5b36f56-2014';
 
 let me = null, classes = [];
 
@@ -21,21 +22,32 @@ let me = null, classes = [];
 
 function askRole() {
   document.getElementById('ask-role').classList.remove('hidden');
+  const teacherBtn = document.getElementById('pick-teacher');
+  const studentBtn = document.getElementById('pick-student');
+
   const choose = async role => {
-    document.getElementById('pick-teacher').disabled = true;
-    document.getElementById('pick-student').disabled = true;
+    const picked = role === 'teacher' ? teacherBtn : studentBtn;
+    const label = picked.textContent;
+    teacherBtn.disabled = true;
+    studentBtn.disabled = true;
+    picked.textContent = 'Saving.';
     try {
       await setMyRole(me.uid, role);
-      // Reload so the header menu picks up the other route as well.
-      location.replace('home.html');
+      // Swap straight to the class lists rather than reloading. A reload here
+      // would depend on the page not being served from cache, and if it were,
+      // this question would simply reappear and look like a dead button.
+      document.getElementById('ask-role').classList.add('hidden');
+      addShellLinks([]);          // rebuilds the sidebar, now with the other route on it
+      showClasses();
     } catch (err) {
-      document.getElementById('pick-teacher').disabled = false;
-      document.getElementById('pick-student').disabled = false;
+      teacherBtn.disabled = false;
+      studentBtn.disabled = false;
+      picked.textContent = label;
       fail('Saving that', err);
     }
   };
-  document.getElementById('pick-teacher').addEventListener('click', () => choose('teacher'));
-  document.getElementById('pick-student').addEventListener('click', () => choose('student'));
+  teacherBtn.addEventListener('click', () => choose('teacher'));
+  studentBtn.addEventListener('click', () => choose('student'));
 }
 
 /* ---------------- the class lists ---------------- */
@@ -61,7 +73,7 @@ function showClasses() {
     panel:
       '<span class="label">Start a new class</span>' +
       '<div class="row">' +
-        '<input type="text" id="new-class-name" class="grow" placeholder="Year 12 Economics" maxlength="80">' +
+        '<input type="text" id="new-class-name" class="grow" placeholder="Write your class name here" maxlength="80">' +
         '<button id="new-class-go" class="btn-go">Create class</button>' +
       '</div>'
   });
@@ -139,10 +151,16 @@ function wire() {
   }
 
   document.getElementById('swap-role').addEventListener('click', async () => {
+    const btn = document.getElementById('swap-role');
+    btn.disabled = true;
     try {
       await setMyRole(me.uid, myRole() === 'teacher' ? 'student' : 'teacher');
-      location.replace('home.html');
-    } catch (err) { fail('Changing that', err); }
+      addShellLinks([]);
+      showClasses();
+    } catch (err) {
+      btn.disabled = false;
+      fail('Changing that', err);
+    }
   });
 }
 

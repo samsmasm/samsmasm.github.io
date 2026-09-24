@@ -6,7 +6,7 @@ import {
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
   saveMarks, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=20192f8-2011';
+} from './core.js?v=5b36f56-2014';
 
 const classId = qp('c');
 const setId = qp('s');

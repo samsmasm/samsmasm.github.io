@@ -86,6 +86,27 @@ wins.
 The QR drawing library comes from cdnjs at page load. If it is blocked, the page
 says so and still shows the link in text.
 
+## Cache busting, which you cannot skip
+
+The host sends `cache-control: max-age=14400`, so a browser will hold a four
+hour old copy of any file. That does not merely look stale: new HTML running
+against an old cached module fails outright, with errors like
+`can't access property "innerHTML", box is null`, because the page and the code
+no longer agree about what exists.
+
+The fix is to change the URL whenever the code changes. Before committing any
+change to the pages or the JS, run:
+
+    python3 stamp.py
+
+It puts a fresh `?v=` on every `<script src="js/...">` and on every relative
+import inside `js/`. Imports from a CDN are left alone. After that a browser
+cannot serve an old module, because it has never seen that URL before.
+
+The pages themselves are still cached, so after a deploy you may need one hard
+refresh (`Ctrl+Shift+R`) to pick up new HTML. If that gets annoying, a cache
+rule on the host giving `*.html` in this folder a short TTL would remove it.
+
 ## Moving it to another host
 
 Copy the folder. Then:
