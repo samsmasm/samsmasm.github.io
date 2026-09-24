@@ -1,6 +1,6 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=641cfbd-2036';
+import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=8faff7a-2110';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp
@@ -467,6 +467,20 @@ export async function markFinished(classId, setId, user) {
 
 export async function saveMarks(classId, setId, uid, patch) {
   await setDoc(doc(db, 'classes', classId, 'sets', setId, 'responses', uid), patch, { merge: true });
+}
+
+// Write one question's mark and nothing else. Writing the whole marks map from
+// local state is how a stale copy ends up overwriting a mark someone just
+// entered; a merge of a single key cannot touch any other question.
+export async function saveOneMark(classId, setId, uid, qid, mark) {
+  await setDoc(doc(db, 'classes', classId, 'sets', setId, 'responses', uid),
+    { marks: { [qid]: mark } }, { merge: true });
+}
+
+// Clearing needs a real delete: a merge cannot remove a key.
+export async function clearOneMark(classId, setId, uid, qid) {
+  await updateDoc(doc(db, 'classes', classId, 'sets', setId, 'responses', uid),
+    { ['marks.' + qid]: deleteField() });
 }
 
 /* ---------------- practice retakes ----------------

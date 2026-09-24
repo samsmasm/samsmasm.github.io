@@ -4,7 +4,7 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
   removeMember, unblock, newJoinCode, renameClass, saveSet, deleteSet, getResponses,
   syncKeyVisibility, needsMarking, answeredCount, addShellLinks
-} from './core.js?v=641cfbd-2036';
+} from './core.js?v=8faff7a-2110';
 
 const classId = qp('c');
 let me = null, cls = null;
@@ -27,7 +27,6 @@ let me = null, cls = null;
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = 'You teach this class.';
   document.getElementById('new-set').href = 'set.html?c=' + encodeURIComponent(classId) + '&new=1';
-  document.getElementById('over-time').href = 'students.html?c=' + encodeURIComponent(classId);
   document.getElementById('code').textContent = cls.joinCode || '------';
   document.getElementById('rename').value = cls.name;
 
@@ -189,13 +188,77 @@ function wireStudents() {
   });
 }
 
+let history = null;
+
 async function paintMembers() {
-  const box = document.getElementById('members');
   let members = [], blocked = [];
   try {
     [members, blocked] = await Promise.all([listMembers(classId), listBlocked(classId)]);
   } catch (err) { return fail('Loading the roll', err); }
 
+  paintRoll(members);
+  paintRemoval(members, blocked);
+}
+
+// The roll, with how each student has been going. The history is a lot of reads,
+// so the names appear first and the trends fill in behind them.
+async function paintRoll(members) {
+  const box = document.getElementById('members');
+  if (!members.length) {
+    box.innerHTML = '<p class="tiny">Nobody has joined yet. Share the code above.</p>';
+    return;
+  }
+
+  const draw = () => {
+    box.innerHTML = members.map(m => rollRow(m)).join('') +
+      (history
+        ? '<p class="tiny mt">The little line is that student across every set, oldest on the ' +
+          'left. A percentage counts unmarked written answers as nothing, so it can rise once ' +
+          'you finish marking.</p>'
+        : '');
+  };
+
+  draw();
+  if (!history) {
+    history = await loadClassHistory(classId).catch(err => {
+      console.error('history', err);
+      return null;
+    });
+    if (history) draw();
+  }
+}
+
+function rollRow(m) {
+  const points = history ? (history.byStudent.get(m.uid) || []) : null;
+  const last = points ? latestPoint(points) : null;
+  const avg = points ? averagePct(points) : null;
+  const link = 'student.html?c=' + encodeURIComponent(classId) + '&u=' + encodeURIComponent(m.uid);
+
+  const recent = !points ? ''
+    : last
+      ? '<b>' + last.pct + '%</b><br><span class="index-desc">' + esc(last.title) + '</span>' +
+        (last.provisional ? '<br><span class="state state-todo">still marking</span>' : '')
+      : '<span class="state state-todo">nothing yet</span>';
+
+  return '<div class="index-row" data-uid="' + m.uid + '">' +
+    '<span class="grow">' +
+      '<a class="index-name" href="' + link + '">' + esc(m.name) + '</a>' +
+      '<br><span class="index-desc">' + esc(m.email) + '</span>' +
+    '</span>' +
+    (points ? '<span class="spark-cell">' + sparkline(points) + '</span>' : '') +
+    '<span class="index-meta">' + recent + '</span>' +
+    (points && avg !== null
+      ? '<span class="index-meta">' + avg + '% average<br>' +
+        points.filter(p => p.attempted).length + ' of ' + history.sets.length + ' done</span>'
+      : '<span class="index-meta">joined ' + fmtDate(m.joinedAt) + '</span>') +
+    '<a class="btn" href="' + link + '">All results</a>' +
+  '</div>';
+}
+
+// Removing someone is a class setting, not something to trip over while looking
+// at how the class is going.
+function paintRemoval(members, blocked) {
+  const box = document.getElementById('removal');
   box.innerHTML = members.length
     ? members.map(m =>
         '<div class="index-row" data-uid="' + m.uid + '">' +
@@ -204,7 +267,7 @@ async function paintMembers() {
           '<span class="index-meta">joined ' + fmtDate(m.joinedAt) + '</span>' +
           '<button class="btn-warn" data-act="remove">Remove</button>' +
         '</div>').join('')
-    : '<p class="tiny">Nobody has joined yet. Share the code above.</p>';
+    : '<p class="tiny">Nobody to remove yet.</p>';
 
   box.querySelectorAll('[data-act=remove]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -216,7 +279,7 @@ async function paintMembers() {
         return;
       }
       btn.disabled = true;
-      try { await removeMember(classId, member); await paintMembers(); }
+      try { history = null; await removeMember(classId, member); await paintMembers(); }
       catch (err) { fail('Removing the student', err); }
     });
   });

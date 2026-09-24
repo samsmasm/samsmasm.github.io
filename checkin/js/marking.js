@@ -16,7 +16,14 @@ export function tidyMark(input, max) {
 // tabbing straight through a set awards full marks and you type only where the
 // answer is not worth full marks.
 export function wireMarkInput(input, max, save, debounced) {
-  const commit = () => save(tidyMark(input, max));
+  let lastWritten = input.value;
+
+  const commit = () => {
+    const value = tidyMark(input, max);
+    if (String(value) === String(lastWritten)) return;   // nothing actually changed
+    lastWritten = String(value);
+    save(value);
+  };
 
   input.addEventListener('focus', () => {
     if (input.value === '') input.value = String(max);
@@ -24,6 +31,9 @@ export function wireMarkInput(input, max, save, debounced) {
   });
   input.addEventListener('input', debounced ? debounced(commit) : commit);
   input.addEventListener('blur', commit);
+
+  // Lets a quick button set the value and have it saved through the same path.
+  input.setMark = value => { input.value = String(value); commit(); };
 
   return commit;
 }

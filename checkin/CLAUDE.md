@@ -56,11 +56,10 @@ Setup and migration steps are in `SETUP.md`.
 |---|---|---|
 | `index.html` | anyone | Split navy/cream sign-in. Google only. |
 | `home.html` | anyone | Classes you teach and classes you are in. Asks teacher or student on a first visit. |
-| `teach.html` | teacher | One class: its question sets, the roll, the join code, class settings. |
+| `teach.html` | teacher | One class. Sets, the roll with how each student is going, the join code, and settings (rename, remove a student). |
 | `set.html` | teacher | Build or edit a question set, by hand or from CSV. |
 | `results.html` | teacher | One set: how they did, what they wrote, marking, live controls. |
 | `qr.html` | teacher | One question as a QR code big enough to scan from the back of the room. |
-| `students.html` | teacher | The whole roll with each student's most recent result and a trend line. |
 | `student.html` | teacher | One student: every set they have done and a percentage-over-time chart. |
 | `class.html` | student | The current question, large. Older sets behind "Previous questions". |
 | `answer.html` | student | One set: answer it, review it marked, or practise it. |
@@ -100,6 +99,21 @@ Two things worth knowing:
   and a student-role account can still create a class.
 
 ---
+
+## Marks are written one question at a time
+
+`applyMark()` and `autoMark()` in `results.js` write a **single question's mark**
+through `saveOneMark()`, never the whole `marks` map, and no `score` field is
+stored at all. This is not a style preference. Writing the whole map from local
+state meant a snapshot arriving mid-run could reassign `responses` underneath
+`autoMark`, whose stale copy then overwrote a mark the teacher had just entered.
+Marks appeared to save and were silently wiped later, sometimes.
+
+Nothing reads a stored score: every view works the total out from the marks with
+`totalAwarded()`, so storing it only created something that could go stale.
+
+Keep both properties. If you ever need to write several marks at once, write
+them as separate keys under `marks`, not as a replacement map.
 
 ## The answer key
 

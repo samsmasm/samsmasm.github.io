@@ -2,8 +2,8 @@
 
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listMembers, addShellLinks
-} from './core.js?v=641cfbd-2036';
-import { loadClassHistory, averagePct, renderPercentChart } from './history.js?v=641cfbd-2036';
+} from './core.js?v=8faff7a-2110';
+import { loadClassHistory, averagePct, renderPercentChart } from './history.js?v=8faff7a-2110';
 
 const classId = qp('c');
 const studentId = qp('u');
@@ -19,10 +19,10 @@ let me = null, cls = null;
     return;
   }
 
-  document.getElementById('back').href = 'students.html?c=' + encodeURIComponent(classId);
+  document.getElementById('back').href = 'teach.html?c=' + encodeURIComponent(classId);
   addShellLinks([
     { label: cls.name, href: 'teach.html?c=' + encodeURIComponent(classId), icon: 'stack' },
-    { label: 'Over time', href: 'students.html?c=' + encodeURIComponent(classId), icon: 'people' }
+    { label: 'Everyone', href: 'teach.html?c=' + encodeURIComponent(classId), icon: 'people' }
   ]);
 
   try {

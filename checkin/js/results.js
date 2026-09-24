@@ -1,13 +1,13 @@
 // Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
-import { loadClassHistory, sparkline } from './history.js?v=641cfbd-2036';
+import { loadClassHistory, sparkline } from './history.js?v=8faff7a-2110';
 import {
   requireUser, qp, esc, fail, debounce, LETTERS,
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
-  saveMarks, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
+  saveOneMark, clearOneMark, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=641cfbd-2036';
+} from './core.js?v=8faff7a-2110';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -59,6 +59,10 @@ let trendByStudent = null;   // filled in after the page is already usable
     .catch(err => console.error('trend history', err));
 })();
 
+function studentLink(uid) {
+  return 'student.html?c=' + encodeURIComponent(classId) + '&u=' + encodeURIComponent(uid);
+}
+
 function qrLink(qid) {
   return 'qr.html?c=' + encodeURIComponent(classId) + '&s=' + encodeURIComponent(setId) +
     (qid ? '&q=' + encodeURIComponent(qid) : '');
@@ -97,31 +101,29 @@ document.addEventListener('focusout', () => {
 
 /* ---------------- multiple choice marks itself ---------------- */
 
-// Firestore hands map fields back with their keys sorted, so comparing the two
-// with JSON.stringify would report a difference every time and write forever.
-function marksEqual(a, b) {
-  const ids = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
-  for (const id of ids) {
-    const x = (a || {})[id] || {}, y = (b || {})[id] || {};
-    for (const f of ['awarded', 'correct', 'comment']) {
-      if (String(x[f] ?? '') !== String(y[f] ?? '')) return false;
-    }
-  }
-  return true;
-}
-
 let autoMarkRunning = false;
+
+// Fills in the multiple choice marks, one question at a time, and only where
+// what is stored disagrees with the key. It deliberately never touches a written
+// answer's mark, and it re-reads each response as it goes rather than trusting
+// the snapshot it started with, because a snapshot arriving mid-run replaces the
+// whole map underneath it.
 async function autoMark() {
   if (autoMarkRunning) return;
   autoMarkRunning = true;
   try {
-    for (const r of responses.values()) {
-      const fresh = computeMarks(set, r, key);
-      const score = totalAwarded(set, fresh);
-      if (!marksEqual(r.marks, fresh) || r.score !== score) {
-        r.marks = fresh;
-        r.score = score;
-        await saveMarks(classId, setId, r.uid, { marks: fresh, score, maxScore: maxScore(set) });
+    for (const uid of [...responses.keys()]) {
+      for (const q of set.questions || []) {
+        if (q.type !== 'mcq') continue;
+        const current = responses.get(uid);
+        if (!current) break;
+        const fresh = computeMarks(set, current, key)[q.id];
+        const stored = (current.marks || {})[q.id];
+        if (!fresh) continue;
+        if (stored && String(stored.awarded ?? '') === String(fresh.awarded ?? '') &&
+            String(stored.correct ?? '') === String(fresh.correct ?? '')) continue;
+        current.marks = { ...(current.marks || {}), [q.id]: fresh };
+        await saveOneMark(classId, setId, uid, q.id, fresh);
       }
     }
   } catch (err) {
@@ -296,7 +298,7 @@ function paintScores() {
       ? '<td class="num spark-cell">' + sparkline(earlier, { width: 54, height: 18 }) + '</td>'
       : '<td class="num cell-none">.</td>';
 
-    return '<tr><td>' + esc(row.name) +
+    return '<tr><td><a href="' + studentLink(row.uid) + '">' + esc(row.name) + '</a>' +
       (r && needsMarking(set, r) ? ' <span class="state state-todo">to mark</span>' : '') +
       '</td>' + trend + cells +
       '<td class="num"><b data-total="' + row.uid + '">' + (r ? total : '') + '</b></td>' +
@@ -353,8 +355,9 @@ function paintAnswers() {
       const given = r && r.answers ? r.answers[q.id] : undefined;
       const has = given !== undefined && given !== null && String(given).trim() !== '';
       if (!has) {
-        return '<div class="index-row"><span class="grow"><span class="index-desc">' + esc(row.name) +
-          '</span></span><span class="index-meta cell-none">no answer</span></div>';
+        return '<div class="index-row"><span class="grow"><a class="index-desc" href="' +
+          studentLink(row.uid) + '">' + esc(row.name) +
+          '</a></span><span class="index-meta cell-none">no answer</span></div>';
       }
       const m = (r.marks && r.marks[q.id]) || {};
       const full = Number(q.maxMark) || 1;
@@ -365,7 +368,8 @@ function paintAnswers() {
         const text = (q.options || [])[n] || '';
         const right = m.correct === true;
         return '<div class="index-row">' +
-          '<span class="grow"><span class="index-desc">' + esc(row.name) + '</span></span>' +
+          '<span class="grow"><a class="index-desc" href="' + studentLink(row.uid) + '">' +
+            esc(row.name) + '</a></span>' +
           '<span class="grow ' + (m.correct === undefined ? '' : right ? 'cell-right' : 'cell-wrong') + '">' +
             esc(letter) + '. ' + esc(text) + '</span>' +
           '<span class="index-meta">' + (m.correct === undefined ? '' : right ? 'correct' : 'wrong') + '</span>' +
@@ -382,7 +386,8 @@ function paintAnswers() {
           '<button data-set-mark="0" class="btn-quiet">Zero</button>';
 
       return '<div class="qblock" data-mark-scope data-uid="' + row.uid + '" data-qid="' + q.id + '" data-max="' + full + '">' +
-        '<div class="spread"><span class="label" style="margin:0">' + esc(row.name) + '</span>' +
+        '<div class="spread"><a class="label" style="margin:0" href="' + studentLink(row.uid) + '">' +
+          esc(row.name) + '</a>' +
           '<span class="tiny" data-note></span></div>' +
         '<div class="answer-given">' + esc(given) + '</div>' +
         '<div class="mark-row mt">' + marker +
@@ -425,7 +430,11 @@ function wireMarking() {
     const max = Number(scope.dataset.max) || 1;
 
     const quickButtons = [...scope.querySelectorAll('[data-set-mark]')];
-    quickButtons.forEach(btn =>
+    quickButtons.forEach(btn => {
+      // Keep focus where it is. Letting the mark box blur here fired the owed
+      // repaint, which rebuilt this panel and destroyed the button before its
+      // click could land, so the button appeared to do nothing at all.
+      btn.addEventListener('mousedown', e => e.preventDefault());
       btn.addEventListener('click', () => {
         const value = Number(btn.dataset.setMark);
         const numberInput = scope.querySelector('[data-mark]');
@@ -436,7 +445,8 @@ function wireMarking() {
           btn.className = value ? 'btn-on' : 'btn-warn';
         }
         saveNow(scope, { awarded: value, correct: value >= max });
-      }));
+      });
+    });
 
     const numberInput = scope.querySelector('[data-mark]');
     if (numberInput) {
@@ -459,15 +469,25 @@ function wireMarking() {
 async function applyMark(uid, qid, patch) {
   const r = responses.get(uid) || { uid, marks: {} };
   const marks = { ...(r.marks || {}) };
-  marks[qid] = { ...(marks[qid] || {}), ...patch, auto: false };
-  const blank = marks[qid].awarded === '' || marks[qid].awarded === null || marks[qid].awarded === undefined;
-  if (blank) { delete marks[qid].awarded; delete marks[qid].correct; }
+  const mark = { ...(marks[qid] || {}), ...patch, auto: false };
+  const blank = mark.awarded === '' || mark.awarded === null || mark.awarded === undefined;
+
+  if (blank && !mark.comment) {
+    delete marks[qid];
+    r.marks = marks;
+    responses.set(uid, r);
+    await clearOneMark(classId, setId, uid, qid).catch(() => {});
+    return totalAwarded(set, marks);
+  }
+
+  if (blank) { delete mark.awarded; delete mark.correct; }
+  marks[qid] = mark;
   r.marks = marks;
   responses.set(uid, r);
-  const score = totalAwarded(set, marks);
-  r.score = score;
-  await saveMarks(classId, setId, uid, { marks, score, maxScore: maxScore(set) });
-  return score;
+  // Only this question is written. No score field: every view works the total
+  // out from the marks, so storing it only created something to go stale.
+  await saveOneMark(classId, setId, uid, qid, mark);
+  return totalAwarded(set, marks);
 }
 
 /* ---------------- the hover panel that shows an answer ---------------- */
