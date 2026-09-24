@@ -7,14 +7,39 @@
 import {
   listSets, getResponses, getKey, computeMarks, totalAwarded, maxScore,
   needsMarking, answeredCount, esc
-} from './core.js?v=4baf2dd-2128';
+} from './core.js?v=34ec0b0-2138';
 
 function when(set) {
   const t = set.openedAt || set.createdAt;
   return (t && t.seconds) || 0;
 }
 
+export function hasAnswer(response, qid) {
+  const a = response && response.answers ? response.answers[qid] : undefined;
+  return a !== undefined && a !== null && String(a).trim() !== '';
+}
+
+// A place in the class, with ties sharing it: two students on 80% are both
+// second and nobody is third.
+function places(done) {
+  const ranked = [...done].sort((a, b) => b.pct - a.pct);
+  const out = new Map();
+  ranked.forEach(r => out.set(r.uid, ranked.findIndex(o => o.pct === r.pct) + 1));
+  return out;
+}
+
+export function ordinal(n) {
+  if (!n) return '';
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return n + 'th';
+  return n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+}
+
 // Everything a class has done, oldest set first.
+//
+// It also works out how the class went on each set and on each question in it,
+// which costs nothing extra: every response is already here. That is what lets a
+// single student's result be read against the class rather than in a vacuum.
 export async function loadClassHistory(classId) {
   const sets = (await listSets(classId))
     .filter(s => s.status !== 'draft')
@@ -28,31 +53,108 @@ export async function loadClassHistory(classId) {
     return { set, key, responses };
   }));
 
-  // uid -> one point per set, in set order
-  const byStudent = new Map();
+  const byStudent = new Map();   // uid -> one point per set, in set order
+  const bySet = new Map();       // setId -> the whole class on that set
+
   for (const { set, key, responses } of loaded) {
     const outOf = maxScore(set);
-    for (const r of responses) {
+
+    const rows = responses.map(r => {
       const attempted = answeredCount(set, r) > 0;
       const marks = computeMarks(set, r, key);
       const awarded = totalAwarded(set, marks);
+      return {
+        uid: r.uid, response: r, marks, attempted, awarded,
+        // A percentage is provisional while any written answer is still unmarked,
+        // because those count as nothing until the teacher gets to them.
+        provisional: needsMarking(set, r),
+        pct: attempted && outOf ? Math.round((awarded / outOf) * 100) : null
+      };
+    });
+
+    const done = rows.filter(r => r.attempted && r.pct !== null);
+    const avgPct = done.length
+      ? Math.round(done.reduce((n, r) => n + r.pct, 0) / done.length) : null;
+    const place = places(done);
+
+    // Per question: how many tried it and how many of those got full marks. The
+    // share is what makes an outlier visible, one way or the other.
+    const questions = new Map();
+    for (const q of set.questions || []) {
+      const full = Number(q.maxMark) || 1;
+      const tried = rows.filter(r => hasAnswer(r.response, q.id));
+      const fullMarks = tried.filter(r => Number((r.marks[q.id] || {}).awarded) >= full).length;
+      questions.set(q.id, {
+        attempts: tried.length, fullMarks,
+        rate: tried.length ? fullMarks / tried.length : null
+      });
+    }
+
+    bySet.set(set.id, { set, key, rows, avgPct, questions, sat: done.length });
+
+    for (const r of rows) {
       if (!byStudent.has(r.uid)) byStudent.set(r.uid, []);
       byStudent.get(r.uid).push({
         setId: set.id,
         title: set.title || 'Untitled',
         at: when(set),
-        attempted,
-        awarded,
+        attempted: r.attempted,
+        awarded: r.awarded,
         outOf,
-        // A percentage is provisional while any written answer is still unmarked,
-        // because those count as nothing until the teacher gets to them.
-        provisional: needsMarking(set, r),
-        pct: attempted && outOf ? Math.round((awarded / outOf) * 100) : null
+        provisional: r.provisional,
+        pct: r.pct,
+        classAvg: avgPct,
+        place: place.get(r.uid) || null,
+        sat: done.length
       });
     }
   }
 
-  return { sets: loaded.map(l => l.set), byStudent };
+  return { sets: loaded.map(l => l.set), byStudent, bySet };
+}
+
+/* ---------------- one student, question by question ----------------
+   Pure: it re-reads what loadClassHistory already gathered, so the detailed
+   view of a student costs no further reads.
+------------------------------------------------------------------- */
+
+// Below this many attempts a class comparison says nothing useful, so no
+// question is flagged as an outlier either way.
+const ENOUGH = 4;
+
+function outlier(awarded, full, stats) {
+  if (awarded === null || stats.rate === null || stats.attempts < ENOUGH) return null;
+  if (awarded < full && stats.rate >= 0.7) return 'missed';
+  if (awarded >= full && stats.rate <= 0.3) return 'nailed';
+  return null;
+}
+
+// Every question this student met, newest set first.
+export function studentQuestions(history, uid) {
+  const out = [];
+  for (const set of [...history.sets].reverse()) {
+    const info = history.bySet.get(set.id);
+    if (!info) continue;
+    const row = info.rows.find(r => r.uid === uid) || null;
+    for (const q of set.questions || []) {
+      const full = Number(q.maxMark) || 1;
+      const stats = info.questions.get(q.id) || { attempts: 0, rate: null, fullMarks: 0 };
+      const mark = row ? (row.marks[q.id] || null) : null;
+      const raw = mark ? mark.awarded : null;
+      const awarded = (raw === undefined || raw === null || raw === '') ? null : Number(raw);
+      out.push({
+        set, at: when(set), q, full,
+        given: row && hasAnswer(row.response, q.id) ? row.response.answers[q.id] : null,
+        model: info.key ? info.key[q.id] : undefined,
+        awarded,
+        comment: (mark && mark.comment) || '',
+        classRate: stats.rate,
+        attempts: stats.attempts,
+        flag: outlier(awarded, full, stats)
+      });
+    }
+  }
+  return out;
 }
 
 export function latestPoint(points) {
@@ -112,13 +214,16 @@ export function sparkline(points, opts = {}) {
 }
 
 /* ---------------- percentage over time ----------------
-   One student, one measure, ordered in time, so: a line. The axis is pinned to
-   0-100 because the numbers are percentages and a trimmed axis would invent
-   drama that is not there. One series, so no legend: the heading names it. The
-   table under the chart carries the same numbers for anyone who cannot use it.
+   One student against their class, ordered in time, so: a line each. The axis is
+   pinned to 0-100 because the numbers are percentages and a trimmed axis would
+   invent drama that is not there. Two series, so there is a legend and both ends
+   are labelled: identity is never left to colour alone. The class line is a
+   quiet dashed grey rather than a second bright colour, because it is a reference
+   and not a rival. Every number in it is also written out in the list of sets
+   below the chart, which is the table view for anyone who cannot read the line.
 ------------------------------------------------------ */
 
-const CHART = { w: 640, h: 260, left: 46, right: 18, top: 18, bottom: 44 };
+const CHART = { w: 640, h: 270, left: 46, right: 74, top: 22, bottom: 44 };
 
 export function renderPercentChart(el, points) {
   const done = (points || []).filter(p => p.attempted && p.pct !== null);
@@ -139,7 +244,12 @@ export function renderPercentChart(el, points) {
     '<text class="chart-axis" x="' + (left - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + '%</text>'
   ).join('');
 
-  const path = done.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.pct).toFixed(1)).join(' ');
+  const line = values => values
+    .map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+
+  const theirs = done.map(p => p.pct);
+  const classLine = done.every(p => typeof p.classAvg === 'number')
+    ? done.map(p => p.classAvg) : null;
 
   const dots = done.map((p, i) =>
     '<circle class="chart-dot' + (p.provisional ? ' provisional' : '') + '" ' +
@@ -153,15 +263,32 @@ export function renderPercentChart(el, points) {
       esc(shortDate(p.at)) + '</text>'
     : '').join('');
 
-  el.innerHTML =
+  // Named at the end of each line as well as in the legend, so the two are never
+  // told apart by colour alone.
+  const endLabel = (values, cls, text) => {
+    const i = values.length - 1;
+    return '<text class="chart-end ' + cls + '" x="' + (x(i) + 7) + '" y="' + (y(values[i]) + 4) + '">' +
+      esc(text) + '</text>';
+  };
+
+  const legend = '<p class="chart-legend">' +
+    '<span class="key key-them">Them</span>' +
+    (classLine ? '<span class="key key-class">Class average</span>' : '') +
+    '</p>';
+
+  el.innerHTML = legend +
     '<div class="chart" data-chart>' +
       '<svg viewBox="0 0 ' + w + ' ' + h + '" role="img" ' +
         'aria-label="Percentage on each question set over time. ' +
-        esc(done.map(p => p.title + ' ' + p.pct + ' percent').join(', ')) + '">' +
+        esc(done.map(p => p.title + ' ' + p.pct + ' percent' +
+          (typeof p.classAvg === 'number' ? ', class average ' + p.classAvg + ' percent' : '')).join('. ')) + '">' +
         grid +
         '<line class="chart-cross hidden" y1="' + top + '" y2="' + (top + plotH) + '"/>' +
-        '<path class="chart-line" d="' + path + '"/>' +
+        (classLine ? '<path class="chart-line chart-line-class" d="' + line(classLine) + '"/>' : '') +
+        '<path class="chart-line" d="' + line(theirs) + '"/>' +
         dots + xLabels +
+        endLabel(theirs, 'chart-end-them', 'Them') +
+        (classLine ? endLabel(classLine, 'chart-end-class', 'Class') : '') +
         '<rect class="chart-hit" x="' + left + '" y="' + top + '" width="' + plotW + '" height="' + plotH + '"/>' +
       '</svg>' +
       '<div class="chart-tip hidden"></div>' +
@@ -183,8 +310,12 @@ function wireChart(root, done, x, y) {
 
   const show = i => {
     const p = done[i];
-    tip.innerHTML = '<b>' + esc(p.title) + '</b><br>' + p.awarded + ' of ' + p.outOf +
-      ', ' + p.pct + '%' + (p.provisional ? '<br>still being marked' : '');
+    const lines = ['<b>' + esc(p.title) + '</b>',
+      p.awarded + ' of ' + p.outOf + ', ' + p.pct + '%'];
+    if (typeof p.classAvg === 'number') lines.push('class average ' + p.classAvg + '%');
+    if (p.place && p.sat > 1) lines.push(ordinal(p.place) + ' of ' + p.sat);
+    if (p.provisional) lines.push('still being marked');
+    tip.innerHTML = lines.join('<br>');
     tip.classList.remove('hidden');
     cross.classList.remove('hidden');
     cross.setAttribute('x1', x(i));

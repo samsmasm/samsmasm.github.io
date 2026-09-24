@@ -1,0 +1,156 @@
+<!-- Checkin - a real browser test of the detailed view of one student.
+     Same idea as marking.html: the import map swaps Firebase for the fakes in
+     test/fake/, so this drives the real student.js and history.js against an
+     in-memory store. It checks the things that are easy to get quietly wrong:
+     the class average line, the place in the class, the outlier flags, and that
+     every set folds open onto the actual answers. -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkin - student detail test</title>
+<link rel="stylesheet" href="../css/style.css">
+<!-- harness convenience: ?theme=dark to eyeball the dark palette -->
+<script>try{var t=new URLSearchParams(location.search).get("theme")||"light";
+localStorage.setItem("checkin_theme",t);   /* the shell re-reads this, so setting the attribute alone is not enough */
+document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<script type="importmap">
+{ "imports": {
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js": "./fake/app.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js": "./fake/auth.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js": "./fake/firestore.js"
+} }
+</script>
+</head>
+<body>
+<div class="app-shell"><div id="sidebar"></div><main class="main-content">
+<div id="page-error"></div>
+<p class="tiny"><a id="back" href="home.html">Back to the class</a></p>
+<div class="page-header"><h1 id="who">Loading</h1><p class="sub" id="sub"></p></div>
+<div class="panel" id="chart-panel">
+  <span class="label">Percentage on each set, oldest first</span>
+  <div id="chart"><p class="tiny">Loading.</p></div>
+  <div id="standing"></div>
+</div>
+<div id="flags-wrap" class="hidden"><p class="rule-label">Worth a look</p><div id="flags"></div></div>
+<p class="rule-label" id="lost-label">Where the marks went</p>
+<div id="lost"></div>
+<p class="rule-label">Every set</p>
+<div id="sets"></div>
+</main></div>
+<pre id="RESULTS">running</pre>
+
+<script type="module">
+import { STORE } from './fake/firestore.js';
+
+const ERRS = [];
+window.addEventListener('error', e => ERRS.push('window.onerror: ' + e.message));
+window.addEventListener('unhandledrejection', e => ERRS.push('unhandled: ' + (e.reason && e.reason.message || e.reason)));
+
+const CLASS = 'C1';
+const roll = [['s1','Ana Apple'],['s2','Bo Berry'],['s3','Cy Cherry'],['s4','Di Date'],['s5','Ed Elder']];
+STORE.set('classes/C1', { name: 'Test class', ownerUid: 'teacher1', ownerName: 'Teacher One' });
+roll.forEach(([uid, name]) => STORE.set('classes/C1/members/' + uid,
+  { name, email: uid + '@ex.com', role: 'student' }));
+
+const questions = [
+  { id: 'q1', type: 'mcq',  prompt: 'Which one is right?', maxMark: 1, options: ['the right one','a wrong one','another wrong one'] },
+  { id: 'q2', type: 'text', prompt: 'Explain it properly', maxMark: 3 }
+];
+
+// Three sets. Ana rises, sits below the class on the first two, and on the last
+// one she is the only person to get the written question out.
+const plan = {
+  S1: { at: 1000, mcq: { s1: 'A', s2: 'A', s3: 'A', s4: 'B', s5: 'A' },
+        text: { s1: 1, s2: 2, s3: 2, s4: 3, s5: 2 } },
+  S2: { at: 2000, mcq: { s1: 'B', s2: 'A', s3: 'A', s4: 'A', s5: 'A' },   // Ana alone gets it wrong
+        text: { s1: 2, s2: 2, s3: 3, s4: 3, s5: 2 } },
+  S3: { at: 3000, mcq: { s1: 'A', s2: 'A', s3: 'B', s4: 'A', s5: 'A' },
+        text: { s1: 3, s2: 1, s3: 1, s4: 1, s5: 0 } }             // Ana alone gets it out
+};
+
+Object.entries(plan).forEach(([sid, spec]) => {
+  STORE.set('classes/C1/sets/' + sid, {
+    title: 'Set ' + sid, status: 'closed', reveal: 'release', resultsReleased: true,
+    mode: 'self', createdAt: { seconds: spec.at }, openedAt: { seconds: spec.at }, questions
+  });
+  STORE.set('classes/C1/sets/' + sid + '/keys/key',
+    { key: { q1: 'A', q2: 'the model answer for ' + sid } });
+  roll.forEach(([uid]) => {
+    STORE.set('classes/C1/sets/' + sid + '/responses/' + uid, {
+      name: uid, email: uid + '@ex.com',
+      answers: { q1: spec.mcq[uid], q2: 'what ' + uid + ' wrote in ' + sid },
+      marks: { q2: { awarded: spec.text[uid], auto: false,
+                     comment: uid === 's1' && sid === 'S2' ? 'needs more detail' : '' } }
+    });
+  });
+});
+
+const out = [];
+const log = s => { out.push(s); document.getElementById('RESULTS').textContent = out.join('\n'); };
+let pass = 0, failn = 0;
+const check = (name, cond, extra) => {
+  (cond ? pass++ : failn++);
+  log((cond ? 'PASS  ' : 'FAIL  ') + name + (cond || extra === undefined ? '' : '  <<' + extra + '>>'));
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const text = id => document.getElementById(id).textContent.replace(/\s+/g, ' ').trim();
+
+history.replaceState(null, '', location.pathname + '?c=C1&u=s1');
+await import('../js/student.js?v=test');
+await sleep(700);
+
+log('--- heading ---');
+check('the student is named', text('who') === 'Ana Apple', text('who'));
+check('the subtitle counts sets and gives an average', /3 of 3 sets answered/.test(text('sub')) && /%\s*average/.test(text('sub')), text('sub'));
+
+log('--- chart ---');
+const chart = document.getElementById('chart');
+check('their line is drawn', !!chart.querySelector('path.chart-line:not(.chart-line-class)'));
+check('the class average line is drawn', !!chart.querySelector('path.chart-line-class'));
+check('there is a legend naming both', /Them/.test(chart.textContent) && /Class average/.test(chart.textContent), chart.textContent.slice(0, 80));
+check('both lines are labelled at the end', chart.querySelectorAll('text.chart-end').length === 2);
+check('the chart has a text alternative', /class average/.test(chart.querySelector('svg').getAttribute('aria-label') || ''));
+
+log('--- where they sit ---');
+const standing = text('standing');
+check('the most recent set is named with a place', /Most recently Set S3/.test(standing) && /of 5 who sat it/.test(standing), standing);
+check('their average is set against the class average', /class average of/.test(standing), standing);
+
+log('--- worth a look ---');
+const flags = text('flags');
+check('the outlier section is shown', !document.getElementById('flags-wrap').classList.contains('hidden'));
+check('a question they missed and the class got is flagged', /Missed, where most of the class did not/.test(flags), flags.slice(0, 200));
+check('a question they got and the class missed is flagged', /Got, where most of the class did not/.test(flags), flags.slice(0, 260));
+check('the flag says how the class went', /% of the 5 who answered it got full marks/.test(flags), flags.slice(0, 260));
+
+log('--- where the marks went ---');
+const lostLabel = text('lost-label');
+const lost = text('lost');
+check('the label counts what fell short', /questions short of full marks/.test(lostLabel), lostLabel);
+check('their own answer is shown', /what s1 wrote in/.test(lost), lost.slice(0, 200));
+check('the right answer is beside it', /Model answer|Correct answer/.test(lost), lost.slice(0, 260));
+check('a comment is carried through', /needs more detail/.test(lost), lost.slice(0, 400));
+
+log('--- every set ---');
+const folds = document.querySelectorAll('#sets details.setfold');
+check('one row per set, newest first', folds.length === 3 && /Set S3/.test(folds[0].textContent), folds.length + ' rows');
+check('rows start closed', ![...folds].some(f => f.open));
+check('a row shows their mark, the class average and their place',
+  /class \d+%/.test(folds[0].textContent) && /of 5/.test(folds[0].textContent),
+  folds[0].querySelector('.index-meta').textContent);
+folds[0].open = true;
+await sleep(50);
+check('opening it shows every question with the answers',
+  folds[0].querySelectorAll('.qcard').length === 2 &&
+  /Explain it properly/.test(folds[0].textContent) &&
+  /the model answer for S3/.test(folds[0].textContent),
+  folds[0].querySelectorAll('.qcard').length + ' cards');
+check('a multiple choice answer is spelled out, not left as a letter',
+  /A\. the right one/.test(folds[0].textContent), folds[0].textContent.slice(0, 300));
+
+log('');
+log(pass + ' passed, ' + failn + ' failed');
+log('--- errors ---');
+(ERRS.length ? ERRS : ['none']).forEach(e => log('  ' + e));
+log('  page error box: ' + (document.getElementById('page-error').textContent || 'empty'));
+log('DONE');
+</script>
+</body></html>

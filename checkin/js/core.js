@@ -1,6 +1,6 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=4baf2dd-2128';
+import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=34ec0b0-2138';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp
@@ -20,16 +20,25 @@ export function esc(s) {
   ));
 }
 
+// A time can arrive as a Firestore Timestamp, as a plain { seconds } map once it
+// has been through JSON, or as milliseconds. Take all three: getting it wrong
+// only ever shows up as "Invalid Date" on the page.
+function asDate(ts) {
+  if (!ts) return null;
+  if (ts.toDate) return ts.toDate();
+  if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export function fmtDate(ts) {
-  if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+  const d = asDate(ts);
+  return d ? d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '';
 }
 
 export function fmtDateTime(ts) {
-  if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const d = asDate(ts);
+  return d ? d.toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 }
 
 export function newId(prefix = 'q') {

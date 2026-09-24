@@ -44,11 +44,17 @@ page, and `node --check` cannot see either, because both files are valid
 JavaScript. Marks looked as though they saved intermittently only because
 multiple choice is recomputed from the key on every load.
 
-`test/run.sh` does three things: it drives the real `results.js` and `teach.js` in
-headless Chrome against a fake Firestore (`test/fake/`, swapped in with an import
-map) and reads back what would truly have been written, then runs
+`test/run.sh` does two things: it drives the real `results.js`, `teach.js` and
+`student.js` in headless Chrome against a fake Firestore (`test/fake/`, swapped in
+with an import map) and reads back what would truly have been written, then runs
 `test/undefined-calls.py`, which reports any function called but never defined or
-imported. Add a case to `test/marking.html` whenever marking changes.
+imported. Add a case to the matching page whenever marking, the roll or the
+student view changes.
+
+Two traps when writing one of these harness pages: an import map value must be
+`./fake/x.js` and never a bare `fake/x.js`, and the theme comes from
+localStorage, so setting `data-theme` alone is undone the moment the shell
+paints.
 
 ---
 
@@ -77,7 +83,7 @@ Setup and migration steps are in `SETUP.md`.
 | `set.html` | teacher | Build or edit a question set, by hand or from CSV. |
 | `results.html` | teacher | One set: how they did, what they wrote, marking, live controls. |
 | `qr.html` | teacher | One question as a QR code big enough to scan from the back of the room. |
-| `student.html` | teacher | One student: every set they have done and a percentage-over-time chart. |
+| `student.html` | teacher | One student in detail: their line against the class average, where the marks went, and every set folded shut over the whole paper. |
 | `class.html` | student | The current question, large. Older sets behind "Previous questions". |
 | `answer.html` | student | One set: answer it, review it marked, or practise it. |
 
@@ -85,6 +91,14 @@ Setup and migration steps are in `SETUP.md`.
 sparklines and the percentage chart. It recomputes marks from each set's answer
 key rather than trusting stored scores, because a set whose responses page was
 never opened has no stored marks and would otherwise read as zero.
+
+`loadClassHistory` returns three things: `sets`, `byStudent` (one point per set
+per student, carrying the class average, their place and how many sat it) and
+`bySet` (the whole class on that set, including per question how many tried it
+and how many got full marks). All of it falls out of responses that had to be
+read anyway, so a class comparison anywhere costs no extra reads. `studentQuestions`
+is pure: it re-reads what is already loaded and returns every question one student
+met, so the detailed view needs no second trip to Firestore.
 
 `js/core.js` holds everything shared: auth guard, the sidebar shell, all
 Firestore access, CSV parsing and the marking maths. `js/answering.js` renders
@@ -160,6 +174,39 @@ These were settled with Sam. Do not quietly reopen them.
 - **No projector view for questions.** Deliberate. QR codes are the exception.
 - Practice retakes are **private to the student**. The teacher never sees them,
   and the marked record is never touched.
+- Results split two ways: a set's own page stays scoped to that set, and anything
+  across time lives on the class page. Clicking a student's name anywhere on a
+  set's responses page opens their detailed history.
+- The detailed view of a student is **this class only**, not every class Sam
+  teaches them in. Settled 2026-09-24.
+- That page is ordered how they are going, then what is worth acting on, then
+  everything: the chart and where they stand, then the outlier flags and where
+  the marks went, then every set folded shut. Sets open onto the whole paper:
+  what was asked, what they put, what was right, and any comment. Chosen over
+  summary tiles and an always-open transcript.
+- A question is flagged as an outlier only when at least four students answered
+  it: missed when 70% or more of them got full marks, got when 30% or fewer did.
+  Below four the comparison says nothing, so nothing is claimed.
+
+---
+
+## The percentage chart
+
+One student's line against a quiet dashed grey class average. Two series, so
+there is a legend and both lines are labelled at their right-hand end: identity
+is never left to colour alone. The axis is pinned to 0 to 100 because the numbers
+are percentages and a trimmed axis invents drama that is not there.
+
+The student's line is `--chart-them`, which is the **darker** amber on a light
+ground and the bright one on navy. That is measured, not taste: `--primary` on
+cream sits under 2:1 against the page and reads as a smudge. The class line is
+grey on purpose. It is a reference, not a rival, and it should never compete with
+the student for attention.
+
+The chart is drawn in viewBox units and scaled to fit, so its 11px labels land at
+about 6 real pixels on a phone. The mobile block in `style.css` scales the type
+and strokes back up; those are the same sizes seen through the shrink, not a
+second design.
 
 ---
 

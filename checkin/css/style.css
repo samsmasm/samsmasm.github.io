@@ -35,6 +35,11 @@
   --radius: 14px;
   --radius-sm: 8px;
   --radius-xs: 5px;
+
+  /* Chart ink. The student's line is the darker amber on a light ground, where
+     plain --primary sits at under 2:1 against the page and reads as a smudge. */
+  --chart-them: var(--primary-dark);
+  --chart-class: var(--text-muted);
 }
 
 [data-theme="dark"] {
@@ -56,6 +61,10 @@
   --warn: #F5C400;
   --warn-bg: rgba(245, 196, 0, 0.07);
   --warn-border: rgba(245, 196, 0, 0.3);
+
+  /* On navy it is the bright amber that carries, and the dark one that vanishes. */
+  --chart-them: var(--primary);
+  --chart-class: var(--text-muted);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -866,10 +875,19 @@ body.presenting .qr-url { font-size: 0.95rem; color: var(--text); }
 
 .chart-grid { stroke: var(--border); stroke-width: 1; }
 .chart-axis { fill: var(--text-muted); font-size: 11px; font-weight: 700; font-family: 'Nunito', sans-serif; }
-.chart-line { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart-line { fill: none; stroke: var(--chart-them); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 
-.chart-dot { fill: var(--primary); stroke: var(--surface); stroke-width: 2; }
-.chart-dot.provisional { fill: var(--surface); stroke: var(--primary); }
+/* The class average is a reference, not a rival: quiet, grey, and dashed so it is
+   told apart from the student's line without relying on colour. */
+.chart-line-class {
+  stroke: var(--chart-class);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+}
+
+.chart-dot { fill: var(--chart-them); stroke: var(--surface); stroke-width: 2; }
+.chart-dot.provisional { fill: var(--surface); stroke: var(--chart-them); }
 .chart-dot.on { r: 6; }
 
 .chart-cross { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -891,3 +909,125 @@ body.presenting .qr-url { font-size: 0.95rem; color: var(--text); }
 }
 
 .chart-tip.hidden, .chart-cross.hidden { display: none; }
+
+/* Named at the end of each line as well as in the legend, so a reader who cannot
+   separate the two colours still knows which is which. */
+.chart-end {
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+}
+.chart-end-them { fill: var(--chart-them); }
+.chart-end-class { fill: var(--chart-class); }
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.key { display: inline-flex; align-items: center; gap: 7px; }
+.key::before {
+  content: "";
+  width: 18px;
+  height: 0;
+  border-top: 3px solid currentColor;
+  border-radius: 2px;
+}
+.key-them { color: var(--chart-them); }
+.key-class { color: var(--chart-class); }
+.key-class::before { border-top-style: dashed; border-top-width: 2px; }
+
+/* ---------- one student, in detail ---------- */
+
+.standing-line {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0.55rem 0 0;
+  line-height: 1.5;
+}
+.standing-line b { color: var(--text); font-weight: 800; }
+
+.qcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.qcard .prompt-small { margin: 0.4rem 0 0.6rem; }
+.qcard .feedback { margin-top: 0.5rem; }
+
+.row-tight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 0.6rem;
+}
+.row-tight:empty { display: none; }
+
+.chip {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.chip-warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-border); }
+.chip-good { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-border); }
+
+/* Every set is on the page, folded shut. <details> does the work, so nothing
+   here depends on JavaScript staying wired up. */
+.setfold {
+  border-bottom: 1px solid var(--border);
+}
+.setfold:last-of-type { border-bottom: none; }
+
+.setfold > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 4px 14px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.setfold > summary::-webkit-details-marker { display: none; }
+.setfold > summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.setfold[open] > summary::after { transform: rotate(-135deg); }
+.setfold > summary:hover .index-name { color: var(--primary-dark); }
+[data-theme="dark"] .setfold > summary:hover .index-name { color: var(--primary); }
+
+.setfold-body { padding: 0 0 16px; }
+
+@media (max-width: 680px) {
+  .setfold > summary { flex-wrap: wrap; }
+  .setfold > summary .index-meta { margin-left: 0; text-align: left; }
+}
+
+/* The chart is drawn in viewBox units and scaled down to fit, so on a phone its
+   11px labels land at about 6 real pixels. These are the same sizes seen through
+   that shrink, not a different design. */
+@media (max-width: 680px) {
+  .chart-axis { font-size: 18px; }
+  .chart-end { font-size: 18px; }
+  .chart-line { stroke-width: 4; }
+  .chart-line-class { stroke-width: 3.5; stroke-dasharray: 8 6; }
+  .chart-dot { r: 7; stroke-width: 3; }
+  .chart-grid { stroke-width: 1.6; }
+}
