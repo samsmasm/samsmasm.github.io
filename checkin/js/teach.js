@@ -196,7 +196,7 @@ async function paintMembers() {
   box.innerHTML = members.length
     ? members.map(m =>
         '<div class="index-row" data-uid="' + m.uid + '">' +
-          '<span class="grow"><span class="index-name">' + esc(m.name) + '</span>' +
+          '<span class="grow"><span class="index-term">' + esc(m.name) + '</span>' +
           '<br><span class="index-desc">' + esc(m.email) + '</span></span>' +
           '<span class="index-meta">joined ' + fmtDate(m.joinedAt) + '</span>' +
           '<button class="btn-warn" data-act="remove">Remove</button>' +
@@ -222,7 +222,7 @@ async function paintMembers() {
   const bbox = document.getElementById('blocked');
   bbox.innerHTML = blocked.map(b =>
     '<div class="index-row" data-uid="' + b.uid + '">' +
-      '<span class="grow"><span class="index-name">' + esc(b.name || b.email || b.uid) + '</span>' +
+      '<span class="grow"><span class="index-term">' + esc(b.name || b.email || b.uid) + '</span>' +
       '<br><span class="index-desc">' + esc(b.email || '') + '</span></span>' +
       '<button data-act="unblock">Let back in</button>' +
     '</div>').join('');
