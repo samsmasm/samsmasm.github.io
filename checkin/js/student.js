@@ -2,8 +2,8 @@
 
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listMembers, addShellLinks
-} from './core.js?v=b3faad3-2027';
-import { loadClassHistory, averagePct, renderPercentChart } from './history.js?v=b3faad3-2027';
+} from './core.js?v=641cfbd-2036';
+import { loadClassHistory, averagePct, renderPercentChart } from './history.js?v=641cfbd-2036';
 
 const classId = qp('c');
 const studentId = qp('u');

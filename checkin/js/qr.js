@@ -2,8 +2,8 @@
 // points at one question, so scanning lands a student on that question alone.
 
 import { requireUser, qp, esc, fail, getClass, getSet, addShellLinks
-} from './core.js?v=b3faad3-2027';
-import { svgFor } from './qrsvg.js?v=b3faad3-2027';
+} from './core.js?v=641cfbd-2036';
+import { svgFor } from './qrsvg.js?v=641cfbd-2036';
 
 const classId = qp('c');
 const setId = qp('s');

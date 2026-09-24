@@ -1,13 +1,13 @@
 // Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
-import { loadClassHistory, sparkline } from './history.js?v=b3faad3-2027';
+import { loadClassHistory, sparkline } from './history.js?v=641cfbd-2036';
 import {
   requireUser, qp, esc, fail, debounce, LETTERS,
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers,
   saveMarks, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=b3faad3-2027';
+} from './core.js?v=641cfbd-2036';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -75,19 +75,25 @@ function watchResponses() {
   }, err => fail('Watching responses', err));
 }
 
-// Repainting while the teacher is typing a mark would throw away what they typed,
-// so hold off until the field loses focus.
-function safePaint() {
+// Repainting while a mark is being typed would throw away what was typed, so a
+// repaint is owed rather than done. Tabbing from one mark box to the next must
+// not trigger it either: the rebuild would destroy the box being tabbed into and
+// focus would vanish mid-run. So it waits until focus leaves marking altogether.
+function marking() {
   const active = document.activeElement;
-  if (active && active.closest && active.closest('[data-mark-scope]')) {
-    if (!repaintQueued) {
-      repaintQueued = true;
-      active.addEventListener('blur', () => { repaintQueued = false; paintBody(); }, { once: true });
-    }
-    return;
-  }
+  return !!(active && active.closest && active.closest('[data-mark-scope]'));
+}
+
+function safePaint() {
+  if (marking()) { repaintQueued = true; return; }
+  repaintQueued = false;
   paintBody();
 }
+
+document.addEventListener('focusout', () => {
+  // Let focus land on whatever comes next before deciding.
+  setTimeout(() => { if (repaintQueued && !marking()) safePaint(); }, 0);
+});
 
 /* ---------------- multiple choice marks itself ---------------- */
 
@@ -270,7 +276,7 @@ function paintScores() {
         const known = m.correct !== undefined;
         const cls = !known ? 'cell-none' : m.correct ? 'cell-right' : 'cell-wrong';
         const label = !known ? '?' : full === 1 ? (m.correct ? 'right' : 'wrong') : (m.correct ? full : 0);
-        return '<td class="num cell-peek ' + cls + '" tabindex="0"' + where + '>' + label + '</td>';
+        return '<td class="num cell-peek ' + cls + '"' + where + '>' + label + '</td>';
       }
 
       // Written answers are marked here, in the cell, without leaving the grid.
@@ -278,7 +284,7 @@ function paintScores() {
       const cls = awarded === '' ? 'cell-todo' : Number(awarded) >= full ? 'cell-right'
         : Number(awarded) === 0 ? 'cell-wrong' : '';
       return '<td class="num cell-peek cell-mark ' + cls + '" data-mark-scope' + where + '>' +
-        '<input type="number" data-gridmark min="0" max="' + full + '" step="0.5" ' +
+        '<input type="number" data-gridmark min="0" max="' + full + '" step="1" ' +
           'aria-label="Mark out of ' + full + '" value="' + awarded + '">' +
         '</td>';
     }).join('');
@@ -318,7 +324,9 @@ function paintScores() {
     '<p class="tiny mt">Hover or tap any answered cell to read what they put. ' +
     'Written answers can be marked straight into the grid, and save as you type. ' +
     'A dot means no answer, an empty box means a written answer still waiting on you. ' +
-    'Before is how that student went on earlier sets, oldest on the left.</p>' +
+    'Before is how that student went on earlier sets, oldest on the left. ' +
+    'Tab moves between written answers only. Each one starts on full marks, so ' +
+    'tabbing straight through awards full marks and you type only where it is not.</p>' +
     '<p class="rule-label">Question by question</p>' + perQuestion;
 
   wireGrid();
@@ -368,7 +376,7 @@ function paintAnswers() {
       const marker = full === 1
         ? '<button data-set-mark="' + full + '" class="' + (awarded === full ? 'btn-on' : '') + '">Right</button>' +
           '<button data-set-mark="0" class="' + (awarded === 0 ? 'btn-warn' : '') + '">Wrong</button>'
-        : '<input type="number" data-mark min="0" max="' + full + '" step="0.5" value="' + awarded + '">' +
+        : '<input type="number" data-mark min="0" max="' + full + '" step="1" value="' + awarded + '">' +
           '<span class="tiny">of ' + full + '</span>' +
           '<button data-set-mark="' + full + '" class="btn-quiet">Full</button>' +
           '<button data-set-mark="0" class="btn-quiet">Zero</button>';
@@ -432,14 +440,9 @@ function wireMarking() {
 
     const numberInput = scope.querySelector('[data-mark]');
     if (numberInput) {
-      const push = debounce(() => {
-        let value = numberInput.value === '' ? '' : Number(numberInput.value);
-        if (value !== '' && (!Number.isFinite(value) || value < 0)) value = 0;
-        if (value !== '' && value > max) value = max;
-        numberInput.value = value;
-        saveNow(scope, { awarded: value, correct: value !== '' && value >= max });
-      }, 500);
-      numberInput.addEventListener('input', push);
+      wireMarkInput(numberInput, max,
+        value => saveNow(scope, { awarded: value, correct: value !== '' && value >= max }),
+        fn => debounce(fn, 500));
     }
 
     const comment = scope.querySelector('[data-comment]');
@@ -543,11 +546,8 @@ function wireGrid() {
   document.querySelectorAll('#body [data-gridmark]').forEach(input => {
     const cell = input.closest('[data-uid]');
     const max = Number(cell.dataset.max) || 1;
-    const push = debounce(async () => {
-      let value = input.value === '' ? '' : Number(input.value);
-      if (value !== '' && (!Number.isFinite(value) || value < 0)) value = 0;
-      if (value !== '' && value > max) value = max;
-      if (value !== '') input.value = value;
+
+    const save = async value => {
       try {
         const score = await applyMark(cell.dataset.uid, cell.dataset.qid, {
           awarded: value, correct: value !== '' && value >= max
@@ -563,8 +563,9 @@ function wireGrid() {
       } catch (err) {
         fail('Saving a mark', err);
       }
-    }, 500);
-    input.addEventListener('input', push);
+    };
+
+    wireMarkInput(input, max, save, fn => debounce(fn, 500));
   });
 }
 

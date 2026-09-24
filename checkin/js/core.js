@@ -1,6 +1,6 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=b3faad3-2027';
+import { db, auth, signIn, signOutNow, onAuth } from './firebase.js?v=641cfbd-2036';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp
@@ -138,6 +138,13 @@ function paintShell() {
   }
 
   host.innerHTML =
+    '<header class="topbar">' +
+      '<button class="topbar-btn" id="menu-btn" aria-label="Menu" aria-expanded="false">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+        'stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>' +
+      '<span class="topbar-title">Check<span class="logo-accent">in</span></span>' +
+    '</header>' +
+    '<div class="scrim" id="scrim"></div>' +
     '<aside class="sidebar" id="app-sidebar">' +
       '<div class="sidebar-logo">' +
         '<span class="logo-text">Check<span class="logo-accent">in</span></span>' +
@@ -169,16 +176,20 @@ function paintShell() {
   });
 
   const menu = document.getElementById('menu-btn');
-  if (menu && !menu.dataset.wired) {
-    menu.dataset.wired = '1';
-    menu.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
-    document.addEventListener('click', e => {
-      if (document.body.classList.contains('sidebar-open') &&
-          !e.target.closest('#app-sidebar') && !e.target.closest('#menu-btn')) {
-        document.body.classList.remove('sidebar-open');
-      }
-    });
-  }
+  const close = () => {
+    document.body.classList.remove('sidebar-open');
+    menu.setAttribute('aria-expanded', 'false');
+  };
+
+  menu.addEventListener('click', () => {
+    const open = document.body.classList.toggle('sidebar-open');
+    menu.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  // Tapping the dimmed area, or going somewhere, puts the drawer away.
+  document.getElementById('scrim').addEventListener('click', close);
+  host.querySelectorAll('.sidebar a').forEach(a => a.addEventListener('click', close));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }
 
 export function fail(where, err) {

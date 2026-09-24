@@ -4,7 +4,7 @@ import {
   requireUser, qp, esc, fail, newId, LETTERS, BLANK_SET,
   getClass, getSet, createSet, saveSet, saveKey, getKey, syncKeyVisibility,
   csvToQuestions, addShellLinks
-} from './core.js?v=b3faad3-2027';
+} from './core.js?v=641cfbd-2036';
 
 const classId = qp('c');
 let setId = qp('s');

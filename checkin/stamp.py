@@ -34,6 +34,10 @@ def stamp(text, v):
     # <script type="module" src="js/home.js"> and any existing stamp
     text = re.sub(r'(src="js/[A-Za-z0-9_\-]+\.js)(\?v=[^"]*)?"',
                   lambda m: m.group(1) + '?v=' + v + '"', text)
+    # <link rel="stylesheet" href="css/style.css">. Missing this is what left
+    # phones rendering the sidebar markup with no styles at all.
+    text = re.sub(r'(href="css/[A-Za-z0-9_\-]+\.css)(\?v=[^"]*)?"',
+                  lambda m: m.group(1) + '?v=' + v + '"', text)
     # import ... from './core.js'  (relative only, never the CDN)
     text = re.sub(r"(from '\./[A-Za-z0-9_\-]+\.js)(\?v=[^']*)?'",
                   lambda m: m.group(1) + '?v=' + v + "'", text)

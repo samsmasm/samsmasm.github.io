@@ -3,8 +3,8 @@
 
 import {
   requireUser, qp, esc, fail, getClass, listMembers, addShellLinks
-} from './core.js?v=b3faad3-2027';
-import { loadClassHistory, latestPoint, averagePct, sparkline } from './history.js?v=b3faad3-2027';
+} from './core.js?v=641cfbd-2036';
+import { loadClassHistory, latestPoint, averagePct, sparkline } from './history.js?v=641cfbd-2036';
 
 const classId = qp('c');
 let me = null, cls = null;

@@ -23,9 +23,11 @@ link, and keep every path relative.
 The host sends `cache-control: max-age=14400`, so a browser keeps a module for
 four hours. New HTML running against an old cached module does not merely look
 stale, it breaks: this produced `can't access property "innerHTML", box is null`
-after one change. `stamp.py` puts a fresh `?v=` on every script src and every
+after one change. `stamp.py` puts a fresh `?v=` on the stylesheet, every script src and every
 relative import so the browser cannot serve an old copy. CDN imports are left
-alone.
+alone. Forgetting the stylesheet in that list once left phones rendering the
+sidebar markup with no styles at all, which looks like a giant icon and a
+stacked menu above the page.
 
 A corollary: never use `location.reload()` or `location.replace()` as a step in a
 UI flow. If the page comes back from cache the flow silently appears to do
@@ -129,6 +131,14 @@ These were settled with Sam. Do not quietly reopen them.
   and the marked record is never touched.
 
 ---
+
+## On a phone
+
+Under 680px the sidebar becomes a drawer and a navy top bar carries the
+hamburger and the wordmark. Both are rendered by `paintShell()` in `core.js`, so
+pages do not carry any menu markup of their own. The drawer closes on the scrim,
+on any nav link, and on Escape. List rows stack rather than squeezing four
+columns onto a phone, and tables stay inside `.scroller`.
 
 ## Conventions
 

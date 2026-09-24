@@ -7,7 +7,7 @@
 import {
   listSets, getResponses, getKey, computeMarks, totalAwarded, maxScore,
   needsMarking, answeredCount, esc
-} from './core.js?v=b3faad3-2027';
+} from './core.js?v=641cfbd-2036';
 
 function when(set) {
   const t = set.openedAt || set.createdAt;
