@@ -1,6 +1,6 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth, signInAnon } from './firebase.js?v=772c2f2-0736';
+import { db, auth, signIn, signOutNow, onAuth, signInAnon } from './firebase.js?v=290b6c8-1909';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp
@@ -327,6 +327,14 @@ export async function createCheck(user, name) {
 export async function renameCheck(user, checkId, name) {
   await updateDoc(doc(db, 'classes', checkId), { name });
   await rememberCheck(user.uid, checkId, name);
+  // Every run carries a copy of the quiz name for the teacher's own views, so
+  // renaming the test has to reach them or the old name lingers in places the
+  // rename appeared to have fixed.
+  const runs = await listSets(checkId).catch(() => []);
+  if (!runs.length) return;
+  const batch = writeBatch(db);
+  for (const run of runs) batch.update(doc(db, 'classes', checkId, 'sets', run.id), { title: name });
+  await batch.commit();
 }
 
 export function isOneOff(container) {
@@ -733,6 +741,50 @@ export function needsMarking(set, response) {
     if (!m || m.awarded === undefined || m.awarded === null || m.awarded === '') return true;
   }
   return false;
+}
+
+/* -------- what a student can be told yet --------
+   A written answer the student gave but the teacher has not marked is a
+   not-yet, not a zero. Counting it in the total turns a good paper into a bad
+   looking one: eight right out of eight multiple choice reads as "8 out of 12"
+   while the written answers sit in a marking pile. So the total a student is
+   shown counts only what has actually been decided.
+
+   A question left blank is different and does stay in the total. Nobody is
+   waiting on it, and hiding it would flatter the student instead.
+------------------------------------------------- */
+
+export function awaitingMarks(set, response) {
+  let count = 0, points = 0;
+  for (const q of set.questions || []) {
+    if (q.type !== 'text') continue;
+    const given = response && response.answers ? response.answers[q.id] : undefined;
+    if (given === undefined || given === null || String(given).trim() === '') continue;
+    const mark = ((response && response.marks) || {})[q.id];
+    if (!mark || mark.awarded === undefined || mark.awarded === null || mark.awarded === '') {
+      count++;
+      points += Number(q.maxMark) || 1;
+    }
+  }
+  return { count, points };
+}
+
+// The score as a student should be told it. Every student-facing view uses this
+// one, so the finished screen and the class page cannot quote different numbers
+// for the same paper.
+export function studentScore(set, response, marks) {
+  const waiting = awaitingMarks(set, response);
+  const outOf = maxScore(set) - waiting.points;
+  const awarded = totalAwarded(set, marks || (response && response.marks) || {});
+  return {
+    awarded,
+    outOf,
+    waiting: waiting.count,
+    waitingPoints: waiting.points,
+    // Empty when there is nothing decided yet, so a caller can say something
+    // better than "0 out of 0".
+    text: outOf > 0 ? awarded + ' out of ' + outOf : ''
+  };
 }
 
 export function answeredCount(set, response) {

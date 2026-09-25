@@ -5,8 +5,8 @@
 import {
   requireUser, myClasses, createClass, joinClass, esc, fail, qp, myRole, setMyRole,
   addShellLinks
-} from './core.js?v=772c2f2-0736';
-import { mountCodeBox } from './codebox.js?v=772c2f2-0736';
+} from './core.js?v=290b6c8-1909';
+import { mountCodeBox } from './codebox.js?v=290b6c8-1909';
 
 let me = null, classes = [];
 

@@ -3,10 +3,10 @@
 
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, amMember, getResponse,
-  watchSet, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
+  watchSet, computeMarks, studentScore, answeredCount, studentsMaySeeKey,
   practiceAllowed, myClasses, forgetClass, doc, db, addShellLinks
-} from './core.js?v=772c2f2-0736';
-import { mountSet } from './answering.js?v=772c2f2-0736';
+} from './core.js?v=290b6c8-1909';
+import { mountSet } from './answering.js?v=290b6c8-1909';
 import { updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const classId = qp('c');
@@ -153,8 +153,14 @@ async function paintPrevious(sets) {
     if (!done) meta.push('<span class="state state-todo">not answered</span>');
     else if (done < total) meta.push(done + ' of ' + total + ' answered');
     else meta.push('all answered');
-    if (showScore) meta.push('<b>' + totalAwarded(set, marks) + ' out of ' + maxScore(set) + '</b>');
-    else if (done && set.reveal === 'release') meta.push('marks not released yet');
+    if (showScore) {
+      const tally = studentScore(set, response, marks);
+      if (tally.text) meta.push('<b>' + tally.text + '</b>');
+      if (tally.waiting) {
+        meta.push('<span class="tiny">' + tally.waitingPoints +
+          (tally.waitingPoints === 1 ? ' mark' : ' marks') + ' still with your teacher</span>');
+      }
+    } else if (done && set.reveal === 'release') meta.push('marks not released yet');
 
     const link = 'answer.html?c=' + encodeURIComponent(classId) + '&s=' + set.id;
     const actions = [];

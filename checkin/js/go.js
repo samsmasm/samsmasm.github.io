@@ -6,13 +6,16 @@
 // class pages use, so what a room of visitors sees is what a class sees.
 
 import {
-  requireAnyUser, qp, esc, fail, lookupRunCode, getSet, getResponse, watchSet,
-  claimName, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey
-} from './core.js?v=772c2f2-0736';
-import { mountSet } from './answering.js?v=772c2f2-0736';
+  requireAnyUser, qp, esc, fail, lookupRunCode, getSet, getClass, getResponse, watchSet,
+  claimName, computeMarks, studentScore, answeredCount, studentsMaySeeKey
+} from './core.js?v=290b6c8-1909';
+import { mountSet } from './answering.js?v=290b6c8-1909';
 
 const focusQid = qp('q');            // set by a QR code pointing at one question
 let me = null, run = null, set = null, view = null, who = '';
+// The quiz is named on the container and the batch on the run. Students are told
+// both: "Period 3" on its own says nothing about what they are about to sit.
+let quizName = '', batchName = '';
 
 const show = step => {
   ['code', 'name', 'answer', 'shut'].forEach(s =>
@@ -65,7 +68,14 @@ async function enter(code) {
     set = await getSet(run.classId, run.setId);
   } catch (err) { return fail('Opening the test', err); }
 
-  document.title = (set.title || 'Questions') + ' - Checkin';
+  // The container carries the live quiz name, so renaming the test reaches every
+  // batch of it. The name on the code document is only a fallback for when that
+  // read fails.
+  const container = await getClass(run.classId).catch(() => null);
+  quizName = (container && container.name) || run.title || set.title || 'Questions';
+  batchName = set.runLabel || '';
+
+  document.title = [quizName, batchName].filter(Boolean).join(' - ') + ' - Checkin';
 
   if (set.status !== 'open') return shut();
 
@@ -78,7 +88,11 @@ async function enter(code) {
   }
 
   show('name');
-  document.getElementById('name-title').textContent = set.title || 'What is your name?';
+  document.getElementById('name-title').textContent = quizName;
+  if (batchName) {
+    const sub = document.querySelector('#step-name .sub');
+    if (sub) sub.textContent = batchName + '. ' + sub.textContent;
+  }
   document.getElementById('name-go').addEventListener('click', takeName);
   document.getElementById('name').addEventListener('keydown', e => {
     if (e.key === 'Enter') takeName();
@@ -88,7 +102,7 @@ async function enter(code) {
 
 function shut() {
   show('shut');
-  document.getElementById('shut-title').textContent = set.title || 'Not open';
+  document.getElementById('shut-title').textContent = quizName;
   document.getElementById('shut-sub').textContent = set.status === 'closed'
     ? 'This one is closed now, so it cannot be answered any more.'
     : 'This one has not been opened yet. Your teacher will open it when everyone is ready.';
@@ -128,7 +142,7 @@ async function takeName() {
 async function answering() {
   document.getElementById('who').textContent = who;
   show('answer');
-  document.getElementById('set-title').textContent = set.title || 'Questions';
+  document.getElementById('set-title').textContent = quizName;
 
   let response = null;
   try { response = await getResponse(run.classId, run.setId, me.uid); }
@@ -166,10 +180,15 @@ function subtitle(response) {
   const done = answeredCount(set, response);
   const marks = computeMarks(set, response, set.key || {});
   if (done && studentsMaySeeKey(set)) {
-    bits.push(totalAwarded(set, marks) + ' out of ' + maxScore(set));
+    const tally = studentScore(set, response, marks);
+    if (tally.text) bits.push(tally.text);
+    if (tally.waiting) {
+      bits.push(tally.waitingPoints + (tally.waitingPoints === 1 ? ' mark' : ' marks') +
+        ' still to be marked');
+    }
   } else if (done && set.reveal === 'release') {
     bits.push('marks are not out yet');
   }
-  bits.push(esc(run.title || ''));
-  document.getElementById('set-sub').textContent = bits.filter(Boolean).join(' · ');
+  document.getElementById('set-sub').textContent =
+    [batchName].concat(bits).filter(Boolean).join(' · ');
 }

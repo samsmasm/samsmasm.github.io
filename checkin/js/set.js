@@ -3,8 +3,7 @@
 import {
   requireUser, qp, esc, fail, newId, LETTERS, BLANK_SET,
   getClass, getSet, createSet, saveSet, saveKey, getKey, syncKeyVisibility,
-  csvToQuestions, addShellLinks
-} from './core.js?v=772c2f2-0736';
+  csvToQuestions, addShellLinks, isOneOff} from './core.js?v=290b6c8-1909';
 
 const classId = qp('c');
 let setId = qp('s');
@@ -35,7 +34,23 @@ let me = null, cls = null, set = null, key = {};
   document.getElementById('status-line').textContent = isNew
     ? cls.name
     : cls.name + ' · ' + { draft: 'draft', open: 'open to the class now', closed: 'closed' }[set.status];
-  document.getElementById('title').value = set.title || '';
+  // A run of a one off test already has its name: the name of the test itself,
+  // which lives on the container. What this field names is the batch, so it says
+  // so and writes to the batch, rather than quietly overwriting the quiz name
+  // and leaving students looking at "Period 3" with no idea what it is.
+  if (isOneOff(cls)) {
+    document.querySelector('label[for="title"], .panel .label').textContent = 'Batch name';
+    const field = document.getElementById('title');
+    field.value = set.runLabel || '';
+    field.placeholder = 'Period 3, or Tuesday group';
+    const hint = document.createElement('p');
+    hint.className = 'tiny';
+    hint.textContent = 'The test is called "' + (cls.name || '') +
+      '". This names just this batch of people, and both are shown to them.';
+    field.insertAdjacentElement('afterend', hint);
+  } else {
+    document.getElementById('title').value = set.title || '';
+  }
   pick('mode', set.mode || 'self');
   pick('reveal', set.reveal || 'release');
 
@@ -154,7 +169,14 @@ function harvest() {
   });
   set.questions = out;
   key = newKey;
-  set.title = document.getElementById('title').value.trim();
+  if (isOneOff(cls)) {
+    // The quiz name stays the container's, so renaming the test renames every
+    // batch of it and nothing here can clobber it.
+    set.runLabel = document.getElementById('title').value.trim();
+    set.title = cls.name || set.title || '';
+  } else {
+    set.title = document.getElementById('title').value.trim();
+  }
   set.mode = chosen('mode') || 'self';
   set.reveal = chosen('reveal') || 'release';
 }
@@ -275,7 +297,11 @@ Rules:
 async function save(thenOpen) {
   harvest();
   const btns = [document.getElementById('save'), document.getElementById('save-open')];
-  if (!set.title) return note('save-note', 'Give the set a title first.', 'savefail');
+  if (isOneOff(cls)) {
+    if (!set.runLabel) return note('save-note', 'Give this batch a name first.', 'savefail');
+  } else if (!set.title) {
+    return note('save-note', 'Give the set a title first.', 'savefail');
+  }
   if (!set.questions.length) return note('save-note', 'Add at least one question.', 'savefail');
   const blank = set.questions.findIndex(q => !q.prompt);
   if (blank >= 0) return note('save-note', 'Question ' + (blank + 1) + ' has no text.', 'savefail');
@@ -299,6 +325,9 @@ async function save(thenOpen) {
       reveal: set.reveal,
       questions: set.questions
     };
+    // The batch name only exists on a one off run, and must not be written as an
+    // empty field onto an ordinary class set.
+    if (isOneOff(cls)) body.runLabel = set.runLabel;
     if (!setId) {
       setId = await createSet(classId, body);
       set.id = setId;

@@ -43,7 +43,9 @@ STORE.set('classes/C1/members/stu1', { name: 'Ana Apple', email: 'ana@ex.com', r
 
 const questions = [
   { id: 'q1', type: 'mcq',  prompt: 'Which is a public good?', maxMark: 1, options: ['A lighthouse','A sandwich'] },
-  { id: 'q2', type: 'text', prompt: 'Say why in a sentence.',  maxMark: 2 }
+  { id: 'q2', type: 'mcq',  prompt: 'And which is rival?',     maxMark: 1, options: ['A sandwich','A lighthouse'] },
+  { id: 'q3', type: 'text', prompt: 'Say why in a sentence.',  maxMark: 2 },
+  { id: 'q4', type: 'text', prompt: 'Now give an example.',    maxMark: 2 }
 ];
 // Marks show as they go, and practice is allowed, so the finished screen has
 // everything it can have.
@@ -51,9 +53,9 @@ STORE.set('classes/C1/sets/S1', {
   title: 'Public goods', status: 'open', mode: 'self', reveal: 'now',
   resultsReleased: true, allowRetake: true,
   createdAt: { seconds: 1758000000 }, openedAt: { seconds: 1758000000 },
-  questions, key: { q1: 'A' }
+  questions, key: { q1: 'A', q2: 'A' }
 });
-STORE.set('classes/C1/sets/S1/keys/key', { key: { q1: 'A' } });
+STORE.set('classes/C1/sets/S1/keys/key', { key: { q1: 'A', q2: 'A' } });
 
 const page = await (await fetch('../answer.html')).text();
 document.getElementById('mount').innerHTML =
@@ -68,13 +70,31 @@ const text = () => view().textContent.replace(/\s+/g, ' ');
 log('--- answering ---');
 check('the first question is up', /Which is a public good/.test(text()), text().slice(0, 90));
 
-// Answer only the multiple choice, so the blank warning has something to say.
-view().querySelector('[data-letter="A"]').click();
-await sleep(200);
+// Everything answered: both multiple choice right, both written answers given
+// and therefore sitting unmarked. This is the case that used to read as a bad
+// paper: 2 right out of 2 shown as "2 out of 6".
+const answerAll = async () => {
+  view().querySelector('[data-letter="A"]').click();
+  await sleep(150);
+  view().querySelector('[data-go="1"]').click();
+  await sleep(100);
+  view().querySelector('[data-letter="A"]').click();
+  await sleep(150);
+  for (const n of [2, 3]) {
+    view().querySelector('[data-go="' + n + '"]').click();
+    await sleep(100);
+    const area = view().querySelector('[data-answer]');
+    area.value = 'a written answer for question ' + (n + 1);
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(900);                       // the save is debounced
+  }
+};
+await answerAll();
 
 const hand = view().querySelector('[data-finish]');
-check('there is a way to hand in', !!hand, text().slice(-140));
-check('it admits not everything is answered', hand && /Hand in anyway/.test(hand.textContent), hand && hand.textContent);
+check('there is a way to hand in', !!hand, text().slice(-160));
+check('it offers a plain hand in once everything is answered',
+  hand && /^Hand in$/.test(hand.textContent.trim()), hand && hand.textContent);
 
 log('--- handing in ---');
 hand.click();
@@ -82,9 +102,16 @@ await sleep(600);
 
 check('the questions are gone', !/Which is a public good/.test(text()), text().slice(0, 120));
 check('a finished screen is up', /Finished\. Now what\?/.test(text()), text().slice(0, 140));
-check('it says what they scored', /1 out of 3/.test(text()), text().slice(0, 200));
-check('it counts what they answered', /1 of 2 answered, and handed in/.test(text()), text().slice(0, 240));
-check('it points out what they left blank', /left 1 question blank/.test(text()), text().slice(0, 300));
+
+log('--- the total counts only what has been marked ---');
+check('it does not count the unmarked written answers against them',
+  !/2 out of 6/.test(text()), text().slice(0, 220));
+check('it says 2 out of 2', /2 out of 2/.test(text()), text().slice(0, 220));
+check('it says what is still with the teacher',
+  /2 written answers are with your teacher, worth another 4 marks/.test(text()),
+  text().slice(0, 300));
+check('it counts what they answered', /4 of 4 answered, and handed in/.test(text()), text().slice(0, 260));
+check('nothing is reported as left blank', !/left \d+ question/.test(text()), text().slice(0, 300));
 
 const links = [...view().querySelectorAll('a.btn')].map(a => a.textContent.trim());
 check('there is a way back to the class', links.includes('Back to my class'), links.join(' | '));
@@ -99,7 +126,9 @@ const reopen = view().querySelector('[data-reopen]');
 check('there is a way back into the questions', !!reopen);
 reopen.click();
 await sleep(200);
-check('the questions come back', /Which is a public good/.test(text()), text().slice(0, 120));
+// It comes back to the question they were last on, which is question 4, not
+// back to the start.
+check('the questions come back', /Question \d+ of 4/.test(text()), text().slice(0, 120));
 check('and a way back to the finished screen',
   !!view().querySelector('[data-done]'), text().slice(-160));
 

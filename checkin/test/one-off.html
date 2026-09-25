@@ -66,8 +66,8 @@ check('the code points back at the run', await (async () => {
 check('the answer key was copied, and is not on the set itself',
   JSON.stringify(await core.getKey(checkId, run1.id)) === JSON.stringify({ q1: 'A' }));
 
-log('--- the run opens ---');
-await core.saveSet(checkId, run1.id, { status: 'open' });
+log('--- naming the batch, and opening it ---');
+await core.saveSet(checkId, run1.id, { status: 'open', runLabel: 'Period 3' });
 await core.syncKeyVisibility(checkId, { id: run1.id, ...(await core.getSet(checkId, run1.id)) });
 
 log('--- two people with no account answer it ---');
@@ -164,6 +164,25 @@ check('a free name gets them into the questions',
 check('the questions are really there',
   /Pick one|Say why/.test(document.getElementById('set-view').textContent),
   document.getElementById('set-view').textContent.slice(0, 120));
+
+log('--- students are told which quiz as well as which batch ---');
+const heading = document.getElementById('set-title').textContent;
+const sub = document.getElementById('set-sub').textContent;
+check('the heading names the quiz, not the batch',
+  heading === 'Relief lesson check', heading);
+check('the batch is named too', /Period 3/.test(sub), sub);
+check('the two are not confused for each other',
+  heading !== 'Period 3' && /Period 3/.test(sub), heading + ' | ' + sub);
+check('the browser tab carries both',
+  /Relief lesson check/.test(document.title) && /Period 3/.test(document.title),
+  document.title);
+
+log('--- renaming the quiz reaches its runs ---');
+FAKE_USER.current = teacher;
+await core.renameCheck(teacher, checkId, 'Relief lesson check v2');
+const renamed = await core.getSet(checkId, run1.id);
+check('the run carries the new quiz name', renamed.title === 'Relief lesson check v2', renamed.title);
+check('and keeps its own batch name', renamed.runLabel === 'Period 3', renamed.runLabel);
 
 log('');
 log(pass + ' passed, ' + failn + ' failed');

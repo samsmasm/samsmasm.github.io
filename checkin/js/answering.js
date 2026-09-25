@@ -3,8 +3,8 @@
 
 import {
   esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey,
-  computeMarks, totalAwarded, maxScore
-} from './core.js?v=772c2f2-0736';
+  computeMarks, studentScore
+} from './core.js?v=290b6c8-1909';
 
 function isAnswered(v) {
   return v !== undefined && v !== null && String(v).trim() !== '';
@@ -222,14 +222,26 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
     const showKey = studentsMaySeeKey(set);
     const scored = computeMarks(set, { answers, marks }, set.key || {});
 
-    const score = showKey
-      ? '<p class="done-score">' + totalAwarded(set, scored) + ' out of ' + maxScore(set) + '</p>'
+    // Only what has actually been decided. A written answer still in the marking
+    // pile is not a mark lost, and counting it as one is what made eight right
+    // out of eight read as "8 out of 12".
+    const tally = studentScore(set, { answers, marks }, scored);
+
+    const score = showKey && tally.text
+      ? '<p class="done-score">' + tally.text + '</p>'
+      : '';
+
+    const stillOut = tally.waiting
+      ? '<p>' + (tally.text ? 'That is everything marked so far. ' : '') +
+        (tally.waiting === 1
+          ? 'Your written answer is with your teacher, worth another ' + tally.waitingPoints
+          : 'Your ' + tally.waiting + ' written answers are with your teacher, worth another ' +
+            tally.waitingPoints) +
+        (tally.waitingPoints === 1 ? ' mark.' : ' marks.') + '</p>'
       : '';
 
     const waiting = showKey
-      ? (qs.some(item => item.type === 'text')
-          ? '<p>The multiple choice is marked. Your written answers are with your teacher.</p>'
-          : '')
+      ? stillOut
       : '<p>Your teacher has not released the marks yet. They will turn up here when they do.</p>';
 
     const missed = answered < qs.length

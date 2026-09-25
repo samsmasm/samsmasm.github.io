@@ -263,6 +263,22 @@ These were settled with Sam. Do not quietly reopen them.
 - **No projector view for questions.** Deliberate. QR codes are the exception.
 - Practice retakes are **private to the student**. The teacher never sees them,
   and the marked record is never touched.
+- **A student is never shown marks for work that has not been marked.** The
+  total they see counts only what has actually been decided, so eight right out
+  of eight multiple choice reads as "8 out of 8" with a line saying the written
+  answers are still with the teacher, not "8 out of 12" as though they had lost
+  four marks. A question left **blank** is different and does count: nobody is
+  waiting on it, and leaving it out would flatter them instead. `studentScore()`
+  in core.js is the one implementation, used by the finished screen, the class
+  page and both set subtitles, so they cannot quote different numbers for the
+  same paper. Teacher views still show the true total out of everything.
+- **A one off run carries two names**: the quiz is named on the container and the
+  batch on the run (`runLabel`). Students are shown both, quiz first, because
+  "Period 3" on its own tells them nothing about what they are sitting. The
+  builder's title field edits the **batch** name for a one off run: it used to
+  write `title` and so quietly overwrote the quiz name, which is how students
+  ended up seeing only the batch. Renaming the test updates every run's copy of
+  the title.
 - Handing in ends on a **finished screen of its own**, not a line of text under
   the last question, which read as nothing having happened. It carries the score
   if they are allowed to know it, what they left blank, and where to go next:

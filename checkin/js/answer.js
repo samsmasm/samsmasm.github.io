@@ -3,10 +3,10 @@
 
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, getSet, getResponse, watchSet,
-  computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
+  computeMarks, studentScore, answeredCount, studentsMaySeeKey,
   amMember, joinClass, practiceAllowed, newAttemptId, startPractice, savePracticeAnswer
-} from './core.js?v=772c2f2-0736';
-import { mountSet } from './answering.js?v=772c2f2-0736';
+} from './core.js?v=290b6c8-1909';
+import { mountSet } from './answering.js?v=290b6c8-1909';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -57,7 +57,12 @@ let me = null, cls = null, set = null, view = null, attemptId = null;
   } else {
     bits.push(set.status === 'open' ? 'open now' : 'closed ' + fmtDate(set.closedAt || set.openedAt));
     if (done && studentsMaySeeKey(set)) {
-      bits.push(totalAwarded(set, marks) + ' out of ' + maxScore(set));
+      const tally = studentScore(set, response, marks);
+      if (tally.text) bits.push(tally.text);
+      if (tally.waiting) {
+        bits.push(tally.waitingPoints + (tally.waitingPoints === 1 ? ' mark' : ' marks') +
+          ' still to be marked');
+      }
     } else if (done && set.reveal === 'release' && !set.resultsReleased) {
       bits.push('marks not released yet');
     }
