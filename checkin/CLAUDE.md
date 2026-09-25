@@ -275,6 +275,12 @@ These were settled with Sam. Do not quietly reopen them.
   in core.js is the one implementation, used by the finished screen, the class
   page and both set subtitles, so they cannot quote different numbers for the
   same paper. Teacher views still show the true total out of everything.
+- **Finding a set to reuse is a search, not a dropdown** (`js/setpicker.js`). A
+  select is fine with six sets and useless with sixty, which is where a teacher
+  is after a year. Type a word to narrow by title, or pick a class. The word is
+  matched against the class name too, since "year 11" is a reasonable thing to
+  type. The class filter hides itself when there is only one class to choose.
+  Both places that reuse a set share it, so searching works the same in both.
 - **A set can be copied from one class into another**, from the class you are
   copying into (Question sets > Reuse a set you have already written). It makes
   an independent **copy**, chosen over sharing one set with two classes: the

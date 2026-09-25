@@ -5,22 +5,30 @@
 // because a run of a one off test is an ordinary question set underneath.
 
 import {
-  requireUser, esc, fail, fmtDate, myChecks, createCheck, myOwnedSets,
-  listSets, listSets as listRuns, getKey, startRun, getResponses
-} from './core.js?v=735195a-1914';
+  requireUser, esc, fail, fmtDate, myChecks, createCheck,
+  listSets as listRuns, getKey, startRun, getResponses
+} from './core.js?v=2aeb1e7-1921';
+import { mountSetPicker } from './setpicker.js?v=2aeb1e7-1921';
 
 let me = null;
 
 (async function start() {
   me = await requireUser();
   document.getElementById('new-go').addEventListener('click', makeBlank);
-  document.getElementById('copy-go').addEventListener('click', makeFromSet);
   document.getElementById('new-name').addEventListener('keydown', e => {
     if (e.key === 'Enter') makeBlank();
   });
 
   await paintList();
-  fillSetPicker();       // after the list, since it is the slower of the two
+
+  // After the list, since it is the slower of the two.
+  mountSetPicker(document.getElementById('copy-picker'), {
+    uid: me.uid,
+    skipOneOffs: true,
+    actionLabel: 'Use these questions',
+    empty: 'You have no question sets to copy yet. Write one in a class first.',
+    onPick: makeFromSet
+  });
 })();
 
 function note(text, bad) {
@@ -44,41 +52,23 @@ async function makeBlank() {
   } catch (err) { fail('Making the test', err); }
 }
 
-async function makeFromSet() {
-  const picked = document.getElementById('copy-from').value;
-  if (!picked) return note('Pick a set to copy first.', true);
-  const [classId, setId] = picked.split('|');
+async function makeFromSet(chosen, btn) {
+  if (btn) btn.disabled = true;
   note('Copying it.');
   try {
-    const sets = await listSets(classId);
-    const source = sets.find(s => s.id === setId);
-    if (!source) return note('That set has gone.', true);
-    const key = await getKey(classId, setId).catch(() => ({}));
-
+    const key = await getKey(chosen.classId, chosen.set.id).catch(() => ({}));
     const typed = document.getElementById('new-name').value.trim();
-    const checkId = await createCheck(me, typed || source.title || 'One off test');
-    const check = { id: checkId, name: typed || source.title || 'One off test' };
-    const run = await startRun(check, me, {
-      questions: source.questions || [], key, mode: source.mode, reveal: source.reveal
+    const name = typed || chosen.set.title || 'One off test';
+
+    const checkId = await createCheck(me, name);
+    const run = await startRun({ id: checkId, name }, me, {
+      questions: chosen.set.questions || [], key,
+      mode: chosen.set.mode, reveal: chosen.set.reveal
     });
     location.href = 'check.html?k=' + encodeURIComponent(checkId) + '&new=' + run.id;
-  } catch (err) { fail('Copying the set', err); }
-}
-
-// Every set in every class the teacher owns, so a check can start from work
-// already done rather than being typed out again.
-async function fillSetPicker() {
-  const picker = document.getElementById('copy-from');
-  try {
-    const owned = await myOwnedSets(me.uid, { skipOneOffs: true });
-    picker.innerHTML = owned.length
-      ? '<option value="">Pick a question set</option>' + owned.map(o =>
-          '<option value="' + o.classId + '|' + o.set.id + '">' +
-          esc(o.className) + ' &middot; ' + esc(o.set.title || 'Untitled') + ' (' +
-          (o.set.questions || []).length + ')</option>').join('')
-      : '<option value="">You have no question sets to copy yet</option>';
-  } catch {
-    picker.innerHTML = '<option value="">Could not read your question sets</option>';
+  } catch (err) {
+    fail('Copying the set', err);
+    if (btn) btn.disabled = false;
   }
 }
 

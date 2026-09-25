@@ -1,14 +1,14 @@
 // Checkin - teacher view of one set: live controls, scores, and marking
 // the written answers.
 
-import { loadClassHistory, sparkline } from './history.js?v=735195a-1914';
-import { wireMarkInput } from './marking.js?v=735195a-1914';
+import { loadClassHistory, sparkline } from './history.js?v=2aeb1e7-1921';
+import { wireMarkInput } from './marking.js?v=2aeb1e7-1921';
 import {
   requireUser, qp, esc, fail, debounce, LETTERS,
   getClass, getSet, saveSet, getKey, syncKeyVisibility, listMembers, isOneOff,
   saveOneMark, clearOneMark, computeMarks, totalAwarded, maxScore, answeredCount, needsMarking,
   onSnapshot, collection, db, addShellLinks
-} from './core.js?v=735195a-1914';
+} from './core.js?v=2aeb1e7-1921';
 
 const classId = qp('c');
 const setId = qp('s');

@@ -4,12 +4,13 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, listMembers, listBlocked,
   removeMember, unblock, newJoinCode, renameClass, saveSet, deleteSet, getResponses,
   syncKeyVisibility, needsMarking, answeredCount, addShellLinks,
-  myOwnedSets, copySetInto
-} from './core.js?v=735195a-1914';
-import { loadClassHistory, latestPoint, averagePct, sparkline } from './history.js?v=735195a-1914';
+  copySetInto
+} from './core.js?v=2aeb1e7-1921';
+import { mountSetPicker } from './setpicker.js?v=2aeb1e7-1921';
+import { loadClassHistory, latestPoint, averagePct, sparkline } from './history.js?v=2aeb1e7-1921';
 
 const classId = qp('c');
-let me = null, cls = null;
+let me = null, cls = null, picker = null;
 
 (async function start() {
   me = await requireUser();
@@ -29,8 +30,13 @@ let me = null, cls = null;
   document.getElementById('class-name').textContent = cls.name;
   document.getElementById('class-sub').textContent = 'You teach this class.';
   document.getElementById('new-set').href = 'set.html?c=' + encodeURIComponent(classId) + '&new=1';
-  document.getElementById('copy-go').addEventListener('click', copyIn);
-  fillCopyPicker();
+  picker = mountSetPicker(document.getElementById('copy-picker'), {
+    uid: me.uid,
+    skipOneOffs: true,
+    actionLabel: 'Copy it here',
+    empty: 'You have no other question sets to copy yet.',
+    onPick: copyIn
+  });
   document.getElementById('code').textContent = cls.joinCode || '------';
   document.getElementById('rename').value = cls.name;
 
@@ -59,48 +65,26 @@ const STATE_WORD = { draft: 'Draft', open: 'Open', closed: 'Closed' };
 /* ---------------- reusing a set from somewhere else ---------------- */
 
 // The list is every set this teacher owns, this class included, so it doubles as
-// a way to duplicate a set within a class. The class name on each option is what
+// a way to duplicate a set within a class. The class name on each row is what
 // keeps the two uses apart.
-async function fillCopyPicker() {
-  const picker = document.getElementById('copy-from');
-  try {
-    const owned = await myOwnedSets(me.uid, { skipOneOffs: true });
-    picker.innerHTML = owned.length
-      ? '<option value="">Pick a question set</option>' + owned.map(o =>
-          '<option value="' + o.classId + '|' + o.set.id + '">' +
-          esc(o.className) + ' &middot; ' + esc(o.set.title || 'Untitled') + ' (' +
-          (o.set.questions || []).length + ')</option>').join('')
-      : '<option value="">You have no other question sets yet</option>';
-  } catch {
-    picker.innerHTML = '<option value="">Could not read your question sets</option>';
-  }
-}
-
-async function copyIn() {
-  const picked = document.getElementById('copy-from').value;
+async function copyIn(chosen, btn) {
   const note = document.getElementById('copy-note');
-  if (!picked) { note.className = 'tiny savefail'; note.textContent = 'Pick a set first.'; return; }
-
-  const [fromClass, fromSet] = picked.split('|');
-  const btn = document.getElementById('copy-go');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   note.className = 'tiny';
   note.textContent = 'Copying.';
   try {
-    const sets = await listSets(fromClass);
-    const set = sets.find(item => item.id === fromSet);
-    if (!set) { note.className = 'tiny savefail'; note.textContent = 'That set has gone.'; return; }
-
-    const newId = await copySetInto(classId, { classId: fromClass, set });
+    const newId = await copySetInto(classId, chosen);
     note.className = 'saved';
-    note.innerHTML = 'Copied in as a draft. ' +
+    note.innerHTML = 'Copied <b>' + esc(chosen.set.title || 'it') + '</b> in as a draft. ' +
       '<a href="set.html?c=' + encodeURIComponent(classId) + '&s=' + newId + '">Edit it</a>' +
       ' or open it from the list above.';
     await paintSets();
+    // The new draft is now one of the sets on offer, so the list has to know.
+    if (picker) picker.refresh();
   } catch (err) {
     fail('Copying the set', err);
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 

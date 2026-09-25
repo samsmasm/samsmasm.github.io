@@ -62,6 +62,12 @@ STORE.set('classes/C1/sets/S1/responses/stu1', {
   name: 'Ana Apple', answers: { q1: 'A', q2: 'because nobody can be shut out' },
   marks: { q2: { awarded: 3, auto: false } }
 });
+// A second set in the same class, so searching and filtering have something to
+// actually do.
+STORE.set('classes/C1/sets/S2', {
+  title: 'Elasticity check', status: 'closed', mode: 'self', reveal: 'release',
+  createdAt: { seconds: 1757000000 }, questions
+});
 // A one off run, which must not be offered as something to copy into a class.
 STORE.set('classes/K1/sets/R1', { title: 'A one off', runLabel: 'Run 1', runCode: 'ZZZ999',
   status: 'open', questions });
@@ -113,29 +119,72 @@ history.replaceState(null, '', location.pathname + '?c=C2');
 await import('../js/teach.js?v=test');
 await sleep(700);
 
-const picker = document.getElementById('copy-from');
-check('the picker is filled in', picker && picker.options.length > 1,
-  picker && [...picker.options].map(o => o.textContent).join(' | '));
-check('each option says which class it is from',
-  [...picker.options].some(o => /Year 12 Economics/.test(o.textContent)),
-  [...picker.options].map(o => o.textContent).join(' | '));
+const box = document.getElementById('copy-picker');
+const rows = () => [...box.querySelectorAll('.index-row')];
+const rowText = () => rows().map(r => r.textContent.replace(/\s+/g, ' ').trim());
 
-picker.value = 'C1|S1';
-document.getElementById('copy-go').click();
-await sleep(700);
-check('it reports back where the copy went',
-  /Copied in as a draft/.test(document.getElementById('copy-note').textContent),
-  document.getElementById('copy-note').textContent);
-check('the new draft is in the list',
-  (await core.listSets('C2')).filter(s => s.title === 'Public goods').length === 1,
-  JSON.stringify((await core.listSets('C2')).map(s => s.title)));
+check('the sets are listed', rows().length >= 2, rowText().join(' | '));
+check('each row says which class it is from',
+  rowText().some(t => /Year 12 Economics/.test(t)), rowText().join(' | '));
+check('the copy made earlier in this test is on offer too',
+  rowText().some(t => /Year 11 Economics/.test(t)), rowText().join(' | '));
 
-document.getElementById('copy-from').value = '';
-document.getElementById('copy-go').click();
-await sleep(200);
-check('picking nothing is refused rather than copying something at random',
-  /Pick a set first/.test(document.getElementById('copy-note').textContent),
+log('--- searching by title ---');
+const search = box.querySelector('[data-search]');
+search.value = 'elastic';
+search.dispatchEvent(new Event('input', { bubbles: true }));
+await sleep(100);
+check('a word in the title narrows it down',
+  rows().length === 1 && /Elasticity/.test(rowText()[0]), rowText().join(' | '));
+
+search.value = 'ELASTIC';
+search.dispatchEvent(new Event('input', { bubbles: true }));
+await sleep(100);
+check('case does not matter', rows().length === 1, rowText().join(' | '));
+
+search.value = 'year 12';
+search.dispatchEvent(new Event('input', { bubbles: true }));
+await sleep(100);
+check('a class name works as a search word too', rows().length === 2, rowText().join(' | '));
+
+search.value = 'zzzz';
+search.dispatchEvent(new Event('input', { bubbles: true }));
+await sleep(100);
+check('a word matching nothing says so, with a way back',
+  !rows().length && /Nothing matches/.test(box.textContent) && !!box.querySelector('[data-clear]'),
+  box.textContent.slice(0, 120));
+box.querySelector('[data-clear]').click();
+await sleep(100);
+check('showing all again works', rows().length >= 3, rowText().join(' | '));
+
+log('--- narrowing by class ---');
+const classPick = box.querySelector('[data-class]');
+check('every class of yours is offered', classPick.options.length === 3,
+  [...classPick.options].map(o => o.textContent).join(' | '));
+classPick.value = 'C1';
+classPick.dispatchEvent(new Event('change', { bubbles: true }));
+await sleep(100);
+check('picking a class shows only that class',
+  rows().length === 2 && rowText().every(t => /Year 12 Economics/.test(t)), rowText().join(' | '));
+classPick.value = '';
+classPick.dispatchEvent(new Event('change', { bubbles: true }));
+await sleep(100);
+
+log('--- copying from the list ---');
+search.value = 'public goods';
+search.dispatchEvent(new Event('input', { bubbles: true }));
+await sleep(100);
+const before = (await core.listSets('C2')).length;
+rows()[0].querySelector('[data-pick]').click();
+await sleep(800);
+check('it reports back what was copied and where',
+  /Copied .*Public goods.* in as a draft/.test(document.getElementById('copy-note').textContent),
   document.getElementById('copy-note').textContent);
+check('the new draft really is in the class',
+  (await core.listSets('C2')).length === before + 1,
+  before + ' then ' + (await core.listSets('C2')).length);
+check('the list picks the new draft up straight away',
+  rows().length > 0, rowText().join(' | '));
 
 log('');
 log(pass + ' passed, ' + failn + ' failed');

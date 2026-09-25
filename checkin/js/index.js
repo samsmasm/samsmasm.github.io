@@ -1,7 +1,7 @@
 // Checkin - sign-in page.
 
-import { signIn, onAuth, ensureUserDoc, qp, fail } from './core.js?v=735195a-1914';
-import { mountCodeBox } from './codebox.js?v=735195a-1914';
+import { signIn, onAuth, ensureUserDoc, qp, fail } from './core.js?v=2aeb1e7-1921';
+import { mountCodeBox } from './codebox.js?v=2aeb1e7-1921';
 
 const next = qp('next') || 'home.html';
 const btn = document.getElementById('signin');
