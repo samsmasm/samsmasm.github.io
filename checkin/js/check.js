@@ -7,7 +7,7 @@
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, getKey, getResponses,
   startRun, renameCheck, deleteCheck, deleteRun, isOneOff, addShellLinks, answeredCount
-} from './core.js?v=290b6c8-1909';
+} from './core.js?v=735195a-1914';
 
 const checkId = qp('k');
 const justMade = qp('new');

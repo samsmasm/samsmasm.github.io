@@ -5,8 +5,8 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, getSet, getResponse, watchSet,
   computeMarks, studentScore, answeredCount, studentsMaySeeKey,
   amMember, joinClass, practiceAllowed, newAttemptId, startPractice, savePracticeAnswer
-} from './core.js?v=290b6c8-1909';
-import { mountSet } from './answering.js?v=290b6c8-1909';
+} from './core.js?v=735195a-1914';
+import { mountSet } from './answering.js?v=735195a-1914';
 
 const classId = qp('c');
 const setId = qp('s');

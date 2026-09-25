@@ -1,0 +1,146 @@
+<!-- Checkin - a real browser test of copying a set from one class into another.
+     The thing that matters is that the copy is independent: the questions and
+     the answer key come across, nobody's answers do, and editing one never
+     reaches the other. -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkin - copying a set</title>
+<link rel="stylesheet" href="../css/style.css">
+<script type="importmap">
+{ "imports": {
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js": "./fake/app.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js": "./fake/auth.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js": "./fake/firestore.js"
+} }
+</script>
+</head>
+<body>
+<div id="mount"></div>
+<pre id="RESULTS">running</pre>
+
+<script type="module">
+import { STORE } from './fake/firestore.js';
+import { FAKE_USER } from './fake/auth.js';
+
+const ERRS = [];
+window.addEventListener('error', e => ERRS.push('window.onerror: ' + e.message));
+window.addEventListener('unhandledrejection', e => ERRS.push('unhandled: ' + (e.reason && e.reason.message || e.reason)));
+
+const out = [];
+const log = s => { out.push(s); document.getElementById('RESULTS').textContent = out.join('\n'); };
+let pass = 0, failn = 0;
+const check = (name, cond, extra) => {
+  (cond ? pass++ : failn++);
+  log((cond ? 'PASS  ' : 'FAIL  ') + name + (cond || extra === undefined ? '' : '  <<' + extra + '>>'));
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const teacher = { uid: 'teacher1', displayName: 'Teacher One', email: 't@example.com' };
+FAKE_USER.current = teacher;
+STORE.set('users/teacher1', { email: teacher.email, name: teacher.displayName, role: 'teacher',
+  classes: { C1: { name: 'Year 12 Economics', role: 'teacher' },
+             C2: { name: 'Year 11 Economics', role: 'teacher' },
+             K1: { name: 'A one off', role: 'teacher' } } });
+STORE.set('classes/C1', { name: 'Year 12 Economics', ownerUid: 'teacher1', joinCode: 'AAA111' });
+STORE.set('classes/C2', { name: 'Year 11 Economics', ownerUid: 'teacher1', joinCode: 'BBB222' });
+STORE.set('classes/K1', { name: 'A one off', kind: 'oneoff', ownerUid: 'teacher1' });
+STORE.set('classes/C2/members/stu9', { name: 'Existing Student', email: 's9@ex.com', role: 'student' });
+
+const questions = [
+  { id: 'q1', type: 'mcq',  prompt: 'Which is a public good?', maxMark: 1, options: ['A lighthouse','A sandwich'] },
+  { id: 'q2', type: 'text', prompt: 'Explain why.',            maxMark: 3 }
+];
+// The source set has been run: it is closed, results are out, and a student
+// answered it. None of that may come across.
+STORE.set('classes/C1/sets/S1', {
+  title: 'Public goods', status: 'closed', mode: 'live', reveal: 'now',
+  resultsReleased: true, allowRetake: true, liveIndex: 1,
+  createdAt: { seconds: 1758000000 }, openedAt: { seconds: 1758000000 },
+  questions, key: { q1: 'A' }
+});
+STORE.set('classes/C1/sets/S1/keys/key', { key: { q1: 'A' } });
+STORE.set('classes/C1/sets/S1/responses/stu1', {
+  name: 'Ana Apple', answers: { q1: 'A', q2: 'because nobody can be shut out' },
+  marks: { q2: { awarded: 3, auto: false } }
+});
+// A one off run, which must not be offered as something to copy into a class.
+STORE.set('classes/K1/sets/R1', { title: 'A one off', runLabel: 'Run 1', runCode: 'ZZZ999',
+  status: 'open', questions });
+
+const core = await import('../js/core.js?v=test');
+
+log('--- what is offered ---');
+const owned = await core.myOwnedSets('teacher1', { skipOneOffs: true });
+check('a set from another class is offered',
+  owned.some(o => o.classId === 'C1' && o.set.id === 'S1'), JSON.stringify(owned.map(o => o.className)));
+check('one off runs are not offered as class sets',
+  !owned.some(o => o.classId === 'K1'), JSON.stringify(owned.map(o => o.className)));
+
+log('--- copying it in ---');
+const newId = await core.copySetInto('C2', { classId: 'C1', set: await core.getSet('C1', 'S1') });
+const copy = await core.getSet('C2', newId);
+
+check('the questions came across',
+  JSON.stringify(copy.questions) === JSON.stringify(questions), JSON.stringify(copy.questions));
+check('the answer key came across',
+  JSON.stringify(await core.getKey('C2', newId)) === JSON.stringify({ q1: 'A' }));
+check('the title came across', copy.title === 'Public goods', copy.title);
+check('how students work through it came across', copy.mode === 'live', copy.mode);
+check('when marks show came across', copy.reveal === 'now', copy.reveal);
+
+log('--- what did not come across ---');
+check('it arrives as a draft, not open or closed', copy.status === 'draft', copy.status);
+check('nobody has answered it', (await core.getResponses('C2', newId)).length === 0);
+check('results are not released on it', !copy.resultsReleased, String(copy.resultsReleased));
+check('practice retakes are not on', !copy.allowRetake, String(copy.allowRetake));
+check('the live position is back at the start', !copy.liveIndex, String(copy.liveIndex));
+check('the answer key is not exposed on the set document itself',
+  copy.key === undefined, JSON.stringify(copy.key));
+
+log('--- the two are independent ---');
+await core.saveSet('C2', newId, { title: 'Public goods, Year 11', questions: [questions[0]] });
+const original = await core.getSet('C1', 'S1');
+check('editing the copy leaves the original alone',
+  original.title === 'Public goods' && original.questions.length === 2,
+  original.title + ', ' + original.questions.length + ' questions');
+check('the original still has its answers', (await core.getResponses('C1', 'S1')).length === 1);
+check('and the copy really did change', (await core.getSet('C2', newId)).questions.length === 1);
+
+log('--- through the class page ---');
+const page = await (await fetch('../teach.html')).text();
+document.getElementById('mount').innerHTML =
+  page.slice(page.indexOf('<div class="app-shell">'), page.indexOf('<script type="module"'));
+history.replaceState(null, '', location.pathname + '?c=C2');
+await import('../js/teach.js?v=test');
+await sleep(700);
+
+const picker = document.getElementById('copy-from');
+check('the picker is filled in', picker && picker.options.length > 1,
+  picker && [...picker.options].map(o => o.textContent).join(' | '));
+check('each option says which class it is from',
+  [...picker.options].some(o => /Year 12 Economics/.test(o.textContent)),
+  [...picker.options].map(o => o.textContent).join(' | '));
+
+picker.value = 'C1|S1';
+document.getElementById('copy-go').click();
+await sleep(700);
+check('it reports back where the copy went',
+  /Copied in as a draft/.test(document.getElementById('copy-note').textContent),
+  document.getElementById('copy-note').textContent);
+check('the new draft is in the list',
+  (await core.listSets('C2')).filter(s => s.title === 'Public goods').length === 1,
+  JSON.stringify((await core.listSets('C2')).map(s => s.title)));
+
+document.getElementById('copy-from').value = '';
+document.getElementById('copy-go').click();
+await sleep(200);
+check('picking nothing is refused rather than copying something at random',
+  /Pick a set first/.test(document.getElementById('copy-note').textContent),
+  document.getElementById('copy-note').textContent);
+
+log('');
+log(pass + ' passed, ' + failn + ' failed');
+log('--- errors ---');
+(ERRS.length ? ERRS : ['none']).forEach(e => log('  ' + e));
+log('DONE');
+</script>
+</body></html>

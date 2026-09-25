@@ -68,7 +68,7 @@ JavaScript. Marks looked as though they saved intermittently only because
 multiple choice is recomputed from the key on every load.
 
 `test/run.sh` does two things: it drives the real `results.js`, `teach.js`,
-`student.js`, `check.js` and `go.js` in headless Chrome against a fake Firestore (`test/fake/`, swapped in
+`student.js`, `check.js`, `answer.js` and `go.js` in headless Chrome against a fake Firestore (`test/fake/`, swapped in
 with an import map) and reads back what would truly have been written, then runs
 `test/undefined-calls.py`, which reports any function called but never defined or
 imported. Add a case to the matching page whenever marking, the roll or the
@@ -79,7 +79,10 @@ Traps when writing one of these harness pages: an import map value must be
 setting `data-theme` alone is undone the moment the shell paints; and a harness
 page missing an element the real page has looks exactly like a real bug. Where a
 test needs a page's markup, fetch the real `.html` and slice it rather than
-pasting a copy that will drift.
+pasting a copy that will drift. That is not a style preference: the class trends
+harness held a hand-built copy of `teach.html`, and the day `teach.html` gained
+one element the test failed in a way that read exactly like a bug in the app.
+Every harness page now fetches the page it is testing.
 
 The fakes are only as honest as they are made to be. `test/fake/firestore.js` has
 had to learn that `doc(collectionRef)` mints an id, that a reference carries
@@ -272,6 +275,16 @@ These were settled with Sam. Do not quietly reopen them.
   in core.js is the one implementation, used by the finished screen, the class
   page and both set subtitles, so they cannot quote different numbers for the
   same paper. Teacher views still show the true total out of everything.
+- **A set can be copied from one class into another**, from the class you are
+  copying into (Question sets > Reuse a set you have already written). It makes
+  an independent **copy**, chosen over sharing one set with two classes: the
+  questions and the answer key come across as a new draft, nothing else does,
+  and editing one never reaches the other. `copySetInto()` in core.js, and it is
+  careful to leave behind the things that would be wrong on a fresh set: status,
+  released results, retakes, the live position, the exposed key and everyone's
+  answers. The same picker offers sets from the class you are already in, so it
+  doubles as a way to duplicate one in place. `myOwnedSets()` builds the list and
+  is shared with the one off tests page, which offers the same thing.
 - **A one off run carries two names**: the quiz is named on the container and the
   batch on the run (`runLabel`). Students are shown both, quiz first, because
   "Period 3" on its own tells them nothing about what they are sitting. The

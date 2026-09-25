@@ -8,8 +8,8 @@
 import {
   requireAnyUser, qp, esc, fail, lookupRunCode, getSet, getClass, getResponse, watchSet,
   claimName, computeMarks, studentScore, answeredCount, studentsMaySeeKey
-} from './core.js?v=290b6c8-1909';
-import { mountSet } from './answering.js?v=290b6c8-1909';
+} from './core.js?v=735195a-1914';
+import { mountSet } from './answering.js?v=735195a-1914';
 
 const focusQid = qp('q');            // set by a QR code pointing at one question
 let me = null, run = null, set = null, view = null, who = '';

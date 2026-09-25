@@ -16,7 +16,7 @@ trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1
 
 fails=0
-for page in marking class-trends student-detail one-off finish; do
+for page in marking class-trends student-detail one-off finish copy-set; do
   echo "=== $page ==="
   output=$(google-chrome --headless=new --disable-gpu --no-sandbox \
     --virtual-time-budget=15000 --dump-dom \

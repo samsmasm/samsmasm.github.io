@@ -4,7 +4,7 @@
 import {
   esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey,
   computeMarks, studentScore
-} from './core.js?v=290b6c8-1909';
+} from './core.js?v=735195a-1914';
 
 function isAnswered(v) {
   return v !== undefined && v !== null && String(v).trim() !== '';

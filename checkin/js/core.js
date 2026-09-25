@@ -1,6 +1,6 @@
 // Checkin - shared helpers: auth guard, page chrome, data access, CSV.
 
-import { db, auth, signIn, signOutNow, onAuth, signInAnon } from './firebase.js?v=290b6c8-1909';
+import { db, auth, signIn, signOutNow, onAuth, signInAnon } from './firebase.js?v=735195a-1914';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, getDocs,
   query, orderBy, onSnapshot, writeBatch, deleteField, serverTimestamp
@@ -575,6 +575,43 @@ export async function createSet(classId, data) {
     ...BLANK_SET(), ...data, createdAt: serverTimestamp()
   });
   return ref.id;
+}
+
+// Every set in every class this teacher owns, newest class first. Used by
+// anything that offers "start from something you already have", so the two
+// places that do are looking at the same list.
+export async function myOwnedSets(uid, opts = {}) {
+  const mine = await myClasses(uid);
+  const out = [];
+  for (const row of mine) {
+    const cls = await getClass(row.id).catch(() => null);
+    if (!cls || cls.ownerUid !== uid) continue;
+    if (opts.skipOneOffs && cls.kind === 'oneoff') continue;
+    const sets = await listSets(row.id).catch(() => []);
+    for (const set of sets) {
+      if (!(set.questions || []).length) continue;
+      if (opts.exclude && opts.exclude.classId === row.id && opts.exclude.setId === set.id) continue;
+      out.push({ classId: row.id, className: cls.name, set });
+    }
+  }
+  return out;
+}
+
+// Copy a set into a class as a fresh draft. The questions and the answer key
+// come across; nothing else does. Status, results, retakes and everyone's
+// answers stay behind, because this is a new set that happens to ask the same
+// questions, not a second view of the old one. Editing one never touches the
+// other.
+export async function copySetInto(targetClassId, source, title) {
+  const key = await getKey(source.classId, source.set.id).catch(() => ({}));
+  const setId = await createSet(targetClassId, {
+    title: title || source.set.title || 'Untitled',
+    mode: source.set.mode || 'self',
+    reveal: source.set.reveal || 'release',
+    questions: source.set.questions || []
+  });
+  if (key && Object.keys(key).length) await saveKey(targetClassId, setId, key);
+  return setId;
 }
 
 export async function saveSet(classId, setId, data) {

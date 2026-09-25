@@ -5,9 +5,9 @@
 // because a run of a one off test is an ordinary question set underneath.
 
 import {
-  requireUser, esc, fail, fmtDate, myClasses, myChecks, createCheck, getClass,
+  requireUser, esc, fail, fmtDate, myChecks, createCheck, myOwnedSets,
   listSets, listSets as listRuns, getKey, startRun, getResponses
-} from './core.js?v=290b6c8-1909';
+} from './core.js?v=735195a-1914';
 
 let me = null;
 
@@ -70,17 +70,7 @@ async function makeFromSet() {
 async function fillSetPicker() {
   const picker = document.getElementById('copy-from');
   try {
-    const mine = await myClasses(me.uid);
-    const owned = [];
-    for (const row of mine) {
-      const cls = await getClass(row.id).catch(() => null);
-      if (!cls || cls.ownerUid !== me.uid || cls.kind === 'oneoff') continue;
-      const sets = await listSets(row.id).catch(() => []);
-      for (const set of sets) {
-        if (!(set.questions || []).length) continue;
-        owned.push({ classId: row.id, className: cls.name, set });
-      }
-    }
+    const owned = await myOwnedSets(me.uid, { skipOneOffs: true });
     picker.innerHTML = owned.length
       ? '<option value="">Pick a question set</option>' + owned.map(o =>
           '<option value="' + o.classId + '|' + o.set.id + '">' +

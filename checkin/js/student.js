@@ -7,10 +7,10 @@
 
 import {
   requireUser, qp, esc, fail, fmtDate, getClass, listMembers, addShellLinks, LETTERS
-} from './core.js?v=290b6c8-1909';
+} from './core.js?v=735195a-1914';
 import {
   loadClassHistory, averagePct, latestPoint, renderPercentChart, studentQuestions, ordinal
-} from './history.js?v=290b6c8-1909';
+} from './history.js?v=735195a-1914';
 
 const classId = qp('c');
 const studentId = qp('u');
