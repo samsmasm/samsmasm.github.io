@@ -116,16 +116,48 @@ The pages themselves are still cached, so after a deploy you may need one hard
 refresh (`Ctrl+Shift+R`) to pick up new HTML. If that gets annoying, a cache
 rule on the host giving `*.html` in this folder a short TTL would remove it.
 
-## Moving it to another host
+## Moving it to another host and another Firebase project
 
-Copy the folder. Then:
+Copy the whole `checkin/` folder. It is self-contained on purpose: no reference
+to the site it currently lives on, no root-absolute paths, and the only things
+loaded from elsewhere are the Firebase SDK (gstatic), Google Fonts
+(fonts.googleapis.com) and the QR library (cdnjs). If the school blocks any of
+those three hosts, that is the thing to sort out first.
 
-1. Replace `firebaseConfig` in `js/firebase.js` with the new project's web config.
-2. Do the four console steps above on that project.
-3. Add the new domain to the authorized domains list.
+1. **Replace `firebaseConfig` in `js/firebase.js`** with the new project's web
+   config. That is the only file that knows which Firebase project this is.
+2. **Do the four console steps above** on the new project. All four, in order.
+   The Anonymous provider in step 1 is easy to skip and one off tests do not work
+   without it.
+3. **Authorized domains** must include wherever it is actually served from: the
+   school's GitHub Pages domain, and any custom domain in front of it. Sign-in
+   fails with `auth/unauthorized-domain` on anything not listed.
+4. **Publish `firestore.rules`.** The rules are not deployed from the repo, so a
+   new project starts with whatever the console gives it, which is either
+   deny-all or wide open. Neither is what you want.
+5. **Run the tests**: `./test/run.sh` from inside the folder. It needs `python3`
+   and `google-chrome`. It touches no Firebase project at all, so it is safe to
+   run anywhere and it will tell you whether the copy is intact.
 
-Nothing else is tied to where it is served from. QR codes build their links from
-whatever address the page is open on, so they follow the move by themselves.
+**The data does not come with it.** A new Firebase project starts empty: no
+classes, no question sets, no responses, no accounts. Everyone signs in again and
+classes are made again. If the existing data has to move, that is a Firestore
+export and import between projects, and it is a separate job from this one.
+
+Nothing else is tied to where it is served from. QR codes and the one off test
+links build themselves from whatever address the page is open on, so they follow
+the move by themselves.
+
+**After changing any file in `js/` or any page, run `python3 stamp.py`.** It puts
+a fresh `?v=` on the stylesheet and every script so browsers cannot serve a stale
+module against new HTML. A host that sends long cache headers, which is most of
+them, makes this the difference between a deploy working and a deploy breaking in
+a way that is hard to read.
+
+The `test/` folder can be deleted if the school would rather not publish it. It
+holds no credentials and talks to a fake Firestore, so it is harmless either way,
+but it is the thing that catches the mistakes this project actually makes, so
+keeping it is the better call.
 
 ## Teacher or student
 
