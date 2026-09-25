@@ -7,6 +7,18 @@ choice with short written answers a teacher reads and marks.
 migrated to a school's own GitHub, so nothing here may depend on the site it
 currently sits in.
 
+> **Migrating this to another GitHub and another Firebase project?**
+> The instructions are in **`SETUP.md`**, under *Moving it to another host and
+> another Firebase project*, with the console steps it refers to just above it.
+> Read that first; this file is about working on the code, not standing it up.
+>
+> The very short version: swap `firebaseConfig` in `js/firebase.js`, do the four
+> console steps on the new project (the **Anonymous** provider is the one people
+> skip, and one off tests do not work without it), add the serving domain to
+> Authorized domains, publish `firestore.rules` by hand because it is not
+> deployed from the repo, and run `./test/run.sh` to check the copy is intact.
+> **No data comes across**: a new Firebase project starts empty.
+
 ---
 
 ## Three rules that are easy to break by accident
