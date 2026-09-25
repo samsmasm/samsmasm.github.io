@@ -19,6 +19,16 @@ a dark mode toggle, both of which `AESTHETIC.md` forbids. That is intentional. D
 not restore the house style, do not add the site logo, do not add a unisam.nz
 link, and keep every path relative.
 
+**Telling whether the published rules are current.** `firestore.rules` is not
+deployed from this repo: the console holds its own copy, so the file here can be
+ahead of what is live. Rather than guess, grep the console's Rules tab for the
+newest marker in this file. As of 2026-09-25 that is **`runCodes`**, added with
+one off tests; before that it was `retakes`. If the marker is missing, the live
+rules are older than the repo and need a paste. `git log -- checkin/firestore.rules`
+says when the file last actually changed, which is usually the faster answer.
+
+---
+
 **2. Run `python3 stamp.py` before committing any change to the pages or the JS.**
 The host sends `cache-control: max-age=14400`, so a browser keeps a module for
 four hours. New HTML running against an old cached module does not merely look
@@ -158,11 +168,12 @@ Identity, where there are no accounts:
 `realAccount()` in the rules keeps an anonymous visitor from creating classes,
 join codes or run codes: a throwaway account may answer, and nothing else.
 
-**The console needs Anonymous sign-in enabled** (Authentication > Sign-in method
-> Add new provider > Anonymous). Without it the name step fails with
-`auth/operation-not-allowed` and nothing else in Checkin is affected. Anonymous
-account auto clean-up is on; it deletes unused accounts after 30 days and does
-not touch Firestore, so results stay.
+**Anonymous sign-in is enabled on coldwar-d8109**, with auto clean-up on (Sam did
+this on 2026-09-25). It is still worth writing down for a fresh project:
+Authentication > Sign-in method > Add new provider > Anonymous. Without it the
+name step fails with `auth/operation-not-allowed` and nothing else in Checkin is
+affected. Auto clean-up deletes unused anonymous accounts after 30 days and does
+not touch Firestore, so results already written stay.
 
 ---
 
