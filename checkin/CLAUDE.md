@@ -12,11 +12,12 @@ currently sits in.
 > another Firebase project*, with the console steps it refers to just above it.
 > Read that first; this file is about working on the code, not standing it up.
 >
-> The very short version: swap `firebaseConfig` in `js/firebase.js`, do the four
-> console steps on the new project (the **Anonymous** provider is the one people
-> skip, and one off tests do not work without it), add the serving domain to
-> Authorized domains, publish `firestore.rules` by hand because it is not
-> deployed from the repo, and run `./test/run.sh` to check the copy is intact.
+> The very short version: swap `firebaseConfig` in `js/firebase.js`, do the five
+> console steps on the new project, and run `./test/run.sh` to check the copy is
+> intact. Two of those five steps get missed and neither failure looks like a
+> missing setup step: **enabling the Anonymous provider**, without which one off
+> tests fail at the name step while everything else keeps working, and
+> **publishing `firestore.rules` by hand**, which is not deployed from the repo.
 > **No data comes across**: a new Firebase project starts empty.
 
 ---

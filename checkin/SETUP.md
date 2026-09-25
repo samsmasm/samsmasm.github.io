@@ -13,38 +13,54 @@ personal account used for trying it out.
 ## Console steps, once
 
 All of these are in the Firebase console, and none of them can be done from a
-code editor. If you are setting this up on a new Firebase project, do all four;
+code editor. If you are setting this up on a new Firebase project, do all five;
 if you are moving it to a different project, also replace `firebaseConfig` in
 `js/firebase.js` with that project's web config.
 
-1. **Authentication**: press **Get started** first, because the project has no
-   auth configuration at all and the sign-in method list does not appear until
-   you do. Then **Sign-in method > Google > Enable**, and set the support email
-   to your own address. Skipping the Get started step is what produces
+**Steps 2 and 5 are the two that get missed.** They are separate steps here
+rather than notes attached to other steps, because both have been skipped before,
+and neither failure looks like a missing setup step when it turns up.
+
+1. **Authentication > Get started, then Sign-in method > Google > Enable.** Press
+   **Get started** first: until you do, the project has no auth configuration at
+   all and the sign-in method list does not appear. Set the support email to your
+   own address. Skipping Get started is what produces
    `auth/configuration-not-found` at sign-in.
-   Then, on the same tab, **Add new provider > Anonymous > Enable**. One off
-   tests are answered by people with no account, and Firestore still has to pin
-   every write to somebody, so their browser is handed a throwaway account it
-   never shows them. Without this, a one off test fails at the name step with
-   `auth/operation-not-allowed`, and nothing else is affected.
-   Anonymous account auto clean-up, on the same page, is worth turning on. It
-   deletes accounts nobody has used for 30 days. It does not touch Firestore, so
-   results already written stay exactly where they are.
-2. **Authentication > Settings > Authorized domains**: add every domain the site
+
+2. **Authentication > Sign-in method > Add new provider > Anonymous > Enable.**
+   Easy to miss, because step 1 looks finished without it. One off tests are
+   answered by people with no account, and Firestore still has to pin every write
+   to somebody, so their browser is handed a throwaway account it never shows
+   them. Without this, a one off test fails at the name step with
+   `auth/operation-not-allowed`. Nothing else in Checkin is affected, which is
+   what makes it easy to miss: everything a signed-in user does keeps working.
+   Turn on **anonymous account auto clean-up** on the same page while you are
+   there. It deletes accounts nobody has used for 30 days, and it does not touch
+   Firestore, so results already written stay exactly where they are.
+
+3. **Authentication > Settings > Authorized domains**: add every domain the site
    will be opened on, including the GitHub Pages one. Sign-in fails with
    `auth/unauthorized-domain` on any address not listed. `localhost` is already
    there by default for local testing.
-3. **Firestore Database**: create a database if the project has none yet.
+
+4. **Firestore Database**: create a database if the project has none yet.
    Production mode, and pick a region near you (`australia-southeast1`).
    Do not use the default open test rules.
-4. **Firestore Database > Rules**: paste the contents of `firestore.rules`
-   from this folder and publish. Do this again whenever that file changes, since
-   the console holds its own copy: the rules are not deployed from this repo.
 
-Take care to use the **Firestore Database > Rules** tab, not the similar looking
-**Realtime Database > Rules** tab. Overwriting the Realtime Database rules would
-break Operation: Shadow Protocol, which is the one realistic way this setup goes
-wrong.
+5. **Firestore Database > Rules**: paste the contents of `firestore.rules` from
+   this folder and publish. **The rules are not deployed from this repo.** The
+   console holds its own copy, so a new project runs on whatever the console gave
+   it, which is either deny-all or wide open, and the file here can be ahead of
+   what is live at any time. Do this again every time `firestore.rules` changes.
+   To check whether a console copy is current, search it for the newest marker in
+   the file: as of September 2026 that is `runCodes`.
+
+If the Firebase project is shared with anything else, take care to use the
+**Firestore Database > Rules** tab and not the similar looking **Realtime
+Database > Rules** tab. They are separate databases with separate rulesets, and
+overwriting the wrong one breaks the other tool rather than this one. On the
+project Checkin was built in, that tool is Operation: Shadow Protocol, and this
+is the one realistic way the setup goes wrong.
 
 No indexes need creating: every query is a single collection ordered by one
 field, which Firestore indexes automatically.
@@ -126,9 +142,9 @@ those three hosts, that is the thing to sort out first.
 
 1. **Replace `firebaseConfig` in `js/firebase.js`** with the new project's web
    config. That is the only file that knows which Firebase project this is.
-2. **Do the four console steps above** on the new project. All four, in order.
-   The Anonymous provider in step 1 is easy to skip and one off tests do not work
-   without it.
+2. **Do the five console steps above** on the new project. All five. Steps 2 and
+   5, the Anonymous provider and publishing the rules, are the two that get
+   missed.
 3. **Authorized domains** must include wherever it is actually served from: the
    school's GitHub Pages domain, and any custom domain in front of it. Sign-in
    fails with `auth/unauthorized-domain` on anything not listed.
