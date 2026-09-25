@@ -5,8 +5,8 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, getSet, getResponse, watchSet,
   computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
   amMember, joinClass, practiceAllowed, newAttemptId, startPractice, savePracticeAnswer
-} from './core.js?v=28ba446-0639';
-import { mountSet } from './answering.js?v=28ba446-0639';
+} from './core.js?v=772c2f2-0736';
+import { mountSet } from './answering.js?v=772c2f2-0736';
 
 const classId = qp('c');
 const setId = qp('s');
@@ -83,6 +83,7 @@ let me = null, cls = null, set = null, view = null, attemptId = null;
     classId, user: me, set,
     response: practice ? null : response,
     focusQid, practice,
+    finishLinks: finishLinks(),
     onSaveAnswer: practice
       ? (qid, value) => savePracticeAnswer(classId, setId, me.uid, attemptId, qid, value)
       : null,
@@ -96,6 +97,19 @@ let me = null, cls = null, set = null, view = null, attemptId = null;
     }, err => console.error(err));
   }
 })();
+
+// Where to go once it is handed in. The same three places the class page offers,
+// so the end of a set reads the same wherever it was started from.
+function finishLinks() {
+  const c = encodeURIComponent(classId);
+  const links = [{ label: 'Back to my class', href: 'class.html?c=' + c, primary: true }];
+  if (practiceAllowed(set)) {
+    links.push({ label: 'Try it again for practice',
+                 href: 'answer.html?c=' + c + '&s=' + setId + '&practice=1' });
+  }
+  links.push({ label: 'See my earlier questions', href: 'class.html?c=' + c + '&prev=1' });
+  return links;
+}
 
 // A student who scans a QR code before joining is let in by the code riding
 // along in the link, so scanning just works on the first day.

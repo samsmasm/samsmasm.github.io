@@ -5,8 +5,8 @@ import {
   requireUser, qp, esc, fail, fmtDate, getClass, listSets, amMember, getResponse,
   watchSet, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey,
   practiceAllowed, myClasses, forgetClass, doc, db, addShellLinks
-} from './core.js?v=28ba446-0639';
-import { mountSet } from './answering.js?v=28ba446-0639';
+} from './core.js?v=772c2f2-0736';
+import { mountSet } from './answering.js?v=772c2f2-0736';
 import { updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const classId = qp('c');
@@ -44,14 +44,25 @@ let me = null, cls = null, view = null, stopWatch = null;
   document.getElementById('class-sub').textContent = cls.ownerName ? 'Set by ' + cls.ownerName : '';
   await healCachedName();
 
-  document.getElementById('prev-toggle').addEventListener('click', () => {
+  const togglePrev = open => {
     const box = document.getElementById('previous');
-    box.classList.toggle('hidden');
+    box.classList.toggle('hidden', !open);
     document.getElementById('prev-toggle').textContent =
-      box.classList.contains('hidden') ? 'Previous questions' : 'Hide previous questions';
+      open ? 'Hide previous questions' : 'Previous questions';
+  };
+  document.getElementById('prev-toggle').addEventListener('click', () => {
+    togglePrev(document.getElementById('previous').classList.contains('hidden'));
   });
 
   await paint();
+
+  // Arriving from "See my earlier questions" should land on them, not on a
+  // closed panel the student has to find and open.
+  if (qp('prev') === '1') {
+    togglePrev(true);
+    const wrap = document.getElementById('previous-wrap');
+    if (wrap && !wrap.classList.contains('hidden')) wrap.scrollIntoView({ block: 'start' });
+  }
 })();
 
 // The class name is cached on the student's own user document for the home page.
@@ -97,6 +108,7 @@ async function paint() {
     view = mountSet({
       el: document.getElementById('set-view'),
       classId, user: me, set: current, response,
+      finishLinks: finishLinks(current),
       onChange: () => { /* answers are saved as they go */ }
     });
     if (stopWatch) stopWatch();
@@ -109,6 +121,19 @@ async function paint() {
   }
 
   await paintPrevious(rest);
+}
+
+// Where a student can go once they have handed in. The class first, because that
+// is where everything else about this class is.
+function finishLinks(set) {
+  const c = encodeURIComponent(classId);
+  const links = [{ label: 'Back to my class', href: 'class.html?c=' + c, primary: true }];
+  if (practiceAllowed(set)) {
+    links.push({ label: 'Try it again for practice',
+                 href: 'answer.html?c=' + c + '&s=' + set.id + '&practice=1' });
+  }
+  links.push({ label: 'See my earlier questions', href: 'class.html?c=' + c + '&prev=1' });
+  return links;
 }
 
 async function paintPrevious(sets) {

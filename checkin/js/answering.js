@@ -1,7 +1,10 @@
 // Checkin - the student's question view, shared by the class page and the
 // single set page. One question at a time, large, with dots to move between them.
 
-import { esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey } from './core.js?v=28ba446-0639';
+import {
+  esc, debounce, saveAnswer, markFinished, LETTERS, studentsMaySeeKey,
+  computeMarks, totalAwarded, maxScore
+} from './core.js?v=772c2f2-0736';
 
 function isAnswered(v) {
   return v !== undefined && v !== null && String(v).trim() !== '';
@@ -14,10 +17,15 @@ function firstUnanswered(set, answers) {
 }
 
 export function mountSet({ el, classId, user, set, key, response, onChange, focusQid,
-                           practice, onSaveAnswer, onRestart }) {
+                           practice, onSaveAnswer, onRestart, finishLinks }) {
   let answers = { ...((response && response.answers) || {}) };
   let marks = { ...((response && response.marks) || {}) };
   let submitted = !!(response && response.submittedAt);
+  // Handing in ends on a page of its own rather than dropping the student back
+  // on the last question with a line of text under it. Only ever reached by
+  // actually handing in: arriving at a set already handed in shows the answers,
+  // because that is what the student clicked to see.
+  let done = false;
   const focusIndex = focusQid
     ? (set.questions || []).findIndex(q => q.id === focusQid)
     : -1;
@@ -116,6 +124,7 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
       el.innerHTML = '<p class="tiny">This set has no questions yet.</p>';
       return;
     }
+    if (done) return doneScreen();
     const limit = visibleLimit();
     if (focused) idx = focusIndex;
     else if (idx > limit) idx = Math.max(0, limit);
@@ -181,7 +190,8 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
     const finish = (!practice && !focused && set.mode !== 'live' && editable())
       ? '<div class="row mt">' +
           (submitted
-            ? '<span class="saved">Handed in. You can still change your answers until the set closes.</span>'
+            ? '<span class="saved">Handed in. You can still change your answers until the set closes.</span>' +
+              '<button data-done class="btn-quiet">What now?</button>'
             : '<button data-finish class="' + (answeredAll ? 'btn-go' : 'btn-quiet') + '">' +
               (answeredAll ? 'Hand in' : 'Hand in anyway') + '</button>' +
               '<span class="tiny" data-count>' + qs.filter(item => isAnswered(answers[item.id])).length +
@@ -201,6 +211,56 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
       '</div>';
 
     wire(q);
+  }
+
+  // What they see the moment they hand in. The marks if they are allowed to know
+  // them, and somewhere to go next, because the end of a question set is not the
+  // end of the lesson.
+  function doneScreen() {
+    const qs = set.questions || [];
+    const answered = qs.filter(item => isAnswered(answers[item.id])).length;
+    const showKey = studentsMaySeeKey(set);
+    const scored = computeMarks(set, { answers, marks }, set.key || {});
+
+    const score = showKey
+      ? '<p class="done-score">' + totalAwarded(set, scored) + ' out of ' + maxScore(set) + '</p>'
+      : '';
+
+    const waiting = showKey
+      ? (qs.some(item => item.type === 'text')
+          ? '<p>The multiple choice is marked. Your written answers are with your teacher.</p>'
+          : '')
+      : '<p>Your teacher has not released the marks yet. They will turn up here when they do.</p>';
+
+    const missed = answered < qs.length
+      ? '<p class="done-warn">You left ' + (qs.length - answered) +
+        (qs.length - answered === 1 ? ' question' : ' questions') + ' blank. ' +
+        'There is still time to go back if the set is open.</p>'
+      : '';
+
+    const links = (finishLinks || []).map(item =>
+      '<a class="btn' + (item.primary ? ' btn-go' : '') + '" href="' + item.href + '">' +
+      esc(item.label) + '</a>').join('');
+
+    el.innerHTML =
+      '<div class="now done-panel">' +
+        '<div class="now-kicker">' + esc(set.title || 'Finished') + '</div>' +
+        '<h2 class="done-title">Finished. Now what?</h2>' +
+        score +
+        '<p>' + answered + ' of ' + qs.length + ' answered, and handed in.</p>' +
+        waiting + missed +
+        // Where they are going next leads; going back to fiddle with an answer
+        // is the quiet option at the end.
+        '<div class="row mt2">' +
+          links +
+          (editable()
+            ? '<button data-reopen class="btn-quiet">Go back and change an answer</button>'
+            : '') +
+        '</div>' +
+      '</div>';
+
+    const reopen = el.querySelector('[data-reopen]');
+    if (reopen) reopen.addEventListener('click', () => { done = false; render(); });
   }
 
   function wire(q) {
@@ -248,10 +308,14 @@ export function mountSet({ el, classId, user, set, key, response, onChange, focu
       try {
         await markFinished(classId, set.id, user);
         submitted = true;
+        done = true;
         render();
         if (onChange) onChange();
       } catch (err) { console.error(err); hand.disabled = false; }
     });
+
+    const toDone = el.querySelector('[data-done]');
+    if (toDone) toDone.addEventListener('click', () => { done = true; render(); });
   }
 
   async function choose(q, letter) {

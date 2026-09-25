@@ -94,6 +94,10 @@ Setup and migration steps are in `SETUP.md`.
 | `checks.html` | teacher | One off tests: the list, and making a new one from scratch or from a set you already have. |
 | `check.html` | teacher | One one off test: its runs, the live code, and starting it again for the next group. |
 | `go.html` | anyone | Answering a one off test with **no account at all**: a code, a name, the questions. |
+
+The one off code box is on the sign-in page and on the home page, from
+`js/codebox.js`. One module for both, because two copies of a box that small is
+how the two end up behaving differently.
 | `student.html` | teacher | One student in detail: their line against the class average, where the marks went, and every set folded shut over the whole paper. |
 | `class.html` | student | The current question, large. Older sets behind "Previous questions". |
 | `answer.html` | student | One set: answer it, review it marked, or practise it. |
@@ -235,6 +239,13 @@ These were settled with Sam. Do not quietly reopen them.
 - **No projector view for questions.** Deliberate. QR codes are the exception.
 - Practice retakes are **private to the student**. The teacher never sees them,
   and the marked record is never touched.
+- Handing in ends on a **finished screen of its own**, not a line of text under
+  the last question, which read as nothing having happened. It carries the score
+  if they are allowed to know it, what they left blank, and where to go next:
+  the class, practice, earlier sets, or another code for a one off. The way back
+  into the answers is the quiet option at the end, since answers stay editable
+  until the set closes. Arriving at a set already handed in still opens on the
+  answers, because that is what the student clicked to see.
 - Results split two ways: a set's own page stays scoped to that set, and anything
   across time lives on the class page. Clicking a student's name anywhere on a
   set's responses page opens their detailed history.

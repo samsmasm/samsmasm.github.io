@@ -1,0 +1,130 @@
+<!-- Checkin - a real browser test of what happens when a student hands in.
+     Handing in used to leave them on the last question with a line of text
+     under it. This drives the real answer.js and checks they get a page of
+     their own, with somewhere to go next and a way back to their answers. -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkin - finishing test</title>
+<link rel="stylesheet" href="../css/style.css">
+<script type="importmap">
+{ "imports": {
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js": "./fake/app.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js": "./fake/auth.js",
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js": "./fake/firestore.js"
+} }
+</script>
+</head>
+<body>
+<div id="mount"></div>
+<pre id="RESULTS">running</pre>
+
+<script type="module">
+import { STORE } from './fake/firestore.js';
+import { FAKE_USER } from './fake/auth.js';
+
+const ERRS = [];
+window.addEventListener('error', e => ERRS.push('window.onerror: ' + e.message));
+window.addEventListener('unhandledrejection', e => ERRS.push('unhandled: ' + (e.reason && e.reason.message || e.reason)));
+
+const out = [];
+const log = s => { out.push(s); document.getElementById('RESULTS').textContent = out.join('\n'); };
+let pass = 0, failn = 0;
+const check = (name, cond, extra) => {
+  (cond ? pass++ : failn++);
+  log((cond ? 'PASS  ' : 'FAIL  ') + name + (cond || extra === undefined ? '' : '  <<' + extra + '>>'));
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const student = { uid: 'stu1', displayName: 'Ana Apple', email: 'ana@ex.com' };
+FAKE_USER.current = student;
+STORE.set('users/stu1', { email: student.email, name: student.displayName, role: 'student',
+  classes: { C1: { name: 'Year 12 Economics', role: 'student' } } });
+STORE.set('classes/C1', { name: 'Year 12 Economics', ownerUid: 'teacher1', joinCode: 'ABC234' });
+STORE.set('classes/C1/members/stu1', { name: 'Ana Apple', email: 'ana@ex.com', role: 'student' });
+
+const questions = [
+  { id: 'q1', type: 'mcq',  prompt: 'Which is a public good?', maxMark: 1, options: ['A lighthouse','A sandwich'] },
+  { id: 'q2', type: 'text', prompt: 'Say why in a sentence.',  maxMark: 2 }
+];
+// Marks show as they go, and practice is allowed, so the finished screen has
+// everything it can have.
+STORE.set('classes/C1/sets/S1', {
+  title: 'Public goods', status: 'open', mode: 'self', reveal: 'now',
+  resultsReleased: true, allowRetake: true,
+  createdAt: { seconds: 1758000000 }, openedAt: { seconds: 1758000000 },
+  questions, key: { q1: 'A' }
+});
+STORE.set('classes/C1/sets/S1/keys/key', { key: { q1: 'A' } });
+
+const page = await (await fetch('../answer.html')).text();
+document.getElementById('mount').innerHTML =
+  page.slice(page.indexOf('<div class="app-shell">'), page.indexOf('<script type="module"'));
+history.replaceState(null, '', location.pathname + '?c=C1&s=S1');
+await import('../js/answer.js?v=test');
+await sleep(500);
+
+const view = () => document.getElementById('set-view');
+const text = () => view().textContent.replace(/\s+/g, ' ');
+
+log('--- answering ---');
+check('the first question is up', /Which is a public good/.test(text()), text().slice(0, 90));
+
+// Answer only the multiple choice, so the blank warning has something to say.
+view().querySelector('[data-letter="A"]').click();
+await sleep(200);
+
+const hand = view().querySelector('[data-finish]');
+check('there is a way to hand in', !!hand, text().slice(-140));
+check('it admits not everything is answered', hand && /Hand in anyway/.test(hand.textContent), hand && hand.textContent);
+
+log('--- handing in ---');
+hand.click();
+await sleep(600);
+
+check('the questions are gone', !/Which is a public good/.test(text()), text().slice(0, 120));
+check('a finished screen is up', /Finished\. Now what\?/.test(text()), text().slice(0, 140));
+check('it says what they scored', /1 out of 3/.test(text()), text().slice(0, 200));
+check('it counts what they answered', /1 of 2 answered, and handed in/.test(text()), text().slice(0, 240));
+check('it points out what they left blank', /left 1 question blank/.test(text()), text().slice(0, 300));
+
+const links = [...view().querySelectorAll('a.btn')].map(a => a.textContent.trim());
+check('there is a way back to the class', links.includes('Back to my class'), links.join(' | '));
+check('there is a way to practise it again', links.includes('Try it again for practice'), links.join(' | '));
+check('there is a way to earlier question sets', links.includes('See my earlier questions'), links.join(' | '));
+const prev = [...view().querySelectorAll('a.btn')].find(a => /earlier/.test(a.textContent));
+check('that link opens the earlier sets rather than just the class page',
+  prev && /prev=1/.test(prev.getAttribute('href')), prev && prev.getAttribute('href'));
+
+log('--- getting back to the answers ---');
+const reopen = view().querySelector('[data-reopen]');
+check('there is a way back into the questions', !!reopen);
+reopen.click();
+await sleep(200);
+check('the questions come back', /Which is a public good/.test(text()), text().slice(0, 120));
+check('and a way back to the finished screen',
+  !!view().querySelector('[data-done]'), text().slice(-160));
+
+view().querySelector('[data-done]').click();
+await sleep(200);
+check('which works', /Finished\. Now what\?/.test(text()), text().slice(0, 90));
+
+log('--- the code box ---');
+const box = document.createElement('div');
+document.body.appendChild(box);
+const { mountCodeBox } = await import('../js/codebox.js?v=test');
+mountCodeBox(box, { idPrefix: 't' });
+check('it has a box and a button',
+  !!box.querySelector('input.code-input') && !!box.querySelector('button'));
+box.querySelector('input').value = 'ab';
+box.querySelector('button').click();
+await sleep(100);
+check('a short code is refused rather than followed',
+  /too short/.test(box.textContent) && !/\/go\.html/.test(location.href),
+  box.textContent.trim());
+
+log('');
+log(pass + ' passed, ' + failn + ' failed');
+log('--- errors ---');
+(ERRS.length ? ERRS : ['none']).forEach(e => log('  ' + e));
+log('DONE');
+</script>
+</body></html>

@@ -5,7 +5,8 @@
 import {
   requireUser, myClasses, createClass, joinClass, esc, fail, qp, myRole, setMyRole,
   addShellLinks
-} from './core.js?v=28ba446-0639';
+} from './core.js?v=772c2f2-0736';
+import { mountCodeBox } from './codebox.js?v=772c2f2-0736';
 
 let me = null, classes = [];
 
@@ -98,6 +99,8 @@ function showClasses() {
   const teacherFirst = role === 'teacher';
   document.getElementById('primary').innerHTML = teacherFirst ? teachBlock(true) : learnBlock(true);
   document.getElementById('secondary').innerHTML = teacherFirst ? learnBlock(false) : teachBlock(false);
+
+  mountCodeBox(document.getElementById('oneoff-box'));
 
   document.getElementById('role-switch').innerHTML =
     'Set up as ' + (teacherFirst ? 'a teacher' : 'a student') + '. ' +

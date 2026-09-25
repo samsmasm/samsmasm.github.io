@@ -8,8 +8,8 @@
 import {
   requireAnyUser, qp, esc, fail, lookupRunCode, getSet, getResponse, watchSet,
   claimName, computeMarks, totalAwarded, maxScore, answeredCount, studentsMaySeeKey
-} from './core.js?v=28ba446-0639';
-import { mountSet } from './answering.js?v=28ba446-0639';
+} from './core.js?v=772c2f2-0736';
+import { mountSet } from './answering.js?v=772c2f2-0736';
 
 const focusQid = qp('q');            // set by a QR code pointing at one question
 let me = null, run = null, set = null, view = null, who = '';
@@ -143,6 +143,9 @@ async function answering() {
   view = mountSet({
     el: document.getElementById('set-view'),
     classId: run.classId, user: person, set, response, focusQid,
+    // There is no class to go back to and no account to keep anything in, so the
+    // only honest offer is another test.
+    finishLinks: [{ label: 'Put in another code', href: 'go.html' }],
     onChange: () => { /* answers save as they go */ }
   });
 

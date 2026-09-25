@@ -7,7 +7,7 @@
 import {
   requireUser, esc, fail, fmtDate, myClasses, myChecks, createCheck, getClass,
   listSets, listSets as listRuns, getKey, startRun, getResponses
-} from './core.js?v=28ba446-0639';
+} from './core.js?v=772c2f2-0736';
 
 let me = null;
 
