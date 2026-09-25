@@ -70,13 +70,18 @@ field, which Firestore indexes automatically.
 ```
 users/{uid}                        email, name, cached lists of their classes and one off tests
 joinCodes/{CODE}                   points a six character code at one class
-runCodes/{CODE}                    points a six character code at one run of one off test
+runCodes/{CODE}                    points a six character code at one run of a one off test
 classes/{cid}                      name, ownerUid, joinCode
+                                   a one off test is the same document with kind: 'oneoff',
+                                   no join code and no roll
   members/{uid}                    the roll, students only
   blocked/{uid}                    students removed by the teacher
   sets/{sid}                       title, mode, status, reveal, questions[]
+                                   a run of a one off test also carries runCode and runLabel
     keys/key                       the answer key, teacher only
+    names/{slug}                   one off tests only: a name claimed in a room with no accounts
     responses/{uid}                one document per student per set
+      retakes/{attemptId}          private practice runs, readable by that student alone
 ```
 
 The class list on a person's own user document is only a convenience for the
@@ -107,6 +112,10 @@ rides along in the link, so a student who has not joined yet is let in by the
 scan instead of hitting a wall. In a live set, a scanned link ignores the
 question you are currently on: the code is you pointing at a question, so it
 wins.
+
+A QR code for a one off test goes somewhere else entirely: there is no class to
+join and no account to have, so the link carries only that run's code and drops
+whoever scans it straight at the name step.
 
 The QR drawing library comes from cdnjs at page load. If it is blocked, the page
 says so and still shows the link in text.
@@ -184,6 +193,65 @@ join a class: the other route moves to a plain link in the header and a quiet
 line at the foot of the home page. It is never a permission, so there is nothing
 in the rules about it, and anyone can switch at the bottom of their home page.
 
+## One off tests
+
+For a room that is not one of your classes: a relief lesson, a workshop, an open
+evening. **One offs** in the menu.
+
+Write the questions, or copy a set you already have, and you get a six character
+code and a QR code. Whoever is in front of you goes to `go.html`, puts in the
+code, types a name and answers. No account, no sign-in, no roll. The code box is
+on the sign-in page as well as the home page, so somebody with no account never
+has to get past a sign-in screen to reach it.
+
+Everything else works as it does for a class: open and close it, live mode,
+instant marking or results held back, and the same marking grid afterwards.
+
+A one off test holds **runs**. Start it again for the next group and you get a
+new run with its own code and its own responses, so one group's answers are
+never mixed into another's and editing the questions now cannot rewrite what an
+earlier group was asked. Each run can be given a batch name; students see the
+name of the test and the name of the batch.
+
+Two names are claimed per run, so two people in one room cannot both answer as
+"Sam": the second is asked to add a last name. The name is remembered in that
+browser, so a reload does not ask again or start a second answer sheet.
+
+This is the only part of Checkin that needs the **Anonymous** sign-in provider.
+Each browser is given a throwaway account it never sees, because Firestore has to
+be able to pin every write to somebody. Without the provider enabled, a one off
+test fails at the name step and nothing else is affected.
+
+## Reusing a question set
+
+Two places offer to start from something you have already written, and both
+search the same list: type a word to match a title or a class name, or pick a
+class.
+
+- **Class > Question sets > Reuse a set you have already written** copies a set
+  into that class as a new draft. It is a copy, not a shared set: the questions
+  and the answer key come across, the status, results, retakes and everyone's
+  answers stay behind, and editing one never changes the other. The list
+  includes the class you are in, so it also duplicates a set in place.
+- **One offs > start from a set you already have** does the same into a new one
+  off test.
+
+## Finishing a set
+
+Handing in ends on a screen of its own: what they scored, how many they
+answered, anything left blank, and where to go next (the class, a practice run
+if you have allowed it, their earlier sets, or another code for a one off).
+
+**A student is never shown marks for work nobody has marked yet.** Eight right
+out of eight multiple choice reads as "8 out of 8", with a line saying the
+written answers are still with you and what they are worth, rather than "8 out
+of 12" as though four marks had been lost. A question left blank is different
+and does count, since nobody is waiting on it. Your own views always show the
+true total out of everything, because that is what marking needs.
+
+Answers stay editable until you close the set, so the finished screen keeps a
+quiet way back into them.
+
 ## Practice retakes
 
 A student who has done a set can press **Try again** for a private practice run.
@@ -222,6 +290,13 @@ would keep an answer key they are no longer meant to have.
 - Editing questions in a set that students have already answered keeps the
   answers attached to the questions they belong to, because questions carry
   their own ids. Deleting a question does orphan any answers to it.
+- A one off test is only as private as its code. Anyone the code reaches can
+  answer, from anywhere, for as long as the run is open. Close the run when the
+  lesson ends, and start a fresh run for the next group, which is what the run
+  button is for.
+- Names on a one off test are typed, not proven. Nobody can take a name somebody
+  in the room has already claimed, but the first person to claim one can type
+  anything. It is a way of labelling answer sheets, not a register.
 
 ## Next step, when you want it
 

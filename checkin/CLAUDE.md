@@ -141,9 +141,23 @@ read anyway, so a class comparison anywhere costs no extra reads. `studentQuesti
 is pure: it re-reads what is already loaded and returns every question one student
 met, so the detailed view needs no second trip to Firestore.
 
-`js/core.js` holds everything shared: auth guard, the sidebar shell, all
-Firestore access, CSV parsing and the marking maths. `js/answering.js` renders
-the student question view and is used by both `class.html` and `answer.html`.
+### The shared modules
+
+Anything used by more than one page lives in one of these. **Check here before
+writing something that looks like it exists already**: the two worst bugs this
+project has had were a second copy of something drifting from the first, and the
+habit that prevents it is looking first.
+
+| Module | What it holds | Used by |
+|---|---|---|
+| `core.js` | Auth guards, the sidebar shell, every Firestore call, CSV parsing, the marking maths, `studentScore` | everything |
+| `answering.js` | The student question view, one question at a time, and the finished screen | `class.html`, `answer.html`, `go.html` |
+| `history.js` | How a class has done over time, the sparklines and the percentage chart | `teach.html`, `results.html`, `student.html` |
+| `marking.js` | How a mark box behaves, so the grid and the per-question view cannot drift | `results.js` |
+| `setpicker.js` | Searching your own sets by title or class, with a button per row | `teach.html`, `checks.html` |
+| `codebox.js` | The one off test code box | `index.html`, `home.html` |
+| `qrsvg.js` | Drawing a QR code, over the cdnjs qrcode-generator global | `qr.html` |
+| `firebase.js` | The only file that knows which Firebase project this is | `core.js` |
 
 ---
 
