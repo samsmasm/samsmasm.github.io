@@ -53,7 +53,8 @@ const FAQS = {
   magnifier: [{
     q: "Can I trust them?",
     a: ["I check everything before you see it. If I can’t check something, I flag it as AI-generated.",
-        "The AI also works from the course guide, examiner reports and sources I trust, not the open internet."],
+        "The AI also works from the course guide, examiner reports and sources I trust, not the open internet.",
+        "And teachers make mistakes at the best of times, even when we’re not using AI. I think I’m more accurate with AI in my workflow than without it."],
     more: "checking-my-work"
   }],
 
