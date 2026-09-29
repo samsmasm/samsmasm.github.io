@@ -108,7 +108,7 @@ To add an item: draw it in `build.py`, add it to `figure()` with `part(..., "new
 
 ### After changing the drawing
 
-Regenerate the landing thumbnail: serve the repo, screenshot `/ai/me/` at 1200 × 900, and crop the figure (at that size it sits at 513 × 519 + 94 + 254), resized to 440 px wide → `ai/me-thumb.jpg`.
+Regenerate the landing thumbnail: serve the repo, screenshot `/ai/me/` at 1200 × 900, and crop the figure (at that size it sits at 513 × 519 + 94 + 254), resized to 440 px wide → `ai/me-thumb.jpg`. Then bump the `?v=` number on its `src` in `ai/index.html`: images are cached for 4 hours, so without it people keep seeing the old picture.
 
 ---
 
