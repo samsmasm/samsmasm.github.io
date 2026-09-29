@@ -31,6 +31,8 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
                              (Fraunces + Nunito, amber on navy, sidebar shell, dark mode) because it is a
                              standalone concept meant to be migrated to a school GitHub. Keep it self-contained:
                              no site logo, no unisam.nz references, relative paths only.
+  ai/                     ← "How I Use AI": landing, full statement, Click-on-me bobblehead (see CLAUDE.md inside;
+                             NEVER commit ai/me.jpg, ai/id.jpg or the bobble-* mockups)
   qreview/                ← IB continual revision / flashcard tool
   reports/                ← automated student report tools (see CLAUDE.md inside)
   cultivar/               ← genetics/cultivar tool (see CLAUDE.md inside)
