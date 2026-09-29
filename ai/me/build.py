@@ -59,6 +59,21 @@ STUBBLE = ("M362,400 C368,490 430,532 500,534 C570,532 632,490 638,400 C618,445 
            "C545,448 522,444 500,448 C478,444 455,448 440,456 C415,452 382,445 362,400 Z")
 
 
+HAIR_BASE, HAIR_SQUASH = 240, 0.74
+
+
+def flatten(d):
+    """Squash hair points above the hairline so it sits lower and less bouffant."""
+    num = r"-?\d+(?:\.\d+)?"
+    vals = [float(v) for v in re.findall(num, d)]
+    for i in range(0, len(vals), 2):
+        if vals[i + 1] < HAIR_BASE:
+            vals[i + 1] = HAIR_BASE - (HAIR_BASE - vals[i + 1]) * HAIR_SQUASH
+            vals[i] = 500 + (vals[i] - 500) * 0.97
+    it = iter(vals)
+    return re.sub(num, lambda m: f"{next(it):.0f}", d)
+
+
 def head():
     g = []
     for x in (364, 636):
@@ -69,10 +84,10 @@ def head():
              f'<path class="solo" d="{STUBBLE}" fill="url(#dots)"/></g>')
     for x in (400, 600):
         g.append(f'<ellipse cx="{x}" cy="440" rx="26" ry="13" fill="#f2a0a0" opacity=".35"/>')
-    g.append(f'<path d="{HAIR_PATH}" fill="{HAIR}" {L}/>')
-    g.append(f'<path d="M458,112 Q452,160 458,210" stroke="{HAIR_DARK}" stroke-width="3" fill="none"/>')
+    g.append(f'<path d="{flatten(HAIR_PATH)}" fill="{HAIR}" {L}/>')
+    g.append(f'<path d="{flatten("M458,112 Q452,160 458,210")}" stroke="{HAIR_DARK}" stroke-width="3" fill="none"/>')
     for d in STRANDS:
-        g.append(f'<path d="{d}" stroke="{HAIR_DARK}" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".85"/>')
+        g.append(f'<path d="{flatten(d)}" stroke="{HAIR_DARK}" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".85"/>')
     g.append(f'<path d="M405,286 Q440,268 475,281" stroke="{HAIR_DARK}" stroke-width="5" fill="none" stroke-linecap="round"/>')
     g.append(f'<path d="M525,281 Q560,268 595,286" stroke="{HAIR_DARK}" stroke-width="5" fill="none" stroke-linecap="round"/>')
     for x in (442, 558):
@@ -107,8 +122,8 @@ def trousers():
 def shirt():
     g = [f'<path d="M392,588 C362,592 344,602 336,628 L326,812 Q500,830 674,812 L664,628 C656,602 638,592 608,588 '
          f'L560,586 L500,646 L440,586 Z" fill="{SHIRT}" {L}/>',
-         f'<path d="M392,590 C360,596 342,606 334,632 L312,705 L364,716 L372,660 Z" fill="{SHIRT}" {L}/>',
-         f'<path d="M608,590 C640,596 658,606 666,632 L688,705 L636,716 L628,660 Z" fill="{SHIRT}" {L}/>',
+         f'<path d="M392,588 C352,592 318,606 300,640 L282,714 L346,726 L362,664 Z" fill="{SHIRT}" {L}/>',
+         f'<path d="M608,588 C648,592 682,606 700,640 L718,714 L654,726 L638,664 Z" fill="{SHIRT}" {L}/>',
          f'<path d="M500,646 L500,818" {T}/>']
     for y in (682, 722, 762, 800):
         g.append(f'<circle cx="508" cy="{y}" r="4" fill="#fffaf0" {L}/>')
