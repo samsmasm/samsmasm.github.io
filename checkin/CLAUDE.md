@@ -35,8 +35,9 @@ link, and keep every path relative.
 **Telling whether the published rules are current.** `firestore.rules` is not
 deployed from this repo: the console holds its own copy, so the file here can be
 ahead of what is live. Rather than guess, grep the console's Rules tab for the
-newest marker in this file. As of 2026-09-25 that is **`runCodes`**, added with
-one off tests; before that it was `retakes`. If the marker is missing, the live
+newest marker in this file. As of 2026-09-30 that is **`aiorusRooms`**, the block
+at the end for the separate /aiorus card sort, which shares this project and so
+this ruleset. Before that it was `runCodes` (one off tests), then `retakes`. If the marker is missing, the live
 rules are older than the repo and need a paste. `git log -- checkin/firestore.rules`
 says when the file last actually changed, which is usually the faster answer.
 

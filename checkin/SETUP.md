@@ -53,7 +53,8 @@ and neither failure looks like a missing setup step when it turns up.
    it, which is either deny-all or wide open, and the file here can be ahead of
    what is live at any time. Do this again every time `firestore.rules` changes.
    To check whether a console copy is current, search it for the newest marker in
-   the file: as of September 2026 that is `runCodes`.
+   the file: as of 30 September 2026 that is `aiorusRooms` (the block at the end
+   belongs to /aiorus, which shares this Firebase project).
 
 If the Firebase project is shared with anything else, take care to use the
 **Firestore Database > Rules** tab and not the similar looking **Realtime

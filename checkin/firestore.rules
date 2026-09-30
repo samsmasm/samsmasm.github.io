@@ -171,5 +171,46 @@ service cloud.firestore {
         }
       }
     }
+
+    // ------------------------------------------------------------------------
+    // aiorus (the /aiorus card sort). Not part of Checkin: it shares this file
+    // only because a Firebase project has one Firestore ruleset. See
+    // aiorus/SETUP.md. Students are anonymous accounts and send nothing but card
+    // ids and numbers; only the teacher who opened a room can read it.
+    // ------------------------------------------------------------------------
+    match /aiorusRooms/{code} {
+      function aiorusRoom() {
+        return get(/databases/$(database)/documents/aiorusRooms/$(code)).data;
+      }
+
+      allow get: if signedIn();
+      allow list: if realAccount() && resource.data.ownerUid == uid();
+      allow create: if realAccount()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt', 'expireAt'])
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt < request.time + duration.value(25, 'h');
+      allow update: if false;
+      allow delete: if realAccount() && resource.data.ownerUid == uid();
+
+      // One document per student device, named by its anonymous uid.
+      match /placements/{pid} {
+        allow read: if realAccount() && aiorusRoom().ownerUid == uid();
+        allow get: if signedIn() && pid == uid();
+        allow create, update: if signedIn()
+          && pid == uid()
+          && request.time < aiorusRoom().expireAt
+          && request.resource.data.keys().hasOnly(['now', 'before', 'updatedAt', 'expireAt'])
+          && request.resource.data.now is map
+          && request.resource.data.now.size() <= 60
+          && (!('before' in request.resource.data)
+              || (request.resource.data.before is map && request.resource.data.before.size() <= 60))
+          && request.resource.data.expireAt == aiorusRoom().expireAt
+          // The first-instinct sort is fixed once it has been sent.
+          && (resource == null || !('before' in resource.data)
+              || request.resource.data.before == resource.data.before);
+        allow delete: if realAccount() && aiorusRoom().ownerUid == uid();
+      }
+    }
   }
 }

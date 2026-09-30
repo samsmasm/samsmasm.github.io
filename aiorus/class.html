@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI or us? Class screen</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  main { max-width: 1400px; }
+  .top-inner { max-width: 1400px; }
+
+  .signed { color: var(--muted); font-size: 0.9rem; margin-left: auto; text-align: right; }
+  .signed button { min-height: 40px; padding: 0.2rem 0.8rem; font-size: 0.85rem; margin-left: 0.5rem; }
+
+  .sessions { list-style: none; padding: 0; margin: 0; }
+  .sessions li {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem;
+    padding: 0.6rem 0; border-bottom: 1px solid var(--line);
+  }
+  .sessions .code { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.15em; min-width: 5.5rem; }
+  .sessions .when { color: var(--muted); flex: 1; }
+  .sessions button { min-height: 42px; padding: 0.3rem 1rem; }
+
+  /* Join panel */
+  .joinbar { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: center; }
+  .joinbar .how { flex: 1; min-width: 16rem; font-size: 1.2rem; line-height: 1.5; }
+  .joinbar .url { font-weight: 700; word-break: break-all; }
+  .roomcode { font-size: 3.4rem; font-weight: 800; letter-spacing: 0.2em; line-height: 1.1; color: var(--task-ink); }
+  .qr { width: 150px; height: 150px; cursor: zoom-in; border: 2px solid var(--line); border-radius: 8px; padding: 4px; background: #fff; }
+  .counts { font-size: 1.1rem; font-weight: 600; }
+
+  .qrbig {
+    position: fixed; inset: 0; z-index: 100; background: rgba(255,255,255,0.97);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;
+    cursor: zoom-out; padding: 1rem;
+  }
+  .qrbig .qrsvg { width: min(70vh, 88vw); height: min(70vh, 88vw); }
+  .qrbig .roomcode { font-size: 4rem; }
+
+  /* Controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 1rem 1.6rem; align-items: center; margin: 1rem 0; }
+  .seg { display: inline-flex; flex-wrap: wrap; }
+  .seg button { border-radius: 0; margin-left: -2px; background: #fff; color: var(--task-edge); }
+  .seg button:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+  .seg button:last-child { border-radius: 0 8px 8px 0; }
+  .seg button[aria-pressed=true] { background: var(--task-edge); color: #fff; }
+  .seg-label { font-weight: 700; margin-right: 0.5rem; }
+  button.danger { background: #fff; color: var(--big-edge); border-color: var(--big-edge); }
+  button.danger.armed { background: var(--big-edge); color: #fff; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; align-items: center; font-weight: 600; }
+  .legend .sw, .meta .sw { display: inline-block; width: 1.1em; height: 1.1em; border-radius: 4px; vertical-align: -0.15em; margin-right: 0.35em; border: 2px solid #14141f; }
+
+  /* Stacked spectrums */
+  .grid { margin-top: 1rem; }
+  .row, .headrow {
+    display: grid;
+    grid-template-columns: 17rem 1fr;
+    gap: 0 1.2rem;
+    align-items: center;
+  }
+  .headrow {
+    position: sticky; top: 0; z-index: 5; background: #fff;
+    padding: 0.5rem 0; border-bottom: 2px solid #14141f;
+    font-weight: 800; font-size: 1rem; line-height: 1.3;
+  }
+  .headrow .ends { display: flex; justify-content: space-between; gap: 1rem; }
+  .headrow .ends span { max-width: 45%; }
+  .headrow .ends span:last-child { text-align: right; }
+
+  .row {
+    border-left: 12px solid #bbb;
+    border-bottom: 1px solid var(--line);
+    padding: 0.5rem 0 0.5rem 0.8rem;
+  }
+  .meta .name { font-weight: 800; font-size: 1.05rem; line-height: 1.3; }
+  .meta .era { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--task-edge); margin-right: 0.4em; }
+  .meta .stat { font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+  .row .note { grid-column: 1 / -1; margin: 0.5rem 0 0.2rem; font-size: 1rem; }
+
+  .track { position: relative; height: 76px; margin: 0 18px; }
+  .track .line { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; background: #14141f; border-radius: 2px; }
+  .track .tick { position: absolute; top: 50%; width: 3px; height: 22px; margin: -11px 0 0 -1.5px; background: #14141f; }
+  .track .band { position: absolute; top: 22%; height: 56%; border-radius: 6px; opacity: 0.28; transition: left 0.6s, width 0.6s, background 0.6s; }
+  .track .dot {
+    position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+    background: rgba(26, 45, 90, 0.32); transition: left 0.6s, top 0.6s;
+  }
+  .track .avg {
+    position: absolute; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%;
+    border: 5px solid #14141f; z-index: 3; transition: left 0.6s, background 0.6s;
+  }
+  .track .was {
+    position: absolute; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
+    border: 4px dashed #14141f; background: #fff; z-index: 2; transition: left 0.6s;
+  }
+  .track .arrow { position: absolute; top: 50%; height: 6px; margin-top: -3px; background: #14141f; z-index: 2; transition: left 0.6s, width 0.6s; }
+  .track .none { position: absolute; left: 0; right: 0; top: 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
+
+  .empty-state { font-size: 1.1rem; }
+
+  @media (max-width: 760px) {
+    .row, .headrow { grid-template-columns: 1fr; }
+    .headrow > :first-child { display: none; }
+    .roomcode { font-size: 2.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <img src="../unisamsq.png" alt="" onerror="this.remove()">
+    <div>
+      <h1>AI or us?</h1>
+      <p>Class screen</p>
+    </div>
+    <div class="signed hidden" id="signedBox"><span id="whoami"></span><button class="quiet" id="signOutBtn">Sign out</button></div>
+  </div>
+</header>
+
+<main>
+
+  <section id="loading"><p>Loading...</p></section>
+
+  <!-- Signed out -->
+  <section id="signInView" class="hidden">
+    <div class="box info">
+      <p>This is the class screen. It shows where everyone put each card, so you can talk about the cards where the class disagrees.</p>
+      <p>Students do not sign in. Only teachers do, to start a session.</p>
+    </div>
+    <button id="signInBtn">Sign in with Google</button>
+    <p id="signInMsg" class="msg"></p>
+  </section>
+
+  <!-- Sessions -->
+  <section id="homeView" class="hidden">
+    <button id="newBtn">Start a new session</button>
+    <p id="homeMsg"></p>
+    <h2>Your sessions</h2>
+    <div class="box info">
+      <p>A session stays open for 24 hours. After that students cannot send anything more. End a session to delete everything in it.</p>
+    </div>
+    <ul class="sessions" id="sessionList"></ul>
+  </section>
+
+  <!-- A room -->
+  <section id="roomView" class="hidden">
+    <div class="box task joinbar">
+      <div class="how">
+        <div>Go to <span class="url" id="joinUrl"></span> and type</div>
+        <div class="roomcode" id="roomCode"></div>
+        <div class="counts" id="counts"></div>
+      </div>
+      <div class="qr" id="qr" title="Show a bigger QR code"></div>
+    </div>
+
+    <div class="controls">
+      <div><span class="seg-label">Show</span><span class="seg" id="viewSeg">
+        <button data-v="now" aria-pressed="true">Now</button><button data-v="before" aria-pressed="false">First instinct</button><button data-v="shift" aria-pressed="false">How it shifted</button>
+      </span></div>
+      <div><span class="seg-label">Order</span><span class="seg" id="orderSeg">
+        <button data-o="list" aria-pressed="true">Card list</button><button data-o="split" aria-pressed="false">Most split first</button>
+      </span></div>
+      <button class="quiet" id="notesBtn" aria-pressed="false">Show notes</button>
+    </div>
+
+    <div class="legend" id="legend"></div>
+    <div class="box info" id="viewHelp"></div>
+
+    <div class="grid" id="grid">
+      <div class="headrow"><div>Card</div><div class="ends" style="margin: 0 18px"><span id="leftEnd"></span><span id="rightEnd"></span></div></div>
+    </div>
+
+    <div class="controls">
+      <button class="quiet" id="backBtn">Back to sessions</button>
+      <button class="danger" id="endBtn">End session and delete</button>
+    </div>
+  </section>
+
+</main>
+
+<div class="qrbig hidden" id="qrBig"></div>
+
+<script type="module" src="class.js"></script>
+</body>
+</html>
