@@ -15,14 +15,13 @@ const db = fb.db;
 const DAY = 24 * 60 * 60 * 1000;
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O, which look like 1 and 0
 
-// How spread out the class is, as the standard deviation of placements on the
-// 0 to 100 line. Everyone at one point is 0; half at each end is 50; dots spread
-// evenly along the whole line come to about 29.
+// How much the class disagrees, as the interquartile range: the width of the
+// box, where the middle half of the class put the card, on the 0 to 100 line.
+// Dots spread evenly along the whole line give an IQR of about 50.
 const LEVELS = [
-  { max: 8,        colour: '#7b3fc4', label: 'Agreed' },
-  { max: 14,       colour: '#2e9e44', label: 'Mostly agreed' },
-  { max: 20,       colour: '#e8c20c', label: 'Mixed' },
-  { max: 26,       colour: '#ef7d1a', label: 'Divided' },
+  { max: 15,       colour: '#2e9e44', label: 'Agreed' },
+  { max: 25,       colour: '#e8c20c', label: 'Mixed' },
+  { max: 35,       colour: '#ef7d1a', label: 'Divided' },
   { max: Infinity, colour: '#d32f2f', label: 'Split' }
 ];
 const WAITING = { colour: '#bbbbbb', label: 'Waiting for more students' };
@@ -271,7 +270,7 @@ $('notesBtn').addEventListener('click', () => {
 });
 
 const HELP = {
-  now: 'Where everyone has the cards right now. Faint dots are students. The big dot is the class average. The shaded bar shows how spread out the class is.',
+  now: 'Where everyone has the cards right now. Faint dots are students. The box holds the middle half of the class, with a line at the median. The whiskers reach the furthest students. The big dot is the class average. A wider box means more disagreement.',
   before: 'Where everyone put the cards before they tapped Reveal: their first instinct.',
   shift: 'The dashed circle is the class average before Reveal. The solid dot is the average now. Only students who have tapped Reveal are counted.'
 };
@@ -298,7 +297,9 @@ function buildRows() {
     row.innerHTML =
       '<div class="meta"><div class="name"><span class="era"></span><span class="txt"></span></div>' +
       '<div class="stat"><span class="sw"></span><span class="lvl"></span></div></div>' +
-      '<div class="track"><div class="line"></div><div class="band"></div>' +
+      '<div class="track"><div class="line"></div>' +
+      '<div class="bp"><div class="whisker"></div><div class="cap lo"></div><div class="cap hi"></div>' +
+      '<div class="iqr"></div><div class="median"></div></div>' +
       '<div class="arrow"></div><div class="was"></div><div class="avg"></div><div class="none"></div></div>' +
       '<div class="note box info hidden"></div>';
     row.querySelector('.era').textContent = card.era === 'then' ? 'Then' : 'Now';
@@ -309,7 +310,7 @@ function buildRows() {
       const tick = document.createElement('div');
       tick.className = 'tick';
       tick.style.left = t + '%';
-      track.insertBefore(tick, track.querySelector('.band'));
+      track.insertBefore(tick, track.querySelector('.bp'));
     }
     $('grid').appendChild(row);
     rows.set(card.id, { row, track, dots: new Map() });
@@ -320,13 +321,19 @@ function stats(values) {
   const n = values.length;
   if (!n) return { n };
   const mean = values.reduce((a, b) => a + b, 0) / n;
-  const sd = Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / n);
-  return { n, mean, sd };
+  const v = [...values].sort((x, y) => x - y);
+  // Quartiles by linear interpolation between the sorted values.
+  const q = p => {
+    const i = (n - 1) * p, lo = Math.floor(i);
+    return v[lo] + (v[Math.min(lo + 1, n - 1)] - v[lo]) * (i - lo);
+  };
+  const q1 = q(0.25), q3 = q(0.75);
+  return { n, mean, min: v[0], q1, median: q(0.5), q3, max: v[n - 1], iqr: q3 - q1 };
 }
 
 function level(s) {
   if (!s.n || s.n < 2) return WAITING;
-  return LEVELS.find(l => s.sd < l.max);
+  return LEVELS.find(l => s.iqr < l.max);
 }
 
 // A steady up-and-down offset for each student's dot, so dots that land in the
@@ -367,7 +374,7 @@ function draw() {
   });
 
   if (order === 'split') {
-    results.sort((a, b) => (b.current.n >= 2 ? b.current.sd : -1) - (a.current.n >= 2 ? a.current.sd : -1));
+    results.sort((a, b) => (b.current.n >= 2 ? b.current.iqr : -1) - (a.current.n >= 2 ? a.current.iqr : -1));
   }
 
   for (const r of results) {
@@ -401,22 +408,30 @@ function draw() {
     }
     for (const [uid, dot] of dots) if (!seen.has(uid)) { dot.remove(); dots.delete(uid); }
 
-    const band = track.querySelector('.band');
+    const bp = track.querySelector('.bp');
     const avg = track.querySelector('.avg');
     const was = track.querySelector('.was');
     const arrow = track.querySelector('.arrow');
     const none = track.querySelector('.none');
     const has = r.current.n > 0;
     avg.classList.toggle('hidden', !has);
-    band.classList.toggle('hidden', !has || r.current.n < 2);
+    bp.classList.toggle('hidden', !has || r.current.n < 2);
     none.textContent = has ? '' : view === 'now' ? 'Nobody has placed this card yet' : 'Nobody has tapped Reveal yet';
     if (has) {
       place(avg, r.current.mean);
       avg.style.background = r.lvl.colour;
       avg.title = 'Class average: ' + Math.round(r.current.mean);
-      band.style.left = Math.max(0, r.current.mean - r.current.sd) + '%';
-      band.style.width = (Math.min(100, r.current.mean + r.current.sd) - Math.max(0, r.current.mean - r.current.sd)) + '%';
-      band.style.background = r.lvl.colour;
+      const c = r.current;
+      const span = (el, from, to) => { el.style.left = from + '%'; el.style.width = (to - from) + '%'; };
+      span(bp.querySelector('.whisker'), c.min, c.max);
+      span(bp.querySelector('.iqr'), c.q1, c.q3);
+      place(bp.querySelector('.cap.lo'), c.min);
+      place(bp.querySelector('.cap.hi'), c.max);
+      place(bp.querySelector('.median'), c.median);
+      bp.querySelector('.iqr').style.background = r.lvl.colour;
+      bp.querySelector('.whisker').style.background = r.lvl.colour;
+      bp.title = 'Median ' + Math.round(c.median) + ', middle half from ' + Math.round(c.q1) + ' to ' + Math.round(c.q3) +
+        ' (IQR ' + Math.round(c.iqr) + ')';
     }
     const shift = view === 'shift' && has && r.earlier && r.earlier.n;
     was.classList.toggle('hidden', !shift);
