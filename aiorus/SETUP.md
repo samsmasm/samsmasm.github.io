@@ -6,6 +6,8 @@ to read what has really happened, then answer one reflection question.
 
 - `index.html` + `student.js`: the student page. Link: `aiorus/?room=CODE`.
 - `class.html` + `class.js`: the class screen (teacher signs in with Google).
+  **Join screen** shows the QR code and room code together, both big. **Display
+  mode** goes full screen and squeezes every card onto one screen for the projector.
 - `cards.js`: **the card list, the two line labels and the reflection question.
   Edit this file to change the cards.** Keep a card's `id` once a class has used it.
 - `firebase.js`: Firebase config and sign-in.
@@ -13,8 +15,8 @@ to read what has really happened, then answer one reflection question.
 ## Privacy
 
 Students never sign in. Each device gets an anonymous Firebase account and sends
-only card ids and numbers from 0 to 100. The written reflection never leaves the
-device (it is kept in localStorage so a reload does not lose it). Only the teacher
+only card ids and numbers from 0 to 100. Students answer the reflection question
+in their notebooks, so no writing is collected at all. Only the teacher
 who opened a room can read it. Rooms stop accepting writes after 24 hours, and
 "End session and delete" removes everything.
 

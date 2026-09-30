@@ -44,12 +44,12 @@ export const CARDS = [
   {
     id: 'translate', era: 'now',
     text: 'Translating a language',
-    note: 'Hundreds of millions of people use machine translation every day. Humans are still trusted for legal, medical and literary work, where small errors or tone matter. Many translators now check machine translations instead of starting from scratch.'
+    note: 'Machine translation is used by hundreds of millions of people every day and is good at swapping words. But translation is not just about words. It is about the ideas, jokes and feelings behind them, and it is unclear whether AI understands those. That is why people still trust humans for legal, medical and literary work.'
   },
   {
     id: 'laugh', era: 'now',
     text: 'Making a friend laugh',
-    note: 'AI can write jokes, and some are funny. But making a friend laugh depends on knowing them, timing and shared history. Experts disagree on whether a machine can really "get" a joke.'
+    note: 'AI can write jokes, but most of them are not funny! Making a friend laugh depends on knowing them, timing and shared history. Experts disagree on whether a machine can really "get" a joke.'
   },
   {
     id: 'comfort', era: 'now',

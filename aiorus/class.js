@@ -162,6 +162,7 @@ async function deleteRoom(code) {
 /* ---------- a room ---------- */
 
 function closeRoom() {
+  document.body.classList.remove('display');
   if (stopListening) stopListening();
   stopListening = null;
   room = null;
@@ -181,7 +182,12 @@ async function openRoom(code) {
   $('joinUrl').textContent = shortUrl.host + shortUrl.pathname.replace(/\/$/, '');
   $('roomCode').textContent = code;
   $('qr').innerHTML = qrSvg(joinUrl);
-  $('qrBig').innerHTML = '<div class="qrsvg">' + qrSvg(joinUrl) + '</div><div class="roomcode">' + code + '</div>';
+  $('joinScreen').innerHTML = '<div class="qrsvg">' + qrSvg(joinUrl) + '</div>' +
+    '<div class="side"><div class="go">Scan the code, or go to<br><b></b><br>and type</div>' +
+    '<div class="roomcode">' + code + '</div><div class="counts" id="joinCounts"></div>' +
+    '<div class="close">Click anywhere to close</div></div>';
+  $('joinScreen').querySelector('.go b').textContent = $('joinUrl').textContent;
+  $('miniCode').innerHTML = code + ' <span></span>';
 
   show('roomView');
   drawLegend();
@@ -204,9 +210,28 @@ armable($('endBtn'), 'Tap again: this deletes every placement', async () => {
   goHome();
 });
 
-$('qr').addEventListener('click', () => $('qrBig').classList.remove('hidden'));
-$('qrBig').addEventListener('click', () => $('qrBig').classList.add('hidden'));
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $('qrBig').classList.add('hidden'); });
+const joinScreen = $('joinScreen');
+$('qr').addEventListener('click', () => joinScreen.classList.remove('hidden'));
+$('joinScreenBtn').addEventListener('click', () => joinScreen.classList.remove('hidden'));
+joinScreen.addEventListener('click', () => joinScreen.classList.add('hidden'));
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!joinScreen.classList.contains('hidden')) joinScreen.classList.add('hidden');
+  else setDisplay(false);
+});
+
+// Display mode: everything fits one screen, full screen where the browser allows.
+function setDisplay(on) {
+  document.body.classList.toggle('display', on);
+  if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+}
+$('displayBtn').addEventListener('click', () => setDisplay(true));
+$('exitDisplayBtn').addEventListener('click', () => setDisplay(false));
+// Leaving full screen (Esc in most browsers) leaves display mode too.
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) document.body.classList.remove('display');
+});
 
 function qrSvg(text) {
   const code = qrcode(0, 'M');
@@ -320,6 +345,10 @@ function draw() {
   const revealed = docs.filter(d => d.before);
   $('counts').textContent = placedAny.length + (placedAny.length === 1 ? ' student' : ' students') +
     ' sorting. ' + revealed.length + ' tapped Reveal.';
+  const joined = placedAny.length + (placedAny.length === 1 ? ' student has joined' : ' students have joined');
+  if ($('joinCounts')) $('joinCounts').textContent = joined;
+  const mini = $('miniCode').querySelector('span');
+  if (mini) mini.textContent = placedAny.length + ' sorting, ' + revealed.length + ' revealed';
   $('viewHelp').textContent = HELP[view];
 
   const results = CARDS.map(card => {

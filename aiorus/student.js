@@ -3,7 +3,7 @@
 // Everything is saved on the device first (localStorage), so a reload or a
 // dropped connection loses nothing. In a room, placements are also sent to
 // Firestore under an anonymous account: card ids and numbers from 0 to 100,
-// nothing else. The written reflection never leaves the device.
+// nothing else. Students write their reflection in their notebooks.
 
 import { CARDS, LEFT_END, RIGHT_END, REFLECTION } from './cards.js';
 
@@ -16,7 +16,7 @@ const LINE_Y = 26;      // where the line sits inside the board
 const CARD_TOP = 50;    // first row of cards, below the line
 const GAP = 8;          // space between stacked cards
 
-let state = null;       // { key, room, placed, before, reflection }
+let state = null;       // { key, room, placed, before }
 let selected = null;    // card id picked by a tap
 let drag = null;
 let fb = null;          // { db, user, api, expireAt } once in a room
@@ -30,7 +30,7 @@ $('reflectQ').textContent = REFLECTION;
 function load(key) {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('aiorus:' + key)); } catch (e) {}
-  const s = { key, placed: {}, before: null, reflection: '' };
+  const s = { key, placed: {}, before: null };
   if (saved) Object.assign(s, saved);
   // Drop anything for a card that has since been removed from cards.js.
   const ids = new Set(CARDS.map(c => c.id));
@@ -41,7 +41,7 @@ function load(key) {
 function save() {
   try {
     localStorage.setItem('aiorus:' + state.key, JSON.stringify({
-      placed: state.placed, before: state.before, reflection: state.reflection
+      placed: state.placed, before: state.before
     }));
   } catch (e) {}
 }
@@ -95,7 +95,6 @@ function start(key, room) {
   state.room = room;
   $('joinView').classList.add('hidden');
   $('sortView').classList.remove('hidden');
-  $('reflectA').value = state.reflection;
   $('syncMsg').textContent = room ? 'Room ' + room + '.' : 'Sorting on your own. Nothing is sent anywhere.';
   render();
 }
@@ -393,7 +392,7 @@ function onKey(e, id) {
   }
 }
 
-/* ---------- reveal and reflect ---------- */
+/* ---------- reveal ---------- */
 
 $('revealBtn').addEventListener('click', () => {
   state.before = { ...state.placed };
@@ -402,20 +401,6 @@ $('revealBtn').addEventListener('click', () => {
   push();
   render();
   $('afterReveal').scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
-
-$('reflectA').addEventListener('input', e => {
-  state.reflection = e.target.value;
-  save();
-});
-
-$('copyBtn').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(REFLECTION + '\n\n' + state.reflection);
-    $('copyMsg').textContent = 'Copied.';
-  } catch (e) {
-    $('copyMsg').textContent = 'Could not copy. Select the text and copy it yourself.';
-  }
 });
 
 let resizeTimer = null;

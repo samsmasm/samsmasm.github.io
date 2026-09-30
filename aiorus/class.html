@@ -30,13 +30,26 @@
   .qr { width: 150px; height: 150px; cursor: zoom-in; border: 2px solid var(--line); border-radius: 8px; padding: 4px; background: #fff; }
   .counts { font-size: 1.1rem; font-weight: 600; }
 
-  .qrbig {
-    position: fixed; inset: 0; z-index: 100; background: rgba(255,255,255,0.97);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;
-    cursor: zoom-out; padding: 1rem;
+  /* Join screen: QR code and room code, both big */
+  .joinscreen {
+    position: fixed; inset: 0; z-index: 100; background: #fff;
+    display: grid; grid-template-columns: auto auto; align-items: center; justify-content: center; gap: 5vw;
+    padding: 3vh 3vw; cursor: zoom-out;
   }
-  .qrbig .qrsvg { width: min(70vh, 88vw); height: min(70vh, 88vw); }
-  .qrbig .roomcode { font-size: 4rem; }
+  .joinscreen .qrsvg { width: min(84vh, 48vw); height: min(84vh, 48vw); }
+  .joinscreen .side { text-align: center; }
+  .joinscreen .go { font-size: min(4.2vh, 2.6vw); line-height: 1.3; }
+  .joinscreen .go b { word-break: break-all; }
+  .joinscreen .roomcode { font-size: min(24vh, 9vw); letter-spacing: 0.12em; margin: 1vh 0; }
+  .joinscreen .counts { font-size: min(3.6vh, 2.2vw); }
+  .joinscreen .close { font-size: min(2.6vh, 1.6vw); color: var(--muted); margin-top: 2vh; }
+  @media (orientation: portrait) {
+    .joinscreen { grid-template-columns: auto; }
+    .joinscreen .qrsvg { width: min(55vh, 86vw); height: min(55vh, 86vw); }
+    .joinscreen .go { font-size: 4.5vw; }
+    .joinscreen .roomcode { font-size: 20vw; }
+    .joinscreen .counts { font-size: 4vw; }
+  }
 
   /* Controls */
   .controls { display: flex; flex-wrap: wrap; gap: 1rem 1.6rem; align-items: center; margin: 1rem 0; }
@@ -100,6 +113,33 @@
 
   .empty-state { font-size: 1.1rem; }
 
+  .only-display { display: none; }
+
+  /* Display mode: the whole class screen fits the window, for the projector */
+  body.display .top, body.display .joinbar, body.display #viewHelp,
+  body.display .bottombar, body.display #notesBtn, body.display .row .note,
+  body.display .seg-label, body.display .meta .stat,
+  body.display .not-display { display: none !important; }
+  body.display .only-display { display: inline-flex; }
+  body.display main { max-width: none; padding: 0.6vh 1.2vw; }
+  body.display #roomView { height: calc(100vh - 1.2vh); display: flex; flex-direction: column; }
+  body.display .controls { margin: 0 0 0.6vh; gap: 0.5rem 1.2rem; font-size: min(2.4vh, 1rem); }
+  body.display .controls button { min-height: 0; padding: 0.3em 0.8em; }
+  body.display .legend { font-size: min(2.2vh, 0.95rem); }
+  body.display .mini { font-weight: 800; font-size: min(3.4vh, 1.4rem); letter-spacing: 0.1em; color: var(--task-ink); align-items: center; gap: 0.6em; }
+  body.display .mini span { font-weight: 600; letter-spacing: 0; font-size: 0.75em; color: var(--muted); }
+  body.display .grid { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 0.4vh; }
+  body.display .headrow { position: static; padding: 0.3vh 0; font-size: min(2.4vh, 1rem); }
+  body.display .row { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 0 0 0 0.6rem; border-left-width: 10px; grid-template-columns: minmax(12rem, 22vw) 1fr; }
+  body.display .headrow { grid-template-columns: minmax(12rem, 22vw) 1fr; }
+  body.display .meta .name { font-size: min(2.9vh, 1.2rem); line-height: 1.2; }
+  body.display .meta .era { font-size: min(1.9vh, 0.8rem); }
+  body.display .track { height: 100%; }
+  body.display .track .dot { width: min(2.2vh, 18px); height: min(2.2vh, 18px); margin: calc(min(2.2vh, 18px) / -2) 0 0 calc(min(2.2vh, 18px) / -2); }
+  body.display .track .avg { width: min(4.4vh, 34px); height: min(4.4vh, 34px); margin: calc(min(4.4vh, 34px) / -2) 0 0 calc(min(4.4vh, 34px) / -2); border-width: min(0.6vh, 5px); }
+  body.display .track .was { width: min(4vh, 30px); height: min(4vh, 30px); margin: calc(min(4vh, 30px) / -2) 0 0 calc(min(4vh, 30px) / -2); border-width: min(0.5vh, 4px); }
+  body.display .track .tick { height: 40%; margin-top: 0; transform: translateY(-50%); }
+
   @media (max-width: 760px) {
     .row, .headrow { grid-template-columns: 1fr; }
     .headrow > :first-child { display: none; }
@@ -153,10 +193,11 @@
         <div class="roomcode" id="roomCode"></div>
         <div class="counts" id="counts"></div>
       </div>
-      <div class="qr" id="qr" title="Show a bigger QR code"></div>
+      <div class="qr" id="qr" title="Show the join screen"></div>
     </div>
 
     <div class="controls">
+      <div class="only-display mini" id="miniCode"></div>
       <div><span class="seg-label">Show</span><span class="seg" id="viewSeg">
         <button data-v="now" aria-pressed="true">Now</button><button data-v="before" aria-pressed="false">First instinct</button><button data-v="shift" aria-pressed="false">How it shifted</button>
       </span></div>
@@ -164,6 +205,9 @@
         <button data-o="list" aria-pressed="true">Card list</button><button data-o="split" aria-pressed="false">Most split first</button>
       </span></div>
       <button class="quiet" id="notesBtn" aria-pressed="false">Show notes</button>
+      <button id="joinScreenBtn">Join screen</button>
+      <button id="displayBtn" class="not-display">Display mode</button>
+      <button id="exitDisplayBtn" class="only-display quiet">Exit display</button>
     </div>
 
     <div class="legend" id="legend"></div>
@@ -173,7 +217,7 @@
       <div class="headrow"><div>Card</div><div class="ends" style="margin: 0 18px"><span id="leftEnd"></span><span id="rightEnd"></span></div></div>
     </div>
 
-    <div class="controls">
+    <div class="controls bottombar">
       <button class="quiet" id="backBtn">Back to sessions</button>
       <button class="danger" id="endBtn">End session and delete</button>
     </div>
@@ -181,7 +225,7 @@
 
 </main>
 
-<div class="qrbig hidden" id="qrBig"></div>
+<div class="joinscreen hidden" id="joinScreen" title="Click to close"></div>
 
 <script type="module" src="class.js"></script>
 </body>
