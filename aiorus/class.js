@@ -2,11 +2,11 @@
 // faint dot, the class average is a big dark-rimmed marker, and each row is
 // coloured by how much the class disagrees about that card.
 
-import { CARDS, LEFT_END, RIGHT_END } from './cards.js';
+import { CARDS, LEFT_END, RIGHT_END } from './cards.js?v=20260930-190126';
 import {
   teacherFirebase, ROOMS, doc, getDoc, setDoc, getDocs, deleteDoc, collection, query, where,
   onSnapshot, writeBatch, serverTimestamp, Timestamp
-} from './firebase.js';
+} from './firebase.js?v=20260930-190126';
 
 const $ = id => document.getElementById(id);
 const fb = teacherFirebase();

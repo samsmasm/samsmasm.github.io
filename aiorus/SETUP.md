@@ -45,3 +45,10 @@ to another Firebase project, swap `firebaseConfig` in `firebase.js`, enable
 Google + Anonymous sign-in, add the domain to Authorized domains, and publish the
 aiorus rules block (it needs the `signedIn`, `uid` and `realAccount` helpers from
 the top of Checkin's rules file).
+
+## Before every commit: `python3 stamp.py`
+
+unisam.nz tells browsers to cache files for 4 hours, so a change can leave a
+student with new HTML and old JS, which breaks the page. `stamp.py` puts a fresh
+`?v=` on every script, stylesheet and import so browsers always fetch matching
+files. Run it (from this folder) whenever a `.html`, `.js` or `.css` file changes.

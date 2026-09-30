@@ -5,7 +5,7 @@
 // Firestore under an anonymous account: card ids and numbers from 0 to 100,
 // nothing else. Students write their reflection in their notebooks.
 
-import { CARDS, LEFT_END, RIGHT_END, REFLECTION } from './cards.js';
+import { CARDS, LEFT_END, RIGHT_END, REFLECTION } from './cards.js?v=20260930-190126';
 
 const $ = id => document.getElementById(id);
 const board = $('board');
@@ -68,7 +68,7 @@ async function join() {
   $('joinMsg').textContent = 'Joining...';
   $('joinMsg').className = 'msg';
   try {
-    const api = await import('./firebase.js');
+    const api = await import('./firebase.js?v=20260930-190126');
     if (!fb || !fb.db) {
       const { db, ready } = api.studentFirebase();
       const user = await ready;
