@@ -3,7 +3,7 @@
 AI or us? A card sort for Grade 9 History, for the compelling question "To what
 extent will AI mirror the Industrial Revolution?". Each card is something that
 happened in the Industrial Revolution. Students place it on a line from "AI will
-be just like this" to "AI will be nothing like this", tap Reveal to read the
+be nothing like this" (left) to "AI will be just like this" (right), tap Reveal to read the
 evidence (then and now), and answer one reflection question in their notebooks.
 
 The earlier version, which sorted tasks from "Machines already do this" to "Only

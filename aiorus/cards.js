@@ -69,10 +69,10 @@ export const CARDS = [
 ];
 
 // The two ends of the line, and short names for them on the class screen.
-export const LEFT_END = 'AI will be just like this';
-export const RIGHT_END = 'AI will be nothing like this';
-export const LEFT_SHORT = '"just like"';
-export const RIGHT_SHORT = '"nothing like"';
+export const LEFT_END = 'AI will be nothing like this';
+export const RIGHT_END = 'AI will be just like this';
+export const LEFT_SHORT = '"nothing like"';
+export const RIGHT_SHORT = '"just like"';
 
 // The compelling question, shown at the top of the student page.
 export const QUESTION = 'To what extent will AI mirror the Industrial Revolution?';
