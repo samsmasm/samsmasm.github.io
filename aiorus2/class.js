@@ -2,11 +2,11 @@
 // faint dot, the class average is a big dark-rimmed marker, and each row is
 // coloured by how much the class disagrees about that card.
 
-import { CARDS, LEFT_END, RIGHT_END, LEFT_SHORT, RIGHT_SHORT } from './cards.js?v=20261001-073537';
+import { CARDS, LEFT_END, RIGHT_END } from './cards.js?v=20260930-190126';
 import {
   teacherFirebase, ROOMS, doc, getDoc, setDoc, getDocs, deleteDoc, collection, query, where,
   onSnapshot, writeBatch, serverTimestamp, Timestamp
-} from './firebase.js?v=20261001-073537';
+} from './firebase.js?v=20260930-190126';
 
 const $ = id => document.getElementById(id);
 const fb = teacherFirebase();
@@ -302,7 +302,7 @@ function buildRows() {
       '<div class="iqr"></div><div class="median"></div></div>' +
       '<div class="arrow"></div><div class="was"></div><div class="avg"></div><div class="none"></div></div>' +
       '<div class="note box info hidden"></div>';
-    row.querySelector('.era').textContent = !card.era ? '' : card.era === 'then' ? 'Then' : 'Now';
+    row.querySelector('.era').textContent = card.era === 'then' ? 'Then' : 'Now';
     row.querySelector('.txt').textContent = card.text;
     row.querySelector('.note').textContent = card.note;
     const track = row.querySelector('.track');
@@ -387,7 +387,7 @@ function draw() {
     if (r.current.n) stat += '. ' + r.current.n + (r.current.n === 1 ? ' student' : ' students');
     if (r.earlier && r.earlier.n) {
       const moved = Math.round(r.current.mean - r.earlier.mean);
-      stat += moved === 0 ? '. No overall shift' : '. Moved ' + Math.abs(moved) + ' toward ' + (moved > 0 ? RIGHT_SHORT : LEFT_SHORT);
+      stat += moved === 0 ? '. No overall shift' : '. Moved ' + Math.abs(moved) + ' toward ' + (moved > 0 ? 'humans' : 'machines');
     }
     row.querySelector('.lvl').textContent = stat;
     row.querySelector('.note').classList.toggle('hidden', !showNotes);

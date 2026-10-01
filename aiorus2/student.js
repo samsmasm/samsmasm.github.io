@@ -5,7 +5,7 @@
 // Firestore under an anonymous account: card ids and numbers from 0 to 100,
 // nothing else. Students write their reflection in their notebooks.
 
-import { CARDS, LEFT_END, RIGHT_END, REFLECTION, QUESTION } from './cards.js?v=20261001-073537';
+import { CARDS, LEFT_END, RIGHT_END, REFLECTION } from './cards.js?v=20260930-190126';
 
 const $ = id => document.getElementById(id);
 const board = $('board');
@@ -24,7 +24,6 @@ let fb = null;          // { db, user, api, expireAt } once in a room
 $('leftEnd').textContent = '← ' + LEFT_END;
 $('rightEnd').textContent = RIGHT_END + ' →';
 $('reflectQ').textContent = REFLECTION;
-document.querySelectorAll('.question').forEach(h => { h.textContent = QUESTION; });
 
 /* ---------- saving on the device ---------- */
 
@@ -69,7 +68,7 @@ async function join() {
   $('joinMsg').textContent = 'Joining...';
   $('joinMsg').className = 'msg';
   try {
-    const api = await import('./firebase.js?v=20261001-073537');
+    const api = await import('./firebase.js?v=20260930-190126');
     if (!fb || !fb.db) {
       const { db, ready } = api.studentFirebase();
       const user = await ready;
@@ -152,17 +151,14 @@ function unplace(id) {
 
 function cardEl(card) {
   const el = document.createElement('div');
-  el.className = 'card' + (card.era ? ' ' + card.era : '') + (selected === card.id ? ' selected' : '');
+  el.className = 'card ' + card.era + (selected === card.id ? ' selected' : '');
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
   el.dataset.id = card.id;
-  if (card.era) {
-    const era = document.createElement('span');
-    era.className = 'era';
-    era.textContent = card.era === 'then' ? 'Then' : 'Now';
-    el.append(era);
-  }
-  el.append(document.createTextNode(card.text));
+  const era = document.createElement('span');
+  era.className = 'era';
+  era.textContent = card.era === 'then' ? 'Then' : 'Now';
+  el.append(era, document.createTextNode(card.text));
   const pos = state.placed[card.id];
   el.setAttribute('aria-label', card.text + (pos == null
     ? '. Not placed yet. Press the arrow keys to place it.'

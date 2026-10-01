@@ -1,19 +1,20 @@
-# aiorus - setup
+# aiorus2 - setup
 
-AI or us? A card sort for Grade 9 History, for the compelling question "To what
-extent will AI mirror the Industrial Revolution?". Each card is something that
-happened in the Industrial Revolution. Students place it on a line from "AI will
-be just like this" to "AI will be nothing like this", tap Reveal to read the
-evidence (then and now), and answer one reflection question in their notebooks.
+This is the first version of aiorus (task sort: machines vs humans), kept here
+when `../aiorus/` was rebuilt around the compelling question on 1 Oct 2026. Both
+share the same Firebase rooms collection, so a session started on either class
+screen appears in both session lists. Students must use the link or QR from the
+class screen they are on.
 
-The earlier version, which sorted tasks from "Machines already do this" to "Only
-humans, even in 50 years", lives on unchanged at `../aiorus2/`.
+AI or us? A card sort for Grade 9 History: students drag task cards onto a line
+from "Machines already do this" to "Only humans, even in 50 years", tap Reveal
+to read what has really happened, then answer one reflection question.
 
 - `index.html` + `student.js`: the student page. Link: `aiorus/?room=CODE`.
 - `class.html` + `class.js`: the class screen (teacher signs in with Google).
   **Join screen** shows the QR code and room code together, both big. **Display
   mode** goes full screen and squeezes every card onto one screen for the projector.
-- `cards.js`: **the card list, the line labels, the compelling question and the reflection question.
+- `cards.js`: **the card list, the two line labels and the reflection question.
   Edit this file to change the cards.** Keep a card's `id` once a class has used it.
 - `firebase.js`: Firebase config and sign-in.
 
