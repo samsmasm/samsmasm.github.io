@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Door Cover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: one column. Search box with live suggestions, two cover options, one click prints. */
+  :root {
+    --bg: #e9edf0;
+    --surface: #ffffff;
+    --ink: #17212b;
+    --muted: #5b6874;
+    --line: #cfd6dc;
+    --accent: #0b6e4f;
+    --accent-ink: #ffffff;
+    --hover: #eef3f1;
+    --good: #0b6e4f;
+    --warn: #9a5b00;
+    --shadow: 0 1px 2px rgba(23,33,43,.08), 0 8px 24px rgba(23,33,43,.10);
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11171c; --surface: #1a232b; --ink: #e8eef2; --muted: #93a1ad; --line: #2c3843;
+      --accent: #3fb68b; --accent-ink: #06241a; --hover: #22303a; --good: #3fb68b; --warn: #e0a24a;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.45;
+    padding-inline: 16px;
+    padding-block: 32px 48px;
+  }
+  main { max-width: 960px; margin-inline: auto; display: flex; flex-direction: column; gap: 24px; }
+
+  header h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2rem, 6vw, 3rem);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0 0 6px;
+  }
+  header p { margin: 0; color: var(--muted); font-size: 1.05rem; }
+
+  form.search { display: flex; gap: 10px; flex-wrap: wrap; }
+  .combo { position: relative; flex: 1 1 280px; min-width: 0; }
+  .combo input {
+    width: 100%; height: 60px; padding: 0 18px;
+    font: inherit; font-size: 1.25rem;
+    color: var(--ink); background: var(--surface);
+    border: 2px solid var(--line); border-radius: 10px;
+  }
+  .combo input::placeholder { color: var(--muted); }
+  button { font: inherit; cursor: pointer; }
+  .search > button {
+    height: 60px; padding: 0 26px;
+    font-weight: 600; font-size: 1.05rem;
+    color: var(--accent-ink); background: var(--accent);
+    border: 0; border-radius: 10px;
+  }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .combo input:focus-visible { outline-offset: 0; border-color: var(--accent); }
+
+  .sug {
+    position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 6px);
+    margin: 0; padding: 6px; list-style: none;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow); max-height: min(70vh, 560px); overflow-y: auto;
+  }
+  .sug[hidden] { display: none; }
+  .sug li[role="option"] {
+    display: flex; gap: 14px; align-items: center; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  }
+  .sug li[role="option"]:hover, .sug li[aria-selected="true"] { background: var(--hover); }
+  .sug li[aria-selected="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .sug .thumb {
+    flex: none; width: 44px; height: 64px; display: grid; place-items: center; overflow: hidden;
+    background: color-mix(in srgb, var(--ink) 7%, var(--surface)); border-radius: 3px;
+  }
+  .sug .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sug .info { min-width: 0; display: flex; flex-direction: column; }
+  .sug .t { font-weight: 600; font-size: 1.05rem; line-height: 1.25; overflow-wrap: anywhere; }
+  .sug .a { color: var(--muted); font-size: .93rem; overflow-wrap: anywhere; }
+  .sug .note { padding: 12px 10px; color: var(--muted); }
+
+  .status { color: var(--muted); min-height: 1.5em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chips .label { color: var(--muted); font-size: .92rem; margin-right: 2px; }
+  .chip {
+    padding: 6px 12px; font-size: .95rem;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 999px;
+  }
+  .chip:hover { border-color: var(--accent); }
+
+  .covers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  @media (max-width: 640px) { .covers { grid-template-columns: minmax(0, 1fr); } }
+  .card {
+    background: var(--surface); border-radius: 12px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  }
+  .card .stage {
+    display: grid; place-items: center;
+    padding: 24px; min-height: 280px;
+    background: color-mix(in srgb, var(--ink) 5%, var(--surface));
+    border: 0; width: 100%; color: var(--muted);
+  }
+  .card .stage img {
+    display: block; max-width: 100%; max-height: 440px; width: auto; height: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,.25), 0 10px 28px rgba(0,0,0,.22);
+  }
+  .card .meta { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .card .row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+  .card .opt { font-weight: 600; }
+  .card .src { color: var(--muted); font-size: .9rem; }
+  .card .q { font-size: .9rem; color: var(--muted); }
+  .card .q.good { color: var(--good); }
+  .card .q.warn { color: var(--warn); }
+  .printbtn {
+    width: 100%; height: 52px;
+    font-weight: 600; font-size: 1.05rem;
+    color: var(--accent-ink); background: var(--accent);
+    border: 0; border-radius: 10px;
+  }
+
+  .book-head { margin-bottom: 16px; }
+  .book-title { font-family: var(--display); font-weight: 600; font-size: 1.35rem; line-height: 1.2; margin: 0; text-wrap: balance; }
+  .book-by { color: var(--muted); }
+  .below { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-top: 20px; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+  .morebtn {
+    padding: 10px 18px; font-weight: 600; color: var(--ink);
+    background: var(--surface); border: 2px solid var(--line); border-radius: 10px;
+  }
+  .morebtn:hover { border-color: var(--accent); }
+  .more { margin-top: 20px; }
+
+  details.options { border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); }
+  details.options summary { cursor: pointer; font-size: .95rem; width: fit-content; }
+  .opts { display: flex; flex-wrap: wrap; gap: 16px 32px; padding-top: 14px; }
+  .group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .group .gl { font-size: .92rem; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { padding: 7px 14px; border: 0; background: transparent; color: var(--ink); font-size: .95rem; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .seg button + button { border-left: 1px solid var(--line); }
+
+  .skeleton { height: 300px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 7%, var(--bg)); }
+
+  /* Print: show only the chosen cover, scaled to the paper. */
+  #printSheet { display: none; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    main { display: none !important; }
+    #printSheet {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; height: calc(var(--ph) * 1mm);
+    }
+    #printImg {
+      display: block;
+      max-width: calc(var(--pw) * var(--k) * 1mm);
+      max-height: calc(var(--ph) * var(--k) * 1mm);
+      width: auto; height: auto;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Door Cover</h1>
+    <p>Start typing the book. Pick it from the list. Print.</p>
+  </header>
+
+  <form class="search" id="searchForm" autocomplete="off">
+    <div class="combo">
+      <input id="q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sug"
+             placeholder="Book title, and author if you know it" aria-label="Book title" autofocus
+             autocapitalize="off" autocorrect="off" spellcheck="false">
+      <ul class="sug" id="sug" role="listbox" hidden></ul>
+    </div>
+    <button type="submit">Find</button>
+  </form>
+
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+  <div id="results"></div>
+
+  <details class="options">
+    <summary>Print settings</summary>
+    <div class="opts">
+      <div class="group">
+        <span class="gl">Paper</span>
+        <span class="seg" id="paperSeg">
+          <button type="button" data-v="A4" aria-pressed="true">A4</button>
+          <button type="button" data-v="Letter" aria-pressed="false">Letter</button>
+        </span>
+      </div>
+      <div class="group">
+        <span class="gl">Size</span>
+        <span class="seg" id="sizeSeg">
+          <button type="button" data-v="auto" aria-pressed="true">Auto</button>
+          <button type="button" data-v="full" aria-pressed="false">Full page</button>
+          <button type="button" data-v="small" aria-pressed="false">Smaller</button>
+        </span>
+      </div>
+    </div>
+  </details>
+</main>
+
+<div id="printSheet"><img id="printImg" alt=""></div>
+<style id="pageRule"></style>
+
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var PAPER = { A4: [210, 297], Letter: [215.9, 279.4] };
+  var MARGIN = 8;                       // mm margin on every side
+  var STEPS = [1, 0.72, 0.5];           // full, half, quarter page (linear scale)
+  var STEP_NAME = { '1': 'full page', '0.72': 'half page', '0.5': 'quarter page' };
+  var EXAMPLES = ['The Kite Runner', 'Things Fall Apart', 'Animal Farm', 'The Hunger Games'];
+
+  var settings = { paper: 'A4', size: 'auto' };
+  try {
+    var saved = JSON.parse(localStorage.getItem('doorcover') || '{}');
+    if (PAPER[saved.paper]) settings.paper = saved.paper;
+    if (saved.size === 'half') saved.size = 'small';
+    if (['auto', 'full', 'small'].indexOf(saved.size) > -1) settings.size = saved.size;
+  } catch (e) {}
+
+  var matches = [];        // suggestions for the current query
+  var suggestQ = '';       // the query those suggestions belong to
+  var loading = false;
+  var hi = -1;             // highlighted suggestion
+  var shown = null;        // the book whose covers are on screen
+  var runId = 0;
+  var timer = null;
+  var qualityEls = [];
+
+  /* ---------- helpers ---------- */
+  function norm(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function sameTitle(a, b) {
+    if (!a || !b) return false;
+    return a === b || a.indexOf(b + ' ') === 0 || b.indexOf(a + ' ') === 0;
+  }
+  function sameAuthor(a, b) {
+    var x = norm(a), y = norm(b);
+    if (!x || !y) return true;
+    if (x.indexOf(y) > -1 || y.indexOf(x) > -1) return true;
+    return x.split(' ').pop() === y.split(' ').pop();
+  }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function setStatus(t) { $('#status').textContent = t || ''; }
+  function olCover(id) { return 'https://covers.openlibrary.org/b/id/' + id + '-L.jpg?default=false'; }
+
+  /* ---------- data sources ---------- */
+  function searchOL(q) {
+    var url = 'https://openlibrary.org/search.json?limit=14&fields=key,title,author_name,cover_i,first_publish_year,edition_count&q=' + encodeURIComponent(q);
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('openlibrary ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      return (j.docs || []).filter(function (d) { return d.cover_i; }).map(function (d, i) {
+        return {
+          source: 'Open Library', key: d.key, title: d.title || '',
+          author: (d.author_name || [])[0] || '', year: d.first_publish_year || '',
+          ec: d.edition_count || 0, idx: i,
+          url: olCover(d.cover_i), coverId: d.cover_i
+        };
+      });
+    });
+  }
+
+  function gbImage(links) {
+    var u = links.extraLarge || links.large || links.medium || links.thumbnail || links.smallThumbnail;
+    if (!u) return '';
+    u = u.replace(/^http:/, 'https:').replace(/&edge=curl/g, '');
+    if (/zoom=\d/.test(u)) u = u.replace(/zoom=\d/, 'zoom=0'); else u += '&zoom=0';
+    return u;
+  }
+  function searchGB(q) {
+    var url = 'https://www.googleapis.com/books/v1/volumes?maxResults=12&printType=books&q=' + encodeURIComponent(q);
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('google ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      return (j.items || []).filter(function (i) {
+        return i.volumeInfo && i.volumeInfo.imageLinks;
+      }).map(function (i, n) {
+        var v = i.volumeInfo;
+        return {
+          source: 'Google Books', title: v.title || '',
+          author: (v.authors || [])[0] || '', year: (v.publishedDate || '').slice(0, 4),
+          ec: 0, idx: n, url: gbImage(v.imageLinks)
+        };
+      }).filter(function (c) { return c.url; });
+    });
+  }
+
+  // Books whose title contains every word typed come first; within that, the most widely published first.
+  function rank(list, q) {
+    var qt = norm(q).split(' ').filter(Boolean);
+    function tier(c) {
+      var h = ' ' + norm(c.title) + ' ';
+      return qt.every(function (t) { return h.indexOf(t) > -1; }) ? 0 : 1;
+    }
+    return list.slice().sort(function (a, b) {
+      return (tier(a) - tier(b)) || (b.ec - a.ec) || (a.idx - b.idx);
+    });
+  }
+
+  function buildMatches(list, fromGB) {
+    var out = [];
+    list.forEach(function (b) {
+      if (out.length >= 8) return;
+      var nt = norm(b.title), na = norm(b.author);
+      var dup = out.some(function (o) {
+        return (o.na === na || !o.na || !na) && sameTitle(o.nt, nt);
+      });
+      if (dup) return;
+      out.push({ nt: nt, na: na, title: b.title, author: b.author, year: b.year, key: b.key || '',
+                 coverId: b.coverId || 0, fromGB: !!fromGB, pool: [b], altsState: '', showMore: false });
+    });
+    if (fromGB) {
+      out.forEach(function (m) {
+        list.forEach(function (c) {
+          if (c !== m.pool[0] && sameTitle(norm(c.title), m.nt) && sameAuthor(c.author, m.author)) m.pool.push(c);
+        });
+        m.altsState = 'done';
+      });
+    }
+    return out;
+  }
+
+  // Looks up more covers for one chosen book: Google Books, and other Open Library editions.
+  function loadAlts(m) {
+    if (m.altsState) return;
+    m.altsState = 'loading';
+    var gbP = searchGB('intitle:' + m.title + (m.author ? ' inauthor:' + m.author : '')).catch(function () { return []; });
+    var edP = (m.key && m.key.indexOf('/works/') === 0)
+      ? fetch('https://openlibrary.org' + m.key + '/editions.json?limit=60')
+          .then(function (r) { return r.ok ? r.json() : { entries: [] }; })
+          .then(function (j) {
+            var ids = [];
+            (j.entries || []).forEach(function (e) {
+              var id = (e.covers || []).filter(function (c) { return c > 0; })[0];
+              if (id && id !== m.coverId && ids.indexOf(id) < 0) ids.push(id);
+            });
+            return ids;
+          }).catch(function () { return []; })
+      : Promise.resolve([]);
+    Promise.all([gbP, edP]).then(function (r) {
+      var seen = {};
+      m.pool.forEach(function (c) { seen[c.url] = 1; });
+      function add(c) { if (!seen[c.url]) { seen[c.url] = 1; m.pool.push(c); } }
+      r[0].forEach(function (g) {
+        if (sameTitle(norm(g.title), m.nt) && sameAuthor(g.author, m.author)) add(g);
+      });
+      r[1].forEach(function (id) {
+        add({ source: 'Open Library', title: m.title, author: m.author, url: olCover(id) });
+      });
+      m.altsState = 'done';
+      if (shown === m) renderCovers(m);
+    });
+  }
+
+  /* ---------- suggestions ---------- */
+  function isConfident(q) {
+    if (matches.length <= 1) return true;
+    var qt = norm(q).split(' ').filter(Boolean);
+    function covers(m) {
+      var h = ' ' + norm(m.title + ' ' + m.author) + ' ';
+      return qt.every(function (t) { return h.indexOf(t) > -1; });
+    }
+    if (!covers(matches[0])) return false;
+    return !matches.slice(1).some(covers);
+  }
+
+  function suggest(q, enter) {
+    q = q.trim();
+    var myRun = ++runId;
+    if (q.length < 2) {
+      hideSug(); matches = []; suggestQ = ''; loading = false;
+      if (!shown) showIdle();
+      return;
+    }
+    loading = true;
+    if ($('#sug').hidden) showNote('Searching...');
+    searchOL(q).then(function (ol) {
+      if (ol.length) return buildMatches(rank(ol, q), false);
+      return searchGB(q).then(function (gb) { return buildMatches(gb, true); });
+    }).catch(function () { return searchGB(q).then(function (gb) { return buildMatches(gb, true); }); })
+    .then(function (m) {
+      if (myRun !== runId) return;
+      loading = false; matches = m; suggestQ = q; hi = -1;
+      if (enter) { applyEnter(q); return; }
+      showSug();
+    }, function () {
+      if (myRun !== runId) return;
+      loading = false; matches = []; suggestQ = '';
+      showNote('Could not reach the book databases. Check the internet connection.');
+    });
+  }
+
+  function showNote(text) {
+    var ul = $('#sug');
+    ul.textContent = '';
+    ul.appendChild(el('li', 'note', text));
+    ul.hidden = false;
+    $('#q').setAttribute('aria-expanded', 'true');
+  }
+  function hideSug() {
+    $('#sug').hidden = true;
+    $('#q').setAttribute('aria-expanded', 'false');
+    $('#q').removeAttribute('aria-activedescendant');
+  }
+
+  function showSug() {
+    var ul = $('#sug');
+    ul.textContent = '';
+    if (!matches.length) { showNote('No matching books. Try adding the author, or check the spelling.'); return; }
+    matches.forEach(function (m, i) {
+      var li = el('li');
+      li.id = 'opt' + i;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
+      var th = el('span', 'thumb');
+      var im = new Image();
+      im.alt = ''; im.loading = 'lazy';
+      im.onerror = function () { im.remove(); };
+      im.src = m.pool[0].url.replace('-L.jpg', '-M.jpg');
+      th.appendChild(im);
+      var info = el('span', 'info');
+      info.appendChild(el('span', 't', m.title));
+      var by = m.author || 'Author unknown';
+      if (m.year) by += ', first published ' + m.year;
+      info.appendChild(el('span', 'a', by));
+      li.appendChild(th); li.appendChild(info);
+      li.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      li.addEventListener('click', function () { choose(i); });
+      ul.appendChild(li);
+    });
+    ul.hidden = false;
+    $('#q').setAttribute('aria-expanded', 'true');
+    setHi(hi);
+  }
+
+  function setHi(i) {
+    hi = i;
+    var items = $('#sug').querySelectorAll('[role="option"]');
+    Array.prototype.forEach.call(items, function (n, k) {
+      n.setAttribute('aria-selected', String(k === hi));
+      if (k === hi) { n.scrollIntoView({ block: 'nearest' }); $('#q').setAttribute('aria-activedescendant', n.id); }
+    });
+    if (hi < 0) $('#q').removeAttribute('aria-activedescendant');
+  }
+
+  function applyEnter(q) {
+    if (!matches.length) { showSug(); return; }
+    if (hi >= 0) { choose(hi); return; }
+    if (isConfident(q)) { choose(0); return; }
+    showSug();
+    setHi(0);
+    setStatus('Several books match. Pick the right one.');
+  }
+
+  function choose(i) {
+    var m = matches[i];
+    if (!m) return;
+    hideSug();
+    setStatus('');
+    $('#q').value = m.title;
+    shown = m;
+    renderCovers(m);
+    loadAlts(m);
+    $('#q').blur();
+  }
+
+  /* ---------- rendering ---------- */
+  function showIdle() {
+    shown = null;
+    qualityEls = [];
+    var res = $('#results');
+    res.textContent = '';
+    var wrap = el('div', 'chips');
+    wrap.appendChild(el('span', 'label', 'Try one:'));
+    EXAMPLES.forEach(function (t) {
+      var b = el('button', 'chip', t);
+      b.type = 'button';
+      b.addEventListener('click', function () {
+        $('#q').value = t;
+        suggest(t, true);
+      });
+      wrap.appendChild(b);
+    });
+    res.appendChild(wrap);
+    setStatus('');
+  }
+
+  function dpiAt(img, k) {
+    var d = PAPER[settings.paper];
+    var bw = (d[0] - 2 * MARGIN) * k, bh = (d[1] - 2 * MARGIN) * k;
+    var ratio = img.naturalWidth / img.naturalHeight;
+    var printW = Math.min(bw, bh * ratio);
+    return img.naturalWidth / (printW / 25.4);
+  }
+  // Auto: the largest size that still prints sharp. If none do, the largest that prints well, else the smallest.
+  function sizeFor(img) {
+    var k, i;
+    if (settings.size === 'full') k = 1;
+    else if (settings.size === 'small') k = 0.72;
+    else {
+      k = STEPS[STEPS.length - 1];
+      var found = false;
+      for (i = 0; i < STEPS.length && !found; i++) if (dpiAt(img, STEPS[i]) >= 150) { k = STEPS[i]; found = true; }
+      for (i = 0; i < STEPS.length && !found; i++) if (dpiAt(img, STEPS[i]) >= 100) { k = STEPS[i]; found = true; }
+    }
+    return { k: k, dpi: dpiAt(img, k) };
+  }
+  function quality(img, node) {
+    var s = sizeFor(img);
+    var word = s.dpi >= 150 ? 'sharp' : (s.dpi >= 100 ? 'good quality' : 'a little soft');
+    node.className = 'q ' + (s.dpi >= 100 ? 'good' : 'warn');
+    node.textContent = 'Prints at ' + STEP_NAME[String(s.k)] + ', ' + word;
+  }
+
+  function makeCard(m, c, n) {
+    var card = el('div', 'card');
+    var stage = el('button', 'stage');
+    stage.type = 'button';
+    stage.setAttribute('aria-label', 'Print option ' + n);
+    var img = new Image();
+    img.alt = 'Cover of ' + m.title + ', option ' + n;
+    var meta = el('div', 'meta');
+    var row = el('div', 'row');
+    row.appendChild(el('span', 'opt', 'Option ' + n));
+    row.appendChild(el('span', 'src', c.source));
+    var q = el('div', 'q', 'Checking size...');
+    var btn = el('button', 'printbtn', 'Print this cover');
+    btn.type = 'button';
+    meta.appendChild(row); meta.appendChild(q); meta.appendChild(btn);
+    img.onload = function () {
+      if (img.naturalWidth < 60) { card.remove(); checkEmpty(); return; }   // placeholder image
+      stage.textContent = '';
+      stage.appendChild(img);
+      qualityEls.push({ img: img, node: q });
+      quality(img, q);
+    };
+    img.onerror = function () { card.remove(); checkEmpty(); };
+    stage.textContent = 'Loading cover...';
+    img.src = c.url;
+    var go = function () { if (img.naturalWidth) printCover(img); };
+    stage.addEventListener('click', go);
+    btn.addEventListener('click', go);
+    card.appendChild(stage); card.appendChild(meta);
+    return card;
+  }
+
+  function renderCovers(m) {
+    var res = $('#results');
+    res.textContent = '';
+    qualityEls = [];
+
+    var head = el('div', 'book-head');
+    head.appendChild(el('h2', 'book-title', m.title));
+    var by = m.author || '';
+    if (m.year) by += (by ? ', ' : '') + m.year;
+    if (by) head.appendChild(el('div', 'book-by', by));
+    res.appendChild(head);
+
+    var grid = el('div', 'covers');
+    var firstTwo = m.pool.slice(0, 2);
+    firstTwo.forEach(function (c, i) { grid.appendChild(makeCard(m, c, i + 1)); });
+    if (firstTwo.length < 2 && m.altsState === 'loading') {
+      var wait = el('div', 'card');
+      wait.appendChild(el('div', 'stage', 'Looking for another cover...'));
+      grid.appendChild(wait);
+    }
+    res.appendChild(grid);
+
+    if (m.showMore && m.pool.length > 2) {
+      var more = el('div', 'covers more');
+      m.pool.slice(2, 10).forEach(function (c, i) { more.appendChild(makeCard(m, c, i + 3)); });
+      res.appendChild(more);
+    }
+
+    var below = el('div', 'below');
+    if (!m.showMore && m.altsState === 'done' && m.pool.length > 2) {
+      var mb = el('button', 'morebtn', 'More covers (' + (Math.min(m.pool.length, 10) - 2) + ')');
+      mb.type = 'button';
+      mb.addEventListener('click', function () { m.showMore = true; renderCovers(m); });
+      below.appendChild(mb);
+    }
+    if (matches.length > 1) {
+      var lb = el('button', 'linkbtn', 'Not this book? See the other matches');
+      lb.type = 'button';
+      lb.addEventListener('click', function () {
+        window.scrollTo(0, 0);
+        $('#q').focus();
+        hi = -1;
+        showSug();
+      });
+      below.appendChild(lb);
+    }
+    if (below.children.length) res.appendChild(below);
+  }
+
+  function checkEmpty() {
+    var g = document.querySelector('.covers');
+    if (g && !g.children.length && shown && shown.altsState === 'done') {
+      setStatus('That book has no usable cover image. Try another match, or add the author to your search.');
+    }
+  }
+
+  /* ---------- printing ---------- */
+  function applyPrintSettings(k) {
+    var d = PAPER[settings.paper];
+    var root = document.documentElement.style;
+    root.setProperty('--pw', d[0] - 2 * MARGIN);
+    root.setProperty('--ph', d[1] - 2 * MARGIN);
+    root.setProperty('--k', k == null ? 1 : k);
+    $('#pageRule').textContent = '@page { size: ' + settings.paper + ' portrait; margin: ' + MARGIN + 'mm; }';
+  }
+
+  function printCover(srcImg) {
+    applyPrintSettings(sizeFor(srcImg).k);
+    var pi = $('#printImg');
+    pi.alt = srcImg.alt;
+    pi.src = srcImg.src;
+    var go = function () { setTimeout(function () { window.print(); }, 50); };
+    if (pi.decode) pi.decode().then(go, go); else pi.onload = go;
+  }
+
+  /* ---------- controls ---------- */
+  function syncSeg(id, value) {
+    Array.prototype.forEach.call($(id).querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === value));
+    });
+  }
+  function bindSeg(id, key) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      settings[key] = b.getAttribute('data-v');
+      syncSeg(id, settings[key]);
+      try { localStorage.setItem('doorcover', JSON.stringify(settings)); } catch (err) {}
+      applyPrintSettings();
+      qualityEls.forEach(function (x) { quality(x.img, x.node); });
+    });
+  }
+  syncSeg('#paperSeg', settings.paper);
+  syncSeg('#sizeSeg', settings.size);
+  bindSeg('#paperSeg', 'paper');
+  bindSeg('#sizeSeg', 'size');
+  applyPrintSettings();
+
+  var input = $('#q');
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    hi = -1;
+    var v = input.value;
+    setStatus('');
+    timer = setTimeout(function () { suggest(v, false); }, 250);
+  });
+  input.addEventListener('focus', function () {
+    if (matches.length && input.value.trim() === suggestQ && !shown) showSug();
+  });
+  input.addEventListener('keydown', function (e) {
+    var open = !$('#sug').hidden && matches.length;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!open && matches.length) { showSug(); setHi(0); }
+      else if (open) setHi(Math.min(hi + 1, matches.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      if (open) { e.preventDefault(); setHi(Math.max(hi - 1, -1)); }
+    } else if (e.key === 'Escape') {
+      hideSug();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.combo')) hideSug();
+  });
+  $('#searchForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearTimeout(timer);
+    var v = input.value.trim();
+    if (!$('#sug').hidden && hi >= 0 && matches[hi]) { choose(hi); return; }
+    if (!loading && v === suggestQ && matches.length) applyEnter(v);
+    else suggest(v, true);
+  });
+
+  showIdle();
+})();
+</script>
+</body>
+</html>
