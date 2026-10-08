@@ -43,6 +43,8 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
                              auto arrange and drag to rearrange. Single HTML, linked from /tools (see CLAUDE.md inside)
   ai/                     ← "How I Use AI": landing, full statement, Click-on-me bobblehead (see CLAUDE.md inside;
                              NEVER commit ai/me.jpg, ai/id.jpg or the bobble-* mockups)
+  find/                   ← Find: "which tool do I want?" filter page over every public tool. The tools list is find/tools.js;
+                             add new public tools there (see CLAUDE.md inside)
   qreview/                ← IB continual revision / flashcard tool
   reports/                ← automated student report tools (see CLAUDE.md inside)
   cultivar/               ← genetics/cultivar tool (see CLAUDE.md inside)
