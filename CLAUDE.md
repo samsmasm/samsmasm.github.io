@@ -98,14 +98,14 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `coldwar/`: Cold War classroom role-play game: nations, team goals, individual missions, live scoreboard.
 - `flare/`: Students press a button to signal the teacher (e.g. 'I'm lost'); when enough do, the teacher's screen plays a sound.
 - `flippinghard/`: Live coin-flip betting game: teacher runs flips, students join a session and bet their balance.
-- `griz/`: Jeopardy-style trivia board for teams, with point decay and a times-table generator. Questions come as CSV from a custom GPT.
+- `griz/`: **in use.** Jeopardy-style team quiz board from CSV (questions via Sam's custom GPT), point decay, pass/steal mode, times-table boards. Full notes in its CLAUDE.md.
 - `hippiesandspies/`: FMW (Grade 9) question-tree for choosing a 1960s research topic: spies, counterculture, civil rights.
 - `inflation/`: NZ inflation by household group: headline CPI vs household living-cost price indexes, by demographic, income and housing.
 - `marketinghub/`: IB BM Unit 4 Marketing notes: one page per subtopic (4.1 to 4.6, including each of the 7 Ps).
 - `printergoesbrrr/`: Classroom simulation of rate setting and lending rounds.
 - `quiz/`: The Talkonomics weekly economics quiz: latest edition plus archive.
 - `samples/`: Proof of concept: IB model answers revealed step by step from hint to full paragraph.
-- `stocksimulator/`: Generates random-walk stock price lines and picks 'interesting' ones (straightest, biggest range, longest streak).
+- `stocksimulator/`: **in use.** Many random-walk price paths, then pick the 'most interesting' one to show patterns in noise. `index.html` (simple ±1 walk) and `index2.html` (log returns, drift, price mode). Full notes in its CLAUDE.md.
 - `supplyanddemand/`: Shift supply and demand curves and see the changes.
 - `uniquiz/`: Kahoot-style live quiz: teacher creates a quiz (CSV import), students join with a PIN.
 - `wingeometer/`: NZ parliamentary speech analyser: language patterns by party from Hansard (future/past, positive/negative, fear, we/they).
