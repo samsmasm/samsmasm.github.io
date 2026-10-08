@@ -50,6 +50,40 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   [many other small tools]
 ```
 
+### Other projects with their own CLAUDE.md
+
+Read the folder's own CLAUDE.md before working in any of these.
+
+**Teaching tools (IB / classroom)**
+- `econia/`: step-by-step IB Economics IA commentary guide with stage progress tracking
+- `ibeconinequality/`: tax and redistribution simulation (Lorenz curve, Gini)
+- `slopstudy/`: Slop Study (CaseGen), slot-machine IB BM case study + exam question generator
+- `argmap/`: Argument Mapper, freeform canvas for essay argument maps
+- `dowser/`: live collaborative sticky-note board (predecessor to Pulse)
+- `spectra/`: live opinion poll, students place themselves on an agree/disagree spectrum
+- `wb/`: minimal whiteboard, drawing layer + grid layer, no backend
+- `pdfwrite/`: upload a PDF and annotate it freehand
+- `newbiz/`: random-word business case generator with 3D drum spinner (no CLAUDE.md; chrome-free by design)
+
+**Personal / private tools** (keep off the public index)
+- `sayso/`: marking transcription app (Cloudflare Worker, live)
+- `moderntranslation/`: password-gated classic-text modernizer (Cloudflare Worker)
+- `tote/`: tiny shared notes, Firebase Realtime DB, notes expire after 96h
+- `mortgage/`: mortgage payoff calculator built from Sam's tracking spreadsheet
+- `fnl/`: Friday Night Live open mic scheduler
+- `cluitar/`: classical guitar practice path
+- `wc26/`: World Cup 2026 office sweepstake leaderboard, scored from ESPN's API
+
+**Kids' games**
+- `typurr/`: Typurr typing game for ages 4 to 8, starring Ty the cat (branched from `catjump`)
+- `catjump/`: Cat Jump runner game (no CLAUDE.md)
+
+**Evolution simulations**
+- `amoeba/`: organisms with four heritable genes compete for food
+- `trees/`: forest evolution, 11 genes, climate controls
+- `walker/`: bone-and-muscle creatures learn to walk (custom Verlet physics)
+- `racecar/`: evolving polygon cars on Planck.js tracks
+
 ---
 
 ## Design system
