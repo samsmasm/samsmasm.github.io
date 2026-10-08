@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lineup</title>
+<link rel="stylesheet" href="style.css?v=20261008-193745">
+<style>
+  .join-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+  .join-row input { width: 9rem; font-size: 1.5rem; letter-spacing: 0.3em; text-transform: uppercase; text-align: center; }
+
+  .spectrum { margin-top: 1.4rem; }
+  .ends {
+    display: flex; justify-content: space-between; gap: 1rem;
+    font-weight: 700; font-size: 1rem; line-height: 1.3;
+  }
+  .ends span { max-width: 45%; }
+  .ends .right { text-align: right; }
+
+  .board {
+    position: relative;
+    min-height: 180px;
+    margin-top: 0.4rem;
+    border: 2px dashed var(--task-edge);
+    border-radius: 10px;
+    background: #fbfcff;
+    touch-action: pan-y;
+  }
+  .board svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .board .empty {
+    position: absolute; left: 0; right: 0; top: 80px;
+    text-align: center; color: var(--muted); pointer-events: none;
+  }
+  .ghost {
+    position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px;
+    background: #f2a900; pointer-events: none;
+  }
+
+  .card {
+    background: var(--card-bg);
+    color: var(--task-ink);
+    border: 3px solid var(--task-edge);
+    border-radius: 10px;
+    padding: 0.4rem 0.6rem 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.35;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .board .card { position: absolute; }
+  .card .era {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--task-edge);
+  }
+  .card.selected { outline: 4px solid #f2a900; outline-offset: 2px; }
+  .card.dragging { cursor: grabbing; z-index: 50; position: relative; opacity: 0.92; }
+  .board .card.dragging { position: absolute; }
+
+  .tray-label { font-weight: 700; margin: 1.2rem 0 0.4rem; }
+  .tray {
+    display: flex; flex-wrap: wrap; gap: 0.6rem;
+    min-height: 70px;
+    padding: 0.7rem;
+    border: 2px solid var(--line);
+    border-radius: 10px;
+  }
+  .tray .card { width: 12rem; max-width: calc(50% - 0.3rem); }
+  .tray-done { color: var(--muted); align-self: center; }
+
+  .actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 1.2rem; }
+  .actions button { font-size: 1.1rem; padding: 0.6rem 2rem; }
+  .sync { color: var(--info-ink); font-weight: 600; }
+
+  .notes .box p, #tapNote { white-space: pre-line; }
+  .cq { font-size: 1.5rem; margin: 0; }
+  .notes .box h3 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+  .notes .box.lit { outline: 4px solid #f2a900; outline-offset: 2px; }
+  #tapNote { margin-top: 0.8rem; }
+
+  .big .q { font-size: 1.3rem; font-weight: 700; line-height: 1.45; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <img src="../unisamsq.png" alt="" onerror="this.remove()">
+    <div>
+      <h1>Lineup</h1>
+      <p>Where do you stand?</p>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Joining -->
+  <section id="joinView">
+    <div class="box task">
+      <h2>Join your class</h2>
+      <p>Type the room code from the board.</p>
+      <div class="join-row">
+        <input id="codeInput" type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+        <button id="joinBtn">Join</button>
+      </div>
+      <p id="joinMsg" class="msg" role="status"></p>
+    </div>
+
+    <div class="box info">
+      <p>No names and no logins. The class screen only sees where you put the cards.</p>
+    </div>
+
+    <p><a href="teach.html">Teachers: make a Lineup for your class</a></p>
+  </section>
+
+  <!-- Sorting -->
+  <section id="sortView" class="hidden">
+    <div id="previewNote" class="box big hidden">
+      <p><strong>Teacher preview.</strong> This is what students will see. Nothing is saved or sent.</p>
+    </div>
+    <div id="intro" class="box info hidden"><p id="introText"></p></div>
+    <div class="box task">
+      <h2 class="cq question"></h2>
+    </div>
+
+    <div class="box task">
+      <h2>Step 1: Sort the cards</h2>
+      <p id="instructions" class="hidden"></p>
+      <p>Drag each card onto the line. Put it where you think it belongs. Anywhere along the line is fine.</p>
+      <p>Or tap a card, then tap the line.</p>
+    </div>
+
+    <div class="spectrum">
+      <div class="ends">
+        <span class="left" id="leftEnd"></span>
+        <span class="right" id="rightEnd"></span>
+      </div>
+      <div id="board" class="board" aria-label="The line">
+        <svg id="guides" aria-hidden="true"></svg>
+      </div>
+    </div>
+
+    <div id="tapNote" class="box info hidden" role="status"></div>
+
+    <p class="tray-label" id="trayLabel">Cards to place</p>
+    <div id="tray" class="tray"></div>
+
+    <div class="actions">
+      <button id="revealBtn" disabled>Reveal</button>
+      <span id="leftCount"></span>
+    </div>
+    <p id="syncMsg" class="sync" role="status"></p>
+
+    <section id="afterReveal" class="hidden">
+      <div class="box task">
+        <h2>Step 2: Read the evidence</h2>
+        <p>Each card now has a note. Tap a card on the line to see its note there. You can still move cards if you change your mind.</p>
+      </div>
+      <div id="notes" class="notes"></div>
+
+      <div class="box big">
+        <h2>Step 3: Reflect</h2>
+        <p class="q" id="reflectQ"></p>
+        <p>Write your answer in your notebook.</p>
+      </div>
+    </section>
+  </section>
+
+</main>
+
+<script type="module" src="student.js?v=20261008-193745"></script>
+</body>
+</html>

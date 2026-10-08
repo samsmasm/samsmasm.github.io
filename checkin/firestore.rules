@@ -212,5 +212,68 @@ service cloud.firestore {
         allow delete: if realAccount() && aiorusRoom().ownerUid == uid();
       }
     }
+
+    // ------------------------------------------------------------------------
+    // Lineup (the /lineup card sort for any topic). Not part of Checkin: it
+    // shares this file only because a Firebase project has one Firestore
+    // ruleset. See lineup/SETUP.md. Same room model as aiorus, plus decks.
+    // ------------------------------------------------------------------------
+
+    // A teacher's decks. A shared deck can be read by anyone signed in,
+    // including a student's anonymous account (the "sort on your own" link)
+    // and another teacher copying it.
+    match /lineupDecks/{id} {
+      allow get: if (signedIn() && resource.data.shared == true)
+        || (realAccount() && resource.data.ownerUid == uid());
+      allow list: if realAccount() && resource.data.ownerUid == uid();
+      allow create: if realAccount()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.cards is list
+        && request.resource.data.cards.size() <= 16;
+      allow update: if realAccount()
+        && resource.data.ownerUid == uid()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.cards is list
+        && request.resource.data.cards.size() <= 16;
+      allow delete: if realAccount() && resource.data.ownerUid == uid();
+    }
+
+    match /lineupRooms/{code} {
+      function lineupRoom() {
+        return get(/databases/$(database)/documents/lineupRooms/$(code)).data;
+      }
+
+      allow get: if signedIn();
+      allow list: if realAccount() && resource.data.ownerUid == uid();
+      allow create: if realAccount()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt', 'expireAt', 'deckId', 'deck'])
+        && request.resource.data.deck is map
+        && request.resource.data.deck.cards is list
+        && request.resource.data.deck.cards.size() <= 16
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt < request.time + duration.value(25, 'h');
+      allow update: if false;
+      allow delete: if realAccount() && resource.data.ownerUid == uid();
+
+      // One document per student device, named by its anonymous uid.
+      match /placements/{pid} {
+        allow read: if realAccount() && lineupRoom().ownerUid == uid();
+        allow get: if signedIn() && pid == uid();
+        allow create, update: if signedIn()
+          && pid == uid()
+          && request.time < lineupRoom().expireAt
+          && request.resource.data.keys().hasOnly(['now', 'before', 'updatedAt', 'expireAt'])
+          && request.resource.data.now is map
+          && request.resource.data.now.size() <= 60
+          && (!('before' in request.resource.data)
+              || (request.resource.data.before is map && request.resource.data.before.size() <= 60))
+          && request.resource.data.expireAt == lineupRoom().expireAt
+          // The first-instinct sort is fixed once it has been sent.
+          && (resource == null || !('before' in resource.data)
+              || request.resource.data.before == resource.data.before);
+        allow delete: if realAccount() && lineupRoom().ownerUid == uid();
+      }
+    }
   }
 }

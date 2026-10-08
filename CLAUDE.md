@@ -35,6 +35,10 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
                              coldwar-d8109; its rules live at the end of checkin/firestore.rules; see SETUP.md).
                              Run `python3 stamp.py` inside it before committing (4h cache).
   aiorus2/                ← first version of aiorus (machines-vs-humans task sort), kept as-is
+  lineup/                 ← Lineup: aiorus generalised to any topic. Teachers sign in, make decks with an AI prompt
+                             (copy prompt → chatbot → paste reply), share decks, run sessions. Firestore lineupDecks +
+                             lineupRooms in coldwar-d8109; rules at the end of checkin/firestore.rules; see SETUP.md.
+                             Run `python3 stamp.py` inside it before committing (4h cache).
   ai/                     ← "How I Use AI": landing, full statement, Click-on-me bobblehead (see CLAUDE.md inside;
                              NEVER commit ai/me.jpg, ai/id.jpg or the bobble-* mockups)
   qreview/                ← IB continual revision / flashcard tool
