@@ -1,10 +1,10 @@
 // Bootstrap: auth gate, tab switching, settings, and wiring the two controllers.
 
-import { apiJson } from "./api.js?v=9";
-import * as store from "./store.js?v=9";
-import { initRecord, setMode } from "./record.js?v=9";
-import { initUpload } from "./upload.js?v=9";
-import { initCost } from "./cost.js?v=9";
+import { apiJson, setUnauthorizedHandler } from "./api.js?v=10";
+import * as store from "./store.js?v=10";
+import { initRecord, setMode } from "./record.js?v=10";
+import { initUpload } from "./upload.js?v=10";
+import { initCost } from "./cost.js?v=10";
 
 const loginEl = document.getElementById("login");
 const appEl = document.getElementById("app");
@@ -48,13 +48,37 @@ function showLogin() {
   passwordInput.focus();
 }
 
+// Sessions can lapse while the page sits open (or is restored from a mobile
+// browser's tab list), because auth is only checked at boot. When that happens
+// put the login gate back up as an overlay, leaving #app mounted so the
+// transcript and each failed block's Retry closure survive the re-login.
+let relocked = false;
+
+setUnauthorizedHandler(() => {
+  if (relocked || appEl.hidden) return; // already relocked, or never got in
+  relocked = true;
+  loginEl.hidden = false;
+  loginError.textContent = "Session expired. Enter the password to continue.";
+  loginError.hidden = false;
+  passwordInput.focus();
+});
+
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   loginError.hidden = true;
   try {
     await apiJson("/login", "POST", { password: passwordInput.value });
     passwordInput.value = "";
-    enterApp();
+    if (relocked) {
+      // The app is still mounted underneath, so just lift the gate. Re-running
+      // enterApp() would re-bind every listener and let resumeOrNew() overwrite
+      // the live in-memory session.
+      relocked = false;
+      loginEl.hidden = true;
+      window.saysoToast("Signed back in. Tap Retry on any failed block.");
+    } else {
+      enterApp();
+    }
   } catch (err) {
     loginError.textContent = err.message || "Login failed";
     loginError.hidden = false;

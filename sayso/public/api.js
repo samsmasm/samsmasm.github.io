@@ -1,5 +1,18 @@
 // Thin wrappers around the Worker API. Cookies carry the session automatically.
 
+// A 401 from any route means the session lapsed while the page was open. The
+// app registers a handler here so it can put the login gate back up, rather
+// than letting the failure surface as a per-block error.
+let onUnauthorized = null;
+
+export function setUnauthorizedHandler(fn) {
+  onUnauthorized = fn;
+}
+
+function noteStatus(status) {
+  if (status === 401 && onUnauthorized) onUnauthorized();
+}
+
 export async function apiJson(path, method = "GET", body) {
   const opts = { method, credentials: "same-origin", headers: {} };
   if (body !== undefined) {
@@ -10,6 +23,7 @@ export async function apiJson(path, method = "GET", body) {
   const res = await fetch(`api${path}`, opts);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    noteStatus(res.status);
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.status = res.status;
     err.detail = data.detail;
@@ -37,6 +51,7 @@ export async function transcribeBlob(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    noteStatus(res.status);
     const err = new Error(data.error || `Transcription failed (${res.status})`);
     err.status = res.status;
     err.detail = data.detail;

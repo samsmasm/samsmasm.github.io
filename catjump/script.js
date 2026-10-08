@@ -385,14 +385,14 @@ function phaseNow() {
   return t < 0.5 ? CYCLE[i][1] : CYCLE[i + 1][1];
 }
 
-function spawnObstacle() {
+function spawnObstacle(startX) {
   const phase = phaseNow();
   const pool = OBSTACLE_TYPES.filter(t => t.phases.includes(phase));
   const type = pool[Math.floor(Math.random() * pool.length)];
   const el = document.createElement('div');
   el.className = 'obstacle';
   el.innerHTML = type.svg;
-  const x = container.clientWidth + 40;
+  const x = startX != null ? startX : container.clientWidth + 40;
   el.style.transform = `translateX(${x}px)`;
   container.appendChild(el);
   obstacles.push({ el, x, w: type.w });
@@ -622,7 +622,7 @@ function startRun() {
   platforms = [];
   standingOn = null;
   cloudTimer = 0;
-  nextCloudIn = 6 + Math.random() * 4;
+  nextCloudIn = 4 + Math.random() * 2.7;
   catY = GROUND_Y;
   velocity = 0;
   airborne = false;
@@ -637,8 +637,8 @@ function startRun() {
   nextYarnIn = 12 + Math.random() * 10;
   catEl.classList.remove('power', 'power-ending');
   nextStarAt = STAR_EVERY;
-  scheduleNextSpawn();
-  nextSpawnIn = 1.8; // a moment to get ready
+  scheduleNextSpawn();              // sets the gap for obstacles after the first
+  spawnObstacle(catEl.offsetLeft + 940); // first one arrives quickly (~3s)
   starCountEl.textContent = '0';
   fishCountEl.textContent = '0';
   timerEl.textContent = '0.0';
@@ -790,7 +790,7 @@ function frame(now) {
     if (cloudTimer >= nextCloudIn) {
       spawnCloud();
       cloudTimer = 0;
-      nextCloudIn = 8 + Math.random() * 6;
+      nextCloudIn = 5.3 + Math.random() * 4;
     }
 
     // move items, collect on touch

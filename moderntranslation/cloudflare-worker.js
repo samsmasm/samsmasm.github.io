@@ -1,5 +1,5 @@
 /**
- * Plainspeak — classic text modernizer. Cloudflare Worker.
+ * Modern Translation — classic text modernizer. Cloudflare Worker.
  *
  * Route: unisam.nz/moderntranslation/*  (zone must be proxied / orange-cloud).
  *
@@ -70,7 +70,7 @@ function parseCookies(header) {
 function loginPage(message, status) {
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow"><title>Plainspeak</title>
+<meta name="robots" content="noindex, nofollow"><title>Modern Translation</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;
@@ -89,7 +89,7 @@ button:hover{background:#3a1361}
 .err{color:#c62a30;font-weight:600;font-size:13px;margin:14px 0 0}
 </style></head><body>
 <form class="card" method="POST" action="/moderntranslation/login" autocomplete="off">
-  <p class="mark">Plainspeak</p>
+  <p class="mark">Modern Translation</p>
   <p class="sub">Classic texts in plain modern English</p>
   <label for="p">Password</label>
   <input id="p" name="password" type="password" autofocus autocomplete="off">

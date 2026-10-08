@@ -65,7 +65,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `pdfwrite/`: upload a PDF and annotate it freehand
 - `newbiz/`: random-word business case generator with 3D drum spinner (no CLAUDE.md; chrome-free by design)
 
-**Personal / private tools** (keep off the public index)
+**Personal tools** (`sayso`, `moderntranslation`, `tote` are meant for the future private page; keep them off the public index)
 - `sayso/`: marking transcription app (Cloudflare Worker, live)
 - `moderntranslation/`: password-gated classic-text modernizer (Cloudflare Worker)
 - `tote/`: tiny shared notes, Firebase Realtime DB, notes expire after 96h

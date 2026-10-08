@@ -67,6 +67,7 @@ export default {
 
       const articles = mergeArticles(guardianArticles, nytArticles, newsApiArticles);
 
+      // ── Return debug info if no articles found ──
       if (articles.length === 0) {
         return corsResponse({ error: { message: 'No articles found. Debug: ' + JSON.stringify(debugInfo) } }, 200, env);
       }
@@ -75,36 +76,40 @@ export default {
       const systemPrompt = buildSystemPrompt(subjectName, topicLabel, conceptLabel, paper, recency, focus);
       const userMessage = buildUserMessage(articles, topicLabel, subjectName);
 
-      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 3000,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userMessage }],
-        }),
-      });
-
-      const claudeData = await anthropicRes.json();
+      let anthropicRes, claudeData;
+      try {
+        anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 3000,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userMessage }],
+          }),
+        });
+        claudeData = await anthropicRes.json();
+      } catch (err) {
+        return corsResponse({ error: { message: 'Anthropic fetch failed: ' + err.message, articles: articles.length, debug: debugInfo } }, 200, env);
+      }
 
       if (!anthropicRes.ok) {
-        return corsResponse(claudeData, anthropicRes.status, env);
+        return corsResponse({ error: { message: 'Anthropic error: ' + JSON.stringify(claudeData), articles: articles.length } }, 200, env);
       }
 
       // ── Extract and parse the JSON from Claude's response ──
       const textBlock = claudeData.content?.find(b => b.type === 'text');
       if (!textBlock?.text) {
-        return corsResponse({ error: { message: 'No response from Claude.' } }, 200, env);
+        return corsResponse({ error: { message: 'No text from Claude.', articles: articles.length } }, 200, env);
       }
 
       const match = textBlock.text.match(/\{[\s\S]*\}/);
       if (!match) {
-        return corsResponse({ error: { message: 'Unexpected response format from Claude.' } }, 200, env);
+        return corsResponse({ error: { message: 'Unexpected Claude response format.', articles: articles.length } }, 200, env);
       }
 
       const parsed = JSON.parse(match[0]);

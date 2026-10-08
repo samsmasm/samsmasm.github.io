@@ -1,4 +1,4 @@
-# Plainspeak — deployment
+# Modern Translation — deployment
 
 The frontend (`index.html`) is served by GitHub Pages at `unisam.nz/moderntranslation/`.
 The Worker (`cloudflare-worker.js`) gates that path and proxies the Claude + Gemini APIs.

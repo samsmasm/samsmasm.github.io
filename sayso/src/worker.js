@@ -11,7 +11,7 @@ const OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 const MODEL = "gpt-transcribe";
 const DIARIZE_MODEL = "gpt-4o-transcribe-diarize"; // used only when multi-speaker is on
 const COOKIE = "sayso_session";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+const SESSION_TTL_SECONDS = 120; // TEMP for local renewal test
 const RATE_LIMIT = 25; // transcription requests …
 const RATE_WINDOW = 60; // … per this many seconds, per session
 
@@ -74,6 +74,11 @@ async function handleApi(request, env, path, url) {
   const session = await verifySession(request, env);
   if (!session) return json({ error: "Not authenticated" }, 401);
 
+  const resp = await handleAuthed(request, env, route, url, session);
+  return renewIfNeeded(resp, env, session);
+}
+
+async function handleAuthed(request, env, route, url, session) {
   if (route === "/transcribe" && request.method === "POST") {
     return transcribe(request, env, session);
   }
@@ -124,6 +129,18 @@ function logout() {
       "Set-Cookie": cookie(COOKIE, "", 0),
     },
   });
+}
+
+// Sliding session: once a session is past its halfway point, re-issue the cookie
+// on the next authenticated response. Regular use therefore never expires, and
+// only a genuine gap of SESSION_TTL_SECONDS with no requests logs you out.
+async function renewIfNeeded(resp, env, session) {
+  const remaining = session.exp - Math.floor(Date.now() / 1000);
+  if (remaining > SESSION_TTL_SECONDS / 2) return resp;
+  const token = await signSession(env);
+  const fresh = new Response(resp.body, resp);
+  fresh.headers.append("Set-Cookie", cookie(COOKIE, token, SESSION_TTL_SECONDS));
+  return fresh;
 }
 
 // A session token is: base64url(payload) "." base64url(hmac).
