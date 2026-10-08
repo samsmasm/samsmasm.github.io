@@ -148,7 +148,7 @@
   .opts { display: flex; flex-wrap: wrap; gap: 16px 32px; padding-top: 14px; }
   .group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .group .gl { font-size: .92rem; }
-  .seg { display: inline-flex; border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; }
   .seg button { padding: 7px 14px; border: 0; background: transparent; color: var(--ink); font-size: .95rem; }
   .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
   .seg button + button { border-left: 1.5px solid var(--border); }
@@ -156,17 +156,38 @@
   .site-footer { border-top: 1px solid var(--rule); }
   .site-footer .wrap { padding-block: 16px 22px; font-size: 11px; color: #bbb; }
 
-  /* Print: show only the chosen cover. Its size in mm is set from script. */
+  .addbtn {
+    width: 100%; height: 44px; font-weight: 600; color: var(--accent);
+    background: #fff; border: 1.5px solid var(--border); border-radius: 8px;
+  }
+  .addbtn:hover { border-color: var(--accent); }
+  .addbtn[aria-pressed="true"] { background: var(--tint); border-color: var(--accent); }
+
+  /* The sheet: covers collected for printing together, with a preview of the arrangement */
+  .sheetbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: #fff; border-top: 1.5px solid var(--border); }
+  .sheetbar .wrap { display: flex; align-items: center; gap: 12px 22px; flex-wrap: wrap; padding-block: 12px; }
+  .sheetbar .pages { display: flex; gap: 10px; overflow-x: auto; max-width: 100%; }
+  .mini-page { flex: none; display: grid; align-content: start; justify-content: start; background: #fff; border: 1px solid var(--border); }
+  .mini-page .cell { display: flex; align-items: center; justify-content: center; background: var(--rule); }
+  .mini-page img { display: block; cursor: pointer; }
+  .mini-page img:hover { outline: 2px solid var(--warn); }
+  .sheetbar .txt { flex: 1 1 220px; font-size: .95rem; color: var(--muted); }
+  .sheetbar .txt strong { color: var(--accent-dark); font-weight: 600; }
+  .sheetbar .txt .warn { color: var(--warn); }
+  .sheetbar .printbtn { width: auto; height: 48px; }
+  body.has-sheet { padding-bottom: 180px; }
+
+  /* Print: only the sheet pages. Every size is set in mm from script. */
   #printSheet { display: none; }
   @media print {
-    body { background: #fff; }
-    .site-header, main, .site-footer { display: none !important; }
-    #printSheet {
-      display: flex; align-items: center; justify-content: center;
-      width: 100%; height: calc(var(--ph) * 1mm - 1mm);
-      overflow: hidden; break-inside: avoid;
-    }
-    #printImg { display: block; max-width: none; }
+    body { background: #fff; padding: 0 !important; }
+    .site-header, main, .site-footer, .sheetbar { display: none !important; }
+    #printSheet { display: block; }
+    .sheet-page { display: grid; overflow: hidden; break-after: page; }
+    .sheet-page:last-child { break-after: auto; }
+    .sheet-page .cell { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    #printSheet img { display: block; max-width: none; box-sizing: border-box; }
+    #printSheet img.cut { border: 0.25mm solid #ccc; }
   }
 </style>
 </head>
@@ -219,7 +240,9 @@
         <span class="seg" id="sizeSeg">
           <button type="button" data-v="auto" aria-pressed="true">Auto</button>
           <button type="button" data-v="full" aria-pressed="false">Full page</button>
-          <button type="button" data-v="small" aria-pressed="false">Smaller</button>
+          <button type="button" data-v="half" aria-pressed="false">Half page</button>
+          <button type="button" data-v="quarter" aria-pressed="false">Quarter page</button>
+          <button type="button" data-v="eighth" aria-pressed="false">Eighth page</button>
         </span>
       </div>
     </div>
@@ -230,7 +253,16 @@
   <div class="wrap">Built by Sam G &middot; all vibe coded &middot; found a problem? tell Sam.</div>
 </footer>
 
-<div id="printSheet"><img id="printImg" alt=""></div>
+<div class="sheetbar" id="sheetBar" hidden>
+  <div class="wrap">
+    <div class="pages" id="sheetPages" aria-label="Page preview. Click a cover to take it off the sheet."></div>
+    <div class="txt" id="sheetTxt" role="status" aria-live="polite"></div>
+    <button type="button" class="printbtn" id="sheetPrint">Print sheet</button>
+    <button type="button" class="linkbtn" id="sheetClear">Clear</button>
+  </div>
+</div>
+
+<div id="printSheet"></div>
 <style id="pageRule"></style>
 
 <script>
@@ -238,17 +270,26 @@
   var $ = function (s) { return document.querySelector(s); };
   var PAPER = { A4: [210, 297], Letter: [215.9, 279.4] };
   var MARGIN = 8;                       // mm margin on every side
-  var STEPS = [1, 0.72, 0.5];           // full, half, quarter page (linear scale)
-  var STEP_NAME = { '1': 'full page', '0.72': 'half page', '0.5': 'quarter page' };
+  var GAP = 4;                          // mm between covers on a shared page, for cutting
+  var CAPS = { full: 1, half: 2, quarter: 4, eighth: 8 };   // covers to a page at each size
+  var CAP_NAME = { 1: 'full page', 2: 'half page', 4: 'quarter page', 8: 'eighth page' };
   var EXAMPLES = ['The Kite Runner', 'Things Fall Apart', 'Animal Farm', 'The Hunger Games'];
 
   var settings = { paper: 'A4', size: 'auto' };
   try {
     var saved = JSON.parse(localStorage.getItem('doorcover') || '{}');
     if (PAPER[saved.paper]) settings.paper = saved.paper;
-    if (saved.size === 'half') saved.size = 'small';
-    if (['auto', 'full', 'small'].indexOf(saved.size) > -1) settings.size = saved.size;
+    if (saved.size === 'small') saved.size = 'half';
+    if (saved.size === 'auto' || CAPS[saved.size]) settings.size = saved.size;
   } catch (e) {}
+
+  // Covers collected to print together: { url, w, h, alt }, kept between visits.
+  var sheet = [];
+  try {
+    sheet = (JSON.parse(localStorage.getItem('doorcover-sheet') || '[]') || []).filter(function (s) {
+      return s && typeof s.url === 'string' && s.w > 0 && s.h > 0;
+    });
+  } catch (e) { sheet = []; }
 
   var matches = [];        // suggestions for the current query
   var suggestQ = '';       // the query those suggestions belong to
@@ -563,31 +604,70 @@
     setStatus('');
   }
 
-  function dpiAt(img, k) {
-    var d = PAPER[settings.paper];
-    var bw = (d[0] - 2 * MARGIN) * k, bh = (d[1] - 2 * MARGIN) * k;
-    var ratio = img.naturalWidth / img.naturalHeight;
-    var printW = Math.min(bw, bh * ratio);
-    return img.naturalWidth / (printW / 25.4);
+  /* ---------- arranging covers on pages ---------- */
+  function itemOf(img) { return { url: img.src, w: img.naturalWidth, h: img.naturalHeight, alt: img.alt }; }
+  function ratioOf(it) { return it.w / it.h; }
+  // Printable area in mm (1mm spare in height so a page never spills onto a second).
+  function pageBox(orient) {
+    var d = PAPER[settings.paper], w = d[0] - 2 * MARGIN, h = d[1] - 2 * MARGIN;
+    return orient === 'landscape' ? { w: h, h: w - 1 } : { w: w, h: h - 1 };
   }
-  // Auto: the largest size that still prints sharp. If none do, the largest that prints well, else the smallest.
-  function sizeFor(img) {
-    var k, i;
-    if (settings.size === 'full') k = 1;
-    else if (settings.size === 'small') k = 0.72;
-    else {
-      k = STEPS[STEPS.length - 1];
-      var found = false;
-      for (i = 0; i < STEPS.length && !found; i++) if (dpiAt(img, STEPS[i]) >= 150) { k = STEPS[i]; found = true; }
-      for (i = 0; i < STEPS.length && !found; i++) if (dpiAt(img, STEPS[i]) >= 100) { k = STEPS[i]; found = true; }
+  function cellBox(orient, r, c) {
+    var b = pageBox(orient);
+    return { w: (b.w - (c - 1) * GAP) / c, h: (b.h - (r - 1) * GAP) / r };
+  }
+  function fitWidth(ratio, cell) { return Math.min(cell.w, cell.h * ratio); }
+  // Grids to try: exactly cap cells for a fixed size, or any grid that holds n (up to 8) for auto.
+  function gridsFor(n, cap) {
+    var out = [];
+    for (var r = 1; r <= 4; r++) for (var c = 1; c <= 4; c++) {
+      if (cap ? r * c === cap : (r * c >= n && r * c <= 8)) out.push([r, c]);
     }
-    return { k: k, dpi: dpiAt(img, k) };
+    return out;
   }
+  // The grid that makes the smallest cover on the page as big as possible.
+  function bestGrid(orient, ratios, cap) {
+    var best = null;
+    gridsFor(ratios.length, cap).forEach(function (g) {
+      var cell = cellBox(orient, g[0], g[1]);
+      var score = Math.min.apply(null, ratios.map(function (q) { var w = fitWidth(q, cell); return w * w / q; }));
+      if (!best || score > best.score + 1e-6) best = { grid: g, cell: cell, score: score };
+    });
+    return best;
+  }
+  // cap 0 = auto: fit up to 8 covers on each page, as big as they will go.
+  function layout(items, cap) {
+    var per = cap || 8, chunks = [], best = null;
+    for (var i = 0; i < items.length; i += per) chunks.push(items.slice(i, i + per));
+    ['portrait', 'landscape'].forEach(function (o) {
+      var pages = chunks.map(function (ch) {
+        var b = bestGrid(o, ch.map(ratioOf), cap);
+        b.items = ch;
+        return b;
+      });
+      var score = Math.min.apply(null, pages.map(function (p) { return p.score; }));
+      if (!best || score > best.score * 1.02) best = { orient: o, pages: pages, score: score };
+    });
+    return best;
+  }
+  function dpiIn(it, page) { return it.w / (fitWidth(ratioOf(it), page.cell) / 25.4); }
+
+  // One cover printed alone. Auto: the largest size that still prints sharp,
+  // else the largest that prints well, else a quarter page.
+  function capFor(it) {
+    if (CAPS[settings.size]) return CAPS[settings.size];
+    var steps = [1, 2, 4], t, i;
+    for (t = 0; t < 2; t++) for (i = 0; i < steps.length; i++) {
+      if (dpiIn(it, layout([it], steps[i]).pages[0]) >= [150, 100][t]) return steps[i];
+    }
+    return 4;
+  }
+  function qualityWord(dpi) { return dpi >= 150 ? 'sharp' : (dpi >= 100 ? 'good quality' : 'a little soft'); }
   function quality(img, node) {
-    var s = sizeFor(img);
-    var word = s.dpi >= 150 ? 'sharp' : (s.dpi >= 100 ? 'good quality' : 'a little soft');
-    node.className = 'q ' + (s.dpi >= 100 ? 'good' : 'warn');
-    node.textContent = 'Prints at ' + STEP_NAME[String(s.k)] + ', ' + word;
+    var it = itemOf(img), cap = capFor(it);
+    var dpi = dpiIn(it, layout([it], cap).pages[0]);
+    node.className = 'q ' + (dpi >= 100 ? 'good' : 'warn');
+    node.textContent = 'Prints at ' + CAP_NAME[cap] + ', ' + qualityWord(dpi);
   }
 
   function makeCard(m, c, n) {
@@ -604,13 +684,19 @@
     var q = el('div', 'q', 'Checking size...');
     var btn = el('button', 'printbtn', 'Print this cover');
     btn.type = 'button';
-    meta.appendChild(row); meta.appendChild(q); meta.appendChild(btn);
+    var add = el('button', 'addbtn', 'Add to sheet');
+    add.type = 'button';
+    add.disabled = true;
+    meta.appendChild(row); meta.appendChild(q); meta.appendChild(btn); meta.appendChild(add);
     img.onload = function () {
       if (img.naturalWidth < 60) { card.remove(); checkEmpty(); return; }   // placeholder image
       stage.textContent = '';
       stage.appendChild(img);
       qualityEls.push({ img: img, node: q });
       quality(img, q);
+      add.disabled = false;
+      add.setAttribute('data-url', img.src);
+      syncAddButtons();
     };
     var fallbackUrl = smaller(c.url, 'L');
     img.onerror = function () {
@@ -622,6 +708,7 @@
     var go = function () { if (img.naturalWidth) printCover(img); };
     stage.addEventListener('click', go);
     btn.addEventListener('click', go);
+    add.addEventListener('click', function () { if (img.naturalWidth) toggleSheet(itemOf(img)); });
     card.appendChild(stage); card.appendChild(meta);
     return card;
   }
@@ -682,30 +769,121 @@
     }
   }
 
+  /* ---------- the sheet ---------- */
+  function sheetIndex(url) {
+    for (var i = 0; i < sheet.length; i++) if (sheet[i].url === url) return i;
+    return -1;
+  }
+  function saveSheet() {
+    try { localStorage.setItem('doorcover-sheet', JSON.stringify(sheet)); } catch (e) {}
+  }
+  function toggleSheet(it) {
+    var i = sheetIndex(it.url);
+    if (i > -1) sheet.splice(i, 1); else sheet.push(it);
+    saveSheet();
+    renderSheet();
+  }
+  function syncAddButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll('.addbtn[data-url]'), function (b) {
+      var on = sheetIndex(b.getAttribute('data-url')) > -1;
+      b.setAttribute('aria-pressed', String(on));
+      b.textContent = on ? 'On the sheet \u2713 (tap to remove)' : 'Add to sheet';
+    });
+  }
+  function sheetCap() {
+    if (sheet.length === 1) return capFor(sheet[0]);
+    return CAPS[settings.size] || 0;
+  }
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function renderSheet() {
+    syncAddButtons();
+    var bar = $('#sheetBar');
+    bar.hidden = !sheet.length;
+    document.body.classList.toggle('has-sheet', sheet.length > 0);
+    if (!sheet.length) return;
+
+    var L = layout(sheet, sheetCap());
+    var box = pageBox(L.orient);
+    var paper = PAPER[settings.paper];
+    var s = 104 / (L.orient === 'landscape' ? paper[1] : paper[0]);   // px per mm in the preview
+    var pages = $('#sheetPages');
+    pages.textContent = '';
+    var soft = 0;
+    L.pages.forEach(function (p) {
+      var pg = el('div', 'mini-page');
+      pg.style.width = ((box.w + 2 * MARGIN) * s) + 'px';
+      pg.style.height = ((box.h + 1 + 2 * MARGIN) * s) + 'px';
+      pg.style.padding = (MARGIN * s) + 'px';
+      pg.style.gap = (GAP * s) + 'px';
+      pg.style.gridTemplateColumns = 'repeat(' + p.grid[1] + ', ' + (p.cell.w * s) + 'px)';
+      pg.style.gridTemplateRows = 'repeat(' + p.grid[0] + ', ' + (p.cell.h * s) + 'px)';
+      p.items.forEach(function (it) {
+        var cell = el('div', 'cell');
+        var w = fitWidth(ratioOf(it), p.cell);
+        var im = new Image();
+        im.src = smaller(it.url, 'M') || it.url;
+        im.alt = it.alt;
+        im.title = 'Take this cover off the sheet';
+        im.style.width = (w * s) + 'px';
+        im.style.height = (w / ratioOf(it) * s) + 'px';
+        im.addEventListener('click', function () { toggleSheet(it); });
+        cell.appendChild(im);
+        pg.appendChild(cell);
+        if (dpiIn(it, p) < 100) soft++;
+      });
+      pages.appendChild(pg);
+    });
+
+    var cells = L.pages[0].grid[0] * L.pages[0].grid[1];
+    var size = CAP_NAME[cells] || ('1/' + cells + ' page');
+    var txt = $('#sheetTxt');
+    txt.textContent = '';
+    txt.appendChild(el('strong', '', plural(sheet.length, 'cover') + ' on the sheet'));
+    txt.appendChild(document.createTextNode(': ' + size + ' each, ' + plural(L.pages.length, 'page') +
+      ', ' + L.orient + '. Click a cover in the preview to take it off.'));
+    if (soft) txt.appendChild(el('span', 'warn', ' ' + plural(soft, 'cover') + ' will print a little soft at this size.'));
+    $('#sheetPrint').textContent = sheet.length === 1 ? 'Print sheet' : 'Print ' + plural(sheet.length, 'cover');
+  }
+
   /* ---------- printing ---------- */
-  function applyPrintSettings(k) {
-    var d = PAPER[settings.paper];
-    var root = document.documentElement.style;
-    root.setProperty('--pw', d[0] - 2 * MARGIN);
-    root.setProperty('--ph', d[1] - 2 * MARGIN);
-    root.setProperty('--k', k == null ? 1 : k);
-    $('#pageRule').textContent = '@page { size: ' + settings.paper + ' portrait; margin: ' + MARGIN + 'mm; }';
+  function printItems(items, cap) {
+    var L = layout(items, cap);
+    var box = pageBox(L.orient);
+    $('#pageRule').textContent = '@page { size: ' + settings.paper + ' ' + L.orient + '; margin: ' + MARGIN + 'mm; }';
+    var out = $('#printSheet');
+    out.textContent = '';
+    var imgs = [];
+    L.pages.forEach(function (p) {
+      var pg = el('div', 'sheet-page');
+      pg.style.width = box.w.toFixed(2) + 'mm';
+      pg.style.height = box.h.toFixed(2) + 'mm';
+      pg.style.gap = GAP + 'mm';
+      pg.style.gridTemplateColumns = 'repeat(' + p.grid[1] + ', ' + p.cell.w.toFixed(2) + 'mm)';
+      pg.style.gridTemplateRows = 'repeat(' + p.grid[0] + ', ' + p.cell.h.toFixed(2) + 'mm)';
+      p.items.forEach(function (it) {
+        var cell = el('div', 'cell');
+        var r = ratioOf(it), w = fitWidth(r, p.cell);
+        var im = new Image();
+        if (items.length > 1) im.className = 'cut';
+        im.style.width = w.toFixed(2) + 'mm';
+        im.style.height = (w / r).toFixed(2) + 'mm';
+        im.alt = it.alt;
+        im.src = it.url;
+        cell.appendChild(im);
+        pg.appendChild(cell);
+        imgs.push(im);
+      });
+      out.appendChild(pg);
+    });
+    Promise.all(imgs.map(function (im) {
+      return im.decode ? im.decode().catch(function () {}) : Promise.resolve();
+    })).then(function () { setTimeout(function () { window.print(); }, 50); });
   }
 
   function printCover(srcImg) {
-    var k = sizeFor(srcImg).k;
-    applyPrintSettings(k);
-    var d = PAPER[settings.paper];
-    var bw = (d[0] - 2 * MARGIN) * k, bh = (d[1] - 2 * MARGIN) * k - 1;
-    var ratio = srcImg.naturalWidth / srcImg.naturalHeight;
-    var w = Math.min(bw, bh * ratio);
-    var pi = $('#printImg');
-    pi.style.width = w.toFixed(2) + 'mm';
-    pi.style.height = (w / ratio).toFixed(2) + 'mm';
-    pi.alt = srcImg.alt;
-    pi.src = srcImg.src;
-    var go = function () { setTimeout(function () { window.print(); }, 50); };
-    if (pi.decode) pi.decode().then(go, go); else pi.onload = go;
+    var it = itemOf(srcImg);
+    printItems([it], capFor(it));
   }
 
   /* ---------- controls ---------- */
@@ -721,15 +899,17 @@
       settings[key] = b.getAttribute('data-v');
       syncSeg(id, settings[key]);
       try { localStorage.setItem('doorcover', JSON.stringify(settings)); } catch (err) {}
-      applyPrintSettings();
       qualityEls.forEach(function (x) { quality(x.img, x.node); });
+      renderSheet();
     });
   }
   syncSeg('#paperSeg', settings.paper);
   syncSeg('#sizeSeg', settings.size);
   bindSeg('#paperSeg', 'paper');
   bindSeg('#sizeSeg', 'size');
-  applyPrintSettings();
+  $('#sheetPrint').addEventListener('click', function () { if (sheet.length) printItems(sheet, sheetCap()); });
+  $('#sheetClear').addEventListener('click', function () { sheet = []; saveSheet(); renderSheet(); });
+  renderSheet();
 
   var input = $('#q');
   input.addEventListener('input', function () {
