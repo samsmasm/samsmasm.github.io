@@ -24,6 +24,8 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   fmwskills/              ← FMW skills-sequencing planning docs + collaborative Kanban tool (Firebase, see CLAUDE.md inside)
   longcut/                ← Quiet-route A* pathfinder (Leaflet + OSM, single HTML)
   turtle/                 ← Turtle Artist: kids' turtle-graphics tool (single HTML, see CLAUDE.md inside)
+  covers/                 ← Covers: find a book cover and print it for a classroom door, or arrange several
+                             to a page (single HTML, no backend, see CLAUDE.md inside)
   graphs/                 ← Economics Graph Drawer (see CLAUDE.md inside)
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
   checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore in coldwar-d8109, see SETUP.md inside)
