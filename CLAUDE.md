@@ -63,7 +63,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `spectra/`: live opinion poll, students place themselves on an agree/disagree spectrum
 - `wb/`: minimal whiteboard, drawing layer + grid layer, no backend
 - `pdfwrite/`: upload a PDF and annotate it freehand
-- `newbiz/`: random-word business case generator with 3D drum spinner (no CLAUDE.md; chrome-free by design)
+- `newbiz/`: random-word business case generator with 3D drum spinner (chrome-free by design)
 
 **Personal tools** (`sayso`, `moderntranslation`, `tote` are meant for the future private page; keep them off the public index)
 - `sayso/`: marking transcription app (Cloudflare Worker, live)
@@ -76,13 +76,104 @@ Read the folder's own CLAUDE.md before working in any of these.
 
 **Kids' games**
 - `typurr/`: Typurr typing game for ages 4 to 8, starring Ty the cat (branched from `catjump`)
-- `catjump/`: Cat Jump runner game (no CLAUDE.md)
+- `catjump/`: Cat Jump runner game
 
 **Evolution simulations**
 - `amoeba/`: organisms with four heritable genes compete for food
 - `trees/`: forest evolution, 11 genes, climate controls
 - `walker/`: bone-and-muscle creatures learn to walk (custom Verlet physics)
 - `racecar/`: evolving polygon cars on Planck.js tracks
+
+### Smaller projects (each has a brief CLAUDE.md)
+
+**Hub pages**
+- `experiments/`: The /experiments hub page: links to evolution sims, visual maths toys, make-and-build tools and kids' games.
+- `tools/`: The /tools hub page: quizzes and games, reading the room, thinking and boards, PDFs and more.
+
+**Teaching tools**
+- `ask-v1.0/`: Early student question-submission tool with a teacher login.
+- `busia/`: Student guide to the IB Business Management Internal Assessment, start to finish, one page per stage.
+- `causation/`: Practise explaining how one event caused another: random sentence pairs, with an optional checking mode for typed answers.
+- `causation2/`: Levelled version of the causation trainer with AI checking of answers.
+- `coldwar/`: Cold War classroom role-play game: nations, team goals, individual missions, live scoreboard.
+- `flare/`: Students press a button to signal the teacher (e.g. 'I'm lost'); when enough do, the teacher's screen plays a sound.
+- `flippinghard/`: Live coin-flip betting game: teacher runs flips, students join a session and bet their balance.
+- `griz/`: Jeopardy-style trivia board for teams, with point decay and a times-table generator. Questions come as CSV from a custom GPT.
+- `hippiesandspies/`: FMW (Grade 9) question-tree for choosing a 1960s research topic: spies, counterculture, civil rights.
+- `inflation/`: NZ inflation by household group: headline CPI vs household living-cost price indexes, by demographic, income and housing.
+- `marketinghub/`: IB BM Unit 4 Marketing notes: one page per subtopic (4.1 to 4.6, including each of the 7 Ps).
+- `printergoesbrrr/`: Classroom simulation of rate setting and lending rounds.
+- `quiz/`: The Talkonomics weekly economics quiz: latest edition plus archive.
+- `samples/`: Proof of concept: IB model answers revealed step by step from hint to full paragraph.
+- `stocksimulator/`: Generates random-walk stock price lines and picks 'interesting' ones (straightest, biggest range, longest streak).
+- `supplyanddemand/`: Shift supply and demand curves and see the changes.
+- `uniquiz/`: Kahoot-style live quiz: teacher creates a quiz (CSV import), students join with a PIN.
+- `wingeometer/`: NZ parliamentary speech analyser: language patterns by party from Hansard (future/past, positive/negative, fear, we/they).
+
+**General tools**
+- `peedeeeffer/`: In-browser PDF split, merge, extract and EPUB tool with a heavy-file mode.
+- `pinhole/`: Pinhole camera design calculator: film format, focal length, optimal pinhole diameter, exposure.
+- `reveal/`: Upload an image, cover it in tiles, click to reveal it bit by bit (classroom guessing game).
+- `scrim/`: Collaborative note/web canvas with pan/zoom, connectors, JPG/TXT export and password-protected rooms.
+- `spin/`: Word spinner with saved word lists, temporary sets, dice and a timer.
+- `turnright/`: Generates walking routes by always turning one way (left- or right-hand rule) from a start pin for a target distance, on OSM streets.
+
+**Maths toys and practice**
+- `algeqs/`: Generates NCEA-style algebra questions at Achieved, Merit or Excellence level.
+- `binary-game-v1.1/`: Toggle bits to hit a target number. Includes an 'Age in Binary' page.
+- `chaos/`: Chaos game fractal explorer: polygon presets or click to place vertices, colour modes, exclusion rules, speed.
+- `cinvert/`: Draw circles and lines, see their inversions and equations.
+- `coordgeo-v1.1/`: Generates coordinate geometry problems with a Chart.js plot.
+- `discountdash-v1.0/`: Pick the cheaper supermarket basket over six timed rounds.
+- `findtreasure/`: Hidden-treasure guessing game inside a shape (triangles, squares, countries), with adjustable win radius and click count.
+- `flowers/`: Sunflower-style seed spirals from a rotation fraction, with animated sweeps through decimal places.
+- `funcheatmap-v2/`: Heatmap and contour of any formula in a and b, with log scale option.
+- `joinedpoints/`: Random points joined to nearest neighbours, with motion, rainbow and polygon fill options.
+- `mandelbrot-v2/`: Mandelbrot set explorer with pan, zoom and iteration controls.
+- `runymxc/`: Predict where Bob should start so he finishes with Amber; teaches linear equations.
+- `treethree/`: Build a sequence of coloured trees under TREE(3)-style rules by drag and drop.
+
+**Kids' games**
+- `anipics/`: Type an animal name, get its emoji.
+- `cookiejar-v2.0/`: Kids' addition game: answer to collect cookies.
+- `flyswat/`: 60-second fly-swatting game.
+- `fractions/`: Kids' fraction games with Mr. Pizza: order pizzas, match equivalents, build a fraction; three difficulty levels and player profiles.
+- `guesswhoanimals/`: Suggests the best yes/no question to ask at each step of an animal Guess Who game.
+- `ipmemory/`: Timed card-matching memory game.
+- `kittymaze/`: Mobile-friendly cat maze game with difficulty levels and sounds.
+- `mousechase-v2/`: Pick a hunter and prey emoji and chase.
+- `multiplication-memory-v2.1/`: Memory-match game for chosen times tables.
+- `numbertiles/`: Put number (or emoji) tiles in order.
+- `snowflake/`: Fold paper three times, cut while folded, unfold to reveal the snowflake; save PNG.
+- `sudoku/`: Sudoku with four levels, notes mode, and save/load as a string.
+- `unichase/`: Joystick-controlled unicorn chase game with a best-time record.
+
+**Simulations**
+- `racecar2/`: Variant of `racecar/` where the whole population races at once: tournament selection, crossover, evolvable drivetrain.
+- `spiral/`: Factions claim numbers on a square spiral by turn; watch the patterns that emerge.
+
+**Jokes**
+- `heresy/`: Joke page in Ancient Greek with a 'reveal the truth' button and heretical quotes.
+- `isluxonpm/`: Answers whether Christopher Luxon is still NZ Prime Minister, using the Wikipedia REST summary.
+
+**Personal**
+- `mymaths/`: Sam's personal roadmap from NCEA Level 3 to graduate-level mathematics.
+- `photos/`: Sam's photo gallery with tags.
+- `typeit/`: Photos or PDFs of pages to faithful text (handwriting or print), password-gated, nothing stored.
+
+**Pipelines and workers (no public page)**
+- `businews_scripts/`: Python pipeline that generates the BusiNews IB BM case studies.
+- `econnews_scripts/`: Python pipeline for the weekly EconNews feed (RSS to Claude to GitHub Pages).
+- `quiz_scripts/`: `quiz_generate.py` builds each weekly Talkonomics quiz into `quiz/`.
+- `talkonomics/`: Cloudflare Worker and design handoff for Talkonomics. No public page here; the quiz itself is at `quiz/`.
+
+**Old versions and placeholders (do not edit unless asked)**
+- `catjumpold/`: Original simple Cat Jump. Superseded by `catjump/`; kept for reference.
+- `copythisone/`: Empty placeholder (blank `index.html`, `script.js`, `styles.css`). Nothing to work on here unless Sam asks.
+- `econnewsbackup/`: Old snapshot of EconNews (a handful of March 2026 posts). Live version is `econnews/`. Do not edit.
+- `fractions-classic/`: Earlier Pizza Fractions with the cat theme. Superseded by `fractions/`.
+- `treethree-v2.1/`: Iteration of `treethree/`.
+- `treethree-v2.2/`: Latest iteration of `treethree/`.
 
 ---
 
