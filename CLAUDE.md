@@ -24,8 +24,6 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   fmwskills/              ← FMW skills-sequencing planning docs + collaborative Kanban tool (Firebase, see CLAUDE.md inside)
   longcut/                ← Quiet-route A* pathfinder (Leaflet + OSM, single HTML)
   turtle/                 ← Turtle Artist: kids' turtle-graphics tool (single HTML, see CLAUDE.md inside)
-  covers/                 ← Covers: find a book cover and print it for a classroom door, or arrange several
-                             to a page (single HTML, no backend, see CLAUDE.md inside)
   graphs/                 ← Economics Graph Drawer (see CLAUDE.md inside)
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
   checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore in coldwar-d8109, see SETUP.md inside)
@@ -42,7 +40,7 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
                              lineupRooms in coldwar-d8109; rules at the end of checkin/firestore.rules (Sam re-pastes
                              them into the console). See CLAUDE.md + SETUP.md inside. Run `python3 stamp.py` before committing.
   covers/                 ← Covers (was Door Cover): find and print book covers, page sizes, multi-cover sheet with
-                             auto arrange. Single HTML, linked from /tools (see CLAUDE.md inside)
+                             auto arrange and drag to rearrange. Single HTML, linked from /tools (see CLAUDE.md inside)
   ai/                     ← "How I Use AI": landing, full statement, Click-on-me bobblehead (see CLAUDE.md inside;
                              NEVER commit ai/me.jpg, ai/id.jpg or the bobble-* mockups)
   qreview/                ← IB continual revision / flashcard tool
