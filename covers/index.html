@@ -207,7 +207,13 @@
   .pcover.is-soft img { outline: 2px solid #e8a04a; }
   .pcover.is-over img { outline: 3px solid var(--accent); outline-offset: 2px; }
   .pcover.is-dragging { opacity: .3; }
-  .pcover.ghost { position: fixed; z-index: 50; pointer-events: none; opacity: .85; cursor: grabbing; }
+  .ghost { position: fixed !important; z-index: 50; pointer-events: none; opacity: .85; margin: 0; }
+  .srow.ghost { background: #fff; border: 1.5px solid var(--accent); border-radius: 8px; padding-inline: 8px; }
+  body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }
+  .gcell.is-over { border: 2px solid var(--accent); background: var(--tint); }
+  .srow { cursor: grab; touch-action: none; }
+  .srow.is-over { background: var(--tint); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .srow.is-dragging { opacity: .35; }
   .sheet-list { list-style: none; margin: 0; padding: 0; }
   .srow { display: grid; grid-template-columns: auto 40px minmax(0, 1fr); gap: 4px 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); }
   .srow .sthumb { width: 40px; height: 58px; object-fit: cover; border: 1px solid rgba(45,26,74,.18); }
@@ -298,10 +304,11 @@
         <button type="button" class="printbtn" id="sheetPrint">Print</button>
       </div>
       <div class="sheet-grid">
-        <div class="sheet-pages" id="sheetPages" aria-label="Page preview. Drag a cover onto another to swap them."></div>
+        <div class="sheet-pages" id="sheetPages" aria-label="Page preview. Drag a cover onto another to swap them, or onto an empty slot to move it there."></div>
         <div class="sheet-side">
           <ol class="sheet-list" id="sheetList"></ol>
           <div class="below">
+            <button type="button" class="linkbtn" id="sheetTidy" hidden>Tidy up (auto arrange)</button>
             <button type="button" class="linkbtn" id="sheetBack">Find more covers</button>
             <button type="button" class="linkbtn" id="sheetClear">Clear the sheet</button>
           </div>
@@ -708,43 +715,62 @@
     return 8;
   }
 
-  // Fills pages in sheet order: each cover goes in the first free spot that holds its block,
-  // on the earliest page with room, scanning left to right, top to bottom.
+  // Covers dragged into a slot are pinned there ({ orient, page, x, y }) and placed first.
+  // Then the rest fill pages in sheet order: each goes in the first free spot that holds its block,
+  // on the earliest page with room, scanning left to right, top to bottom. Empty pages are dropped.
   function pack(items, orient) {
     var g = GRID[orient], pages = [];
     function fits(used, x, y, b) {
-      if (x + b[0] > g.cols || y + b[1] > g.rows) return false;
+      if (x < 0 || y < 0 || x + b[0] > g.cols || y + b[1] > g.rows) return false;
       for (var j = y; j < y + b[1]; j++) for (var i = x; i < x + b[0]; i++) if (used[j][i]) return false;
       return true;
     }
-    function newPage() {
-      var used = [];
-      for (var r = 0; r < g.rows; r++) { used.push([]); for (var c = 0; c < g.cols; c++) used[r].push(false); }
-      var p = { used: used, spots: [] };
-      pages.push(p);
-      return p;
+    function page(n) {
+      while (pages.length <= n) {
+        var used = [];
+        for (var r = 0; r < g.rows; r++) { used.push([]); for (var c = 0; c < g.cols; c++) used[r].push(false); }
+        pages.push({ used: used, spots: [] });
+      }
+      return pages[n];
     }
+    function take(p, x, y, b, it, idx) {
+      var pg = page(p);
+      for (var j = y; j < y + b[1]; j++) for (var i = x; i < x + b[0]; i++) pg.used[j][i] = true;
+      var fit = fitIn(it, blockBox(orient, it.size, x, y));
+      pg.spots.push({ item: it, idx: idx, fit: fit, dpi: dpiOf(it, fit), page: p, x: x, y: y, bw: b[0], bh: b[1] });
+    }
+    var loose = [];
     items.forEach(function (it, idx) {
-      var b = g.blk[it.size], placed = false;
-      for (var p = 0; p < pages.length && !placed; p++) {
-        for (var y = 0; y < g.rows && !placed; y++) for (var x = 0; x < g.cols && !placed; x++) {
-          if (fits(pages[p].used, x, y, b)) { take(pages[p], x, y, b, it, idx); placed = true; }
+      var b = g.blk[it.size], pin = it.pin;
+      if (pin && pin.orient === orient && pin.page < 50 && fits(page(pin.page).used, pin.x, pin.y, b)) take(pin.page, pin.x, pin.y, b, it, idx);
+      else loose.push(idx);
+    });
+    loose.forEach(function (idx) {
+      var it = items[idx], b = g.blk[it.size];
+      for (var p = 0; ; p++) {
+        for (var y = 0; y < g.rows; y++) for (var x = 0; x < g.cols; x++) {
+          if (fits(page(p).used, x, y, b)) { take(p, x, y, b, it, idx); return; }
         }
       }
-      if (!placed) take(newPage(), 0, 0, b, it, idx);
     });
-    function take(page, x, y, b, it, idx) {
-      for (var j = y; j < y + b[1]; j++) for (var i = x; i < x + b[0]; i++) page.used[j][i] = true;
-      var fit = fitIn(it, blockBox(orient, it.size, x, y));
-      page.spots.push({ item: it, idx: idx, fit: fit, dpi: dpiOf(it, fit) });
-    }
+    pages = pages.filter(function (p) { return p.spots.length; });
     var area = 0;
-    pages.forEach(function (p) { p.spots.forEach(function (s) { area += s.fit.w * s.fit.h; }); });
+    pages.forEach(function (p, n) {
+      p.spots.forEach(function (s) { s.page = n; area += s.fit.w * s.fit.h; });
+      p.spots.sort(function (a, b) { return a.idx - b.idx; });
+    });
     return { orient: orient, pages: pages, area: area };
   }
-  // Every page the same way round. Auto picks fewer pages, then bigger covers.
+  function pinOrient() {
+    for (var i = 0; i < sheet.length; i++) if (sheet[i].pin) return sheet[i].pin.orient;
+    return '';
+  }
+  // Every page the same way round. Auto keeps the way pinned covers were placed,
+  // otherwise picks fewer pages, then bigger covers.
   function arrange(items) {
     if (settings.orient !== 'auto') return pack(items, settings.orient);
+    var po = items === sheet && pinOrient();
+    if (po) return pack(items, po);
     var p = pack(items, 'portrait'), l = pack(items, 'landscape');
     if (l.pages.length !== p.pages.length) return l.pages.length < p.pages.length ? l : p;
     return l.area > p.area * 1.02 ? l : p;
@@ -905,9 +931,25 @@
     });
   }
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+  var shownLayout = null;   // the arrangement currently in the preview
   function moveTo(from, to) {
     if (from === to || to < 0 || to >= sheet.length) return;
-    var t = sheet[from]; sheet[from] = sheet[to]; sheet[to] = t;
+    var a = sheet[from], b = sheet[to];
+    var pa = a.pin, pb = b.pin;
+    // Pinned covers trade slots; a loose one takes the other's place in the order.
+    if (pa || pb) {
+      var spots = {};
+      shownLayout.pages.forEach(function (pg) { pg.spots.forEach(function (sp) { spots[sp.idx] = sp; }); });
+      var o = shownLayout.orient, sa = spots[from], sb = spots[to];
+      a.pin = sb ? { orient: o, page: sb.page, x: sb.x, y: sb.y } : pb;
+      b.pin = sa ? { orient: o, page: sa.page, x: sa.x, y: sa.y } : pa;
+    }
+    sheet[from] = b; sheet[to] = a;
+    saveSheet();
+    renderSheet();
+  }
+  function tidy() {
+    sheet.forEach(function (it) { delete it.pin; });
     saveSheet();
     renderSheet();
   }
@@ -921,6 +963,7 @@
     if (!has) return;
 
     var L = arrange(sheet);
+    shownLayout = L;
     var box = pageBox(L.orient), cs = cellSize(L.orient), g = GRID[L.orient];
     var wrap = $('#sheetPages');
     // Preview scale: pages as large as the column allows, two across when landscape fits.
@@ -941,6 +984,9 @@
       // Faint eighth-page cells, so the snapping is visible.
       for (var y = 0; y < g.rows; y++) for (var x = 0; x < g.cols; x++) {
         var c = el('div', 'gcell');
+        c.setAttribute('data-page', pi);
+        c.setAttribute('data-x', x);
+        c.setAttribute('data-y', y);
         c.style.left = (x * (cs.w + GAP) * s) + 'px';
         c.style.top = (y * (cs.h + GAP) * s) + 'px';
         c.style.width = (cs.w * s) + 'px';
@@ -962,7 +1008,7 @@
         holder.appendChild(im);
         holder.appendChild(el('span', 'num', String(sp.idx + 1)));
         if (sp.dpi < 100) { holder.classList.add('is-soft'); soft++; }
-        holder.title = 'Drag onto another cover to swap them';
+        holder.title = 'Drag onto another cover to swap, or onto an empty slot to move it';
         inner.appendChild(holder);
       });
       pg.appendChild(inner);
@@ -994,7 +1040,7 @@
         b.setAttribute('aria-pressed', String(it.size === sz));
         b.setAttribute('aria-label', CAP_NAME[sz]);
         markSoft(b, it, sz);
-        b.addEventListener('click', function () { it.size = sz; saveSheet(); renderSheet(); });
+        b.addEventListener('click', function () { it.size = sz; delete it.pin; saveSheet(); renderSheet(); });
         seg.appendChild(b);
       });
       info.appendChild(seg);
@@ -1019,62 +1065,133 @@
     var txt = $('#sheetTxt');
     txt.textContent = '';
     txt.appendChild(el('strong', '', plural(sheet.length, 'cover')));
-    txt.appendChild(document.createTextNode(' on ' + plural(L.pages.length, 'page') + ', ' + L.orient + '.'));
+    txt.appendChild(document.createTextNode(' on ' + plural(L.pages.length, 'page') + ', ' + L.orient + '. Drag covers to rearrange them.'));
     if (soft) txt.appendChild(el('span', 'warn', ' ' + plural(soft, 'cover') + ' will print a little soft (outlined in orange).'));
+    $('#sheetTidy').hidden = !sheet.some(function (it) { return it.pin; });
     $('#sheetPrint').textContent = 'Print ' + plural(L.pages.length, 'page');
   }
 
-  // Drag a cover in the preview onto another to swap them. Pointer events, so touch works too.
+  /* ---------- dragging ----------
+     Pick up a cover in the preview, or a row in the list, and drop it:
+     on another cover to swap them, on an empty slot to move it there (as near as the sizes allow),
+     or on a row in the list to move it to that place in the order. Pointer events, so touch works too. */
+  function spotAt(page, x, y) {
+    var hit = null;
+    shownLayout.pages[page].spots.forEach(function (sp) {
+      if (x >= sp.x && x < sp.x + sp.bw && y >= sp.y && y < sp.y + sp.bh) hit = sp;
+    });
+    return hit;
+  }
+  // Pins cover `from` to grid cell (x, y) of page `page`, nudged back if its block would hang off the page.
+  // Covers it lands on are unpinned and flow around it.
+  function moveToCell(from, page, x, y) {
+    var o = shownLayout.orient, g = GRID[o], it = sheet[from], b = g.blk[it.size];
+    x = Math.min(x, g.cols - b[0]); y = Math.min(y, g.rows - b[1]);
+    // Other pinned covers keep the slot they are shown in (page numbers may have shifted).
+    shownLayout.pages.forEach(function (pg) {
+      pg.spots.forEach(function (sp) {
+        if (sp.idx !== from && sheet[sp.idx].pin) sheet[sp.idx].pin = { orient: o, page: sp.page, x: sp.x, y: sp.y };
+      });
+    });
+    shownLayout.pages[page].spots.forEach(function (sp) {
+      if (sp.idx !== from && sp.x < x + b[0] && x < sp.x + sp.bw && sp.y < y + b[1] && y < sp.y + sp.bh) delete sheet[sp.idx].pin;
+    });
+    it.pin = { orient: o, page: page, x: x, y: y };
+    saveSheet();
+    renderSheet();
+  }
+  function moveInList(from, to) {
+    if (from === to) return;
+    var it = sheet.splice(from, 1)[0];
+    sheet.splice(to, 0, it);
+    saveSheet();
+    renderSheet();
+  }
+
   (function () {
     var drag = null;
-    function targetAt(x, y) {
-      var n = document.elementFromPoint(x, y);
-      n = n && n.closest('#sheetPages .pcover, #sheetList .srow');
-      return n ? +n.getAttribute('data-idx') : -1;
+    // What is under the pointer: { kind: 'cover'|'cell'|'row', idx, node, page, x, y }
+    function targetAt(px, py) {
+      var n = document.elementFromPoint(px, py);
+      if (!n) return null;
+      var c = n.closest('#sheetPages .pcover');
+      if (c) return { kind: 'cover', idx: +c.getAttribute('data-idx'), node: c };
+      var g = n.closest('#sheetPages .gcell');
+      if (g) {
+        var p = +g.getAttribute('data-page'), x = +g.getAttribute('data-x'), y = +g.getAttribute('data-y');
+        var sp = spotAt(p, x, y);
+        if (sp) return { kind: 'cover', idx: sp.idx, node: document.querySelector('#sheetPages .pcover[data-idx="' + sp.idx + '"]') };
+        return { kind: 'cell', node: g, page: p, x: x, y: y };
+      }
+      var r = n.closest('#sheetList .srow');
+      if (r) return { kind: 'row', idx: +r.getAttribute('data-idx'), node: r };
+      return null;
     }
     function clearOver() {
       Array.prototype.forEach.call(document.querySelectorAll('.is-over'), function (n) { n.classList.remove('is-over'); });
     }
+    function start(e, node, from) {
+      if (e.button > 0) return;
+      e.preventDefault();
+      drag = { from: from, src: node, x: e.clientX, y: e.clientY, ghost: null };
+    }
     $('#sheetPages').addEventListener('pointerdown', function (e) {
       var h = e.target.closest('.pcover');
-      if (!h || e.button > 0) return;
-      e.preventDefault();
-      drag = { from: +h.getAttribute('data-idx'), src: h, x: e.clientX, y: e.clientY, ghost: null };
+      if (h) start(e, h, +h.getAttribute('data-idx'));
     });
+    $('#sheetList').addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button')) return;
+      var r = e.target.closest('.srow');
+      if (r) start(e, r, +r.getAttribute('data-idx'));
+    });
+    // Scrolls the window while a drag is held near the top or bottom edge, so later pages can be reached.
+    function autoScroll() {
+      if (!drag || !drag.ghost) return;
+      var edge = 70, y = drag.cy, v = 0;
+      if (y < edge) v = -Math.ceil((edge - y) / 4);
+      else if (y > innerHeight - edge) v = Math.ceil((y - (innerHeight - edge)) / 4);
+      if (v) { window.scrollBy(0, v); hover(drag.cx, drag.cy); }
+      requestAnimationFrame(autoScroll);
+    }
+    function hover(px, py) {
+      var t = targetAt(px, py);
+      clearOver();
+      if (t && !(t.idx === drag.from && t.kind !== 'cell') && t.node) t.node.classList.add('is-over');
+    }
     window.addEventListener('pointermove', function (e) {
       if (!drag) return;
+      drag.cx = e.clientX; drag.cy = e.clientY;
       if (!drag.ghost) {
-        if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 6) return;
+        if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 5) return;
         var r = drag.src.getBoundingClientRect();
         drag.ghost = drag.src.cloneNode(true);
-        drag.ghost.className = 'pcover ghost';
+        drag.ghost.classList.add('ghost');
         drag.ghost.style.width = r.width + 'px';
         drag.ghost.style.height = r.height + 'px';
         drag.dx = drag.x - r.left; drag.dy = drag.y - r.top;
         document.body.appendChild(drag.ghost);
         drag.src.classList.add('is-dragging');
+        document.body.classList.add('dragging');
+        requestAnimationFrame(autoScroll);
       }
       drag.ghost.style.left = (e.clientX - drag.dx) + 'px';
       drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
-      drag.ghost.hidden = true;
-      var to = targetAt(e.clientX, e.clientY);
-      drag.ghost.hidden = false;
-      clearOver();
-      if (to > -1 && to !== drag.from) {
-        var t = document.querySelector('#sheetPages .pcover[data-idx="' + to + '"]');
-        if (t) t.classList.add('is-over');
-      }
+      hover(e.clientX, e.clientY);
     });
     function end(e) {
       if (!drag) return;
       var d = drag;
       drag = null;
       clearOver();
+      document.body.classList.remove('dragging');
       if (!d.ghost) return;
       d.ghost.remove();
       d.src.classList.remove('is-dragging');
-      var to = e.type === 'pointerup' ? targetAt(e.clientX, e.clientY) : -1;
-      if (to > -1) moveTo(d.from, to);
+      var t = e.type === 'pointerup' ? targetAt(e.clientX, e.clientY) : null;
+      if (!t) return;
+      if (t.kind === 'cover') moveTo(d.from, t.idx);
+      else if (t.kind === 'cell') moveToCell(d.from, t.page, t.x, t.y);
+      else if (t.kind === 'row') moveInList(d.from, t.idx);
     }
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
@@ -1157,6 +1274,7 @@
   $('#sheetPrint').addEventListener('click', printSheet);
   $('#sheetClear').addEventListener('click', function () { sheet = []; saveSheet(); renderSheet(); });
   $('#sheetBack').addEventListener('click', function () { showView('find'); });
+  $('#sheetTidy').addEventListener('click', tidy);
   document.querySelector('.tabs').addEventListener('click', function (e) {
     var b = e.target.closest('[data-view]');
     if (b) showView(b.getAttribute('data-view'));
