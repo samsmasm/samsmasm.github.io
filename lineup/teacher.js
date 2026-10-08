@@ -2,8 +2,8 @@
 
 import {
   ROOMS, doc, getDoc, setDoc, getDocs, deleteDoc, collection, writeBatch, serverTimestamp, Timestamp
-} from './firebase.js?v=20261008-193745';
-import { playable } from './deck.js?v=20261008-193745';
+} from './firebase.js?v=20261008-194926';
+import { playable } from './deck.js?v=20261008-194926';
 
 const DAY = 24 * 60 * 60 * 1000;
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O, which look like 1 and 0

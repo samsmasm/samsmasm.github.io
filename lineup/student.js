@@ -10,7 +10,7 @@
 //   ?deck=ID     a deck its teacher has shared: sort on your own, nothing sent
 //   ?preview=1   the teacher's editor, through localStorage: nothing saved
 
-import { normaliseDeck } from './deck.js?v=20261008-193745';
+import { normaliseDeck } from './deck.js?v=20261008-194926';
 
 const $ = id => document.getElementById(id);
 const board = $('board');
@@ -107,7 +107,7 @@ async function join() {
 
 async function connect() {
   if (fb && fb.db) return;
-  const api = await import('./firebase.js?v=20261008-193745');
+  const api = await import('./firebase.js?v=20261008-194926');
   const { db, ready } = api.studentFirebase();
   const user = await ready;
   fb = { db, user, api };
@@ -466,6 +466,12 @@ if (params.get('room')) {
   if (raw) {
     setDeck(raw);
     $('previewNote').classList.remove('hidden');
+    // The editor opens the preview in its own tab, which a script may close.
+    // If the browser refuses (say, the link was opened by hand), go back to the teacher page.
+    $('closePreviewBtn').addEventListener('click', () => {
+      window.close();
+      setTimeout(() => { location.href = 'teach.html'; }, 300);
+    });
     start('preview', null);
   }
 }

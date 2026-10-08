@@ -7,13 +7,13 @@
 import {
   teacherFirebase, ROOMS, DECKS, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   collection, query, where, serverTimestamp
-} from './firebase.js?v=20261008-193745';
+} from './firebase.js?v=20261008-194926';
 import {
   MIN_CARDS, MAX_CARDS, FIELDS, blankDeck, normaliseDeck, checkDeck, nextCardId,
   playable, buildPrompt, buildRevisePrompt, parseReply
-} from './deck.js?v=20261008-193745';
-import { STARTERS } from './starters.js?v=20261008-193745';
-import { fmt, createRoom, deleteRoom, armable } from './teacher.js?v=20261008-193745';
+} from './deck.js?v=20261008-194926';
+import { STARTERS } from './starters.js?v=20261008-194926';
+import { fmt, createRoom, deleteRoom, armable } from './teacher.js?v=20261008-194926';
 
 const $ = id => document.getElementById(id);
 const fb = teacherFirebase();

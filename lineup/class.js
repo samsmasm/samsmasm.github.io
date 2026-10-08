@@ -4,9 +4,9 @@
 
 // The deck comes from the room, which got its own copy when the session started.
 
-import { teacherFirebase, ROOMS, doc, getDoc, collection, onSnapshot } from './firebase.js?v=20261008-193745';
-import { normaliseDeck } from './deck.js?v=20261008-193745';
-import { deleteRoom, armable } from './teacher.js?v=20261008-193745';
+import { teacherFirebase, ROOMS, doc, getDoc, collection, onSnapshot } from './firebase.js?v=20261008-194926';
+import { normaliseDeck } from './deck.js?v=20261008-194926';
+import { deleteRoom, armable } from './teacher.js?v=20261008-194926';
 
 const $ = id => document.getElementById(id);
 const fb = teacherFirebase();
