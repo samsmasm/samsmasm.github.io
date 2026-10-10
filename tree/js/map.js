@@ -7,7 +7,7 @@ const TreeMap = (() => {
   // bold on purpose: telling the lines apart matters more than matching the sheet's palette
   const BRANCH_COL = ['#e3201b', '#1f5fe0', '#18a43c', '#ff8a00'], DIRECT = '#8b1fd1', OTHER = '#8f8f8f';
   const ERA = ['#6a1fd1', '#1f5fe0', '#00b3d6', '#18a43c', '#f2cf00', '#ff8a00', '#e3201b'];   // rainbow, early (violet) to late (red)
-  let libs = null, M = null, data = null, ui = { mode: 'branch', lines: false, lo: 0, hi: 0 };
+  let libs = null, M = null, data = null, ui = { mode: 'branch', show: 'markers', lines: false, lo: 0, hi: 0 };
 
   const load = () => libs || (libs = (async () => {
     const mine = document.querySelector('link[href="css/tree.css"]');   // library CSS goes first so ours wins
@@ -80,6 +80,32 @@ const TreeMap = (() => {
     const n = {}; items.forEach(x => x.who.forEach(p => { const c = brCol(p.id); n[c] = (n[c] || 0) + 1; }));
     return Object.entries(n).sort((a, b) => b[1] - a[1])[0][0];
   }
+  // colour -> count for a set of entries: one per person (family line), or per entry in the nearest era band
+  function tally(items) {
+    const n = {}, add = c => { n[c] = (n[c] || 0) + 1; };
+    for (const x of items) {
+      if (ui.mode === 'era') {
+        const y = x.e.year;
+        add(y ? ERA[Math.round(Math.max(0, Math.min(1, (y - data.lo) / ((data.hi - data.lo) || 1))) * (ERA.length - 1))] : OTHER);
+      } else x.who.forEach(p => add(brCol(p.id)));
+    }
+    return n;
+  }
+  // ring split by colour share, count in the middle
+  function pie(counts, n, s) {
+    const R = s / 2 - 1, r = R - Math.max(6, s * .22), c = s / 2, tot = Object.values(counts).reduce((a, b) => a + b, 0);
+    let a0 = -Math.PI / 2, segs = '';
+    const pt = (a, rad) => `${(c + rad * Math.cos(a)).toFixed(2)},${(c + rad * Math.sin(a)).toFixed(2)}`;
+    const ents = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (ents.length === 1) segs = `<circle cx="${c}" cy="${c}" r="${(R + r) / 2}" fill="none" stroke="${ents[0][0]}" stroke-width="${R - r}"/>`;
+    else for (const [col, v] of ents) {
+      const a1 = a0 + v / tot * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
+      segs += `<path d="M${pt(a0, R)} A${R},${R} 0 ${big} 1 ${pt(a1, R)} L${pt(a1, r)} A${r},${r} 0 ${big} 0 ${pt(a0, r)} Z" fill="${col}"/>`;
+      a0 = a1;
+    }
+    return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">${segs}<circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="#2a2922"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="#f7f3e4" stroke="#2a2922"/><text x="${c}" y="${c + 4}" text-anchor="middle">${n}</text></svg>`;
+  }
   function icon(col, hollow, n) {
     const r = Math.min(11, 5 + Math.sqrt(n) * 1.6), s = Math.ceil(r * 2 + 4);
     const svg = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><circle cx="${s / 2}" cy="${s / 2}" r="${r}" fill="${hollow ? '#f7f3e4' : col}" fill-opacity="${hollow ? .55 : .9}" stroke="${hollow ? col : '#2a2922'}" stroke-width="${hollow ? 2.2 : 1}"${hollow ? ' stroke-dasharray="3 2"' : ''}/></svg>`;
@@ -98,11 +124,12 @@ const TreeMap = (() => {
   }
 
   function draw() {
-    const { map, cl, ln } = M; cl.clearLayers(); ln.clearLayers(); M.markers = {};
+    const { map, cl, ln } = M; cl.clearLayers(); ln.clearLayers(); M.markers = {}; M.blobs = [];
     let shown = 0;
     for (const pt of Object.values(data.pts)) {
       const items = pt.items.filter(x => inRange(x.e.year)); if (!items.length) continue;
-      const m = L.marker([pt.info.lat, pt.info.lng], { icon: icon(colourFor(items), isHollow(pt.info), items.length), title: pt.info.name, n: items.length })
+      M.blobs.push({ ll: L.latLng(pt.info.lat, pt.info.lng), counts: tally(items) });
+      const m = L.marker([pt.info.lat, pt.info.lng], { icon: icon(colourFor(items), isHollow(pt.info), items.length), title: pt.info.name, n: items.length, counts: tally(items) })
         .bindPopup(() => popup(pt, items), { maxWidth: 360, minWidth: 260, autoPanPadding: [30, 30] });
       cl.addLayer(m); M.markers[pt.name] = m; shown += items.length;
     }
@@ -117,6 +144,8 @@ const TreeMap = (() => {
       ln.addLayer(pl);
     }
     $('#mapcount').textContent = `${shown} entries at ${Object.keys(M.markers).length} places`;
+    if (ui.show === 'clouds') { if (map.hasLayer(cl)) map.removeLayer(cl); M.cloud.addTo(map); M.cloud.redraw(); }
+    else { if (map.hasLayer(M.cloud)) map.removeLayer(M.cloud); if (!map.hasLayer(cl)) map.addLayer(cl); }
     legend();
   }
 
@@ -133,13 +162,68 @@ const TreeMap = (() => {
   }
 
   function clusterIcon(c) {
-    const n = c.getAllChildMarkers().reduce((s, m) => s + (m.options.n || 1), 0), s = n < 10 ? 30 : n < 50 ? 36 : 44;
-    return L.divIcon({ html: `<span>${n}</span>`, className: 'cluster', iconSize: [s, s] });
+    const ms = c.getAllChildMarkers(), n = ms.reduce((s, m) => s + (m.options.n || 1), 0), s = n < 10 ? 34 : n < 50 ? 40 : 48, counts = {};
+    for (const m of ms) for (const [k, v] of Object.entries(m.options.counts || {})) counts[k] = (counts[k] || 0) + v;
+    return L.divIcon({ html: pie(counts, n, s), className: 'cluster', iconSize: [s, s] });
+  }
+
+  /* cloud mode: a soft density glow per colour; where colours overlap they blend by weight */
+  function cloudLayer() {
+    const SC = 4, SIG = 22;   // grid cell size and blob spread, in screen pixels
+    let cv, map;
+    const layer = L.Layer.extend({
+      onAdd(m) { map = m; cv = L.DomUtil.create('canvas', 'cloud'); map.getPane('overlayPane').appendChild(cv);
+        map.on('moveend zoomend resize', this.redraw, this); map.on('zoomstart', hide); this.redraw(); },
+      onRemove() { map.off('moveend zoomend resize', this.redraw, this); map.off('zoomstart', hide); cv.remove(); },
+      redraw() {
+        if (!cv || !map) return;
+        const sz = map.getSize(), gw = Math.ceil(sz.x / SC), gh = Math.ceil(sz.y / SC), sig = SIG / SC, R = Math.ceil(sig * 5);   // 5 sigma so big places fade out instead of ending in a hard edge
+        cv.width = sz.x; cv.height = sz.y; cv.style.display = '';
+        L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([0, 0]));
+        const cols = [...new Set(M.blobs.flatMap(b => Object.keys(b.counts)))];
+        const grids = cols.map(() => new Float32Array(gw * gh)), rgb = cols.map(h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16)));
+        for (const b of M.blobs) {
+          const p = map.latLngToContainerPoint(b.ll), gx = p.x / SC, gy = p.y / SC;
+          if (gx < -R || gy < -R || gx > gw + R || gy > gh + R) continue;
+          for (const [col, v] of Object.entries(b.counts)) {
+            const g = grids[cols.indexOf(col)], w = Math.log2(1 + v);
+            for (let y = Math.max(0, Math.floor(gy - R)); y < Math.min(gh, gy + R); y++)
+              for (let x = Math.max(0, Math.floor(gx - R)); x < Math.min(gw, gx + R); x++) {
+                const d2 = (x - gx) ** 2 + (y - gy) ** 2; g[y * gw + x] += w * Math.exp(-d2 / (2 * sig * sig));
+              }
+          }
+        }
+        const small = document.createElement('canvas'); small.width = gw; small.height = gh;
+        const sx = small.getContext('2d'), img = sx.createImageData(gw, gh);
+        for (let i = 0; i < gw * gh; i++) {
+          let t = 0, r = 0, g = 0, bl = 0;
+          for (let k = 0; k < cols.length; k++) { const v = grids[k][i]; if (!v) continue; t += v; r += v * rgb[k][0]; g += v * rgb[k][1]; bl += v * rgb[k][2]; }
+          if (t < .02) continue;
+          const [R8, G8, B8] = vivid(r / t, g / t, bl / t);
+          img.data[i * 4] = R8; img.data[i * 4 + 1] = G8; img.data[i * 4 + 2] = B8;
+          img.data[i * 4 + 3] = 205 * (1 - Math.exp(-t / 1.5));
+        }
+        sx.putImageData(img, 0, 0);
+        const cx = cv.getContext('2d'); cx.imageSmoothingEnabled = true; cx.drawImage(small, 0, 0, gw * SC, gh * SC);
+      }
+    });
+    const hide = () => { if (cv) cv.style.display = 'none'; };
+    // a weighted average of bright colours goes muddy; push the blend back to full saturation
+    function vivid(r, g, b) {
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx - mn < 8) return [r, g, b];
+      const l = (mx + mn) / 510, s = Math.max(.75, (mx - mn) / 255 / (1 - Math.abs(2 * l - 1))), L2 = Math.min(.58, Math.max(.4, l));
+      let h = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4; h = (h * 60 + 360) % 360;
+      const c = (1 - Math.abs(2 * L2 - 1)) * Math.min(1, s), x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = L2 - c / 2;
+      const [a, bb, cc] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+      return [(a + m) * 255, (bb + m) * 255, (cc + m) * 255];
+    }
+    return new layer();
   }
 
   function view() {
     return `<div class="card slate mapcard"><div class="head"><span class="k">Map of places</span><span class="k" id="mapcount"></span></div>
       <div class="body mapctl">
+        <span class="k gen-pick">Show <a href="#" data-show="markers">Markers</a><a href="#" data-show="clouds">Clouds</a></span>
         <span class="k gen-pick">Colour by <a href="#" data-mode="branch">Family line</a><a href="#" data-mode="era">Era</a></span>
         <label class="k"><input type="checkbox" id="maplines"> Migration lines</label>
         <span class="yrs"><label class="k">From <input type="range" id="ylo"></label><label class="k">To <input type="range" id="yhi"></label><span class="dates" id="yread"></span></span>
@@ -154,6 +238,7 @@ const TreeMap = (() => {
     try { await load(); } catch (_) { $('#map').innerHTML = '<p class="empty" style="padding:20px">The map library could not be loaded.</p>'; return; }
     if (!$('#map')) return;   // left the page while loading
     data = data || build();
+    if (focus) ui.show = 'markers';   // a "show on the map" link needs the marker and its popup
     if (!ui.hi) { ui.lo = data.lo; ui.hi = data.hi; }
     $('#map').innerHTML = '';
     const map = L.map('map', { worldCopyJump: true, zoomSnap: .5, minZoom: 2 });
@@ -162,7 +247,7 @@ const TreeMap = (() => {
       attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, USGS, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors and the GIS user community' }).addTo(map);
     const cl = L.markerClusterGroup({ maxClusterRadius: 38, showCoverageOnHover: false, iconCreateFunction: clusterIcon });
     const ln = L.layerGroup().addTo(map); cl.addTo(map);
-    M = { map, cl, ln, markers: {} };
+    M = { map, cl, ln, markers: {}, blobs: [], cloud: cloudLayer() };
     const sl = [$('#ylo'), $('#yhi')];
     sl.forEach(s => { s.min = data.lo; s.max = data.hi; s.step = 5; });
     sl[0].value = ui.lo; sl[1].value = ui.hi;
@@ -176,6 +261,10 @@ const TreeMap = (() => {
     const setMode = () => modes.forEach(a => a.classList.toggle('on', a.dataset.mode === ui.mode));
     modes.forEach(a => a.onclick = e => { e.preventDefault(); ui.mode = a.dataset.mode; setMode(); draw(); });
     setMode();
+    const shows = document.querySelectorAll('[data-show]');
+    const setShow = () => shows.forEach(a => a.classList.toggle('on', a.dataset.show === ui.show));
+    shows.forEach(a => a.onclick = e => { e.preventDefault(); ui.show = a.dataset.show; setShow(); draw(); });
+    setShow();
     $('#maplines').checked = ui.lines; $('#maplines').onchange = e => { ui.lines = e.target.checked; draw(); };
     draw();
     $('#mapfoot').textContent = `${data.lines.length} people have a line from birth to death place, through any immigration stop. ${data.skipped} entries have no plottable place (country only or not identified) and are not shown. Private and living people are left off.`;
