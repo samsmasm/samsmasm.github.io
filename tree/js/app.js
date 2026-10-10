@@ -8,7 +8,7 @@ const pHref = p => '#/person/' + S.idKey(p.id);
 const ref = p => 'REF. ' + S.idKey(p.id);
 
 function mini(p, extra) {
-  if (p && p.private) return `<div class="minicard unk"><div class="k">${esc(extra || 'Person')}</div><div class="nm">Private</div></div>`;
+  if (p && p.private) return `<a class="minicard unk" href="${pHref(p)}"><div class="k">${esc(extra || 'Person')}</div><div class="nm">Private</div></a>`;
   if (!p) return '<div class="minicard unk"><div class="nm">Unknown</div><div class="k">not recorded</div></div>';
   const b = S.ev(p, 'BIRT');
   return `<a class="minicard" href="${pHref(p)}"><div class="k">${esc(extra || '')}${extra ? ' · ' : ''}<span class="mono">${esc(S.idKey(p.id))}</span></div>
@@ -25,14 +25,18 @@ function home() {
   const ppl = S.all(), sn = S.surnames();
   const top = Object.entries(sn).filter(([k]) => !k.startsWith('(')).sort((a, b) => b[1].length - a[1].length).slice(0, 12);
   const yrs = ppl.map(p => p.birth_year).filter(Boolean);
-  let root = S.person('@I1@');
-  while (root && root.private) { const f = S.parents(root).father || S.parents(root).mother; root = f; }
+  const root = S.person('@I1@');
+  const side = q => { if (!q) return []; const g = [S.parents(q).father, S.parents(q).mother].filter(x => x && !x.private); return g.length ? g : (q.private ? [] : [q]); };
+  const par = root ? S.parents(root) : {};
+  const lines = [['Father\u2019s parents', side(par.father)], ['Mother\u2019s parents', side(par.mother)]].filter(l => l[1].length);
   const pl = Object.keys(S.places()).length;
   return `<div class="hero">
     <div class="card slate"><div class="head"><span class="k">Sheet 1</span><span class="k">Index</span></div><div class="body">
       <h2 style="font-size:2rem;margin:4px 0 8px">The Graham, Dawes, Clark<br>and related families</h2>
       <p>A working record of ${ppl.length} people across ${yrs.length ? Math.round((Math.max(...yrs) - Math.min(...yrs)) / 25) : 0} or so generations, from ${Math.min(...yrs)} to the present, mostly in England, Scotland and New Zealand.</p>
-      <p>${root ? `Begin at <a href="${pHref(root)}">${esc(S.name(root))}</a> and walk back, or ` : ''}search by name or place above.</p></div></div>
+      <p>Begin with the four grandparents, or search by name or place above.</p>
+      ${lines.map(([lab, ps]) => `<p><span class="k">${lab}</span><br>${ps.map(q => `<a href="${pHref(q)}">${esc(S.name(q))}</a> <span class="dates">${esc(S.span(q))}</span>`).join(' &amp; ')}</p>`).join('')}
+      ${root ? `<p><a href="#/chart/${S.idKey(root.id)}/6">Both lines on one chart \u2192</a></p>` : ''}</div></div>
     <div><div class="section" style="margin-top:0"><h2>Survey summary</h2>
       <div class="stat"><span>People</span><span>${ppl.length}</span></div>
       <div class="stat"><span>Families</span><span>${document.body.dataset.fams}</span></div>
