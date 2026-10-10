@@ -36,7 +36,7 @@ function home() {
       <p>A working record of ${ppl.length} people across ${yrs.length ? Math.round((Math.max(...yrs) - Math.min(...yrs)) / 25) : 0} or so generations, from ${Math.min(...yrs)} to the present, mostly in England, Scotland and New Zealand.</p>
       <p>Begin with the four grandparents, or search by name or place above.</p>
       ${lines.map(([lab, ps]) => `<p><span class="k">${lab}</span><br>${ps.map(q => `<a href="${pHref(q)}">${esc(S.name(q))}</a> <span class="dates">${esc(S.span(q))}</span>`).join(' &amp; ')}</p>`).join('')}
-      ${root ? `<p><a href="#/chart/${S.idKey(root.id)}/6">Both lines on one chart \u2192</a></p>` : ''}</div></div>
+      ${root ? `<p><a href="#/chart/${S.idKey(root.id)}">Both lines on one chart \u2192</a></p>` : ''}</div></div>
     <div><div class="section" style="margin-top:0"><h2>Survey summary</h2>
       <div class="stat"><span>People</span><span>${ppl.length}</span></div>
       <div class="stat"><span>Families</span><span>${document.body.dataset.fams}</span></div>
@@ -61,7 +61,7 @@ function personView(key) {
     <div class="body"><h1 class="person-name">${esc(S.name(p))}</h1><div class="dates">${esc(S.span(p))}</div>
       <table class="ledger" style="margin-top:10px">${fact('Born', b)}${fact('Died', d)}${fact('Buried', bu)}</table></div></div>
     <div class="section"><h2>Parents</h2><div class="cols">${mini(par.father, 'Father')}${mini(par.mother, 'Mother')}</div>
-      <p style="margin-top:10px"><a href="#/chart/${esc(key)}/5">Ancestor chart →</a></p></div>
+      <p style="margin-top:10px"><a href="#/chart/${esc(key)}">Family chart →</a></p></div>
     ${sibs.length ? `<div class="section"><h2>Siblings</h2><div class="cols">${sibs.map(s => mini(s)).join('')}</div></div>` : ''}
     ${un.length ? `<div class="section"><h2>${un.length > 1 ? 'Partners and children' : 'Partner and children'}</h2>${un.map(u => `
       <div style="margin-bottom:18px"><div class="cols">${mini(u.spouse, 'Partner')}</div>
@@ -91,38 +91,6 @@ document.addEventListener('toggle', async e => {
   catch (_) { box.innerHTML += 'Could not load.'; }
 }, true);
 
-function chartView(key, gens) {
-  const p = S.person(S.keyId(key)); if (!p) return notFound();
-  const G = Math.min(7, Math.max(2, +gens || 5)), W = 210, H = 40, GAP = 54, slot = H + 10, rows = 2 ** (G - 1), top = 30;
-  const totalH = rows * slot + top + 10, totalW = G * W + (G - 1) * GAP + 20;
-  const nodes = [], lines = [];
-  (function place(person, g, i) {
-    if (!person || g >= G) return;
-    const x = 10 + g * (W + GAP), y = top + (i + 0.5) * (rows * slot / 2 ** g);
-    nodes.push({ person, x, y, g });
-    const par = S.parents(person);
-    [[par.father, i * 2], [par.mother, i * 2 + 1]].forEach(([q, j]) => {
-      if (!q) return;
-      if (g + 1 >= G) { nodes.push({ more: true, x: x + W, y }); return; }
-      const qy = top + (j + 0.5) * (rows * slot / 2 ** (g + 1)), qx = 10 + (g + 1) * (W + GAP);
-      lines.push(`M${x + W},${y} H${x + W + GAP / 2} V${qy} H${qx}`);
-      place(q, g + 1, j);
-    });
-  })(p, 0, 0);
-  const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
-    ${Array.from({ length: G }, (_, g) => `<text x="${10 + g * (W + GAP)}" y="18" font-size="13" fill="#5b5846" letter-spacing="2">GEN. ${ROM[g]}</text><line x1="${10 + g * (W + GAP)}" x2="${10 + g * (W + GAP) + W}" y1="23" y2="23" stroke="#2a2922"/>`).join('')}
-    ${lines.map(d => `<path d="${d}" fill="none" stroke="#3f5159" stroke-width="1.2"/>`).join('')}
-    ${nodes.map(n => n.more ? `<text x="${n.x + 6}" y="${n.y + 5}" fill="#9b4a2a" font-size="15">›</text>` : `
-      <a href="${pHref(n.person)}"><rect x="${n.x}" y="${n.y - H / 2}" width="${W}" height="${H}" fill="${n.g === 0 ? '#e4dcc0' : '#f7f3e4'}" stroke="#2a2922"/>
-      <rect x="${n.x}" y="${n.y - H / 2}" width="4" height="${H}" fill="${n.person.sex === 'F' ? '#9b4a2a' : '#5f6532'}"/>
-      <text x="${n.x + 12}" y="${n.y - 3}" font-size="15" fill="#2a2922">${esc(trunc(S.name(n.person), 27))}</text>
-      <text x="${n.x + 12}" y="${n.y + 13}" font-size="12" fill="#5b5846">${esc(S.span(n.person))}</text></a>`).join('')}</svg>`;
-  return `<div class="card slate"><div class="head"><span class="k">Ancestor chart</span><span class="k gen-pick">Generations: ${[3, 4, 5, 6, 7].map(n => `<a class="${n === G ? 'on' : ''}" href="#/chart/${esc(key)}/${n}">${n}</a>`).join('')}</span></div>
-    <div class="body"><h1 class="person-name" style="font-size:1.9rem"><a href="${pHref(p)}" style="border:0">${esc(S.name(p))}</a></h1>
-    <span class="k">Click any name to move the chart there. › marks a line that continues beyond the chart.</span></div></div>
-    <div class="pedwrap" style="margin-top:18px">${svg}</div>`;
-}
 const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
 
 function surnamesView() {
@@ -183,7 +151,7 @@ function route() {
   let html;
   if (!a) html = home();
   else if (a === 'person') html = personView(b);
-  else if (a === 'chart') html = chartView(b, c);
+  else if (a === 'chart') html = TreeChart.view(b || 'I1');
   else if (a === 'surnames') html = surnamesView();
   else if (a === 'surname') html = surnameView(b);
   else if (a === 'places') html = placesView();
@@ -193,10 +161,11 @@ function route() {
   else if (a === 'records') html = Records.view();
   else if (a === 'given') html = Records.givenView(b);
   else html = notFound();
-  TreeMap.unmount();
+  TreeMap.unmount(); TreeChart.unmount();
   $('#view').innerHTML = html;
   document.body.classList.toggle('wide', a === 'map');
   if (a === 'map') TreeMap.mount(h.slice(4) || null);
+  if (a === 'chart') TreeChart.mount();
   document.querySelectorAll('nav.legend a').forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#/' + (a || '')));
   const pn = a === 'person' && S.person(S.keyId(b));
   document.title = pn ? S.name(pn) + ' · Family tree' : 'Family tree';
