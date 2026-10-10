@@ -41,7 +41,8 @@ function home() {
       <div class="stat"><span>People</span><span>${ppl.length}</span></div>
       <div class="stat"><span>Families</span><span>${document.body.dataset.fams}</span></div>
       <div class="stat"><span>Places named</span><span>${pl}</span></div>
-      <div class="stat"><span>Earliest birth recorded</span><span>${Math.min(...yrs)}</span></div></div>
+      <div class="stat"><span>Earliest birth recorded</span><span>${Math.min(...yrs)}</span></div>
+      <p style="margin-top:8px"><a href="#/records">Records: oldest, furthest back, longest-lived and more →</a></p></div>
       <div class="section"><h2>Principal surnames</h2>
       ${top.map(([k, v]) => `<div class="stat"><a href="#/surname/${encodeURIComponent(k)}">${esc(k)}</a><span>${v.length}</span></div>`).join('')}
       <p style="margin-top:8px"><a href="#/surnames">All surnames →</a></p></div></div></div>`;
@@ -68,6 +69,7 @@ function personView(key) {
       ${u.children.length ? `<div class="cols" style="margin-top:10px">${sortByBirth(u.children).map(c => mini(c, 'Child')).join('')}</div>` : ''}</div>`).join('')}</div>` : ''}
     ${rest.length ? `<div class="section"><h2>Other recorded events</h2><table class="ledger">${evRows(rest)}</table></div>` : ''}
     ${p.notes.length ? `<div class="section"><h2>Notes</h2>${p.notes.map(n => `<div class="note">${esc(n)}</div>`).join('')}</div>` : ''}
+    ${Records.forPerson(p)}
     ${attView(p)}
     ${p.media.length ? `<div class="section"><h2>Attached documents</h2>${p.media.map(m => `<details class="att"><summary>${esc(m.file)}</summary><div class="inner">${m.note ? esc(m.note) : '<span class="empty">No transcription yet. Image display comes in a later stage.</span>'}</div></details>`).join('')}</div>` : ''}`;
 }
@@ -133,18 +135,41 @@ function surnameView(s) {
   const list = sortByBirth(S.surnames()[s] || []);
   return `<div class="section" style="margin-top:0"><h2>${esc(s)} — ${list.length} ${list.length === 1 ? 'person' : 'people'}</h2><div class="cols wide">${list.map(p => mini(p)).join('')}</div></div>`;
 }
+/* place hierarchy: country, then region (the level under the country), then the place */
+function placeGroup(pl) {
+  const ch = S.placeChain(pl);
+  if (!ch.length) return { country: pl.split(',').pop().trim() || '(none)', region: '' };
+  const country = ch[0][1].name, own = ch[ch.length - 1][1];
+  const region = ch.length >= 3 ? ch[1][0] : ch.length === 2 && own.precision !== 'place' ? ch[1][0] : '';
+  return { country, region };
+}
+const venues = evs => [...new Set(evs.map(e => e.place_detail).filter(Boolean))];
 function placesView() {
   const m = S.places(), by = {};
-  for (const [pl, v] of Object.entries(m)) { const c = pl.split(',').pop().trim() || '(none)'; (by[c] = by[c] || []).push([pl, v.people.size]); }
-  return `<div class="section" style="margin-top:0"><h2>Places</h2>` + Object.entries(by).sort((a, b) => b[1].length - a[1].length).map(([c, arr]) =>
-    `<details open class="att"><summary>${esc(c)} <span class="k">· ${arr.length} places</span></summary><div class="inner"><div class="list-split">${arr.sort((a, b) => a[0].localeCompare(b[0])).map(([pl, n]) =>
-      `<div><a href="#/place/${encodeURIComponent(pl)}">${esc(pl)}</a><span>${n}</span></div>`).join('')}</div></div></details>`).join('') + '</div>';
+  for (const [pl, v] of Object.entries(m)) {
+    const g = placeGroup(pl), c = (by[g.country] = by[g.country] || {});
+    (c[g.region] = c[g.region] || []).push([pl, v.people.size, venues([...v.people.values()].flat())]);
+  }
+  const nPl = c => Object.values(c).reduce((s, a) => s + a.length, 0);
+  const row = ([pl, n, vs]) => `<div><span><a href="#/place/${encodeURIComponent(pl)}">${esc(pl.split(', ')[0])}</a>${pl === placeGroup(pl).region ? ' <span class="venue">(region only)</span>' : ''}${vs.length ? ` <span class="venue">${esc(vs.join('; '))}</span>` : ''}</span><span>${n}</span></div>`;
+  return `<div class="section" style="margin-top:0"><h2>Places</h2><p class="k">Grouped by country, then region. Numbers are people with an event there. <a href="#/map">See them on the map →</a></p>` +
+    Object.entries(by).sort((a, b) => nPl(b[1]) - nPl(a[1])).map(([c, regs]) =>
+    `<details open class="att"><summary>${esc(c)} <span class="k">· ${nPl(regs)} places</span></summary><div class="inner">${Object.entries(regs)
+      .sort((a, b) => (a[0] ? 1 : 0) - (b[0] ? 1 : 0) || a[0].localeCompare(b[0])).map(([r, arr]) =>
+      `${r ? `<h3 class="region"><a href="#/place/${encodeURIComponent(r)}">${esc(r.split(', ')[0])}</a></h3>` : ''}<div class="list-split">${arr.sort((a, b) => a[0].localeCompare(b[0])).map(row).join('')}</div>`).join('')}</div></details>`).join('') + '</div>';
 }
 function placeView(pl) {
-  const v = S.places()[pl]; if (!v) return notFound();
-  const rows = [...v.people.entries()].map(([id, evs]) => [S.person(id), evs]).sort((a, b) => (a[0].birth_year || 9999) - (b[0].birth_year || 9999));
-  return `<div class="section" style="margin-top:0"><h2>${esc(pl)}</h2><table class="ledger">${rows.map(([p, evs]) =>
-    `<tr><td class="k">${evs.map(e => S.EV[e.type] || e.type).join(', ')}</td><td class="d">${esc(evs.map(e => e.date).filter(Boolean).join('; '))}</td><td><a href="${pHref(p)}">${esc(S.name(p))}</a> <span class="dates">${esc(S.span(p))}</span></td></tr>`).join('')}</table></div>`;
+  const m = S.places(), v = m[pl], info = S.placeInfo(pl);
+  const within = Object.keys(m).filter(k => k !== pl && k.endsWith(', ' + pl)).sort();
+  if (!v && !within.length) return notFound();
+  const crumbs = S.placeChain(pl).slice(0, -1).map(([n, i]) => `<a href="#/place/${encodeURIComponent(n)}">${esc(i.name)}</a>`).reverse().join(', ');
+  const rows = v ? [...v.people.entries()].map(([id, evs]) => [S.person(id), evs]).sort((a, b) => (a[0].birth_year || 9999) - (b[0].birth_year || 9999)) : [];
+  const note = !info ? '' : info.lat == null || info.precision === 'country' ? 'Not on the map' : info.approx ? 'Approximate position on the map' : info.precision === 'place' ? '' : 'Mapped as a region';
+  return `<div class="section" style="margin-top:0"><h2>${esc(info ? info.name : pl)}${crumbs ? ` <span class="crumbs">· ${crumbs}</span>` : ''}</h2>
+    <p class="k">${TreeMap.has(pl) ? `<a href="#/map/${encodeURIComponent(pl)}">Show on the map →</a> ` : ''}${note ? esc(note) + ' · ' : ''}<a href="#/places">All places</a></p>
+    ${rows.length ? `<table class="ledger">${rows.map(([p, evs]) =>
+    `<tr><td class="k">${evs.map(e => S.EV[e.type] || e.type).join(', ')}</td><td class="d">${esc(evs.map(e => e.date).filter(Boolean).join('; '))}</td><td><a href="${pHref(p)}">${esc(S.name(p))}</a> <span class="dates">${esc(S.span(p))}</span>${venues(evs).length ? `<div class="venue">${esc(venues(evs).join('; '))}</div>` : ''}</td></tr>`).join('')}</table>` : ''}
+    ${within.length ? `<div class="section"><h2>Places within</h2><div class="list-split">${within.map(k => `<div><a href="#/place/${encodeURIComponent(k)}">${esc(k.slice(0, -pl.length - 2))}</a><span>${m[k].people.size}</span></div>`).join('')}</div></div>` : ''}</div>`;
 }
 function searchView(q) {
   const r = S.search(q);
@@ -164,12 +189,19 @@ function route() {
   else if (a === 'places') html = placesView();
   else if (a === 'place') html = placeView(h.slice(6));
   else if (a === 'search') html = searchView(h.slice(7));
+  else if (a === 'map') html = TreeMap.view();
+  else if (a === 'records') html = Records.view();
+  else if (a === 'given') html = Records.givenView(b);
   else html = notFound();
+  TreeMap.unmount();
   $('#view').innerHTML = html;
+  document.body.classList.toggle('wide', a === 'map');
+  if (a === 'map') TreeMap.mount(h.slice(4) || null);
   document.querySelectorAll('nav.legend a').forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#/' + (a || '')));
   const pn = a === 'person' && S.person(S.keyId(b));
   document.title = pn ? S.name(pn) + ' · Family tree' : 'Family tree';
   window.scrollTo(0, 0);
+  const rec = a === 'records' && b && document.getElementById('rec-' + b); if (rec) rec.scrollIntoView({ block: 'start' });
   document.querySelectorAll('[data-jump]').forEach(l => l.onclick = e => { e.preventDefault(); const t = document.querySelector(`[id^="s-${l.dataset.jump}-"]`); t && t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 }
 async function boot() {

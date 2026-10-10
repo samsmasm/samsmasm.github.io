@@ -57,6 +57,7 @@ const Store = (() => {
     const m = {};
     const add = (pl, o, e) => { if (!pl) return; const x = (m[pl] = m[pl] || { people: new Map() }); const k = o.id; if (!x.people.has(k)) x.people.set(k, []); x.people.get(k).push(e); };
     for (const p of all()) for (const e of p.events) add(e.place, p, e);
+    for (const f of Object.values(D.families)) for (const e of f.events) for (const id of [f.husb, f.wife]) { const q = person(id); if (q && !q.private) add(e.place, q, e); }
     return m;
   }
   function search(q) {
@@ -70,5 +71,9 @@ const Store = (() => {
     return res.sort((a, b) => a[0] - b[0] || (a[1].birth_year || 9999) - (b[1].birth_year || 9999)).map(x => x[1]);
   }
   const meta = () => D.meta;
-  return { load, attachments, mediaUrl, person, family, all, ev, name, span, parents, siblings, unions, surnames, places, search, meta, EV, idKey, keyId };
+  const families = () => D.families;
+  // clean place hierarchy from the export: { name, parent, precision, lat, lng, approx }
+  const placeInfo = n => (D.places || {})[n] || null;
+  function placeChain(n) { const out = []; let i; while (n && (i = placeInfo(n))) { out.unshift([n, i]); n = i.parent; } return out; }
+  return { load, attachments, mediaUrl, person, family, families, placeInfo, placeChain, all, ev, name, span, parents, siblings, unions, surnames, places, search, meta, EV, idKey, keyId };
 })();
