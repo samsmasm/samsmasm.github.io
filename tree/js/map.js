@@ -4,9 +4,10 @@ const TreeMap = (() => {
   const LIB = 'https://cdnjs.cloudflare.com/ajax/libs/';
   const CSS = [LIB + 'leaflet/1.9.4/leaflet.min.css', LIB + 'leaflet.markercluster/1.5.3/MarkerCluster.min.css'];
   const JS = [LIB + 'leaflet/1.9.4/leaflet.min.js', LIB + 'leaflet.markercluster/1.5.3/leaflet.markercluster.min.js'];
-  const BRANCH_COL = ['#9b4a2a', '#5f6532', '#3f5159', '#8a6a24'], DIRECT = '#2a2922', OTHER = '#9a927a';
-  const ERA = ['#3f5159', '#5f6532', '#b48a68', '#9b4a2a'];   // early to late
-  let libs = null, M = null, data = null, ui = { mode: 'branch', lines: true, lo: 0, hi: 0 };
+  // bold on purpose: telling the lines apart matters more than matching the sheet's palette
+  const BRANCH_COL = ['#e3201b', '#1f5fe0', '#18a43c', '#ff8a00'], DIRECT = '#8b1fd1', OTHER = '#8f8f8f';
+  const ERA = ['#6a1fd1', '#1f5fe0', '#00b3d6', '#18a43c', '#f2cf00', '#ff8a00', '#e3201b'];   // rainbow, early (violet) to late (red)
+  let libs = null, M = null, data = null, ui = { mode: 'branch', lines: false, lo: 0, hi: 0 };
 
   const load = () => libs || (libs = (async () => {
     const mine = document.querySelector('link[href="css/tree.css"]');   // library CSS goes first so ours wins
@@ -140,7 +141,7 @@ const TreeMap = (() => {
     return `<div class="card slate mapcard"><div class="head"><span class="k">Map of places</span><span class="k" id="mapcount"></span></div>
       <div class="body mapctl">
         <span class="k gen-pick">Colour by <a href="#" data-mode="branch">Family line</a><a href="#" data-mode="era">Era</a></span>
-        <label class="k"><input type="checkbox" id="maplines" checked> Migration lines</label>
+        <label class="k"><input type="checkbox" id="maplines"> Migration lines</label>
         <span class="yrs"><label class="k">From <input type="range" id="ylo"></label><label class="k">To <input type="range" id="yhi"></label><span class="dates" id="yread"></span></span>
       </div><div id="maplegend" class="maplegend"></div></div>
       <div id="map" class="mapbox"><p class="empty" style="padding:20px">Loading map…</p></div>
