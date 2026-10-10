@@ -68,8 +68,26 @@ function personView(key) {
       ${u.children.length ? `<div class="cols" style="margin-top:10px">${sortByBirth(u.children).map(c => mini(c, 'Child')).join('')}</div>` : ''}</div>`).join('')}</div>` : ''}
     ${rest.length ? `<div class="section"><h2>Other recorded events</h2><table class="ledger">${evRows(rest)}</table></div>` : ''}
     ${p.notes.length ? `<div class="section"><h2>Notes</h2>${p.notes.map(n => `<div class="note">${esc(n)}</div>`).join('')}</div>` : ''}
+    ${attView(p)}
     ${p.media.length ? `<div class="section"><h2>Attached documents</h2>${p.media.map(m => `<details class="att"><summary>${esc(m.file)}</summary><div class="inner">${m.note ? esc(m.note) : '<span class="empty">No transcription yet. Image display comes in a later stage.</span>'}</div></details>`).join('')}</div>` : ''}`;
 }
+
+const ROLE = { subject: '', sender: 'Written by', recipient: 'Sent to', mentioned: 'Mentioned', place: 'Place' };
+function attView(p) {
+  const L = S.attachments(p.id); if (!L.length) return '';
+  const pics = L.filter(a => a.kind === 'pic'), docs = L.filter(a => a.kind === 'text');
+  const cap = a => `${ROLE[a.role] || ''}${a.conf === 'low' ? ' (uncertain)' : ''}`.trim();
+  const flag = a => a.note ? `<div class="attnote">${esc(a.note)}</div>` : '';
+  return `<div class="section"><h2>Pictures and documents</h2>
+    ${pics.length ? `<div class="gallery">${pics.map(a => `<figure><a href="${S.mediaUrl(a)}" target="_blank"><img loading="lazy" src="${S.mediaUrl(a)}" alt="${esc(a.title)}"></a><figcaption>${esc(a.title)}${cap(a) ? ` <span class="k">${esc(cap(a))}</span>` : ''}${flag(a)}</figcaption></figure>`).join('')}</div>` : ''}
+    ${docs.map(a => `<details class="att" data-src="${S.mediaUrl(a)}"><summary>${esc(a.title)}${cap(a) ? ` <span class="k">${esc(cap(a))}</span>` : ''}</summary><div class="inner">${flag(a)}<span class="empty">Loading…</span></div></details>`).join('')}</div>`;
+}
+document.addEventListener('toggle', async e => {
+  const d = e.target; if (!d.matches || !d.matches('details.att[data-src]') || !d.open || d.dataset.done) return;
+  d.dataset.done = 1; const box = d.querySelector('.inner'), nt = box.querySelector('.attnote');
+  try { const t = await (await fetch(d.dataset.src)).text(); box.innerHTML = (nt ? nt.outerHTML : '') + '<pre class="ocr">' + esc(t) + '</pre>'; }
+  catch (_) { box.innerHTML += 'Could not load.'; }
+}, true);
 
 function chartView(key, gens) {
   const p = S.person(S.keyId(key)); if (!p) return notFound();
