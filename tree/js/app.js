@@ -1,0 +1,164 @@
+/* Views. Read-only for now. MODE is the hook for the later edit mode:
+   views render through helpers that can add edit controls when MODE === 'edit'. */
+const MODE = 'view';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const S = Store;
+const pHref = p => '#/person/' + S.idKey(p.id);
+const ref = p => 'REF. ' + S.idKey(p.id);
+
+function mini(p, extra) {
+  if (p && p.private) return `<div class="minicard unk"><div class="k">${esc(extra || 'Person')}</div><div class="nm">Private</div></div>`;
+  if (!p) return '<div class="minicard unk"><div class="nm">Unknown</div><div class="k">not recorded</div></div>';
+  const b = S.ev(p, 'BIRT');
+  return `<a class="minicard" href="${pHref(p)}"><div class="k">${esc(extra || '')}${extra ? ' · ' : ''}<span class="mono">${esc(S.idKey(p.id))}</span></div>
+    <div class="nm">${esc(S.name(p))}</div><div class="dates">${esc(S.span(p))}${b && b.place ? ' · ' + esc(b.place.split(',')[0]) : ''}</div></a>`;
+}
+const sortByBirth = a => a.slice().sort((x, y) => (x.birth_year || 9999) - (y.birth_year || 9999));
+function evRows(list) {
+  return list.slice().sort((a, b) => (a.year || 9999) - (b.year || 9999)).map(e =>
+    `<tr><td class="k">${esc(S.EV[e.type] || e.type)}</td><td class="d">${esc(e.date)}</td><td>${esc(e.place)}${e.desc ? (e.place ? ' — ' : '') + esc(e.desc.split('\n')[0]) : ''}</td></tr>`).join('');
+}
+
+/* ---------- views ---------- */
+function home() {
+  const ppl = S.all(), sn = S.surnames();
+  const top = Object.entries(sn).filter(([k]) => !k.startsWith('(')).sort((a, b) => b[1].length - a[1].length).slice(0, 12);
+  const yrs = ppl.map(p => p.birth_year).filter(Boolean);
+  let root = S.person('@I1@');
+  while (root && root.private) { const f = S.parents(root).father || S.parents(root).mother; root = f; }
+  const pl = Object.keys(S.places()).length;
+  return `<div class="hero">
+    <div class="card slate"><div class="head"><span class="k">Sheet 1</span><span class="k">Index</span></div><div class="body">
+      <h2 style="font-size:2rem;margin:4px 0 8px">The Graham, Dawes, Clark<br>and related families</h2>
+      <p>A working record of ${ppl.length} people across ${yrs.length ? Math.round((Math.max(...yrs) - Math.min(...yrs)) / 25) : 0} or so generations, from ${Math.min(...yrs)} to the present, mostly in England, Scotland and New Zealand.</p>
+      <p>${root ? `Begin at <a href="${pHref(root)}">${esc(S.name(root))}</a> and walk back, or ` : ''}search by name or place above.</p></div></div>
+    <div><div class="section" style="margin-top:0"><h2>Survey summary</h2>
+      <div class="stat"><span>People</span><span>${ppl.length}</span></div>
+      <div class="stat"><span>Families</span><span>${document.body.dataset.fams}</span></div>
+      <div class="stat"><span>Places named</span><span>${pl}</span></div>
+      <div class="stat"><span>Earliest birth recorded</span><span>${Math.min(...yrs)}</span></div></div>
+      <div class="section"><h2>Principal surnames</h2>
+      ${top.map(([k, v]) => `<div class="stat"><a href="#/surname/${encodeURIComponent(k)}">${esc(k)}</a><span>${v.length}</span></div>`).join('')}
+      <p style="margin-top:8px"><a href="#/surnames">All surnames →</a></p></div></div></div>`;
+}
+
+function personView(key) {
+  const p = S.person(S.keyId(key)); if (!p) return notFound();
+  if (p.private) return `<div class="card slate"><div class="head"><span class="k">${esc(ref(p))}</span><span class="k">Private</span></div><div class="body"><h1 class="person-name">Private</h1><p class="empty">Details of this person are kept private.</p></div></div><div class="section"><h2>Parents</h2><div class="cols">${mini(S.parents(p).father, 'Father')}${mini(S.parents(p).mother, 'Mother')}</div></div>`;
+  const b = S.ev(p, 'BIRT'), d = S.ev(p, 'DEAT'), bu = S.ev(p, 'BURI');
+  const par = S.parents(p), sibs = sortByBirth(S.siblings(p)), un = S.unions(p);
+  const fact = (lab, e) => e ? `<tr><td class="k">${lab}</td><td class="d">${esc(e.date)}</td><td>${esc(e.place)}</td></tr>` : '';
+  const rest = p.events.filter(e => !['BIRT', 'DEAT', 'BURI'].includes(e.type));
+  const famEvents = un.map(u => u.fam.events.map(e => ({ ...e, _with: u.spouse }))).flat();
+  return `<div class="card ${p.sex === 'F' ? 'rust' : p.sex === 'M' ? 'olive' : 'slate'}">
+    <div class="head"><span class="k">${esc(ref(p))}</span><span class="k">${p.sex === 'F' ? 'Female' : p.sex === 'M' ? 'Male' : 'Sex not recorded'}</span></div>
+    <div class="body"><h1 class="person-name">${esc(S.name(p))}</h1><div class="dates">${esc(S.span(p))}</div>
+      <table class="ledger" style="margin-top:10px">${fact('Born', b)}${fact('Died', d)}${fact('Buried', bu)}</table></div></div>
+    <div class="section"><h2>Parents</h2><div class="cols">${mini(par.father, 'Father')}${mini(par.mother, 'Mother')}</div>
+      <p style="margin-top:10px"><a href="#/chart/${esc(key)}/5">Ancestor chart →</a></p></div>
+    ${sibs.length ? `<div class="section"><h2>Siblings</h2><div class="cols">${sibs.map(s => mini(s)).join('')}</div></div>` : ''}
+    ${un.length ? `<div class="section"><h2>${un.length > 1 ? 'Partners and children' : 'Partner and children'}</h2>${un.map(u => `
+      <div style="margin-bottom:18px"><div class="cols">${mini(u.spouse, 'Partner')}</div>
+      ${u.fam.events.length ? `<table class="ledger" style="margin-top:8px">${evRows(u.fam.events)}</table>` : ''}
+      ${u.children.length ? `<div class="cols" style="margin-top:10px">${sortByBirth(u.children).map(c => mini(c, 'Child')).join('')}</div>` : ''}</div>`).join('')}</div>` : ''}
+    ${rest.length ? `<div class="section"><h2>Other recorded events</h2><table class="ledger">${evRows(rest)}</table></div>` : ''}
+    ${p.notes.length ? `<div class="section"><h2>Notes</h2>${p.notes.map(n => `<div class="note">${esc(n)}</div>`).join('')}</div>` : ''}
+    ${p.media.length ? `<div class="section"><h2>Attached documents</h2>${p.media.map(m => `<details class="att"><summary>${esc(m.file)}</summary><div class="inner">${m.note ? esc(m.note) : '<span class="empty">No transcription yet. Image display comes in a later stage.</span>'}</div></details>`).join('')}</div>` : ''}`;
+}
+
+function chartView(key, gens) {
+  const p = S.person(S.keyId(key)); if (!p) return notFound();
+  const G = Math.min(7, Math.max(2, +gens || 5)), W = 210, H = 40, GAP = 54, slot = H + 10, rows = 2 ** (G - 1), top = 30;
+  const totalH = rows * slot + top + 10, totalW = G * W + (G - 1) * GAP + 20;
+  const nodes = [], lines = [];
+  (function place(person, g, i) {
+    if (!person || g >= G) return;
+    const x = 10 + g * (W + GAP), y = top + (i + 0.5) * (rows * slot / 2 ** g);
+    nodes.push({ person, x, y, g });
+    const par = S.parents(person);
+    [[par.father, i * 2], [par.mother, i * 2 + 1]].forEach(([q, j]) => {
+      if (!q) return;
+      if (g + 1 >= G) { nodes.push({ more: true, x: x + W, y }); return; }
+      const qy = top + (j + 0.5) * (rows * slot / 2 ** (g + 1)), qx = 10 + (g + 1) * (W + GAP);
+      lines.push(`M${x + W},${y} H${x + W + GAP / 2} V${qy} H${qx}`);
+      place(q, g + 1, j);
+    });
+  })(p, 0, 0);
+  const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
+    ${Array.from({ length: G }, (_, g) => `<text x="${10 + g * (W + GAP)}" y="18" font-size="13" fill="#5b5846" letter-spacing="2">GEN. ${ROM[g]}</text><line x1="${10 + g * (W + GAP)}" x2="${10 + g * (W + GAP) + W}" y1="23" y2="23" stroke="#2a2922"/>`).join('')}
+    ${lines.map(d => `<path d="${d}" fill="none" stroke="#3f5159" stroke-width="1.2"/>`).join('')}
+    ${nodes.map(n => n.more ? `<text x="${n.x + 6}" y="${n.y + 5}" fill="#9b4a2a" font-size="15">›</text>` : `
+      <a href="${pHref(n.person)}"><rect x="${n.x}" y="${n.y - H / 2}" width="${W}" height="${H}" fill="${n.g === 0 ? '#e4dcc0' : '#f7f3e4'}" stroke="#2a2922"/>
+      <rect x="${n.x}" y="${n.y - H / 2}" width="4" height="${H}" fill="${n.person.sex === 'F' ? '#9b4a2a' : '#5f6532'}"/>
+      <text x="${n.x + 12}" y="${n.y - 3}" font-size="15" fill="#2a2922">${esc(trunc(S.name(n.person), 27))}</text>
+      <text x="${n.x + 12}" y="${n.y + 13}" font-size="12" fill="#5b5846">${esc(S.span(n.person))}</text></a>`).join('')}</svg>`;
+  return `<div class="card slate"><div class="head"><span class="k">Ancestor chart</span><span class="k gen-pick">Generations: ${[3, 4, 5, 6, 7].map(n => `<a class="${n === G ? 'on' : ''}" href="#/chart/${esc(key)}/${n}">${n}</a>`).join('')}</span></div>
+    <div class="body"><h1 class="person-name" style="font-size:1.9rem"><a href="${pHref(p)}" style="border:0">${esc(S.name(p))}</a></h1>
+    <span class="k">Click any name to move the chart there. › marks a line that continues beyond the chart.</span></div></div>
+    <div class="pedwrap" style="margin-top:18px">${svg}</div>`;
+}
+const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+function surnamesView() {
+  const m = S.surnames(), keys = Object.keys(m).sort((a, b) => a.localeCompare(b));
+  const letters = [...new Set(keys.map(k => k[0].toUpperCase()))];
+  return `<div class="section" style="margin-top:0"><h2>Surnames</h2><div class="letters">${letters.map(l => `<a href="#" data-jump="${l}">${l}</a>`).join('')}</div>
+    <div class="list-split">${keys.map(k => `<div id="s-${esc(k[0].toUpperCase())}-${esc(k)}"><a href="#/surname/${encodeURIComponent(k)}">${esc(k)}</a><span>${m[k].length}</span></div>`).join('')}</div></div>`;
+}
+function surnameView(s) {
+  const list = sortByBirth(S.surnames()[s] || []);
+  return `<div class="section" style="margin-top:0"><h2>${esc(s)} — ${list.length} ${list.length === 1 ? 'person' : 'people'}</h2><div class="cols wide">${list.map(p => mini(p)).join('')}</div></div>`;
+}
+function placesView() {
+  const m = S.places(), by = {};
+  for (const [pl, v] of Object.entries(m)) { const c = pl.split(',').pop().trim() || '(none)'; (by[c] = by[c] || []).push([pl, v.people.size]); }
+  return `<div class="section" style="margin-top:0"><h2>Places</h2>` + Object.entries(by).sort((a, b) => b[1].length - a[1].length).map(([c, arr]) =>
+    `<details open class="att"><summary>${esc(c)} <span class="k">· ${arr.length} places</span></summary><div class="inner"><div class="list-split">${arr.sort((a, b) => a[0].localeCompare(b[0])).map(([pl, n]) =>
+      `<div><a href="#/place/${encodeURIComponent(pl)}">${esc(pl)}</a><span>${n}</span></div>`).join('')}</div></div></details>`).join('') + '</div>';
+}
+function placeView(pl) {
+  const v = S.places()[pl]; if (!v) return notFound();
+  const rows = [...v.people.entries()].map(([id, evs]) => [S.person(id), evs]).sort((a, b) => (a[0].birth_year || 9999) - (b[0].birth_year || 9999));
+  return `<div class="section" style="margin-top:0"><h2>${esc(pl)}</h2><table class="ledger">${rows.map(([p, evs]) =>
+    `<tr><td class="k">${evs.map(e => S.EV[e.type] || e.type).join(', ')}</td><td class="d">${esc(evs.map(e => e.date).filter(Boolean).join('; '))}</td><td><a href="${pHref(p)}">${esc(S.name(p))}</a> <span class="dates">${esc(S.span(p))}</span></td></tr>`).join('')}</table></div>`;
+}
+function searchView(q) {
+  const r = S.search(q);
+  return `<div class="section" style="margin-top:0"><h2>${r.length} result${r.length === 1 ? '' : 's'} for “${esc(q)}”</h2><div class="cols wide">${r.slice(0, 120).map(p => mini(p)).join('') || '<p class="empty">Nothing matches. Try fewer words, or just a surname.</p>'}</div></div>`;
+}
+const notFound = () => '<p class="empty">That page is not on this sheet.</p>';
+
+/* ---------- router ---------- */
+function route() {
+  const h = decodeURIComponent((location.hash || '#/').slice(2)), [a, b, c] = h.split('/');
+  let html;
+  if (!a) html = home();
+  else if (a === 'person') html = personView(b);
+  else if (a === 'chart') html = chartView(b, c);
+  else if (a === 'surnames') html = surnamesView();
+  else if (a === 'surname') html = surnameView(b);
+  else if (a === 'places') html = placesView();
+  else if (a === 'place') html = placeView(h.slice(6));
+  else if (a === 'search') html = searchView(h.slice(7));
+  else html = notFound();
+  $('#view').innerHTML = html;
+  document.querySelectorAll('nav.legend a').forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#/' + (a || '')));
+  const pn = a === 'person' && S.person(S.keyId(b));
+  document.title = pn ? S.name(pn) + ' · Family tree' : 'Family tree';
+  window.scrollTo(0, 0);
+  document.querySelectorAll('[data-jump]').forEach(l => l.onclick = e => { e.preventDefault(); const t = document.querySelector(`[id^="s-${l.dataset.jump}-"]`); t && t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+}
+async function boot() {
+  try {
+    const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+    let D; try { if (!local) throw 0; D = await S.load('data/tree.full.json'); } catch (_) { D = await S.load('data/tree.json'); }
+    document.body.dataset.fams = Object.keys(D.families).length;
+    $('#gen').textContent = 'Compiled ' + D.meta.generated.slice(0, 10) + ' from ' + D.meta.source;
+    $('#mode').textContent = D.meta.variant === 'full' ? 'Local full copy, includes private people' : 'Read-only view, private details withheld';
+    $('#q').form.onsubmit = e => { e.preventDefault(); const q = $('#q').value.trim(); if (q) location.hash = '#/search/' + encodeURIComponent(q); };
+    window.addEventListener('hashchange', route); route();
+  } catch (e) { $('#view').innerHTML = '<p class="empty">Could not load the tree data. If you opened this file directly, serve the folder instead (see README).</p>'; console.error(e); }
+}
+boot();
