@@ -193,7 +193,8 @@ const Records = (() => {
     return people().flatMap(p => p.events.filter(e => e.type === 'OCCU' && e.desc).map(e => ({ p, e })))
       .sort((a, b) => a.e.desc.localeCompare(b.e.desc) || (b.e.date ? 1 : 0) - (a.e.date ? 1 : 0))
       .filter((x, i, L) => !i || x.p !== L[i - 1].p || x.e.desc !== L[i - 1].e.desc)
-      .map(({ p, e }) => prow(esc(e.desc.split(' - ')[0]), [p], [e.date, e.place].filter(Boolean).map(esc).join(', ')));
+      // occupation is the main text (some are long), the year sits in the narrow left column
+      .map(({ p, e }) => row(esc(e.date), `<span class="occ">${esc(e.desc.split(' - ')[0])}</span><br>${who(p)}`, e.place ? esc(e.place) : '', '', [p]));
   }
   function twins() {
     const out = [];
