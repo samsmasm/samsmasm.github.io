@@ -84,13 +84,13 @@ const TreeMap = (() => {
     const svg = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><circle cx="${s / 2}" cy="${s / 2}" r="${r}" fill="${hollow ? '#f7f3e4' : col}" fill-opacity="${hollow ? .55 : .9}" stroke="${hollow ? col : '#2a2922'}" stroke-width="${hollow ? 2.2 : 1}"${hollow ? ' stroke-dasharray="3 2"' : ''}/></svg>`;
     return L.divIcon({ html: svg, className: 'pin', iconSize: [s, s], iconAnchor: [s / 2, s / 2], popupAnchor: [0, -s / 2] });
   }
-  const isHollow = i => i.precision !== 'place' || i.approx;
+  const isHollow = i => i.precision !== 'place' || i.approx || i.uncertain;
 
   function popup(pt, items) {
     const i = pt.info, where = pt.name.split(', ').slice(1).join(', ');
     const rows = items.slice().sort((a, b) => (a.e.year || 9999) - (b.e.year || 9999)).map(({ who, e }) =>
       `<tr><td class="k">${esc(S.EV[e.type] || e.type)}</td><td class="d">${esc(e.year || '')}</td><td>${who.map(p => `<a href="${pHref(p)}">${esc(S.name(p))}</a>`).join(' &amp; ')}${e.place_detail ? `<div class="venue">${esc(e.place_detail)}</div>` : ''}</td></tr>`).join('');
-    const note = i.approx ? 'Approximate position' : i.precision === 'place' ? '' : 'Region only, approximate';
+    const note = i.uncertain ? 'Position uncertain, needs review' : i.approx ? 'Approximate position' : i.precision === 'place' ? '' : 'Region only, approximate';
     return `<div class="pcard"><div class="head"><span class="k">${esc(where || 'Place')}</span><span class="k">${items.length} ${items.length === 1 ? 'entry' : 'entries'}</span></div>
       <div class="body"><h3>${esc(i.name)}</h3>${note ? `<div class="k approx">${note}</div>` : ''}<table class="ledger">${rows}</table>
       <p><a href="#/place/${encodeURIComponent(pt.name)}">Place page →</a></p></div></div>`;
@@ -128,7 +128,7 @@ const TreeMap = (() => {
         `<span><i style="background:${DIRECT}"></i>Grandparents' descendants</span><span><i style="background:${OTHER}"></i>Not linked</span>`;
     }
     box.innerHTML += `<span class="keypin"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#5b5846" stroke="#2a2922"/></svg>Town or village</span>
-      <span class="keypin"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#f7f3e4" stroke="#5b5846" stroke-width="2" stroke-dasharray="3 2"/></svg>Region or approximate</span>`;
+      <span class="keypin"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#f7f3e4" stroke="#5b5846" stroke-width="2" stroke-dasharray="3 2"/></svg>Region, approximate or uncertain</span>`;
   }
 
   function clusterIcon(c) {

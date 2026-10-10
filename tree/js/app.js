@@ -164,7 +164,7 @@ function placeView(pl) {
   if (!v && !within.length) return notFound();
   const crumbs = S.placeChain(pl).slice(0, -1).map(([n, i]) => `<a href="#/place/${encodeURIComponent(n)}">${esc(i.name)}</a>`).reverse().join(', ');
   const rows = v ? [...v.people.entries()].map(([id, evs]) => [S.person(id), evs]).sort((a, b) => (a[0].birth_year || 9999) - (b[0].birth_year || 9999)) : [];
-  const note = !info ? '' : info.lat == null || info.precision === 'country' ? 'Not on the map' : info.approx ? 'Approximate position on the map' : info.precision === 'place' ? '' : 'Mapped as a region';
+  const note = !info ? '' : info.lat == null || info.precision === 'country' ? 'Not on the map' : info.uncertain ? 'Position on the map is uncertain and needs review' : info.approx ? 'Approximate position on the map' : info.precision === 'place' ? '' : 'Mapped as a region';
   return `<div class="section" style="margin-top:0"><h2>${esc(info ? info.name : pl)}${crumbs ? ` <span class="crumbs">· ${crumbs}</span>` : ''}</h2>
     <p class="k">${TreeMap.has(pl) ? `<a href="#/map/${encodeURIComponent(pl)}">Show on the map →</a> ` : ''}${note ? esc(note) + ' · ' : ''}<a href="#/places">All places</a></p>
     ${rows.length ? `<table class="ledger">${rows.map(([p, evs]) =>
