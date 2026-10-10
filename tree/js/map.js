@@ -84,13 +84,13 @@ const TreeMap = (() => {
     const svg = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><circle cx="${s / 2}" cy="${s / 2}" r="${r}" fill="${hollow ? '#f7f3e4' : col}" fill-opacity="${hollow ? .55 : .9}" stroke="${hollow ? col : '#2a2922'}" stroke-width="${hollow ? 2.2 : 1}"${hollow ? ' stroke-dasharray="3 2"' : ''}/></svg>`;
     return L.divIcon({ html: svg, className: 'pin', iconSize: [s, s], iconAnchor: [s / 2, s / 2], popupAnchor: [0, -s / 2] });
   }
-  const isHollow = i => i.precision !== 'place' || i.approx || i.uncertain;
+  const isHollow = i => i.precision === 'region' || i.approx || i.uncertain;   // 'area' with its own coordinates is a town, e.g. Hawkshead
 
   function popup(pt, items) {
     const i = pt.info, where = pt.name.split(', ').slice(1).join(', ');
     const rows = items.slice().sort((a, b) => (a.e.year || 9999) - (b.e.year || 9999)).map(({ who, e }) =>
       `<tr><td class="k">${esc(S.EV[e.type] || e.type)}</td><td class="d">${esc(e.year || '')}</td><td>${who.map(p => `<a href="${pHref(p)}">${esc(S.name(p))}</a>`).join(' &amp; ')}${e.place_detail ? `<div class="venue">${esc(e.place_detail)}</div>` : ''}</td></tr>`).join('');
-    const note = i.uncertain ? 'Position uncertain, needs review' : i.approx ? 'Approximate position' : i.precision === 'place' ? '' : 'Region only, approximate';
+    const note = i.uncertain ? 'Position uncertain, needs review' : i.approx ? 'Approximate position' : i.precision === 'region' ? 'Region only, approximate' : '';
     return `<div class="pcard"><div class="head"><span class="k">${esc(where || 'Place')}</span><span class="k">${items.length} ${items.length === 1 ? 'entry' : 'entries'}</span></div>
       <div class="body"><h3>${esc(i.name)}</h3>${note ? `<div class="k approx">${note}</div>` : ''}<table class="ledger">${rows}</table>
       <p><a href="#/place/${encodeURIComponent(pt.name)}">Place page →</a></p></div></div>`;
@@ -156,7 +156,9 @@ const TreeMap = (() => {
     if (!ui.hi) { ui.lo = data.lo; ui.hi = data.hi; }
     $('#map').innerHTML = '';
     const map = L.map('map', { worldCopyJump: true, zoomSnap: .5, minZoom: 2 });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
+    // Esri topographic tiles: tile.openstreetmap.org is blocked on some networks (e.g. Sam's Wi-Fi) and CARTO now needs a key
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18,
+      attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, USGS, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors and the GIS user community' }).addTo(map);
     const cl = L.markerClusterGroup({ maxClusterRadius: 38, showCoverageOnHover: false, iconCreateFunction: clusterIcon });
     const ln = L.layerGroup().addTo(map); cl.addTo(map);
     M = { map, cl, ln, markers: {} };
