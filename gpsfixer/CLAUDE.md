@@ -233,7 +233,10 @@ satisfied. Live at unisam.nz/gpsfixer.
 
 -   Single file: `index.html`. Leaflet 1.9.4 from unpkg, CARTO Voyager
     tiles (OSM data, attribution shown). Not tile.openstreetmap.org: Sam's
-    network DNS resolves it to 127.0.0.1, so the map came up blank. No drawing library: vertex and midpoint handles are plain
+    network DNS resolves it to 127.0.0.1, so the map came up blank.
+    CARTO raster tiles now need an API key (`CARTO_KEY` in index.html,
+    free non-commercial up to 5M tiles/month). The key email is in
+    `api.md`, which is local only (in .git/info/exclude): never commit it. No drawing library: vertex and midpoint handles are plain
     draggable Leaflet markers.
 -   Parsing uses `DOMParser`, matching elements by `localName` so GPX
     1.0 and 1.1 (and prefixed namespaces) both work. Files with invalid
