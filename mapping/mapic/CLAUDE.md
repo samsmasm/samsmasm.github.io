@@ -1,4 +1,4 @@
-# Route Drawer (working name)
+# Mapic
 
 ## Project Overview
 
@@ -10,7 +10,7 @@ stretch and rotate the drawing to find a spot where the roads fit it
 well, and download the result as a GPX route to follow.
 
 Part of the mapping suite: follow `../CLAUDE.md` for the shared header,
-map tiles and conventions. Lives at `/mapping/draw/`.
+map tiles and conventions. Lives at `/mapping/mapic/`.
 
 ## Core Principles
 
@@ -100,12 +100,15 @@ map tiles and conventions. Lives at `/mapping/draw/`.
 
 ## Suggested build rounds
 
-1.  Page, map, image overlay and freehand drawing (no snapping).
+1.  Page, map, image overlay and freehand drawing (no snapping),
+    including touch. Sam's laptop has a touchscreen, so touch and pen
+    drawing must work from the start: use pointer events, a clear Draw
+    / Pan toggle (in Draw mode one finger draws, map dragging is off;
+    pinch zoom can stay), and test on a touch device.
 2.  Road data from Overpass and snapping, with fit score and export.
 3.  Move, stretch and rotate with live re-snapping.
 
-## Open questions for Sam
+## Decisions
 
--   Name: "Route Drawer" is a placeholder.
--   Should the first round include touch drawing, or is desktop enough
-    to start?
+-   Name: Mapic (Sam, 2026-10-13).
+-   Touch drawing is in round 1 (Sam, 2026-10-13).
