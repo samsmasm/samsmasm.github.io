@@ -276,4 +276,30 @@ satisfied. Live at unisam.nz/gpsfixer.
 -   Gap suspects: per segment, time step > max(30 s, 6x median) with a
     real jump, or distance > max(150 m, 10x median spacing). Top 12 by
     distance. Users can also pick any two points in a segment on the map.
--   Personal tool: not linked from /tools or /find.
+-   v3 / round 1 (2026-10-13):
+    -   Click a leg of the current repair to switch it straight <-> follow
+        roads (`setLegMode`). Routed legs are solid, straight are dashed.
+        `legs(r)` builds per-leg geometry (with via-point trimming) and
+        `routePts` is just their concatenation. Midpoint handles sit half
+        way along each leg's drawn path.
+    -   Stray points: no separate mode. "Pick on the map" around them; the
+        recorded points between A and B are drawn red ("will be
+        replaced"), skipped above 2000.
+    -   One undo/redo history across all repairs (`record()` before every
+        change, snapshots of `S.repairs` + current index). Map control top
+        right, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z. Remove-repair and reset no
+        longer confirm, since they can be undone. Loading a file clears it.
+-   Public since 2026-10-13: on /tools (Document utilities) and /find
+    ("Walks, maps and photos"); keep those descriptions in step.
+-   Sam confirmed a repaired file uploads to Strava fine (acceptance
+    criterion 9).
+
+## Roadmap (agreed 2026-10-13)
+
+-   Round 2: smarter detection (suggest moving A/B when GPS drifts
+    before or after a dropout). Needs real Strava GPX files to tune.
+-   Round 3: timing. Mark a stop inside a gap; optionally time the
+    repaired section at the activity's usual pace with the rest as a
+    stop. Check the controls with Sam first.
+-   Skipped on purpose: direct Strava upload (needs OAuth + server,
+    breaks local-only), terrain elevation (Strava recalculates anyway).

@@ -78,7 +78,9 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `fnl/`: Friday Night Live open mic scheduler
 - `cluitar/`: classical guitar practice path
 - `wc26/`: World Cup 2026 office sweepstake leaderboard, scored from ESPN's API
-- `gpsfixer/`: GPS Fixer, repair GPS gaps in a GPX file by redrawing the route (Leaflet + OSM, all in-browser)
+
+**Public tools**
+- `gpsfixer/`: GPS Fixer, repair GPS dropouts in a GPX file by redrawing the route (Leaflet + CARTO tiles + optional OSRM road-following, all in-browser). Linked from /tools (Document utilities) and /find. Read its CLAUDE.md first.
 
 **Kids' games**
 - `typurr/`: Typurr typing game for ages 4 to 8, starring Ty the cat (branched from `catjump`)

@@ -116,6 +116,10 @@ footer p{margin-bottom:6px}
 .repitem .todo{color:var(--warn)}
 .gapitem .done{color:var(--ok)}
 .gapitem .wip{color:var(--warn)}
+.undoctl{display:flex;gap:4px}
+.undoctl button{font:inherit;font-size:12.5px;padding:5px 10px;border-radius:6px;cursor:pointer;border:1px solid var(--accent-border);background:#fff;color:var(--accent)}
+.undoctl button:hover:not(:disabled){background:var(--accent-bg)}
+.undoctl button:disabled{opacity:.4;cursor:default}
 </style>
 </head>
 <body>
@@ -140,12 +144,13 @@ footer p{margin-bottom:6px}
   </section>
 
   <section class="step off" id="s2">
-    <h2><span>2</span>Choose a gap</h2>
+    <h2><span>2</span>Choose what to fix</h2>
     <p id="gapintro">Long jumps between recorded points are listed below. They are only suspects: some straight sections are real.</p>
     <div class="gaplist" id="gaplist"></div>
     <div class="row">
-      <button class="btn" id="pickbtn">Pick the ends on the map</button>
+      <button class="btn" id="pickbtn">Pick on the map</button>
     </div>
+    <p style="margin-top:6px">Works for stray points too, where the GPS wandered off while still recording: pick the last good point before them and the first good one after. Everything in between is replaced.</p>
     <dl class="stats" id="selstats" hidden></dl>
     <div id="selmsgs"></div>
   </section>
@@ -156,6 +161,7 @@ footer p{margin-bottom:6px}
       <li>Click the map to add points, in order, from A towards B.</li>
       <li>Drag an orange point to move it. Click one to remove it.</li>
       <li>Drag a hollow midpoint to bend a line.</li>
+      <li>Click a line to switch it between straight (dashed) and following roads (solid).</li>
     </ul>
     <div class="snapbox">
       <label class="chk"><input type="checkbox" id="snapchk"> Follow roads and paths for
@@ -165,7 +171,6 @@ footer p{margin-bottom:6px}
     <div class="big" id="repdist" style="margin-top:10px">–</div>
     <div class="status" id="routestatus"></div>
     <div class="row">
-      <button class="btn" id="undobtn" disabled>Undo</button>
       <button class="btn" id="clearbtn" disabled>Clear drawing</button>
       <button class="btn" id="deletebtn">Remove this repair</button>
     </div>
@@ -183,16 +188,17 @@ footer p{margin-bottom:6px}
 
   <section class="step off" id="s5">
     <h2><span>5</span>Review and download</h2>
-    <p>Fix as many gaps as you like before downloading. Click a repair to go back to it.</p>
+    <p>Fix as many gaps as you like before downloading. Click a repair to go back to it. Undo and redo (top right of the map, or Ctrl+Z / Ctrl+Y) work across all of them.</p>
     <div class="replist" id="replist"></div>
     <dl class="stats" id="reviewstats"></dl>
     <div id="reviewmsgs"></div>
     <div class="legend">
       <span><i style="border-color:var(--track)"></i>Recorded track</span>
-      <span><i style="border-color:var(--gap);border-top-style:dashed"></i>Original gap (being replaced)</span>
-      <span><i style="border-color:var(--repair)"></i>Your repairs (estimated)</span>
+      <span><i style="border-color:var(--gap);border-top-style:dashed"></i>Original section (being replaced)</span>
+      <span><i style="border-color:var(--repair)"></i>Your repair, following roads</span>
+      <span><i style="border-color:var(--repair);border-top-style:dashed"></i>Your repair, straight line</span>
     </div>
-    <label class="chk"><input type="checkbox" id="showorig" checked> Show the original gap lines</label>
+    <label class="chk"><input type="checkbox" id="showorig" checked> Show the original sections</label>
     <div class="row">
       <button class="btn primary" id="dlbtn" disabled>Download repaired GPX</button>
       <button class="btn" id="resetbtn">Reset to original</button>
@@ -224,6 +230,20 @@ function hav(a, b) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 function pathLen(pts) { let d = 0; for (let i = 1; i < pts.length; i++) d += hav(pts[i - 1], pts[i]); return d; }
+function halfway(pts) {
+  // the point half way along a path, by distance
+  const half = pathLen(pts) / 2;
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const seg = hav(pts[i - 1], pts[i]);
+    if (d + seg >= half && seg > 0) {
+      const f = (half - d) / seg, p = pts[i - 1], q = pts[i];
+      return { lat: p.lat + (q.lat - p.lat) * f, lon: p.lon + (q.lon - p.lon) * f };
+    }
+    d += seg;
+  }
+  return pts[0];
+}
 function median(arr) {
   if (!arr.length) return 0;
   const s = [...arr].sort((a, b) => a - b), m = s.length >> 1;
@@ -265,15 +285,18 @@ const kid = (el, name) => kids(el, name)[0] || null;
 // A repair replaces the recorded points strictly between a and b in segment s.
 // verts are the clicked points; each carries the mode of the leg that ends at it
 // (null = straight line, or a routing profile). endMode is the mode of the last leg into B.
+// Vert objects are never mutated in place (always replaced), so undo snapshots can share them.
 const S = {
   fileName: null,
   srcText: null,     // original file text, never modified
   segs: [],          // [{trk, seg, pts:[{lat,lon,ele,time,timeStr}]}]
   gaps: [],
-  repairs: [],       // [{s, a, b, verts:[{lat,lon,mode}], endMode, history:[], timed}]
+  repairs: [],       // [{s, a, b, verts:[{lat,lon,mode}], endMode, timed, result}]
   cur: null,         // the repair being edited
+  undo: [], redo: [],
   picking: false,
   pickFirst: null,
+  dragging: false,
   fracSeconds: false,
   snap: store.get('gpsfixer.snap') === '1',
 };
@@ -281,7 +304,7 @@ const S = {
 // ---------- map ----------
 // key is public by nature (tile URLs are visible); restrict it to unisam.nz in the CARTO dashboard
 const CARTO_KEY = 'cb1_4itu_1_620672c638e620b7bde4db87';
-const map = L.map('map', { preferCanvas: true, zoomControl: true }).setView([-41.29, 174.78], 5);
+const map = L.map('map', { renderer: L.canvas({ tolerance: 6 }), zoomControl: true }).setView([-41.29, 174.78], 5);
 L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=' + CARTO_KEY, {
   maxZoom: 20, maxNativeZoom: 18, // CARTO serves up to z18; Leaflet scales those tiles up beyond that
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a> · routing <a href="https://routing.openstreetmap.de/about.html">FOSSGIS OSRM</a>'
@@ -294,6 +317,16 @@ const handleLayer = L.layerGroup().addTo(map);
 const pickLayer = L.layerGroup().addTo(map);
 let curLine = null;
 
+const UndoCtl = L.Control.extend({
+  onAdd() {
+    const d = L.DomUtil.create('div', 'undoctl');
+    d.innerHTML = '<button id="undobtn" title="Undo (Ctrl+Z)" disabled>Undo</button><button id="redobtn" title="Redo (Ctrl+Y)" disabled>Redo</button>';
+    L.DomEvent.disableClickPropagation(d);
+    return d;
+  }
+});
+new UndoCtl({ position: 'topright' }).addTo(map);
+
 const $ = id => document.getElementById(id);
 function hint(text) { const h = $('maphint'); h.textContent = text || ''; h.style.display = text ? 'block' : 'none'; }
 function msgs(el, list) {
@@ -305,6 +338,32 @@ function stats(el, rows) {
   dl.hidden = !rows.length;
 }
 function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// ---------- undo / redo (one history across every repair) ----------
+function snapshot() {
+  return { repairs: S.repairs.map(r => ({ ...r, verts: [...r.verts] })), cur: S.repairs.indexOf(S.cur) };
+}
+function record() {
+  // call before every change to the repairs
+  S.undo.push(snapshot());
+  if (S.undo.length > 300) S.undo.shift();
+  S.redo = [];
+}
+function restore(snap) {
+  S.repairs = snap.repairs.map(r => ({ ...r, verts: [...r.verts] }));
+  S.cur = snap.cur >= 0 ? S.repairs[snap.cur] : null;
+  showCur();
+}
+function undo() { if (!S.undo.length) return; S.redo.push(snapshot()); restore(S.undo.pop()); }
+function redo() { if (!S.redo.length) return; S.undo.push(snapshot()); restore(S.redo.pop()); }
+$('undobtn').onclick = undo;
+$('redobtn').onclick = redo;
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+});
 
 // ---------- routing (follow roads) ----------
 const legCache = new Map(); // key -> {status:'pending'|'ok'|'err', pts}
@@ -320,43 +379,48 @@ function requestLeg(key, mode, p, q) {
     legCache.set(key, { status: 'err' });
   }).then(() => { if (!S.dragging) refresh(); });
 }
-// full path of a repair: A, every leg (routed where possible), B
-function routePts(r) {
-  const pts = S.segs[r.s].pts, A = pts[r.a], B = pts[r.b];
-  const ctrl = [A, ...r.verts, B];
-  const routed = []; // per leg: routed geometry, or null for a straight line
-  for (let i = 1; i < ctrl.length; i++) {
-    const p = ctrl[i - 1], q = ctrl[i];
-    const mode = i < ctrl.length - 1 ? r.verts[i - 1].mode : r.endMode;
+const legMode = (r, i) => i < r.verts.length ? r.verts[i].mode : r.endMode;
+function setLegMode(r, i, mode) {
+  if (i < r.verts.length) r.verts[i] = { ...r.verts[i], mode };
+  else r.endMode = mode;
+}
+// every leg of a repair, A to B: its mode, routing status and the path drawn for it
+function legs(r) {
+  const pts = S.segs[r.s].pts;
+  const ctrl = [pts[r.a], ...r.verts, pts[r.b]];
+  const out = [];
+  for (let i = 0; i < ctrl.length - 1; i++) {
+    const p = ctrl[i], q = ctrl[i + 1], mode = legMode(r, i);
     let c = null;
     if (mode) {
       const k = legKey(mode, p, q);
       c = legCache.get(k);
       if (!c) { requestLeg(k, mode, p, q); c = legCache.get(k); }
     }
-    routed.push(c && c.status === 'ok' ? c.pts : null);
+    out.push({ i, p, q, mode, status: mode ? c.status : 'straight', routed: c && c.status === 'ok' ? c.pts : null });
   }
-  const out = [{ lat: A.lat, lon: A.lon }];
-  routed.forEach((leg, i) => {
-    if (leg) leg.forEach(x => out.push(x));
-    // a clicked point between two routed legs is just a "via" hint: skip it so an
-    // off-road click doesn't leave a spike out to it and back
-    const last = i === routed.length - 1;
-    if (last || !leg || !routed[i + 1]) out.push({ lat: ctrl[i + 1].lat, lon: ctrl[i + 1].lon });
+  // a clicked point between two routed legs is just a "via" hint: leave it out so an
+  // off-road click doesn't leave a spike out to it and back
+  out.forEach((l, i) => {
+    const viaStart = l.routed && i > 0 && out[i - 1].routed;
+    const viaEnd = l.routed && i < out.length - 1 && out[i + 1].routed;
+    l.pts = [
+      ...(viaStart ? [] : [{ lat: l.p.lat, lon: l.p.lon }]),
+      ...(l.routed || []),
+      ...(viaEnd ? [] : [{ lat: l.q.lat, lon: l.q.lon }]),
+    ];
   });
-  // drop consecutive duplicates (routed legs start/end close to the clicked points)
+  return out;
+}
+// full path of a repair, A to B
+function routePts(r) {
+  const out = legs(r).flatMap(l => l.pts);
   return out.filter((p, i) => i === 0 || hav(out[i - 1], p) > 0.05);
 }
 function legStatus(r) {
-  const pts = S.segs[r.s].pts, ctrl = [pts[r.a], ...r.verts, pts[r.b]];
-  let pending = 0, err = 0, routed = 0;
-  for (let i = 1; i < ctrl.length; i++) {
-    const mode = i < ctrl.length - 1 ? r.verts[i - 1].mode : r.endMode;
-    if (!mode) continue;
-    const c = legCache.get(legKey(mode, ctrl[i - 1], ctrl[i]));
-    if (!c || c.status === 'pending') pending++; else if (c.status === 'err') err++; else routed++;
-  }
-  return { pending, err, routed };
+  const n = { pending: 0, err: 0 };
+  legs(r).forEach(l => { if (l.status in n) n[l.status]++; });
+  return n;
 }
 const sigOf = r => JSON.stringify(routePts(r).map(p => [+p.lat.toFixed(7), +p.lon.toFixed(7)]));
 const isTimed = r => !!(r.timed && r.timed.sig === sigOf(r));
@@ -424,6 +488,7 @@ async function loadFile(file) {
   S.segs = segs;
   S.fracSeconds = segs.some(s => s.pts.some(p => p.timeStr && /\.\d/.test(p.timeStr)));
   resetAll();
+  S.undo = []; S.redo = [];
   S.gaps = findGaps(segs);
 
   // guess the routing profile from the activity type (Strava writes e.g. "running", "cycling", or a number)
@@ -486,6 +551,7 @@ function drawTrack() {
   });
 }
 
+function repairFor(g) { return S.repairs.find(r => r.s === g.s && r.a <= g.a && r.b >= g.b); }
 function renderGaps() {
   const list = $('gaplist');
   if (!S.gaps.length) {
@@ -496,7 +562,7 @@ function renderGaps() {
   $('gapintro').textContent = 'Long jumps between recorded points, biggest first. They are only suspects: some straight sections are real.';
   list.innerHTML = S.gaps.map((g, i) => {
     const a = S.segs[g.s].pts[g.a];
-    const r = S.repairs.find(r => r.s === g.s && r.a <= g.a && r.b >= g.b);
+    const r = repairFor(g);
     const sel = r && r === S.cur ? ' sel' : '';
     const state = !r ? '' : isTimed(r) ? ' · <span class="done">repaired</span>' : ' · <span class="wip">in progress</span>';
     return `<button class="gapitem${sel}" data-i="${i}"><span class="t">${fmtTime(a.time)}</span>
@@ -504,7 +570,7 @@ function renderGaps() {
   }).join('');
   list.querySelectorAll('.gapitem').forEach(btn => btn.onclick = () => {
     const g = S.gaps[+btn.dataset.i];
-    const r = S.repairs.find(r => r.s === g.s && r.a <= g.a && r.b >= g.b);
+    const r = repairFor(g);
     if (r) activate(r, true); else selectGap(g.s, g.a, g.b);
   });
 }
@@ -517,13 +583,13 @@ $('pickbtn').onclick = () => {
   $('pickbtn').classList.add('on');
   $('pickbtn').textContent = 'Cancel picking';
   map.getContainer().style.cursor = 'crosshair';
-  hint('Click the last good recorded point before the gap');
+  hint('Click the last good recorded point before the problem');
 };
 function stopPicking() {
   S.picking = false; S.pickFirst = null;
   pickLayer.clearLayers();
   $('pickbtn').classList.remove('on');
-  $('pickbtn').textContent = 'Pick the ends on the map';
+  $('pickbtn').textContent = 'Pick on the map';
   map.getContainer().style.cursor = '';
   hint(S.cur ? 'Click the map to add route points between A and B' : '');
 }
@@ -545,31 +611,33 @@ function pickAt(latlng) {
     S.pickFirst = n;
     L.circleMarker([p.lat, p.lon], { radius: 7, color: getCss('--accent'), weight: 3, fillColor: '#fff', fillOpacity: 1 })
       .bindTooltip('A · ' + fmtTime(p.time), { permanent: true, direction: 'top' }).addTo(pickLayer);
-    hint('Now click the first good recorded point after the gap');
+    hint('Now click the first good recorded point after it');
     return;
   }
   const f = S.pickFirst;
   if (f.s !== n.s) return hint('Both ends must be in the same track segment. Pick the second point again.');
-  if (f.i === n.i) return hint('That is the same point. Pick a different one after the gap.');
+  if (f.i === n.i) return hint('That is the same point. Pick a different one.');
   const a = Math.min(f.i, n.i), b = Math.max(f.i, n.i);
   stopPicking();
   selectGap(n.s, a, b);
 }
 
 // ---------- repairs: create, switch, remove ----------
+const isEmpty = r => !r.verts.length && !r.timed;
 function dropIfEmpty(r) {
-  if (r && !r.verts.length && !r.timed) S.repairs = S.repairs.filter(x => x !== r);
+  if (r && isEmpty(r)) S.repairs = S.repairs.filter(x => x !== r);
 }
 function selectGap(s, a, b) {
   if (S.picking) stopPicking();
-  const empty = r => !r.verts.length && !r.timed; // empty repairs get dropped when you move on
-  const clash = S.repairs.find(r => !(r === S.cur && empty(r)) && r.s === s && a < r.b && r.a < b);
+  // an empty repair being left behind will be dropped, so it doesn't count as a clash
+  const clash = S.repairs.find(r => !(r === S.cur && isEmpty(r)) && r.s === s && a < r.b && r.a < b);
   if (clash) {
     msgs('selmsgs', [['err', `That overlaps the repair starting at ${fmtTime(S.segs[s].pts[clash.a].time)}. Remove that one first, or pick ends that do not overlap it.`]]);
     return;
   }
+  record();
   dropIfEmpty(S.cur);
-  const r = { s, a, b, verts: [], endMode: curMode(), history: [], timed: null };
+  const r = { s, a, b, verts: [], endMode: curMode(), timed: null, result: null };
   S.repairs.push(r);
   S.repairs.sort((x, y) => x.s - y.s || x.a - y.a);
   activate(r, true);
@@ -577,6 +645,22 @@ function selectGap(s, a, b) {
 function activate(r, zoom) {
   if (S.cur !== r) dropIfEmpty(S.cur);
   S.cur = r;
+  showCur();
+  if (zoom) {
+    const pts = S.segs[r.s].pts;
+    const ctx = pts.slice(Math.max(0, r.a - 3), r.b + 4).map(p => [p.lat, p.lon]).concat(r.verts.map(v => [v.lat, v.lon]));
+    map.fitBounds(L.latLngBounds(ctx), { padding: [60, 60], maxZoom: 17 });
+  }
+}
+// show the panels for whichever repair is current (or none)
+function showCur() {
+  const r = S.cur;
+  if (!r) {
+    stats('selstats', []); msgs('selmsgs', []); msgs('timemsgs', []); stats('timestats', []);
+    ['s3', 's4'].forEach(id => $(id).classList.add('off'));
+    hint(S.repairs.length ? 'Choose another gap, or download' : S.segs.length ? 'Choose a gap from the list, or pick its ends on the map' : '');
+    return refresh();
+  }
   const pts = S.segs[r.s].pts, A = pts[r.a], B = pts[r.b];
   const inside = r.b - r.a - 1;
   const dt = A.time != null && B.time != null ? (B.time - A.time) / 1000 : null;
@@ -585,28 +669,14 @@ function activate(r, zoom) {
     ['B (first good)', fmtTime(B.time)],
     ['Time between', dt != null ? fmtDur(dt) : '–'],
     ['Recorded distance', fmtDist(pathLen(pts.slice(r.a, r.b + 1)))],
-    ['Points replaced', inside ? `${inside} recorded point${inside > 1 ? 's' : ''} between A and B` : 'none (just the straight line)'],
+    ['Points replaced', inside ? `${inside} recorded point${inside > 1 ? 's' : ''} between A and B (red on the map)` : 'none (just the straight line)'],
   ]);
   const m = [];
   if (A.time == null || B.time == null) m.push(['warn', 'One or both ends have no timestamp, so the new points cannot be timed. They will be saved without times.']);
   else if (dt <= 0) m.push(['err', 'B is not later than A, so there is no time available for the repaired section. Pick different ends.']);
   msgs('selmsgs', m);
-  showTimeResult(r);
   ['s3', 's4', 's5'].forEach(id => $(id).classList.remove('off'));
-  refresh();
-  if (zoom) {
-    const ctx = pts.slice(Math.max(0, r.a - 3), r.b + 4).map(p => [p.lat, p.lon]).concat(r.verts.map(v => [v.lat, v.lon]));
-    map.fitBounds(L.latLngBounds(ctx), { padding: [60, 60], maxZoom: 17 });
-  }
   hint('Click the map to add route points between A and B');
-}
-function deactivate() {
-  dropIfEmpty(S.cur);
-  S.cur = null;
-  stats('selstats', []); msgs('selmsgs', []); msgs('timemsgs', []); stats('timestats', []);
-  ['s3', 's4'].forEach(id => $(id).classList.add('off'));
-  $('s5').classList.toggle('off', !S.repairs.length);
-  hint(S.repairs.length ? 'Choose another gap, or download' : '');
   refresh();
 }
 function resetAll() {
@@ -620,39 +690,31 @@ function resetAll() {
 }
 
 // ---------- step 3: editing ----------
-function pushHistory(r) {
-  r.history.push({ verts: r.verts.map(v => ({ ...v })), endMode: r.endMode });
-  if (r.history.length > 200) r.history.shift();
-}
-
 map.on('click', e => {
   if (S.picking) return pickAt(e.latlng);
   const r = S.cur;
   if (!r) return;
-  pushHistory(r);
+  record();
   const m = curMode();
   r.verts.push({ lat: e.latlng.lat, lon: e.latlng.lng, mode: m });
   r.endMode = m;
   refresh();
 });
-$('undobtn').onclick = () => {
-  const r = S.cur; if (!r || !r.history.length) return;
-  const h = r.history.pop(); r.verts = h.verts; r.endMode = h.endMode; refresh();
-};
 $('clearbtn').onclick = () => {
   const r = S.cur; if (!r || !r.verts.length) return;
-  pushHistory(r); r.verts = []; r.endMode = curMode(); refresh();
+  record(); r.verts = []; r.endMode = curMode(); refresh();
 };
 $('deletebtn').onclick = () => {
   const r = S.cur; if (!r) return;
-  if ((r.verts.length || r.timed) && !confirm('Remove this repair and keep the original straight line?')) return;
+  record();
   S.repairs = S.repairs.filter(x => x !== r);
   S.cur = null;
-  deactivate();
+  showCur();
 };
 $('resetbtn').onclick = () => {
-  if (S.repairs.some(r => r.verts.length || r.timed) && !confirm('Throw away all your repairs and go back to the original track?')) return;
-  resetAll(); refresh();
+  if (!S.repairs.length) return;
+  record();
+  resetAll(); showCur();
   if (S.segs.length) map.fitBounds(L.latLngBounds(S.segs.flatMap(s => s.pts.map(p => [p.lat, p.lon]))), { padding: [30, 30] });
 };
 $('showorig').onchange = () => refresh();
@@ -661,62 +723,88 @@ function drawMap() {
   [gapLayer, ctxLayer, repairLayer, handleLayer].forEach(l => l.clearLayers());
   curLine = null;
   if ($('showorig').checked) gapLayer.addTo(map); else map.removeLayer(gapLayer);
+  const orange = getCss('--repair');
   S.repairs.forEach(r => {
     const pts = S.segs[r.s].pts;
     L.polyline(pts.slice(r.a, r.b + 1).map(p => [p.lat, p.lon]), { color: getCss('--gap'), weight: 3, dashArray: '6 6', interactive: false }).addTo(gapLayer);
-    const active = r === S.cur;
-    const line = L.polyline(routePts(r).map(p => [p.lat, p.lon]), { color: getCss('--repair'), weight: active ? 4 : 3, opacity: active ? 1 : .75 }).addTo(repairLayer);
-    if (active) curLine = line;
-    else line.on('click', e => { L.DomEvent.stop(e); activate(r, false); }).bindTooltip('Click to edit this repair');
-    if (isTimed(r) && active) {
-      r.timed.pts.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 2, color: getCss('--repair'), weight: 1, fillOpacity: 1, interactive: false }).addTo(repairLayer));
-    }
+    if (r === S.cur) return;
+    L.polyline(routePts(r).map(p => [p.lat, p.lon]), { color: orange, weight: 3, opacity: .75 })
+      .on('click', e => { L.DomEvent.stop(e); activate(r, false); })
+      .bindTooltip('Click to edit this repair').addTo(repairLayer);
   });
   const r = S.cur;
   if (!r) return;
   const pts = S.segs[r.s].pts;
-  // recorded context points either side, with times
+  // recorded points either side for context, and the ones being replaced in red
+  const inside = r.b - r.a - 1;
   for (let i = Math.max(0, r.a - 5); i <= Math.min(pts.length - 1, r.b + 5); i++) {
-    if (i >= r.a && i <= r.b) continue;
-    const p = pts[i];
-    L.circleMarker([p.lat, p.lon], { radius: 3.5, color: getCss('--track'), weight: 1, fillColor: '#fff', fillOpacity: 1 })
-      .bindTooltip('Recorded · ' + fmtTime(p.time)).addTo(ctxLayer);
+    if (i === r.a || i === r.b) continue;
+    const p = pts[i], replaced = i > r.a && i < r.b;
+    if (replaced && inside > 2000) continue; // too many to draw usefully; the dashed line shows them
+    L.circleMarker([p.lat, p.lon], replaced
+      ? { radius: 3.5, color: getCss('--gap'), weight: 1.5, fillColor: '#fff', fillOpacity: 1 }
+      : { radius: 3.5, color: getCss('--track'), weight: 1, fillColor: '#fff', fillOpacity: 1 })
+      .bindTooltip((replaced ? 'Recorded, will be replaced · ' : 'Recorded · ') + fmtTime(p.time)).addTo(ctxLayer);
   }
   [[r.a, 'A'], [r.b, 'B']].forEach(([i, label]) => {
     const p = pts[i];
     L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'anchor', html: label, iconSize: [22, 22] }), zIndexOffset: 1000 })
       .bindTooltip(`${label} · recorded · ${fmtTime(p.time)}`).addTo(ctxLayer);
   });
+  // the current repair, leg by leg: solid follows roads, dashed is straight; click a leg to switch it
+  const ls = legs(r);
+  ls.forEach(l => {
+    const routed = l.status === 'ok';
+    const line = L.polyline(l.pts.map(p => [p.lat, p.lon]), { color: orange, weight: 4, dashArray: routed ? null : '9 7' });
+    line.bindTooltip(l.mode
+      ? (routed ? 'Follows roads · click to make it straight' : l.status === 'pending' ? 'Finding roads…' : 'Could not follow roads here · click to make it straight')
+      : 'Straight · click to follow roads');
+    line.on('click', e => {
+      L.DomEvent.stop(e);
+      record();
+      setLegMode(r, l.i, l.mode ? null : $('profile').value);
+      refresh();
+    });
+    line.addTo(repairLayer);
+  });
+  // during drags, one straight preview line through the clicked points
+  curLine = L.polyline([], { color: orange, weight: 2, dashArray: '2 5', interactive: false }).addTo(repairLayer);
+  if (isTimed(r)) {
+    r.timed.pts.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 2, color: orange, weight: 1, fillOpacity: 1, interactive: false }).addTo(repairLayer));
+  }
   // vertex handles
   r.verts.forEach((v, i) => {
     const m = L.marker([v.lat, v.lon], { draggable: true, icon: L.divIcon({ className: 'vtx', iconSize: [14, 14] }), zIndexOffset: 500 });
     let dragged = false;
-    m.on('dragstart', () => { dragged = true; S.dragging = true; pushHistory(r); });
+    m.on('dragstart', () => { dragged = true; S.dragging = true; record(); });
     m.on('drag', e => { r.verts[i] = { ...r.verts[i], lat: e.latlng.lat, lon: e.latlng.lng }; liveUpdate(); });
     m.on('dragend', () => { S.dragging = false; refresh(); setTimeout(() => dragged = false, 0); });
     // removing a point merges its two legs; the merged leg keeps the mode of the leg after it
-    m.on('click', e => { L.DomEvent.stop(e); if (dragged) return; pushHistory(r); r.verts.splice(i, 1); refresh(); });
+    m.on('click', e => { L.DomEvent.stop(e); if (dragged) return; record(); r.verts.splice(i, 1); refresh(); });
     m.bindTooltip('Your point (click to remove)', { direction: 'top' });
     m.addTo(handleLayer);
   });
-  // midpoint handles between clicked points: drag to insert a new point (it keeps that leg's mode)
-  const ctrl = [pts[r.a], ...r.verts, pts[r.b]];
-  for (let i = 1; i < ctrl.length; i++) {
-    const p = ctrl[i - 1], q = ctrl[i];
-    const legMode = i < ctrl.length - 1 ? r.verts[i - 1].mode : r.endMode;
-    const mid = L.marker([(p.lat + q.lat) / 2, (p.lon + q.lon) / 2], { draggable: true, icon: L.divIcon({ className: 'mid', iconSize: [11, 11] }), zIndexOffset: 400 });
-    const at = i - 1;
+  // midpoint handles, half way along each leg: drag to insert a new point (it keeps that leg's mode)
+  ls.forEach(l => {
+    const h = halfway(l.pts);
+    const mid = L.marker([h.lat, h.lon], { draggable: true, icon: L.divIcon({ className: 'mid', iconSize: [11, 11] }), zIndexOffset: 400 });
     let inserted = false;
-    mid.on('dragstart', () => { S.dragging = true; pushHistory(r); const ll = mid.getLatLng(); r.verts.splice(at, 0, { lat: ll.lat, lon: ll.lng, mode: legMode }); inserted = true; });
-    mid.on('drag', e => { if (inserted) { r.verts[at] = { ...r.verts[at], lat: e.latlng.lat, lon: e.latlng.lng }; liveUpdate(); } });
+    mid.on('dragstart', () => {
+      S.dragging = true; record();
+      const ll = mid.getLatLng();
+      r.verts.splice(l.i, 0, { lat: ll.lat, lon: ll.lng, mode: l.mode });
+      inserted = true;
+    });
+    mid.on('drag', e => { if (inserted) { r.verts[l.i] = { ...r.verts[l.i], lat: e.latlng.lat, lon: e.latlng.lng }; liveUpdate(); } });
     mid.on('dragend', () => { S.dragging = false; refresh(); });
     mid.on('click', e => L.DomEvent.stop(e));
+    mid.bindTooltip('Drag to bend this line', { direction: 'top' });
     mid.addTo(handleLayer);
-  }
+  });
 }
 
 function liveUpdate() {
-  // cheap update during drags: straight lines for the moving legs, no routing requests
+  // cheap update during drags: a straight preview through the clicked points, no routing requests
   const r = S.cur; if (!r || !curLine) return;
   const pts = S.segs[r.s].pts;
   curLine.setLatLngs([pts[r.a], ...r.verts, pts[r.b]].map(p => [p.lat, p.lon]));
@@ -732,7 +820,7 @@ function spacing(r) {
 const inRepair = (si, i) => S.repairs.some(r => r.s === si && i > r.a && i <= r.b);
 
 function activitySpeed() {
-  // typical moving speed outside the gaps: pairs of recorded points with short time steps
+  // typical moving speed outside the repairs: pairs of recorded points with short time steps
   let d = 0, t = 0;
   S.segs.forEach((s, si) => {
     for (let i = 1; i < s.pts.length; i++) {
@@ -749,7 +837,7 @@ function activitySpeed() {
   return t > 60 ? d / t : null;
 }
 
-$('timebtn').onclick = () => { if (S.cur) { calculate(S.cur); showTimeResult(S.cur); refresh(); } };
+$('timebtn').onclick = () => { if (S.cur) { record(); calculate(S.cur); refresh(); } };
 function calculate(r) {
   const pts = S.segs[r.s].pts, A = pts[r.a], B = pts[r.b];
   const rp = routePts(r);
@@ -826,7 +914,8 @@ function refresh() {
   const r = S.cur;
   drawMap();
   renderGaps();
-  $('undobtn').disabled = !r || !r.history.length;
+  $('undobtn').disabled = !S.undo.length;
+  $('redobtn').disabled = !S.redo.length;
   $('clearbtn').disabled = !r || !r.verts.length;
   if (r) {
     const pts = S.segs[r.s].pts;
@@ -847,7 +936,11 @@ function refresh() {
 
 // ---------- step 5: review + export ----------
 function renderReview() {
-  if (!S.repairs.length) { $('replist').innerHTML = ''; stats('reviewstats', []); msgs('reviewmsgs', []); $('dlbtn').disabled = true; return; }
+  if (!S.repairs.length) {
+    $('replist').innerHTML = ''; stats('reviewstats', []); msgs('reviewmsgs', []); $('dlbtn').disabled = true;
+    $('s5').classList.toggle('off', !S.undo.length); // keep it reachable so a reset can be undone
+    return;
+  }
   $('s5').classList.remove('off');
   let oldSum = 0, newSum = 0;
   $('replist').innerHTML = S.repairs.map((r, i) => {
