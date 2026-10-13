@@ -34,6 +34,7 @@ window.TOOLS = [
   { name: "Covers", url: "/covers", s: "any", desc: "Find a book's cover and print it big enough for a classroom door.", tags: "book cover print door poster" },
   { name: "Longcut", url: "/longcut", s: "any", desc: "Find a walking or cycling route that favours quiet back streets and paths over main roads.", tags: "map route walk bike quiet" },
   { name: "GPS Fixer", url: "/mapping/gpsfixer/", s: "any", desc: "Redraw the bit of a run or ride where your GPS dropped out, then upload the fixed GPX to Strava.", tags: "gpx strava gps run ride map repair track" },
+  { name: "Mapic", url: "/mapping/mapic/", s: "any", desc: "Draw a picture on the map, or trace an image, and turn it into a route along real roads for GPS art.", tags: "gps art strava drawing picture route map trace gpx run ride" },
   { name: "Pinhole", url: "/pinhole", s: "any", desc: "Design and test pinhole cameras.", tags: "camera photography" },
   { name: "Photos", url: "/photos", s: "any", desc: "A photo gallery.", tags: "pictures gallery" },
   { name: "Is Luxon PM?", url: "/isluxonpm", s: "any", desc: "A live answer to the question on everyone's lips.", tags: "prime minister nz joke" },

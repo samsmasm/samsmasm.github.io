@@ -13,7 +13,7 @@
   --ink:#2a2233;--muted:#7a6f88;--light:#a99fb6;
   --accent:#4a1a7a;--accent-bg:#f5f0ff;--accent-border:#d0b6f5;
   --rule:#f0e8ff;
-  --line:#d6336c;--img:#1a6fb8;
+  --line:#d6336c;--img:#1a6fb8;--route:#2b8a3e;
   --warn:#7a4a0a;--warn-bg:#fff8ec;--warn-border:#f5d9a8;
   --err:#7a1a1a;--err-bg:#fff0f0;--err-border:#f5b6b6;
 }
@@ -61,6 +61,14 @@ header a.home:hover{color:var(--accent)}
 .btn:hover:not(:disabled){background:#ebe0ff}
 .btn:disabled{opacity:.45;cursor:default}
 .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover:not(:disabled){background:#3a1162}
+.status{font-size:12px;color:var(--muted);margin-top:6px;min-height:1em}
+.big.route{color:var(--route)}
+.legend{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+.selrow{font-size:12.5px;color:var(--muted)}
+.selrow select{font:inherit;font-size:12.5px;margin-left:4px;border:1px solid var(--accent-border);border-radius:5px;padding:1px 4px;color:var(--accent);background:#fff}
 .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
 #drop{
   border:1.5px dashed var(--accent-border);border-radius:10px;padding:14px;text-align:center;
@@ -166,14 +174,32 @@ footer p{margin-bottom:6px}
     </div>
   </section>
 
-  <section class="step off">
+  <section class="step">
     <h2><span>4</span>Follow the roads</h2>
-    <p>Coming next: turn the drawing into a route along real roads and paths, slide and stretch it to find a good fit, and download it as a GPX file.</p>
+    <p>Finds the route along roads and paths that stays closest to your drawing. After the first snap it updates by itself whenever you change the drawing.</p>
+    <div class="selrow" style="margin-top:8px">Route for
+      <select id="profile"><option value="foot">walking / running</option><option value="bike">cycling</option></select></div>
+    <div class="row"><button class="btn primary" id="snapbtn" disabled>Snap to roads</button></div>
+    <div class="status" id="snapstatus"></div>
+    <div id="snapmsgs"></div>
+    <div class="big route" id="routedist"></div>
+    <dl class="stats" id="routestats" hidden></dl>
+    <label class="chk"><input type="checkbox" id="showdrawchk" checked> Show my drawing</label>
+    <div class="legend">
+      <span><i style="border-color:var(--line)"></i>Your drawing</span>
+      <span><i style="border-color:var(--route)"></i>Route along roads</span>
+    </div>
+  </section>
+
+  <section class="step">
+    <h2><span>5</span>Download</h2>
+    <p>A GPX track with no times, for route planners and watches (Strava, Garmin, Komoot and so on).</p>
+    <div class="row"><button class="btn" id="gpxbtn" disabled>Download GPX</button></div>
   </section>
 
   <footer>
-    <p>Privacy: your image and drawing stay in this browser. Nothing is uploaded. Map tiles (OpenStreetMap data, served by CARTO) reveal roughly which area you are looking at, as any web map does.</p>
-    <p>Map data © OpenStreetMap contributors, tiles © CARTO. Built by Sam G · all vibe coded.</p>
+    <p>Privacy: your image and drawing stay in this browser. Map tiles (OpenStreetMap data, served by CARTO) reveal roughly which area you are looking at, as any web map does. When you snap to roads, the rectangle around your drawing is sent to the Overpass API to fetch the roads in it; the drawing itself is not sent, and the route is worked out in this browser.</p>
+    <p>Map data © OpenStreetMap contributors, tiles © CARTO, road data via Overpass API. Built by Sam G · all vibe coded.</p>
   </footer>
 </div>
 <div id="mapwrap"><div id="map"></div><div id="maphint"></div></div>
@@ -213,6 +239,8 @@ traceEl.alt = '';
 traceEl.draggable = false;
 traceEl.style.display = 'none';
 
+const routeCasing = L.polyline([], { color: '#fff', weight: 9, opacity: .9, interactive: false }).addTo(map);
+const routeLine = L.polyline([], { color: getCss('--route'), weight: 5, interactive: false }).addTo(map);
 const casing = L.polyline([], { color: '#fff', weight: 8, opacity: .9, interactive: false }).addTo(map);
 const line = L.polyline([], { color: getCss('--line'), weight: 4, interactive: false }).addTo(map);
 const stroke = L.polyline([], { color: getCss('--line'), weight: 3, opacity: .7, dashArray: '4 6', interactive: false }).addTo(map);
@@ -455,7 +483,15 @@ function addStroke(ll) {
 // ---------- drawing display and point editing ----------
 const MAX_HANDLES = 600;
 function drawnPath() { return S.closed && S.pts.length > 2 ? S.pts.concat([S.pts[0]]) : S.pts; }
-function renderLine() { const p = drawnPath(); line.setLatLngs(p); casing.setLatLngs(p); }
+function renderLine() {
+  const p = $('showdrawchk').checked ? drawnPath() : [];
+  line.setLatLngs(p);
+  casing.setLatLngs(p);
+  // once there is a route, the drawing steps back to a thin dashed guide
+  const quiet = !!route;
+  line.setStyle({ weight: quiet ? 3 : 4, dashArray: quiet ? '6 6' : null, opacity: quiet ? .8 : 1 });
+  casing.setStyle({ opacity: quiet ? 0 : .9 });
+}
 function renderVertices() {
   vtxLayer.clearLayers();
   if (S.mode !== 'pan' || S.pts.length > MAX_HANDLES) return;
@@ -501,6 +537,8 @@ function render() {
   $('imghelp').style.display = imgLocked ? 'none' : '';
   msgs('drawmsgs', !draw && S.pts.length > MAX_HANDLES
     ? [['warn', `This drawing has ${S.pts.length} points, too many to show as dots. Undo or clear to edit it.`]] : []);
+  $('snapbtn').disabled = S.pts.length < 2 || roadsLoading;
+  renderRoute();
   if (draw && !S.pts.length) hint('Draw with a mouse, finger or pen. Use Pan to move the map.');
   else if (draw) hint('Keep drawing to extend the line.');
   else if (S.img && !imgLocked) hint('Drag the image to move it. Lock it when it is in place.');
@@ -508,6 +546,402 @@ function render() {
 }
 $('closedchk').onchange = e => { record(); S.closed = e.target.checked; render(); };
 $('clearbtn').onclick = () => { record(); S.pts = []; render(); };
+
+// ---------- road data (Overpass) ----------
+// overpass-api.de is the main server but often busy (406, 429, 504); the others are public mirrors
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const MAX_AREA_KM2 = 60;
+let roads = null;        // { bbox: [s, w, n, e], nodes: Map id -> [lat, lon], ways: [{ nodes, tags }] }
+let roadsLoading = false;
+let G = null;            // graph built from `roads` for one profile
+let route = null;        // { sig, latlngs, len, fit, wrongWay }
+let wantRoute = false;   // set by the first successful snap; later edits re-snap by themselves
+let snapTimer = null;
+
+function bboxOf(pts, padMin, padFrac) {
+  let s = 90, w = 180, n = -90, e = -180;
+  for (const q of pts) { s = Math.min(s, q.lat); n = Math.max(n, q.lat); w = Math.min(w, q.lng); e = Math.max(e, q.lng); }
+  const kx = 111320 * Math.cos((s + n) / 2 * Math.PI / 180), ky = 110540;
+  const pad = Math.max(padMin, padFrac * Math.max((n - s) * ky, (e - w) * kx));
+  return [s - pad / ky, w - pad / kx, n + pad / ky, e + pad / kx];
+}
+const bboxKm2 = b => (b[2] - b[0]) * 110.54 * (b[3] - b[1]) * 111.32 * Math.cos((b[0] + b[2]) / 2 * Math.PI / 180);
+const bboxInside = (a, b) => !!b && a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3];
+
+async function fetchRoads(b) {
+  const q = `[out:json][timeout:90];way["highway"](${b.map(v => v.toFixed(6)).join(',')});out body qt;>;out skel qt;`;
+  let lastErr = 'no response';
+  for (const url of OVERPASS) {
+    try {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 60000);
+      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal })
+        .finally(() => clearTimeout(timer));
+      if (!res.ok) { lastErr = [406, 429, 503, 504].includes(res.status) ? 'busy' : 'HTTP ' + res.status; continue; }
+      const j = await res.json();
+      const nodes = new Map(), ways = [];
+      for (const el of j.elements) {
+        if (el.type === 'node') nodes.set(el.id, [el.lat, el.lon]);
+        else if (el.type === 'way') ways.push({ nodes: el.nodes, tags: el.tags || {} });
+      }
+      return { bbox: b, nodes, ways };
+    } catch (err) { lastErr = 'network'; }
+  }
+  throw new Error(lastErr);
+}
+
+// Which ways a profile may use. Returns null (not allowed), or the one-way direction (0, 1 or -1).
+const YES = v => v === 'yes' || v === 'designated' || v === 'permissive';
+const NEVER = new Set(['construction', 'proposed', 'raceway', 'bus_guideway', 'escape', 'abandoned', 'disused', 'corridor', 'elevator', 'razed', 'planned']);
+function wayRule(t, profile) {
+  const hw = t.highway;
+  if (NEVER.has(hw) || t.area === 'yes' && hw !== 'pedestrian') return null;
+  const closed = v => v === 'no' || v === 'private';
+  if (profile === 'foot') {
+    if (closed(t.foot)) return null;
+    if (YES(t.foot)) return 0;
+    if (hw === 'motorway' || hw === 'motorway_link' || closed(t.access)) return null;
+    return 0;
+  }
+  if (closed(t.bicycle)) return null;
+  if (!YES(t.bicycle)) {
+    if (hw === 'motorway' || hw === 'motorway_link' || hw === 'steps' || closed(t.access)) return null;
+    if ((hw === 'footway' || hw === 'pedestrian') ) return null;
+  }
+  if (t['oneway:bicycle'] === 'no' || /^opposite/.test(t.cycleway || '')) return 0;
+  if (t.oneway === 'yes' || t.oneway === '1' || t.oneway === 'true' || t.junction === 'roundabout') return 1;
+  if (t.oneway === '-1' || t.oneway === 'reverse') return -1;
+  return 0;
+}
+
+// Graph in local metres. Edges are directed; the wrong way along a one-way street is kept but
+// costs WRONG_WAY times as much, so the route only uses it when there is no sensible alternative.
+const WRONG_WAY = 6;
+function buildGraph(raw, profile) {
+  const lat0 = (raw.bbox[0] + raw.bbox[2]) / 2, lon0 = (raw.bbox[1] + raw.bbox[3]) / 2;
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+  const idx = new Map(), X = [], Y = [], LAT = [], LON = [];
+  const node = id => {
+    let i = idx.get(id);
+    if (i === undefined) {
+      const c = raw.nodes.get(id);
+      if (!c) return -1;
+      i = X.length; idx.set(id, i);
+      LAT.push(c[0]); LON.push(c[1]); X.push((c[1] - lon0) * kx); Y.push((c[0] - lat0) * ky);
+    }
+    return i;
+  };
+  const ef = [], et = [], el = [], ew = [];
+  for (const w of raw.ways) {
+    const dir = wayRule(w.tags, profile);
+    if (dir === null) continue;
+    for (let k = 1; k < w.nodes.length; k++) {
+      const a = node(w.nodes[k - 1]), b = node(w.nodes[k]);
+      if (a < 0 || b < 0 || a === b) continue;
+      const len = Math.hypot(X[a] - X[b], Y[a] - Y[b]);
+      ef.push(a, b); et.push(b, a); el.push(len, len); ew.push(dir < 0 ? 1 : 0, dir > 0 ? 1 : 0);
+    }
+  }
+  const n = X.length, m = ef.length;
+  const first = new Int32Array(n + 1);
+  for (const a of ef) first[a + 1]++;
+  for (let i = 0; i < n; i++) first[i + 1] += first[i];
+  const out = new Int32Array(m), fill = first.slice(0, n);
+  for (let e = 0; e < m; e++) out[fill[ef[e]]++] = e;
+  // connected components, so snapping ignores islands of path that do not join the main network
+  const parent = new Int32Array(n).map((_, i) => i);
+  const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let e = 0; e < m; e += 2) { const a = find(ef[e]), b = find(et[e]); if (a !== b) parent[a] = b; }
+  const size = new Map();
+  let main = -1, best = 0;
+  for (let i = 0; i < n; i++) { const r = find(i), c = (size.get(r) || 0) + 1; size.set(r, c); if (c > best) { best = c; main = r; } }
+  const CELL = 60, grid = new Map();
+  for (let i = 0; i < n; i++) {
+    if (find(i) !== main) continue;
+    const key = Math.floor(X[i] / CELL) + ',' + Math.floor(Y[i] / CELL);
+    (grid.get(key) || grid.set(key, []).get(key)).push(i);
+  }
+  return {
+    profile, src: raw, n, m, lat0, lon0, kx, ky, X, Y, LAT, LON, first, out,
+    to: Int32Array.from(et), len: Float64Array.from(el), wrong: Uint8Array.from(ew),
+    grid, CELL, g: new Float64Array(n), prev: new Int32Array(n), stamp: new Int32Array(n), done: new Int32Array(n), run: 0,
+  };
+}
+function nearestNode(x, y) {
+  const { grid, CELL, X, Y } = G, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  let best = -1, bd = Infinity;
+  for (let r = 0; r < 40; r++) {
+    for (let i = cx - r; i <= cx + r; i++) for (let j = cy - r; j <= cy + r; j++) {
+      if (Math.max(Math.abs(i - cx), Math.abs(j - cy)) !== r) continue;
+      for (const k of grid.get(i + ',' + j) || []) { const d = Math.hypot(X[k] - x, Y[k] - y); if (d < bd) { bd = d; best = k; } }
+    }
+    if (best >= 0 && bd <= r * CELL) break;
+  }
+  return best;
+}
+
+// Segment index for distance-to-polyline queries.
+function segIndex(P, cell) {
+  const grid = new Map();
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i];
+    for (let gx = Math.floor(Math.min(a[0], b[0]) / cell); gx <= Math.floor(Math.max(a[0], b[0]) / cell); gx++)
+      for (let gy = Math.floor(Math.min(a[1], b[1]) / cell); gy <= Math.floor(Math.max(a[1], b[1]) / cell); gy++) {
+        const key = gx + ',' + gy;
+        (grid.get(key) || grid.set(key, []).get(key)).push(i);
+      }
+  }
+  return {
+    // distance from (x, y) to the polyline, capped at max
+    dist(x, y, max) {
+      const r = Math.ceil(max / cell), cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+      let best = max;
+      for (let i = cx - r; i <= cx + r; i++) for (let j = cy - r; j <= cy + r; j++) {
+        for (const k of grid.get(i + ',' + j) || []) {
+          const a = P[k - 1], b = P[k], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+          const t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)) : 0;
+          const d = Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+          if (d < best) best = d;
+        }
+      }
+      return best;
+    }
+  };
+}
+function densify(P, step) {
+  const out = [P[0]];
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.ceil(d / step);
+    for (let j = 1; j <= k; j++) out.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]);
+  }
+  return out;
+}
+
+// A* from s to t using G.cost; returns the node path
+function astar(s, t, cost) {
+  const { first, out, to, X, Y, g, prev, stamp, done } = G;
+  const run = ++G.run;
+  const hf = [], hn = []; // binary heap of (f, node)
+  const push = (f, v) => {
+    let i = hf.length; hf.push(f); hn.push(v);
+    while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= f) break; hf[i] = hf[p]; hn[i] = hn[p]; i = p; }
+    hf[i] = f; hn[i] = v;
+  };
+  const pop = () => {
+    const v = hn[0], lf = hf.pop(), ln = hn.pop();
+    if (hf.length) {
+      let i = 0;
+      for (;;) {
+        let c = 2 * i + 1;
+        if (c >= hf.length) break;
+        if (c + 1 < hf.length && hf[c + 1] < hf[c]) c++;
+        if (hf[c] >= lf) break;
+        hf[i] = hf[c]; hn[i] = hn[c]; i = c;
+      }
+      hf[i] = lf; hn[i] = ln;
+    }
+    return v;
+  };
+  const h = v => Math.hypot(X[v] - X[t], Y[v] - Y[t]);
+  g[s] = 0; prev[s] = -1; stamp[s] = run; push(h(s), s);
+  while (hf.length) {
+    const v = pop();
+    if (done[v] === run) continue;
+    done[v] = run;
+    if (v === t) break;
+    for (let k = first[v]; k < first[v + 1]; k++) {
+      const e = out[k], w = to[e], ng = g[v] + cost[e];
+      if (stamp[w] !== run || ng < g[w]) { stamp[w] = run; g[w] = ng; prev[w] = e; push(ng + h(w), w); }
+    }
+  }
+  if (done[t] !== run) return null;
+  const path = [t];
+  for (let v = t; v !== s;) { const e = prev[v]; v = G.to[e ^ 1]; path.push(v); } // edges come in pairs, e ^ 1 is the reverse
+  return path.reverse();
+}
+
+// Remove short detours that come back to where they left: out-and-back spurs (A, B, A) and
+// small loops (A, B, C, A), usually an anchor that snapped to a side street or the other side
+// of a divided road. Long ones stay, since they may be part of the picture.
+function dropDetours(path, maxLen) {
+  const d = (a, b) => Math.hypot(G.X[a] - G.X[b], G.Y[a] - G.Y[b]);
+  for (let changed = true; changed;) {
+    changed = false;
+    const seen = new Map();
+    let along = 0;
+    const cum = [0];
+    for (let i = 1; i < path.length; i++) cum.push(along += d(path[i - 1], path[i]));
+    for (let i = 0; i < path.length; i++) {
+      const j = seen.get(path[i]);
+      if (j !== undefined && cum[i] - cum[j] <= maxLen && !(j === 0 && i === path.length - 1)) {
+        path.splice(j + 1, i - j);
+        changed = true;
+        break;
+      }
+      seen.set(path[i], i);
+    }
+  }
+  return path;
+}
+
+function snapRoute() {
+  const xy = ll => [(ll.lng - G.lon0) * G.kx, (ll.lat - G.lat0) * G.ky];
+  const P = drawnPath().map(xy);
+  let total = 0, minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < P.length; i++) {
+    if (i) total += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+    minX = Math.min(minX, P[i][0]); maxX = Math.max(maxX, P[i][0]); minY = Math.min(minY, P[i][1]); maxY = Math.max(maxY, P[i][1]);
+  }
+  const size = Math.hypot(maxX - minX, maxY - minY);
+  const D = Math.min(120, Math.max(15, size * .02));      // how far from the drawing is "close"
+  const A = Math.min(250, Math.max(30, total / 50));      // anchor spacing along the drawing
+  const idx = segIndex(P, 4 * D);
+  // edge cost: length, inflated the further the edge's middle is from the drawing
+  const cost = new Float64Array(G.m);
+  for (let e = 0; e < G.m; e += 2) {
+    const a = G.to[e + 1], b = G.to[e];
+    const dd = idx.dist((G.X[a] + G.X[b]) / 2, (G.Y[a] + G.Y[b]) / 2, 4 * D) / D;
+    const c = G.len[e] * (1 + dd * dd);
+    cost[e] = c * (G.wrong[e] ? WRONG_WAY : 1);
+    cost[e + 1] = c * (G.wrong[e + 1] ? WRONG_WAY : 1);
+  }
+  // anchors: every A metres along the drawing, plus sharp corners, plus the ends
+  const anchors = [P[0]];
+  let since = 0;
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    let pos = A - since;
+    while (pos < seg) { anchors.push([a[0] + (b[0] - a[0]) * pos / seg, a[1] + (b[1] - a[1]) * pos / seg]); pos += A; }
+    since = (since + seg) % A;
+    if (i < P.length - 1) {
+      const c = P[i + 1];
+      const t1 = Math.atan2(b[1] - a[1], b[0] - a[0]), t2 = Math.atan2(c[1] - b[1], c[0] - b[0]);
+      let turn = Math.abs(t2 - t1); if (turn > Math.PI) turn = 2 * Math.PI - turn;
+      if (turn > Math.PI / 3.5) { anchors.push(b); since = 0; }
+    } else anchors.push(b);
+  }
+  const nodes = anchors.map(([x, y]) => nearestNode(x, y));
+  let path = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (i === 0 || nodes[i] === nodes[i - 1]) { if (!path.length) path.push(nodes[i]); continue; }
+    const leg = astar(nodes[i - 1], nodes[i], cost);
+    if (!leg) continue;
+    path.push(...leg.slice(1));
+  }
+  path = dropDetours(path, Math.max(A * 1.5, 3 * D));
+  // which edges were used the wrong way
+  let wrongWay = 0;
+  for (let i = 1; i < path.length; i++) {
+    for (let k = G.first[path[i - 1]]; k < G.first[path[i - 1] + 1]; k++) {
+      const e = G.out[k];
+      if (G.to[e] === path[i]) { if (G.wrong[e]) wrongWay += G.len[e]; break; }
+    }
+  }
+  const R = path.map(v => [G.X[v], G.Y[v]]);
+  let len = 0;
+  for (let i = 1; i < R.length; i++) len += Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]);
+  // fit: how far the drawing is from the route, and the route from the drawing
+  const cap = Math.max(200, size / 2);
+  const ridx = segIndex(R, Math.max(50, D * 2));
+  const ds = densify(P, 10).map(([x, y]) => ridx.dist(x, y, cap));
+  const rs = R.length > 1 ? densify(R, 10).map(([x, y]) => idx.dist(x, y, 4 * D)) : [];
+  const all = ds.concat(rs).sort((a, b) => a - b);
+  const mean = all.reduce((a, b) => a + b, 0) / (all.length || 1);
+  const p95 = all[Math.floor(all.length * .95)] || 0;
+  return { latlngs: path.map(v => L.latLng(G.LAT[v], G.LON[v])), len, fit: { mean, p95, rel: mean / (size || 1) }, wrongWay };
+}
+
+const sig = () => $('profile').value + '|' + (S.closed ? 1 : 0) + '|' + S.pts.map(p => p.lat.toFixed(6) + ',' + p.lng.toFixed(6)).join(';');
+function snapStatus(t) { $('snapstatus').textContent = t || ''; }
+
+async function doSnap(asked) {
+  clearTimeout(snapTimer);
+  if (S.pts.length < 2 || roadsLoading) return;
+  const path = drawnPath();
+  if (!roads || !bboxInside(bboxOf(path, 100, .05), roads.bbox)) {
+    if (!asked) { snapStatus('The drawing has gone outside the roads loaded so far. Press Snap to roads to load more.'); renderRoute(); return; }
+    const b = bboxOf(path, 400, .2), km2 = bboxKm2(b);
+    if (km2 > MAX_AREA_KM2) {
+      msgs('snapmsgs', [['err', `This drawing covers about ${Math.round(km2)} km², more than the ${MAX_AREA_KM2} km² limit for loading roads. Zoom in and draw it smaller.`]]);
+      return;
+    }
+    roadsLoading = true;
+    msgs('snapmsgs', []);
+    snapStatus('Loading roads and paths for this area. This can take up to a minute when the server is busy.');
+    render();
+    try { roads = await fetchRoads(b); G = null; }
+    catch (err) {
+      msgs('snapmsgs', [['err', err.message === 'busy'
+        ? 'The road data server is busy. Try again in a minute.'
+        : 'Could not load the roads (' + err.message + '). Check your connection and try again.']]);
+      snapStatus('');
+      return;
+    } finally { roadsLoading = false; render(); }
+  }
+  const profile = $('profile').value;
+  if (!G || G.src !== roads || G.profile !== profile) G = buildGraph(roads, profile);
+  if (!G.grid.size) { msgs('snapmsgs', [['err', 'No usable roads or paths here for this kind of route.']]); snapStatus(''); return; }
+  const t0 = performance.now();
+  const r = snapRoute();
+  r.sig = sig();
+  route = r;
+  wantRoute = true;
+  msgs('snapmsgs', r.wrongWay > 20 ? [['warn', `${fmtDist(r.wrongWay)} of this route goes the wrong way along one-way streets. Walk the bike there, or reshape the drawing.`]] : []);
+  snapStatus(`Snapped in ${Math.round(performance.now() - t0)} ms.`);
+  render();
+}
+function scheduleSnap() { clearTimeout(snapTimer); snapTimer = setTimeout(() => doSnap(false), 250); }
+
+function renderRoute() {
+  if (S.pts.length < 2) { route = null; }
+  const stale = route && route.sig !== sig();
+  const pts = route ? route.latlngs : [];
+  routeLine.setLatLngs(pts);
+  routeCasing.setLatLngs(pts);
+  routeLine.setStyle({ opacity: stale ? .35 : 1 });
+  routeCasing.setStyle({ opacity: stale ? 0 : .9 });
+  $('gpxbtn').disabled = !route || stale || route.latlngs.length < 2;
+  $('routedist').textContent = route ? fmtDist(route.len) : '';
+  const dl = $('routestats');
+  if (!route) { dl.hidden = true; dl.innerHTML = ''; }
+  else {
+    const f = route.fit, word = f.rel < .012 ? 'close' : f.rel < .03 ? 'recognisable' : 'loose';
+    dl.hidden = false;
+    dl.innerHTML = `<dt>Fit</dt><dd>${word}</dd><dt>Average gap</dt><dd>${fmtDist(f.mean)} from your drawing</dd>` +
+      `<dt>Worst bits</dt><dd>${fmtDist(f.p95)}</dd><dt>Your drawing</dt><dd>${S.pts.length > 1 ? fmtDist(lengthM()) : '–'}</dd>`;
+  }
+  if (wantRoute && S.pts.length > 1 && stale) scheduleSnap();
+}
+
+$('snapbtn').onclick = () => doSnap(true);
+$('profile').value = store.get('mapic.profile') === 'bike' ? 'bike' : 'foot';
+$('profile').onchange = e => { store.set('mapic.profile', e.target.value); if (wantRoute) doSnap(false); else render(); };
+$('showdrawchk').onchange = () => render();
+
+$('gpxbtn').onclick = () => {
+  if (!route) return;
+  const x = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const name = 'Mapic route';
+  const type = $('profile').value === 'bike' ? 'cycling' : 'running';
+  const pts = route.latlngs.map(p => `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lng.toFixed(7)}"/>`).join('\n');
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Mapic (unisam.nz/mapping/mapic)" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>${x(name)}</name><time>${new Date().toISOString()}</time></metadata>
+  <trk>
+    <name>${x(name)}</name>
+    <type>${type}</type>
+    <trkseg>
+${pts}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
+  a.download = 'mapic-route-' + new Date().toISOString().slice(0, 10) + '.gpx';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+};
 
 setMode(S.mode);
 </script>

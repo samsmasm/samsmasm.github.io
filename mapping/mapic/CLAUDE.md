@@ -106,7 +106,19 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
     / Pan toggle (in Draw mode one finger draws, map dragging is off;
     pinch zoom can stay), and test on a touch device.
 2.  Road data from Overpass and snapping, with fit score and export.
-3.  Move, stretch and rotate with live re-snapping.
+3.  Move, stretch and rotate with live re-snapping, plus Sam's
+    additions (2026-10-13):
+    -   Drag the auto-created route by hand: grab any point on the green
+        route and pull it onto a different road (a via point the router
+        must pass through), as in GPS Fixer's follow-roads lines.
+    -   Distance displayed throughout (route length is already shown
+        after round 2; keep it visible and live while dragging).
+    -   Loops: if the drawing is closed, or its ends are close, let the
+        user choose where the start/finish is (click a point on the
+        loop). The exported GPX starts there.
+    -   Multi-stroke lines: allow two, three or four strokes as separate
+        pieces, joined into one line where their ends are close together,
+        instead of every new stroke joining on to the end.
 
 ## Implementation (round 1, 2026-10-13)
 
@@ -133,6 +145,38 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
     600 points.
 -   Smoke-tested in headless Chrome with a synthetic pen stroke and image.
     Not yet tried on a real touchscreen.
+
+## Implementation (round 2, 2026-10-13)
+
+-   Overpass: `way["highway"]` for the drawing's bbox padded by
+    max(400 m, 20%), `out body; >; out skel`. Capped at 60 km². Tries
+    overpass-api.de, then the maps.mail.ru and private.coffee mirrors
+    (60 s each). overpass-api.de was very flaky on 2026-10-13, giving
+    random 406/504; those count as "busy". Raw data is cached for the
+    session; new data is fetched only when the drawing leaves the box.
+-   `wayRule` decides per profile (foot / bike) which ways count. Bike
+    respects one-way streets, but the wrong way is kept at 6x cost
+    (`WRONG_WAY`) and reported, so routing never fails outright.
+-   Graph in local metres (CSR arrays, edges in pairs so `e ^ 1` is the
+    reverse). Snapping only uses the largest connected component.
+-   Snapping: edge cost = length x (1 + (d / D)^2), d = distance from the
+    edge's middle to the drawing (capped at 4D), D = 2% of drawing size
+    (15 to 120 m). Anchors every A metres (total / 50, 30 to 250 m) plus
+    corners sharper than about 50 degrees, each snapped to the nearest
+    node; A* between consecutive anchors. `dropDetours` then cuts any
+    loop or out-and-back shorter than max(1.5A, 3D).
+-   Fit: distances both ways (drawing to route, route to drawing) sampled
+    every 10 m; shows the mean and the 95th percentile, with a word
+    (close / recognisable / loose) from mean / drawing size.
+-   After the first snap, any change to the drawing or profile re-snaps
+    automatically (250 ms debounce) if the roads are already loaded.
+-   GPX: one `trk`, no times, `type` running or cycling.
+-   Tested on Wellington data (36k nodes): graph build about 80 ms,
+    snap about 100 ms. Foot routes look good. Bike routes in the CBD
+    still show a few short stubs from one-way pairs; round 3's route
+    dragging is the fix.
+-   Testing note: headless Chrome hangs on exit while the beforeunload
+    warning is armed; strip it in test copies.
 
 ## Decisions
 

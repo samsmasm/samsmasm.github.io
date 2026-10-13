@@ -102,7 +102,7 @@ window.TREE = {
           ] } },
         { id: "play", label: "Maths to play with", tools: ["/mandelbrot-v2", "/chaos", "/flowers", "/joinedpoints", "/funcheatmap-v2", "/cinvert"] },
         { id: "sims", label: "Simulations", hint: "Evolution and randomness", tools: ["/racecar", "/trees", "/stocksimulator"] },
-        { id: "outside", label: "Walks, maps and photos", tools: ["/longcut", "/mapping/gpsfixer/", "/pinhole", "/photos"] },
+        { id: "outside", label: "Walks, maps and photos", tools: ["/longcut", "/mapping/gpsfixer/", "/mapping/mapic/", "/pinhole", "/photos"] },
         { id: "fun", label: "Just for fun", tools: ["/isluxonpm", "/anipics", "/sudoku"] }
       ] } }
   ]
