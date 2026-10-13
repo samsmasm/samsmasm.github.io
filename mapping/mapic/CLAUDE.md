@@ -148,13 +148,24 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
 
 ## Implementation (round 2, 2026-10-13)
 
--   Overpass: `way["highway"]` for the drawing's bbox padded by
-    max(400 m, 20%), `out body; >; out skel`. Capped at 60 km². Tries
-    overpass-api.de, then the maps.mail.ru and private.coffee mirrors
-    (60 s each). overpass-api.de was very flaky on 2026-10-13, giving
-    random 406/504; those count as "busy". Raw data is cached for the
-    session; new data is fetched only when the drawing leaves the box.
--   `wayRule` decides per profile (foot / bike) which ways count. Bike
+-   Road data (since 2026-10-13, replacing Overpass): OpenFreeMap vector
+    tiles (OpenMapTiles schema), `transportation` layer at z14, URL from
+    the TileJSON at tiles.openfreemap.org/planet. CDN, CORS, about 0.5 to
+    2 s per tile, cached per tile for the session; 6 parallel fetches,
+    3 tries each. Limit 64 tiles (about 15 km across). Small MVT decoder
+    inline (`decodeMVT`), no library. Overpass was dropped because the
+    public servers were overloaded (random 406/504; a 39 km² query took
+    100 s on the mail.ru mirror), so big drawings failed.
+-   Tile lines are clipped to the tile (buffer dropped) and points on the
+    tile edge are welded to the neighbour's matching point (+-1 unit).
+-   Noding in `buildGraph`: tile lines are simplified, so many junctions
+    lack a shared point. Segments are split where they cross (same
+    layer, not bridge/tunnel) and dead ends are joined to any segment
+    within 3 m. Without this only about 65% of the network was
+    connected; with it about 90%.
+-   `roadRule` decides per profile (foot / bike) which roads count, from
+    OpenMapTiles fields (class, subclass, service, oneway, access, foot,
+    bicycle). Bike
     respects one-way streets, but the wrong way is kept at 6x cost
     (`WRONG_WAY`) and reported, so routing never fails outright.
 -   Graph in local metres (CSR arrays, edges in pairs so `e ^ 1` is the
@@ -163,16 +174,18 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
     edge's middle to the drawing (capped at 4D), D = 2% of drawing size
     (15 to 120 m). Anchors every A metres (total / 50, 30 to 250 m) plus
     corners sharper than about 50 degrees, each snapped to the nearest
-    node; A* between consecutive anchors. `dropDetours` then cuts any
-    loop or out-and-back shorter than max(1.5A, 3D).
+    node (never a dead-end tip); A* between consecutive anchors.
+    `dropDetours` then cuts any loop or out-and-back shorter than
+    max(3A, 6D).
 -   Fit: distances both ways (drawing to route, route to drawing) sampled
-    every 10 m; shows the mean and the 95th percentile, with a word
-    (close / recognisable / loose) from mean / drawing size.
+    every max(10 m, size / 400), capped at 6D; shows the mean and the 95th
+    percentile, with a word (close / recognisable / loose) from mean /
+    drawing size. Loose whenever the 95th percentile hits the cap.
 -   After the first snap, any change to the drawing or profile re-snaps
     automatically (250 ms debounce) if the roads are already loaded.
 -   GPX: one `trk`, no times, `type` running or cycling.
--   Tested on Wellington data (36k nodes): graph build about 80 ms,
-    snap about 100 ms. Foot routes look good. Bike routes in the CBD
+-   Tested on Wellington: a 12 km drawing loads 42 tiles in about 5 s
+    (under 1 s cached), graph build about 350 ms, snap about 300 ms. Foot routes look good. Bike routes in the CBD
     still show a few short stubs from one-way pairs; round 3's route
     dragging is the fix.
 -   Testing note: headless Chrome hangs on exit while the beforeunload

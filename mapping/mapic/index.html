@@ -198,8 +198,8 @@ footer p{margin-bottom:6px}
   </section>
 
   <footer>
-    <p>Privacy: your image and drawing stay in this browser. Map tiles (OpenStreetMap data, served by CARTO) reveal roughly which area you are looking at, as any web map does. When you snap to roads, the rectangle around your drawing is sent to the Overpass API to fetch the roads in it; the drawing itself is not sent, and the route is worked out in this browser.</p>
-    <p>Map data © OpenStreetMap contributors, tiles © CARTO, road data via Overpass API. Built by Sam G · all vibe coded.</p>
+    <p>Privacy: your image and drawing stay in this browser. Map tiles (OpenStreetMap data, served by CARTO) reveal roughly which area you are looking at, as any web map does. When you snap to roads, map data for the area around your drawing is downloaded from OpenFreeMap, which sees which map tiles are fetched; the drawing itself is not sent, and the route is worked out in this browser.</p>
+    <p>Map data © OpenStreetMap contributors, tiles © CARTO, road data via OpenFreeMap / OpenMapTiles. Built by Sam G · all vibe coded.</p>
   </footer>
 </div>
 <div id="mapwrap"><div id="map"></div><div id="maphint"></div></div>
@@ -547,15 +547,19 @@ function render() {
 $('closedchk').onchange = e => { record(); S.closed = e.target.checked; render(); };
 $('clearbtn').onclick = () => { record(); S.pts = []; render(); };
 
-// ---------- road data (Overpass) ----------
-// overpass-api.de is the main server but often busy (406, 429, 504); the others are public mirrors
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-const MAX_AREA_KM2 = 60;
-let roads = null;        // { bbox: [s, w, n, e], nodes: Map id -> [lat, lon], ways: [{ nodes, tags }] }
+// ---------- road data (OpenFreeMap vector tiles) ----------
+// Roads come from the transportation layer of OpenFreeMap's OpenMapTiles vector tiles at z14
+// (about 2 km square), fetched from their CDN and cached per tile for the session.
+// Public Overpass servers were too slow and unreliable for anything but small areas.
+const TILEJSON = 'https://tiles.openfreemap.org/planet';
+const TZ = 14, EXT = 4096, WORLD = Math.pow(2, TZ) * EXT; // global coordinates are z14 tile units
+const MAX_TILES = 64;
+let tileUrl = null;
+const tiles = new Map();  // 'x/y' -> [{ props, pieces: [[[gx, gy, edge], ...]] }]
 let roadsLoading = false;
-let G = null;            // graph built from `roads` for one profile
-let route = null;        // { sig, latlngs, len, fit, wrongWay }
-let wantRoute = false;   // set by the first successful snap; later edits re-snap by themselves
+let G = null;             // graph built from a set of tiles for one profile
+let route = null;         // { sig, latlngs, len, fit, wrongWay }
+let wantRoute = false;    // set by the first successful snap; later edits re-snap by themselves
 let snapTimer = null;
 
 function bboxOf(pts, padMin, padFrac) {
@@ -565,82 +569,284 @@ function bboxOf(pts, padMin, padFrac) {
   const pad = Math.max(padMin, padFrac * Math.max((n - s) * ky, (e - w) * kx));
   return [s - pad / ky, w - pad / kx, n + pad / ky, e + pad / kx];
 }
-const bboxKm2 = b => (b[2] - b[0]) * 110.54 * (b[3] - b[1]) * 111.32 * Math.cos((b[0] + b[2]) / 2 * Math.PI / 180);
-const bboxInside = (a, b) => !!b && a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3];
-
-async function fetchRoads(b) {
-  const q = `[out:json][timeout:90];way["highway"](${b.map(v => v.toFixed(6)).join(',')});out body qt;>;out skel qt;`;
-  let lastErr = 'no response';
-  for (const url of OVERPASS) {
-    try {
-      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 60000);
-      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal })
-        .finally(() => clearTimeout(timer));
-      if (!res.ok) { lastErr = [406, 429, 503, 504].includes(res.status) ? 'busy' : 'HTTP ' + res.status; continue; }
-      const j = await res.json();
-      const nodes = new Map(), ways = [];
-      for (const el of j.elements) {
-        if (el.type === 'node') nodes.set(el.id, [el.lat, el.lon]);
-        else if (el.type === 'way') ways.push({ nodes: el.nodes, tags: el.tags || {} });
-      }
-      return { bbox: b, nodes, ways };
-    } catch (err) { lastErr = 'network'; }
-  }
-  throw new Error(lastErr);
+function tilesFor(b) {
+  const n = Math.pow(2, TZ);
+  const tx = lon => Math.floor((lon + 180) / 360 * n);
+  const ty = lat => Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+  const keys = [];
+  for (let x = tx(b[1]); x <= tx(b[3]); x++) for (let y = ty(b[2]); y <= ty(b[0]); y++) keys.push(x + '/' + y);
+  return keys;
 }
 
-// Which ways a profile may use. Returns null (not allowed), or the one-way direction (0, 1 or -1).
+// Minimal Mapbox Vector Tile decoder: returns { extent, features: [{ props, lines: [[[x, y], ...]] }] } for one layer
+function decodeMVT(buf, want) {
+  const b = new Uint8Array(buf);
+  let p = 0;
+  const varint = () => { let r = 0, s = 0, c; do { c = b[p++]; r += (c & 0x7f) * Math.pow(2, s); s += 7; } while (c & 0x80); return r; };
+  const skip = t => { if (t === 0) varint(); else if (t === 1) p += 8; else if (t === 2) p += varint(); else if (t === 5) p += 4; };
+  const str = (end) => new TextDecoder().decode(b.subarray(p, end));
+  const out = { extent: 4096, features: [] };
+  while (p < b.length) {
+    const tag = varint();
+    if (tag >> 3 !== 3 || (tag & 7) !== 2) { skip(tag & 7); continue; }
+    const lend = varint() + p;
+    let name = null, keys = [], vals = [], feats = [], extent = 4096;
+    while (p < lend) {
+      const t = varint(), f = t >> 3;
+      if (f === 1) { const l = varint(); name = str(p + l); p += l; }
+      else if (f === 3) { const l = varint(); keys.push(str(p + l)); p += l; }
+      else if (f === 4) {
+        const vend = varint() + p; let v = null;
+        while (p < vend) {
+          const vt = varint(), vf = vt >> 3;
+          if (vf === 1) { const l = varint(); v = str(p + l); p += l; }
+          else if (vf === 2) { v = new DataView(b.buffer, b.byteOffset + p, 4).getFloat32(0, true); p += 4; }
+          else if (vf === 3) { v = new DataView(b.buffer, b.byteOffset + p, 8).getFloat64(0, true); p += 8; }
+          else if (vf === 4 || vf === 5) v = varint();
+          else if (vf === 6) { const n = varint(); v = (n >>> 1) ^ -(n & 1); }
+          else if (vf === 7) v = !!varint();
+          else skip(vt & 7);
+        }
+        vals.push(v);
+      }
+      else if (f === 2) { const l = varint(); feats.push([p, p + l]); p += l; }
+      else if (f === 5) extent = varint();
+      else skip(t & 7);
+    }
+    p = lend;
+    if (name !== want) continue;
+    out.extent = extent;
+    for (const [fs, fe] of feats) {
+      const save = p; p = fs;
+      let type = 0, tags = [], geom = [];
+      while (p < fe) {
+        const t = varint(), f = t >> 3;
+        if (f === 2) { const e = varint() + p; while (p < e) tags.push(varint()); }
+        else if (f === 3) type = varint();
+        else if (f === 4) { const e = varint() + p; while (p < e) geom.push(varint()); }
+        else skip(t & 7);
+      }
+      p = save;
+      if (type !== 2) continue; // lines only
+      const props = {};
+      for (let i = 0; i < tags.length; i += 2) props[keys[tags[i]]] = vals[tags[i + 1]];
+      const lines = []; let x = 0, y = 0, cur = null;
+      for (let i = 0; i < geom.length;) {
+        const cmd = geom[i] & 7, cnt = geom[i++] >> 3;
+        if (cmd === 7) continue;
+        for (let k = 0; k < cnt; k++) {
+          const dx = geom[i++], dy = geom[i++];
+          x += (dx >>> 1) ^ -(dx & 1); y += (dy >>> 1) ^ -(dy & 1);
+          if (cmd === 1) { cur = [[x, y]]; lines.push(cur); } else cur.push([x, y]);
+        }
+      }
+      out.features.push({ props, lines });
+    }
+  }
+  return out;
+}
+
+// Clip a tile's lines to the tile itself (dropping the buffer, which the next tile covers) and
+// convert to global units. Points on the tile edge are flagged (1 = vertical edge, 2 = horizontal)
+// so the graph can weld them to the matching point from the neighbouring tile.
+function tileFeatures(buf, tx, ty) {
+  const d = decodeMVT(buf, 'transportation'), k = EXT / d.extent, ox = tx * EXT, oy = ty * EXT;
+  const feats = [];
+  for (const f of d.features) {
+    const pieces = [];
+    for (const line of f.lines) {
+      let cur = null;
+      for (let i = 1; i < line.length; i++) {
+        const x0 = line[i - 1][0] * k, y0 = line[i - 1][1] * k, x1 = line[i][0] * k, y1 = line[i][1] * k;
+        const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0, EXT - x0, y0, EXT - y0];
+        let t0 = 0, t1 = 1, ok = true;
+        for (let j = 0; j < 4 && ok; j++) {
+          if (P[j] === 0) { if (Q[j] < 0) ok = false; continue; }
+          const r = Q[j] / P[j];
+          if (P[j] < 0) { if (r > t1) ok = false; else if (r > t0) t0 = r; }
+          else { if (r < t0) ok = false; else if (r < t1) t1 = r; }
+        }
+        if (!ok || t1 - t0 < 1e-9) { cur = null; continue; }
+        const pt = t => {
+          let x = t === 0 ? x0 : t === 1 ? x1 : x0 + dx * t, y = t === 0 ? y0 : t === 1 ? y1 : y0 + dy * t;
+          if (Math.abs(x) < 1e-6) x = 0; else if (Math.abs(x - EXT) < 1e-6) x = EXT;
+          if (Math.abs(y) < 1e-6) y = 0; else if (Math.abs(y - EXT) < 1e-6) y = EXT;
+          return [ox + x, oy + y, x === 0 || x === EXT ? 1 : y === 0 || y === EXT ? 2 : 0];
+        };
+        if (!cur || t0 > 0) { cur = [pt(t0)]; pieces.push(cur); }
+        cur.push(pt(t1));
+        if (t1 < 1) cur = null;
+      }
+    }
+    if (pieces.length) feats.push({ props: f.props, pieces });
+  }
+  return feats;
+}
+
+async function loadTiles(keys, progress) {
+  if (!tileUrl) {
+    const res = await fetch(TILEJSON);
+    if (!res.ok) throw new Error('map data index HTTP ' + res.status);
+    tileUrl = (await res.json()).tiles[0];
+  }
+  const todo = keys.filter(k => !tiles.has(k));
+  let done = 0;
+  progress(done, todo.length);
+  const one = async key => {
+    const [x, y] = key.split('/').map(Number);
+    const url = tileUrl.replace('{z}', TZ).replace('{x}', x).replace('{y}', y);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(url);
+        if (res.status === 204 || res.status === 404) { tiles.set(key, []); break; } // open sea
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        tiles.set(key, tileFeatures(await res.arrayBuffer(), x, y));
+        break;
+      } catch (err) { if (attempt >= 2) throw err; await new Promise(r => setTimeout(r, 800 * (attempt + 1))); }
+    }
+    progress(++done, todo.length);
+  };
+  const queue = todo.slice();
+  await Promise.all(Array.from({ length: Math.min(6, queue.length) }, async () => { while (queue.length) await one(queue.shift()); }));
+}
+
+// Which roads a profile may use. Returns null (not allowed), or the one-way direction (0, 1 or -1).
+// Properties are OpenMapTiles transportation fields: class, subclass, service, oneway, access, foot, bicycle.
 const YES = v => v === 'yes' || v === 'designated' || v === 'permissive';
-const NEVER = new Set(['construction', 'proposed', 'raceway', 'bus_guideway', 'escape', 'abandoned', 'disused', 'corridor', 'elevator', 'razed', 'planned']);
-function wayRule(t, profile) {
-  const hw = t.highway;
-  if (NEVER.has(hw) || t.area === 'yes' && hw !== 'pedestrian') return null;
+const NEVER = new Set(['rail', 'transit', 'ferry', 'aerialway', 'raceway', 'busway', 'bus_guideway']);
+function roadRule(t, profile) {
+  const cls = t.class, sub = t.subclass;
+  if (NEVER.has(cls) || /_construction$/.test(cls)) return null;
+  if (sub === 'corridor' || sub === 'platform' || sub === 'elevator') return null;
+  if (t.service === 'parking_aisle' || t.service === 'driveway') return null;
   const closed = v => v === 'no' || v === 'private';
   if (profile === 'foot') {
     if (closed(t.foot)) return null;
     if (YES(t.foot)) return 0;
-    if (hw === 'motorway' || hw === 'motorway_link' || closed(t.access)) return null;
+    if (cls === 'motorway' || closed(t.access)) return null;
     return 0;
   }
   if (closed(t.bicycle)) return null;
   if (!YES(t.bicycle)) {
-    if (hw === 'motorway' || hw === 'motorway_link' || hw === 'steps' || closed(t.access)) return null;
-    if ((hw === 'footway' || hw === 'pedestrian') ) return null;
+    if (cls === 'motorway' || sub === 'steps' || closed(t.access)) return null;
+    if (sub === 'footway' || sub === 'pedestrian') return null;
   }
-  if (t['oneway:bicycle'] === 'no' || /^opposite/.test(t.cycleway || '')) return 0;
-  if (t.oneway === 'yes' || t.oneway === '1' || t.oneway === 'true' || t.junction === 'roundabout') return 1;
-  if (t.oneway === '-1' || t.oneway === 'reverse') return -1;
-  return 0;
+  return t.oneway === 1 ? 1 : t.oneway === -1 ? -1 : 0;
 }
 
 // Graph in local metres. Edges are directed; the wrong way along a one-way street is kept but
 // costs WRONG_WAY times as much, so the route only uses it when there is no sensible alternative.
 const WRONG_WAY = 6;
-function buildGraph(raw, profile) {
-  const lat0 = (raw.bbox[0] + raw.bbox[2]) / 2, lon0 = (raw.bbox[1] + raw.bbox[3]) / 2;
+const gLon = gx => gx / WORLD * 360 - 180;
+const gLat = gy => Math.atan(Math.sinh(Math.PI * (1 - 2 * gy / WORLD))) * 180 / Math.PI;
+function buildGraph(keys, profile) {
+  let sx = 0, sy = 0;
+  for (const k of keys) { const [x, y] = k.split('/').map(Number); sx += x + .5; sy += y + .5; }
+  const lat0 = gLat(sy / keys.length * EXT), lon0 = gLon(sx / keys.length * EXT);
   const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
   const idx = new Map(), X = [], Y = [], LAT = [], LON = [];
-  const node = id => {
-    let i = idx.get(id);
-    if (i === undefined) {
-      const c = raw.nodes.get(id);
-      if (!c) return -1;
-      i = X.length; idx.set(id, i);
-      LAT.push(c[0]); LON.push(c[1]); X.push((c[1] - lon0) * kx); Y.push((c[0] - lat0) * ky);
-    }
+  const add = (key, gx, gy) => {
+    const i = X.length, lat = gLat(gy), lon = gLon(gx);
+    idx.set(key, i); LAT.push(lat); LON.push(lon); X.push((lon - lon0) * kx); Y.push((lat - lat0) * ky);
     return i;
   };
-  const ef = [], et = [], el = [], ew = [];
-  for (const w of raw.ways) {
-    const dir = wayRule(w.tags, profile);
+  const node = ([gx, gy, edge]) => {
+    if (!edge) { const key = gx + ',' + gy, i = idx.get(key); return i === undefined ? add(key, gx, gy) : i; }
+    // tile-edge point: the neighbouring tile's copy may differ by a fraction of a unit
+    const fixed = edge === 1 ? gx : gy, r = Math.round(edge === 1 ? gy : gx), p = edge === 1 ? 'v' : 'h';
+    for (const dd of [0, -1, 1]) { const i = idx.get(p + fixed + ',' + (r + dd)); if (i !== undefined) return i; }
+    return add(p + fixed + ',' + r, gx, gy);
+  };
+  // raw segments; lvl says which others they may join where lines cross (not bridges or tunnels)
+  const SA = [], SB = [], SD = [], SL = [];
+  for (const k of keys) for (const f of tiles.get(k) || []) {
+    const dir = roadRule(f.props, profile);
     if (dir === null) continue;
-    for (let k = 1; k < w.nodes.length; k++) {
-      const a = node(w.nodes[k - 1]), b = node(w.nodes[k]);
-      if (a < 0 || b < 0 || a === b) continue;
-      const len = Math.hypot(X[a] - X[b], Y[a] - Y[b]);
-      ef.push(a, b); et.push(b, a); el.push(len, len); ew.push(dir < 0 ? 1 : 0, dir > 0 ? 1 : 0);
+    const lvl = f.props.brunnel === 'bridge' || f.props.brunnel === 'tunnel' ? -1 : (f.props.layer || 0);
+    for (const piece of f.pieces) {
+      let a = node(piece[0]);
+      for (let j = 1; j < piece.length; j++) {
+        const b = node(piece[j]);
+        if (a !== b) { SA.push(a); SB.push(b); SD.push(dir); SL.push(lvl); }
+        a = b;
+      }
     }
   }
+  // Noding. Tile lines are simplified, so many junctions have no shared point: lines cross with no
+  // node, or a side street stops just short of (or on) the main road. Split segments where they
+  // cross, and join dead ends to any segment within WELD metres.
+  const WELD = 3, NC = 25, ns = SA.length, sgrid = new Map();
+  for (let i = 0; i < ns; i++) {
+    const a = SA[i], b = SB[i];
+    for (let gx = Math.floor(Math.min(X[a], X[b]) / NC); gx <= Math.floor(Math.max(X[a], X[b]) / NC); gx++)
+      for (let gy = Math.floor(Math.min(Y[a], Y[b]) / NC); gy <= Math.floor(Math.max(Y[a], Y[b]) / NC); gy++) {
+        const key = gx + ',' + gy;
+        (sgrid.get(key) || sgrid.set(key, []).get(key)).push(i);
+      }
+  }
+  const splits = new Map(); // segment -> [[t, node]]
+  const split = (si, t, v) => (splits.get(si) || splits.set(si, []).get(si)).push([t, v]);
+  const newNode = (x, y) => {
+    const i = X.length, lat = lat0 + y / ky, lon = lon0 + x / kx;
+    X.push(x); Y.push(y); LAT.push(lat); LON.push(lon);
+    return i;
+  };
+  const tried = new Set();
+  for (const list of sgrid.values()) {
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const s1 = list[i], s2 = list[j];
+      if (SL[s1] !== SL[s2] || SL[s1] < 0) continue;
+      const a = SA[s1], b = SB[s1], c = SA[s2], d = SB[s2];
+      if (a === c || a === d || b === c || b === d) continue;
+      const key = s1 < s2 ? s1 * ns + s2 : s2 * ns + s1;
+      if (tried.has(key)) continue;
+      tried.add(key);
+      const den = (X[a] - X[b]) * (Y[c] - Y[d]) - (Y[a] - Y[b]) * (X[c] - X[d]);
+      if (!den) continue;
+      const t = ((X[a] - X[c]) * (Y[c] - Y[d]) - (Y[a] - Y[c]) * (X[c] - X[d])) / den;
+      const u = -((X[a] - X[b]) * (Y[a] - Y[c]) - (Y[a] - Y[b]) * (X[a] - X[c])) / den;
+      if (t <= 1e-6 || t >= 1 - 1e-6 || u <= 1e-6 || u >= 1 - 1e-6) continue;
+      const v = newNode(X[a] + (X[b] - X[a]) * t, Y[a] + (Y[b] - Y[a]) * t);
+      split(s1, t, v);
+      split(s2, u, v);
+    }
+  }
+  const deg = new Int32Array(X.length);
+  for (let i = 0; i < ns; i++) { deg[SA[i]]++; deg[SB[i]]++; }
+  const extra = []; // [a, b, dir] short joining edges
+  for (let v = 0; v < deg.length; v++) {
+    if (deg[v] !== 1) continue;
+    const gx = Math.floor(X[v] / NC), gy = Math.floor(Y[v] / NC);
+    let best = WELD, bs = -1, bt = 0;
+    for (let i = gx - 1; i <= gx + 1; i++) for (let j = gy - 1; j <= gy + 1; j++) for (const si of sgrid.get(i + ',' + j) || []) {
+      const a = SA[si], b = SB[si];
+      if (a === v || b === v) continue;
+      const dx = X[b] - X[a], dy = Y[b] - Y[a], L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, ((X[v] - X[a]) * dx + (Y[v] - Y[a]) * dy) / L2)) : 0;
+      const dd = Math.hypot(X[v] - X[a] - t * dx, Y[v] - Y[a] - t * dy);
+      if (dd < best) { best = dd; bs = si; bt = t; }
+    }
+    if (bs < 0) continue;
+    const len = Math.hypot(X[SB[bs]] - X[SA[bs]], Y[SB[bs]] - Y[SA[bs]]);
+    if (bt * len < .5) extra.push([v, SA[bs]]);
+    else if ((1 - bt) * len < .5) extra.push([v, SB[bs]]);
+    else split(bs, bt, v); // the segment now runs through the dead end
+  }
+  const ef = [], et = [], el = [], ew = [];
+  const edge = (a, b, dir) => {
+    if (a === b) return;
+    const len = Math.hypot(X[a] - X[b], Y[a] - Y[b]);
+    ef.push(a, b); et.push(b, a); el.push(len, len); ew.push(dir < 0 ? 1 : 0, dir > 0 ? 1 : 0);
+  };
+  for (let i = 0; i < ns; i++) {
+    const sp = splits.get(i);
+    if (!sp) { edge(SA[i], SB[i], SD[i]); continue; }
+    sp.sort((p, q) => p[0] - q[0]);
+    let a = SA[i];
+    for (const [, v] of sp) { edge(a, v, SD[i]); a = v; }
+    edge(a, SB[i], SD[i]);
+  }
+  for (const [a, b] of extra) edge(a, b, 0);
   const n = X.length, m = ef.length;
   const first = new Int32Array(n + 1);
   for (const a of ef) first[a + 1]++;
@@ -654,14 +860,17 @@ function buildGraph(raw, profile) {
   const size = new Map();
   let main = -1, best = 0;
   for (let i = 0; i < n; i++) { const r = find(i), c = (size.get(r) || 0) + 1; size.set(r, c); if (c > best) { best = c; main = r; } }
+  // anchors snap to the main network, never to a dead-end tip (those make out-and-back spikes)
+  const nd = new Int32Array(n);
+  for (let e = 0; e < m; e += 2) { nd[ef[e]]++; nd[et[e]]++; }
   const CELL = 60, grid = new Map();
   for (let i = 0; i < n; i++) {
-    if (find(i) !== main) continue;
+    if (find(i) !== main || nd[i] < 2) continue;
     const key = Math.floor(X[i] / CELL) + ',' + Math.floor(Y[i] / CELL);
     (grid.get(key) || grid.set(key, []).get(key)).push(i);
   }
   return {
-    profile, src: raw, n, m, lat0, lon0, kx, ky, X, Y, LAT, LON, first, out,
+    profile, keys: keys.join(' '), n, m, lat0, lon0, kx, ky, X, Y, LAT, LON, first, out,
     to: Int32Array.from(et), len: Float64Array.from(el), wrong: Uint8Array.from(ew),
     grid, CELL, g: new Float64Array(n), prev: new Int32Array(n), stamp: new Int32Array(n), done: new Int32Array(n), run: 0,
   };
@@ -827,7 +1036,7 @@ function snapRoute() {
     if (!leg) continue;
     path.push(...leg.slice(1));
   }
-  path = dropDetours(path, Math.max(A * 1.5, 3 * D));
+  path = dropDetours(path, Math.max(A * 3, 6 * D));
   // which edges were used the wrong way
   let wrongWay = 0;
   for (let i = 1; i < path.length; i++) {
@@ -840,14 +1049,15 @@ function snapRoute() {
   let len = 0;
   for (let i = 1; i < R.length; i++) len += Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]);
   // fit: how far the drawing is from the route, and the route from the drawing
-  const cap = Math.max(200, size / 2);
-  const ridx = segIndex(R, Math.max(50, D * 2));
-  const ds = densify(P, 10).map(([x, y]) => ridx.dist(x, y, cap));
-  const rs = R.length > 1 ? densify(R, 10).map(([x, y]) => idx.dist(x, y, 4 * D)) : [];
+  // (sampled more coarsely on big drawings, and distances capped, so this stays quick)
+  const step = Math.max(10, size / 400), cap = 6 * D;
+  const ridx = segIndex(R, 2 * D);
+  const ds = densify(P, step).map(([x, y]) => ridx.dist(x, y, cap));
+  const rs = R.length > 1 ? densify(R, step).map(([x, y]) => idx.dist(x, y, 4 * D)) : [];
   const all = ds.concat(rs).sort((a, b) => a - b);
   const mean = all.reduce((a, b) => a + b, 0) / (all.length || 1);
   const p95 = all[Math.floor(all.length * .95)] || 0;
-  return { latlngs: path.map(v => L.latLng(G.LAT[v], G.LON[v])), len, fit: { mean, p95, rel: mean / (size || 1) }, wrongWay };
+  return { latlngs: path.map(v => L.latLng(G.LAT[v], G.LON[v])), len, fit: { mean, p95, capped: p95 >= cap - 1e-6, cap, rel: mean / (size || 1) }, wrongWay };
 }
 
 const sig = () => $('profile').value + '|' + (S.closed ? 1 : 0) + '|' + S.pts.map(p => p.lat.toFixed(6) + ',' + p.lng.toFixed(6)).join(';');
@@ -856,29 +1066,27 @@ function snapStatus(t) { $('snapstatus').textContent = t || ''; }
 async function doSnap(asked) {
   clearTimeout(snapTimer);
   if (S.pts.length < 2 || roadsLoading) return;
-  const path = drawnPath();
-  if (!roads || !bboxInside(bboxOf(path, 100, .05), roads.bbox)) {
-    if (!asked) { snapStatus('The drawing has gone outside the roads loaded so far. Press Snap to roads to load more.'); renderRoute(); return; }
-    const b = bboxOf(path, 400, .2), km2 = bboxKm2(b);
-    if (km2 > MAX_AREA_KM2) {
-      msgs('snapmsgs', [['err', `This drawing covers about ${Math.round(km2)} km², more than the ${MAX_AREA_KM2} km² limit for loading roads. Zoom in and draw it smaller.`]]);
-      return;
-    }
+  const keys = tilesFor(bboxOf(drawnPath(), 300, .1));
+  if (keys.length > MAX_TILES) {
+    msgs('snapmsgs', [['err', `This drawing is too big to load the roads for (it needs ${keys.length} map tiles, the limit is ${MAX_TILES}, roughly 15 km across). Zoom in and draw it smaller.`]]);
+    snapStatus('');
+    return;
+  }
+  const missing = keys.filter(k => !tiles.has(k));
+  if (missing.length) {
+    if (!asked && missing.length > 4) { snapStatus('The drawing has moved well outside the roads loaded so far. Press Snap to roads to load more.'); renderRoute(); return; }
     roadsLoading = true;
     msgs('snapmsgs', []);
-    snapStatus('Loading roads and paths for this area. This can take up to a minute when the server is busy.');
     render();
-    try { roads = await fetchRoads(b); G = null; }
+    try { await loadTiles(keys, (d, n) => snapStatus(n ? `Loading roads and paths: ${d} of ${n} map tiles...` : '')); }
     catch (err) {
-      msgs('snapmsgs', [['err', err.message === 'busy'
-        ? 'The road data server is busy. Try again in a minute.'
-        : 'Could not load the roads (' + err.message + '). Check your connection and try again.']]);
+      msgs('snapmsgs', [['err', 'Could not load the roads (' + (err.message || 'network error') + '). Check your connection and try again.']]);
       snapStatus('');
       return;
     } finally { roadsLoading = false; render(); }
   }
   const profile = $('profile').value;
-  if (!G || G.src !== roads || G.profile !== profile) G = buildGraph(roads, profile);
+  if (!G || G.keys !== keys.join(' ') || G.profile !== profile) G = buildGraph(keys, profile);
   if (!G.grid.size) { msgs('snapmsgs', [['err', 'No usable roads or paths here for this kind of route.']]); snapStatus(''); return; }
   const t0 = performance.now();
   const r = snapRoute();
@@ -904,10 +1112,10 @@ function renderRoute() {
   const dl = $('routestats');
   if (!route) { dl.hidden = true; dl.innerHTML = ''; }
   else {
-    const f = route.fit, word = f.rel < .012 ? 'close' : f.rel < .03 ? 'recognisable' : 'loose';
+    const f = route.fit, word = f.capped || f.rel >= .03 ? 'loose' : f.rel < .012 ? 'close' : 'recognisable';
     dl.hidden = false;
     dl.innerHTML = `<dt>Fit</dt><dd>${word}</dd><dt>Average gap</dt><dd>${fmtDist(f.mean)} from your drawing</dd>` +
-      `<dt>Worst bits</dt><dd>${fmtDist(f.p95)}</dd><dt>Your drawing</dt><dd>${S.pts.length > 1 ? fmtDist(lengthM()) : '–'}</dd>`;
+      `<dt>Worst bits</dt><dd>${f.capped ? 'over ' + fmtDist(f.cap) + ' (no roads near parts of the drawing)' : fmtDist(f.p95)}</dd><dt>Your drawing</dt><dd>${S.pts.length > 1 ? fmtDist(lengthM()) : '–'}</dd>`;
   }
   if (wantRoute && S.pts.length > 1 && stale) scheduleSnap();
 }

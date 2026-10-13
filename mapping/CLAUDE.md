@@ -27,9 +27,10 @@ A small suite of browser-only map tools. Set up 2026-10-13.
     `gpsfixer/index.html` (`CARTO_KEY`), `maxNativeZoom: 18`, attribution
     shown. Never tile.openstreetmap.org (Sam's DNS sends it to 127.0.0.1).
     The key's account details are in `gpsfixer/api.md`, local only.
--   Routing: FOSSGIS OSRM (routing.openstreetmap.de), fair use. Road data:
-    Overpass (overpass-api.de) works from Sam's network (checked
-    2026-10-13); requests need a normal User-Agent, which browsers send.
+-   Routing: FOSSGIS OSRM (routing.openstreetmap.de), fair use (GPS
+    Fixer). Road data for in-browser routing: OpenFreeMap vector tiles
+    (see mapic/CLAUDE.md). Public Overpass proved too unreliable
+    (2026-10-13), so do not build on it.
 -   Moving work between tools: hand GPX text over via sessionStorage,
     never a server.
 -   Warn before leaving a page with unsaved edits.
