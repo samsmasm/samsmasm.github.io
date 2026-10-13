@@ -248,7 +248,21 @@ satisfied. Live at unisam.nz/gpsfixer.
     `trkpt`s (plus an XML comment saying they are reconstructed). All
     metadata, extensions (HR etc.), other tracks and segments are kept.
     Output is re-parsed as a validity check before download.
--   One repair per session (multiple gaps = download, reopen, repeat).
+-   v2 (2026-10-13): any number of repairs per session (`S.repairs`,
+    `S.cur` is the one being edited). Repairs in the same segment may not
+    overlap; an empty repair is dropped when you move to another. Download
+    needs every repair timed. Export finds all A/B elements first, then
+    edits, so indices never shift.
+-   v2 "Follow roads": optional, off by default, remembered in
+    localStorage. Each clicked point stores the mode of the leg ending at
+    it (null = straight, or foot/bike/car); `endMode` is the last leg into
+    B, so straight and routed legs can mix. Legs are routed by the FOSSGIS
+    OSRM server (routing.openstreetmap.de/routed-{foot,bike,car}, CORS ok,
+    free, fair use) and cached by mode + endpoints. A click between two
+    routed legs is a via point and is left out of the path (avoids spikes
+    to off-road clicks). Timestamps are valid only while the route
+    signature matches (`timed.sig`), so a re-route invalidates them.
+    Profile is guessed from the GPX `<type>`.
 -   Reconstructed path is densified to the recording's median point
     spacing (clamped 3 to 30 m). Timestamps are distance-proportional;
     whole seconds if the source has no fractional seconds, falling back
