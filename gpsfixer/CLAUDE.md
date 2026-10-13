@@ -236,7 +236,9 @@ satisfied. Live at unisam.nz/gpsfixer.
     network DNS resolves it to 127.0.0.1, so the map came up blank.
     CARTO raster tiles now need an API key (`CARTO_KEY` in index.html,
     free non-commercial up to 5M tiles/month). The key email is in
-    `api.md`, which is local only (in .git/info/exclude): never commit it. No drawing library: vertex and midpoint handles are plain
+    `api.md`, which is local only (in .git/info/exclude): never commit it.
+    CARTO raster tiles stop at z18 (z19+ returns 403), so `maxNativeZoom: 18`
+    with `maxZoom: 20` upscales. No drawing library: vertex and midpoint handles are plain
     draggable Leaflet markers.
 -   Parsing uses `DOMParser`, matching elements by `localName` so GPX
     1.0 and 1.1 (and prefixed namespaces) both work. Files with invalid
