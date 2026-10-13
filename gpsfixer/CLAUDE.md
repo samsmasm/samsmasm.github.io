@@ -231,9 +231,9 @@ first version focused on repairing GPS gaps accurately and predictably.
 Sam asked for the build, so the "do not code until asked" line above is
 satisfied. Live at unisam.nz/gpsfixer.
 
--   Single file: `index.html`. Leaflet 1.9.4 from unpkg, OSM standard
-    tiles (tile.openstreetmap.org, low-volume personal use, attribution
-    shown). No drawing library: vertex and midpoint handles are plain
+-   Single file: `index.html`. Leaflet 1.9.4 from unpkg, CARTO Voyager
+    tiles (OSM data, attribution shown). Not tile.openstreetmap.org: Sam's
+    network DNS resolves it to 127.0.0.1, so the map came up blank. No drawing library: vertex and midpoint handles are plain
     draggable Leaflet markers.
 -   Parsing uses `DOMParser`, matching elements by `localName` so GPX
     1.0 and 1.1 (and prefixed namespaces) both work. Files with invalid
