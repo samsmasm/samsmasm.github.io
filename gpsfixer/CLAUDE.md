@@ -226,7 +226,7 @@ map-tile usage.
 Do not add features merely because they are easy to implement. Keep the
 first version focused on repairing GPS gaps accurately and predictably.
 
-## Implementation (v1 built 2026-10-13)
+## Implementation (v1, v2 and round 1, all 2026-10-13)
 
 Sam asked for the build, so the "do not code until asked" line above is
 satisfied. Live at unisam.nz/gpsfixer.
@@ -268,8 +268,9 @@ satisfied. Live at unisam.nz/gpsfixer.
     whole seconds if the source has no fractional seconds, falling back
     to milliseconds if rounding would create duplicates. Elevation is
     linearly interpolated between A and B. New points get no extensions.
--   Any geometry change after calculating clears the timestamps;
-    download stays disabled until recalculated.
+-   Timestamps are not cleared when the route changes; they just stop
+    counting (signature mismatch), so undo can bring them back. Download
+    stays disabled until every repair's timestamps match its route.
 -   Speed warnings: over 55 m/s, or over 1.8x / under 0.35x the
     activity's typical moving speed (pairs with dt <= 60 s, ignoring
     stops).
