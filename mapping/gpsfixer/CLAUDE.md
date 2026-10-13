@@ -229,7 +229,9 @@ first version focused on repairing GPS gaps accurately and predictably.
 ## Implementation (v1, v2 and round 1, all 2026-10-13)
 
 Sam asked for the build, so the "do not code until asked" line above is
-satisfied. Live at unisam.nz/gpsfixer.
+satisfied. Live at unisam.nz/mapping/gpsfixer/ (moved from /gpsfixer on
+2026-10-13, no redirect kept). Part of the mapping suite: read
+`../CLAUDE.md` for the shared header and conventions.
 
 -   Single file: `index.html`. Leaflet 1.9.4 from unpkg, CARTO Voyager
     tiles (OSM data, attribution shown). Not tile.openstreetmap.org: Sam's
