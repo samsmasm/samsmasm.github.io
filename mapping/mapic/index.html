@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapic</title>
+<meta name="description" content="Draw a picture on the map, or trace an image, to plan a GPS art route. Runs entirely in your browser.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#2a2233;--muted:#7a6f88;--light:#a99fb6;
+  --accent:#4a1a7a;--accent-bg:#f5f0ff;--accent-border:#d0b6f5;
+  --rule:#f0e8ff;
+  --line:#d6336c;--img:#1a6fb8;
+  --warn:#7a4a0a;--warn-bg:#fff8ec;--warn-border:#f5d9a8;
+  --err:#7a1a1a;--err-bg:#fff0f0;--err-border:#f5b6b6;
+}
+html,body{height:100%}
+body{font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink);background:#fff;display:flex;flex-direction:column}
+header{
+  display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--rule);
+  background:
+    radial-gradient(ellipse at 8% 60%,#ffd6e7 0%,transparent 50%),
+    radial-gradient(ellipse at 38% 15%,#d6f0ff 0%,transparent 45%),
+    radial-gradient(ellipse at 62% 90%,#ffd6e7 0%,transparent 45%),
+    radial-gradient(ellipse at 85% 30%,#e8d6ff 0%,transparent 45%),
+    #f9f0ff;
+}
+header img{width:44px;height:44px;border-radius:11px;background:rgba(255,255,255,.6)}
+header h1{font:400 24px Georgia,serif;color:var(--accent)}
+header .sub{font-size:12px;color:var(--muted)}
+header nav.suite{margin-left:auto;display:flex;gap:2px;align-self:flex-end;margin-bottom:-10px}
+header nav.suite a{font-size:12.5px;font-weight:500;color:#666;text-decoration:none;padding:6px 10px 8px;border-bottom:3px solid transparent;white-space:nowrap}
+header nav.suite a:hover{color:var(--accent)}
+header nav.suite a.on{color:var(--accent);border-bottom-color:var(--accent)}
+header a.home{margin-left:12px;font-size:12px;color:var(--muted);text-decoration:none}
+header a.home:hover{color:var(--accent)}
+#wrap{flex:1;display:flex;min-height:0}
+#panel{width:340px;min-width:340px;border-right:1px solid var(--rule);overflow-y:auto;background:#fff}
+#mapwrap{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0}
+#map.drawing{cursor:crosshair;touch-action:none!important}
+#map.drawing .leaflet-interactive{cursor:crosshair}
+#maphint{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:500;pointer-events:none;
+  background:#fff;border:1px solid var(--accent-border);border-radius:8px;padding:6px 12px;
+  font-size:12px;color:var(--accent);display:none;max-width:70%;text-align:center
+}
+.step{padding:14px 16px;border-bottom:1px solid var(--rule)}
+.step.off{opacity:.5}
+.step h2{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.step h2 span{color:var(--light);margin-right:6px}
+.step p,.step li{font-size:12.5px;color:var(--muted)}
+.step ul{padding-left:16px;margin:4px 0}
+.btn{
+  font:inherit;font-size:13px;padding:6px 12px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--accent-border);background:var(--accent-bg);color:var(--accent)
+}
+.btn:hover:not(:disabled){background:#ebe0ff}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+#drop{
+  border:1.5px dashed var(--accent-border);border-radius:10px;padding:14px;text-align:center;
+  font-size:12.5px;color:var(--muted);cursor:pointer;background:#fcfaff
+}
+#drop.hover{background:var(--accent-bg);border-color:var(--accent)}
+#drop strong{color:var(--accent);font-weight:600}
+#fileinput{display:none}
+#imgctl[hidden]{display:none}
+.slider{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-top:10px}
+.slider input{flex:1;accent-color:var(--accent)}
+label.chk{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer}
+label.chk input{accent-color:var(--accent)}
+dl.stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin-top:10px;font-size:12.5px}
+dl.stats dt{color:var(--muted)}
+dl.stats dd{color:var(--ink);font-variant-numeric:tabular-nums}
+.big{font:400 22px Georgia,serif;color:var(--line);font-variant-numeric:tabular-nums;margin-top:10px}
+.msg{font-size:12.5px;border-radius:8px;padding:8px 10px;margin-top:8px;border:1px solid}
+.msg.warn{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn)}
+.msg.err{background:var(--err-bg);border-color:var(--err-border);color:var(--err)}
+footer{font-size:11px;color:#bbb;padding:12px 16px}
+footer p{margin-bottom:6px}
+/* map controls */
+.mapctl{display:flex;gap:4px}
+.mapctl button{font:inherit;font-size:12.5px;padding:5px 10px;border-radius:6px;cursor:pointer;border:1px solid var(--accent-border);background:#fff;color:var(--accent)}
+.mapctl button:hover:not(:disabled){background:var(--accent-bg)}
+.mapctl button:disabled{opacity:.4;cursor:default}
+.mapctl button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.mapctl .gap{width:6px}
+/* trace image */
+#trace{position:absolute;left:0;top:0;max-width:none!important;max-height:none!important;transform-origin:50% 50%;
+  user-select:none;-webkit-user-select:none;-webkit-user-drag:none;pointer-events:none;touch-action:none}
+#trace.movable{pointer-events:auto;cursor:move;outline:2px dashed var(--img);outline-offset:0}
+.ih{background:#fff;border:2.5px solid var(--img);border-radius:50%}
+.ih.rot{border-radius:50%;background:var(--img)}
+.vtx{background:var(--line);border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--line)}
+.vtx.start{background:#fff;border:3px solid var(--line);box-shadow:none}
+@media (max-width:760px){
+  #wrap{flex-direction:column-reverse}
+  #panel{width:auto;min-width:0;border-right:none;border-top:1px solid var(--rule);flex:1}
+  #mapwrap{flex:none;height:58vh}
+  header .sub,header a.home{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <img src="/unisamsq.png" alt="">
+  <div>
+    <h1>Mapic</h1>
+    <div class="sub">Draw a picture on the map, or trace one. Your image never leaves this browser.</div>
+  </div>
+  <nav class="suite">
+    <a href="/mapping/">Mapping tools</a>
+    <a href="/mapping/gpsfixer/">GPS Fixer</a>
+    <a href="/mapping/mapic/" class="on">Mapic</a>
+  </nav>
+  <a class="home" href="/">unisam.nz</a>
+</header>
+
+<div id="wrap">
+<div id="panel">
+
+  <section class="step">
+    <h2><span>1</span>Find your area</h2>
+    <p>Switch to <strong>Pan</strong> (top right of the map) to move and zoom the map to where the route should go. Pinch or scroll to zoom in either mode.</p>
+  </section>
+
+  <section class="step">
+    <h2><span>2</span>Image to trace (optional)</h2>
+    <div id="drop"><strong>Choose an image</strong> or drop it here</div>
+    <input type="file" id="fileinput" accept="image/*">
+    <div id="imgmsgs"></div>
+    <div id="imgctl" hidden>
+      <div class="slider">See-through <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.5"></div>
+      <label class="chk"><input type="checkbox" id="lockchk"> Lock the image</label>
+      <p id="imghelp" style="margin-top:6px">In Pan mode: drag the image to move it, the white corner dot to resize it, and the blue dot to rotate it.</p>
+      <div class="row">
+        <button class="btn" id="fitbtn">Fit to view</button>
+        <button class="btn" id="rotresetbtn">Straighten</button>
+        <button class="btn" id="removeimgbtn">Remove image</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="step">
+    <h2><span>3</span>Draw</h2>
+    <div class="row" style="margin-top:0">
+      <button class="btn" id="drawbtn">Draw</button>
+      <button class="btn" id="panbtn">Pan</button>
+    </div>
+    <ul style="margin-top:8px">
+      <li>In Draw mode, draw with a mouse, finger or pen. Each new stroke joins on to the end of the line (or the start, if you begin near it).</li>
+      <li>In Pan mode, drag a pink dot to move it, or click it to remove it.</li>
+      <li>Undo and redo: top right of the map, or Ctrl+Z / Ctrl+Y.</li>
+    </ul>
+    <label class="chk"><input type="checkbox" id="closedchk"> Closed shape (join the end back to the start)</label>
+    <div class="big" id="dist">–</div>
+    <dl class="stats" id="drawstats" hidden></dl>
+    <div id="drawmsgs"></div>
+    <div class="row">
+      <button class="btn" id="clearbtn" disabled>Clear drawing</button>
+    </div>
+  </section>
+
+  <section class="step off">
+    <h2><span>4</span>Follow the roads</h2>
+    <p>Coming next: turn the drawing into a route along real roads and paths, slide and stretch it to find a good fit, and download it as a GPX file.</p>
+  </section>
+
+  <footer>
+    <p>Privacy: your image and drawing stay in this browser. Nothing is uploaded. Map tiles (OpenStreetMap data, served by CARTO) reveal roughly which area you are looking at, as any web map does.</p>
+    <p>Map data © OpenStreetMap contributors, tiles © CARTO. Built by Sam G · all vibe coded.</p>
+  </footer>
+</div>
+<div id="mapwrap"><div id="map"></div><div id="maphint"></div></div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode etc */ } },
+};
+
+// ---------- state ----------
+// pts: the drawing, an array of L.LatLng. Point objects are never mutated (always replaced),
+// and S.img is replaced rather than edited, so undo snapshots can share them.
+// img: { url, nw, nh, c (centre LatLng), wm (width in metres), rot (degrees clockwise) }
+const S = { pts: [], closed: false, img: null, mode: 'draw', undo: [], redo: [] };
+let imgOpacity = 0.5, imgLocked = false;
+
+// ---------- map ----------
+// key is public by nature (tile URLs are visible); restrict it to unisam.nz in the CARTO dashboard
+const CARTO_KEY = 'cb1_4itu_1_620672c638e620b7bde4db87';
+let view = null;
+try { view = JSON.parse(store.get('mapic.view')); } catch (e) { /* ignore */ }
+const map = L.map('map', { zoomControl: true }).setView(view ? [view.lat, view.lng] : [-41.29, 174.78], view ? view.z : 5);
+L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=' + CARTO_KEY, {
+  maxZoom: 20, maxNativeZoom: 18, // CARTO serves up to z18; Leaflet scales those tiles up beyond that
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+}).addTo(map);
+map.on('moveend', () => { const c = map.getCenter(); store.set('mapic.view', JSON.stringify({ lat: c.lat, lng: c.lng, z: map.getZoom() })); });
+
+map.createPane('trace').style.zIndex = 350; // above tiles, below the drawing
+const traceEl = L.DomUtil.create('img', 'leaflet-zoom-animated', map.getPane('trace'));
+traceEl.id = 'trace';
+traceEl.alt = '';
+traceEl.draggable = false;
+traceEl.style.display = 'none';
+
+const casing = L.polyline([], { color: '#fff', weight: 8, opacity: .9, interactive: false }).addTo(map);
+const line = L.polyline([], { color: getCss('--line'), weight: 4, interactive: false }).addTo(map);
+const stroke = L.polyline([], { color: getCss('--line'), weight: 3, opacity: .7, dashArray: '4 6', interactive: false }).addTo(map);
+const vtxLayer = L.layerGroup().addTo(map);
+const imgHandleLayer = L.layerGroup().addTo(map);
+
+const MapCtl = L.Control.extend({
+  onAdd() {
+    const d = L.DomUtil.create('div', 'mapctl');
+    d.innerHTML = '<button id="mdraw" title="Draw on the map">Draw</button><button id="mpan" title="Move the map">Pan</button><span class="gap"></span>' +
+      '<button id="undobtn" title="Undo (Ctrl+Z)" disabled>Undo</button><button id="redobtn" title="Redo (Ctrl+Y)" disabled>Redo</button>';
+    L.DomEvent.disableClickPropagation(d);
+    return d;
+  }
+});
+new MapCtl({ position: 'topright' }).addTo(map);
+
+function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function hint(text) { const h = $('maphint'); h.textContent = text || ''; h.style.display = text ? 'block' : 'none'; }
+function msgs(el, list) { $(el).innerHTML = list.map(([kind, text]) => `<div class="msg ${kind}">${text}</div>`).join(''); }
+const mpp = (lat, zoom) => 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, zoom)); // metres per layer pixel
+function fmtDist(m) { return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km'; }
+
+// ---------- undo / redo (drawing and image placement together) ----------
+const snapshot = () => ({ pts: S.pts.slice(), closed: S.closed, img: S.img });
+function record() {
+  // call before every change
+  S.undo.push(snapshot());
+  if (S.undo.length > 300) S.undo.shift();
+  S.redo = [];
+}
+function restore(snap) {
+  S.pts = snap.pts.slice();
+  S.closed = snap.closed;
+  S.img = snap.img;
+  render();
+}
+function undo() { if (!S.undo.length) return; S.redo.push(snapshot()); restore(S.undo.pop()); }
+function redo() { if (!S.redo.length) return; S.undo.push(snapshot()); restore(S.redo.pop()); }
+$('undobtn').onclick = undo;
+$('redobtn').onclick = redo;
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+});
+window.addEventListener('beforeunload', e => { if (S.pts.length) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- modes ----------
+function setMode(m) {
+  S.mode = m;
+  cancelStroke();
+  const c = map.getContainer();
+  if (m === 'draw') { map.dragging.disable(); map.doubleClickZoom.disable(); c.classList.add('drawing'); }
+  else { map.dragging.enable(); map.doubleClickZoom.enable(); c.classList.remove('drawing'); }
+  render();
+}
+$('drawbtn').onclick = $('mdraw').onclick = () => setMode('draw');
+$('panbtn').onclick = $('mpan').onclick = () => setMode('pan');
+
+// ---------- trace image ----------
+function imgGeom(zoom) {
+  const w = S.img.wm / mpp(S.img.c.lat, zoom == null ? map.getZoom() : zoom);
+  return { w, h: w * S.img.nh / S.img.nw };
+}
+function placeImg(pos, w, h, scale) {
+  traceEl.style.width = w + 'px';
+  traceEl.style.height = h + 'px';
+  traceEl.style.transform = `translate(${pos.x - w / 2}px,${pos.y - h / 2}px) rotate(${S.img.rot}deg)` + (scale !== 1 ? ` scale(${scale})` : '');
+}
+function renderImg() {
+  if (!S.img) { traceEl.style.display = 'none'; traceEl.classList.remove('movable'); return; }
+  if (traceEl.getAttribute('src') !== S.img.url) traceEl.src = S.img.url;
+  traceEl.style.display = '';
+  traceEl.style.opacity = imgOpacity;
+  const { w, h } = imgGeom();
+  placeImg(map.latLngToLayerPoint(S.img.c), w, h, 1);
+  traceEl.classList.toggle('movable', !imgLocked && S.mode === 'pan');
+}
+map.on('zoom viewreset', () => { renderImg(); placeImgHandles(); });
+map.on('zoomanim', e => {
+  if (!S.img) return;
+  const { w, h } = imgGeom();
+  placeImg(map._latLngToNewLayerPoint(S.img.c, e.zoom, e.center), w, h, map.getZoomScale(e.zoom));
+});
+
+// handles: white corner dot resizes, blue dot above the top edge rotates
+const handleIcon = cls => L.divIcon({ className: 'ih ' + cls, iconSize: [16, 16] });
+let scaleH = null, rotH = null;
+function handlePos() {
+  const c = map.latLngToLayerPoint(S.img.c), { w, h } = imgGeom(), r = S.img.rot * Math.PI / 180;
+  const at = (x, y) => map.layerPointToLatLng(L.point(c.x + x * Math.cos(r) - y * Math.sin(r), c.y + x * Math.sin(r) + y * Math.cos(r)));
+  return { scale: at(w / 2, h / 2), rot: at(0, -h / 2 - 28) };
+}
+function placeImgHandles() {
+  if (!scaleH) return;
+  const p = handlePos();
+  scaleH.setLatLng(p.scale);
+  rotH.setLatLng(p.rot);
+}
+function renderImgHandles() {
+  imgHandleLayer.clearLayers();
+  scaleH = rotH = null;
+  if (!S.img || imgLocked || S.mode !== 'pan') return;
+  const p = handlePos();
+  scaleH = L.marker(p.scale, { icon: handleIcon('scale'), draggable: true, title: 'Drag to resize' }).addTo(imgHandleLayer);
+  rotH = L.marker(p.rot, { icon: handleIcon('rot'), draggable: true, title: 'Drag to rotate' }).addTo(imgHandleLayer);
+  scaleH.on('dragstart', record).on('drag', () => {
+    const c = map.latLngToLayerPoint(S.img.c), q = map.latLngToLayerPoint(scaleH.getLatLng());
+    const halfDiag = Math.hypot(1, S.img.nh / S.img.nw) / 2;
+    const wpx = Math.max(20, c.distanceTo(q) / halfDiag);
+    S.img = { ...S.img, wm: wpx * mpp(S.img.c.lat, map.getZoom()) };
+    renderImg();
+    rotH.setLatLng(handlePos().rot);
+  }).on('dragend', placeImgHandles);
+  rotH.on('dragstart', record).on('drag', () => {
+    const c = map.latLngToLayerPoint(S.img.c), q = map.latLngToLayerPoint(rotH.getLatLng());
+    S.img = { ...S.img, rot: Math.atan2(q.x - c.x, c.y - q.y) * 180 / Math.PI };
+    renderImg();
+    scaleH.setLatLng(handlePos().scale);
+  }).on('dragend', placeImgHandles);
+}
+
+// dragging the image itself moves it (Pan mode, unlocked)
+let imgDrag = null;
+traceEl.addEventListener('pointerdown', e => {
+  if (!S.img || imgLocked || S.mode !== 'pan' || e.button) return;
+  e.preventDefault();
+  e.stopPropagation();
+  record();
+  imgDrag = { id: e.pointerId, start: map.mouseEventToLatLng(e), c0: S.img.c };
+  traceEl.setPointerCapture(e.pointerId);
+  map.dragging.disable();
+});
+traceEl.addEventListener('pointermove', e => {
+  if (!imgDrag || e.pointerId !== imgDrag.id) return;
+  const ll = map.mouseEventToLatLng(e);
+  S.img = { ...S.img, c: L.latLng(imgDrag.c0.lat + ll.lat - imgDrag.start.lat, imgDrag.c0.lng + ll.lng - imgDrag.start.lng) };
+  renderImg();
+  placeImgHandles();
+});
+function endImgDrag(e) {
+  if (!imgDrag || e.pointerId !== imgDrag.id) return;
+  imgDrag = null;
+  if (S.mode === 'pan') map.dragging.enable();
+}
+traceEl.addEventListener('pointerup', endImgDrag);
+traceEl.addEventListener('pointercancel', endImgDrag);
+
+function fitImg() {
+  const size = map.getSize(), c = map.getCenter();
+  const k = Math.min(size.x * .7 / S.img.nw, size.y * .7 / S.img.nh);
+  return { c, wm: S.img.nw * k * mpp(c.lat, map.getZoom()) };
+}
+function loadImage(file) {
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { msgs('imgmsgs', [['err', 'That is not an image file. Try a PNG, JPG or SVG.']]); return; }
+  const url = URL.createObjectURL(file);
+  const probe = new Image();
+  probe.onload = () => {
+    let nw = probe.naturalWidth, nh = probe.naturalHeight;
+    const warn = [];
+    if (!nw || !nh) { nw = nh = 1000; warn.push(['warn', 'This image does not say how big it is (common with SVGs), so it is shown square. Resize it to suit.']); }
+    record();
+    S.img = { url, nw, nh, c: map.getCenter(), wm: 1, rot: 0 };
+    S.img = { ...S.img, ...fitImg() };
+    imgLocked = false;
+    $('lockchk').checked = false;
+    msgs('imgmsgs', warn);
+    if (S.mode === 'draw') setMode('pan'); else render();
+  };
+  probe.onerror = () => { URL.revokeObjectURL(url); msgs('imgmsgs', [['err', 'Could not open that image.']]); };
+  probe.src = url;
+}
+$('drop').onclick = () => $('fileinput').click();
+$('fileinput').onchange = e => { loadImage(e.target.files[0]); e.target.value = ''; };
+for (const el of [$('drop'), $('mapwrap')]) {
+  el.addEventListener('dragover', e => { e.preventDefault(); $('drop').classList.add('hover'); });
+  el.addEventListener('dragleave', () => $('drop').classList.remove('hover'));
+  el.addEventListener('drop', e => { e.preventDefault(); $('drop').classList.remove('hover'); loadImage(e.dataTransfer.files[0]); });
+}
+$('opacity').oninput = e => { imgOpacity = +e.target.value; traceEl.style.opacity = imgOpacity; };
+$('lockchk').onchange = e => { imgLocked = e.target.checked; render(); };
+$('fitbtn').onclick = () => { record(); S.img = { ...S.img, ...fitImg() }; render(); };
+$('rotresetbtn').onclick = () => { record(); S.img = { ...S.img, rot: 0 }; render(); };
+$('removeimgbtn').onclick = () => { record(); S.img = null; msgs('imgmsgs', []); render(); };
+
+// ---------- freehand drawing (mouse, touch and pen via pointer events) ----------
+const container = map.getContainer();
+const pointers = new Set();
+let cur = null; // { id, pts: [container points] }
+function cancelStroke() { cur = null; stroke.setLatLngs([]); }
+container.addEventListener('pointerdown', e => {
+  pointers.add(e.pointerId);
+  if (S.mode !== 'draw') return;
+  if (pointers.size > 1) { cancelStroke(); return; } // second finger: a pinch, not a stroke
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (e.target.closest('.leaflet-control')) return;
+  cur = { id: e.pointerId, pts: [map.mouseEventToContainerPoint(e)] };
+  try { container.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  stroke.setLatLngs([map.containerPointToLatLng(cur.pts[0])]);
+});
+container.addEventListener('pointermove', e => {
+  if (!cur || e.pointerId !== cur.id) return;
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of (evs.length ? evs : [e])) {
+    const p = map.mouseEventToContainerPoint(ev);
+    if (p.distanceTo(cur.pts[cur.pts.length - 1]) < 2) continue;
+    cur.pts.push(p);
+    stroke.addLatLng(map.containerPointToLatLng(p));
+  }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (!cur || e.pointerId !== cur.id) return;
+  const pts = cur.pts;
+  cancelStroke();
+  if (pts.length < 2) return; // a tap, not a stroke
+  const simple = L.LineUtil.simplify(pts, 1.5).map(p => map.containerPointToLatLng(p));
+  if (simple.length < 2) return;
+  addStroke(simple);
+}
+container.addEventListener('pointerup', endPointer);
+container.addEventListener('pointercancel', endPointer);
+
+function addStroke(ll) {
+  record();
+  if (!S.pts.length) S.pts = ll;
+  else {
+    // join on to whichever end the stroke starts nearer (the start only if it is close)
+    const p0 = map.latLngToContainerPoint(ll[0]);
+    const dStart = p0.distanceTo(map.latLngToContainerPoint(S.pts[0]));
+    const dEnd = p0.distanceTo(map.latLngToContainerPoint(S.pts[S.pts.length - 1]));
+    S.pts = dStart < dEnd && dStart < 40 ? ll.slice().reverse().concat(S.pts) : S.pts.concat(ll);
+  }
+  render();
+}
+
+// ---------- drawing display and point editing ----------
+const MAX_HANDLES = 600;
+function drawnPath() { return S.closed && S.pts.length > 2 ? S.pts.concat([S.pts[0]]) : S.pts; }
+function renderLine() { const p = drawnPath(); line.setLatLngs(p); casing.setLatLngs(p); }
+function renderVertices() {
+  vtxLayer.clearLayers();
+  if (S.mode !== 'pan' || S.pts.length > MAX_HANDLES) return;
+  S.pts.forEach((ll, i) => {
+    const m = L.marker(ll, {
+      icon: L.divIcon({ className: i === 0 ? 'vtx start' : 'vtx', iconSize: i === 0 ? [14, 14] : [11, 11] }),
+      draggable: true, title: i === 0 ? 'Start. Drag to move, click to remove' : 'Drag to move, click to remove',
+    }).addTo(vtxLayer);
+    m.on('dragstart', record);
+    m.on('drag', () => { S.pts[i] = m.getLatLng(); renderLine(); renderStats(); });
+    m.on('dragend', render);
+    m.on('click', () => { record(); S.pts.splice(i, 1); render(); });
+  });
+}
+function lengthM() {
+  const p = drawnPath();
+  let d = 0;
+  for (let i = 1; i < p.length; i++) d += map.distance(p[i - 1], p[i]);
+  return d;
+}
+function renderStats() {
+  $('dist').textContent = S.pts.length > 1 ? fmtDist(lengthM()) : '–';
+  const dl = $('drawstats');
+  dl.hidden = !S.pts.length;
+  dl.innerHTML = S.pts.length ? `<dt>Points</dt><dd>${S.pts.length}</dd><dt>Shape</dt><dd>${S.closed ? 'closed loop' : 'open line'}</dd>` : '';
+}
+
+function render() {
+  renderLine();
+  renderVertices();
+  renderImg();
+  renderImgHandles();
+  renderStats();
+  const draw = S.mode === 'draw';
+  for (const id of ['drawbtn', 'mdraw']) $(id).classList.toggle('on', draw);
+  for (const id of ['panbtn', 'mpan']) $(id).classList.toggle('on', !draw);
+  $('undobtn').disabled = !S.undo.length;
+  $('redobtn').disabled = !S.redo.length;
+  $('clearbtn').disabled = !S.pts.length;
+  $('closedchk').checked = S.closed;
+  $('imgctl').hidden = !S.img;
+  $('opacity').value = imgOpacity;
+  $('imghelp').style.display = imgLocked ? 'none' : '';
+  msgs('drawmsgs', !draw && S.pts.length > MAX_HANDLES
+    ? [['warn', `This drawing has ${S.pts.length} points, too many to show as dots. Undo or clear to edit it.`]] : []);
+  if (draw && !S.pts.length) hint('Draw with a mouse, finger or pen. Use Pan to move the map.');
+  else if (draw) hint('Keep drawing to extend the line.');
+  else if (S.img && !imgLocked) hint('Drag the image to move it. Lock it when it is in place.');
+  else hint('');
+}
+$('closedchk').onchange = e => { record(); S.closed = e.target.checked; render(); };
+$('clearbtn').onclick = () => { record(); S.pts = []; render(); };
+
+setMode(S.mode);
+</script>
+</body>
+</html>

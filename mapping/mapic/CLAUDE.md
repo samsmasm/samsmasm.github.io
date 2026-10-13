@@ -108,6 +108,32 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
 2.  Road data from Overpass and snapping, with fit score and export.
 3.  Move, stretch and rotate with live re-snapping.
 
+## Implementation (round 1, 2026-10-13)
+
+-   Single `index.html`, same Leaflet/CARTO setup and header nav as GPS
+    Fixer. Last map view remembered in localStorage `mapic.view`.
+-   State `S`: `pts` (LatLngs), `closed`, `img` ({url, nw, nh, c, wm =
+    width in metres, rot = degrees clockwise}). Points and `img` are
+    replaced, never mutated, so undo snapshots share them. One undo/redo
+    history covers drawing and image placement; opacity and lock are not
+    recorded.
+-   Trace image: an `<img>` (object URL, never uploaded) in a custom pane
+    (z 350, between tiles and the drawing), placed with a CSS transform
+    from centre, width in metres and rotation. Repositioned on
+    `zoom`/`viewreset`, animated on `zoomanim` like Leaflet's
+    ImageOverlay. Unlocked + Pan mode: drag the image to move, white
+    corner handle to resize (aspect kept), blue handle to rotate.
+    "Straighten" sets rotation to 0. No plugin.
+-   Drawing: pointer events on the map container. Draw mode disables map
+    dragging and double-click zoom and sets touch-action none; a second
+    pointer cancels the stroke so pinch zoom still works. Strokes are
+    simplified (`L.LineUtil.simplify`, 1.5 px) and join on to the end of
+    the line, or the start if begun within 40 px of it (reversed).
+-   Pan mode shows a dot per point (drag to move, click to remove), up to
+    600 points.
+-   Smoke-tested in headless Chrome with a synthetic pen stroke and image.
+    Not yet tried on a real touchscreen.
+
 ## Decisions
 
 -   Name: Mapic (Sam, 2026-10-13).
