@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GPS Fixer</title>
+<meta name="description" content="Repair GPS gaps in a GPX file by redrawing the missing section. Runs entirely in your browser.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#2a2233;--muted:#7a6f88;--light:#a99fb6;
+  --accent:#4a1a7a;--accent-bg:#f5f0ff;--accent-border:#d0b6f5;
+  --rule:#f0e8ff;
+  --track:#6a3db8;--gap:#d43a3a;--repair:#e07a10;
+  --ok:#145c34;--ok-bg:#f0faf4;--ok-border:#b6e8cb;
+  --warn:#7a4a0a;--warn-bg:#fff8ec;--warn-border:#f5d9a8;
+  --err:#7a1a1a;--err-bg:#fff0f0;--err-border:#f5b6b6;
+}
+html,body{height:100%}
+body{font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink);background:#fff;display:flex;flex-direction:column}
+header{
+  display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--rule);
+  background:
+    radial-gradient(ellipse at 8% 60%,#ffd6e7 0%,transparent 50%),
+    radial-gradient(ellipse at 35% 10%,#d6f0ff 0%,transparent 45%),
+    radial-gradient(ellipse at 60% 90%,#e8d6ff 0%,transparent 45%),
+    radial-gradient(ellipse at 85% 30%,#fff3d6 0%,transparent 45%),
+    #f9f0ff;
+}
+header img{width:44px;height:44px;border-radius:11px;background:rgba(255,255,255,.6)}
+header h1{font:400 24px Georgia,serif;color:var(--accent)}
+header .sub{font-size:12px;color:var(--muted)}
+header a.home{margin-left:auto;font-size:12px;color:var(--muted);text-decoration:none}
+header a.home:hover{color:var(--accent)}
+#wrap{flex:1;display:flex;min-height:0}
+#panel{width:360px;min-width:360px;border-right:1px solid var(--rule);overflow-y:auto;background:#fff}
+#mapwrap{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0}
+#maphint{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:500;
+  background:#fff;border:1px solid var(--accent-border);border-radius:8px;padding:6px 12px;
+  font-size:12px;color:var(--accent);display:none;max-width:90%;text-align:center
+}
+.step{padding:14px 16px;border-bottom:1px solid var(--rule)}
+.step.off{opacity:.45;pointer-events:none}
+.step h2{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.step h2 span{color:var(--light);margin-right:6px}
+.step p,.step li{font-size:12.5px;color:var(--muted)}
+.step ul{padding-left:16px;margin:4px 0}
+.btn{
+  font:inherit;font-size:13px;padding:6px 12px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--accent-border);background:var(--accent-bg);color:var(--accent)
+}
+.btn:hover:not(:disabled){background:#ebe0ff}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover:not(:disabled){background:#3a1162}
+.btn.on{background:var(--accent);color:#fff}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#drop{
+  border:1.5px dashed var(--accent-border);border-radius:10px;padding:14px;text-align:center;
+  font-size:12.5px;color:var(--muted);cursor:pointer;background:#fcfaff
+}
+#drop.hover{background:var(--accent-bg);border-color:var(--accent)}
+#drop strong{color:var(--accent);font-weight:600}
+#fileinput{display:none}
+dl.stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin-top:8px;font-size:12.5px}
+dl.stats dt{color:var(--muted)}
+dl.stats dd{color:var(--ink);font-variant-numeric:tabular-nums}
+.gaplist{margin-top:6px}
+.gapitem{
+  display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;background:none;border:none;
+  border-bottom:1px solid var(--rule);padding:6px 2px;cursor:pointer;color:var(--ink)
+}
+.gapitem:hover{background:#fcfaff}
+.gapitem.sel{background:var(--accent-bg)}
+.gapitem .t{font-family:Georgia,serif;color:var(--accent)}
+.gapitem .d{color:var(--muted);font-size:12px}
+.msg{font-size:12.5px;border-radius:8px;padding:8px 10px;margin-top:8px;border:1px solid}
+.msg.warn{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn)}
+.msg.err{background:var(--err-bg);border-color:var(--err-border);color:var(--err)}
+.msg.ok{background:var(--ok-bg);border-color:var(--ok-border);color:var(--ok)}
+.msg.info{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent)}
+.big{font:400 22px Georgia,serif;color:var(--repair);font-variant-numeric:tabular-nums}
+.big small{font:12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--muted)}
+.legend{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+label.chk{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer}
+footer{font-size:11px;color:#bbb;padding:12px 16px}
+footer p{margin-bottom:6px}
+.vtx{background:var(--repair);border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--repair)}
+.mid{background:#fff;border:1.5px solid var(--repair);border-radius:50%;opacity:.8}
+.anchor{background:#fff;border:2.5px solid var(--accent);border-radius:50%;font:600 11px/17px sans-serif;color:var(--accent);text-align:center}
+@media (max-width:760px){
+  #wrap{flex-direction:column-reverse}
+  #panel{width:auto;min-width:0;border-right:none;border-top:1px solid var(--rule);flex:1}
+  #mapwrap{flex:none;height:55vh}
+  header .sub{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <img src="/unisamsq.png" alt="">
+  <div>
+    <h1>GPS Fixer</h1>
+    <div class="sub">Redraw the bit where your GPS gave up. Your file never leaves this browser.</div>
+  </div>
+  <a class="home" href="/">unisam.nz</a>
+</header>
+
+<div id="wrap">
+<div id="panel">
+
+  <section class="step" id="s1">
+    <h2><span>1</span>Open a GPX file</h2>
+    <div id="drop"><strong>Choose a .gpx file</strong> or drop it here</div>
+    <input type="file" id="fileinput" accept=".gpx,application/gpx+xml,application/xml,text/xml">
+    <div id="filemsgs"></div>
+    <dl class="stats" id="filestats" hidden></dl>
+  </section>
+
+  <section class="step off" id="s2">
+    <h2><span>2</span>Choose the gap</h2>
+    <p id="gapintro">Long jumps between recorded points are listed below. They are only suspects: some straight sections are real.</p>
+    <div class="gaplist" id="gaplist"></div>
+    <div class="row">
+      <button class="btn" id="pickbtn">Pick the ends on the map</button>
+    </div>
+    <dl class="stats" id="selstats" hidden></dl>
+    <div id="selmsgs"></div>
+  </section>
+
+  <section class="step off" id="s3">
+    <h2><span>3</span>Draw the real route</h2>
+    <ul>
+      <li>Click the map to add points, in order, from A towards B.</li>
+      <li>Drag an orange point to move it. Click one to remove it.</li>
+      <li>Drag a hollow midpoint to bend a line.</li>
+    </ul>
+    <div class="big" id="repdist" style="margin-top:8px">–</div>
+    <div class="row">
+      <button class="btn" id="undobtn" disabled>Undo</button>
+      <button class="btn" id="clearbtn" disabled>Clear drawing</button>
+      <button class="btn" id="cancelbtn">Choose a different gap</button>
+    </div>
+  </section>
+
+  <section class="step off" id="s4">
+    <h2><span>4</span>Calculate timestamps</h2>
+    <p>Spreads the time between A and B along your route by distance, so the section is covered at a constant average speed. These are estimates, not recovered GPS data.</p>
+    <div class="row">
+      <button class="btn primary" id="timebtn" disabled>Calculate timestamps</button>
+    </div>
+    <div id="timemsgs"></div>
+    <dl class="stats" id="timestats" hidden></dl>
+  </section>
+
+  <section class="step off" id="s5">
+    <h2><span>5</span>Review and download</h2>
+    <dl class="stats" id="reviewstats"></dl>
+    <div class="legend">
+      <span><i style="border-color:var(--track)"></i>Recorded track</span>
+      <span><i style="border-color:var(--gap);border-top-style:dashed"></i>Original gap (being replaced)</span>
+      <span><i style="border-color:var(--repair)"></i>Your repair (estimated)</span>
+    </div>
+    <label class="chk"><input type="checkbox" id="showorig" checked> Show the original gap line</label>
+    <div class="row">
+      <button class="btn primary" id="dlbtn" disabled>Download repaired GPX</button>
+      <button class="btn" id="resetbtn">Reset to original</button>
+    </div>
+    <p style="margin-top:8px">Upload the downloaded file to Strava as a new activity (delete the old one first if you want to replace it). Strava works out its own distance from the track, so it may differ a little from the figure here.</p>
+  </section>
+
+  <footer>
+    <p>Privacy: your GPX file is read, edited and saved entirely in this browser. Nothing is uploaded. The only network requests are for map tiles from OpenStreetMap, which reveal roughly which area you are looking at, as any web map does.</p>
+    <p>Map data © OpenStreetMap contributors. Built by Sam G · all vibe coded.</p>
+  </footer>
+</div>
+
+<div id="mapwrap">
+  <div id="map"></div>
+  <div id="maphint"></div>
+</div>
+</div>
+
+<script>
+'use strict';
+
+// ---------- geometry helpers ----------
+const R = 6371008.8;
+const rad = d => d * Math.PI / 180;
+function hav(a, b) {
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+function pathLen(pts) { let d = 0; for (let i = 1; i < pts.length; i++) d += hav(pts[i - 1], pts[i]); return d; }
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function fmtDist(m) { return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(2) + ' km'; }
+function fmtDur(s) {
+  if (s == null || !isFinite(s)) return '–';
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  return h ? `${h}h ${m}m ${sec}s` : m ? `${m}m ${sec}s` : `${sec}s`;
+}
+function fmtSpeed(mps) {
+  if (!isFinite(mps)) return '–';
+  const kmh = mps * 3.6;
+  const pace = mps > 0 ? Math.round(1000 / mps) : Infinity;
+  const p = isFinite(pace) && pace < 3600 ? ` · ${Math.floor(pace / 60)}:${String(pace % 60).padStart(2, '0')} /km` : '';
+  return kmh.toFixed(1) + ' km/h' + p;
+}
+function fmtTime(ms) {
+  if (ms == null) return 'no time';
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+function fmtDateTime(ms) {
+  if (ms == null) return '–';
+  return new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- XML helpers (namespace-agnostic, so GPX 1.0 and 1.1 both work) ----------
+const kids = (el, name) => Array.from(el.children).filter(c => c.localName === name);
+const kid = (el, name) => kids(el, name)[0] || null;
+
+// ---------- state ----------
+const S = {
+  fileName: null,
+  srcText: null,     // original file text, never modified
+  segs: [],          // [{trk, seg, pts:[{lat,lon,ele,time,timeStr}]}]
+  gaps: [],
+  sel: null,         // {s, a, b}  segment index, start point index, end point index
+  verts: [],         // user-drawn intermediate points [{lat,lon}]
+  history: [],
+  timed: null,       // result of calculate timestamps, or null
+  picking: false,
+  pickFirst: null,
+  fracSeconds: false,
+};
+
+// ---------- map ----------
+const map = L.map('map', { preferCanvas: true, zoomControl: true }).setView([-41.29, 174.78], 5);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+const trackLayer = L.layerGroup().addTo(map);
+const gapLayer = L.layerGroup().addTo(map);
+const ctxLayer = L.layerGroup().addTo(map);
+const repairLayer = L.layerGroup().addTo(map);
+const handleLayer = L.layerGroup().addTo(map);
+const pickLayer = L.layerGroup().addTo(map);
+let repairLine = null;
+
+const $ = id => document.getElementById(id);
+function hint(text) { const h = $('maphint'); h.textContent = text || ''; h.style.display = text ? 'block' : 'none'; }
+function msgs(el, list) {
+  $(el).innerHTML = list.map(([kind, text]) => `<div class="msg ${kind}">${text}</div>`).join('');
+}
+function stats(el, rows) {
+  const dl = $(el);
+  dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  dl.hidden = !rows.length;
+}
+
+// ---------- step 1: load ----------
+$('drop').onclick = () => $('fileinput').click();
+$('fileinput').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; };
+['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('hover'); }));
+['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('hover'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+async function loadFile(file) {
+  let text;
+  try { text = await file.text(); } catch (err) { return msgs('filemsgs', [['err', 'Could not read that file.']]); }
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) {
+    return msgs('filemsgs', [['err', 'That file is not valid XML, so it cannot be a working GPX file. Check you exported a .gpx (not .fit or .tcx).']]);
+  }
+  const root = doc.documentElement;
+  if (root.localName !== 'gpx') {
+    return msgs('filemsgs', [['err', `This looks like a <code>${esc(root.localName)}</code> file, not GPX. Export the activity as GPX and try again.`]]);
+  }
+  const segs = [];
+  kids(root, 'trk').forEach((trk, ti) => kids(trk, 'trkseg').forEach((seg, si) => {
+    const pts = [];
+    let badCoords = 0;
+    kids(seg, 'trkpt').forEach(p => {
+      const lat = parseFloat(p.getAttribute('lat')), lon = parseFloat(p.getAttribute('lon'));
+      if (!isFinite(lat) || !isFinite(lon)) { badCoords++; }
+      const eleEl = kid(p, 'ele'), timeEl = kid(p, 'time');
+      const ele = eleEl ? parseFloat(eleEl.textContent) : null;
+      const timeStr = timeEl ? timeEl.textContent.trim() : null;
+      const t = timeStr ? Date.parse(timeStr) : NaN;
+      pts.push({ lat, lon, ele: isFinite(ele) ? ele : null, time: isFinite(t) ? t : null, timeStr });
+    });
+    segs.push({ trk: ti, seg: si, pts, badCoords });
+  }));
+
+  const total = segs.reduce((n, s) => n + s.pts.length, 0);
+  if (!total) {
+    const hasRte = kids(root, 'rte').length, hasWpt = kids(root, 'wpt').length;
+    return msgs('filemsgs', [['err', hasRte || hasWpt
+      ? 'This GPX has routes or waypoints but no recorded track (trkpt). GPS Fixer repairs recorded activity tracks only.'
+      : 'No track points found in this GPX file.']]);
+  }
+  const bad = segs.reduce((n, s) => n + s.badCoords, 0);
+  if (bad) return msgs('filemsgs', [['err', `${bad} track point(s) have missing or invalid coordinates. GPS Fixer will not edit a file it cannot read fully, to avoid losing data.`]]);
+
+  // whole-file warnings
+  const warn = [];
+  const withTime = segs.reduce((n, s) => n + s.pts.filter(p => p.time != null).length, 0);
+  if (withTime === 0) warn.push(['warn', 'This file has no timestamps. You can still redraw a route, but new points will have no times either, and Strava may treat it as a route rather than an activity.']);
+  else if (withTime < total) warn.push(['warn', `${total - withTime} of ${total} points have no timestamp. A gap can only be timed if both its ends have one.`]);
+  let backwards = 0;
+  segs.forEach(s => { for (let i = 1; i < s.pts.length; i++) if (s.pts[i].time != null && s.pts[i - 1].time != null && s.pts[i].time < s.pts[i - 1].time) backwards++; });
+  if (backwards) warn.push(['warn', `${backwards} place(s) where time goes backwards between recorded points. These are left as they are.`]);
+
+  S.fileName = file.name;
+  S.srcText = text;
+  S.segs = segs;
+  S.fracSeconds = segs.some(s => s.pts.some(p => p.timeStr && /\.\d/.test(p.timeStr)));
+  resetRepair();
+  S.gaps = findGaps(segs);
+
+  msgs('filemsgs', warn);
+  const times = segs.flatMap(s => s.pts.map(p => p.time)).filter(t => t != null);
+  const nameEl = kid(root, 'trk') && kid(kid(root, 'trk'), 'name');
+  stats('filestats', [
+    ['File', esc(file.name)],
+    nameEl ? ['Activity', esc(nameEl.textContent.trim())] : null,
+    ['Started', times.length ? fmtDateTime(Math.min(...times)) : '–'],
+    ['Points', total.toLocaleString() + (segs.length > 1 ? ` in ${segs.length} segments` : '')],
+    ['Distance', fmtDist(totalDist())],
+    ['Duration', times.length ? fmtDur((Math.max(...times) - Math.min(...times)) / 1000) : '–'],
+  ].filter(Boolean));
+
+  drawTrack();
+  renderGaps();
+  $('s2').classList.remove('off');
+  const b = L.latLngBounds(segs.flatMap(s => s.pts.map(p => [p.lat, p.lon])));
+  map.fitBounds(b, { padding: [30, 30] });
+}
+
+function totalDist() { return S.segs.reduce((d, s) => d + pathLen(s.pts), 0); }
+
+function findGaps(segs) {
+  const out = [];
+  segs.forEach((s, si) => {
+    const p = s.pts;
+    const dts = [], dds = [];
+    for (let i = 1; i < p.length; i++) {
+      dds.push(hav(p[i - 1], p[i]));
+      if (p[i].time != null && p[i - 1].time != null && p[i].time > p[i - 1].time) dts.push((p[i].time - p[i - 1].time) / 1000);
+    }
+    const mdt = median(dts), mdd = median(dds);
+    for (let i = 1; i < p.length; i++) {
+      const d = dds[i - 1];
+      const dt = p[i].time != null && p[i - 1].time != null ? (p[i].time - p[i - 1].time) / 1000 : null;
+      const longTime = dt != null && dt > Math.max(30, 6 * mdt) && d > Math.max(50, 4 * mdd);
+      const longJump = d > Math.max(150, 10 * mdd);
+      if (longTime || longJump) out.push({ s: si, a: i - 1, b: i, d, dt });
+    }
+  });
+  return out.sort((x, y) => y.d - x.d).slice(0, 12);
+}
+
+// ---------- drawing the track ----------
+function drawTrack() {
+  trackLayer.clearLayers();
+  S.segs.forEach((s, si) => {
+    const line = L.polyline(s.pts.map(p => [p.lat, p.lon]), { color: getCss('--track'), weight: 3, opacity: .85 });
+    line.on('click', e => { if (S.picking) { L.DomEvent.stop(e); pickAt(e.latlng); } });
+    line.addTo(trackLayer);
+  });
+}
+function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function renderGaps() {
+  const list = $('gaplist');
+  if (!S.gaps.length) {
+    $('gapintro').textContent = 'No obvious gaps found. You can still pick a section on the map.';
+    list.innerHTML = '';
+    return;
+  }
+  $('gapintro').textContent = 'Long jumps between recorded points, biggest first. They are only suspects: some straight sections are real.';
+  list.innerHTML = S.gaps.map((g, i) => {
+    const a = S.segs[g.s].pts[g.a];
+    const sel = S.sel && S.sel.s === g.s && S.sel.a === g.a && S.sel.b === g.b ? ' sel' : '';
+    return `<button class="gapitem${sel}" data-i="${i}"><span class="t">${fmtTime(a.time)}</span>
+      <span class="d"> · ${fmtDist(g.d)} straight line · ${g.dt != null ? fmtDur(g.dt) + ' without a point' : 'no time'}</span></button>`;
+  }).join('');
+  list.querySelectorAll('.gapitem').forEach(btn => btn.onclick = () => {
+    const g = S.gaps[+btn.dataset.i];
+    selectGap(g.s, g.a, g.b);
+  });
+}
+
+// ---------- step 2: pick on map ----------
+$('pickbtn').onclick = () => {
+  if (S.picking) return stopPicking();
+  if (S.sel && (S.verts.length) && !confirm('Discard the route you have drawn?')) return;
+  S.picking = true; S.pickFirst = null;
+  pickLayer.clearLayers();
+  $('pickbtn').classList.add('on');
+  $('pickbtn').textContent = 'Cancel picking';
+  map.getContainer().style.cursor = 'crosshair';
+  hint('Click the last good recorded point before the gap');
+};
+function stopPicking() {
+  S.picking = false; S.pickFirst = null;
+  pickLayer.clearLayers();
+  $('pickbtn').classList.remove('on');
+  $('pickbtn').textContent = 'Pick the ends on the map';
+  map.getContainer().style.cursor = '';
+  hint(S.sel ? 'Click the map to add route points between A and B' : '');
+}
+function nearestPoint(latlng) {
+  const c = map.latLngToContainerPoint(latlng);
+  let best = null, bd = Infinity;
+  S.segs.forEach((s, si) => s.pts.forEach((p, pi) => {
+    const q = map.latLngToContainerPoint([p.lat, p.lon]);
+    const d = (q.x - c.x) ** 2 + (q.y - c.y) ** 2;
+    if (d < bd) { bd = d; best = { s: si, i: pi }; }
+  }));
+  return bd <= 30 * 30 ? best : null;
+}
+function pickAt(latlng) {
+  const n = nearestPoint(latlng);
+  if (!n) return hint('No recorded point there. Click closer to the track.');
+  const p = S.segs[n.s].pts[n.i];
+  if (!S.pickFirst) {
+    S.pickFirst = n;
+    L.circleMarker([p.lat, p.lon], { radius: 7, color: getCss('--accent'), weight: 3, fillColor: '#fff', fillOpacity: 1 })
+      .bindTooltip('A · ' + fmtTime(p.time), { permanent: true, direction: 'top' }).addTo(pickLayer);
+    hint('Now click the first good recorded point after the gap');
+    return;
+  }
+  const f = S.pickFirst;
+  if (f.s !== n.s) return hint('Both ends must be in the same track segment. Pick the second point again.');
+  if (f.i === n.i) return hint('That is the same point. Pick a different one after the gap.');
+  const a = Math.min(f.i, n.i), b = Math.max(f.i, n.i);
+  stopPicking();
+  selectGap(n.s, a, b);
+}
+
+// ---------- selection ----------
+function selectGap(s, a, b) {
+  if (S.picking) stopPicking();
+  S.sel = { s, a, b };
+  S.verts = []; S.history = []; S.timed = null;
+  const pts = S.segs[s].pts, A = pts[a], B = pts[b];
+  const inside = b - a - 1;
+  const recorded = pathLen(pts.slice(a, b + 1));
+  const dt = A.time != null && B.time != null ? (B.time - A.time) / 1000 : null;
+  stats('selstats', [
+    ['A (last good)', fmtTime(A.time)],
+    ['B (first good)', fmtTime(B.time)],
+    ['Time between', dt != null ? fmtDur(dt) : '–'],
+    ['Recorded distance', fmtDist(recorded)],
+    ['Points replaced', inside ? `${inside} recorded point${inside > 1 ? 's' : ''} between A and B` : 'none (just the straight line)'],
+  ]);
+  const m = [];
+  if (A.time == null || B.time == null) m.push(['warn', 'One or both ends have no timestamp, so the new points cannot be timed. They will be saved without times.']);
+  else if (dt <= 0) m.push(['err', 'B is not later than A, so there is no time available for the repaired section. Pick different ends.']);
+  msgs('selmsgs', m);
+  ['s3', 's4', 's5'].forEach(id => $(id).classList.remove('off'));
+  renderGaps();
+  drawSelection();
+  refresh();
+  const ctx = pts.slice(Math.max(0, a - 3), b + 4).map(p => [p.lat, p.lon]);
+  map.fitBounds(L.latLngBounds(ctx), { padding: [60, 60], maxZoom: 17 });
+  hint('Click the map to add route points between A and B');
+}
+
+function drawSelection() {
+  gapLayer.clearLayers(); ctxLayer.clearLayers();
+  if (!S.sel) return;
+  const { s, a, b } = S.sel, pts = S.segs[s].pts;
+  L.polyline(pts.slice(a, b + 1).map(p => [p.lat, p.lon]), { color: getCss('--gap'), weight: 3, dashArray: '6 6', interactive: false }).addTo(gapLayer);
+  if (!$('showorig').checked) map.removeLayer(gapLayer); else gapLayer.addTo(map);
+  // recorded context points either side, with times
+  for (let i = Math.max(0, a - 5); i <= Math.min(pts.length - 1, b + 5); i++) {
+    if (i === a || i === b || (i > a && i < b)) continue;
+    const p = pts[i];
+    L.circleMarker([p.lat, p.lon], { radius: 3.5, color: getCss('--track'), weight: 1, fillColor: '#fff', fillOpacity: 1 })
+      .bindTooltip('Recorded · ' + fmtTime(p.time)).addTo(ctxLayer);
+  }
+  [[a, 'A'], [b, 'B']].forEach(([i, label]) => {
+    const p = pts[i];
+    L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'anchor', html: label, iconSize: [22, 22] }), interactive: true, zIndexOffset: 1000 })
+      .bindTooltip(`${label} · recorded · ${fmtTime(p.time)}`).addTo(ctxLayer);
+  });
+}
+
+// ---------- step 3: editing ----------
+function routePts() {
+  if (!S.sel) return [];
+  const pts = S.segs[S.sel.s].pts;
+  return [pts[S.sel.a], ...S.verts, pts[S.sel.b]];
+}
+function pushHistory() { S.history.push(S.verts.map(v => ({ ...v }))); if (S.history.length > 200) S.history.shift(); }
+function changed() { S.timed = null; refresh(); }
+
+map.on('click', e => {
+  if (S.picking) return pickAt(e.latlng);
+  if (!S.sel) return;
+  pushHistory();
+  S.verts.push({ lat: e.latlng.lat, lon: e.latlng.lng });
+  changed();
+});
+$('undobtn').onclick = () => { if (!S.history.length) return; S.verts = S.history.pop(); changed(); };
+$('clearbtn').onclick = () => { if (!S.verts.length) return; pushHistory(); S.verts = []; changed(); };
+$('cancelbtn').onclick = () => {
+  if (S.verts.length && !confirm('Discard the route you have drawn?')) return;
+  resetRepair(); renderGaps(); refresh();
+};
+$('resetbtn').onclick = () => {
+  if ((S.verts.length || S.timed) && !confirm('Throw away your repair and go back to the original track?')) return;
+  resetRepair(); renderGaps(); refresh();
+  if (S.segs.length) map.fitBounds(L.latLngBounds(S.segs.flatMap(s => s.pts.map(p => [p.lat, p.lon]))), { padding: [30, 30] });
+};
+$('showorig').onchange = drawSelection;
+
+function resetRepair() {
+  S.sel = null; S.verts = []; S.history = []; S.timed = null;
+  if (S.picking) stopPicking();
+  gapLayer.clearLayers(); ctxLayer.clearLayers(); repairLayer.clearLayers(); handleLayer.clearLayers();
+  repairLine = null;
+  stats('selstats', []); msgs('selmsgs', []); msgs('timemsgs', []); stats('timestats', []);
+  ['s3', 's4', 's5'].forEach(id => $(id).classList.add('off'));
+  hint('');
+}
+
+function drawRepair() {
+  repairLayer.clearLayers(); handleLayer.clearLayers();
+  if (!S.sel) return;
+  const rp = routePts();
+  repairLine = L.polyline(rp.map(p => [p.lat, p.lon]), { color: getCss('--repair'), weight: 4, interactive: false }).addTo(repairLayer);
+  if (S.timed) {
+    S.timed.pts.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 2, color: getCss('--repair'), weight: 1, fillOpacity: 1, interactive: false }).addTo(repairLayer));
+  }
+  // vertex handles
+  S.verts.forEach((v, i) => {
+    const m = L.marker([v.lat, v.lon], { draggable: true, icon: L.divIcon({ className: 'vtx', iconSize: [14, 14] }), zIndexOffset: 500 });
+    let dragged = false;
+    m.on('dragstart', () => { dragged = true; pushHistory(); });
+    m.on('drag', e => { S.verts[i] = { lat: e.latlng.lat, lon: e.latlng.lng }; liveUpdate(); });
+    m.on('dragend', () => { changed(); setTimeout(() => dragged = false, 0); });
+    m.on('click', e => { L.DomEvent.stop(e); if (dragged) return; pushHistory(); S.verts.splice(i, 1); changed(); });
+    m.bindTooltip('Reconstructed point (click to remove)', { direction: 'top' });
+    m.addTo(handleLayer);
+  });
+  // midpoint handles: drag to insert a new point between neighbours
+  for (let i = 1; i < rp.length; i++) {
+    const p = rp[i - 1], q = rp[i];
+    const mid = L.marker([(p.lat + q.lat) / 2, (p.lon + q.lon) / 2], { draggable: true, icon: L.divIcon({ className: 'mid', iconSize: [11, 11] }), zIndexOffset: 400 });
+    const at = i - 1; // index into verts to insert at
+    let inserted = false;
+    mid.on('dragstart', () => { pushHistory(); S.verts.splice(at, 0, { lat: mid.getLatLng().lat, lon: mid.getLatLng().lng }); inserted = true; });
+    mid.on('drag', e => { if (inserted) { S.verts[at] = { lat: e.latlng.lat, lon: e.latlng.lng }; liveUpdate(); } });
+    mid.on('dragend', () => changed());
+    mid.on('click', e => L.DomEvent.stop(e));
+    mid.addTo(handleLayer);
+  }
+}
+
+function liveUpdate() {
+  // cheap update during drags: redraw the line and the distance only
+  const rp = routePts();
+  if (repairLine) repairLine.setLatLngs(rp.map(p => [p.lat, p.lon]));
+  showDist();
+}
+
+function showDist() {
+  if (!S.sel) { $('repdist').textContent = '–'; return; }
+  const rp = routePts();
+  const pts = S.segs[S.sel.s].pts;
+  const before = pathLen(pts.slice(S.sel.a, S.sel.b + 1));
+  $('repdist').innerHTML = `${fmtDist(pathLen(rp))} <small>repaired section (was ${fmtDist(before)})</small>`;
+}
+
+// ---------- step 4: timestamps ----------
+function spacing() {
+  // densify to roughly the recording's usual point spacing, so the new section looks like the rest
+  const p = S.segs[S.sel.s].pts, d = [];
+  for (let i = 1; i < p.length; i++) d.push(hav(p[i - 1], p[i]));
+  return Math.min(30, Math.max(3, median(d) || 10));
+}
+
+function activitySpeed() {
+  // typical moving speed outside the gap: pairs of recorded points with short time steps
+  let d = 0, t = 0;
+  S.segs.forEach((s, si) => {
+    for (let i = 1; i < s.pts.length; i++) {
+      if (S.sel && si === S.sel.s && i > S.sel.a && i <= S.sel.b) continue;
+      const a = s.pts[i - 1], b = s.pts[i];
+      if (a.time == null || b.time == null) continue;
+      const dt = (b.time - a.time) / 1000;
+      if (dt <= 0 || dt > 60) continue;
+      const dd = hav(a, b);
+      if (dd / dt < 0.3) continue; // standing still
+      d += dd; t += dt;
+    }
+  });
+  return t > 60 ? d / t : null;
+}
+
+$('timebtn').onclick = calculate;
+function calculate() {
+  const { s, a, b } = S.sel, pts = S.segs[s].pts, A = pts[a], B = pts[b];
+  const rp = routePts();
+  const step = spacing();
+  // build the output points: user vertices plus evenly spaced fill-in points, excluding A and B
+  const out = [];
+  for (let i = 1; i < rp.length; i++) {
+    const p = rp[i - 1], q = rp[i], len = hav(p, q);
+    const n = Math.max(1, Math.round(len / step));
+    for (let k = 1; k <= n; k++) {
+      if (i === rp.length - 1 && k === n) break; // that's B
+      const f = k / n;
+      out.push({ lat: p.lat + (q.lat - p.lat) * f, lon: p.lon + (q.lon - p.lon) * f });
+    }
+  }
+  const D = pathLen(rp);
+  let cum = 0, prev = A;
+  out.forEach(p => { cum += hav(prev, p); p.dist = cum; prev = p; });
+  const m = [];
+  const hasEle = A.ele != null && B.ele != null;
+  out.forEach(p => { p.ele = hasEle ? A.ele + (B.ele - A.ele) * (D ? p.dist / D : 0) : null; });
+
+  const canTime = A.time != null && B.time != null;
+  const dt = canTime ? (B.time - A.time) / 1000 : null;
+  if (canTime && dt <= 0) {
+    msgs('timemsgs', [['err', 'B is not later than A, so there is no time for this section. Pick different ends.']]);
+    S.timed = null; return refresh();
+  }
+  if (canTime) {
+    out.forEach(p => { p.time = A.time + (B.time - A.time) * (D ? p.dist / D : 0); });
+    // match the file's precision; fall back to milliseconds if whole seconds would collide
+    let frac = S.fracSeconds;
+    if (!frac) {
+      const r = out.map(p => Math.round(p.time / 1000) * 1000);
+      const all = [A.time, ...r, B.time];
+      for (let i = 1; i < all.length; i++) if (all[i] <= all[i - 1]) { frac = true; break; }
+      if (!frac) out.forEach((p, i) => p.time = r[i]);
+    }
+    S.timedFrac = frac;
+    // validate
+    let ok = true;
+    const all = [A.time, ...out.map(p => p.time), B.time];
+    for (let i = 1; i < all.length; i++) if (!(all[i] > all[i - 1])) ok = false;
+    if (!ok) m.push(['warn', 'Some timestamps could not be kept strictly increasing (the points are very close together in time). They are still in order and inside the A to B interval.']);
+    const v = D / dt, typical = activitySpeed();
+    if (v > 55) m.push(['warn', `The implied speed is ${fmtSpeed(v)}. That is faster than a car on a motorway. Check the route and the gap ends. Timestamps have been calculated anyway; recorded times are untouched.`]);
+    else if (typical && v > typical * 1.8) m.push(['warn', `The implied speed (${fmtSpeed(v)}) is much faster than the rest of this activity (${fmtSpeed(typical)}). Your route may be too long, or the gap ends may be wrong.`]);
+    else if (typical && v < typical * 0.35) m.push(['info', `The implied speed (${fmtSpeed(v)}) is much slower than the rest of this activity (${fmtSpeed(typical)}). Perhaps you stopped during the gap. The time is spread evenly anyway, so the section will look slow rather than paused.`]);
+    if (!m.length) m.unshift(['ok', 'Timestamps calculated. They are estimates spread evenly by distance.']);
+    stats('timestats', [
+      ['New points', out.length],
+      ['Section time', fmtDur(dt)],
+      ['Average speed', fmtSpeed(v)],
+      typical ? ['Rest of activity', fmtSpeed(typical)] : null,
+      ['Elevation', hasEle ? 'interpolated from A to B' : 'none (ends have no elevation)'],
+    ].filter(Boolean));
+  } else {
+    out.forEach(p => p.time = null);
+    m.push(['warn', 'A or B has no timestamp, so the new points have no times. The file can still be downloaded.']);
+    stats('timestats', [['New points', out.length], ['Elevation', hasEle ? 'interpolated from A to B' : 'none']]);
+  }
+  msgs('timemsgs', m);
+  S.timed = { pts: out, routeLen: D, key: JSON.stringify(S.verts) };
+  refresh();
+}
+
+// ---------- step 5: review + export ----------
+function refresh() {
+  $('undobtn').disabled = !S.history.length;
+  $('clearbtn').disabled = !S.verts.length;
+  drawRepair();
+  showDist();
+  $('timebtn').disabled = !S.sel;
+  if (S.sel && !S.timed && $('timestats').innerHTML) {
+    msgs('timemsgs', [['info', 'The route has changed since the timestamps were calculated. Calculate them again before downloading.']]);
+    stats('timestats', []);
+  }
+  $('dlbtn').disabled = !S.timed;
+  if (!S.sel) { $('reviewstats').innerHTML = ''; return; }
+  const pts = S.segs[S.sel.s].pts;
+  const oldSec = pathLen(pts.slice(S.sel.a, S.sel.b + 1));
+  const newSec = pathLen(routePts());
+  const orig = totalDist();
+  stats('reviewstats', [
+    ['Section', `${fmtDist(oldSec)} → ${fmtDist(newSec)} (estimate)`],
+    ['Section time', pts[S.sel.a].time != null && pts[S.sel.b].time != null ? fmtDur((pts[S.sel.b].time - pts[S.sel.a].time) / 1000) : '–'],
+    ['Activity total', `${fmtDist(orig)} → ${fmtDist(orig - oldSec + newSec)}`],
+    ['Timestamps', S.timed ? 'calculated' : 'not yet calculated'],
+  ]);
+}
+
+function isoOut(ms) {
+  const s = new Date(ms).toISOString();
+  return S.timedFrac ? s : s.replace(/\.\d{3}Z$/, 'Z');
+}
+
+$('dlbtn').onclick = () => {
+  if (!S.timed) return;
+  // work on a fresh parse of the untouched original text, so the original stays as it was
+  const doc = new DOMParser().parseFromString(S.srcText, 'application/xml');
+  const seg = S.segs[S.sel.s];
+  const trk = kids(doc.documentElement, 'trk')[seg.trk];
+  const trkseg = kids(trk, 'trkseg')[seg.seg];
+  const tps = kids(trkseg, 'trkpt');
+  const A = tps[S.sel.a], B = tps[S.sel.b];
+  // remove recorded points strictly between A and B (and the whitespace between them)
+  let n = A.nextSibling;
+  while (n && n !== B) { const next = n.nextSibling; trkseg.removeChild(n); n = next; }
+  // indentation copied from the original, if any
+  const ws = A.previousSibling && A.previousSibling.nodeType === 3 ? A.previousSibling.textContent : '\n';
+  const ns = A.namespaceURI, pre = A.prefix ? A.prefix + ':' : '';
+  const mk = (name, text) => { const e = doc.createElementNS(ns, pre + name); if (text != null) e.textContent = text; return e; };
+  const frag = doc.createDocumentFragment();
+  frag.appendChild(doc.createTextNode(ws));
+  frag.appendChild(doc.createComment(` GPS Fixer: ${S.timed.pts.length} reconstructed points drawn by hand; timestamps estimated by distance `));
+  S.timed.pts.forEach(p => {
+    frag.appendChild(doc.createTextNode(ws));
+    const tp = mk('trkpt');
+    tp.setAttribute('lat', p.lat.toFixed(7));
+    tp.setAttribute('lon', p.lon.toFixed(7));
+    if (p.ele != null) tp.appendChild(mk('ele', p.ele.toFixed(1)));
+    if (p.time != null) tp.appendChild(mk('time', isoOut(p.time)));
+    frag.appendChild(tp);
+  });
+  frag.appendChild(doc.createTextNode(ws));
+  trkseg.insertBefore(frag, B);
+
+  let xml = new XMLSerializer().serializeToString(doc);
+  if (!/^<\?xml/.test(xml)) xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + xml;
+  // sanity check before handing it over
+  const check = new DOMParser().parseFromString(xml, 'application/xml');
+  if (check.getElementsByTagName('parsererror').length) {
+    return msgs('timemsgs', [['err', 'Something went wrong building the file (it would not be valid XML). Nothing was downloaded.']]);
+  }
+  const blob = new Blob([xml], { type: 'application/gpx+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = S.fileName.replace(/\.gpx$/i, '') + '-repaired.gpx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
+hint('Open a GPX file to start');
+</script>
+</body>
+</html>
