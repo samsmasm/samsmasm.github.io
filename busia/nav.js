@@ -10,6 +10,7 @@ const STAGES = [
   { slug: 'conclusion', label: 'Conclusion',         num: 'C' },
   { slug: 'submit',     label: 'Submitting It',      num: 'B' },
   { slug: 'check',      label: 'Check Your Draft',  num: '✓' },
+  { slug: 'examiners',  label: 'What Examiners Say', num: 'E' },
   { slug: 'sample',     label: 'Sample IA',         num: 'S' },
   { slug: 'faq',        label: 'FAQ',               num: '?' },
   { slug: 'team',       label: 'Team Work',         num: 'T' },
