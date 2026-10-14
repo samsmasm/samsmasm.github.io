@@ -152,7 +152,7 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
     tiles (OpenMapTiles schema), `transportation` layer at z14, URL from
     the TileJSON at tiles.openfreemap.org/planet. CDN, CORS, about 0.5 to
     2 s per tile, cached per tile for the session; 6 parallel fetches,
-    3 tries each. Limit 64 tiles (about 15 km across). Small MVT decoder
+    3 tries each. Limit 64 tiles (about 15 km across; round 3 adds z13 for bigger). Small MVT decoder
     inline (`decodeMVT`), no library. Overpass was dropped because the
     public servers were overloaded (random 406/504; a 39 km² query took
     100 s on the mail.ru mirror), so big drawings failed.
@@ -190,6 +190,40 @@ map tiles and conventions. Lives at `/mapping/mapic/`.
     dragging is the fix.
 -   Testing note: headless Chrome hangs on exit while the beforeunload
     warning is armed; strip it in test copies.
+
+## Implementation (round 3, 2026-10-14)
+
+-   Drawing model: `S.lines`, pieces of LatLngs. A stroke joins on to any
+    piece whose end is within 40 px of either of its ends (and can bridge
+    two pieces); otherwise it is a new piece. `chain()` links pieces end to
+    nearest end for routing; the joins show as dotted gaps and a message.
+    When the two ends nearly meet, a "Make it a loop" button appears.
+-   Adjust mode (third mode button): dashed box with handles to move
+    (middle), resize (corners), stretch sideways / up-down (sides) and
+    rotate (dot above). Each drag transforms the drawing as it was at drag
+    start, in layer pixels. Stretch is along screen axes.
+-   Live re-snap while dragging anything (`liveSnap`, 30 ms throttle;
+    `held` stops render() rebuilding the handle being dragged). A graph is
+    reused while its tiles cover the drawing.
+-   Route dragging: `S.vias` = [{ ll, at }]. In Pan mode a ghost dot
+    follows the mouse along the route; dragging it makes a via. On touch,
+    tap the route to make a dot, then drag it. `at` is the drawing point
+    the via belongs to; snapping replaces ordinary anchors within 0.9 A of
+    it and protects via nodes from detour removal. Click a via to remove.
+    Vias move with the drawing in Adjust mode and are in undo.
+-   Loops: "Choose the start" then click the loop; the drawing is turned
+    round to start there (pieces merge into one). "Reverse direction"
+    keeps the start. A green S marks the route start; GPX starts there.
+-   Distance badge on the map (route and drawing), always live.
+-   Big drawings: over 64 z14 tiles, z13 tiles are used (still has paths
+    and service roads, coarser geometry; weld and edge tolerance scaled).
+    Limit about 30 km across.
+-   Spurs: anchors with no node within 3 D are skipped (in empty country
+    they forced long out-and-backs), and `dropSpurs` removes any pure
+    out-and-back unless it reaches a via or the drawing itself U-turns or
+    ends there. Small Wellington heart: route 5.9 km to 4.5 km, fit
+    better. A 20 km Christchurch circle: doubled-back distance 16 km to
+    0.2 km. Raising D's 120 m cap for big drawings made fit worse; left.
 
 ## Decisions
 

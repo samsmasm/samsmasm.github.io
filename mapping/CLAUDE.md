@@ -7,7 +7,7 @@ A small suite of browser-only map tools. Set up 2026-10-13.
   plain text marked "Coming", not linked.
 - `gpsfixer/`: GPS Fixer (live). Read its CLAUDE.md.
 - `mapic/`: Mapic, draw or trace a picture and snap it to roads (rounds 1
-  and 2 live). Listed on /tools (Document utilities) and /find. Read its
+  to 3 live). Listed on /tools (Document utilities) and /find. Read its
   CLAUDE.md.
 - Longcut (`/longcut`) is a related map tool but stays where it is; the
   hub lists it under "Elsewhere on unisam.nz".

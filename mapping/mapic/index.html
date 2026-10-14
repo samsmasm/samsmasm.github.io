@@ -106,6 +106,17 @@ footer p{margin-bottom:6px}
 .ih.rot{border-radius:50%;background:var(--img)}
 .vtx{background:var(--line);border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--line)}
 .vtx.start{background:#fff;border:3px solid var(--line);box-shadow:none}
+.via{background:#fff;border:3px solid var(--route);border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.via.ghost{opacity:.85;cursor:grab}
+.startflag{background:var(--route);border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 1.5px var(--route);color:#fff;font:700 10px/16px sans-serif;text-align:center}
+.sh{background:#fff;border:2.5px solid var(--accent);border-radius:3px}
+.sh.move{border-radius:50%;background:var(--accent);border-color:#fff;box-shadow:0 0 0 1.5px var(--accent);cursor:move}
+.sh.rot{border-radius:50%;background:var(--accent-border)}
+#distbadge{position:absolute;left:10px;bottom:22px;z-index:500;pointer-events:none;background:#fff;border:1px solid var(--accent-border);border-radius:8px;padding:4px 10px;font-size:12.5px;color:var(--muted);display:none}
+#distbadge b{font:400 17px Georgia,serif;font-variant-numeric:tabular-nums}
+#distbadge b.r{color:var(--route)}
+#distbadge b.d{color:var(--line)}
+.msg .btn{margin-top:6px;font-size:12px;padding:3px 9px}
 @media (max-width:760px){
   #wrap{flex-direction:column-reverse}
   #panel{width:auto;min-width:0;border-right:none;border-top:1px solid var(--rule);flex:1}
@@ -159,10 +170,12 @@ footer p{margin-bottom:6px}
     <div class="row" style="margin-top:0">
       <button class="btn" id="drawbtn">Draw</button>
       <button class="btn" id="panbtn">Pan</button>
+      <button class="btn" id="adjbtn">Adjust</button>
     </div>
     <ul style="margin-top:8px">
-      <li>In Draw mode, draw with a mouse, finger or pen. Each new stroke joins on to the end of the line (or the start, if you begin near it).</li>
+      <li>In Draw mode, draw with a mouse, finger or pen. You can use several strokes: a stroke that starts or ends near the end of another joins on to it.</li>
       <li>In Pan mode, drag a pink dot to move it, or click it to remove it.</li>
+      <li>In Adjust mode, move, resize, stretch or rotate the whole drawing. The route follows as you drag.</li>
       <li>Undo and redo: top right of the map, or Ctrl+Z / Ctrl+Y.</li>
     </ul>
     <label class="chk"><input type="checkbox" id="closedchk"> Closed shape (join the end back to the start)</label>
@@ -184,6 +197,16 @@ footer p{margin-bottom:6px}
     <div id="snapmsgs"></div>
     <div class="big route" id="routedist"></div>
     <dl class="stats" id="routestats" hidden></dl>
+    <div id="routehelp" hidden>
+      <ul style="margin-top:8px">
+        <li>Not the road you wanted? In Pan mode, drag the green route onto another road (on a touchscreen, tap the route first, then drag the dot). Click a green dot to remove it.</li>
+      </ul>
+      <div class="row">
+        <button class="btn" id="startbtn">Choose the start</button>
+        <button class="btn" id="revbtn">Reverse direction</button>
+        <button class="btn" id="viaclearbtn">Remove my changes to the route</button>
+      </div>
+    </div>
     <label class="chk"><input type="checkbox" id="showdrawchk" checked> Show my drawing</label>
     <div class="legend">
       <span><i style="border-color:var(--line)"></i>Your drawing</span>
@@ -202,7 +225,7 @@ footer p{margin-bottom:6px}
     <p>Map data © OpenStreetMap contributors, tiles © CARTO, road data via OpenFreeMap / OpenMapTiles. Built by Sam G · all vibe coded.</p>
   </footer>
 </div>
-<div id="mapwrap"><div id="map"></div><div id="maphint"></div></div>
+<div id="mapwrap"><div id="map"></div><div id="maphint"></div><div id="distbadge"></div></div>
 </div>
 
 <script>
@@ -214,11 +237,15 @@ const store = {
 };
 
 // ---------- state ----------
-// pts: the drawing, an array of L.LatLng. Point objects are never mutated (always replaced),
-// and S.img is replaced rather than edited, so undo snapshots can share them.
+// lines: the drawing, as pieces (arrays of L.LatLng). Strokes whose ends meet are joined into one
+// piece; separate pieces are chained by their nearest ends when routing. Arrays and point objects
+// are never mutated (always replaced), and neither is S.img, so undo snapshots can share them.
+// vias: points the user dragged the route to, [{ ll, at }]: ll is where the route must go, at is
+// the point on the drawing it belongs to (which orders it along the route).
 // img: { url, nw, nh, c (centre LatLng), wm (width in metres), rot (degrees clockwise) }
-const S = { pts: [], closed: false, img: null, mode: 'draw', undo: [], redo: [] };
+const S = { lines: [], closed: false, vias: [], img: null, mode: 'draw', undo: [], redo: [] };
 let imgOpacity = 0.5, imgLocked = false;
+let picking = false; // waiting for a click on the loop to set the start
 
 // ---------- map ----------
 // key is public by nature (tile URLs are visible); restrict it to unisam.nz in the CARTO dashboard
@@ -244,13 +271,17 @@ const routeLine = L.polyline([], { color: getCss('--route'), weight: 5, interact
 const casing = L.polyline([], { color: '#fff', weight: 8, opacity: .9, interactive: false }).addTo(map);
 const line = L.polyline([], { color: getCss('--line'), weight: 4, interactive: false }).addTo(map);
 const stroke = L.polyline([], { color: getCss('--line'), weight: 3, opacity: .7, dashArray: '4 6', interactive: false }).addTo(map);
+const gapLine = L.polyline([], { color: getCss('--line'), weight: 2, opacity: .8, dashArray: '2 6', interactive: false }).addTo(map);
 const vtxLayer = L.layerGroup().addTo(map);
+const viaLayer = L.layerGroup().addTo(map);
+const shapeLayer = L.layerGroup().addTo(map);
 const imgHandleLayer = L.layerGroup().addTo(map);
 
 const MapCtl = L.Control.extend({
   onAdd() {
     const d = L.DomUtil.create('div', 'mapctl');
-    d.innerHTML = '<button id="mdraw" title="Draw on the map">Draw</button><button id="mpan" title="Move the map">Pan</button><span class="gap"></span>' +
+    d.innerHTML = '<button id="mdraw" title="Draw on the map">Draw</button><button id="mpan" title="Move the map, edit points and the route">Pan</button>' +
+      '<button id="madj" title="Move, resize, stretch or rotate the drawing">Adjust</button><span class="gap"></span>' +
       '<button id="undobtn" title="Undo (Ctrl+Z)" disabled>Undo</button><button id="redobtn" title="Redo (Ctrl+Y)" disabled>Redo</button>';
     L.DomEvent.disableClickPropagation(d);
     return d;
@@ -265,7 +296,7 @@ const mpp = (lat, zoom) => 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 *
 function fmtDist(m) { return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km'; }
 
 // ---------- undo / redo (drawing and image placement together) ----------
-const snapshot = () => ({ pts: S.pts.slice(), closed: S.closed, img: S.img });
+const snapshot = () => ({ lines: S.lines, closed: S.closed, vias: S.vias, img: S.img });
 function record() {
   // call before every change
   S.undo.push(snapshot());
@@ -273,8 +304,9 @@ function record() {
   S.redo = [];
 }
 function restore(snap) {
-  S.pts = snap.pts.slice();
+  S.lines = snap.lines;
   S.closed = snap.closed;
+  S.vias = snap.vias;
   S.img = snap.img;
   render();
 }
@@ -288,12 +320,13 @@ document.addEventListener('keydown', e => {
   if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
 });
-window.addEventListener('beforeunload', e => { if (S.pts.length) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (S.lines.length) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- modes ----------
 function setMode(m) {
   S.mode = m;
   cancelStroke();
+  picking = false;
   const c = map.getContainer();
   if (m === 'draw') { map.dragging.disable(); map.doubleClickZoom.disable(); c.classList.add('drawing'); }
   else { map.dragging.enable(); map.doubleClickZoom.enable(); c.classList.remove('drawing'); }
@@ -301,6 +334,7 @@ function setMode(m) {
 }
 $('drawbtn').onclick = $('mdraw').onclick = () => setMode('draw');
 $('panbtn').onclick = $('mpan').onclick = () => setMode('pan');
+$('adjbtn').onclick = $('madj').onclick = () => setMode('adjust');
 
 // ---------- trace image ----------
 function imgGeom(zoom) {
@@ -467,45 +501,170 @@ function endPointer(e) {
 container.addEventListener('pointerup', endPointer);
 container.addEventListener('pointercancel', endPointer);
 
+// A stroke joins on to a piece whose end is near either of its own ends (within JOIN px), and can
+// bridge two pieces. Otherwise it starts a new piece.
+const JOIN = 40;
+const rev = a => a.slice().reverse();
 function addStroke(ll) {
   record();
-  if (!S.pts.length) S.pts = ll;
-  else {
-    // join on to whichever end the stroke starts nearer (the start only if it is close)
-    const p0 = map.latLngToContainerPoint(ll[0]);
-    const dStart = p0.distanceTo(map.latLngToContainerPoint(S.pts[0]));
-    const dEnd = p0.distanceTo(map.latLngToContainerPoint(S.pts[S.pts.length - 1]));
-    S.pts = dStart < dEnd && dStart < 40 ? ll.slice().reverse().concat(S.pts) : S.pts.concat(ll);
+  const px = q => map.latLngToContainerPoint(q);
+  let lines = S.lines.slice(), cur = ll, at = lines.length;
+  for (;;) {
+    let best = null;
+    lines.forEach((l, i) => {
+      for (const ce of [0, 1]) for (const le of [0, 1]) {
+        const d = px(ce ? cur[cur.length - 1] : cur[0]).distanceTo(px(le ? l[l.length - 1] : l[0]));
+        if (d < JOIN && (!best || d < best.d)) best = { i, ce, le, d };
+      }
+    });
+    if (!best) break;
+    const l = lines[best.i];
+    lines.splice(best.i, 1);
+    at = Math.min(at, best.i);
+    // keep the existing piece's direction
+    cur = best.le ? l.concat(best.ce ? rev(cur) : cur) : (best.ce ? cur : rev(cur)).concat(l);
   }
+  lines.splice(Math.min(at, lines.length), 0, cur);
+  S.lines = lines;
   render();
+}
+
+// The drawing as one path: pieces chained end to nearest end, starting with the first piece.
+// gaps lists the indices i where the step from i - 1 to i jumps between pieces.
+let chainCache = null;
+function chain() {
+  if (chainCache && chainCache.lines === S.lines) return chainCache;
+  let pts = S.lines.length ? S.lines[0].slice() : [];
+  const gaps = [], rest = S.lines.slice(1);
+  while (rest.length) {
+    const end = pts[pts.length - 1];
+    let bi = 0, flip = false, bd = Infinity;
+    rest.forEach((l, i) => {
+      const d1 = end.distanceTo(l[0]), d2 = end.distanceTo(l[l.length - 1]);
+      if (d1 < bd) { bd = d1; bi = i; flip = false; }
+      if (d2 < bd) { bd = d2; bi = i; flip = true; }
+    });
+    const l = rest.splice(bi, 1)[0];
+    gaps.push(pts.length);
+    pts = pts.concat(flip ? rev(l) : l);
+  }
+  return (chainCache = { lines: S.lines, pts, gaps });
+}
+const nPts = () => S.lines.reduce((n, l) => n + l.length, 0);
+
+// Nearest point on a path of [x, y] (metres): segment i (from P[i] to P[i + 1]), fraction t,
+// the point itself, its distance d, and s, how far along the path it is.
+function project(P, x, y) {
+  let best = null, s = 0;
+  for (let i = 0; i + 1 < P.length; i++) {
+    const a = P[i], b = P[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy, len = Math.sqrt(L2);
+    const t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)) : 0;
+    const d = Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+    if (!best || d < best.d) best = { i, t, d, x: a[0] + t * dx, y: a[1] + t * dy, s: s + t * len };
+    s += len;
+  }
+  return best;
+}
+// local metres around a point, for projecting LatLngs
+function localXY(ref) {
+  const kx = 111320 * Math.cos(ref.lat * Math.PI / 180), ky = 110540;
+  return { xy: ll => [(ll.lng - ref.lng) * kx, (ll.lat - ref.lat) * ky], ll: (x, y) => L.latLng(ref.lat + y / ky, ref.lng + x / kx) };
 }
 
 // ---------- drawing display and point editing ----------
 const MAX_HANDLES = 600;
-function drawnPath() { return S.closed && S.pts.length > 2 ? S.pts.concat([S.pts[0]]) : S.pts; }
+let held = false; // a handle is being dragged: don't rebuild the handles under it
+function drawnPath() { const p = chain().pts; return S.closed && p.length > 2 ? p.concat([p[0]]) : p; }
 function renderLine() {
-  const p = $('showdrawchk').checked ? drawnPath() : [];
-  line.setLatLngs(p);
-  casing.setLatLngs(p);
+  const show = $('showdrawchk').checked, c = chain();
+  const parts = S.lines.slice();
+  if (S.closed && c.pts.length > 2) parts.push([c.pts[c.pts.length - 1], c.pts[0]]);
+  line.setLatLngs(show ? parts : []);
+  casing.setLatLngs(show ? parts : []);
+  gapLine.setLatLngs(show ? c.gaps.map(i => [c.pts[i - 1], c.pts[i]]) : []);
   // once there is a route, the drawing steps back to a thin dashed guide
   const quiet = !!route;
   line.setStyle({ weight: quiet ? 3 : 4, dashArray: quiet ? '6 6' : null, opacity: quiet ? .8 : 1 });
   casing.setStyle({ opacity: quiet ? 0 : .9 });
 }
 function renderVertices() {
+  if (held) return;
   vtxLayer.clearLayers();
-  if (S.mode !== 'pan' || S.pts.length > MAX_HANDLES) return;
-  S.pts.forEach((ll, i) => {
+  if (S.mode !== 'pan' || nPts() > MAX_HANDLES || picking) return;
+  S.lines.forEach((l, li) => l.forEach((ll, i) => {
+    const start = li === 0 && i === 0;
     const m = L.marker(ll, {
-      icon: L.divIcon({ className: i === 0 ? 'vtx start' : 'vtx', iconSize: i === 0 ? [14, 14] : [11, 11] }),
-      draggable: true, title: i === 0 ? 'Start. Drag to move, click to remove' : 'Drag to move, click to remove',
+      icon: L.divIcon({ className: start ? 'vtx start' : 'vtx', iconSize: start ? [14, 14] : [11, 11] }),
+      draggable: true, title: start ? 'Start. Drag to move, click to remove' : 'Drag to move, click to remove',
     }).addTo(vtxLayer);
-    m.on('dragstart', record);
-    m.on('drag', () => { S.pts[i] = m.getLatLng(); renderLine(); renderStats(); });
-    m.on('dragend', render);
-    m.on('click', () => { record(); S.pts.splice(i, 1); render(); });
-  });
+    m.on('dragstart', () => { record(); held = true; });
+    m.on('drag', () => {
+      const nl = S.lines[li].slice();
+      nl[i] = m.getLatLng();
+      S.lines = S.lines.map((x, k) => k === li ? nl : x);
+      renderLine(); renderStats(); liveSnap();
+    });
+    m.on('dragend', () => { held = false; render(); });
+    m.on('click', () => {
+      record();
+      const nl = S.lines[li].filter((_, k) => k !== i);
+      S.lines = nl.length > 1 ? S.lines.map((x, k) => k === li ? nl : x) : S.lines.filter((_, k) => k !== li);
+      render();
+    });
+  }));
 }
+
+// Adjust mode: a box round the drawing with handles to move (middle), resize (corners),
+// stretch (sides) and rotate (above the top). Each drag transforms the drawing as it was when the
+// drag began, in layer pixels, so nothing drifts.
+const shIcon = (cls, n) => L.divIcon({ className: 'sh ' + cls, iconSize: [n, n] });
+function renderShape() {
+  if (held) return;
+  shapeLayer.clearLayers();
+  if (S.mode !== 'adjust' || nPts() < 2) return;
+  const P = S.lines.flat().map(q => map.latLngToLayerPoint(q));
+  const b = L.bounds(P), c = b.getCenter(), lo = b.min, hi = b.max;
+  const at = (x, y) => map.layerPointToLatLng(L.point(x, y));
+  const box = L.polygon([], { color: getCss('--accent'), weight: 1.5, dashArray: '5 5', fill: false, interactive: false }).addTo(shapeLayer);
+  const rect = [[lo.x, lo.y], [hi.x, lo.y], [hi.x, hi.y], [lo.x, hi.y]];
+  box.setLatLngs(rect.map(([x, y]) => at(x, y)));
+  const handles = [
+    ['move', c.x, c.y, 'Drag to move the drawing'],
+    ...rect.map(([x, y]) => ['scale', x, y, 'Drag to resize']),
+    ['sx', hi.x, c.y, 'Drag to stretch sideways'], ['sx', lo.x, c.y, 'Drag to stretch sideways'],
+    ['sy', c.x, lo.y, 'Drag to stretch up and down'], ['sy', c.x, hi.y, 'Drag to stretch up and down'],
+    ['rot', c.x, lo.y - 30, 'Drag to rotate'],
+  ];
+  for (const [kind, x, y, title] of handles) {
+    const m = L.marker(at(x, y), { icon: shIcon(kind === 'move' ? 'move' : kind === 'rot' ? 'rot' : '', kind === 'move' ? 20 : 13), draggable: true, title }).addTo(shapeLayer);
+    let base = null;
+    m.on('dragstart', () => {
+      record();
+      held = true;
+      const lp = q => map.latLngToLayerPoint(q);
+      base = { q0: L.point(x, y), lines: S.lines.map(l => l.map(lp)), vias: S.vias.map(v => [lp(v.ll), lp(v.at)]) };
+    });
+    m.on('drag', () => {
+      const q = map.latLngToLayerPoint(m.getLatLng()), q0 = base.q0;
+      let f;
+      if (kind === 'move') f = p => p.add(q.subtract(q0));
+      else if (kind === 'scale') { const k = Math.max(.05, q.distanceTo(c) / (q0.distanceTo(c) || 1)); f = p => c.add(p.subtract(c).multiplyBy(k)); }
+      else if (kind === 'sx') { const k = Math.max(.05, (q.x - c.x) / (q0.x - c.x || 1)); f = p => L.point(c.x + (p.x - c.x) * k, p.y); }
+      else if (kind === 'sy') { const k = Math.max(.05, (q.y - c.y) / (q0.y - c.y || 1)); f = p => L.point(p.x, c.y + (p.y - c.y) * k); }
+      else {
+        const a = Math.atan2(q.y - c.y, q.x - c.x) - Math.atan2(q0.y - c.y, q0.x - c.x), co = Math.cos(a), si = Math.sin(a);
+        f = p => L.point(c.x + (p.x - c.x) * co - (p.y - c.y) * si, c.y + (p.x - c.x) * si + (p.y - c.y) * co);
+      }
+      const ll = p => map.layerPointToLatLng(f(p));
+      S.lines = base.lines.map(l => l.map(ll));
+      S.vias = base.vias.map(([a, b]) => ({ ll: ll(a), at: ll(b) }));
+      box.setLatLngs(rect.map(([x, y]) => ll(L.point(x, y))));
+      renderLine(); renderStats(); renderVias(); liveSnap();
+    });
+    m.on('dragend', () => { held = false; render(); });
+  }
+}
+
 function lengthM() {
   const p = drawnPath();
   let d = 0;
@@ -513,49 +672,76 @@ function lengthM() {
   return d;
 }
 function renderStats() {
-  $('dist').textContent = S.pts.length > 1 ? fmtDist(lengthM()) : '–';
+  const n = nPts();
+  $('dist').textContent = n > 1 ? fmtDist(lengthM()) : '–';
   const dl = $('drawstats');
-  dl.hidden = !S.pts.length;
-  dl.innerHTML = S.pts.length ? `<dt>Points</dt><dd>${S.pts.length}</dd><dt>Shape</dt><dd>${S.closed ? 'closed loop' : 'open line'}</dd>` : '';
+  dl.hidden = !n;
+  dl.innerHTML = n ? `<dt>Points</dt><dd>${n}</dd><dt>Shape</dt><dd>${S.closed ? 'closed loop' : 'open line'}${S.lines.length > 1 ? ', ' + S.lines.length + ' pieces' : ''}</dd>` : '';
+  renderBadge();
+}
+function renderBadge() {
+  const b = $('distbadge'), n = nPts();
+  const r = route && route.latlngs.length > 1 ? `Route <b class="r">${fmtDist(route.len)}</b>` : '';
+  const d = n > 1 ? `Drawing <b class="d">${fmtDist(lengthM())}</b>` : '';
+  b.innerHTML = [r, d].filter(Boolean).join(' &nbsp; ');
+  b.style.display = r || d ? 'block' : 'none';
+}
+
+// a message about the drawing, with an optional button
+function drawWarnings() {
+  const out = [], c = chain(), n = nPts();
+  if (S.mode === 'pan' && n > MAX_HANDLES) out.push(['warn', `This drawing has ${n} points, too many to show as dots. Undo or clear to edit it.`]);
+  if (S.lines.length > 1) out.push(['warn', `Your drawing is in ${S.lines.length} pieces. The route joins them where the dotted lines are. To join two pieces, draw a stroke that starts or ends near the end of one.`]);
+  if (!S.closed && c.pts.length > 2) {
+    const a = c.pts[0], z = c.pts[c.pts.length - 1];
+    const size = L.latLngBounds(c.pts).getNorthWest().distanceTo(L.latLngBounds(c.pts).getSouthEast());
+    if (a.distanceTo(z) < Math.max(30, size * .1)) out.push(['warn', 'The two ends nearly meet. <button class="btn" id="loopbtn">Make it a loop</button>']);
+  }
+  msgs('drawmsgs', out);
+  if ($('loopbtn')) $('loopbtn').onclick = () => { record(); S.closed = true; render(); };
 }
 
 function render() {
   renderLine();
   renderVertices();
+  renderShape();
   renderImg();
   renderImgHandles();
   renderStats();
-  const draw = S.mode === 'draw';
-  for (const id of ['drawbtn', 'mdraw']) $(id).classList.toggle('on', draw);
-  for (const id of ['panbtn', 'mpan']) $(id).classList.toggle('on', !draw);
+  const n = nPts(), mode = S.mode;
+  for (const [a, b, m] of [['drawbtn', 'mdraw', 'draw'], ['panbtn', 'mpan', 'pan'], ['adjbtn', 'madj', 'adjust']])
+    for (const id of [a, b]) $(id).classList.toggle('on', mode === m);
   $('undobtn').disabled = !S.undo.length;
   $('redobtn').disabled = !S.redo.length;
-  $('clearbtn').disabled = !S.pts.length;
+  $('clearbtn').disabled = !n;
   $('closedchk').checked = S.closed;
   $('imgctl').hidden = !S.img;
   $('opacity').value = imgOpacity;
   $('imghelp').style.display = imgLocked ? 'none' : '';
-  msgs('drawmsgs', !draw && S.pts.length > MAX_HANDLES
-    ? [['warn', `This drawing has ${S.pts.length} points, too many to show as dots. Undo or clear to edit it.`]] : []);
-  $('snapbtn').disabled = S.pts.length < 2 || roadsLoading;
+  drawWarnings();
+  $('snapbtn').disabled = n < 2 || roadsLoading;
   renderRoute();
-  if (draw && !S.pts.length) hint('Draw with a mouse, finger or pen. Use Pan to move the map.');
-  else if (draw) hint('Keep drawing to extend the line.');
+  if (picking) hint('Click the loop where the route should start and finish.');
+  else if (mode === 'draw' && !n) hint('Draw with a mouse, finger or pen. Use Pan to move the map.');
+  else if (mode === 'draw') hint('Keep drawing. A stroke that starts or ends near an end joins on.');
+  else if (mode === 'adjust') hint(n > 1 ? 'Drag the middle to move, a corner to resize, a side to stretch, the top dot to rotate.' : 'Draw something first.');
   else if (S.img && !imgLocked) hint('Drag the image to move it. Lock it when it is in place.');
   else hint('');
 }
 $('closedchk').onchange = e => { record(); S.closed = e.target.checked; render(); };
-$('clearbtn').onclick = () => { record(); S.pts = []; render(); };
+$('clearbtn').onclick = () => { record(); S.lines = []; S.vias = []; render(); };
+map.on('zoomend', () => { if (!held) { renderShape(); } });
 
 // ---------- road data (OpenFreeMap vector tiles) ----------
 // Roads come from the transportation layer of OpenFreeMap's OpenMapTiles vector tiles at z14
-// (about 2 km square), fetched from their CDN and cached per tile for the session.
+// (about 2 km square), fetched from their CDN and cached per tile for the session. Drawings too
+// big for MAX_TILES of those use z13 tiles (4 km square, a little less detail) instead.
 // Public Overpass servers were too slow and unreliable for anything but small areas.
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
 const TZ = 14, EXT = 4096, WORLD = Math.pow(2, TZ) * EXT; // global coordinates are z14 tile units
 const MAX_TILES = 64;
 let tileUrl = null;
-const tiles = new Map();  // 'x/y' -> [{ props, pieces: [[[gx, gy, edge], ...]] }]
+const tiles = new Map();  // 'z/x/y' -> [{ props, pieces: [[[gx, gy, edge], ...]] }]
 let roadsLoading = false;
 let G = null;             // graph built from a set of tiles for one profile
 let route = null;         // { sig, latlngs, len, fit, wrongWay }
@@ -569,12 +755,12 @@ function bboxOf(pts, padMin, padFrac) {
   const pad = Math.max(padMin, padFrac * Math.max((n - s) * ky, (e - w) * kx));
   return [s - pad / ky, w - pad / kx, n + pad / ky, e + pad / kx];
 }
-function tilesFor(b) {
-  const n = Math.pow(2, TZ);
+function tilesFor(b, z) {
+  const n = Math.pow(2, z);
   const tx = lon => Math.floor((lon + 180) / 360 * n);
   const ty = lat => Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n);
   const keys = [];
-  for (let x = tx(b[1]); x <= tx(b[3]); x++) for (let y = ty(b[2]); y <= ty(b[0]); y++) keys.push(x + '/' + y);
+  for (let x = tx(b[1]); x <= tx(b[3]); x++) for (let y = ty(b[2]); y <= ty(b[0]); y++) keys.push(z + '/' + x + '/' + y);
   return keys;
 }
 
@@ -649,8 +835,9 @@ function decodeMVT(buf, want) {
 // Clip a tile's lines to the tile itself (dropping the buffer, which the next tile covers) and
 // convert to global units. Points on the tile edge are flagged (1 = vertical edge, 2 = horizontal)
 // so the graph can weld them to the matching point from the neighbouring tile.
-function tileFeatures(buf, tx, ty) {
-  const d = decodeMVT(buf, 'transportation'), k = EXT / d.extent, ox = tx * EXT, oy = ty * EXT;
+function tileFeatures(buf, z, tx, ty) {
+  const T = EXT * Math.pow(2, TZ - z); // tile size in global units
+  const d = decodeMVT(buf, 'transportation'), k = T / d.extent, ox = tx * T, oy = ty * T;
   const feats = [];
   for (const f of d.features) {
     const pieces = [];
@@ -658,7 +845,7 @@ function tileFeatures(buf, tx, ty) {
       let cur = null;
       for (let i = 1; i < line.length; i++) {
         const x0 = line[i - 1][0] * k, y0 = line[i - 1][1] * k, x1 = line[i][0] * k, y1 = line[i][1] * k;
-        const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0, EXT - x0, y0, EXT - y0];
+        const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0, T - x0, y0, T - y0];
         let t0 = 0, t1 = 1, ok = true;
         for (let j = 0; j < 4 && ok; j++) {
           if (P[j] === 0) { if (Q[j] < 0) ok = false; continue; }
@@ -669,9 +856,9 @@ function tileFeatures(buf, tx, ty) {
         if (!ok || t1 - t0 < 1e-9) { cur = null; continue; }
         const pt = t => {
           let x = t === 0 ? x0 : t === 1 ? x1 : x0 + dx * t, y = t === 0 ? y0 : t === 1 ? y1 : y0 + dy * t;
-          if (Math.abs(x) < 1e-6) x = 0; else if (Math.abs(x - EXT) < 1e-6) x = EXT;
-          if (Math.abs(y) < 1e-6) y = 0; else if (Math.abs(y - EXT) < 1e-6) y = EXT;
-          return [ox + x, oy + y, x === 0 || x === EXT ? 1 : y === 0 || y === EXT ? 2 : 0];
+          if (Math.abs(x) < 1e-6) x = 0; else if (Math.abs(x - T) < 1e-6) x = T;
+          if (Math.abs(y) < 1e-6) y = 0; else if (Math.abs(y - T) < 1e-6) y = T;
+          return [ox + x, oy + y, x === 0 || x === T ? 1 : y === 0 || y === T ? 2 : 0];
         };
         if (!cur || t0 > 0) { cur = [pt(t0)]; pieces.push(cur); }
         cur.push(pt(t1));
@@ -693,14 +880,14 @@ async function loadTiles(keys, progress) {
   let done = 0;
   progress(done, todo.length);
   const one = async key => {
-    const [x, y] = key.split('/').map(Number);
-    const url = tileUrl.replace('{z}', TZ).replace('{x}', x).replace('{y}', y);
+    const [z, x, y] = key.split('/').map(Number);
+    const url = tileUrl.replace('{z}', z).replace('{x}', x).replace('{y}', y);
     for (let attempt = 0; ; attempt++) {
       try {
         const res = await fetch(url);
         if (res.status === 204 || res.status === 404) { tiles.set(key, []); break; } // open sea
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        tiles.set(key, tileFeatures(await res.arrayBuffer(), x, y));
+        tiles.set(key, tileFeatures(await res.arrayBuffer(), z, x, y));
         break;
       } catch (err) { if (attempt >= 2) throw err; await new Promise(r => setTimeout(r, 800 * (attempt + 1))); }
     }
@@ -741,8 +928,9 @@ const gLon = gx => gx / WORLD * 360 - 180;
 const gLat = gy => Math.atan(Math.sinh(Math.PI * (1 - 2 * gy / WORLD))) * 180 / Math.PI;
 function buildGraph(keys, profile) {
   let sx = 0, sy = 0;
-  for (const k of keys) { const [x, y] = k.split('/').map(Number); sx += x + .5; sy += y + .5; }
-  const lat0 = gLat(sy / keys.length * EXT), lon0 = gLon(sx / keys.length * EXT);
+  const z = +keys[0].split('/')[0], sc = Math.pow(2, TZ - z); // z13 tiles: coordinates are coarser
+  for (const k of keys) { const [, x, y] = k.split('/').map(Number); sx += x + .5; sy += y + .5; }
+  const lat0 = gLat(sy / keys.length * EXT * sc), lon0 = gLon(sx / keys.length * EXT * sc);
   const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
   const idx = new Map(), X = [], Y = [], LAT = [], LON = [];
   const add = (key, gx, gy) => {
@@ -754,7 +942,7 @@ function buildGraph(keys, profile) {
     if (!edge) { const key = gx + ',' + gy, i = idx.get(key); return i === undefined ? add(key, gx, gy) : i; }
     // tile-edge point: the neighbouring tile's copy may differ by a fraction of a unit
     const fixed = edge === 1 ? gx : gy, r = Math.round(edge === 1 ? gy : gx), p = edge === 1 ? 'v' : 'h';
-    for (const dd of [0, -1, 1]) { const i = idx.get(p + fixed + ',' + (r + dd)); if (i !== undefined) return i; }
+    for (let k = 0; k <= 2 * sc; k++) { const dd = k & 1 ? (k + 1) / 2 : -k / 2, i = idx.get(p + fixed + ',' + (r + dd)); if (i !== undefined) return i; }
     return add(p + fixed + ',' + r, gx, gy);
   };
   // raw segments; lvl says which others they may join where lines cross (not bridges or tunnels)
@@ -775,7 +963,7 @@ function buildGraph(keys, profile) {
   // Noding. Tile lines are simplified, so many junctions have no shared point: lines cross with no
   // node, or a side street stops just short of (or on) the main road. Split segments where they
   // cross, and join dead ends to any segment within WELD metres.
-  const WELD = 3, NC = 25, ns = SA.length, sgrid = new Map();
+  const WELD = 3 * sc, NC = 25, ns = SA.length, sgrid = new Map();
   for (let i = 0; i < ns; i++) {
     const a = SA[i], b = SB[i];
     for (let gx = Math.floor(Math.min(X[a], X[b]) / NC); gx <= Math.floor(Math.max(X[a], X[b]) / NC); gx++)
@@ -870,7 +1058,7 @@ function buildGraph(keys, profile) {
     (grid.get(key) || grid.set(key, []).get(key)).push(i);
   }
   return {
-    profile, keys: keys.join(' '), n, m, lat0, lon0, kx, ky, X, Y, LAT, LON, first, out,
+    profile, z, keySet: new Set(keys), n, m, lat0, lon0, kx, ky, X, Y, LAT, LON, first, out,
     to: Int32Array.from(et), len: Float64Array.from(el), wrong: Uint8Array.from(ew),
     grid, CELL, g: new Float64Array(n), prev: new Int32Array(n), stamp: new Int32Array(n), done: new Int32Array(n), run: 0,
   };
@@ -970,8 +1158,9 @@ function astar(s, t, cost) {
 
 // Remove short detours that come back to where they left: out-and-back spurs (A, B, A) and
 // small loops (A, B, C, A), usually an anchor that snapped to a side street or the other side
-// of a divided road. Long ones stay, since they may be part of the picture.
-function dropDetours(path, maxLen) {
+// of a divided road. Long ones stay, since they may be part of the picture, and so does any detour
+// that reaches a point the user dragged the route to (keep).
+function dropDetours(path, maxLen, keep) {
   const d = (a, b) => Math.hypot(G.X[a] - G.X[b], G.Y[a] - G.Y[b]);
   for (let changed = true; changed;) {
     changed = false;
@@ -981,13 +1170,29 @@ function dropDetours(path, maxLen) {
     for (let i = 1; i < path.length; i++) cum.push(along += d(path[i - 1], path[i]));
     for (let i = 0; i < path.length; i++) {
       const j = seen.get(path[i]);
-      if (j !== undefined && cum[i] - cum[j] <= maxLen && !(j === 0 && i === path.length - 1)) {
+      if (j !== undefined && cum[i] - cum[j] <= maxLen && !(j === 0 && i === path.length - 1) &&
+          !path.slice(j + 1, i).some(v => keep.has(v))) {
         path.splice(j + 1, i - j);
         changed = true;
         break;
       }
       seen.set(path[i], i);
     }
+  }
+  return path;
+}
+
+// Remove out-and-back spurs (A ... B C B ... A, retracing the same nodes) unless they reach a via
+// point or the tip is somewhere the drawing turns back (wanted).
+function dropSpurs(path, keep, wanted) {
+  for (let i = 1; i + 1 < path.length; i++) {
+    if (path[i - 1] !== path[i + 1]) continue;
+    let k = 1;
+    while (i - k - 1 >= 0 && i + k + 1 < path.length && path[i - k - 1] === path[i + k + 1]) k++;
+    const span = path.slice(i - k + 1, i + 1);
+    if (span.some(v => keep.has(v)) || wanted(path[i])) continue;
+    path.splice(i - k + 1, 2 * k);
+    i = Math.max(0, i - k - 1);
   }
   return path;
 }
@@ -1013,30 +1218,64 @@ function snapRoute() {
     cost[e] = c * (G.wrong[e] ? WRONG_WAY : 1);
     cost[e + 1] = c * (G.wrong[e + 1] ? WRONG_WAY : 1);
   }
-  // anchors: every A metres along the drawing, plus sharp corners, plus the ends
-  const anchors = [P[0]];
-  let since = 0;
+  // anchors: every A metres along the drawing, plus sharp corners, plus the ends; s is the
+  // distance along the drawing
+  let anchors = [{ p: P[0], s: 0 }];
+  let since = 0, along = 0;
   for (let i = 1; i < P.length; i++) {
     const a = P[i - 1], b = P[i], seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
     let pos = A - since;
-    while (pos < seg) { anchors.push([a[0] + (b[0] - a[0]) * pos / seg, a[1] + (b[1] - a[1]) * pos / seg]); pos += A; }
+    while (pos < seg) { anchors.push({ p: [a[0] + (b[0] - a[0]) * pos / seg, a[1] + (b[1] - a[1]) * pos / seg], s: along + pos }); pos += A; }
     since = (since + seg) % A;
+    along += seg;
     if (i < P.length - 1) {
       const c = P[i + 1];
       const t1 = Math.atan2(b[1] - a[1], b[0] - a[0]), t2 = Math.atan2(c[1] - b[1], c[0] - b[0]);
       let turn = Math.abs(t2 - t1); if (turn > Math.PI) turn = 2 * Math.PI - turn;
-      if (turn > Math.PI / 3.5) { anchors.push(b); since = 0; }
-    } else anchors.push(b);
+      if (turn > Math.PI / 3.5) { anchors.push({ p: b, s: along }); since = 0; }
+    } else anchors.push({ p: b, s: along, end: true });
   }
-  const nodes = anchors.map(([x, y]) => nearestNode(x, y));
+  anchors[0].end = true;
+  // an anchor with no road near it (water, farmland) is skipped: forcing the route out to the
+  // nearest road and back makes long spurs. The edge costs still pull the route along the drawing.
+  let nodes = anchors.map(a => {
+    const v = nearestNode(a.p[0], a.p[1]);
+    return v >= 0 && (a.end || Math.hypot(G.X[v] - a.p[0], G.Y[v] - a.p[1]) <= 3 * D) ? v : -1;
+  });
+  // via points replace the ordinary anchors near them; they go in order of where they sit on the drawing
+  const keep = new Set();
+  if (S.vias.length) {
+    const vs = S.vias.map(v => {
+      const [ax, ay] = xy(v.at), [vx, vy] = xy(v.ll), pr = project(P, ax, ay);
+      return { s: Math.max(1e-3, Math.min(along - 1e-3, pr ? pr.s : 0)), node: nearestNode(vx, vy), via: true };
+    }).filter(v => v.node >= 0);
+    const near = a => !a.end && vs.some(v => Math.abs(v.s - a.s) < A * .9);
+    const list = anchors.map((a, i) => ({ s: a.s, node: nodes[i], drop: near(a) })).filter(a => !a.drop).concat(vs);
+    list.sort((a, b) => a.s - b.s);
+    nodes = list.map(a => a.node);
+    for (const v of vs) keep.add(v.node);
+  }
+  nodes = nodes.filter(v => v >= 0);
   let path = [];
   for (let i = 0; i < nodes.length; i++) {
-    if (i === 0 || nodes[i] === nodes[i - 1]) { if (!path.length) path.push(nodes[i]); continue; }
-    const leg = astar(nodes[i - 1], nodes[i], cost);
+    if (!path.length) { path.push(nodes[i]); continue; }
+    if (nodes[i] === path[path.length - 1]) continue;
+    const leg = astar(path[path.length - 1], nodes[i], cost);
     if (!leg) continue;
     path.push(...leg.slice(1));
   }
-  path = dropDetours(path, Math.max(A * 3, 6 * D));
+  path = dropDetours(path, Math.max(A * 3, 6 * D), keep);
+  // where the drawing itself doubles back (a sharp U-turn, or the end of an open line), an
+  // out-and-back in the route is part of the picture; anywhere else it goes, however long
+  const turns = [];
+  if (!S.closed) turns.push(P[0], P[P.length - 1]);
+  for (let i = 1; i + 1 < P.length; i++) {
+    const a = P[i - 1], b = P[i], c = P[i + 1];
+    const u = Math.atan2(b[1] - a[1], b[0] - a[0]), w = Math.atan2(c[1] - b[1], c[0] - b[0]);
+    let turn = Math.abs(w - u); if (turn > Math.PI) turn = 2 * Math.PI - turn;
+    if (turn > Math.PI * .75) turns.push(b);
+  }
+  path = dropSpurs(path, keep, v => turns.some(([x, y]) => Math.hypot(G.X[v] - x, G.Y[v] - y) < 3 * D));
   // which edges were used the wrong way
   let wrongWay = 0;
   for (let i = 1; i < path.length; i++) {
@@ -1060,15 +1299,19 @@ function snapRoute() {
   return { latlngs: path.map(v => L.latLng(G.LAT[v], G.LON[v])), len, fit: { mean, p95, capped: p95 >= cap - 1e-6, cap, rel: mean / (size || 1) }, wrongWay };
 }
 
-const sig = () => $('profile').value + '|' + (S.closed ? 1 : 0) + '|' + S.pts.map(p => p.lat.toFixed(6) + ',' + p.lng.toFixed(6)).join(';');
+const llKey = p => p.lat.toFixed(6) + ',' + p.lng.toFixed(6);
+const sig = () => $('profile').value + '|' + (S.closed ? 1 : 0) + '|' + S.lines.map(l => l.map(llKey).join(';')).join('/') +
+  '|' + S.vias.map(v => llKey(v.ll) + '@' + llKey(v.at)).join(';');
 function snapStatus(t) { $('snapstatus').textContent = t || ''; }
 
 async function doSnap(asked) {
   clearTimeout(snapTimer);
-  if (S.pts.length < 2 || roadsLoading) return;
-  const keys = tilesFor(bboxOf(drawnPath(), 300, .1));
+  if (nPts() < 2 || roadsLoading) return;
+  const b = bboxOf(drawnPath(), 300, .1);
+  let keys = tilesFor(b, 14);
+  if (keys.length > MAX_TILES) keys = tilesFor(b, 13);
   if (keys.length > MAX_TILES) {
-    msgs('snapmsgs', [['err', `This drawing is too big to load the roads for (it needs ${keys.length} map tiles, the limit is ${MAX_TILES}, roughly 15 km across). Zoom in and draw it smaller.`]]);
+    msgs('snapmsgs', [['err', `This drawing is too big to load the roads for (roughly 30 km across is the limit). Zoom in and draw it smaller.`]]);
     snapStatus('');
     return;
   }
@@ -1086,21 +1329,27 @@ async function doSnap(asked) {
     } finally { roadsLoading = false; render(); }
   }
   const profile = $('profile').value;
-  if (!G || G.keys !== keys.join(' ') || G.profile !== profile) G = buildGraph(keys, profile);
+  if (!G || G.profile !== profile || !keys.every(k => G.keySet.has(k))) G = buildGraph(keys, profile);
   if (!G.grid.size) { msgs('snapmsgs', [['err', 'No usable roads or paths here for this kind of route.']]); snapStatus(''); return; }
   const t0 = performance.now();
   const r = snapRoute();
   r.sig = sig();
   route = r;
   wantRoute = true;
-  msgs('snapmsgs', r.wrongWay > 20 ? [['warn', `${fmtDist(r.wrongWay)} of this route goes the wrong way along one-way streets. Walk the bike there, or reshape the drawing.`]] : []);
+  const warn = [];
+  if (G.z < 14) warn.push(['warn', 'This is a big drawing, so Mapic is using less detailed map data. A few small footpaths and lanes may be missing.']);
+  if (r.wrongWay > 20) warn.push(['warn', `${fmtDist(r.wrongWay)} of this route goes the wrong way along one-way streets. Walk the bike there, or reshape the drawing.`]);
+  msgs('snapmsgs', warn);
   snapStatus(`Snapped in ${Math.round(performance.now() - t0)} ms.`);
   render();
 }
 function scheduleSnap() { clearTimeout(snapTimer); snapTimer = setTimeout(() => doSnap(false), 250); }
+// while dragging: re-snap as often as the snapping keeps up
+let liveTimer = null;
+function liveSnap() { if (!wantRoute || liveTimer) return; liveTimer = setTimeout(() => { liveTimer = null; doSnap(false); }, 30); }
 
 function renderRoute() {
-  if (S.pts.length < 2) { route = null; }
+  if (nPts() < 2) { route = null; }
   const stale = route && route.sig !== sig();
   const pts = route ? route.latlngs : [];
   routeLine.setLatLngs(pts);
@@ -1115,10 +1364,95 @@ function renderRoute() {
     const f = route.fit, word = f.capped || f.rel >= .03 ? 'loose' : f.rel < .012 ? 'close' : 'recognisable';
     dl.hidden = false;
     dl.innerHTML = `<dt>Fit</dt><dd>${word}</dd><dt>Average gap</dt><dd>${fmtDist(f.mean)} from your drawing</dd>` +
-      `<dt>Worst bits</dt><dd>${f.capped ? 'over ' + fmtDist(f.cap) + ' (no roads near parts of the drawing)' : fmtDist(f.p95)}</dd><dt>Your drawing</dt><dd>${S.pts.length > 1 ? fmtDist(lengthM()) : '–'}</dd>`;
+      `<dt>Worst bits</dt><dd>${f.capped ? 'over ' + fmtDist(f.cap) + ' (no roads near parts of the drawing)' : fmtDist(f.p95)}</dd><dt>Your drawing</dt><dd>${nPts() > 1 ? fmtDist(lengthM()) : '–'}</dd>`;
   }
-  if (wantRoute && S.pts.length > 1 && stale) scheduleSnap();
+  $('routehelp').hidden = !route;
+  $('startbtn').hidden = !S.closed;
+  $('startbtn').classList.toggle('on', picking);
+  $('viaclearbtn').hidden = !S.vias.length;
+  renderVias();
+  renderBadge();
+  if (wantRoute && nPts() > 1 && stale) scheduleSnap();
 }
+
+// ---------- dragging the route ----------
+// Grab the route anywhere (a ghost dot follows the mouse along it; on touch, tap the route to
+// make a dot) and drag it onto another road. That makes a via point the route must pass through.
+const viaIcon = cls => L.divIcon({ className: 'via' + (cls ? ' ' + cls : ''), iconSize: [14, 14] });
+const startMarker = L.marker([0, 0], { icon: L.divIcon({ className: 'startflag', iconSize: [16, 16], html: 'S' }), interactive: false, keyboard: false });
+const ghost = L.marker([0, 0], { icon: viaIcon('ghost'), draggable: true, title: 'Drag onto another road' });
+let ghostVia = -1;
+// the drawing point a route point belongs to
+function drawingPointFor(ll) {
+  const P = drawnPath(), loc = localXY(ll), pr = project(P.map(loc.xy), 0, 0);
+  return pr ? loc.ll(pr.x, pr.y) : ll;
+}
+function addVia(ll) {
+  S.vias = S.vias.concat([{ ll, at: drawingPointFor(ll) }]);
+  return S.vias.length - 1;
+}
+function moveVia(i, ll) { S.vias = S.vias.map((v, k) => k === i ? { ...v, ll } : v); }
+function renderVias() {
+  const live = route && route.latlngs.length > 1 && S.mode === 'pan' && !picking;
+  if (route && route.latlngs.length > 1) startMarker.setLatLng(route.latlngs[0]).addTo(map); else startMarker.remove();
+  if (!live) ghost.remove();
+  if (held) return;
+  viaLayer.clearLayers();
+  if (!live) return;
+  S.vias.forEach((v, i) => {
+    const m = L.marker(v.ll, { icon: viaIcon(), draggable: true, title: 'Drag to move, click to remove' }).addTo(viaLayer);
+    m.on('dragstart', () => { record(); held = true; });
+    m.on('drag', () => { moveVia(i, m.getLatLng()); liveSnap(); });
+    m.on('dragend', () => { held = false; render(); });
+    m.on('click', () => { record(); S.vias = S.vias.filter((_, k) => k !== i); render(); });
+  });
+}
+ghost.on('dragstart', () => { record(); held = true; ghostVia = addVia(ghost.getLatLng()); });
+ghost.on('drag', () => { moveVia(ghostVia, ghost.getLatLng()); liveSnap(); });
+ghost.on('dragend', () => { held = false; ghost.remove(); render(); });
+function nearRoute(layerPoint, px) {
+  if (!route || route.latlngs.length < 2 || !routeLine._map) return null;
+  const q = routeLine.closestLayerPoint(layerPoint);
+  return q && q.distance <= px ? map.layerPointToLatLng(q) : null;
+}
+map.on('mousemove', e => {
+  if (held || S.mode !== 'pan' || picking || !route || route.sig !== sig()) return;
+  const ll = nearRoute(e.layerPoint, 10);
+  if (ll) ghost.setLatLng(ll).addTo(map); else ghost.remove();
+});
+map.on('click', e => {
+  if (picking) { pickStart(e.latlng); return; }
+  if (S.mode !== 'pan' || !route || route.sig !== sig()) return;
+  const ll = nearRoute(e.layerPoint, 16); // a tap on the route makes a dot to drag
+  if (ll) { record(); addVia(ll); render(); }
+});
+
+// ---------- start point and direction ----------
+// Choosing the start of a loop turns the drawing round so it begins at the clicked point.
+function pickStart(ll) {
+  picking = false;
+  const P = chain().pts, loc = localXY(ll), pr = project(P.concat([P[0]]).map(loc.xy), 0, 0);
+  if (!pr) { render(); return; }
+  record();
+  const q = loc.ll(pr.x, pr.y), i = pr.i, n = P.length;
+  const after = [], before = [];
+  for (let k = i + 1; k < n; k++) after.push(P[k]);
+  for (let k = 0; k <= i; k++) before.push(P[k]);
+  let pts = [q].concat(after, before);
+  pts = pts.filter((p, k) => k === 0 || !p.equals(pts[k - 1]));
+  if (pts.length > 1 && pts[pts.length - 1].equals(q)) pts.pop();
+  S.lines = [pts];
+  render();
+}
+$('startbtn').onclick = () => { const on = !picking; if (on && S.mode !== 'pan') setMode('pan'); picking = on; render(); };
+$('revbtn').onclick = () => {
+  const P = chain().pts;
+  if (P.length < 2) return;
+  record();
+  S.lines = [S.closed ? [P[0]].concat(rev(P.slice(1))) : rev(P)];
+  render();
+};
+$('viaclearbtn').onclick = () => { record(); S.vias = []; render(); };
 
 $('snapbtn').onclick = () => doSnap(true);
 $('profile').value = store.get('mapic.profile') === 'bike' ? 'bike' : 'foot';
