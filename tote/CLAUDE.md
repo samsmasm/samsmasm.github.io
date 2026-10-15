@@ -22,6 +22,9 @@ Notes live under `notes/` in Realtime DB as `{ content, createdAt }`, keyed by F
 - Sidebar lists notes; left border colour fades green→red as a note nears expiry (`expiryColor`).
 - Sidebar header has a refresh button (`↻`, re-runs `loadNotes`) and a new-note button (`+`).
 - **Single click** on the note view opens the editor (`startEdit`). Clicking the toolbar title also edits.
+- Toolbar **Copy** button (view mode) copies the note text to the clipboard.
+- **Autosave:** leaving the editor for another note (sidebar click, `+`, refresh, delete of another note) saves first via `leaveEdit()`. Hiding the tab (`visibilitychange`/`pagehide`) saves too but stays in the editor. All writes go through `writeEdit()`, which chains them so a new note is never pushed twice. Cancel still discards.
+- **Local draft:** every keystroke stores `{id, content}` in `localStorage["tote-draft"]`; cleared on save/cancel. On load, an unsaved draft reopens in the editor ("Unsaved draft restored"). This is the safety net for a tab closed before the Firebase write lands (writes during page close are best-effort).
 - Keyboard: Enter = new note, ↑/↓ = move between notes, Ctrl/Cmd+Enter = save, Esc = cancel.
 - Mobile: sidebar is an off-canvas drawer toggled by the hamburger.
 

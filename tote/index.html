@@ -347,6 +347,7 @@
     <button id="hamburger" aria-label="Toggle menu">&#9776;</button>
     <div id="note-title-display">Select a note</div>
     <span id="expires-label"></span>
+    <button class="btn btn-ghost" id="copy-btn" style="display:none" title="Copy note to clipboard">Copy</button>
     <button class="btn btn-ghost" id="renew-btn" style="display:none" title="Reset expiry to 96 hours">&#8635; Renew</button>
   </div>
 
@@ -411,6 +412,7 @@
   const titleDisplay   = document.getElementById("note-title-display");
   const expiresLabel   = document.getElementById("expires-label");
   const renewBtn       = document.getElementById("renew-btn");
+  const copyBtn        = document.getElementById("copy-btn");
   const sidebar        = document.getElementById("sidebar");
   const overlay        = document.getElementById("sidebar-overlay");
 
@@ -441,7 +443,10 @@
     emptyState.style.display = "none";
     noteView.style.display   = "none";
     noteEditor.style.display = "none";
-    if (panel !== noteView) renewBtn.style.display = "none";
+    if (panel !== noteView) {
+      renewBtn.style.display = "none";
+      copyBtn.style.display  = "none";
+    }
     if (panel) panel.style.display = "flex";
     if (panel === noteView) noteView.style.display = "block";
   }
@@ -475,7 +480,11 @@
 
       item.appendChild(prev);
       item.appendChild(del);
-      item.addEventListener("click", () => { selectNote(note.id); closeSidebar(); });
+      item.addEventListener("click", async () => {
+        if (!(await leaveEdit())) return;
+        selectNote(note.id);
+        closeSidebar();
+      });
       noteList.appendChild(item);
     });
   }
@@ -493,6 +502,7 @@
     titleDisplay.textContent = preview(note.content) || "(empty)";
     expiresLabel.textContent = formatExpiry(note.createdAt);
     renewBtn.style.display = "inline-flex";
+    copyBtn.style.display  = "inline-flex";
     showPanel(noteView);
 
     // Single-click to edit
@@ -520,30 +530,44 @@
   }
 
   // ── Save ──
-  async function saveNote() {
+  // Writes the editor contents to the DB without changing the UI. Writes are
+  // chained so overlapping saves (e.g. tab hidden mid-save) never double-push.
+  let writeChain = Promise.resolve();
+  function writeEdit() {
+    const run = writeChain.then(doWrite);
+    writeChain = run.catch(() => {});
+    return run;
+  }
+
+  async function doWrite() {
     const content = noteTextarea.value.trim();
-    if (!content) { cancelEdit(); return; }
+    const existing = notes.find(n => n.id === activeId);
+    if (!content || (existing && existing.content === content)) { clearDraft(content); return; }
+
+    if (existing) {
+      // Update existing note in place
+      await set(ref(db, "notes/" + activeId), { content, createdAt: serverTimestamp() });
+      notes = notes.map(n => n.id === activeId ? { ...n, content } : n);
+    } else {
+      // New note
+      const newRef = await push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
+      notes.unshift({ id: newRef.key, content, createdAt: Date.now() });
+      activeId = newRef.key;
+    }
+    clearDraft(content);
+    renderList();
+  }
+
+  async function saveNote() {
+    if (!noteTextarea.value.trim()) { cancelEdit(); return; }
 
     const saveBtn = document.getElementById("save-btn");
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving…";
 
     try {
-      if (activeId) {
-        // Update existing note in place
-        await set(ref(db, "notes/" + activeId), { content, createdAt: serverTimestamp() });
-        notes = notes.map(n => n.id === activeId ? { ...n, content } : n);
-        renderList();
-        selectNote(activeId);
-      } else {
-        // New note
-        const newRef = await push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
-        const newNote = { id: newRef.key, content, createdAt: Date.now() };
-        notes.unshift(newNote);
-        activeId = newRef.key;
-        renderList();
-        selectNote(newRef.key);
-      }
+      await writeEdit();
+      selectNote(activeId);
     } catch (err) {
       alert("Failed to save: " + err.message);
     } finally {
@@ -552,8 +576,66 @@
     }
   }
 
+  // Autosave before leaving the editor for another note. Returns false if the
+  // save failed, so the caller stays put and nothing is lost.
+  async function leaveEdit() {
+    if (!isEditing) return true;
+    try {
+      await writeEdit();
+      isEditing = false;
+      return true;
+    } catch (err) {
+      alert("Failed to save: " + err.message);
+      return false;
+    }
+  }
+
+  // ── Local draft (safety net if the tab closes before a save lands) ──
+  const DRAFT_KEY = "tote-draft";
+
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ id: activeId, content: noteTextarea.value })); } catch {}
+  }
+
+  function clearDraft(savedContent) {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+      if (savedContent === undefined || !d || d.content.trim() === savedContent) localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+  }
+
+  function restoreDraft() {
+    let d;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch {}
+    if (!d || !d.content || !d.content.trim()) return false;
+    const note = notes.find(n => n.id === d.id);
+    if (note && note.content === d.content.trim()) { clearDraft(); return false; }
+
+    activeId = note ? note.id : null;
+    renderList();
+    startEdit(null);
+    noteTextarea.value = d.content;
+    titleDisplay.textContent = "Unsaved draft restored";
+    expiresLabel.textContent = "";
+    return true;
+  }
+
+  // ── Copy ──
+  async function copyNote() {
+    const note = notes.find(n => n.id === activeId);
+    if (!note) return;
+    try {
+      await navigator.clipboard.writeText(note.content);
+      copyBtn.textContent = "Copied ✓";
+    } catch {
+      copyBtn.textContent = "Copy failed";
+    }
+    setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+  }
+
   function cancelEdit() {
     isEditing = false;
+    clearDraft();
     if (activeId) {
       selectNote(activeId);
     } else if (notes.length > 0) {
@@ -583,6 +665,7 @@
   // ── Delete ──
   async function deleteNote(id) {
     if (!confirm("Delete this note?")) return;
+    if (id !== activeId && !(await leaveEdit())) return;
     try {
       await remove(ref(db, "notes/" + id));
       notes = notes.filter(n => n.id !== id);
@@ -631,7 +714,9 @@
       toDelete.forEach(id => remove(ref(db, "notes/" + id)).catch(() => {}));
 
       renderList();
-      if (notes.length > 0) {
+      if (restoreDraft()) {
+        // reopened in the editor with the unsaved text
+      } else if (notes.length > 0) {
         selectNote(notes[0].id);
       } else {
         showPanel(emptyState);
@@ -653,18 +738,31 @@
   }
 
   // ── Event listeners ──
-  document.getElementById("new-note-btn").addEventListener("click", startNewNote);
+  async function newNoteClicked() {
+    if (await leaveEdit()) startNewNote();
+  }
+
+  document.getElementById("new-note-btn").addEventListener("click", newNoteClicked);
   document.getElementById("refresh-btn").addEventListener("click", async (e) => {
     const btn = e.currentTarget;
+    if (!(await leaveEdit())) return;
     btn.classList.add("spinning");
     await loadNotes();
     btn.classList.remove("spinning");
   });
-  document.getElementById("empty-new-btn").addEventListener("click", startNewNote);
+  document.getElementById("empty-new-btn").addEventListener("click", newNoteClicked);
   document.getElementById("save-btn").addEventListener("click", saveNote);
   document.getElementById("cancel-btn").addEventListener("click", cancelEdit);
   document.getElementById("hamburger").addEventListener("click", openSidebar);
   renewBtn.addEventListener("click", renewNote);
+  copyBtn.addEventListener("click", copyNote);
+  noteTextarea.addEventListener("input", saveDraft);
+
+  // Autosave when the tab is hidden (switching tabs, minimising, or closing).
+  // Stays in the editor so you can carry on typing when you come back.
+  const autosaveOnHide = () => { if (isEditing) writeEdit().catch(() => {}); };
+  document.addEventListener("visibilitychange", () => { if (document.hidden) autosaveOnHide(); });
+  window.addEventListener("pagehide", autosaveOnHide);
   overlay.addEventListener("click", closeSidebar);
 
   // Global keyboard shortcuts (not while typing in textarea)
