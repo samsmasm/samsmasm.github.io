@@ -8,6 +8,7 @@
  *   BUSIA_PASSWORD  the password for the results page
  *   AUTH_SECRET     random string that signs the login cookie
  *
+ *   POST /busia-ab/assign  balanced Version 1 / 2 for a student opting in (public, same-origin)
  *   POST /busia-ab/log     records from /busia/ab/ab.js (public, validated, create-only)
  *   GET  /busia-ab/        login form, or the results page once logged in
  *   POST /busia-ab/login   password check
@@ -35,6 +36,7 @@ async function ensureTable(db) {
     seconds_on_page INTEGER, scrolled INTEGER, device TEXT,
     max_depth INTEGER, scroll_backs INTEGER, ts TEXT)`).run();
   await db.prepare('CREATE TABLE IF NOT EXISTS excluded (anon_id TEXT PRIMARY KEY, at TEXT NOT NULL)').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS assignments (anon_id TEXT PRIMARY KEY, version INTEGER NOT NULL, at TEXT NOT NULL)').run();
   tableReady = true;
 }
 
@@ -86,6 +88,34 @@ async function handleLog(request, env) {
     }));
   } catch (e) { /* fail silently: the page never waits on this */ }
   return ok;
+}
+
+// ---------- balanced assignment ----------
+// Called by the notice page when a student clicks "Take part". Puts them in
+// whichever version has fewer students so far (coin flip on a tie), so the
+// groups never differ by more than one. Students assigned before this existed
+// are counted from their records.
+async function handleAssign(request, env) {
+  const json = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  try {
+    const { anon_id } = JSON.parse(await request.text());
+    if (!isId(anon_id)) return json({ error: 'bad id' }, 400);
+    await ensureTable(env.DB);
+    const had = await env.DB.prepare('SELECT version FROM assignments WHERE anon_id = ?').bind(anon_id).first();
+    if (had) return json({ version: had.version });
+    const counts = await env.DB.prepare(`SELECT version, count(*) AS n FROM (
+        SELECT anon_id, version FROM assignments
+        UNION SELECT DISTINCT anon_id, version_assigned AS version FROM records
+          WHERE version_assigned IN (1, 2) AND anon_id NOT IN (SELECT anon_id FROM assignments)
+      ) GROUP BY version`).all();
+    const n = { 1: 0, 2: 0 };
+    for (const r of counts.results) n[r.version] = r.n;
+    const coin = crypto.getRandomValues(new Uint8Array(1))[0] & 1 ? 2 : 1;
+    const version = n[1] < n[2] ? 1 : n[2] < n[1] ? 2 : coin;
+    await env.DB.prepare('INSERT OR IGNORE INTO assignments (anon_id, version, at) VALUES (?, ?, ?)').bind(anon_id, version, new Date().toISOString()).run();
+    const final = await env.DB.prepare('SELECT version FROM assignments WHERE anon_id = ?').bind(anon_id).first();
+    return json({ version: final.version });
+  } catch (e) { return json({ error: 'failed' }, 500); }
 }
 
 // ---------- login (same signed-cookie pattern as wc26-auth) ----------
@@ -170,6 +200,10 @@ async function resultsPage(env) {
 <p class="note">You are logged in, so this browser is not counted from now on. Classroom-sized samples: these are counts and means only, not significance tests. Read differences of a few tenths of a point as noise unless they are consistent across questions and pages.</p>
 <p><a class="btn" href="/busia-ab/csv">Download CSV</a> &nbsp; <a href="/busia-ab/logout">Log out</a></p>
 <script>try{localStorage.setItem('busia-ab-ignore','1')}catch(e){}</script>`;
+
+  const { results: asg } = await env.DB.prepare('SELECT version, count(*) AS n FROM assignments GROUP BY version').all();
+  const an = { 1: 0, 2: 0 }; asg.forEach(r => an[r.version] = r.n);
+  out += `<p class="note">Opted in through the notice since balanced assignment started: Version 1 ${an[1]}, Version 2 ${an[2]}.</p>`;
 
   // Students per version
   out += `<h2>Students</h2><div class="scroll"><table><tr><th></th><th>Students seen</th><th>Students who rated</th><th>Prompts answered</th><th>Prompts skipped</th></tr>`;
@@ -284,6 +318,10 @@ export default {
     const path = url.pathname.replace(/\/+$/, '') || '/';
     if (url.pathname === '/busia-ab') return Response.redirect(url.origin + '/busia-ab/', 301);
 
+    if (path === '/busia-ab/assign') {
+      if (request.method !== 'POST' || request.headers.get('Origin') !== url.origin) return new Response('Forbidden', { status: 403 });
+      return handleAssign(request, env);
+    }
     if (path === '/busia-ab/log') {
       return request.method === 'POST' ? handleLog(request, env) : new Response('Method not allowed', { status: 405 });
     }
