@@ -6,11 +6,11 @@ source_page: docs/index.html
 
 The evidence base for your research. Aim for five.
 
-The supporting documents sit in your appendix and form the evidential foundation of your IA. They are not just references: they are the raw material you will actually analyse. The examiner will check them. Every factual claim in your commentary should trace back to one of these documents.
+The supporting documents sit in your appendix and form the evidential foundation of your IA. They are not just references: they are the raw material you will actually analyse. The examiner will check them. Almost all the evidence in your commentary should trace back to these documents.
 
 ## The rules
 
-- **3 to 5 documents - aim for 5.** Five is almost always better than four or three. More documents means more evidence to draw on, more perspectives, and stronger breadth for Criterion B. Only go lower if the documents you have are genuinely stronger without the extras. Note: fewer than three or more than five results in a score of only 1 mark for Criterion B, regardless of quality.
+- **3 to 5 documents - aim for 5.** Five is almost always better than four or three. More documents means more evidence to draw on, more perspectives, and stronger breadth for Criterion B. Only go lower if the documents you have are genuinely stronger without the extras. Note: one or two, or more than five, caps you at 1 mark for Criterion B, regardless of quality.
 - **Published within the last three years** of your submission date. Check the date on every document.
 - **Primary and/or secondary.** You can rely on primary, secondary, or both - but in our experience it is best to have a strong base of secondary resources.
 - **Balanced documents.** They should say different things, present a variety of perspectives, give different types of information, and come from multiple sources. Five documents that all make the same point are no stronger than one.
@@ -49,13 +49,13 @@ You can rely on primary, secondary, or both. All-secondary IAs are perfectly acc
 
 ## Common mistakes
 
-**Using Wikipedia or blog posts.** These are not acceptable sources. Use the original source that Wikipedia itself cites.
+**Using Wikipedia or ready-made analyses.** Wikipedia, textbooks, and SWOT or PESTLE analyses downloaded from the internet are not suitable. Use the original source that Wikipedia cites.
 
 **Five documents that all say the same thing.** Diversity of source and perspective strengthens your analysis. If all five documents come from the company's own PR, your evaluation is one-sided.
 
 **Collecting documents before you know your RQ.** This leads to documents that are loosely related but not genuinely useful. Know your RQ first, then collect evidence to answer it.
 
-**Forgetting to label them.** Each document must be labelled clearly in the appendix (Document 1, Document 2...) and referenced by that label in the commentary.
+**Forgetting to label them.** Each document must be labelled clearly in the appendix (Supporting document 1, Supporting document 2...) and referenced by that label in the commentary.
 
 ## Document Treasure Hunt
 

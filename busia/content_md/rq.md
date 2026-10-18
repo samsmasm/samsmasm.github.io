@@ -45,7 +45,7 @@ The type of business you choose has a direct impact on what evidence you can fin
 
 | | Private | Public |
 |---|---------|--------|
-| **Local** | Primary access possible. Interviews and visits are achievable. But secondary data is very limited - private local companies rarely appear in the news and publish no financial accounts. Proceed with caution and only after investigating it carefully with Sam. | Can work. Public local companies exist and primary access may be possible. Make sure there are enough documents beyond what the company itself has released - independent news coverage, analyst commentary, or sector reports - to give your analysis real depth. |
+| **Local** | Primary access possible. Interviews and visits are achievable. But secondary data is very limited - private local companies rarely appear in the news and publish no financial accounts. Proceed with caution and only after investigating it carefully with me. | Can work. Public local companies exist and primary access may be possible. Make sure there are enough documents beyond what the company itself has released - independent news coverage, analyst commentary, or sector reports - to give your analysis real depth. |
 | **International** | Secondary data is scarce. No published financial accounts. Likely doable only where financial information is not required - for example, an RQ focused on marketing strategy or brand ethics where news coverage and company communications are sufficient. | Strongest choice. Annual reports, financial statements, and news coverage are usually abundant. The secondary data advantage almost always outweighs the lack of primary access. |
 
 ## Finding your RQ: pick a route
@@ -75,8 +75,8 @@ Once you have your list, ask yourself: which of these businesses has made a deci
 News Hunt: finding a researchable business.
 
 1. **Pick a sector you find interesting.** Retail, tech, food and beverage, sport, fashion, healthcare - anything. Write it down.
-2. **Search for recent news in that sector.** Use Google News, BBC Business, or a business newspaper. Search terms like: "[sector] company decision 2023", "[sector] ethics controversy", "[sector] sustainability strategy". You are looking for a story about a specific named business that has actually done something - not just a trend article.
-3. **Check whether documents exist.** Before you commit to a business, spend 10 minutes checking: Is there a company annual report or sustainability report? Are there two or three news articles about this specific decision? If the answer to at least two of these is yes, it is worth pursuing.
+2. **Search for recent news in that sector.** Use Google News, BBC Business, or a business newspaper. Search terms like: "[sector] company decision 2026", "[sector] ethics controversy", "[sector] sustainability strategy". You are looking for a story about a specific named business that has actually done something - not just a trend article.
+3. **Check whether documents exist.** Before you commit to a business, spend 20 minutes checking: Is there a company annual report or sustainability report? Are there two or three news articles about this specific decision? If the answer to at least two of these is yes, it is worth pursuing.
 4. **Draft a rough RQ.** Write it in the format: "To what extent has [business] [done something specific] in order to [achieve what]?" or "How effective has [business]'s [strategy/decision] been in [achieving what]?" It does not need to be perfect yet. You will refine it as you gather your documents.
 
 ## [TAB] Concept or company first

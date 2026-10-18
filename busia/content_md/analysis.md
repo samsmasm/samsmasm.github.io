@@ -39,7 +39,7 @@ This is the most important distinction in the whole IA. Description tells the re
 
 **Description (weak):** "Nike's revenue grew by 10% in 2024. The company has a large marketing budget and invests heavily in sponsorships."
 
-**Analysis (strong):** "Nike's 10% revenue growth in 2024 (Document 2) suggests that its pivot toward direct-to-consumer sales has not damaged overall volume, which weakens the argument that the strategy carries significant revenue risk."
+**Analysis (strong):** "Nike's 10% revenue growth in 2024 (Supporting document 2) suggests that its pivot toward direct-to-consumer sales has not damaged overall volume, which weakens the argument that the strategy carries significant revenue risk."
 
 Notice what the analysis version does: it names the evidence and its source, draws a conclusion from the data, and connects that conclusion directly to the RQ. Every paragraph in your analysis section should do all three.
 
@@ -56,10 +56,10 @@ A useful writing habit: in the last sentence of each paragraph, loop back to the
 The examiner is looking for direct, specific use of the documents - not general knowledge. When you make a claim, cite the document and the specific data.
 
 - **Quote sparingly, paraphrase often.** A short direct quote is strong evidence. A long block quote is a word-count problem. Use the number or the finding; summarise the reasoning in your own words.
-- **Reference by label.** Refer to your documents as "Document 1", "Document 2" and so on - the same labels you use in the appendix.
-- **Use, do not describe.** Do not write "Document 1 is an article about X." Just use it: "Revenue fell 12% in Q3 2024 (Document 1), which suggests..."
+- **Reference by label.** Refer to your documents as "Supporting document 1", "Supporting document 2" and so on - the same labels you use in the appendix.
+- **Use, do not describe.** Do not write "Supporting document 1 is an article about X." Just use it: "Revenue fell 12% in Q3 2024 (Supporting document 1), which suggests..."
 
-## Getting started: write one BMT first
+## Getting started: write one business management tool (BMT) first
 
 If you are staring at a blank page, start here. Pick the tool that feels most central to your RQ. Write a rough 200-300 word application of it using the data from your supporting documents. Do not worry about transitions or polish - just get the argument down.
 

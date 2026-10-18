@@ -46,11 +46,11 @@ The word count here is generous because this is where the marks are. Criterion D
 
 ## What does not count toward the word limit
 
-These do not count: the research question itself, headings, references and bibliography, the contents page, any labels or captions on figures, and the supporting documents in the appendix. Everything in the main commentary does count.
+These do not count: the supporting documents, diagrams and figures, tables of statistical data, equations and calculations, in-text citations, references, the bibliography, the contents page, and acknowledgements. Everything else in the main commentary counts, including definitions and quotes.
 
 ## Choosing your tools
 
-The IB allows up to five tools, theories, or techniques, but in practice **aim for two to three**. More than three almost always means not enough depth to score well on Criterion C. Three done superficially is worse than two done properly. Depth vs. breadth is the most important decision here.
+The IB sets no number of tools and Kognity recommends two to four, but in practice **aim for two to three**. More than three almost always means not enough depth to score well on Criterion C. Three done superficially is worse than two done properly. Depth vs. breadth is the most important decision here.
 
 **Strong choices:**
 

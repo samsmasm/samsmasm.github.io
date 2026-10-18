@@ -23,7 +23,7 @@ Or try a five-minute unprompted free write. Set a timer. Do not stop writing. Do
 
 Once you have sketched your thinking, go deeper on two things.
 
-**1. Apply a BMT roughly.** Pick the tool that feels most relevant to your RQ right now. Fill it in using what you know so far - it does not need to be complete or polished. What does it tell you?
+**1. Apply a business management tool (BMT) roughly.** Pick the tool that feels most relevant to your RQ right now. Fill it in using what you know so far - it does not need to be complete or polished. What does it tell you?
 
 **2. Look at the financial accounts.** Find the figures most relevant to your RQ. What do you notice? What do the numbers suggest about the company's situation? Annotate as you go.
 

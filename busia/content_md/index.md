@@ -20,7 +20,7 @@ This guide walks you through the whole process, stage by stage. Work through it 
 | 30% | of your final grade (SL) |
 | 20% | of your final grade (HL) |
 
-The word count is strict: 1,800 is the ceiling, not the target. Moderators will not read beyond this limit. The best IAs use every word deliberately. Appendices (your supporting documents, diagrams, references) do not count toward the limit, but the written commentary does.
+The word count is strict: 1,800 is the ceiling, not the target. Moderators will not read beyond this limit. The best IAs use every word deliberately. Appendices (supporting documents), diagrams, data tables, citations and references don't count. Definitions and quotes in the body do.
 
 ## The marking criteria
 
@@ -34,7 +34,7 @@ Your IA is marked out of 25 across seven criteria. Know these - they are a check
 | D | Quality of analysis and evaluation | 5 |
 | E | Conclusions linked to the research question | 3 |
 | F | Structure and organisation | 2 |
-| G | Presentation: references, citations, appendices | 2 |
+| G | Presentation: title page, contents page, headings, page numbers | 2 |
 | **Total** | | **25** |
 
 Notice where the marks are: Criterion A (key concept, 5 marks) and Criterion D (analysis and evaluation, 5 marks) together make up almost half the available marks. Those two criteria reward deep, sustained thinking - not just knowledge.

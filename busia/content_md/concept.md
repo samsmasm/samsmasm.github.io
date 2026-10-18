@@ -68,7 +68,7 @@ Use the concept to structure your evaluation. Has the business genuinely embodie
 
 Your conclusion should return to the concept and say something non-obvious about it. Not just "therefore, sustainability is important" - but what this specific case tells us about how this concept works in practice.
 
-> **Put it on your title page.** The chosen key concept must be explicitly stated on the title page. This is a formal requirement - without it, you cannot access the full 5 marks available for Criterion A.
+> **Put it on your title page.** State your chosen key concept there, alongside your RQ and word count.
 
 > **The concept is the thread, not the subject.** Your subject is the business and its decision. The concept is the intellectual framework you bring to bear on it. A strong concept integration makes the IA feel coherent and purposeful: everything connects to a central idea.
 

@@ -21,7 +21,7 @@ Must include all four of the following:
 - The word count
 - The chosen key concept (Change, Creativity, Ethics, or Sustainability)
 
-Missing the key concept on the title page can cost you marks on Criterion A as well as Criterion G. Do not forget it.
+Do not forget the key concept.
 
 ### 2. Table of contents
 
@@ -41,7 +41,7 @@ All supporting documents and any additional sources cited in the commentary must
 
 ### 6. Supporting documents in the appendix
 
-Each document must be labelled clearly (Document 1, Document 2, etc.) and highlighted where you have drawn on it in the commentary. Documents should be no more than five pages each - if longer, trim to the relevant sections. If a document is not in English, a translation must be provided.
+Each document must be labelled clearly (Supporting document 1, Supporting document 2, etc.) and highlighted where you have drawn on it in the commentary. Documents should be no more than five pages each - if longer, trim to the relevant sections. If a document is not in English, a translation must be provided.
 
 ## What Sam needs from you
 
