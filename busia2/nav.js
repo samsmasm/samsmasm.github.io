@@ -76,4 +76,4 @@ function getBase() {
 document.addEventListener('DOMContentLoaded', renderNav);
 
 // A/B test (shared, one copy): /busia/ab/ab.js. Plan: ~/notes/busiatemp/CLAUDE.md
-(function(){var s=document.createElement('script');s.src='/busia/ab/ab.js?v=20261018c';s.async=true;document.head.appendChild(s);})();
+(function(){var s=document.createElement('script');s.src='/busia/ab/ab.js?v=20261018d';s.async=true;document.head.appendChild(s);})();

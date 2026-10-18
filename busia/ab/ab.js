@@ -8,7 +8,7 @@
   var AB = window.BUSIA_AB;
   if (!AB || !AB.shown) return;
   var BASE = '/busia/ab/';
-  var VER = '?v=20261018c'; // bump with the ?v= on the script tags whenever any A/B file changes (browsers cache scripts for 4 hours)
+  var VER = '?v=20261018d'; // bump with the ?v= on the script tags whenever any A/B file changes (browsers cache scripts for 4 hours)
 
   function load(src, done) {
     var s = document.createElement('script');
