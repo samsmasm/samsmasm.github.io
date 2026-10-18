@@ -11,3 +11,5 @@ Static, no build step; deploys on push to `main`. Follow the root `CLAUDE.md` (a
 ## A/B test (October 2026)
 
 Sam is A/B testing this guide (Version 1) against a short copy at `busia2/` (Version 2). Shared code lives only in `busia/ab/`: `assign.js` (loaded first in `<head>` on every page; master switches `AB_ENABLED` and `TEST_END` at its top), `ab.js` (loaded from `nav.js`), `ab-config.js`, `ab-questions.js`, the opt-in notice at `ab/welcome/`, and the `busia-ab` Cloudflare Worker source in `ab/worker/` (see its `SETUP.md`). Plan: `~/notes/busiatemp/CLAUDE.md`. The only A/B edits to the original pages are the `assign.js` script tag and the loader line at the end of `nav.js`. When editing an unchanged page here, copy the change to `busia2/` too.
+
+**Caching:** Cloudflare tells browsers to keep `.js` files for 4 hours (HTML for 10 minutes). Every A/B script and `nav.js` is loaded with a `?v=YYYYMMDD` tag. When you change any of them, bump that tag everywhere: the `assign.js` and `nav.js` script tags on all `busia/` and `busia2/` pages, the `ab.js` loader at the end of both `nav.js` files, and `VER` in `ab.js`.

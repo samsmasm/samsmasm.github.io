@@ -8,10 +8,11 @@
   var AB = window.BUSIA_AB;
   if (!AB || !AB.shown) return;
   var BASE = '/busia/ab/';
+  var VER = '?v=20261018b'; // bump with the ?v= on the script tags whenever any A/B file changes (browsers cache scripts for 4 hours)
 
   function load(src, done) {
     var s = document.createElement('script');
-    s.src = BASE + src; s.onload = done; s.onerror = function () {};
+    s.src = BASE + src + VER; s.onload = done; s.onerror = function () {};
     document.head.appendChild(s);
   }
   load('ab-config.js', function () { load('ab-questions.js', function () {
@@ -33,9 +34,10 @@
     }
 
     var page = AB.slug || 'index';
-    var canLog = AB.mode === 'test' && AB.log && get('busia-ab-ignore') !== '1';
+    var stopped = get('busia-ab-stopped') === '1'; // student used "Stop the questions"
+    var canLog = AB.mode === 'test' && AB.log && get('busia-ab-ignore') !== '1' && !stopped;
     var preview = AB.mode === 'preview';
-    var promptHere = (AB.mode === 'test' || preview) && C.PROMPT_PAGES.indexOf(AB.slug) !== -1;
+    var promptHere = (AB.mode === 'test' || preview) && !stopped && C.PROMPT_PAGES.indexOf(AB.slug) !== -1;
 
     // ---- menu links ---------------------------------------------------------
     function addMenuLinks() {
@@ -50,6 +52,17 @@
         sw.textContent = other === 2 ? 'Switch to the short version' : 'Switch to the long version';
         sw.addEventListener('click', function () { set('busia-ab-choice', String(other)); });
         box.appendChild(sw);
+      }
+      if (AB.mode === 'test' && !stopped) {
+        var st = document.createElement('a');
+        st.href = '#';
+        st.textContent = 'Stop the questions';
+        st.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          set('busia-ab-stopped', '1'); stopped = true; canLog = false; promptHere = false;
+          st.textContent = 'Questions stopped. Nothing more is recorded.';
+        });
+        box.appendChild(st);
       }
       var be = document.createElement('a');
       be.href = '/busia-ab/';
