@@ -246,6 +246,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
+    if (url.pathname === '/busia-ab') return Response.redirect(url.origin + '/busia-ab/', 301);
 
     if (path === '/busia-ab/log') {
       return request.method === 'POST' ? handleLog(request, env) : new Response('Method not allowed', { status: 405 });
