@@ -48,3 +48,7 @@ The log endpoint only accepts small, strictly checked records, so abuse is unlik
 ## Updating the worker later
 
 If `worker.js` changes in the repo, repeat step 2.3 (Edit code, paste, Deploy). The database, secrets and route stay as they are.
+
+## Done with wrangler instead (2026-10-18)
+
+Claude set this up from the laptop with `npx wrangler` (logged in as Sam): D1 database `busia-ab` (id in `wrangler.toml`), worker deployed from this folder with the `DB` binding and the `unisam.nz/busia-ab/*` route, and `AUTH_SECRET` set to a random value. Sam sets `BUSIA_PASSWORD` himself in the dashboard (worker → Settings → Variables and Secrets). To redeploy after editing `worker.js`: `cd busia/ab/worker && npx wrangler deploy`.
