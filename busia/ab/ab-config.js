@@ -10,6 +10,7 @@ window.BUSIA_AB_CONFIG = {
   PROMPT_PAGES: ['', 'rq', 'docs', 'concept', 'analysis', 'structure', 'sketching', 'conclusion'],
 
   MAX_PROMPTS: 6,               // per student, in total
+  MAX_PER_DAY: 2,               // per student, per calendar day (spreads answers across the weeks)
   LEAVE_PROBABILITY: 1 / 3,     // chance of a prompt when leaving a page by an internal link
   MIN_ACTIVE_BEFORE_LEAVE: 15,  // seconds of active time on the page before a leave prompt is allowed
   TIMED_AFTER: 90,              // seconds of active time on the page before a mid-page prompt

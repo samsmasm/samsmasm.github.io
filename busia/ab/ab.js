@@ -8,7 +8,7 @@
   var AB = window.BUSIA_AB;
   if (!AB || !AB.shown) return;
   var BASE = '/busia/ab/';
-  var VER = '?v=20261018b'; // bump with the ?v= on the script tags whenever any A/B file changes (browsers cache scripts for 4 hours)
+  var VER = '?v=20261018c'; // bump with the ?v= on the script tags whenever any A/B file changes (browsers cache scripts for 4 hours)
 
   function load(src, done) {
     var s = document.createElement('script');
@@ -133,6 +133,7 @@
       var count = parseInt(get('busia-ab-prompts') || '0', 10);
       var last = parseInt(get('busia-ab-last-prompt') || '0', 10);
       if (count >= C.MAX_PROMPTS) return false;
+      if (get('busia-ab-day') === today() && parseInt(get('busia-ab-day-count') || '0', 10) >= (C.MAX_PER_DAY || 99)) return false;
       if (Date.now() - last < C.COOLDOWN * 1000) return false;
       if (trigger === 'leave') return active >= C.MIN_ACTIVE_BEFORE_LEAVE && Math.random() < C.LEAVE_PROBABILITY;
       return active >= C.TIMED_AFTER && scrolled && Math.random() < C.TIMED_PROBABILITY;
@@ -199,6 +200,8 @@
       if (!preview || !C.PREVIEW_ALWAYS_PROMPT) {
         set('busia-ab-prompts', String(parseInt(get('busia-ab-prompts') || '0', 10) + 1));
         set('busia-ab-last-prompt', String(Date.now()));
+        var dc = get('busia-ab-day') === today() ? parseInt(get('busia-ab-day-count') || '0', 10) : 0;
+        set('busia-ab-day', today()); set('busia-ab-day-count', String(dc + 1));
       }
       sheet = document.createElement('div');
       sheet.className = 'busia-ab-sheet';
@@ -246,6 +249,7 @@
       if (sheet) sheet.remove();
       if (pending) { var h = pending; pending = null; location.href = h; }
     }
+    function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
     css();
