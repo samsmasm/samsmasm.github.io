@@ -7,8 +7,8 @@
  */
 (function () {
   // ---- master switches -------------------------------------------------
-  var AB_ENABLED = false;      // false: no notice, no redirects, no sheet, nothing recorded
-  var TEST_END = '';           // 'YYYY-MM-DD' (Ho Chi Minh time): last day of the two-week test. After it, students can switch freely.
+  var AB_ENABLED = true;       // false: no notice, no redirects, no sheet, nothing recorded
+  var TEST_END = '2026-11-01'; // 'YYYY-MM-DD' (Ho Chi Minh time): last day of the two-week test. After it, students can switch freely.
   // ----------------------------------------------------------------------
 
   var K = {
