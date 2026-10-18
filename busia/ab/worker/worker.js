@@ -12,6 +12,7 @@
  *   GET  /busia-ab/        login form, or the results page once logged in
  *   POST /busia-ab/login   password check
  *   GET  /busia-ab/csv     every record as CSV (logged in only)
+ *   POST /busia-ab/exclude, /busia-ab/restore   hide or restore one anonymous student (logged in only)
  *   GET  /busia-ab/logout
  */
 
@@ -19,7 +20,7 @@ const COOKIE = 'busiaab';
 const MAX_AGE = 60 * 60 * 24 * 60; // 60 days
 const PAGES = ['index', 'start', 'rq', 'concept', 'docs', 'sketching', 'structure', 'analysis', 'conclusion', 'submit', 'check', 'examiners', 'sample', 'faq', 'team'];
 const QUESTIONS = { ease: 'How hard or easy was this page to follow?', covered: 'How sure are you that this page told you what you need?', nextstep: 'How unclear or clear is your next step now?' };
-const COLS = ['id', 'received_at', 'type', 'version_shown', 'version_assigned', 'anon_id', 'view_id', 'prompt_id', 'page', 'question_id', 'rating', 'trigger', 'seconds_on_page', 'scrolled', 'device', 'max_depth', 'scroll_backs', 'ts'];
+const COLS = ['excluded', 'id', 'received_at', 'type', 'version_shown', 'version_assigned', 'anon_id', 'view_id', 'prompt_id', 'page', 'question_id', 'rating', 'trigger', 'seconds_on_page', 'scrolled', 'device', 'max_depth', 'scroll_backs', 'ts'];
 
 let tableReady = false;
 async function ensureTable(db) {
@@ -33,6 +34,7 @@ async function ensureTable(db) {
     page TEXT, question_id TEXT, rating TEXT, trigger TEXT,
     seconds_on_page INTEGER, scrolled INTEGER, device TEXT,
     max_depth INTEGER, scroll_backs INTEGER, ts TEXT)`).run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS excluded (anon_id TEXT PRIMARY KEY, at TEXT NOT NULL)').run();
   tableReady = true;
 }
 
@@ -152,7 +154,10 @@ const VN = v => v === 1 ? 'Version 1 (long)' : 'Version 2 (short)';
 
 async function resultsPage(env) {
   await ensureTable(env.DB);
-  const { results: rows } = await env.DB.prepare('SELECT * FROM records ORDER BY id').all();
+  const { results: all } = await env.DB.prepare('SELECT * FROM records ORDER BY id').all();
+  const { results: exRows } = await env.DB.prepare('SELECT anon_id, at FROM excluded ORDER BY at').all();
+  const excluded = new Set(exRows.map(r => r.anon_id));
+  const rows = all.filter(r => !excluded.has(r.anon_id));
   const ratings = rows.filter(r => r.type === 'rating' && r.rating !== 'skip').map(r => ({ ...r, n: parseInt(r.rating, 10) }));
   const prompts = rows.filter(r => r.type === 'rating');
   // Latest record per page visit (a visit can be re-sent with more seconds).
@@ -230,13 +235,44 @@ async function resultsPage(env) {
   };
   out += `<p class="note">Average number of different pages visited per student: Version 1 ${f1(reach(1))}, Version 2 ${f1(reach(2))}.</p>`;
 
+  // Per student (anonymous ids only)
+  const students = {};
+  for (const r of rows) {
+    const s = (students[r.anon_id] ||= { id: r.anon_id, v: r.version_assigned, first: r.ts, pages: new Set(), visits: {}, prompts: new Set(), skips: 0, q: {}, mismatch: false });
+    if (r.ts < s.first) s.first = r.ts;
+    if (r.version_shown !== r.version_assigned) s.mismatch = true;
+    if (r.type === 'pageview') { s.pages.add(r.page); s.visits[r.view_id] = Math.max(s.visits[r.view_id] || 0, r.seconds_on_page); }
+    if (r.type === 'rating') {
+      if (r.rating === 'skip') s.skips++;
+      else { s.prompts.add(r.prompt_id); (s.q[r.question_id] ||= []).push(parseInt(r.rating, 10)); }
+    }
+  }
+  const list = Object.values(students).sort((a, b) => a.v - b.v || a.first.localeCompare(b.first));
+  out += `<h2>Students</h2><p class="note">One row per anonymous student (random id, first 8 characters shown). Exclude removes a student from every table above; the rows stay in the CSV, marked as excluded, and can be restored below.</p>
+<div class="scroll"><table><tr><th>ID</th><th>Version</th><th>First seen</th><th>Pages</th><th>Visits</th><th>Active min</th><th>Prompts</th><th>Skips</th>${Object.keys(QUESTIONS).map(q => `<th>${q}</th>`).join('')}<th></th></tr>`;
+  for (const s of list) {
+    const secs = Object.values(s.visits).reduce((a, b) => a + b, 0);
+    out += `<tr><td title="${esc(s.id)}">${esc(s.id.slice(0, 8))}${s.mismatch ? ' *' : ''}</td><td>${s.v}</td><td>${esc((s.first || '').slice(0, 16).replace('T', ' '))}</td><td>${s.pages.size}</td><td>${Object.keys(s.visits).length}</td><td>${(secs / 60).toFixed(1)}</td><td>${s.prompts.size}</td><td>${s.skips}</td>${Object.keys(QUESTIONS).map(q => `<td>${s.q[q] ? f1(mean(s.q[q])) : ''}</td>`).join('')}
+<td><form method="POST" action="/busia-ab/exclude" onsubmit="return confirm('Exclude ${esc(s.id.slice(0, 8))} from the results? You can restore it later.')"><input type="hidden" name="anon_id" value="${esc(s.id)}"><button type="submit" style="padding:.25rem .6rem;font-size:.8rem">Exclude</button></form></td></tr>`;
+  }
+  out += `</table></div>`;
+  if (list.some(s => s.mismatch)) out += `<p class="note">* has records on a version other than the one assigned.</p>`;
+  if (exRows.length) {
+    out += `<h2>Excluded</h2><div class="scroll"><table><tr><th>ID</th><th>Excluded at (UTC)</th><th></th></tr>`;
+    for (const e of exRows) out += `<tr><td title="${esc(e.anon_id)}">${esc(e.anon_id.slice(0, 8))}</td><td>${esc(e.at.slice(0, 16).replace('T', ' '))}</td><td><form method="POST" action="/busia-ab/restore"><input type="hidden" name="anon_id" value="${esc(e.anon_id)}"><button type="submit" style="padding:.25rem .6rem;font-size:.8rem">Restore</button></form></td></tr>`;
+    out += `</table></div>`;
+  }
+
   out += `</main></body></html>`;
   return html(out);
 }
 
 async function csv(env) {
   await ensureTable(env.DB);
-  const { results } = await env.DB.prepare('SELECT * FROM records ORDER BY id').all();
+  const { results: recs } = await env.DB.prepare('SELECT * FROM records ORDER BY id').all();
+  const { results: ex } = await env.DB.prepare('SELECT anon_id FROM excluded').all();
+  const exSet = new Set(ex.map(r => r.anon_id));
+  const results = recs.map(r => ({ ...r, excluded: exSet.has(r.anon_id) ? 1 : 0 }));
   const q = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const body = [COLS.join(','), ...results.map(r => COLS.map(c => q(r[c])).join(','))].join('\n');
   return new Response(body, { headers: { 'Content-Type': 'text/csv; charset=UTF-8', 'Content-Disposition': `attachment; filename="busia-ab-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
@@ -266,6 +302,16 @@ export default {
     }
     if (!(await loggedIn(request, env))) return loginPage('');
     if (path === '/busia-ab/csv') return csv(env);
+    if ((path === '/busia-ab/exclude' || path === '/busia-ab/restore') && request.method === 'POST') {
+      if (request.headers.get('Origin') !== url.origin) return new Response('Forbidden', { status: 403 });
+      const id = String((await request.formData()).get('anon_id') || '');
+      if (isId(id)) {
+        await ensureTable(env.DB);
+        if (path === '/busia-ab/exclude') await env.DB.prepare('INSERT OR IGNORE INTO excluded (anon_id, at) VALUES (?, ?)').bind(id, new Date().toISOString()).run();
+        else await env.DB.prepare('DELETE FROM excluded WHERE anon_id = ?').bind(id).run();
+      }
+      return new Response(null, { status: 303, headers: { 'Location': '/busia-ab/' } });
+    }
     return resultsPage(env);
   },
 };
