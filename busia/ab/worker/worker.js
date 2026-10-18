@@ -137,7 +137,7 @@ input{font:inherit;padding:.6rem .7rem;border:1.5px solid #b6cff5;border-radius:
 .login{max-width:340px;margin:3rem auto}
 .err{color:#b42318;font-weight:600}
 </style>`;
-const HEAD = (title) => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>${title}</title><link rel="icon" href="/unisamicon2.png">${STYLE}</head><body><header><div><img src="/unisamsq.png" alt="">BUSIA A/B test</div></header>`;
+const HEAD = (title) => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>${title}</title><link rel="icon" href="/unisamicon2.png">${STYLE}</head><body><header><div><img src="/geocornsmall.png" alt="">BUSIA A/B test</div></header>`;
 const html = (body, status = 200) => new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-store' } });
 
 function loginPage(msg) {
