@@ -1,0 +1,1810 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wet Bulb Range</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width column. Day picker, then a sortable league table (sticky city column, measures scroll sideways), then the selected city's detail for that day. */
+:root {
+  --bg: #edf1f3;
+  --surface: #fcfdfd;
+  --sel: #e4ebef;
+  --fg: #0e1a20;
+  --fg2: #4a5a64;
+  --muted: #66767f;
+  --line: #d6dee3;
+  --axis: #b3c0c8;
+  --band: rgba(14, 26, 32, 0.08);
+  --crit: #d03b3b;
+  --crit-text: #b02f2f;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --on1: #ffffff;
+  --on2: #0b0b0b;
+  --on3: #0b0b0b;
+  --on4: #0b0b0b;
+  --display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1418;
+    --surface: #152026;
+    --sel: #1d2d35;
+    --fg: #e8eff2;
+    --fg2: #b3c0c8;
+    --muted: #8a9aa4;
+    --line: #25343c;
+    --axis: #38494f;
+    --band: rgba(232, 239, 242, 0.1);
+    --crit: #d03b3b;
+    --crit-text: #ff8080;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --on1: #0b0b0b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1418;
+  --surface: #152026;
+  --sel: #1d2d35;
+  --fg: #e8eff2;
+  --fg2: #b3c0c8;
+  --muted: #8a9aa4;
+  --line: #25343c;
+  --axis: #38494f;
+  --band: rgba(232, 239, 242, 0.1);
+  --crit: #d03b3b;
+  --crit-text: #ff8080;
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --on1: #0b0b0b;
+  color-scheme: dark;
+}
+
+/* extra tokens: four more model greys, five risk levels, night shading */
+:root {
+  --s5: #8d9aa2; --s6: #c3ccd1; --s7: #6a7a84; --s8: #a9b5bc;
+  --on5: #0b0b0b; --on6: #0b0b0b; --on7: #ffffff; --on8: #0b0b0b;
+  --lv0: #e4ebef; --lv1: #f7e0b5; --lv2: #f4b97a; --lv3: #e0703f; --lv4: #c23030;
+  --night: rgba(14, 26, 32, 0.09);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --s5: #7a8a94; --s6: #4a5a64; --s7: #a3b0b8; --s8: #5c6c76;
+    --on5: #0b0b0b; --on6: #ffffff; --on7: #0b0b0b; --on8: #ffffff;
+    --lv0: #1d2d35; --lv1: #4a3a1c; --lv2: #7a5a22; --lv3: #b8662f; --lv4: #c23030;
+    --night: rgba(0, 0, 0, 0.3);
+  }
+}
+:root[data-theme="dark"] {
+  --s5: #7a8a94; --s6: #4a5a64; --s7: #a3b0b8; --s8: #5c6c76;
+  --on5: #0b0b0b; --on6: #ffffff; --on7: #0b0b0b; --on8: #ffffff;
+  --lv0: #1d2d35; --lv1: #4a3a1c; --lv2: #7a5a22; --lv3: #b8662f; --lv4: #c23030;
+  --night: rgba(0, 0, 0, 0.3);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 18px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+#main, #detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.title { min-width: 0; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 38px; line-height: 1; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+.sub { margin: 6px 0 0; color: var(--fg2); font-size: 14px; max-width: 36ch; }
+
+.btn { border: 1px solid var(--fg); background: transparent; border-radius: 999px; padding: 8px 14px; min-height: 40px; font-weight: 500; font-size: 14px; }
+.btn.solid { background: var(--fg); color: var(--bg); }
+.btn:hover { background: var(--line); }
+.btn.solid:hover { background: var(--fg2); }
+
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--fg2); }
+.chip-status { font-family: var(--mono); font-size: 12px; border: 1px solid var(--axis); border-radius: 999px; padding: 3px 10px; color: var(--fg); background: var(--surface); }
+.status .link { background: none; border: 0; padding: 4px 0; text-decoration: underline; color: var(--fg); min-height: 32px; }
+
+.seg { display: inline-flex; border: 1px solid var(--fg); border-radius: 999px; overflow: hidden; align-self: flex-start; max-width: 100%; }
+.seg button { border: 0; background: transparent; padding: 8px 14px; min-height: 40px; font-size: 14px; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+/* league table */
+.league { padding: 16px 12px; }
+.league > .eyebrow, .league > .hint, .league > .count, .league > .search { margin-left: 4px; margin-right: 4px; }
+.hint { margin-top: 6px; margin-bottom: 0; font-size: 13px; color: var(--fg2); }
+.search { width: calc(100% - 8px); min-height: 46px; margin-top: 10px; padding: 10px 16px; border: 1px solid var(--axis); border-radius: 999px; background: var(--bg); font-size: 16px; }
+.search::placeholder { color: var(--muted); }
+.count { margin-top: 8px; margin-bottom: 4px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.league .tablewrap { overflow-x: auto; margin-top: 4px; }
+.league table { min-width: 540px; }
+.league th { padding: 0 2px 6px; text-align: right; vertical-align: bottom; border: 0; }
+.league th.cy { text-align: left; }
+.sortbtn { background: none; border: 0; padding: 4px 2px; min-height: 44px; width: 100%; text-align: right; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 500; }
+.sortbtn .u { display: block; text-transform: none; letter-spacing: 0; font-family: var(--mono); font-size: 10px; font-weight: 400; }
+th.on .sortbtn { color: var(--fg); }
+.league td { padding: 6px 2px; border-top: 1px solid var(--line); }
+td.m { font-family: var(--mono); font-size: 13px; text-align: right; white-space: nowrap; padding-right: 4px; }
+td.m.on { font-weight: 500; background: var(--band); }
+td.m .subv { display: block; font-size: 10px; font-weight: 400; color: var(--muted); }
+.league th.cy, .league td.cy { position: sticky; left: 0; z-index: 2; background: var(--surface); width: 140px; min-width: 140px; max-width: 140px; box-shadow: 1px 0 0 var(--line); }
+.league tr[data-id] { cursor: pointer; }
+.league tr.sel td, .league tr.sel td.cy { background: var(--sel); }
+.league tr[data-id]:hover td.cy { background: var(--sel); }
+.rowbtn { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; background: none; border: 0; padding: 4px 0; min-height: 40px; }
+.rowbtn .rk { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 1.6em; text-align: right; flex: none; }
+.rowbtn .nm { display: block; min-width: 0; }
+.rowbtn .cn { display: block; font-weight: 500; font-size: 14px; line-height: 1.2; overflow-wrap: anywhere; }
+.rowbtn .cc { display: block; font-size: 11px; color: var(--muted); line-height: 1.2; }
+.rowbtn .mk { font-family: var(--mono); font-weight: 400; color: var(--muted); }
+.none { padding: 14px 4px; color: var(--fg2); font-size: 14px; }
+
+/* detail */
+.dhead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 12px; }
+.dhead h2 { font-family: var(--display); font-weight: 600; font-size: 34px; line-height: 1; margin: 2px 0 0; text-wrap: balance; }
+.dhead .ctry { color: var(--fg2); font-size: 14px; margin-top: 2px; }
+
+.readout .big { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; }
+.readout .num { font-family: var(--display); font-weight: 600; font-size: 76px; line-height: 0.9; letter-spacing: -0.01em; }
+.readout .unit { font-family: var(--display); font-weight: 500; font-size: 30px; color: var(--fg2); }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.facts .v { font-family: var(--mono); font-size: 15px; font-weight: 500; margin-top: 2px; overflow-wrap: anywhere; }
+.facts .v small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.flag { margin: 12px 0 0; font-size: 13px; color: var(--fg2); }
+.flag b { font-family: var(--mono); font-weight: 500; color: var(--fg); margin-right: 6px; }
+
+.chartwrap svg { display: block; width: 100%; height: auto; }
+svg text { font-family: var(--mono); font-size: 9px; fill: var(--muted); }
+svg .lab { fill: var(--fg2); }
+svg .crit-t { fill: var(--crit-text); font-weight: 500; }
+svg .val { fill: var(--fg2); }
+svg .grid { stroke: var(--line); stroke-width: 1; }
+svg .axis { stroke: var(--axis); stroke-width: 1; }
+svg .band { fill: var(--band); }
+svg .med { stroke: var(--fg); stroke-width: 2; }
+svg .limit { stroke: var(--crit); stroke-width: 2; stroke-dasharray: 5 3; }
+svg .gline { stroke: var(--fg2); stroke-width: 1.5; stroke-dasharray: 2 3; }
+svg .dot { stroke: var(--surface); stroke-width: 2; cursor: pointer; }
+svg .d1 { fill: var(--s1); } svg .d2 { fill: var(--s2); } svg .d3 { fill: var(--s3); } svg .d4 { fill: var(--s4); }
+svg .d0 { fill: var(--surface); stroke: var(--fg); stroke-width: 2; }
+svg .dl { font-weight: 500; pointer-events: none; }
+svg .dl1 { fill: var(--on1); } svg .dl2 { fill: var(--on2); } svg .dl3 { fill: var(--on3); } svg .dl4 { fill: var(--on4); } svg .dl0 { fill: var(--fg); }
+svg circle:focus-visible { outline: none; stroke: var(--fg); stroke-width: 3; }
+.tip { margin: 8px 0 0; min-height: 2.9em; font-size: 13px; color: var(--fg2); }
+
+.tablewrap { overflow-x: auto; }
+.srcs table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.srcs th { text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 6px 8px 0; white-space: nowrap; }
+.srcs th.r, .srcs td.r { text-align: right; }
+.srcs td { padding: 6px 6px 6px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+td.src { white-space: nowrap; }
+.sw { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--mono); font-size: 11px; font-weight: 500; margin-right: 8px; vertical-align: middle; }
+.sw.d1 { background: var(--s1); color: var(--on1); } .sw.d2 { background: var(--s2); color: var(--on2); }
+.sw.d3 { background: var(--s3); color: var(--on3); } .sw.d4 { background: var(--s4); color: var(--on4); }
+.sw.d0 { border: 2px solid var(--fg); color: var(--fg); }
+.srcs td input { width: 4.2em; text-align: right; font-family: var(--mono); font-size: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 6px; min-height: 36px; }
+.srcs td.ft { font-family: var(--mono); text-align: right; font-size: 14px; color: var(--fg2); }
+.srcs td.wb { font-family: var(--mono); font-weight: 500; text-align: right; font-size: 15px; padding-right: 0; }
+.srcs tr.hl td { background: var(--band); }
+
+.measures table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+.measures th { text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 6px 8px 0; }
+.measures th.r, .measures td.r { text-align: right; }
+.measures td { padding: 8px 6px 8px 0; border-top: 1px solid var(--line); }
+.measures td.r { font-family: var(--mono); font-size: 14px; padding-right: 0; }
+.measures td.r:nth-child(2) { font-weight: 500; }
+.measures td.r:nth-child(3) { color: var(--fg2); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; }
+.pfield { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg2); }
+.pfield input { width: 5.2em; text-align: right; font-family: var(--mono); font-size: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px; min-height: 36px; }
+
+.sens { margin: 0; font-size: 14px; color: var(--fg2); }
+.sens b { font-family: var(--mono); font-weight: 500; color: var(--fg); }
+
+.guess .q { font-family: var(--display); font-weight: 600; font-size: 28px; line-height: 1.05; margin: 4px 0 10px; text-wrap: balance; }
+.guess .gv { font-family: var(--display); font-weight: 600; font-size: 64px; line-height: 0.95; }
+.guess .gv .u { font-size: 28px; font-weight: 500; color: var(--fg2); margin-left: 4px; }
+.guess input[type=range] { width: 100%; margin: 14px 0; accent-color: var(--fg); min-height: 32px; }
+.guess .scale { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.result p { margin: 0 0 8px; }
+.result p:last-child { margin: 0; }
+
+.notes h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; margin: 8px 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; color: var(--fg2); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+.notes a { color: var(--fg); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background 0.12s; } }
+
+/* forecast detail */
+#fcBox { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.fchead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.fchead h3 { font-family: var(--display); font-weight: 600; font-size: 30px; line-height: 1; margin: 2px 0 0; }
+.fcres { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+.fclead { margin: 12px 0 0; font-size: 16px; line-height: 1.4; }
+.fcnote { margin: 8px 0 0; font-size: 13px; color: var(--fg2); }
+.fcnote b { font-family: var(--mono); font-weight: 500; color: var(--fg); }
+.facts .sm { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 1px; }
+.mchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
+.mchip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--axis); background: transparent; border-radius: 999px; padding: 3px 10px 3px 4px; min-height: 34px; font-size: 12.5px; }
+.mchip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.mchip .sw { margin-right: 0; width: 22px; height: 22px; }
+.sw.d5 { background: var(--s5); color: var(--on5); } .sw.d6 { background: var(--s6); color: var(--on6); }
+.sw.d7 { background: var(--s7); color: var(--on7); } .sw.d8 { background: var(--s8); color: var(--on8); }
+.blocks4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 4px; }
+.blocks4 > div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 2px; text-align: center; min-width: 0; }
+.blocks4 .bn { font-size: 10px; color: var(--fg2); text-transform: uppercase; letter-spacing: 0; font-weight: 500; }
+.blocks4 .bv { font-family: var(--mono); font-weight: 500; font-size: 15px; margin-top: 4px; white-space: nowrap; }
+.blocks4 .bv small { font-size: 10px; font-weight: 400; color: var(--muted); }
+.blocks4 .bs { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.fcsub { margin: 14px 0 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--fg2); margin: 8px 0 0; }
+.legend svg { width: 28px; height: 10px; vertical-align: middle; margin-right: 4px; }
+svg .d5 { fill: var(--s5); } svg .d6 { fill: var(--s6); } svg .d7 { fill: var(--s7); } svg .d8 { fill: var(--s8); }
+svg .dl5 { fill: var(--on5); } svg .dl6 { fill: var(--on6); } svg .dl7 { fill: var(--on7); } svg .dl8 { fill: var(--on8); }
+svg .night { fill: var(--night); }
+svg .nowl { stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: 3 2; }
+svg .hit { fill: transparent; cursor: pointer; }
+svg .seg1 { stroke: var(--surface); stroke-width: 0.6; }
+svg .tl { font-size: 8.5px; fill: var(--fg); text-anchor: middle; pointer-events: none; }
+svg .tl.w { fill: #ffffff; }
+svg .lv0 { fill: var(--lv0); } svg .lv1 { fill: var(--lv1); } svg .lv2 { fill: var(--lv2); } svg .lv3 { fill: var(--lv3); } svg .lv4 { fill: var(--lv4); }
+svg .ln-t { stroke: var(--fg); stroke-width: 2; fill: none; }
+svg .ln-a { stroke: var(--s2); stroke-width: 2; fill: none; stroke-dasharray: 6 3; }
+svg .ln-w { stroke: var(--s1); stroke-width: 2; fill: none; stroke-dasharray: 1.5 3.5; stroke-linecap: round; }
+svg .bandf { fill: var(--fg); opacity: 0.12; }
+svg .sunbar { fill: var(--s4); }
+svg .whisk { stroke: var(--fg2); stroke-width: 1.2; }
+svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.55; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <h1>Wet Bulb Range</h1>
+      <p class="sub">Heat measures for cities worldwide, today and the next two days, from several weather sources at once.</p>
+    </div>
+    <button class="btn" id="gameBtn" type="button">Guess first</button>
+  </header>
+
+  <div class="status" id="status"></div>
+
+  <div class="seg" id="days" role="group" aria-label="Day"></div>
+
+  <section class="card guess" id="guessCard" hidden>
+    <div class="eyebrow">Your guess</div>
+    <p class="q" id="guessQ">What will the median wet bulb be?</p>
+    <div class="gv"><span id="gval">25.0</span><span class="u">&deg;C</span></div>
+    <label class="eyebrow" for="gslider" style="display:block;margin-top:8px">Slide to set your guess</label>
+    <input type="range" id="gslider" min="0" max="40" step="0.5" value="25">
+    <div class="scale"><span>0</span><span>10</span><span>20</span><span>30</span><span>40</span></div>
+    <div class="row" style="margin-top:14px"><button class="btn solid" id="revealBtn" type="button">Reveal</button></div>
+  </section>
+
+  <div id="main">
+    <section class="card league" id="league">
+      <div class="eyebrow">League table</div>
+      <p class="hint">Each day's peak hour, in local time. Tap a column heading to sort, or a city for the detail.</p>
+      <input class="search" id="q" type="search" placeholder="Search a city or country" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search a city or country">
+      <div class="count" id="count" aria-live="polite"></div>
+      <div class="tablewrap">
+        <table>
+          <thead id="lhead"></thead>
+          <tbody id="lrows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="detail">
+      <div class="dhead">
+        <div>
+          <div class="eyebrow">Selected city</div>
+          <h2 id="dName">-</h2>
+          <div class="ctry" id="dCountry"></div>
+        </div>
+        <button class="btn" id="toTop" type="button">Back to league</button>
+      </div>
+
+      <section class="card result" id="resultCard" hidden>
+        <div class="eyebrow">Result</div>
+        <p id="resText" style="margin-top:6px"></p>
+        <div class="row" style="margin-top:10px"><button class="btn solid" id="againBtn" type="button">Try another city</button></div>
+      </section>
+
+      <div id="fcBox"></div>
+
+      <section class="card readout" aria-live="polite">
+        <div class="eyebrow" id="midLbl">Median wet bulb</div>
+        <div class="big"><span class="num" id="mid">-</span><span class="unit">&deg;C</span></div>
+        <div class="facts">
+          <div><div class="eyebrow">Range</div><div class="v" id="fRange">-</div></div>
+          <div><div class="eyebrow">Spread</div><div class="v" id="fSpread">-</div></div>
+          <div><div class="eyebrow">Below limit</div><div class="v" id="fGap">-</div></div>
+        </div>
+        <p class="flag" id="flag"></p>
+      </section>
+
+      <section class="card measures">
+        <div class="eyebrow">All measures, middle and range across sources</div>
+        <table>
+          <thead><tr><th>Measure</th><th class="r">Middle</th><th class="r">Low to high</th></tr></thead>
+          <tbody id="mrows"></tbody>
+        </table>
+      </section>
+
+      <section class="card chartwrap">
+        <div class="eyebrow" style="margin-bottom:6px">Every source on one scale, &deg;C</div>
+        <div id="chart"></div>
+        <p class="tip" id="tip">Tap a dot to see the inputs behind it.</p>
+      </section>
+
+      <section class="card srcs">
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Source</th><th class="r">Temp &deg;C</th><th class="r">RH %</th><th class="r">Feels</th><th class="r">Wet bulb</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="controls">
+          <div class="seg" role="group" aria-label="Method">
+            <button type="button" id="mStull" aria-pressed="true">Stull</button>
+            <button type="button" id="mFull" aria-pressed="false">Full, with pressure</button>
+          </div>
+          <label class="pfield" for="pin">Pressure hPa <input id="pin" type="number" inputmode="decimal" step="1"></label>
+          <button class="btn" id="resetBtn" type="button">Reset values</button>
+        </div>
+      </section>
+
+      <p class="sens" id="sens"></p>
+    </div>
+  </div>
+
+  <section class="notes">
+    <h2>Notes</h2>
+    <ul>
+      <li>Each day shows its peak hour: the hour with the highest wet bulb across the weather models, in the city's local time. Temperature, humidity and feels like are taken at that hour. Every ranged figure shows the lowest and highest value across the sources.</li>
+      <li>Peak sun is the day's strongest sunlight in watts per square metre, and UV max is the day's highest UV index. Not every model reports UV, so it can be blank.</li>
+      <li>Feels like comes from the weather model. If you edit a temperature or humidity, it switches to a simple shade estimate with light wind.</li>
+      <li>Stull (2011) uses temperature and humidity only and is good to about 1&deg;C in normal conditions. The full method solves the psychrometric equation and also uses pressure.</li>
+      <li>Weather models describe a grid cell, not a single street, and an airport observation can differ from the cell around it.</li>
+      <li>35&deg;C is the theoretical limit for people resting in shade. Lab studies on healthy young adults find strain starting lower, around 30 to 31&deg;C in humid heat.</li>
+      <li>This is plain wet bulb temperature. WBGT, used for outdoor work and sport, also counts sun and wind.</li>
+      <li>The forecast detail compares up to eight weather models: ECMWF, GFS, ICON, GEM, JMA, Meteo-France, UK Met Office and CMA. Today is hourly, tomorrow is in three-hour blocks and the day after is in six-hour blocks. Hours already gone today are the models&rsquo; own estimate, not station readings.</li>
+      <li>Rain is shown model by model, not only averaged, because models often disagree on whether a storm happens and when. Bar height is the average rate and each colour is one model&rsquo;s share, so a long drizzle and a short downpour look different.</li>
+      <li>Heat level uses simple thresholds I chose (feels like 32, 38 and 45&deg;C, wet bulb 25, 28 and 31&deg;C), not an official scale. The best and hardest three hours between 6am and 6pm score feels like temperature plus a penalty for rain and UV.</li>
+      <li>Air quality comes from Open-Meteo&rsquo;s separate air quality service and is one forecast, not a comparison of models. Storm energy (CAPE) shows how much fuel there is for thunderstorms, not whether one will form.</li>
+      <li>Example values are rough mid-October guesses. The spread between example sources, the day-to-day changes, sun, UV, feels like and everything in the forecast detail (all eight models, rain, wind, air quality) are simulated. Live data, when it loads, comes from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under CC BY 4.0.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LIMIT = 35;
+  var ORDER = ['ecmwf', 'gfs', 'icon', 'gem', 'obs'];
+  var MODELS = ['ecmwf', 'gfs', 'icon', 'gem'];
+  var SRC = {
+    ecmwf: { key: 'ecmwf_ifs025', name: 'ECMWF', ch: 'E', c: 1 },
+    gfs: { key: 'gfs_seamless', name: 'GFS', ch: 'G', c: 2 },
+    icon: { key: 'icon_seamless', name: 'ICON', ch: 'I', c: 3 },
+    gem: { key: 'gem_seamless', name: 'GEM', ch: 'C', c: 4 },
+    obs: { key: null, name: 'Airport obs', ch: 'O', c: 0 }
+  };
+  /* Example mode only: each source is the city's base value plus a fixed offset. */
+  var OFFS = { ecmwf: [-0.7, 3], gfs: [0.6, -3], icon: [-0.1, 1], gem: [1.0, -5], obs: [-0.4, 6] };
+  var COLS = [
+    { k: 'at', n: 'Feels', long: 'Feels like', u: '°C', d: 1 },
+    { k: 't', n: 'Temp', long: 'Temperature', u: '°C', d: 1 },
+    { k: 'wb', n: 'Wet bulb', long: 'Wet bulb', u: '°C', d: 1 },
+    { k: 'rh', n: 'RH', long: 'Humidity', u: '%', d: 0 },
+    { k: 'sw', n: 'Sun', long: 'Peak sun', u: 'W/m²', d: 0 },
+    { k: 'uv', n: 'UV', long: 'UV max', u: 'index', d: 1 }
+  ];
+
+  /* name, country, extra search words, lat, lon, typical mid-October afternoon temp C, RH %, pressure hPa (rough, for example mode) */
+  var RAW = [
+    ['Ho Chi Minh City', 'Vietnam', 'Saigon Sai Gon HCMC', 10.82, 106.66, 32, 68, 1009],
+    ['Hanoi', 'Vietnam', 'Ha Noi', 21.03, 105.85, 29, 70, 1013],
+    ['Da Nang', 'Vietnam', 'Danang', 16.05, 108.2, 29.5, 75, 1011],
+    ['Vinh', 'Vietnam', 'Nghe An', 18.68, 105.68, 28.5, 78, 1012],
+    ['Bandar Mahshahr', 'Iran', 'Mashhar', 30.56, 49.2, 36, 35, 1005],
+    ['Bandar Abbas', 'Iran', '', 27.18, 56.27, 35, 50, 1008],
+    ['Doha', 'Qatar', '', 25.29, 51.53, 36, 45, 1007],
+    ['Dubai', 'United Arab Emirates', 'UAE', 25.2, 55.27, 36, 45, 1006],
+    ['Abu Dhabi', 'United Arab Emirates', 'UAE', 24.45, 54.38, 36, 45, 1006],
+    ['Ras al-Khaimah', 'United Arab Emirates', 'UAE RAK', 25.79, 55.94, 35, 50, 1006],
+    ['Dhahran', 'Saudi Arabia', 'Dammam KSA', 26.29, 50.11, 36, 40, 1006],
+    ['Jacobabad', 'Pakistan', '', 28.28, 68.44, 35, 25, 1001],
+    ['Chennai', 'India', 'Madras', 13.08, 80.27, 32, 65, 1008],
+    ['Tirunelveli', 'India', '', 8.73, 77.7, 33, 60, 1007],
+    ['Tiruchirappalli', 'India', 'Trichy', 10.79, 78.7, 33, 58, 1006],
+    ['Madurai', 'India', '', 9.93, 78.12, 33, 58, 1006],
+    ['Visakhapatnam', 'India', 'Vizag', 17.69, 83.22, 31, 70, 1008],
+    ['Vijayawada', 'India', '', 16.51, 80.65, 33, 62, 1007],
+    ['Mumbai', 'India', 'Bombay', 19.08, 72.88, 33, 62, 1008],
+    ['Kolkata', 'India', 'Calcutta', 22.57, 88.36, 32, 70, 1009],
+    ['Delhi', 'India', 'New Delhi', 28.61, 77.21, 33, 38, 990],
+    ['Dhaka', 'Bangladesh', '', 23.81, 90.41, 32, 68, 1008],
+    ['Bangkok', 'Thailand', '', 13.75, 100.5, 33, 65, 1008],
+    ['Jakarta', 'Indonesia', '', -6.2, 106.85, 33, 66, 1009],
+    ['Hong Kong', 'China', 'HK SAR', 22.32, 114.17, 28, 70, 1013],
+    ['Phoenix', 'United States', 'USA US Arizona', 33.45, -112.07, 33, 15, 970],
+    ['Auckland', 'New Zealand', 'NZ Aotearoa', -36.85, 174.76, 17, 68, 1015],
+    ['London', 'United Kingdom', 'UK England Britain', 51.51, -0.13, 15, 65, 1013],
+    ['Dublin', 'Ireland', '', 53.35, -6.26, 14, 70, 1012],
+    ['Paris', 'France', '', 48.86, 2.35, 16, 62, 1014],
+    ['Brussels', 'Belgium', '', 50.85, 4.35, 15, 68, 1014],
+    ['Amsterdam', 'Netherlands', 'Holland', 52.37, 4.9, 14, 70, 1014],
+    ['Luxembourg', 'Luxembourg', '', 49.61, 6.13, 14, 70, 995],
+    ['Berlin', 'Germany', '', 52.52, 13.4, 14, 62, 1013],
+    ['Bern', 'Switzerland', '', 46.95, 7.45, 13, 65, 955],
+    ['Vienna', 'Austria', 'Wien', 48.21, 16.37, 14, 60, 1008],
+    ['Prague', 'Czechia', 'Czech Republic', 50.08, 14.44, 12, 62, 1000],
+    ['Warsaw', 'Poland', '', 52.23, 21.01, 12, 65, 1004],
+    ['Budapest', 'Hungary', '', 47.5, 19.04, 15, 58, 1005],
+    ['Bratislava', 'Slovakia', '', 48.15, 17.11, 14, 60, 1008],
+    ['Ljubljana', 'Slovenia', '', 46.06, 14.51, 14, 68, 995],
+    ['Zagreb', 'Croatia', '', 45.81, 15.98, 16, 60, 1000],
+    ['Belgrade', 'Serbia', '', 44.79, 20.45, 17, 56, 1002],
+    ['Sarajevo', 'Bosnia and Herzegovina', 'Bosnia', 43.86, 18.41, 14, 60, 955],
+    ['Podgorica', 'Montenegro', '', 42.44, 19.26, 19, 55, 1010],
+    ['Skopje', 'North Macedonia', 'Macedonia', 41.99, 21.43, 18, 55, 980],
+    ['Tirana', 'Albania', '', 41.33, 19.82, 21, 60, 1012],
+    ['Athens', 'Greece', '', 37.98, 23.73, 23, 55, 1012],
+    ['Sofia', 'Bulgaria', '', 42.7, 23.32, 16, 55, 945],
+    ['Bucharest', 'Romania', '', 44.43, 26.1, 17, 55, 1005],
+    ['Chisinau', 'Moldova', '', 47.01, 28.86, 15, 58, 1005],
+    ['Kyiv', 'Ukraine', 'Kiev', 50.45, 30.52, 12, 65, 1001],
+    ['Minsk', 'Belarus', '', 53.9, 27.57, 9, 70, 995],
+    ['Moscow', 'Russia', '', 55.76, 37.62, 8, 75, 998],
+    ['Vilnius', 'Lithuania', '', 54.69, 25.28, 9, 72, 1004],
+    ['Riga', 'Latvia', '', 56.95, 24.11, 9, 75, 1010],
+    ['Tallinn', 'Estonia', '', 59.44, 24.75, 8, 78, 1010],
+    ['Helsinki', 'Finland', '', 60.17, 24.94, 8, 78, 1010],
+    ['Stockholm', 'Sweden', '', 59.33, 18.07, 9, 75, 1010],
+    ['Oslo', 'Norway', '', 59.91, 10.75, 9, 75, 1010],
+    ['Copenhagen', 'Denmark', '', 55.68, 12.57, 12, 75, 1012],
+    ['Reykjavik', 'Iceland', '', 64.15, -21.94, 7, 78, 1005],
+    ['Madrid', 'Spain', '', 40.42, -3.7, 21, 48, 945],
+    ['Lisbon', 'Portugal', '', 38.72, -9.14, 21, 58, 1016],
+    ['Rome', 'Italy', '', 41.9, 12.5, 21, 58, 1014],
+    ['Valletta', 'Malta', '', 35.9, 14.51, 25, 62, 1015],
+    ['Nicosia', 'Cyprus', '', 35.19, 33.38, 28, 42, 995],
+    ['Kuwait City', 'Kuwait', '', 29.38, 47.99, 35, 20, 1008],
+    ['Basra', 'Iraq', '', 30.51, 47.78, 36, 25, 1007],
+    ['Manama', 'Bahrain', '', 26.23, 50.59, 35, 48, 1008],
+    ['Muscat', 'Oman', '', 23.59, 58.41, 35, 50, 1008],
+    ['Jeddah', 'Saudi Arabia', 'KSA', 21.54, 39.17, 35, 50, 1008],
+    ['Mecca', 'Saudi Arabia', 'Makkah KSA', 21.39, 39.86, 37, 25, 985],
+    ['Riyadh', 'Saudi Arabia', 'KSA', 24.71, 46.68, 35, 15, 945],
+    ['Ahvaz', 'Iran', '', 31.32, 48.67, 36, 28, 1005],
+    ['Baghdad', 'Iraq', '', 33.31, 44.37, 35, 20, 1005],
+    ['Tehran', 'Iran', '', 35.69, 51.39, 24, 30, 885],
+    ['Karachi', 'Pakistan', '', 24.86, 67.01, 34, 55, 1008],
+    ['Lahore', 'Pakistan', '', 31.52, 74.36, 33, 40, 992],
+    ['Ahmedabad', 'India', '', 23.02, 72.57, 35, 45, 1004],
+    ['Hyderabad', 'India', '', 17.39, 78.49, 31, 55, 955],
+    ['Bengaluru', 'India', 'Bangalore', 12.97, 77.59, 28, 60, 910],
+    ['Kochi', 'India', 'Cochin', 9.93, 76.27, 32, 70, 1008],
+    ['Colombo', 'Sri Lanka', '', 6.93, 79.86, 31, 75, 1009],
+    ['Chittagong', 'Bangladesh', 'Chattogram', 22.36, 91.78, 32, 70, 1008],
+    ['Singapore', 'Singapore', '', 1.35, 103.82, 32, 70, 1010],
+    ['Kuala Lumpur', 'Malaysia', 'KL', 3.14, 101.69, 33, 65, 1008],
+    ['Manila', 'Philippines', '', 14.6, 120.98, 32, 68, 1009],
+    ['Yangon', 'Myanmar', 'Rangoon Burma', 16.87, 96.2, 32, 68, 1008],
+    ['Phnom Penh', 'Cambodia', '', 11.56, 104.93, 32, 65, 1009],
+    ['Vientiane', 'Laos', '', 17.97, 102.63, 31, 65, 1000],
+    ['Surabaya', 'Indonesia', '', -7.25, 112.75, 33, 62, 1009],
+    ['Denpasar', 'Indonesia', 'Bali', -8.65, 115.22, 32, 65, 1009],
+    ['Hai Phong', 'Vietnam', 'Haiphong', 20.84, 106.69, 29, 72, 1013],
+    ['Hue', 'Vietnam', '', 16.46, 107.59, 28, 78, 1011],
+    ['Nha Trang', 'Vietnam', '', 12.24, 109.19, 30, 72, 1011],
+    ['Da Lat', 'Vietnam', 'Dalat', 11.94, 108.44, 23, 75, 850],
+    ['Can Tho', 'Vietnam', 'Cantho', 10.04, 105.78, 32, 68, 1009],
+    ['Tokyo', 'Japan', '', 35.68, 139.69, 21, 55, 1015],
+    ['Osaka', 'Japan', '', 34.69, 135.5, 22, 55, 1015],
+    ['Fukuoka', 'Japan', '', 33.59, 130.4, 22, 58, 1015],
+    ['Seoul', 'South Korea', 'Korea', 37.57, 126.98, 19, 50, 1015],
+    ['Beijing', 'China', '', 39.9, 116.41, 18, 45, 1012],
+    ['Shanghai', 'China', '', 31.23, 121.47, 24, 62, 1015],
+    ['Guangzhou', 'China', 'Canton', 23.13, 113.26, 30, 62, 1012],
+    ['Wuhan', 'China', '', 30.59, 114.31, 24, 62, 1014],
+    ['Taipei', 'Taiwan', '', 25.03, 121.57, 27, 68, 1013],
+    ['Cairo', 'Egypt', '', 30.04, 31.24, 30, 40, 1010],
+    ['Lagos', 'Nigeria', '', 6.52, 3.38, 31, 75, 1010],
+    ['Abidjan', 'Ivory Coast', 'Cote d Ivoire', 5.36, -4.01, 31, 75, 1010],
+    ['Accra', 'Ghana', '', 5.6, -0.19, 30, 75, 1010],
+    ['Dakar', 'Senegal', '', 14.72, -17.47, 32, 70, 1010],
+    ['Dar es Salaam', 'Tanzania', '', -6.79, 39.21, 31, 68, 1010],
+    ['Djibouti', 'Djibouti', '', 11.59, 43.15, 35, 55, 1008],
+    ['Khartoum', 'Sudan', '', 15.5, 32.56, 37, 28, 970],
+    ['Nairobi', 'Kenya', '', -1.29, 36.82, 25, 50, 828],
+    ['Kinshasa', 'DR Congo', 'Democratic Republic Congo DRC', -4.44, 15.27, 31, 70, 975],
+    ['Miami', 'United States', 'USA US Florida', 25.76, -80.19, 30, 68, 1015],
+    ['Houston', 'United States', 'USA US Texas', 29.76, -95.37, 29, 60, 1015],
+    ['New Orleans', 'United States', 'USA US Louisiana', 29.95, -90.07, 28, 62, 1016],
+    ['New York', 'United States', 'USA US NYC', 40.71, -74.01, 18, 52, 1016],
+    ['Los Angeles', 'United States', 'USA US LA California', 34.05, -118.24, 26, 40, 1013],
+    ['Chicago', 'United States', 'USA US Illinois', 41.88, -87.63, 17, 55, 1013],
+    ['Toronto', 'Canada', '', 43.65, -79.38, 15, 58, 1014],
+    ['Mexico City', 'Mexico', '', 19.43, -99.13, 24, 50, 775],
+    ['Panama City', 'Panama', '', 8.98, -79.52, 31, 78, 1009],
+    ['Havana', 'Cuba', '', 23.11, -82.37, 30, 68, 1013],
+    ['Santo Domingo', 'Dominican Republic', '', 18.49, -69.93, 31, 72, 1011],
+    ['Cartagena', 'Colombia', '', 10.39, -75.51, 32, 72, 1010],
+    ['Bogota', 'Colombia', '', 4.71, -74.07, 19, 65, 745],
+    ['Guayaquil', 'Ecuador', '', -2.17, -79.92, 29, 70, 1011],
+    ['Lima', 'Peru', '', -12.05, -77.04, 20, 72, 1013],
+    ['Manaus', 'Brazil', '', -3.12, -60.02, 33, 62, 1008],
+    ['Rio de Janeiro', 'Brazil', 'Rio', -22.91, -43.17, 27, 65, 1014],
+    ['Sao Paulo', 'Brazil', '', -23.55, -46.63, 26, 60, 925],
+    ['Buenos Aires', 'Argentina', '', -34.6, -58.38, 22, 60, 1014],
+    ['Darwin', 'Australia', '', -12.46, 130.84, 33, 65, 1008],
+    ['Brisbane', 'Australia', '', -27.47, 153.03, 26, 55, 1014],
+    ['Sydney', 'Australia', '', -33.87, 151.21, 22, 58, 1014],
+    ['Melbourne', 'Australia', '', -37.81, 144.96, 19, 55, 1014],
+    ['Perth', 'Australia', '', -31.95, 115.86, 24, 45, 1014],
+    ['Wellington', 'New Zealand', 'NZ', -41.29, 174.78, 15, 70, 1012],
+    ['Christchurch', 'New Zealand', 'NZ', -43.53, 172.64, 17, 55, 1011],
+    ['Honolulu', 'United States', 'USA US Hawaii', 21.31, -157.86, 30, 62, 1014],
+    ['Port Moresby', 'Papua New Guinea', 'PNG', -9.44, 147.18, 32, 70, 1008],
+    ['Suva', 'Fiji', '', -18.14, 178.44, 28, 75, 1010],
+    ['Apia', 'Samoa', '', -13.83, -171.76, 30, 75, 1009],
+    ['Port Vila', 'Vanuatu', '', -17.73, 168.32, 27, 72, 1010],
+    ['Papeete', 'French Polynesia', 'Tahiti', -17.54, -149.57, 29, 72, 1010],
+    ['Istanbul', 'Turkey', 'Turkiye', 41.01, 28.98, 20, 60, 1013]
+  ];
+
+  function norm(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  var CITIES = RAW.map(function (r) {
+    return {
+      id: norm(r[0]).replace(/[^a-z0-9]+/g, '-'), name: r[0], country: r[1], alt: r[2],
+      lat: r[3], lon: r[4], T: r[5], RH: r[6], P: r[7],
+      words: norm(r[0] + ' ' + r[1] + ' ' + r[2]).split(/[^a-z0-9]+/).filter(Boolean)
+    };
+  });
+  var BYID = {};
+  CITIES.forEach(function (c) { BYID[c.id] = c; });
+
+  /* ---------- maths ---------- */
+  function esat(t) { return 6.112 * Math.exp(17.62 * t / (243.12 + t)); }
+  function wbStull(t, rh) {
+    return t * Math.atan(0.151977 * Math.sqrt(rh + 8.313659)) + Math.atan(t + rh) - Math.atan(rh - 1.676331) +
+      0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh) - 4.686035;
+  }
+  function wbFull(t, rh, p) {
+    var e = rh / 100 * esat(t), lo = -60, hi = t, i, m, f;
+    for (i = 0; i < 60; i++) {
+      m = (lo + hi) / 2;
+      f = esat(m) - 0.00066 * (1 + 0.00115 * m) * p * (t - m) - e;
+      if (f > 0) hi = m; else lo = m;
+    }
+    return (lo + hi) / 2;
+  }
+  /* Shade apparent temperature (Australian Bureau of Meteorology form), ws in m/s */
+  function estAT(t, rh, ws) {
+    var e = rh / 100 * 6.105 * Math.exp(17.27 * t / (237.7 + t));
+    return t + 0.33 * e - 0.70 * ws - 4.0;
+  }
+  function stats(vals) {
+    var s = vals.slice().sort(function (a, b) { return a - b; }), n = s.length;
+    var mean = s.reduce(function (a, b) { return a + b; }, 0) / n;
+    var med = n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+    return { n: n, min: s[0], max: s[n - 1], mid: n >= 4 ? med : mean, kind: n >= 4 ? 'median' : 'mean' };
+  }
+  function fmt(v) { return v.toFixed(1); }
+  function ok(v) { return typeof v === 'number' && isFinite(v); }
+
+  /* ---------- example data ---------- */
+  function mk(rows, p, live, ex) {
+    ex = ex || {};
+    return {
+      rows: rows, p: p, live: live, sw: ex.sw && ok(ex.sw.mid) ? ex.sw : null, uv: ex.uv && ok(ex.uv.mid) ? ex.uv : null, hour: ex.hour || null,
+      orig: JSON.parse(JSON.stringify({ rows: rows, p: p }))
+    };
+  }
+  function rnd(id, d, salt) {
+    var s = 0, str = id + salt, i;
+    for (i = 0; i < str.length; i++) s = (s * 31 + str.charCodeAt(i)) % 9973;
+    s = (s * (d * 2 + 7) + 13 * d) % 9973;
+    return s / 9973 * 2 - 1;
+  }
+  function fresh(c) {
+    var days = [0, 1, 2].map(function (d) {
+      var T = c.T + (d === 0 ? 0 : rnd(c.id, d, 't') * 1.3);
+      var RH = Math.min(98, Math.max(4, c.RH + (d === 0 ? 0 : rnd(c.id, d, 'h') * 7)));
+      var rows = {};
+      ORDER.forEach(function (k) {
+        var o = OFFS[k];
+        var t = Math.round((T + o[0]) * 10) / 10, rh = Math.min(100, Math.max(3, Math.round(RH + o[1])));
+        rows[k] = { t: t, rh: rh, at: Math.round(estAT(t, rh, 3) * 10) / 10 };
+      });
+      var se = Math.sin(Math.max(2, 90 - Math.abs(c.lat + 8.5)) * Math.PI / 180);
+      var cloud = Math.min(0.7, Math.max(0, (RH - 50) / 70));
+      var sw = Math.round(1050 * Math.pow(se, 1.2) * (1 - 0.75 * cloud) * (1 + 0.1 * rnd(c.id, d, 's')) / 10) * 10;
+      var uv = Math.round(12.5 * Math.pow(se, 2.4) * (1 - 0.5 * cloud) * (1 + 0.1 * rnd(c.id, d, 'u')) * 10) / 10;
+      var sp = 0.04 + 0.03 * (rnd(c.id, d, 'r') + 1);
+      return mk(rows, c.P, false, {
+        sw: { mid: sw, min: Math.round(sw * (1 - sp) / 10) * 10, max: Math.round(sw * (1 + sp) / 10) * 10 },
+        uv: { mid: uv, min: Math.round(uv * (1 - sp) * 10) / 10, max: Math.round(uv * (1 + sp) * 10) / 10 },
+        hour: '15:00'
+      });
+    });
+    return { days: days };
+  }
+
+  /* ---------- state ---------- */
+  var state = { city: CITIES[0].id, day: 0, method: 'stull', game: 'off', guess: 25, sort: { key: 'wb', dir: 'desc' }, data: {}, liveState: 'idle', fetched: null };
+  CITIES.forEach(function (c) { state.data[c.id] = fresh(c); });
+  function city() { return BYID[state.city]; }
+  function cur() { return state.data[state.city].days[state.day]; }
+
+  try {
+    var saved = JSON.parse(localStorage.getItem('wbr') || '{}');
+    if (saved.city && BYID[saved.city]) state.city = saved.city;
+    if (saved.method === 'full' || saved.method === 'stull') state.method = saved.method;
+    if (saved.sort && COLS.some(function (c) { return c.k === saved.sort.key; }) && (saved.sort.dir === 'asc' || saved.sort.dir === 'desc')) state.sort = saved.sort;
+  } catch (e) { /* storage unavailable, carry on */ }
+  function persist() {
+    try { localStorage.setItem('wbr', JSON.stringify({ city: state.city, method: state.method, sort: state.sort })); } catch (e) { /* ignore */ }
+  }
+
+  function wbOf(r, p, rhShift) {
+    var rh = Math.min(100, Math.max(1, r.rh + (rhShift || 0)));
+    return state.method === 'full' ? wbFull(r.t, rh, p) : wbStull(r.t, rh);
+  }
+  function atOf(r) { return ok(r.at) ? r.at : estAT(r.t, r.rh, 3); }
+  function calc(d, shift) {
+    var out = [];
+    ORDER.forEach(function (k) {
+      var r = d.rows[k];
+      if (r && ok(r.t) && ok(r.rh) && r.rh > 0 && r.rh <= 100 && (state.method === 'stull' || ok(d.p))) {
+        out.push({ k: k, t: r.t, rh: r.rh, at: atOf(r), wb: wbOf(r, d.p, shift) });
+      }
+    });
+    return out;
+  }
+  function rowStats(id) {
+    var d = state.data[id].days[state.day], list = calc(d, 0);
+    if (!list.length) return null;
+    function rg(key) {
+      var s = stats(list.map(function (x) { return x[key]; }));
+      return { mid: s.mid, min: s.min, max: s.max };
+    }
+    return { wb: rg('wb'), t: rg('t'), rh: rg('rh'), at: rg('at'), sw: d.sw, uv: d.uv };
+  }
+  function liveCount() { return CITIES.filter(function (c) { return state.data[c.id].days[0].live; }).length; }
+
+  /* ---------- DOM helpers ---------- */
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, txt) { var n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; }
+  function hhmm(d) { return d ? d.toTimeString().slice(0, 5) : ''; }
+  function goto(id) {
+    var n = $(id); if (!n || !n.scrollIntoView) return;
+    var rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try { n.scrollIntoView({ behavior: rm ? 'auto' : 'smooth', block: 'start' }); } catch (e) { n.scrollIntoView(); }
+  }
+  function dayName(d) {
+    if (d === 0) return 'Today';
+    if (d === 1) return 'Tomorrow';
+    try { var t = new Date(); t.setDate(t.getDate() + 2); return t.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }); } catch (e) { return 'In 2 days'; }
+  }
+  function dayWord(d) { return ['today', 'tomorrow', 'the day after tomorrow'][d]; }
+
+  /* ---------- day picker and status ---------- */
+  function renderDays() {
+    var box = $('days'); box.textContent = '';
+    [0, 1, 2].forEach(function (d) {
+      var b = el('button', null, dayName(d)); b.type = 'button';
+      b.setAttribute('aria-pressed', d === state.day ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        state.day = d; renderDays(); applyGame(); renderTable(); update();
+      });
+      box.appendChild(b);
+    });
+  }
+  function renderStatus() {
+    var s = $('status'); s.textContent = '';
+    var chip = el('span', 'chip-status'), note = el('span'), n = liveCount(), N = CITIES.length;
+    if (state.liveState === 'loading' || state.liveState === 'idle') {
+      chip.textContent = '○ Example data'; note.textContent = 'Checking for live data.';
+    } else if (n === N) {
+      chip.textContent = '● Live ' + hhmm(state.fetched); note.textContent = 'From Open-Meteo. Edit any value to explore.';
+    } else if (n > 0) {
+      chip.textContent = '◐ Live for ' + n + ' of ' + N; note.textContent = 'The rest are example values, marked ○ in the table.';
+    } else {
+      chip.textContent = '○ Example data';
+      note.textContent = 'Live data could not load here, so these are rough mid-October guesses, not real weather or forecasts. Edit any value to explore.';
+    }
+    s.appendChild(chip); s.appendChild(note);
+    if (state.liveState !== 'loading' && state.liveState !== 'idle' && n < N) {
+      var r = el('button', 'link', 'Try live again'); r.type = 'button';
+      r.addEventListener('click', function () { loadLiveAll(true); });
+      s.appendChild(r);
+    }
+  }
+
+  /* ---------- league table ---------- */
+  function renderHead() {
+    var h = $('lhead'); h.textContent = '';
+    var tr = el('tr'), c0 = el('th', 'cy', 'City'); c0.style.paddingBottom = '10px'; tr.appendChild(c0);
+    COLS.forEach(function (col) {
+      var th = el('th', state.sort.key === col.k ? 'on' : ''), b = el('button', 'sortbtn');
+      b.type = 'button'; b.setAttribute('data-k', col.k);
+      b.setAttribute('aria-label', 'Sort by ' + col.n);
+      var on = state.sort.key === col.k;
+      th.setAttribute('aria-sort', on ? (state.sort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
+      b.appendChild(document.createTextNode(col.n));
+      b.appendChild(el('span', 'u', col.u + (on ? (state.sort.dir === 'desc' ? ' ▼' : ' ▲') : '')));
+      th.appendChild(b); tr.appendChild(th);
+    });
+    h.appendChild(tr);
+  }
+  function renderLeague() {
+    renderHead();
+    var toks = norm($('q').value).split(/\s+/).filter(Boolean);
+    var key = state.sort.key, desc = state.sort.dir === 'desc';
+    var all = CITIES.map(function (c) { return { c: c, s: rowStats(c.id) }; });
+    var valid = all.filter(function (x) { return x.s && x.s[key] && ok(x.s[key].mid); });
+    valid.sort(function (a, b) { return desc ? b.s[key].mid - a.s[key].mid : a.s[key].mid - b.s[key].mid; });
+    var rank = {};
+    valid.forEach(function (x, i) { rank[x.c.id] = i + 1; });
+    var ordered = valid.concat(all.filter(function (x) { return valid.indexOf(x) < 0; }));
+    var shown = ordered.filter(function (x) {
+      return toks.every(function (t) { return x.c.words.some(function (w) { return w.indexOf(t) === 0; }); });
+    });
+    var n = liveCount(), mixed = n > 0 && n < CITIES.length;
+    var colName = COLS.filter(function (c) { return c.k === key; })[0].long.toLowerCase();
+    $('count').textContent = (shown.length === CITIES.length ? CITIES.length : shown.length + ' of ' + CITIES.length) + ' cities, by ' + colName + ', ' + (desc ? 'highest first' : 'lowest first');
+    var tb = $('lrows'); tb.textContent = '';
+    if (!shown.length) {
+      var tr0 = el('tr'), td0 = el('td', 'none', 'No city or country matches that.'); td0.colSpan = COLS.length + 1; tr0.appendChild(td0); tb.appendChild(tr0);
+      return;
+    }
+    shown.forEach(function (x) {
+      var c = x.c, tr = el('tr');
+      tr.setAttribute('data-id', c.id);
+      if (c.id === state.city) tr.className = 'sel';
+      var cy = el('td', 'cy'), b = el('button', 'rowbtn'); b.type = 'button';
+      b.appendChild(el('span', 'rk', rank[c.id] ? String(rank[c.id]) : '-'));
+      var nm = el('span', 'nm'), cn = el('span', 'cn', c.name);
+      if (mixed && !state.data[c.id].days[0].live) { var mkr = el('span', 'mk', ' ○'); mkr.title = 'Example values'; cn.appendChild(mkr); }
+      nm.appendChild(cn); nm.appendChild(el('span', 'cc', c.country));
+      b.appendChild(nm); cy.appendChild(b); tr.appendChild(cy);
+      COLS.forEach(function (col) {
+        var td = el('td', 'm' + (key === col.k ? ' on' : '')), v = x.s ? x.s[col.k] : null, has = v && ok(v.mid);
+        td.textContent = has ? v.mid.toFixed(col.d) : '-';
+        if (has) td.appendChild(el('span', 'subv', v.min.toFixed(col.d) + ' to ' + v.max.toFixed(col.d)));
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ---------- detail ---------- */
+  function swatch(k) {
+    var s = SRC[k], n = el('span', 'sw d' + s.c, s.ch);
+    n.setAttribute('aria-hidden', 'true');
+    return n;
+  }
+  function renderTable() {
+    var d = cur(), tb = $('rows'); tb.textContent = '';
+    ORDER.forEach(function (k) {
+      var r = d.rows[k]; if (!r) return;
+      var tr = el('tr'); tr.setAttribute('data-k', k);
+      var td = el('td', 'src'); td.appendChild(swatch(k)); td.appendChild(document.createTextNode(SRC[k].name)); tr.appendChild(td);
+      [['t', r.t, 'Temperature'], ['rh', r.rh, 'Relative humidity']].forEach(function (f) {
+        var c = el('td', 'r'), i = el('input');
+        i.type = 'number'; i.step = '0.1'; i.setAttribute('inputmode', 'decimal');
+        i.id = f[0] + '-' + k; i.value = f[1]; i.setAttribute('data-f', f[0]);
+        i.setAttribute('aria-label', SRC[k].name + ' ' + f[2]);
+        c.appendChild(i); tr.appendChild(c);
+      });
+      var a = el('td', 'ft', '-'); a.id = 'a-' + k; tr.appendChild(a);
+      var w = el('td', 'wb', '-'); w.id = 'w-' + k; tr.appendChild(w);
+      tb.appendChild(tr);
+    });
+    $('pin').value = ok(d.p) ? d.p : '';
+    $('dName').textContent = city().name;
+    $('dCountry').textContent = city().country;
+  }
+
+  function chartSVG(list, st) {
+    var n = list.length, X0 = 14, X1 = 346, W = X1 - X0;
+    var revealed = state.game === 'revealed';
+    var gv = revealed ? state.guess : st.min;
+    var lo = Math.floor((Math.min(st.min, gv) - 3) / 5) * 5;
+    var hi = Math.max(38, Math.ceil(st.max) + 2, revealed ? Math.ceil(state.guess) + 2 : 0);
+    function x(v) { return X0 + (v - lo) / (hi - lo) * W; }
+    var laneTop = 44, step = 20, bottom = laneTop + (n - 1) * step + 14, axisY = bottom + 6;
+    var H = axisY + (revealed ? 40 : 22), p = [], v;
+    p.push('<svg viewBox="0 0 360 ' + H + '" role="group" aria-label="Wet bulb by source on a number line">');
+    for (v = lo; v <= hi; v += 5) {
+      p.push('<line class="grid" x1="' + x(v).toFixed(1) + '" x2="' + x(v).toFixed(1) + '" y1="30" y2="' + axisY + '"/>');
+      p.push('<text x="' + x(v).toFixed(1) + '" y="' + (axisY + 14) + '" text-anchor="middle">' + v + '</text>');
+    }
+    p.push('<line class="axis" x1="' + X0 + '" x2="' + X1 + '" y1="' + axisY + '" y2="' + axisY + '"/>');
+    var bx = x(st.min), bw = Math.max(x(st.max) - bx, 3);
+    p.push('<rect class="band" x="' + (bx - (bw === 3 ? 1.5 : 0)).toFixed(1) + '" y="30" width="' + bw.toFixed(1) + '" height="' + (bottom - 30) + '" rx="3"/>');
+    var lx = x(LIMIT);
+    p.push('<line class="limit" x1="' + lx.toFixed(1) + '" x2="' + lx.toFixed(1) + '" y1="30" y2="' + axisY + '"/>');
+    p.push('<text class="crit-t" x="' + (lx - 4).toFixed(1) + '" y="24" text-anchor="end">35°C limit</text>');
+    var mx = x(st.mid);
+    p.push('<line class="med" x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) + '" y1="30" y2="' + axisY + '"/>');
+    var ml = Math.min(326, Math.max(40, mx));
+    p.push('<text class="lab" x="' + ml.toFixed(1) + '" y="12" text-anchor="middle">' + st.kind + ' ' + fmt(st.mid) + '</text>');
+    if (revealed) {
+      var gx = x(state.guess), gl = Math.min(318, Math.max(42, gx));
+      p.push('<line class="gline" x1="' + gx.toFixed(1) + '" x2="' + gx.toFixed(1) + '" y1="30" y2="' + axisY + '"/>');
+      p.push('<text class="lab" x="' + gl.toFixed(1) + '" y="' + (axisY + 34) + '" text-anchor="middle">your guess ' + fmt(state.guess) + '</text>');
+    }
+    list.forEach(function (it, i) {
+      var cx = x(it.wb), cy = laneTop + i * step, s = SRC[it.k];
+      p.push('<g><circle class="dot d' + s.c + '" data-k="' + it.k + '" cx="' + cx.toFixed(1) + '" cy="' + cy + '" r="8" tabindex="0" role="img" aria-label="' +
+        s.name + ' wet bulb ' + fmt(it.wb) + ' degrees"/>');
+      p.push('<text class="dl dl' + s.c + '" x="' + cx.toFixed(1) + '" y="' + (cy + 3.5) + '" text-anchor="middle">' + s.ch + '</text>');
+      var onLeft = cx > X1 - 44;
+      p.push('<text class="val" x="' + (onLeft ? cx - 13 : cx + 13).toFixed(1) + '" y="' + (cy + 3.5) + '" text-anchor="' + (onLeft ? 'end' : 'start') + '">' + fmt(it.wb) + '</text></g>');
+    });
+    p.push('</svg>');
+    return p.join('');
+  }
+
+  var lastList = [];
+  function showTip(k) {
+    var it = lastList.filter(function (x) { return x.k === k; })[0];
+    if (!it) return;
+    $('tip').textContent = SRC[k].name + ': ' + fmt(it.t) + '°C and ' + Math.round(it.rh) + '% humidity give a wet bulb of ' + fmt(it.wb) + '°C, and it feels like ' + fmt(it.at) + '°C.';
+    Array.prototype.forEach.call($('rows').children, function (tr) { tr.classList.toggle('hl', tr.getAttribute('data-k') === k); });
+  }
+
+  function renderMeasures() {
+    var tb = $('mrows'); tb.textContent = '';
+    var s = rowStats(state.city);
+    COLS.forEach(function (col) {
+      var v = s ? s[col.k] : null, has = v && ok(v.mid), tr = el('tr');
+      tr.appendChild(el('td', null, col.long + ' (' + col.u + ')'));
+      tr.appendChild(el('td', 'r', has ? v.mid.toFixed(col.d) : '-'));
+      tr.appendChild(el('td', 'r', has ? v.min.toFixed(col.d) + ' to ' + v.max.toFixed(col.d) : '-'));
+      tb.appendChild(tr);
+    });
+  }
+
+  function update() {
+    var d = cur(), list = calc(d, 0);
+    lastList = list;
+    renderForecast();
+    Array.prototype.forEach.call($('rows').children, function (tr) {
+      var k = tr.getAttribute('data-k'), it = list.filter(function (x) { return x.k === k; })[0];
+      $('w-' + k).textContent = it ? fmt(it.wb) : '-';
+      $('a-' + k).textContent = it ? fmt(it.at) : '-';
+      tr.classList.remove('hl');
+    });
+    $('tip').textContent = 'Tap a dot to see the inputs behind it.';
+    renderLeague();
+    renderMeasures();
+    var when = dayWord(state.day) + (d.hour ? ' around ' + d.hour : '');
+    if (!list.length) {
+      $('mid').textContent = '-'; $('fRange').textContent = '-'; $('fSpread').textContent = '-'; $('fGap').textContent = '-';
+      $('flag').textContent = 'Enter a temperature and a humidity between 1 and 100 for at least one source.';
+      $('chart').textContent = ''; $('sens').textContent = ''; $('midLbl').textContent = 'Wet bulb, ' + when;
+      return;
+    }
+    var st = stats(list.map(function (x) { return x.wb; }));
+    $('midLbl').textContent = (st.kind === 'median' ? 'Median' : 'Mean') + ' wet bulb of ' + st.n + ' source' + (st.n === 1 ? '' : 's') + ', ' + when;
+    $('mid').textContent = fmt(st.mid);
+    $('fRange').textContent = fmt(st.min) + ' to ' + fmt(st.max);
+    var spread = st.max - st.min;
+    $('fSpread').textContent = fmt(spread) + '°C';
+    var gap = LIMIT - st.mid;
+    $('fGap').textContent = (gap >= 0 ? fmt(gap) : fmt(-gap) + ' over') + '°C';
+    var f;
+    if (st.n < 2) f = ['', 'Only one source, so there is no spread to compare.'];
+    else if (spread <= 1) f = ['≈', 'Sources agree closely.'];
+    else if (spread <= 2) f = ['~', 'Moderate spread between sources.'];
+    else f = ['≠', 'Sources disagree, so treat the middle with care.'];
+    var fl = $('flag'); fl.textContent = ''; fl.appendChild(el('b', null, f[0])); fl.appendChild(document.createTextNode(f[1]));
+    $('chart').innerHTML = chartSVG(list, st);
+    var drier = calc(d, -5), sens = $('sens');
+    if (drier.length) {
+      var s2 = stats(drier.map(function (x) { return x.wb; }));
+      sens.textContent = '';
+      sens.appendChild(document.createTextNode('Humidity 5 points lower would drop the ' + st.kind + ' by '));
+      sens.appendChild(el('b', null, fmt(st.mid - s2.mid) + '°C'));
+      sens.appendChild(document.createTextNode('. Small humidity differences between sources matter a lot in the tropics.'));
+    }
+    if (state.game === 'revealed') renderResult(st);
+  }
+
+  /* ---------- game ---------- */
+  function applyGame() {
+    var g = state.game;
+    $('guessCard').hidden = g !== 'guessing';
+    $('main').hidden = g === 'guessing';
+    $('resultCard').hidden = g !== 'revealed';
+    $('gameBtn').textContent = g === 'off' ? 'Guess first' : 'Exit game';
+    if (g === 'guessing') $('guessQ').textContent = 'What will the median wet bulb be in ' + city().name + ' ' + dayWord(state.day) + '?';
+  }
+  function renderResult(st) {
+    var diff = state.guess - st.mid, ad = Math.abs(diff);
+    var inside = state.guess >= st.min && state.guess <= st.max;
+    $('resText').textContent = 'You guessed ' + fmt(state.guess) + '°C. The ' + st.kind + ' is ' + fmt(st.mid) + '°C, so you were ' +
+      (ad < 0.05 ? 'spot on' : fmt(ad) + '°C ' + (diff < 0 ? 'low' : 'high')) + '. The sources ran from ' + fmt(st.min) + ' to ' + fmt(st.max) +
+      '°C, and your guess ' + (inside ? 'landed inside that range.' : 'fell outside it.');
+  }
+  $('gameBtn').addEventListener('click', function () {
+    state.game = state.game === 'off' ? 'guessing' : 'off';
+    if (state.game === 'guessing') { state.city = CITIES[Math.floor(Math.random() * CITIES.length)].id; renderTable(); }
+    applyGame(); update();
+  });
+  $('gslider').addEventListener('input', function (e) {
+    state.guess = parseFloat(e.target.value); $('gval').textContent = fmt(state.guess);
+  });
+  $('revealBtn').addEventListener('click', function () { state.game = 'revealed'; applyGame(); update(); goto('detail'); });
+  $('againBtn').addEventListener('click', function () {
+    var others = CITIES.filter(function (c) { return c.id !== state.city; });
+    state.city = others[Math.floor(Math.random() * others.length)].id;
+    state.game = 'guessing'; renderTable(); applyGame(); update();
+    window.scrollTo(0, 0);
+  });
+
+  /* ---------- events ---------- */
+  $('q').addEventListener('input', renderLeague);
+  $('lhead').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-k]') : null;
+    if (!b) return;
+    var k = b.getAttribute('data-k');
+    if (state.sort.key === k) state.sort = { key: k, dir: state.sort.dir === 'desc' ? 'asc' : 'desc' };
+    else state.sort = { key: k, dir: 'desc' };
+    persist(); renderLeague();
+  });
+  $('lrows').addEventListener('click', function (e) {
+    var tr = e.target.closest ? e.target.closest('tr') : null;
+    var id = tr && tr.getAttribute('data-id');
+    if (id) selectCity(id, true);
+  });
+  $('toTop').addEventListener('click', function () { goto('league'); });
+  $('rows').addEventListener('input', function (e) {
+    var inp = e.target; if (inp.tagName !== 'INPUT') return;
+    var tr = inp.closest('tr'), k = tr.getAttribute('data-k'), f = inp.getAttribute('data-f');
+    var r = cur().rows[k];
+    r[f] = parseFloat(inp.value); r.at = null;
+    update();
+  });
+  $('pin').addEventListener('input', function (e) { cur().p = parseFloat(e.target.value); update(); });
+  $('chart').addEventListener('click', function (e) { var k = e.target.getAttribute && e.target.getAttribute('data-k'); if (k) showTip(k); });
+  $('chart').addEventListener('focusin', function (e) { var k = e.target.getAttribute && e.target.getAttribute('data-k'); if (k) showTip(k); });
+  $('mStull').addEventListener('click', function () { setMethod('stull'); });
+  $('mFull').addEventListener('click', function () { setMethod('full'); });
+  $('resetBtn').addEventListener('click', function () {
+    var d = cur();
+    d.rows = JSON.parse(JSON.stringify(d.orig.rows)); d.p = d.orig.p;
+    renderTable(); update();
+  });
+  function setMethod(m) {
+    state.method = m; persist();
+    $('mStull').setAttribute('aria-pressed', m === 'stull' ? 'true' : 'false');
+    $('mFull').setAttribute('aria-pressed', m === 'full' ? 'true' : 'false');
+    update();
+  }
+  function selectCity(id, scroll) {
+    state.city = id; persist();
+    if (state.game === 'revealed') state.game = 'off';
+    renderTable(); applyGame(); update();
+    fcLoad(BYID[id]);
+    if (scroll) goto('detail');
+  }
+
+  /* ---------- live data: hourly forecast, 3 days, 15 cities per request, cached for 10 minutes ---------- */
+  var HVARS = ['temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'surface_pressure', 'shortwave_radiation', 'uv_index'];
+  function chunkUrl(ch) {
+    return 'https://api.open-meteo.com/v1/forecast?latitude=' + ch.map(function (c) { return c.lat; }).join(',') +
+      '&longitude=' + ch.map(function (c) { return c.lon; }).join(',') +
+      '&hourly=' + HVARS.join(',') + '&models=' + MODELS.map(function (m) { return SRC[m].key; }).join(',') +
+      '&forecast_days=3&timezone=auto';
+  }
+  /* parse-start */
+  function seriesOf(h, v, m) { return h[v + '_' + SRC[m].key]; }
+  function maxOf(s, a, b) {
+    if (!s) return null;
+    var m = null, i;
+    for (i = a; i < b; i++) { if (ok(s[i]) && (m === null || s[i] > m)) m = s[i]; }
+    return m;
+  }
+  function rangeOf(vals, dec) {
+    var s = stats(vals), k = Math.pow(10, dec);
+    function r(v) { return Math.round(v * k) / k; }
+    return { mid: r(s.mid), min: r(s.min), max: r(s.max) };
+  }
+  function parseDays(h) {
+    if (!h || !h.time) return null;
+    var n = h.time.length, days = [], d, i;
+    for (d = 0; d < 3; d++) {
+      var a = d * 24, b = a + 24;
+      if (b > n) return null;
+      var best = -1e9, bi = -1;
+      for (i = a; i < b; i++) {
+        var w = [];
+        MODELS.forEach(function (m) {
+          var t = seriesOf(h, 'temperature_2m', m), r = seriesOf(h, 'relative_humidity_2m', m);
+          if (t && r && ok(t[i]) && ok(r[i])) w.push(wbStull(t[i], Math.min(99, Math.max(5, r[i]))));
+        });
+        if (w.length >= 2) { var md = stats(w).mid; if (md > best) { best = md; bi = i; } }
+      }
+      if (bi < 0) return null;
+      var rows = {}, ps = [], sw = [], uv = [];
+      MODELS.forEach(function (m) {
+        var t = seriesOf(h, 'temperature_2m', m), r = seriesOf(h, 'relative_humidity_2m', m);
+        var at = seriesOf(h, 'apparent_temperature', m), pr = seriesOf(h, 'surface_pressure', m);
+        if (t && r && ok(t[bi]) && ok(r[bi])) {
+          rows[m] = { t: t[bi], rh: r[bi], at: at && ok(at[bi]) ? at[bi] : null };
+          if (pr && ok(pr[bi])) ps.push(pr[bi]);
+        }
+        var ms = maxOf(seriesOf(h, 'shortwave_radiation', m), a, b), mu = maxOf(seriesOf(h, 'uv_index', m), a, b);
+        if (ok(ms)) sw.push(ms);
+        if (ok(mu)) uv.push(mu);
+      });
+      days.push({
+        rows: rows,
+        p: ps.length ? Math.round(ps.reduce(function (x, y) { return x + y; }, 0) / ps.length) : null,
+        sw: sw.length ? rangeOf(sw, 0) : null,
+        uv: uv.length ? rangeOf(uv, 1) : null,
+        hour: String(h.time[bi]).slice(-5)
+      });
+    }
+    return days;
+  }
+  /* parse-end */
+  function fetchChunk(ch) {
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 20000);
+    var p;
+    try { p = fetch(chunkUrl(ch), ctl ? { signal: ctl.signal } : undefined); } catch (e) { p = Promise.reject(e); }
+    return p.then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (j) {
+        clearTimeout(timer);
+        var arr = Array.isArray(j) ? j : [j], out = {};
+        ch.forEach(function (c, i) {
+          var days = arr[i] ? parseDays(arr[i].hourly) : null;
+          if (days) out[c.id] = days;
+        });
+        return out;
+      }, function (e) { clearTimeout(timer); throw e; });
+  }
+  function applyLive(got) {
+    Object.keys(got).forEach(function (id) {
+      if (!BYID[id] || !got[id] || got[id].length < 3) return;
+      state.data[id] = {
+        days: got[id].map(function (g) { return mk(g.rows, ok(g.p) ? g.p : BYID[id].P, true, { sw: g.sw, uv: g.uv, hour: g.hour }); })
+      };
+    });
+  }
+  function saveCache(got) { try { localStorage.setItem('wbr-live3', JSON.stringify({ t: Date.now(), cities: got })); } catch (e) { /* ignore */ } }
+  function applyCache() {
+    try {
+      var c = JSON.parse(localStorage.getItem('wbr-live3') || 'null');
+      if (c && c.cities && Date.now() - c.t < 600000 && Object.keys(c.cities).length) {
+        applyLive(c.cities); state.liveState = 'ok'; state.fetched = new Date(c.t); return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+  function refreshAll() { renderStatus(); renderTable(); applyGame(); update(); }
+  function loadLiveAll(force) {
+    if (state.liveState === 'loading') return;
+    if (!force && applyCache()) { refreshAll(); return; }
+    state.liveState = 'loading'; renderStatus();
+    var chunks = [], i, got = {};
+    for (i = 0; i < CITIES.length; i += 15) chunks.push(CITIES.slice(i, i + 15));
+    Promise.all(chunks.map(function (ch) {
+      return fetchChunk(ch).then(function (o) { Object.keys(o).forEach(function (k) { got[k] = o[k]; }); }, function () { /* chunk failed, keep examples */ });
+    })).then(function () {
+      if (Object.keys(got).length) { applyLive(got); state.liveState = 'ok'; state.fetched = new Date(); saveCache(got); }
+      else state.liveState = 'failed';
+      refreshAll();
+    });
+  }
+
+  /* ---------- forecast detail for the selected city ---------- */
+  var FM = ['ecmwf', 'gfs', 'icon', 'gem', 'jma', 'arpege', 'ukmo', 'cma'];
+  var FSRC = {
+    ecmwf: { key: 'ecmwf_ifs025', name: 'ECMWF', ch: 'E', c: 1 },
+    gfs: { key: 'gfs_seamless', name: 'GFS', ch: 'G', c: 2 },
+    icon: { key: 'icon_seamless', name: 'ICON', ch: 'I', c: 3 },
+    gem: { key: 'gem_seamless', name: 'GEM', ch: 'C', c: 4 },
+    jma: { key: 'jma_seamless', name: 'JMA', ch: 'J', c: 5 },
+    arpege: { key: 'meteofrance_seamless', name: 'Meteo-France', ch: 'F', c: 6 },
+    ukmo: { key: 'ukmo_seamless', name: 'UK Met Office', ch: 'U', c: 7 },
+    cma: { key: 'cma_grapes_global', name: 'CMA', ch: 'M', c: 8 }
+  };
+  var FV = [
+    ['t', 'temperature_2m'], ['rh', 'relative_humidity_2m'], ['dp', 'dew_point_2m'], ['at', 'apparent_temperature'],
+    ['pr', 'precipitation'], ['cl', 'cloud_cover'], ['ws', 'wind_speed_10m'], ['wg', 'wind_gusts_10m'],
+    ['sw', 'shortwave_radiation'], ['uv', 'uv_index'], ['cape', 'cape']
+  ];
+  var BSIZE = [1, 3, 6];
+  var GX0 = 34, GX1 = 352;
+  var fcUI = { focus: null, models: false, key: '' };
+  var fcLive = {}, fcTried = {}, fcEx = {}, fcReal = {};
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function hh(x) {
+    var h = Math.floor(x + 1e-9), m = Math.round((x - h) * 60);
+    if (m === 60) { h += 1; m = 0; }
+    return pad2(h % 24) + ':' + pad2(m);
+  }
+  function f1(v) { return v.toFixed(1); }
+  function f0(v) { return String(Math.round(v)); }
+  function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
+  function medOf(a) { var s = a.slice().sort(function (x, y) { return x - y; }), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+  function nice(v, list) { var i; for (i = 0; i < list.length; i++) { if (list[i] >= v) return list[i]; } return list[list.length - 1]; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  /* ----- example forecasts (simulated, deterministic per city) ----- */
+  function mulberry(a) {
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hashStr(s) { var h = 2166136261, i; for (i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function dewOf(t, rh) {
+    var g = Math.log(Math.max(1, rh) / 100) + 17.62 * t / (243.12 + t);
+    return 243.12 * g / (17.62 - g);
+  }
+  function usAqi(pm) {
+    var bp = [[0, 12, 0, 50], [12.1, 35.4, 51, 100], [35.5, 55.4, 101, 150], [55.5, 150.4, 151, 200], [150.5, 250.4, 201, 300], [250.5, 500, 301, 500]], i, b;
+    for (i = 0; i < bp.length; i++) {
+      b = bp[i];
+      if (pm <= b[1] || i === bp.length - 1) return Math.round((b[3] - b[2]) / (b[1] - b[0]) * (Math.min(pm, 500) - b[0]) + b[2]);
+    }
+    return 0;
+  }
+  function sunHours(lat, lon, off) {
+    var now = new Date(Date.now() + off * 1000);
+    var doy = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(now.getUTCFullYear(), 0, 0)) / 86400000);
+    var out = [], d, decl, cosH, dl, noon;
+    for (d = 0; d < 3; d++) {
+      decl = 23.44 * Math.sin(2 * Math.PI * (doy + d - 81) / 365) * Math.PI / 180;
+      cosH = clamp(-Math.tan(lat * Math.PI / 180) * Math.tan(decl), -0.99, 0.99);
+      dl = 2 * Math.acos(cosH) * 12 / Math.PI;
+      noon = 12 + (off / 3600 - lon / 15);
+      out.push({ rise: noon - dl / 2, set: noon + dl / 2 });
+    }
+    return out;
+  }
+  function deriveWb(fc) {
+    fc.H.wb = {};
+    fc.models.forEach(function (m) {
+      var t = fc.H.t[m], r = fc.H.rh && fc.H.rh[m];
+      if (!t || !r) return;
+      fc.H.wb[m] = t.map(function (v, i) { return ok(v) && ok(r[i]) ? wbStull(v, clamp(r[i], 5, 99)) : null; });
+    });
+  }
+  function exFc(c) {
+    var R = mulberry(hashStr(c.id + 'fc')), off = Math.round(c.lon / 15) * 3600;
+    var sun = sunHours(c.lat, c.lon, off), H = {}, d, h, i;
+    FV.forEach(function (v) { H[v[0]] = {}; FM.forEach(function (m) { H[v[0]][m] = []; }); });
+    var OT = { ecmwf: -0.6, gfs: 0.6, icon: -0.1, gem: 1.0, jma: 0.2, arpege: -0.4, ukmo: 0.5, cma: -0.9 };
+    var OR = { ecmwf: 3, gfs: -3, icon: 1, gem: -5, jma: 2, arpege: -2, ukmo: 0, cma: 4 };
+    var noUV = { gem: 1, ukmo: 1, cma: 1 }, noCape = { cma: 1 };
+    var wetP = clamp((c.RH - 40) / 55, 0, 0.95) * (c.T > 22 ? 1 : 0.7);
+    var se = Math.sin(Math.max(2, 90 - Math.abs(c.lat + 8.5)) * Math.PI / 180);
+    var amp = clamp(5 + (60 - c.RH) / 12, 3, 11);
+    for (d = 0; d < 3; d++) {
+      var Tmax = c.T + (d ? rnd(c.id, d, 't') * 1.3 : 0) + (R() - 0.5) * 0.8;
+      var RHa = clamp(c.RH + (d ? rnd(c.id, d, 'h') * 7 : 0), 8, 98);
+      var has = R() < wetP * 0.85, hc = 13.5 + R() * 4, dur = 0.8 + R() * 1.6, I = (3 + R() * 12) * clamp((c.T - 8) / 24, 0.25, 1);
+      var dri = R() < wetP * 0.45, ds = 5 + R() * 8, dlen = 3 + R() * 5, dr = 0.2 + R() * 0.8;
+      var rise = sun[d].rise, set = sun[d].set;
+      FM.forEach(function (m) {
+        var miss = R() < 0.22, sh = (R() - 0.5) * 4.2, fac = 0.3 + R() * 1.4, dm = dur * (0.7 + R() * 0.7), hasD = R() < 0.55;
+        for (h = 0; h < 24; h++) {
+          var cosv = Math.cos(2 * Math.PI * (h - 15) / 24), rate = 0, z;
+          if (has && !miss) { z = (h + 0.5 - (hc + sh)) / (dm / 2); rate += I * fac * Math.exp(-0.5 * z * z); }
+          if (dri && hasD && h + 0.5 >= ds && h + 0.5 <= ds + dlen) rate += dr * (0.6 + 0.8 * R());
+          rate = rate < 0.05 ? 0 : Math.round(rate * 10) / 10;
+          var t = Tmax - amp * (1 - cosv) / 2 + OT[m] + (R() - 0.5) * 0.4 - Math.min(3, rate * 0.25);
+          var rh = clamp(RHa + (Tmax - t) * 2.6 + OR[m] + (rate > 0 ? 5 : 0), 5, 100);
+          var cloud = clamp((0.2 + (RHa - 50) / 100 + (rate > 0 ? 0.35 : 0) + 0.08 * cosv) * 100 + (R() - 0.5) * 14, 0, 100);
+          var up = Math.max(0, Math.sin(Math.PI * (h + 0.5 - rise) / (set - rise)));
+          if (h + 0.5 < rise || h + 0.5 > set) up = 0;
+          var sw = 1050 * Math.pow(se, 1.2) * Math.pow(up, 1.15) * (1 - 0.75 * cloud / 100);
+          var uv = 12.5 * Math.pow(se, 2.4) * Math.pow(up, 1.6) * (1 - 0.5 * cloud / 100);
+          var ws = Math.max(1, 7 + 5 * Math.max(0, cosv) + rate * 0.6 + (R() - 0.5) * 3);
+          var wg = ws * 1.6 + rate * 1.5 + R() * 5;
+          var cape = Math.max(0, (t - 22) * 120 * (rh / 70) * (0.4 + 0.6 * Math.max(0, cosv)) + (rate > 0 ? 600 : 0));
+          H.t[m].push(Math.round(t * 10) / 10);
+          H.rh[m].push(Math.round(rh));
+          H.dp[m].push(Math.round(dewOf(t, rh) * 10) / 10);
+          H.at[m].push(Math.round((estAT(t, rh, ws / 3.6) + sw / 250) * 10) / 10);
+          H.pr[m].push(rate);
+          H.cl[m].push(Math.round(cloud));
+          H.ws[m].push(Math.round(ws * 10) / 10);
+          H.wg[m].push(Math.round(wg * 10) / 10);
+          H.sw[m].push(Math.round(sw));
+          H.uv[m].push(noUV[m] ? null : Math.round(uv * 10) / 10);
+          H.cape[m].push(noCape[m] ? null : Math.round(cape));
+        }
+      });
+    }
+    var base = /India|Bangladesh|Pakistan|Iran|Saudi|Emirates|Qatar|China|Egypt|Nigeria|Kuwait|Iraq/.test(c.country) ? 45 : 14;
+    if (c.country === 'Vietnam') base = c.id === 'hanoi' ? 52 : 30;
+    var pm = [], aqi = [], p;
+    for (i = 0; i < 72; i++) {
+      p = Math.max(2, base * (0.8 + 0.5 * Math.cos(2 * Math.PI * ((i % 24) - 7) / 24)) * (0.85 + 0.3 * R()));
+      p = Math.round(p * 10) / 10; pm.push(p); aqi.push(usAqi(p));
+    }
+    var fc = { live: false, fetched: null, offset: off, models: FM.slice(), H: H, aq: { pm: pm, aqi: aqi }, sun: sun };
+    deriveWb(fc);
+    return fc;
+  }
+
+  /* ----- live forecasts: one request for the city (8 models), one for air quality ----- */
+  function fcUrl(c) {
+    return 'https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon +
+      '&hourly=' + FV.map(function (v) { return v[1]; }).join(',') + '&daily=sunrise,sunset' +
+      '&models=' + FM.map(function (m) { return FSRC[m].key; }).join(',') + '&forecast_days=3&timezone=auto';
+  }
+  function aqUrl(c) {
+    return 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + c.lat + '&longitude=' + c.lon +
+      '&hourly=pm2_5,us_aqi&forecast_days=3&timezone=auto';
+  }
+  function hourOf(s) { var m = /T(\d\d):(\d\d)/.exec(String(s)); return m ? +m[1] + (+m[2]) / 60 : null; }
+  function parseFc(j, aqj, c) {
+    var h = j && j.hourly;
+    if (!h || !h.time || h.time.length < 72) return null;
+    var H = {}, models = [];
+    FV.forEach(function (v) { H[v[0]] = {}; });
+    FM.forEach(function (m) {
+      var got = false;
+      FV.forEach(function (v) {
+        var a = h[v[1] + '_' + FSRC[m].key];
+        if (a && a.length >= 72) {
+          var s = a.slice(0, 72);
+          if (s.some(ok)) { H[v[0]][m] = s; if (v[0] === 't') got = true; }
+        }
+      });
+      if (got) models.push(m);
+    });
+    if (models.length < 2) return null;
+    var off = typeof j.utc_offset_seconds === 'number' ? j.utc_offset_seconds : Math.round(c.lon / 15) * 3600;
+    var sun = sunHours(c.lat, c.lon, off), dly = j.daily || {};
+    var rk = Object.keys(dly).filter(function (k) { return k.indexOf('sunrise') === 0; })[0];
+    var sk = Object.keys(dly).filter(function (k) { return k.indexOf('sunset') === 0; })[0];
+    if (rk && sk && dly[rk] && dly[sk]) {
+      sun = sun.map(function (s, d) {
+        var a = hourOf(dly[rk][d]), b = hourOf(dly[sk][d]);
+        return a !== null && b !== null ? { rise: a, set: b } : s;
+      });
+    }
+    var aq = null;
+    if (aqj && aqj.hourly && aqj.hourly.pm2_5 && aqj.hourly.us_aqi && aqj.hourly.pm2_5.length >= 72 && aqj.hourly.us_aqi.length >= 72) {
+      aq = { pm: aqj.hourly.pm2_5.slice(0, 72), aqi: aqj.hourly.us_aqi.slice(0, 72) };
+    }
+    var fc = { live: true, fetched: new Date(), offset: off, models: models, H: H, aq: aq, sun: sun };
+    deriveWb(fc);
+    return fc;
+  }
+  function getJson(u) {
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 20000), p;
+    try { p = fetch(u, ctl ? { signal: ctl.signal } : undefined); } catch (e) { p = Promise.reject(e); }
+    return p.then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (j) { clearTimeout(timer); return j; }, function (e) { clearTimeout(timer); throw e; });
+  }
+  function fcLoad(c, force) {
+    if (!c || fcLive[c.id] === 'loading') return;
+    var f = fcReal[c.id];
+    if (!force && f && Date.now() - f.fetched.getTime() < 600000) return;
+    if (!force && fcTried[c.id] && Date.now() - fcTried[c.id] < 120000) return;
+    fcTried[c.id] = Date.now(); fcLive[c.id] = 'loading';
+    Promise.all([getJson(fcUrl(c)), getJson(aqUrl(c)).catch(function () { return null; })]).then(function (r) {
+      var fc = parseFc(r[0], r[1], c);
+      if (fc) { fcReal[c.id] = fc; fcLive[c.id] = 'ok'; } else fcLive[c.id] = 'failed';
+      if (state.city === c.id) renderForecast(true);
+    }, function () {
+      fcLive[c.id] = 'failed';
+      if (state.city === c.id) renderForecast(true);
+    });
+  }
+  function fcFor(c) {
+    if (fcReal[c.id]) return fcReal[c.id];
+    if (!fcEx[c.id]) fcEx[c.id] = exFc(c);
+    return fcEx[c.id];
+  }
+  function fcNowF(fc) { var n = new Date(Date.now() + fc.offset * 1000); return n.getUTCHours() + n.getUTCMinutes() / 60; }
+
+  /* ----- aggregation: blocks of 1, 3 or 6 hours; stats across models ----- */
+  function blockVal(arr, a, b, mode) {
+    var s = 0, n = 0, mx = null, mn = null, i, v;
+    for (i = a; i < b; i++) {
+      v = arr[i];
+      if (ok(v)) { s += v; n++; if (mx === null || v > mx) mx = v; if (mn === null || v < mn) mn = v; }
+    }
+    if (!n) return null;
+    return mode === 'sum' ? s : mode === 'max' ? mx : mode === 'min' ? mn : s / n;
+  }
+  function across(fc, key, a, b, mode) {
+    var out = { per: {}, vals: [] };
+    fc.models.forEach(function (m) {
+      var arr = fc.H[key] && fc.H[key][m], v;
+      if (!arr) return;
+      v = blockVal(arr, a, b, mode);
+      if (v !== null) { out.per[m] = v; out.vals.push(v); }
+    });
+    if (!out.vals.length) return null;
+    out.n = out.vals.length; out.mean = avg(out.vals);
+    out.min = Math.min.apply(null, out.vals); out.max = Math.max.apply(null, out.vals);
+    return out;
+  }
+  function agg(fc, key, d, j, mode) { var B = BSIZE[d], a = d * 24 + j * B; return across(fc, key, a, a + B, mode); }
+  function dayVals(fc, key, d, mode) { var r = across(fc, key, d * 24, d * 24 + 24, mode); return r ? r.vals : []; }
+  function summ(vals) { return vals.length ? { mean: avg(vals), min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), n: vals.length } : null; }
+  function single(arr, d, j, mode) {
+    if (!arr) return null;
+    var B = BSIZE[d], a = d * 24 + j * B;
+    return blockVal(arr, a, a + B, mode);
+  }
+
+  /* ----- risk levels and words ----- */
+  var HEAT = ['Mild', 'Warm', 'Hot', 'Severe'];
+  function lvAT(v) { return v >= 45 ? 3 : v >= 38 ? 2 : v >= 32 ? 1 : 0; }
+  function lvWB(v) { return v >= 31 ? 3 : v >= 28 ? 2 : v >= 25 ? 1 : 0; }
+  function lvUV(v) { return v < 3 ? 0 : v < 6 ? 1 : v < 8 ? 2 : v < 11 ? 3 : 4; }
+  function uvName(v) { return ['low', 'moderate', 'high', 'very high', 'extreme'][lvUV(v)]; }
+  function lvAQ(v) { return v <= 50 ? 0 : v <= 100 ? 1 : v <= 150 ? 2 : v <= 200 ? 3 : 4; }
+  function aqName(v) { return ['good', 'moderate', 'sensitive groups', 'unhealthy', 'very unhealthy'][lvAQ(v)]; }
+  function lvCape(v) { return v < 500 ? 0 : v < 1500 ? 1 : v < 2500 ? 2 : v < 3500 ? 3 : 4; }
+  function lvGust(v) { return v < 25 ? 0 : v < 40 ? 1 : v < 55 ? 2 : v < 75 ? 3 : 4; }
+  function lvDew(v) { return v < 18 ? 0 : v < 21 ? 1 : v < 24 ? 2 : v < 26 ? 3 : 4; }
+
+  /* ----- geometry shared by the charts ----- */
+  function geo(d, x1, x0) { var B = BSIZE[d], n = 24 / B; x0 = x0 === undefined ? GX0 : x0; x1 = x1 || GX1; return { d: d, B: B, n: n, x0: x0, x1: x1, cw: (x1 - x0) / n }; }
+  function colMid(g, j) { return g.x0 + (j + 0.5) * g.cw; }
+  function blockText(g, j) { return hh(j * g.B) + ' to ' + hh(j * g.B + g.B); }
+  function shadeAndNow(p, g, fc, top, bottom, label) {
+    var d = g.d, j, rise = fc.sun[d].rise, set = fc.sun[d].set, mid;
+    for (j = 0; j < g.n; j++) {
+      mid = j * g.B + g.B / 2;
+      if (mid < rise || mid > set) p.push('<rect class="night" x="' + (g.x0 + j * g.cw).toFixed(1) + '" y="' + top + '" width="' + g.cw.toFixed(1) + '" height="' + (bottom - top) + '"/>');
+    }
+    if (d === 0 && label !== false) {
+      var nx = g.x0 + fcNowF(fc) / 24 * (g.x1 - g.x0);
+      p.push('<line class="nowl" x1="' + nx.toFixed(1) + '" x2="' + nx.toFixed(1) + '" y1="' + (top - 4) + '" y2="' + bottom + '"/>');
+      p.push('<text class="lab" x="' + (nx > g.x1 - 30 ? nx - 3 : nx + 3).toFixed(1) + '" y="' + (top + 9) + '" text-anchor="' + (nx > g.x1 - 30 ? 'end' : 'start') + '">now</text>');
+    }
+  }
+  function hourAxis(p, g, y) {
+    var j, x;
+    for (j = 0; j < g.n; j++) {
+      if (g.B === 1 && j % 3) continue;
+      x = g.x0 + j * g.cw;
+      p.push('<text x="' + x.toFixed(1) + '" y="' + y + '" text-anchor="' + (j === 0 ? 'start' : 'middle') + '">' + pad2(j * g.B) + '</text>');
+    }
+  }
+  function hits(p, g, top, bottom) {
+    var j;
+    for (j = 0; j < g.n; j++) p.push('<rect class="hit" data-j="' + j + '" x="' + (g.x0 + j * g.cw).toFixed(1) + '" y="' + top + '" width="' + g.cw.toFixed(1) + '" height="' + (bottom - top) + '"/>');
+  }
+  function dotG(m, x, y, r) {
+    var s = FSRC[m];
+    return '<circle class="dot d' + s.c + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '"/><text class="dl dl' + s.c + '" x="' + x.toFixed(1) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="middle">' + s.ch + '</text>';
+  }
+
+  /* ----- rain ----- */
+  function rainCols(fc, g) {
+    var cols = [], j;
+    for (j = 0; j < g.n; j++) cols.push(agg(fc, 'pr', g.d, j, 'mean'));
+    return cols;
+  }
+  function rainSVG(fc, g, cols) {
+    var top = 20, H = 112, bottom = top + H, p = [], j, ymax = 1, mx = 0;
+    cols.forEach(function (c) { if (c && c.mean > mx) mx = c.mean; });
+    ymax = nice(Math.max(0.5, mx * 1.2), [0.5, 1, 2, 4, 8, 16, 32]);
+    p.push('<svg viewBox="0 0 360 ' + (bottom + 22) + '" role="img" aria-label="Average rain rate by time, stacked by model">');
+    shadeAndNow(p, g, fc, top, bottom);
+    [0, 0.5, 1].forEach(function (f) {
+      var y = bottom - f * H;
+      p.push('<line class="grid" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + y + '" y2="' + y + '"/>');
+      p.push('<text x="' + (g.x0 - 4) + '" y="' + (y + 3) + '" text-anchor="end">' + (ymax * f) + '</text>');
+    });
+    p.push('<text x="2" y="12">mm per hour, average of models</text>');
+    cols.forEach(function (c, j) {
+      if (!c) return;
+      var bw = Math.max(2, g.cw * 0.8), x = g.x0 + j * g.cw + (g.cw - bw) / 2, y0 = bottom;
+      fc.models.forEach(function (m) {
+        var v = c.per[m];
+        if (!v) return;
+        var h = v / c.n / ymax * H, dim = fcUI.focus && fcUI.focus !== m;
+        if (h < 0.4) return;
+        y0 -= h;
+        p.push('<rect class="seg1 d' + FSRC[m].c + '" x="' + x.toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '"' + (dim ? ' opacity="0.15"' : '') + '/>');
+      });
+    });
+    p.push('<line class="axis" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + bottom + '" y2="' + bottom + '"/>');
+    hourAxis(p, g, bottom + 14);
+    hits(p, g, top, bottom);
+    p.push('</svg>');
+    return p.join('');
+  }
+  function periodsHTML(fc, d) {
+    var names = ['Night', 'Morning', 'Afternoon', 'Evening'], rs = [], tot = [], i, sum = 0;
+    for (i = 0; i < 4; i++) {
+      var r = across(fc, 'pr', d * 24 + i * 6, d * 24 + i * 6 + 6, 'sum');
+      rs.push(r); if (r) sum += r.mean;
+    }
+    var out = ['<div class="blocks4">'];
+    for (i = 0; i < 4; i++) {
+      var r2 = rs[i];
+      out.push('<div><div class="bn">' + names[i] + '</div><div class="bs">' + pad2(i * 6) + '-' + pad2(i * 6 + 6) + '</div><div class="bv">' +
+        (r2 ? f1(r2.mean) + '<small> mm</small>' : '-') + '</div><div class="bs">' + (r2 && sum > 0.05 ? Math.round(r2.mean / sum * 100) + '%' : (r2 ? 'dry' : '')) +
+        '</div><div class="bs">' + (r2 ? f1(r2.min) + ' to ' + f1(r2.max) : '') + '</div></div>');
+    }
+    out.push('</div>');
+    return out.join('');
+  }
+  function dotsSVG(fc, d) {
+    var tot = across(fc, 'pr', d * 24, d * 24 + 24, 'sum');
+    if (!tot) return '';
+    var X0 = 14, X1 = 346, W = X1 - X0, mx = nice(Math.max(5, tot.max * 1.1), [5, 10, 20, 40, 80, 160, 320]);
+    var items = fc.models.filter(function (m) { return ok(tot.per[m]); }).map(function (m) { return { m: m, v: tot.per[m] }; });
+    items.sort(function (a, b) { return a.v - b.v; });
+    var lanes = [], p = [];
+    items.forEach(function (it) {
+      var x = X0 + it.v / mx * W, k = 0;
+      while (lanes[k] !== undefined && x - lanes[k] < 17) k++;
+      lanes[k] = x; it.x = x; it.k = k;
+    });
+    var nl = Math.max(1, lanes.length), top = 12, H = top + nl * 18 + 8;
+    p.push('<svg viewBox="0 0 360 ' + (H + 18) + '" role="img" aria-label="Day rain total for each model">');
+    [0, 0.5, 1].forEach(function (f) {
+      var x = X0 + f * W;
+      p.push('<line class="grid" x1="' + x + '" x2="' + x + '" y1="' + top + '" y2="' + H + '"/>');
+      p.push('<text x="' + x + '" y="' + (H + 12) + '" text-anchor="' + (f === 0 ? 'start' : f === 1 ? 'end' : 'middle') + '">' + (mx * f) + (f === 1 ? ' mm' : '') + '</text>');
+    });
+    var mxs = X0 + tot.mean / mx * W;
+    p.push('<line class="med" x1="' + mxs.toFixed(1) + '" x2="' + mxs.toFixed(1) + '" y1="' + top + '" y2="' + H + '"/>');
+    p.push('<text class="lab" x="' + (mxs > 250 ? mxs - 4 : mxs + 4).toFixed(1) + '" y="8" text-anchor="' + (mxs > 250 ? 'end' : 'start') + '">average ' + f1(tot.mean) + ' mm</text>');
+    items.forEach(function (it) { p.push(dotG(it.m, it.x, top + 10 + it.k * 18, 8)); });
+    p.push('</svg>');
+    return p.join('');
+  }
+  function modelRowsSVG(fc, d) {
+    var g = geo(d, 312), rowH = 30, top = 6, ms = fc.models.filter(function (m) { return fc.H.pr && fc.H.pr[m]; }), p = [], mxr = 10;
+    ms.forEach(function (m) { var j, v; for (j = 0; j < g.n; j++) { v = single(fc.H.pr[m], d, j, 'mean'); if (v !== null && v > mxr) mxr = v; } });
+    mxr = Math.ceil(mxr);
+    var H = top + ms.length * rowH + 16, bh = rowH - 8;
+    p.push('<svg viewBox="0 0 360 ' + H + '" role="img" aria-label="Rain rate for each model separately">');
+    ms.forEach(function (m, i) {
+      var base = top + i * rowH + rowH - 4, j, v, tot = blockVal(fc.H.pr[m], d * 24, d * 24 + 24, 'sum');
+      p.push(dotG(m, 14, base - 9, 8));
+      [2.5, 7.5].forEach(function (lim) {
+        if (lim < mxr) p.push('<line class="gl" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + (base - lim / mxr * bh).toFixed(1) + '" y2="' + (base - lim / mxr * bh).toFixed(1) + '"/>');
+      });
+      p.push('<line class="axis" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + base + '" y2="' + base + '"/>');
+      for (j = 0; j < g.n; j++) {
+        v = single(fc.H.pr[m], d, j, 'mean');
+        if (v === null || v <= 0) continue;
+        var bw = Math.max(2, g.cw * 0.8), h = Math.max(1, v / mxr * bh);
+        p.push('<rect class="d' + FSRC[m].c + '" x="' + (g.x0 + j * g.cw + (g.cw - bw) / 2).toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '"/>');
+      }
+      p.push('<text class="val" x="' + (g.x1 + 6) + '" y="' + (base - 3) + '">' + (tot === null ? '-' : f1(tot)) + ' mm</text>');
+    });
+    hourAxis(p, g, H - 4);
+    hits(p, g, top, top + ms.length * rowH);
+    p.push('</svg>');
+    return p.join('');
+  }
+
+  /* ----- temperature, feels like, wet bulb ----- */
+  function tempSVG(fc, g) {
+    var cols = [], j, all = [];
+    for (j = 0; j < g.n; j++) {
+      var c = { t: agg(fc, 't', g.d, j, 'mean'), at: agg(fc, 'at', g.d, j, 'mean'), wb: agg(fc, 'wb', g.d, j, 'mean') };
+      cols.push(c);
+      ['t', 'at', 'wb'].forEach(function (k) { if (c[k]) { all.push(c[k].min); all.push(c[k].max); } });
+    }
+    if (!all.length) return '';
+    var lo = Math.floor(Math.min.apply(null, all) - 1), hi = Math.ceil(Math.max.apply(null, all) + 1);
+    var step = hi - lo > 14 ? 5 : 2;
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    var top = 22, bottom = 164;
+    function y(v) { return top + (hi - v) / (hi - lo) * (bottom - top); }
+    var p = [], v;
+    p.push('<svg viewBox="0 0 360 ' + (bottom + 22) + '" role="img" aria-label="Temperature, feels like and wet bulb by time, with the range across models">');
+    shadeAndNow(p, g, fc, top, bottom);
+    for (v = lo; v <= hi; v += step) {
+      p.push('<line class="grid" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/>');
+      p.push('<text x="' + (g.x0 - 4) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' + v + '</text>');
+    }
+    p.push('<text x="2" y="12">&deg;C</text>');
+    var up = [], dn = [];
+    cols.forEach(function (c, j) { if (c.t) { up.push(colMid(g, j).toFixed(1) + ',' + y(c.t.max).toFixed(1)); dn.unshift(colMid(g, j).toFixed(1) + ',' + y(c.t.min).toFixed(1)); } });
+    if (up.length > 1) p.push('<polygon class="bandf" points="' + up.concat(dn).join(' ') + '"/>');
+    var ends = [];
+    [['wb', 'ln-w', 'Wet bulb'], ['at', 'ln-a', 'Feels'], ['t', 'ln-t', 'Temp']].forEach(function (s) {
+      var pts = [], last = null;
+      cols.forEach(function (c, j) { if (c[s[0]]) { pts.push(colMid(g, j).toFixed(1) + ',' + y(c[s[0]].mean).toFixed(1)); last = c[s[0]].mean; } });
+      if (pts.length > 1) p.push('<polyline class="' + s[1] + '" points="' + pts.join(' ') + '"/>');
+      if (g.n <= 8) cols.forEach(function (c, j) { if (c[s[0]]) p.push('<circle cx="' + colMid(g, j).toFixed(1) + '" cy="' + y(c[s[0]].mean).toFixed(1) + '" r="2.6" fill="' + (s[0] === 't' ? 'var(--fg)' : s[0] === 'at' ? 'var(--s2)' : 'var(--s1)') + '"/>'); });
+      if (last !== null) ends.push({ y: y(last), txt: s[2] + ' ' + f1(last) });
+    });
+    ends.sort(function (a, b) { return a.y - b.y; });
+    ends.forEach(function (e, i) { if (i && e.y < ends[i - 1].y + 11) e.y = ends[i - 1].y + 11; });
+    ends.forEach(function (e) { p.push('<text class="lab" x="' + (g.x1 + 4) + '" y="' + (e.y + 3).toFixed(1) + '">' + e.txt + '</text>'); });
+    p.push('<line class="axis" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + bottom + '" y2="' + bottom + '"/>');
+    hourAxis(p, g, bottom + 14);
+    hits(p, g, top, bottom);
+    p.push('</svg>');
+    return p.join('');
+  }
+
+  /* ----- sun bars ----- */
+  function sunSVG(fc, g) {
+    var cols = [], j, mx = 0;
+    for (j = 0; j < g.n; j++) { var c = agg(fc, 'sw', g.d, j, 'mean'); cols.push(c); if (c && c.max > mx) mx = c.max; }
+    if (!cols.some(Boolean)) return '';
+    var ymax = nice(Math.max(200, mx * 1.1), [200, 400, 600, 800, 1000, 1200]), top = 20, H = 96, bottom = top + H, p = [];
+    p.push('<svg viewBox="0 0 360 ' + (bottom + 22) + '" role="img" aria-label="Sunlight strength by time with the range across models">');
+    shadeAndNow(p, g, fc, top, bottom);
+    [0, 0.5, 1].forEach(function (f) {
+      var y = bottom - f * H;
+      p.push('<line class="grid" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + y + '" y2="' + y + '"/>');
+      p.push('<text x="' + (g.x0 - 4) + '" y="' + (y + 3) + '" text-anchor="end">' + (ymax * f) + '</text>');
+    });
+    p.push('<text x="2" y="12">sunlight W/m&sup2;, average of models, line is lowest to highest</text>');
+    cols.forEach(function (c, j) {
+      if (!c) return;
+      var bw = Math.max(2, g.cw * 0.74), x = g.x0 + j * g.cw + (g.cw - bw) / 2, h = c.mean / ymax * H;
+      if (h > 0.4) p.push('<rect class="sunbar" x="' + x.toFixed(1) + '" y="' + (bottom - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '"/>');
+      if (c.max - c.min > ymax * 0.02) {
+        var mxp = colMid(g, j).toFixed(1);
+        p.push('<line class="whisk" x1="' + mxp + '" x2="' + mxp + '" y1="' + (bottom - c.min / ymax * H).toFixed(1) + '" y2="' + (bottom - c.max / ymax * H).toFixed(1) + '"/>');
+      }
+    });
+    p.push('<line class="axis" x1="' + g.x0 + '" x2="' + g.x1 + '" y1="' + bottom + '" y2="' + bottom + '"/>');
+    hourAxis(p, g, bottom + 14);
+    hits(p, g, top, bottom);
+    p.push('</svg>');
+    return p.join('');
+  }
+
+  /* ----- coloured strips: one row per measure, same columns as the charts ----- */
+  function stripsSVG(g, rows, fc) {
+    var rh = 31, H = rows.length * rh + 18, p = [];
+    p.push('<svg viewBox="0 0 360 ' + H + '" role="group" aria-label="Rows of coloured cells by time">');
+    if (fc) shadeAndNow(p, g, fc, 0, rows.length * rh, false);
+    rows.forEach(function (r, i) {
+      var y = i * rh;
+      p.push('<text class="lab" x="' + g.x0 + '" y="' + (y + 10) + '">' + r.name + '</text>');
+      p.push('<text class="val" x="' + g.x1 + '" y="' + (y + 10) + '" text-anchor="end">' + r.peak + '</text>');
+      if (!r.cells) return;
+      r.cells.forEach(function (cell, j) {
+        var x = g.x0 + j * g.cw;
+        if (!cell) { p.push('<rect class="lv0" x="' + (x + 0.5).toFixed(1) + '" y="' + (y + 14) + '" width="' + (g.cw - 1).toFixed(1) + '" height="15" rx="2" opacity="0.4"/>'); return; }
+        if (cell.lvl === null) p.push('<rect fill="var(--fg2)" fill-opacity="' + cell.op.toFixed(2) + '" x="' + (x + 0.5).toFixed(1) + '" y="' + (y + 14) + '" width="' + (g.cw - 1).toFixed(1) + '" height="15" rx="2"/>');
+        else p.push('<rect class="lv' + cell.lvl + '" x="' + (x + 0.5).toFixed(1) + '" y="' + (y + 14) + '" width="' + (g.cw - 1).toFixed(1) + '" height="15" rx="2"/>');
+        if (cell.txt && g.cw >= (cell.wide ? 34 : 26)) p.push('<text class="tl' + (cell.lvl !== null && cell.lvl >= 3 ? ' w' : '') + '" x="' + (x + g.cw / 2).toFixed(1) + '" y="' + (y + 25) + '">' + cell.txt + '</text>');
+      });
+    });
+    hourAxis(p, g, rows.length * rh + 12);
+    hits(p, g, 0, rows.length * rh);
+    p.push('</svg>');
+    return p.join('');
+  }
+  function stripRows(fc, g) {
+    var d = g.d, rows = [], j;
+    function build(fn, lvf, fmt, peakFmt, wide, name) {
+      var cells = [], best = null, bj = 0;
+      for (j = 0; j < g.n; j++) {
+        var v = fn(j);
+        if (v === null || v === undefined) { cells.push(null); continue; }
+        cells.push({ lvl: lvf ? lvf(v) : null, op: lvf ? 0 : clamp(v / 100, 0, 1) * 0.6, txt: fmt(v), wide: wide });
+        if (best === null || v > best) { best = v; bj = j; }
+      }
+      rows.push({ name: name, peak: best === null ? 'no data' : peakFmt(best, bj), cells: best === null ? null : cells });
+    }
+    build(function (j) {
+      var a = agg(fc, 'at', d, j, 'mean'), w = agg(fc, 'wb', d, j, 'mean');
+      if (!a && !w) return null;
+      return Math.max(a ? lvAT(a.mean) : 0, w ? lvWB(w.mean) : 0);
+    }, function (v) { return v; }, function (v) { return HEAT[v]; }, function (v, bj) { return 'worst: ' + HEAT[v].toLowerCase() + ' at ' + hh(bj * g.B); }, true, 'Heat level');
+    build(function (j) { var a = agg(fc, 'cape', d, j, 'max'); return a ? a.mean : null; }, lvCape,
+      function (v) { return v >= 1000 ? f1(v / 1000) + 'k' : f0(v); }, function (v) { return 'peak ' + f0(v) + ' J/kg'; }, false, 'Storm energy (CAPE)');
+    build(function (j) { var a = agg(fc, 'wg', d, j, 'max'); return a ? a.mean : null; }, lvGust,
+      function (v) { return f0(v); }, function (v) { return 'up to ' + f0(v) + ' km/h'; }, false, 'Wind gusts, km/h');
+    build(function (j) { var a = agg(fc, 'dp', d, j, 'mean'); return a ? a.mean : null; }, lvDew,
+      function (v) { return f0(v); }, function (v) { return 'up to ' + f1(v) + '°C'; }, false, 'Dew point, °C (muggy: 24+)');
+    build(function (j) { var a = agg(fc, 'uv', d, j, 'max'); return a ? a.mean : null; }, lvUV,
+      function (v) { return f0(v); }, function (v) { return 'max ' + f1(v) + ', ' + uvName(v); }, false, 'UV index');
+    build(function (j) { var a = agg(fc, 'cl', d, j, 'mean'); return a ? a.mean : null; }, null,
+      function (v) { return f0(v); }, function (v) { return 'up to ' + f0(v) + '%'; }, false, 'Cloud cover, %');
+    if (fc.aq) {
+      build(function (j) { return single(fc.aq.aqi, d, j, 'max'); }, lvAQ,
+        function (v) { return f0(v); }, function (v) { return 'max ' + f0(v) + ', ' + aqName(v); }, false, 'Air quality, US AQI');
+    } else rows.push({ name: 'Air quality, US AQI', peak: 'not available', cells: null });
+    return rows;
+  }
+
+  /* ----- headline, facts, best window ----- */
+  function rainHead(fc, d) {
+    var sums = dayVals(fc, 'pr', d, 'sum'), n = sums.length;
+    if (!n) return 'No rain data for this day.';
+    var wet = sums.filter(function (v) { return v >= 1; });
+    if (!wet.length) return (Math.max.apply(null, sums) >= 0.2 ? 'Dry or only a trace of rain' : 'Dry') + ' in all ' + n + ' models.';
+    var s = 'Rain of 1 mm or more in ' + wet.length + ' of ' + n + ' models, typically ' + f1(medOf(wet)) + ' mm among those (' + f1(Math.min.apply(null, wet)) + ' to ' + f1(Math.max.apply(null, wet)) + ').';
+    var g = geo(d), best = -1, bj = -1, j, a;
+    for (j = 0; j < g.n; j++) { a = agg(fc, 'pr', d, j, 'mean'); if (a && a.mean > best) { best = a.mean; bj = j; } }
+    if (bj >= 0 && best > 0.05) s += ' Heaviest around ' + blockText(g, bj) + '.';
+    return s;
+  }
+  function factHTML(label, s, dec, unit) {
+    return '<div><div class="eyebrow">' + label + '</div><div class="v">' + (s ? s.mean.toFixed(dec) + '<small> ' + unit + '</small>' : '-') + '</div><div class="sm">' +
+      (s ? s.min.toFixed(dec) + ' to ' + s.max.toFixed(dec) : '') + '</div></div>';
+  }
+  function windowFor(fc, d, wantBest) {
+    var rise = fc.sun[d].rise, set = fc.sun[d].set, from = Math.max(6, Math.ceil(rise)), to = Math.min(18, Math.floor(set));
+    if (d === 0) from = Math.max(from, Math.ceil(fcNowF(fc)));
+    var best = null, s, i, m;
+    for (s = from; s + 3 <= to; s++) {
+      var a = d * 24 + s, b = a + 3, at = across(fc, fc.H.at ? 'at' : 't', a, b, 'mean');
+      if (!at) continue;
+      var wetShare = 0, hrs = 0;
+      for (i = a; i < b; i++) {
+        var w = 0, nn = 0;
+        fc.models.forEach(function (mm) { var arr = fc.H.pr && fc.H.pr[mm]; if (arr && ok(arr[i])) { nn++; if (arr[i] >= 0.2) w++; } });
+        if (nn) { wetShare += w / nn; hrs++; }
+      }
+      wetShare = hrs ? wetShare / hrs : 0;
+      var uvr = across(fc, 'uv', a, b, 'mean'), uv = uvr ? uvr.mean : 0;
+      var score = at.mean + 6 * wetShare + 0.3 * uv;
+      if (best === null || (wantBest ? score < best.score : score > best.score)) best = { s: s, score: score, at: at.mean, a: a, b: b };
+    }
+    if (!best) return null;
+    var rr = across(fc, 'pr', best.a, best.b, 'sum'), dry = rr ? rr.vals.filter(function (v) { return v < 0.5; }).length : 0;
+    best.dry = dry; best.n = rr ? rr.n : 0;
+    return best;
+  }
+
+  /* ----- tap detail ----- */
+  function tipFor(fc, d, j) {
+    var g = geo(d), parts = [], t = agg(fc, 't', d, j, 'mean'), at = agg(fc, 'at', d, j, 'mean'), wb = agg(fc, 'wb', d, j, 'mean');
+    var pr = agg(fc, 'pr', d, j, 'sum'), sw = agg(fc, 'sw', d, j, 'mean'), uv = agg(fc, 'uv', d, j, 'max'), cl = agg(fc, 'cl', d, j, 'mean');
+    var cape = agg(fc, 'cape', d, j, 'max'), wg = agg(fc, 'wg', d, j, 'max'), dp = agg(fc, 'dp', d, j, 'mean');
+    if (t) parts.push(f1(t.mean) + '°C (' + f1(t.min) + ' to ' + f1(t.max) + ')');
+    if (at) parts.push('feels like ' + f1(at.mean));
+    if (wb) parts.push('wet bulb ' + f1(wb.mean));
+    if (pr) {
+      var wet = pr.vals.filter(function (v) { return v >= 0.2; }).length;
+      parts.push('rain ' + f1(pr.mean) + ' mm on average, ' + f1(pr.min) + ' to ' + f1(pr.max) + ', wet in ' + wet + ' of ' + pr.n + ' models');
+    }
+    if (sw) parts.push('sunlight ' + f0(sw.mean) + ' W/m²');
+    if (uv) parts.push('UV ' + f1(uv.mean));
+    if (cl) parts.push('cloud ' + f0(cl.mean) + '%');
+    if (dp) parts.push('dew point ' + f1(dp.mean));
+    if (cape) parts.push('storm energy ' + f0(cape.mean) + ' J/kg');
+    if (wg) parts.push('gusts to ' + f0(wg.mean) + ' km/h');
+    if (fc.aq) { var q = single(fc.aq.aqi, d, j, 'max'); if (q !== null) parts.push('air quality ' + f0(q)); }
+    return blockText(g, j) + ': ' + parts.join('; ') + '.';
+  }
+
+  /* ----- assemble the forecast cards ----- */
+  var TIPTXT = 'Tap a column in any chart for the numbers behind it.';
+  function renderForecast(force) {
+    var box = $('fcBox');
+    if (!box) return;
+    var c = city(), fc = fcFor(c), d = state.day;
+    var key = [c.id, d, fcUI.focus, fcUI.models, fc.live ? fc.fetched.getTime() : 'x', fcLive[c.id] || '', Math.floor(Date.now() / 60000)].join('|');
+    if (!force && key === fcUI.key) return;
+    fcUI.key = key;
+    var g = geo(d), gT = geo(d, 280), gS = geo(d, 354, 6), out = [];
+    var st = fc.live ? '● Live, ' + fc.models.length + ' models' : (fcLive[c.id] === 'loading' ? '○ Example data, checking for live' : '○ Example data');
+    var res = d === 0 ? 'Hourly. Hours before the dashed line are the models’ own estimate of what has already happened, not station readings.' :
+      d === 1 ? 'Three-hour blocks.' : 'Six-hour blocks, because forecasts get looser two days out.';
+    var seg = '<div class="seg" role="group" aria-label="Forecast day">' + [0, 1, 2].map(function (k) {
+      return '<button type="button" data-fcday="' + k + '" aria-pressed="' + (k === d ? 'true' : 'false') + '">' + esc(dayName(k)) + '</button>';
+    }).join('') + '</div>';
+    /* A: summary */
+    var hi = summ(dayVals(fc, 't', d, 'max')), fl = summ(dayVals(fc, 'at', d, 'max')), wbm = summ(dayVals(fc, 'wb', d, 'max'));
+    var rain = summ(dayVals(fc, 'pr', d, 'sum')), uvm = summ(dayVals(fc, 'uv', d, 'max'));
+    var lo = summ(dayVals(fc, 't', d, 'min'));
+    var bw = windowFor(fc, d, true), ww = windowFor(fc, d, false);
+    out.push('<section class="card"><div class="fchead"><div><div class="eyebrow">Forecast detail</div><h3>' + esc(c.name) + ', ' + dayWord(d) + '</h3></div><span class="chip-status">' + st + '</span></div>' + seg +
+      '<p class="fcres">' + res + '</p>' +
+      '<p class="fclead">' + rainHead(fc, d) + '</p>' +
+      '<div class="facts">' + factHTML('High', hi, 1, '°C') + factHTML('Feels up to', fl, 1, '°C') + factHTML('Wet bulb', wbm, 1, '°C') +
+      factHTML('Low', lo, 1, '°C') + factHTML('Rain', rain, 1, 'mm') + factHTML('UV max', uvm, 1, '') + '</div>' +
+      '<p class="fcnote">Sun up <b>' + hh(fc.sun[d].rise) + '</b> to <b>' + hh(fc.sun[d].set) + '</b>. Ranges show the lowest and highest model.</p>' +
+      (bw ? '<p class="fcnote">Best three hours outdoors: <b>' + hh(bw.s) + ' to ' + hh(bw.s + 3) + '</b>, feels like about ' + f0(bw.at) + '°C, dry in ' + bw.dry + ' of ' + bw.n + ' models.</p>' :
+        '<p class="fcnote">' + (d === 0 ? 'No daytime hours left to rate today.' : 'No daytime window to rate.') + '</p>') +
+      (ww ? '<p class="fcnote">Hardest three hours: <b>' + hh(ww.s) + ' to ' + hh(ww.s + 3) + '</b>, feels like about ' + f0(ww.at) + '°C.</p>' : '') +
+      '<p class="tip fctip">' + TIPTXT + '</p></section>');
+    /* B: rain */
+    if (fc.H.pr && Object.keys(fc.H.pr).length) {
+      var cols = rainCols(fc, g);
+      var chips = fc.models.filter(function (m) { return fc.H.pr[m]; }).map(function (m) {
+        var s = FSRC[m];
+        return '<button type="button" class="mchip" data-m="' + m + '" aria-pressed="' + (fcUI.focus === m ? 'true' : 'false') + '"><span class="sw d' + s.c + '" aria-hidden="true">' + s.ch + '</span>' + s.name + '</button>';
+      }).join('');
+      out.push('<section class="card chartwrap"><div class="eyebrow">Rain, model by model</div>' +
+        '<p class="hint">Bar height is the average rain rate across the models. Each colour is one model’s share. Many colours in one bar means the models agree. One colour means a single model is calling it. Tap a model to follow it.</p>' +
+        '<div class="mchips">' + chips + '</div>' + rainSVG(fc, g, cols) + periodsHTML(fc, d) +
+        '<div class="eyebrow fcsub">Day total by model</div>' + dotsSVG(fc, d) +
+        '<div class="row" style="margin-top:10px"><button type="button" class="btn" id="fcModels" aria-expanded="' + (fcUI.models ? 'true' : 'false') + '">' + (fcUI.models ? 'Hide each model' : 'Show each model’s own hours') + '</button></div>' +
+        (fcUI.models ? '<p class="hint">Each model’s own rain rate. Dashed lines mark 2.5 mm/h (steady rain) and 7.5 mm/h (heavy). The number on the right is that model’s day total.</p>' + modelRowsSVG(fc, d) : '') +
+        '<p class="tip fctip">' + TIPTXT + '</p></section>');
+    }
+    /* C: temperature */
+    out.push('<section class="card chartwrap"><div class="eyebrow">Temperature, feels like and wet bulb</div>' +
+      '<p class="hint">Lines are the average of the models. The grey band is the lowest to highest model temperature. Shaded columns are night.</p>' +
+      tempSVG(fc, gT) +
+      '<div class="legend"><span><svg viewBox="0 0 28 10"><line class="ln-t" x1="0" x2="28" y1="5" y2="5"/></svg>Temperature</span><span><svg viewBox="0 0 28 10"><line class="ln-a" x1="0" x2="28" y1="5" y2="5"/></svg>Feels like</span><span><svg viewBox="0 0 28 10"><line class="ln-w" x1="0" x2="28" y1="5" y2="5"/></svg>Wet bulb</span></div>' +
+      '<p class="tip fctip">' + TIPTXT + '</p></section>');
+    /* D: sun and the strips */
+    var rows = stripRows(fc, gS);
+    var sunS = sunSVG(fc, g);
+    out.push('<section class="card chartwrap"><div class="eyebrow">Sun</div>' + (sunS || '<p class="hint">No sunlight data.</p>') +
+      '<p class="tip fctip">' + TIPTXT + '</p></section>');
+    out.push('<section class="card chartwrap"><div class="eyebrow">Heat, storms, wind, air</div>' +
+      '<p class="hint">Darker orange and red means more of it. Numbers are shown when the columns are wide enough. Storm energy is the fuel for thunderstorms, not a promise that one forms.</p>' +
+      stripsSVG(gS, rows, fc) + '<p class="tip fctip">' + TIPTXT + '</p></section>');
+    box.innerHTML = out.join('');
+  }
+  (function () {
+    var box = $('fcBox');
+    if (!box) return;
+    box.addEventListener('click', function (e) {
+      var t = e.target, b;
+      if (!t || !t.closest) return;
+      b = t.closest('[data-fcday]');
+      if (b) { state.day = +b.getAttribute('data-fcday'); renderDays(); applyGame(); renderTable(); update(); return; }
+      b = t.closest('[data-m]');
+      if (b) { var m = b.getAttribute('data-m'); fcUI.focus = fcUI.focus === m ? null : m; renderForecast(true); return; }
+      if (t.closest('#fcModels')) { fcUI.models = !fcUI.models; renderForecast(true); return; }
+      b = t.closest('[data-j]');
+      if (b) {
+        var txt = tipFor(fcFor(city()), state.day, +b.getAttribute('data-j'));
+        Array.prototype.forEach.call(box.querySelectorAll('.fctip'), function (n) { n.textContent = txt; });
+      }
+    });
+  })();
+
+  /* ---------- start ---------- */
+  setMethod(state.method);
+  renderDays(); renderStatus(); renderTable(); applyGame(); update();
+  loadLiveAll(false);
+  fcLoad(city());
+})();
+</script>
+</body>
+</html>
