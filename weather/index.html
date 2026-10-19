@@ -396,6 +396,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
       <li>The forecast detail compares up to eight weather models: ECMWF, GFS, ICON, GEM, JMA, Meteo-France, UK Met Office and CMA. Today is hourly, tomorrow is in three-hour blocks and the day after is in six-hour blocks. Hours already gone today are the models&rsquo; own estimate, not station readings.</li>
       <li>Rain is shown model by model, not only averaged, because models often disagree on whether a storm happens and when. Bar height is the average rate and each colour is one model&rsquo;s share, so a long drizzle and a short downpour look different.</li>
       <li>Heat level uses simple thresholds I chose (feels like 32, 38 and 45&deg;C, wet bulb 25, 28 and 31&deg;C), not an official scale. The best and hardest three hours between 6am and 6pm score feels like temperature plus a penalty for rain and UV.</li>
+      <li>Of the weather models only GFS publishes a UV index, so UV is GFS plus CAMS, the European atmosphere service&rsquo;s UV forecast. Some models also skip other things (JMA has no gusts, sunshine or storm energy); a missing value is left out, never counted as zero.</li>
       <li>Air quality comes from Open-Meteo&rsquo;s separate air quality service and is one forecast, not a comparison of models. Storm energy (CAPE) shows how much fuel there is for thunderstorms, not whether one will form.</li>
       <li>Example values are rough mid-October guesses. The spread between example sources, the day-to-day changes, sun, UV, feels like and everything in the forecast detail (all eight models, rain, wind, air quality) are simulated. Live data, when it loads, comes from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under CC BY 4.0.</li>
     </ul>
@@ -1023,11 +1024,17 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
 
   /* ---------- live data: hourly forecast, 3 days, 15 cities per request, cached for 10 minutes ---------- */
   var HVARS = ['temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'surface_pressure', 'shortwave_radiation', 'uv_index'];
+  function latLon(ch) {
+    return 'latitude=' + ch.map(function (c) { return c.lat; }).join(',') + '&longitude=' + ch.map(function (c) { return c.lon; }).join(',');
+  }
   function chunkUrl(ch) {
-    return 'https://api.open-meteo.com/v1/forecast?latitude=' + ch.map(function (c) { return c.lat; }).join(',') +
-      '&longitude=' + ch.map(function (c) { return c.lon; }).join(',') +
+    return 'https://api.open-meteo.com/v1/forecast?' + latLon(ch) +
       '&hourly=' + HVARS.join(',') + '&models=' + MODELS.map(function (m) { return SRC[m].key; }).join(',') +
       '&forecast_days=3&timezone=auto';
+  }
+  /* Of the forecast models only GFS publishes UV, so CAMS UV from the air quality service is the second source. */
+  function uvUrl(ch) {
+    return 'https://air-quality-api.open-meteo.com/v1/air-quality?' + latLon(ch) + '&hourly=uv_index&forecast_days=3&timezone=auto';
   }
   /* parse-start */
   function seriesOf(h, v, m) { return h[v + '_' + SRC[m].key]; }
@@ -1042,7 +1049,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     function r(v) { return Math.round(v * k) / k; }
     return { mid: r(s.mid), min: r(s.min), max: r(s.max) };
   }
-  function parseDays(h) {
+  function parseDays(h, uvh) {
     if (!h || !h.time) return null;
     var n = h.time.length, days = [], d, i;
     for (d = 0; d < 3; d++) {
@@ -1070,6 +1077,8 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
         if (ok(ms)) sw.push(ms);
         if (ok(mu)) uv.push(mu);
       });
+      var cu = uvh && uvh.uv_index && uvh.uv_index.length >= b ? maxOf(uvh.uv_index, a, b) : null;
+      if (ok(cu)) uv.push(cu);
       days.push({
         rows: rows,
         p: ps.length ? Math.round(ps.reduce(function (x, y) { return x + y; }, 0) / ps.length) : null,
@@ -1082,10 +1091,10 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
   /* parse-end */
   function fetchChunk(ch) {
-    return getJson(chunkUrl(ch)).then(function (j) {
-      var arr = Array.isArray(j) ? j : [j], out = {};
+    return Promise.all([getJson(chunkUrl(ch)), getJson(uvUrl(ch)).catch(function () { return null; })]).then(function (r) {
+      var j = r[0], arr = Array.isArray(j) ? j : [j], ua = r[1] ? (Array.isArray(r[1]) ? r[1] : [r[1]]) : [], out = {};
       ch.forEach(function (c, i) {
-        var days = arr[i] ? parseDays(arr[i].hourly) : null;
+        var days = arr[i] ? parseDays(arr[i].hourly, ua[i] && ua[i].hourly) : null;
         if (days) out[c.id] = days;
       });
       return out;
@@ -1271,7 +1280,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
   function aqUrl(c) {
     return 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + c.lat + '&longitude=' + c.lon +
-      '&hourly=pm2_5,us_aqi&forecast_days=3&timezone=auto';
+      '&hourly=pm2_5,us_aqi,uv_index&forecast_days=3&timezone=auto';
   }
   function hourOf(s) { var m = /T(\d\d):(\d\d)/.exec(String(s)); return m ? +m[1] + (+m[2]) / 60 : null; }
   function parseFc(j, aqj, c) {
@@ -1305,6 +1314,9 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     if (aqj && aqj.hourly && aqj.hourly.pm2_5 && aqj.hourly.us_aqi && aqj.hourly.pm2_5.length >= 72 && aqj.hourly.us_aqi.length >= 72) {
       aq = { pm: aqj.hourly.pm2_5.slice(0, 72), aqi: aqj.hourly.us_aqi.slice(0, 72) };
     }
+    /* CAMS UV joins the UV strip as an extra source ('cams'); it is not a forecast model, so it stays out of fc.models */
+    var cuv = aqj && aqj.hourly && aqj.hourly.uv_index;
+    if (cuv && cuv.length >= 72 && cuv.some(ok)) H.uv.cams = cuv.slice(0, 72);
     var fc = { live: true, fetched: new Date(), offset: off, models: models, H: H, aq: aq, sun: sun };
     deriveWb(fc);
     return fc;
@@ -1322,12 +1334,17 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     var ctl = typeof AbortController === 'function' ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 20000), p;
     try { p = fetch(u, ctl ? { signal: ctl.signal } : undefined); } catch (e) { p = Promise.reject(e); }
+    function again() { return new Promise(function (ok) { setTimeout(ok, 1500 * (n + 1)); }).then(function () { return tryGet(u, n + 1); }); }
     return p.then(function (r) {
       clearTimeout(timer);
-      if (r.status === 429 && n < 3) return new Promise(function (ok) { setTimeout(ok, 1500 * (n + 1)); }).then(function () { return tryGet(u, n + 1); });
+      if (r.status === 429 && n < 3) return again();
       if (!r.ok) throw new Error('http ' + r.status);
       return r.json();
-    }, function (e) { clearTimeout(timer); throw e; });
+    }, function (e) {
+      clearTimeout(timer);
+      if (n < 2 && !(ctl && ctl.signal.aborted)) return again(); /* network blip: retry, but not after the 20 s timeout */
+      throw e;
+    });
   }
   function getJson(u, first) {
     return new Promise(function (ok, no) { NET.q[first ? 'unshift' : 'push']({ u: u, ok: ok, no: no }); netPump(); });
@@ -1366,7 +1383,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
   function across(fc, key, a, b, mode) {
     var out = { per: {}, vals: [] };
-    fc.models.forEach(function (m) {
+    (fc.H[key] && fc.H[key].cams ? fc.models.concat('cams') : fc.models).forEach(function (m) {
       var arr = fc.H[key] && fc.H[key][m], v;
       if (!arr) return;
       v = blockVal(arr, a, b, mode);
