@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: one phone-width column. Day picker, then a sortable league table (sticky city column, measures scroll sideways), then the selected city's detail for that day. */
+/* Layout: phone = one column (day picker, your places, league table, then the selected city). From 1000px: dashboard, sticky table on the left, city panels as a grid. The table can be hidden. */
 :root {
   --bg: #edf1f3;
   --surface: #fcfdfd;
@@ -279,6 +279,41 @@ svg .bandf { fill: var(--fg); opacity: 0.12; }
 svg .sunbar { fill: var(--s4); }
 svg .whisk { stroke: var(--fg2); stroke-width: 1.2; }
 svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.55; }
+
+/* Your places: saved cities, a city finder and the table toggle */
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pchips .hint { margin: 0; }
+.pchip { display: inline-flex; align-items: baseline; gap: 8px; border: 1px solid var(--axis); background: transparent; border-radius: 999px; padding: 6px 14px; min-height: 40px; font-size: 14px; color: var(--fg); }
+.pchip .pv { font-family: var(--mono); font-size: 12.5px; color: var(--fg2); }
+.pchip[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.pchip[aria-pressed="true"] .pv { color: var(--bg); }
+.pchip:hover { border-color: var(--fg); }
+.finder { position: relative; }
+.finder .search { width: 100%; }
+.findlist { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; background: var(--surface); border: 1px solid var(--axis); border-radius: 12px; padding: 4px; display: flex; flex-direction: column; }
+.findlist[hidden] { display: none; }
+.findlist button { display: flex; justify-content: space-between; gap: 12px; text-align: left; background: none; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 40px; font-size: 14px; color: var(--fg); }
+.findlist button .cc { color: var(--muted); font-size: 12.5px; }
+.findlist button:hover, .findlist button.act { background: var(--sel); }
+.findlist .none { padding: 8px 12px; font-size: 13px; color: var(--fg2); }
+#saveBtn[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+
+/* Dashboard on wide screens: table on the left (sticky, scrolls on its own), the city's panels as a grid */
+@media (min-width: 1000px) {
+  .wrap { max-width: 1560px; }
+  .places { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(240px, 340px); align-items: center; gap: 12px 16px; }
+  .places .phead { grid-column: 1; }
+  .places .pchips { margin-top: 0; }
+  .places .finder .search { margin-top: 0; }
+  #main { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  #main.notable { grid-template-columns: minmax(0, 1fr); }
+  .league { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+  #detail { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; align-items: start; }
+  #detail > .dhead, #detail > .result, #detail > .sens { grid-column: 1 / -1; }
+  #fcBox { display: contents; }
+  #toTop { display: none; }
+}
 </style>
 </head>
 <body>
@@ -294,6 +329,18 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   <div class="status" id="status"></div>
 
   <div class="seg" id="days" role="group" aria-label="Day"></div>
+
+  <section class="card places" id="places" aria-label="Your places">
+    <div class="phead">
+      <div class="eyebrow">Your places</div>
+      <button class="btn" id="tableBtn" type="button" aria-controls="league" aria-expanded="true">Hide table</button>
+    </div>
+    <div class="pchips" id="pchips"></div>
+    <div class="finder">
+      <input class="search" id="find" type="search" placeholder="Find a city" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Find a city" aria-controls="findList">
+      <div class="findlist" id="findList" hidden></div>
+    </div>
+  </section>
 
   <section class="card guess" id="guessCard" hidden>
     <div class="eyebrow">Your guess</div>
@@ -326,7 +373,10 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
           <h2 id="dName">-</h2>
           <div class="ctry" id="dCountry"></div>
         </div>
-        <button class="btn" id="toTop" type="button">Back to league</button>
+        <div class="row">
+          <button class="btn" id="saveBtn" type="button" aria-pressed="false">☆ Save</button>
+          <button class="btn" id="toTop" type="button">Back to league</button>
+        </div>
       </div>
 
       <section class="card result" id="resultCard" hidden>
@@ -661,7 +711,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
 
   /* ---------- state ---------- */
-  var state = { city: CITIES[0].id, day: 0, method: 'stull', game: 'off', guess: 25, sort: { key: 'at', dir: 'desc' }, data: {}, liveState: 'idle', fetched: null };
+  var state = { city: CITIES[0].id, day: 0, method: 'stull', game: 'off', guess: 25, sort: { key: 'at', dir: 'desc' }, places: [], table: true, data: {}, liveState: 'idle', fetched: null };
   CITIES.forEach(function (c) { state.data[c.id] = fresh(c); });
   function city() { return BYID[state.city]; }
   function cur() { return state.data[state.city].days[state.day]; }
@@ -671,9 +721,11 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     if (saved.city && BYID[saved.city]) state.city = saved.city;
     if (saved.method === 'full' || saved.method === 'stull') state.method = saved.method;
     if (saved.sort && COLS.some(function (c) { return c.k === saved.sort.key; }) && (saved.sort.dir === 'asc' || saved.sort.dir === 'desc')) state.sort = saved.sort;
+    if (Array.isArray(saved.places)) state.places = saved.places.filter(function (id) { return BYID[id]; });
+    if (saved.table === false) state.table = false;
   } catch (e) { /* storage unavailable, carry on */ }
   function persist() {
-    try { localStorage.setItem('wbr', JSON.stringify({ city: state.city, method: state.method, sort: state.sort })); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('wbr', JSON.stringify({ city: state.city, method: state.method, sort: state.sort, places: state.places, table: state.table })); } catch (e) { /* ignore */ }
   }
 
   function wbOf(r, p, rhShift) {
@@ -900,6 +952,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   function update() {
     var d = cur(), list = calc(d, 0);
     lastList = list;
+    renderPlaces();
     renderForecast();
     Array.prototype.forEach.call($('rows').children, function (tr) {
       var k = tr.getAttribute('data-k'), it = list.filter(function (x) { return x.k === k; })[0];
@@ -990,7 +1043,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     var id = tr && tr.getAttribute('data-id');
     if (id) selectCity(id, true);
   });
-  $('toTop').addEventListener('click', function () { goto('league'); });
+  $('toTop').addEventListener('click', function () { if (!state.table) setTable(true); goto('league'); });
   $('rows').addEventListener('input', function (e) {
     var inp = e.target; if (inp.tagName !== 'INPUT') return;
     var tr = inp.closest('tr'), k = tr.getAttribute('data-k'), f = inp.getAttribute('data-f');
@@ -1021,6 +1074,87 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     fcLoad(BYID[id]);
     if (scroll) goto('detail');
   }
+
+  /* ---------- your places: saved cities, finder, table toggle ---------- */
+  function renderPlaces() {
+    var box = $('pchips'); box.textContent = '';
+    if (!state.places.length) box.appendChild(el('p', 'hint', 'Tap ☆ Save next to a city’s name to keep it here.'));
+    state.places.forEach(function (id) {
+      var c = BYID[id], s = rowStats(id), b = el('button', 'pchip'); b.type = 'button';
+      b.setAttribute('data-id', id);
+      b.setAttribute('aria-pressed', id === state.city ? 'true' : 'false');
+      b.appendChild(el('span', null, c.name));
+      if (s && s.at && ok(s.at.mid)) {
+        var v = el('span', 'pv', Math.round(s.at.mid) + '°'); v.title = 'Feels like, ' + dayWord(state.day);
+        b.appendChild(v);
+      }
+      box.appendChild(b);
+    });
+    var on = state.places.indexOf(state.city) >= 0, sb = $('saveBtn');
+    sb.textContent = on ? '★ Saved' : '☆ Save';
+    sb.setAttribute('aria-pressed', on ? 'true' : 'false');
+    sb.setAttribute('aria-label', (on ? 'Remove ' : 'Save ') + city().name + (on ? ' from your places' : ' to your places'));
+  }
+  function applyTableVis() {
+    $('league').hidden = !state.table;
+    $('main').classList.toggle('notable', !state.table);
+    $('tableBtn').textContent = state.table ? 'Hide table' : 'Show table';
+    $('tableBtn').setAttribute('aria-expanded', state.table ? 'true' : 'false');
+    $('toTop').textContent = state.table ? 'Back to league' : 'Show all cities';
+  }
+  function setTable(on) { state.table = on; persist(); applyTableVis(); }
+  var findSel = 0;
+  function findMatches() {
+    var toks = norm($('find').value).split(/\s+/).filter(Boolean);
+    if (!toks.length) return [];
+    var hits = CITIES.filter(function (c) {
+      return toks.every(function (t) { return c.words.some(function (w) { return w.indexOf(t) === 0; }); });
+    });
+    /* city names that start with the search come first */
+    var lead = norm(toks.join(' '));
+    hits.sort(function (a, b) { return (norm(b.name).indexOf(lead) === 0) - (norm(a.name).indexOf(lead) === 0); });
+    return hits.slice(0, 8);
+  }
+  function renderFind() {
+    var list = $('findList'), hits = findMatches(); list.textContent = '';
+    if (!norm($('find').value).trim()) { list.hidden = true; return; }
+    if (findSel >= hits.length) findSel = 0;
+    if (!hits.length) list.appendChild(el('div', 'none', 'No city or country matches that.'));
+    hits.forEach(function (c, i) {
+      var b = el('button', i === findSel ? 'act' : ''); b.type = 'button'; b.setAttribute('data-id', c.id);
+      b.appendChild(el('span', null, c.name)); b.appendChild(el('span', 'cc', c.country));
+      list.appendChild(b);
+    });
+    list.hidden = false;
+  }
+  function closeFind() { $('find').value = ''; findSel = 0; $('findList').hidden = true; }
+  $('find').addEventListener('input', function () { findSel = 0; renderFind(); });
+  $('find').addEventListener('keydown', function (e) {
+    var hits = findMatches();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!hits.length) return;
+      e.preventDefault(); findSel = (findSel + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length; renderFind();
+    } else if (e.key === 'Enter') {
+      if (hits[findSel]) { e.preventDefault(); var id = hits[findSel].id; closeFind(); selectCity(id, true); }
+    } else if (e.key === 'Escape') closeFind();
+  });
+  $('findList').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-id]') : null;
+    if (b) { var id = b.getAttribute('data-id'); closeFind(); selectCity(id, true); }
+  });
+  document.addEventListener('click', function (e) {
+    if (!$('findList').hidden && !(e.target.closest && e.target.closest('.finder'))) $('findList').hidden = true;
+  });
+  $('pchips').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-id]') : null;
+    if (b) selectCity(b.getAttribute('data-id'), false);
+  });
+  $('saveBtn').addEventListener('click', function () {
+    var i = state.places.indexOf(state.city);
+    if (i >= 0) state.places.splice(i, 1); else state.places.push(state.city);
+    persist(); renderPlaces();
+  });
+  $('tableBtn').addEventListener('click', function () { setTable(!state.table); });
 
   /* ---------- live data: hourly forecast, 3 days, 15 cities per request, cached for 10 minutes ---------- */
   var HVARS = ['temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'surface_pressure', 'shortwave_radiation', 'uv_index'];
@@ -1828,6 +1962,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
 
   /* ---------- start ---------- */
   setMethod(state.method);
+  applyTableVis();
   renderDays(); renderStatus(); renderTable(); applyGame(); update();
   loadLiveAll(false);
   fcLoad(city());

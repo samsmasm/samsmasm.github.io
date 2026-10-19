@@ -36,13 +36,14 @@ Open-Meteo forecast API (free, no key, **non-commercial use only**, CC BY 4.0, s
 ## Code map (all in `index.html`)
 
 - `RAW` city list: name, country, extra search words, lat, lon, typical afternoon temp, RH, pressure (example mode only). Search is word-prefix (`words`), so "uk" does not match "Kyiv".
+- Your places (card under the day picker): saved cities as chips showing feels like for the chosen day, a "Find a city" box (works with the table hidden), and the Hide table / Show table toggle. Saved list and table visibility live in `localStorage` key `wbr` (`places`, `table`). Code: `renderPlaces` (called from `update`), `applyTableVis`/`setTable`, `findMatches`/`renderFind`. The Save button is `#saveBtn` in the city header.
 - League: default sort feels like, highest first; the last sort used is saved in `localStorage` key `wbr` (with city and method) and restored on the next visit. `COLS`, `rowStats`, `renderLeague`, `parseDays`, `loadLiveAll`.
 - Detail, wet bulb part: `calc`, `update`, `chartSVG`, game functions.
 - Forecast detail: section starting `/* ---------- forecast detail for the selected city ---------- */`: `exFc`, `parseFc`, `fcLoad`, `across`/`agg` (block statistics across models), `rainSVG`, `tempSVG`, `sunSVG`, `stripsSVG`/`stripRows`, `renderForecast`, `tipFor`.
 
 ## Design
 
-Currently does **not** follow `AESTHETIC.md`: it uses Barlow Condensed and IBM Plex (Google Fonts), pill buttons, grey card backgrounds and a system dark mode. Restyling to the site look is a likely next job. Keep the data-viz encoding when restyling: every model colour carries a letter (E, G, I, C, J, F, U, M), no meaning rests on colour alone, and the four extra models are greys. The layout is one phone-width column (Sam uses it on his phone); keep it working at 360px with no sideways page scroll.
+Currently does **not** follow `AESTHETIC.md`: it uses Barlow Condensed and IBM Plex (Google Fonts), pill buttons, grey card backgrounds and a system dark mode. Restyling to the site look is a likely next job. Keep the data-viz encoding when restyling: every model colour carries a letter (E, G, I, C, J, F, U, M), no meaning rests on colour alone, and the four extra models are greys. On phones the layout is one column (Sam uses it on his phone); keep it working at 360px with no sideways page scroll. From 1000px wide it becomes a dashboard: the table is a sticky left column (560px, scrolls on its own) and the city's panels form a grid (`#detail` is a CSS grid, `#fcBox` is `display: contents` so its cards join that grid); with the table hidden the panels take the full width. The primary purpose is now the weather at your chosen city; the ranking table is secondary and hideable.
 
 ## Testing
 
