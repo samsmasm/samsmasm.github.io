@@ -66,7 +66,7 @@ async function run(mode){
   // temperature svg labels
   const tsvg=qa('#fcBox svg')[2]; res.tempLabels = Array.from(tsvg.querySelectorAll('text.lab')).map(t=>t.textContent).join(' | ');
   res.strips = Array.from(qa('#fcBox svg').pop().querySelectorAll('text.lab, text.val')).map(t=>t.textContent).join(' / ');
-  // switch cities, all 150, three days
+  // switch cities, all of them, three days
   const ids=qa('#lrows tr[data-id]').map(tr=>tr.getAttribute('data-id')); let badCity=[];
   for(const id of ids){ q('#lrows tr[data-id="'+id+'"]').click(); for(let day=0;day<3;day++){ qa('#fcBox [data-fcday]')[day].click(); if(bad()) badCity.push(id+':'+day); } }
   res.cities=ids.length; res.badCity=badCity.slice(0,5); res.errs2=errs.slice(0,3);

@@ -1,6 +1,6 @@
 # Wet Bulb Range, `/weather`
 
-Weather tool for 166 cities. A sortable, searchable league table (feels like, temperature, wet bulb, humidity, peak sun, UV) for today, tomorrow and the day after, with each figure shown as a range across several weather models. Tapping a city opens a detail view: a model-by-model forecast (rain, temperature, sun, storm energy, wind, dew point, air quality) plus the original wet bulb breakdown and a "Guess first" game.
+Weather tool for 152 cities. A sortable, searchable league table (feels like, temperature, wet bulb, humidity, peak sun, UV) for today, tomorrow and the day after, with each figure shown as a range across several weather models. Tapping a city opens a detail view: a model-by-model forecast (rain, temperature, sun, storm energy, wind, dew point, air quality) plus the original wet bulb breakdown and a "Guess first" game.
 
 Built on Sam's phone in a Claude chat, then moved here. Single static file: `index.html` (CSS, markup and one script in an IIFE). No build step, no backend, no API key. Deploys on push to `main` like the rest of the repo, so follow the root `CLAUDE.md`. Keep it off the public index (`index.html`, `/tools`, `/experiments`) until Sam decides where it goes. Add files by name, never `git add -A`.
 
@@ -12,7 +12,6 @@ Built on Sam's phone in a Claude chat, then moved here. Single static file: `ind
 - All 8 model keys work (`ecmwf_ifs025`, `gfs_seamless`, `icon_seamless`, `gem_seamless`, `jma_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `cma_grapes_global`). Known gaps in real responses: **`uv_index` only comes from GFS** (all other models return null); JMA has no gusts, shortwave or CAPE; UKMO shortwave stops partway through day 3. Gaps are left out of averages and ranges, never counted as zero, and the page notes say so.
 - **UV has a second source: CAMS** from the air quality API. League: `uvUrl` fetches `uv_index` for each 15-city chunk alongside the forecast (failure just leaves GFS alone), merged in `parseDays(h, uvh)`. Detail: `aqUrl` asks for `uv_index` too and `parseFc` stores it as `H.uv.cams`; `across` adds `cams` to the sources for any key that has it. `cams` is deliberately not in `fc.models`, so it never shows up in rain or temperature charts or model counts.
 - Requests are retried on 429 (up to 3 times) and on network errors (up to 2 times), but not after the 20 s timeout.
-- Station-style city coordinates (Bandar Mahshahr, Jacobabad, Dhahran, Ras al-Khaimah) checked and correct.
 
 ## Data source
 
