@@ -36,7 +36,7 @@ Open-Meteo forecast API (free, no key, **non-commercial use only**, CC BY 4.0, s
 ## Code map (all in `index.html`)
 
 - `RAW` city list: name, country, extra search words, lat, lon, typical afternoon temp, RH, pressure (example mode only). Search is word-prefix (`words`), so "uk" does not match "Kyiv".
-- League: `COLS`, `rowStats`, `renderLeague`, `parseDays`, `loadLiveAll`.
+- League: default sort feels like, highest first; the last sort used is saved in `localStorage` key `wbr` (with city and method) and restored on the next visit. `COLS`, `rowStats`, `renderLeague`, `parseDays`, `loadLiveAll`.
 - Detail, wet bulb part: `calc`, `update`, `chartSVG`, game functions.
 - Forecast detail: section starting `/* ---------- forecast detail for the selected city ---------- */`: `exFc`, `parseFc`, `fcLoad`, `across`/`agg` (block statistics across models), `rainSVG`, `tempSVG`, `sunSVG`, `stripsSVG`/`stripRows`, `renderForecast`, `tipFor`.
 
