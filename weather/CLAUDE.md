@@ -1,6 +1,6 @@
 # Wet Bulb Range, `/weather`
 
-Weather tool for 150 cities. A sortable, searchable league table (feels like, temperature, wet bulb, humidity, peak sun, UV) for today, tomorrow and the day after, with each figure shown as a range across several weather models. Tapping a city opens a detail view: a model-by-model forecast (rain, temperature, sun, storm energy, wind, dew point, air quality) plus the original wet bulb breakdown and a "Guess first" game.
+Weather tool for 166 cities. A sortable, searchable league table (feels like, temperature, wet bulb, humidity, peak sun, UV) for today, tomorrow and the day after, with each figure shown as a range across several weather models. Tapping a city opens a detail view: a model-by-model forecast (rain, temperature, sun, storm energy, wind, dew point, air quality) plus the original wet bulb breakdown and a "Guess first" game.
 
 Built on Sam's phone in a Claude chat, then moved here. Single static file: `index.html` (CSS, markup and one script in an IIFE). No build step, no backend, no API key. Deploys on push to `main` like the rest of the repo, so follow the root `CLAUDE.md`. Keep it off the public index (`index.html`, `/tools`, `/experiments`) until Sam decides where it goes. Add files by name, never `git add -A`.
 

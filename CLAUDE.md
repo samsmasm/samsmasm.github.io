@@ -127,7 +127,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `scrim/`: Collaborative note/web canvas with pan/zoom, connectors, JPG/TXT export and password-protected rooms.
 - `spin/`: Word spinner with saved word lists, temporary sets, dice and a timer.
 - `turnright/`: Generates walking routes by always turning one way (left- or right-hand rule) from a start pin for a target distance, on OSM streets.
-- `weather/`: Wet Bulb Range: league table of 150 cities (feels like, temperature, wet bulb, humidity, sun, UV with ranges across weather models) plus a per-city model-by-model forecast for rain, temperature, sun, storms, wind and air quality (Open-Meteo, single HTML). Live data tested 2026-10-20; read its CLAUDE.md first. Not yet linked from any index.
+- `weather/`: Wet Bulb Range: league table of 166 cities (feels like, temperature, wet bulb, humidity, sun, UV with ranges across weather models) plus a per-city model-by-model forecast for rain, temperature, sun, storms, wind and air quality (Open-Meteo, single HTML). Live data tested 2026-10-20; read its CLAUDE.md first. Not yet linked from any index.
 
 **Maths toys and practice**
 - `algeqs/`: Generates NCEA-style algebra questions at Achieved, Merit or Excellence level.
