@@ -6,10 +6,11 @@ Built on Sam's phone in a Claude chat, then moved here. Single static file: `ind
 
 ## Status
 
-- **The live data path has never been run against the real Open-Meteo API.** It was written from the documentation and tested only with fake responses in jsdom (`tests/`), because the build environment could not reach Open-Meteo. First job: open the page on the real site, check the status chip says "Live" (not "Example data"), and fix whatever the real responses break.
+- **Live data tested against the real Open-Meteo API on 2026-10-20** (jsdom with real `fetch`): all 150 cities live, city detail live with all 8 models, no errors.
+- **Concurrency limit:** Open-Meteo returns 429 "Too many concurrent requests" when the page fires all 12 requests at once (half the cities silently fell back to example data). Every request now goes through one queue (`NET`, `getJson`): at most 3 in flight, 429 retried up to 3 times with back-off, city-detail requests jump the queue. Do not bypass it with a bare `fetch`.
 - When a live fetch fails the page falls back to labelled **Example data**: rough mid-October guesses per city plus simulated spread, rain, wind and air quality. That is only a demo. Never present example values as a forecast.
-- Model keys that need checking against the real API: `ecmwf_ifs025`, `gfs_seamless`, `icon_seamless`, `gem_seamless`, `jma_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `cma_grapes_global`. A model that returns nothing is dropped, and fewer than two models makes the whole city fall back to example data. Some models lack UV, CAPE or cloud cover; that is handled (null).
-- Station-style city names (for example Bandar Mahshahr, Jacobabad, Dhahran, Ras al-Khaimah) were added from background knowledge. Sanity check their coordinates.
+- All 8 model keys work (`ecmwf_ifs025`, `gfs_seamless`, `icon_seamless`, `gem_seamless`, `jma_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `cma_grapes_global`). Known gaps in real responses: **`uv_index` only comes from GFS** (all other models return null), so the league UV "range" is a single source; JMA has no gusts, shortwave or CAPE; UKMO shortwave stops partway through day 3. Possible UV fix: the air quality API also serves `uv_index` (CAMS) as a second source.
+- Station-style city coordinates (Bandar Mahshahr, Jacobabad, Dhahran, Ras al-Khaimah) checked and correct.
 
 ## Data source
 

@@ -1082,20 +1082,14 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
   /* parse-end */
   function fetchChunk(ch) {
-    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 20000);
-    var p;
-    try { p = fetch(chunkUrl(ch), ctl ? { signal: ctl.signal } : undefined); } catch (e) { p = Promise.reject(e); }
-    return p.then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-      .then(function (j) {
-        clearTimeout(timer);
-        var arr = Array.isArray(j) ? j : [j], out = {};
-        ch.forEach(function (c, i) {
-          var days = arr[i] ? parseDays(arr[i].hourly) : null;
-          if (days) out[c.id] = days;
-        });
-        return out;
-      }, function (e) { clearTimeout(timer); throw e; });
+    return getJson(chunkUrl(ch)).then(function (j) {
+      var arr = Array.isArray(j) ? j : [j], out = {};
+      ch.forEach(function (c, i) {
+        var days = arr[i] ? parseDays(arr[i].hourly) : null;
+        if (days) out[c.id] = days;
+      });
+      return out;
+    });
   }
   function applyLive(got) {
     Object.keys(got).forEach(function (id) {
@@ -1315,12 +1309,28 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     deriveWb(fc);
     return fc;
   }
-  function getJson(u) {
+  /* Open-Meteo answers 429 "Too many concurrent requests" if a page sends too many at once,
+     so every request goes through one small queue. first = jump the queue (city detail). */
+  var NET = { busy: 0, max: 3, q: [] };
+  function netPump() {
+    while (NET.busy < NET.max && NET.q.length) (function (job) {
+      NET.busy++;
+      tryGet(job.u, 0).then(job.ok, job.no).then(function () { NET.busy--; netPump(); });
+    })(NET.q.shift());
+  }
+  function tryGet(u, n) {
     var ctl = typeof AbortController === 'function' ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 20000), p;
     try { p = fetch(u, ctl ? { signal: ctl.signal } : undefined); } catch (e) { p = Promise.reject(e); }
-    return p.then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-      .then(function (j) { clearTimeout(timer); return j; }, function (e) { clearTimeout(timer); throw e; });
+    return p.then(function (r) {
+      clearTimeout(timer);
+      if (r.status === 429 && n < 3) return new Promise(function (ok) { setTimeout(ok, 1500 * (n + 1)); }).then(function () { return tryGet(u, n + 1); });
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    }, function (e) { clearTimeout(timer); throw e; });
+  }
+  function getJson(u, first) {
+    return new Promise(function (ok, no) { NET.q[first ? 'unshift' : 'push']({ u: u, ok: ok, no: no }); netPump(); });
   }
   function fcLoad(c, force) {
     if (!c || fcLive[c.id] === 'loading') return;
@@ -1328,7 +1338,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     if (!force && f && Date.now() - f.fetched.getTime() < 600000) return;
     if (!force && fcTried[c.id] && Date.now() - fcTried[c.id] < 120000) return;
     fcTried[c.id] = Date.now(); fcLive[c.id] = 'loading';
-    Promise.all([getJson(fcUrl(c)), getJson(aqUrl(c)).catch(function () { return null; })]).then(function (r) {
+    Promise.all([getJson(fcUrl(c), true), getJson(aqUrl(c), true).catch(function () { return null; })]).then(function (r) {
       var fc = parseFc(r[0], r[1], c);
       if (fc) { fcReal[c.id] = fc; fcLive[c.id] = 'ok'; } else fcLive[c.id] = 'failed';
       if (state.city === c.id) renderForecast(true);
