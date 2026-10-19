@@ -243,10 +243,26 @@ td.src { white-space: nowrap; }
 #fcBox { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .fchead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .fchead h3 { font-family: var(--display); font-weight: 600; font-size: 30px; line-height: 1; margin: 2px 0 0; }
-.fcres { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
-.fclead { margin: 12px 0 0; font-size: 16px; line-height: 1.4; }
-.fcnote { margin: 8px 0 0; font-size: 13px; color: var(--fg2); }
-.fcnote b { font-family: var(--mono); font-weight: 500; color: var(--fg); }
+.fctip:empty { display: none; }
+.rainvote { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rainvote .mdots { display: inline-flex; gap: 4px; }
+.rainvote .sw { margin-right: 0; }
+.rainvote .sw.off { border: 1.5px solid var(--axis); color: var(--muted); background: transparent; }
+.rainvote b { font-family: var(--mono); font-weight: 500; font-size: 15px; }
+.rainvote .sm { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: 6px; }
+.daybar { display: block; width: 100%; height: auto; margin-top: 10px; }
+.daybar text { font-size: 11px; }
+.daybar .dnight { fill: var(--lv0); }
+.daybar .dday { fill: var(--surface); stroke: var(--axis); stroke-width: 1; }
+.daybar .wbest { fill: var(--s3); opacity: 0.85; }
+.daybar .wworst { fill: var(--crit); opacity: 0.85; }
+.daykey { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--fg2); margin-top: 2px; }
+.daykey b { font-family: var(--mono); font-weight: 500; color: var(--fg); }
+.daykey i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.daykey i.wbest { background: var(--s3); } .daykey i.wworst { background: var(--crit); }
+.howto summary { cursor: pointer; font-size: 14px; font-weight: 500; min-height: 32px; display: flex; align-items: center; }
+.howto ul { margin: 10px 0 0; padding-left: 18px; color: var(--fg2); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+.when { font-family: var(--mono); text-transform: none; letter-spacing: 0; color: var(--fg); margin-left: 6px; }
 .facts .sm { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 1px; }
 .mchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
 .mchip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--axis); background: transparent; border-radius: 999px; padding: 3px 10px 3px 4px; min-height: 34px; font-size: 12.5px; }
@@ -386,6 +402,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
       </section>
 
       <div id="fcBox"></div>
+      <section class="card howto"><details><summary>How to read these charts</summary><ul id="howto"></ul></details></section>
 
       <section class="card readout" aria-live="polite">
         <div class="eyebrow" id="midLbl">Median wet bulb</div>
@@ -399,7 +416,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
       </section>
 
       <section class="card measures">
-        <div class="eyebrow">All measures, middle and range across sources</div>
+        <div class="eyebrow">All measures, across sources<span class="when"></span></div>
         <table>
           <thead><tr><th>Measure</th><th class="r">Middle</th><th class="r">Low to high</th></tr></thead>
           <tbody id="mrows"></tbody>
@@ -407,12 +424,13 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
       </section>
 
       <section class="card chartwrap">
-        <div class="eyebrow" style="margin-bottom:6px">Every source on one scale, &deg;C</div>
+        <div class="eyebrow" style="margin-bottom:6px">Every source on one scale, &deg;C<span class="when"></span></div>
         <div id="chart"></div>
         <p class="tip" id="tip">Tap a dot to see the inputs behind it.</p>
       </section>
 
       <section class="card srcs">
+        <div class="eyebrow" style="margin-bottom:6px">Each source<span class="when"></span></div>
         <div class="tablewrap">
           <table>
             <thead><tr><th>Source</th><th class="r">Temp &deg;C</th><th class="r">RH %</th><th class="r">Feels</th><th class="r">Wet bulb</th></tr></thead>
@@ -966,6 +984,8 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     renderLeague();
     renderMeasures();
     var when = dayWord(state.day) + (d.hour ? ' around ' + d.hour : '');
+    var whenTag = dayName(state.day) + (d.hour ? ' · ' + d.hour + ' local' : '');
+    Array.prototype.forEach.call(document.querySelectorAll('.when'), function (n) { n.textContent = whenTag; n.title = 'The day’s peak wet bulb hour, in the city’s local time. Sun and UV are the day’s maximum.'; });
     if (!list.length) {
       $('mid').textContent = '-'; $('fRange').textContent = '-'; $('fSpread').textContent = '-'; $('fGap').textContent = '-';
       $('flag').textContent = 'Enter a temperature and a humidity between 1 and 100 for at least one source.';
@@ -1820,17 +1840,6 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
 
   /* ----- headline, facts, best window ----- */
-  function rainHead(fc, d) {
-    var sums = dayVals(fc, 'pr', d, 'sum'), n = sums.length;
-    if (!n) return 'No rain data for this day.';
-    var wet = sums.filter(function (v) { return v >= 1; });
-    if (!wet.length) return (Math.max.apply(null, sums) >= 0.2 ? 'Dry or only a trace of rain' : 'Dry') + ' in all ' + n + ' models.';
-    var s = 'Rain of 1 mm or more in ' + wet.length + ' of ' + n + ' models, typically ' + f1(medOf(wet)) + ' mm among those (' + f1(Math.min.apply(null, wet)) + ' to ' + f1(Math.max.apply(null, wet)) + ').';
-    var g = geo(d), best = -1, bj = -1, j, a;
-    for (j = 0; j < g.n; j++) { a = agg(fc, 'pr', d, j, 'mean'); if (a && a.mean > best) { best = a.mean; bj = j; } }
-    if (bj >= 0 && best > 0.05) s += ' Heaviest around ' + blockText(g, bj) + '.';
-    return s;
-  }
   function factHTML(label, s, dec, unit) {
     return '<div><div class="eyebrow">' + label + '</div><div class="v">' + (s ? s.mean.toFixed(dec) + '<small> ' + unit + '</small>' : '-') + '</div><div class="sm">' +
       (s ? s.min.toFixed(dec) + ' to ' + s.max.toFixed(dec) : '') + '</div></div>';
@@ -1881,8 +1890,50 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     return blockText(g, j) + ': ' + parts.join('; ') + '.';
   }
 
+  /* ----- summary visuals: which models expect rain, and the shape of the day ----- */
+  function rainVote(fc, d) {
+    var tot = across(fc, 'pr', d * 24, d * 24 + 24, 'sum');
+    if (!tot) return '';
+    var dots = fc.models.filter(function (m) { return ok(tot.per[m]); }).map(function (m) {
+      var s = FSRC[m], wet = tot.per[m] >= 1;
+      return '<span class="sw ' + (wet ? 'd' + s.c : 'off') + '" title="' + esc(s.name) + ': ' + f1(tot.per[m]) + ' mm">' + s.ch + '</span>';
+    }).join('');
+    var wet = tot.vals.filter(function (v) { return v >= 1; }), g = geo(d), best = -1, bj = -1, j, a;
+    for (j = 0; j < g.n; j++) { a = agg(fc, 'pr', d, j, 'mean'); if (a && a.mean > best) { best = a.mean; bj = j; } }
+    var side = wet.length ? '<b>' + wet.length + '/' + tot.n + '</b>' + (bj >= 0 && best > 0.05 ? '<span class="sm">peak ' + hh(bj * g.B) + '</span>' : '') : '<b>dry</b>';
+    return '<div class="rainvote" aria-label="Rain of 1 mm or more in ' + wet.length + ' of ' + tot.n + ' models"><span class="eyebrow">Rain</span><span class="mdots" aria-hidden="true">' + dots + '</span>' + side + '</div>';
+  }
+  /* 24 h bar: night shaded, sunrise and sunset, best (green) and hardest (red) three daytime hours, now */
+  function daySVG(fc, d, bw, ww) {
+    var W = 360, x0 = 8, x1 = W - 8, y = 4, h = 20, p = [];
+    function X(t) { return x0 + (x1 - x0) * t / 24; }
+    var rise = fc.sun[d].rise, set = fc.sun[d].set;
+    p.push('<rect class="dnight" x="' + X(0) + '" y="' + y + '" width="' + (X(24) - X(0)) + '" height="' + h + '" rx="4"/>');
+    p.push('<rect class="dday" x="' + X(rise).toFixed(1) + '" y="' + y + '" width="' + (X(set) - X(rise)).toFixed(1) + '" height="' + h + '"/>');
+    function win(w, cls) { if (w) p.push('<rect class="' + cls + '" x="' + X(w.s).toFixed(1) + '" y="' + y + '" width="' + (X(w.s + 3) - X(w.s)).toFixed(1) + '" height="' + h + '"/>'); }
+    win(bw, 'wbest'); win(ww, 'wworst');
+    if (d === 0) { var nx = X(fcNowF(fc)); p.push('<line class="nowl" x1="' + nx.toFixed(1) + '" x2="' + nx.toFixed(1) + '" y1="' + (y - 3) + '" y2="' + (y + h + 3) + '"/>'); }
+    p.push('<text x="' + X(rise).toFixed(1) + '" y="' + (y + h + 13) + '" text-anchor="middle">☀ ' + hh(rise) + '</text>');
+    p.push('<text x="' + X(set).toFixed(1) + '" y="' + (y + h + 13) + '" text-anchor="middle">' + hh(set) + ' ☾</text>');
+    function key(w, cls, lab) { return w ? '<span><i class="' + cls + '"></i>' + lab + ' <b>' + hh(w.s) + '–' + hh(w.s + 3) + '</b> ' + f0(w.at) + '°</span>' : ''; }
+    var lab = 'Sun up ' + hh(rise) + ' to ' + hh(set) + (bw ? '. Best three hours ' + hh(bw.s) + ' to ' + hh(bw.s + 3) : '') + (ww ? '. Hardest ' + hh(ww.s) + ' to ' + hh(ww.s + 3) : '');
+    return '<svg class="daybar" viewBox="0 0 ' + W + ' 40" role="img" aria-label="' + lab + '">' + p.join('') + '</svg>' +
+      (bw || ww ? '<div class="daykey" aria-hidden="true">' + key(bw, 'wbest', 'Best') + key(ww, 'wworst', 'Hardest') + '</div>' : '');
+  }
+  /* all the "how to read" text lives in one collapsible card instead of on every chart */
+  var HOWTO = [
+    'Ranges under each number run from the lowest to the highest model.',
+    'Today is hourly, tomorrow is in three-hour blocks and the day after in six-hour blocks. Hours before the dashed “now” line are the models’ own estimate of what already happened, not station readings.',
+    'Rain dots: one per model, filled when that model expects 1 mm or more over the day.',
+    'Day bar: shaded is night. Green is the best three daytime hours to be outside (coolest feels like, least rain and UV), red the hardest.',
+    'Rain bars: height is the average rain rate across the models; each colour is one model’s share. Many colours means the models agree, one colour means a single model is calling it. Tap a model to follow it.',
+    'Temperature: lines are the model average, the grey band is the lowest to highest model temperature.',
+    'Strips: darker orange and red means more of it. Storm energy (CAPE) is fuel for thunderstorms, not a promise that one forms.',
+    'Tap any column in a chart to see the numbers behind it.'
+  ];
+  $('howto').innerHTML = HOWTO.map(function (t) { return '<li>' + t + '</li>'; }).join('');
+
   /* ----- assemble the forecast cards ----- */
-  var TIPTXT = 'Tap a column in any chart for the numbers behind it.';
   function renderForecast(force) {
     var box = $('fcBox');
     if (!box) return;
@@ -1892,8 +1943,6 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     fcUI.key = key;
     var g = geo(d), gT = geo(d, 280), gS = geo(d, 354, 6), out = [];
     var st = fc.live ? '● Live, ' + fc.models.length + ' models' : (fcLive[c.id] === 'loading' ? '○ Example data, checking for live' : '○ Example data');
-    var res = d === 0 ? 'Hourly. Hours before the dashed line are the models’ own estimate of what has already happened, not station readings.' :
-      d === 1 ? 'Three-hour blocks.' : 'Six-hour blocks, because forecasts get looser two days out.';
     var seg = '<div class="seg" role="group" aria-label="Forecast day">' + [0, 1, 2].map(function (k) {
       return '<button type="button" data-fcday="' + k + '" aria-pressed="' + (k === d ? 'true' : 'false') + '">' + esc(dayName(k)) + '</button>';
     }).join('') + '</div>';
@@ -1902,16 +1951,11 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     var rain = summ(dayVals(fc, 'pr', d, 'sum')), uvm = summ(dayVals(fc, 'uv', d, 'max'));
     var lo = summ(dayVals(fc, 't', d, 'min'));
     var bw = windowFor(fc, d, true), ww = windowFor(fc, d, false);
-    out.push('<section class="card"><div class="fchead"><div><div class="eyebrow">Forecast detail</div><h3>' + esc(c.name) + ', ' + dayWord(d) + '</h3></div><span class="chip-status">' + st + '</span></div>' + seg +
-      '<p class="fcres">' + res + '</p>' +
-      '<p class="fclead">' + rainHead(fc, d) + '</p>' +
+    out.push('<section class="card"><div class="fchead"><div><div class="eyebrow">Forecast</div><h3>' + esc(c.name) + ', ' + dayWord(d) + '</h3></div><span class="chip-status">' + st + '</span></div>' + seg +
       '<div class="facts">' + factHTML('High', hi, 1, '°C') + factHTML('Feels up to', fl, 1, '°C') + factHTML('Wet bulb', wbm, 1, '°C') +
       factHTML('Low', lo, 1, '°C') + factHTML('Rain', rain, 1, 'mm') + factHTML('UV max', uvm, 1, '') + '</div>' +
-      '<p class="fcnote">Sun up <b>' + hh(fc.sun[d].rise) + '</b> to <b>' + hh(fc.sun[d].set) + '</b>. Ranges show the lowest and highest model.</p>' +
-      (bw ? '<p class="fcnote">Best three hours outdoors: <b>' + hh(bw.s) + ' to ' + hh(bw.s + 3) + '</b>, feels like about ' + f0(bw.at) + '°C, dry in ' + bw.dry + ' of ' + bw.n + ' models.</p>' :
-        '<p class="fcnote">' + (d === 0 ? 'No daytime hours left to rate today.' : 'No daytime window to rate.') + '</p>') +
-      (ww ? '<p class="fcnote">Hardest three hours: <b>' + hh(ww.s) + ' to ' + hh(ww.s + 3) + '</b>, feels like about ' + f0(ww.at) + '°C.</p>' : '') +
-      '<p class="tip fctip">' + TIPTXT + '</p></section>');
+      rainVote(fc, d) + daySVG(fc, d, bw, ww) +
+      '<p class="tip fctip"></p></section>');
     /* B: rain */
     if (fc.H.pr && Object.keys(fc.H.pr).length) {
       var cols = rainCols(fc, g);
@@ -1920,27 +1964,24 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
         return '<button type="button" class="mchip" data-m="' + m + '" aria-pressed="' + (fcUI.focus === m ? 'true' : 'false') + '"><span class="sw d' + s.c + '" aria-hidden="true">' + s.ch + '</span>' + s.name + '</button>';
       }).join('');
       out.push('<section class="card chartwrap"><div class="eyebrow">Rain, model by model</div>' +
-        '<p class="hint">Bar height is the average rain rate across the models. Each colour is one model’s share. Many colours in one bar means the models agree. One colour means a single model is calling it. Tap a model to follow it.</p>' +
         '<div class="mchips">' + chips + '</div>' + rainSVG(fc, g, cols) + periodsHTML(fc, d) +
         '<div class="eyebrow fcsub">Day total by model</div>' + dotsSVG(fc, d) +
         '<div class="row" style="margin-top:10px"><button type="button" class="btn" id="fcModels" aria-expanded="' + (fcUI.models ? 'true' : 'false') + '">' + (fcUI.models ? 'Hide each model' : 'Show each model’s own hours') + '</button></div>' +
-        (fcUI.models ? '<p class="hint">Each model’s own rain rate. Dashed lines mark 2.5 mm/h (steady rain) and 7.5 mm/h (heavy). The number on the right is that model’s day total.</p>' + modelRowsSVG(fc, d) : '') +
-        '<p class="tip fctip">' + TIPTXT + '</p></section>');
+        (fcUI.models ? '<p class="hint">Dashed: 2.5 mm/h steady, 7.5 mm/h heavy. Right: day total.</p>' + modelRowsSVG(fc, d) : '') +
+        '<p class="tip fctip"></p></section>');
     }
     /* C: temperature */
     out.push('<section class="card chartwrap"><div class="eyebrow">Temperature, feels like and wet bulb</div>' +
-      '<p class="hint">Lines are the average of the models. The grey band is the lowest to highest model temperature. Shaded columns are night.</p>' +
       tempSVG(fc, gT) +
-      '<div class="legend"><span><svg viewBox="0 0 28 10"><line class="ln-t" x1="0" x2="28" y1="5" y2="5"/></svg>Temperature</span><span><svg viewBox="0 0 28 10"><line class="ln-a" x1="0" x2="28" y1="5" y2="5"/></svg>Feels like</span><span><svg viewBox="0 0 28 10"><line class="ln-w" x1="0" x2="28" y1="5" y2="5"/></svg>Wet bulb</span></div>' +
-      '<p class="tip fctip">' + TIPTXT + '</p></section>');
+      '<div class="legend"><span><svg viewBox="0 0 28 10"><line class="ln-t" x1="0" x2="28" y1="5" y2="5"/></svg>Temperature</span><span><svg viewBox="0 0 28 10"><line class="ln-a" x1="0" x2="28" y1="5" y2="5"/></svg>Feels like</span><span><svg viewBox="0 0 28 10"><line class="ln-w" x1="0" x2="28" y1="5" y2="5"/></svg>Wet bulb</span><span><svg viewBox="0 0 28 10"><rect class="bandf" x="0" y="0" width="28" height="10"/></svg>Model range</span></div>' +
+      '<p class="tip fctip"></p></section>');
     /* D: sun and the strips */
     var rows = stripRows(fc, gS);
     var sunS = sunSVG(fc, g);
     out.push('<section class="card chartwrap"><div class="eyebrow">Sun</div>' + (sunS || '<p class="hint">No sunlight data.</p>') +
-      '<p class="tip fctip">' + TIPTXT + '</p></section>');
+      '<p class="tip fctip"></p></section>');
     out.push('<section class="card chartwrap"><div class="eyebrow">Heat, storms, wind, air</div>' +
-      '<p class="hint">Darker orange and red means more of it. Numbers are shown when the columns are wide enough. Storm energy is the fuel for thunderstorms, not a promise that one forms.</p>' +
-      stripsSVG(gS, rows, fc) + '<p class="tip fctip">' + TIPTXT + '</p></section>');
+      stripsSVG(gS, rows, fc) + '<p class="tip fctip"></p></section>');
     box.innerHTML = out.join('');
   }
   (function () {

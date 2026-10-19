@@ -38,6 +38,8 @@ Open-Meteo forecast API (free, no key, **non-commercial use only**, CC BY 4.0, s
 - Your places (card under the day picker): saved cities as chips showing feels like for the chosen day, a "Find a city" box (works with the table hidden), and the Hide table / Show table toggle. Saved list and table visibility live in `localStorage` key `wbr` (`places`, `table`). Code: `renderPlaces` (called from `update`), `applyTableVis`/`setTable`, `findMatches`/`renderFind`. The Save button is `#saveBtn` in the city header.
 - League: default sort feels like, highest first; the last sort used is saved in `localStorage` key `wbr` (with city and method) and restored on the next visit. `COLS`, `rowStats`, `renderLeague`, `parseDays`, `loadLiveAll`.
 - Detail, wet bulb part: `calc`, `update`, `chartSVG`, game functions.
+- Forecast summary is visual, not prose (Sam: "too much text, should be visually interpretable"): fact tiles, `rainVote` (one dot per model, filled when it expects 1 mm or more) and `daySVG` (24 h bar: night, sunrise/sunset, best three hours green, hardest red, now line, with a small key). All explanations live in the one collapsible "How to read these charts" card (`HOWTO` array, static `#howto`); do not put hint paragraphs back on the charts. `.fctip` is empty until a column is tapped.
+- The wet bulb cards (all measures, one-scale chart, each source) carry a `.when` label, e.g. "Today · 15:00 local": the league's peak wet bulb hour. Sun and UV there are the day's maximum.
 - Forecast detail: section starting `/* ---------- forecast detail for the selected city ---------- */`: `exFc`, `parseFc`, `fcLoad`, `across`/`agg` (block statistics across models), `rainSVG`, `tempSVG`, `sunSVG`, `stripsSVG`/`stripRows`, `renderForecast`, `tipFor`.
 
 ## Design
