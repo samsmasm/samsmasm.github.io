@@ -105,12 +105,94 @@ const Engine = (function () {
     return res;
   }
 
-  function run(seq, levers) {
-    const s = newState();
-    seq.forEach((card, i) => play(s, typeof levers === 'function' ? levers(i, s) : levers, card));
+  /* ---------- rules version 2 (added 2026-10-22) ----------
+     Used when a rules object R = { v: 2, hard: bool } is passed; without R the original rules above run unchanged,
+     so old score codes still give the same totals.
+     Levers: { rl: reorder level, qty: reorder quantity, sup: supplier index, build: true on the round a canning line is built }.
+     New for everyone: bulk discount on big orders, cans go off after a shelf life.
+     Hard adds: lost sales cut next round's demand (goodwill), global/local suppliers, make your own (cost to make vs cost to buy),
+     capacity utilisation and productivity of the canning line. */
+  const RULES = {
+    life: 4, bulkMin: 2000, bulkDisc: 0.05, goodwill: 0.25,
+    std: [
+      { key: 'single', name: 'Single supplier', cost: 12, lead: 1, maxDelay: 99, priceShare: 1, fee: 0 },
+      { key: 'dual', name: 'Dual supplier', cost: 12, lead: 1, maxDelay: 1, priceShare: 0.5, fee: 500 },
+    ],
+    hard: [
+      { key: 'global', name: 'Global supplier', cost: 12, lead: 2, maxDelay: 99, priceShare: 1, fee: 0 },
+      { key: 'local', name: 'Local supplier', cost: 13, lead: 1, maxDelay: 0, priceShare: 0.5, fee: 0 },
+      { key: 'make', name: 'Make your own', cost: 8, lead: 1, maxDelay: 0, priceShare: 1, fee: 0, cap: 1000, fixed: 2000, workers: 4 },
+    ],
+  };
+  const suppliers = (R) => (R && R.hard ? RULES.hard : RULES.std);
+
+  function newState2() {
+    return { round: 0, onHand: CFG.startStock, lots: [{ qty: CFG.startStock, cost: CFG.cost, r: 1 }], pipeline: [], total: 0, history: [], goodwill: 0, built: 0 };
+  }
+
+  function play2(s, lev, card, R) {
+    s.round += 1;
+    const r = s.round, sups = suppliers(R);
+    const arrived = [];
+    s.pipeline = s.pipeline.filter((o) => {
+      if (o.arrive <= r) { s.lots.push({ qty: o.qty, cost: o.cost, r }); s.onHand += o.qty; arrived.push(o); return false; }
+      return true;
+    });
+    if (R.hard && lev.build && !s.built) s.built = r;
+    let si = sups[lev.sup] ? lev.sup : 0;
+    if (sups[si].cap && !s.built) si = 0;
+    const sup = sups[si];
+    const startStock = s.onHand;
+    let ordered = null, made = 0;
+    if (startStock <= lev.rl && s.pipeline.length === 0) {
+      let qty = Math.min(lev.qty, CFG.cap - startStock);
+      if (sup.cap) qty = Math.min(qty, sup.cap);
+      if (qty > 0) {
+        const delay = Math.min(card.delay, sup.maxDelay);
+        const pm = 1 + (card.priceMult - 1) * sup.priceShare;
+        const bulk = !sup.cap && qty >= RULES.bulkMin;
+        const cost = sup.cost * pm * (bulk ? 1 - RULES.bulkDisc : 1);
+        const lead = sup.lead + delay;
+        ordered = { qty, cost, arrive: r + lead, lead, delay, sup: si, bulk };
+        s.pipeline.push(ordered);
+        if (sup.cap) made = qty;
+      }
+    }
+    const goodwillLoss = R.hard ? s.goodwill : 0;
+    const demand = Math.max(0, card.demand - goodwillLoss);
+    const sold = Math.min(demand, s.onHand);
+    const lost = demand - sold;
+    let need = sold, cogs = 0;
+    while (need > 0) {
+      const lot = s.lots[0];
+      const take = Math.min(lot.qty, need);
+      cogs += take * lot.cost; lot.qty -= take; need -= take;
+      if (lot.qty === 0) s.lots.shift();
+    }
+    s.onHand -= sold;
+    // Cans still on the shelf after `life` rounds go off and are thrown away.
+    let spoiled = 0, spoilCost = 0;
+    while (s.lots.length && r - s.lots[0].r + 1 >= RULES.life) { const lot = s.lots.shift(); spoiled += lot.qty; spoilCost += lot.qty * lot.cost; }
+    s.onHand -= spoiled;
+    const revenue = sold * CFG.price;
+    const holding = s.onHand * CFG.holdPerUnit;
+    const fee = sup.fee;
+    const fixed = R.hard && s.built ? RULES.hard[2].fixed : 0;
+    const profit = revenue - cogs - holding - fee - fixed - spoilCost;
+    s.total += profit;
+    if (R.hard) s.goodwill = Math.round((lost * RULES.goodwill) / 50) * 50;
+    const line = RULES.hard[2];
+    const res = { round: r, card, lev: { ...lev, sup: si }, startStock, ordered, arrivedQty: arrived.reduce((a, o) => a + o.qty, 0), demand, cardDemand: card.demand, goodwillLoss, sold, lost, endStock: s.onHand, revenue, cogs, holding, fee, fixed, spoiled, spoilCost, profit, total: s.total, lostProfit: lost * (CFG.price - CFG.cost), stockout: lost > 0, built: s.built, made, util: s.built ? made / line.cap : null, productivity: s.built ? made / line.workers : null, nextGoodwill: R.hard ? s.goodwill : 0 };
+    s.history.push(res);
+    return res;
+  }
+
+  function run(seq, levers, R) {
+    const s = R ? newState2() : newState();
+    seq.forEach((card, i) => (R ? play2 : play)(s, typeof levers === 'function' ? levers(i, s) : levers, card, R));
     return s;
   }
 
-  return { CFG, CARDS: C, SEQ, SEQ_NAMES, WORLD_DECK, seqFor, newState, play, run, reorderLevel, rng };
+  return { CFG, CARDS: C, SEQ, SEQ_NAMES, WORLD_DECK, RULES, suppliers, seqFor, newState, newState2, play, play2, run, reorderLevel, rng };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;

@@ -37,7 +37,9 @@ python3 build.py && node smoke.js
 - Original artwork only. Draw simple cats and cans yourself. Do not copy any existing character, brand or logo.
 - Player-facing text is concise and in plain English. Keep British or international spelling consistent with the existing text (for example "colour").
 
-## Game rules (do not change)
+## Game rules (original rules, version 1)
+
+Superseded for new games by rules version 2 (see the section at the end). Version 1 still runs, unchanged, for score codes and leaderboard rows without `v`.
 
 - 10 rounds, one week each. Fixed shock sequences A, B, C, a seeded random sequence R, and S (default class set, added 2026-10-22): A's ten events with round 1 calm and rounds 2 to 10 shuffled by a per-game seed. S is additive in `seqFor`; A, B, C and R are unchanged. All S games share one leaderboard.
 - Holding cost is shown to players as one "storage costs" figure ($1 per unit per round). The 0.40/0.20/0.40 split still exists in `CFG.hold` but is no longer shown.
@@ -151,3 +153,15 @@ Players are distracted grade 11 students who experiment rather than read. Keep e
 - Teacher tab is behind the code `0987` (`TEACHER_CODE`, deliberately low security). Unlocked, it lists every saved game from the last 7 days with a two-click Delete (REST `DELETE stockshock/scores/<key>`).
 - End screen has "How JIT and JIC played your shocks": sawtooth stock control charts (`strategyChart`) for pure JIT and pure JIC on the player's own shocks, with a short explanation of each.
 - Rounds 3, 6 and 9: a cat walks along the bottom of the screen (`catWalk`). Rounds 3 and 9 it bites the background hills, round 6 it leaves a smiling poo ("Pardon me!"). It stops in the side margin when the window is wide enough so the marks stay visible; on narrow screens the poo fades after a few seconds. Skipped in fast mode and reduced motion.
+
+## Rules version 2 (added 2026-10-22)
+
+- Engine: `Engine.play2(state, lev, card, R)` / `Engine.run(seq, levers, R)` with `R = {v:2, hard}`; without `R` the original rules run unchanged. Constants in `Engine.RULES`. Balance checked with 200 shuffles per world (Stable favours JIT, Unsettled the hybrid, Chaotic JIC/hybrid; Hard has no dominant supplier).
+- Levers: `{rl, qty, sup, build}`. Students set the reorder level directly; the game shows the buffer it leaves = reorder level - 800 x this round's delivery time (can be negative: warns of a stock-out).
+- Everyone: orders of 2,000+ get 5% off; cans go off after 4 rounds on the shelf (FIFO lots carry their arrival round).
+- Hard (HL): global supplier ($12, 2 weeks, full shocks), local ($13, 1 week, no delays, half price rises), build a canning line from round 4 (fixed $2,000 a round, $8 a can, max 1,000 per order, no delays) for cost to make vs cost to buy, capacity utilisation and productivity (4 workers); lost sales cut next round's demand by 25% of cats turned away (rounded to 50). Still one order on the way at a time.
+- Score code v2: `{n, m, d, t, v:2, x:hard?1:0, h:[[rl, qty, sup, built?1:0], ...]}`. `decode` handles both versions. Leaderboard boards only count v2 rows, split by world and level; rows also carry `vs` = profit minus pure JIC on the same shocks ("Beat pure JIC by" ordering).
+- Benchmarks (`benchLevers`): Standard JIT rl 800 q 800 single, JIC rl 4000 q 2400 single, hybrid rl 1600 q 1200 dual on shock rounds. Hard JIT local rl 800 q 800, JIC global rl 4000 q 2400, hybrid rl 2000 q 1600 local on shock rounds.
+- Round screen chart is a sawtooth stock control chart (`stockControlChart`) with reorder level, buffer, maximum stock (buffer + reorder quantity), lead-time brackets and delivery labels; `ccUpdate` moves its lines with the sliders.
+- Quick questions (`makeQuestion`, toggle on setup, default on): rounds 2 (reorder level), 5 (buffer from reorder level), 8 (bulk discount cost, or capacity utilisation on Hard once the line is built), and round 4 on Hard (cost to make). Run is disabled until answered; the end screen shows how many were right.
+- Teacher tab has a Class view (`classView`, tab 'class'): projector leaderboard plus class average reorder level and quantity and stock-out share by round, refreshed every 15 seconds, optionally limited to the last 60 minutes.
