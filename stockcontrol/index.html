@@ -209,6 +209,9 @@ button.danger.arm{background:var(--red);color:#fff}
 @keyframes chomp{from{transform:rotate(0)}to{transform:rotate(16deg)}}
 @keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 .bufout{font-size:15px;margin-top:4px}
+.bufout:empty{display:none}
+.rlcalc{background:#fff;border-radius:12px;padding:6px 10px;margin-top:6px;font-size:15px;line-height:1.45;box-shadow:0 3px 0 rgba(31,95,191,.12)}
+.rlcalc .eqn{font-weight:bold;color:var(--blue)}
 .bufout.x{color:var(--red);font-weight:bold}
 .quiz{background:#fffbe0;border:3px solid #f2a33a;border-radius:16px;padding:10px 14px;margin:14px 0 0}
 .quiz b.q{display:block;margin-bottom:6px}
@@ -264,7 +267,11 @@ button.ghost.mini{padding:3px 10px;font-size:13px;margin-top:4px;border-width:2p
 .build details>summary{font-size:14px}
 
 .levers .forecast{margin:10px 0;padding:6px 12px;line-height:1.55}
-.levers .quiz{margin:0 0 10px}
+.colA .quiz{margin:0 0 12px;padding:10px 14px}
+.colA .quiz .qt{font-size:15px;line-height:1.45;margin:2px 0 6px}
+.colA .quiz input{padding:5px 8px;max-width:150px}
+.colA .quiz .row button{padding:5px 12px}
+.rlcalc .small{font-size:12.5px;margin-top:0}
 @media(min-width:761px){.levers{position:sticky;top:10px}}
 .charth{margin:14px 0 2px;font-size:15px}
 button.primary:disabled,button.ghost:disabled{background:#c3c6cf;color:#f4f4f7;box-shadow:0 5px 0 #9a9da8;cursor:not-allowed;border-color:#c3c6cf}
@@ -510,7 +517,7 @@ const units = (n)=> Math.round(n).toLocaleString('en-US');
 const cls = (n)=> n<0?'neg':'pos';
 let tab = 'play';
 let G = null; // game
-const defaultLev = { rl: 1600, qty: 1200, sup: 0, build: false };
+const defaultLev = { buf: 800, rl: 1600, qty: 1200, sup: 0, build: false }; // rl is always worked out from buf (see expLead)
 const USAGE = CFG.baseDemand; // expected usage per round for reorder level sums
 
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -532,11 +539,14 @@ function leadFor(lev,card,hard,built){
   return {sp,si,delay,lead:sp.lead+delay};
 }
 const bufferFor=(rl,lead)=>rl-USAGE*lead;
+// Expected (normal) lead time of the chosen supplier: the reorder level is planned on this, as in the IB stock control model.
+const expLead=(lev,hard,built)=>leadFor(lev,{delay:0},hard,built).lead;
+const planRl=(lev,hard,built)=>lev.buf+USAGE*expLead(lev,hard,built);
 
 /* ---------- term help: "?" buttons with a definition and an equation ---------- */
 const TERMS={
   reorder:['Reorder level','The stock level that triggers a new order. When stock falls to it, you order.','Reorder level = buffer stock + (usage x lead time)'],
-  buffer:['Buffer stock (safety stock)','The minimum stock you plan to keep, as protection against late deliveries and demand surges. It cannot go below 0.','Buffer stock = reorder level - (usage x lead time)'],
+  buffer:['Buffer stock (safety stock)','The minimum stock you plan to keep (green cans), as protection against late deliveries and demand surges. Late deliveries eat into it; stock cannot go below 0.','Buffer stock = reorder level - (usage x lead time)'],
   qty:['Reorder quantity','How many units you order each time you reorder.','Maximum stock = buffer stock + reorder quantity'],
   usage:['Usage rate','How much stock is sold in a week. Normally 800 cans here.','Weeks of stock left = stock / usage'],
   lead:['Lead time (delivery time)','The time between placing an order and receiving it. Shocks can make it longer.','Delivery round = order round + lead time'],
@@ -823,7 +833,7 @@ function animView(h,crate){
   window.scrollTo(0,0);
   app.innerHTML=`
   <div class="animgrid">
-    <div class="card stage bigscene"><div class="scenebox">${sceneSVG({stock:h.startStock,rl:h.lev.rl,buffer:bufferFor(h.lev.rl,leadFor(h.lev,h.card,G.hard,h.built).lead),moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0,late})}</div></div>
+    <div class="card stage bigscene"><div class="scenebox">${sceneSVG({stock:h.startStock,rl:h.lev.rl,buffer:h.lev.buf!=null?h.lev.buf:bufferFor(h.lev.rl,expLead(h.lev,G.hard,h.built)),moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0,late})}</div></div>
     <div class="animside">
       <div class="bar"><i style="width:${(h.round-1)/CFG.rounds*100}%"></i></div>
       ${cardView(h.card,h.round)}
@@ -1157,7 +1167,7 @@ function setupView(){
   <div class="card"><h2>Key terms</h2>
     <ul class="q">
       <li>Buffer stock (safety stock): the extra stock you try to keep in the warehouse as insurance, on top of what you expect to sell. It is what stops a late delivery or a demand spike from causing a stock-out. It costs ${money(CFG.holdPerUnit)} per unit each week while it sits there.</li>
-      <li>Reorder level: when your stock falls to this level, you place a new order. Reorder level = buffer stock + usage x lead time. With usage of ${units(CFG.baseDemand)} a week and a ${CFG.baseLead} week lead time, a buffer of 400 needs a reorder level of 1,200. If deliveries take 3 weeks, the same buffer needs a reorder level of 2,800.</li>
+      <li>Reorder level: when your stock falls to this level, you place a new order. Reorder level = buffer stock + usage x lead time. You choose the buffer; the game works out the reorder level from your supplier's normal lead time. With usage of ${units(CFG.baseDemand)} a week and a ${CFG.baseLead} week lead time, a buffer of 400 needs a reorder level of 1,200. If a delivery is late, the extra wait is taken from your buffer, and once the buffer is used up you have a stock-out.</li>
       <li>Bulk discount: orders of ${units(Engine.RULES.bulkMin)} or more get ${Math.round(Engine.RULES.bulkDisc*100)}% off. Shelf life: cans still on the shelf after ${Engine.RULES.life} rounds go off and are thrown away.</li>
       <li>Hard level: a global supplier ($12 a can, 2 weeks, hit by shocks) or a local one ($13 a can, 1 week, no shipping delays); from round 4 you can build your own canning line ($2,000 a round plus $8 a can, up to 1,000 cans a round); and lost sales cut next round's demand by a quarter of the cats you turned away.</li>
       <li>Reorder quantity: how many units you order each time. To build a buffer, order more than weekly demand.</li>
@@ -1199,6 +1209,7 @@ function roundView(){
   const demand=Math.max(0,card.demand-(hard?s.goodwill:0)), stockNow=s.onHand+arrNow;
   const sups=supsFor(hard), canBuild=hard&&r>=4&&!s.built, q=G.quiz&&G.qDone!==r?makeQuestion(r):null;
   if(hard&&!s.built&&!lev.build&&lev.sup===2) lev.sup=0;
+  if(lev.buf==null) lev.buf=Math.max(0,lev.rl-USAGE*expLead(lev,hard,s.built));
   const pct=(r-1)/CFG.rounds*100;
   const supOpt=(k)=>{ const sp=sups[k], off=sp.cap&&!s.built&&!lev.build, sub=hard?(k===0?`$${sp.cost}, ${sp.lead} weeks, shocks`:k===1?`$${sp.cost}, 1 week, no delays`:`$${sp.cost} + ${money(sp.fixed)}/round${tip('ctm')}`):(k===0?'Cheapest':'Shocks hit half as hard');
     return `<div class="opt ${lev.sup===k?'sel':''}${off?' off':''}" data-d="${k}"><input type="radio" name="sp" ${lev.sup===k?'checked':''} ${off?'disabled':''}><div><b>${hard?['Global','Local','Make'][k]:(k===0?'Single':'Dual: '+money(CFG.dualFee))}</b><br><span class="small">${sub}</span>${k===2&&canBuild?`<br><button class="ghost mini" id="buildBtn">${lev.build?'Cancel build':'Build line'}</button>`:''}</div></div>`; };
@@ -1209,6 +1220,8 @@ function roundView(){
     <div class="hud"><span class="pill">Round <b>${r}</b> of ${CFG.rounds}</span><span class="pill">Profit <b class="${cls(s.total)}">${money(s.total)}</b></span><span class="pill small">${esc(G.name)}, ${esc(Engine.SEQ_NAMES[G.mode])}${hard?', Hard':''}</span></div>
     ${cardView(card)}
     ${r===1?'<p class="coach">Drag the sliders and watch the shelves change. Then press Run.</p>':''}
+      ${q?`<div class="quiz card" id="quiz"><b class="q">Quick question: ${money(Engine.RULES.quizBonus)} bonus if right</b><div class="qt">${q.text}</div>
+        ${q.choices?`<div class="qch">${q.choices.map((c,i)=>`<button class="ghost qopt" data-i="${i}">${esc(c)}</button>`).join('')}</div>`:`<div class="row"><input id="qa" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer"><button class="ghost" id="qcheck">Check</button></div>`}<div class="fb" id="qfb"></div></div>`:''}
    </div>
     <div class="card stage colB">
       <div class="scenebox">${sceneSVG({stock:stockNow,rl:lev.rl,buffer:0,moods:Array(nCats(demand)).fill('neutral'),crate:crateText(arrNow,due[0]),late:card.delay>0})}</div>
@@ -1219,9 +1232,9 @@ function roundView(){
         <h3 class="charth">Revenue, costs and profit each round${tip('profit')}</h3>${profitChart(s.history)}</div>
     </div>
     <div class="card todo levers">
-      <label for="rl">Reorder level: <span class="out" id="rlo"></span>${tip('reorder')}</label>
-      <input id="rl" type="range" min="0" max="4000" step="200" value="${lev.rl}">
-      <div class="hint">Order when stock falls to this. Reorder level = buffer you want + usage (${units(USAGE)} sold a week) x delivery time.</div>
+      <label for="bf">Target buffer stock: <span class="out" id="bfv"></span>${tip('buffer')}</label>
+      <input id="bf" type="range" min="0" max="3200" step="200" value="${lev.buf}">
+      <div id="rlcalc" class="rlcalc"></div>
       <div id="bfo" class="bufout"></div>
       <label for="qy">Reorder quantity: <span class="out" id="qyo"></span>${tip('qty')}</label>
       <input id="qy" type="range" min="0" max="4000" step="200" value="${lev.qty}">
@@ -1229,20 +1242,22 @@ function roundView(){
       <label>Supplier${tip(hard?'suppliers':'supplier')}</label>
       <div class="optrow${hard?' three':''}">${sups.map((_,k)=>supOpt(k)).join('')}</div>
       <div id="prev" class="forecast"></div>
-      ${q?`<div class="quiz" id="quiz"><b class="q">Quick question: ${money(Engine.RULES.quizBonus)} bonus if right (unlocks Run)</b><div class="qt">${q.text}</div>
-        ${q.choices?`<div class="qch">${q.choices.map((c,i)=>`<button class="ghost qopt" data-i="${i}">${esc(c)}</button>`).join('')}</div>`:`<div class="row"><input id="qa" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer"><button class="ghost" id="qcheck">Check</button></div>`}<div class="fb" id="qfb"></div></div>`:''}
-      <div class="runrow"><button class="primary" id="run" ${q?'disabled':''}>Run round ${r}</button><label class="small inl"><input type="checkbox" id="fast" ${fastMode?'checked':''}> Fast mode (no animation)</label></div>
+      <div class="runrow"><button class="primary" id="run" ${q?'disabled':''}>${q?'Answer the question first':'Run round '+r}</button><label class="small inl"><input type="checkbox" id="fast" ${fastMode?'checked':''}> Fast mode (no animation)</label></div>
     </div>
   </div>`;
   const upd=()=>{
-    lev.rl=+$('#rl').value; lev.qty=+$('#qy').value;
-    $('#rlo').textContent=units(lev.rl); $('#qyo').textContent=units(lev.qty);
-    const L=leadFor(lev,card,hard,s.built), buffer=bufferFor(lev.rl,L.lead);
-    $('#bfo').className='bufout'+(buffer<0?' x':'');
-    $('#bfo').innerHTML=buffer>=0?`Buffer when the delivery arrives: <b>${units(buffer)}</b> (reorder level ${units(lev.rl)} - usage ${units(USAGE)} x ${L.lead} week${L.lead>1?'s':''})${tip('buffer')}`:`<b>No buffer.</b> You sell ${units(USAGE)} a week, so you need ${units(USAGE*L.lead)} to cover the ${L.lead}-week wait, so you will be <b>${units(-buffer)} short</b> before the delivery arrives.${tip('buffer')}`;
+    lev.buf=+$('#bf').value; lev.qty=+$('#qy').value;
+    const L0=expLead(lev,hard,s.built), L=leadFor(lev,card,hard,s.built), buffer=lev.buf, wk=(n)=>n+' week'+(n>1?'s':'');
+    lev.rl=planRl(lev,hard,s.built);
+    $('#bfv').textContent=units(lev.buf); $('#qyo').textContent=units(lev.qty);
+    $('#rlcalc').innerHTML=`Reorder level${tip('reorder')} <span class="eqn">= ${units(lev.buf)} + ${units(USAGE)} x ${wk(L0)} = ${units(lev.rl)}</span><div class="small">buffer + usage x lead time</div>`;
+    // a delay this round: the extra wait eats into the buffer (stock never goes below 0)
+    const extra=USAGE*(L.lead-L0), ordering=stockNow<=lev.rl&&!s.pipeline.some(o=>o.arrive>r)&&lev.qty>0;
+    $('#bfo').className='bufout'+(ordering&&extra>buffer?' x':'');
+    $('#bfo').innerHTML=extra<=0?'':!ordering?`Orders placed this round take ${wk(L.lead)}, not ${L0}, but you are not ordering this round.`:`Your order this round takes ${wk(L.lead)}, not ${L0}. You will sell ${units(extra)} more while you wait: `+(extra<=buffer?`that uses <b>${units(extra)}</b> of your ${units(buffer)} buffer.`:`your ${units(buffer)} buffer will be used up and you will be <b>${units(extra-buffer)} short</b>.`);
     const out=s.pipeline.filter(o=>o.arrive>r).length>0;
     const sold=Math.min(demand,stockNow), lostU=demand-sold;
-    let t='<b>If you press Run:</b><br>';
+    let t='';
     t+=lostU?`<span class="x">X Stock-out: sell ${units(sold)}, lose ${units(lostU)}</span>${tip('stockout')}<br>`:`Yes: all ${units(demand)} sold<br>`;
     if(out) t+='Order: one is already on the way';
     else if(stockNow<=lev.rl){
@@ -1254,7 +1269,7 @@ function roundView(){
     $('#prev').innerHTML=`<div class="ltime${L.delay?' late':''}" id="lt"><svg viewBox="0 0 22 20" width="22" height="20" aria-hidden="true"><rect width="22" height="20" rx="2" fill="#c89b5e" stroke="#6b4a22" stroke-width="1.5"/><path d="M1 1 L21 19 M21 1 L1 19" stroke="#6b4a22"/></svg><span>Delivery time${tip('lead')}: <b>${L.lead} round${L.lead>1?'s':''}</b>${L.delay?` <span class="x">(${L.delay} late)</span>`:''}</span></div>`+t;
     G.lev=lev; ccUpdate(lev.rl,buffer,lev.qty); sceneLevers(lev.rl,buffer);
   };
-  $('#rl').oninput=upd; $('#qy').oninput=upd; upd();
+  $('#bf').oninput=upd; $('#qy').oninput=upd; upd();
   if(G.mark===undefined) G.mark='flower';
   walkMark();
   if(r%2===0&&!skipAnim()){ G.walks=G.walks||{}; if(!G.walks[r]){ G.walks[r]=1; setTimeout(()=>catWalk(r/2),900); } }
@@ -1281,7 +1296,7 @@ function roundView(){
     document.querySelectorAll('.opt').forEach(o=>{ const on=+o.dataset.d===lev.sup; o.classList.toggle('sel',on); o.querySelector('input').checked=on; });
     $('#buildBtn').textContent=lev.build?'Cancel build':'Build line'; upd(); };
   if(q){
-    const done=(ok)=>{ G.quizLog.push({r,ok}); G.qDone=r; G.qOk=ok?r:null; $('#run').disabled=false;
+    const done=(ok)=>{ G.quizLog.push({r,ok}); G.qDone=r; G.qOk=ok?r:null; $('#run').disabled=false; $('#run').textContent='Run round '+r;
       document.querySelectorAll('#quiz input,#quiz button').forEach(el=>el.disabled=true);
       $('#qfb').className='fb '+(ok?'ok':'no'); $('#qfb').innerHTML=(ok?`Correct! +${money(Engine.RULES.quizBonus)} bonus. `:'Not quite. ')+q.working; };
     if(q.choices) document.querySelectorAll('.qopt').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
@@ -1307,15 +1322,15 @@ function roundView(){
 // in a game. Numeric questions are typed; concept questions have two or three buttons.
 function makeQuestion(r){
   const s=G.s, card=G.seq[r-1], lev=G.lev, sups=supsFor(G.hard), line=sups[2], disc=Engine.RULES.bulkDisc;
-  const L=leadFor({...lev,sup:G.hard?0:lev.sup},card,G.hard,s.built).lead, wk=(n)=>n+' week'+(n>1?'s':'');
+  const L=expLead({...lev,sup:G.hard?0:lev.sup},G.hard,s.built), wk=(n)=>n+' week'+(n>1?'s':'');
   const rnd=Engine.rng((G.seed||1)*97+r*13+G.quizLog.length), pick=(a)=>a[Math.floor(rnd()*a.length)];
   const num=(id,text,answer,working)=>({id,text,answer,working});
   const mcq=(id,text,choices,answer,working)=>({id,text,choices,answer,working});
   const bank=[
-    ()=>{ const b=pick([400,800,1200]); return num('rl',`Usage is ${units(USAGE)} cans a week and the delivery time is ${wk(L)}. You want a buffer of ${units(b)}. What reorder level should you set?`,b+USAGE*L,`Reorder level = buffer + usage x delivery time = ${units(b)} + ${units(USAGE)} x ${L} = ${units(b+USAGE*L)}.`); },
-    ()=>{ const rl=lev.rl, left=rl-USAGE*L;
-      if(left>=0) return num('buf',`Your reorder level is ${units(rl)}, usage is ${units(USAGE)} a week and the delivery time is ${wk(L)}. How much buffer stock is left when the delivery arrives?`,left,`Buffer = reorder level - usage x delivery time = ${units(rl)} - ${units(USAGE)} x ${L} = ${units(left)}.`);
-      return num('short',`Your reorder level is ${units(rl)}, usage is ${units(USAGE)} a week and the delivery time is ${wk(L)}. How many sales will you miss before the delivery arrives?`,-left,`You need ${units(USAGE)} x ${L} = ${units(USAGE*L)} to cover the wait but only have ${units(rl)}. Stock hits 0 and you miss ${units(USAGE*L)} - ${units(rl)} = ${units(-left)} sales. Stock can never go below 0.`); },
+    ()=>{ const b=pick([400,800,1200]); return num('rl',`Usage is ${units(USAGE)} cans a week and the lead time is ${wk(L)}. You want a buffer stock of ${units(b)}. What should the reorder level be?`,b+USAGE*L,`Reorder level = buffer + usage x delivery time = ${units(b)} + ${units(USAGE)} x ${L} = ${units(b+USAGE*L)}.`); },
+    ()=>{ const b=lev.buf, d=pick([1,2]), use=USAGE*d;
+      if(use<=b) return num('use',`Your buffer stock is ${units(b)} and you sell ${units(USAGE)} a week. A delivery arrives ${wk(d)} late. How much of your buffer do you use while you wait?`,use,`Extra wait x usage = ${d} x ${units(USAGE)} = ${units(use)}, taken from the ${units(b)} buffer (${units(b-use)} left).`);
+      return num('short',`Your buffer stock is ${units(b)} and you sell ${units(USAGE)} a week. A delivery arrives ${wk(d)} late. How many sales will you miss?`,use-b,`The late wait needs ${d} x ${units(USAGE)} = ${units(use)}. The buffer covers ${units(b)}, then stock hits 0: ${units(use)} - ${units(b)} = ${units(use-b)} sales missed. Stock never goes below 0.`); },
     ()=>{ const l=pick([1,2,3]); return num('arrive',`You place an order in round ${r} and the delivery time is ${wk(l)}. In which round does it arrive?`,r+l,`Round ${r} + ${l} = round ${r+l}.`); },
     ()=>{ const b=pick([400,800,1200]), q=pick([1200,1600,2000]); return num('max',`Your buffer stock is ${units(b)} and your reorder quantity is ${units(q)}. What is the maximum stock level?`,b+q,`Maximum stock = buffer + reorder quantity = ${units(b)} + ${units(q)} = ${units(b+q)}.`); },
     ()=>{ const n=pick([1200,1800,2600,3400]); return num('store',`${units(n)} units are left on the shelves at the end of a round. Storage costs ${money(CFG.holdPerUnit)} a unit. What is the storage cost?`,n*CFG.holdPerUnit,`${units(n)} x ${money(CFG.holdPerUnit)} = ${money(n*CFG.holdPerUnit)}.`); },
@@ -1530,7 +1545,7 @@ function teacherView(){
     <ul class="q">
       <li>Syllabus links (HL 5.6): JIT and JIC, buffer stock, reorder level, reorder quantity, lead time, stock-out, costs of holding stock, supply chain risk and supplier reliability.</li>
       <li>Timing: about 8 minutes of play, then debrief. Run it after students have met the stock control chart.</li>
-      <li>Rules (updated 2026-10-22): students set the reorder level directly, and the game shows the buffer it leaves (reorder level minus usage x delivery time). Orders of 2,000 or more get a 5% bulk discount; cans go off after 4 rounds on the shelf. Hard level adds global or local suppliers, make or buy (cost to make vs cost to buy, capacity utilisation, productivity) and lost goodwill after stock-outs. Codes from before this update still score under the old rules.</li>
+      <li>Rules (updated 2026-10-22): students set a target buffer stock; the game shows the reorder level live (buffer + usage x the supplier's normal lead time). In delay rounds the panel shows how much of the buffer the extra wait will use, or how many sales will be missed. Orders of 2,000 or more get a 5% bulk discount; cans go off after 4 rounds on the shelf. Hard level adds global or local suppliers, make or buy (cost to make vs cost to buy, capacity utilisation, productivity) and lost goodwill after stock-outs. Codes from before this update still score under the old rules.</li>
       <li>Quick questions (on by default) appear before rounds 2, 5 and 8 (and round 4 on Hard) and must be answered before Run. The end screen shows how many were right.</li>
       <li>Worlds: Stable (the Calm waters events), Unsettled (the Supply crunch events: import licence delay, fish price spike, single-source dependence) and Chaotic (the Cascade events). Each game shuffles that world's ten events, with round 1 always calm, so groups face the same shocks in a different order. Random draws new events every game. Use Unsettled as the class world. Fixed orders are still available by adding #seq=A, #seq=B or #seq=C to the link.</li>
       <li>Live mode: project this page, let teams agree levers by vote or whiteboard, then press Run round. Cards are hidden until each round starts.</li>

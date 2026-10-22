@@ -66,29 +66,28 @@ check(d.querySelectorAll('#scene [data-can]').length === 8, 'round 1 scene has 8
 check(d.querySelectorAll('#scene [data-cat]').length === 8, 'round 1 scene has 8 cats');
 check(d.querySelectorAll('#scene [data-cat][data-mood="neutral"]').length === 8, 'round 1 cats are neutral');
 
-// 3. Reorder level 2,000 puts the line at 20 cans, updated without a re-render; buffer = 2,000 - 800 x 1 week
+// 3. Target buffer 1,200 gives reorder level 1,200 + 800 x 1 week = 2,000 (line at 20 cans), updated without a re-render
 const sceneBefore = d.querySelector('#scene'), ccBefore = d.querySelector('#ccRl').getAttribute('y1');
-setRange('#rl', 2000);
-check(d.querySelector('#scene') === sceneBefore, 'reorder level slider updates the scene without re-render');
-check(d.querySelector('#scRl').getAttribute('data-cans') === '20', 'reorder line at 20 cans for reorder level 2,000');
-check(/Buffer when the delivery arrives: 1,200/.test(d.querySelector('#bfo').textContent), 'buffer shown as reorder level minus usage x delivery time');
+setRange('#bf', 1200);
+check(d.querySelector('#scene') === sceneBefore, 'buffer slider updates the scene without re-render');
+check(d.querySelector('#scRl').getAttribute('data-cans') === '20' && w.__G().lev.rl === 2000, 'reorder line at 20 cans for buffer 1,200');
+check(/= 1,200 \+ 800 x 1 week = 2,000/.test(d.querySelector('#rlcalc').textContent), 'reorder level calculation shown live');
 check(d.querySelectorAll('#scene [data-can] .cb[stroke="#1f7a45"]').length === 8, 'buffer cans outlined in green');
 check(d.querySelector('#ccRl').getAttribute('y1') !== ccBefore, 'stock control chart reorder line moves with the slider');
-setRange('#rl', 400);
-check(/No buffer.*400 short/.test(d.querySelector('#bfo').textContent) && !/-\d/.test(d.querySelector('#bfo').textContent), 'a reorder level below usage x delivery time says how short you will be, never a negative buffer');
-setRange('#rl', 1600);
+check(d.querySelector('#bfo').textContent === '', 'no delay warning in a calm round');
+setRange('#bf', 800);
 check(d.querySelector('#scRl').getAttribute('data-cans') === '16', 'reorder line back to 16 cans');
 
 let sawOut = 0, sawCalm = 0, sawDel = 0;
 for (let r = 1; r <= 10; r++) {
   if (!d.querySelector('#run')) throw new Error('no run button round ' + r);
   if (r === 2) {
-    check(!!d.querySelector('#quiz') && d.querySelector('#run').disabled, 'round 2 asks a question and Run waits for it');
+    check(!!d.querySelector('.colA #quiz') && d.querySelector('#run').disabled && /Answer the question/.test(d.querySelector('#run').textContent), 'round 2 asks a question and Run waits for it');
     answer(false);
     check(/Not quite\. .{10,}/.test(d.querySelector('#qfb').textContent) && !d.querySelector('#run').disabled, 'a wrong answer shows the working and unlocks Run');
   }
   if (r === 5) { answer(true); check(/Correct/.test(d.querySelector('#qfb').textContent), 'a right answer is marked correct'); }
-  if (r === 3) { setRange('#rl', 2000); setRange('#qy', 1600); }
+  if (r === 3) { setRange('#bf', 1200); setRange('#qy', 1600); }
   if (r === 5) d.querySelectorAll('.opt')[1].click();
   answer();
   { const st = w.__G().s, arr = st.pipeline.filter((o) => o.arrive <= r).reduce((t, o) => t + o.qty, 0);
@@ -197,7 +196,7 @@ check(/Test Team/.test(d.querySelector('#lbBox').textContent) && d.querySelector
 d.querySelector('#tabPlay').click();
 w.__start('Out Team', 'A', 0);
 for (let r = 1; r <= 10; r++) {
-  setRange('#rl', 0); setRange('#qy', 400); answer();
+  setRange('#bf', 0); setRange('#qy', 400); answer();
   click('#run');
   const h = w.__G().last;
   if (h.stockout) { sawOut++; check(sadCount() > 0 && lostShown(), `low-stock round ${r}: sad cat and Lost sale label`); }
@@ -218,10 +217,12 @@ check(d.querySelectorAll('.optrow.three .opt').length === 3 && d.querySelector('
 let sawGoodwill = false;
 for (let r = 1; r <= 10; r++) {
   check(!d.querySelector('#quiz'), `round ${r}: no question when questions are off`);
-  if (r === 2) { setRange('#rl', 0); setRange('#qy', 400); }
+  if (r === 2) { setRange('#bf', 0); setRange('#qy', 400); }
+  if (r === 1) { setRange('#bf', 800); check(w.__G().lev.rl === 2400 && /800 x 2 weeks = 2,400/.test(d.querySelector('#rlcalc').textContent), 'Hard: global supplier plans on a 2-week lead time');
+    d.querySelectorAll('.opt')[1].click(); check(w.__G().lev.rl === 1600, 'Hard: switching to local recalculates the reorder level'); d.querySelectorAll('.opt')[0].click(); }
   if (r === 4) {
     check(!!d.querySelector('.opt[data-d="2"] #buildBtn'), 'round 4 offers to build the canning line on the Make card');
-    click('#buildBtn'); check(d.querySelector('.opt[data-d="2"]').classList.contains('sel'), 'building selects Make'); setRange('#rl', 1600); setRange('#qy', 1200);
+    click('#buildBtn'); check(d.querySelector('.opt[data-d="2"]').classList.contains('sel'), 'building selects Make'); setRange('#bf', 800); setRange('#qy', 1200);
   }
   if (w.__G().s.goodwill > 0 && /unhappy cats/.test(d.body.textContent)) sawGoodwill = true;
   click('#run');
@@ -263,7 +264,9 @@ check(/Hard/.test(d.body.textContent) && /local supplier/.test(d.body.textConten
 
 { // results picture uses the normal delivery time, not this round's delay
   w.__opts({ quiz: false, hard: false }); w.__start('Buf', 'A', 0);
-  for (let r = 1; r <= 5; r++) { setRange('#rl', 1600); click('#run'); if (r < 5) click('#next'); }
+  for (let r = 1; r <= 5; r++) { setRange('#bf', 800);
+    if (r === 5) check(/takes 3 weeks, not 1\. You will sell 1,600 more while you wait: your 800 buffer will be used up and you will be 800 short|take 3 weeks, not 1, but you are not ordering this round/.test(d.querySelector('#bfo').textContent), 'a delay round warns that the buffer will be used up and how short you will be');
+    click('#run'); if (r < 5) click('#next'); }
   check(w.__G().last.card.delay === 2 && d.querySelector('#scBf').getAttribute('data-cans') === '8' && !/No buffer/.test(d.querySelector('#scBfT').textContent), 'results after a delay round show the planned buffer at normal delivery time'); }
 
 { w.__opts({ quiz: false, hard: false }); w.__start('Zero', 'A', 0);
