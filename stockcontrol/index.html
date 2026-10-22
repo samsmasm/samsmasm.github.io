@@ -75,6 +75,23 @@ label.inl{display:inline-flex;gap:8px;align-items:center;margin:0;font-weight:no
 .rpcap{background:var(--purple-bg);border-left:4px solid var(--purple);padding:8px 12px;border-radius:6px;min-height:3.2em}
 .rpctl{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin:8px 0}
 .rpctl select{width:auto;padding:5px 8px}
+.hud{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline;margin:0 0 12px;font-size:17px}
+.lead{font-size:19px;margin:6px 0 10px}
+.big{font-size:34px;font-weight:bold;margin:4px 0}
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:12px 0}
+.tile{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.tile svg{flex:none}
+.facts{display:flex;flex-wrap:wrap;gap:4px 16px;margin:8px 0;font-size:15px}
+.facts b{font-size:17px}
+.optrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.optrow .opt{margin:0}
+.hint{font-size:14px;color:var(--muted)}
+.forecast{background:#fff;border:2px solid var(--line);border-radius:10px;padding:8px 12px;margin:14px 0;line-height:1.7}
+.forecast .x{color:var(--red);font-weight:bold}
+.coach{background:var(--blue-bg);border:2px dashed var(--blue);color:var(--blue);border-radius:10px;padding:8px 12px;font-weight:bold}
+details>summary{cursor:pointer;color:var(--blue);font-weight:bold;font-size:17px}
+details[open]>summary{margin-bottom:10px}
+.news h2{margin-bottom:6px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -211,7 +228,7 @@ const defaultLev = { buffer: 800, qty: 1200, dual: false };
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function startGame(name, mode, seed){
-  G = { name: name||'Player', mode, seed, seq: Engine.seqFor(mode, seed), s: Engine.newState(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
+  G = { name: name||'Player', mode, seed, seq: Engine.seqFor(mode, seed), s: Engine.newState(), lev: {...defaultLev}, view: 'round', last: null, showTheory: false };
   render();
 }
 
@@ -377,9 +394,9 @@ function animView(h,crate){
   app.innerHTML=`
   <div class="bar"><i style="width:${(h.round-1)/CFG.rounds*100}%"></i></div>
   ${cardView(h.card,h.round)}
-  <div class="card"><h3>Round ${h.round}: the week in your warehouse</h3>
+  <div class="card">
     <div class="scenebox">${sceneSVG({stock:h.startStock-h.arrivedQty,buffer:h.lev.buffer,moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0})}</div>
-    <p id="animMsg" class="small" aria-live="polite" style="min-height:3em"></p>
+    <p id="animMsg" class="lead" aria-live="polite" style="min-height:1.6em;font-weight:bold"></p>
     <p><button class="ghost" id="skip">Skip animation</button></p>
   </div>`;
 }
@@ -396,7 +413,7 @@ async function runAnim(h,crate){
   try{
     // 1. Delivery
     if(h.arrivedQty>0){
-      msg(`Delivery: ${units(h.arrivedQty)} units arrive. Stock is now ${units(h.startStock)}.`);
+      msg(`Delivery: +${units(h.arrivedQty)}`);
       setCrate(`Delivered: ${units(h.arrivedQty)}`);
       const from=nCans(h.startStock-h.arrivedQty), to=nCans(h.startStock), gap=Math.min(60,700/Math.max(1,to-from)), ps=[];
       for(let i=from;i<to;i++){
@@ -412,16 +429,16 @@ async function runAnim(h,crate){
     if(h.ordered){
       setCrate(null); await wait(sleep(200));
       setCrate(`Order ${units(h.ordered.qty)}: arrives round ${h.ordered.arrive}`);
-      msg(`Stock ${units(h.startStock)} is at or below the reorder level (${units(Engine.reorderLevel(h.lev.buffer))}), so ${units(h.ordered.qty)} units are ordered.`);
+      msg(`Hit the reorder level: ordering ${units(h.ordered.qty)}`);
       await wait(sleep(1100));
     } else {
       setCrate(due?crateText(0,due):null);
-      msg(due?'An order is already on the way, so no new order.':'Stock is above the reorder level, so no order.');
+      msg(due?'Order already on the way':'Above the reorder level: no order');
       await wait(sleep(700));
     }
     // 3. Customers
     const cats=[...sv.querySelectorAll('[data-cat]')], nc=cats.length, sad=sadCats(h), happy=nc-sad, per=Math.min(300,2400/nc);
-    msg(`Customers want ${units(h.demand)} units this week.`);
+    msg(`Cats want ${units(h.demand)}`);
     for(let j=0;j<happy;j++){
       const el=cats[j], [cx,cy]=catXY(j), want=nCans(h.startStock-h.sold*(j+1)/happy), flights=[];
       await wait(tween(el,[cx,cy],[cx,cy-8],per*.3,a));
@@ -436,15 +453,15 @@ async function runAnim(h,crate){
     }
     while(cansG.children.length>nCans(h.endStock)) cansG.lastElementChild.remove();
     if(sad){
-      msg(`The shelves are empty. ${units(h.lost)} units of demand are lost for good.`);
+      msg(`Shelves empty! ${units(h.lost)} sales lost`);
       const ps=[];
       for(let j=happy;j<nc;j++){ const el=cats[j], [cx,cy]=catXY(j); setMood(el,'sad'); ps.push(tween(el,[cx,cy],[cx+8,cy+4],600,a).then(()=>el.setAttribute('opacity','.55'))); }
       $('#scLost').removeAttribute('display'); $('#scLostT').textContent=lostText(h);
       await wait(Promise.all(ps)); await wait(sleep(900));
-    } else { msg(`Every customer was served: ${units(h.sold)} units sold.`); await wait(sleep(500)); }
+    } else { msg(`All fed: ${units(h.sold)} sold`); await wait(sleep(500)); }
     // 4. Holding cost
     if(h.endStock>0){
-      msg(`${units(h.endStock)} units are left on the shelves. Holding cost: ${money(h.holding)}.`);
+      msg(`${units(h.endStock)} left over: -${money(h.holding)} to hold`);
       const coins=$('#scCoins'), left=cansG.children.length, ps=[];
       COINS.forEach((t,k)=>{
         const [x,y]=canPos(Math.floor((k+.5)*left/COINS.length)), from=[x+11,y+15];
@@ -455,7 +472,7 @@ async function runAnim(h,crate){
       await wait(Promise.all(ps));
       $('#scHoldT').textContent='Holding cost '+money(h.holding);
       await wait(sleep(1000));
-    } else { msg('No stock left, so no holding cost this week.'); await wait(sleep(800)); }
+    } else { msg('Nothing left over: no holding cost'); await wait(sleep(800)); }
     finish();
   }catch(e){ if(e!==STOP) { finish(); throw e; } }
 }
@@ -496,11 +513,10 @@ function rpChart(kind,lines){
 }
 function replayCard(lines){
   return `<div class="card" id="replay"><h2>Replay your game</h2>
-    <p class="small">Same shocks, week by week. Thick purple line: you. Grey lines: fixed strategies played on the same shocks.</p>
     <div id="rpNews" class="rpnews"></div>
     <div id="rpLegend" class="rplegend"></div>
-    <h3>Stock at the end of each week</h3>${rpChart('stock',lines)}
-    <h3>Total profit so far</h3>${rpChart('cum',lines)}
+    <h3>Stock left each round</h3>${rpChart('stock',lines)}
+    <h3>Profit so far</h3>${rpChart('cum',lines)}
     <p id="rpCap" class="rpcap" aria-live="polite"></p>
     <div class="rpctl">
       <button class="ghost" id="rpPlay">Play</button><button class="ghost" id="rpPause">Pause</button><button class="ghost" id="rpRestart">Restart</button>
@@ -524,9 +540,9 @@ function rpText(n){
   $('#rpRd').textContent=n; $('#rpScrub').value=n;
   $('#rpNews').innerHTML=n===0?`<b>Start: everyone has ${units(CFG.startStock)} units in stock</b>`:`<b>Round ${n}: ${esc(G.seq[n-1].title)}</b>${rpChips(G.seq[n-1])}`;
   $('#rpLegend').innerHTML=vis.map(L=>`<span><svg width="30" height="10" aria-hidden="true"><line x1="0" x2="30" y1="5" y2="5" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}"/></svg>${L.name}: <b data-key="${L.key}" data-total="${Math.round(L.cum[n])}">${money(L.cum[n])}</b></span>`).join('');
-  if(n===0){ $('#rpCap').textContent='Round 0: everyone starts with the same stock. Press Play or drag the slider to watch each week.'; return; }
-  const parts=vis.map(L=>{ const h=L.h[n-1]; return `${L.who} had ${units(h.endStock)} in stock${h.lost?` and lost ${units(h.lost)} sales`:''}`; });
-  $('#rpCap').textContent=`Round ${n}, ${G.seq[n-1].title}: ${parts.join(', ')}.`;
+  if(n===0){ $('#rpCap').textContent='Round 0: same start for everyone.'; return; }
+  const parts=vis.map(L=>{ const h=L.h[n-1]; return `${L.name} ${units(h.endStock)}${h.lost?` (lost ${units(h.lost)} sales)`:''}`; });
+  $('#rpCap').textContent=`Round ${n}, ${G.seq[n-1].title}. Stock left: ${parts.join(', ')}.`;
 }
 function rpDraw(t){
   if(rp.reduce) t=Math.floor(t);
@@ -579,7 +595,32 @@ function rpInit(lines){
 /* ---------- views ---------- */
 function setupView(){
   const h=location.hash.match(/seq=([ABCR])/); const pre=h?h[1]:'A';
+  const icon=(vb,inner)=>`<svg viewBox="${vb}" width="44" height="52" aria-hidden="true">${inner}</svg>`;
   app.innerHTML=`
+  <div class="card info"><h2>Run the cat food warehouse</h2>
+    <p class="lead">${CFG.rounds} rounds. Most profit wins.</p>
+    <div class="tiles">
+      <div class="tile">${icon('11 172 26 34',canSVG(0,0))}<div><b>+${money(CFG.price-CFG.cost)}</b> for every can a cat buys</div></div>
+      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> for every can still on the shelf at the end of a round</div></div>
+      <div class="tile">${icon('122 232 28 36',catSVG(4,'sad',false))}<div><b>No can, no sale.</b> Hungry cats don't come back.</div></div>
+    </div>
+    <p><b>Each round:</b> read the news, set 3 levers, press Run.</p>
+  </div>
+  <div class="card"><h2>Start</h2>
+    <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban">
+    <p><button class="primary" id="go">Start round 1</button></p>
+    <details><summary>Shock set (teacher)</summary>
+    <label for="sq">Shock sequence</label>
+    <select id="sq">
+      <option value="A" ${pre==='A'?'selected':''}>Rare earth crunch (class set)</option>
+      <option value="B" ${pre==='B'?'selected':''}>Calm waters</option>
+      <option value="C" ${pre==='C'?'selected':''}>Cascade</option>
+      <option value="R" ${pre==='R'?'selected':''}>Seeded random</option>
+    </select>
+    <div id="seedBox" class="${pre==='R'?'':'hidden'}"><label for="sd">Seed (same seed, same shocks)</label><input id="sd" type="number" value="${Math.floor(Math.random()*9000+1000)}"></div>
+    </details>
+  </div>
+  <details class="card"><summary>Full rules and key terms</summary>
   <div class="card info"><h2>The situation</h2>
     <p>You manage the warehouse for a manufacturer that imports its key inputs, including rare earths. Each round is one week. You sell each unit for ${money(CFG.price)} and buy it for about ${money(CFG.cost)}, so a normal week earns about ${money(CFG.baseDemand*(CFG.price-CFG.cost))} before other costs.</p>
     <p><b>Your aim:</b> the highest total profit after ${CFG.rounds} weeks.</p>
@@ -613,18 +654,7 @@ function setupView(){
     <h3>Worked example</h3>
     <p>Buffer stock 400, so reorder level 1,200. Your stock falls to 1,200 and an order is placed. During the week you wait, you sell 800, so the delivery arrives while you still have 400 left: that is your buffer, untouched. If the delivery is one week late, the buffer covers only half a week of demand, so you sell 400 and lose 400 sales. A bigger buffer would have covered it, but would have cost more to hold in every calm week.</p>
   </div>
-  <div class="card"><h2>Start</h2>
-    <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban">
-    <label for="sq">Shock sequence</label>
-    <select id="sq">
-      <option value="A" ${pre==='A'?'selected':''}>Rare earth crunch (class set)</option>
-      <option value="B" ${pre==='B'?'selected':''}>Calm waters</option>
-      <option value="C" ${pre==='C'?'selected':''}>Cascade</option>
-      <option value="R" ${pre==='R'?'selected':''}>Seeded random</option>
-    </select>
-    <div id="seedBox" class="${pre==='R'?'':'hidden'}"><label for="sd">Seed (same seed, same shocks)</label><input id="sd" type="number" value="${Math.floor(Math.random()*9000+1000)}"></div>
-    <p><button class="primary" id="go">Start round 1</button></p>
-  </div>`;
+  </details>`;
   $('#sq').onchange=()=>{ $('#seedBox').classList.toggle('hidden', $('#sq').value!=='R'); };
   $('#go').onclick=()=>{ const m=$('#sq').value; startGame($('#nm').value.trim(), m, m==='R'?(+$('#sd').value||1):0); };
 }
@@ -632,11 +662,11 @@ function setupView(){
 function cardView(c, rn=G.s.round+1){
   const kind=c.tag==='calm'?'calmcard':'shock';
   const chips=[];
-  if(c.demand!==CFG.baseDemand) chips.push(`<span class="chip">Demand ${units(c.demand)} units</span>`);
-  if(c.delay>0) chips.push(`<span class="chip">Delivery +${c.delay} week${c.delay>1?'s':''} (dual supplier: +${Math.min(c.delay,1)})</span>`);
-  if(c.priceMult>1) chips.push(`<span class="chip">Input price +${Math.round((c.priceMult-1)*100)}% (dual supplier: +${Math.round((c.priceMult-1)*50)}%)</span>`);
+  if(c.demand!==CFG.baseDemand) chips.push(`<span class="chip">Demand ${units(c.demand)}</span>`);
+  if(c.delay>0) chips.push(`<span class="chip">New orders +${c.delay} week${c.delay>1?'s':''} late (dual: +${Math.min(c.delay,1)})</span>`);
+  if(c.priceMult>1) chips.push(`<span class="chip">New orders +${Math.round((c.priceMult-1)*100)}% price (dual: +${Math.round((c.priceMult-1)*50)}%)</span>`);
   if(!chips.length) chips.push(`<span class="chip g">No disruption</span>`);
-  return `<div class="card ${kind}"><h2>Round ${rn}: ${esc(c.title)}</h2><p>${esc(c.text)}</p>${chips.join('')}${c.link?`<p class="small">Linked to the rare earths article: ${esc(c.link)}</p>`:''}</div>`;
+  return `<div class="card news ${kind}"><h2>Round ${rn}: ${esc(c.title)}</h2>${chips.join('')}${c.link?`<p class="small" style="margin:6px 0 0">Article link: ${esc(c.link)}</p>`:''}</div>`;
 }
 
 function roundView(){
@@ -646,40 +676,31 @@ function roundView(){
   const pct=(r-1)/CFG.rounds*100;
   app.innerHTML=`
   <div class="bar"><i style="width:${pct}%"></i></div>
-  <div class="grid" style="margin-bottom:16px">
-    <div class="stat"><div class="l">Round</div><div class="v">${r} of ${CFG.rounds}</div></div>
-    <div class="stat"><div class="l">Total profit so far</div><div class="v ${cls(s.total)}">${money(s.total)}</div></div>
-    <div class="stat"><div class="l">${esc(G.name)}</div><div class="v" style="font-size:15px">${esc(Engine.SEQ_NAMES[G.mode])}${G.mode==='R'?' #'+G.seed:''}</div></div>
-  </div>
+  <div class="hud"><b>Round ${r} of ${CFG.rounds}</b><span>Profit <b class="${cls(s.total)}">${money(s.total)}</b></span><span class="small">${esc(G.name)}</span></div>
   ${cardView(card)}
+  ${r===1?'<p class="coach">Drag the sliders and watch the shelves change. Then press Run.</p>':''}
   <div class="two">
     <div class="card">
-      <h3>Your warehouse</h3>
       <div class="scenebox">${sceneSVG({stock:s.onHand,buffer:lev.buffer,moods:Array(nCats(card.demand)).fill('neutral'),crate:crateText(arrNow,due[0])})}</div>
-      <p class="small">1 can = 100 units. 1 cat = 100 units of this week's demand. Green outline: buffer stock.</p>
-      <div class="mini">
-        <div class="stat"><div class="l">This week's demand (known)</div><div class="v">${units(card.demand)}</div></div>
-        <div class="stat"><div class="l">Stock in warehouse</div><div class="v">${units(s.onHand)}</div></div>
-        <div class="stat"><div class="l">Delivery arriving this week</div><div class="v">${units(arrNow)}</div></div>
-        <div class="stat"><div class="l">Order still on the way</div><div class="v">${due.length?units(due[0].qty):'None'}</div><div class="l">${due.length?'arrives round '+due[0].arrive:''}</div></div>
-      </div>
-      <p class="small">Dashed blue line on the chart: the reorder level. Dotted green line: your buffer stock. Purple line: stock left at the end of each week.</p>
-      <label class="small" style="font-weight:normal"><input type="checkbox" id="th" ${G.showTheory?'checked':''}> Show stock control chart</label>
+      <div class="facts"><span>In stock <b>${units(s.onHand)}</b></span><span>Cats want <b>${units(card.demand)}</b></span><span>Arriving <b>${units(arrNow)}</b></span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span></div>
+      <p class="hint">1 can = 100 units. 1 cat wants 100.</p>
+      <label class="small inl"><input type="checkbox" id="th" ${G.showTheory?'checked':''}> Show stock chart</label>
       <div id="chartBox" class="${G.showTheory?'':'hidden'}">${stockChart()}</div>
     </div>
     <div class="card todo">
-      <h3>Set your levers</h3>
-      <p class="small">These decide when you reorder and how much you order. They protect the weeks ahead, not this week's sales.</p>
-      <label for="bf">Buffer stock (safety stock): <span class="out" id="bfo"></span> units</label>
+      <h3>Your move</h3>
+      <label for="bf">Buffer stock: <span class="out" id="bfo"></span></label>
       <input id="bf" type="range" min="0" max="3200" step="200" value="${lev.buffer}">
-      <div class="small">Extra stock you aim to keep as insurance against delays and demand spikes. More buffer means fewer stock-outs but more holding cost.</div>
-      <label for="qy">Reorder quantity: <span class="out" id="qyo"></span> units</label>
+      <div class="hint">Safety cans (green). Fewer stock-outs, more holding cost.</div>
+      <label for="qy">Reorder quantity: <span class="out" id="qyo"></span></label>
       <input id="qy" type="range" min="400" max="4000" step="200" value="${lev.qty}">
-      <div class="small">How many units you order when stock falls to the reorder level. Order more than 800 to build a buffer.</div>
+      <div class="hint">Cans per order. Over 800 builds up your buffer.</div>
       <label>Supplier</label>
-      <div class="opt ${!lev.dual?'sel':''}" data-d="0"><input type="radio" name="sp" ${!lev.dual?'checked':''}><div><b>Single supplier</b><br><span class="small">Cheapest. Takes the full hit from delays and price rises.</span></div></div>
-      <div class="opt ${lev.dual?'sel':''}" data-d="1"><input type="radio" name="sp" ${lev.dual?'checked':''}><div><b>Dual supplier: ${money(CFG.dualFee)} this round</b><br><span class="small">Delays capped at +1 week. Price rises halved.</span></div></div>
-      <div id="prev" class="warn"></div>
+      <div class="optrow">
+        <div class="opt ${!lev.dual?'sel':''}" data-d="0"><input type="radio" name="sp" ${!lev.dual?'checked':''}><div><b>Single</b><br><span class="small">Cheapest</span></div></div>
+        <div class="opt ${lev.dual?'sel':''}" data-d="1"><input type="radio" name="sp" ${lev.dual?'checked':''}><div><b>Dual: ${money(CFG.dualFee)}</b><br><span class="small">Shocks hit half as hard</span></div></div>
+      </div>
+      <div id="prev" class="forecast"></div>
       <div class="runrow"><button class="primary" id="run">Run round ${r}</button><label class="small inl"><input type="checkbox" id="fast" ${fastMode?'checked':''}> Fast mode (no animation)</label></div>
     </div>
   </div>`;
@@ -689,15 +710,14 @@ function roundView(){
     const after=s.onHand+arrNow, rl=Engine.reorderLevel(lev.buffer);
     const out=s.pipeline.filter(o=>o.arrive>r).length>0;
     const sold=Math.min(card.demand,after), lostU=card.demand-sold;
-    let t=`<b>What will happen if you press Run</b><br>1. Stock after this week's delivery: <b>${units(after)}</b>.<br>2. Reorder level: <b>${units(rl)}</b> (your buffer ${units(lev.buffer)} + ${units(CFG.baseDemand*CFG.baseLead)} you expect to sell while waiting for delivery).<br>`;
-    if(out) t+='3. An order is already on the way, so no new order is placed.';
+    let t='<b>If you press Run:</b><br>';
+    t+=lostU?`<span class="x">X Stock-out: sell ${units(sold)}, lose ${units(lostU)}</span><br>`:`Yes: all ${units(card.demand)} sold<br>`;
+    if(out) t+='Order: one is already on the way';
     else if(after<=rl){
       const q=Math.min(lev.qty,CFG.cap-after), delay=lev.dual?Math.min(card.delay,1):card.delay, lead=CFG.baseLead+delay;
-      t+= q>0 ? `3. Stock is at or below the reorder level, so an order of <b>${units(q)}</b> units is placed now. It arrives in round <b>${r+lead}</b> (lead time ${lead} week${lead>1?'s':''}).` : '3. Warehouse full: no order possible.';
-      if(lev.qty>CFG.cap-after) t+=' Order capped by the storage limit.';
-    } else t+='3. Stock is above the reorder level, so no order is placed.';
-    t+=`<br>4. This week's demand is ${units(card.demand)}, so you will sell <b>${units(sold)}</b>${lostU?` and lose <b>${units(lostU)}</b> to a stock-out`:''}.`;
-    if(lev.qty<=CFG.baseDemand && lev.buffer>0) t+='<br>Tip: your buffer only builds if the reorder quantity is larger than weekly demand.';
+      t+= q>0 ? `Order: <b>${units(q)}</b> now, arrives round <b>${r+lead}</b>${lev.qty>q?' (shelves full)':''}` : 'Order: none, shelves are full';
+    } else t+=`Order: none (stock ${units(after)} is above reorder level ${units(rl)})`;
+    if(lev.qty<=CFG.baseDemand && lev.buffer>0) t+='<br><span class="hint">Tip: order more than 800 or your buffer never fills.</span>';
     $('#prev').innerHTML=t;
     G.lev=lev; stockChartUpdate(); sceneLevers(lev.buffer);
   };
@@ -718,29 +738,26 @@ function roundView(){
 
 function resultView(){
   const h=G.last, last=h.round===CFG.rounds, pct=h.round/CFG.rounds*100;
-  const hc=h.holding, hs=h.endStock*CFG.hold.storage, hi=h.endStock*CFG.hold.insurance, ho=h.endStock*CFG.hold.opportunity;
+  const hs=h.endStock*CFG.hold.storage, hi=h.endStock*CFG.hold.insurance, ho=h.endStock*CFG.hold.opportunity;
+  const due=G.s.pipeline.find(o=>o.arrive>h.round);
   app.innerHTML=`
   <div class="bar"><i style="width:${pct}%"></i></div>
-  ${cardView(h.card,h.round)}
-  <div class="card"><h3>Your warehouse at the end of round ${h.round}</h3>
-    <div class="scenebox">${sceneSVG({stock:h.endStock,buffer:h.lev.buffer,moods:Array.from({length:nCats(h.demand)},(_,j)=>j<nCats(h.demand)-sadCats(h)?'happy':'sad'),crate:crateText(0,G.s.pipeline.find(o=>o.arrive>h.round)),lost:h.lost?h:null,hold:h.holding})}</div>
-    <p class="small">Started the week with ${units(h.startStock)} units. Sold ${units(h.sold)}${h.lost?`, lost ${units(h.lost)}`:''}. ${units(h.endStock)} left on the shelves.${h.holding>0?' Coins in the jar: S storage, I insurance and security, O opportunity cost.':''}</p>
+  <div class="hud"><b>Round ${h.round} of ${CFG.rounds}: ${esc(h.card.title)}</b></div>
+  <div class="card ${h.stockout?'shock':'calmcard'}">
+    <h2>${h.stockout?`Stock-out! ${units(h.lost)} sales lost`:'Every cat got fed'}</h2>
+    ${h.stockout?`<p>That cost you ${money(h.lostProfit)} of profit.</p>`:''}
+    ${!h.stockout&&h.endStock>=2000?`<div class="warn">Big pile: ${units(h.endStock)} cans cost ${money(h.holding)} to hold this round.</div>`:''}
+    <p class="lead">This round <b class="${cls(h.profit)}">${money(h.profit)}</b> &nbsp; Total <b class="${cls(h.total)}">${money(h.total)}</b></p>
+    <button class="primary" id="next">${last?'See final results':'Next round'}</button>
   </div>
-  <div class="two">
-    <div class="card info"><h3>What happened</h3>
-      <ul class="q">
-        <li>Delivered this round: ${units(h.arrivedQty)} units</li>
-        <li>${h.ordered?`Order placed: ${units(h.ordered.qty)} units at ${money(h.ordered.cost)} each, arriving round ${h.ordered.arrive} (${h.ordered.lead} week lead time)`:'No order placed'}</li>
-        <li>Demand: ${units(h.demand)}. Sold: ${units(h.sold)}.</li>
-        <li>Stock left at end of round: ${units(h.endStock)}</li>
-      </ul>
-      ${h.stockout?`<div class="bad"><b>Stock-out:</b> ${units(h.lost)} units of demand were lost. That is ${money(h.lostProfit)} of profit gone.</div>`:'<div class="good">No stock-out. Every customer was served.</div>'}
-      ${h.endStock>=2000?`<div class="warn">You carried ${units(h.endStock)} units into next week. Holding cost: ${money(h.holding)}.</div>`:''}
-    </div>
-    <div class="card"><h3>Round ${h.round} profit</h3>
+  <div class="card">
+    <div class="scenebox">${sceneSVG({stock:h.endStock,buffer:h.lev.buffer,moods:Array.from({length:nCats(h.demand)},(_,j)=>j<nCats(h.demand)-sadCats(h)?'happy':'sad'),crate:crateText(0,due),lost:h.lost?h:null,hold:h.holding})}</div>
+    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span><span>Sold <b>${units(h.sold)}</b></span><span>Left over <b>${units(h.endStock)}</b></span></div>
+    ${h.holding>0?'<p class="hint">Jar coins: S storage, I insurance and security, O opportunity cost.</p>':''}
+    <details><summary>Profit breakdown</summary>
       <table>
         <tr><td class="l">Revenue (${units(h.sold)} x ${money(CFG.price)})</td><td>${money(h.revenue)}</td></tr>
-        <tr><td class="l">Cost of units sold</td><td class="neg">-${money(h.cogs).replace('$','$')}</td></tr>
+        <tr><td class="l">Cost of units sold</td><td class="neg">-${money(h.cogs)}</td></tr>
         <tr><td class="l">Storage</td><td class="neg">-${money(hs)}</td></tr>
         <tr><td class="l">Insurance and security</td><td class="neg">-${money(hi)}</td></tr>
         <tr><td class="l">Opportunity cost</td><td class="neg">-${money(ho)}</td></tr>
@@ -748,9 +765,9 @@ function resultView(){
         <tr class="tot"><td class="l">Profit this round</td><td class="${cls(h.profit)}">${money(h.profit)}</td></tr>
         <tr><td class="l">Total so far</td><td class="${cls(h.total)}">${money(h.total)}</td></tr>
       </table>
-    </div>
-  </div>
-  <p><button class="primary" id="next">${last?'See final results':'Next round'}</button></p>`;
+      ${h.ordered?`<p class="small">Order cost: ${money(h.ordered.cost)} a unit, lead time ${h.ordered.lead} week${h.ordered.lead>1?'s':''}.</p>`:''}
+    </details>
+  </div>`;
   $('#next').onclick=()=>{ G.view=last?'end':'round'; render(); };
 }
 
@@ -785,19 +802,22 @@ function endView(){
   const bm=benchmarks(G.seq);
   const hiHold=H.reduce((m,h)=>h.holding>m.holding?h:m,H[0]);
   const lines=replayLines(bm);
+  const short=['pure JIT','pure JIC','the hybrid'], beat=short.filter((n,k)=>s.total>=bm[k].total);
+  const best=bm.map((b,k)=>({n:short[k],t:b.total})).sort((a,b)=>b.t-a.t)[0];
+  const verdict=beat.length===3?'You beat all three fixed strategies.':`${beat.length?'You beat '+beat.join(' and ')+'. ':''}Best fixed strategy: ${best.n}, ${money(best.t)}.`;
   app.innerHTML=`
   <div class="card info"><h2>Final result: ${esc(G.name)}</h2>
-    <div class="grid">
-      <div class="stat"><div class="l">Total profit</div><div class="v ${cls(s.total)}">${money(s.total)}</div></div>
-      <div class="stat"><div class="l">Stock-out rounds</div><div class="v">${so}</div></div>
-      <div class="stat"><div class="l">Profit lost to stock-outs</div><div class="v">${money(lost)}</div></div>
-      <div class="stat"><div class="l">Holding costs paid</div><div class="v">${money(holdTot)}</div></div>
-      <div class="stat"><div class="l">Dual supplier fees</div><div class="v">${money(feeTot)}</div></div>
-    </div>
-    <p>Average profit in calm rounds: <b>${money(avg(calm))}</b>. Average profit in shock rounds: <b>${money(avg(shk))}</b>.</p>
+    <p class="big ${cls(s.total)}">${money(s.total)}</p>
+    <p class="lead">${verdict}</p>
+    <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Holding paid <b>${money(holdTot)}</b></span><span>Dual fees <b>${money(feeTot)}</b></span></div>
   </div>
   ${replayCard(lines)}
-  <div class="card"><h3>Profit by round</h3>${profitBars(H)}</div>
+  <div class="card"><h3>Score code for your teacher</h3><code class="codebox" id="code">${code}</code>
+    <p><button class="ghost" id="copy">Copy code</button> <span class="small" id="cmsg"></span></p></div>
+  <p><button class="ghost" id="fresh">New game</button></p>
+  <details class="card"><summary>All the numbers</summary>
+    <p>Average profit in calm rounds: <b>${money(avg(calm))}</b>. Average profit in shock rounds: <b>${money(avg(shk))}</b>.</p>
+    <div class="card"><h3>Profit by round</h3>${profitBars(H)}</div>
   <div class="card"><h3>Round by round</h3><div style="overflow-x:auto"><table>
     <tr><th>Rd</th><th class="l">News</th><th>Buffer</th><th>Order qty</th><th>Supplier</th><th>Sold</th><th>Lost</th><th>End stock</th><th>Profit</th></tr>
     ${H.map(h=>`<tr><td>${h.round}</td><td class="l">${esc(h.card.title)}</td><td>${units(h.lev.buffer)}</td><td>${units(h.lev.qty)}</td><td>${h.lev.dual?'Dual':'Single'}</td><td>${units(h.sold)}</td><td class="${h.lost?'neg':''}">${units(h.lost)}</td><td>${units(h.endStock)}</td><td class="${cls(h.profit)}">${money(h.profit)}</td></tr>`).join('')}
@@ -809,7 +829,8 @@ function endView(){
     <tr class="tot"><td class="l">You</td><td class="${cls(s.total)}">${money(s.total)}</td></tr></table>
     <p class="small">Use this to judge skill or luck: the shocks are identical, only the strategy changes. Replay the same shocks with a different strategy to test your answer.</p>
   </div>
-  <div class="card todo"><h2>Debrief</h2>
+  </details>
+  <details class="card todo"><summary>Debrief</summary>
     <ol class="q">
       <li><b>Calculate</b> the holding cost you paid in round ${hiHold.round}, when ${units(hiHold.endStock)} units were left at the end of the week (${money(CFG.holdPerUnit)} per unit). Split it into storage, insurance and security, and opportunity cost.</li>
       <li><b>Explain</b> why the same buffer stock earned more in a calm round than in a round with a ${H.find(h=>h.card.delay>0)?esc(H.find(h=>h.card.delay>0).card.title.toLowerCase()):'delivery shock'}.</li>
@@ -818,13 +839,8 @@ function endView(){
       <li><b>Discuss</b> whether the dual supplier fee was worth paying, using at least one round as evidence.</li>
       <li>Name one limitation of this simulation (for example fixed demand pattern, shocks known to be random, no customer loyalty effect).</li>
     </ol>
-  </div>
-  <div class="card"><h3>Score code for your teacher</h3><code class="codebox" id="code">${code}</code>
-    <p><button class="ghost" id="copy">Copy code</button> <span class="small" id="cmsg"></span></p>
-    <p class="small">The teacher screen rebuilds your score from this code, so it cannot be edited.</p></div>
-  <p><button class="primary" id="again">Replay the same shocks</button> <button class="ghost" id="fresh">New game</button></p>`;
+    </details>`;
   $('#copy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(code).then(()=>{$('#cmsg').textContent='Copied.';},()=>{$('#cmsg').textContent='Select the code above and copy it.';}); };
-  $('#again').onclick=()=>startGame(G.name,G.mode,G.seed);
   $('#fresh').onclick=()=>{G=null;render();};
   rpInit(lines);
 }

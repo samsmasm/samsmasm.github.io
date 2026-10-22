@@ -130,3 +130,7 @@ Report back with: what changed in `app.html`, any helper added to `engine.js`, t
 ## Deployment
 
 Lives in `samsmasm.github.io/stockcontrol/`, served at unisam.nz/stockcontrol/. `build.py` writes both `out/Stock_Shock_JIT_vs_JIC.html` (the offline single file) and `index.html` (the live page). Commit `index.html` after every build. `out/` and `node_modules/` are git-ignored; run `npm install jsdom` here before `node smoke.js`.
+
+## Player-facing copy (decided 2026-10-22)
+
+Players are distracted grade 11 students who experiment rather than read. Keep every screen scannable: the decision or outcome first, in a few words, with numbers in bold. Explanations live in collapsed `<details>` (full rules and key terms on the setup screen, profit breakdown on the result screen, "All the numbers" and "Debrief" on the end screen). The original rules, key terms, worked example and debrief text are kept word for word inside those sections. The stock chart is off by default.
