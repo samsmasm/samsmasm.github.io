@@ -13,16 +13,16 @@ const Engine = (function () {
   CFG.holdPerUnit = CFG.hold.storage + CFG.hold.insurance + CFG.hold.opportunity;
 
   const C = {
-    calm: { id: 'calm', title: 'Quiet month', text: 'Orders arrive on time and demand is steady at about 800 units.', demand: 800, delay: 0, priceMult: 1, tag: 'calm' },
-    quiet: { id: 'quiet', title: 'Slow sales month', text: 'Customers hold back spending. Demand falls to 650 units. Deliveries are normal.', demand: 650, delay: 0, priceMult: 1, tag: 'demand' },
-    surge: { id: 'surge', title: 'Demand surge', text: 'A viral cat video features your cat food. Demand jumps to 1,200 units. Deliveries are normal.', demand: 1200, delay: 0, priceMult: 1, tag: 'demand' },
-    surge2: { id: 'surge2', title: 'Demand surge and port congestion', text: 'Demand rises to 1,100 units while congested ports add 1 week to any order placed now.', demand: 1100, delay: 1, priceMult: 1, tag: 'both' },
-    licence: { id: 'licence', title: 'Import licence delays', text: 'New rules mean imported cat food needs an import licence. Orders placed now arrive 2 weeks late and prices rise 25% (single source).', demand: 800, delay: 2, priceMult: 1.25, tag: 'supply' },
-    lane: { id: 'lane', title: 'Shipping lane closed', text: 'A key shipping lane closes. Orders placed now arrive 3 weeks late.', demand: 800, delay: 3, priceMult: 1, tag: 'supply' },
-    lane2: { id: 'lane2', title: 'Shipping delays', text: 'Port strikes add 2 weeks to any order placed now.', demand: 800, delay: 2, priceMult: 1, tag: 'supply' },
-    spike: { id: 'spike', title: 'Fish price spike', text: 'A poor fishing season makes tuna scarce. Orders placed now cost 40% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.4, tag: 'price' },
-    spike2: { id: 'spike2', title: 'Can and fish prices rise', text: 'Tin and fish prices rise 30% for orders placed now (single source).', demand: 800, delay: 0, priceMult: 1.3, tag: 'price' },
-    licence1: { id: 'licence1', title: 'Paperwork hold-up', text: 'Customs paperwork adds 1 week to any order placed now.', demand: 800, delay: 1, priceMult: 1, tag: 'supply' },
+    calm: { id: 'calm', title: 'Purr-fectly normal week', text: 'Nothing to report. Orders arrive on time and demand is steady at about 800 units.', demand: 800, delay: 0, priceMult: 1, tag: 'calm' },
+    quiet: { id: 'quiet', title: 'Cats on a diet', text: 'The vet says every cat in town is a bit chubby. Demand falls to 600 units. Deliveries are normal.', demand: 600, demandV1: 650, delay: 0, priceMult: 1, tag: 'demand' },
+    surge: { id: 'surge', title: 'Viral cat video', text: 'A cat eating your food gets 10 million views. Demand jumps to 1,200 units. Deliveries are normal.', demand: 1200, delay: 0, priceMult: 1, tag: 'demand' },
+    surge2: { id: 'surge2', title: 'Cat show season and a sleepy driver', text: 'Every cat in town is entering the cat show, so demand rises to 1,100 units. And the delivery driver took a cat nap: orders placed now arrive 1 week late.', demand: 1100, delay: 1, priceMult: 1, tag: 'both' },
+    licence: { id: 'licence', title: 'The office cat sat on the import licence', text: 'Imported cat food now needs an import licence, and the office cat is sitting on it. Orders placed now arrive 2 weeks late and prices rise 25% (single source).', demand: 800, delay: 2, priceMult: 1.25, tag: 'supply' },
+    lane: { id: 'lane', title: 'Giant hairball blocks the canal', text: 'A hairball the size of a whale blocks the shipping canal. Orders placed now arrive 3 weeks late.', demand: 800, delay: 3, priceMult: 1, tag: 'supply' },
+    lane2: { id: 'lane2', title: 'Port workers strike for longer naps', text: 'The port workers want three naps a day. Orders placed now arrive 2 weeks late.', demand: 800, delay: 2, priceMult: 1, tag: 'supply' },
+    spike: { id: 'spike', title: 'The tuna went on holiday', text: 'All the tuna swam off to a warmer sea. Fish is scarce, so orders placed now cost 40% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.4, tag: 'price' },
+    spike2: { id: 'spike2', title: 'Cat knocks over the tin factory', text: 'A cat pushed the tin factory\'s stock off a shelf, one tin at a time. Orders placed now cost 30% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.3, tag: 'price' },
+    licence1: { id: 'licence1', title: 'Cat burglar robs the supplier', text: 'A cat burglar raided your supplier\'s warehouse. Orders placed now arrive 1 week late.', demand: 800, delay: 1, priceMult: 1, tag: 'supply' },
   };
 
   const SEQ = {
@@ -84,7 +84,7 @@ const Engine = (function () {
         s.pipeline.push(ordered);
       }
     }
-    const demand = card.demand;
+    const demand = card.demandV1 || card.demand; // original rules keep their numbers
     const sold = Math.min(demand, s.onHand);
     const lost = demand - sold;
     let need = sold, cogs = 0;
@@ -108,12 +108,13 @@ const Engine = (function () {
   /* ---------- rules version 2 (added 2026-10-22) ----------
      Used when a rules object R = { v: 2, hard: bool } is passed; without R the original rules above run unchanged,
      so old score codes still give the same totals.
-     Levers: { rl: reorder level, qty: reorder quantity, sup: supplier index, build: true on the round a canning line is built }.
+     Levers: { rl: reorder level, qty: reorder quantity, sup: supplier index, build: true on the round a canning line is built,
+     bonus: true if that round's quick question was answered correctly (adds RULES.quizBonus) }.
      New for everyone: bulk discount on big orders, cans go off after a shelf life.
      Hard adds: lost sales cut next round's demand (goodwill), global/local suppliers, make your own (cost to make vs cost to buy),
      capacity utilisation and productivity of the canning line. */
   const RULES = {
-    life: 4, bulkMin: 2000, bulkDisc: 0.05, goodwill: 0.25,
+    life: 4, bulkMin: 2000, bulkDisc: 0.05, goodwill: 0.25, quizBonus: 500,
     std: [
       { key: 'single', name: 'Single supplier', cost: 12, lead: 1, maxDelay: 99, priceShare: 1, fee: 0 },
       { key: 'dual', name: 'Dual supplier', cost: 12, lead: 1, maxDelay: 1, priceShare: 0.5, fee: 500 },
@@ -178,11 +179,12 @@ const Engine = (function () {
     const holding = s.onHand * CFG.holdPerUnit;
     const fee = sup.fee;
     const fixed = R.hard && s.built ? RULES.hard[2].fixed : 0;
-    const profit = revenue - cogs - holding - fee - fixed - spoilCost;
+    const bonus = lev.bonus ? RULES.quizBonus : 0; // right answer to that round's quick question
+    const profit = revenue - cogs - holding - fee - fixed - spoilCost + bonus;
     s.total += profit;
-    if (R.hard) s.goodwill = Math.round((lost * RULES.goodwill) / 50) * 50;
+    if (R.hard) s.goodwill = Math.round((lost * RULES.goodwill) / 100) * 100; // whole cats (1 cat = 100 units)
     const line = RULES.hard[2];
-    const res = { round: r, card, lev: { ...lev, sup: si }, startStock, ordered, arrivedQty: arrived.reduce((a, o) => a + o.qty, 0), demand, cardDemand: card.demand, goodwillLoss, sold, lost, endStock: s.onHand, revenue, cogs, holding, fee, fixed, spoiled, spoilCost, profit, total: s.total, lostProfit: lost * (CFG.price - CFG.cost), stockout: lost > 0, built: s.built, made, util: s.built ? made / line.cap : null, productivity: s.built ? made / line.workers : null, nextGoodwill: R.hard ? s.goodwill : 0 };
+    const res = { round: r, card, lev: { ...lev, sup: si }, startStock, ordered, arrivedQty: arrived.reduce((a, o) => a + o.qty, 0), demand, cardDemand: card.demand, goodwillLoss, sold, lost, endStock: s.onHand, revenue, cogs, holding, fee, fixed, spoiled, spoilCost, bonus, profit, total: s.total, lostProfit: lost * (CFG.price - CFG.cost), stockout: lost > 0, built: s.built, made, util: s.built ? made / line.cap : null, productivity: s.built ? made / line.workers : null, nextGoodwill: R.hard ? s.goodwill : 0 };
     s.history.push(res);
     return res;
   }

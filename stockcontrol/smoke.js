@@ -19,7 +19,7 @@ check(html.split(String.fromCharCode(8212)).length - 1 === 0, 'built HTML has no
   check(jic.history.every((h) => h.profit === h.revenue - h.cogs - h.holding - h.fee - h.fixed - h.spoilCost), 'profit includes spoiled stock');
   const out = Engine.run(A, { rl: 0, qty: 400, sup: 0 }, HARD);
   const k = out.history.findIndex((h) => h.lost > 0);
-  check(k >= 0 && k < 9 && out.history[k + 1].goodwillLoss === Math.round(out.history[k].lost * 0.25 / 50) * 50 && out.history[k + 1].demand === out.history[k + 1].cardDemand - out.history[k + 1].goodwillLoss, 'Hard: lost sales cut next round demand');
+  check(k >= 0 && k < 9 && out.history[k + 1].goodwillLoss === Math.round(out.history[k].lost * 0.25 / 100) * 100 && out.history[k + 1].demand === out.history[k + 1].cardDemand - out.history[k + 1].goodwillLoss, 'Hard: lost sales cut next round demand');
   const mk = Engine.run(A, (i) => ({ rl: 1600, qty: 1200, sup: i >= 3 ? 2 : 0, build: i === 3 }), HARD);
   check(mk.history[3].built === 4 && mk.history.slice(3).every((h) => h.fixed === 2000) && mk.history.slice(0, 3).every((h) => h.fixed === 0), 'Hard: canning line fixed cost from the build round');
   check(mk.history.filter((h) => h.made).every((h) => h.made <= 1000 && h.util === h.made / 1000 && h.ordered.cost === 8 * (1 + (h.card.priceMult - 1))), 'Hard: making is capped at capacity and costs $8 a can');
@@ -47,7 +47,11 @@ const click = (sel) => d.querySelector(sel).click();
 const setRange = (sel, v) => { const el = d.querySelector(sel); el.value = v; el.dispatchEvent(new w.Event('input')); };
 const sadCount = () => d.querySelectorAll('[data-cat][data-mood="sad"]').length;
 const lostShown = () => { const g = d.querySelector('#scLost'); return !!g && g.getAttribute('display') !== 'none' && /Lost sale/.test(g.textContent); };
-const answer = (right = true) => { if (d.querySelector('#quiz')) { d.querySelector('#qa').value = right ? String(w.__qa()) : '0'; click('#qcheck'); } };
+const answer = (right = true) => {
+  if (!d.querySelector('#quiz') || d.querySelector('#qfb').textContent) return;
+  if (w.__qmc()) { const n = d.querySelectorAll('.qopt').length; click(`.qopt[data-i="${right ? w.__qa() : (w.__qa() + 1) % n}"]`); }
+  else { d.querySelector('#qa').value = right ? String(w.__qa()) : '-99999'; click('#qcheck'); }
+};
 
 (async () => {
 check(d.querySelectorAll('#worldPick .world').length === 4 && d.querySelectorAll('.world.lvl').length === 2 && d.querySelector('#quizOn').checked, 'setup offers four worlds, two levels, questions on by default');
@@ -71,7 +75,7 @@ check(/Buffer when the delivery arrives: 1,200/.test(d.querySelector('#bfo').tex
 check(d.querySelectorAll('#scene [data-can] .cb[stroke="#1f7a45"]').length === 8, 'buffer cans outlined in green');
 check(d.querySelector('#ccRl').getAttribute('y1') !== ccBefore, 'stock control chart reorder line moves with the slider');
 setRange('#rl', 400);
-check(/run out while you wait/.test(d.querySelector('#bfo').textContent), 'a reorder level below usage x delivery time warns of a stock-out');
+check(/No buffer.*400 short/.test(d.querySelector('#bfo').textContent) && !/-\d/.test(d.querySelector('#bfo').textContent), 'a reorder level below usage x delivery time says how short you will be, never a negative buffer');
 setRange('#rl', 1600);
 check(d.querySelector('#scRl').getAttribute('data-cans') === '16', 'reorder line back to 16 cans');
 
@@ -81,7 +85,7 @@ for (let r = 1; r <= 10; r++) {
   if (r === 2) {
     check(!!d.querySelector('#quiz') && d.querySelector('#run').disabled, 'round 2 asks a question and Run waits for it');
     answer(false);
-    check(/Not quite/.test(d.querySelector('#qfb').textContent) && /Reorder level = buffer \+ usage x delivery time/.test(d.querySelector('#qfb').textContent) && !d.querySelector('#run').disabled, 'a wrong answer shows the working and unlocks Run');
+    check(/Not quite\. .{10,}/.test(d.querySelector('#qfb').textContent) && !d.querySelector('#run').disabled, 'a wrong answer shows the working and unlocks Run');
   }
   if (r === 5) { answer(true); check(/Correct/.test(d.querySelector('#qfb').textContent), 'a right answer is marked correct'); }
   if (r === 3) { setRange('#rl', 2000); setRange('#qy', 1600); }
@@ -110,7 +114,9 @@ check(sawDel > 0, 'played at least one round with a delivery');
 const txt = d.body.textContent;
 check(/Final result: Test Team/.test(txt) && /Debrief/.test(txt), 'end screen shown');
 check(/How JIT and JIC played your shocks/.test(txt) && /Reorder level 4,000/.test(txt) && /Reorder level 800/.test(txt) && /Maximum stock/.test(txt) && /Lead time/.test(txt), 'end screen has JIT and JIC stock control charts with lead times');
-check(/Questions right 3 of 3|Questions right 2 of 3/.test(txt), 'end screen counts questions right');
+check(/Questions right 2 of 3/.test(txt), 'end screen counts questions right');
+{ const H = w.__G().s.history, right = w.__G().quizLog.filter((x) => x.ok).map((x) => x.r);
+  check(H.filter((h) => h.bonus === 500).map((h) => h.round).join() === right.join() && H.every((h) => !h.bonus || right.includes(h.round)), 'each right answer adds a $500 bonus to that round, wrong answers add nothing'); }
 
 // 8. Leaderboard
 await tick();
@@ -226,6 +232,22 @@ await tick();
 check(posts.length === before, 'private game is not saved');
 check(/stay off the leaderboard/.test(d.querySelector('#lbBox').textContent), 'private game explains it was not added');
 check(/Hard/.test(d.body.textContent) && /local supplier/.test(d.body.textContent), 'Hard end screen describes the Hard benchmarks');
+
+// Question bank: varied, no repeats within a game, every right answer marked correct
+{ w.__opts({ quiz: true, hard: false }); const kinds = new Set(); let bad = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    w.__start('Q', 'S', seed); const seen = [];
+    for (let r = 1; r <= 10; r++) { if (d.querySelector('#quiz')) { seen.push(d.querySelector('.qt').textContent); answer(true); if (!/Correct/.test(d.querySelector('#qfb').textContent)) bad++; } click('#run'); click('#next'); }
+    seen.forEach((x) => kinds.add(x.replace(/[0-9,$%]+/g, '#')));
+    if (seen.length !== 3 || new Set(seen).size !== 3) bad++;
+  }
+  check(kinds.size >= 15 && bad === 0, `question bank is varied (${kinds.size} kinds over 40 games) and every right answer is marked correct`); }
+
+{ const b = (k, x) => ({ n: 'B' + k, m: 'S', d: 7, v: 2, x: 0, h: Array.from({ length: 10 }, (_, i) => [1600, 1200, 0, 0, x(i)]) });
+  const W = w.eval('(o)=>o'); // run lbCheck through a score code round trip
+  const code = (o) => Buffer.from(JSON.stringify(o)).toString('base64');
+  const plain = w.__decode(code(b(0, () => 0))).total, two = w.__decode(code(b(1, (i) => (i === 1 || i === 4 ? 1 : 0)))).total;
+  check(two - plain === 1000, 'score codes include question bonuses'); }
 
 // 1. No uncaught errors
 check(errs.length === 0, 'no uncaught errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

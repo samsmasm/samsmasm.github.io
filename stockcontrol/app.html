@@ -157,13 +157,22 @@ ol.lb .gm{font-size:13px;color:var(--muted)}
 .start h2{margin-bottom:4px}
 .start label{margin:6px 0 3px}
 .start p{margin:8px 0 0}
-.setupscene{padding:0}
+.setupscene,.bigscene{padding:0}
+.animgrid{display:grid;gap:16px;align-items:start;grid-template-columns:minmax(0,1fr)}
+.animgrid>.card,.animside .card{margin-bottom:12px}
+.animmsg{font-size:22px;font-weight:bold;min-height:2.8em;margin:0 0 6px;color:var(--purple)}
+.qch{display:flex;flex-direction:column;gap:6px}
+.qch button{text-align:left;padding:6px 12px;font-size:15px}
+.qch button.right{border-color:var(--green);background:var(--green-bg);color:var(--green)}
+.qch button.wrong{border-color:var(--red);background:var(--red-bg);color:var(--red)}
+.qch button:disabled{opacity:1;cursor:default}
 @media(min-width:900px){
   .setupgrid{grid-template-columns:auto minmax(340px,440px);justify-content:center}
   .setupgrid .setupscene{order:1}.setupgrid .start{order:2}.setupgrid .hero{order:3;grid-column:1 / -1}
   .hero .tiles{margin:0;grid-template-columns:repeat(3,minmax(0,1fr))}
-  .setupscene{width:fit-content;max-width:100%}
-  .setupscene .scenebox svg{height:calc(100vh - 100px);min-height:380px;max-height:860px;width:auto;max-width:calc(100vw - 500px);margin:0 auto}
+  .bigscene{width:fit-content;max-width:100%;padding:0}
+  .bigscene .scenebox svg{height:calc(100vh - 100px);min-height:380px;max-height:860px;width:auto;max-width:calc(100vw - 500px);margin:0 auto}
+  .animgrid{grid-template-columns:auto minmax(300px,400px);justify-content:center}
 }
 
 .worlds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:8px 0 14px}
@@ -343,29 +352,29 @@ function stockControlChart(hist,o){
     s+=`<path d="M${cx-5} ${cy-11} h10 l-5 8z" fill="#8c1d2c"/><text x="${cx}" y="${cy-14-(i%2)*12}" font-size="10" text-anchor="middle" fill="#8c1d2c">Stock-out</text>`; });
   return s+'</svg>';
 }
-// Revenue and stacked costs for each round played, with a profit marker.
-const PC_COLS=[['cogs','Cost of cans sold','#b79ad8'],['holding','Storage costs','#f0b98a'],['other','Fees, line and spoiled cans','#e58a9a']];
+// Revenue, total costs and profit for each round played, as lines.
+const PC_LINES=[['revenue','Revenue','#2f9a5d','',3],['costs','Total costs','#c0392b','7 4',3],['profit','Profit','#5b3d99','',4]];
 function profitChart(hist){
-  const W=520,H=230,L=58,R=12,T=16,B=36,n=CFG.rounds,slot=(W-L-R)/n,bw=slot*0.34;
-  const other=(h)=>h.fee+(h.fixed||0)+(h.spoilCost||0);
-  const top=Math.max(1,...hist.map(h=>Math.max(h.revenue,h.cogs+h.holding+other(h)))), lo=Math.min(0,...hist.map(h=>h.profit));
-  const y=v=>T+(H-T-B)*(1-(v-lo)/(top-lo));
+  const W=520,H=230,L=58,R=12,T=16,B=36,n=CFG.rounds,x=i=>L+(W-L-R)*(i-0.5)/n;
+  const val=(h,k)=>k==='costs'?h.revenue-h.profit:h[k];
+  const all=hist.flatMap(h=>PC_LINES.map(([k])=>val(h,k)));
+  const top=Math.max(1000,...all), lo=Math.min(0,...all), y=v=>T+(H-T-B)*(1-(v-lo)/(top-lo));
   const step=Math.max(2000,Math.ceil((top-lo)/4/2000)*2000);
   let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Revenue, costs and profit each round">`;
   for(let v=Math.ceil(lo/step)*step;v<=top;v+=step) s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${money(v)}</text>`;
-  for(let i=0;i<n;i++) s+=`<text x="${L+slot*(i+.5)}" y="${H-20}" font-size="11" text-anchor="middle" fill="#5b5868">${i+1}</text>`;
-  s+=`<text x="${(W+L)/2}" y="${H-6}" font-size="11" text-anchor="middle" fill="#5b5868">Round (left bar revenue, right bar costs)</text>`;
-  hist.forEach((h,i)=>{
-    const cx=L+slot*(i+.5), xr=cx-bw-1, xc=cx+1;
-    s+=`<rect x="${xr}" y="${y(h.revenue)}" width="${bw}" height="${y(0)-y(h.revenue)}" fill="#6fbf8f" rx="2"/>`;
-    let base=0; PC_COLS.forEach(([k,,col])=>{ const v=k==='other'?other(h):h[k]; if(v<=0) return; s+=`<rect x="${xc}" y="${y(base+v)}" width="${bw}" height="${y(base)-y(base+v)}" fill="${col}"/>`; base+=v; });
-    s+=`<path d="M${cx} ${y(h.profit)-6} l6 6 -6 6 -6 -6z" fill="#5b3d99" stroke="#fff" stroke-width="1.5"/>`;
+  for(let i=1;i<=n;i++) s+=`<text x="${x(i)}" y="${H-20}" font-size="11" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  s+=`<text x="${(W+L)/2}" y="${H-6}" font-size="11" text-anchor="middle" fill="#5b5868">Round</text>`;
+  if(lo<0) s+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="#5b5868"/>`;
+  PC_LINES.forEach(([k,,col,dash,wd])=>{
+    if(!hist.length) return;
+    const pts=hist.map((h,i)=>[x(i+1),y(val(h,k))]);
+    s+=`<path d="${pts.map((p,j)=>(j?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="${wd}" stroke-dasharray="${dash}" stroke-linejoin="round"/>`;
+    pts.forEach(p=>{ s+=k==='profit'?`<path d="M${p[0]} ${p[1]-5} l5 5 -5 5 -5 -5z" fill="${col}" stroke="#fff" stroke-width="1.2"/>`:k==='costs'?`<rect x="${p[0]-3.5}" y="${p[1]-3.5}" width="7" height="7" fill="${col}"/>`:`<circle cx="${p[0]}" cy="${p[1]}" r="3.8" fill="${col}"/>`; });
   });
-  s+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="#5b5868"/>`;
-  if(!hist.length) s+=`<text x="${(W+L)/2}" y="${(H-B+T)/2}" font-size="13" text-anchor="middle" fill="#5b5868">Bars appear after round 1</text>`;
+  if(!hist.length) s+=`<text x="${(W+L)/2}" y="${(H-B+T)/2}" font-size="13" text-anchor="middle" fill="#5b5868">Lines appear after round 1</text>`;
   s+='</svg>';
-  const key=(col,t,shape='')=>`<span><svg width="14" height="14" aria-hidden="true">${shape||`<rect width="14" height="14" rx="3" fill="${col}"/>`}</svg>${t}</span>`;
-  return s+`<div class="rplegend">${key('#6fbf8f','Revenue')}${PC_COLS.map(([,t,c])=>key(c,t)).join('')}${key('','Profit','<path d="M7 1 l6 6 -6 6 -6 -6z" fill="#5b3d99"/>')}</div>`;
+  const key=([,t,col,dash,wd],k)=>`<span><svg width="34" height="12" aria-hidden="true"><line x1="1" x2="33" y1="6" y2="6" stroke="${col}" stroke-width="${wd}" stroke-dasharray="${dash}"/>${k===2?`<path d="M17 1 l5 5 -5 5 -5 -5z" fill="${col}"/>`:k===1?`<rect x="13.5" y="2.5" width="7" height="7" fill="${col}"/>`:`<circle cx="17" cy="6" r="3.8" fill="${col}"/>`}</svg>${t}</span>`;
+  return s+`<div class="rplegend">${PC_LINES.map(key).join('')}</div>`;
 }
 function ccUpdate(rl,buffer,qty){
   const a=$('#ccRl'); if(!a) return;
@@ -557,16 +566,19 @@ function animView(h,crate){
   const late=h.ordered?h.ordered.delay>0:leadFor(h.lev,h.card,G.hard,h.built).delay>0;
   window.scrollTo(0,0);
   app.innerHTML=`
-  <div class="bar"><i style="width:${(h.round-1)/CFG.rounds*100}%"></i></div>
-  ${cardView(h.card,h.round)}
-  <div class="card stage solo">
-    <div class="scenebox">${sceneSVG({stock:h.startStock,rl:h.lev.rl,buffer:bufferFor(h.lev.rl,leadFor(h.lev,h.card,G.hard,h.built).lead),moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0,late})}</div>
-    <p id="animMsg" class="lead" aria-live="polite" style="min-height:1.6em;font-weight:bold"></p>
-    <p><button class="ghost" id="skip">Skip animation</button></p>
+  <div class="animgrid">
+    <div class="card stage bigscene"><div class="scenebox">${sceneSVG({stock:h.startStock,rl:h.lev.rl,buffer:bufferFor(h.lev.rl,leadFor(h.lev,h.card,G.hard,h.built).lead),moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0,late})}</div></div>
+    <div class="animside">
+      <div class="bar"><i style="width:${(h.round-1)/CFG.rounds*100}%"></i></div>
+      ${cardView(h.card,h.round)}
+      <div class="card"><p id="animMsg" class="animmsg" aria-live="polite"></p>
+      <p><button class="ghost" id="skip">Skip animation</button></p></div>
+    </div>
   </div>`;
 }
 // Driven only by the result object h from Engine.play.
 async function runAnim(h,crate){
+  app.classList.add('wide');
   animView(h,crate);
   const a=anim={cancel:false,done:false};
   const finish=()=>{ if(a.done) return; a.done=true; a.cancel=true; if(tab==='play'&&anim===a) render(); };
@@ -820,7 +832,7 @@ function setupView(){
   const icon=(vb,inner)=>`<svg viewBox="${vb}" width="44" height="52" aria-hidden="true">${inner}</svg>`;
   app.innerHTML=`
   <div class="setupgrid">
-  <div class="card stage setupscene"><div class="scenebox">${sceneSVG({stock:2000,rl:1600,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div></div>
+  <div class="card stage setupscene bigscene"><div class="scenebox">${sceneSVG({stock:2000,rl:1600,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div></div>
   <div class="card start"><h2>Run the cat food warehouse</h2>
     <p class="lead">${CFG.rounds} rounds. Most profit wins. Read the news, set your levers, press Run.</p>
     <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban" required aria-describedby="nmMsg"><div class="bufout x" id="nmMsg" role="alert"></div>
@@ -927,7 +939,7 @@ function roundView(){
     <div class="card todo levers">
       <label for="rl">Reorder level: <span class="out" id="rlo"></span></label>
       <input id="rl" type="range" min="0" max="4000" step="200" value="${lev.rl}">
-      <div class="hint">Order when stock falls to this. Buffer you want + ${units(USAGE)} x delivery time.</div>
+      <div class="hint">Order when stock falls to this. Reorder level = buffer you want + usage (${units(USAGE)} sold a week) x delivery time.</div>
       <div id="bfo" class="bufout"></div>
       <label for="qy">Reorder quantity: <span class="out" id="qyo"></span></label>
       <input id="qy" type="range" min="400" max="4000" step="200" value="${lev.qty}">
@@ -935,8 +947,8 @@ function roundView(){
       <label>Supplier</label>
       <div class="optrow${hard?' three':''}">${sups.map((_,k)=>supOpt(k)).join('')}</div>
       <div id="prev" class="forecast"></div>
-      ${q?`<div class="quiz" id="quiz"><b class="q">Quick question (unlocks Run)</b><div class="qt">${q.text}</div>
-        <div class="row"><input id="qa" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer"><button class="ghost" id="qcheck">Check</button></div><div class="fb" id="qfb"></div></div>`:''}
+      ${q?`<div class="quiz" id="quiz"><b class="q">Quick question: ${money(Engine.RULES.quizBonus)} bonus if right (unlocks Run)</b><div class="qt">${q.text}</div>
+        ${q.choices?`<div class="qch">${q.choices.map((c,i)=>`<button class="ghost qopt" data-i="${i}">${esc(c)}</button>`).join('')}</div>`:`<div class="row"><input id="qa" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer"><button class="ghost" id="qcheck">Check</button></div>`}<div class="fb" id="qfb"></div></div>`:''}
       <div class="runrow"><button class="primary" id="run" ${q?'disabled':''}>Run round ${r}</button><label class="small inl"><input type="checkbox" id="fast" ${fastMode?'checked':''}> Fast mode (no animation)</label></div>
     </div>
   </div>`;
@@ -945,7 +957,7 @@ function roundView(){
     $('#rlo').textContent=units(lev.rl); $('#qyo').textContent=units(lev.qty);
     const L=leadFor(lev,card,hard,s.built), buffer=bufferFor(lev.rl,L.lead);
     $('#bfo').className='bufout'+(buffer<0?' x':'');
-    $('#bfo').innerHTML=buffer>=0?`Buffer when the delivery arrives: <b>${units(buffer)}</b> (${units(lev.rl)} - ${units(USAGE)} x ${L.lead} week${L.lead>1?'s':''})`:`Buffer: <b>${units(buffer)}</b>. You will run out while you wait (${units(lev.rl)} - ${units(USAGE)} x ${L.lead} week${L.lead>1?'s':''}).`;
+    $('#bfo').innerHTML=buffer>=0?`Buffer when the delivery arrives: <b>${units(buffer)}</b> (reorder level ${units(lev.rl)} - usage ${units(USAGE)} x ${L.lead} week${L.lead>1?'s':''})`:`<b>No buffer.</b> You sell ${units(USAGE)} a week, so you need ${units(USAGE*L.lead)} to cover the ${L.lead}-week wait, so you will be <b>${units(-buffer)} short</b> before the delivery arrives.`;
     const out=s.pipeline.filter(o=>o.arrive>r).length>0;
     const sold=Math.min(demand,stockNow), lostU=demand-sold;
     let t='<b>If you press Run:</b><br>';
@@ -984,32 +996,79 @@ function roundView(){
     document.querySelectorAll('.opt').forEach(o=>{ const on=+o.dataset.d===lev.sup; o.classList.toggle('sel',on); o.querySelector('input').checked=on; });
     $('#buildBtn').textContent=lev.build?'Cancel build':'Build line'; upd(); };
   if(q){
-    const done=(ok)=>{ G.quizLog.push({r,ok}); G.qDone=r; $('#run').disabled=false; $('#qa').disabled=true; $('#qcheck').disabled=true;
-      $('#qfb').className='fb '+(ok?'ok':'no'); $('#qfb').innerHTML=(ok?'Correct! ':'Not quite. ')+q.working; };
-    $('#qcheck').onclick=()=>{ const v=parseFloat($('#qa').value.replace(/[$,%\s]/g,'')); done(Math.abs(v-q.answer)<0.5); };
-    $('#qa').onkeydown=(e)=>{ if(e.key==='Enter') $('#qcheck').click(); };
-    window.__qa=()=>q.answer;
-  } else window.__qa=()=>null;
+    const done=(ok)=>{ G.quizLog.push({r,ok}); G.qDone=r; G.qOk=ok?r:null; $('#run').disabled=false;
+      document.querySelectorAll('#quiz input,#quiz button').forEach(el=>el.disabled=true);
+      $('#qfb').className='fb '+(ok?'ok':'no'); $('#qfb').innerHTML=(ok?`Correct! +${money(Engine.RULES.quizBonus)} bonus. `:'Not quite. ')+q.working; };
+    if(q.choices) document.querySelectorAll('.qopt').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
+      b.classList.add(i===q.answer?'right':'wrong'); document.querySelector(`.qopt[data-i="${q.answer}"]`).classList.add('right'); done(i===q.answer); });
+    else {
+      $('#qcheck').onclick=()=>{ const v=parseFloat($('#qa').value.replace(/[$,%\s]/g,'')); done(Math.abs(v-q.answer)<0.5); };
+      $('#qa').onkeydown=(e)=>{ if(e.key==='Enter') $('#qcheck').click(); };
+    }
+    window.__qa=()=>q.answer; window.__qmc=()=>!!q.choices;
+  } else { window.__qa=()=>null; window.__qmc=()=>false; }
   $('#th').onchange=()=>{G.showTheory=$('#th').checked; $('#chartBox').classList.toggle('hidden',!G.showTheory);};
   $('#fast').onchange=()=>{fastMode=$('#fast').checked;};
   $('#run').onclick=()=>{
     if($('#run').disabled) return;
     const crate=crateText(arrNow,due[0]);
-    G.last=Engine.play2(G.s,{...G.lev},card,rules()); G.view='result';
+    G.last=Engine.play2(G.s,{...G.lev,bonus:G.qOk===r},card,rules()); G.view='result';
     G.lev.build=false;
     if(skipAnim()) render(); else runAnim(G.last,crate);
   };
 }
 // Quick questions before some rounds (can be switched off at the start).
+// Quick questions before rounds 2, 5 and 8 (and 4 on Hard). Each is picked at random from a bank, never repeating
+// in a game. Numeric questions are typed; concept questions have two or three buttons.
 function makeQuestion(r){
-  const s=G.s, card=G.seq[r-1], lev=G.lev, sups=supsFor(G.hard), line=sups[2];
+  const s=G.s, card=G.seq[r-1], lev=G.lev, sups=supsFor(G.hard), line=sups[2], disc=Engine.RULES.bulkDisc;
   const L=leadFor({...lev,sup:G.hard?0:lev.sup},card,G.hard,s.built).lead, wk=(n)=>n+' week'+(n>1?'s':'');
-  if(r===2) return {text:`Usage is ${units(USAGE)} cans a week and the delivery time is ${wk(L)}. You want a buffer of 800. What reorder level should you set?`,answer:800+USAGE*L,working:`Reorder level = buffer + usage x delivery time = 800 + ${units(USAGE)} x ${L} = ${units(800+USAGE*L)}.`};
-  if(G.hard&&r===4&&!s.built) return {text:`A canning line costs ${money(line.fixed)} a round plus $${line.cost} a can. What is the cost to make ${units(USAGE)} cans in a round?`,answer:line.fixed+line.cost*USAGE,working:`Cost to make = fixed cost + variable cost x quantity = ${money(line.fixed)} + $${line.cost} x ${units(USAGE)} = ${money(line.fixed+line.cost*USAGE)}. Buying ${units(USAGE)} from the global supplier costs ${money(sups[0].cost*USAGE)}.`};
-  if(r===5){ const rl=lev.rl; return {text:`Your reorder level is ${units(rl)}, usage is ${units(USAGE)} a week and the delivery time is ${wk(L)}. How much buffer is left when the delivery arrives?`,answer:rl-USAGE*L,working:`Buffer = reorder level - usage x delivery time = ${units(rl)} - ${units(USAGE)} x ${L} = ${units(rl-USAGE*L)}.`}; }
-  if(r===8&&G.hard&&s.built) return {text:`Your canning line can make ${units(line.cap)} cans a round. This round it makes 800. What is the capacity utilisation rate (%)?`,answer:80,working:`Capacity utilisation = actual output / maximum output x 100 = 800 / ${units(line.cap)} x 100 = 80%.`};
-  if(r===8){ const c=12, qn=2400, tot=qn*c*(1-Engine.RULES.bulkDisc); return {text:`You order ${units(qn)} cans at $${c} each and get a ${Math.round(Engine.RULES.bulkDisc*100)}% bulk discount. What is the total cost?`,answer:tot,working:`${units(qn)} x $${c} = ${money(qn*c)}. Minus ${Math.round(Engine.RULES.bulkDisc*100)}%: ${money(qn*c)} x 0.95 = ${money(tot)}.`}; }
-  return null;
+  const rnd=Engine.rng((G.seed||1)*97+r*13+G.quizLog.length), pick=(a)=>a[Math.floor(rnd()*a.length)];
+  const num=(id,text,answer,working)=>({id,text,answer,working});
+  const mcq=(id,text,choices,answer,working)=>({id,text,choices,answer,working});
+  const bank=[
+    ()=>{ const b=pick([400,800,1200]); return num('rl',`Usage is ${units(USAGE)} cans a week and the delivery time is ${wk(L)}. You want a buffer of ${units(b)}. What reorder level should you set?`,b+USAGE*L,`Reorder level = buffer + usage x delivery time = ${units(b)} + ${units(USAGE)} x ${L} = ${units(b+USAGE*L)}.`); },
+    ()=>{ const rl=lev.rl, left=rl-USAGE*L;
+      if(left>=0) return num('buf',`Your reorder level is ${units(rl)}, usage is ${units(USAGE)} a week and the delivery time is ${wk(L)}. How much buffer stock is left when the delivery arrives?`,left,`Buffer = reorder level - usage x delivery time = ${units(rl)} - ${units(USAGE)} x ${L} = ${units(left)}.`);
+      return num('short',`Your reorder level is ${units(rl)}, usage is ${units(USAGE)} a week and the delivery time is ${wk(L)}. How many sales will you miss before the delivery arrives?`,-left,`You need ${units(USAGE)} x ${L} = ${units(USAGE*L)} to cover the wait but only have ${units(rl)}. Stock hits 0 and you miss ${units(USAGE*L)} - ${units(rl)} = ${units(-left)} sales. Stock can never go below 0.`); },
+    ()=>{ const l=pick([1,2,3]); return num('arrive',`You place an order in round ${r} and the delivery time is ${wk(l)}. In which round does it arrive?`,r+l,`Round ${r} + ${l} = round ${r+l}.`); },
+    ()=>{ const b=pick([400,800,1200]), q=pick([1200,1600,2000]); return num('max',`Your buffer stock is ${units(b)} and your reorder quantity is ${units(q)}. What is the maximum stock level?`,b+q,`Maximum stock = buffer + reorder quantity = ${units(b)} + ${units(q)} = ${units(b+q)}.`); },
+    ()=>{ const n=pick([1200,1800,2600,3400]); return num('store',`${units(n)} units are left on the shelves at the end of a round. Storage costs ${money(CFG.holdPerUnit)} a unit. What is the storage cost?`,n*CFG.holdPerUnit,`${units(n)} x ${money(CFG.holdPerUnit)} = ${money(n*CFG.holdPerUnit)}.`); },
+    ()=>{ const d=pick([1100,1200]), h=pick([600,800]), m=CFG.price-CFG.cost; return num('lost',`Cats want ${units(d)} cans but you only have ${units(h)}. Each sale earns $${m} profit. How much profit do you lose to the stock-out?`,(d-h)*m,`Lost sales = ${units(d)} - ${units(h)} = ${units(d-h)}. ${units(d-h)} x $${m} = ${money((d-h)*m)}.`); },
+    ()=>{ const n=pick([1600,2400,3200]); return num('cover',`You have ${units(n)} cans and sell ${units(USAGE)} a week. How many weeks will they last?`,n/USAGE,`${units(n)} / ${units(USAGE)} = ${n/USAGE} weeks.`); },
+    ()=>{ const q=pick([2000,2400,3200]), tot=q*CFG.cost*(1-disc); return num('bulk',`You order ${units(q)} cans at $${CFG.cost} each and get a ${Math.round(disc*100)}% bulk discount. What is the total cost?`,tot,`${units(q)} x $${CFG.cost} = ${money(q*CFG.cost)}. Minus ${Math.round(disc*100)}%: ${money(q*CFG.cost)} x ${1-disc} = ${money(tot)}.`); },
+    ()=>{ const n=pick([600,800,1100]); return num('rev',`You sell ${units(n)} cans at ${money(CFG.price)} each. What is the revenue?`,n*CFG.price,`${units(n)} x ${money(CFG.price)} = ${money(n*CFG.price)}.`); },
+    ()=>{ const rev=16000, cogs=9600, st=pick([400,1200,2000]); return num('profit',`This round: revenue ${money(rev)}, cost of cans sold ${money(cogs)}, storage costs ${money(st)}. What is the profit?`,rev-cogs-st,`${money(rev)} - ${money(cogs)} - ${money(st)} = ${money(rev-cogs-st)}.`); },
+    ()=>{ const a=1, b=pick([2,3]); return num('rise',`Usage is ${units(USAGE)} a week. The delivery time rises from ${a} week to ${b} weeks. How much higher should the reorder level be to keep the same buffer?`,USAGE*(b-a),`The extra wait is ${b-a} week${b-a>1?'s':''}: ${units(USAGE)} x ${b-a} = ${units(USAGE*(b-a))} more.`); },
+    ()=>mcq('jit','Which approach keeps almost no buffer stock?',['Just in time (JIT)','Just in case (JIC)'],0,'JIT orders stock to arrive just as it is needed, so very little sits on the shelves.'),
+    ()=>mcq('lane','A shipping lane closes and deliveries will be 3 weeks late. Which approach copes better?',['Just in time (JIT)','Just in case (JIC)'],1,'JIC holds a large buffer, so it can keep selling while deliveries are late.'),
+    ()=>mcq('holdcost','Which of these is a cost of holding stock?',['Storage and insurance','Lost sales from a stock-out','The price customers pay'],0,'Holding stock costs money for storage, insurance and security, and ties up cash (opportunity cost).'),
+    ()=>mcq('low','Your reorder level is lower than usage x delivery time. What will happen?',['You run out before the delivery arrives','You end up with too much stock','Nothing changes'],0,'You sell more while you wait than the reorder level covers, so the shelves empty before the delivery comes.'),
+    ()=>mcq('lead','What does lead time mean?',['The wait between ordering stock and receiving it','How long stock sits on the shelf','How long a round lasts'],0,'Lead time is the time between placing an order and the delivery arriving.'),
+    ()=>mcq('jitadv','Which is an advantage of JIT?',['Low storage costs','Bulk-buying discounts','Protection against supply delays'],0,'JIT holds little stock, so storage costs are low. Bulk discounts and protection from delays are JIC advantages.'),
+    ()=>mcq('jicadv','Which is an advantage of JIC?',['Fewer stock-outs when demand surges','Less money tied up in stock','No cans going off'],0,'A big buffer means you can meet sudden demand. The downsides are cash tied up in stock and cans going off.'),
+    ()=>mcq('buffer','What is buffer stock for?',['Covering late deliveries and demand surges','Getting a bulk discount','Lowering storage costs'],0,'Buffer (safety) stock is kept as insurance against delays and unexpected demand.'),
+  ];
+  const hardBank=[
+    ()=>{ const q=pick([600,800,1000]); return num('ctm',`A canning line costs ${money(line.fixed)} a round plus $${line.cost} a can. What is the cost to make ${units(q)} cans in a round?`,line.fixed+line.cost*q,`Cost to make = fixed cost + variable cost x quantity = ${money(line.fixed)} + $${line.cost} x ${units(q)} = ${money(line.fixed+line.cost*q)}.`); },
+    ()=>{ const q=pick([600,800,1000]); return num('ctb',`The local supplier charges $${sups[1].cost} a can. What is the cost to buy ${units(q)} cans locally?`,sups[1].cost*q,`Cost to buy = price x quantity = $${sups[1].cost} x ${units(q)} = ${money(sups[1].cost*q)}.`); },
+    ()=>num('be',`Making costs ${money(line.fixed)} a round plus $${line.cost} a can. Buying from the global supplier costs $${sups[0].cost} a can. Above how many cans a round is making cheaper?`,line.fixed/(sups[0].cost-line.cost),`Each can made saves $${sups[0].cost} - $${line.cost} = $${sups[0].cost-line.cost}. ${money(line.fixed)} / $${sups[0].cost-line.cost} = ${units(line.fixed/(sups[0].cost-line.cost))} cans.`),
+    ()=>mcq('local','Why might a local supplier suit JIT better than a global one?',['Shorter, more reliable delivery times','Lower prices per can','Bigger bulk discounts'],0,'JIT needs deliveries to arrive exactly when expected, and local suppliers are nearer and less exposed to shipping shocks.'),
+  ];
+  const lineBank=[
+    ()=>{ const m=pick([600,800,900]); return num('cu',`Your canning line can make ${units(line.cap)} cans a round. This round it makes ${units(m)}. What is the capacity utilisation rate (%)?`,m/line.cap*100,`Capacity utilisation = actual output / maximum output x 100 = ${units(m)} / ${units(line.cap)} x 100 = ${m/line.cap*100}%.`); },
+    ()=>{ const m=pick([600,800,1000]); return num('prod',`Your canning line made ${units(m)} cans this round with ${line.workers} workers. What is the productivity (cans per worker)?`,m/line.workers,`Productivity = output / number of workers = ${units(m)} / ${line.workers} = ${units(m/line.workers)}.`); },
+  ];
+  let pool=bank;
+  if(G.hard&&r===4&&!s.built) pool=hardBank;
+  else if(G.hard&&s.built&&r===8) pool=lineBank;
+  else if(G.hard) pool=bank.concat(hardBank);
+  if(!(r===2||r===5||r===8||(G.hard&&r===4))) return null;
+  G.qUsed=G.qUsed||[];
+  const fresh=pool.map(f=>f()).filter(q=>!G.qUsed.includes(q.id));
+  const q=fresh.length?fresh[Math.floor(rnd()*fresh.length)]:pool[0]();
+  G.qUsed.push(q.id);
+  return q;
 }
 
 function resultView(){
@@ -1026,7 +1085,7 @@ function resultView(){
     ${h.spoiled?`<div class="warn">${units(h.spoiled)} cans went off after ${Engine.RULES.life} rounds on the shelf: ${money(h.spoilCost)} thrown away.</div>`:''}
     ${G.hard&&h.nextGoodwill?`<div class="bad">Unhappy cats tell their friends: next round's demand drops by ${units(h.nextGoodwill)}.</div>`:''}
     <p class="lead">This round <b class="${cls(h.profit)}">${money(h.profit)}</b> &nbsp; Total <b class="${cls(h.total)}">${money(h.total)}</b></p>
-    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span>${h.ordered?`<span>Delivery time <b>${h.ordered.lead} round${h.ordered.lead>1?'s':''}</b></span>`:''}${h.ordered&&h.ordered.bulk?'<span>Bulk discount <b>yes</b></span>':''}<span>Sold <b>${units(h.sold)}</b></span><span>Left over <b>${units(h.endStock)}</b></span>${h.built?`<span>Capacity utilisation <b>${Math.round(h.util*100)}%</b></span><span>Productivity <b>${units(h.productivity)}</b> cans per worker</span>`:''}</div>
+    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span>${h.ordered?`<span>Delivery time <b>${h.ordered.lead} round${h.ordered.lead>1?'s':''}</b></span>`:''}${h.ordered&&h.ordered.bulk?'<span>Bulk discount <b>yes</b></span>':''}<span>Sold <b>${units(h.sold)}</b></span><span>Left over <b>${units(h.endStock)}</b></span>${h.bonus?`<span>Question bonus <b class="pos">+${money(h.bonus)}</b></span>`:''}${h.built?`<span>Capacity utilisation <b>${Math.round(h.util*100)}%</b></span><span>Productivity <b>${units(h.productivity)}</b> cans per worker</span>`:''}</div>
     <button class="primary" id="next">${last?'See final results':'Next round'}</button>
     <details><summary>Profit breakdown</summary>
       <table>
@@ -1035,6 +1094,7 @@ function resultView(){
         <tr><td class="l">Storage costs</td><td class="neg">-${money(h.holding)}</td></tr>
         ${h.spoilCost?`<tr><td class="l">Cans that went off</td><td class="neg">-${money(h.spoilCost)}</td></tr>`:''}
         ${G.hard?`<tr><td class="l">Canning line fixed cost</td><td class="neg">-${money(h.fixed)}</td></tr>`:`<tr><td class="l">Dual supplier fee</td><td class="neg">-${money(h.fee)}</td></tr>`}
+        ${h.bonus?`<tr><td class="l">Quick question bonus</td><td class="pos">+${money(h.bonus)}</td></tr>`:''}
         <tr class="tot"><td class="l">Profit this round</td><td class="${cls(h.profit)}">${money(h.profit)}</td></tr>
         <tr><td class="l">Total so far</td><td class="${cls(h.total)}">${money(h.total)}</td></tr>
       </table>
@@ -1050,14 +1110,14 @@ function resultView(){
 
 // Score code: base64 JSON. Rules version 2 adds v:2 and x (1 = Hard); h holds [reorder level, quantity, supplier, built this round].
 // Codes without v use the original rules, with h as [buffer, quantity, dual].
-const levCode=(l)=>[l.rl,l.qty,l.sup,l.build?1:0];
+const levCode=(l)=>[l.rl,l.qty,l.sup,l.build?1:0,l.bonus?1:0];
 function encode(g){
   const o={n:g.name,m:g.mode,d:g.seed,t:Math.round(g.s.total),v:2,x:g.hard?1:0,h:g.s.history.map(h=>levCode(h.lev))};
   return btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 }
 function codeRun(o){
   const seq=Engine.seqFor(o.m,o.d);
-  if(o.v===2) return Engine.run(seq,(i)=>({rl:o.h[i][0],qty:o.h[i][1],sup:o.h[i][2],build:!!o.h[i][3]}),{v:2,hard:!!o.x});
+  if(o.v===2) return Engine.run(seq,(i)=>({rl:o.h[i][0],qty:o.h[i][1],sup:o.h[i][2],build:!!o.h[i][3],bonus:!!o.h[i][4]}),{v:2,hard:!!o.x});
   return Engine.run(seq,(i)=>({buffer:o.h[i][0],qty:o.h[i][1],dual:!!o.h[i][2]}));
 }
 function decode(code){
@@ -1117,7 +1177,7 @@ function endView(){
   <div class="card info"><h2>Final result: ${esc(G.name)}</h2>
     <div class="verdict">${bigCat(0,'happy')}<p class="big ${cls(s.total)}">${money(s.total)}</p></div>
     <p class="lead">${verdict}</p>
-    <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Storage costs <b>${money(holdTot)}</b></span>${spoilTot?`<span>Cans gone off <b>${money(spoilTot)}</b></span>`:''}<span>${G.hard?'Canning line costs':'Dual fees'} <b>${money(feeTot)}</b></span>${G.quizLog.length?`<span>Questions right <b>${qr} of ${G.quizLog.length}</b></span>`:''}</div>
+    <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Storage costs <b>${money(holdTot)}</b></span>${spoilTot?`<span>Cans gone off <b>${money(spoilTot)}</b></span>`:''}<span>${G.hard?'Canning line costs':'Dual fees'} <b>${money(feeTot)}</b></span>${G.quizLog.length?`<span>Questions right <b>${qr} of ${G.quizLog.length}</b> (+${money(qr*Engine.RULES.quizBonus)})</span>`:''}</div>
   </div>
   <div class="card" id="lbCard"><h2>Class leaderboard</h2><p class="hint">Best score per player in the last 7 days: ${esc(boardName(G.mode,G.hard))}.</p>
     <div class="seg" id="lbSort"><button data-k="total" class="on">Total profit</button><button data-k="vs">Beat pure JIC by</button></div><div id="lbBox">Loading...</div></div>
@@ -1252,6 +1312,7 @@ function lbCheck(o){
     const hard=o.x===1, maxSup=hard?2:1;
     if(!o.h.every(x=>Array.isArray(x)&&x[0]>=0&&x[0]<=4000&&x[0]%200===0&&x[1]>=400&&x[1]<=4000&&x[1]%200===0&&Number.isInteger(x[2])&&x[2]>=0&&x[2]<=maxSup&&(x[3]===0||x[3]===1))) return null;
     if(o.h.filter(x=>x[3]===1).length>1) return null;
+    if(!o.h.every((x,i)=>x[4]===undefined||x[4]===0||(x[4]===1&&[2,5,8].concat(hard?[4]:[]).includes(i+1)))) return null; // bonus only on question rounds
     const seed='ABC'.includes(o.m)?0:(Math.floor(+o.d)||1), seq=Engine.seqFor(o.m,seed);
     const st=codeRun({...o,d:seed}), jic=benchLevers(hard)[1];
     const jicTotal=Engine.run(seq,jic.lev,{v:2,hard}).total;
@@ -1380,7 +1441,7 @@ $('#tabPlay').onclick=()=>{tab='play';render();};
 $('#tabTeacher').onclick=()=>{tab='teacher';render();};
 $('#tabLb').onclick=()=>{tab='lb';render();};
 render();
-window.__G=()=>G; window.__start=startGame; window.__decode=decode;
+window.__G=()=>G; window.__start=startGame; window.__opts=(o)=>{ gameOpts={...gameOpts,...o}; }; window.__decode=decode;
 })();
 </script>
 </body>
