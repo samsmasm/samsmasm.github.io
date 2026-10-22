@@ -16,6 +16,7 @@ const posts = [], store = {
 let fetchUrls = [];
 const fakeFetch = (url, opt = {}) => {
   fetchUrls.push(url);
+  if (opt.method === 'DELETE') { const k = decodeURIComponent(url.split('/scores/')[1].replace('.json', '')); delete store[k]; return Promise.resolve({ ok: true, json: () => Promise.resolve(null) }); }
   if (opt.method === 'POST') { const b = JSON.parse(opt.body); posts.push(b); store['-P' + posts.length] = b; return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'x' }) }); }
   return Promise.resolve({ ok: true, json: () => Promise.resolve(JSON.parse(JSON.stringify(store))) });
 };
@@ -63,14 +64,17 @@ for (let r = 1; r <= 10; r++) {
   click('#next');
 }
 check(sawCalm > 0, 'played at least one no-stock-out round');
-check(w.__G().mode === 'S' && w.__G().seed > 0, 'default game is the shuffled class set');
+check(w.__G().mode === 'S' && w.__G().seed > 0, 'default game is the Unsettled world');
 { const ids = (sq) => sq.map((c) => c.id).sort().join(); const a = Engine.seqFor('A', 0);
   check([1, 2, 3, 99].every((k) => ids(Engine.seqFor('S', k)) === ids(a) && Engine.seqFor('S', k)[0].id === 'calm'), 'shuffled games have the same events, round 1 calm');
+  check([['L', 'B'], ['H', 'C']].every(([m, f]) => [5, 6].every((k) => ids(Engine.seqFor(m, k)) === ids(Engine.seqFor(f)))), 'Stable and Chaotic worlds use their event sets');
+  check(['A', 'B', 'C'].every((m) => Engine.seqFor(m).map((c) => c.id).join() === Engine.SEQ[m].join()), 'fixed sets unchanged');
   check(Engine.seqFor('S', 1).map((c) => c.id).join() !== Engine.seqFor('S', 2).map((c) => c.id).join(), 'shuffled games differ in order'); }
 check(sawDel > 0, 'played at least one round with a delivery');
 
 const txt = d.body.textContent;
 check(/Final result: Test Team/.test(txt) && /Debrief/.test(txt), 'end screen shown');
+check(/How JIT and JIC played your shocks/.test(txt) && /Reorder level 4,000/.test(txt) && /Reorder level 800/.test(txt), 'end screen has JIT and JIC stock control charts');
 
 // 8. Leaderboard: public named game saves once, board recomputes totals and drops bad rows
 await tick();
@@ -114,6 +118,17 @@ console.log('game total', Math.round(G.s.total), 'decoded', Math.round(dec.total
 check(Math.round(dec.total) === Math.round(G.s.total) && dec.claimed === Math.round(G.s.total), 'score code decodes to game total');
 
 d.querySelector('#tabTeacher').click();
+check(!d.querySelector('#codes'), 'teacher tab is locked');
+d.querySelector('#tcode').value = '1234'; click('#tgo');
+check(!d.querySelector('#codes') && /not right/.test(d.querySelector('#tmsg').textContent), 'wrong teacher code is refused');
+d.querySelector('#tcode').value = '0987'; click('#tgo');
+check(!!d.querySelector('#codes'), 'teacher code 0987 unlocks');
+await tick();
+{ const n0 = d.querySelectorAll('#lbAdmin .adm').length, row = [...d.querySelectorAll('#lbAdmin .adm')].find((r) => /Cheat/.test(r.textContent));
+  check(n0 === Object.keys(store).length && !!row, 'teacher sees every saved game');
+  row.querySelector('button').click(); check(!!store['-A0'], 'first delete click only arms the button');
+  row.querySelector('button').click(); await tick();
+  check(!store['-A0'] && d.querySelectorAll('#lbAdmin .adm').length === n0 - 1, 'second click deletes the entry'); }
 d.querySelector('#codes').value = code + '\n' + code.replace(/.$/, '') + '\n';
 d.querySelector('#build').click();
 console.log('leaderboard rows:', d.querySelectorAll('#lb table tr').length, /could not be read/.test(d.body.textContent));
@@ -139,7 +154,10 @@ await tick();
 // 10. Private game sends nothing
 const before = posts.length;
 d.querySelector('#fresh').click();
-d.querySelector('#nm').value = 'Private Pat'; d.querySelector('#priv').checked = true; click('#go');
+d.querySelector('#nm').value = 'Private Pat'; d.querySelector('#priv').checked = true;
+check(d.querySelectorAll('.world').length === 4, 'setup offers four worlds');
+d.querySelector('.world[data-m="H"]').click(); click('#go');
+check(w.__G().mode === 'H', 'picking Chaotic world starts it');
 for (let r = 1; r <= 10; r++) { click('#run'); click('#next'); }
 await tick();
 check(posts.length === before, 'private game is not saved');

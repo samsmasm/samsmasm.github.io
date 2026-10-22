@@ -142,5 +142,12 @@ Players are distracted grade 11 students who experiment rather than read. Keep e
 - Each save: `{n, m, d, t, h, at}` (same fields as the score code plus a server timestamp). Only named, non-private players are saved, once per game (`G.posted`).
 - "Last 7 days" uses `orderBy="$key"&startAt=<push id for now minus 7 days>`. Push keys are time ordered, so no `.indexOn` rule is needed.
 - Totals shown are always recomputed from `h` with `Engine.run`; malformed rows are skipped. Best score per name and shock set, with a games count.
-- Setup has "Keep me off the class leaderboard" (`lbPrivate`). The end screen shows the top 10 plus your row; the Leaderboard tab has a shock-set picker.
+- Setup has "Keep me off the class leaderboard" (`lbPrivate`). The end screen shows the top 10 plus your row; the Leaderboard tab has a world picker.
 - `smoke.js` stubs `fetch` with a fake store, so tests never write to the real database.
+
+## Worlds, teacher code, walking cat (added 2026-10-22)
+
+- Setup offers four worlds (`seqFor` modes): `L` Stable world (Calm waters events), `S` Unsettled world (Rare earth crunch events, default), `H` Chaotic world (Cascade events), each shuffled per game with round 1 calm; `R` Random draws new events every game. Fixed A, B, C remain for old codes and `#seq=A|B|C` links. Leaderboard has one board per world (seed ignored).
+- Teacher tab is behind the code `0987` (`TEACHER_CODE`, deliberately low security). Unlocked, it lists every saved game from the last 7 days with a two-click Delete (REST `DELETE stockshock/scores/<key>`).
+- End screen has "How JIT and JIC played your shocks": sawtooth stock control charts (`strategyChart`) for pure JIT and pure JIC on the player's own shocks, with a short explanation of each.
+- Rounds 3, 6 and 9: a cat walks along the bottom of the screen (`catWalk`). Rounds 3 and 9 it bites the background hills, round 6 it leaves a smiling poo ("Pardon me!"). It stops in the side margin when the window is wide enough so the marks stay visible; on narrow screens the poo fades after a few seconds. Skipped in fast mode and reduced motion.

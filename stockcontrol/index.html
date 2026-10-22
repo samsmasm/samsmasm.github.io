@@ -140,12 +140,40 @@ ol.lb .rk3{background:#f0b98a;color:#5a2e0a}
 ol.lb .nm{font-weight:bold;overflow-wrap:anywhere}
 ol.lb .sc{font-weight:bold;font-size:18px;text-align:right;grid-row:span 2}
 ol.lb .gm{font-size:13px;color:var(--muted)}
+.hero{display:grid;gap:16px;grid-template-columns:1fr minmax(0,440px);align-items:start}
+@media(max-width:860px){.hero{grid-template-columns:1fr}}
+.worlds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:8px 0 14px}
+.world{display:flex;gap:10px;align-items:flex-start;border:3px solid #fff;background:#fff;border-radius:16px;padding:10px 12px;cursor:pointer;box-shadow:0 4px 0 rgba(31,95,191,.15)}
+.world.sel{border-color:var(--blue);background:#fffbe8}
+.world input{margin-top:5px}
+.world b{font-size:17px}
+.stratgrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.adm{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;background:#fff;border-radius:12px;padding:8px 12px;margin:6px 0}
+.adm .meta{font-size:13px;color:var(--muted)}
+button.danger{background:#fff;color:var(--red);border:3px solid var(--red);border-radius:12px;padding:6px 12px;font:inherit;font-weight:bold;cursor:pointer}
+button.danger.arm{background:var(--red);color:#fff}
+/* walking cat (every third round) */
+.walker{position:fixed;bottom:4px;left:0;width:120px;height:90px;z-index:5;pointer-events:none;will-change:transform}
+.walker svg{width:120px;height:90px;overflow:visible}
+.walker .leg{transform-box:fill-box;transform-origin:50% 0;animation:leg .32s ease-in-out infinite alternate}
+.walker .leg.b{animation-delay:-.32s}
+.walker .wbody{animation:wbob .32s ease-in-out infinite alternate}
+.walker .wtail{transform-box:fill-box;transform-origin:0% 100%;animation:swish 1.1s ease-in-out infinite}
+.walker.stop .leg,.walker.stop .wbody{animation:none}
+.walker.eat .whead{transform-box:fill-box;transform-origin:20% 80%;animation:chomp .22s ease-in-out 6 alternate}
+.walker .bubble{position:absolute;bottom:84px;left:40px;background:#fff;border-radius:14px;padding:4px 12px;font-weight:bold;font-size:15px;white-space:nowrap;box-shadow:0 3px 0 rgba(31,80,150,.18);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s}
+.walker.say .bubble{opacity:1;transform:none}
+.poo{position:fixed;bottom:6px;width:34px;height:30px;z-index:0;pointer-events:none;animation:pop .45s ease-out}
+@keyframes leg{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes wbob{from{transform:translateY(0)}to{transform:translateY(-2px)}}
+@keyframes chomp{from{transform:rotate(0)}to{transform:rotate(16deg)}}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
 <div class="deco" aria-hidden="true"><div class="sun"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
-  <svg class="hills" viewBox="0 0 800 160" preserveAspectRatio="none"><path d="M0 160 L0 90 Q100 30 220 90 Q320 135 430 75 Q540 20 660 85 Q730 125 800 90 L800 160Z" fill="#bfe3a2"/><path d="M0 160 L0 120 Q90 80 200 118 Q290 150 400 112 Q500 78 610 118 Q700 148 800 118 L800 160Z" fill="#9fd283"/></svg></div>
+  <svg class="hills" id="hills" viewBox="0 0 800 160" preserveAspectRatio="none"><path id="hillBack" d="M0 160 L0 90 Q100 30 220 90 Q320 135 430 75 Q540 20 660 85 Q730 125 800 90 L800 160Z" fill="#bfe3a2"/><path id="hillFront" d="M0 160 L0 120 Q90 80 200 118 Q290 150 400 112 Q500 78 610 118 Q700 148 800 118 L800 160Z" fill="#9fd283"/></svg></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <linearGradient id="gCan" x1="0" x2="1"><stop offset="0" stop-color="#8f99a6"/><stop offset=".3" stop-color="#f4f6f9"/><stop offset=".65" stop-color="#c3cad3"/><stop offset="1" stop-color="#7f8895"/></linearGradient>
   <linearGradient id="gLab" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffd36e"/><stop offset="1" stop-color="#f2932a"/></linearGradient>
@@ -197,7 +225,9 @@ const Engine = (function () {
     B: ['calm', 'calm', 'calm', 'licence1', 'calm', 'calm', 'calm', 'quiet', 'calm', 'spike2'],
     C: ['calm', 'surge', 'lane2', 'lane', 'spike', 'surge2', 'calm', 'licence', 'surge', 'calm'],
   };
-  const SEQ_NAMES = { A: 'Rare earth crunch', B: 'Calm waters', C: 'Cascade', R: 'Seeded random', S: 'Rare earth crunch, shuffled' };
+  const SEQ_NAMES = { A: 'Rare earth crunch', B: 'Calm waters', C: 'Cascade', R: 'Random', L: 'Stable world', S: 'Unsettled world', H: 'Chaotic world' };
+  // Worlds: the ten events of a fixed set in a seeded random order, round 1 kept calm as a warm-up.
+  const WORLD_DECK = { L: 'B', S: 'A', H: 'C' };
 
   function rng(seed) {
     let a = seed >>> 0;
@@ -211,11 +241,10 @@ const Engine = (function () {
 
   function seqFor(mode, seed) {
     if (SEQ[mode]) return SEQ[mode].map((k) => C[k]);
-    // S: the same ten events as A in a seeded random order, round 1 kept calm as a warm-up.
-    if (mode === 'S') {
-      const r = rng(seed), rest = SEQ.A.slice(1);
+    if (WORLD_DECK[mode]) {
+      const deck = SEQ[WORLD_DECK[mode]], r = rng(seed), rest = deck.slice(1);
       for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
-      return [SEQ.A[0]].concat(rest).map((k) => C[k]);
+      return [deck[0]].concat(rest).map((k) => C[k]);
     }
     const r = rng(seed);
     const pool = ['calm', 'calm', 'calm', 'quiet', 'surge', 'surge2', 'licence', 'lane', 'lane2', 'spike', 'spike2', 'licence1'];
@@ -277,7 +306,7 @@ const Engine = (function () {
     return s;
   }
 
-  return { CFG, CARDS: C, SEQ, SEQ_NAMES, seqFor, newState, play, run, reorderLevel, rng };
+  return { CFG, CARDS: C, SEQ, SEQ_NAMES, WORLD_DECK, seqFor, newState, play, run, reorderLevel, rng };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 
@@ -296,6 +325,7 @@ const defaultLev = { buffer: 800, qty: 1200, dual: false };
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 let lbPrivate=false;
+const WORLDS=[['L','Mostly calm weeks with a couple of hiccups.'],['S','Demand surges, supply delays and price spikes, like the rare earths story.'],['H','Shock after shock.'],['R','Anything can happen. New events every game.']];
 function startGame(name, mode, seed){
   G = { name: name||'Player', anon: !name, private: lbPrivate, posted: false, mode, seed, seq: Engine.seqFor(mode, seed), s: Engine.newState(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
   render();
@@ -697,36 +727,89 @@ function rpInit(lines){
   if(rp.playing) rpLoop();
 }
 
+/* ---------- walking cat ----------
+   Every third round a cat strolls along the bottom of the screen, stops, and either takes a bite out of the
+   background hills or leaves a polite little poo. Purely decorative: skipped in fast mode and reduced motion. */
+function walkerSVG(){
+  const fur='#f0a050', dk='#d9803a', ol='#3a2a1a';
+  const leg=(x,b)=>`<rect class="leg${b?' b':''}" x="${x}" y="52" width="9" height="24" rx="4.5" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>`;
+  return `<svg viewBox="0 0 120 90" aria-hidden="true">
+    <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${ol}" stroke-width="9" stroke-linecap="round"/>
+    <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${fur}" stroke-width="6" stroke-linecap="round"/>
+    ${leg(24,1)}${leg(66,0)}
+    <g class="wbody"><ellipse cx="50" cy="50" rx="34" ry="18" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>
+      <ellipse cx="54" cy="58" rx="20" ry="8" fill="#fff3e2"/>
+      <path d="M36 36 q2 8 0 14 M48 33 q2 9 0 16 M60 34 q2 8 0 14" stroke="${dk}" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <g class="whead"><path d="M76 24 L80 6 L90 18z M98 18 L106 4 L108 24z" fill="${fur}" stroke="${ol}" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M80 18 L81 11 L86 17z M101 17 L105 9 L105.5 20z" fill="#f4a6b4"/>
+        <circle cx="92" cy="32" r="17" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>
+        <path d="M86 17 l1 5 M92 16 v5 M98 17 l-1 5" stroke="${dk}" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="88" cy="30" r="2.8" fill="${ol}"/><circle cx="100" cy="30" r="2.8" fill="${ol}"/><circle cx="89" cy="29" r="1" fill="#fff"/><circle cx="101" cy="29" r="1" fill="#fff"/>
+        <circle cx="84" cy="37" r="3" fill="#ff8fa3" opacity=".5"/><circle cx="104" cy="37" r="3" fill="#ff8fa3" opacity=".5"/>
+        <path d="M93 34 h3.5 l-1.75 2.2z" fill="#e58a9a"/><path d="M91 38 q2 2 3.8 0 q2 2 3.8 0" fill="none" stroke="${ol}" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M100 35 l12 -2 M100 37 l12 2" stroke="${ol}" stroke-width=".8"/></g></g>
+    ${leg(32,0)}${leg(74,1)}
+  </svg><div class="bubble"></div>`;
+}
+function pooSVG(){
+  return `<svg viewBox="0 0 34 30" width="34" height="30" aria-hidden="true"><ellipse cx="17" cy="27" rx="14" ry="3" fill="#000" opacity=".12"/>
+    <path d="M4 26 q-2 -7 6 -8 h14 q8 1 6 8z" fill="#8a5a33"/><path d="M8 18 q-1 -6 6 -6 h7 q6 1 5 6z" fill="#9a6a3f"/><path d="M12 12 q1 -5 6 -6 q3 2 2 6z" fill="#a8774a"/>
+    <circle cx="13" cy="22" r="1.4" fill="#2a1a0e"/><circle cx="21" cy="22" r="1.4" fill="#2a1a0e"/><path d="M15 24.5 q2 1.6 4 0" fill="none" stroke="#2a1a0e" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M28 6 l1 2.5 2.5 1 -2.5 1 -1 2.5 -1 -2.5 -2.5 -1 2.5 -1z" fill="#ffd95e"/></svg>`;
+}
+// Bite a scalloped chunk out of the front hill crest at screen x.
+function biteHill(sx){
+  const svg=$('#hills'), front=$('#hillFront'), back=$('#hillBack');
+  if(!svg||!front||!front.isPointInFill||!window.DOMPoint) return;
+  const r=svg.getBoundingClientRect(), vx=(sx-r.left)/r.width*800;
+  let cy=null; for(let y=0;y<=160;y+=1){ if(front.isPointInFill(new DOMPoint(vx,y))){ cy=y; break; } }
+  if(cy==null) return;
+  const fill=back.isPointInFill(new DOMPoint(vx,cy+3))?'#bfe3a2':'#e4f5ef', kx=800/r.width, ky=160/r.height;
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.innerHTML=[[-13,1,11],[0,4,12],[13,1,11]].map(([dx,dy,rr])=>`<ellipse cx="${vx+dx*kx}" cy="${cy+dy*ky}" rx="${rr*kx}" ry="${rr*ky}" fill="${fill}"/>`).join('');
+  svg.appendChild(g);
+}
+function catWalk(act){
+  if(skipAnim()||document.querySelector('.walker')) return;
+  const el=document.createElement('div'); el.className='walker'; el.innerHTML=walkerSVG(); document.body.appendChild(el);
+  const W=window.innerWidth, margin=(W-Math.min(W,980))/2, wide=margin>=140;
+  const mid=wide?Math.round(W-margin+(margin-125)/2):Math.round(W*(0.25+Math.random()*0.35)), sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const move=(a,b,ms)=>new Promise(res=>{ const t0=performance.now(); const f=(now)=>{ const p=Math.min(1,(now-t0)/ms); el.style.transform=`translateX(${a+(b-a)*p}px)`; if(p<1) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
+  const say=(t)=>{ el.querySelector('.bubble').textContent=t; el.classList.toggle('say',!!t); };
+  (async()=>{
+    await move(-130,mid,Math.max(1800,mid*6));
+    el.classList.add('stop');
+    if(act==='eat'){ say('Nom nom!'); el.classList.add('eat'); await sleep(700); if(wide) biteHill(mid+100); await sleep(900); el.classList.remove('eat'); }
+    else { say('Pardon me!'); await sleep(800); const p=document.createElement('div'); p.className='poo'; p.style.left=(mid-4)+'px'; p.innerHTML=pooSVG();
+      if(wide) document.querySelector('.deco').appendChild(p);
+      else { p.style.zIndex=4; document.body.appendChild(p); setTimeout(()=>{ p.style.transition='opacity .8s'; p.style.opacity=0; setTimeout(()=>p.remove(),900); },3500); }
+      await sleep(900); }
+    say(''); el.classList.remove('stop');
+    await move(mid,W+40,Math.max(1800,(W-mid)*6));
+    el.remove();
+  })();
+}
+
 /* ---------- views ---------- */
 function setupView(){
-  const h=location.hash.match(/seq=([ABCRS])/); const pre=h?h[1]:'S';
+  const h=location.hash.match(/seq=([ABCLSHR])/); const pre=h?h[1]:(G?G.mode:'S');
+  const opts=WORLDS.concat('ABC'.includes(pre)?[[pre,'Fixed order (teacher link).']]:[]);
   const icon=(vb,inner)=>`<svg viewBox="${vb}" width="44" height="52" aria-hidden="true">${inner}</svg>`;
   app.innerHTML=`
-  <div class="card info"><h2>Run the cat food warehouse</h2>
+  <div class="card info hero"><div><h2>Run the cat food warehouse</h2>
     <p class="lead">${CFG.rounds} rounds. Most profit wins.</p>
-    <div class="scenebox" style="border-radius:16px;overflow:hidden;max-width:520px;margin:10px 0">${sceneSVG({stock:2000,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div>
-    <div class="tiles">
-      <div class="tile">${icon('-3 -3 28 36','<rect width="22" height="30" rx="4" fill="url(#gCan)" stroke="#6f7884"/>'+canArt())}<div><b>+${money(CFG.price-CFG.cost)}</b> for every unit sold (1 can = 100 units)</div></div>
-      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> storage cost for every unit left over at the end of a round</div></div>
-      <div class="tile">${icon('-20 -34 40 64',catArt(4,'sad'))}<div><b>No can, no sale.</b> Hungry cats don't come back.</div></div>
-    </div>
     <p><b>Each round:</b> read the news, set 3 levers, press Run.</p>
+    <div class="tiles" style="grid-template-columns:1fr"><div class="tile">${icon('-3 -3 28 36','<rect width="22" height="30" rx="4" fill="url(#gCan)" stroke="#6f7884"/>'+canArt())}<div><b>+${money(CFG.price-CFG.cost)}</b> for every unit sold (1 can = 100 units)</div></div>
+      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> storage cost for every unit left over at the end of a round</div></div>
+      <div class="tile">${icon('-20 -34 40 64',catArt(4,'sad'))}<div><b>No can, no sale.</b> Hungry cats don't come back.</div></div></div></div>
+    <div class="scenebox" style="border-radius:16px;overflow:hidden">${sceneSVG({stock:2000,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div>
   </div>
   <div class="card"><h2>Start</h2>
     <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban">
     <label class="small inl" style="margin-top:10px"><input type="checkbox" id="priv" ${lbPrivate?'checked':''}> Keep me off the class leaderboard</label>
+    <label>Choose your world</label>
+    <div class="worlds">${opts.map(([m,t])=>`<div class="world ${m===pre?'sel':''}" data-m="${m}"><input type="radio" name="world" ${m===pre?'checked':''}><div><b>${Engine.SEQ_NAMES[m]}</b><br><span class="small">${t}</span></div></div>`).join('')}</div>
     <p><button class="primary" id="go">Start round 1</button></p>
-    <details><summary>Shock set (teacher)</summary>
-    <label for="sq">Shock sequence</label>
-    <select id="sq">
-      <option value="S" ${pre==='S'?'selected':''}>Rare earth crunch, shuffled (class set: same events, random order)</option>
-      <option value="A" ${pre==='A'?'selected':''}>Rare earth crunch (fixed order)</option>
-      <option value="B" ${pre==='B'?'selected':''}>Calm waters</option>
-      <option value="C" ${pre==='C'?'selected':''}>Cascade</option>
-      <option value="R" ${pre==='R'?'selected':''}>Seeded random</option>
-    </select>
-    <div id="seedBox" class="${pre==='R'?'':'hidden'}"><label for="sd">Seed (same seed, same shocks)</label><input id="sd" type="number" value="${Math.floor(Math.random()*9000+1000)}"></div>
-    </details>
   </div>
   <details class="card"><summary>Full rules and key terms</summary>
   <div class="card info"><h2>The situation</h2>
@@ -763,8 +846,8 @@ function setupView(){
     <p>Buffer stock 400, so reorder level 1,200. Your stock falls to 1,200 and an order is placed. During the week you wait, you sell 800, so the delivery arrives while you still have 400 left: that is your buffer, untouched. If the delivery is one week late, the buffer covers only half a week of demand, so you sell 400 and lose 400 sales. A bigger buffer would have covered it, but would have cost more to hold in every calm week.</p>
   </div>
   </details>`;
-  $('#sq').onchange=()=>{ $('#seedBox').classList.toggle('hidden', $('#sq').value!=='R'); };
-  $('#go').onclick=()=>{ lbPrivate=$('#priv').checked; const m=$('#sq').value; startGame($('#nm').value.trim(), m, m==='R'?(+$('#sd').value||1):m==='S'?Math.floor(Math.random()*1e6)+1:0); };
+  document.querySelectorAll('.world').forEach(el=>el.onclick=()=>{ document.querySelectorAll('.world').forEach(o=>{o.classList.toggle('sel',o===el);o.querySelector('input').checked=(o===el);}); });
+  $('#go').onclick=()=>{ lbPrivate=$('#priv').checked; const m=$('.world.sel').dataset.m; startGame($('#nm').value.trim(), m, 'ABC'.includes(m)?0:Math.floor(Math.random()*1e6)+1); };
 }
 
 function cardView(c, rn=G.s.round+1){
@@ -784,7 +867,7 @@ function roundView(){
   const pct=(r-1)/CFG.rounds*100;
   app.innerHTML=`
   <div class="bar"><i style="width:${pct}%"></i></div>
-  <div class="hud"><span class="pill">Round <b>${r}</b> of ${CFG.rounds}</span><span class="pill">Profit <b class="${cls(s.total)}">${money(s.total)}</b></span><span class="pill small">${esc(G.name)}</span></div>
+  <div class="hud"><span class="pill">Round <b>${r}</b> of ${CFG.rounds}</span><span class="pill">Profit <b class="${cls(s.total)}">${money(s.total)}</b></span><span class="pill small">${esc(G.name)}, ${esc(Engine.SEQ_NAMES[G.mode])}</span></div>
   ${cardView(card)}
   ${r===1?'<p class="coach">Drag the sliders and watch the shelves change. Then press Run.</p>':''}
   <div class="two">
@@ -834,6 +917,7 @@ function roundView(){
     G.lev=lev; stockChartUpdate(); sceneLevers(lev.buffer);
   };
   $('#bf').oninput=upd; $('#qy').oninput=upd; upd();
+  if(r%3===0&&r<CFG.rounds&&!skipAnim()){ G.walks=G.walks||{}; if(!G.walks[r]){ G.walks[r]=1; setTimeout(()=>catWalk(r===6?'poo':'eat'),900); } }
   if(arrNow>0&&!skipAnim()){
     const a={cancel:false}, from=nCans(s.onHand), to=nCans(s.onHand+arrNow), gap=Math.min(60,700/Math.max(1,to-from));
     tween($('#scTruck'),[-120,0],[0,0],600,a);
@@ -912,6 +996,33 @@ function benchmarks(seq){
   ];
 }
 
+// Sawtooth stock control chart for a fixed strategy: stock jumps at deliveries and falls as cats buy.
+function strategyChart(st, buffer){
+  const W=380,H=230,L=46,R=12,T=16,B=32,n=CFG.rounds,max=CFG.cap, x=i=>L+(W-L-R)*i/n, y=v=>T+(H-T-B)*(1-v/max), rl=Engine.reorderLevel(buffer);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Stock control chart">`;
+  [0,1000,2000,3000,4000].forEach(v=>{ s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${units(v)}</text>`; });
+  for(let i=0;i<=n;i++) s+=`<text x="${x(i)}" y="${H-14}" font-size="11" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  s+=`<text x="${(W+L)/2}" y="${H-1}" font-size="11" text-anchor="middle" fill="#5b5868">Round</text>`;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(max)}" y2="${y(max)}" stroke="#8c1d2c" stroke-width="2"/><text x="${W-R}" y="${y(max)-4}" font-size="11" text-anchor="end" fill="#8c1d2c">Storage limit</text>`;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(rl)}" y2="${y(rl)}" stroke="#1f5fbf" stroke-width="2" stroke-dasharray="6 4"/><text x="${L+4}" y="${y(rl)+(rl>=max?13:-4)}" font-size="11" fill="#1f5fbf" font-weight="bold">Reorder level ${units(rl)}</text>`;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(buffer)}" y2="${y(buffer)}" stroke="#1f7a45" stroke-width="2" stroke-dasharray="2 4"/><text x="${W-R}" y="${y(buffer)-4}" font-size="11" text-anchor="end" fill="#1f7a45" font-weight="bold">Buffer ${units(buffer)}</text>`;
+  let d=''; st.history.forEach((h,i)=>{ d+=(i?'L':'M')+x(i)+' '+y(h.startStock)+' L'+x(i+1)+' '+y(h.endStock)+' '; });
+  s+=`<path d="${d}" fill="none" stroke="#5b3d99" stroke-width="3" stroke-linejoin="round"/>`;
+  st.history.forEach((h,i)=>{ if(!h.stockout) return; const cx=x(i+1), cy=y(0);
+    s+=`<path d="M${cx-5} ${cy-11} h10 l-5 8z" fill="#8c1d2c"/><text x="${cx}" y="${cy-14-(i%2)*12}" font-size="10" text-anchor="middle" fill="#8c1d2c">Stock-out</text>`; });
+  return s+'</svg>';
+}
+function strategyCard(bm){
+  const sum=(st)=>{ const H=st.history; return `<div class="facts"><span>Profit <b>${money(st.total)}</b></span><span>Stock-out rounds <b>${H.filter(h=>h.stockout).length}</b></span><span>Storage costs <b>${money(H.reduce((a,h)=>a+h.holding,0))}</b></span></div>`; };
+  return `<div class="card"><h2>How JIT and JIC played your shocks</h2>
+    <div class="stratgrid">
+      <div><h3>Pure JIT (just in time)</h3>${strategyChart(bm[0].s,0)}
+        <p>Buffer 0, order 800, single supplier. The reorder level is 800, so it orders exactly one week's demand every round. It arrives just in time, sells out, and leaves nothing to store. Perfect in calm weeks, but any delay or demand surge empties the shelves.</p>${sum(bm[0].s)}</div>
+      <div><h3>Pure JIC (just in case)</h3>${strategyChart(bm[1].s,3200)}
+        <p>Buffer 3,200, order 2,400, single supplier. The reorder level is 4,000 (full shelves), so it reorders whenever nothing is on the way, up to the storage limit. It almost never runs out, but pays to store a big pile every round.</p>${sum(bm[1].s)}</div>
+    </div></div>`;
+}
+
 function endView(){
   const s=G.s, H=s.history, code=encode(G);
   const so=H.filter(h=>h.stockout).length, dual=H.filter(h=>h.lev.dual).length;
@@ -930,8 +1041,9 @@ function endView(){
     <p class="lead">${verdict}</p>
     <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Storage costs <b>${money(holdTot)}</b></span><span>Dual fees <b>${money(feeTot)}</b></span></div>
   </div>
-  <div class="card" id="lbCard"><h2>Class leaderboard</h2><p class="hint">Best score per player in the last 7 days: ${esc(setName(G.mode,boardSeed(G.mode,G.seed)))}.</p><div id="lbBox">Loading...</div></div>
+  <div class="card" id="lbCard"><h2>Class leaderboard</h2><p class="hint">Best score per player in the last 7 days: ${esc(setName(G.mode))}.</p><div id="lbBox">Loading...</div></div>
   ${replayCard(lines)}
+  ${strategyCard(bm)}
   <div class="card"><h3>Score code for your teacher</h3><code class="codebox" id="code">${code}</code>
     <p><button class="ghost" id="copy">Copy code</button> <span class="small" id="cmsg"></span></p></div>
   <p><button class="ghost" id="fresh">New game</button></p>
@@ -966,8 +1078,21 @@ function endView(){
   lbEnd();
 }
 
+const TEACHER_CODE='0987'; // low stakes: only unlocks the teacher tab
+let teacherOK=false;
 function teacherView(){
+  if(!teacherOK){
+    app.innerHTML=`<div class="card todo"><h2>Teacher</h2>
+      <label for="tcode">Teacher code</label><input id="tcode" type="password" inputmode="numeric" maxlength="12" style="max-width:220px">
+      <p><button class="primary" id="tgo">Unlock</button></p><p class="hint" id="tmsg"></p></div>`;
+    const go=()=>{ if($('#tcode').value.trim()===TEACHER_CODE){ teacherOK=true; teacherView(); } else $('#tmsg').textContent='That code is not right.'; };
+    $('#tgo').onclick=go; $('#tcode').onkeydown=(e)=>{ if(e.key==='Enter') go(); };
+    return;
+  }
   app.innerHTML=`
+  <div class="card todo"><h2>Manage the class leaderboard</h2>
+    <p class="hint">Every game saved in the last 7 days, newest first. Delete removes it for everyone (press twice to confirm).</p>
+    <div id="lbAdmin">Loading...</div></div>
   <div class="card todo"><h2>Leaderboard</h2>
     <p>Paste one score code per line. Totals are recalculated from each player's decisions.</p>
     <textarea id="codes" placeholder="Paste score codes here"></textarea>
@@ -978,15 +1103,14 @@ function teacherView(){
     <ul class="q">
       <li>Syllabus links (HL 5.6): JIT and JIC, buffer stock, reorder level, reorder quantity, lead time, stock-out, costs of holding stock, supply chain risk and supplier reliability.</li>
       <li>Timing: about 8 minutes of play, then debrief. Run it after students have met the stock control chart.</li>
-      <li>Use "Rare earth crunch" as the class sequence. It links to the rare earths article (licence delay, price spike, single-source dependence). Use "Calm waters" or "Cascade" afterwards to show the best strategy changes with the shocks.</li>
-      <li>Default class set: "Rare earth crunch, shuffled". Every game gets the same ten events as Rare earth crunch, with round 1 calm and rounds 2 to 10 in a random order, so groups face equal shocks without being able to memorise the order. All shuffled games share one leaderboard.</li>
+      <li>Worlds: Stable (the Calm waters events), Unsettled (the Rare earth crunch events, linked to the rare earths article: licence delay, price spike, single-source dependence) and Chaotic (the Cascade events). Each game shuffles that world's ten events, with round 1 always calm, so groups face the same shocks in a different order. Random draws new events every game. Use Unsettled as the class world. Fixed orders are still available by adding #seq=A, #seq=B or #seq=C to the link.</li>
       <li>Live mode: project this page, let teams agree levers by vote or whiteboard, then press Run round. Cards are hidden until each round starts.</li>
       <li>Skill or luck: play the same sequence again. Same shocks, so any difference comes from decisions.</li>
       <li>Parameters: demand ${units(CFG.baseDemand)} a week, price ${money(CFG.price)}, unit cost ${money(CFG.cost)}, lead time ${CFG.baseLead} week, storage limit ${units(CFG.cap)}, storage cost ${money(CFG.holdPerUnit)} per unit per round, dual supplier ${money(CFG.dualFee)} a round.</li>
     </ul>
-    <h3>Sequences</h3>
-    <table><tr><th class="l">Name</th><th class="l">Rounds 1 to 10</th></tr>
-    ${['A','B','C'].map(k=>`<tr><td class="l">${Engine.SEQ_NAMES[k]}</td><td class="l">${Engine.SEQ[k].map((id,i)=>(i+1)+'. '+Engine.CARDS[id].title).join('<br>')}</td></tr>`).join('')}
+    <h3>World events (round 1 first, the rest shuffled each game)</h3>
+    <table><tr><th class="l">World</th><th class="l">Events</th></tr>
+    ${['L','S','H'].map(k=>`<tr><td class="l">${Engine.SEQ_NAMES[k]}</td><td class="l">${Engine.SEQ[Engine.WORLD_DECK[k]].map(id=>Engine.CARDS[id].title).join('<br>')}</td></tr>`).join('')}
     </table>
   </div>`;
   $('#build').onclick=()=>{
@@ -995,10 +1119,28 @@ function teacherView(){
     if(!ok.length){ $('#lb').innerHTML=`<div class="bad">No valid codes found.</div>`; return; }
     $('#lb').innerHTML=`<div class="card"><h2>Results</h2>
       <table><tr><th>#</th><th class="l">Player</th><th class="l">Sequence</th><th>Total profit</th><th>Stock-out rounds</th><th>Avg buffer</th><th>Dual rounds</th><th>Storage paid</th></tr>
-      ${ok.map((p,i)=>`<tr><td>${i+1}</td><td class="l">${esc(p.name)}</td><td class="l">${Engine.SEQ_NAMES[p.mode]}${p.mode==='R'?' #'+p.seed:''}</td><td class="${cls(p.total)}">${money(p.total)}</td><td>${p.stockouts}</td><td>${units(p.avgBuf)}</td><td>${p.dualRounds}</td><td>${money(p.holding)}</td></tr>`).join('')}
+      ${ok.map((p,i)=>`<tr><td>${i+1}</td><td class="l">${esc(p.name)}</td><td class="l">${Engine.SEQ_NAMES[p.mode]}</td><td class="${cls(p.total)}">${money(p.total)}</td><td>${p.stockouts}</td><td>${units(p.avgBuf)}</td><td>${p.dualRounds}</td><td>${money(p.holding)}</td></tr>`).join('')}
       </table>${bad?`<p class="small">${bad} line(s) could not be read.</p>`:''}</div>
       <div class="card"><h3>Cumulative profit, top ${Math.min(5,ok.length)}</h3>${cumLines(ok.slice(0,5))}</div>`;
   };
+  lbAdmin();
+}
+async function lbAdmin(){
+  const box=()=>$('#lbAdmin');
+  try{
+    const data=await lbFetch(), keys=Object.keys(data).reverse();
+    if(!box()) return;
+    if(!keys.length){ box().innerHTML='<p>No games saved in the last 7 days.</p>'; return; }
+    box().innerHTML=keys.map(k=>{ const o=data[k], row=lbCheck(o), when=o&&o.at?new Date(o.at).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'}):'';
+      return `<div class="adm" data-k="${esc(k)}"><div><b>${esc(o&&typeof o.n==='string'?o.n:'(no name)')}</b><div class="meta">${row?esc(Engine.SEQ_NAMES[row.mode])+', '+money(row.total):'Unreadable entry'}${when?', '+esc(when):''}</div></div><button class="danger">Delete</button></div>`; }).join('');
+    box().querySelectorAll('.adm button').forEach(b=>b.onclick=async()=>{
+      if(!b.classList.contains('arm')){ b.classList.add('arm'); b.textContent='Confirm'; return; }
+      const row=b.closest('.adm'), k=row.getAttribute('data-k');
+      b.disabled=true; b.textContent='Deleting...';
+      try{ const r=await fetch(`${LB_URL}/${encodeURIComponent(k)}.json`,{method:'DELETE'}); if(!r.ok) throw new Error(r.status); row.remove(); }
+      catch(e){ b.disabled=false; b.textContent='Failed, try again'; }
+    });
+  }catch(e){ if(box()) box().innerHTML='<p class="hint">The leaderboard needs an internet connection.</p>'; }
 }
 
 /* ---------- class leaderboard ----------
@@ -1008,8 +1150,8 @@ function teacherView(){
    Totals are always recomputed from the levers, like the teacher tab. */
 const LB_URL='https://coldwar-d8109-default-rtdb.asia-southeast1.firebasedatabase.app/stockshock/scores';
 const PUSH_CHARS='-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
-const setName=(m,d)=>Engine.SEQ_NAMES[m]+(m==='R'?' #'+d:'');
-const boardSeed=(m,d)=>m==='R'?d:0; // shuffled (S) games all share one board
+const setName=(m)=>Engine.SEQ_NAMES[m];
+const boardSeed=()=>0; // one board per world, whatever the shuffle or random draw
 function pushPrefix(ms){ let s=''; for(let i=0;i<8;i++){ s=PUSH_CHARS.charAt(ms%64)+s; ms=Math.floor(ms/64); } return s; }
 function lbPost(g){
   if(g.posted||g.private||g.anon||!window.fetch) return Promise.resolve(null);
@@ -1022,17 +1164,20 @@ function lbCheck(o){
   try{
     if(!o||typeof o.n!=='string'||!o.n.trim()||!Engine.SEQ_NAMES[o.m]||!Array.isArray(o.h)||o.h.length!==CFG.rounds) return null;
     if(!o.h.every(x=>Array.isArray(x)&&x[0]>=0&&x[0]<=3200&&x[0]%200===0&&x[1]>=400&&x[1]<=4000&&x[1]%200===0&&(x[2]===0||x[2]===1))) return null;
-    const seed=o.m==='R'||o.m==='S'?(Math.floor(+o.d)||1):0;
+    const seed='ABC'.includes(o.m)?0:(Math.floor(+o.d)||1);
     const st=Engine.run(Engine.seqFor(o.m,seed),(i)=>({buffer:o.h[i][0],qty:o.h[i][1],dual:!!o.h[i][2]}));
     return {name:o.n.trim().slice(0,24),mode:o.m,seed:boardSeed(o.m,seed),total:st.total};
   }catch(e){ return null; }
 }
 // Best score per player and shock set over the last 7 days.
-async function lbLoad(){
+async function lbFetch(){
   if(!window.fetch) throw new Error('offline');
   const r=await fetch(`${LB_URL}.json?orderBy=%22$key%22&startAt=%22${pushPrefix(Date.now()-7*864e5)}%22`);
   if(!r.ok) throw new Error('load '+r.status);
-  const data=(await r.json())||{}, best={};
+  return (await r.json())||{};
+}
+async function lbLoad(){
+  const data=await lbFetch(), best={};
   Object.values(data).forEach(o=>{
     const row=lbCheck(o); if(!row) return;
     const id=row.mode+'|'+row.seed+'|'+row.name.toLowerCase(), b=best[id];
@@ -1062,20 +1207,20 @@ async function lbEnd(){
   }catch(e){ if(box()) box().innerHTML=note+'<p class="hint">The leaderboard needs an internet connection.</p>'; }
 }
 function lbView(){
-  const cur=G?(G.mode==='R'?'R'+G.seed:G.mode):'S', me=G&&!G.private&&!G.anon?G:null;
+  const cur=G?G.mode:'S', me=G&&!G.private&&!G.anon?G:null;
   app.innerHTML=`<div class="card info"><h2>Class leaderboard</h2>
-    <p class="hint">Best score per player in the last 7 days. Pick a shock set to compare like with like.</p>
-    <label for="lbSet">Shock set</label><select id="lbSet"><option value="${cur}">${esc(setName(cur[0],+cur.slice(1)||0))}</option></select>
+    <p class="hint">Best score per player in the last 7 days. Pick a world to compare like with like.</p>
+    <label for="lbSet">World</label><select id="lbSet"><option value="${cur}">${esc(setName(cur))}</option></select>
     <div id="lbBox">Loading...</div></div>`;
   let rows=[];
-  const draw=()=>{ const v=$('#lbSet').value, m=v[0], d=m==='R'?+v.slice(1):0;
-    $('#lbBox').innerHTML=lbList(rows.filter(r=>r.mode===m&&r.seed===d),me,100); };
+  const draw=()=>{ const m=$('#lbSet').value;
+    $('#lbBox').innerHTML=lbList(rows.filter(r=>r.mode===m),me,100); };
   $('#lbSet').onchange=draw;
   lbLoad().then(r=>{
     rows=r; if(!$('#lbSet')) return;
-    const sets=['S','A','B','C'].concat([...new Set(r.filter(x=>x.mode==='R').map(x=>'R'+x.seed))]);
+    const sets=['L','S','H','R'].concat([...new Set(r.map(x=>x.mode))].filter(m=>'ABC'.includes(m)));
     if(!sets.includes(cur)) sets.push(cur);
-    $('#lbSet').innerHTML=sets.map(v=>`<option value="${v}" ${v===cur?'selected':''}>${esc(setName(v[0],+v.slice(1)||0))}</option>`).join('');
+    $('#lbSet').innerHTML=sets.map(v=>`<option value="${v}" ${v===cur?'selected':''}>${esc(setName(v))}</option>`).join('');
     draw();
   }).catch(()=>{ if($('#lbBox')) $('#lbBox').innerHTML='<p class="hint">The leaderboard needs an internet connection.</p>'; });
 }
