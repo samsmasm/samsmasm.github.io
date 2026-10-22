@@ -141,8 +141,31 @@ ol.lb .rk3{background:#f0b98a;color:#5a2e0a}
 ol.lb .nm{font-weight:bold;overflow-wrap:anywhere}
 ol.lb .sc{font-weight:bold;font-size:18px;text-align:right;grid-row:span 2}
 ol.lb .gm{font-size:13px;color:var(--muted)}
-.hero{display:grid;gap:16px;grid-template-columns:1fr minmax(0,440px);align-items:start}
-@media(max-width:860px){.hero{grid-template-columns:1fr}}
+/* start screen: intro strip on top, then a big picture beside the start form, so Start round 1 needs no scrolling */
+.setupgrid{display:grid;gap:14px;align-items:start;grid-template-columns:minmax(0,1fr)}
+.setupgrid>.card{margin-bottom:0}
+.setupgrid .setupscene{order:1}.setupgrid .start{order:2}.setupgrid .hero{order:3}
+.start .lead{margin:0 0 4px;font-size:17px}
+.hero .tiles{margin:10px 0 0;grid-template-columns:1fr}
+.hero .tile{padding:6px 10px;font-size:14.5px;line-height:1.35}
+.hero .tile svg{width:30px;height:38px}
+.start .worlds{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 4px}
+.start .world{padding:6px 14px;border-radius:999px;align-items:center;box-shadow:0 3px 0 rgba(31,95,191,.15)}
+.start .world input,.start .world br,.start .world .small{display:none}
+.start .world b{font-size:16px}
+.start #pickInfo{margin:4px 0 6px;min-height:2.6em}
+.start h2{margin-bottom:4px}
+.start label{margin:6px 0 3px}
+.start p{margin:8px 0 0}
+.setupscene{padding:0}
+@media(min-width:900px){
+  .setupgrid{grid-template-columns:auto minmax(340px,440px);justify-content:center}
+  .setupgrid .setupscene{order:1}.setupgrid .start{order:2}.setupgrid .hero{order:3;grid-column:1 / -1}
+  .hero .tiles{margin:0;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .setupscene{width:fit-content;max-width:100%}
+  .setupscene .scenebox svg{height:calc(100vh - 100px);min-height:380px;max-height:860px;width:auto;max-width:calc(100vw - 500px);margin:0 auto}
+}
+
 .worlds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:8px 0 14px}
 .world{display:flex;gap:10px;align-items:flex-start;border:3px solid #fff;background:#fff;border-radius:16px;padding:10px 12px;cursor:pointer;box-shadow:0 4px 0 rgba(31,95,191,.15)}
 .world.sel{border-color:var(--blue);background:#fffbe8}
@@ -272,7 +295,7 @@ const USAGE = CFG.baseDemand; // expected usage per round for reorder level sums
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 let lbPrivate=false, gameOpts={hard:false, quiz:true};
-const WORLDS=[['L','Mostly calm weeks with a couple of hiccups.'],['S','Demand surges, import delays and price spikes.'],['H','Shock after shock.'],['R','Anything can happen. New events every game.']];
+const WORLDS=[['L','Mostly calm, a few hiccups.'],['S','Surges, delays and price spikes.'],['H','Shock after shock.'],['R','New events every game.']];
 function startGame(name, mode, seed){
   G = { name: name||'Player', anon: !name, private: lbPrivate, posted: false, mode, seed, hard: !!gameOpts.hard, quiz: gameOpts.quiz!==false, quizLog: [], seq: Engine.seqFor(mode, seed), s: Engine.newState2(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
   render();
@@ -796,24 +819,25 @@ function setupView(){
   const opts=WORLDS.concat('ABC'.includes(pre)?[[pre,'Fixed order (teacher link).']]:[]);
   const icon=(vb,inner)=>`<svg viewBox="${vb}" width="44" height="52" aria-hidden="true">${inner}</svg>`;
   app.innerHTML=`
-  <div class="card info hero"><div><h2>Run the cat food warehouse</h2>
-    <p class="lead">${CFG.rounds} rounds. Most profit wins.</p>
-    <p><b>Each round:</b> read the news, set 3 levers, press Run.</p>
-    <div class="tiles" style="grid-template-columns:1fr"><div class="tile">${icon('-3 -3 28 36','<rect width="22" height="30" rx="4" fill="url(#gCan)" stroke="#6f7884"/>'+canArt())}<div><b>+${money(CFG.price-CFG.cost)}</b> for every unit sold (1 can = 100 units)</div></div>
-      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> storage cost for every unit left over at the end of a round</div></div>
-      <div class="tile">${icon('-20 -34 40 64',catArt(4,'sad'))}<div><b>No can, no sale.</b> Hungry cats don't come back.</div></div></div></div>
-    <div class="scenebox" style="border-radius:16px;overflow:hidden">${sceneSVG({stock:2000,rl:1600,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div>
-  </div>
-  <div class="card"><h2>Start</h2>
+  <div class="setupgrid">
+  <div class="card stage setupscene"><div class="scenebox">${sceneSVG({stock:2000,rl:1600,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div></div>
+  <div class="card start"><h2>Run the cat food warehouse</h2>
+    <p class="lead">${CFG.rounds} rounds. Most profit wins. Read the news, set your levers, press Run.</p>
     <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban" required aria-describedby="nmMsg"><div class="bufout x" id="nmMsg" role="alert"></div>
     <label class="small inl" style="margin-top:10px"><input type="checkbox" id="priv" ${lbPrivate?'checked':''}> Keep me off the class leaderboard</label>
     <label>Level</label>
-    <div class="worlds" id="lvls"><div class="world lvl ${!gameOpts.hard?'sel':''}" data-h="0"><input type="radio" name="lvl" ${!gameOpts.hard?'checked':''}><div><b>Standard</b><br><span class="small">Reorder level, reorder quantity, single or dual supplier.</span></div></div>
-      <div class="world lvl ${gameOpts.hard?'sel':''}" data-h="1"><input type="radio" name="lvl" ${gameOpts.hard?'checked':''}><div><b>Hard</b><br><span class="small">Global or local suppliers, make or buy, and unhappy cats who stay away.</span></div></div></div>
-    <label class="small inl"><input type="checkbox" id="quizOn" ${gameOpts.quiz?'checked':''}> Quick questions before some rounds</label>
+    <div class="worlds" id="lvls"><div class="world lvl ${!gameOpts.hard?'sel':''}" data-h="0"><input type="radio" name="lvl" ${!gameOpts.hard?'checked':''}><div><b>Standard</b><br><span class="small">Single or dual supplier.</span></div></div>
+      <div class="world lvl ${gameOpts.hard?'sel':''}" data-h="1"><input type="radio" name="lvl" ${gameOpts.hard?'checked':''}><div><b>Hard</b><br><span class="small">Global or local, make or buy, unhappy cats.</span></div></div></div>
     <label>Choose your world</label>
     <div class="worlds" id="worldPick">${opts.map(([m,t])=>`<div class="world ${m===pre?'sel':''}" data-m="${m}"><input type="radio" name="world" ${m===pre?'checked':''}><div><b>${Engine.SEQ_NAMES[m]}</b><br><span class="small">${t}</span></div></div>`).join('')}</div>
+    <p class="hint" id="pickInfo"></p>
+    <label class="small inl"><input type="checkbox" id="quizOn" ${gameOpts.quiz?'checked':''}> Quick questions before some rounds</label>
     <p><button class="primary" id="go">Start round 1</button></p>
+  </div>
+  <div class="card info hero"><div class="tiles"><div class="tile">${icon('-3 -3 28 36','<rect width="22" height="30" rx="4" fill="url(#gCan)" stroke="#6f7884"/>'+canArt())}<div><b>+${money(CFG.price-CFG.cost)}</b> profit per unit sold (1 can = 100 units)</div></div>
+      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> a round for every unit left over (storage)</div></div>
+      <div class="tile">${icon('-20 -34 40 64',catArt(4,'sad'))}<div><b>No can, no sale.</b> Hungry cats leave.</div></div></div>
+  </div>
   </div>
   <details class="card"><summary>Full rules and key terms</summary>
   <div class="card info"><h2>The situation</h2>
@@ -854,6 +878,9 @@ function setupView(){
   </details>`;
   const pick=(sel)=>document.querySelectorAll(sel).forEach(el=>el.onclick=()=>{ document.querySelectorAll(sel).forEach(o=>{o.classList.toggle('sel',o===el);o.querySelector('input').checked=(o===el);}); });
   pick('.world:not(.lvl)'); pick('.world.lvl');
+  // one line describing the chosen level and world (the pills themselves stay short)
+  const info=()=>{ const l=$('.world.lvl.sel'), w=$('#worldPick .world.sel'); $('#pickInfo').innerHTML=`<b>${l.querySelector('b').textContent}:</b> ${l.querySelector('.small').textContent} <b>${w.querySelector('b').textContent}:</b> ${w.querySelector('.small').textContent}`; };
+  document.querySelectorAll('.start .world').forEach(el=>el.addEventListener('click',info)); info();
   $('#nm').oninput=()=>{ $('#nmMsg').textContent=''; };
   $('#go').onclick=()=>{
     if(!$('#nm').value.trim()){ $('#nmMsg').textContent='Type your name or team name to start.'; $('#nm').focus(); return; }
@@ -1338,7 +1365,7 @@ function classChart(rows){
 
 function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
-  app.classList.toggle('wide',tab==='play'&&!!G&&G.view==='round');
+  app.classList.toggle('wide',tab==='play'&&(!G||G.view==='round'));
   window.scrollTo(0,0);
   if(anim){ anim.cancel=true; anim=null; }
   if(tab==='teacher') return teacherView();
