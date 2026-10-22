@@ -185,7 +185,7 @@ ol.lb .gm{font-size:13px;color:var(--muted)}
 .adm .meta{font-size:13px;color:var(--muted)}
 button.danger{background:#fff;color:var(--red);border:3px solid var(--red);border-radius:12px;padding:6px 12px;font:inherit;font-weight:bold;cursor:pointer}
 button.danger.arm{background:var(--red);color:#fff}
-/* walking cat (every third round) */
+/* walking cat story (rounds 2, 4, 6, 8, 10) */
 .walker{position:fixed;bottom:4px;left:0;width:120px;height:90px;z-index:5;pointer-events:none;will-change:transform}
 .walker svg{width:120px;height:90px;overflow:visible}
 .walker .leg{transform-box:fill-box;transform-origin:50% 0;animation:leg .32s ease-in-out infinite alternate}
@@ -196,7 +196,14 @@ button.danger.arm{background:var(--red);color:#fff}
 .walker.eat .whead{transform-box:fill-box;transform-origin:20% 80%;animation:chomp .22s ease-in-out 6 alternate}
 .walker .bubble{position:absolute;bottom:84px;left:40px;background:#fff;border-radius:14px;padding:4px 12px;font-weight:bold;font-size:15px;white-space:nowrap;box-shadow:0 3px 0 rgba(31,80,150,.18);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s}
 .walker.say .bubble{opacity:1;transform:none}
-.poo{position:fixed;bottom:6px;width:34px;height:30px;z-index:0;pointer-events:none;animation:pop .45s ease-out}
+.walkmark{position:fixed;bottom:4px;z-index:4;pointer-events:none;transform:translateX(-50%)}
+.walkmark .pop{animation:pop .45s ease-out}
+.walker .wsvg{transform-box:fill-box;transform-origin:50% 100%}
+.walker.flip .wsvg{transform:scaleX(-1)}
+.walker.slip .wsvg{animation:slip .9s ease-in-out}
+.walker.sniff .whead{transform-box:fill-box;transform-origin:20% 80%;animation:sniff .3s ease-in-out 5 alternate}
+@keyframes slip{0%{transform:rotate(0)}20%{transform:translateY(-14px) rotate(-28deg)}45%{transform:translateY(-4px) rotate(22deg)}70%{transform:rotate(-10deg)}100%{transform:rotate(0)}}
+@keyframes sniff{from{transform:translateY(0)}to{transform:translateY(5px)}}
 @keyframes leg{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
 @keyframes wbob{from{transform:translateY(0)}to{transform:translateY(-2px)}}
 @keyframes chomp{from{transform:rotate(0)}to{transform:rotate(16deg)}}
@@ -511,6 +518,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;'
 let lbPrivate=false, gameOpts={hard:false, quiz:true};
 const WORLDS=[['L','Mostly calm, a few hiccups.'],['S','Surges, delays and price spikes.'],['H','Shock after shock.'],['R','New events every game.']];
 function startGame(name, mode, seed){
+  const old=document.getElementById('walkMark'); if(old) old.remove();
   G = { name: name||'Player', anon: !name, private: lbPrivate, posted: false, mode, seed, hard: !!gameOpts.hard, quiz: gameOpts.quiz!==false, quizLog: [], seq: Engine.seqFor(mode, seed), s: Engine.newState2(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
   render();
 }
@@ -1016,7 +1024,7 @@ function rpInit(lines){
 function walkerSVG(){
   const fur='#f0a050', dk='#d9803a', ol='#3a2a1a';
   const leg=(x,b)=>`<rect class="leg${b?' b':''}" x="${x}" y="52" width="9" height="24" rx="4.5" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>`;
-  return `<svg viewBox="0 0 120 90" aria-hidden="true">
+  return `<svg class="wsvg" viewBox="0 0 120 90" aria-hidden="true">
     <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${ol}" stroke-width="9" stroke-linecap="round"/>
     <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${fur}" stroke-width="6" stroke-linecap="round"/>
     ${leg(24,1)}${leg(66,0)}
@@ -1040,38 +1048,46 @@ function pooSVG(){
     <circle cx="13" cy="22" r="1.4" fill="#2a1a0e"/><circle cx="21" cy="22" r="1.4" fill="#2a1a0e"/><path d="M15 24.5 q2 1.6 4 0" fill="none" stroke="#2a1a0e" stroke-width="1.1" stroke-linecap="round"/>
     <path d="M28 6 l1 2.5 2.5 1 -2.5 1 -1 2.5 -1 -2.5 -2.5 -1 2.5 -1z" fill="#ffd95e"/></svg>`;
 }
-// Bite a scalloped chunk out of the front hill crest at screen x.
-function biteHill(sx){
-  const svg=$('#hills'), front=$('#hillFront'), back=$('#hillBack');
-  if(!svg||!front||!front.isPointInFill||!window.DOMPoint) return;
-  const r=svg.getBoundingClientRect(), vx=(sx-r.left)/r.width*800;
-  let cy=null; for(let y=0;y<=160;y+=1){ if(front.isPointInFill(new DOMPoint(vx,y))){ cy=y; break; } }
-  if(cy==null) return;
-  const fill=back.isPointInFill(new DOMPoint(vx,cy+3))?'#bfe3a2':'#e4f5ef', kx=800/r.width, ky=160/r.height;
-  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
-  g.innerHTML=[[-13,1,11],[0,4,12],[13,1,11]].map(([dx,dy,rr])=>`<ellipse cx="${vx+dx*kx}" cy="${cy+dy*ky}" rx="${rr*kx}" ry="${rr*ky}" fill="${fill}"/>`).join('');
-  svg.appendChild(g);
+function flowerSVG(){
+  return `<svg viewBox="0 0 34 48" width="34" height="48" aria-hidden="true"><path d="M17 46 V22" stroke="#4c9a3a" stroke-width="3" stroke-linecap="round"/><path d="M17 36 q-10 -2 -12 -9 q9 0 12 7z M17 32 q10 -2 12 -9 q-9 0 -12 7z" fill="#6cbf4f"/>
+    ${[0,72,144,216,288].map(a=>`<ellipse cx="17" cy="9" rx="5" ry="8" fill="#ff8fb3" stroke="#d9608a" transform="rotate(${a} 17 16)"/>`).join('')}<circle cx="17" cy="16" r="4.5" fill="#ffd95e" stroke="#d9a520"/></svg>`;
 }
-function catWalk(act){
+function smearSVG(){
+  return `<svg viewBox="0 0 70 16" width="70" height="16" aria-hidden="true"><path d="M2 11 q8 -7 22 -5 q14 -3 26 0 q12 1 18 5 q-6 4 -20 3 q-14 2 -28 0 q-14 1 -18 -3z" fill="#7a4a26"/><path d="M14 9 q10 -3 22 -1 M40 9 q8 -2 16 1" stroke="#a8774a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+}
+// Where the story happens: a free side margin on wide screens, otherwise near the bottom right.
+function walkSpot(){ const W=innerWidth, main=$('#app').getBoundingClientRect(), right=W-main.right; return right>=150?Math.round(main.right+right/2):Math.round(W-170); }
+function walkMark(){
+  let m=document.getElementById('walkMark');
+  if(!G||!G.mark||skipAnim()){ if(m) m.remove(); return null; }
+  if(!m){ m=document.createElement('div'); m.id='walkMark'; m.className='walkmark'; document.body.appendChild(m); }
+  if(m.dataset.k!==G.mark){ m.dataset.k=G.mark; m.innerHTML=`<div class="pop">${G.mark==='flower'?flowerSVG():G.mark==='poo'?pooSVG():smearSVG()}</div>`; }
+  m.style.left=walkSpot()+'px';
+  return m;
+}
+// One chapter per walk: eat the flower, poo, slip on the poo, sniff the smear and turn back, jump the smear.
+function catWalk(n){
   if(skipAnim()||document.querySelector('.walker')) return;
   const el=document.createElement('div'); el.className='walker'; el.innerHTML=walkerSVG(); document.body.appendChild(el);
-  const W=window.innerWidth, margin=(W-Math.min(W,980))/2, wide=margin>=140;
-  const mid=wide?Math.round(W-margin+(margin-125)/2):Math.round(W*(0.25+Math.random()*0.35)), sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
-  const move=(a,b,ms)=>new Promise(res=>{ const t0=performance.now(); const f=(now)=>{ const p=Math.min(1,(now-t0)/ms); el.style.transform=`translateX(${a+(b-a)*p}px)`; if(p<1) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
+  const W=innerWidth, spot=walkSpot(), sleep=(ms)=>new Promise(r=>setTimeout(r,ms)), pace=(d)=>Math.max(900,Math.abs(d)*6);
+  const pos={x:-130,y:0}, put=()=>{ el.style.transform=`translate(${pos.x}px,${-pos.y}px)`; };
+  const move=(x,ms=pace(x-pos.x),hop=0)=>new Promise(res=>{ const x0=pos.x, t0=performance.now(); const f=(now)=>{ const p=Math.min(1,(now-t0)/ms); pos.x=x0+(x-x0)*p; pos.y=hop*4*p*(1-p); put(); if(p<1) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
   const say=(t)=>{ el.querySelector('.bubble').textContent=t; el.classList.toggle('say',!!t); };
+  const stop=(on)=>el.classList.toggle('stop',on);
+  const mark=(k)=>{ G.mark=k; walkMark(); };
+  put();
   (async()=>{
-    await move(-130,mid,Math.max(1800,mid*6));
-    el.classList.add('stop');
-    if(act==='eat'){ say('Nom nom!'); el.classList.add('eat'); await sleep(700); if(wide) biteHill(mid+100); await sleep(900); el.classList.remove('eat'); }
-    else { say('Pardon me!'); await sleep(800); const p=document.createElement('div'); p.className='poo'; p.style.left=(mid-4)+'px'; p.innerHTML=pooSVG();
-      if(wide) document.querySelector('.deco').appendChild(p);
-      else { p.style.zIndex=4; document.body.appendChild(p); setTimeout(()=>{ p.style.transition='opacity .8s'; p.style.opacity=0; setTimeout(()=>p.remove(),900); },3500); }
-      await sleep(900); }
-    say(''); el.classList.remove('stop');
-    await move(mid,W+40,Math.max(1800,(W-mid)*6));
+    if(n===1){ await move(spot-100); stop(true); say('Nom nom!'); el.classList.add('eat'); await sleep(900); mark(null); await sleep(600); el.classList.remove('eat'); }
+    else if(n===2){ await move(spot-12); stop(true); say('Pardon me!'); await sleep(800); mark('poo'); await sleep(1000); }
+    else if(n===3){ await move(spot-70); say('Whoa!'); el.classList.add('slip'); await sleep(450); mark('smear'); await sleep(500); el.classList.remove('slip'); say('...nobody saw that.'); await move(spot+40,700); }
+    else if(n===4){ await move(spot-105); stop(true); say('Sniff...'); el.classList.add('sniff'); await sleep(1500); el.classList.remove('sniff'); say('Eww!'); await sleep(500); el.classList.add('flip'); await sleep(300); say(''); stop(false); await move(-140); el.remove(); return; }
+    else { await move(spot-150); say('Hup!'); await move(spot+40,700,70); }
+    say(''); stop(false);
+    await move(W+40);
     el.remove();
   })();
 }
+addEventListener('resize',()=>{ if(G) walkMark(); });
 
 /* ---------- views ---------- */
 function setupView(){
@@ -1220,7 +1236,9 @@ function roundView(){
     G.lev=lev; ccUpdate(lev.rl,buffer,lev.qty); sceneLevers(lev.rl,buffer);
   };
   $('#rl').oninput=upd; $('#qy').oninput=upd; upd();
-  if(r%3===0&&r<CFG.rounds&&!skipAnim()){ G.walks=G.walks||{}; if(!G.walks[r]){ G.walks[r]=1; setTimeout(()=>catWalk(r===6?'poo':'eat'),900); } }
+  if(G.mark===undefined) G.mark='flower';
+  walkMark();
+  if(r%2===0&&!skipAnim()){ G.walks=G.walks||{}; if(!G.walks[r]){ G.walks[r]=1; setTimeout(()=>catWalk(r/2),900); } }
   if(arrNow>0&&!skipAnim()){
     const a={cancel:false}, from=nCans(s.onHand), to=nCans(stockNow), gap=Math.min(60,700/Math.max(1,to-from));
     tween($('#scTruck'),[-120,0],[0,0],600,a);
