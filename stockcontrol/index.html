@@ -1049,8 +1049,10 @@ function rpInit(lines,keep){
 /* ---------- walking cat ----------
    Every third round a cat strolls along the bottom of the screen, stops, and either takes a bite out of the
    background hills or leaves a polite little poo. Purely decorative: skipped in fast mode and reduced motion. */
-function walkerSVG(){
-  const fur='#f0a050', dk='#d9803a', ol='#3a2a1a';
+// A different cat each walk: orange tabby, grey tabby, black, brown tabby, cream.
+const WALKER_COATS=[['#f0a050','#d9803a'],['#a8a8b0','#7e7e88'],['#4a4650','#2e2b33'],['#b07848','#8a5a30'],['#ecdcc0','#cdb894']];
+function walkerSVG(n=1){
+  const [fur,dk]=WALKER_COATS[(n-1)%WALKER_COATS.length], ol='#3a2a1a', eye=(n-1)%WALKER_COATS.length===2?'#ffd95e':ol;
   const leg=(x,b)=>`<rect class="leg${b?' b':''}" x="${x}" y="52" width="9" height="24" rx="4.5" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>`;
   return `<svg class="wsvg" viewBox="0 0 120 90" aria-hidden="true">
     <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${ol}" stroke-width="9" stroke-linecap="round"/>
@@ -1063,7 +1065,7 @@ function walkerSVG(){
         <path d="M80 18 L81 11 L86 17z M101 17 L105 9 L105.5 20z" fill="#f4a6b4"/>
         <circle cx="92" cy="32" r="17" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>
         <path d="M86 17 l1 5 M92 16 v5 M98 17 l-1 5" stroke="${dk}" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="88" cy="30" r="2.8" fill="${ol}"/><circle cx="100" cy="30" r="2.8" fill="${ol}"/><circle cx="89" cy="29" r="1" fill="#fff"/><circle cx="101" cy="29" r="1" fill="#fff"/>
+        <circle cx="88" cy="30" r="2.8" fill="${eye}"/><circle cx="100" cy="30" r="2.8" fill="${eye}"/><circle cx="89" cy="29" r="1" fill="#fff"/><circle cx="101" cy="29" r="1" fill="#fff"/>
         <circle cx="84" cy="37" r="3" fill="#ff8fa3" opacity=".5"/><circle cx="104" cy="37" r="3" fill="#ff8fa3" opacity=".5"/>
         <path d="M93 34 h3.5 l-1.75 2.2z" fill="#e58a9a"/><path d="M91 38 q2 2 3.8 0 q2 2 3.8 0" fill="none" stroke="${ol}" stroke-width="1.3" stroke-linecap="round"/>
         <path d="M100 35 l12 -2 M100 37 l12 2" stroke="${ol}" stroke-width=".8"/></g></g>
@@ -1096,7 +1098,7 @@ function walkMark(){
 // One chapter per walk: eat the flower, poo, slip on the poo, sniff the smear and turn back, jump the smear.
 function catWalk(n){
   if(skipAnim()||document.querySelector('.walker')) return;
-  const el=document.createElement('div'); el.className='walker'; el.innerHTML=walkerSVG(); document.body.appendChild(el);
+  const el=document.createElement('div'); el.className='walker'; el.innerHTML=walkerSVG(n); document.body.appendChild(el);
   const W=innerWidth, spot=walkSpot(), sleep=(ms)=>new Promise(r=>setTimeout(r,ms)), pace=(d)=>Math.max(900,Math.abs(d)*6);
   const pos={x:-130,y:0}, put=()=>{ el.style.transform=`translate(${pos.x}px,${-pos.y}px)`; };
   const move=(x,ms=pace(x-pos.x),hop=0)=>new Promise(res=>{ const x0=pos.x, t0=performance.now(); const f=(now)=>{ const p=Math.min(1,(now-t0)/ms); pos.x=x0+(x-x0)*p; pos.y=hop*4*p*(1-p); put(); if(p<1) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
@@ -1477,7 +1479,7 @@ function endView(){
   <div class="card info"><h2>Final result: ${esc(G.name)}</h2>
     <div class="verdict">${bigCat(0,'happy')}<p class="big ${cls(s.total)}">${money(s.total)}</p></div>
     <p class="lead">${verdict}</p>
-    <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Storage costs <b>${money(holdTot)}</b></span>${spoilTot?`<span>Cans gone off <b>${money(spoilTot)}</b></span>`:''}<span>${G.hard?'Canning line costs':'Dual fees'} <b>${money(feeTot)}</b></span>${G.quizLog.length?`<span>Questions right <b>${qr} of ${G.quizLog.length}</b> (+${money(qr*Engine.RULES.quizBonus)})</span>`:''}</div>
+    <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Cans left at the end <b>${units(s.onHand)}</b> (not a cost: you only pay for cans when you sell them)</span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Storage costs <b>${money(holdTot)}</b></span>${spoilTot?`<span>Cans gone off <b>${money(spoilTot)}</b></span>`:''}<span>${G.hard?'Canning line costs':'Dual fees'} <b>${money(feeTot)}</b></span>${G.quizLog.length?`<span>Questions right <b>${qr} of ${G.quizLog.length}</b> (+${money(qr*Engine.RULES.quizBonus)})</span>`:''}</div>
   </div>
   <div class="card" id="lbCard"><h2>Class leaderboard</h2><p class="hint">Best score per player in the last 7 days: ${esc(boardName(G.mode,G.hard))}.</p>
     <div class="seg" id="lbSort"><button data-k="total" class="on">Total profit</button><button data-k="vs">Beat pure JIC by</button></div><div id="lbBox">Loading...</div></div>

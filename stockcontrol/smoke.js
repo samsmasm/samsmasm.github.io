@@ -114,6 +114,7 @@ const txt = d.body.textContent;
 check(/Final result: Test Team/.test(txt) && /Debrief/.test(txt), 'end screen shown');
 check(/How JIT and JIC played your shocks/.test(txt) && /Reorder level 4,000/.test(txt) && /Reorder level 800/.test(txt) && /Maximum stock/.test(txt) && /Lead time/.test(txt), 'end screen has JIT and JIC stock control charts with lead times');
 check(/Questions right 2 of 3/.test(txt), 'end screen counts questions right');
+{ const st = w.__G().s; check(txt.includes('Cans left at the end ' + st.onHand.toLocaleString('en-US')) && Math.abs(st.total - st.history.reduce((a, h) => a + h.revenue - h.cogs - h.holding - h.fee - h.fixed - h.spoilCost + h.bonus, 0)) < 1e-6, 'end stock is shown and only cans sold are charged to profit'); }
 { const H = w.__G().s.history, right = w.__G().quizLog.filter((x) => x.ok).map((x) => x.r);
   check(H.filter((h) => h.bonus === 500).map((h) => h.round).join() === right.join() && H.every((h) => !h.bonus || right.includes(h.round)), 'each right answer adds a $500 bonus to that round, wrong answers add nothing'); }
 
