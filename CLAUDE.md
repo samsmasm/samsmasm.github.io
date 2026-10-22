@@ -115,7 +115,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `printergoesbrrr/`: Classroom simulation of rate setting and lending rounds.
 - `quiz/`: The Talkonomics weekly economics quiz: latest edition plus archive.
 - `samples/`: Proof of concept: IB model answers revealed step by step from hint to full paragraph.
-- `stockcontrol/`: Stock Shock, JIT vs JIC stock control game for IB BM HL 5.6 (cat food cans, cat customers, end-of-game replay). Single built `index.html` from `app.html` + `engine.js` via `build.py`; read its CLAUDE.md first. Not yet linked from any index.
+- `stockshock/`: Stock Shock, JIT vs JIC stock control game for IB BM HL 5.6 (moved from `stockcontrol/`, which now only redirects) (cat food cans, cat customers, end-of-game replay). Single built `index.html` from `app.html` + `engine.js` via `build.py`; read its CLAUDE.md first. Not yet linked from any index.
 - `stocksimulator/`: **in use.** Many random-walk price paths, then pick the 'most interesting' one to show patterns in noise. `index.html` (simple ±1 walk) and `index2.html` (log returns, drift, price mode). Full notes in its CLAUDE.md.
 - `supplyanddemand/`: Shift supply and demand curves and see the changes.
 - `uniquiz/`: Kahoot-style live quiz: teacher creates a quiz (CSV import), students join with a PIN.

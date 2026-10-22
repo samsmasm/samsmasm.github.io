@@ -12,6 +12,6 @@ out.mkdir(exist_ok=True)
 dest = out / 'Stock_Shock_JIT_vs_JIC.html'
 built = html.replace('/*ENGINE*/', engine, 1)
 dest.write_text(built, encoding='utf-8')
-# Same file served on the site at unisam.nz/stockcontrol/
+# Same file served on the site at unisam.nz/stockshock/
 (here / 'index.html').write_text(built, encoding='utf-8')
 print('wrote', dest.relative_to(here), 'and index.html')

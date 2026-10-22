@@ -132,7 +132,7 @@ Report back with: what changed in `app.html`, any helper added to `engine.js`, t
 
 ## Deployment
 
-Lives in `samsmasm.github.io/stockcontrol/`, served at unisam.nz/stockcontrol/. `build.py` writes both `out/Stock_Shock_JIT_vs_JIC.html` (the offline single file) and `index.html` (the live page). Commit `index.html` after every build. `out/` and `node_modules/` are git-ignored; run `npm install jsdom` here before `node smoke.js`.
+Lives in `samsmasm.github.io/stockshock/`, served at unisam.nz/stockshock/ (moved 2026-10-22; `stockcontrol/index.html` redirects old links). `build.py` writes both `out/Stock_Shock_JIT_vs_JIC.html` (the offline single file) and `index.html` (the live page). Commit `index.html` after every build. `out/` and `node_modules/` are git-ignored; run `npm install jsdom` here before `node smoke.js`.
 
 ## Player-facing copy (decided 2026-10-22)
 

@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Shock: JIT vs JIC</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M9 30 L12 4 L29 18z M55 30 L52 4 L35 18z' fill='%23f0a050' stroke='%233a2a1a' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M14 24 L15 11 L24 18z M50 24 L49 11 L40 18z' fill='%23f4a6b4'/%3E%3Ccircle cx='32' cy='37' r='24' fill='%23f0a050' stroke='%233a2a1a' stroke-width='2.5'/%3E%3Cpath d='M26 15 l2 7 M32 14 v8 M38 15 l-2 7' stroke='%23d9803a' stroke-width='3.5' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='35' r='4.5' fill='%233a2a1a'/%3E%3Ccircle cx='41' cy='35' r='4.5' fill='%233a2a1a'/%3E%3Ccircle cx='24.5' cy='33.5' r='1.6' fill='%23fff'/%3E%3Ccircle cx='42.5' cy='33.5' r='1.6' fill='%23fff'/%3E%3Ccircle cx='15' cy='44' r='4' fill='%23ff8fa3' opacity='.55'/%3E%3Ccircle cx='49' cy='44' r='4' fill='%23ff8fa3' opacity='.55'/%3E%3Cpath d='M29 42 h6 l-3 3.5z' fill='%23e58a9a'/%3E%3Cpath d='M27 48 q2.5 3 5 0 q2.5 3 5 0' fill='none' stroke='%233a2a1a' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#fbfaf6; --ink:#1d1b25; --muted:#5b5868; --card:#ffffff; --line:#dcd8e6;
+  --purple:#5b3d99; --purple-bg:#efe9fb; --blue:#1f5fbf; --blue-bg:#e6effc;
+  --red:#8c1d2c; --red-bg:#fbe9eb; --green:#1f7a45; --green-bg:#e4f4ea; --amber:#8a5a00; --amber-bg:#fdf1d8;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(#93d8ef 0,#cdeff3 420px,#eaf7ef 900px) fixed #eaf7ef;color:var(--ink);font-family:Verdana,Tahoma,"Segoe UI",sans-serif;font-size:16px;line-height:1.55;text-align:left}
+header{background:transparent;color:#fff;padding:14px 20px 4px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+header h1{margin:0;font-size:26px;display:flex;align-items:center;gap:10px;text-shadow:0 3px 0 rgba(31,80,150,.35)}
+nav button{background:#fff;border:0;color:var(--purple);padding:8px 16px;border-radius:999px;font:inherit;font-weight:bold;cursor:pointer;margin-left:6px;box-shadow:0 3px 0 rgba(31,80,150,.25)}
+nav button.on{background:#ffd95e;color:#3a2a1a}
+main{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+h2{font-size:22px;margin:0 0 10px;color:var(--purple)}
+h3{font-size:17px;margin:0 0 8px;color:var(--purple)}
+.card{background:var(--card);border:3px solid #fff;border-radius:22px;padding:18px 20px;margin-bottom:18px;box-shadow:0 6px 0 rgba(40,70,110,.10)}
+.info{background:var(--purple-bg)}
+.todo{background:var(--blue-bg)}
+.shock{background:var(--red-bg);border:3px solid var(--red)}
+.shock h2{color:var(--red)}
+.calmcard{background:var(--green-bg);border:3px solid var(--green)}
+.calmcard h2{color:var(--green)}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .l{font-size:13px;color:var(--muted)}
+.stat .v{font-size:22px;font-weight:bold}
+.two{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+label{display:block;font-weight:bold;margin:12px 0 4px}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:14px;border-radius:999px;background:#c9dcf5;margin:10px 0 6px;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#fff;border:5px solid var(--blue);box-shadow:0 3px 0 rgba(0,0,0,.18)}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:5px solid var(--blue);box-shadow:0 3px 0 rgba(0,0,0,.18)}
+input[type=range]::-moz-range-track{height:14px;border-radius:999px;background:#c9dcf5}
+input[type=text],input[type=number],select,textarea{font:inherit;padding:8px 10px;border:2px solid var(--line);border-radius:8px;width:100%;background:#fff}
+textarea{min-height:140px;font-family:monospace;font-size:13px}
+.out{font-weight:bold;color:var(--blue)}
+.opt{display:flex;gap:10px;align-items:flex-start;border:3px solid #fff;background:#fff;border-radius:16px;box-shadow:0 4px 0 rgba(31,95,191,.15);padding:10px 12px;margin:6px 0;cursor:pointer}
+.opt.sel{border-color:var(--blue);background:#fffbe8}
+.opt input{margin-top:5px}
+button.primary{background:var(--blue);color:#fff;border:0;border-radius:16px;padding:14px 26px;font:inherit;font-weight:bold;cursor:pointer;font-size:18px;box-shadow:0 5px 0 #133f82;transition:transform .08s,box-shadow .08s}
+button.primary:hover{background:#2468cf}
+button.primary:active{transform:translateY(3px);box-shadow:0 2px 0 #133f82}
+button.ghost{background:#fff;color:var(--blue);border:3px solid var(--blue);border-radius:14px;padding:9px 16px;font:inherit;font-weight:bold;cursor:pointer;box-shadow:0 3px 0 rgba(31,95,191,.25)}
+button.ghost:active{transform:translateY(2px);box-shadow:none}
+.chip{display:inline-block;background:#fff;border:2px solid var(--red);font-weight:bold;color:var(--red);border-radius:999px;padding:2px 10px;margin:2px 6px 2px 0;font-size:14px}
+.chip.g{border-color:var(--green);color:var(--green)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+th{background:var(--purple-bg);color:var(--purple)}
+tr.tot td{font-weight:bold;border-top:2px solid var(--purple)}
+.neg{color:var(--red)} .pos{color:var(--green)}
+.warn{background:var(--amber-bg);border:1px solid #e3c47a;color:var(--amber);padding:8px 12px;border-radius:8px;margin:8px 0}
+.bad{background:var(--red-bg);border:1px solid var(--red);color:var(--red);padding:8px 12px;border-radius:8px;margin:8px 0}
+.good{background:var(--green-bg);border:1px solid var(--green);color:var(--green);padding:8px 12px;border-radius:8px;margin:8px 0}
+.small{font-size:14px;color:var(--muted)}
+.bar{height:14px;background:rgba(255,255,255,.7);border-radius:999px;overflow:hidden;margin:6px 0 12px;border:3px solid #fff}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#ffc94a,#f2902e);border-radius:999px}
+code.codebox{display:block;word-break:break-all;background:#fff;border:1px dashed var(--purple);padding:10px;border-radius:8px;font-size:12px;max-height:120px;overflow:auto}
+ol.q li,ul.q li{margin-bottom:8px}
+svg text{font-family:Verdana,Tahoma,sans-serif}
+.hidden{display:none}
+.mini{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));margin:8px 0}
+.mini .stat{padding:6px 10px}
+.mini .stat .v{font-size:18px}
+.scenebox svg{display:block}
+label.inl{display:inline-flex;gap:8px;align-items:center;margin:0;font-weight:normal}
+.runrow{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center}
+.rpnews{margin:4px 0 10px}
+.rpnews b{display:block;margin-bottom:4px}
+.rplegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;margin:6px 0 10px}
+.rplegend span{display:inline-flex;align-items:center;gap:6px}
+#replay svg[id^="rp-"]{display:block;max-width:760px}
+.rpcap{background:var(--purple-bg);border-left:4px solid var(--purple);padding:8px 12px;border-radius:6px;min-height:3.2em}
+.rpctl{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin:8px 0}
+.rpctl select{width:auto;padding:5px 8px}
+.hud{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin:0 0 14px;font-size:17px}
+.pill{background:#fff;border-radius:999px;padding:6px 16px;box-shadow:0 3px 0 rgba(31,80,150,.15)}
+.lead{font-size:19px;margin:6px 0 10px}
+.big{font-size:34px;font-weight:bold;margin:4px 0}
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:12px 0}
+.tile{display:flex;gap:12px;align-items:center;background:#fff;border:3px solid #fff;border-radius:16px;box-shadow:0 4px 0 rgba(91,61,153,.12);padding:10px 12px}
+.tile svg{flex:none}
+.facts{display:flex;flex-wrap:wrap;gap:4px 16px;margin:8px 0;font-size:15px}
+.facts b{font-size:17px}
+.optrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.optrow .opt{margin:0}
+.hint{font-size:14px;color:var(--muted)}
+.forecast{background:#fff;border:3px solid #fff;border-radius:16px;box-shadow:0 4px 0 rgba(31,95,191,.12);padding:8px 12px;margin:14px 0;line-height:1.7}
+.forecast .x,.ltime .x{color:var(--red);font-weight:bold}
+.ltime{display:flex;gap:10px;align-items:center;font-size:19px;background:#fff;border:3px solid var(--blue);border-radius:16px;padding:8px 12px;margin:14px 0 0}
+.ltime.late{border-color:var(--red);background:var(--red-bg)}
+.coach{background:#fffbe0;border:3px dashed #f2a33a;color:#7a4a00;border-radius:16px;padding:8px 12px;font-weight:bold}
+details>summary{cursor:pointer;color:var(--blue);font-weight:bold;font-size:17px}
+details[open]>summary{margin-bottom:10px}
+.news h2{margin-bottom:6px}
+.stage{padding:0 0 12px;overflow:hidden;background:#fff4e2}
+.stage>:not(.scenebox){margin-left:16px;margin-right:16px}
+.stage.solo{max-width:640px;margin-left:auto;margin-right:auto}
+.verdict{display:flex;gap:14px;align-items:center}
+.verdict svg{flex:none}
+/* sky decoration behind the page */
+.deco{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.deco .sun{position:absolute;top:28px;right:6%;width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 38% 35%,#fff6c8,#ffd95e 60%,#ffc233);box-shadow:0 0 50px 18px rgba(255,214,90,.5);animation:breathe 4s ease-in-out infinite}
+.deco .cloud{position:absolute;width:130px;height:42px;border-radius:21px;background:rgba(255,255,255,.92);animation:drift linear infinite}
+.deco .cloud::before,.deco .cloud::after{content:'';position:absolute;background:inherit;border-radius:50%}
+.deco .cloud::before{width:56px;height:56px;top:-26px;left:22px}
+.deco .cloud::after{width:40px;height:40px;top:-18px;right:24px}
+.deco .c1{top:9%;animation-duration:70s}
+.deco .c2{top:22%;transform:scale(.7);animation-duration:95s;animation-delay:-40s}
+.deco .c3{top:4%;transform:scale(.55);animation-duration:120s;animation-delay:-80s}
+@media(max-width:600px){.deco .sun{width:54px;height:54px;top:16px;right:5%}}
+.deco .hills{position:absolute;left:0;bottom:0;width:100%;height:160px}
+@keyframes drift{from{left:105%}to{left:-180px}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+/* scene motion */
+.bob{animation:bob 2.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.6px)}}
+.tail{transform-box:fill-box;transform-origin:0% 100%;animation:swish 2.4s ease-in-out infinite}
+@keyframes swish{0%,100%{transform:rotate(0)}50%{transform:rotate(-14deg)}}
+.fx-heart{animation:heart 1.3s ease-out forwards}
+@keyframes heart{0%{transform:translateY(4px) scale(.3);opacity:0}25%{transform:translateY(0) scale(1.15);opacity:1}100%{transform:translateY(-16px) scale(1);opacity:0}}
+.drift{animation:sdrift 40s linear infinite}
+@keyframes sdrift{from{transform:translateX(0)}to{transform:translateX(-470px)}}
+.wheel{transform-box:fill-box;transform-origin:50% 50%}
+ol.lb{list-style:none;margin:8px 0;padding:0}
+ol.lb li{display:grid;grid-template-columns:40px 1fr auto;gap:2px 10px;align-items:center;background:#fff;border-radius:14px;padding:8px 12px;margin:6px 0;box-shadow:0 3px 0 rgba(91,61,153,.10)}
+ol.lb li.me{background:#fffbe0;outline:3px solid #f2a33a}
+ol.lb li.gap{display:block;background:none;box-shadow:none;text-align:center;color:var(--muted);padding:0}
+ol.lb .rk{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:bold;background:#ece8f4;color:var(--purple);grid-row:span 2}
+ol.lb .rk1{background:#ffd95e;color:#5a3a00}
+ol.lb .rk2{background:#dde3ea;color:#33404d}
+ol.lb .rk3{background:#f0b98a;color:#5a2e0a}
+ol.lb .nm{font-weight:bold;overflow-wrap:anywhere}
+ol.lb .sc{font-weight:bold;font-size:18px;text-align:right;grid-row:span 2}
+ol.lb .gm{font-size:13px;color:var(--muted)}
+/* start screen: intro strip on top, then a big picture beside the start form, so Start round 1 needs no scrolling */
+.setupgrid{display:grid;gap:14px;align-items:start;grid-template-columns:minmax(0,1fr)}
+.setupgrid>.card{margin-bottom:0}
+.setupgrid .setupscene{order:1}.setupgrid .start{order:2}.setupgrid .hero{order:3}
+.start .lead{margin:0 0 4px;font-size:17px}
+.hero .tiles{margin:10px 0 0;grid-template-columns:1fr}
+.hero .tile{padding:6px 10px;font-size:14.5px;line-height:1.35}
+.hero .tile svg{width:30px;height:38px}
+.start .worlds{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 4px}
+.start .world{padding:6px 14px;border-radius:999px;align-items:center;box-shadow:0 3px 0 rgba(31,95,191,.15)}
+.start .world input,.start .world br,.start .world .small{display:none}
+.start .world b{font-size:16px}
+.start #pickInfo{margin:4px 0 6px;min-height:2.6em}
+.start h2{margin-bottom:4px}
+.start label{margin:6px 0 3px}
+.start p{margin:8px 0 0}
+.setupscene,.bigscene{padding:0}
+.animgrid{display:grid;gap:16px;align-items:start;grid-template-columns:minmax(0,1fr)}
+.animgrid>.card,.animside .card{margin-bottom:12px}
+.animmsg{font-size:22px;font-weight:bold;min-height:2.8em;margin:0 0 6px;color:var(--purple)}
+.qch{display:flex;flex-direction:column;gap:6px}
+.qch button{text-align:left;padding:6px 12px;font-size:15px}
+.qch button.right{border-color:var(--green);background:var(--green-bg);color:var(--green)}
+.qch button.wrong{border-color:var(--red);background:var(--red-bg);color:var(--red)}
+.qch button:disabled{opacity:1;cursor:default}
+@media(min-width:900px){
+  .setupgrid{grid-template-columns:auto minmax(340px,440px);justify-content:center}
+  .setupgrid .setupscene{order:1}.setupgrid .start{order:2}.setupgrid .hero{order:3;grid-column:1 / -1}
+  .hero .tiles{margin:0;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .bigscene{width:fit-content;max-width:100%;padding:0}
+  .bigscene .scenebox svg{height:calc(100vh - 100px);min-height:380px;max-height:860px;width:auto;max-width:calc(100vw - 500px);margin:0 auto}
+  .animgrid{grid-template-columns:auto minmax(300px,400px);justify-content:center}
+}
+
+.worlds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:8px 0 14px}
+.world{display:flex;gap:10px;align-items:flex-start;border:3px solid #fff;background:#fff;border-radius:16px;padding:10px 12px;cursor:pointer;box-shadow:0 4px 0 rgba(31,95,191,.15)}
+.world.sel{border-color:var(--blue);background:#fffbe8}
+.world input{margin-top:5px}
+.world b{font-size:17px}
+.stratgrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.adm{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;background:#fff;border-radius:12px;padding:8px 12px;margin:6px 0}
+.adm .meta{font-size:13px;color:var(--muted)}
+button.danger{background:#fff;color:var(--red);border:3px solid var(--red);border-radius:12px;padding:6px 12px;font:inherit;font-weight:bold;cursor:pointer}
+button.danger.arm{background:var(--red);color:#fff}
+/* walking cat story (rounds 2, 4, 6, 8, 10) */
+.walker{position:fixed;bottom:4px;left:0;width:120px;height:90px;z-index:5;pointer-events:none;will-change:transform}
+.walker svg{width:120px;height:90px;overflow:visible}
+.walker .leg{transform-box:fill-box;transform-origin:50% 0;animation:leg .32s ease-in-out infinite alternate}
+.walker .leg.b{animation-delay:-.32s}
+.walker .wbody{animation:wbob .32s ease-in-out infinite alternate}
+.walker .wtail{transform-box:fill-box;transform-origin:0% 100%;animation:swish 1.1s ease-in-out infinite}
+.walker.stop .leg,.walker.stop .wbody{animation:none}
+.walker.eat .whead{transform-box:fill-box;transform-origin:20% 80%;animation:chomp .22s ease-in-out 6 alternate}
+.walker .bubble{position:absolute;bottom:84px;left:40px;background:#fff;border-radius:14px;padding:4px 12px;font-weight:bold;font-size:15px;white-space:nowrap;box-shadow:0 3px 0 rgba(31,80,150,.18);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s}
+.walker.say .bubble{opacity:1;transform:none}
+.walkmark{position:fixed;bottom:4px;z-index:4;pointer-events:none;transform:translateX(-50%)}
+.walkmark .pop{animation:pop .45s ease-out}
+.walker .wsvg{transform-box:fill-box;transform-origin:50% 100%}
+.walker.flip .wsvg{transform:scaleX(-1)}
+.walker.slip .wsvg{animation:slip .9s ease-in-out}
+.walker.sniff .whead{transform-box:fill-box;transform-origin:20% 80%;animation:sniff .3s ease-in-out 5 alternate}
+@keyframes slip{0%{transform:rotate(0)}20%{transform:translateY(-14px) rotate(-28deg)}45%{transform:translateY(-4px) rotate(22deg)}70%{transform:rotate(-10deg)}100%{transform:rotate(0)}}
+@keyframes sniff{from{transform:translateY(0)}to{transform:translateY(5px)}}
+@keyframes leg{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes wbob{from{transform:translateY(0)}to{transform:translateY(-2px)}}
+@keyframes chomp{from{transform:rotate(0)}to{transform:rotate(16deg)}}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+.bufout{font-size:15px;margin-top:4px}
+.bufout:empty{display:none}
+.rlcalc{background:#fff;border-radius:12px;padding:6px 10px;margin-top:6px;font-size:15px;line-height:1.45;box-shadow:0 3px 0 rgba(31,95,191,.12)}
+.rlcalc .eqn{font-weight:bold;color:var(--blue)}
+.bufout.x{color:var(--red);font-weight:bold}
+.quiz{background:#fffbe0;border:3px solid #f2a33a;border-radius:16px;padding:10px 14px;margin:14px 0 0}
+.quiz b.q{display:block;margin-bottom:6px}
+.quiz .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.quiz input{max-width:160px}
+.quiz .fb{margin-top:6px}
+.quiz .fb.ok{color:var(--green);font-weight:bold}
+.quiz .fb.no{color:var(--red)}
+.build{background:#fff;border:3px dashed var(--purple);border-radius:16px;padding:10px 14px;margin:12px 0 0}
+.build.on{border-style:solid;background:#f3eefc}
+.opt.off{opacity:.45;cursor:not-allowed}
+.optrow.three{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:520px){.optrow.three{grid-template-columns:1fr}}
+.seg{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg button{background:#fff;border:3px solid #fff;border-radius:12px;padding:6px 12px;font:inherit;font-weight:bold;color:var(--blue);cursor:pointer;box-shadow:0 3px 0 rgba(31,95,191,.15)}
+.seg button.on{border-color:var(--blue);background:#fffbe8}
+.ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end;margin:6px 0 10px}
+.ctl label{margin:0 0 4px}
+.ctl select{width:auto}
+.bigboard ol.lb li{font-size:20px}
+header{padding:8px 20px 0}
+main{padding-top:10px}
+.roundgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);align-items:start}
+.roundgrid>*{margin-bottom:0}
+.colA .card{margin-bottom:12px}
+@media(min-width:761px){.roundgrid{grid-template-columns:minmax(0,1fr) minmax(0,1.12fr)}.roundgrid .colA,.roundgrid .colB{grid-column:1}.roundgrid .levers{grid-column:2;grid-row:1 / span 2}}
+@media(min-width:1180px){main.wide{max-width:1560px}.roundgrid{grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(380px,430px)}.roundgrid .colA{grid-column:1;grid-row:1}.roundgrid .colB{grid-column:2;grid-row:1}.roundgrid .levers{grid-column:3;grid-row:1}.colA .hud{flex-direction:column;align-items:stretch}.colA .news h2{font-size:19px}}
+.roundgrid .bar{margin-top:0}
+.levers{padding:14px 18px}
+.levers label{margin:8px 0 2px}
+.levers h3{margin-bottom:2px}
+.levers input[type=range]{margin:6px 0 2px}
+.levers .opt{padding:6px 10px;line-height:1.35}
+.levers .opt .small{font-size:13px}
+.levers>label:first-child{margin-top:0}
+.levers .ltime{font-size:17px;padding:0 0 4px;margin:0 0 4px;border:0;border-bottom:2px solid var(--line);border-radius:0;background:none}
+.levers .ltime.late{color:var(--red);border-bottom-color:var(--red)}
+.levers .quiz{padding:8px 12px}
+.levers .quiz b.q{margin-bottom:2px}
+.levers .quiz .qt{font-size:15px;line-height:1.45;margin-bottom:6px}
+.levers .quiz input{padding:5px 8px}
+.levers .quiz button{padding:5px 12px}
+.levers .quiz .fb{font-size:14px}
+.levers .hint{font-size:13px}
+.levers .bufout{font-size:14px;margin-top:2px}
+button.ghost.mini{padding:3px 10px;font-size:13px;margin-top:4px;border-width:2px}
+.opt.off button.mini{opacity:1;pointer-events:auto}
+.opt.off:has(button.mini){opacity:1}
+.opt.off:has(button.mini) b,.opt.off:has(button.mini) .small{opacity:.5}
+.build{padding:8px 12px;margin:10px 0 0}
+.build .brow{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.build .brow button{padding:5px 12px;flex:none}
+.build details>summary{font-size:14px}
+
+.levers .forecast{margin:10px 0;padding:6px 12px;line-height:1.55}
+.colA .quiz{margin:0 0 12px;padding:10px 14px}
+.colA .quiz .qt{font-size:15px;line-height:1.45;margin:2px 0 6px}
+.colA .quiz input{padding:5px 8px;max-width:150px}
+.colA .quiz .row button{padding:5px 12px}
+.rlcalc .small{font-size:12.5px;margin-top:0}
+@media(min-width:761px){.levers{position:sticky;top:10px}}
+.charth{margin:14px 0 2px;font-size:15px}
+button.primary:disabled,button.ghost:disabled{background:#c3c6cf;color:#f4f4f7;box-shadow:0 5px 0 #9a9da8;cursor:not-allowed;border-color:#c3c6cf}
+button.primary:disabled:hover{background:#c3c6cf}
+button.tip{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;margin:0 0 0 6px;border-radius:50%;border:2px solid var(--blue);background:#fff;color:var(--blue);font:bold 12px/1 Verdana,sans-serif;cursor:help;vertical-align:middle;box-shadow:none}
+button.tip:hover,button.tip:focus{background:var(--blue);color:#fff;outline:none}
+.tipbox{position:fixed;z-index:60;background:#fff;border:3px solid var(--purple);border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.45;box-shadow:0 6px 0 rgba(91,61,153,.18)}
+.tipbox b{display:block;color:var(--purple);margin-bottom:2px}
+.tipbox .eq{margin-top:6px;background:var(--purple-bg);border-radius:8px;padding:5px 8px;font-weight:bold}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="deco" aria-hidden="true"><div class="sun"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <svg class="hills" id="hills" viewBox="0 0 800 160" preserveAspectRatio="none"><path id="hillBack" d="M0 160 L0 90 Q100 30 220 90 Q320 135 430 75 Q540 20 660 85 Q730 125 800 90 L800 160Z" fill="#bfe3a2"/><path id="hillFront" d="M0 160 L0 120 Q90 80 200 118 Q290 150 400 112 Q500 78 610 118 Q700 148 800 118 L800 160Z" fill="#9fd283"/></svg></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="gCan" x1="0" x2="1"><stop offset="0" stop-color="#8f99a6"/><stop offset=".3" stop-color="#f4f6f9"/><stop offset=".65" stop-color="#c3cad3"/><stop offset="1" stop-color="#7f8895"/></linearGradient>
+  <linearGradient id="gLab" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffd36e"/><stop offset="1" stop-color="#f2932a"/></linearGradient>
+  <linearGradient id="gWood" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#deb075"/><stop offset="1" stop-color="#a8723f"/></linearGradient>
+  <linearGradient id="gPost" x1="0" x2="1"><stop offset="0" stop-color="#b98450"/><stop offset="1" stop-color="#8a5a2e"/></linearGradient>
+  <linearGradient id="gBack" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fbf0de"/><stop offset="1" stop-color="#efdcbd"/></linearGradient>
+  <linearGradient id="gSky" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8fd6ee"/><stop offset="1" stop-color="#e0f5f2"/></linearGradient>
+  <linearGradient id="gWall" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff2dd"/><stop offset="1" stop-color="#ffe2bf"/></linearGradient>
+  <linearGradient id="gGlass" x1="0" x2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".85"/><stop offset=".5" stop-color="#dff1f8" stop-opacity=".5"/><stop offset="1" stop-color="#bcdcea" stop-opacity=".75"/></linearGradient>
+  <pattern id="pFloor" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#e6d4bb"/><rect width="14" height="14" fill="#f4e9d8"/><rect x="14" y="14" width="14" height="14" fill="#f4e9d8"/></pattern>
+  <pattern id="pWall" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="1.8" fill="#f8d7ad"/><circle cx="19" cy="19" r="1.8" fill="#f8d7ad"/></pattern>
+</defs></svg>
+<header>
+  <h1><svg viewBox="0 0 24 32" width="26" height="34" aria-hidden="true"><rect width="24" height="32" rx="4" fill="url(#gCan)" stroke="#fff" stroke-width="1.5"/><rect x="1" y="10" width="22" height="13" fill="url(#gLab)"/><path d="M5 16.5 q5 -5 10 0 q-5 5 -10 0z M15 16.5 l4.5 -4 v8z" fill="#1f5fbf"/></svg>Stock Shock!</h1>
+  <nav><button id="tabPlay" data-tab="play" class="on">Play</button><button id="tabLb" data-tab="lb">Leaderboard</button><button id="tabTeacher" data-tab="teacher">Teacher</button></nav>
+</header>
+<main id="app"></main>
+
+<script>
+const Engine = (function () {
+  const CFG = {
+    price: 20,
+    cost: 12,
+    baseDemand: 800,
+    baseLead: 1,
+    cap: 4000,
+    startStock: 800,
+    rounds: 10,
+    hold: { storage: 0.4, insurance: 0.2, opportunity: 0.4 },
+    dualFee: 500,
+  };
+  CFG.holdPerUnit = CFG.hold.storage + CFG.hold.insurance + CFG.hold.opportunity;
+
+  const C = {
+    calm: { id: 'calm', title: 'Purr-fectly normal week', text: 'Nothing to report. Orders arrive on time and demand is steady at about 800 units.', demand: 800, delay: 0, priceMult: 1, tag: 'calm' },
+    quiet: { id: 'quiet', title: 'Cats on a diet', text: 'The vet says every cat in town is a bit chubby. Demand falls to 600 units. Deliveries are normal.', demand: 600, demandV1: 650, delay: 0, priceMult: 1, tag: 'demand' },
+    surge: { id: 'surge', title: 'Viral cat video', text: 'A cat eating your food gets 10 million views. Demand jumps to 1,200 units. Deliveries are normal.', demand: 1200, delay: 0, priceMult: 1, tag: 'demand' },
+    surge2: { id: 'surge2', title: 'Cat show season and a sleepy driver', text: 'Every cat in town is entering the cat show, so demand rises to 1,100 units. And the delivery driver took a cat nap: orders placed now arrive 1 week late.', demand: 1100, delay: 1, priceMult: 1, tag: 'both' },
+    licence: { id: 'licence', title: 'The office cat sat on the import licence', text: 'Imported cat food now needs an import licence, and the office cat is sitting on it. Orders placed now arrive 2 weeks late and prices rise 25% (single source).', demand: 800, delay: 2, priceMult: 1.25, tag: 'supply' },
+    lane: { id: 'lane', title: 'Giant hairball blocks the canal', text: 'A hairball the size of a whale blocks the shipping canal. Orders placed now arrive 3 weeks late.', demand: 800, delay: 3, priceMult: 1, tag: 'supply' },
+    lane2: { id: 'lane2', title: 'Port workers strike for longer naps', text: 'The port workers want three naps a day. Orders placed now arrive 2 weeks late.', demand: 800, delay: 2, priceMult: 1, tag: 'supply' },
+    spike: { id: 'spike', title: 'The tuna went on holiday', text: 'All the tuna swam off to a warmer sea. Fish is scarce, so orders placed now cost 40% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.4, tag: 'price' },
+    spike2: { id: 'spike2', title: 'Cat knocks over the tin factory', text: 'A cat pushed the tin factory\'s stock off a shelf, one tin at a time. Orders placed now cost 30% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.3, tag: 'price' },
+    licence1: { id: 'licence1', title: 'Cat burglar robs the supplier', text: 'A cat burglar raided your supplier\'s warehouse. Orders placed now arrive 1 week late.', demand: 800, delay: 1, priceMult: 1, tag: 'supply' },
+  };
+
+  const SEQ = {
+    A: ['calm', 'calm', 'surge', 'calm', 'licence', 'lane', 'spike', 'quiet', 'calm', 'surge2'],
+    B: ['calm', 'calm', 'calm', 'licence1', 'calm', 'calm', 'calm', 'quiet', 'calm', 'spike2'],
+    C: ['calm', 'surge', 'lane2', 'lane', 'spike', 'surge2', 'calm', 'licence', 'surge', 'calm'],
+  };
+  const SEQ_NAMES = { A: 'Supply crunch', B: 'Calm waters', C: 'Cascade', R: 'Random', L: 'Stable world', S: 'Unsettled world', H: 'Chaotic world' };
+  // Worlds: the ten events of a fixed set in a seeded random order, round 1 kept calm as a warm-up.
+  const WORLD_DECK = { L: 'B', S: 'A', H: 'C' };
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function seqFor(mode, seed) {
+    if (SEQ[mode]) return SEQ[mode].map((k) => C[k]);
+    if (WORLD_DECK[mode]) {
+      const deck = SEQ[WORLD_DECK[mode]], r = rng(seed), rest = deck.slice(1);
+      for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+      return [deck[0]].concat(rest).map((k) => C[k]);
+    }
+    const r = rng(seed);
+    const pool = ['calm', 'calm', 'calm', 'quiet', 'surge', 'surge2', 'licence', 'lane', 'lane2', 'spike', 'spike2', 'licence1'];
+    const out = ['calm', 'calm'];
+    while (out.length < CFG.rounds) out.push(pool[Math.floor(r() * pool.length)]);
+    return out.map((k) => C[k]);
+  }
+
+  function newState() {
+    return { round: 0, onHand: CFG.startStock, lots: [{ qty: CFG.startStock, cost: CFG.cost }], pipeline: [], total: 0, history: [] };
+  }
+
+  function reorderLevel(buffer) { return buffer + CFG.baseDemand * CFG.baseLead; }
+
+  function play(s, lev, card) {
+    s.round += 1;
+    const r = s.round;
+    const arrived = [];
+    s.pipeline = s.pipeline.filter((o) => {
+      if (o.arrive <= r) { s.lots.push({ qty: o.qty, cost: o.cost }); s.onHand += o.qty; arrived.push(o); return false; }
+      return true;
+    });
+    const startStock = s.onHand;
+    let ordered = null;
+    if (startStock <= reorderLevel(lev.buffer) && s.pipeline.length === 0) {
+      const qty = Math.min(lev.qty, CFG.cap - startStock);
+      if (qty > 0) {
+        const delay = lev.dual ? Math.min(card.delay, 1) : card.delay;
+        const pm = lev.dual ? 1 + (card.priceMult - 1) / 2 : card.priceMult;
+        const lead = CFG.baseLead + delay;
+        ordered = { qty, cost: CFG.cost * pm, arrive: r + lead, lead, delay };
+        s.pipeline.push(ordered);
+      }
+    }
+    const demand = card.demandV1 || card.demand; // original rules keep their numbers
+    const sold = Math.min(demand, s.onHand);
+    const lost = demand - sold;
+    let need = sold, cogs = 0;
+    while (need > 0) {
+      const lot = s.lots[0];
+      const take = Math.min(lot.qty, need);
+      cogs += take * lot.cost; lot.qty -= take; need -= take;
+      if (lot.qty === 0) s.lots.shift();
+    }
+    s.onHand -= sold;
+    const revenue = sold * CFG.price;
+    const holding = s.onHand * CFG.holdPerUnit;
+    const fee = lev.dual ? CFG.dualFee : 0;
+    const profit = revenue - cogs - holding - fee;
+    s.total += profit;
+    const res = { round: r, card, lev: { ...lev }, startStock, ordered, arrivedQty: arrived.reduce((a, o) => a + o.qty, 0), demand, sold, lost, endStock: s.onHand, revenue, cogs, holding, fee, profit, total: s.total, lostProfit: lost * (CFG.price - CFG.cost), stockout: lost > 0 };
+    s.history.push(res);
+    return res;
+  }
+
+  /* ---------- rules version 2 (added 2026-10-22) ----------
+     Used when a rules object R = { v: 2, hard: bool } is passed; without R the original rules above run unchanged,
+     so old score codes still give the same totals.
+     Levers: { rl: reorder level, qty: reorder quantity, sup: supplier index, build: true on the round a canning line is built,
+     bonus: true if that round's quick question was answered correctly (adds RULES.quizBonus) }.
+     New for everyone: bulk discount on big orders, cans go off after a shelf life.
+     Hard adds: lost sales cut next round's demand (goodwill), global/local suppliers, make your own (cost to make vs cost to buy),
+     capacity utilisation and productivity of the canning line. */
+  const RULES = {
+    life: 4, bulkMin: 2000, bulkDisc: 0.05, goodwill: 0.25, quizBonus: 500,
+    std: [
+      { key: 'single', name: 'Single supplier', cost: 12, lead: 1, maxDelay: 99, priceShare: 1, fee: 0 },
+      { key: 'dual', name: 'Dual supplier', cost: 12, lead: 1, maxDelay: 1, priceShare: 0.5, fee: 500 },
+    ],
+    hard: [
+      { key: 'global', name: 'Global supplier', cost: 12, lead: 2, maxDelay: 99, priceShare: 1, fee: 0 },
+      { key: 'local', name: 'Local supplier', cost: 13, lead: 1, maxDelay: 0, priceShare: 0.5, fee: 0 },
+      { key: 'make', name: 'Make your own', cost: 8, lead: 1, maxDelay: 0, priceShare: 1, fee: 0, cap: 1000, fixed: 2000, workers: 4 },
+    ],
+  };
+  const suppliers = (R) => (R && R.hard ? RULES.hard : RULES.std);
+
+  function newState2() {
+    return { round: 0, onHand: CFG.startStock, lots: [{ qty: CFG.startStock, cost: CFG.cost, r: 1 }], pipeline: [], total: 0, history: [], goodwill: 0, built: 0 };
+  }
+
+  function play2(s, lev, card, R) {
+    s.round += 1;
+    const r = s.round, sups = suppliers(R);
+    const arrived = [];
+    s.pipeline = s.pipeline.filter((o) => {
+      if (o.arrive <= r) { s.lots.push({ qty: o.qty, cost: o.cost, r }); s.onHand += o.qty; arrived.push(o); return false; }
+      return true;
+    });
+    if (R.hard && lev.build && !s.built) s.built = r;
+    let si = sups[lev.sup] ? lev.sup : 0;
+    if (sups[si].cap && !s.built) si = 0;
+    const sup = sups[si];
+    const startStock = s.onHand;
+    let ordered = null, made = 0;
+    if (startStock <= lev.rl && s.pipeline.length === 0) {
+      let qty = Math.min(lev.qty, CFG.cap - startStock);
+      if (sup.cap) qty = Math.min(qty, sup.cap);
+      if (qty > 0) {
+        const delay = Math.min(card.delay, sup.maxDelay);
+        const pm = 1 + (card.priceMult - 1) * sup.priceShare;
+        const bulk = !sup.cap && qty >= RULES.bulkMin;
+        const cost = sup.cost * pm * (bulk ? 1 - RULES.bulkDisc : 1);
+        const lead = sup.lead + delay;
+        ordered = { qty, cost, arrive: r + lead, lead, delay, sup: si, bulk };
+        s.pipeline.push(ordered);
+        if (sup.cap) made = qty;
+      }
+    }
+    const goodwillLoss = R.hard ? s.goodwill : 0;
+    const demand = Math.max(0, card.demand - goodwillLoss);
+    const sold = Math.min(demand, s.onHand);
+    const lost = demand - sold;
+    let need = sold, cogs = 0;
+    while (need > 0) {
+      const lot = s.lots[0];
+      const take = Math.min(lot.qty, need);
+      cogs += take * lot.cost; lot.qty -= take; need -= take;
+      if (lot.qty === 0) s.lots.shift();
+    }
+    s.onHand -= sold;
+    // Cans still on the shelf after `life` rounds go off and are thrown away.
+    let spoiled = 0, spoilCost = 0;
+    while (s.lots.length && r - s.lots[0].r + 1 >= RULES.life) { const lot = s.lots.shift(); spoiled += lot.qty; spoilCost += lot.qty * lot.cost; }
+    s.onHand -= spoiled;
+    const revenue = sold * CFG.price;
+    const holding = s.onHand * CFG.holdPerUnit;
+    const fee = sup.fee;
+    const fixed = R.hard && s.built ? RULES.hard[2].fixed : 0;
+    const bonus = lev.bonus ? RULES.quizBonus : 0; // right answer to that round's quick question
+    const profit = revenue - cogs - holding - fee - fixed - spoilCost + bonus;
+    s.total += profit;
+    if (R.hard) s.goodwill = Math.round((lost * RULES.goodwill) / 100) * 100; // whole cats (1 cat = 100 units)
+    const line = RULES.hard[2];
+    const res = { round: r, card, lev: { ...lev, sup: si }, startStock, ordered, arrivedQty: arrived.reduce((a, o) => a + o.qty, 0), demand, cardDemand: card.demand, goodwillLoss, sold, lost, endStock: s.onHand, revenue, cogs, holding, fee, fixed, spoiled, spoilCost, bonus, profit, total: s.total, lostProfit: lost * (CFG.price - CFG.cost), stockout: lost > 0, built: s.built, made, util: s.built ? made / line.cap : null, productivity: s.built ? made / line.workers : null, nextGoodwill: R.hard ? s.goodwill : 0 };
+    s.history.push(res);
+    return res;
+  }
+
+  function run(seq, levers, R) {
+    const s = R ? newState2() : newState();
+    seq.forEach((card, i) => (R ? play2 : play)(s, typeof levers === 'function' ? levers(i, s) : levers, card, R));
+    return s;
+  }
+
+  return { CFG, CARDS: C, SEQ, SEQ_NAMES, WORLD_DECK, RULES, suppliers, seqFor, newState, newState2, play, play2, run, reorderLevel, rng };
+})();
+if (typeof module !== 'undefined') module.exports = Engine;
+
+</script>
+<script>
+(function(){
+const CFG = Engine.CFG, $ = (s)=>document.querySelector(s);
+const app = $('#app');
+const money = (n)=> (n<0?'-$':'$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const units = (n)=> Math.round(n).toLocaleString('en-US');
+const cls = (n)=> n<0?'neg':'pos';
+let tab = 'play';
+let G = null; // game
+const defaultLev = { buf: 800, rl: 1600, qty: 1200, sup: 0, build: false }; // rl is always worked out from buf (see expLead)
+const USAGE = CFG.baseDemand; // expected usage per round for reorder level sums
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+let lbPrivate=false, gameOpts={hard:false, quiz:true};
+const WORLDS=[['L','Mostly calm, a few hiccups.'],['S','Surges, delays and price spikes.'],['H','Shock after shock.'],['R','New events every game.']];
+function startGame(name, mode, seed){
+  const old=document.getElementById('walkMark'); if(old) old.remove();
+  G = { name: name||'Player', anon: !name, private: lbPrivate, posted: false, mode, seed, hard: !!gameOpts.hard, quiz: gameOpts.quiz!==false, quizLog: [], seq: Engine.seqFor(mode, seed), s: Engine.newState2(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
+  render();
+}
+const rules=(g=G)=>({v:2,hard:!!g.hard});
+const supsFor=(hard)=>Engine.suppliers({v:2,hard});
+// Supplier actually used and this round's delivery time for a lever choice.
+function leadFor(lev,card,hard,built){
+  const sups=supsFor(hard); let si=sups[lev.sup]?lev.sup:0;
+  if(sups[si].cap&&!built&&!lev.build) si=0;
+  const sp=sups[si], delay=Math.min(card.delay,sp.maxDelay);
+  return {sp,si,delay,lead:sp.lead+delay};
+}
+const bufferFor=(rl,lead)=>rl-USAGE*lead;
+// Expected (normal) lead time of the chosen supplier: the reorder level is planned on this, as in the IB stock control model.
+const expLead=(lev,hard,built)=>leadFor(lev,{delay:0},hard,built).lead;
+const planRl=(lev,hard,built)=>lev.buf+USAGE*expLead(lev,hard,built);
+
+/* ---------- term help: "?" buttons with a definition and an equation ---------- */
+const TERMS={
+  reorder:['Reorder level','The stock level that triggers a new order. When stock falls to it, you order.','Reorder level = buffer stock + (usage x lead time)'],
+  buffer:['Buffer stock (safety stock)','The minimum stock you plan to keep (green cans), as protection against late deliveries and demand surges. Late deliveries eat into it; stock cannot go below 0.','Buffer stock = reorder level - (usage x lead time)'],
+  qty:['Reorder quantity','How many units you order each time you reorder.','Maximum stock = buffer stock + reorder quantity'],
+  usage:['Usage rate','How much stock is sold in a week. Normally 800 cans here.','Weeks of stock left = stock / usage'],
+  lead:['Lead time (delivery time)','The time between placing an order and receiving it. Shocks can make it longer.','Delivery round = order round + lead time'],
+  max:['Maximum stock level','The most stock you plan to hold, just after a delivery arrives.','Maximum stock = buffer stock + reorder quantity'],
+  holding:['Storage (holding) costs','The cost of keeping stock: storage space, insurance and security, and money tied up that could be used elsewhere.','Storage costs = units left over x $1 a round'],
+  stockout:['Stock-out','Customers want more than you have, so sales are lost.','Profit lost = lost sales x $8 per unit'],
+  bulk:['Bulk-buying discount','A lower price per unit for big orders (purchasing economies of scale). An advantage of JIC.','Cost = quantity x $12 x 0.95 (orders of 2,000 or more)'],
+  supplier:['Single or dual supplier','A single supplier is cheapest. A dual (second) supplier costs $500 a round but spreads the risk of supply shocks.','Dual: delays capped at +1 week, price rises halved'],
+  suppliers:['Global or local supplier','Global suppliers are cheaper but further away, so lead times are longer and more exposed to shocks. Local suppliers cost more but are quicker and more reliable.','Global: $12 a can, 2 weeks. Local: $13 a can, 1 week'],
+  ctm:['Cost to make vs cost to buy','Making your own has fixed costs plus a low cost per unit. Buying has no fixed cost but a higher price per unit.','CTM = fixed costs + (variable cost x quantity). CTB = price x quantity'],
+  cu:['Capacity utilisation rate','How much of the maximum possible output is actually being used.','Capacity utilisation = (actual output / maximum output) x 100'],
+  prod:['Productivity rate','How much output each worker produces.','Productivity = total output / number of workers'],
+  chart:['Stock control chart','Shows stock over time: it falls as you sell and jumps up when a delivery arrives. The gap between ordering and delivery is the lead time.','Reorder level = buffer + (usage x lead time). Maximum stock = buffer + reorder quantity'],
+  profit:['Revenue, costs and profit','Revenue is money from sales. Costs here are the cans sold, storage, fees, and cans that went off.','Revenue = units sold x $20. Profit = revenue - total costs'],
+  jit:['Just in time (JIT)','Hold little or no buffer stock. Order so deliveries arrive just as stock is needed. Low storage costs, but risky if supply is disrupted.','Buffer about 0, so reorder level = usage x lead time'],
+  jic:['Just in case (JIC)','Hold large buffer stocks in case of disruption or demand surges. Safe, but storage costs are high and stock can go off.','Large buffer: reorder level well above usage x lead time'],
+};
+const tip=(k)=>`<button type="button" class="tip" data-tip="${k}" aria-label="What is ${esc(TERMS[k][0])}?">?</button>`;
+(function(){
+  const box=document.createElement('div'); box.className='tipbox'; box.setAttribute('role','tooltip'); box.hidden=true; document.body.appendChild(box);
+  let cur=null;
+  const show=(b)=>{ const t=TERMS[b.dataset.tip]; if(!t) return; cur=b;
+    box.innerHTML=`<b>${t[0]}</b><div>${t[1]}</div><div class="eq">${t[2]}</div>`; box.hidden=false;
+    const r=b.getBoundingClientRect(), w=Math.min(320,innerWidth-24), left=Math.max(12,Math.min(innerWidth-w-12,r.left+r.width/2-w/2));
+    box.style.width=w+'px'; box.style.left=left+'px';
+    const h=box.offsetHeight, below=r.bottom+8;
+    box.style.top=(below+h>innerHeight-8&&r.top-h-8>0?r.top-h-8:below)+'px'; };
+  const hide=()=>{ box.hidden=true; cur=null; };
+  document.addEventListener('mouseover',(e)=>{ const b=e.target.closest&&e.target.closest('.tip'); if(b) show(b); });
+  document.addEventListener('mouseout',(e)=>{ const b=e.target.closest&&e.target.closest('.tip'); if(b&&b===cur&&!b.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('focusin',(e)=>{ if(e.target.classList&&e.target.classList.contains('tip')) show(e.target); });
+  document.addEventListener('focusout',(e)=>{ if(e.target===cur) hide(); });
+  // capture phase: a tap shows the help without also choosing the card the button sits on
+  document.addEventListener('click',(e)=>{ const b=e.target.closest&&e.target.closest('.tip');
+    if(b){ e.stopPropagation(); e.preventDefault(); if(cur===b&&!box.hidden) hide(); else show(b); } else if(!box.hidden) hide(); },true);
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') hide(); });
+  window.addEventListener('scroll',hide,{passive:true});
+})();
+
+/* ---------- charts ---------- */
+const CC={W:520,H:256,L:48,R:16,T:34,B:32};
+const ccX=i=>CC.L+(CC.W-CC.L-CC.R)*i/CFG.rounds, ccY=v=>CC.T+(CC.H-CC.T-CC.B)*(1-Math.max(0,Math.min(CFG.cap,v))/CFG.cap);
+// Stock control chart: stock jumps at each delivery and falls as cats buy.
+// o: {rl, buffer, qty, nowStock?, arrNow?, live?}. Live charts get ids so the sliders can move the lines.
+function stockControlChart(hist,o){
+  const {W,H,L,R,T,B}=CC, x=ccX, y=ccY, n=CFG.rounds, id=(k)=>o.live?` id="${k}"`:'';
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Stock control chart">`;
+  [0,1000,2000,3000,4000].forEach(v=>{ s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${units(v)}</text>`; });
+  for(let i=0;i<=n;i++) s+=`<text x="${x(i)}" y="${H-15}" font-size="11" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  s+=`<text x="${(W+L)/2}" y="${H-2}" font-size="11" text-anchor="middle" fill="#5b5868">Round</text>`;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(CFG.cap)}" y2="${y(CFG.cap)}" stroke="#8c1d2c" stroke-width="2"/><text x="${W-R}" y="${y(CFG.cap)-4}" font-size="11" text-anchor="end" fill="#8c1d2c">Storage limit</text>`;
+  const mx=Math.min(CFG.cap,Math.max(0,o.buffer)+o.qty);
+  s+=`<line${id('ccMax')} x1="${L}" x2="${W-R}" y1="${y(mx)}" y2="${y(mx)}" stroke="#8a5a00" stroke-width="1.5" stroke-dasharray="10 4 2 4"/><text${id('ccMaxT')} x="${W-R}" y="${y(mx)+13}" font-size="11" text-anchor="end" fill="#8a5a00">Maximum stock ${units(mx)}</text>`;
+  s+=`<line${id('ccRl')} x1="${L}" x2="${W-R}" y1="${y(o.rl)}" y2="${y(o.rl)}" stroke="#1f5fbf" stroke-width="2" stroke-dasharray="6 4"/><text${id('ccRlT')} x="${L+4}" y="${y(o.rl)-4}" font-size="11" font-weight="bold" fill="#1f5fbf">Reorder level ${units(o.rl)}</text>`;
+  s+=`<line${id('ccBf')} x1="${L}" x2="${W-R}" y1="${y(o.buffer)}" y2="${y(o.buffer)}" stroke="#1f7a45" stroke-width="2" stroke-dasharray="2 4"/><text${id('ccBfT')} x="${L+4}" y="${y(o.buffer)+13}" font-size="11" font-weight="bold" fill="#1f7a45">${o.buffer>0?'Buffer '+units(o.buffer):'No buffer'}</text>`;
+  // sawtooth line
+  let d=''; hist.forEach((h,i)=>{ d+=(i?'L':'M')+x(i)+' '+y(h.startStock)+' L'+x(i+1)+' '+y(h.endStock)+' '; });
+  if(o.nowStock!=null){ const k=hist.length; d+=(k?'L':'M')+x(k)+' '+y(k?hist[k-1].endStock:CFG.startStock)+' L'+x(k)+' '+y(o.nowStock); }
+  s+=`<path d="${d}" fill="none" stroke="#5b3d99" stroke-width="3" stroke-linejoin="round"/>`;
+  if(o.nowStock!=null) s+=`<circle cx="${x(hist.length)}" cy="${y(o.nowStock)}" r="5" fill="#5b3d99" stroke="#fff" stroke-width="2"/>`;
+  // reorder quantity arriving at each jump
+  const jump=(i,q,top)=>`<text x="${x(i)+4}" y="${y(top)+12}" font-size="10" font-weight="bold" fill="#5b3d99">+${units(q)}</text>`;
+  hist.forEach((h,i)=>{ if(h.arrivedQty>0) s+=jump(i,h.arrivedQty,h.startStock); });
+  if(o.nowStock!=null&&o.arrNow) s+=jump(hist.length,o.arrNow,o.nowStock);
+  // lead time brackets: from the round an order is placed to the round it arrives
+  let k=0; hist.forEach(h=>{ if(!h.ordered) return; const x1=x(h.round-1), x2=x(Math.min(n,h.ordered.arrive-1)), by=10+(k++%2)*11;
+    s+=`<path d="M${x1} ${by+5} V${by} H${x2} V${by+5}" fill="none" stroke="#5b5868" stroke-width="1.2"/>${x2-x1>=44?`<text x="${(x1+x2)/2}" y="${by-2}" font-size="10" text-anchor="middle" fill="#5b5868">Lead time ${h.ordered.lead}</text>`:''}`; });
+  hist.forEach((h,i)=>{ if(!h.stockout) return; const cx=x(i+1), cy=y(0);
+    s+=`<path d="M${cx-5} ${cy-11} h10 l-5 8z" fill="#8c1d2c"/><text x="${cx}" y="${cy-14-(i%2)*12}" font-size="10" text-anchor="middle" fill="#8c1d2c">Stock-out</text>`; });
+  return s+'</svg>';
+}
+// Revenue, total costs and profit for each round played, as lines.
+const PC_LINES=[['revenue','Revenue','#2f9a5d','',3],['costs','Total costs','#c0392b','7 4',3],['profit','Profit','#5b3d99','',4]];
+function profitChart(hist){
+  const W=520,H=230,L=58,R=12,T=16,B=36,n=CFG.rounds,x=i=>L+(W-L-R)*(i-0.5)/n;
+  const val=(h,k)=>k==='costs'?h.revenue-h.profit:h[k];
+  const all=hist.flatMap(h=>PC_LINES.map(([k])=>val(h,k)));
+  const top=Math.max(1000,...all), lo=Math.min(0,...all), y=v=>T+(H-T-B)*(1-(v-lo)/(top-lo));
+  const step=Math.max(2000,Math.ceil((top-lo)/4/2000)*2000);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Revenue, costs and profit each round">`;
+  for(let v=Math.ceil(lo/step)*step;v<=top;v+=step) s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${money(v)}</text>`;
+  for(let i=1;i<=n;i++) s+=`<text x="${x(i)}" y="${H-20}" font-size="11" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  s+=`<text x="${(W+L)/2}" y="${H-6}" font-size="11" text-anchor="middle" fill="#5b5868">Round</text>`;
+  if(lo<0) s+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="#5b5868"/>`;
+  PC_LINES.forEach(([k,,col,dash,wd])=>{
+    if(!hist.length) return;
+    const pts=hist.map((h,i)=>[x(i+1),y(val(h,k))]);
+    s+=`<path d="${pts.map((p,j)=>(j?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="${wd}" stroke-dasharray="${dash}" stroke-linejoin="round"/>`;
+    pts.forEach(p=>{ s+=k==='profit'?`<path d="M${p[0]} ${p[1]-5} l5 5 -5 5 -5 -5z" fill="${col}" stroke="#fff" stroke-width="1.2"/>`:k==='costs'?`<rect x="${p[0]-3.5}" y="${p[1]-3.5}" width="7" height="7" fill="${col}"/>`:`<circle cx="${p[0]}" cy="${p[1]}" r="3.8" fill="${col}"/>`; });
+  });
+  if(!hist.length) s+=`<text x="${(W+L)/2}" y="${(H-B+T)/2}" font-size="13" text-anchor="middle" fill="#5b5868">Lines appear after round 1</text>`;
+  s+='</svg>';
+  const key=([,t,col,dash,wd],k)=>`<span><svg width="34" height="12" aria-hidden="true"><line x1="1" x2="33" y1="6" y2="6" stroke="${col}" stroke-width="${wd}" stroke-dasharray="${dash}"/>${k===2?`<path d="M17 1 l5 5 -5 5 -5 -5z" fill="${col}"/>`:k===1?`<rect x="13.5" y="2.5" width="7" height="7" fill="${col}"/>`:`<circle cx="17" cy="6" r="3.8" fill="${col}"/>`}</svg>${t}</span>`;
+  return s+`<div class="rplegend">${PC_LINES.map(key).join('')}</div>`;
+}
+function ccUpdate(rl,buffer,qty){
+  const a=$('#ccRl'); if(!a) return;
+  const mx=Math.min(CFG.cap,Math.max(0,buffer)+qty), set=(k,v)=>{ $('#'+k).setAttribute('y1',ccY(v)); $('#'+k).setAttribute('y2',ccY(v)); };
+  set('ccRl',rl); $('#ccRlT').setAttribute('y',ccY(rl)-4); $('#ccRlT').textContent='Reorder level '+units(rl);
+  set('ccBf',buffer); $('#ccBfT').setAttribute('y',ccY(buffer)+13); $('#ccBfT').textContent=buffer>0?'Buffer '+units(buffer):'No buffer';
+  set('ccMax',mx); $('#ccMaxT').setAttribute('y',ccY(mx)+13); $('#ccMaxT').textContent='Maximum stock '+units(mx);
+}
+function profitBars(hist, W=640, H=240){
+  const L=56,R=10,T=16,B=34, vals=hist.map(h=>h.profit);
+  const mx=Math.max(0,...vals), mn=Math.min(0,...vals), span=(mx-mn)||1;
+  const y=v=>T+(H-T-B)*(1-(v-mn)/span), bw=(W-L-R)/hist.length;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Profit by round">`;
+  const step=Math.ceil(span/4/1000)*1000;
+  for(let v=Math.ceil(mn/step)*step; v<=mx; v+=step) s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${money(v)}</text>`;
+  hist.forEach((h,i)=>{
+    const x0=L+i*bw+6, w=bw-12, yy=y(Math.max(h.profit,0)), hh=Math.abs(y(h.profit)-y(0));
+    const col=h.stockout?'#8c1d2c':(h.profit>=0?'#5b3d99':'#8c1d2c');
+    s+=`<rect x="${x0}" y="${yy}" width="${w}" height="${Math.max(hh,1)}" fill="${col}" rx="3"/>`;
+    s+=`<text x="${x0+w/2}" y="${H-16}" font-size="11" text-anchor="middle" fill="#5b5868">${h.round}</text>`;
+    if(h.stockout) s+=`<text x="${x0+w/2}" y="${yy-4}" font-size="11" text-anchor="middle" fill="#8c1d2c">stock-out</text>`;
+  });
+  s+=`<text x="${(W+L)/2}" y="${H-2}" font-size="11" text-anchor="middle" fill="#5b5868">Round (red = stock-out)</text></svg>`;
+  return s;
+}
+function cumLines(players, W=720, H=280){
+  const L=60,R=90,T=14,B=30, n=CFG.rounds;
+  const all=players.flatMap(p=>p.cum); const mx=Math.max(1,...all), mn=Math.min(0,...all), span=(mx-mn)||1;
+  const x=i=>L+(W-L-R)*i/n, y=v=>T+(H-T-B)*(1-(v-mn)/span);
+  const cols=['#5b3d99','#1f5fbf','#1f7a45','#8c1d2c','#8a5a00'];
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Cumulative profit">`;
+  const step=Math.ceil(span/5/5000)*5000;
+  for(let v=Math.ceil(mn/step)*step; v<=mx; v+=step) s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${money(v)}</text>`;
+  for(let i=0;i<=n;i++) s+=`<text x="${x(i)}" y="${H-10}" font-size="11" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  players.forEach((p,k)=>{
+    let d=''; [0].concat(p.cum).forEach((v,i)=>{d+=(i?'L':'M')+x(i)+' '+y(v)+' ';});
+    s+=`<path d="${d}" fill="none" stroke="${cols[k%5]}" stroke-width="3"/>`;
+    s+=`<text x="${W-R+6}" y="${y(p.cum[p.cum.length-1])+4}" font-size="11" fill="${cols[k%5]}">${esc(p.name).slice(0,12)}</text>`;
+  });
+  return s+'</svg>';
+}
+
+/* ---------- warehouse scene ---------- */
+// 1 can = 100 units, 1 cat = 100 units of demand. Shelves: 4 rows of 10 slots = 4,000.
+const SC={W:420,H:394,X0:10,SW:28,TOP:106,FLOOR:266,RH:40,CATX:24,CATS:28,CATY:312};
+const FUR=[['#f0a050','#3a2a1a','#d9803a'],['#a8a8b0','#26242c','#86868f'],['#ecdcc0','#3a2a1a','#cdb894'],['#b07848','#2a1a0e','#8e5a30'],['#f7f4ef','#3a3440','#d8d2c8'],['#6c6870','#ffffff','#55515a']];
+const COINS=['c','c','c','c','c'];
+const JAR=[[368,336],[380,336],[392,336],[374,322],[386,322]];
+let fastMode=/[?&]fast\b/.test(location.search), anim=null;
+const reduceMotion=()=>!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const skipAnim=()=>fastMode||!!window.__fast||reduceMotion();
+const nCans=(u)=>Math.max(0,Math.min(40,Math.ceil(u/100)));
+const nCats=(d)=>Math.ceil(d/100);
+const sadCats=(h)=>h.lost>0?Math.min(nCats(h.demand)-(h.sold>0?1:0),Math.ceil(h.lost/100)):0;
+const rowY=(n)=>SC.FLOOR-n*SC.RH;
+const catXY=(j)=>[SC.CATX+j*SC.CATS,SC.CATY];
+const HALO='stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke"';
+function canPos(i){ return [SC.X0+(i%10)*SC.SW+3, rowY(Math.floor(i/10))-32]; }
+// Stepped line with exactly k can slots below it (filled bottom left, row by row).
+function stepPath(k){
+  k=Math.max(0,Math.min(40,k)); const r=Math.floor(k/10), c=k%10, x1=SC.X0+10*SC.SW, y=rowY(r)-1;
+  if(c===0) return {d:`M${SC.X0} ${y} H${x1}`, y};
+  return {d:`M${SC.X0} ${rowY(r+1)-1} H${SC.X0+c*SC.SW} V${y} H${x1}`, y};
+}
+function canArt(){
+  return `<rect x="1" y="1" width="20" height="3.5" rx="1.5" fill="#a9b1bc"/><rect x="1" y="26" width="20" height="3" rx="1.5" fill="#a9b1bc"/><rect x="0.5" y="9" width="21" height="13" fill="url(#gLab)"/><path d="M4 15.5 q4.5 -4.8 9.5 0 q-5 4.8 -9.5 0z M13.5 15.5 l4.2 -3.6 v7.2z" fill="#1f5fbf"/><circle cx="7" cy="14.8" r="1" fill="#fff"/><rect x="3.5" y="3" width="2.2" height="24" rx="1" fill="#fff" opacity=".55"/>`;
+}
+function canSVG(i,buf){
+  const [x,y]=canPos(i), b=i<buf;
+  return `<g data-can="${i}" transform="translate(${x},${y})"><rect class="cb" width="22" height="30" rx="4" fill="url(#gCan)" stroke="${b?'#1f7a45':'#6f7884'}" stroke-width="${b?2.5:1}"/>${canArt()}</g>`;
+}
+function catFace(mood,ink){
+  const hi=ink==='#ffffff'?'#3a3440':'#fff';
+  let eyes, mouth;
+  if(mood==='happy'){
+    eyes=`<path d="M-6.5 -0.5 q2.3 -4 4.6 0 M1.9 -0.5 q2.3 -4 4.6 0" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
+    mouth=`<path d="M-4 4.8 q2 3 4 0 q2 3 4 0" fill="none" stroke="${ink}" stroke-width="1.3" stroke-linecap="round"/>`;
+  } else if(mood==='sad'){
+    eyes=`<circle cx="-4.2" cy="0" r="2.1" fill="${ink}"/><circle cx="4.2" cy="0" r="2.1" fill="${ink}"/><circle cx="-3.6" cy="-.7" r=".7" fill="${hi}"/><circle cx="4.8" cy="-.7" r=".7" fill="${hi}"/><path d="M-7.5 -4 l5 -1.8 M7.5 -4 l-5 -1.8" stroke="${ink}" stroke-width="1.2" stroke-linecap="round"/><path d="M6 2.5 q-1.3 2.2 0 3.2 q1.3 -1 0 -3.2z" fill="#5aa7e8"/>`;
+    mouth=`<path d="M-3.5 8 q3.5 -3.5 7 0" fill="none" stroke="${ink}" stroke-width="1.3" stroke-linecap="round"/>`;
+  } else {
+    eyes=`<circle cx="-4.2" cy="-1" r="2.3" fill="${ink}"/><circle cx="4.2" cy="-1" r="2.3" fill="${ink}"/><circle cx="-3.5" cy="-1.8" r=".8" fill="${hi}"/><circle cx="4.9" cy="-1.8" r=".8" fill="${hi}"/>`;
+    mouth=`<path d="M-2.6 6.2 q1.3 1.2 2.6 0 q1.3 1.2 2.6 0" fill="none" stroke="${ink}" stroke-width="1.2" stroke-linecap="round"/>`;
+  }
+  return eyes+'<path d="M-1.8 2.4 h3.6 l-1.8 2z" fill="#e58a9a"/>'+mouth;
+}
+// Cat drawn around its head centre (0,0); sits on the floor about 26 below.
+function catArt(j,mood,delay=0){
+  const [fur,ink,dark]=FUR[j%FUR.length], ol='#3a3440', tabby=(j%FUR.length===0||j%FUR.length===3);
+  return `<g class="bob" style="animation-delay:-${delay}s">`+
+    `<path class="tail" style="animation-delay:-${delay*1.3}s" d="M7 22 q13 1 11 -13" fill="none" stroke="${ol}" stroke-width="5.6" stroke-linecap="round"/>`+
+    `<path class="tail" style="animation-delay:-${delay*1.3}s" d="M7 22 q13 1 11 -13" fill="none" stroke="${fur}" stroke-width="3.8" stroke-linecap="round"/>`+
+    `<ellipse cy="16" rx="10" ry="9.5" fill="${fur}" stroke="${ol}" stroke-width=".9"/>`+
+    `<ellipse cy="18" rx="5" ry="6" fill="#fff8ee" opacity=".85"/>`+
+    `<ellipse cx="-4.5" cy="24.5" rx="3.4" ry="2.2" fill="${fur}" stroke="${ol}" stroke-width=".8"/><ellipse cx="4.5" cy="24.5" rx="3.4" ry="2.2" fill="${fur}" stroke="${ol}" stroke-width=".8"/>`+
+    `<path d="M-10.5 -3 L-8.5 -16.5 L-1.5 -10z M10.5 -3 L8.5 -16.5 L1.5 -10z" fill="${fur}" stroke="${ol}" stroke-width=".9" stroke-linejoin="round"/>`+
+    `<path d="M-8.6 -5 L-7.8 -13 L-3.8 -9.6z M8.6 -5 L7.8 -13 L3.8 -9.6z" fill="#f4a6b4"/>`+
+    `<circle r="11.5" fill="${fur}" stroke="${ol}" stroke-width=".9"/>`+
+    (tabby?`<path d="M-3 -11 l1 4 M0 -11.5 v4.5 M3 -11 l-1 4" stroke="${dark}" stroke-width="1.4" stroke-linecap="round"/>`:'')+
+    `<circle cx="-7" cy="4" r="2.3" fill="#ff8fa3" opacity=".45"/><circle cx="7" cy="4" r="2.3" fill="#ff8fa3" opacity=".45"/>`+
+    `<path d="M-3 3.8 l-10 -1.6 M-3 5.4 l-10 2 M3 3.8 l10 -1.6 M3 5.4 l10 2" stroke="${ink}" stroke-width=".7" opacity=".7"/>`+
+    `<g class="face">${catFace(mood,ink)}</g></g>`+
+    `<g class="fx">${mood==='sad'?rainFx():''}</g>`;
+}
+function rainFx(){ return `<g transform="translate(0,-27)"><path d="M-8 2 a4 4 0 0 1 3 -6 a5 5 0 0 1 9 0 a3.6 3.6 0 0 1 4 6z" fill="#9aa3b2"/><path d="M-4 5 l-1 3 M1 5 l-1 3 M6 5 l-1 3" stroke="#4f97dc" stroke-width="1.4" stroke-linecap="round"/></g>`; }
+function heartFx(){ return `<g transform="translate(9,-20)"><g class="fx-heart"><path d="M0 4 C-7 -1 -4.5 -8 0 -3.5 C4.5 -8 7 -1 0 4z" fill="#ff5c7a" stroke="#fff" stroke-width="1"/></g></g>`; }
+function catSVG(j,mood,away){
+  let [x,y]=catXY(j);
+  if(away){ x+=8; y+=4; }
+  return `<g data-cat="${j}" data-mood="${mood}" transform="translate(${x},${y})"${away?' opacity=".7"':''}><g transform="scale(1.3)">${catArt(j,mood,(j*0.37)%2.8)}</g></g>`;
+}
+function setMood(el,mood){
+  el.setAttribute('data-mood',mood);
+  el.querySelector('.face').innerHTML=catFace(mood,FUR[+el.getAttribute('data-cat')%FUR.length][1]);
+  el.querySelector('.fx').innerHTML=mood==='sad'?rainFx():mood==='happy'?heartFx():'';
+}
+function coinSVG(t,x,y){ return `<g data-coin="${t}" transform="translate(${x},${y})"><circle r="6.6" fill="#e9c13b" stroke="#6b5520" stroke-width="1"/><circle r="4.6" fill="none" stroke="#fff" stroke-opacity=".55"/><text y="3.3" font-size="8.5" font-weight="bold" text-anchor="middle" fill="#6b5520">$</text></g>`; }
+const lostText=(h)=>`Lost sale: ${units(h.lost)} units (${money(h.lostProfit)} profit)`;
+const lostW=(t)=>Math.round(t.length*7.2+22);
+function crateText(arrNow,o){ return arrNow?`Just delivered: ${units(arrNow)}`:(o?`On order ${units(o.qty)}: arrives round ${o.arrive}`:''); }
+function truckArt(){
+  return `<g transform="translate(40,62)"><rect x="0" y="-24" width="32" height="21" rx="3" fill="#fff" stroke="#3a3440"/><rect x="3" y="-15" width="26" height="4" fill="#f29b2e"/><path d="M8 -19 q4 -3.5 8 0 q-4 3.5 -8 0z M16 -19 l3.5 -2.6 v5.2z" fill="#1f5fbf"/><path d="M32 -16 h8 l6 7 v6 h-14z" fill="#1f5fbf" stroke="#3a3440"/><path d="M34 -14 h5 l4 5 h-9z" fill="#cfe9f7"/>`+
+    `<g class="wheel"><circle cx="9" cy="-2" r="4.3" fill="#2b2a33"/><circle cx="9" cy="-2" r="1.6" fill="#c9ced6"/></g><g class="wheel"><circle cx="37" cy="-2" r="4.3" fill="#2b2a33"/><circle cx="37" cy="-2" r="1.6" fill="#c9ced6"/></g></g>`;
+}
+// o: {stock, rl, buffer, moods:[...], crate:'label', lost:h|null, hold:number|null, late:bool}
+function sceneSVG(o){
+  const buf=Math.max(0,o.buffer)/100, rl=o.rl/100, rp=stepPath(rl), bp=stepPath(buf), cans=nCans(o.stock), xr=SC.X0+10*SC.SW, W=SC.W;
+  let s=`<svg id="scene" viewBox="0 0 ${W} ${SC.H}" width="100%" role="img" aria-label="Warehouse shelves with ${cans} cans of cat food and ${o.moods.length} cat customers">`;
+  // outside: sky, hills, road
+  s+=`<rect width="${W}" height="72" fill="url(#gSky)"/><circle cx="392" cy="20" r="11" fill="#ffd95e"/><circle cx="392" cy="20" r="16" fill="#ffd95e" opacity=".3"/>`;
+  s+=`<g class="drift"><g fill="#fff" opacity=".95"><path d="M60 26 a8 8 0 0 1 14 -6 a10 10 0 0 1 18 4 a7 7 0 0 1 2 13 h-32 a6 6 0 0 1 -2 -11z"/><path d="M300 16 a6 6 0 0 1 10 -4 a8 8 0 0 1 14 3 a5 5 0 0 1 1 10 h-24 a5 5 0 0 1 -1 -9z"/><path d="M530 26 a8 8 0 0 1 14 -6 a10 10 0 0 1 18 4 a7 7 0 0 1 2 13 h-32 a6 6 0 0 1 -2 -11z"/><path d="M770 16 a6 6 0 0 1 10 -4 a8 8 0 0 1 14 3 a5 5 0 0 1 1 10 h-24 a5 5 0 0 1 -1 -9z"/></g></g>`;
+  s+=`<path d="M0 52 Q60 30 130 48 Q200 62 270 44 Q340 28 420 46 V60 H0z" fill="#a9d98f"/><rect y="56" width="${W}" height="16" fill="#8d8a96"/><path d="M0 64 H${W}" stroke="#fff" stroke-width="2" stroke-dasharray="12 10"/>`;
+  if(o.late) s+=`<g transform="translate(300,48)"><rect x="2" y="6" width="3" height="16" fill="#5b5868"/><rect x="39" y="6" width="3" height="16" fill="#5b5868"/><rect width="44" height="9" rx="2" fill="#fff" stroke="#8c1d2c" stroke-width="1.5"/><path d="M6 0 l-6 9 M16 0 l-6 9 M26 0 l-6 9 M36 0 l-6 9 M44 2 l-5 7" stroke="#d6283a" stroke-width="4"/><text x="22" y="-4" font-size="11" font-weight="bold" text-anchor="middle" fill="#8c1d2c" ${HALO}>Delays</text></g>`;
+  s+=`<g id="scCrate"${o.crate?'':' display="none"'}><g id="scTruck">${truckArt()}</g><text id="scCrateT" x="92" y="40" font-size="13" font-weight="bold" fill="#1d1b25" ${HALO}>${o.crate||''}</text></g>`;
+  // shop: awning, wall, floor
+  s+=`<rect y="72" width="${W}" height="${SC.H-72}" fill="url(#gWall)"/><rect y="72" width="${W}" height="200" fill="url(#pWall)"/>`;
+  let aw=''; for(let k=0;k<15;k++){ const c=k%2?'#fff6ea':'#e8584f'; aw+=`<rect x="${k*30}" y="72" width="30" height="13" fill="${c}"/><circle cx="${k*30+15}" cy="85" r="15" fill="${c}"/>`; }
+  s+=`<clipPath id="awClip"><rect y="72" width="${W}" height="20"/></clipPath><g clip-path="url(#awClip)">${aw}</g><rect y="72" width="${W}" height="3" fill="#b8423b"/>`;
+  s+=`<rect y="${SC.FLOOR+6}" width="${W}" height="${SC.H-SC.FLOOR-6}" fill="url(#pFloor)"/><rect y="${SC.FLOOR+2}" width="${W}" height="6" fill="#c98f5a"/>`;
+  s+=`<g transform="translate(318,112)"><path d="M18 0 L36 -10 L54 0" fill="none" stroke="#8a5a2e" stroke-width="2"/><rect x="0" y="0" width="90" height="46" rx="8" fill="url(#gWood)" stroke="#8a5a2e" stroke-width="2"/><rect x="5" y="5" width="80" height="36" rx="5" fill="#fff8ec"/><text x="45" y="21" font-size="11" font-weight="bold" text-anchor="middle" fill="#8a5a2e">CAT FOOD</text><path d="M30 31 q7 -7 15 0 q-8 7 -15 0z M45 31 l6 -5 v10z" fill="#f29b2e"/><circle cx="35" cy="30" r="1.1" fill="#3a2a1a"/></g>`;
+  // shelving unit
+  s+=`<rect x="${SC.X0-6}" y="${SC.TOP-4}" width="${xr-SC.X0+12}" height="${SC.FLOOR-SC.TOP+10}" rx="4" fill="url(#gBack)"/>`;
+  for(let i=0;i<40;i++){ const [x,y]=canPos(i); s+=`<rect data-slot="${i}" x="${x}" y="${y}" width="22" height="30" rx="4" fill="none" stroke="${i<buf?'#1f7a45':'#e0cfb2'}" stroke-dasharray="3 2"/>`; }
+  for(let n=0;n<4;n++) s+=`<rect x="${SC.X0-6}" y="${rowY(n)}" width="${xr-SC.X0+12}" height="6" rx="1.5" fill="url(#gWood)"/><rect x="${SC.X0-4}" y="${rowY(n)+6}" width="${xr-SC.X0+8}" height="3" fill="#000" opacity=".08"/>`;
+  s+=`<rect x="${SC.X0-8}" y="${SC.TOP-4}" width="6" height="${SC.FLOOR-SC.TOP+12}" rx="2" fill="url(#gPost)"/><rect x="${xr+2}" y="${SC.TOP-4}" width="6" height="${SC.FLOOR-SC.TOP+12}" rx="2" fill="url(#gPost)"/>`;
+  s+=`<rect x="${SC.X0-8}" y="${SC.TOP-2}" width="${xr-SC.X0+16}" height="3" fill="#8c1d2c"/><text x="${SC.X0-4}" y="${SC.TOP-8}" font-size="12" font-weight="bold" fill="#8c1d2c" ${HALO}>Storage limit 4,000</text>`;
+  s+=`<g id="scCans">${Array.from({length:cans},(_,i)=>canSVG(i,buf)).join('')}</g>`;
+  s+=`<path id="scBf" data-cans="${buf}" d="${bp.d}" fill="none" stroke="#1f7a45" stroke-width="3" stroke-dasharray="2 4" stroke-linecap="round"/><text id="scBfT" x="${xr+12}" y="${bp.y+14}" font-size="13" font-weight="bold" fill="#1f7a45" ${HALO}>${o.buffer>0?'Buffer':'No buffer'}</text>`;
+  s+=`<path id="scRl" data-cans="${rl}" d="${rp.d}" fill="none" stroke="#1f5fbf" stroke-width="3" stroke-dasharray="7 4"/><text id="scRlT" x="${xr+12}" y="${rp.y-5}" font-size="13" font-weight="bold" fill="#1f5fbf" ${HALO}>Reorder level</text>`;
+  s+=`<g id="scCats">${o.moods.map((m,j)=>catSVG(j,m,m==='sad')).join('')}</g>`;
+  if(o.hold!=null){
+    s+=`<rect x="354" y="284" width="52" height="7" rx="3" fill="#b07848"/><path d="M356 291 h48 v52 q0 7 -7 7 h-34 q-7 0 -7 -7z" fill="url(#gGlass)" stroke="#6f7a88" stroke-width="1.5"/><rect x="361" y="296" width="3" height="40" rx="1.5" fill="#fff" opacity=".8"/>`;
+    s+=`<g id="scCoins">${o.hold>0?COINS.map((t,k)=>coinSVG(t,...JAR[k])).join(''):''}</g>`;
+    s+=`<text id="scHoldT" x="${W-6}" y="386" font-size="13" font-weight="bold" text-anchor="end" fill="#1d1b25" ${HALO}>${o.hold>0?'Storage costs '+money(o.hold):''}</text>`;
+  }
+  const lt=o.lost?lostText(o.lost):'';
+  s+=`<g id="scLost"${o.lost?'':' display="none"'}><rect id="scLostB" x="6" y="356" width="${lostW(lt)}" height="22" rx="11" fill="#8c1d2c"/><text id="scLostT" x="17" y="371" font-size="12" font-weight="bold" fill="#fff">${lt}</text></g>`;
+  s+=`<g id="scFly"></g></svg>`;
+  return s;
+}
+function showLost(h){ const t=lostText(h); $('#scLost').removeAttribute('display'); $('#scLostT').textContent=t; $('#scLostB').setAttribute('width',lostW(t)); }
+function sceneLevers(rlUnits,buffer){
+  const sv=$('#scene'); if(!sv) return;
+  const buf=Math.max(0,buffer)/100, rl=rlUnits/100;
+  $('#scBfT').textContent=buffer>0?'Buffer':'No buffer';
+  const _=0, rp=stepPath(rl), bp=stepPath(buf);
+  const a=$('#scRl'); a.setAttribute('d',rp.d); a.setAttribute('data-cans',rl); $('#scRlT').setAttribute('y',rp.y-5);
+  const b=$('#scBf'); b.setAttribute('d',bp.d); b.setAttribute('data-cans',buf); $('#scBfT').setAttribute('y',bp.y+14);
+  sv.querySelectorAll('[data-slot]').forEach(el=>el.setAttribute('stroke',+el.getAttribute('data-slot')<buf?'#1f7a45':'#e0cfb2'));
+  sv.querySelectorAll('[data-can]').forEach(el=>{ const on=+el.getAttribute('data-can')<buf, r=el.querySelector('.cb'); r.setAttribute('stroke',on?'#1f7a45':'#6f7884'); r.setAttribute('stroke-width',on?2.5:1); });
+}
+function setCrate(label){ const g=$('#scCrate'); if(!g) return; if(label){ g.removeAttribute('display'); $('#scCrateT').textContent=label; } else g.setAttribute('display','none'); }
+function bigCat(j,mood){ return `<svg viewBox="-20 -34 40 64" width="80" height="128" aria-hidden="true">${catArt(j,mood,0)}</svg>`; }
+
+/* ---------- run animation ---------- */
+function tween(el,from,to,ms,a){
+  return new Promise(res=>{
+    const t0=performance.now();
+    const step=(now)=>{
+      if(a.cancel) return res();
+      const p=Math.min(1,(now-t0)/ms), e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+      el.setAttribute('transform',`translate(${from[0]+(to[0]-from[0])*e},${from[1]+(to[1]-from[1])*e})`);
+      if(p<1) requestAnimationFrame(step); else res();
+    };
+    requestAnimationFrame(step);
+  });
+}
+function animView(h,crate){
+  const late=h.ordered?h.ordered.delay>0:leadFor(h.lev,h.card,G.hard,h.built).delay>0;
+  window.scrollTo(0,0);
+  app.innerHTML=`
+  <div class="animgrid">
+    <div class="card stage bigscene"><div class="scenebox">${sceneSVG({stock:h.startStock,rl:h.lev.rl,buffer:h.lev.buf!=null?h.lev.buf:bufferFor(h.lev.rl,expLead(h.lev,G.hard,h.built)),moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0,late})}</div></div>
+    <div class="animside">
+      <div class="bar"><i style="width:${(h.round-1)/CFG.rounds*100}%"></i></div>
+      ${cardView(h.card,h.round)}
+      <div class="card"><p id="animMsg" class="animmsg" aria-live="polite"></p>
+      <p><button class="ghost" id="skip">Skip animation</button></p></div>
+    </div>
+  </div>`;
+}
+// Driven only by the result object h from Engine.play.
+async function runAnim(h,crate){
+  app.classList.add('wide');
+  animView(h,crate);
+  const a=anim={cancel:false,done:false};
+  const finish=()=>{ if(a.done) return; a.done=true; a.cancel=true; if(tab==='play'&&anim===a) render(); };
+  $('#skip').onclick=finish;
+  const STOP={}, wait=async(p)=>{ await p; if(a.cancel) throw STOP; };
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const msg=(t)=>{ $('#animMsg').textContent=t; };
+  const sv=$('#scene'), cansG=$('#scCans'), fly=$('#scFly');
+  try{
+    // 1. Order
+    const due=G.s.pipeline.find(o=>o.arrive>h.round);
+    if(h.ordered){
+      setCrate(`Order ${units(h.ordered.qty)}: arrives round ${h.ordered.arrive}`);
+      await wait(tween($('#scTruck'),[-120,0],[0,0],700,a));
+      msg(`Hit the reorder level: ordering ${units(h.ordered.qty)}`);
+      await wait(sleep(1100));
+    } else {
+      setCrate(due?crateText(0,due):null);
+      msg(due?'Order already on the way':'Above the reorder level: no order');
+      await wait(sleep(700));
+    }
+    // 2. Customers
+    const cats=[...sv.querySelectorAll('[data-cat]')], nc=cats.length, sad=sadCats(h), happy=nc-sad, per=Math.min(300,2400/nc);
+    msg(`Cats want ${units(h.demand)}`);
+    for(let j=0;j<happy;j++){
+      const el=cats[j], [cx,cy]=catXY(j), want=nCans(h.startStock-h.sold*(j+1)/happy), flights=[];
+      await wait(tween(el,[cx,cy],[cx,cy-8],per*.3,a));
+      while(cansG.children.length>want){
+        const c=cansG.lastElementChild, [x,y]=canPos(+c.getAttribute('data-can'));
+        c.removeAttribute('data-can'); fly.appendChild(c);
+        flights.push(tween(c,[x,y],[cx-11,cy-62],per*.5,a).then(()=>c.remove()));
+      }
+      await wait(Promise.all(flights));
+      setMood(el,'happy');
+      await wait(tween(el,[cx,cy-8],[cx,cy],per*.2,a));
+    }
+    while(cansG.children.length>nCans(h.endStock+h.spoiled)) cansG.lastElementChild.remove();
+    if(sad){
+      msg(`Shelves empty! ${units(h.lost)} sales lost`);
+      const ps=[];
+      for(let j=happy;j<nc;j++){ const el=cats[j], [cx,cy]=catXY(j); setMood(el,'sad'); ps.push(tween(el,[cx,cy],[cx+8,cy+4],600,a).then(()=>el.setAttribute('opacity','.55'))); }
+      showLost(h);
+      await wait(Promise.all(ps)); await wait(sleep(900));
+    } else { msg(`All fed: ${units(h.sold)} sold`); await wait(sleep(500)); }
+    // 3. Cans past their shelf life are thrown away
+    if(h.spoiled>0){
+      msg(`${units(h.spoiled)} cans went off: -${money(h.spoilCost)}`);
+      const gone=[]; while(cansG.children.length>nCans(h.endStock)) gone.push(cansG.firstElementChild&&cansG.removeChild(cansG.lastElementChild));
+      await wait(sleep(1300));
+    }
+    // 4. Storage cost
+    if(h.endStock>0){
+      msg(`${units(h.endStock)} left over: -${money(h.holding)} storage costs`);
+      const coins=$('#scCoins'), left=cansG.children.length, ps=[];
+      COINS.forEach((t,k)=>{
+        const [x,y]=canPos(Math.floor((k+.5)*left/COINS.length)), from=[x+11,y+15];
+        coins.insertAdjacentHTML('beforeend',coinSVG(t,...from));
+        const el=coins.lastElementChild;
+        ps.push(sleep(k*160).then(()=>tween(el,from,JAR[k],700,a)));
+      });
+      await wait(Promise.all(ps));
+      $('#scHoldT').textContent='Storage costs '+money(h.holding);
+      await wait(sleep(1000));
+    } else { msg('Nothing left over: no storage costs'); await wait(sleep(800)); }
+    finish();
+  }catch(e){ if(e!==STOP) { finish(); throw e; } }
+}
+
+/* ---------- final replay ---------- */
+let rp=null;
+function replayLines(bm){
+  return [
+    {key:'you',name:'You',who:'you',h:G.s.history,col:'#5b3d99',w:4,dash:''},
+    {key:'jit',name:'Pure JIT',who:'pure JIT',h:bm[0].s.history,col:'#86828f',w:2.5,dash:''},
+    {key:'jic',name:'Pure JIC',who:'pure JIC',h:bm[1].s.history,col:'#86828f',w:2.5,dash:'8 5'},
+    {key:'hyb',name:'Hybrid',who:'the hybrid',h:bm[2].s.history,col:'#86828f',w:2.5,dash:'2 4',opt:true},
+  ].map(L=>({...L, stock:[CFG.startStock].concat(L.h.map(h=>h.endStock)), cum:[0].concat(L.h.map(h=>h.total))}));
+}
+const RP={W:540,H:250,L:66,R:104,T:16,B:32};
+function rpScale(kind,lines){
+  const n=CFG.rounds, x=i=>RP.L+(RP.W-RP.L-RP.R)*i/n;
+  let mn=0, mx=CFG.cap;
+  if(kind==='cum'){ const all=lines.flatMap(L=>L.cum); mn=Math.min(0,...all); mx=Math.max(1,...all); }
+  const y=v=>RP.T+(RP.H-RP.T-RP.B)*(1-(v-mn)/((mx-mn)||1));
+  return {x,y,mn,mx};
+}
+function rpChart(kind,lines){
+  const {x,y,mn,mx}=rpScale(kind,lines), n=CFG.rounds;
+  let s=`<svg id="rp-${kind}" viewBox="0 0 ${RP.W} ${RP.H}" width="100%" role="img" aria-label="${kind==='stock'?'Stock at end of each week':'Total profit so far'}, replay">`;
+  const ticks=kind==='stock'?[0,1000,2000,3000,4000]:(()=>{ const st=Math.ceil((mx-mn)/4/5000)*5000||5000, out=[]; for(let v=Math.ceil(mn/st)*st;v<=mx;v+=st) out.push(v); return out; })();
+  ticks.forEach(v=>{ s+=`<line x1="${RP.L}" x2="${RP.W-RP.R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${RP.L-6}" y="${y(v)+4}" font-size="13" text-anchor="end" fill="#5b5868">${kind==='stock'?units(v):money(v)}</text>`; });
+  for(let i=0;i<=n;i++) s+=`<text x="${x(i)}" y="${RP.H-12}" font-size="13" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  s+=`<text x="${(RP.W-RP.R+RP.L)/2}" y="${RP.H-1}" font-size="13" text-anchor="middle" fill="#5b5868">Round</text>`;
+  s+=`<line id="rp-${kind}-cur" y1="${RP.T}" y2="${RP.H-RP.B}" stroke="#bcd2f3" stroke-width="2"/>`;
+  lines.slice().reverse().forEach(L=>{
+    s+=`<path id="rp-${kind}-${L.key}" fill="none" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}" stroke-linejoin="round"/><text id="rp-${kind}-${L.key}-l" font-size="13" fill="${L.key==='you'?L.col:'#5b5868'}"${L.key==='you'?' font-weight="bold"':''}>${esc(L.name.slice(0,12))}</text>`;
+  });
+  if(kind==='stock') lines[0].h.forEach((h,i)=>{ if(!h.stockout) return;
+    const cx=x(i+1), cy=y(h.endStock), ty=cy-15-(i%2)*14;
+    s+=`<g class="rp-so" data-round="${i+1}" display="none"><path d="M${cx-6} ${cy-12} h12 l-6 9z" fill="#8c1d2c"/><text x="${cx}" y="${ty}" font-size="11" text-anchor="middle" fill="#8c1d2c">Stock-out</text></g>`; });
+  return s+'</svg>';
+}
+function replayCard(lines){
+  return `<div class="card" id="replay"><h2>Replay your game</h2>
+    ${lines.some(L=>L.other)?'<p class="hint">Coloured dashed lines: the last other players in this world. They had the same events in a different order.</p>':''}
+    <div id="rpNews" class="rpnews"></div>
+    <div id="rpLegend" class="rplegend"></div>
+    <h3>Stock left each round</h3>${rpChart('stock',lines)}
+    <h3>Profit so far</h3>${rpChart('cum',lines)}
+    <p id="rpCap" class="rpcap" aria-live="polite"></p>
+    <div class="rpctl">
+      <button class="ghost" id="rpPlay">Play</button><button class="ghost" id="rpPause">Pause</button><button class="ghost" id="rpRestart">Restart</button>
+      <label class="small inl">Speed <select id="rpSpeed"><option value="1">1x</option><option value="2">2x</option></select></label>
+      <label class="small inl"><input type="checkbox" id="rpHyb"> Show hybrid</label>
+    </div>
+    <label for="rpScrub">Replay round: <span class="out" id="rpRd">0</span> of ${CFG.rounds}</label>
+    <input type="range" id="rpScrub" min="0" max="${CFG.rounds}" step="1" value="0">
+    <p><button class="primary" id="rpAgain">Replay with different levers</button></p>
+  </div>`;
+}
+function rpChips(c){
+  const ch=[];
+  ch.push(c.demand!==CFG.baseDemand?`<span class="chip">Demand ${units(c.demand)}</span>`:`<span class="chip g">Demand ${units(c.demand)}</span>`);
+  ch.push(c.delay>0?`<span class="chip">Delay +${c.delay} week${c.delay>1?'s':''}</span>`:'<span class="chip g">No delay</span>');
+  ch.push(c.priceMult>1?`<span class="chip">Price +${Math.round((c.priceMult-1)*100)}%</span>`:'<span class="chip g">Normal price</span>');
+  return ch.join('');
+}
+function rpText(n){
+  const vis=rp.lines.filter(L=>!L.opt||rp.hyb);
+  $('#rpRd').textContent=n; $('#rpScrub').value=n;
+  $('#rpNews').innerHTML=n===0?`<b>Start: everyone has ${units(CFG.startStock)} units in stock</b>`:`<b>Round ${n}: ${esc(G.seq[n-1].title)}</b>${rpChips(G.seq[n-1])}`;
+  $('#rpLegend').innerHTML=vis.map(L=>`<span><svg width="30" height="10" aria-hidden="true"><line x1="0" x2="30" y1="5" y2="5" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}"/></svg>${esc(L.name)}${L.other?' (other order)':''}: <b data-key="${L.key}" data-total="${Math.round(L.cum[n])}">${money(L.cum[n])}</b></span>`).join('');
+  if(n===0){ $('#rpCap').textContent='Round 0: same start for everyone.'; return; }
+  const parts=vis.map(L=>{ const h=L.h[n-1]; return `${L.name.slice(0,14)} ${units(h.endStock)}${h.lost?` (lost ${units(h.lost)} sales)`:''}`; });
+  $('#rpCap').textContent=`Round ${n}, ${G.seq[n-1].title}. Stock left: ${parts.join(', ')}.`;
+}
+function rpDraw(t){
+  if(rp.reduce) t=Math.floor(t);
+  const n=Math.floor(t), f=t-n;
+  ['stock','cum'].forEach(kind=>{
+    const {x,y}=rpScale(kind,rp.lines), labs=[];
+    rp.lines.forEach(L=>{
+      const show=!L.opt||rp.hyb, arr=L[kind], pts=arr.slice(0,n+1).map((v,i)=>[i,v]);
+      if(f>0&&n<CFG.rounds) pts.push([n+f,arr[n]+(arr[n+1]-arr[n])*f]);
+      const p=$(`#rp-${kind}-${L.key}`), lb=$(`#rp-${kind}-${L.key}-l`);
+      p.setAttribute('d',pts.map((q,i)=>(i?'L':'M')+x(q[0]).toFixed(1)+' '+y(q[1]).toFixed(1)).join(' '));
+      p.setAttribute('display',show?'inline':'none'); lb.setAttribute('display',show?'inline':'none');
+      const last=pts[pts.length-1]; if(show) labs.push({lb,x:x(last[0])+7,y:y(last[1])+4});
+    });
+    labs.sort((a,b)=>a.y-b.y); for(let i=1;i<labs.length;i++) if(labs[i].y-labs[i-1].y<14) labs[i].y=labs[i-1].y+14;
+    const over=labs.length?labs[labs.length-1].y-(RP.H-RP.B+4):0; if(over>0) labs.forEach(l=>{ l.y-=over; }); // keep names inside the chart
+    labs.forEach(l=>{ l.lb.setAttribute('x',l.x); l.lb.setAttribute('y',l.y); });
+    const cur=$(`#rp-${kind}-cur`); cur.setAttribute('x1',x(t)); cur.setAttribute('x2',x(t));
+  });
+  document.querySelectorAll('.rp-so').forEach(g=>g.setAttribute('display',+g.getAttribute('data-round')<=n?'inline':'none'));
+  if(n!==rp.n){ rp.n=n; rpText(n); }
+}
+// The last three other players in the same world and level, added to the replay once the leaderboard loads.
+const OTHER_STYLE=[['#e07b39','6 3'],['#2a9d8f','10 3 2 3'],['#d65db1','2 3']];
+async function rpLoadOthers(g){
+  try{
+    const data=await lbFetch(), me=g.name.trim().slice(0,24).toLowerCase();
+    const rows=Object.values(data).map(lbCheck).filter(r=>r&&r.mode===g.mode&&r.hard===!!g.hard&&r.name.toLowerCase()!==me).sort((a,b)=>b.at-a.at);
+    const seen=new Set(), pick=[];
+    for(const r of rows){ const k=r.name.toLowerCase(); if(seen.has(k)) continue; seen.add(k); pick.push(r); if(pick.length===3) break; }
+    if(!pick.length||G!==g||!rp||!rp.el.isConnected) return;
+    const others=pick.map((r,k)=>({key:'o'+k,name:r.name,who:r.name,h:r.hist,col:OTHER_STYLE[k][0],w:2.5,dash:OTHER_STYLE[k][1],other:true}))
+      .map(L=>({...L,stock:[CFG.startStock].concat(L.h.map(h=>h.endStock)),cum:[0].concat(L.h.map(h=>h.total))}));
+    const lines=rp.lines.filter(L=>!L.other).concat(others), keep={t:rp.t,playing:rp.playing,hyb:rp.hyb,speed:rp.speed};
+    rp.playing=false; rp.el.outerHTML=replayCard(lines); rpInit(lines,keep);
+  }catch(e){}
+}
+function rpLoop(){
+  const r=rp; if(r.raf) return;
+  let last=null;
+  const step=(now)=>{
+    r.raf=null;
+    if(rp!==r||!r.el.isConnected||!r.playing) return;
+    if(last!=null) r.t=Math.min(CFG.rounds,r.t+(now-last)/1000*r.speed);
+    last=now; rpDraw(r.t);
+    if(r.t>=CFG.rounds){ r.playing=false; return; }
+    r.raf=requestAnimationFrame(step);
+  };
+  r.raf=requestAnimationFrame(step);
+}
+function rpInit(lines,keep){
+  const still=reduceMotion()||fastMode||!!window.__fast;
+  rp={lines,el:$('#replay'),t:still?CFG.rounds:0,n:-1,playing:!still,speed:1,hyb:false,reduce:reduceMotion(),raf:null,...(keep||{})};
+  if(keep){ $('#rpHyb').checked=rp.hyb; $('#rpSpeed').value=String(rp.speed); }
+  rpDraw(rp.t);
+  const play=()=>{ if(rp.t>=CFG.rounds){ rp.t=0; } rp.playing=true; rpLoop(); };
+  $('#rpPlay').onclick=play;
+  $('#rpPause').onclick=()=>{ rp.playing=false; };
+  $('#rpRestart').onclick=()=>{ rp.t=0; rpDraw(0); play(); };
+  $('#rpSpeed').onchange=()=>{ rp.speed=+$('#rpSpeed').value; };
+  $('#rpHyb').onchange=()=>{ rp.hyb=$('#rpHyb').checked; rp.n=-1; rpDraw(rp.t); };
+  $('#rpScrub').oninput=()=>{ rp.playing=false; rp.t=+$('#rpScrub').value; rpDraw(rp.t); };
+  $('#rpAgain').onclick=()=>startGame(G.name,G.mode,G.seed);
+  if(rp.playing) rpLoop();
+}
+
+/* ---------- walking cat ----------
+   Every third round a cat strolls along the bottom of the screen, stops, and either takes a bite out of the
+   background hills or leaves a polite little poo. Purely decorative: skipped in fast mode and reduced motion. */
+// A different cat each walk: orange tabby, grey tabby, black, brown tabby, cream.
+const WALKER_COATS=[['#f0a050','#d9803a'],['#a8a8b0','#7e7e88'],['#4a4650','#2e2b33'],['#b07848','#8a5a30'],['#ecdcc0','#cdb894']];
+function walkerSVG(n=1){
+  const [fur,dk]=WALKER_COATS[(n-1)%WALKER_COATS.length], ol='#3a2a1a', eye=(n-1)%WALKER_COATS.length===2?'#ffd95e':ol;
+  const leg=(x,b)=>`<rect class="leg${b?' b':''}" x="${x}" y="52" width="9" height="24" rx="4.5" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>`;
+  return `<svg class="wsvg" viewBox="0 0 120 90" aria-hidden="true">
+    <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${ol}" stroke-width="9" stroke-linecap="round"/>
+    <path class="wtail" d="M18 46 q-16 -6 -10 -30" fill="none" stroke="${fur}" stroke-width="6" stroke-linecap="round"/>
+    ${leg(24,1)}${leg(66,0)}
+    <g class="wbody"><ellipse cx="50" cy="50" rx="34" ry="18" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>
+      <ellipse cx="54" cy="58" rx="20" ry="8" fill="#fff3e2"/>
+      <path d="M36 36 q2 8 0 14 M48 33 q2 9 0 16 M60 34 q2 8 0 14" stroke="${dk}" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <g class="whead"><path d="M76 24 L80 6 L90 18z M98 18 L106 4 L108 24z" fill="${fur}" stroke="${ol}" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M80 18 L81 11 L86 17z M101 17 L105 9 L105.5 20z" fill="#f4a6b4"/>
+        <circle cx="92" cy="32" r="17" fill="${fur}" stroke="${ol}" stroke-width="1.5"/>
+        <path d="M86 17 l1 5 M92 16 v5 M98 17 l-1 5" stroke="${dk}" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="88" cy="30" r="2.8" fill="${eye}"/><circle cx="100" cy="30" r="2.8" fill="${eye}"/><circle cx="89" cy="29" r="1" fill="#fff"/><circle cx="101" cy="29" r="1" fill="#fff"/>
+        <circle cx="84" cy="37" r="3" fill="#ff8fa3" opacity=".5"/><circle cx="104" cy="37" r="3" fill="#ff8fa3" opacity=".5"/>
+        <path d="M93 34 h3.5 l-1.75 2.2z" fill="#e58a9a"/><path d="M91 38 q2 2 3.8 0 q2 2 3.8 0" fill="none" stroke="${ol}" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M100 35 l12 -2 M100 37 l12 2" stroke="${ol}" stroke-width=".8"/></g></g>
+    ${leg(32,0)}${leg(74,1)}
+  </svg><div class="bubble"></div>`;
+}
+function pooSVG(){
+  return `<svg viewBox="0 0 34 30" width="34" height="30" aria-hidden="true"><ellipse cx="17" cy="27" rx="14" ry="3" fill="#000" opacity=".12"/>
+    <path d="M4 26 q-2 -7 6 -8 h14 q8 1 6 8z" fill="#8a5a33"/><path d="M8 18 q-1 -6 6 -6 h7 q6 1 5 6z" fill="#9a6a3f"/><path d="M12 12 q1 -5 6 -6 q3 2 2 6z" fill="#a8774a"/>
+    <circle cx="13" cy="22" r="1.4" fill="#2a1a0e"/><circle cx="21" cy="22" r="1.4" fill="#2a1a0e"/><path d="M15 24.5 q2 1.6 4 0" fill="none" stroke="#2a1a0e" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M28 6 l1 2.5 2.5 1 -2.5 1 -1 2.5 -1 -2.5 -2.5 -1 2.5 -1z" fill="#ffd95e"/></svg>`;
+}
+function flowerSVG(){
+  return `<svg viewBox="0 0 34 48" width="34" height="48" aria-hidden="true"><path d="M17 46 V22" stroke="#4c9a3a" stroke-width="3" stroke-linecap="round"/><path d="M17 36 q-10 -2 -12 -9 q9 0 12 7z M17 32 q10 -2 12 -9 q-9 0 -12 7z" fill="#6cbf4f"/>
+    ${[0,72,144,216,288].map(a=>`<ellipse cx="17" cy="9" rx="5" ry="8" fill="#ff8fb3" stroke="#d9608a" transform="rotate(${a} 17 16)"/>`).join('')}<circle cx="17" cy="16" r="4.5" fill="#ffd95e" stroke="#d9a520"/></svg>`;
+}
+function smearSVG(){
+  return `<svg viewBox="0 0 70 16" width="70" height="16" aria-hidden="true"><path d="M2 11 q8 -7 22 -5 q14 -3 26 0 q12 1 18 5 q-6 4 -20 3 q-14 2 -28 0 q-14 1 -18 -3z" fill="#7a4a26"/><path d="M14 9 q10 -3 22 -1 M40 9 q8 -2 16 1" stroke="#a8774a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+}
+// Where the story happens: a free side margin on wide screens, otherwise near the bottom right.
+function walkSpot(){ const W=innerWidth, main=$('#app').getBoundingClientRect(), right=W-main.right; return right>=150?Math.round(main.right+right/2):Math.round(W-170); }
+function walkMark(){
+  let m=document.getElementById('walkMark');
+  if(!G||!G.mark||skipAnim()){ if(m) m.remove(); return null; }
+  if(!m){ m=document.createElement('div'); m.id='walkMark'; m.className='walkmark'; document.body.appendChild(m); }
+  if(m.dataset.k!==G.mark){ m.dataset.k=G.mark; m.innerHTML=`<div class="pop">${G.mark==='flower'?flowerSVG():G.mark==='poo'?pooSVG():smearSVG()}</div>`; }
+  m.style.left=walkSpot()+'px';
+  return m;
+}
+// One chapter per walk: eat the flower, poo, slip on the poo, sniff the smear and turn back, jump the smear.
+function catWalk(n){
+  if(skipAnim()||document.querySelector('.walker')) return;
+  const el=document.createElement('div'); el.className='walker'; el.innerHTML=walkerSVG(n); document.body.appendChild(el);
+  const W=innerWidth, spot=walkSpot(), sleep=(ms)=>new Promise(r=>setTimeout(r,ms)), pace=(d)=>Math.max(900,Math.abs(d)*6);
+  const pos={x:-130,y:0}, put=()=>{ el.style.transform=`translate(${pos.x}px,${-pos.y}px)`; };
+  const move=(x,ms=pace(x-pos.x),hop=0)=>new Promise(res=>{ const x0=pos.x, t0=performance.now(); const f=(now)=>{ const p=Math.min(1,(now-t0)/ms); pos.x=x0+(x-x0)*p; pos.y=hop*4*p*(1-p); put(); if(p<1) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
+  const say=(t)=>{ el.querySelector('.bubble').textContent=t; el.classList.toggle('say',!!t); };
+  const stop=(on)=>el.classList.toggle('stop',on);
+  const mark=(k)=>{ G.mark=k; walkMark(); };
+  put();
+  (async()=>{
+    if(n===1){ await move(spot-100); stop(true); say('Nom nom!'); el.classList.add('eat'); await sleep(900); mark(null); await sleep(600); el.classList.remove('eat'); }
+    else if(n===2){ await move(spot-12); stop(true); say('Pardon me!'); await sleep(800); mark('poo'); await sleep(1000); }
+    else if(n===3){ await move(spot-70); say('Whoa!'); el.classList.add('slip'); await sleep(450); mark('smear'); await sleep(500); el.classList.remove('slip'); say('...nobody saw that.'); await move(spot+40,700); }
+    else if(n===4){ await move(spot-105); stop(true); say('Sniff...'); el.classList.add('sniff'); await sleep(1500); el.classList.remove('sniff'); say('Eww!'); await sleep(500); el.classList.add('flip'); await sleep(300); say(''); stop(false); await move(-140); el.remove(); return; }
+    else { await move(spot-150); say('Hup!'); await move(spot+40,700,70); }
+    say(''); stop(false);
+    await move(W+40);
+    el.remove();
+  })();
+}
+addEventListener('resize',()=>{ if(G) walkMark(); });
+
+/* ---------- views ---------- */
+function setupView(){
+  const h=location.hash.match(/seq=([ABCLSHR])/); const pre=h?h[1]:(G?G.mode:'S');
+  const opts=WORLDS.concat('ABC'.includes(pre)?[[pre,'Fixed order (teacher link).']]:[]);
+  const icon=(vb,inner)=>`<svg viewBox="${vb}" width="44" height="52" aria-hidden="true">${inner}</svg>`;
+  app.innerHTML=`
+  <div class="setupgrid">
+  <div class="card stage setupscene bigscene"><div class="scenebox">${sceneSVG({stock:2000,rl:1600,buffer:800,moods:Array(8).fill('happy'),crate:'On order 1,200: arrives round 2'})}</div></div>
+  <div class="card start"><h2>Run the cat food warehouse</h2>
+    <p class="lead">${CFG.rounds} rounds. Most profit wins. Read the news, set your levers, press Run.</p>
+    <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban" required aria-describedby="nmMsg"><div class="bufout x" id="nmMsg" role="alert"></div>
+    <label class="small inl" style="margin-top:10px"><input type="checkbox" id="priv" ${lbPrivate?'checked':''}> Keep me off the class leaderboard</label>
+    <label>Level</label>
+    <div class="worlds" id="lvls"><div class="world lvl ${!gameOpts.hard?'sel':''}" data-h="0"><input type="radio" name="lvl" ${!gameOpts.hard?'checked':''}><div><b>Standard</b><br><span class="small">Single or dual supplier.</span></div></div>
+      <div class="world lvl ${gameOpts.hard?'sel':''}" data-h="1"><input type="radio" name="lvl" ${gameOpts.hard?'checked':''}><div><b>Hard</b><br><span class="small">Global or local, make or buy, unhappy cats.</span></div></div></div>
+    <label>Choose your world</label>
+    <div class="worlds" id="worldPick">${opts.map(([m,t])=>`<div class="world ${m===pre?'sel':''}" data-m="${m}"><input type="radio" name="world" ${m===pre?'checked':''}><div><b>${Engine.SEQ_NAMES[m]}</b><br><span class="small">${t}</span></div></div>`).join('')}</div>
+    <p class="hint" id="pickInfo"></p>
+    <label class="small inl"><input type="checkbox" id="quizOn" ${gameOpts.quiz?'checked':''}> Quick questions before some rounds</label>
+    <p><button class="primary" id="go">Start round 1</button></p>
+  </div>
+  <div class="card info hero"><div class="tiles"><div class="tile">${icon('-3 -3 28 36','<rect width="22" height="30" rx="4" fill="url(#gCan)" stroke="#6f7884"/>'+canArt())}<div><b>+${money(CFG.price-CFG.cost)}</b> profit per unit sold (1 can = 100 units)</div></div>
+      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> a round for every unit left over (storage)${tip('holding')}</div></div>
+      <div class="tile">${icon('-20 -34 40 64',catArt(4,'sad'))}<div><b>No can, no sale.</b> Hungry cats leave.</div></div></div>
+  </div>
+  </div>
+  <details class="card"><summary>Full rules and key terms</summary>
+  <div class="card info"><h2>The situation</h2>
+    <p>You run the warehouse for a cat food company that imports its cans from overseas. Each round is one week. You sell each unit for ${money(CFG.price)} and buy it for about ${money(CFG.cost)}, so a normal week earns about ${money(CFG.baseDemand*(CFG.price-CFG.cost))} before other costs.</p>
+    <p><b>Your aim:</b> the highest total profit after ${CFG.rounds} weeks.</p>
+    <p><b>The catch:</b> every unit still sitting in the warehouse at the end of a week costs you ${money(CFG.holdPerUnit)} in storage costs. But if customers want more than you have, you have a stock-out and those sales are lost for good.</p>
+  </div>
+  <div class="card todo"><h2>How each round works</h2>
+    <ol class="q">
+      <li>Read the news card. It tells you this week's demand and any problem with deliveries or prices.</li>
+      <li>Set your three levers: reorder level, reorder quantity and supplier.</li>
+      <li>Press Run. Customers buy from the stock in your warehouse. Then you see your profit.</li>
+    </ol>
+  </div>
+  <div class="card info"><h2>What do you know in advance?</h2>
+    <ul class="q">
+      <li>This week's demand: yes, it is on the news card. This week's sales come from stock you already have, or a delivery arriving at the start of the week. Your levers cannot change this week's sales.</li>
+      <li>Next week's demand: no. You are guessing. Normal demand is about ${units(CFG.baseDemand)}, but it can jump or drop.</li>
+      <li>Orders take time. An order placed this week arrives next week at the earliest (lead time ${CFG.baseLead} week), later if there is a delay. So your levers are really about protecting the weeks you cannot see yet.</li>
+      <li>Future shocks: no. A shipping problem can appear in any round.</li>
+    </ul>
+  </div>
+  <div class="card"><h2>Key terms</h2>
+    <ul class="q">
+      <li>Buffer stock (safety stock): the extra stock you try to keep in the warehouse as insurance, on top of what you expect to sell. It is what stops a late delivery or a demand spike from causing a stock-out. It costs ${money(CFG.holdPerUnit)} per unit each week while it sits there.</li>
+      <li>Reorder level: when your stock falls to this level, you place a new order. Reorder level = buffer stock + usage x lead time. You choose the buffer; the game works out the reorder level from your supplier's normal lead time. With usage of ${units(CFG.baseDemand)} a week and a ${CFG.baseLead} week lead time, a buffer of 400 needs a reorder level of 1,200. If a delivery is late, the extra wait is taken from your buffer, and once the buffer is used up you have a stock-out.</li>
+      <li>Bulk discount: orders of ${units(Engine.RULES.bulkMin)} or more get ${Math.round(Engine.RULES.bulkDisc*100)}% off. Shelf life: cans still on the shelf after ${Engine.RULES.life} rounds go off and are thrown away.</li>
+      <li>Hard level: a global supplier ($12 a can, 2 weeks, hit by shocks) or a local one ($13 a can, 1 week, no shipping delays); from round 4 you can build your own canning line ($2,000 a round plus $8 a can, up to 1,000 cans a round); and lost sales cut next round's demand by a quarter of the cats you turned away.</li>
+      <li>Reorder quantity: how many units you order each time. To build a buffer, order more than weekly demand.</li>
+      <li>Lead time: the wait between placing an order and receiving it.</li>
+      <li>Just-in-time (JIT): hold almost no stock and get deliveries just as you need them. Cheap to hold, risky if anything goes wrong.</li>
+      <li>Just-in-case (JIC): hold a large stock in case something goes wrong. Safe, but you pay to hold it every week.</li>
+      <li>Single or dual supplier: a single supplier is cheapest but takes the full hit from delays and price rises. A dual supplier costs ${money(CFG.dualFee)} a round, caps any delay at 1 extra week and halves price rises.</li>
+    </ul>
+    <h3>Worked example</h3>
+    <p>Buffer stock 400, so reorder level 1,200. Your stock falls to 1,200 and an order is placed. During the week you wait, you sell 800, so the delivery arrives while you still have 400 left: that is your buffer, untouched. If the delivery is one week late, the buffer covers only half a week of demand, so you sell 400 and lose 400 sales. A bigger buffer would have covered it, but would have cost more to hold in every calm week.</p>
+  </div>
+  </details>`;
+  const pick=(sel)=>document.querySelectorAll(sel).forEach(el=>el.onclick=()=>{ document.querySelectorAll(sel).forEach(o=>{o.classList.toggle('sel',o===el);o.querySelector('input').checked=(o===el);}); });
+  pick('.world:not(.lvl)'); pick('.world.lvl');
+  // one line describing the chosen level and world (the pills themselves stay short)
+  const info=()=>{ const l=$('.world.lvl.sel'), w=$('#worldPick .world.sel'); $('#pickInfo').innerHTML=`<b>${l.querySelector('b').textContent}:</b> ${l.querySelector('.small').textContent} <b>${w.querySelector('b').textContent}:</b> ${w.querySelector('.small').textContent}`; };
+  document.querySelectorAll('.start .world').forEach(el=>el.addEventListener('click',info)); info();
+  $('#nm').oninput=()=>{ $('#nmMsg').textContent=''; };
+  $('#go').onclick=()=>{
+    if(!$('#nm').value.trim()){ $('#nmMsg').textContent='Type your name or team name to start.'; $('#nm').focus(); return; }
+    lbPrivate=$('#priv').checked; gameOpts={hard:$('.world.lvl.sel').dataset.h==='1',quiz:$('#quizOn').checked}; const m=$('.world.sel:not(.lvl)').dataset.m; startGame($('#nm').value.trim(), m, 'ABC'.includes(m)?0:Math.floor(Math.random()*1e6)+1); };
+}
+
+function cardView(c, rn=G.s.round+1){
+  const kind=c.tag==='calm'?'calmcard':'shock';
+  const chips=[];
+  if(c.demand!==CFG.baseDemand) chips.push(`<span class="chip">Demand ${units(c.demand)}</span>`);
+  const hard=G&&G.hard;
+  if(c.delay>0) chips.push(`<span class="chip">New orders +${c.delay} week${c.delay>1?'s':''} late (${hard?'local and own line: no delay':'dual: +'+Math.min(c.delay,1)})</span>`);
+  if(c.priceMult>1) chips.push(`<span class="chip">New orders +${Math.round((c.priceMult-1)*100)}% price (${hard?'local':'dual'}: +${Math.round((c.priceMult-1)*50)}%)</span>`);
+  if(!chips.length) chips.push(`<span class="chip g">No disruption</span>`);
+  return `<div class="card news ${kind}"><h2>Round ${rn}: ${esc(c.title)}</h2>${chips.join('')}${c.link?`<p class="small" style="margin:6px 0 0">Article link: ${esc(c.link)}</p>`:''}</div>`;
+}
+
+function roundView(){
+  const s=G.s, r=s.round+1, card=G.seq[r-1], lev=G.lev, hard=G.hard;
+  const arrNow=s.pipeline.filter(o=>o.arrive<=r).reduce((a,o)=>a+o.qty,0);
+  const due=s.pipeline.filter(o=>o.arrive>r);
+  const demand=Math.max(0,card.demand-(hard?s.goodwill:0)), stockNow=s.onHand+arrNow;
+  const sups=supsFor(hard), canBuild=hard&&r>=4&&!s.built, q=G.quiz&&G.qDone!==r?makeQuestion(r):null;
+  if(hard&&!s.built&&!lev.build&&lev.sup===2) lev.sup=0;
+  if(lev.buf==null) lev.buf=Math.max(0,lev.rl-USAGE*expLead(lev,hard,s.built));
+  const pct=(r-1)/CFG.rounds*100;
+  const supOpt=(k)=>{ const sp=sups[k], off=sp.cap&&!s.built&&!lev.build, sub=hard?(k===0?`$${sp.cost}, ${sp.lead} weeks, shocks`:k===1?`$${sp.cost}, 1 week, no delays`:`$${sp.cost} + ${money(sp.fixed)}/round${tip('ctm')}`):(k===0?'Cheapest':'Shocks hit half as hard');
+    return `<div class="opt ${lev.sup===k?'sel':''}${off?' off':''}" data-d="${k}"><input type="radio" name="sp" ${lev.sup===k?'checked':''} ${off?'disabled':''}><div><b>${hard?['Global','Local','Make'][k]:(k===0?'Single':'Dual: '+money(CFG.dualFee))}</b><br><span class="small">${sub}</span>${k===2&&canBuild?`<br><button class="ghost mini" id="buildBtn">${lev.build?'Cancel build':'Build line'}</button>`:''}</div></div>`; };
+  app.innerHTML=`
+  <div class="roundgrid">
+   <div class="colA">
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="hud"><span class="pill">Round <b>${r}</b> of ${CFG.rounds}</span><span class="pill">Profit <b class="${cls(s.total)}">${money(s.total)}</b></span><span class="pill small">${esc(G.name)}, ${esc(Engine.SEQ_NAMES[G.mode])}${hard?', Hard':''}</span></div>
+    ${cardView(card)}
+    ${r===1?'<p class="coach">Drag the sliders and watch the shelves change. Then press Run.</p>':''}
+      ${q?`<div class="quiz card" id="quiz"><b class="q">Quick question: ${money(Engine.RULES.quizBonus)} bonus if right</b><div class="qt">${q.text}</div>
+        ${q.choices?`<div class="qch">${q.choices.map((c,i)=>`<button class="ghost qopt" data-i="${i}">${esc(c)}</button>`).join('')}</div>`:`<div class="row"><input id="qa" type="text" inputmode="decimal" autocomplete="off" placeholder="Your answer"><button class="ghost" id="qcheck">Check</button></div>`}<div class="fb" id="qfb"></div></div>`:''}
+   </div>
+    <div class="card stage colB">
+      <div class="scenebox">${sceneSVG({stock:stockNow,rl:lev.rl,buffer:0,moods:Array(nCats(demand)).fill('neutral'),crate:crateText(arrNow,due[0]),late:card.delay>0})}</div>
+      <div class="facts"><span>In stock <b>${units(stockNow)}</b>${arrNow?` (${units(arrNow)} just delivered)`:''}</span><span>Cats want${tip('usage')} <b>${units(demand)}</b>${hard&&s.goodwill?` <span class="x">(down ${units(s.goodwill)}: unhappy cats from last round)</span>`:''}</span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span>${s.built?`<span>Canning line <b>built</b></span>`:''}</div>
+      <p class="hint">1 can = 100 units. 1 cat wants 100. Cans go off after ${Engine.RULES.life} rounds on the shelf.</p>
+      <label class="small inl"><input type="checkbox" id="th" ${G.showTheory?'checked':''}> Show charts</label>
+      <div id="chartBox" class="${G.showTheory?'':'hidden'}"><h3 class="charth">Stock control chart${tip('chart')}</h3>${stockControlChart(s.history,{rl:lev.rl,buffer:0,qty:lev.qty,nowStock:stockNow,arrNow,live:true})}
+        <h3 class="charth">Revenue, costs and profit each round${tip('profit')}</h3>${profitChart(s.history)}</div>
+    </div>
+    <div class="card todo levers">
+      <label for="bf">Target buffer stock: <span class="out" id="bfv"></span>${tip('buffer')}</label>
+      <input id="bf" type="range" min="0" max="3200" step="200" value="${lev.buf}">
+      <div id="rlcalc" class="rlcalc"></div>
+      <div id="bfo" class="bufout"></div>
+      <label for="qy">Reorder quantity: <span class="out" id="qyo"></span>${tip('qty')}</label>
+      <input id="qy" type="range" min="0" max="4000" step="200" value="${lev.qty}">
+      <div class="hint">Cans per order. ${units(Engine.RULES.bulkMin)} or more: ${Math.round(Engine.RULES.bulkDisc*100)}% bulk discount.${tip('bulk')}</div>
+      <label>Supplier${tip(hard?'suppliers':'supplier')}</label>
+      <div class="optrow${hard?' three':''}">${sups.map((_,k)=>supOpt(k)).join('')}</div>
+      <div id="prev" class="forecast"></div>
+      <div class="runrow"><button class="primary" id="run" ${q?'disabled':''}>${q?'Answer the question first':'Run round '+r}</button><label class="small inl"><input type="checkbox" id="fast" ${fastMode?'checked':''}> Fast mode (no animation)</label></div>
+    </div>
+  </div>`;
+  const upd=()=>{
+    lev.buf=+$('#bf').value; lev.qty=+$('#qy').value;
+    const L0=expLead(lev,hard,s.built), L=leadFor(lev,card,hard,s.built), buffer=lev.buf, wk=(n)=>n+' week'+(n>1?'s':'');
+    lev.rl=planRl(lev,hard,s.built);
+    $('#bfv').textContent=units(lev.buf); $('#qyo').textContent=units(lev.qty);
+    $('#rlcalc').innerHTML=`Reorder level${tip('reorder')} <span class="eqn">= ${units(lev.buf)} + ${units(USAGE)} x ${wk(L0)} = ${units(lev.rl)}</span><div class="small">buffer + usage x lead time</div>`;
+    // a delay this round: the extra wait eats into the buffer (stock never goes below 0)
+    const extra=USAGE*(L.lead-L0), ordering=stockNow<=lev.rl&&!s.pipeline.some(o=>o.arrive>r)&&lev.qty>0;
+    $('#bfo').className='bufout'+(ordering&&extra>buffer?' x':'');
+    $('#bfo').innerHTML=extra<=0?'':!ordering?`Orders placed this round take ${wk(L.lead)}, not ${L0}, but you are not ordering this round.`:`Your order this round takes ${wk(L.lead)}, not ${L0}. You will sell ${units(extra)} more while you wait: `+(extra<=buffer?`that uses <b>${units(extra)}</b> of your ${units(buffer)} buffer.`:`your ${units(buffer)} buffer will be used up and you will be <b>${units(extra-buffer)} short</b>.`);
+    const out=s.pipeline.filter(o=>o.arrive>r).length>0;
+    const sold=Math.min(demand,stockNow), lostU=demand-sold;
+    let t='';
+    t+=lostU?`<span class="x">X Stock-out: sell ${units(sold)}, lose ${units(lostU)}</span>${tip('stockout')}<br>`:`Yes: all ${units(demand)} sold<br>`;
+    if(out) t+='Order: one is already on the way';
+    else if(stockNow<=lev.rl){
+      let qq=Math.min(lev.qty,CFG.cap-stockNow); if(L.sp.cap) qq=Math.min(qq,L.sp.cap);
+      const bulk=!L.sp.cap&&qq>=Engine.RULES.bulkMin;
+      if(lev.qty===0) t+='Order: none (reorder quantity is 0)';
+      else t+= qq>0 ? `Order: <b>${units(qq)}</b> now, arrives round <b>${r+L.lead}</b>${lev.qty>qq?(L.sp.cap&&qq===L.sp.cap?' (line capacity)':' (shelves full)'):''}${bulk?' with bulk discount':''}` : 'Order: none, shelves are full';
+    } else t+=`Order: none (stock ${units(stockNow)} is above your reorder level ${units(lev.rl)})`;
+    $('#prev').innerHTML=`<div class="ltime${L.delay?' late':''}" id="lt"><svg viewBox="0 0 22 20" width="22" height="20" aria-hidden="true"><rect width="22" height="20" rx="2" fill="#c89b5e" stroke="#6b4a22" stroke-width="1.5"/><path d="M1 1 L21 19 M21 1 L1 19" stroke="#6b4a22"/></svg><span>Delivery time${tip('lead')}: <b>${L.lead} round${L.lead>1?'s':''}</b>${L.delay?` <span class="x">(${L.delay} late)</span>`:''}</span></div>`+t;
+    G.lev=lev; ccUpdate(lev.rl,buffer,lev.qty); sceneLevers(lev.rl,buffer);
+  };
+  $('#bf').oninput=upd; $('#qy').oninput=upd; upd();
+  if(G.mark===undefined) G.mark='flower';
+  walkMark();
+  if(r%2===0&&!skipAnim()){ G.walks=G.walks||{}; if(!G.walks[r]){ G.walks[r]=1; setTimeout(()=>catWalk(r/2),900); } }
+  if(arrNow>0&&!skipAnim()){
+    const a={cancel:false}, from=nCans(s.onHand), to=nCans(stockNow), gap=Math.min(60,700/Math.max(1,to-from));
+    tween($('#scTruck'),[-120,0],[0,0],600,a);
+    for(let i=from;i<to;i++){
+      const el=document.querySelector(`#scene [data-can="${i}"]`), [x,y]=canPos(i);
+      el.setAttribute('transform',`translate(${x},${y-240})`);
+      setTimeout(()=>tween(el,[x,y-240],[x,y],450,a),650+(i-from)*gap);
+    }
+  }
+  document.querySelectorAll('.opt').forEach(el=>el.onclick=()=>{
+    if(el.classList.contains('off')) return;
+    lev.sup=+el.dataset.d;
+    document.querySelectorAll('.opt').forEach(o=>{o.classList.toggle('sel',o===el);o.querySelector('input').checked=(o===el);});
+    upd();
+  });
+  // Building the canning line (Hard, from round 4): the Make card's button unlocks and selects it.
+  if(canBuild) $('#buildBtn').onclick=(e)=>{
+    e.stopPropagation();
+    lev.build=!lev.build; lev.sup=lev.build?2:0; G.lev=lev;
+    const mk=document.querySelector('.opt[data-d="2"]'); mk.classList.toggle('off',!lev.build); mk.querySelector('input').disabled=!lev.build;
+    document.querySelectorAll('.opt').forEach(o=>{ const on=+o.dataset.d===lev.sup; o.classList.toggle('sel',on); o.querySelector('input').checked=on; });
+    $('#buildBtn').textContent=lev.build?'Cancel build':'Build line'; upd(); };
+  if(q){
+    const done=(ok)=>{ G.quizLog.push({r,ok}); G.qDone=r; G.qOk=ok?r:null; $('#run').disabled=false; $('#run').textContent='Run round '+r;
+      document.querySelectorAll('#quiz input,#quiz button').forEach(el=>el.disabled=true);
+      $('#qfb').className='fb '+(ok?'ok':'no'); $('#qfb').innerHTML=(ok?`Correct! +${money(Engine.RULES.quizBonus)} bonus. `:'Not quite. ')+q.working; };
+    if(q.choices) document.querySelectorAll('.qopt').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
+      b.classList.add(i===q.answer?'right':'wrong'); document.querySelector(`.qopt[data-i="${q.answer}"]`).classList.add('right'); done(i===q.answer); });
+    else {
+      $('#qcheck').onclick=()=>{ const v=parseFloat($('#qa').value.replace(/[$,%\s]/g,'')); done(Math.abs(v-q.answer)<0.5); };
+      $('#qa').onkeydown=(e)=>{ if(e.key==='Enter') $('#qcheck').click(); };
+    }
+    window.__qa=()=>q.answer; window.__qmc=()=>!!q.choices;
+  } else { window.__qa=()=>null; window.__qmc=()=>false; }
+  $('#th').onchange=()=>{G.showTheory=$('#th').checked; $('#chartBox').classList.toggle('hidden',!G.showTheory);};
+  $('#fast').onchange=()=>{fastMode=$('#fast').checked;};
+  $('#run').onclick=()=>{
+    if($('#run').disabled) return;
+    const crate=crateText(arrNow,due[0]);
+    G.last=Engine.play2(G.s,{...G.lev,bonus:G.qOk===r},card,rules()); G.view='result';
+    G.lev.build=false;
+    if(skipAnim()) render(); else runAnim(G.last,crate);
+  };
+}
+// Quick questions before some rounds (can be switched off at the start).
+// Quick questions before rounds 2, 5 and 8 (and 4 on Hard). Each is picked at random from a bank, never repeating
+// in a game. Numeric questions are typed; concept questions have two or three buttons.
+function makeQuestion(r){
+  const s=G.s, card=G.seq[r-1], lev=G.lev, sups=supsFor(G.hard), line=sups[2], disc=Engine.RULES.bulkDisc;
+  const L=expLead({...lev,sup:G.hard?0:lev.sup},G.hard,s.built), wk=(n)=>n+' week'+(n>1?'s':'');
+  const rnd=Engine.rng((G.seed||1)*97+r*13+G.quizLog.length), pick=(a)=>a[Math.floor(rnd()*a.length)];
+  const num=(id,text,answer,working)=>({id,text,answer,working});
+  const mcq=(id,text,choices,answer,working)=>({id,text,choices,answer,working});
+  const bank=[
+    ()=>{ const b=pick([400,800,1200]); return num('rl',`Usage is ${units(USAGE)} cans a week and the lead time is ${wk(L)}. You want a buffer stock of ${units(b)}. What should the reorder level be?`,b+USAGE*L,`Reorder level = buffer + usage x delivery time = ${units(b)} + ${units(USAGE)} x ${L} = ${units(b+USAGE*L)}.`); },
+    ()=>{ const b=lev.buf, d=pick([1,2]), use=USAGE*d;
+      if(use<=b) return num('use',`Your buffer stock is ${units(b)} and you sell ${units(USAGE)} a week. A delivery arrives ${wk(d)} late. How much of your buffer do you use while you wait?`,use,`Extra wait x usage = ${d} x ${units(USAGE)} = ${units(use)}, taken from the ${units(b)} buffer (${units(b-use)} left).`);
+      return num('short',`Your buffer stock is ${units(b)} and you sell ${units(USAGE)} a week. A delivery arrives ${wk(d)} late. How many sales will you miss?`,use-b,`The late wait needs ${d} x ${units(USAGE)} = ${units(use)}. The buffer covers ${units(b)}, then stock hits 0: ${units(use)} - ${units(b)} = ${units(use-b)} sales missed. Stock never goes below 0.`); },
+    ()=>{ const l=pick([1,2,3]); return num('arrive',`You place an order in round ${r} and the delivery time is ${wk(l)}. In which round does it arrive?`,r+l,`Round ${r} + ${l} = round ${r+l}.`); },
+    ()=>{ const b=pick([400,800,1200]), q=pick([1200,1600,2000]); return num('max',`Your buffer stock is ${units(b)} and your reorder quantity is ${units(q)}. What is the maximum stock level?`,b+q,`Maximum stock = buffer + reorder quantity = ${units(b)} + ${units(q)} = ${units(b+q)}.`); },
+    ()=>{ const n=pick([1200,1800,2600,3400]); return num('store',`${units(n)} units are left on the shelves at the end of a round. Storage costs ${money(CFG.holdPerUnit)} a unit. What is the storage cost?`,n*CFG.holdPerUnit,`${units(n)} x ${money(CFG.holdPerUnit)} = ${money(n*CFG.holdPerUnit)}.`); },
+    ()=>{ const d=pick([1100,1200]), h=pick([600,800]), m=CFG.price-CFG.cost; return num('lost',`Cats want ${units(d)} cans but you only have ${units(h)}. Each sale earns $${m} profit. How much profit do you lose to the stock-out?`,(d-h)*m,`Lost sales = ${units(d)} - ${units(h)} = ${units(d-h)}. ${units(d-h)} x $${m} = ${money((d-h)*m)}.`); },
+    ()=>{ const n=pick([1600,2400,3200]); return num('cover',`You have ${units(n)} cans and sell ${units(USAGE)} a week. How many weeks will they last?`,n/USAGE,`${units(n)} / ${units(USAGE)} = ${n/USAGE} weeks.`); },
+    ()=>{ const q=pick([2000,2400,3200]), tot=q*CFG.cost*(1-disc); return num('bulk',`You order ${units(q)} cans at $${CFG.cost} each and get a ${Math.round(disc*100)}% bulk discount. What is the total cost?`,tot,`${units(q)} x $${CFG.cost} = ${money(q*CFG.cost)}. Minus ${Math.round(disc*100)}%: ${money(q*CFG.cost)} x ${1-disc} = ${money(tot)}.`); },
+    ()=>{ const n=pick([600,800,1100]); return num('rev',`You sell ${units(n)} cans at ${money(CFG.price)} each. What is the revenue?`,n*CFG.price,`${units(n)} x ${money(CFG.price)} = ${money(n*CFG.price)}.`); },
+    ()=>{ const rev=16000, cogs=9600, st=pick([400,1200,2000]); return num('profit',`This round: revenue ${money(rev)}, cost of cans sold ${money(cogs)}, storage costs ${money(st)}. What is the profit?`,rev-cogs-st,`${money(rev)} - ${money(cogs)} - ${money(st)} = ${money(rev-cogs-st)}.`); },
+    ()=>{ const a=1, b=pick([2,3]); return num('rise',`Usage is ${units(USAGE)} a week. The delivery time rises from ${a} week to ${b} weeks. How much higher should the reorder level be to keep the same buffer?`,USAGE*(b-a),`The extra wait is ${b-a} week${b-a>1?'s':''}: ${units(USAGE)} x ${b-a} = ${units(USAGE*(b-a))} more.`); },
+    ()=>mcq('jit','Which approach keeps almost no buffer stock?',['Just in time (JIT)','Just in case (JIC)'],0,'JIT orders stock to arrive just as it is needed, so very little sits on the shelves.'),
+    ()=>mcq('lane','A shipping lane closes and deliveries will be 3 weeks late. Which approach copes better?',['Just in time (JIT)','Just in case (JIC)'],1,'JIC holds a large buffer, so it can keep selling while deliveries are late.'),
+    ()=>mcq('holdcost','Which of these is a cost of holding stock?',['Storage and insurance','Lost sales from a stock-out','The price customers pay'],0,'Holding stock costs money for storage, insurance and security, and ties up cash (opportunity cost).'),
+    ()=>mcq('low','Your reorder level is lower than usage x delivery time. What will happen?',['You run out before the delivery arrives','You end up with too much stock','Nothing changes'],0,'You sell more while you wait than the reorder level covers, so the shelves empty before the delivery comes.'),
+    ()=>mcq('lead','What does lead time mean?',['The wait between ordering stock and receiving it','How long stock sits on the shelf','How long a round lasts'],0,'Lead time is the time between placing an order and the delivery arriving.'),
+    ()=>mcq('jitadv','Which is an advantage of JIT?',['Low storage costs','Bulk-buying discounts','Protection against supply delays'],0,'JIT holds little stock, so storage costs are low. Bulk discounts and protection from delays are JIC advantages.'),
+    ()=>mcq('jicadv','Which is an advantage of JIC?',['Fewer stock-outs when demand surges','Less money tied up in stock','No cans going off'],0,'A big buffer means you can meet sudden demand. The downsides are cash tied up in stock and cans going off.'),
+    ()=>mcq('buffer','What is buffer stock for?',['Covering late deliveries and demand surges','Getting a bulk discount','Lowering storage costs'],0,'Buffer (safety) stock is kept as insurance against delays and unexpected demand.'),
+  ];
+  const hardBank=[
+    ()=>{ const q=pick([600,800,1000]); return num('ctm',`A canning line costs ${money(line.fixed)} a round plus $${line.cost} a can. What is the cost to make ${units(q)} cans in a round?`,line.fixed+line.cost*q,`Cost to make = fixed cost + variable cost x quantity = ${money(line.fixed)} + $${line.cost} x ${units(q)} = ${money(line.fixed+line.cost*q)}.`); },
+    ()=>{ const q=pick([600,800,1000]); return num('ctb',`The local supplier charges $${sups[1].cost} a can. What is the cost to buy ${units(q)} cans locally?`,sups[1].cost*q,`Cost to buy = price x quantity = $${sups[1].cost} x ${units(q)} = ${money(sups[1].cost*q)}.`); },
+    ()=>num('be',`Making costs ${money(line.fixed)} a round plus $${line.cost} a can. Buying from the global supplier costs $${sups[0].cost} a can. Above how many cans a round is making cheaper?`,line.fixed/(sups[0].cost-line.cost),`Each can made saves $${sups[0].cost} - $${line.cost} = $${sups[0].cost-line.cost}. ${money(line.fixed)} / $${sups[0].cost-line.cost} = ${units(line.fixed/(sups[0].cost-line.cost))} cans.`),
+    ()=>mcq('local','Why might a local supplier suit JIT better than a global one?',['Shorter, more reliable delivery times','Lower prices per can','Bigger bulk discounts'],0,'JIT needs deliveries to arrive exactly when expected, and local suppliers are nearer and less exposed to shipping shocks.'),
+  ];
+  const lineBank=[
+    ()=>{ const m=pick([600,800,900]); return num('cu',`Your canning line can make ${units(line.cap)} cans a round. This round it makes ${units(m)}. What is the capacity utilisation rate (%)?`,m/line.cap*100,`Capacity utilisation = actual output / maximum output x 100 = ${units(m)} / ${units(line.cap)} x 100 = ${m/line.cap*100}%.`); },
+    ()=>{ const m=pick([600,800,1000]); return num('prod',`Your canning line made ${units(m)} cans this round with ${line.workers} workers. What is the productivity (cans per worker)?`,m/line.workers,`Productivity = output / number of workers = ${units(m)} / ${line.workers} = ${units(m/line.workers)}.`); },
+  ];
+  let pool=bank;
+  if(G.hard&&r===4&&!s.built) pool=hardBank;
+  else if(G.hard&&s.built&&r===8) pool=lineBank;
+  else if(G.hard) pool=bank.concat(hardBank);
+  if(!(r===2||r===5||r===8||(G.hard&&r===4))) return null;
+  G.qUsed=G.qUsed||[];
+  const fresh=pool.map(f=>f()).filter(q=>!G.qUsed.includes(q.id));
+  const q=fresh.length?fresh[Math.floor(rnd()*fresh.length)]:pool[0]();
+  G.qUsed.push(q.id);
+  return q;
+}
+
+function resultView(){
+  const h=G.last, last=h.round===CFG.rounds, pct=h.round/CFG.rounds*100;
+  const due=G.s.pipeline.find(o=>o.arrive>h.round), L=leadFor(h.lev,h.card,G.hard,h.built), line=Engine.RULES.hard[2];
+  app.innerHTML=`
+  <div class="bar"><i style="width:${pct}%"></i></div>
+  <div class="hud"><span class="pill">Round <b>${h.round}</b> of ${CFG.rounds}: ${esc(h.card.title)}</span></div>
+  <div class="two">
+  <div class="card ${h.stockout?'shock':'calmcard'}">
+    <div class="verdict">${bigCat(h.stockout?1:0,h.stockout?'sad':'happy')}<h2>${h.stockout?`Stock-out! ${units(h.lost)} sales lost`:'Every cat got fed'}</h2></div>
+    ${h.stockout?`<p>That cost you ${money(h.lostProfit)} of profit.</p>`:''}
+    ${!h.stockout&&h.endStock>=2000?`<div class="warn">Big pile: ${units(h.endStock)} cans cost ${money(h.holding)} to store this round.</div>`:''}
+    ${h.spoiled?`<div class="warn">${units(h.spoiled)} cans went off after ${Engine.RULES.life} rounds on the shelf: ${money(h.spoilCost)} thrown away.</div>`:''}
+    ${G.hard&&h.nextGoodwill?`<div class="bad">Unhappy cats tell their friends: next round's demand drops by ${units(h.nextGoodwill)}.</div>`:''}
+    <p class="lead">This round <b class="${cls(h.profit)}">${money(h.profit)}</b> &nbsp; Total <b class="${cls(h.total)}">${money(h.total)}</b></p>
+    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span>${h.ordered?`<span>Delivery time <b>${h.ordered.lead} round${h.ordered.lead>1?'s':''}</b></span>`:''}${h.ordered&&h.ordered.bulk?'<span>Bulk discount <b>yes</b></span>':''}<span>Sold <b>${units(h.sold)}</b></span><span>Left over${tip('holding')} <b>${units(h.endStock)}</b></span>${h.bonus?`<span>Question bonus <b class="pos">+${money(h.bonus)}</b></span>`:''}${h.built?`<span>Capacity utilisation${tip('cu')} <b>${Math.round(h.util*100)}%</b></span><span>Productivity${tip('prod')} <b>${units(h.productivity)}</b> cans per worker</span>`:''}</div>
+    <button class="primary" id="next">${last?'See final results':'Next round'}</button>
+    <details><summary>Profit breakdown</summary>
+      <table>
+        <tr><td class="l">Revenue (${units(h.sold)} x ${money(CFG.price)})</td><td>${money(h.revenue)}</td></tr>
+        <tr><td class="l">Cost of units sold</td><td class="neg">-${money(h.cogs)}</td></tr>
+        <tr><td class="l">Storage costs${tip('holding')}</td><td class="neg">-${money(h.holding)}</td></tr>
+        ${h.spoilCost?`<tr><td class="l">Cans that went off</td><td class="neg">-${money(h.spoilCost)}</td></tr>`:''}
+        ${G.hard?`<tr><td class="l">Canning line fixed cost</td><td class="neg">-${money(h.fixed)}</td></tr>`:`<tr><td class="l">Dual supplier fee</td><td class="neg">-${money(h.fee)}</td></tr>`}
+        ${h.bonus?`<tr><td class="l">Quick question bonus</td><td class="pos">+${money(h.bonus)}</td></tr>`:''}
+        <tr class="tot"><td class="l">Profit this round</td><td class="${cls(h.profit)}">${money(h.profit)}</td></tr>
+        <tr><td class="l">Total so far</td><td class="${cls(h.total)}">${money(h.total)}</td></tr>
+      </table>
+      ${h.ordered?`<p class="small">Order cost: ${money(h.ordered.cost)} a unit, lead time ${h.ordered.lead} week${h.ordered.lead>1?'s':''}.</p>`:''}
+    </details>
+  </div>
+  <div class="card stage">
+    <div class="scenebox">${sceneSVG({stock:h.endStock,rl:h.lev.rl,buffer:bufferFor(h.lev.rl,L.sp.lead),moods:Array.from({length:nCats(h.demand)},(_,j)=>j<nCats(h.demand)-sadCats(h)?'happy':'sad'),crate:crateText(0,due),lost:h.lost?h:null,hold:h.holding})}</div>
+  </div>
+  </div>`;
+  $('#next').onclick=()=>{ G.view=last?'end':'round'; render(); };
+}
+
+// Score code: base64 JSON. Rules version 2 adds v:2 and x (1 = Hard); h holds [reorder level, quantity, supplier, built this round].
+// Codes without v use the original rules, with h as [buffer, quantity, dual].
+const levCode=(l)=>[l.rl,l.qty,l.sup,l.build?1:0,l.bonus?1:0];
+function encode(g){
+  const o={n:g.name,m:g.mode,d:g.seed,t:Math.round(g.s.total),v:2,x:g.hard?1:0,h:g.s.history.map(h=>levCode(h.lev))};
+  return btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+}
+function codeRun(o){
+  const seq=Engine.seqFor(o.m,o.d);
+  if(o.v===2) return Engine.run(seq,(i)=>({rl:o.h[i][0],qty:o.h[i][1],sup:o.h[i][2],build:!!o.h[i][3],bonus:!!o.h[i][4]}),{v:2,hard:!!o.x});
+  return Engine.run(seq,(i)=>({buffer:o.h[i][0],qty:o.h[i][1],dual:!!o.h[i][2]}));
+}
+function decode(code){
+  try{
+    const o=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    const st=codeRun(o); let c=0; const cum=st.history.map(h=>c+=h.profit);
+    const rlOf=(x)=>o.v===2?x[0]:Engine.reorderLevel(x[0]);
+    return {name:o.n,mode:o.m,seed:o.d,hard:!!o.x,v:o.v||1,total:st.total,cum,stockouts:st.history.filter(h=>h.stockout).length,dualRounds:o.h.filter(x=>x[2]).length,avgRl:o.h.reduce((a,x)=>a+rlOf(x),0)/o.h.length,holding:st.history.reduce((a,h)=>a+h.holding,0),lost:st.history.reduce((a,h)=>a+h.lostProfit,0),claimed:o.t};
+  }catch(e){ return null; }
+}
+
+const shockCard=(c)=>c.delay>0||c.priceMult>1;
+// Fixed strategies for comparison. Hard: JIT relies on the local supplier, JIC on cheap global bulk orders.
+function benchLevers(hard){
+  return hard?[
+    {name:'Pure JIT: reorder level 800, order 800, local supplier',lev:{rl:800,qty:800,sup:1},lead:1},
+    {name:'Pure JIC: reorder level 4,000, order 2,400, global supplier',lev:{rl:4000,qty:2400,sup:0},lead:2},
+    {name:'Hybrid: reorder level 2,000, order 1,600, local supplier only on shock rounds',fn:(seq)=>(i)=>({rl:2000,qty:1600,sup:shockCard(seq[i])?1:0})},
+  ]:[
+    {name:'Pure JIT: reorder level 800, order 800, single supplier',lev:{rl:800,qty:800,sup:0},lead:1},
+    {name:'Pure JIC: reorder level 4,000, order 2,400, single supplier',lev:{rl:4000,qty:2400,sup:0},lead:1},
+    {name:'Hybrid: reorder level 1,600, order 1,200, dual supplier only on shock rounds',fn:(seq)=>(i)=>({rl:1600,qty:1200,sup:shockCard(seq[i])?1:0})},
+  ];
+}
+function benchmarks(seq,hard=G.hard){
+  return benchLevers(hard).map(b=>{ const s=Engine.run(seq,b.fn?b.fn(seq):b.lev,{v:2,hard}); return {name:b.name,total:s.total,s,b}; });
+}
+
+function strategyCard(bm){
+  const sum=(st)=>{ const H=st.history; return `<div class="facts"><span>Profit <b>${money(st.total)}</b></span><span>Stock-out rounds <b>${H.filter(h=>h.stockout).length}</b></span><span>Storage costs <b>${money(H.reduce((a,h)=>a+h.holding,0))}</b></span>${H.some(h=>h.spoiled)?`<span>Cans gone off <b>${units(H.reduce((a,h)=>a+h.spoiled,0))}</b></span>`:''}</div>`; };
+  const chart=(b)=>stockControlChart(b.s.history,{rl:b.b.lev.rl,buffer:bufferFor(b.b.lev.rl,b.b.lead),qty:b.b.lev.qty});
+  const jit=G.hard?`Reorder level 800, order 800, local supplier. With a 1-week delivery time that leaves no buffer: it orders exactly one week's demand every round, which arrives just in time and sells out. Nothing to store, but local cans cost more, and a demand surge empties the shelves.`
+    :`Reorder level 800, order 800, single supplier. With a 1-week delivery time that leaves no buffer: it orders exactly one week's demand every round. It arrives just in time, sells out, and leaves nothing to store. Perfect in calm weeks, but any delay or demand surge empties the shelves.`;
+  const jic=G.hard?`Reorder level 4,000 (full shelves), order 2,400, global supplier. It reorders whenever nothing is on the way, buying cheap in bulk. The 2-week delivery time still leaves a 2,400 buffer, so it rarely runs out, but it pays to store a big pile and some cans go off.`
+    :`Reorder level 4,000 (full shelves), order 2,400, single supplier. It reorders whenever nothing is on the way, up to the storage limit, and gets the bulk discount. It almost never runs out, but pays to store a big pile every round, and old cans can go off.`;
+  return `<div class="card"><h2>How JIT and JIC played your shocks</h2>
+    <div class="stratgrid">
+      <div><h3>Pure JIT (just in time)${tip('jit')}</h3>${chart(bm[0])}<p>${jit}</p>${sum(bm[0].s)}</div>
+      <div><h3>Pure JIC (just in case)${tip('jic')}</h3>${chart(bm[1])}<p>${jic}</p>${sum(bm[1].s)}</div>
+    </div></div>`;
+}
+
+function endView(){
+  const s=G.s, H=s.history, code=encode(G);
+  const so=H.filter(h=>h.stockout).length;
+  const holdTot=H.reduce((a,h)=>a+h.holding,0), feeTot=H.reduce((a,h)=>a+h.fee+h.fixed,0), lost=H.reduce((a,h)=>a+h.lostProfit,0), spoilTot=H.reduce((a,h)=>a+h.spoilCost,0);
+  const qr=G.quizLog.filter(x=>x.ok).length;
+  const calm=H.filter(h=>h.card.tag==='calm'), shk=H.filter(h=>h.card.tag!=='calm');
+  const avg=a=>a.length?a.reduce((x,h)=>x+h.profit,0)/a.length:0;
+  const bm=benchmarks(G.seq);
+  const hiHold=H.reduce((m,h)=>h.holding>m.holding?h:m,H[0]);
+  const lines=replayLines(bm);
+  const short=['pure JIT','pure JIC','the hybrid'], beat=short.filter((n,k)=>s.total>=bm[k].total);
+  const best=bm.map((b,k)=>({n:short[k],t:b.total})).sort((a,b)=>b.t-a.t)[0];
+  const verdict=beat.length===3?'You beat all three fixed strategies.':`${beat.length?'You beat '+beat.join(' and ')+'. ':''}Best fixed strategy: ${best.n}, ${money(best.t)}.`;
+  app.innerHTML=`
+  <div class="card info"><h2>Final result: ${esc(G.name)}</h2>
+    <div class="verdict">${bigCat(0,'happy')}<p class="big ${cls(s.total)}">${money(s.total)}</p></div>
+    <p class="lead">${verdict}</p>
+    <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Cans left at the end <b>${units(s.onHand)}</b> (not a cost: you only pay for cans when you sell them)</span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Storage costs <b>${money(holdTot)}</b></span>${spoilTot?`<span>Cans gone off <b>${money(spoilTot)}</b></span>`:''}<span>${G.hard?'Canning line costs':'Dual fees'} <b>${money(feeTot)}</b></span>${G.quizLog.length?`<span>Questions right <b>${qr} of ${G.quizLog.length}</b> (+${money(qr*Engine.RULES.quizBonus)})</span>`:''}</div>
+  </div>
+  <div class="card" id="lbCard"><h2>Class leaderboard</h2><p class="hint">Best score per player in the last 7 days: ${esc(boardName(G.mode,G.hard))}.</p>
+    <div class="seg" id="lbSort"><button data-k="total" class="on">Total profit</button><button data-k="vs">Beat pure JIC by</button></div><div id="lbBox">Loading...</div></div>
+  ${replayCard(lines)}
+  ${strategyCard(bm)}
+  <div class="card"><h3>Score code for your teacher</h3><code class="codebox" id="code">${code}</code>
+    <p><button class="ghost" id="copy">Copy code</button> <span class="small" id="cmsg"></span></p></div>
+  <p><button class="ghost" id="fresh">New game</button></p>
+  <details class="card"><summary>All the numbers</summary>
+    <p>Average profit in calm rounds: <b>${money(avg(calm))}</b>. Average profit in shock rounds: <b>${money(avg(shk))}</b>.</p>
+    <div class="card"><h3>Profit by round</h3>${profitBars(H)}</div>
+  <div class="card"><h3>Round by round</h3><div style="overflow-x:auto"><table>
+    <tr><th>Rd</th><th class="l">News</th><th>Reorder level</th><th>Order qty</th><th>Supplier</th><th>Sold</th><th>Lost</th><th>End stock</th><th>Profit</th></tr>
+    ${H.map(h=>`<tr><td>${h.round}</td><td class="l">${esc(h.card.title)}</td><td>${units(h.lev.rl)}</td><td>${units(h.lev.qty)}</td><td>${supsFor(G.hard)[h.lev.sup].name}</td><td>${units(h.sold)}</td><td class="${h.lost?'neg':''}">${units(h.lost)}</td><td>${units(h.endStock)}</td><td class="${cls(h.profit)}">${money(h.profit)}</td></tr>`).join('')}
+    <tr class="tot"><td></td><td class="l">Total</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="${cls(s.total)}">${money(s.total)}</td></tr>
+  </table></div></div>
+  <div class="card"><h3>Same shocks, fixed strategies</h3>
+    <table><tr><th class="l">Strategy</th><th>Total profit</th></tr>
+    ${bm.map(b=>`<tr><td class="l">${b.name}</td><td class="${cls(b.total)}">${money(b.total)}</td></tr>`).join('')}
+    <tr class="tot"><td class="l">You</td><td class="${cls(s.total)}">${money(s.total)}</td></tr></table>
+    <p class="small">Use this to judge skill or luck: the shocks are identical, only the strategy changes. Replay the same shocks with a different strategy to test your answer.</p>
+  </div>
+  </details>
+  <details class="card todo"><summary>Debrief</summary>
+    <ol class="q">
+      <li><b>Calculate</b> the storage costs you paid in round ${hiHold.round}, when ${units(hiHold.endStock)} units were left at the end of the week (${money(CFG.holdPerUnit)} per unit).</li>
+      <li><b>Explain</b> why the same buffer stock earned more in a calm round than in a round with a ${H.find(h=>h.card.delay>0)?esc(H.find(h=>h.card.delay>0).card.title.toLowerCase()):'delivery shock'}.</li>
+      <li><b>Explain</b> one way a stock-out in this game differs from a stock-out in a real business (lost sales here are lost for good, with no effect on customer loyalty).</li>
+      <li><b>Discuss</b> to what extent a hybrid of JIT and JIC beat both extremes on your sequence, using the table above.</li>
+      <li><b>Discuss</b> whether ${G.hard?'your supplier choices (global, local or making your own)':'the dual supplier fee'} ${G.hard?'were':'was'} worth it, using at least one round as evidence.</li>
+      <li>Name one limitation of this simulation (for example fixed demand pattern, shocks known to be random, no customer loyalty effect).</li>
+    </ol>
+    </details>`;
+  $('#copy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(code).then(()=>{$('#cmsg').textContent='Copied.';},()=>{$('#cmsg').textContent='Select the code above and copy it.';}); };
+  $('#fresh').onclick=()=>{G=null;render();};
+  document.querySelectorAll('#lbSort button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#lbSort button').forEach(o=>o.classList.toggle('on',o===b)); lbSortKey=b.dataset.k; lbEnd(true); });
+  rpInit(lines);
+  lbEnd();
+  rpLoadOthers(G);
+}
+
+const TEACHER_CODE='0987'; // low stakes: only unlocks the teacher tab
+let teacherOK=false;
+function teacherView(){
+  if(!teacherOK){
+    app.innerHTML=`<div class="card todo"><h2>Teacher</h2>
+      <label for="tcode">Teacher code</label><input id="tcode" type="password" inputmode="numeric" maxlength="12" style="max-width:220px">
+      <p><button class="primary" id="tgo">Unlock</button></p><p class="hint" id="tmsg"></p></div>`;
+    const go=()=>{ if($('#tcode').value.trim()===TEACHER_CODE){ teacherOK=true; teacherView(); } else $('#tmsg').textContent='That code is not right.'; };
+    $('#tgo').onclick=go; $('#tcode').onkeydown=(e)=>{ if(e.key==='Enter') go(); };
+    return;
+  }
+  app.innerHTML=`
+  <div class="card info"><h2>Class view</h2><p>A big, auto-updating leaderboard and class charts for the projector.</p><p><button class="primary" id="openClass">Open class view</button></p></div>
+  <div class="card todo"><h2>Manage the class leaderboard</h2>
+    <p class="hint">Every game saved in the last 7 days, newest first. Delete removes it for everyone (press twice to confirm).</p>
+    <div id="lbAdmin">Loading...</div></div>
+  <div class="card todo"><h2>Leaderboard</h2>
+    <p>Paste one score code per line. Totals are recalculated from each player's decisions.</p>
+    <textarea id="codes" placeholder="Paste score codes here"></textarea>
+    <p><button class="primary" id="build">Build leaderboard</button></p>
+  </div>
+  <div id="lb"></div>
+  <div class="card info"><h2>Teacher notes</h2>
+    <ul class="q">
+      <li>Syllabus links (HL 5.6): JIT and JIC, buffer stock, reorder level, reorder quantity, lead time, stock-out, costs of holding stock, supply chain risk and supplier reliability.</li>
+      <li>Timing: about 8 minutes of play, then debrief. Run it after students have met the stock control chart.</li>
+      <li>Rules (updated 2026-10-22): students set a target buffer stock; the game shows the reorder level live (buffer + usage x the supplier's normal lead time). In delay rounds the panel shows how much of the buffer the extra wait will use, or how many sales will be missed. Orders of 2,000 or more get a 5% bulk discount; cans go off after 4 rounds on the shelf. Hard level adds global or local suppliers, make or buy (cost to make vs cost to buy, capacity utilisation, productivity) and lost goodwill after stock-outs. Codes from before this update still score under the old rules.</li>
+      <li>Quick questions (on by default) appear before rounds 2, 5 and 8 (and round 4 on Hard) and must be answered before Run. The end screen shows how many were right.</li>
+      <li>Worlds: Stable (the Calm waters events), Unsettled (the Supply crunch events: import licence delay, fish price spike, single-source dependence) and Chaotic (the Cascade events). Each game shuffles that world's ten events, with round 1 always calm, so groups face the same shocks in a different order. Random draws new events every game. Use Unsettled as the class world. Fixed orders are still available by adding #seq=A, #seq=B or #seq=C to the link.</li>
+      <li>Live mode: project this page, let teams agree levers by vote or whiteboard, then press Run round. Cards are hidden until each round starts.</li>
+      <li>Skill or luck: play the same sequence again. Same shocks, so any difference comes from decisions.</li>
+      <li>Parameters: demand ${units(CFG.baseDemand)} a week, price ${money(CFG.price)}, unit cost ${money(CFG.cost)}, lead time ${CFG.baseLead} week, storage limit ${units(CFG.cap)}, storage cost ${money(CFG.holdPerUnit)} per unit per round, dual supplier ${money(CFG.dualFee)} a round.</li>
+    </ul>
+    <h3>World events (round 1 first, the rest shuffled each game)</h3>
+    <table><tr><th class="l">World</th><th class="l">Events</th></tr>
+    ${['L','S','H'].map(k=>`<tr><td class="l">${Engine.SEQ_NAMES[k]}</td><td class="l">${Engine.SEQ[Engine.WORLD_DECK[k]].map(id=>Engine.CARDS[id].title).join('<br>')}</td></tr>`).join('')}
+    </table>
+  </div>`;
+  $('#build').onclick=()=>{
+    const rows=$('#codes').value.split(/\n+/).map(x=>x.trim()).filter(Boolean).map(decode);
+    const ok=rows.filter(Boolean).sort((a,b)=>b.total-a.total), bad=rows.length-ok.length;
+    if(!ok.length){ $('#lb').innerHTML=`<div class="bad">No valid codes found.</div>`; return; }
+    $('#lb').innerHTML=`<div class="card"><h2>Results</h2>
+      <table><tr><th>#</th><th class="l">Player</th><th class="l">Sequence</th><th>Total profit</th><th>Stock-out rounds</th><th>Avg reorder level</th><th>Other supplier rounds</th><th>Storage paid</th></tr>
+      ${ok.map((p,i)=>`<tr><td>${i+1}</td><td class="l">${esc(p.name)}</td><td class="l">${Engine.SEQ_NAMES[p.mode]}${p.hard?', Hard':''}${p.v<2?' (old rules)':''}</td><td class="${cls(p.total)}">${money(p.total)}</td><td>${p.stockouts}</td><td>${units(p.avgRl)}</td><td>${p.dualRounds}</td><td>${money(p.holding)}</td></tr>`).join('')}
+      </table>${bad?`<p class="small">${bad} line(s) could not be read.</p>`:''}</div>
+      <div class="card"><h3>Cumulative profit, top ${Math.min(5,ok.length)}</h3>${cumLines(ok.slice(0,5))}</div>`;
+  };
+  $('#openClass').onclick=()=>{ tab='class'; render(); };
+  lbAdmin();
+}
+async function lbAdmin(){
+  const box=()=>$('#lbAdmin');
+  try{
+    const data=await lbFetch(), keys=Object.keys(data).reverse();
+    if(!box()) return;
+    if(!keys.length){ box().innerHTML='<p>No games saved in the last 7 days.</p>'; return; }
+    box().innerHTML=keys.map(k=>{ const o=data[k], row=lbCheck(o), when=o&&o.at?new Date(o.at).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'}):'';
+      return `<div class="adm" data-k="${esc(k)}"><div><b>${esc(o&&typeof o.n==='string'?o.n:'(no name)')}</b><div class="meta">${row?esc(boardName(row.mode,row.hard))+', '+money(row.total):(o&&!o.v?'Old version entry':'Unreadable entry')}${when?', '+esc(when):''}</div></div><button class="danger">Delete</button></div>`; }).join('');
+    box().querySelectorAll('.adm button').forEach(b=>b.onclick=async()=>{
+      if(!b.classList.contains('arm')){ b.classList.add('arm'); b.textContent='Confirm'; return; }
+      const row=b.closest('.adm'), k=row.getAttribute('data-k');
+      b.disabled=true; b.textContent='Deleting...';
+      try{ const r=await fetch(`${LB_URL}/${encodeURIComponent(k)}.json`,{method:'DELETE'}); if(!r.ok) throw new Error(r.status); row.remove(); }
+      catch(e){ b.disabled=false; b.textContent='Failed, try again'; }
+    });
+  }catch(e){ if(box()) box().innerHTML='<p class="hint">The leaderboard needs an internet connection.</p>'; }
+}
+
+/* ---------- class leaderboard ----------
+   Optional and online only: the game itself works offline. Scores go to the Realtime Database
+   used by /coldwar, under stockshock/scores, through its REST API (no Firebase library).
+   Push keys are time ordered, so "last 7 days" is a key range query and needs no index rule.
+   Totals are always recomputed from the levers, like the teacher tab. */
+const LB_URL='https://coldwar-d8109-default-rtdb.asia-southeast1.firebasedatabase.app/stockshock/scores';
+const PUSH_CHARS='-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+const setName=(m)=>Engine.SEQ_NAMES[m];
+const boardName=(m,hard)=>Engine.SEQ_NAMES[m]+(hard?', Hard':'');
+let lbSortKey='total';
+function pushPrefix(ms){ let s=''; for(let i=0;i<8;i++){ s=PUSH_CHARS.charAt(ms%64)+s; ms=Math.floor(ms/64); } return s; }
+function lbPost(g){
+  if(g.posted||g.private||g.anon||!window.fetch) return Promise.resolve(null);
+  g.posted=true;
+  const body={n:g.name.slice(0,24),m:g.mode,d:g.seed,t:Math.round(g.s.total),v:2,x:g.hard?1:0,h:g.s.history.map(h=>levCode(h.lev)),at:{'.sv':'timestamp'}};
+  return fetch(LB_URL+'.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>{ if(!r.ok) throw new Error('save '+r.status); return true; });
+}
+// Only games played under the current rules count. Totals are recomputed; vs = profit minus pure JIC on the same shocks.
+function lbCheck(o){
+  try{
+    if(!o||o.v!==2||typeof o.n!=='string'||!o.n.trim()||!Engine.SEQ_NAMES[o.m]||!Array.isArray(o.h)||o.h.length!==CFG.rounds) return null;
+    const hard=o.x===1, maxSup=hard?2:1;
+    if(!o.h.every(x=>Array.isArray(x)&&x[0]>=0&&x[0]<=4000&&x[0]%200===0&&x[1]>=0&&x[1]<=4000&&x[1]%200===0&&Number.isInteger(x[2])&&x[2]>=0&&x[2]<=maxSup&&(x[3]===0||x[3]===1))) return null;
+    if(o.h.filter(x=>x[3]===1).length>1) return null;
+    if(!o.h.every((x,i)=>x[4]===undefined||x[4]===0||(x[4]===1&&[2,5,8].concat(hard?[4]:[]).includes(i+1)))) return null; // bonus only on question rounds
+    const seed='ABC'.includes(o.m)?0:(Math.floor(+o.d)||1), seq=Engine.seqFor(o.m,seed);
+    const st=codeRun({...o,d:seed}), jic=benchLevers(hard)[1];
+    const jicTotal=Engine.run(seq,jic.lev,{v:2,hard}).total;
+    return {name:o.n.trim().slice(0,24),mode:o.m,hard,total:st.total,vs:st.total-jicTotal,h:o.h,hist:st.history,at:o.at||0};
+  }catch(e){ return null; }
+}
+async function lbFetch(){
+  if(!window.fetch) throw new Error('offline');
+  const r=await fetch(`${LB_URL}.json?orderBy=%22$key%22&startAt=%22${pushPrefix(Date.now()-7*864e5)}%22`);
+  if(!r.ok) throw new Error('load '+r.status);
+  return (await r.json())||{};
+}
+async function lbLoad(){
+  const data=await lbFetch(), best={};
+  Object.values(data).forEach(o=>{
+    const row=lbCheck(o); if(!row) return;
+    const id=row.mode+'|'+(row.hard?1:0)+'|'+row.name.toLowerCase(), b=best[id];
+    if(!b) best[id]={name:row.name,mode:row.mode,hard:row.hard,total:row.total,vs:row.vs,games:1};
+    else { b.games++; if(row.total>b.total){ b.total=row.total; b.name=row.name; } b.vs=Math.max(b.vs,row.vs); }
+  });
+  return Object.values(best);
+}
+const lbSame=(r,g)=>!!g&&r.mode===g.mode&&r.hard===!!g.hard&&r.name.toLowerCase()===g.name.slice(0,24).trim().toLowerCase();
+function lbList(rows,me,limit,key=lbSortKey){
+  if(!rows.length) return '<p>No scores yet this week. Be the first!</p>';
+  rows=rows.slice().sort((a,b)=>b[key]-a[key]);
+  const val=(r)=>key==='vs'?(r.vs>=0?'+':'')+money(r.vs):money(r.total);
+  const li=(r,i)=>{ const m=lbSame(r,me); return `<li class="${m?'me':''}"><span class="rk${i<3?' rk'+(i+1):''}">${i+1}</span><span class="nm">${esc(r.name)}${m?' (you)':''}</span><span class="sc ${cls(r[key])}">${val(r)}</span><span class="gm">${r.games} game${r.games>1?'s':''}${key==='vs'?', vs pure JIC':''}</span></li>`; };
+  let out=rows.slice(0,limit).map(li).join('');
+  const k=me?rows.findIndex(r=>lbSame(r,me)):-1;
+  if(k>=limit) out+='<li class="gap">...</li>'+li(rows[k],k);
+  return `<ol class="lb">${out}</ol>`;
+}
+let lbCache=null;
+async function lbEnd(redraw){
+  const g=G, box=()=>(G===g?$('#lbBox'):null);
+  if(redraw&&lbCache&&lbCache.g===g){ if(box()) box().innerHTML=lbCache.note+lbList(lbCache.rows,g.private||g.anon?null:g,10); return; }
+  let note='';
+  if(g.private) note='<p class="hint">You chose to stay off the leaderboard, so this game was not added.</p>';
+  else if(g.anon) note='<p class="hint">Add a name next time to join the leaderboard.</p>';
+  try{ await lbPost(g); }catch(e){ note='<p class="hint">Could not save your score to the leaderboard.</p>'; }
+  try{
+    const rows=(await lbLoad()).filter(r=>r.mode===g.mode&&r.hard===!!g.hard);
+    lbCache={g,rows,note};
+    if(box()) box().innerHTML=note+lbList(rows,g.private||g.anon?null:g,10);
+  }catch(e){ if(box()) box().innerHTML=note+'<p class="hint">The leaderboard needs an internet connection.</p>'; }
+}
+function lbView(){
+  const cur=G?G.mode:'S', me=G&&!G.private&&!G.anon?G:null;
+  app.innerHTML=`<div class="card info"><h2>Class leaderboard</h2>
+    <p class="hint">Best score per player in the last 7 days. "Beat pure JIC by" compares each game with pure JIC on the same shocks, so lucky or unlucky shock orders matter less.</p>
+    <div class="ctl"><div><label for="lbSet">World</label><select id="lbSet">${['L','S','H','R'].map(v=>`<option value="${v}" ${v===cur?'selected':''}>${esc(setName(v))}</option>`).join('')}</select></div>
+    <div><label for="lbLvl">Level</label><select id="lbLvl"><option value="0">Standard</option><option value="1" ${G&&G.hard?'selected':''}>Hard</option></select></div>
+    <div><label>Order by</label><div class="seg" id="lbSort"><button data-k="total" class="${lbSortKey==='total'?'on':''}">Total profit</button><button data-k="vs" class="${lbSortKey==='vs'?'on':''}">Beat pure JIC by</button></div></div></div>
+    <div id="lbBox">Loading...</div></div>`;
+  let rows=null;
+  const draw=()=>{ if(!rows) return; const m=$('#lbSet').value, hard=$('#lbLvl').value==='1';
+    $('#lbBox').innerHTML=lbList(rows.filter(r=>r.mode===m&&r.hard===hard),me,100); };
+  $('#lbSet').onchange=draw; $('#lbLvl').onchange=draw;
+  document.querySelectorAll('#lbSort button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#lbSort button').forEach(o=>o.classList.toggle('on',o===b)); lbSortKey=b.dataset.k; draw(); });
+  lbLoad().then(r=>{ rows=r; if($('#lbSet')) draw(); })
+    .catch(()=>{ if($('#lbBox')) $('#lbBox').innerHTML='<p class="hint">The leaderboard needs an internet connection.</p>'; });
+}
+
+// Projector view for the teacher: big leaderboard plus what the class did, refreshed every 15 seconds.
+let classTimer=null;
+function classView(){
+  if(!teacherOK){ tab='teacher'; return teacherView(); }
+  const cur=G?G.mode:'S';
+  app.innerHTML=`<div class="card info"><h2>Class view</h2>
+    <div class="ctl"><div><label for="cvSet">World</label><select id="cvSet">${['L','S','H','R'].map(v=>`<option value="${v}" ${v===cur?'selected':''}>${esc(setName(v))}</option>`).join('')}</select></div>
+    <div><label for="cvLvl">Level</label><select id="cvLvl"><option value="0">Standard</option><option value="1">Hard</option></select></div>
+    <div><label>Order by</label><div class="seg" id="lbSort"><button data-k="total" class="${lbSortKey==='total'?'on':''}">Total profit</button><button data-k="vs" class="${lbSortKey==='vs'?'on':''}">Beat pure JIC by</button></div></div>
+    <label class="small inl"><input type="checkbox" id="cvRecent" checked> This lesson only (last 60 minutes)</label>
+    <button class="ghost" id="cvBack">Back to teacher tab</button></div>
+    <p class="hint" id="cvMsg">Loading...</p></div>
+  <div class="two"><div class="card bigboard"><h2>Leaderboard</h2><div id="cvBoard"></div></div>
+  <div class="card"><h2>What the class did</h2><div id="cvChart"></div><p class="hint">Lines: average reorder level and reorder quantity each round. Bars: share of players with a stock-out that round.</p></div></div>`;
+  let raw=null;
+  const draw=()=>{
+    if(!raw||!$('#cvBoard')) return;
+    const m=$('#cvSet').value, hard=$('#cvLvl').value==='1', since=$('#cvRecent').checked?Date.now()-3600e3:0;
+    const rows=Object.values(raw).map(lbCheck).filter(r=>r&&r.mode===m&&r.hard===hard&&(!since||r.at>=since));
+    const best={}; rows.forEach(r=>{ const id=r.name.toLowerCase(), b=best[id]; if(!b) best[id]={...r,games:1}; else { b.games++; if(r.total>b.total) b.total=r.total; b.vs=Math.max(b.vs,r.vs); } });
+    $('#cvBoard').innerHTML=lbList(Object.values(best),null,15);
+    $('#cvChart').innerHTML=classChart(rows);
+    $('#cvMsg').textContent=`${rows.length} game${rows.length===1?'':'s'} shown. Updated ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}.`;
+  };
+  const load=()=>lbFetch().then(d=>{ raw=d; draw(); }).catch(()=>{ if($('#cvMsg')) $('#cvMsg').textContent='The class view needs an internet connection.'; });
+  ['cvSet','cvLvl','cvRecent'].forEach(k=>$('#'+k).onchange=draw);
+  document.querySelectorAll('#lbSort button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#lbSort button').forEach(o=>o.classList.toggle('on',o===b)); lbSortKey=b.dataset.k; draw(); });
+  $('#cvBack').onclick=()=>{ tab='teacher'; render(); };
+  clearInterval(classTimer); load();
+  classTimer=setInterval(()=>{ if(tab!=='class'||!$('#cvBoard')){ clearInterval(classTimer); return; } load(); },15000);
+}
+function classChart(rows){
+  const W=520,H=260,L=50,R=14,T=16,B=32,n=CFG.rounds,x=i=>L+(W-L-R)*(i-0.5)/n,y=v=>T+(H-T-B)*(1-v/CFG.cap);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Class averages by round">`;
+  [0,1000,2000,3000,4000].forEach(v=>{ s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e2ef"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#5b5868">${units(v)}</text>`; });
+  for(let i=1;i<=n;i++) s+=`<text x="${x(i)}" y="${H-15}" font-size="11" text-anchor="middle" fill="#5b5868">${i}</text>`;
+  s+=`<text x="${(W+L)/2}" y="${H-2}" font-size="11" text-anchor="middle" fill="#5b5868">Round</text>`;
+  if(!rows.length) return s+`<text x="${W/2}" y="${H/2}" font-size="14" text-anchor="middle" fill="#5b5868">No games yet</text></svg>`;
+  const bw=(W-L-R)/n*0.6;
+  for(let i=1;i<=n;i++){ const share=rows.filter(r=>r.hist[i-1].stockout).length/rows.length, hgt=(H-T-B)*share;
+    s+=`<rect x="${x(i)-bw/2}" y="${H-B-hgt}" width="${bw}" height="${hgt}" fill="#f4c7cd"/>${share?`<text x="${x(i)}" y="${H-B-hgt-3}" font-size="10" text-anchor="middle" fill="#8c1d2c">${Math.round(share*100)}%</text>`:''}`; }
+  const line=(k,col,dash,label)=>{ const pts=[]; for(let i=1;i<=n;i++) pts.push([x(i),y(rows.reduce((a,r)=>a+r.h[i-1][k],0)/rows.length)]);
+    return `<path d="${pts.map((p,j)=>(j?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="3" stroke-dasharray="${dash}"/><text x="${pts[n-1][0]}" y="${pts[n-1][1]-6}" font-size="11" font-weight="bold" text-anchor="end" fill="${col}">${label}</text>`; };
+  s+=line(0,'#1f5fbf','6 4','Reorder level')+line(1,'#5b3d99','','Reorder quantity');
+  return s+'</svg>';
+}
+
+function render(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  app.classList.toggle('wide',tab==='play'&&(!G||G.view==='round'));
+  window.scrollTo(0,0);
+  if(anim){ anim.cancel=true; anim=null; }
+  if(tab==='teacher') return teacherView();
+  if(tab==='lb') return lbView();
+  if(tab==='class') return classView();
+  if(!G) return setupView();
+  if(G.view==='round') return roundView();
+  if(G.view==='result') return resultView();
+  return endView();
+}
+$('#tabPlay').onclick=()=>{tab='play';render();};
+$('#tabTeacher').onclick=()=>{tab='teacher';render();};
+$('#tabLb').onclick=()=>{tab='lb';render();};
+render();
+window.__G=()=>G; window.__start=startGame; window.__opts=(o)=>{ gameOpts={...gameOpts,...o}; }; window.__decode=decode;
+})();
+</script>
+</body>
+</html>
