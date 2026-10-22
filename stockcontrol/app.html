@@ -192,7 +192,11 @@ button.danger.arm{background:var(--red);color:#fff}
 .bigboard ol.lb li{font-size:20px}
 header{padding:8px 20px 0}
 main{padding-top:10px}
-.roundgrid{align-items:start}
+.roundgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);align-items:start}
+.roundgrid>*{margin-bottom:0}
+.colA .card{margin-bottom:12px}
+@media(min-width:761px){.roundgrid{grid-template-columns:minmax(0,1fr) minmax(0,1.12fr)}.roundgrid .colA,.roundgrid .colB{grid-column:1}.roundgrid .levers{grid-column:2;grid-row:1 / span 2}}
+@media(min-width:1180px){main.wide{max-width:1560px}.roundgrid{grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(380px,430px)}.roundgrid .colA{grid-column:1;grid-row:1}.roundgrid .colB{grid-column:2;grid-row:1}.roundgrid .levers{grid-column:3;grid-row:1}.colA .hud{flex-direction:column;align-items:stretch}.colA .news h2{font-size:19px}}
 .roundgrid .bar{margin-top:0}
 .levers{padding:14px 18px}
 .levers label{margin:8px 0 2px}
@@ -219,7 +223,7 @@ button.ghost.mini{padding:3px 10px;font-size:13px;margin-top:4px;border-width:2p
 .build .brow{display:flex;gap:10px;align-items:center;justify-content:space-between}
 .build .brow button{padding:5px 12px;flex:none}
 .build details>summary{font-size:14px}
-@media(min-width:761px){.roundgrid{grid-template-columns:minmax(0,1fr) minmax(0,1.12fr)}}
+
 .levers .forecast{margin:10px 0;padding:6px 12px;line-height:1.55}
 .levers .quiz{margin:0 0 10px}
 @media(min-width:761px){.levers{position:sticky;top:10px}}
@@ -878,13 +882,14 @@ function roundView(){
   const supOpt=(k)=>{ const sp=sups[k], off=sp.cap&&!s.built&&!lev.build, sub=hard?(k===0?`$${sp.cost}, ${sp.lead} weeks, shocks`:k===1?`$${sp.cost}, 1 week, no delays`:`$${sp.cost} + ${money(sp.fixed)}/round`):(k===0?'Cheapest':'Shocks hit half as hard');
     return `<div class="opt ${lev.sup===k?'sel':''}${off?' off':''}" data-d="${k}"><input type="radio" name="sp" ${lev.sup===k?'checked':''} ${off?'disabled':''}><div><b>${hard?['Global','Local','Make'][k]:(k===0?'Single':'Dual: '+money(CFG.dualFee))}</b><br><span class="small">${sub}</span>${k===2&&canBuild?`<br><button class="ghost mini" id="buildBtn">${lev.build?'Cancel build':'Build line'}</button>`:''}</div></div>`; };
   app.innerHTML=`
-  <div class="two roundgrid">
-   <div>
+  <div class="roundgrid">
+   <div class="colA">
     <div class="bar"><i style="width:${pct}%"></i></div>
     <div class="hud"><span class="pill">Round <b>${r}</b> of ${CFG.rounds}</span><span class="pill">Profit <b class="${cls(s.total)}">${money(s.total)}</b></span><span class="pill small">${esc(G.name)}, ${esc(Engine.SEQ_NAMES[G.mode])}${hard?', Hard':''}</span></div>
     ${cardView(card)}
     ${r===1?'<p class="coach">Drag the sliders and watch the shelves change. Then press Run.</p>':''}
-    <div class="card stage">
+   </div>
+    <div class="card stage colB">
       <div class="scenebox">${sceneSVG({stock:stockNow,rl:lev.rl,buffer:0,moods:Array(nCats(demand)).fill('neutral'),crate:crateText(arrNow,due[0]),late:card.delay>0})}</div>
       <div class="facts"><span>In stock <b>${units(stockNow)}</b>${arrNow?` (${units(arrNow)} just delivered)`:''}</span><span>Cats want <b>${units(demand)}</b>${hard&&s.goodwill?` <span class="x">(down ${units(s.goodwill)}: unhappy cats from last round)</span>`:''}</span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span>${s.built?`<span>Canning line <b>built</b></span>`:''}</div>
       <p class="hint">1 can = 100 units. 1 cat wants 100. Cans go off after ${Engine.RULES.life} rounds on the shelf.</p>
@@ -892,7 +897,6 @@ function roundView(){
       <div id="chartBox" class="${G.showTheory?'':'hidden'}"><h3 class="charth">Stock control chart</h3>${stockControlChart(s.history,{rl:lev.rl,buffer:0,qty:lev.qty,nowStock:stockNow,arrNow,live:true})}
         <h3 class="charth">Revenue, costs and profit each round</h3>${profitChart(s.history)}</div>
     </div>
-   </div>
     <div class="card todo levers">
       <label for="rl">Reorder level: <span class="out" id="rlo"></span></label>
       <input id="rl" type="range" min="0" max="4000" step="200" value="${lev.rl}">
@@ -1334,6 +1338,7 @@ function classChart(rows){
 
 function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  app.classList.toggle('wide',tab==='play'&&!!G&&G.view==='round');
   window.scrollTo(0,0);
   if(anim){ anim.cancel=true; anim=null; }
   if(tab==='teacher') return teacherView();
