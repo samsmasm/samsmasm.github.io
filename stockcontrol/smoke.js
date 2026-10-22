@@ -51,6 +51,10 @@ const answer = (right = true) => { if (d.querySelector('#quiz')) { d.querySelect
 
 (async () => {
 check(d.querySelectorAll('#worldPick .world').length === 4 && d.querySelectorAll('.world.lvl').length === 2 && d.querySelector('#quizOn').checked, 'setup offers four worlds, two levels, questions on by default');
+click('#go');
+check(!w.__G() && /Type your name/.test(d.querySelector('#nmMsg').textContent), 'cannot start without a name');
+d.querySelector('#nm').value = '   '; click('#go');
+check(!w.__G(), 'a blank name does not count');
 d.querySelector('#nm').value = 'Test Team'; click('#go');
 
 // 2. Round 1 scene: stock 800 and demand 800 give 8 cans and 8 cats
