@@ -9,14 +9,26 @@ const check = (ok, msg) => { console.log((ok ? 'PASS ' : 'FAIL ') + msg); if (!o
 check(html.split(String.fromCharCode(8212)).length - 1 === 0, 'built HTML has no em dashes');
 
 const errs = [];
+const posts = [], store = {
+  '-A0': { n: 'Cheat', m: 'A', d: 0, t: 999999, h: Array(10).fill([800, 1200, 0]) },
+  '-A1': { n: 'Broken', m: 'A', d: 0, t: 5, h: [[1, 2, 3]] },
+};
+let fetchUrls = [];
+const fakeFetch = (url, opt = {}) => {
+  fetchUrls.push(url);
+  if (opt.method === 'POST') { const b = JSON.parse(opt.body); posts.push(b); store['-P' + posts.length] = b; return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'x' }) }); }
+  return Promise.resolve({ ok: true, json: () => Promise.resolve(JSON.parse(JSON.stringify(store))) });
+};
+const tick = () => new Promise((r) => setTimeout(r, 30));
 const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'http://localhost/?fast', pretendToBeVisual: true,
-  beforeParse(w) { w.scrollTo = () => {}; w.__fast = true; w.addEventListener('error', (e) => errs.push(e.message)); } });
+  beforeParse(w) { w.scrollTo = () => {}; w.__fast = true; w.fetch = fakeFetch; w.addEventListener('error', (e) => errs.push(e.message)); } });
 const w = dom.window, d = w.document;
 const click = (sel) => d.querySelector(sel).click();
 const setRange = (sel, v) => { const el = d.querySelector(sel); el.value = v; el.dispatchEvent(new w.Event('input')); };
 const sadCount = () => d.querySelectorAll('[data-cat][data-mood="sad"]').length;
 const lostShown = () => { const g = d.querySelector('#scLost'); return !!g && g.getAttribute('display') !== 'none' && /Lost sale/.test(g.textContent); };
 
+(async () => {
 d.querySelector('#nm').value = 'Test Team'; click('#go');
 
 // 2. Round 1 scene: stock 800 and demand 800 give 8 cans and 8 cats
@@ -56,6 +68,17 @@ check(sawDel > 0, 'played at least one round with a delivery');
 const txt = d.body.textContent;
 check(/Final result: Test Team/.test(txt) && /Debrief/.test(txt), 'end screen shown');
 
+// 8. Leaderboard: public named game saves once, board recomputes totals and drops bad rows
+await tick();
+check(posts.length === 1 && posts[0].n === 'Test Team' && posts[0].h.length === 10, 'public game saved to leaderboard once');
+check(posts[0].h.every((x, i) => x[0] === w.__G().s.history[i].lev.buffer && x[1] === w.__G().s.history[i].lev.qty), 'saved levers match the game');
+check(fetchUrls.some((u) => /orderBy=%22\$key%22&startAt=%22/.test(u)), 'leaderboard loads by time-ordered key');
+const lbTxt = d.querySelector('#lbBox').textContent;
+const cheatTrue = Math.round(Engine.run(Engine.seqFor('A', 0), { buffer: 800, qty: 1200, dual: false }).total);
+check(/Test Team \(you\)/.test(lbTxt), 'leaderboard shows you');
+check(/Cheat/.test(lbTxt) && !/999,999/.test(lbTxt) && lbTxt.includes('$' + cheatTrue.toLocaleString('en-US')), 'leaderboard recomputes edited totals');
+check(!/Broken/.test(lbTxt), 'leaderboard skips invalid rows');
+
 // 5. Replay card, scrub slider 0 to 10, totals match Engine.run
 const G = w.__G();
 check(!!d.querySelector('#replay'), 'replay card present');
@@ -91,6 +114,10 @@ d.querySelector('#codes').value = code + '\n' + code.replace(/.$/, '') + '\n';
 d.querySelector('#build').click();
 console.log('leaderboard rows:', d.querySelectorAll('#lb table tr').length, /could not be read/.test(d.body.textContent));
 
+// 9. Leaderboard tab renders
+d.querySelector('#tabLb').click(); await tick();
+check(/Test Team/.test(d.querySelector('#lbBox').textContent) && d.querySelector('#lbSet'), 'leaderboard tab lists players');
+
 // 4b. A game built to stock out: buffer 0, order 400
 d.querySelector('#tabPlay').click();
 w.__start('Out Team', 'A', 0);
@@ -103,9 +130,20 @@ for (let r = 1; r <= 10; r++) {
   click('#next');
 }
 check(sawOut > 0, 'played at least one stock-out round');
+await tick();
+
+// 10. Private game sends nothing
+const before = posts.length;
+d.querySelector('#fresh').click();
+d.querySelector('#nm').value = 'Private Pat'; d.querySelector('#priv').checked = true; click('#go');
+for (let r = 1; r <= 10; r++) { click('#run'); click('#next'); }
+await tick();
+check(posts.length === before, 'private game is not saved');
+check(/stay off the leaderboard/.test(d.querySelector('#lbBox').textContent), 'private game explains it was not added');
 
 // 1. No uncaught errors
 check(errs.length === 0, 'no uncaught errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 
 if (fails.length) { console.error(`\n${fails.length} check(s) FAILED`); process.exit(1); }
 console.log('\nAll checks passed.');
+})().catch((e) => { console.error(e); process.exit(1); });

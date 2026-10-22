@@ -129,6 +129,17 @@ details[open]>summary{margin-bottom:10px}
 .drift{animation:sdrift 40s linear infinite}
 @keyframes sdrift{from{transform:translateX(0)}to{transform:translateX(-470px)}}
 .wheel{transform-box:fill-box;transform-origin:50% 50%}
+ol.lb{list-style:none;margin:8px 0;padding:0}
+ol.lb li{display:grid;grid-template-columns:40px 1fr auto;gap:2px 10px;align-items:center;background:#fff;border-radius:14px;padding:8px 12px;margin:6px 0;box-shadow:0 3px 0 rgba(91,61,153,.10)}
+ol.lb li.me{background:#fffbe0;outline:3px solid #f2a33a}
+ol.lb li.gap{display:block;background:none;box-shadow:none;text-align:center;color:var(--muted);padding:0}
+ol.lb .rk{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:bold;background:#ece8f4;color:var(--purple);grid-row:span 2}
+ol.lb .rk1{background:#ffd95e;color:#5a3a00}
+ol.lb .rk2{background:#dde3ea;color:#33404d}
+ol.lb .rk3{background:#f0b98a;color:#5a2e0a}
+ol.lb .nm{font-weight:bold;overflow-wrap:anywhere}
+ol.lb .sc{font-weight:bold;font-size:18px;text-align:right;grid-row:span 2}
+ol.lb .gm{font-size:13px;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -149,7 +160,7 @@ details[open]>summary{margin-bottom:10px}
 </defs></svg>
 <header>
   <h1><svg viewBox="0 0 24 32" width="26" height="34" aria-hidden="true"><rect width="24" height="32" rx="4" fill="url(#gCan)" stroke="#fff" stroke-width="1.5"/><rect x="1" y="10" width="22" height="13" fill="url(#gLab)"/><path d="M5 16.5 q5 -5 10 0 q-5 5 -10 0z M15 16.5 l4.5 -4 v8z" fill="#1f5fbf"/></svg>Stock Shock!</h1>
-  <nav><button id="tabPlay" class="on">Play</button><button id="tabTeacher">Teacher</button></nav>
+  <nav><button id="tabPlay" data-tab="play" class="on">Play</button><button id="tabLb" data-tab="lb">Leaderboard</button><button id="tabTeacher" data-tab="teacher">Teacher</button></nav>
 </header>
 <main id="app"></main>
 
@@ -278,8 +289,9 @@ const defaultLev = { buffer: 800, qty: 1200, dual: false };
 
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+let lbPrivate=false;
 function startGame(name, mode, seed){
-  G = { name: name||'Player', mode, seed, seq: Engine.seqFor(mode, seed), s: Engine.newState(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
+  G = { name: name||'Player', anon: !name, private: lbPrivate, posted: false, mode, seed, seq: Engine.seqFor(mode, seed), s: Engine.newState(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
   render();
 }
 
@@ -696,6 +708,7 @@ function setupView(){
   </div>
   <div class="card"><h2>Start</h2>
     <label for="nm">Name or team name</label><input id="nm" type="text" maxlength="24" placeholder="e.g. Team Kanban">
+    <label class="small inl" style="margin-top:10px"><input type="checkbox" id="priv" ${lbPrivate?'checked':''}> Keep me off the class leaderboard</label>
     <p><button class="primary" id="go">Start round 1</button></p>
     <details><summary>Shock set (teacher)</summary>
     <label for="sq">Shock sequence</label>
@@ -744,7 +757,7 @@ function setupView(){
   </div>
   </details>`;
   $('#sq').onchange=()=>{ $('#seedBox').classList.toggle('hidden', $('#sq').value!=='R'); };
-  $('#go').onclick=()=>{ const m=$('#sq').value; startGame($('#nm').value.trim(), m, m==='R'?(+$('#sd').value||1):0); };
+  $('#go').onclick=()=>{ lbPrivate=$('#priv').checked; const m=$('#sq').value; startGame($('#nm').value.trim(), m, m==='R'?(+$('#sd').value||1):0); };
 }
 
 function cardView(c, rn=G.s.round+1){
@@ -914,6 +927,7 @@ function endView(){
     <p class="lead">${verdict}</p>
     <div class="facts"><span>Stock-out rounds <b>${so}</b></span><span>Lost to stock-outs <b>${money(lost)}</b></span><span>Holding paid <b>${money(holdTot)}</b></span><span>Dual fees <b>${money(feeTot)}</b></span></div>
   </div>
+  <div class="card" id="lbCard"><h2>Class leaderboard</h2><p class="hint">Best score per player in the last 7 days: ${esc(setName(G.mode,G.seed))}.</p><div id="lbBox">Loading...</div></div>
   ${replayCard(lines)}
   <div class="card"><h3>Score code for your teacher</h3><code class="codebox" id="code">${code}</code>
     <p><button class="ghost" id="copy">Copy code</button> <span class="small" id="cmsg"></span></p></div>
@@ -946,6 +960,7 @@ function endView(){
   $('#copy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(code).then(()=>{$('#cmsg').textContent='Copied.';},()=>{$('#cmsg').textContent='Select the code above and copy it.';}); };
   $('#fresh').onclick=()=>{G=null;render();};
   rpInit(lines);
+  lbEnd();
 }
 
 function teacherView(){
@@ -982,11 +997,90 @@ function teacherView(){
   };
 }
 
+/* ---------- class leaderboard ----------
+   Optional and online only: the game itself works offline. Scores go to the Realtime Database
+   used by /coldwar, under stockshock/scores, through its REST API (no Firebase library).
+   Push keys are time ordered, so "last 7 days" is a key range query and needs no index rule.
+   Totals are always recomputed from the levers, like the teacher tab. */
+const LB_URL='https://coldwar-d8109-default-rtdb.asia-southeast1.firebasedatabase.app/stockshock/scores';
+const PUSH_CHARS='-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+const setName=(m,d)=>Engine.SEQ_NAMES[m]+(m==='R'?' #'+d:'');
+function pushPrefix(ms){ let s=''; for(let i=0;i<8;i++){ s=PUSH_CHARS.charAt(ms%64)+s; ms=Math.floor(ms/64); } return s; }
+function lbPost(g){
+  if(g.posted||g.private||g.anon||!window.fetch) return Promise.resolve(null);
+  g.posted=true;
+  const body={n:g.name.slice(0,24),m:g.mode,d:g.seed,t:Math.round(g.s.total),h:g.s.history.map(h=>[h.lev.buffer,h.lev.qty,h.lev.dual?1:0]),at:{'.sv':'timestamp'}};
+  return fetch(LB_URL+'.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>{ if(!r.ok) throw new Error('save '+r.status); return true; });
+}
+function lbCheck(o){
+  try{
+    if(!o||typeof o.n!=='string'||!o.n.trim()||!Engine.SEQ_NAMES[o.m]||!Array.isArray(o.h)||o.h.length!==CFG.rounds) return null;
+    if(!o.h.every(x=>Array.isArray(x)&&x[0]>=0&&x[0]<=3200&&x[0]%200===0&&x[1]>=400&&x[1]<=4000&&x[1]%200===0&&(x[2]===0||x[2]===1))) return null;
+    const seed=o.m==='R'?(Math.floor(+o.d)||1):0;
+    const st=Engine.run(Engine.seqFor(o.m,seed),(i)=>({buffer:o.h[i][0],qty:o.h[i][1],dual:!!o.h[i][2]}));
+    return {name:o.n.trim().slice(0,24),mode:o.m,seed,total:st.total};
+  }catch(e){ return null; }
+}
+// Best score per player and shock set over the last 7 days.
+async function lbLoad(){
+  if(!window.fetch) throw new Error('offline');
+  const r=await fetch(`${LB_URL}.json?orderBy=%22$key%22&startAt=%22${pushPrefix(Date.now()-7*864e5)}%22`);
+  if(!r.ok) throw new Error('load '+r.status);
+  const data=(await r.json())||{}, best={};
+  Object.values(data).forEach(o=>{
+    const row=lbCheck(o); if(!row) return;
+    const id=row.mode+'|'+row.seed+'|'+row.name.toLowerCase(), b=best[id];
+    if(!b) best[id]={...row,games:1};
+    else { b.games++; if(row.total>b.total){ b.total=row.total; b.name=row.name; } }
+  });
+  return Object.values(best).sort((a,b)=>b.total-a.total);
+}
+const lbSame=(r,g)=>!!g&&r.mode===g.mode&&r.seed===(g.mode==='R'?g.seed:0)&&r.name.toLowerCase()===g.name.slice(0,24).trim().toLowerCase();
+function lbList(rows,me,limit){
+  if(!rows.length) return '<p>No scores yet this week. Be the first!</p>';
+  const li=(r,i)=>{ const m=lbSame(r,me); return `<li class="${m?'me':''}"><span class="rk${i<3?' rk'+(i+1):''}">${i+1}</span><span class="nm">${esc(r.name)}${m?' (you)':''}</span><span class="sc ${cls(r.total)}">${money(r.total)}</span><span class="gm">${r.games} game${r.games>1?'s':''}</span></li>`; };
+  let out=rows.slice(0,limit).map(li).join('');
+  const k=me?rows.findIndex(r=>lbSame(r,me)):-1;
+  if(k>=limit) out+='<li class="gap">...</li>'+li(rows[k],k);
+  return `<ol class="lb">${out}</ol>`;
+}
+async function lbEnd(){
+  const g=G, box=()=>(G===g?$('#lbBox'):null);
+  let note='';
+  if(g.private) note='<p class="hint">You chose to stay off the leaderboard, so this game was not added.</p>';
+  else if(g.anon) note='<p class="hint">Add a name next time to join the leaderboard.</p>';
+  try{ await lbPost(g); }catch(e){ note='<p class="hint">Could not save your score to the leaderboard.</p>'; }
+  try{
+    const rows=(await lbLoad()).filter(r=>r.mode===g.mode&&r.seed===(g.mode==='R'?g.seed:0));
+    if(box()) box().innerHTML=note+lbList(rows,g.private||g.anon?null:g,10);
+  }catch(e){ if(box()) box().innerHTML=note+'<p class="hint">The leaderboard needs an internet connection.</p>'; }
+}
+function lbView(){
+  const cur=G?(G.mode==='R'?'R'+G.seed:G.mode):'A', me=G&&!G.private&&!G.anon?G:null;
+  app.innerHTML=`<div class="card info"><h2>Class leaderboard</h2>
+    <p class="hint">Best score per player in the last 7 days. Pick a shock set to compare like with like.</p>
+    <label for="lbSet">Shock set</label><select id="lbSet"><option value="${cur}">${esc(setName(cur[0],+cur.slice(1)||0))}</option></select>
+    <div id="lbBox">Loading...</div></div>`;
+  let rows=[];
+  const draw=()=>{ const v=$('#lbSet').value, m=v[0], d=m==='R'?+v.slice(1):0;
+    $('#lbBox').innerHTML=lbList(rows.filter(r=>r.mode===m&&r.seed===d),me,100); };
+  $('#lbSet').onchange=draw;
+  lbLoad().then(r=>{
+    rows=r; if(!$('#lbSet')) return;
+    const sets=['A','B','C'].concat([...new Set(r.filter(x=>x.mode==='R').map(x=>'R'+x.seed))]);
+    if(!sets.includes(cur)) sets.push(cur);
+    $('#lbSet').innerHTML=sets.map(v=>`<option value="${v}" ${v===cur?'selected':''}>${esc(setName(v[0],+v.slice(1)||0))}</option>`).join('');
+    draw();
+  }).catch(()=>{ if($('#lbBox')) $('#lbBox').innerHTML='<p class="hint">The leaderboard needs an internet connection.</p>'; });
+}
+
 function render(){
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',(b.id==='tabPlay')===(tab==='play')));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   window.scrollTo(0,0);
   if(anim){ anim.cancel=true; anim=null; }
   if(tab==='teacher') return teacherView();
+  if(tab==='lb') return lbView();
   if(!G) return setupView();
   if(G.view==='round') return roundView();
   if(G.view==='result') return resultView();
@@ -994,6 +1088,7 @@ function render(){
 }
 $('#tabPlay').onclick=()=>{tab='play';render();};
 $('#tabTeacher').onclick=()=>{tab='teacher';render();};
+$('#tabLb').onclick=()=>{tab='lb';render();};
 render();
 window.__G=()=>G; window.__start=startGame; window.__decode=decode;
 })();

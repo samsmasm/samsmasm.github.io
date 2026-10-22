@@ -27,7 +27,7 @@ python3 build.py && node smoke.js
 
 ## Hard constraints
 
-- Single self-contained HTML file. No external requests, fonts, images, frameworks or CDNs. Must work offline on student devices and a projector. Draw everything with inline SVG and CSS.
+- Single self-contained HTML file. No external fonts, images, frameworks or CDNs. Must work offline on student devices and a projector. Draw everything with inline SVG and CSS. The one exception is the optional class leaderboard (see below), which uses `fetch` and fails quietly offline.
 - No localStorage or other persistence. State lives in the `G` object in memory.
 - Never use em dashes anywhere (code comments, UI text, docs). Use commas, colons or hyphens.
 - Do not put assessment objective labels (AO1, AO2 and so on) in any UI text.
@@ -134,3 +134,12 @@ Lives in `samsmasm.github.io/stockcontrol/`, served at unisam.nz/stockcontrol/. 
 ## Player-facing copy (decided 2026-10-22)
 
 Players are distracted grade 11 students who experiment rather than read. Keep every screen scannable: the decision or outcome first, in a few words, with numbers in bold. Explanations live in collapsed `<details>` (full rules and key terms on the setup screen, profit breakdown on the result screen, "All the numbers" and "Debrief" on the end screen). The original rules, key terms, worked example and debrief text are kept word for word inside those sections. The stock chart is on by default.
+
+## Class leaderboard (added 2026-10-22)
+
+- Scores are stored in the Realtime Database of the Cold War game (`coldwar-d8109`, asia-southeast1), under `stockshock/scores`, via the REST API with `fetch`. No Firebase library and no rule changes: Sam agreed to share that database.
+- Each save: `{n, m, d, t, h, at}` (same fields as the score code plus a server timestamp). Only named, non-private players are saved, once per game (`G.posted`).
+- "Last 7 days" uses `orderBy="$key"&startAt=<push id for now minus 7 days>`. Push keys are time ordered, so no `.indexOn` rule is needed.
+- Totals shown are always recomputed from `h` with `Engine.run`; malformed rows are skipped. Best score per name and shock set, with a games count.
+- Setup has "Keep me off the class leaderboard" (`lbPrivate`). The end screen shows the top 10 plus your row; the Leaderboard tab has a shock-set picker.
+- `smoke.js` stubs `fetch` with a fake store, so tests never write to the real database.
