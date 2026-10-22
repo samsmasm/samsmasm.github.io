@@ -261,6 +261,11 @@ check(/Hard/.test(d.body.textContent) && /local supplier/.test(d.body.textConten
   check(/buffer stock \+ \(usage x lead time\)/.test(box.querySelector('.eq').textContent) && d.querySelector('.opt.sel') === sel, 'help switches terms and does not change choices');
   d.body.click(); check(box.hidden, 'clicking elsewhere hides the help'); }
 
+{ // results picture uses the normal delivery time, not this round's delay
+  w.__opts({ quiz: false, hard: false }); w.__start('Buf', 'A', 0);
+  for (let r = 1; r <= 5; r++) { setRange('#rl', 1600); click('#run'); if (r < 5) click('#next'); }
+  check(w.__G().last.card.delay === 2 && d.querySelector('#scBf').getAttribute('data-cans') === '8' && !/No buffer/.test(d.querySelector('#scBfT').textContent), 'results after a delay round show the planned buffer at normal delivery time'); }
+
 // 1. No uncaught errors
 check(errs.length === 0, 'no uncaught errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 
