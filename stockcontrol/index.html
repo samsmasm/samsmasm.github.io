@@ -87,7 +87,9 @@ label.inl{display:inline-flex;gap:8px;align-items:center;margin:0;font-weight:no
 .optrow .opt{margin:0}
 .hint{font-size:14px;color:var(--muted)}
 .forecast{background:#fff;border:2px solid var(--line);border-radius:10px;padding:8px 12px;margin:14px 0;line-height:1.7}
-.forecast .x{color:var(--red);font-weight:bold}
+.forecast .x,.ltime .x{color:var(--red);font-weight:bold}
+.ltime{display:flex;gap:10px;align-items:center;font-size:19px;background:#fff;border:2px solid var(--blue);border-radius:10px;padding:8px 12px;margin:14px 0 0}
+.ltime.late{border-color:var(--red);background:var(--red-bg)}
 .coach{background:var(--blue-bg);border:2px dashed var(--blue);color:var(--blue);border-radius:10px;padding:8px 12px;font-weight:bold}
 details>summary{cursor:pointer;color:var(--blue);font-weight:bold;font-size:17px}
 details[open]>summary{margin-bottom:10px}
@@ -341,7 +343,7 @@ function catSVG(j,mood,away){
 function setMood(el,mood){ el.setAttribute('data-mood',mood); el.querySelector('.face').innerHTML=catFace(mood,FUR[+el.getAttribute('data-cat')%FUR.length][1]); }
 function coinSVG(t,x,y){ return `<g data-coin="${t}" transform="translate(${x},${y})"><circle r="6.5" fill="${COIN[t][0]}" stroke="#5b4a1a"/><text y="3.3" font-size="9" font-weight="bold" text-anchor="middle" fill="#1d1b25">${COIN[t][1]}</text></g>`; }
 const lostText=(h)=>`Lost sale: ${units(h.lost)} units (${money(h.lostProfit)} profit)`;
-function crateText(arrNow,o){ return arrNow?`Arriving this week: ${units(arrNow)}`:(o?`On order ${units(o.qty)}: arrives round ${o.arrive}`:''); }
+function crateText(arrNow,o){ return arrNow?`Just delivered: ${units(arrNow)}`:(o?`On order ${units(o.qty)}: arrives round ${o.arrive}`:''); }
 // o: {stock, buffer, moods:[...], crate:'label', lost:h|null, hold:number|null}
 function sceneSVG(o){
   const buf=o.buffer/100, rl=Engine.reorderLevel(o.buffer)/100, rp=stepPath(rl), bp=stepPath(buf), cans=nCans(o.stock), xr=SC.X0+10*SC.SW;
@@ -395,7 +397,7 @@ function animView(h,crate){
   <div class="bar"><i style="width:${(h.round-1)/CFG.rounds*100}%"></i></div>
   ${cardView(h.card,h.round)}
   <div class="card">
-    <div class="scenebox">${sceneSVG({stock:h.startStock-h.arrivedQty,buffer:h.lev.buffer,moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0})}</div>
+    <div class="scenebox">${sceneSVG({stock:h.startStock,buffer:h.lev.buffer,moods:Array(nCats(h.demand)).fill('neutral'),crate,hold:0})}</div>
     <p id="animMsg" class="lead" aria-live="polite" style="min-height:1.6em;font-weight:bold"></p>
     <p><button class="ghost" id="skip">Skip animation</button></p>
   </div>`;
@@ -411,20 +413,7 @@ async function runAnim(h,crate){
   const msg=(t)=>{ $('#animMsg').textContent=t; };
   const sv=$('#scene'), cansG=$('#scCans'), fly=$('#scFly'), buf=h.lev.buffer/100;
   try{
-    // 1. Delivery
-    if(h.arrivedQty>0){
-      msg(`Delivery: +${units(h.arrivedQty)}`);
-      setCrate(`Delivered: ${units(h.arrivedQty)}`);
-      const from=nCans(h.startStock-h.arrivedQty), to=nCans(h.startStock), gap=Math.min(60,700/Math.max(1,to-from)), ps=[];
-      for(let i=from;i<to;i++){
-        cansG.insertAdjacentHTML('beforeend',canSVG(i,buf));
-        const el=cansG.lastElementChild, [x,y]=canPos(i);
-        el.setAttribute('transform',`translate(${x},${y-240})`);
-        ps.push(sleep((i-from)*gap).then(()=>tween(el,[x,y-240],[x,y],450,a)));
-      }
-      await wait(Promise.all(ps)); await wait(sleep(400));
-    }
-    // 2. Order
+    // 1. Order
     const due=G.s.pipeline.find(o=>o.arrive>h.round);
     if(h.ordered){
       setCrate(null); await wait(sleep(200));
@@ -436,7 +425,7 @@ async function runAnim(h,crate){
       msg(due?'Order already on the way':'Above the reorder level: no order');
       await wait(sleep(700));
     }
-    // 3. Customers
+    // 2. Customers
     const cats=[...sv.querySelectorAll('[data-cat]')], nc=cats.length, sad=sadCats(h), happy=nc-sad, per=Math.min(300,2400/nc);
     msg(`Cats want ${units(h.demand)}`);
     for(let j=0;j<happy;j++){
@@ -459,7 +448,7 @@ async function runAnim(h,crate){
       $('#scLost').removeAttribute('display'); $('#scLostT').textContent=lostText(h);
       await wait(Promise.all(ps)); await wait(sleep(900));
     } else { msg(`All fed: ${units(h.sold)} sold`); await wait(sleep(500)); }
-    // 4. Holding cost
+    // 3. Holding cost
     if(h.endStock>0){
       msg(`${units(h.endStock)} left over: -${money(h.holding)} to hold`);
       const coins=$('#scCoins'), left=cansG.children.length, ps=[];
@@ -681,8 +670,8 @@ function roundView(){
   ${r===1?'<p class="coach">Drag the sliders and watch the shelves change. Then press Run.</p>':''}
   <div class="two">
     <div class="card">
-      <div class="scenebox">${sceneSVG({stock:s.onHand,buffer:lev.buffer,moods:Array(nCats(card.demand)).fill('neutral'),crate:crateText(arrNow,due[0])})}</div>
-      <div class="facts"><span>In stock <b>${units(s.onHand)}</b></span><span>Cats want <b>${units(card.demand)}</b></span><span>Arriving <b>${units(arrNow)}</b></span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span></div>
+      <div class="scenebox">${sceneSVG({stock:s.onHand+arrNow,buffer:lev.buffer,moods:Array(nCats(card.demand)).fill('neutral'),crate:crateText(arrNow,due[0])})}</div>
+      <div class="facts"><span>In stock <b>${units(s.onHand+arrNow)}</b>${arrNow?` (${units(arrNow)} just delivered)`:''}</span><span>Cats want <b>${units(card.demand)}</b></span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span></div>
       <p class="hint">1 can = 100 units. 1 cat wants 100.</p>
       <label class="small inl"><input type="checkbox" id="th" ${G.showTheory?'checked':''}> Show stock chart</label>
       <div id="chartBox" class="${G.showTheory?'':'hidden'}">${stockChart()}</div>
@@ -700,6 +689,7 @@ function roundView(){
         <div class="opt ${!lev.dual?'sel':''}" data-d="0"><input type="radio" name="sp" ${!lev.dual?'checked':''}><div><b>Single</b><br><span class="small">Cheapest</span></div></div>
         <div class="opt ${lev.dual?'sel':''}" data-d="1"><input type="radio" name="sp" ${lev.dual?'checked':''}><div><b>Dual: ${money(CFG.dualFee)}</b><br><span class="small">Shocks hit half as hard</span></div></div>
       </div>
+      <div id="lt" class="ltime"></div>
       <div id="prev" class="forecast"></div>
       <div class="runrow"><button class="primary" id="run">Run round ${r}</button><label class="small inl"><input type="checkbox" id="fast" ${fastMode?'checked':''}> Fast mode (no animation)</label></div>
     </div>
@@ -719,9 +709,20 @@ function roundView(){
     } else t+=`Order: none (stock ${units(after)} is above reorder level ${units(rl)})`;
     if(lev.qty<=CFG.baseDemand && lev.buffer>0) t+='<br><span class="hint">Tip: order more than 800 or your buffer never fills.</span>';
     $('#prev').innerHTML=t;
+    const dl=lev.dual?Math.min(card.delay,1):card.delay, ld=CFG.baseLead+dl;
+    $('#lt').className='ltime'+(dl?' late':'');
+    $('#lt').innerHTML=`<svg viewBox="0 0 22 20" width="26" height="24" aria-hidden="true"><rect width="22" height="20" rx="2" fill="#c89b5e" stroke="#6b4a22" stroke-width="1.5"/><path d="M1 1 L21 19 M21 1 L1 19" stroke="#6b4a22"/></svg><span>Delivery time: <b>${ld} round${ld>1?'s':''}</b>${dl?` <span class="x">(${dl} late${lev.dual?', dual supplier':''})</span>`:''}</span>`;
     G.lev=lev; stockChartUpdate(); sceneLevers(lev.buffer);
   };
   $('#bf').oninput=upd; $('#qy').oninput=upd; upd();
+  if(arrNow>0&&!skipAnim()){
+    const a={cancel:false}, from=nCans(s.onHand), to=nCans(s.onHand+arrNow), gap=Math.min(60,700/Math.max(1,to-from));
+    for(let i=from;i<to;i++){
+      const el=document.querySelector(`#scene [data-can="${i}"]`), [x,y]=canPos(i);
+      el.setAttribute('transform',`translate(${x},${y-240})`);
+      setTimeout(()=>tween(el,[x,y-240],[x,y],450,a),200+(i-from)*gap);
+    }
+  }
   document.querySelectorAll('.opt').forEach(el=>el.onclick=()=>{
     lev.dual=el.dataset.d==='1';
     document.querySelectorAll('.opt').forEach(o=>{o.classList.toggle('sel',o===el);o.querySelector('input').checked=(o===el);});
@@ -752,7 +753,7 @@ function resultView(){
   </div>
   <div class="card">
     <div class="scenebox">${sceneSVG({stock:h.endStock,buffer:h.lev.buffer,moods:Array.from({length:nCats(h.demand)},(_,j)=>j<nCats(h.demand)-sadCats(h)?'happy':'sad'),crate:crateText(0,due),lost:h.lost?h:null,hold:h.holding})}</div>
-    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span><span>Sold <b>${units(h.sold)}</b></span><span>Left over <b>${units(h.endStock)}</b></span></div>
+    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span>${h.ordered?`<span>Delivery time <b>${h.ordered.lead} round${h.ordered.lead>1?'s':''}</b></span>`:''}<span>Sold <b>${units(h.sold)}</b></span><span>Left over <b>${units(h.endStock)}</b></span></div>
     ${h.holding>0?'<p class="hint">Jar coins: S storage, I insurance and security, O opportunity cost.</p>':''}
     <details><summary>Profit breakdown</summary>
       <table>

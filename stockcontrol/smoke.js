@@ -33,11 +33,14 @@ check(d.querySelectorAll('#scene [data-can] .cb[stroke="#1f7a45"]').length === 8
 setRange('#bf', 800);
 check(d.querySelector('#scRl').getAttribute('data-cans') === '16', 'reorder line back to 16 cans for buffer 800');
 
-let sawOut = 0, sawCalm = 0;
+let sawOut = 0, sawCalm = 0, sawDel = 0;
 for (let r = 1; r <= 10; r++) {
   if (!d.querySelector('#run')) throw new Error('no run button round ' + r);
   if (r === 3) { setRange('#bf', 1200); setRange('#qy', 1600); }
   if (r === 5) d.querySelectorAll('.opt')[1].click();
+  { const st = w.__G().s, arr = st.pipeline.filter((o) => o.arrive <= r).reduce((t, o) => t + o.qty, 0);
+    if (arr) sawDel++;
+    check(d.querySelectorAll('#scene [data-can]').length === Math.ceil((st.onHand + arr) / 100), `round ${r} scene shows stock after this round's delivery`); }
   click('#run');
   if (!d.querySelector('#next')) throw new Error('no next round ' + r);
   // 4. Moods match the stock-out result
@@ -48,6 +51,7 @@ for (let r = 1; r <= 10; r++) {
   click('#next');
 }
 check(sawCalm > 0, 'played at least one no-stock-out round');
+check(sawDel > 0, 'played at least one round with a delivery');
 
 const txt = d.body.textContent;
 check(/Final result: Test Team/.test(txt) && /Debrief/.test(txt), 'end screen shown');
