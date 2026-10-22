@@ -133,6 +133,8 @@ lbTxt = d.querySelector('#lbBox').textContent;
 const cheatVs = Math.round(cheatTrue - Engine.run(cheatSeq, { rl: 4000, qty: 2400, sup: 0 }, STD).total);
 check(/vs pure JIC/.test(lbTxt) && lbTxt.includes((cheatVs >= 0 ? '+$' : '-$') + Math.abs(cheatVs).toLocaleString('en-US')), 'leaderboard can order by beating pure JIC');
 d.querySelector('#lbSort [data-k="total"]').click();
+{ const o = d.querySelector('#rpLegend [data-key="o0"]');
+  check(!!o && /Cheat/.test(o.parentNode.textContent) && /other order/.test(o.parentNode.textContent) && +o.getAttribute('data-total') === cheatTrue && !d.querySelector('#rpLegend [data-key="o1"]') && !!d.querySelector('#rp-stock-o0'), 'replay adds other players in this world, named, with recomputed totals (not you)'); }
 
 // 5. Replay card, scrub slider 0 to 10, totals match Engine.run
 const G = w.__G();

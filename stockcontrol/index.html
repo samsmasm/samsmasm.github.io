@@ -913,7 +913,7 @@ function replayLines(bm){
     {key:'hyb',name:'Hybrid',who:'the hybrid',h:bm[2].s.history,col:'#86828f',w:2.5,dash:'2 4',opt:true},
   ].map(L=>({...L, stock:[CFG.startStock].concat(L.h.map(h=>h.endStock)), cum:[0].concat(L.h.map(h=>h.total))}));
 }
-const RP={W:520,H:250,L:66,R:84,T:16,B:32};
+const RP={W:540,H:250,L:66,R:104,T:16,B:32};
 function rpScale(kind,lines){
   const n=CFG.rounds, x=i=>RP.L+(RP.W-RP.L-RP.R)*i/n;
   let mn=0, mx=CFG.cap;
@@ -930,7 +930,7 @@ function rpChart(kind,lines){
   s+=`<text x="${(RP.W-RP.R+RP.L)/2}" y="${RP.H-1}" font-size="13" text-anchor="middle" fill="#5b5868">Round</text>`;
   s+=`<line id="rp-${kind}-cur" y1="${RP.T}" y2="${RP.H-RP.B}" stroke="#bcd2f3" stroke-width="2"/>`;
   lines.slice().reverse().forEach(L=>{
-    s+=`<path id="rp-${kind}-${L.key}" fill="none" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}" stroke-linejoin="round"/><text id="rp-${kind}-${L.key}-l" font-size="13" fill="${L.key==='you'?L.col:'#5b5868'}"${L.key==='you'?' font-weight="bold"':''}>${L.name}</text>`;
+    s+=`<path id="rp-${kind}-${L.key}" fill="none" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}" stroke-linejoin="round"/><text id="rp-${kind}-${L.key}-l" font-size="13" fill="${L.key==='you'?L.col:'#5b5868'}"${L.key==='you'?' font-weight="bold"':''}>${esc(L.name.slice(0,12))}</text>`;
   });
   if(kind==='stock') lines[0].h.forEach((h,i)=>{ if(!h.stockout) return;
     const cx=x(i+1), cy=y(h.endStock), ty=cy-15-(i%2)*14;
@@ -939,6 +939,7 @@ function rpChart(kind,lines){
 }
 function replayCard(lines){
   return `<div class="card" id="replay"><h2>Replay your game</h2>
+    ${lines.some(L=>L.other)?'<p class="hint">Coloured dashed lines: the last other players in this world. They had the same events in a different order.</p>':''}
     <div id="rpNews" class="rpnews"></div>
     <div id="rpLegend" class="rplegend"></div>
     <h3>Stock left each round</h3>${rpChart('stock',lines)}
@@ -965,9 +966,9 @@ function rpText(n){
   const vis=rp.lines.filter(L=>!L.opt||rp.hyb);
   $('#rpRd').textContent=n; $('#rpScrub').value=n;
   $('#rpNews').innerHTML=n===0?`<b>Start: everyone has ${units(CFG.startStock)} units in stock</b>`:`<b>Round ${n}: ${esc(G.seq[n-1].title)}</b>${rpChips(G.seq[n-1])}`;
-  $('#rpLegend').innerHTML=vis.map(L=>`<span><svg width="30" height="10" aria-hidden="true"><line x1="0" x2="30" y1="5" y2="5" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}"/></svg>${L.name}: <b data-key="${L.key}" data-total="${Math.round(L.cum[n])}">${money(L.cum[n])}</b></span>`).join('');
+  $('#rpLegend').innerHTML=vis.map(L=>`<span><svg width="30" height="10" aria-hidden="true"><line x1="0" x2="30" y1="5" y2="5" stroke="${L.col}" stroke-width="${L.w}" stroke-dasharray="${L.dash}"/></svg>${esc(L.name)}${L.other?' (other order)':''}: <b data-key="${L.key}" data-total="${Math.round(L.cum[n])}">${money(L.cum[n])}</b></span>`).join('');
   if(n===0){ $('#rpCap').textContent='Round 0: same start for everyone.'; return; }
-  const parts=vis.map(L=>{ const h=L.h[n-1]; return `${L.name} ${units(h.endStock)}${h.lost?` (lost ${units(h.lost)} sales)`:''}`; });
+  const parts=vis.map(L=>{ const h=L.h[n-1]; return `${L.name.slice(0,14)} ${units(h.endStock)}${h.lost?` (lost ${units(h.lost)} sales)`:''}`; });
   $('#rpCap').textContent=`Round ${n}, ${G.seq[n-1].title}. Stock left: ${parts.join(', ')}.`;
 }
 function rpDraw(t){
@@ -984,11 +985,27 @@ function rpDraw(t){
       const last=pts[pts.length-1]; if(show) labs.push({lb,x:x(last[0])+7,y:y(last[1])+4});
     });
     labs.sort((a,b)=>a.y-b.y); for(let i=1;i<labs.length;i++) if(labs[i].y-labs[i-1].y<14) labs[i].y=labs[i-1].y+14;
+    const over=labs.length?labs[labs.length-1].y-(RP.H-RP.B+4):0; if(over>0) labs.forEach(l=>{ l.y-=over; }); // keep names inside the chart
     labs.forEach(l=>{ l.lb.setAttribute('x',l.x); l.lb.setAttribute('y',l.y); });
     const cur=$(`#rp-${kind}-cur`); cur.setAttribute('x1',x(t)); cur.setAttribute('x2',x(t));
   });
   document.querySelectorAll('.rp-so').forEach(g=>g.setAttribute('display',+g.getAttribute('data-round')<=n?'inline':'none'));
   if(n!==rp.n){ rp.n=n; rpText(n); }
+}
+// The last three other players in the same world and level, added to the replay once the leaderboard loads.
+const OTHER_STYLE=[['#e07b39','6 3'],['#2a9d8f','10 3 2 3'],['#d65db1','2 3']];
+async function rpLoadOthers(g){
+  try{
+    const data=await lbFetch(), me=g.name.trim().slice(0,24).toLowerCase();
+    const rows=Object.values(data).map(lbCheck).filter(r=>r&&r.mode===g.mode&&r.hard===!!g.hard&&r.name.toLowerCase()!==me).sort((a,b)=>b.at-a.at);
+    const seen=new Set(), pick=[];
+    for(const r of rows){ const k=r.name.toLowerCase(); if(seen.has(k)) continue; seen.add(k); pick.push(r); if(pick.length===3) break; }
+    if(!pick.length||G!==g||!rp||!rp.el.isConnected) return;
+    const others=pick.map((r,k)=>({key:'o'+k,name:r.name,who:r.name,h:r.hist,col:OTHER_STYLE[k][0],w:2.5,dash:OTHER_STYLE[k][1],other:true}))
+      .map(L=>({...L,stock:[CFG.startStock].concat(L.h.map(h=>h.endStock)),cum:[0].concat(L.h.map(h=>h.total))}));
+    const lines=rp.lines.filter(L=>!L.other).concat(others), keep={t:rp.t,playing:rp.playing,hyb:rp.hyb,speed:rp.speed};
+    rp.playing=false; rp.el.outerHTML=replayCard(lines); rpInit(lines,keep);
+  }catch(e){}
 }
 function rpLoop(){
   const r=rp; if(r.raf) return;
@@ -1003,9 +1020,10 @@ function rpLoop(){
   };
   r.raf=requestAnimationFrame(step);
 }
-function rpInit(lines){
+function rpInit(lines,keep){
   const still=reduceMotion()||fastMode||!!window.__fast;
-  rp={lines,el:$('#replay'),t:still?CFG.rounds:0,n:-1,playing:!still,speed:1,hyb:false,reduce:reduceMotion(),raf:null};
+  rp={lines,el:$('#replay'),t:still?CFG.rounds:0,n:-1,playing:!still,speed:1,hyb:false,reduce:reduceMotion(),raf:null,...(keep||{})};
+  if(keep){ $('#rpHyb').checked=rp.hyb; $('#rpSpeed').value=String(rp.speed); }
   rpDraw(rp.t);
   const play=()=>{ if(rp.t>=CFG.rounds){ rp.t=0; } rp.playing=true; rpLoop(); };
   $('#rpPlay').onclick=play;
@@ -1482,6 +1500,7 @@ function endView(){
   document.querySelectorAll('#lbSort button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#lbSort button').forEach(o=>o.classList.toggle('on',o===b)); lbSortKey=b.dataset.k; lbEnd(true); });
   rpInit(lines);
   lbEnd();
+  rpLoadOthers(G);
 }
 
 const TEACHER_CODE='0987'; // low stakes: only unlocks the teacher tab
