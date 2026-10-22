@@ -266,6 +266,11 @@ check(/Hard/.test(d.body.textContent) && /local supplier/.test(d.body.textConten
   for (let r = 1; r <= 5; r++) { setRange('#rl', 1600); click('#run'); if (r < 5) click('#next'); }
   check(w.__G().last.card.delay === 2 && d.querySelector('#scBf').getAttribute('data-cans') === '8' && !/No buffer/.test(d.querySelector('#scBfT').textContent), 'results after a delay round show the planned buffer at normal delivery time'); }
 
+{ w.__opts({ quiz: false, hard: false }); w.__start('Zero', 'A', 0);
+  check(d.querySelector('#qy').getAttribute('min') === '0', 'reorder quantity slider starts at 0');
+  setRange('#qy', 0); check(/reorder quantity is 0/.test(d.querySelector('#prev').textContent), 'reorder quantity 0 means no order');
+  click('#run'); check(!w.__G().last.ordered, 'no order is placed with reorder quantity 0'); }
+
 // 1. No uncaught errors
 check(errs.length === 0, 'no uncaught errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 

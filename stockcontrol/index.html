@@ -1224,7 +1224,7 @@ function roundView(){
       <div class="hint">Order when stock falls to this. Reorder level = buffer you want + usage (${units(USAGE)} sold a week) x delivery time.</div>
       <div id="bfo" class="bufout"></div>
       <label for="qy">Reorder quantity: <span class="out" id="qyo"></span>${tip('qty')}</label>
-      <input id="qy" type="range" min="400" max="4000" step="200" value="${lev.qty}">
+      <input id="qy" type="range" min="0" max="4000" step="200" value="${lev.qty}">
       <div class="hint">Cans per order. ${units(Engine.RULES.bulkMin)} or more: ${Math.round(Engine.RULES.bulkDisc*100)}% bulk discount.${tip('bulk')}</div>
       <label>Supplier${tip(hard?'suppliers':'supplier')}</label>
       <div class="optrow${hard?' three':''}">${sups.map((_,k)=>supOpt(k)).join('')}</div>
@@ -1248,7 +1248,8 @@ function roundView(){
     else if(stockNow<=lev.rl){
       let qq=Math.min(lev.qty,CFG.cap-stockNow); if(L.sp.cap) qq=Math.min(qq,L.sp.cap);
       const bulk=!L.sp.cap&&qq>=Engine.RULES.bulkMin;
-      t+= qq>0 ? `Order: <b>${units(qq)}</b> now, arrives round <b>${r+L.lead}</b>${lev.qty>qq?(L.sp.cap&&qq===L.sp.cap?' (line capacity)':' (shelves full)'):''}${bulk?' with bulk discount':''}` : 'Order: none, shelves are full';
+      if(lev.qty===0) t+='Order: none (reorder quantity is 0)';
+      else t+= qq>0 ? `Order: <b>${units(qq)}</b> now, arrives round <b>${r+L.lead}</b>${lev.qty>qq?(L.sp.cap&&qq===L.sp.cap?' (line capacity)':' (shelves full)'):''}${bulk?' with bulk discount':''}` : 'Order: none, shelves are full';
     } else t+=`Order: none (stock ${units(stockNow)} is above your reorder level ${units(lev.rl)})`;
     $('#prev').innerHTML=`<div class="ltime${L.delay?' late':''}" id="lt"><svg viewBox="0 0 22 20" width="22" height="20" aria-hidden="true"><rect width="22" height="20" rx="2" fill="#c89b5e" stroke="#6b4a22" stroke-width="1.5"/><path d="M1 1 L21 19 M21 1 L1 19" stroke="#6b4a22"/></svg><span>Delivery time${tip('lead')}: <b>${L.lead} round${L.lead>1?'s':''}</b>${L.delay?` <span class="x">(${L.delay} late)</span>`:''}</span></div>`+t;
     G.lev=lev; ccUpdate(lev.rl,buffer,lev.qty); sceneLevers(lev.rl,buffer);
@@ -1595,7 +1596,7 @@ function lbCheck(o){
   try{
     if(!o||o.v!==2||typeof o.n!=='string'||!o.n.trim()||!Engine.SEQ_NAMES[o.m]||!Array.isArray(o.h)||o.h.length!==CFG.rounds) return null;
     const hard=o.x===1, maxSup=hard?2:1;
-    if(!o.h.every(x=>Array.isArray(x)&&x[0]>=0&&x[0]<=4000&&x[0]%200===0&&x[1]>=400&&x[1]<=4000&&x[1]%200===0&&Number.isInteger(x[2])&&x[2]>=0&&x[2]<=maxSup&&(x[3]===0||x[3]===1))) return null;
+    if(!o.h.every(x=>Array.isArray(x)&&x[0]>=0&&x[0]<=4000&&x[0]%200===0&&x[1]>=0&&x[1]<=4000&&x[1]%200===0&&Number.isInteger(x[2])&&x[2]>=0&&x[2]<=maxSup&&(x[3]===0||x[3]===1))) return null;
     if(o.h.filter(x=>x[3]===1).length>1) return null;
     if(!o.h.every((x,i)=>x[4]===undefined||x[4]===0||(x[4]===1&&[2,5,8].concat(hard?[4]:[]).includes(i+1)))) return null; // bonus only on question rounds
     const seed='ABC'.includes(o.m)?0:(Math.floor(+o.d)||1), seq=Engine.seqFor(o.m,seed);
