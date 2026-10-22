@@ -262,6 +262,11 @@ button.ghost.mini{padding:3px 10px;font-size:13px;margin-top:4px;border-width:2p
 .charth{margin:14px 0 2px;font-size:15px}
 button.primary:disabled,button.ghost:disabled{background:#c3c6cf;color:#f4f4f7;box-shadow:0 5px 0 #9a9da8;cursor:not-allowed;border-color:#c3c6cf}
 button.primary:disabled:hover{background:#c3c6cf}
+button.tip{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;margin:0 0 0 6px;border-radius:50%;border:2px solid var(--blue);background:#fff;color:var(--blue);font:bold 12px/1 Verdana,sans-serif;cursor:help;vertical-align:middle;box-shadow:none}
+button.tip:hover,button.tip:focus{background:var(--blue);color:#fff;outline:none}
+.tipbox{position:fixed;z-index:60;background:#fff;border:3px solid var(--purple);border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.45;box-shadow:0 6px 0 rgba(91,61,153,.18)}
+.tipbox b{display:block;color:var(--purple);margin-bottom:2px}
+.tipbox .eq{margin-top:6px;background:var(--purple-bg);border-radius:8px;padding:5px 8px;font-weight:bold}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -519,6 +524,49 @@ function leadFor(lev,card,hard,built){
   return {sp,si,delay,lead:sp.lead+delay};
 }
 const bufferFor=(rl,lead)=>rl-USAGE*lead;
+
+/* ---------- term help: "?" buttons with a definition and an equation ---------- */
+const TERMS={
+  reorder:['Reorder level','The stock level that triggers a new order. When stock falls to it, you order.','Reorder level = buffer stock + (usage x lead time)'],
+  buffer:['Buffer stock (safety stock)','The minimum stock you plan to keep, as protection against late deliveries and demand surges. It cannot go below 0.','Buffer stock = reorder level - (usage x lead time)'],
+  qty:['Reorder quantity','How many units you order each time you reorder.','Maximum stock = buffer stock + reorder quantity'],
+  usage:['Usage rate','How much stock is sold in a week. Normally 800 cans here.','Weeks of stock left = stock / usage'],
+  lead:['Lead time (delivery time)','The time between placing an order and receiving it. Shocks can make it longer.','Delivery round = order round + lead time'],
+  max:['Maximum stock level','The most stock you plan to hold, just after a delivery arrives.','Maximum stock = buffer stock + reorder quantity'],
+  holding:['Storage (holding) costs','The cost of keeping stock: storage space, insurance and security, and money tied up that could be used elsewhere.','Storage costs = units left over x $1 a round'],
+  stockout:['Stock-out','Customers want more than you have, so sales are lost.','Profit lost = lost sales x $8 per unit'],
+  bulk:['Bulk-buying discount','A lower price per unit for big orders (purchasing economies of scale). An advantage of JIC.','Cost = quantity x $12 x 0.95 (orders of 2,000 or more)'],
+  supplier:['Single or dual supplier','A single supplier is cheapest. A dual (second) supplier costs $500 a round but spreads the risk of supply shocks.','Dual: delays capped at +1 week, price rises halved'],
+  suppliers:['Global or local supplier','Global suppliers are cheaper but further away, so lead times are longer and more exposed to shocks. Local suppliers cost more but are quicker and more reliable.','Global: $12 a can, 2 weeks. Local: $13 a can, 1 week'],
+  ctm:['Cost to make vs cost to buy','Making your own has fixed costs plus a low cost per unit. Buying has no fixed cost but a higher price per unit.','CTM = fixed costs + (variable cost x quantity). CTB = price x quantity'],
+  cu:['Capacity utilisation rate','How much of the maximum possible output is actually being used.','Capacity utilisation = (actual output / maximum output) x 100'],
+  prod:['Productivity rate','How much output each worker produces.','Productivity = total output / number of workers'],
+  chart:['Stock control chart','Shows stock over time: it falls as you sell and jumps up when a delivery arrives. The gap between ordering and delivery is the lead time.','Reorder level = buffer + (usage x lead time). Maximum stock = buffer + reorder quantity'],
+  profit:['Revenue, costs and profit','Revenue is money from sales. Costs here are the cans sold, storage, fees, and cans that went off.','Revenue = units sold x $20. Profit = revenue - total costs'],
+  jit:['Just in time (JIT)','Hold little or no buffer stock. Order so deliveries arrive just as stock is needed. Low storage costs, but risky if supply is disrupted.','Buffer about 0, so reorder level = usage x lead time'],
+  jic:['Just in case (JIC)','Hold large buffer stocks in case of disruption or demand surges. Safe, but storage costs are high and stock can go off.','Large buffer: reorder level well above usage x lead time'],
+};
+const tip=(k)=>`<button type="button" class="tip" data-tip="${k}" aria-label="What is ${esc(TERMS[k][0])}?">?</button>`;
+(function(){
+  const box=document.createElement('div'); box.className='tipbox'; box.setAttribute('role','tooltip'); box.hidden=true; document.body.appendChild(box);
+  let cur=null;
+  const show=(b)=>{ const t=TERMS[b.dataset.tip]; if(!t) return; cur=b;
+    box.innerHTML=`<b>${t[0]}</b><div>${t[1]}</div><div class="eq">${t[2]}</div>`; box.hidden=false;
+    const r=b.getBoundingClientRect(), w=Math.min(320,innerWidth-24), left=Math.max(12,Math.min(innerWidth-w-12,r.left+r.width/2-w/2));
+    box.style.width=w+'px'; box.style.left=left+'px';
+    const h=box.offsetHeight, below=r.bottom+8;
+    box.style.top=(below+h>innerHeight-8&&r.top-h-8>0?r.top-h-8:below)+'px'; };
+  const hide=()=>{ box.hidden=true; cur=null; };
+  document.addEventListener('mouseover',(e)=>{ const b=e.target.closest&&e.target.closest('.tip'); if(b) show(b); });
+  document.addEventListener('mouseout',(e)=>{ const b=e.target.closest&&e.target.closest('.tip'); if(b&&b===cur&&!b.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('focusin',(e)=>{ if(e.target.classList&&e.target.classList.contains('tip')) show(e.target); });
+  document.addEventListener('focusout',(e)=>{ if(e.target===cur) hide(); });
+  // capture phase: a tap shows the help without also choosing the card the button sits on
+  document.addEventListener('click',(e)=>{ const b=e.target.closest&&e.target.closest('.tip');
+    if(b){ e.stopPropagation(); e.preventDefault(); if(cur===b&&!box.hidden) hide(); else show(b); } else if(!box.hidden) hide(); },true);
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') hide(); });
+  window.addEventListener('scroll',hide,{passive:true});
+})();
 
 /* ---------- charts ---------- */
 const CC={W:520,H:256,L:48,R:16,T:34,B:32};
@@ -1047,7 +1095,7 @@ function setupView(){
     <p><button class="primary" id="go">Start round 1</button></p>
   </div>
   <div class="card info hero"><div class="tiles"><div class="tile">${icon('-3 -3 28 36','<rect width="22" height="30" rx="4" fill="url(#gCan)" stroke="#6f7884"/>'+canArt())}<div><b>+${money(CFG.price-CFG.cost)}</b> profit per unit sold (1 can = 100 units)</div></div>
-      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> a round for every unit left over (storage)</div></div>
+      <div class="tile">${icon('-11 -13 22 26',coinSVG('s',0,0))}<div><b>-${money(CFG.holdPerUnit)}</b> a round for every unit left over (storage)${tip('holding')}</div></div>
       <div class="tile">${icon('-20 -34 40 64',catArt(4,'sad'))}<div><b>No can, no sale.</b> Hungry cats leave.</div></div></div>
   </div>
   </div>
@@ -1118,7 +1166,7 @@ function roundView(){
   const sups=supsFor(hard), canBuild=hard&&r>=4&&!s.built, q=G.quiz&&G.qDone!==r?makeQuestion(r):null;
   if(hard&&!s.built&&!lev.build&&lev.sup===2) lev.sup=0;
   const pct=(r-1)/CFG.rounds*100;
-  const supOpt=(k)=>{ const sp=sups[k], off=sp.cap&&!s.built&&!lev.build, sub=hard?(k===0?`$${sp.cost}, ${sp.lead} weeks, shocks`:k===1?`$${sp.cost}, 1 week, no delays`:`$${sp.cost} + ${money(sp.fixed)}/round`):(k===0?'Cheapest':'Shocks hit half as hard');
+  const supOpt=(k)=>{ const sp=sups[k], off=sp.cap&&!s.built&&!lev.build, sub=hard?(k===0?`$${sp.cost}, ${sp.lead} weeks, shocks`:k===1?`$${sp.cost}, 1 week, no delays`:`$${sp.cost} + ${money(sp.fixed)}/round${tip('ctm')}`):(k===0?'Cheapest':'Shocks hit half as hard');
     return `<div class="opt ${lev.sup===k?'sel':''}${off?' off':''}" data-d="${k}"><input type="radio" name="sp" ${lev.sup===k?'checked':''} ${off?'disabled':''}><div><b>${hard?['Global','Local','Make'][k]:(k===0?'Single':'Dual: '+money(CFG.dualFee))}</b><br><span class="small">${sub}</span>${k===2&&canBuild?`<br><button class="ghost mini" id="buildBtn">${lev.build?'Cancel build':'Build line'}</button>`:''}</div></div>`; };
   app.innerHTML=`
   <div class="roundgrid">
@@ -1130,21 +1178,21 @@ function roundView(){
    </div>
     <div class="card stage colB">
       <div class="scenebox">${sceneSVG({stock:stockNow,rl:lev.rl,buffer:0,moods:Array(nCats(demand)).fill('neutral'),crate:crateText(arrNow,due[0]),late:card.delay>0})}</div>
-      <div class="facts"><span>In stock <b>${units(stockNow)}</b>${arrNow?` (${units(arrNow)} just delivered)`:''}</span><span>Cats want <b>${units(demand)}</b>${hard&&s.goodwill?` <span class="x">(down ${units(s.goodwill)}: unhappy cats from last round)</span>`:''}</span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span>${s.built?`<span>Canning line <b>built</b></span>`:''}</div>
+      <div class="facts"><span>In stock <b>${units(stockNow)}</b>${arrNow?` (${units(arrNow)} just delivered)`:''}</span><span>Cats want${tip('usage')} <b>${units(demand)}</b>${hard&&s.goodwill?` <span class="x">(down ${units(s.goodwill)}: unhappy cats from last round)</span>`:''}</span><span>On order <b>${due.length?units(due[0].qty)+' (round '+due[0].arrive+')':'none'}</b></span>${s.built?`<span>Canning line <b>built</b></span>`:''}</div>
       <p class="hint">1 can = 100 units. 1 cat wants 100. Cans go off after ${Engine.RULES.life} rounds on the shelf.</p>
       <label class="small inl"><input type="checkbox" id="th" ${G.showTheory?'checked':''}> Show charts</label>
-      <div id="chartBox" class="${G.showTheory?'':'hidden'}"><h3 class="charth">Stock control chart</h3>${stockControlChart(s.history,{rl:lev.rl,buffer:0,qty:lev.qty,nowStock:stockNow,arrNow,live:true})}
-        <h3 class="charth">Revenue, costs and profit each round</h3>${profitChart(s.history)}</div>
+      <div id="chartBox" class="${G.showTheory?'':'hidden'}"><h3 class="charth">Stock control chart${tip('chart')}</h3>${stockControlChart(s.history,{rl:lev.rl,buffer:0,qty:lev.qty,nowStock:stockNow,arrNow,live:true})}
+        <h3 class="charth">Revenue, costs and profit each round${tip('profit')}</h3>${profitChart(s.history)}</div>
     </div>
     <div class="card todo levers">
-      <label for="rl">Reorder level: <span class="out" id="rlo"></span></label>
+      <label for="rl">Reorder level: <span class="out" id="rlo"></span>${tip('reorder')}</label>
       <input id="rl" type="range" min="0" max="4000" step="200" value="${lev.rl}">
       <div class="hint">Order when stock falls to this. Reorder level = buffer you want + usage (${units(USAGE)} sold a week) x delivery time.</div>
       <div id="bfo" class="bufout"></div>
-      <label for="qy">Reorder quantity: <span class="out" id="qyo"></span></label>
+      <label for="qy">Reorder quantity: <span class="out" id="qyo"></span>${tip('qty')}</label>
       <input id="qy" type="range" min="400" max="4000" step="200" value="${lev.qty}">
-      <div class="hint">Cans per order. ${units(Engine.RULES.bulkMin)} or more: ${Math.round(Engine.RULES.bulkDisc*100)}% bulk discount.</div>
-      <label>Supplier</label>
+      <div class="hint">Cans per order. ${units(Engine.RULES.bulkMin)} or more: ${Math.round(Engine.RULES.bulkDisc*100)}% bulk discount.${tip('bulk')}</div>
+      <label>Supplier${tip(hard?'suppliers':'supplier')}</label>
       <div class="optrow${hard?' three':''}">${sups.map((_,k)=>supOpt(k)).join('')}</div>
       <div id="prev" class="forecast"></div>
       ${q?`<div class="quiz" id="quiz"><b class="q">Quick question: ${money(Engine.RULES.quizBonus)} bonus if right (unlocks Run)</b><div class="qt">${q.text}</div>
@@ -1157,18 +1205,18 @@ function roundView(){
     $('#rlo').textContent=units(lev.rl); $('#qyo').textContent=units(lev.qty);
     const L=leadFor(lev,card,hard,s.built), buffer=bufferFor(lev.rl,L.lead);
     $('#bfo').className='bufout'+(buffer<0?' x':'');
-    $('#bfo').innerHTML=buffer>=0?`Buffer when the delivery arrives: <b>${units(buffer)}</b> (reorder level ${units(lev.rl)} - usage ${units(USAGE)} x ${L.lead} week${L.lead>1?'s':''})`:`<b>No buffer.</b> You sell ${units(USAGE)} a week, so you need ${units(USAGE*L.lead)} to cover the ${L.lead}-week wait, so you will be <b>${units(-buffer)} short</b> before the delivery arrives.`;
+    $('#bfo').innerHTML=buffer>=0?`Buffer when the delivery arrives: <b>${units(buffer)}</b> (reorder level ${units(lev.rl)} - usage ${units(USAGE)} x ${L.lead} week${L.lead>1?'s':''})${tip('buffer')}`:`<b>No buffer.</b> You sell ${units(USAGE)} a week, so you need ${units(USAGE*L.lead)} to cover the ${L.lead}-week wait, so you will be <b>${units(-buffer)} short</b> before the delivery arrives.${tip('buffer')}`;
     const out=s.pipeline.filter(o=>o.arrive>r).length>0;
     const sold=Math.min(demand,stockNow), lostU=demand-sold;
     let t='<b>If you press Run:</b><br>';
-    t+=lostU?`<span class="x">X Stock-out: sell ${units(sold)}, lose ${units(lostU)}</span><br>`:`Yes: all ${units(demand)} sold<br>`;
+    t+=lostU?`<span class="x">X Stock-out: sell ${units(sold)}, lose ${units(lostU)}</span>${tip('stockout')}<br>`:`Yes: all ${units(demand)} sold<br>`;
     if(out) t+='Order: one is already on the way';
     else if(stockNow<=lev.rl){
       let qq=Math.min(lev.qty,CFG.cap-stockNow); if(L.sp.cap) qq=Math.min(qq,L.sp.cap);
       const bulk=!L.sp.cap&&qq>=Engine.RULES.bulkMin;
       t+= qq>0 ? `Order: <b>${units(qq)}</b> now, arrives round <b>${r+L.lead}</b>${lev.qty>qq?(L.sp.cap&&qq===L.sp.cap?' (line capacity)':' (shelves full)'):''}${bulk?' with bulk discount':''}` : 'Order: none, shelves are full';
     } else t+=`Order: none (stock ${units(stockNow)} is above your reorder level ${units(lev.rl)})`;
-    $('#prev').innerHTML=`<div class="ltime${L.delay?' late':''}" id="lt"><svg viewBox="0 0 22 20" width="22" height="20" aria-hidden="true"><rect width="22" height="20" rx="2" fill="#c89b5e" stroke="#6b4a22" stroke-width="1.5"/><path d="M1 1 L21 19 M21 1 L1 19" stroke="#6b4a22"/></svg><span>Delivery time: <b>${L.lead} round${L.lead>1?'s':''}</b>${L.delay?` <span class="x">(${L.delay} late)</span>`:''}</span></div>`+t;
+    $('#prev').innerHTML=`<div class="ltime${L.delay?' late':''}" id="lt"><svg viewBox="0 0 22 20" width="22" height="20" aria-hidden="true"><rect width="22" height="20" rx="2" fill="#c89b5e" stroke="#6b4a22" stroke-width="1.5"/><path d="M1 1 L21 19 M21 1 L1 19" stroke="#6b4a22"/></svg><span>Delivery time${tip('lead')}: <b>${L.lead} round${L.lead>1?'s':''}</b>${L.delay?` <span class="x">(${L.delay} late)</span>`:''}</span></div>`+t;
     G.lev=lev; ccUpdate(lev.rl,buffer,lev.qty); sceneLevers(lev.rl,buffer);
   };
   $('#rl').oninput=upd; $('#qy').oninput=upd; upd();
@@ -1285,13 +1333,13 @@ function resultView(){
     ${h.spoiled?`<div class="warn">${units(h.spoiled)} cans went off after ${Engine.RULES.life} rounds on the shelf: ${money(h.spoilCost)} thrown away.</div>`:''}
     ${G.hard&&h.nextGoodwill?`<div class="bad">Unhappy cats tell their friends: next round's demand drops by ${units(h.nextGoodwill)}.</div>`:''}
     <p class="lead">This round <b class="${cls(h.profit)}">${money(h.profit)}</b> &nbsp; Total <b class="${cls(h.total)}">${money(h.total)}</b></p>
-    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span>${h.ordered?`<span>Delivery time <b>${h.ordered.lead} round${h.ordered.lead>1?'s':''}</b></span>`:''}${h.ordered&&h.ordered.bulk?'<span>Bulk discount <b>yes</b></span>':''}<span>Sold <b>${units(h.sold)}</b></span><span>Left over <b>${units(h.endStock)}</b></span>${h.bonus?`<span>Question bonus <b class="pos">+${money(h.bonus)}</b></span>`:''}${h.built?`<span>Capacity utilisation <b>${Math.round(h.util*100)}%</b></span><span>Productivity <b>${units(h.productivity)}</b> cans per worker</span>`:''}</div>
+    <div class="facts"><span>Delivered <b>${units(h.arrivedQty)}</b></span><span>Ordered <b>${h.ordered?units(h.ordered.qty)+' (round '+h.ordered.arrive+')':'none'}</b></span>${h.ordered?`<span>Delivery time <b>${h.ordered.lead} round${h.ordered.lead>1?'s':''}</b></span>`:''}${h.ordered&&h.ordered.bulk?'<span>Bulk discount <b>yes</b></span>':''}<span>Sold <b>${units(h.sold)}</b></span><span>Left over${tip('holding')} <b>${units(h.endStock)}</b></span>${h.bonus?`<span>Question bonus <b class="pos">+${money(h.bonus)}</b></span>`:''}${h.built?`<span>Capacity utilisation${tip('cu')} <b>${Math.round(h.util*100)}%</b></span><span>Productivity${tip('prod')} <b>${units(h.productivity)}</b> cans per worker</span>`:''}</div>
     <button class="primary" id="next">${last?'See final results':'Next round'}</button>
     <details><summary>Profit breakdown</summary>
       <table>
         <tr><td class="l">Revenue (${units(h.sold)} x ${money(CFG.price)})</td><td>${money(h.revenue)}</td></tr>
         <tr><td class="l">Cost of units sold</td><td class="neg">-${money(h.cogs)}</td></tr>
-        <tr><td class="l">Storage costs</td><td class="neg">-${money(h.holding)}</td></tr>
+        <tr><td class="l">Storage costs${tip('holding')}</td><td class="neg">-${money(h.holding)}</td></tr>
         ${h.spoilCost?`<tr><td class="l">Cans that went off</td><td class="neg">-${money(h.spoilCost)}</td></tr>`:''}
         ${G.hard?`<tr><td class="l">Canning line fixed cost</td><td class="neg">-${money(h.fixed)}</td></tr>`:`<tr><td class="l">Dual supplier fee</td><td class="neg">-${money(h.fee)}</td></tr>`}
         ${h.bonus?`<tr><td class="l">Quick question bonus</td><td class="pos">+${money(h.bonus)}</td></tr>`:''}
@@ -1355,8 +1403,8 @@ function strategyCard(bm){
     :`Reorder level 4,000 (full shelves), order 2,400, single supplier. It reorders whenever nothing is on the way, up to the storage limit, and gets the bulk discount. It almost never runs out, but pays to store a big pile every round, and old cans can go off.`;
   return `<div class="card"><h2>How JIT and JIC played your shocks</h2>
     <div class="stratgrid">
-      <div><h3>Pure JIT (just in time)</h3>${chart(bm[0])}<p>${jit}</p>${sum(bm[0].s)}</div>
-      <div><h3>Pure JIC (just in case)</h3>${chart(bm[1])}<p>${jic}</p>${sum(bm[1].s)}</div>
+      <div><h3>Pure JIT (just in time)${tip('jit')}</h3>${chart(bm[0])}<p>${jit}</p>${sum(bm[0].s)}</div>
+      <div><h3>Pure JIC (just in case)${tip('jic')}</h3>${chart(bm[1])}<p>${jic}</p>${sum(bm[1].s)}</div>
     </div></div>`;
 }
 

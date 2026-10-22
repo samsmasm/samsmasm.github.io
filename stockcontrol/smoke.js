@@ -249,6 +249,16 @@ check(/Hard/.test(d.body.textContent) && /local supplier/.test(d.body.textConten
   const plain = w.__decode(code(b(0, () => 0))).total, two = w.__decode(code(b(1, (i) => (i === 1 || i === 4 ? 1 : 0)))).total;
   check(two - plain === 1000, 'score codes include question bonuses'); }
 
+// Term help buttons
+{ w.__start('Tips', 'S', 3); const tips = [...d.querySelectorAll('button.tip')].map((b) => b.dataset.tip);
+  check(['reorder', 'qty', 'bulk', 'supplier', 'buffer', 'lead', 'chart', 'profit', 'usage'].every((k) => tips.includes(k)), 'round screen has ? help on the key terms');
+  const sel = d.querySelector('.opt.sel'); d.querySelector('button.tip[data-tip="supplier"]').click();
+  const box = d.querySelector('.tipbox');
+  check(!box.hidden && /Single or dual supplier/.test(box.textContent) && /Dual: delays capped/.test(box.querySelector('.eq').textContent), 'tapping ? shows the definition and equation');
+  d.querySelector('button.tip[data-tip="reorder"]').click();
+  check(/buffer stock \+ \(usage x lead time\)/.test(box.querySelector('.eq').textContent) && d.querySelector('.opt.sel') === sel, 'help switches terms and does not change choices');
+  d.body.click(); check(box.hidden, 'clicking elsewhere hides the help'); }
+
 // 1. No uncaught errors
 check(errs.length === 0, 'no uncaught errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 
