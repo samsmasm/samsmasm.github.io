@@ -39,7 +39,8 @@ python3 build.py && node smoke.js
 
 ## Game rules (do not change)
 
-- 10 rounds, one week each. Fixed shock sequences A, B, C and a seeded random sequence R.
+- 10 rounds, one week each. Fixed shock sequences A, B, C, a seeded random sequence R, and S (default class set, added 2026-10-22): A's ten events with round 1 calm and rounds 2 to 10 shuffled by a per-game seed. S is additive in `seqFor`; A, B, C and R are unchanged. All S games share one leaderboard.
+- Holding cost is shown to players as one "storage costs" figure ($1 per unit per round). The 0.40/0.20/0.40 split still exists in `CFG.hold` but is no longer shown.
 - Levers per round: buffer stock (0 to 3,200, step 200), reorder quantity (400 to 4,000, step 200), single or dual supplier.
 - Reorder level = buffer + baseDemand x baseLead (800). An order is placed at the start of a round only if stock after deliveries is at or below the reorder level and no order is outstanding. Order quantity is capped by the 4,000 storage limit.
 - Price $20, cost $12, base demand 800, lead time 1 week, start stock 800.

@@ -10,8 +10,8 @@ check(html.split(String.fromCharCode(8212)).length - 1 === 0, 'built HTML has no
 
 const errs = [];
 const posts = [], store = {
-  '-A0': { n: 'Cheat', m: 'A', d: 0, t: 999999, h: Array(10).fill([800, 1200, 0]) },
-  '-A1': { n: 'Broken', m: 'A', d: 0, t: 5, h: [[1, 2, 3]] },
+  '-A0': { n: 'Cheat', m: 'S', d: 7, t: 999999, h: Array(10).fill([800, 1200, 0]) },
+  '-A1': { n: 'Broken', m: 'S', d: 7, t: 5, h: [[1, 2, 3]] },
 };
 let fetchUrls = [];
 const fakeFetch = (url, opt = {}) => {
@@ -63,6 +63,10 @@ for (let r = 1; r <= 10; r++) {
   click('#next');
 }
 check(sawCalm > 0, 'played at least one no-stock-out round');
+check(w.__G().mode === 'S' && w.__G().seed > 0, 'default game is the shuffled class set');
+{ const ids = (sq) => sq.map((c) => c.id).sort().join(); const a = Engine.seqFor('A', 0);
+  check([1, 2, 3, 99].every((k) => ids(Engine.seqFor('S', k)) === ids(a) && Engine.seqFor('S', k)[0].id === 'calm'), 'shuffled games have the same events, round 1 calm');
+  check(Engine.seqFor('S', 1).map((c) => c.id).join() !== Engine.seqFor('S', 2).map((c) => c.id).join(), 'shuffled games differ in order'); }
 check(sawDel > 0, 'played at least one round with a delivery');
 
 const txt = d.body.textContent;
@@ -74,7 +78,7 @@ check(posts.length === 1 && posts[0].n === 'Test Team' && posts[0].h.length === 
 check(posts[0].h.every((x, i) => x[0] === w.__G().s.history[i].lev.buffer && x[1] === w.__G().s.history[i].lev.qty), 'saved levers match the game');
 check(fetchUrls.some((u) => /orderBy=%22\$key%22&startAt=%22/.test(u)), 'leaderboard loads by time-ordered key');
 const lbTxt = d.querySelector('#lbBox').textContent;
-const cheatTrue = Math.round(Engine.run(Engine.seqFor('A', 0), { buffer: 800, qty: 1200, dual: false }).total);
+const cheatTrue = Math.round(Engine.run(Engine.seqFor('S', 7), { buffer: 800, qty: 1200, dual: false }).total);
 check(/Test Team \(you\)/.test(lbTxt), 'leaderboard shows you');
 check(/Cheat/.test(lbTxt) && !/999,999/.test(lbTxt) && lbTxt.includes('$' + cheatTrue.toLocaleString('en-US')), 'leaderboard recomputes edited totals');
 check(!/Broken/.test(lbTxt), 'leaderboard skips invalid rows');

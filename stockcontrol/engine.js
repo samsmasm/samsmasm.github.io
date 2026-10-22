@@ -30,7 +30,7 @@ const Engine = (function () {
     B: ['calm', 'calm', 'calm', 'licence1', 'calm', 'calm', 'calm', 'quiet', 'calm', 'spike2'],
     C: ['calm', 'surge', 'lane2', 'lane', 'spike', 'surge2', 'calm', 'licence', 'surge', 'calm'],
   };
-  const SEQ_NAMES = { A: 'Rare earth crunch', B: 'Calm waters', C: 'Cascade', R: 'Seeded random' };
+  const SEQ_NAMES = { A: 'Rare earth crunch', B: 'Calm waters', C: 'Cascade', R: 'Seeded random', S: 'Rare earth crunch, shuffled' };
 
   function rng(seed) {
     let a = seed >>> 0;
@@ -44,6 +44,12 @@ const Engine = (function () {
 
   function seqFor(mode, seed) {
     if (SEQ[mode]) return SEQ[mode].map((k) => C[k]);
+    // S: the same ten events as A in a seeded random order, round 1 kept calm as a warm-up.
+    if (mode === 'S') {
+      const r = rng(seed), rest = SEQ.A.slice(1);
+      for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+      return [SEQ.A[0]].concat(rest).map((k) => C[k]);
+    }
     const r = rng(seed);
     const pool = ['calm', 'calm', 'calm', 'quiet', 'surge', 'surge2', 'licence', 'lane', 'lane2', 'spike', 'spike2', 'licence1'];
     const out = ['calm', 'calm'];
