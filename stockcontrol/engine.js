@@ -15,13 +15,13 @@ const Engine = (function () {
   const C = {
     calm: { id: 'calm', title: 'Quiet month', text: 'Orders arrive on time and demand is steady at about 800 units.', demand: 800, delay: 0, priceMult: 1, tag: 'calm' },
     quiet: { id: 'quiet', title: 'Slow sales month', text: 'Customers hold back spending. Demand falls to 650 units. Deliveries are normal.', demand: 650, delay: 0, priceMult: 1, tag: 'demand' },
-    surge: { id: 'surge', title: 'Demand surge', text: 'A viral product review sends demand to 1,200 units. Deliveries are normal.', demand: 1200, delay: 0, priceMult: 1, tag: 'demand' },
+    surge: { id: 'surge', title: 'Demand surge', text: 'A viral cat video features your cat food. Demand jumps to 1,200 units. Deliveries are normal.', demand: 1200, delay: 0, priceMult: 1, tag: 'demand' },
     surge2: { id: 'surge2', title: 'Demand surge and port congestion', text: 'Demand rises to 1,100 units while congested ports add 1 week to any order placed now.', demand: 1100, delay: 1, priceMult: 1, tag: 'both' },
-    licence: { id: 'licence', title: 'Export licence delays', text: 'Your rare earth supplier waits on a government export licence. Orders placed now arrive 2 weeks late and input prices rise 25% (single source).', demand: 800, delay: 2, priceMult: 1.25, tag: 'supply', link: 'Rare earths: licence delay and single-source dependence' },
+    licence: { id: 'licence', title: 'Import licence delays', text: 'New rules mean imported cat food needs an import licence. Orders placed now arrive 2 weeks late and prices rise 25% (single source).', demand: 800, delay: 2, priceMult: 1.25, tag: 'supply' },
     lane: { id: 'lane', title: 'Shipping lane closed', text: 'A key shipping lane closes. Orders placed now arrive 3 weeks late.', demand: 800, delay: 3, priceMult: 1, tag: 'supply' },
     lane2: { id: 'lane2', title: 'Shipping delays', text: 'Port strikes add 2 weeks to any order placed now.', demand: 800, delay: 2, priceMult: 1, tag: 'supply' },
-    spike: { id: 'spike', title: 'Input price spike', text: 'Rare earth prices jump 40% as supply tightens. Orders placed now cost 40% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.4, tag: 'price', link: 'Rare earths: price spike' },
-    spike2: { id: 'spike2', title: 'Input price rise', text: 'Input prices rise 30% for orders placed now (single source).', demand: 800, delay: 0, priceMult: 1.3, tag: 'price' },
+    spike: { id: 'spike', title: 'Fish price spike', text: 'A poor fishing season makes tuna scarce. Orders placed now cost 40% more per unit (single source).', demand: 800, delay: 0, priceMult: 1.4, tag: 'price' },
+    spike2: { id: 'spike2', title: 'Can and fish prices rise', text: 'Tin and fish prices rise 30% for orders placed now (single source).', demand: 800, delay: 0, priceMult: 1.3, tag: 'price' },
     licence1: { id: 'licence1', title: 'Paperwork hold-up', text: 'Customs paperwork adds 1 week to any order placed now.', demand: 800, delay: 1, priceMult: 1, tag: 'supply' },
   };
 
@@ -30,7 +30,7 @@ const Engine = (function () {
     B: ['calm', 'calm', 'calm', 'licence1', 'calm', 'calm', 'calm', 'quiet', 'calm', 'spike2'],
     C: ['calm', 'surge', 'lane2', 'lane', 'spike', 'surge2', 'calm', 'licence', 'surge', 'calm'],
   };
-  const SEQ_NAMES = { A: 'Rare earth crunch', B: 'Calm waters', C: 'Cascade', R: 'Random', L: 'Stable world', S: 'Unsettled world', H: 'Chaotic world' };
+  const SEQ_NAMES = { A: 'Supply crunch', B: 'Calm waters', C: 'Cascade', R: 'Random', L: 'Stable world', S: 'Unsettled world', H: 'Chaotic world' };
   // Worlds: the ten events of a fixed set in a seeded random order, round 1 kept calm as a warm-up.
   const WORLD_DECK = { L: 'B', S: 'A', H: 'C' };
 

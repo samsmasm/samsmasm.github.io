@@ -208,8 +208,8 @@ for (let r = 1; r <= 10; r++) {
   check(!d.querySelector('#quiz'), `round ${r}: no question when questions are off`);
   if (r === 2) { setRange('#rl', 0); setRange('#qy', 400); }
   if (r === 4) {
-    check(!!d.querySelector('#buildBox'), 'round 4 offers to build the canning line');
-    click('#buildBtn'); d.querySelector('.opt[data-d="2"]').click(); setRange('#rl', 1600); setRange('#qy', 1200);
+    check(!!d.querySelector('.opt[data-d="2"] #buildBtn'), 'round 4 offers to build the canning line on the Make card');
+    click('#buildBtn'); check(d.querySelector('.opt[data-d="2"]').classList.contains('sel'), 'building selects Make'); setRange('#rl', 1600); setRange('#qy', 1200);
   }
   if (w.__G().s.goodwill > 0 && /unhappy cats/.test(d.body.textContent)) sawGoodwill = true;
   click('#run');
