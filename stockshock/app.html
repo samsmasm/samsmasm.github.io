@@ -285,6 +285,15 @@ button.tip:hover,button.tip:focus{background:var(--blue);color:#fff;outline:none
 .namewarn{background:var(--amber-bg);border:2px solid #e3c47a;color:var(--amber);border-radius:12px;padding:6px 10px;margin-top:6px;font-size:14px}
 .namewarn:empty{display:none}
 .tipbox .eq{margin-top:6px;background:var(--purple-bg);border-radius:8px;padding:5px 8px;font-weight:bold}
+.modal{position:fixed;inset:0;z-index:80;background:rgba(29,27,37,.45);display:grid;place-items:center;padding:16px;overflow:auto}
+.modalbox{position:relative;background:#fff;border:3px solid #fff;border-radius:22px;box-shadow:0 8px 0 rgba(40,70,110,.18);max-width:680px;width:100%;padding:18px 22px;max-height:calc(100vh - 32px);overflow:auto}
+.modalbox h2{margin:0}
+.modalbox .lead{margin:4px 0 0}
+.modalx{position:absolute;top:10px;right:12px;width:34px;height:34px;border-radius:50%;border:2px solid var(--line);background:#fff;font:bold 15px Verdana,sans-serif;color:var(--muted);cursor:pointer}
+.helpsteps{margin:10px 0;padding-left:24px}
+.helpsteps li{margin-bottom:8px;line-height:1.5}
+.helphard{background:var(--purple-bg);border-radius:12px;padding:8px 12px;margin:6px 0}
+.helptip{background:#fffbe0;border:2px dashed #f2a33a;border-radius:12px;padding:8px 12px;margin:6px 0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -305,7 +314,7 @@ button.tip:hover,button.tip:focus{background:var(--blue);color:#fff;outline:none
 </defs></svg>
 <header>
   <h1><svg viewBox="0 0 24 32" width="26" height="34" aria-hidden="true"><rect width="24" height="32" rx="4" fill="url(#gCan)" stroke="#fff" stroke-width="1.5"/><rect x="1" y="10" width="22" height="13" fill="url(#gLab)"/><path d="M5 16.5 q5 -5 10 0 q-5 5 -10 0z M15 16.5 l4.5 -4 v8z" fill="#1f5fbf"/></svg>Stock Shock!</h1>
-  <nav><button id="tabPlay" data-tab="play" class="on">Play</button><button id="tabLb" data-tab="lb">Leaderboard</button><button id="tabTeacher" data-tab="teacher">Teacher</button></nav>
+  <nav><button id="tabPlay" data-tab="play" class="on">Play</button><button id="tabLb" data-tab="lb">Leaderboard</button><button id="tabTeacher" data-tab="teacher">Teacher</button><button id="helpBtn" type="button">How to play</button></nav>
 </header>
 <main id="app"></main>
 
@@ -330,8 +339,10 @@ let lbPrivate=false, gameOpts={hard:false, quiz:true};
 const WORLDS=[['L','Mostly calm, a few hiccups.'],['S','Surges, delays and price spikes.'],['H','Shock after shock.'],['R','New events every game.']];
 function startGame(name, mode, seed){
   const old=document.getElementById('walkMark'); if(old) old.remove();
+  const first=!helpSeen();
   G = { name: name||'Player', anon: !name, private: lbPrivate, posted: false, mode, seed, hard: !!gameOpts.hard, quiz: gameOpts.quiz!==false, quizLog: [], seq: Engine.seqFor(mode, seed), s: Engine.newState2(), lev: {...defaultLev}, view: 'round', last: null, showTheory: true };
   render();
+  if(first) showHelp();
 }
 const rules=(g=G)=>({v:2,hard:!!g.hard});
 const supsFor=(hard)=>Engine.suppliers({v:2,hard});
@@ -346,6 +357,37 @@ const bufferFor=(rl,lead)=>rl-USAGE*lead;
 // Expected (normal) lead time of the chosen supplier: the reorder level is planned on this, as in the IB stock control model.
 const expLead=(lev,hard,built)=>leadFor(lev,{delay:0},hard,built).lead;
 const planRl=(lev,hard,built)=>lev.buf+USAGE*expLead(lev,hard,built);
+
+/* ---------- How to play pop-up ----------
+   Opens by itself the first time a game starts on this device (one "seen" flag in localStorage, nothing else is
+   saved), and any time from the How to play button in the header. */
+const HELP_KEY='stockshock-seen-help';
+function helpSeen(){ try{ return localStorage.getItem(HELP_KEY)==='1'; }catch(e){ return false; } }
+function showHelp(){
+  if(document.getElementById('helpModal')) return;
+  const hard=G?G.hard:gameOpts.hard, back=document.activeElement;
+  const m=document.createElement('div'); m.id='helpModal'; m.className='modal';
+  m.innerHTML=`<div class="modalbox" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <button type="button" class="modalx" aria-label="Close">X</button>
+    <div class="verdict">${bigCat(0,'happy')}<div><h2 id="helpTitle">How to play Stock Shock</h2><p class="lead">You run a cat food warehouse for ${CFG.rounds} rounds. Make the most profit.</p></div></div>
+    <ol class="helpsteps">
+      <li><b>Cats come to buy.</b> Each round about 8 cats arrive (1 cat = 1 can = 100 units, so about 800 units). The news card tells you how many this round, and any problems with deliveries or prices.</li>
+      <li><b>Each can you sell earns ${money(CFG.price-CFG.cost)} profit.</b> But every can still on the shelf at the end of a round costs ${money(CFG.holdPerUnit)} to store, and if the shelves run empty, hungry cats leave and those sales are lost.</li>
+      <li><b>Set your buffer stock.</b> This is the minimum you want left on the shelves when a delivery arrives: your safety cans (outlined in green). The game works out your reorder level for you: when stock falls to it, you order.</li>
+      <li><b>Set your reorder quantity.</b> This is how many cans you order each time. Orders take time to arrive (usually 1 round), and shocks can make them late.</li>
+      <li><b>Choose a supplier, then press Run.</b> Watch the cats buy, then see your profit. Repeat for ${CFG.rounds} rounds.</li>
+    </ol>
+    ${hard?'<p class="helphard"><b>Hard:</b> choose a global or local supplier, and from round 4 you can build your own canning line.</p>':''}
+    <p class="helptip"><b>Tip:</b> a big buffer means fewer empty shelves but higher storage costs. That is the JIT or JIC choice.</p>
+    <p><button type="button" class="primary" id="helpGo">Let's play</button></p></div>`;
+  document.body.appendChild(m);
+  const close=()=>{ try{ localStorage.setItem(HELP_KEY,'1'); }catch(e){} m.remove(); document.removeEventListener('keydown',esc1); if(back&&back.focus) back.focus(); };
+  const esc1=(e)=>{ if(e.key==='Escape') close(); };
+  m.querySelector('#helpGo').onclick=close; m.querySelector('.modalx').onclick=close;
+  m.onclick=(e)=>{ if(e.target===m) close(); };
+  document.addEventListener('keydown',esc1);
+  m.querySelector('#helpGo').focus({preventScroll:true}); m.querySelector('.modalbox').scrollTop=0;
+}
 
 /* ---------- term help: "?" buttons with a definition and an equation ---------- */
 const TERMS={
@@ -1564,6 +1606,7 @@ function render(){
 $('#tabPlay').onclick=()=>{tab='play';render();};
 $('#tabTeacher').onclick=()=>{tab='teacher';render();};
 $('#tabLb').onclick=()=>{tab='lb';render();};
+$('#helpBtn').onclick=showHelp;
 render();
 window.__G=()=>G; window.__start=startGame; window.__opts=(o)=>{ gameOpts={...gameOpts,...o}; }; window.__decode=decode;
 })();

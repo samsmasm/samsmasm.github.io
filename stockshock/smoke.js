@@ -60,6 +60,10 @@ check(!w.__G() && /Type your name/.test(d.querySelector('#nmMsg').textContent), 
 d.querySelector('#nm').value = '   '; click('#go');
 check(!w.__G(), 'a blank name does not count');
 d.querySelector('#nm').value = 'Test Team'; click('#go');
+check(!!d.querySelector('#helpModal') && /about 8 cats arrive/.test(d.querySelector('#helpModal').textContent) && /minimum you want left on the shelves/.test(d.querySelector('#helpModal').textContent) && !/Hard:/.test(d.querySelector('#helpModal').textContent), 'How to play opens by itself the first time');
+click('#helpGo'); check(!d.querySelector('#helpModal') && w.localStorage.getItem('stockshock-seen-help') === '1', "Let's play closes it and remembers it was seen");
+click('#helpBtn'); check(!!d.querySelector('#helpModal'), 'How to play button opens it again');
+d.querySelector('#helpModal .modalx').click(); check(!d.querySelector('#helpModal'), 'X closes it');
 
 // 2. Round 1 scene: stock 800 and demand 800 give 8 cans and 8 cats
 check(d.querySelectorAll('#scene [data-can]').length === 8, 'round 1 scene has 8 cans');
@@ -196,6 +200,7 @@ check(/Test Team/.test(d.querySelector('#lbBox').textContent) && d.querySelector
 // 4b. A game built to stock out: reorder level 0, order 400
 d.querySelector('#tabPlay').click();
 w.__start('Out Team', 'A', 0);
+check(!d.querySelector('#helpModal'), 'How to play does not open by itself again');
 for (let r = 1; r <= 10; r++) {
   setRange('#bf', 0); setRange('#qy', 400); answer();
   click('#run');
