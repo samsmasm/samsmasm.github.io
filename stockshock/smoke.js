@@ -116,7 +116,7 @@ check(sawDel > 0, 'played at least one round with a delivery');
 
 const txt = d.body.textContent;
 check(/Final result: Test Team/.test(txt) && /Debrief/.test(txt), 'end screen shown');
-check(/How JIT and JIC played your shocks/.test(txt) && /Reorder level 4,000/.test(txt) && /Reorder level 800/.test(txt) && /Maximum stock/.test(txt) && /Lead time/.test(txt), 'end screen has JIT and JIC stock control charts with lead times');
+check(/How JIT and JIC played your shocks/.test(txt) && /Reorder level 2,800/.test(txt) && /Buffer 2,000/.test(txt) && /Reorder level 800/.test(txt) && /Maximum stock/.test(txt) && /Lead time/.test(txt), 'end screen has JIT and JIC stock control charts with lead times');
 check(/Questions right 2 of 3/.test(txt), 'end screen counts questions right');
 { const st = w.__G().s; check(txt.includes('Cans left at the end ' + st.onHand.toLocaleString('en-US')) && Math.abs(st.total - st.history.reduce((a, h) => a + h.revenue - h.cogs - h.holding - h.fee - h.fixed - h.spoilCost + h.bonus, 0)) < 1e-6, 'end stock is shown and only cans sold are charged to profit'); }
 { const H = w.__G().s.history, right = w.__G().quizLog.filter((x) => x.ok).map((x) => x.r);
@@ -134,7 +134,7 @@ check(/Cheat/.test(lbTxt) && !/999,999/.test(lbTxt) && lbTxt.includes('$' + chea
 check(!/Broken/.test(lbTxt) && !/Oldie/.test(lbTxt), 'leaderboard skips invalid and old-rules rows');
 d.querySelector('#lbSort [data-k="vs"]').click();
 lbTxt = d.querySelector('#lbBox').textContent;
-const cheatVs = Math.round(cheatTrue - Engine.run(cheatSeq, { rl: 4000, qty: 2400, sup: 0 }, STD).total);
+const cheatVs = Math.round(cheatTrue - Engine.run(cheatSeq, { rl: 2800, qty: 4000, sup: 0 }, STD).total);
 check(/vs pure JIC/.test(lbTxt) && lbTxt.includes((cheatVs >= 0 ? '+$' : '-$') + Math.abs(cheatVs).toLocaleString('en-US')), 'leaderboard can order by beating pure JIC');
 d.querySelector('#lbSort [data-k="total"]').click();
 { const o = d.querySelector('#rpLegend [data-key="o0"]');
@@ -151,7 +151,7 @@ const seq = Engine.seqFor(G.mode, G.seed);
 const want = {
   you: Engine.run(seq, (i) => G.s.history[i].lev, STD).total,
   jit: Engine.run(seq, { rl: 800, qty: 800, sup: 0 }, STD).total,
-  jic: Engine.run(seq, { rl: 4000, qty: 2400, sup: 0 }, STD).total,
+  jic: Engine.run(seq, { rl: 2800, qty: 4000, sup: 0 }, STD).total,
   hyb: Engine.run(seq, (i) => ({ rl: 1600, qty: 1200, sup: seq[i].delay > 0 || seq[i].priceMult > 1 ? 1 : 0 }), STD).total,
 };
 for (const [k, v] of Object.entries(want)) {

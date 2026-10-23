@@ -1294,11 +1294,11 @@ const shockCard=(c)=>c.delay>0||c.priceMult>1;
 function benchLevers(hard){
   return hard?[
     {name:'Pure JIT: reorder level 800, order 800, local supplier',lev:{rl:800,qty:800,sup:1},lead:1},
-    {name:'Pure JIC: reorder level 4,000, order 2,400, global supplier',lev:{rl:4000,qty:2400,sup:0},lead:2},
+    {name:'Pure JIC: buffer 2,000 (reorder level 3,600), order 2,400, global supplier',lev:{rl:3600,qty:2400,sup:0},lead:2},
     {name:'Hybrid: reorder level 2,000, order 1,600, local supplier only on shock rounds',fn:(seq)=>(i)=>({rl:2000,qty:1600,sup:shockCard(seq[i])?1:0})},
   ]:[
     {name:'Pure JIT: reorder level 800, order 800, single supplier',lev:{rl:800,qty:800,sup:0},lead:1},
-    {name:'Pure JIC: reorder level 4,000, order 2,400, single supplier',lev:{rl:4000,qty:2400,sup:0},lead:1},
+    {name:'Pure JIC: buffer 2,000 (reorder level 2,800), orders enough to fill the shelves, single supplier',lev:{rl:2800,qty:4000,sup:0},lead:1},
     {name:'Hybrid: reorder level 1,600, order 1,200, dual supplier only on shock rounds',fn:(seq)=>(i)=>({rl:1600,qty:1200,sup:shockCard(seq[i])?1:0})},
   ];
 }
@@ -1311,8 +1311,8 @@ function strategyCard(bm){
   const chart=(b)=>stockControlChart(b.s.history,{rl:b.b.lev.rl,buffer:bufferFor(b.b.lev.rl,b.b.lead),qty:b.b.lev.qty});
   const jit=G.hard?`Reorder level 800, order 800, local supplier. With a 1-week delivery time that leaves no buffer: it orders exactly one week's demand every round, which arrives just in time and sells out. Nothing to store, but local cans cost more, and a demand surge empties the shelves.`
     :`Reorder level 800, order 800, single supplier. With a 1-week delivery time that leaves no buffer: it orders exactly one week's demand every round. It arrives just in time, sells out, and leaves nothing to store. Perfect in calm weeks, but any delay or demand surge empties the shelves.`;
-  const jic=G.hard?`Reorder level 4,000 (full shelves), order 2,400, global supplier. It reorders whenever nothing is on the way, buying cheap in bulk. The 2-week delivery time still leaves a 2,400 buffer, so it rarely runs out, but it pays to store a big pile and some cans go off.`
-    :`Reorder level 4,000 (full shelves), order 2,400, single supplier. It reorders whenever nothing is on the way, up to the storage limit, and gets the bulk discount. It almost never runs out, but pays to store a big pile every round, and old cans can go off.`;
+  const jic=G.hard?`Buffer 2,000 (20 cans). With the global supplier's 2-week lead time, the reorder level is 2,000 + 800 x 2 = 3,600. It orders 2,400 at a time, buying cheap in bulk. Stock stays high, so it rarely runs out, but it pays to store a big pile and some cans go off.`
+    :`Buffer 2,000 (20 cans), so the reorder level is 2,000 + 800 x 1 week = 2,800. When stock falls to it, it orders enough to fill the shelves (with the bulk discount), so stock swings between about 3,200 and 1,600. It rarely runs out, but pays to store a big pile every round, and old cans can go off.`;
   return `<div class="card"><h2>How JIT and JIC played your shocks</h2>
     <div class="stratgrid">
       <div><h3>Pure JIT (just in time)${tip('jit')}</h3>${chart(bm[0])}<p>${jit}</p>${sum(bm[0].s)}</div>
