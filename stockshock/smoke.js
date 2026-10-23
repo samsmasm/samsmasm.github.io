@@ -275,6 +275,21 @@ check(/Hard/.test(d.body.textContent) && /local supplier/.test(d.body.textConten
   setRange('#qy', 0); check(/reorder quantity is 0/.test(d.querySelector('#prev').textContent), 'reorder quantity 0 means no order');
   click('#run'); check(!w.__G().last.ordered, 'no order is placed with reorder quantity 0'); }
 
+// Same name warning and top-three scores
+{ d.querySelector('#tabPlay').click();
+  for (let k = 0; k < 30 && !d.querySelector('#fresh'); k++) { answer(); if (d.querySelector('#run')) click('#run'); else if (d.querySelector('#next')) click('#next'); }
+  d.querySelector('#fresh').click(); await tick();
+  d.querySelector('#priv').checked = false; d.querySelector('#nm').value = 'test team'; d.querySelector('#nm').dispatchEvent(new w.Event('input'));
+  check(/already on this week's leaderboard/.test(d.querySelector('#nmWarn').textContent), 'warns when the name is already on the leaderboard');
+  const before = w.__G(); click('#go');
+  check(w.__G() === before && /Start with this name/.test(d.querySelector('#go').textContent), 'first Start press with a taken name only asks to confirm');
+  click('#go'); check(w.__G() !== before && w.__G().name === 'test team', 'second press keeps the name and starts');
+  d.querySelector('#tabLb').click(); await tick();
+  const nm = [...d.querySelectorAll('#lbBox .poptip')].find((x) => /Test Team/i.test(x.textContent));
+  nm.click(); const box = d.querySelector('.tipbox');
+  check(!!nm && !box.hidden && /top (score|\d scores)/.test(box.textContent) && /\$/.test(box.textContent), 'leaderboard names show their top scores');
+  d.body.click(); d.querySelector('#tabPlay').click(); }
+
 // 1. No uncaught errors
 check(errs.length === 0, 'no uncaught errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 
