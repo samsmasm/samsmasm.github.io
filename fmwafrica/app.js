@@ -24,7 +24,6 @@ const COUNTRIES = [
       ['Also look at', 'The South African War (1899 to 1902), where camps held Boer and Black African civilians. The Natives Land Act (1913).'],
     ],
     search: ['Anglo-Zulu War', 'Cetshwayo', 'Mineral Revolution', 'Bambatha Rebellion', 'Natives Land Act 1913', 'migrant labour South Africa'],
-    archives: ['South African History Online', 'Illustrated London News Archive', 'Punch Magazine Archive', 'Library of Congress'],
   },
   {
     id: 'et', name: 'Ethiopia', power: 'Italian',
@@ -36,7 +35,6 @@ const COUNTRIES = [
       ['Also look at', 'How Menelik bought modern rifles, and how he expanded his own empire south at the same time.'],
     ],
     search: ['Battle of Adwa', 'Menelik II', 'Taytu Betul', 'Treaty of Wuchale', 'First Italo-Ethiopian War'],
-    archives: ['Gallica (France)', 'Wikimedia Commons', 'Illustrated London News Archive', 'Europeana'],
   },
   {
     id: 'na', name: 'Namibia', power: 'German South West Africa',
@@ -48,7 +46,6 @@ const COUNTRIES = [
       ['Also look at', 'The Battle of Waterberg (1904), von Trotha\'s extermination order, the camps such as Shark Island. Germany recognised it as genocide in 2021.'],
     ],
     search: ['Herero and Nama genocide', 'Samuel Maharero', 'Hendrik Witbooi', 'Lothar von Trotha', 'Shark Island camp'],
-    archives: ['Wikimedia Commons', 'Europeana', 'UK National Archives', 'Library of Congress'],
   },
   {
     id: 'ml', name: 'Mali', power: 'French West Africa',
@@ -60,7 +57,6 @@ const COUNTRIES = [
       ['Also look at', 'Timbuktu taken in 1894. How the French used African soldiers (tirailleurs).'],
     ],
     search: ['Samori Touré', 'Toucouleur Empire', 'Siege of Sikasso', 'French Sudan', 'Dakar-Niger railway', 'tirailleurs sénégalais'],
-    archives: ['Gallica (France)', 'Europeana', 'Smithsonian African Art Museum', 'Wikimedia Commons'],
   },
 ];
 
@@ -220,7 +216,6 @@ function route() {
       $('#nextBtn').href = '#' + next.id;
       $('#nextBtn').textContent = next.id === 'submit' ? 'Hand it in' : 'Next step';
     }
-    if (id === 'step-4') renderImgPicks();
     if (id === 'step-6') renderThesisPin();
   }
   renderRail(id);
@@ -344,18 +339,9 @@ function srcVerdict(s) {
 }
 
 // ---------- step 4: images ----------
-function renderImgPicks() {
-  const c = COUNTRIES.find(x => x.id === state.country);
-  $('#imgPicks').innerHTML = c
-    ? `<p class="small">Good places to start for <b>${c.name}</b> are marked first.</p>`
-    : `<p class="small">Choose your country in <a href="#step-2">step 2</a> and the best archives for it will be marked here.</p>`;
-  const picks = c ? c.archives : [];
-  const sorted = [...ARCHIVES].sort((a, b) => {
-    const ia = picks.indexOf(a[0]), ib = picks.indexOf(b[0]);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-  });
+function renderArchives() {
   $('#archives').innerHTML = `<li><a href="https://sites.google.com/ssis.edu.vn/library/hs-research-sources/african-imperialism-9fmw?authuser=0" target="_blank" rel="noopener">SSIS library suggestions</a><span>Start here if you haven’t stumbled on images yet.</span></li>`
-    + sorted.map(([n, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(n)}</a><span>${picks.includes(n) ? `<span class="star">Good for ${c.name}</span> · ` : ''}${esc(d)}</span></li>`).join('');
+    + ARCHIVES.map(([n, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(n)}</a><span>${esc(d)}</span></li>`).join('');
 }
 
 // ---------- step 5: thesis ----------
@@ -440,6 +426,7 @@ $('#nsalaShow').addEventListener('click', () => { $('#nsalaCw').hidden = true; $
 // ---------- go ----------
 renderNT();
 renderCountries();
+renderArchives();
 renderSrcs();
 renderWriter();
 renderCountdown();
