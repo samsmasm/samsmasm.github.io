@@ -306,7 +306,7 @@ function renderCountries() {
       <dl>${c.facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       <p class="searchwords" style="margin:12px 0 0"><span class="label">Search for</span><br>
         ${c.search.map(esc).join(' · ')}</p>
-      <p class="small" style="margin:8px 0 0">Search for them in Britannica through the <a href="https://sites.google.com/ssis.edu.vn/library/hs-research-sources/african-imperialism-9fmw?authuser=0" target="_blank" rel="noopener">SSIS library page</a>. It's the school version, so don't use the public Britannica site.</p>
+      <p class="small" style="margin:8px 0 0">Search for them in Britannica through the <a href="https://sites.google.com/ssis.edu.vn/library/hs-research-sources/african-imperialism-9fmw?authuser=0" target="_blank" rel="noopener">SSIS library page</a>. This is the school version, more suitable than the public version.</p>
     </div>` : `<p class="small">Tap a country to see a starting point. You can change your mind.</p>`;
   document.querySelectorAll('.country').forEach(b => b.addEventListener('click', () => {
     state.country = state.country === b.dataset.c ? null : b.dataset.c;
