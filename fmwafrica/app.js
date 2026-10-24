@@ -4,7 +4,7 @@
 const DUE = new Date('2026-10-30T23:59:00+07:00');
 
 const STEPS = [
-  { id: 'step-1', label: 'Set up NoodleTools', desc: 'Name it, share it with Sam' },
+  { id: 'step-1', label: 'Set up NoodleTools', desc: 'Name it, share it with your teacher' },
   { id: 'step-2', label: 'Choose and research', desc: 'Pick a country, find three academic sources' },
   { id: 'step-3', label: 'Check your sources', desc: 'Seven questions for each source' },
   { id: 'step-4', label: 'Find two images', desc: 'From the time, and saying different things' },
@@ -269,15 +269,14 @@ $('#doneBox').addEventListener('change', e => {
 
 // ---------- step 1: NoodleTools ----------
 function renderNT() {
-  const clean = s => (s || '').replace(/[^A-Za-zÀ-ɏ'-]/g, '');
-  const first = clean(state.nt.first), last = clean(state.nt.last), block = state.nt.block || 'E';
-  const name = `sgraham-${block}-africa-${first || 'First'}${last || 'Last'}`;
-  $('#ntName').textContent = name;
-  $('#ntShare').textContent = `FMW Block ${block} Africa 26`;
+  const clean = s => (s || '').replace(/[^A-Za-z\u00C0-\u024F'-]/g, '');
+  const first = clean(state.nt.first), last = clean(state.nt.last);
+  const teacher = state.nt.teacher || 'sgraham', block = state.nt.block || 'E';
+  $('#ntName').textContent = `${teacher}-${block}-africa-${first || 'First'}${last || 'Last'}`;
 }
-['first', 'last', 'block'].forEach(k => {
+['teacher', 'block', 'first', 'last'].forEach(k => {
   const el = $('#nt' + k[0].toUpperCase() + k.slice(1));
-  el.value = state.nt[k] || '';
+  if (state.nt[k]) el.value = state.nt[k];
   el.addEventListener('input', () => { state.nt[k] = el.value; save(); renderNT(); });
 });
 $('#ntCopy').addEventListener('click', () => copyText($('#ntName').textContent, 'Project name copied'));
