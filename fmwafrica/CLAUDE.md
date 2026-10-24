@@ -1,6 +1,6 @@
 # fmwafrica: FMW African Imperialism museum poster companion
 
-Student guide for Sam's Grade 9 FMW African Imperialism museum poster assessment (due Fri 30 Oct 2026).
+Student guide for Sam's Grade 9 FMW African Imperialism museum poster assessment (due Thu 29 Oct 2026 for blocks A to D, Fri 30 Oct for E to H; set by DUES/dueFor in app.js from the student's block).
 Built from Sam's materials in ~/Downloads/africa (deck slides 60 to 68, rubric, OPCVL template, exemplar,
 Congo images doc). It is a companion for the task, NOT a store of everything about Africa.
 

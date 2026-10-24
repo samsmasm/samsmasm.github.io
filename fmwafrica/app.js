@@ -1,7 +1,15 @@
 // FMW Africa museum poster companion. Everything a student types is saved in
 // localStorage under 'fmwafrica' (this device only).
 
-const DUE = new Date('2026-10-30T23:59:00+07:00');
+// Blocks A to D hand in on Thursday 29 Oct, E to H on Friday 30 Oct.
+const DUES = {
+  early: { y: 2026, m: 9, d: 29, long: 'Thursday 29 October', short: 'Thu 29 Oct' },
+  late: { y: 2026, m: 9, d: 30, long: 'Friday 30 October', short: 'Fri 30 Oct' },
+};
+function dueFor(block) {
+  if (!block) return null;
+  return 'ABCD'.includes(block) ? DUES.early : DUES.late;
+}
 
 const STEPS = [
   { id: 'step-1', label: 'Set up NoodleTools', desc: 'Name it, share it with your teacher' },
@@ -227,7 +235,7 @@ function renderRail(current) {
   $('#rail').innerHTML = STEPS.map((s, i) => `
     <li><a href="#${s.id}" class="${s.id === current ? 'active' : ''} ${state.done[s.id] ? 'done' : ''}">
       <span class="n">${s.id === 'submit' ? '✓' : i + 1}</span><span class="lbl">${esc(s.label)}</span></a></li>`).join('')
-    + `<li class="due">Due <strong>Fri 30 Oct</strong></li>`;
+    + `<li class="due">Due <strong>${(dueFor(state.nt.block) || { short: '29 or 30 Oct' }).short}</strong></li>`;
 }
 
 function renderHomeSteps() {
@@ -245,13 +253,29 @@ function renderHomeSteps() {
 }
 
 function renderCountdown() {
-  const days = Math.ceil((DUE - new Date()) / 86400000);
+  const due = dueFor(state.nt.block);
   const el = $('#countdown'), sub = $('#countdownSub');
-  if (days > 1) { el.textContent = days + ' days'; sub.textContent = 'until Friday 30 October'; }
-  else if (days === 1) { el.textContent = 'Tomorrow'; sub.textContent = 'Friday 30 October'; }
-  else if (days === 0) { el.textContent = 'Today'; sub.textContent = 'Friday 30 October'; }
-  else { el.textContent = 'Fri 30 Oct'; sub.textContent = 'The deadline has passed'; }
+  $('#homeBlock').value = state.nt.block || '';
+  $('#submitDue').textContent = due ? due.long : 'Thursday 29 October (blocks A to D) or Friday 30 October (blocks E to H)';
+  if (!due) {
+    el.textContent = '29 or 30 Oct';
+    sub.textContent = 'Blocks A to D: Thursday 29 October · Blocks E to H: Friday 30 October';
+    return;
+  }
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((new Date(due.y, due.m, due.d) - today) / 86400000);
+  if (days > 1) { el.textContent = days + ' days'; sub.textContent = 'until ' + due.long; }
+  else if (days === 1) { el.textContent = 'Tomorrow'; sub.textContent = due.long; }
+  else if (days === 0) { el.textContent = 'Today'; sub.textContent = due.long; }
+  else { el.textContent = due.short; sub.textContent = 'The deadline has passed'; }
 }
+$('#homeBlock').addEventListener('input', e => {
+  state.nt.block = e.target.value;
+  $('#ntBlock').value = e.target.value;
+  save();
+  renderNT();
+});
 
 $('#doneBox').addEventListener('change', e => {
   const id = location.hash.slice(1);
@@ -268,6 +292,8 @@ function renderNT() {
   const first = clean(state.nt.first), last = clean(state.nt.last);
   const teacher = state.nt.teacher || 'sgraham', block = state.nt.block || 'E';
   $('#ntName').textContent = `${teacher}-${block}-africa-${first || 'First'}${last || 'Last'}`;
+  renderCountdown();
+  renderRail(location.hash.slice(1));
 }
 ['teacher', 'block', 'first', 'last'].forEach(k => {
   const el = $('#nt' + k[0].toUpperCase() + k.slice(1));
