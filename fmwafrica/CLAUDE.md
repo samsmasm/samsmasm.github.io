@@ -12,6 +12,9 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
 - `style.css`: History rust `#7a2d0a` (red ochre) + indigo `#22305e` second accent, white background.
   Sam asked for a scheme suitable for the continent: ochre + indigo chosen; avoid pan-African flag colours,
   kente/mudcloth patterns, safari/animal print, colonial map colours.
+- Header: Sam said this site need NOT follow the pastel rainbow AESTHETIC.md look. Solid indigo masthead, ochre-light
+  (#d9874f) rule and active tab, Africa silhouette logo (img/africa.svg) instead of /unisamsq.png, favicon img/favicon.svg.
+  Africa outline traced from findtreasure/countries.geojson (Natural Earth 110m, public domain) with OpenCV.
 - `img/`: nt1-4 NoodleTools screenshots, rubber-coils.jpg (Punch 1906), nsala.jpg (behind a content-warning click), tervuren.jpg (1897).
 
 ## Conventions
