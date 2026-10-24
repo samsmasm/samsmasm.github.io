@@ -177,11 +177,11 @@ producer surplus amber), never two shades of the same hue.
 | Unit | Notes | Practice |
 |---|---|---|
 | Unit 1 (1.1–1.2) | complete | **stubs** ("Materials to come") |
-| Unit 2 (2.1–2.12) | complete | 2.1, 2.2, 2.3 done. **2.4–2.12 are stubs** |
+| Unit 2 (2.1–2.12) | complete | 2.1, 2.2, 2.3, 2.5, 2.6, 2.7 done. **2.4, 2.8–2.12 are stubs** |
 | Unit 3 (3.1–3.7) | complete | complete |
 | Unit 4 (4.1–4.10) | **nothing**, index stub only | n/a |
 
-Eleven pages still carry the "Materials to come" practice stub: `1-1`, `1-2`, and `2-4`
+Eight pages still carry the "Materials to come" practice stub: `1-1`, `1-2`, `2-4`, and `2-8`
 through `2-12`. Find them with `grep -rl "Materials to come" src/pages`.
 
 ---
@@ -245,12 +245,19 @@ If running Year 1 and Year 2 simultaneously, the simplest path is two side-by-si
 
 ## Current status
 
-Notes are complete for Units 1, 2 and 3. Practice is complete for Unit 3 and for 2.1–2.3;
-the other eleven topic pages still have practice stubs. Unit 4 has no content at all.
+Notes are complete for Units 1, 2 and 3. Practice is complete for Unit 3 and for 2.1–2.3 and 2.5–2.7
+(2.5–2.7 added 2026-10-24 from the elasticities and government intervention decks);
+the other eight topic pages still have practice stubs. Unit 4 has no content at all.
 
 The homepage is the four-unit card grid. The Today board is hidden at `/ibecon/today/`.
 
-**Not built:** all 10 Unit 4 topics; practice for 1.1, 1.2 and 2.4–2.12; the Today page
+**Not built:** all 10 Unit 4 topics; practice for 1.1, 1.2, 2.4 and 2.8–2.12; the Today page
 multi-year / IB1-IB2 expansion documented above.
 
 **No known bugs in built content.**
+
+## Writing style (Sam, 2026-10-24)
+
+TL;DR, not a textbook. Use Sam's wording from his decks; paraphrase textbook (Kognity) text, never copy.
+Questions he adapted from IB papers are fine to use. Only fill gaps inside sub-units he has given
+material for, marked pending teacher review; don't invent sub-units with no trace. No em dashes in new text.
