@@ -203,6 +203,21 @@ function fallbackCopy(text, done) {
   ta.remove();
 }
 
+// ---------- analytics ----------
+// GoatCounter's own page-load count is off (no_onload); each view is counted
+// here as its own path, e.g. /fmwafrica/#step-3, so the parts show separately.
+let lastTracked = null;
+function track(id) {
+  if (id === lastTracked) return;
+  lastTracked = id;
+  const go = () => {
+    if (!window.goatcounter || !window.goatcounter.count) return;
+    window.goatcounter.count({ path: '/fmwafrica/' + (id === 'home' ? '' : '#' + id), title: 'FMW Africa: ' + id });
+  };
+  if (window.goatcounter && window.goatcounter.count) go();
+  else window.addEventListener('load', go, { once: true });
+}
+
 // ---------- router ----------
 function route() {
   let id = location.hash.slice(1) || 'home';
@@ -230,6 +245,7 @@ function route() {
   }
   renderRail(id);
   renderHomeSteps();
+  track(id);
   window.scrollTo(0, 0);
 }
 

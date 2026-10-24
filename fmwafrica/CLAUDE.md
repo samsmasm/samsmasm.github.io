@@ -18,6 +18,10 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
   Africa outline traced from findtreasure/countries.geojson (Natural Earth 110m, public domain) with OpenCV.
 - `img/`: nt1-4 NoodleTools screenshots, rubber-coils.jpg (Punch 1906), nsala.jpg (behind a content-warning click), tervuren.jpg (1897).
 
+## Analytics
+- GoatCounter (samsmasm.goatcounter.com) with no_onload; track() in app.js counts each view as /fmwafrica/#<view>
+  (home = /fmwafrica/), so steps, examples, rubric and docs show as separate paths.
+
 ## Conventions
 - Examples are all Congo (not one of the four country choices) so students can't copy them.
 - Country cards are launchpads only (power, turning point, resistance, search words). No direct Britannica links: students must use Britannica via the SSIS library page (school version). The SSIS library page link itself is fine.
