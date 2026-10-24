@@ -21,5 +21,5 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
 
 ## Pending
 - Exact submission instructions (Submit view says "coming"). Currently: printed poster, bibliography, OPCVLs.
-- Block letters: slide 63 name format says E/F, share groups say E/G. Site uses E and G.
+- Blocks are E and F (confirmed by Sam). Share groups: FMW Block E Africa 26 / FMW Block F Africa 26.
 - AI thesis feedback: Sam said not yet.
