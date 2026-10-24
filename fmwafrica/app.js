@@ -14,6 +14,7 @@ const STEPS = [
   { id: 'step-4', label: 'Find two images', desc: 'From the time, and saying different things' },
   { id: 'step-5', label: 'Write the thesis', desc: 'Answer the question, include resistance' },
   { id: 'step-6', label: 'Analyse your images', desc: 'OPCVL, then five sentences each' },
+  { id: 'step-7', label: 'Put it in a poster', desc: 'A3, Google Docs recommended. Not judged on looks' },
   { id: 'submit', label: 'Hand it in', desc: 'Poster, bibliography, OPCVLs' },
 ];
 
@@ -108,7 +109,7 @@ const THESIS_CHECKS = [
 ];
 
 const SUBMIT_CHECKS = [
-  'Poster printed, with my thesis and two images',
+  'Poster printed on A3, with my name, title, thesis and two images',
   'Each image has a title and its five-sentence analysis',
   'Citations in the text of the poster',
   'Bibliography: both images, plus two (or three) academic sources',

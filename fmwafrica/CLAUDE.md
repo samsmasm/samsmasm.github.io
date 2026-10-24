@@ -5,7 +5,7 @@ Built from Sam's materials in ~/Downloads/africa (deck slides 60 to 68, rubric, 
 Congo images doc). It is a companion for the task, NOT a store of everything about Africa.
 
 ## Files
-- `index.html`: all views as `<section data-view>`; hash routes (#home, #step-1..#step-6, #submit, #examples, #rubric, #docs).
+- `index.html`: all views as `<section data-view>`; hash routes (#home, #step-1..#step-7, #submit, #examples, #rubric, #docs).
   Most student-facing wording lives here, so edit text here.
 - `app.js`: data (STEPS, COUNTRIES, ARCHIVES, SOURCE_QS, THESIS_CHECKS, SUBMIT_CHECKS, WRITER_FIELDS) and tools.
   Student input saved in localStorage key `fmwafrica` (device only; the UI tells them to paste into their own doc).
