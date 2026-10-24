@@ -16,7 +16,7 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
 
 ## Conventions
 - Examples are all Congo (not one of the four country choices) so students can't copy them.
-- Country cards are launchpads only (power, turning point, resistance, search words). Britannica links are search URLs.
+- Country cards are launchpads only (power, turning point, resistance, search words). No direct Britannica or SSIS Library links: Sam is training students to go Schoology > Courses > Library and search themselves. Keep it that way.
 - Sam's own wording kept verbatim where used (OPCVL prompts, source questions, rubric original).
 
 ## Pending

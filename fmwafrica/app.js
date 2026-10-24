@@ -296,8 +296,9 @@ function renderCountries() {
       <h3>${c.name}: a starting point</h3>
       <p class="small" style="margin-top:0">Just enough to know what to search for. Your three academic sources do the real work.</p>
       <dl>${c.facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-      <p class="searchwords" style="margin:12px 0 0"><span class="label">Search Britannica for</span><br>
-        ${c.search.map(w => `<a href="https://www.britannica.com/search?query=${encodeURIComponent(w)}" target="_blank" rel="noopener">${esc(w)}</a>`).join(' · ')}</p>
+      <p class="searchwords" style="margin:12px 0 0"><span class="label">Search for</span><br>
+        ${c.search.map(esc).join(' · ')}</p>
+      <p class="small" style="margin:8px 0 0">Search Britannica and Gale from the SSIS Library site: <b>Schoology &gt; Courses &gt; Library</b>.</p>
     </div>` : `<p class="small">Tap a country to see a starting point. You can change your mind.</p>`;
   document.querySelectorAll('.country').forEach(b => b.addEventListener('click', () => {
     state.country = state.country === b.dataset.c ? null : b.dataset.c;
@@ -353,7 +354,7 @@ function renderImgPicks() {
     const ia = picks.indexOf(a[0]), ib = picks.indexOf(b[0]);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
   });
-  $('#archives').innerHTML = `<li><a href="https://sites.google.com/ssis.edu.vn/library/hs-research-sources/african-imperialism-9fmw?authuser=0" target="_blank" rel="noopener">SSIS library suggestions</a><span>Start here if you haven’t stumbled on images yet.</span></li>`
+  $('#archives').innerHTML = `<li><span style="font-family:Georgia,serif;font-size:16px;color:var(--ink)">SSIS Library suggestions</span><span>Start here if you haven’t stumbled on images yet: <b>Schoology &gt; Courses &gt; Library</b>.</span></li>`
     + sorted.map(([n, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(n)}</a><span>${picks.includes(n) ? `<span class="star">Good for ${c.name}</span> · ` : ''}${esc(d)}</span></li>`).join('');
 }
 
