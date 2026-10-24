@@ -9,7 +9,7 @@ const DUES = {
 
 const STEPS = [
   { id: 'step-1', label: 'Set up NoodleTools', desc: 'Name it, share it with your teacher' },
-  { id: 'step-2', label: 'Choose and research', desc: 'Pick a country, find three academic sources' },
+  { id: 'step-2', label: 'Choose and research', desc: 'Pick a country, find two (or three) academic sources' },
   { id: 'step-3', label: 'Check your sources', desc: 'Seven questions for each source' },
   { id: 'step-4', label: 'Find two images', desc: 'From the time, and saying different things' },
   { id: 'step-5', label: 'Write the thesis', desc: 'Answer the question, include resistance' },
@@ -90,6 +90,11 @@ const SOURCE_QS = [
   'Does it add useful insight or match what other good sources say?',
   'Could the author’s role, purpose, or context make it biased or incomplete?',
 ];
+const SRC_HINTS = [
+  { ph: 'Probably Britannica or Gale: title, author, or link' },
+  { ph: 'Probably an academic article or similar: title, author, or link' },
+  { ph: 'A third academic source, if you use one', opt: true },
+];
 // For the last question "yes" is the warning answer.
 const SOURCE_FLIP = 6;
 
@@ -106,7 +111,7 @@ const SUBMIT_CHECKS = [
   'Poster printed, with my thesis and two images',
   'Each image has a title and its five-sentence analysis',
   'Citations in the text of the poster',
-  'Bibliography: three academic sources and both images',
+  'Bibliography: both images, plus two (or three) academic sources',
   'An OPCVL for image 1',
   'An OPCVL for image 2',
 ];
@@ -297,7 +302,7 @@ function renderCountries() {
   $('#countryDetail').innerHTML = c ? `
     <div class="box cdetail">
       <h3>${c.name}: a starting point</h3>
-      <p class="small" style="margin-top:0">Just enough to know what to search for. Your three academic sources do the real work.</p>
+      <p class="small" style="margin-top:0">Just enough to know what to search for. Your academic sources do the real work.</p>
       <dl>${c.facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       <p class="searchwords" style="margin:12px 0 0"><span class="label">Search for</span><br>
         ${c.search.map(esc).join(' · ')}</p>
@@ -314,8 +319,8 @@ function renderCountries() {
 function renderSrcs() {
   $('#srcs').innerHTML = state.srcs.map((s, i) => `
     <div class="box src" data-i="${i}">
-      <h3>Source ${i + 1}</h3>
-      <input type="text" class="src-name" placeholder="Title, author, or link" value="${esc(s.name || '')}">
+      <h3>Source ${i + 1}${SRC_HINTS[i].opt ? ' <span class="small">(optional)</span>' : ''}</h3>
+      <input type="text" class="src-name" placeholder="${SRC_HINTS[i].ph}" value="${esc(s.name || '')}">
       <ul class="qs">${SOURCE_QS.map((q, j) => {
         const a = (s.a || {})[j];
         return `<li><span>${esc(q)}</span><span class="yn" data-j="${j}">
