@@ -492,9 +492,12 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     { k: 't', n: 'Temp', long: 'Temperature', u: '°C', d: 1 },
     { k: 'wb', n: 'Wet bulb', long: 'Wet bulb', u: '°C', d: 1 },
     { k: 'rh', n: 'RH', long: 'Humidity', u: '%', d: 0 },
-    { k: 'sw', n: 'Sun', long: 'Peak sun', u: 'W/m²', d: 0 },
-    { k: 'uv', n: 'UV', long: 'UV max', u: 'index', d: 1 }
+    { k: 'sw', n: 'Sun', long: 'Peak sun', now: 'Sun now', u: 'W/m²', d: 0 },
+    { k: 'uv', n: 'UV', long: 'UV max', now: 'UV now', u: 'index', d: 1 }
   ];
+  /* days[0..2] are today, tomorrow and the day after (peak wet bulb hour); days[NOW] is the current hour */
+  var NOW = 3;
+  function colLong(col) { return state.day === NOW && col.now ? col.now : col.long; }
 
   /* name, country, extra search words, lat, lon, typical mid-October afternoon temp C, RH %, pressure hPa (rough, for example mode) */
   var RAW = [
@@ -727,11 +730,12 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
         hour: '15:00'
       });
     });
+    days.push(mk(JSON.parse(JSON.stringify(days[0].rows)), c.P, false, { sw: days[0].sw, uv: days[0].uv }));
     return { days: days };
   }
 
   /* ---------- state ---------- */
-  var state = { city: CITIES[0].id, day: 0, method: 'stull', game: 'off', guess: 25, sort: { key: 'at', dir: 'desc' }, places: [], table: true, data: {}, liveState: 'idle', fetched: null };
+  var state = { city: CITIES[0].id, day: NOW, method: 'stull', game: 'off', guess: 25, sort: { key: 'at', dir: 'desc' }, places: [], table: true, data: {}, liveState: 'idle', fetched: null };
   CITIES.forEach(function (c) { state.data[c.id] = fresh(c); });
   function city() { return BYID[state.city]; }
   function cur() { return state.data[state.city].days[state.day]; }
@@ -784,16 +788,17 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     try { n.scrollIntoView({ behavior: rm ? 'auto' : 'smooth', block: 'start' }); } catch (e) { n.scrollIntoView(); }
   }
   function dayName(d) {
+    if (d === NOW) return 'Now';
     if (d === 0) return 'Today';
     if (d === 1) return 'Tomorrow';
     try { var t = new Date(); t.setDate(t.getDate() + 2); return t.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }); } catch (e) { return 'In 2 days'; }
   }
-  function dayWord(d) { return ['today', 'tomorrow', 'the day after tomorrow'][d]; }
+  function dayWord(d) { return ['today', 'tomorrow', 'the day after tomorrow', 'right now'][d]; }
 
   /* ---------- day picker and status ---------- */
   function renderDays() {
     var box = $('days'); box.textContent = '';
-    [0, 1, 2].forEach(function (d) {
+    [NOW, 0, 1, 2].forEach(function (d) {
       var b = el('button', null, dayName(d)); b.type = 'button';
       b.setAttribute('aria-pressed', d === state.day ? 'true' : 'false');
       b.addEventListener('click', function () {
@@ -853,7 +858,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
       return toks.every(function (t) { return x.c.words.some(function (w) { return w.indexOf(t) === 0; }); });
     });
     var n = liveCount(), mixed = n > 0 && n < CITIES.length;
-    var colName = COLS.filter(function (c) { return c.k === key; })[0].long.toLowerCase();
+    var colName = colLong(COLS.filter(function (c) { return c.k === key; })[0]).toLowerCase();
     $('count').textContent = (shown.length === CITIES.length ? CITIES.length : shown.length + ' of ' + CITIES.length) + ' cities, by ' + colName + ', ' + (desc ? 'highest first' : 'lowest first');
     var tb = $('lrows'); tb.textContent = '';
     if (!shown.length) {
@@ -962,7 +967,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     var s = rowStats(state.city);
     COLS.forEach(function (col) {
       var v = s ? s[col.k] : null, has = v && ok(v.mid), tr = el('tr');
-      tr.appendChild(el('td', null, col.long + ' (' + col.u + ')'));
+      tr.appendChild(el('td', null, colLong(col) + ' (' + col.u + ')'));
       tr.appendChild(el('td', 'r', has ? v.mid.toFixed(col.d) : '-'));
       tr.appendChild(el('td', 'r', has ? v.min.toFixed(col.d) + ' to ' + v.max.toFixed(col.d) : '-'));
       tb.appendChild(tr);
@@ -983,9 +988,11 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     $('tip').textContent = 'Tap a dot to see the inputs behind it.';
     renderLeague();
     renderMeasures();
-    var when = dayWord(state.day) + (d.hour ? ' around ' + d.hour : '');
+    var isNow = state.day === NOW;
+    var when = dayWord(state.day) + (d.hour ? (isNow ? ' (' + d.hour + ')' : ' around ' + d.hour) : '');
     var whenTag = dayName(state.day) + (d.hour ? ' · ' + d.hour + ' local' : '');
-    Array.prototype.forEach.call(document.querySelectorAll('.when'), function (n) { n.textContent = whenTag; n.title = 'The day’s peak wet bulb hour, in the city’s local time. Sun and UV are the day’s maximum.'; });
+    var whenTip = isNow ? 'Current conditions in the city’s local time, from the models’ hourly values.' : 'The day’s peak wet bulb hour, in the city’s local time. Sun and UV are the day’s maximum.';
+    Array.prototype.forEach.call(document.querySelectorAll('.when'), function (n) { n.textContent = whenTag; n.title = whenTip; });
     if (!list.length) {
       $('mid').textContent = '-'; $('fRange').textContent = '-'; $('fSpread').textContent = '-'; $('fGap').textContent = '-';
       $('flag').textContent = 'Enter a temperature and a humidity between 1 and 100 for at least one source.';
@@ -1025,7 +1032,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     $('main').hidden = g === 'guessing';
     $('resultCard').hidden = g !== 'revealed';
     $('gameBtn').textContent = g === 'off' ? 'Guess first' : 'Exit game';
-    if (g === 'guessing') $('guessQ').textContent = 'What will the median wet bulb be in ' + city().name + ' ' + dayWord(state.day) + '?';
+    if (g === 'guessing') $('guessQ').textContent = (state.day === NOW ? 'What is' : 'What will') + ' the median wet bulb be in ' + city().name + ' ' + dayWord(state.day) + '?';
   }
   function renderResult(st) {
     var diff = state.guess - st.mid, ad = Math.abs(diff);
@@ -1205,7 +1212,45 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     function r(v) { return Math.round(v * k) / k; }
     return { mid: r(s.mid), min: r(s.min), max: r(s.max) };
   }
-  function parseDays(h, uvh) {
+  /* value between hour i and i + 1, f of the way along (falls back to whichever end exists) */
+  function lerpAt(s, i, f) {
+    if (!s || !ok(s[i])) return null;
+    return ok(s[i + 1]) ? s[i] + (s[i + 1] - s[i]) * f : s[i];
+  }
+  /* the current hour in the city's local time, from its UTC offset */
+  function nowSpot(h, off) {
+    var t = new Date(Date.now() + (off || 0) * 1000), t0 = Date.parse(String(h.time[0]) + 'Z');
+    if (!ok(t0)) return null;
+    var x = Math.min(h.time.length - 1, Math.max(0, (t.getTime() - t0) / 3600000)), i = Math.floor(x);
+    return { i: i, f: x - i, hour: t.toISOString().slice(11, 16) };
+  }
+  function parseNow(h, uvh, off) {
+    var sp = nowSpot(h, off);
+    if (!sp) return null;
+    var i = sp.i, f = sp.f, rows = {}, ps = [], sw = [], uv = [];
+    MODELS.forEach(function (m) {
+      var t = lerpAt(seriesOf(h, 'temperature_2m', m), i, f), r = lerpAt(seriesOf(h, 'relative_humidity_2m', m), i, f);
+      var at = lerpAt(seriesOf(h, 'apparent_temperature', m), i, f), pr = lerpAt(seriesOf(h, 'surface_pressure', m), i, f);
+      if (ok(t) && ok(r)) {
+        rows[m] = { t: Math.round(t * 10) / 10, rh: Math.round(r), at: ok(at) ? Math.round(at * 10) / 10 : null };
+        if (ok(pr)) ps.push(pr);
+      }
+      var ms = lerpAt(seriesOf(h, 'shortwave_radiation', m), i, f), mu = lerpAt(seriesOf(h, 'uv_index', m), i, f);
+      if (ok(ms)) sw.push(ms);
+      if (ok(mu)) uv.push(mu);
+    });
+    var cu = uvh ? lerpAt(uvh.uv_index, i, f) : null;
+    if (ok(cu)) uv.push(cu);
+    if (!Object.keys(rows).length) return null;
+    return {
+      rows: rows,
+      p: ps.length ? Math.round(ps.reduce(function (x, y) { return x + y; }, 0) / ps.length) : null,
+      sw: sw.length ? rangeOf(sw, 0) : null,
+      uv: uv.length ? rangeOf(uv, 1) : null,
+      hour: sp.hour
+    };
+  }
+  function parseDays(h, uvh, off) {
     if (!h || !h.time) return null;
     var n = h.time.length, days = [], d, i;
     for (d = 0; d < 3; d++) {
@@ -1243,6 +1288,9 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
         hour: String(h.time[bi]).slice(-5)
       });
     }
+    var now = parseNow(h, uvh, off);
+    if (!now) return null;
+    days.push(now);
     return days;
   }
   /* parse-end */
@@ -1250,7 +1298,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
     return Promise.all([getJson(chunkUrl(ch)), getJson(uvUrl(ch)).catch(function () { return null; })]).then(function (r) {
       var j = r[0], arr = Array.isArray(j) ? j : [j], ua = r[1] ? (Array.isArray(r[1]) ? r[1] : [r[1]]) : [], out = {};
       ch.forEach(function (c, i) {
-        var days = arr[i] ? parseDays(arr[i].hourly, ua[i] && ua[i].hourly) : null;
+        var days = arr[i] ? parseDays(arr[i].hourly, ua[i] && ua[i].hourly, arr[i].utc_offset_seconds) : null;
         if (days) out[c.id] = days;
       });
       return out;
@@ -1258,16 +1306,16 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   }
   function applyLive(got) {
     Object.keys(got).forEach(function (id) {
-      if (!BYID[id] || !got[id] || got[id].length < 3) return;
+      if (!BYID[id] || !got[id] || got[id].length < 4) return;
       state.data[id] = {
         days: got[id].map(function (g) { return mk(g.rows, ok(g.p) ? g.p : BYID[id].P, true, { sw: g.sw, uv: g.uv, hour: g.hour }); })
       };
     });
   }
-  function saveCache(got) { try { localStorage.setItem('wbr-live3', JSON.stringify({ t: Date.now(), cities: got })); } catch (e) { /* ignore */ } }
+  function saveCache(got) { try { localStorage.setItem('wbr-live4', JSON.stringify({ t: Date.now(), cities: got })); } catch (e) { /* ignore */ } }
   function applyCache() {
     try {
-      var c = JSON.parse(localStorage.getItem('wbr-live3') || 'null');
+      var c = JSON.parse(localStorage.getItem('wbr-live4') || 'null');
       if (c && c.cities && Date.now() - c.t < 600000 && Object.keys(c.cities).length) {
         applyLive(c.cities); state.liveState = 'ok'; state.fetched = new Date(c.t); return true;
       }
@@ -1937,7 +1985,7 @@ svg .gl { stroke: var(--fg2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0
   function renderForecast(force) {
     var box = $('fcBox');
     if (!box) return;
-    var c = city(), fc = fcFor(c), d = state.day;
+    var c = city(), fc = fcFor(c), d = state.day === NOW ? 0 : state.day;
     var key = [c.id, d, fcUI.focus, fcUI.models, fc.live ? fc.fetched.getTime() : 'x', fcLive[c.id] || '', Math.floor(Date.now() / 60000)].join('|');
     if (!force && key === fcUI.key) return;
     fcUI.key = key;
