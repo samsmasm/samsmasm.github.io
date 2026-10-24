@@ -29,6 +29,6 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
 - Exact submission instructions (Submit view says "coming"). Currently: printed poster, bibliography, OPCVLs.
 - NoodleTools step: teachers sgraham (Mr Graham), tredfern (Mr Redfern), dniedringhaus (Mr Niedringhaus); blocks A to H.
   Title = <teacher>-<block>-africa-FirstLast. Citation: MLA, Junior. Students type "Africa" in Share to find their teacher's inbox.
-  Screenshots img/nt1..nt4 (nt3 cropped from Sam's full-browser capture to hide tabs and email).
+  Screenshots img/nt1..nt4 (nt3: grey + drawn and circled under Sharing, where it appears on hover; cropped from Sam's full-browser capture to hide tabs and email).
 - NotebookLM links removed at Sam's request; don't add them back.
 - AI thesis feedback: Sam said not yet.
