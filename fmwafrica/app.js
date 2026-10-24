@@ -108,7 +108,7 @@ const SUBMIT_CHECKS = [
 ];
 
 const WRITER_FIELDS = [
-  { part: 'OPCVL', key: 'o', label: 'Origin', prompts: [
+  { part: 'OPCVL', sub: 'Origin · Purpose · Content · Value · Limitation', cls: 'opc', key: 'o', label: 'Origin', prompts: [
     'Who created the text, and if anyone else is speaking, who are they?',
     'When was it created and when was it published?',
     'Where was the author from?',
@@ -132,7 +132,7 @@ const WRITER_FIELDS = [
     'Are there limitations in the perspective that leave out important information?',
     'Could this be intentional?'],
     eg: "It cannot tell us what life under the rubber system was like for Congolese people, or what they thought, because it is a British view and they have no voice in it; it even shows them only as helpless victims. It blames one man and leaves out the concession companies, the soldiers of the Force Publique and the other powers that let Leopold take the Congo in 1885. This may be intentional: Britain had its own empire, so blaming one foreign king moved attention away from colonialism as a whole, including Britain’s own colonies." },
-  { part: 'Analysis: one sentence each', key: 'ctx', label: 'Context', one: true, prompts: [
+  { part: 'Analysis', sub: 'Context · Observe · Symbols · Perspective · Link: one sentence each', cls: 'ana', key: 'ctx', label: 'Context', one: true, prompts: [
     'What is the immediate context for this artifact, referring to the country and where the artifact was published?'],
     eg: "This image was published in Britain in Punch in 1906, when Congo was still producing a large amount of rubber (Hochschild) under the personal control of King Leopold II, who had held Congo since 1885 (Britannica).", fromEx: true },
   { key: 'obs', label: 'Observe', one: true, prompts: [
@@ -372,7 +372,7 @@ function renderWriter() {
       <input type="text" id="w-title" data-k="title" value="${esc(d.title || '')}" placeholder="e.g. 1906 cartoon of Leopold II as a snake">
     </div><div class="prompts">Give it a title for your poster, as in the exemplar.</div></div>`;
   WRITER_FIELDS.forEach(f => {
-    if (f.part) html += `<h3 class="part">${f.part}</h3>`;
+    if (f.part) html += `<h2 class="part ${f.cls}">${f.part}<span>${f.sub}</span></h2>`;
     html += `<div class="field"><div>
         <label class="fl" for="w-${f.key}">${f.label}</label>
         <textarea id="w-${f.key}" data-k="${f.key}" rows="${f.one ? 2 : 3}">${esc(d[f.key] || '')}</textarea>
