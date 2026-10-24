@@ -34,9 +34,13 @@ ibbm-src/
     pages/
       index.astro         ← homepage
       unit1/              ← 1-1 through 1-6, plus index
+      unit2/              ← 2-1, 2-2, 2-3, plus index
       unit3/              ← 3-1 through 3-9 (+5-5 break-even), plus index
       unit4/              ← 4-1, 4-2, 4-3, 4-4, 4-5-{product,price,promotion,place,people,processes,physical}, 4-6, plus index
+      unit5/              ← 5-1, 5-2, 5-3 (HL), 5-4, 5-6 (HL), 5-8 (HL), plus index (5.5 lives in unit3/)
       casestudies/        ← case study pages
+      examtechnique/      ← exam skills pages
+  public/img/             ← images (served at /ibbm/img/)
     styles/
       global.css          ← all site-wide styles
   finsyl.md               ← IB Finance syllabus reference (Unit 3 content checklist)
@@ -83,10 +87,12 @@ Content should match the IB BM syllabus. `finsyl.md` is the Unit 3 checklist. Fo
 ## Nav structure (completed units)
 
 Unit 1: 1.1–1.6 (Business Org)
+Unit 2: 2.1–2.3 (HR, built 2026-10-24)
 Unit 3: 3.1–3.9 + 5.5 (Finance — all built)
 Unit 4: 4.1–4.6 including 4.5 split into 7Ps (all built)
+Unit 5: 5.1, 5.2, 5.3, 5.4, 5.6, 5.8 (5.5 is under Unit 3)
 
-Units 2 and 5 are not yet in the nav. Do not add them unless asked.
+Only build sub-units Sam has given materials for. Where a sub-unit has some of his material, fill the remaining syllabus points briefly and mark them "Pending teacher review". Where there's no trace of a sub-unit, don't create it.
 
 Case studies are separate pages under `/casestudies/`.
 
@@ -110,8 +116,8 @@ Case studies are separate pages under `/casestudies/`.
 
 ## Current status
 
-Units 1, 3, and 4 fully built (all pages). Units 2 (Human Resource Management) and 5 (Operations Management) have no pages and are not in the nav.
+Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.3), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.4–2.7, 5.7, 5.9 (no materials yet).
 
-**Not built:** Units 2 and 5 entirely. Case studies page exists but content may be sparse.
+## Writing style
 
-**No bugs in built content.**
+TL;DR, not a textbook: short notes, tables, key terms. Sam's wording from his slides; paraphrase textbook (Kognity) text, never copy. Questions Sam adapted from IB papers are fine to use. No em dashes in new text.
