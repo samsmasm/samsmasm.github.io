@@ -14,6 +14,7 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
   kente/mudcloth patterns, safari/animal print, colonial map colours.
 - Header: Sam said this site need NOT follow the pastel rainbow AESTHETIC.md look. Solid indigo masthead, ochre-light
   (#d9874f) rule and active tab, Africa silhouette logo (img/africa.svg) instead of /unisamsq.png, favicon img/favicon.svg.
+  Fonts: Young Serif (headings, with lining-nums so 1 is not read as I) + Atkinson Hyperlegible (body), Google Fonts.
   Africa outline traced from findtreasure/countries.geojson (Natural Earth 110m, public domain) with OpenCV.
 - `img/`: nt1-4 NoodleTools screenshots, rubber-coils.jpg (Punch 1906), nsala.jpg (behind a content-warning click), tervuren.jpg (1897).
 
