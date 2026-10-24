@@ -113,43 +113,43 @@ const WRITER_FIELDS = [
     'When was it created and when was it published?',
     'Where was the author from?',
     'Where was it published?'],
-    eg: 'Linley Sambourne, Punch, London, 28 November 1906.' },
+    eg: "A cartoon titled “In the Rubber Coils”, drawn by Linley Sambourne, Punch’s chief cartoonist. Sambourne was English, born in London. It was created and published in November 1906 (28 November) in Punch, a weekly humour and politics magazine published in London. No one else speaks in it: the Congolese people shown have no words." },
   { key: 'p', label: 'Purpose', prompts: [
     'Why does this source exist and why did the creator choose this particular format?',
     'Who is the intended audience?'],
-    eg: 'Pressure for reform while Parliament debated the Casement report.' },
+    eg: "Punch used cartoons to comment on the news, because a cartoon makes its point in one glance and can make readers laugh or feel outraged far faster than a report. It appeared while the Congo Reform Association was campaigning in Britain and the Casement report (1904) was still being discussed, so it existed to criticise Leopold and add to the pressure for reform. Its intended audience was educated, middle- and upper-class British readers, including politicians who could push Belgium to act." },
   { key: 'c', label: 'Content', prompts: [
     'What does the source say?',
     'What do the images convey?'],
-    eg: 'A snake with Leopold’s crowned head strangles a Congolese man; others flee.' },
+    eg: "A huge snake with Leopold II’s crowned head coils around a Congolese man and squeezes him, while other Congolese people flee, one carrying a child away. The title links the snake to the rubber vine and the rubber trade that made Leopold rich. The image conveys that Leopold is strangling the Congo and its people, and that they cannot fight back or escape." },
   { key: 'v', label: 'Value', prompts: [
     'How does the source help us understand the time and place, as well as the events occurring at the time the source was created or is focusing on?',
     'How does the text help us understand the perspectives of a given time and place?',
     'How does it help us understand the perspectives of the author?'],
-    eg: 'Shows how the British press framed the Congo.' },
+    eg: "It shows how the Congo was seen in Britain in 1906: as a scandal caused by one cruel king. That the abuses were well enough known to appear in a popular magazine is evidence of the international pressure building on Leopold before he gave up the Congo in 1908. It also shows the author’s perspective: Sambourne and Punch saw Leopold as personally responsible and wanted their readers to be outraged." },
   { key: 'l', label: 'Limitation', prompts: [
     'What is there from the time and place discussed that we cannot understand from the source?',
     'Are there limitations in the perspective that leave out important information?',
     'Could this be intentional?'],
-    eg: 'A British view, not a Congolese voice. Blames one villain, not companies or other powers.' },
+    eg: "It cannot tell us what life under the rubber system was like for Congolese people, or what they thought, because it is a British view and they have no voice in it; it even shows them only as helpless victims. It blames one man and leaves out the concession companies, the soldiers of the Force Publique and the other powers that let Leopold take the Congo in 1885. This may be intentional: Britain had its own empire, so blaming one foreign king moved attention away from colonialism as a whole, including Britain’s own colonies." },
   { part: 'Analysis: one sentence each', key: 'ctx', label: 'Context', one: true, prompts: [
     'What is the immediate context for this artifact, referring to the country and where the artifact was published?'],
-    eg: 'Published in Punch in London in November 1906, while Leopold still personally owned the Congo and Parliament was debating the Casement report.' },
+    eg: "This image was published in Britain in Punch in 1906, when Congo was still producing a large amount of rubber (Hochschild) under the personal control of King Leopold II, who had held Congo since 1885 (Britannica).", fromEx: true },
   { key: 'obs', label: 'Observe', one: true, prompts: [
     'Describe what you literally see in the image.',
     'Only what you see.'],
-    eg: 'A snake with Leopold’s crowned head coils around a Congolese man, while another figure carries a child away.' },
+    eg: "The snake with Leopold’s head is wrapped around the Congolese man, while other Congolese people flee the scene.", fromEx: true, egNote: "The exemplar mixes what it sees into its Symbols sentences. This is that seeing, pulled out on its own." },
   { key: 'sym', label: 'Symbols', one: true, prompts: [
     'Explain the symbolism or the emotions produced by the image, linking this explanation to your previous observations.',
     'What stands for what?'],
-    eg: 'The snake stands for both the rubber vine and Leopold himself, squeezing the life and wealth out of the Congo.' },
+    eg: "The snake with Leopold’s head, being wrapped around the Congolese man, represented both the rubber vine and a predator squeezing the life (or in Congo, the wealth and life) out of its victim. The other Congolese people fleeing the scene indicate the inability to fight. The singular snake with Leopold’s head suggests that he alone was responsible for the atrocities in Congo.", fromEx: true },
   { key: 'per', label: 'Perspective', one: true, prompts: [
     'Analyse the perspectives, biases, meaning, and purpose of the artifact.',
     'Who is this made for? Whose voice is missing?'],
-    eg: 'Drawn by a British cartoonist for British readers, it blames Leopold alone and shows Congolese people only as helpless.' },
+    eg: "The cartoon was published with the motivation to expose the abuses in the Congo, and to criticize Leopold in particular. By putting all blame onto Leopold, it also moves blame away from the colonial system as a whole, including the British colonies. Being published in the UK and drawn by a British cartoonist, it does not represent the voice of Congolese people and shows them as helpless.", fromEx: true },
   { key: 'lnk', label: 'Link', one: true, prompts: [
     'Link back to your thesis statement.'],
-    eg: 'Its publication in London, not Belgium, supports my thesis that international pressure helped end Leopold’s personal rule in 1908.' },
+    eg: "However, its publication in the UK (not Belgium or Congo) supports the idea that international pressure played a role in the end of Leopold’s control.", fromEx: true },
 ];
 
 // ---------- storage ----------
@@ -379,7 +379,7 @@ function renderWriter() {
         <div class="meta" data-meta="${f.key}"></div>
       </div><div class="prompts">
         <ul>${f.prompts.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
-        <details><summary>See an example</summary><p class="eg">${esc(f.eg)}</p></details>
+        <details><summary>${f.fromEx ? 'See it in the exemplar' : 'See an example'}</summary><p class="eg">${esc(f.eg)}</p>${f.egNote ? `<p class="egnote">${esc(f.egNote)}</p>` : ''}</details>
       </div></div>`;
   });
   $('#writer').innerHTML = html;
@@ -396,8 +396,8 @@ function meta(el) {
   const words = el.value.trim() ? el.value.trim().split(/\s+/).length : 0;
   if (f.one) {
     const n = sentences(el.value);
-    m.textContent = n ? `${n} sentence${n > 1 ? 's' : ''} · aim for one` : 'One sentence';
-    m.classList.toggle('long', n > 2);
+    m.textContent = n ? `${n} sentence${n > 1 ? 's' : ''} · aim for one, three at most` : 'One sentence, three at most';
+    m.classList.toggle('long', n > 3);
   } else m.textContent = words ? `${words} words` : '';
 }
 function grow(el) {

@@ -18,6 +18,8 @@ Congo images doc). It is a companion for the task, NOT a store of everything abo
 - Examples are all Congo (not one of the four country choices) so students can't copy them.
 - Country cards are launchpads only (power, turning point, resistance, search words). No direct Britannica links: students must use Britannica via the SSIS library page (school version). The SSIS library page link itself is fine.
 - Sam's own wording kept verbatim where used (OPCVL prompts, source questions, rubric original).
+- Step 6 writer examples (WRITER_FIELDS `eg`): the OPCVL ones answer every prompt at full length (Sam: short ones are "not long enough for a good mark"). The analysis ones are the exemplar's own sentences, split by part (`fromEx`); Observe is pulled out of the exemplar's Symbols wording (`egNote` says so). The weak/strong table's strong column uses the same exemplar sentences. Sentence counter: aim for one, flags over three (the exemplar uses up to three per part).
+- Step 6 must keep the big `.nosave` warning (do not rely on the site to save) and the formulaic-writing tip (write off the page or edit the copied response). Sam asked for both.
 
 ## Pending
 - Exact submission instructions (Submit view says "coming"). Currently: printed poster, bibliography, OPCVLs.
