@@ -1565,6 +1565,7 @@ function removeElementQuietly(id) {
 function toggleSnap() {
   snapEnabled = !snapEnabled;
   syncSnapButton();
+  scheduleAutosave();
 }
 function syncSnapButton() {
   const btn = document.getElementById('snap-btn');
@@ -2913,6 +2914,7 @@ function setTool(t) {
   updateZoomLabel();
   curvePoints = [];
   drawing = false;
+  scheduleAutosave();
 }
 
 function updateHint(t) {
@@ -3958,6 +3960,19 @@ function driveGranted() {
   try { return localStorage.getItem('sw2_drive_granted') === '1'; } catch(e) { return false; }
 }
 
+// The session (access token, about an hour, drive.file only; and the email)
+// is kept in localStorage so a page refresh stays signed in. Google's token
+// client can only renew through a popup, which browsers allow only from a
+// click, so nothing is requested on load: an expired token is renewed on the
+// next Drive action (a click; with the existing grant the popup just closes).
+const DRIVE_SESSION_KEY = 'sw2_drive_session';
+function driveSaveSession() {
+  try { localStorage.setItem(DRIVE_SESSION_KEY, JSON.stringify({ token: driveToken, user: driveUser })); } catch(e) {}
+}
+function driveForget() {
+  try { localStorage.removeItem('sw2_drive_granted'); localStorage.removeItem(DRIVE_SESSION_KEY); } catch(e) {}
+}
+
 function driveInitClient() {
   if (driveTokenClient) return true;
   if (!driveEnabled()) return false;
@@ -3977,11 +3992,12 @@ function driveRequestToken(silent) {
       // Google lets users untick individual permissions, so confirm Drive was actually granted.
       const need = 'https://www.googleapis.com/auth/drive.file';
       if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(resp, need)) {
-        try { localStorage.removeItem('sw2_drive_granted'); } catch(e) {}
+        driveForget();
         return reject(new Error('Please leave the Google Drive permission ticked, or diagrams cannot be saved.'));
       }
       driveToken = { access_token: resp.access_token, expires_at: Date.now() + ((resp.expires_in || 3600) - 60) * 1000 };
       try { localStorage.setItem('sw2_drive_granted', '1'); } catch(e) {}
+      driveSaveSession();
       resolve(driveToken);
     };
     driveTokenClient.error_callback = (err) => reject(new Error((err && err.type) === 'popup_closed' ? 'Sign-in cancelled.' : 'Sign-in failed.'));
@@ -4011,7 +4027,7 @@ async function driveApi(url, opts) {
     // A scope-related 403 means the stored grant is missing drive.file: force a fresh consent screen.
     if (r.status === 403 && attempt === 0 && /insufficient|scope|permission/i.test(detail)) {
       driveToken = null;
-      try { localStorage.removeItem('sw2_drive_granted'); } catch(e) {}
+      driveForget();
       continue;
     }
     throw new Error(detail ? 'Drive: ' + detail : 'Drive error ' + r.status);
@@ -4040,6 +4056,7 @@ async function driveFetchUser() {
     const r = await driveApi('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)');
     driveUser = ((await r.json()).user || {}).emailAddress || '';
   } catch(e) { driveUser = ''; }
+  driveSaveSession();
 }
 
 async function driveSignIn() {
@@ -4061,12 +4078,14 @@ function driveSignOut() {
     try { google.accounts.oauth2.revoke(driveToken.access_token, () => {}); } catch(e) {}
   }
   driveToken = null; driveUser = ''; driveFolderId = null; driveCurrentFile = null;
-  try { localStorage.removeItem('sw2_drive_granted'); } catch(e) {}
+  driveForget();
   driveMsg('');
   driveRefreshUI();
 }
 
-function driveSignedIn() { return !!(driveToken && Date.now() < driveToken.expires_at); }
+// Signed in = we hold a session, even if its token has expired (it is renewed
+// on the next Drive action).
+function driveSignedIn() { return !!driveToken; }
 
 async function driveLoadList() {
   const folder = await driveGetFolder();
@@ -4240,15 +4259,16 @@ function driveRefreshUI() {
   }
 }
 
-// Restore a previous grant silently so returning students land signed in.
-window.addEventListener('load', () => {
+// Returning students land signed in: restore the saved session (no popup).
+function driveRestoreSession() {
   if (!driveEnabled() || !driveGranted()) return;
-  setTimeout(() => {
-    driveRequestToken(true)
-      .then(async () => { await driveFetchUser(); driveRefreshUI(); })
-      .catch(() => {});
-  }, 600);
-});
+  try {
+    const s = JSON.parse(localStorage.getItem(DRIVE_SESSION_KEY) || 'null');
+    if (s && s.token && s.token.access_token) { driveToken = s.token; driveUser = s.user || ''; }
+  } catch(e) {}
+  driveRefreshUI();
+}
+driveRestoreSession();
 
 // ─── FEEDBACK ────────────────────────────────────────────────
 // Reports go to the shared unisam-feedback Worker (see /feedback/). The
@@ -4362,7 +4382,10 @@ function scheduleAutosave() {
 }
 
 function writeAutosave() {
-  const str = JSON.stringify({ graph: currentGraphData(), driveFile: driveCurrentFile });
+  // `view` is how the page was left (Colour or B/W, snap, tool, zoom),
+  // restored with the diagram so a refresh changes nothing.
+  const view = { bw: bwMode, snap: snapEnabled, tool: state.tool, zoom: [viewScale, viewOffsetX, viewOffsetY] };
+  const str = JSON.stringify({ graph: currentGraphData(), driveFile: driveCurrentFile, view });
   if (str === lastAutosave) return;
   try { localStorage.setItem(AUTOSAVE_KEY, str); lastAutosave = str; autosaveFailed = false; }
   catch (e) { autosaveFailed = true; }
@@ -4371,6 +4394,17 @@ function writeAutosave() {
 function restoreAutosave() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch (e) {}
+  // The view comes back even for an empty diagram.
+  const v = saved && saved.view;
+  if (v) {
+    if (typeof v.bw === 'boolean' && v.bw !== bwMode) toggleBW();
+    if (typeof v.snap === 'boolean') { snapEnabled = v.snap; syncSnapButton(); }
+    if (v.tool && document.getElementById('tool-' + v.tool)) setTool(v.tool);
+    if (Array.isArray(v.zoom) && v.zoom.every(Number.isFinite)) {
+      [viewScale, viewOffsetX, viewOffsetY] = v.zoom;
+      updateZoomLabel();
+    }
+  }
   const g = saved && saved.graph;
   if (!g || !((g.elements && g.elements.length) || g.title)) return false;
   applyGraphData(g);
@@ -4484,6 +4518,8 @@ function openSaveModal() {
   document.getElementById('save-code').value = btoa(unescape(encodeURIComponent(JSON.stringify(currentGraphData()))));
   document.getElementById('save-modal').classList.add('open');
   driveRefreshUI();
+  // Fill the Drive list (renewing an expired token now, inside this click).
+  if (driveSignedIn()) driveLoadList().catch(e => driveMsg(e.message, true));
 }
 
 function copySaveCode(btn) {

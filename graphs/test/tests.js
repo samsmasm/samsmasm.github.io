@@ -676,6 +676,25 @@ test('settings shape templates, new drawings and exports, and are saved', async 
   eq(await ev(page, `[prefs.currency, GUIDE.dash, bwMode, myPrefs.currency]`), ['$', '6,4', true, '$'], 'reset');
 });
 
+test('a page refresh keeps Colour/B/W, snap, tool and zoom as they were left', async (page) => {
+  await ev(page, `toggleBW(); toggleSnap(); setTool('curve'); changeZoom(2, 100, 80); writeAutosave()`);
+  const zoom = await ev(page, `[viewScale, viewOffsetX, viewOffsetY]`);
+  await page.reload({ waitUntil: 'load' });
+  eq(await ev(page, `[bwMode, snapEnabled, document.getElementById('bw-btn').classList.contains('bw'), document.getElementById('snap-btn').textContent, state.tool]`),
+    [false, false, false, 'Snap: off', 'curve'], 'after refresh');
+  eq(await ev(page, `[viewScale, viewOffsetX, viewOffsetY]`), zoom, 'zoom');
+});
+
+test('a page refresh stays signed in to Drive, with no Google popup', async (page) => {
+  await ev(page, `localStorage.setItem('sw2_drive_granted', '1'); localStorage.setItem('sw2_drive_session', JSON.stringify({ token: { access_token: 'tok', expires_at: Date.now() - 1000 }, user: 'sam@example.com' }))`);
+  await page.reload({ waitUntil: 'load' });
+  eq(await ev(page, `[driveSignedIn(), document.querySelector('#header-user .hu-email') && document.querySelector('#header-user .hu-email').textContent, driveTokenClient]`),
+    [true, 'sam@example.com', null], 'after refresh');
+  // Signing out forgets the session.
+  await ev(page, `driveSignOut()`);
+  eq(await ev(page, `[localStorage.getItem('sw2_drive_session'), localStorage.getItem('sw2_drive_granted')]`), [null, null], 'session kept after sign out');
+});
+
 test('Google sign-in asks only for Drive access to its own files', async (page) => {
   eq(await ev(page, `DRIVE_SCOPES`), 'https://www.googleapis.com/auth/drive.file', 'scopes');
 });
