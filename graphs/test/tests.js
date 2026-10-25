@@ -650,6 +650,10 @@ test('settings shape templates, new drawings and exports, and are saved', async 
   eq(await ev(page, `[prefs.currency, GUIDE.dash, bwMode, myPrefs.currency]`), ['$', '6,4', true, '$'], 'reset');
 });
 
+test('Google sign-in asks only for Drive access to its own files', async (page) => {
+  eq(await ev(page, `DRIVE_SCOPES`), 'https://www.googleapis.com/auth/drive.file', 'scopes');
+});
+
 test('when zoomed in, dragging empty space moves the view', async (page) => {
   await ev(page, `loadTemplate('blank'); setTool('select'); changeZoom(2, W / 2, H / 2)`);
   const before = await ev(page, `[viewOffsetX, viewOffsetY]`);

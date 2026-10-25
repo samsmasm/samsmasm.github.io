@@ -3909,7 +3909,10 @@ const GOOGLE_CLIENT_ID = '164227206202-sduuhb15difgum84nvt91scjj7gbgjls.apps.goo
 // This is a convenience filter, not a security control. Leave '' to allow any Google account.
 const GOOGLE_HOSTED_DOMAIN = '';
 
-const DRIVE_SCOPES = 'openid email profile https://www.googleapis.com/auth/drive.file';
+// Only drive.file: ShiftWork sees just the files it made, and Google's
+// consent screen asks for nothing else (no name, email or profile). The
+// email shown in the header comes from Drive's own `about` call.
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FOLDER = 'ShiftWork Diagrams';
 const DRIVE_EXT = '.shiftwork.json';
 
@@ -4008,15 +4011,20 @@ async function driveGetFolder() {
   return driveFolderId;
 }
 
+// The signed-in account's email, from Drive (works with drive.file alone).
+async function driveFetchUser() {
+  try {
+    const r = await driveApi('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)');
+    driveUser = ((await r.json()).user || {}).emailAddress || '';
+  } catch(e) { driveUser = ''; }
+}
+
 async function driveSignIn() {
   if (!driveEnabled()) return;
   driveMsg('Signing in…');
   try {
     await driveRequestToken(driveGranted());
-    try {
-      const r = await driveApi('https://www.googleapis.com/oauth2/v3/userinfo');
-      driveUser = (await r.json()).email || '';
-    } catch(e) { driveUser = ''; }
+    await driveFetchUser();
     driveMsg('');
     await driveLoadList();
   } catch(e) {
@@ -4177,13 +4185,7 @@ window.addEventListener('load', () => {
   if (!driveEnabled() || !driveGranted()) return;
   setTimeout(() => {
     driveRequestToken(true)
-      .then(async () => {
-        try {
-          const r = await driveApi('https://www.googleapis.com/oauth2/v3/userinfo');
-          driveUser = (await r.json()).email || '';
-        } catch(e) {}
-        driveRefreshUI();
-      })
+      .then(async () => { await driveFetchUser(); driveRefreshUI(); })
       .catch(() => {});
   }, 600);
 });

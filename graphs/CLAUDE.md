@@ -235,7 +235,7 @@ Two paths, both serialising the same object via `currentGraphData()` / `applyGra
 
 Config constants sit at the top of the Drive block: `GOOGLE_CLIENT_ID` (empty by default) and `GOOGLE_HOSTED_DOMAIN`. **When `GOOGLE_CLIENT_ID` is empty the whole Drive panel hides itself** and the app behaves exactly as v1.8 did, so the file is safe to ship unconfigured.
 
-- Scope is `openid email profile .../auth/drive.file`. All three are **non-sensitive**, so this needs only basic OAuth verification, not the sensitive-scope review. Do not widen to `drive` or `drive.readonly`, which are restricted and would trigger a security assessment.
+- Scope is **only** `.../auth/drive.file` (`DRIVE_SCOPES`; a test pins it). Sam found the consent screen asked for too much, so `openid email profile` were dropped on 2026-10-25; the header email now comes from Drive's `about?fields=user(emailAddress)` (`driveFetchUser`), which works with drive.file. drive.file is **non-sensitive**, so this needs only basic OAuth verification. Do not widen to `drive` or `drive.readonly`, which are restricted and would trigger a security assessment, and don't add profile scopes back.
 - `drive.file` only ever sees files this app created, so the folder lookup query reliably finds our own folder and nothing else in the student's Drive is visible to the app.
 - Uses the GIS **token model** (`initTokenClient`), not the ID-token/One Tap model. Tokens last ~1 hour; `driveEnsureToken()` refreshes silently using the `sw2_drive_granted` localStorage flag to decide between `prompt:''` and `prompt:'consent'`.
 - `driveApi()` wraps fetch, attaching the bearer token and retrying once on a 401 after clearing the token.
