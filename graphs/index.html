@@ -3271,13 +3271,16 @@ function onMouseMove(e) {
     if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'select' && drawing && drawStart) {
     // drag to move
-    const dx = cx - drawStart.cx;
-    const dy = cy - drawStart.cy;
-    const dxn = dx / PLOT_W;
-    const dyn = dy / PLOT_H;
     const orig = drawStart.el;
     const el = state.elements.find(e => e.id === state.selectedId);
     if (!el) return;
+    let dx = cx - drawStart.cx;
+    let dy = cy - drawStart.cy;
+    // Lines and curves move straight sideways or straight up/down, as a
+    // shift does, unless the drag is plainly diagonal (between ~27° and ~63°).
+    if (el.type === 'line' || el.type === 'curve') [dx, dy] = axisLock(dx, dy);
+    const dxn = dx / PLOT_W;
+    const dyn = dy / PLOT_H;
     if (!drawStart.moved) {
       if (Math.hypot(dx, dy) < 2) return;
       if (el.type === 'dot' && el.on) {
@@ -3829,6 +3832,13 @@ function colorSwatchHTML(currentColor, propKey) {
   ).join('')}</div>`;
 }
 
+const AXIS_LOCK = 0.5; // |minor / major| below this snaps to the major axis
+function axisLock(dx, dy) {
+  if (Math.abs(dy) < Math.abs(dx) * AXIS_LOCK) return [dx, 0];
+  if (Math.abs(dx) < Math.abs(dy) * AXIS_LOCK) return [0, dy];
+  return [dx, dy];
+}
+
 function moveElement(el, dxn, dyn) {
   if (isLinear(el)) {
     el.x1n += dxn; el.y1n += dyn; el.x2n += dxn; el.y2n += dyn;
@@ -3873,26 +3883,24 @@ function shiftSelected(dir) {
   if (!el || (el.type !== 'line' && el.type !== 'curve')) return;
   saveUndo();
   const dx = SHIFT_BY * dir * PLOT_W;
-  // The arrow always starts from this (the last) curve. If a curve already
-  // sits where the copy would go, it is reused: just an arrow to it (D₃ back
-  // to D₂). Only when this curve's latest arrow already goes to it (D₁ picked
-  // again and shifted again) does the shift go a step further (D₂ → D₃).
-  let copy;
+  // The arrow always starts from this (the last) curve and always makes a
+  // new curve, even back on top of an older one (S₁ → S₂ → S₃, with S₃ where
+  // S₁ is). Only when this curve's latest arrow already goes to a curve in
+  // that spot (D₁ picked again and shifted again) does the shift go a step
+  // further from there (D₂ → D₃) instead of stacking a second D₂.
+  let copy, twin;
   for (let i = 0; i < 20; i++) {
     copy = copyOf(el, SHIFT_BY * dir, 0);
-    const twin = state.elements.find(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
+    twin = state.elements.find(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
     if (!twin) break;
     const latest = state.elements.filter(e => e.type === 'arrow' && ((e.p1On && e.p1On.id === el.id) || (e.p2On && e.p2On.id === el.id))).pop();
-    if (!(latest && latest.p1On && latest.p1On.id === el.id && latest.p2On && latest.p2On.id === twin.id)) {
-      addShiftArrow(el, twin, dx);
-      state.selectedId = twin.id;
-      renderLegendList(); renderProps(); redraw();
-      return;
-    }
+    if (!(latest && latest.p1On && latest.p1On.id === el.id && latest.p2On && latest.p2On.id === twin.id)) break;
     el = twin;
   }
   clipToPlot(copy);
   numberCopy(el, copy);
+  // On top of an older curve: put its label just below that one's.
+  if (twin && copy.label) copy.labelDy = (twin.labelDy || 0) + fontPx(16);
   const newDots = [];
   state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
   addShiftArrow(el, copy, dx);

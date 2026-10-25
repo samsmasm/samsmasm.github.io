@@ -804,19 +804,46 @@ test('a curve shifted past the right edge is cut there, so its label stays in th
 test('shift left, left, right, left always starts from the last curve', async (page) => {
   await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'D').id;
     shiftSelected(-1); shiftSelected(-1); shiftSelected(1)`);
-  const lines = () => ev(page, `state.elements.filter(e => e.type === 'line' && /^D/.test(e.label)).length`);
-  eq(await lines(), 3, 'right should go back to D₂, not make a new curve');
   const arrows = () => ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => [elById(e.p1On.id).label, elById(e.p2On.id).label])`);
-  eq(await arrows(), [['D₁', 'D₂'], ['D₂', 'D₃'], ['D₃', 'D₂']], 'arrows after right');
-  eq(await ev(page, `elById(state.selectedId).label`), 'D₂', 'selection');
+  // Right makes a new D₄ where D₂ is, from D₃.
+  eq(await arrows(), [['D₁', 'D₂'], ['D₂', 'D₃'], ['D₃', 'D₄']], 'arrows after right');
+  eq(await ev(page, `sameShape(elById(state.selectedId), state.elements.find(e => e.label === 'D₂'))`), true, 'D₄ not where D₂ is');
   await ev(page, `shiftSelected(-1)`);
-  eq(await lines(), 3, 'left should go back to D₃');
-  eq((await arrows()).pop(), ['D₂', 'D₃'], 'last arrow not from the last curve');
+  eq((await arrows()).pop(), ['D₄', 'D₅'], 'last arrow not from the last curve');
   // No two shift arrows on top of each other.
   const close = await ev(page, `(() => { const s = state.elements.filter(e => e.type === 'arrow').map(drawnSegment), bad = [];
     for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) if (segDist(...s[i], ...s[j]) < 8) bad.push([i, j]);
     return bad; })()`);
   eq(close, [], 'overlapping arrows');
+});
+
+test('S shift right then left makes S₃ on top of S₁, with its label clear of S₁', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'S').id; shiftSelected(1); shiftSelected(-1)`);
+  eq(await ev(page, `state.elements.filter(e => /^S/.test(e.label || '')).map(e => e.label).sort()`), ['S₁', 'S₂', 'S₃'], 'curves');
+  eq(await ev(page, `sameShape(state.elements.find(e => e.label === 'S₃'), state.elements.find(e => e.label === 'S₁'))`), true, 'S₃ not on S₁');
+  const [a, b] = await ev(page, `['S₁', 'S₃'].map(l => getFullLabelPos(state.elements.find(e => e.label === l)))`);
+  assert(Math.hypot(a.x - b.x, a.y - b.y) > 12, 'labels on top of each other');
+  eq(await ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => [elById(e.p1On.id).label, elById(e.p2On.id).label])`),
+    [['S₁', 'S₂'], ['S₂', 'S₃']], 'arrows');
+});
+
+test('dragging a curve moves it straight sideways or up/down unless plainly diagonal', async (page) => {
+  await ev(page, `loadTemplate('sd'); setTool('select')`);
+  const drag1 = async (ddx, ddy) => {
+    await ev(page, `loadTemplate('sd')`);
+    const d0 = await ev(page, `state.elements.find(e => e.label === 'D')`);
+    const s = await ptn(page, d0.x1n + (d0.x2n - d0.x1n) * 0.25, d0.y1n + (d0.y2n - d0.y1n) * 0.25); // away from the equilibrium
+    const k = await ev(page, `stageFit`);
+    await drag(page, s, { x: s.x + ddx * k, y: s.y + ddy * k });
+    const d1 = await ev(page, `state.elements.find(e => e.label === 'D')`);
+    return [(d1.x1n - d0.x1n) * 550, (d1.y1n - d0.y1n) * 450];
+  };
+  const [hx, hy] = await drag1(60, 12);
+  assert(hx > 50 && hy === 0, 'sideways drag not snapped: ' + [hx, hy]);
+  const [vx, vy] = await drag1(-10, 60);
+  assert(vx === 0 && vy > 50, 'up/down drag not snapped: ' + [vx, vy]);
+  const [qx, qy] = await drag1(50, 45);
+  assert(qx > 40 && qy > 35, 'diagonal drag snapped: ' + [qx, qy]);
 });
 
 test('new axis labels move left (P) or down (Q) clear of existing ones', async (page) => {
