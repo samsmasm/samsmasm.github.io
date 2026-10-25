@@ -109,7 +109,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `flare/`: Students press a button to signal the teacher (e.g. 'I'm lost'); when enough do, the teacher's screen plays a sound.
 - `flippinghard/`: Live coin-flip betting game: teacher runs flips, students join a session and bet their balance.
 - `griz/`: **in use.** Jeopardy-style team quiz board from CSV (questions via Sam's custom GPT), point decay, pass/steal mode, times-table boards. Full notes in its CLAUDE.md.
-- `fmwafrica/`: FMW (Grade 9) African Imperialism museum poster companion: the task in six steps with small tools (NoodleTools name, source checker, thesis check, OPCVL writer), Congo examples, rubric. Read its CLAUDE.md.
+- `fmwafrica/`: FMW (Grade 9) African Imperialism museum poster companion (Graham, Redfern, Niedringhaus classes): the task in seven steps with small tools (NoodleTools title, source checker, thesis check, OPCVL writer, poster guide), Congo examples, rubric, GoatCounter per view. Own indigo/ochre design, not AESTHETIC.md. Read its CLAUDE.md.
 - `hippiesandspies/`: FMW (Grade 9) question-tree for choosing a 1960s research topic: spies, counterculture, civil rights.
 - `inflation/`: NZ inflation by household group: headline CPI vs household living-cost price indexes, by demographic, income and housing.
 - `marketinghub/`: IB BM Unit 4 Marketing notes: one page per subtopic (4.1 to 4.6, including each of the 7 Ps).
