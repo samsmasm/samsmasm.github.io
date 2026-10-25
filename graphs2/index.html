@@ -377,6 +377,13 @@
   .modal-colors { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
   .modal-col { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; }
   .modal-col.active { border-color: var(--text); }
+  /* SETTINGS */
+  header button.gear { font-size: 15px; padding: 2px 8px; }
+  .settings-modal { width: 460px; max-height: 88vh; overflow-y: auto; }
+  .settings-modal h3 { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
+  .set-note { font-size: 12px; color: var(--muted); line-height: 1.4; margin: -6px 0 4px; }
+  .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; }
+  .set-row select { font-family: var(--sans); font-size: 12px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; color: var(--text); max-width: 250px; }
   /* GOOGLE DRIVE */
   #save-modal .modal { width: 420px; }
   .drive-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 14px; background: var(--tag-bg); }
@@ -480,6 +487,7 @@
   <div class="header-actions">
     <button id="undo-btn" class="ghost" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button id="redo-btn" class="ghost" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+    <button class="ghost gear" onclick="openSettings()" title="Settings" aria-label="Settings">⚙</button>
     <button class="ghost" onclick="openFeedback()" title="Report a problem or suggest an idea">Feedback</button>
     <button onclick="openSaveModal()">Save / Load</button>
     <div class="export-wrap">
@@ -658,6 +666,19 @@
   </div>
 </div>
 
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal settings-modal" role="dialog" aria-label="Settings">
+    <h2>Settings</h2>
+    <p class="set-note">Saved in this browser. They shape new drawings and templates. Diagrams you've already made keep their look, apart from text size and guide lines.</p>
+    <div id="settings-form"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="resetPrefs()">Reset to defaults</button>
+      <button class="btn-confirm" onclick="document.getElementById('settings-modal').classList.remove('open')">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- FEEDBACK MODAL -->
 <div class="modal-overlay" id="feedback-modal">
   <div class="modal" style="width:440px">
@@ -718,7 +739,7 @@ const PLOT_W = W - MARGIN.left - MARGIN.right;
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;
 // One style for every guide line: equilibrium drop lines, template guides and
 // the sidebar's "Dashed" choice.
-const GUIDE = { color: '#888', weight: 1.5, dash: '6,4' };
+const GUIDE = { color: '#888', weight: 1.5, dash: '6,4' }; // dash follows the guide setting (applyPrefs)
 
 // ─── STATE ───────────────────────────────────────────────────
 let state = {
@@ -744,9 +765,24 @@ let curvePoints = [];
 let axisLabelDrag = null;
 let labelDrag = null;
 let nodeDrag = null;
-let snapEnabled = true;
+// ─── SETTINGS (gear) ─────────────────────────────────────────
+// Per-browser preferences. They shape new drawings and templates; existing
+// diagrams keep their own styles (except guide style and text size, which
+// are drawn from the settings).
+const PREF_DEFAULTS = {
+  bw: true, weight: 2.5, guide: 'dashed', fill: 'auto', textSize: 1,
+  eqLabels: 'num', showDot: false, snap: true, start: 'last',
+  axisUnits: true, currency: '$', exportSize: 2, transparent: false,
+};
+let prefs = { ...PREF_DEFAULTS };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem('sw2_prefs') || '{}')); } catch (e) {}
+function savePrefs() { try { localStorage.setItem('sw2_prefs', JSON.stringify(prefs)); } catch (e) {} }
+const fontPx = n => Math.round(n * prefs.textSize * 10) / 10;
+const newFill = () => prefs.fill === 'hatch' ? 'hatch45' : prefs.fill === 'solid' ? 'solid' : (bwMode ? 'hatch45' : 'solid');
+
+let snapEnabled = prefs.snap;
 let snapHoverActive = false;
-let bwMode = true;
+let bwMode = prefs.bw;
 
 let viewScale = 1.0;
 let viewOffsetX = 0, viewOffsetY = 0;
@@ -836,7 +872,8 @@ new ResizeObserver(fitCanvas).observe(canvasWrap);
 
 // ─── INIT ────────────────────────────────────────────────────
 function init() {
-  if (!restoreAutosave()) loadTemplate('blank', { record: false });
+  applyPrefs();
+  if (prefs.start !== 'last' || !restoreAutosave()) loadTemplate(prefs.start === 'sd' ? 'sd' : 'blank', { record: false });
   openHandoffDiagram();
   fitCanvas();
   // Pointer events: one code path for mouse, touch screens and pens.
@@ -1247,8 +1284,29 @@ function setDiagram(t) {
 
 // Loading is undoable rather than confirmed: a toast offers Undo when it
 // replaced real work. `record: false` is for start-up only.
-function loadTemplate(name, opts = {}) {
+// A template shaped by the settings: line thickness, guide style, fills,
+// dots at equilibria, and axis titles (units, currency).
+function buildTemplate(name) {
   const t = TEMPLATES[name].build();
+  t.elements.forEach(el => {
+    if ((el.type === 'line' || el.type === 'curve') && !isGuide(el) && el.weight === 2.5) el.weight = prefs.weight;
+    if (el.type === 'dot' && !el.mark && prefs.showDot) el.showDot = true;
+    if (el.type === 'region' && prefs.fill !== 'auto') el.fill = prefs.fill === 'solid' ? 'solid' : (el.fill === 'solid' ? 'hatch45' : el.fill);
+  });
+  t.yLabel = axisTitle(t.yLabel); t.xLabel = axisTitle(t.xLabel);
+  return t;
+}
+// "Price ($/unit)" → "Price (€/unit)", or "Price" with units off. Only the
+// bracketed part changes, so "Price of € in $" is left alone.
+function axisTitle(s) {
+  return s.replace(/\s*\(([^)]*)\)/g, (m, inner) => {
+    if (!prefs.axisUnits && /\$|unit/.test(inner)) return '';
+    return m.replace(/\$/g, prefs.currency);
+  });
+}
+
+function loadTemplate(name, opts = {}) {
+  const t = buildTemplate(name);
   const replacedWork = !diagramIsEmpty();
   if (opts.record !== false) saveUndo();
   setDiagram(t);
@@ -1266,7 +1324,7 @@ const thumbCache = {};
 function templateThumb(key) {
   if (thumbCache[key]) return thumbCache[key];
   const snap = snapshot(), sel = state.selectedId;
-  setDiagram(TEMPLATES[key].build());
+  setDiagram(buildTemplate(key));
   thumbCache[key] = renderExport(0.5, 'image/png');
   restoreSnapshot(snap);
   state.selectedId = sel;
@@ -1400,7 +1458,7 @@ function getFullLabelPos(el) {
 }
 
 function hitTestAxisLabel(cx, cy) {
-  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   // X label: right-aligned to MARGIN.left+PLOT_W, below axis
   const xlx = MARGIN.left + PLOT_W + state.xLabelDx;
   const xly = MARGIN.top + PLOT_H + 8 + state.xLabelDy;
@@ -1481,19 +1539,87 @@ function removeElementQuietly(id) {
 // ─── SNAP ─────────────────────────────────────────────────────
 function toggleSnap() {
   snapEnabled = !snapEnabled;
+  syncSnapButton();
+}
+function syncSnapButton() {
   const btn = document.getElementById('snap-btn');
   btn.textContent = snapEnabled ? 'Snap: on' : 'Snap: off';
   btn.classList.toggle('active', snapEnabled);
 }
 
+// Settings that act on what is on screen now, as well as on start-up.
+function applyPrefs() {
+  GUIDE.dash = prefs.guide === 'dotted' ? '2,3' : '6,4';
+  state.strokeWeight = prefs.weight;
+  syncSnapButton();
+  syncBWSwitch();
+}
+
+const PREF_FIELDS = [
+  ['Starting up', [
+    ['start', 'When ShiftWork opens', [['last', 'Your last diagram'], ['blank', 'Blank axes'], ['sd', 'Supply & Demand']]],
+    ['bw', 'Start in', [[true, 'B/W'], [false, 'Colour']]],
+    ['snap', 'Snap', [[true, 'On'], [false, 'Off']]],
+  ]],
+  ['New drawings and templates', [
+    ['weight', 'Line thickness', [[1.5, 'Thin'], [2.5, 'Normal'], [4, 'Thick']]],
+    ['guide', 'Guide lines', [['dashed', 'Dashed - - -'], ['dotted', 'Dotted · · ·']]],
+    ['fill', 'Shaded areas', [['auto', 'Hatching in B/W, shading in colour'], ['hatch', 'Always hatching'], ['solid', 'Always shading']]],
+    ['eqLabels', 'Equilibrium labels', [['num', 'P₁ and Q₁'], ['e', 'Pe and Qe'], ['star', 'P* and Q*']]],
+    ['showDot', 'Dot at equilibria', [[false, 'No'], [true, 'Yes']]],
+    ['axisUnits', 'Axis titles', [[true, 'With units: Price ($/unit)'], [false, 'Plain: Price']]],
+    ['currency', 'Currency', [['$', '$'], ['€', '€'], ['£', '£'], ['¥', '¥'], ['₹', '₹'], ['₫', '₫']]],
+  ]],
+  ['Text and pictures', [
+    ['textSize', 'Text size', [[0.85, 'Small'], [1, 'Normal'], [1.25, 'Large (for slides)']]],
+    ['exportSize', 'Picture size', [[2, 'Large (1360 px wide)'], [4, 'Extra large (2720 px wide)']]],
+    ['transparent', 'PNG background', [[false, 'White'], [true, 'Transparent (for coloured slides)']]],
+  ]],
+];
+
+function openSettings() {
+  document.getElementById('settings-form').innerHTML = PREF_FIELDS.map(([group, fields]) =>
+    `<h3>${group}</h3>` + fields.map(([key, label, opts]) =>
+      `<label class="set-row"><span>${label}</span><select onchange="setPref('${key}', this.selectedIndex)">${
+        opts.map(([v, t]) => `<option${v === prefs[key] ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')
+      }</select></label>`).join('')).join('');
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function setPref(key, index) {
+  const field = PREF_FIELDS.flatMap(g => g[1]).find(f => f[0] === key);
+  prefs[key] = field[2][index][0];
+  savePrefs();
+  // The current session follows the start-up choices too.
+  if (key === 'bw' && bwMode !== prefs.bw) toggleBW();
+  if (key === 'snap') snapEnabled = prefs.snap;
+  applyPrefs();
+  Object.keys(thumbCache).forEach(k => delete thumbCache[k]);
+  redraw();
+}
+
+function resetPrefs() {
+  prefs = { ...PREF_DEFAULTS };
+  savePrefs();
+  if (bwMode !== prefs.bw) toggleBW();
+  snapEnabled = prefs.snap;
+  applyPrefs();
+  Object.keys(thumbCache).forEach(k => delete thumbCache[k]);
+  redraw();
+  openSettings();
+}
+
 function toggleBW() {
   bwMode = !bwMode;
-  const btn = document.getElementById('bw-btn');
-  btn.classList.toggle('bw', bwMode);
-  btn.setAttribute('aria-checked', String(bwMode));
+  syncBWSwitch();
   renderProps();
   renderLegendList();
   redraw();
+}
+function syncBWSwitch() {
+  const btn = document.getElementById('bw-btn');
+  btn.classList.toggle('bw', bwMode);
+  btn.setAttribute('aria-checked', String(bwMode));
 }
 
 // ─── STYLE MENU ──────────────────────────────────────────────
@@ -2129,8 +2255,9 @@ function redraw() {
   resolveAttachments();
   // Clear entire canvas with bg colour (no transform)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#f5f4f0';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  if (exporting && exportTransparent) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  else ctx.fillRect(0, 0, canvas.width, canvas.height);
   // Apply view transform for all diagram drawing
   applyViewXform();
   drawBackground();
@@ -2143,6 +2270,7 @@ function redraw() {
 }
 
 function drawBackground() {
+  if (exporting && exportTransparent) return;
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, W, H);
 }
@@ -2169,7 +2297,7 @@ function drawAxes() {
 
   // Axis labels at ends of axes
   ctx.save();
-  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   ctx.fillStyle = '#1a1918';
   // X label — below and right-aligned to the right end of x-axis
   ctx.textAlign = 'right';
@@ -2185,7 +2313,7 @@ function drawAxes() {
   ctx.restore();
 
   // Title
-  ctx.font = '600 15px "IBM Plex Sans", sans-serif';
+  ctx.font = `600 ${fontPx(15)}px "IBM Plex Sans", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(state.title, W / 2, 26);
@@ -2320,7 +2448,7 @@ function drawLineLabel(el) {
   // Dotted underline when selected to hint it's editable/draggable
   if (el.id === state.selectedId) {
     ctx.save();
-    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
     const w = ctx.measureText(el.label).width;
     ctx.strokeStyle = el.color || '#1a1918';
     ctx.lineWidth = 1;
@@ -2344,7 +2472,7 @@ function haloText(text, x, y) {
 
 function drawLabelAt(text, x, y, color) {
   ctx.save();
-  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   ctx.fillStyle = color || '#1a1918';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -2356,7 +2484,7 @@ function drawLabelAt(text, x, y, color) {
 function drawTextEl(el) {
   const p = toCanvas(el.xn, el.yn);
   ctx.save();
-  ctx.font = `500 ${el.size || 13}px "IBM Plex Sans", sans-serif`;
+  ctx.font = `500 ${fontPx(el.size || 13)}px "IBM Plex Sans", sans-serif`;
   ctx.fillStyle = bwMode ? '#1a1918' : (el.color || '#333');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -2371,7 +2499,7 @@ function dotLabelBox(el, which) {
   const text = which === 'p' ? el.pLabel : el.qLabel;
   if (!text) return null;
   ctx.save();
-  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   const w = ctx.measureText(text).width;
   ctx.restore();
   if (which === 'p') {
@@ -2711,7 +2839,7 @@ function fillAt(cx, cy) {
   if (pts === 'open') { showToast('That area isn’t closed in on all sides. Draw a line to close it, or click Fill region again to draw it.'); return; }
   if (!pts) { showToast('Click inside an area to fill it.'); return; }
   saveUndo();
-  const el = mkRegion(pts, drawColor(), bwMode ? 'hatch45' : 'solid');
+  const el = mkRegion(pts, drawColor(), newFill());
   // Behind the curves, so lines stay crisp on top of the fill.
   state.elements.unshift(el);
   state.selectedId = el.id;
@@ -2865,6 +2993,7 @@ function onMouseDown(e) {
     saveUndo();
     const [pl, ql] = nextEqLabels();
     const el = mkDot(n.xn, n.yn, GUIDE.color, pl, ql);
+    el.showDot = prefs.showDot;
     const hitX = nearestCrossing(cx, cy, 16);
     if (hitX) {
       const hn = fromCanvas(hitX.x, hitX.y);
@@ -2884,14 +3013,18 @@ function nextEqLabels() {
   const sub = String(n).split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
   syncTextInputs();
   const macro = /price level|\bPL\b|inflation/i.test(state.yLabel) || /GDP|output|national income/i.test(state.xLabel);
-  return macro ? ['PL' + sub, 'Y' + sub] : ['P' + sub, 'Q' + sub];
+  const [p, q] = macro ? ['PL', 'Y'] : ['P', 'Q'];
+  // Settings: P₁/Q₁, or Pe/Qe or P*/Q* for the first point (then P₂/Q₂…).
+  if (n === 1 && prefs.eqLabels === 'e') return [p + 'e', q + 'e'];
+  if (n === 1 && prefs.eqLabels === 'star') return [p + '*', q + '*'];
+  return [p + sub, q + sub];
 }
 
 // Labels that can be dragged on their own: curve/line/region labels and a
 // dot's P and Q labels. Returns which offset fields the drag changes.
 function hitTestLabel(cx, cy) {
   ctx.save();
-  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   try {
     for (let i = state.elements.length - 1; i >= 0; i--) {
       const el = state.elements[i];
@@ -3145,7 +3278,7 @@ function onDblClick(e) {
 
   if (state.tool === 'region' && drawing && curvePoints.length >= 3) {
     saveUndo();
-    const el = mkRegion([...curvePoints], drawColor(), bwMode ? 'hatch45' : 'solid');
+    const el = mkRegion([...curvePoints], drawColor(), newFill());
     state.elements.push(el); state.selectedId = el.id;
     curvePoints = []; drawing = false;
     renderProps(); redraw();
@@ -3283,7 +3416,7 @@ function hitTest(cx, cy) {
     } else if (el.type === 'text') {
       const p = toCanvas(el.xn, el.yn);
       ctx.save();
-      ctx.font = `500 ${el.size || 13}px "IBM Plex Sans", sans-serif`;
+      ctx.font = `500 ${fontPx(el.size || 13)}px "IBM Plex Sans", sans-serif`;
       const hw = Math.max(12, ctx.measureText(el.text || '').width / 2 + 4);
       ctx.restore();
       if (Math.abs(cx - p.x) < hw && Math.abs(cy - p.y) < (el.size || 13) * 0.6 + 4) return el;
@@ -4278,7 +4411,13 @@ function loadFromSaveModal() {
   }
 }
 
-// Exports are always 2× (1360 px wide): sharp in documents and on projectors.
+// Exports are 2× (1360 px wide) or, by setting, 4×: sharp in documents and
+// on projectors. PNG and copied images can have a transparent background.
+let exportTransparent = false;
+function exportPNG() {
+  exportTransparent = prefs.transparent;
+  try { return renderExport(prefs.exportSize, 'image/png'); } finally { exportTransparent = false; }
+}
 function exportFileName(ext) {
   return (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.' + ext;
 }
@@ -4287,14 +4426,14 @@ function downloadImage(ext) {
   closeExportMenu();
   const link = document.createElement('a');
   link.download = exportFileName(ext);
-  link.href = ext === 'png' ? renderExport(2, 'image/png') : renderExport(2, 'image/jpeg', 0.95);
+  link.href = ext === 'png' ? exportPNG() : renderExport(prefs.exportSize, 'image/jpeg', 0.95);
   link.click();
 }
 
 async function copyImage() {
   closeExportMenu();
   try {
-    const url = renderExport(2, 'image/png');
+    const url = exportPNG();
     const bytes = Uint8Array.from(atob(url.split(',')[1]), ch => ch.charCodeAt(0));
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) })]);
     showToast('Image copied. Paste it into your document.');
@@ -4347,14 +4486,14 @@ function renderExport(exportScale, mime, quality) {
   // Draw legend at export scale
   ctx.setTransform(exportScale, 0, 0, exportScale, 0, 0);
 
-  if (legendH > 0) {
+  if (legendH > 0 && !exportTransparent) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, H, W, legendH);
   }
 
   if (legendItems.length > 0) {
     ctx.save();
-    ctx.font = '500 12px "IBM Plex Sans", sans-serif';
+    ctx.font = `500 ${fontPx(12)}px "IBM Plex Sans", sans-serif`;
     ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(MARGIN.left, H + 6); ctx.lineTo(W - MARGIN.right, H + 6); ctx.stroke();
 

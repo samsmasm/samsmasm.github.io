@@ -199,4 +199,13 @@ All seven items, with 6 new tests (44 in total), including real touch events thr
 - 4 new tests (48 in total), including one that loads every template and checks nothing is off the canvas.
 - Economics needs Sam's eye before Phase 7: labels follow common IB usage (Pc/Pp, Pm/Qm with P*/Q* for the optimum, PL/Y, Yfe, NRU), but conventions vary by textbook.
 
+### 2026-10-25: Sam's feedback round (after trying the beta)
+
+Undo/Redo buttons; sidebar templates S&D, Keynesian AD/AS, AD/LRAS/SRAS; colour and line style only in the selected-object panel; real MC/AVC/ATC (MC exactly through both minimums); shapes became templates; curves pass through their points; Fill region click-to-fill; Point tool (dot/cross); Colour/B/W switch; Style menu; open canvas with export outline; pan when zoomed. Then user settings (gear).
+
+## Future ideas (Sam, 2026-10-25; not now)
+
+- **Custom styles, shareable.** Saved style presets (weights, guide style, fills, colours, label style) that can be shared by link, e.g. a teacher sets the house style for a class. Builds on the settings (gear).
+- **Questions after a while.** Once someone has used the site for a while, ask: teacher / student / other, plus a few questions. Not yet.
+
 **Next: Phase 7 (promote).** Wait for Sam to try graphs2 first.

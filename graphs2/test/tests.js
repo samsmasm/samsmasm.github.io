@@ -611,6 +611,38 @@ test('Style menu restyles the whole diagram in one undo step, leaving guides alo
   eq(await ev(page, `state.elements.filter(e => e.type === 'line' && !isGuide(e)).every(e => e.weight === 2.5)`), true, 'undo did not restore');
 });
 
+test('settings shape templates, new drawings and exports, and are saved', async (page) => {
+  await page.click('header button.gear');
+  assert(await ev(page, `document.getElementById('settings-modal').classList.contains('open')`), 'settings did not open');
+  const set = (key, label) => ev(page, `(() => { const f = PREF_FIELDS.flatMap(g => g[1]).find(f => f[0] === '${key}'); setPref('${key}', f[2].findIndex(o => o[1] === ${JSON.stringify(label)})); })()`);
+  await set('weight', 'Thick');
+  await set('guide', 'Dotted · · ·');
+  await set('currency', '€');
+  await set('eqLabels', 'Pe and Qe');
+  await set('showDot', 'Yes');
+  await set('fill', 'Always hatching');
+  await set('bw', 'Colour');
+  eq(await ev(page, `bwMode`), false, 'session did not switch to colour');
+  await ev(page, `loadTemplate('sd')`);
+  eq(await ev(page, `[state.yLabel, state.elements[0].weight, state.elements.find(e => e.type === 'dot').showDot, GUIDE.dash]`),
+    ['Price (€/unit)', 4, true, '2,3'], 'template');
+  await set('axisUnits', 'Plain: Price');
+  await ev(page, `loadTemplate('monopoly')`);
+  eq(await ev(page, `[state.yLabel, state.xLabel]`), ['Price, costs, revenue', 'Quantity'], 'plain axis titles');
+  await ev(page, `loadTemplate('blank'); state.elements = [mkLine(0.1, 0.1, 0.9, 0.9, '#1a4a8a', 2.5, '', 'D'), mkLine(0.1, 0.9, 0.9, 0.1, '#1a7a4a', 2.5, '', 'S')]; redraw()`);
+  eq(await ev(page, `nextEqLabels()`), ['Pe', 'Qe'], 'eq labels');
+  eq(await ev(page, `newFill()`), 'hatch45', 'fill in colour mode');
+  // Saved for next time.
+  eq(await ev(page, `JSON.parse(localStorage.getItem('sw2_prefs')).currency`), '€', 'not saved');
+  // Transparent PNG at 4×.
+  await set('exportSize', 'Extra large (2720 px wide)');
+  await set('transparent', 'Transparent (for coloured slides)');
+  const px = await ev(page, `new Promise(res => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); res([img.width, x.getImageData(2, 2, 1, 1).data[3]]); }; img.src = exportPNG(); })`);
+  eq(px, [2720, 0], 'export size / transparency');
+  await ev(page, `resetPrefs()`);
+  eq(await ev(page, `[prefs.currency, GUIDE.dash, bwMode]`), ['$', '6,4', true], 'reset');
+});
+
 test('when zoomed in, dragging empty space moves the view', async (page) => {
   await ev(page, `loadTemplate('blank'); setTool('select'); changeZoom(2, W / 2, H / 2)`);
   const before = await ev(page, `[viewOffsetX, viewOffsetY]`);
