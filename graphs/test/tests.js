@@ -715,6 +715,36 @@ test('canvas fills the space between the panels and the export outline zooms wit
   eq(await ev(page, `viewScale`), 2, 'zoom not restored after export');
 });
 
+test('cannot zoom out past 100%, and back at 100% the page is centred', async (page) => {
+  await ev(page, `zoomOut(); zoomOut()`);
+  eq(await ev(page, `[viewScale, viewOffsetX, viewOffsetY]`), [1, 0, 0], 'zoomed out past 100%');
+  await ev(page, `changeZoom(2, 100, 80); changeZoom(0.1, 300, 300)`);
+  eq(await ev(page, `[viewScale, viewOffsetX, viewOffsetY, document.getElementById('zoom-label').textContent]`), [1, 0, 0, '100%'], 'not centred at 100%');
+});
+
+test('Backspace deletes the selected item without the browser going back', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'D').id`);
+  const n = await ev(page, `state.elements.length`);
+  const blocked = await ev(page, `(() => { const e = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true });
+    document.dispatchEvent(e); return e.defaultPrevented; })()`);
+  eq(blocked, true, 'browser default not blocked');
+  assert(await ev(page, `state.elements.length`) < n, 'not deleted');
+  // Nothing selected: still blocked, nothing deleted.
+  const m = await ev(page, `state.elements.length`);
+  eq(await ev(page, `(() => { const e = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true });
+    document.dispatchEvent(e); return e.defaultPrevented; })()`), true, 'blocked with nothing selected');
+  eq(await ev(page, `state.elements.length`), m, 'deleted with nothing selected');
+});
+
+test('settings list the keyboard and mouse shortcuts', async (page) => {
+  await page.click('header button.gear');
+  const text = await ev(page, `document.getElementById('shortcuts').textContent`);
+  for (const s of ['Undo', 'Duplicate', 'Nudge', 'Straight line', 'Equilibrium', 'Zoom']) assert(text.includes(s), 'missing ' + s);
+  // Every tool letter listed is one onKeyDown knows.
+  const letters = await ev(page, `SHORTCUTS[0][1].map(r => r[0][0])`);
+  eq(letters.join(''), 'VLACTREP', 'tool letters');
+});
+
 test('when zoomed in, dragging empty space moves the view', async (page) => {
   await ev(page, `loadTemplate('blank'); setTool('select'); changeZoom(2, W / 2, H / 2)`);
   const before = await ev(page, `[viewOffsetX, viewOffsetY]`);

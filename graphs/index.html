@@ -387,6 +387,10 @@
   #prefs-switch .ms-track { background: var(--accent); }
   #prefs-switch.bw .ms-track { background: #888; }
   .set-row select:disabled { opacity: 0.55; cursor: default; }
+  .shortcuts { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; font-size: 12px; align-items: baseline; }
+  .shortcuts .sc-group { grid-column: 1 / -1; font-weight: 600; margin-top: 6px; }
+  .shortcuts .sc-keys { white-space: nowrap; }
+  .shortcuts kbd { font-family: var(--mono); font-size: 11px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; }
   .set-note { font-size: 12px; color: var(--muted); line-height: 1.4; margin: -6px 0 4px; }
   .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; }
   .set-row select { font-family: var(--sans); font-size: 12px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; color: var(--text); max-width: 250px; }
@@ -683,6 +687,8 @@
     </div>
     <p class="set-note">Saved in this browser. They shape new drawings and templates. Diagrams you've already made keep their look, apart from text size and guide lines.</p>
     <div id="settings-form"></div>
+    <h3>Keyboard and mouse shortcuts</h3>
+    <div class="shortcuts" id="shortcuts"></div>
     <div class="modal-actions">
       <button class="btn-cancel" id="prefs-reset" onclick="resetPrefs()">Reset my settings</button>
       <button class="btn-confirm" onclick="document.getElementById('settings-modal').classList.remove('open')">Done</button>
@@ -1618,7 +1624,45 @@ const PREF_FIELDS = [
   ]],
 ];
 
+// Shown in Settings. Keep in step with onKeyDown and the pointer handlers.
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = IS_MAC ? '⌘' : 'Ctrl', ALT = IS_MAC ? 'Option' : 'Alt';
+const SHORTCUTS = [
+  ['Tools', [
+    [['V'], 'Select'], [['L'], 'Straight line'], [['A'], 'Arrow'], [['C'], 'Curve'],
+    [['T'], 'Label'], [['R'], 'Fill region'], [['E'], 'Equilibrium'], [['P'], 'Point'],
+  ]],
+  ['Editing', [
+    [[MOD, 'Z'], 'Undo'],
+    [[MOD, 'Y'], 'Redo (or ' + MOD + ' Shift Z)'],
+    [[MOD, 'C'], 'Copy the selected item'],
+    [[MOD, 'V'], 'Paste'],
+    [[MOD, 'D'], 'Duplicate'],
+    [['Delete'], 'Delete the selected item'],
+    [['←', '→', '↑', '↓'], 'Nudge the selected item (hold Shift for bigger steps)'],
+    [['Esc'], 'Cancel drawing, deselect, or close a dialog'],
+    ['Double-click', 'Edit a label'],
+    [[ALT], 'Hold while dragging to move one item on its own'],
+  ]],
+  ['Drawing', [
+    [['Shift'], 'Hold while drawing a line to keep it level, upright or at 45°'],
+    ['Double-click', 'Finish a curve'],
+  ]],
+  ['Moving around', [
+    ['Scroll wheel', 'Zoom in and out (or pinch)'],
+    ['Drag', 'Drag empty space to move around when zoomed in'],
+    [['Space'], 'Hold and drag to move around'],
+  ]],
+];
+function renderShortcuts() {
+  document.getElementById('shortcuts').innerHTML = SHORTCUTS.map(([group, rows]) =>
+    `<div class="sc-group">${group}</div>` + rows.map(([keys, what]) =>
+      `<span class="sc-keys">${Array.isArray(keys) ? keys.map(k => `<kbd>${escapeHtml(k)}</kbd>`).join(' ') : escapeHtml(keys)}</span><span>${escapeHtml(what)}</span>`
+    ).join('')).join('');
+}
+
 function openSettings() {
+  renderShortcuts();
   const sw = document.getElementById('prefs-switch');
   sw.classList.toggle('bw', useDefaults);
   sw.setAttribute('aria-checked', String(useDefaults));
@@ -1746,10 +1790,12 @@ function zoomIn()  { changeZoom(1.2, W / 2, H / 2); }
 function zoomOut() { changeZoom(1 / 1.2, W / 2, H / 2); }
 
 function changeZoom(factor, rawCx, rawCy) {
-  const newScale = Math.max(0.25, Math.min(8, viewScale * factor));
+  // 100% (the export area fitted to the space) is as far out as it goes;
+  // back at 100% the page is centred again.
+  const newScale = Math.max(1, Math.min(8, viewScale * factor));
   const f = newScale / viewScale;
-  viewOffsetX = rawCx - (rawCx - viewOffsetX) * f;
-  viewOffsetY = rawCy - (rawCy - viewOffsetY) * f;
+  viewOffsetX = newScale === 1 ? 0 : rawCx - (rawCx - viewOffsetX) * f;
+  viewOffsetY = newScale === 1 ? 0 : rawCy - (rawCy - viewOffsetY) * f;
   viewScale = newScale;
   updateZoomLabel(); redraw();
 }
@@ -3436,10 +3482,12 @@ function onKeyDown(e) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
-    const focused = document.activeElement;
-    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
-    deleteSelected();
+  // Outside a text box, Backspace must never reach the browser: some treat
+  // it as "go back" and the diagram's page would be left.
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !typing) {
+    e.preventDefault();
+    if (state.selectedId) deleteSelected();
+    return;
   }
   if (e.key === 'Escape') {
     if (drawing && state.tool !== 'select') {
@@ -4430,6 +4478,7 @@ function restoreAutosave() {
     if (v.tool && document.getElementById('tool-' + v.tool)) setTool(v.tool);
     if (Array.isArray(v.zoom) && v.zoom.every(Number.isFinite)) {
       [viewScale, viewOffsetX, viewOffsetY] = v.zoom;
+      if (viewScale <= 1) { viewScale = 1; viewOffsetX = 0; viewOffsetY = 0; } // older saves could zoom out
       updateZoomLabel();
     }
   }
