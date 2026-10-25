@@ -64,7 +64,9 @@ Positions of attached elements are **derived** on every redraw by `resolveAttach
 - **Curve points**: every point of a selected curve has a handle (ends larger); `hitTestNode` returns a point index for curves.
 - **Label halo**: `haloText()` strokes white behind every label and text.
 - **Pointer events**: the canvas listens to `pointerdown/move/up/cancel` (with pointer capture) instead of mouse events, and `touch-action: none`. `clickCount` replaces `e.detail` (pointer events have none); a double tap on touch calls `onDblClick` from `onPointerDown`, and `lastDblAt` stops a native dblclick doubling it.
-- **Ready-made shapes** (`SHAPES`, `addShape`): MC/AC, PPC, J-curve (with zero line), Lorenz (with line of equality).
+- **Shapes** (`SHAPES`): MC/AC, PPC, J-curve (with zero line), Lorenz (with line of equality). Used only by templates (cost, ppc, jcurve, lorenz). There is deliberately no "add a shape" button: Sam found buttons that add to the page next to templates confusing. Every template replaces everything.
+- **Cost curves** come from `costCurves(qMin, acMin, c)`, one cubic cost function, so MC dips, rises, and cuts AC exactly at AC's minimum. Never draw MC as a straight line. Monopoly finds Qm with `mrCrossesMC`.
+- **Colour is chosen in one place**, the selected-object panel (hidden in B/W). There is no sidebar colour picker: `drawColor()` gives new lines, curves and regions the first palette colour not yet used, and arrows/braces black.
 
 ---
 
@@ -109,7 +111,6 @@ let state = {
   curves: [],        // legend entries { name, color } — shown in sidebar + JPG export
   selectedId: null,
   tool: 'select',
-  drawColor: COLORS[0],
   strokeWeight: 2.5,
   strokeDash: '',
   xLabelDx, xLabelDy, yLabelDx, yLabelDy,  // axis label offsets

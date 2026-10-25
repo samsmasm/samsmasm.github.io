@@ -213,16 +213,6 @@
   }
   .add-curve-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* Color picker row */
-  .color-row { padding: 6px 14px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
-  .color-dot {
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: border-color 0.1s;
-  }
-  .color-dot.active { border-color: var(--text); }
 
   .stroke-row { padding: 0 14px 10px; display: flex; align-items: center; gap: 8px; }
   .stroke-row label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
@@ -546,10 +536,6 @@
       </button>
     </div>
 
-    <div class="section-head" style="margin-top:2px">Line color</div>
-    <div class="color-row" id="color-row"></div>
-    <div class="bw-note" id="bw-color-note" style="margin:0 14px 10px">Colours show in Colour mode. B/W draws everything in black.</div>
-
     <div class="section-head" style="margin-top:2px">Line style</div>
     <div class="stroke-row">
       <label>Weight</label>
@@ -731,7 +717,6 @@ let state = {
   legend: { show: false, hidden: [] }, // automatic legend: on/off, unticked element ids
   selectedId: null,
   tool: 'select',
-  drawColor: COLORS[0],
   strokeWeight: 2.5,
   strokeDash: '',
   xLabelDx: 0, xLabelDy: 0,
@@ -837,7 +822,6 @@ new ResizeObserver(fitCanvas).observe(canvasWrap);
 
 // ─── INIT ────────────────────────────────────────────────────
 function init() {
-  buildColorRow();
   if (!restoreAutosave()) loadTemplate('blank', { record: false });
   openHandoffDiagram();
   fitCanvas();
@@ -871,16 +855,13 @@ function initStrokeDefaults() {
   });
 }
 
-function buildColorRow() {
-  const row = document.getElementById('color-row');
-  row.innerHTML = '';
-  COLORS.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'color-dot' + (c === state.drawColor ? ' active' : '');
-    d.style.background = c;
-    d.onclick = () => { state.drawColor = c; buildColorRow(); };
-    row.appendChild(d);
-  });
+// Colour for the next thing drawn. Colour is chosen in one place only (the
+// selected-object panel), so new curves take the first palette colour not
+// yet used, which keeps D and S apart; arrows and braces are black.
+function drawColor() {
+  if (['arrow', 'dbarrow', 'brace'].includes(state.tool)) return COLORS[COLORS.length - 1];
+  const used = new Set(state.elements.filter(e => ['line', 'curve', 'region'].includes(e.type)).map(e => e.fillColor || e.color));
+  return COLORS.find(c => !used.has(c)) || COLORS[0];
 }
 
 // ─── TEMPLATES ───────────────────────────────────────────────
@@ -1494,7 +1475,6 @@ function toggleBW() {
   const btn = document.getElementById('bw-btn');
   btn.textContent = bwMode ? 'B/W' : 'Colour';
   btn.classList.toggle('active', bwMode);
-  document.getElementById('bw-color-note').style.display = bwMode ? '' : 'none';
   renderProps();
   renderLegendList();
   redraw();
@@ -2001,18 +1981,18 @@ function drawRegionPreview(mouseN) {
   if (allPts.length < 2) return;
   const pts = allPts.map(p => toCanvas(p.xn, p.yn));
   ctx.save();
-  ctx.strokeStyle = state.drawColor; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = drawColor(); ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
   pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
   if (allPts.length >= 3) { ctx.lineTo(pts[0].x, pts[0].y); } // close preview
   ctx.stroke();
   if (allPts.length >= 3) {
-    ctx.fillStyle = hexToRgba(state.drawColor, 0.10); ctx.fill();
+    ctx.fillStyle = hexToRgba(drawColor(), 0.10); ctx.fill();
   }
   curvePoints.forEach(p => {
     const c = toCanvas(p.xn, p.yn);
     ctx.beginPath(); ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = state.drawColor; ctx.setLineDash([]); ctx.fill();
+    ctx.fillStyle = drawColor(); ctx.setLineDash([]); ctx.fill();
   });
   ctx.restore();
 }
@@ -2655,9 +2635,9 @@ function onMouseMove(e) {
     const w = parseFloat(document.getElementById('stroke-weight').value);
     ctx.save(); applyViewXform();
     if (state.tool === 'brace') {
-      drawBraceShape(a.x, a.y, b.x, b.y, false, state.drawColor, w);
+      drawBraceShape(a.x, a.y, b.x, b.y, false, drawColor(), w);
     } else {
-      ctx.strokeStyle = state.drawColor; ctx.lineWidth = w;
+      ctx.strokeStyle = drawColor(); ctx.lineWidth = w;
       const dash = document.getElementById('stroke-dash').value;
       if (dash) ctx.setLineDash(dash.split(',').map(Number));
       ctx.lineCap = 'round';
@@ -2792,10 +2772,10 @@ function onMouseUp(e) {
       const w = parseFloat(document.getElementById('stroke-weight').value);
       const dash = document.getElementById('stroke-dash').value;
       let el;
-      if (state.tool === 'arrow')        el = mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
-      else if (state.tool === 'dbarrow') el = mkDArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
-      else if (state.tool === 'brace')   el = mkBrace(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, '');
-      else                               el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      if (state.tool === 'arrow')        el = mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, drawColor(), w, dash, '');
+      else if (state.tool === 'dbarrow') el = mkDArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, drawColor(), w, dash, '');
+      else if (state.tool === 'brace')   el = mkBrace(drawStart.xn, drawStart.yn, endN.xn, endN.yn, drawColor(), w, '');
+      else                               el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn, drawColor(), w, dash, '');
       // Ends drawn onto a curve stay on it (e.g. a shift arrow between S₁ and S₂).
       attachEnd(el, 1); attachEnd(el, 2);
       state.elements.push(el);
@@ -2826,7 +2806,7 @@ function onDblClick(e) {
 
   if (state.tool === 'curve' && drawing && curvePoints.length >= 2) {
     saveUndo();
-    const el = mkCurve([...curvePoints], state.drawColor,
+    const el = mkCurve([...curvePoints], drawColor(),
       parseFloat(document.getElementById('stroke-weight').value),
       document.getElementById('stroke-dash').value, '');
     state.elements.push(el); state.selectedId = el.id;
@@ -2836,7 +2816,7 @@ function onDblClick(e) {
 
   if (state.tool === 'region' && drawing && curvePoints.length >= 3) {
     saveUndo();
-    const el = mkRegion([...curvePoints], state.drawColor, bwMode ? 'hatch45' : 'solid');
+    const el = mkRegion([...curvePoints], drawColor(), bwMode ? 'hatch45' : 'solid');
     state.elements.push(el); state.selectedId = el.id;
     curvePoints = []; drawing = false;
     renderProps(); redraw();
@@ -2921,7 +2901,7 @@ function drawCurvePreview(mouseN) {
   if (allPts.length < 2) return;
   const pts = allPts.map(p => toCanvas(p.xn, p.yn));
   ctx.save();
-  ctx.strokeStyle = state.drawColor;
+  ctx.strokeStyle = drawColor();
   ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
   const dash = document.getElementById('stroke-dash').value;
   if (dash) ctx.setLineDash(dash.split(',').map(Number));
@@ -2933,7 +2913,7 @@ function drawCurvePreview(mouseN) {
     const c = toCanvas(p.xn, p.yn);
     ctx.beginPath();
     ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = state.drawColor;
+    ctx.fillStyle = drawColor();
     ctx.fill();
   });
   ctx.restore();

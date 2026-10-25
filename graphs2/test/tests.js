@@ -443,12 +443,24 @@ test('exported picture grows a legend only when switched on', async (page) => {
   assert(w === 680 && h > 560, 'legend not added: ' + h);
 });
 
-test('header has no sign-in button; B/W mode notes that colours need Colour mode', async (page) => {
+test('header has no sign-in button', async (page) => {
   eq(await ev(page, `!!document.getElementById('header-auth-btn')`), false, 'header sign-in still there');
   eq(await ev(page, `getComputedStyle(document.getElementById('header-user')).display`), 'none', 'status shown when signed out');
-  assert(await ev(page, `bwMode && document.getElementById('bw-color-note').style.display !== 'none'`), 'note hidden in B/W');
-  await ev(page, `toggleBW()`);
-  eq(await ev(page, `document.getElementById('bw-color-note').style.display`), 'none', 'note shown in colour mode');
+});
+
+test('colour is chosen in one place: new lines take the next unused colour, arrows are black', async (page) => {
+  eq(await ev(page, `!!document.getElementById('color-row')`), false, 'sidebar colour row still there');
+  await ev(page, `loadTemplate('blank'); setTool('line')`);
+  const draw = async (x1, y1, x2, y2) => {
+    const r = await page.$eval('#graph-canvas', c => { const b = c.getBoundingClientRect(); return { x: b.left, y: b.top, s: b.width / 680 }; });
+    await page.mouse.move(r.x + x1 * r.s, r.y + y1 * r.s); await page.mouse.down();
+    await page.mouse.move(r.x + x2 * r.s, r.y + y2 * r.s, { steps: 5 }); await page.mouse.up();
+  };
+  await draw(120, 100, 500, 450);
+  await draw(120, 450, 500, 100);
+  await ev(page, `setTool('arrow')`);
+  await draw(300, 200, 400, 200);
+  eq(await ev(page, `state.elements.map(e => e.color)`), ['#1a4a8a', '#c8380a', '#1a1918'], 'colours');
 });
 
 test('selected-object panel hides colour choice in B/W mode', async (page) => {
