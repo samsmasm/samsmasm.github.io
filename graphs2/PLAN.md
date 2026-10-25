@@ -136,3 +136,19 @@ Every element can be attached to another, and positions are resolved from the at
 - Feedback Worker stays live for the main app.
 
 Commit and push after each phase step so Sam can test at unisam.nz/graphs2.
+
+---
+
+## Progress log
+
+### 2026-10-25: Phases 0 and 1 done
+
+Phase 0: forked to `graphs2/` (beta tag, link to stable, `noindex`, `sw2_` storage keys, `v: 2` saves via `migrateGraphData`), browser test harness in `test/`, helpers `isLinear`, `eventToLogical`, `escapeHtml`, dead code removed.
+
+Phase 1: all ten items done and covered by tests. Decisions taken along the way (Sam was away, trusted these calls):
+- **No confirms at all.** Loading a template over work and clearing are undoable and show an Undo toast, rather than asking first. This matches the new philosophy better than the plan's "asks first".
+- **No leave-page warning** while autosave works, since nothing is lost on reload. The warning only appears if localStorage writes fail (private mode, full storage).
+- **"Clear canvas" and "Reset everything" merged into one "Clear diagram"** (pulled forward from Phase 4; it is just loading the blank template, so it is undoable).
+- **Edit modal removed and the Label tool's `prompt()` replaced** by the inline editor (pulled forward from Phase 4), because double-clicking a dot opened the modal on a field dots don't use, and inline editing also had to learn zoom/pan.
+- Also fixed while there: templates were shallow-copied, so editing a template curve's endpoint changed the template itself for the next load; inline edit box was mispositioned when zoomed; text hit area now matches the text width; Escape cancels any in-progress drawing (from Phase 5).
+- Brace dash dropdown hidden (braces always draw solid).

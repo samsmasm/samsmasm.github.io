@@ -1,6 +1,6 @@
 # Economics Graph Drawer — Project Notes for Claude
 
-> **v2 is planned: read `PLAN.md` before any work.** v2 is built in `graphs2/` (a fork) and promoted over this folder only at the end. Do not make v2 changes here.
+> **v2 is planned: read `../graphs2/PLAN.md` before any work.** v2 is built in `graphs2/` (a fork) and promoted over this folder only at the end. Do not make v2 changes here.
 >
 > **Philosophy changed (2026-10-25):** v1 kept some deliberate friction. That is dropped. Make it as easy as possible for students and teachers: connected things move together (curve, its label, its equilibrium points, their drop lines and P/Q labels), common IB moves are one click, no popups where inline edit or undo would do. When in doubt, the app does the work, not the student.
 

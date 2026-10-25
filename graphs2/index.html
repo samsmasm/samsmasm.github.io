@@ -1,0 +1,3007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>ShiftWork</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --panel: #ffffff;
+    --border: #d8d6cf;
+    --border2: #e8e6e0;
+    --text: #1a1918;
+    --muted: #6b6860;
+    --accent: #1a4a8a;
+    --accent2: #c8380a;
+    --accent3: #1a7a4a;
+    --accent4: #8a1a6a;
+    --accent5: #8a6a1a;
+    --tag-bg: #eceae3;
+    --radius: 6px;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--text);
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  header .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: rgba(255,255,255,0.15);
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  header .spacer { flex: 1; }
+  header button {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    background: #fff;
+    color: var(--text);
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  header button:hover { background: #e8e6e0; }
+  header button.ghost {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+  }
+  header button.ghost:hover { background: rgba(255,255,255,0.28); }
+  .header-actions { display: flex; align-items: center; gap: 6px; }
+  #header-user {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(255,255,255,0.75);
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app { display: flex; flex: 1; overflow: hidden; }
+
+  /* LEFT PANEL */
+  .sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    min-height: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .section-head {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 14px 14px 6px;
+    border-bottom: 1px solid var(--border2);
+  }
+
+  .template-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border2);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .template-btn:hover { background: var(--tag-bg); }
+  .template-btn .sub { font-weight: 400; font-size: 11px; color: var(--muted); display: block; margin-top: 1px; }
+
+  .tool-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px 14px;
+  }
+  .tool-btn {
+    padding: 8px 6px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--tag-bg);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text);
+    text-align: center;
+    transition: all 0.1s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .tool-btn .icon { font-size: 16px; line-height: 1; }
+  .tool-btn:hover { border-color: var(--accent); }
+  .tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .curve-list { padding: 6px 14px 10px; }
+  .curve-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.1s;
+    position: relative;
+  }
+  .curve-item:hover { background: var(--tag-bg); }
+  .curve-item.selected { background: #e8f0fa; }
+  .curve-swatch {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .curve-name { flex: 1; font-weight: 500; font-family: var(--mono); font-size: 11px; }
+  .curve-del {
+    opacity: 0;
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+    width: 18px;
+    text-align: center;
+    line-height: 1;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  .curve-item:hover .curve-del { opacity: 1; }
+  .curve-del:hover { color: var(--accent2); }
+
+  .add-curve-row { padding: 0 14px 10px; }
+  .add-curve-btn {
+    width: 100%;
+    padding: 7px;
+    font-size: 11px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .add-curve-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Color picker row */
+  .color-row { padding: 6px 14px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .color-dot {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.1s;
+  }
+  .color-dot.active { border-color: var(--text); }
+
+  .stroke-row { padding: 0 14px 10px; display: flex; align-items: center; gap: 8px; }
+  .stroke-row label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .stroke-row select {
+    font-size: 11px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .canvas-toolbar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .canvas-toolbar label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .canvas-toolbar input[type=text] {
+    font-size: 12px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--text);
+    width: 130px;
+  }
+  .canvas-toolbar input[type=text]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .canvas-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .hint { font-size: 13px; color: var(--text); font-family: var(--mono); font-weight: 500; margin-left: auto; }
+  .tb-toggle {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    background: var(--tag-bg); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 4px 10px;
+    cursor: pointer; color: var(--muted); letter-spacing: 0.05em;
+    text-transform: uppercase; white-space: nowrap;
+    transition: all 0.1s;
+  }
+  .tb-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .tb-toggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    background: var(--bg);
+  }
+
+  #graph-canvas {
+    background: #ffffff;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+    border-radius: 4px;
+    cursor: crosshair;
+    display: block;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    width: 210px;
+    flex-shrink: 0;
+    min-height: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .props-form { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .prop-row { display: flex; flex-direction: column; gap: 3px; }
+  .prop-row label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .prop-row input[type=text], .prop-row select {
+    font-size: 12px;
+    font-family: var(--sans);
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: var(--text);
+  }
+  .prop-row input:focus, .prop-row select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+  .action-btn {
+    width: 100%;
+    padding: 8px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .action-btn.primary { background: var(--accent); color: #fff; }
+  .action-btn.primary:hover { background: #143d72; }
+  .action-btn.danger { background: var(--tag-bg); color: var(--accent2); border: 1px solid var(--border); }
+  .action-btn.danger:hover { background: #fde8e3; }
+  .action-btn.secondary { background: var(--tag-bg); color: var(--text); border: 1px solid var(--border); }
+  .action-btn.secondary:hover { background: var(--border2); }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 24px;
+    width: 340px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  }
+  .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+  .modal .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .modal .field label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .modal .field input {
+    font-size: 13px; font-family: var(--sans);
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 7px 10px; color: var(--text);
+  }
+  .modal .field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .modal-colors { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .modal-col { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; }
+  .modal-col.active { border-color: var(--text); }
+  /* GOOGLE DRIVE */
+  #save-modal .modal { width: 420px; }
+  .drive-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 14px; background: var(--tag-bg); }
+  .drive-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .drive-who { font-size: 11px; font-family: var(--mono); color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drive-list { max-height: 190px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+  .drive-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-bottom: 1px solid var(--border2); cursor: pointer; font-size: 12px; }
+  .drive-item:last-child { border-bottom: none; }
+  .drive-item:hover { background: var(--tag-bg); }
+  .drive-item.current { background: #e8f0fa; }
+  .drive-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drive-date { font-family: var(--mono); font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .drive-del { opacity: 0; border: none; background: none; cursor: pointer; color: var(--accent2); font-size: 14px; padding: 0 2px; flex-shrink: 0; }
+  .drive-item:hover .drive-del { opacity: 1; }
+  .drive-empty { padding: 14px 10px; font-size: 12px; color: var(--muted); text-align: center; }
+  .drive-msg { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-top: 8px; min-height: 14px; }
+  .drive-msg.err { color: var(--accent2); }
+  .drive-btn { font-family: var(--sans); font-size: 12px; font-weight: 500; padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+  .drive-btn:hover { background: var(--border2); }
+  .drive-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .drive-btn.primary:hover { background: #143d72; }
+  .drive-btn:disabled { opacity: 0.5; cursor: default; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions button { flex: 1; padding: 8px; font-family: var(--sans); font-size: 12px; font-weight: 600; border-radius: var(--radius); border: none; cursor: pointer; }
+  .btn-confirm { background: var(--accent); color: #fff; }
+  .btn-confirm:hover { background: #143d72; }
+  .btn-cancel { background: var(--tag-bg); color: var(--text); border: 1px solid var(--border); }
+  .btn-cancel:hover { background: var(--border2); }
+  /* TOAST */
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+    background: var(--text); color: #fff; font-size: 13px; border-radius: var(--radius);
+    padding: 9px 14px; display: flex; align-items: center; gap: 14px;
+    opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s; z-index: 300;
+  }
+  #toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+  #toast button { background: none; border: none; color: #9cc3ff; font: 600 13px var(--sans); cursor: pointer; padding: 0; }
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<header>
+  <h1>ShiftWork</h1>
+  <span style="font-family:var(--sans);font-size:13px;color:#fff;opacity:0.7;margin-left:2px;margin-right:8px">economics graph maker</span>
+  <span class="tag">v2.0 beta</span>
+  <a href="../graphs/" style="font-size:11px;color:rgba(255,255,255,0.7);text-decoration:underline">Back to stable version</a>
+  <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
+  <div class="spacer"></div>
+  <div class="header-actions">
+    <button onclick="openSaveModal()">Save / Load</button>
+    <button onclick="downloadJPG(1)">⬇ JPG</button>
+    <button onclick="downloadJPG(2)">⬇ Hi-res</button>
+    <span id="header-user"></span>
+    <button id="header-auth-btn" class="ghost" onclick="driveSignIn()">Sign in</button>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+    <div class="section-head">Templates</div>
+    <button class="template-btn" onclick="loadTemplate('blank')">
+      Blank axes
+      <span class="sub">Start from scratch</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('sd')">
+      Supply &amp; Demand
+      <span class="sub">Micro market equilibrium</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('adas')">
+      New Classical AD/AS
+      <span class="sub">Macroeconomic equilibrium</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('keyn')">
+      Keynesian AD/AS
+      <span class="sub">Horizontal AS with Keynesian range</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('ext_neg')">
+      Negative Externality
+      <span class="sub">Market failure (overproduction)</span>
+    </button>
+    <button class="template-btn" onclick="loadTemplate('ext_pos')">
+      Positive Externality
+      <span class="sub">Market failure (underproduction)</span>
+    </button>
+
+    <div class="section-head" style="margin-top:4px">Drawing tool</div>
+    <div class="tool-grid">
+      <button class="tool-btn active" id="tool-select" onclick="setTool('select')">
+        <span class="icon">↖</span>Select
+      </button>
+      <button class="tool-btn" id="tool-line" onclick="setTool('line')">
+        <span class="icon">╱</span>Straight line
+      </button>
+      <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')">
+        <span class="icon">→</span>Arrow
+      </button>
+      <button class="tool-btn" id="tool-dbarrow" onclick="setTool('dbarrow')">
+        <span class="icon">↔</span>Double arrow
+      </button>
+      <button class="tool-btn" id="tool-brace" onclick="setTool('brace')">
+        <span class="icon">⌒</span>Brace
+      </button>
+      <button class="tool-btn" id="tool-curve" onclick="setTool('curve')">
+        <span class="icon">∿</span>Curve
+      </button>
+      <button class="tool-btn" id="tool-text" onclick="setTool('text')">
+        <span class="icon">T</span>Label
+      </button>
+      <button class="tool-btn" id="tool-region" onclick="setTool('region')">
+        <span class="icon">▨</span>Fill region
+      </button>
+      <button class="tool-btn" id="tool-equil" onclick="setTool('equil')" style="grid-column:span 2">
+        <span class="icon">⊕</span>Equilibrium point
+      </button>
+    </div>
+
+    <div class="section-head" style="margin-top:2px">Line color</div>
+    <div class="color-row" id="color-row"></div>
+
+    <div class="section-head" style="margin-top:2px">Line style</div>
+    <div class="stroke-row">
+      <label>Weight</label>
+      <select id="stroke-weight">
+        <option value="1.5">Thin</option>
+        <option value="2.5" selected>Normal</option>
+        <option value="4">Bold</option>
+      </select>
+      <label>Dash</label>
+      <select id="stroke-dash">
+        <option value="">Solid</option>
+        <option value="6,4">Dashed</option>
+        <option value="2,3">Dotted</option>
+      </select>
+    </div>
+
+    <div class="section-head" style="margin-top:2px">Legend <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:9px;opacity:0.7">(JPG export)</span></div>
+    <div class="curve-list" id="curve-list"></div>
+    <div class="add-curve-row">
+      <button class="add-curve-btn" onclick="openAddCurve()">+ Add / rename curve</button>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area">
+    <div class="canvas-toolbar">
+      <label>Title</label>
+      <input type="text" id="graph-title" placeholder="e.g. Market for coffee" onfocus="onDocTextFocus()" oninput="onDocTextInput()">
+      <div class="sep"></div>
+      <label>Y-axis</label>
+      <input type="text" id="y-label" placeholder="Price ($/unit)" style="width:100px" onfocus="onDocTextFocus()" oninput="onDocTextInput()">
+      <div class="sep"></div>
+      <label>X-axis</label>
+      <input type="text" id="x-label" placeholder="Quantity (units/wk)" style="width:110px" onfocus="onDocTextFocus()" oninput="onDocTextInput()">
+      <div class="sep"></div>
+      <button class="tb-toggle active" id="snap-btn" onclick="toggleSnap()">Snap: on</button>
+      <button class="tb-toggle active" id="bw-btn" onclick="toggleBW()">B/W</button>
+      <div class="sep"></div>
+      <button class="tb-toggle" onclick="zoomOut()" title="Zoom out" style="padding:4px 8px;min-width:28px">−</button>
+      <span id="zoom-label" style="font-size:11px;font-family:var(--mono);color:var(--muted);min-width:38px;text-align:center;user-select:none">100%</span>
+      <button class="tb-toggle" onclick="zoomIn()" title="Zoom in" style="padding:4px 8px;min-width:28px">+</button>
+      <button class="tb-toggle" onclick="resetView()" title="Reset zoom and pan" style="font-size:10px">Reset view</button>
+      <span class="hint" id="hint-text">Select a template or pick a tool to draw</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="graph-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="section-head">Selected object</div>
+    <div class="props-form" id="props-form">
+      <div style="font-size:13px;color:var(--text);padding:4px 0;font-family:var(--sans);line-height:1.5">Nothing selected.<br><br>Click any line, curve, or region to edit its label, colour, or style.</div>
+    </div>
+
+    <div class="section-head" style="margin-top:4px">Canvas</div>
+    <div class="props-form">
+      <button class="action-btn danger" onclick="clearDiagram()">Clear diagram</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD CURVE MODAL -->
+<div class="modal-overlay" id="curve-modal">
+  <div class="modal">
+    <h2>Add curve to legend</h2>
+    <div class="field">
+      <label>Curve name</label>
+      <input type="text" id="modal-name" placeholder="e.g. S₁" maxlength="12">
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="modal-colors" id="modal-colors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm" onclick="confirmAddCurve()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVE / LOAD MODAL -->
+<div class="modal-overlay" id="save-modal">
+  <div class="modal">
+    <h2>Save / Load diagram</h2>
+
+    <div class="drive-box" id="drive-box">
+      <div class="drive-head">
+        <strong style="font-size:12px">Google Drive</strong>
+        <span class="drive-who" id="drive-who"></span>
+        <button class="drive-btn" id="drive-auth-btn" onclick="driveSignIn()">Sign in</button>
+      </div>
+      <div id="drive-signed-in" style="display:none">
+        <div class="field" style="margin-bottom:8px">
+          <label>Diagram name</label>
+          <input type="text" id="drive-name" placeholder="e.g. Negative externality" maxlength="60">
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <button class="drive-btn primary" style="flex:1" id="drive-save-btn" onclick="driveSave(false)">Save</button>
+          <button class="drive-btn" style="flex:1" onclick="driveSave(true)">Save as new</button>
+        </div>
+        <div class="drive-list" id="drive-list"></div>
+      </div>
+      <div class="drive-msg" id="drive-msg"></div>
+    </div>
+
+    <div class="field">
+      <label>Or copy this code to save · paste it back to restore</label>
+      <textarea id="save-code" rows="4" style="font-family:monospace;font-size:11px;resize:vertical;width:100%;background:var(--tag-bg);border:1px solid var(--border);border-radius:4px;padding:8px;color:var(--text);margin-top:4px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('save-modal').classList.remove('open')">Close</button>
+      <button class="btn-confirm" onclick="copySaveCode(this)">Copy code</button>
+      <button class="btn-confirm" onclick="loadFromSaveModal()">Load from code</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ─── CONSTANTS ───────────────────────────────────────────────
+const COLORS = [
+  '#1a4a8a','#c8380a','#1a7a4a','#8a1a6a','#8a6a1a',
+  '#2a8ab8','#888','#1a1918'
+];
+const MARGIN = { top: 50, right: 60, bottom: 60, left: 70 };
+const W = 680, H = 560;
+let SCALE = 2; // render scale — canvas pixels = W*SCALE × H*SCALE, logical coords stay W×H
+const PLOT_W = W - MARGIN.left - MARGIN.right;
+const PLOT_H = H - MARGIN.top - MARGIN.bottom;
+
+// ─── STATE ───────────────────────────────────────────────────
+let state = {
+  title: '',
+  yLabel: 'Price ($/unit)',
+  xLabel: 'Quantity (units/week)',
+  elements: [],   // {type, ...}
+  curves: [],     // legend entries {name, color}
+  selectedId: null,
+  tool: 'select',
+  drawColor: COLORS[0],
+  strokeWeight: 2.5,
+  strokeDash: '',
+  xLabelDx: 0, xLabelDy: 0,
+  yLabelDx: 0, yLabelDy: 0,
+};
+
+let nextId = 1;
+let drawing = false;
+let drawStart = null;
+let curvePoints = [];
+let axisLabelDrag = null;
+let labelDrag = null;
+let nodeDrag = null;
+let snapEnabled = true;
+let snapHoverActive = false;
+let bwMode = true;
+
+let viewScale = 1.0;
+let viewOffsetX = 0, viewOffsetY = 0;
+let isPanning = false;
+let panStartRaw = null, panStartOffset = null;
+let spaceHeld = false;
+
+// ─── UNDO / REDO ─────────────────────────────────────────────
+let undoStack = [];
+let redoStack = [];
+
+// Snapshots cover the whole document, not just elements, so title, axis
+// labels, legend and template loads are all undoable.
+function snapshot() {
+  syncTextInputs();
+  return JSON.stringify({
+    elements: state.elements, curves: state.curves,
+    title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
+    xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
+    yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
+  });
+}
+
+function restoreSnapshot(snap) {
+  const d = JSON.parse(snap);
+  Object.assign(state, d);
+  document.getElementById('graph-title').value = state.title;
+  document.getElementById('y-label').value = state.yLabel;
+  document.getElementById('x-label').value = state.xLabel;
+  if (state.selectedId && !state.elements.find(e => e.id === state.selectedId)) state.selectedId = null;
+  renderCurveList();
+  renderProps();
+  redraw();
+}
+
+// Pass a snapshot taken earlier to record a change only once it really
+// happens (e.g. a drag that has actually moved).
+function saveUndo(snap) {
+  undoStack.push(snap || snapshot());
+  if (undoStack.length > 80) undoStack.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(snapshot());
+  restoreSnapshot(undoStack.pop());
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(snapshot());
+  restoreSnapshot(redoStack.pop());
+}
+
+const canvas = document.getElementById('graph-canvas');
+canvas.width = W * SCALE;
+canvas.height = H * SCALE;
+const ctx = canvas.getContext('2d');
+
+// Fit canvas to available space while preserving aspect ratio
+const canvasWrap = document.querySelector('.canvas-wrap');
+function fitCanvas() {
+  const ww = canvasWrap.clientWidth;
+  const wh = canvasWrap.clientHeight;
+  const aspect = W / H;
+  let cw, ch;
+  if (ww / wh > aspect) {
+    ch = wh;
+    cw = ch * aspect;
+  } else {
+    cw = ww;
+    ch = cw / aspect;
+  }
+  canvas.style.width = Math.floor(cw) + 'px';
+  canvas.style.height = Math.floor(ch) + 'px';
+}
+new ResizeObserver(fitCanvas).observe(canvasWrap);
+
+// ─── INIT ────────────────────────────────────────────────────
+function init() {
+  buildColorRow();
+  buildModalColors();
+  if (!restoreAutosave()) loadTemplate('blank', { record: false });
+  fitCanvas();
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('dblclick', onDblClick);
+  document.addEventListener('keydown', onKeyDown);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  document.addEventListener('keyup', onKeyUp);
+  initStrokeDefaults();
+  driveRefreshUI();
+  // Canvas text doesn't wait for web fonts: redraw once IBM Plex is ready.
+  if (document.fonts && document.fonts.load) {
+    Promise.all([
+      document.fonts.load('500 13px "IBM Plex Sans"'),
+      document.fonts.load('600 15px "IBM Plex Sans"'),
+    ]).then(redraw, () => {});
+  }
+}
+
+// Dashed and dotted lines are nearly always annotation rather than curves, so
+// default them to Thin to match the templates. Once the student picks a weight
+// themselves we stop overriding it.
+function initStrokeDefaults() {
+  const weightSel = document.getElementById('stroke-weight');
+  const dashSel = document.getElementById('stroke-dash');
+  let weightChosen = false;
+  weightSel.addEventListener('change', () => { weightChosen = true; });
+  dashSel.addEventListener('change', () => {
+    if (weightChosen) return;
+    weightSel.value = dashSel.value ? '1.5' : '2.5';
+  });
+}
+
+function buildColorRow() {
+  const row = document.getElementById('color-row');
+  row.innerHTML = '';
+  COLORS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'color-dot' + (c === state.drawColor ? ' active' : '');
+    d.style.background = c;
+    d.onclick = () => { state.drawColor = c; buildColorRow(); };
+    row.appendChild(d);
+  });
+}
+
+function buildModalColors() {
+  const row = document.getElementById('modal-colors');
+  row.innerHTML = '';
+  COLORS.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'modal-col' + (i === 0 ? ' active' : '');
+    d.style.background = c;
+    d.dataset.color = c;
+    d.onclick = () => {
+      row.querySelectorAll('.modal-col').forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+    };
+    row.appendChild(d);
+  });
+}
+
+// ─── TEMPLATES ───────────────────────────────────────────────
+const TEMPLATES = {
+  blank: {
+    title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [], elements: []
+  },
+  sd: {
+    title: '',
+    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [
+      { name: 'D', color: COLORS[0] },
+      { name: 'S', color: COLORS[2] },
+    ],
+    elements: [
+      // Demand: top-left to bottom-right
+      mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D'),
+      // Supply: bottom-left to top-right
+      mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S'),
+      // Equilibrium dotted lines at the exact D x S intersection
+      mkLine(0, 0.4625, 0.4975, 0.4625, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.4975, 0.4625, 0.4975, 1.0, '#aaa', 1.5, '5,4', ''),
+      // P* and Q* axis labels
+      mkText(0.4975, 1.02, 'Q*'),
+      mkText(-0.07, 0.4625, 'P'),
+    ]
+  },
+  adas: {
+    title: '',
+    yLabel: 'Price level', xLabel: 'Real GDP',
+    curves: [
+      { name: 'AD', color: COLORS[0] },
+      { name: 'SRAS', color: COLORS[2] },
+      { name: 'LRAS', color: COLORS[1] },
+    ],
+    elements: [
+      // AD: downward sloping
+      mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD'),
+      // SRAS: upward sloping
+      mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS'),
+      // LRAS: vertical through the AD x SRAS intersection
+      mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS'),
+      // Dotted to axes from the exact equilibrium
+      mkLine(0, 0.4793, 0.5012, 0.4793, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5012, 0.4793, 0.5012, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.5012, 1.02, 'Yfe'),
+      mkText(-0.07, 0.4793, 'PL'),
+    ]
+  },
+  keyn: {
+    title: '',
+    yLabel: 'Price level', xLabel: 'Real GDP',
+    curves: [
+      { name: 'AD', color: COLORS[0] },
+      { name: 'AS', color: COLORS[2] },
+    ],
+    elements: [
+      // AD: downward sloping (high price at low GDP → low price at high GDP)
+      mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD'),
+      // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
+      mkCurve([
+        {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
+        {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
+      ], COLORS[2], 2.5, '', 'AS'),
+      // YFE vertical line (label placed below x-axis via mkText)
+      mkLine(0.71, 0, 0.71, 1.0, COLORS[1], 1.5, '5,4', ''),
+      mkText(0.71, 1.05, 'YFE'),
+      // Equilibrium: AD intersects flat part of AS at ~(0.20, 0.70)
+      mkLine(0, 0.70, 0.20, 0.70, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.20, 0.70, 0.20, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.20, 1.02, 'Y₁'),
+      mkText(-0.07, 0.70, 'P₁'),
+    ]
+  },
+  ext_neg: {
+    title: '',
+    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [
+      { name: 'MPB=D', color: COLORS[0] },
+      { name: 'MPC=S', color: COLORS[2] },
+      { name: 'MSC', color: COLORS[1] },
+    ],
+    elements: [
+      // MPB = D downward
+      mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
+      // MPC = S upward
+      mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
+      // MSC above MPC (parallel, shifted up)
+      mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC'),
+      // Market eq: exact D x MPC intersection
+      mkLine(0, 0.4805, 0.5005, 0.4805, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5005, 0.4805, 0.5005, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Social optimum: exact D x MSC intersection
+      mkLine(0, 0.3844, 0.3996, 0.3844, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.3996, 0.3844, 0.3996, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.5005, 1.02, 'Qm'),
+      mkText(0.3996, 1.02, 'Qs'),
+      mkText(-0.07, 0.4805, 'Pm'),
+      mkText(-0.07, 0.3844, 'Ps'),
+    ]
+  },
+  ext_pos: {
+    title: '',
+    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+    curves: [
+      { name: 'MPC=S', color: COLORS[2] },
+      { name: 'MPB=D', color: COLORS[0] },
+      { name: 'MSB', color: COLORS[3] },
+    ],
+    elements: [
+      mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
+      mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
+      // MSB shifted right of MPB
+      mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB'),
+      // Market eq: exact MPB x MPC intersection
+      mkLine(0, 0.4805, 0.5005, 0.4805, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5005, 0.4805, 0.5005, 1.0, '#aaa', 1.5, '5,4', ''),
+      // Social optimum: exact MSB x MPC intersection
+      mkLine(0, 0.4133, 0.5713, 0.4133, '#aaa', 1.5, '5,4', ''),
+      mkLine(0.5713, 0.4133, 0.5713, 1.0, '#aaa', 1.5, '5,4', ''),
+      mkText(0.5005, 1.02, 'Qm'),
+      mkText(0.5713, 1.02, 'Qs'),
+      mkText(-0.07, 0.4805, 'Pm'),
+      mkText(-0.07, 0.4133, 'Ps'),
+    ]
+  }
+};
+
+function mkLine(x1n, y1n, x2n, y2n, color, weight, dash, label) {
+  return { id: nextId++, type: 'line', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkCurve(points, color, weight, dash, label) {
+  return { id: nextId++, type: 'curve', points, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkText(xn, yn, text) {
+  return { id: nextId++, type: 'text', xn, yn, text, color: '#333', size: 13 };
+}
+function mkDot(xn, yn, color, pLabel, qLabel) {
+  return { id: nextId++, type: 'dot', xn, yn, color, pLabel, qLabel };
+}
+function mkRegion(points, fillColor, pattern) {
+  return { id: nextId++, type: 'region', points, fillColor: fillColor || COLORS[0],
+           pattern: pattern || 'solid', fillOpacity: 0.25, label: '', labelDx: 0, labelDy: 0,
+           bwPattern: 'bw-hatch45' };
+}
+function mkArrow(x1n, y1n, x2n, y2n, color, weight, dash, label) {
+  return { id: nextId++, type: 'arrow', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkDArrow(x1n, y1n, x2n, y2n, color, weight, dash, label) {
+  return { id: nextId++, type: 'dbarrow', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+}
+function mkBrace(x1n, y1n, x2n, y2n, color, weight, label, flip) {
+  return { id: nextId++, type: 'brace', x1n, y1n, x2n, y2n, color, weight, label, labelDx: 0, labelDy: 0, flip: !!flip };
+}
+
+function diagramIsEmpty() {
+  syncTextInputs();
+  return !state.elements.length && !state.curves.length && !state.title;
+}
+
+// Loading is undoable rather than confirmed: a toast offers Undo when it
+// replaced real work. `record: false` is for start-up only.
+function loadTemplate(name, opts = {}) {
+  const t = TEMPLATES[name];
+  const replacedWork = !diagramIsEmpty();
+  if (opts.record !== false) saveUndo();
+  // Deep copy: node edits mutate curve point arrays in place.
+  state.elements = JSON.parse(JSON.stringify(t.elements)).map(e => ({ ...e, id: nextId++ }));
+  state.curves = JSON.parse(JSON.stringify(t.curves));
+  state.title = t.title;
+  state.yLabel = t.yLabel;
+  state.xLabel = t.xLabel;
+  state.selectedId = null;
+  state.xLabelDx = 0; state.xLabelDy = 0;
+  state.yLabelDx = 0; state.yLabelDy = 0;
+  document.getElementById('graph-title').value = t.title;
+  document.getElementById('y-label').value = t.yLabel;
+  document.getElementById('x-label').value = t.xLabel;
+  renderCurveList();
+  renderProps();
+  redraw();
+  if (opts.record !== false && replacedWork)
+    showToast(opts.message || 'Template loaded.', { undo: true });
+}
+
+// ─── COORDINATE HELPERS ──────────────────────────────────────
+const LINEAR_TYPES = ['line', 'arrow', 'dbarrow', 'brace'];
+function isLinear(el) { return !!el && LINEAR_TYPES.includes(el.type); }
+function isLinearTool(t) { return LINEAR_TYPES.includes(t); }
+
+// Mouse event → raw logical coords (before the zoom/pan view transform) and
+// diagram coords (after undoing it).
+function eventToLogical(e) {
+  const r = canvas.getBoundingClientRect();
+  const rawCx = (e.clientX - r.left) * (W / r.width);
+  const rawCy = (e.clientY - r.top) * (H / r.height);
+  return { rawCx, rawCy, cx: (rawCx - viewOffsetX) / viewScale, cy: (rawCy - viewOffsetY) / viewScale };
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Normalized coords: (0,0) = top-left of plot area, (1,1) = bottom-right
+function toCanvas(xn, yn) {
+  return {
+    x: MARGIN.left + xn * PLOT_W,
+    y: MARGIN.top + yn * PLOT_H
+  };
+}
+function fromCanvas(cx, cy) {
+  return {
+    xn: (cx - MARGIN.left) / PLOT_W,
+    yn: (cy - MARGIN.top) / PLOT_H
+  };
+}
+
+function getLabelBasePos(el) {
+  if (el.type === 'brace') {
+    const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+    return braceGeometry(a.x, a.y, b.x, b.y, el.flip).tip;
+  }
+  if (el.type === 'text' || el.type === 'dot') return toCanvas(el.xn, el.yn);
+  if (isLinear(el)) {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (Math.abs(dy) > Math.abs(dx)) {
+      const top = a.y <= b.y ? a : b;  // smallest y = highest on canvas
+      return { x: top.x + 9, y: top.y - 6 };
+    } else {
+      const right = a.x >= b.x ? a : b;
+      return { x: right.x + 8, y: right.y };
+    }
+  } else if (el.type === 'curve') {
+    if (!el.points || !el.points.length) return { x: 0, y: 0 };
+    const last = toCanvas(el.points[el.points.length - 1].xn, el.points[el.points.length - 1].yn);
+    return { x: last.x + 8, y: last.y };
+  } else if (el.type === 'region') {
+    if (!el.points || !el.points.length) return { x: 0, y: 0 };
+    const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    return { x: pts.reduce((s,p) => s+p.x, 0)/pts.length, y: pts.reduce((s,p) => s+p.y, 0)/pts.length };
+  }
+  return { x: 0, y: 0 };
+}
+
+function getFullLabelPos(el) {
+  const base = getLabelBasePos(el);
+  return { x: base.x + (el.labelDx || 0), y: base.y + (el.labelDy || 0) };
+}
+
+function hitTestAxisLabel(cx, cy) {
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  // X label: right-aligned to MARGIN.left+PLOT_W, below axis
+  const xlx = MARGIN.left + PLOT_W + state.xLabelDx;
+  const xly = MARGIN.top + PLOT_H + 8 + state.xLabelDy;
+  const xw = ctx.measureText(state.xLabel).width;
+  if (cx >= xlx - xw - 4 && cx <= xlx + 4 && Math.abs(cy - xly - 6) < 14) return 'xLabel';
+  // Y label: rotated, top-left of y-axis; right-aligned so text ends at top
+  const ylx = MARGIN.left / 2 + state.yLabelDx;
+  const yly = MARGIN.top + state.yLabelDy;
+  const yw = ctx.measureText(state.yLabel).width;
+  if (Math.abs(cx - ylx) < 12 && cy >= yly - 4 && cy <= yly + yw + 4) return 'yLabel';
+  return null;
+}
+
+// `opts.isNew`: the element was just created for this edit (Label tool), so
+// an empty or cancelled edit removes it, and `opts.undoSnap` is the state
+// before it existed.
+function showInlineLabelEdit(el, opts = {}) {
+  const pos = getFullLabelPos(el);
+  const rect = canvas.getBoundingClientRect();
+  const sx = rect.left + (pos.x * viewScale + viewOffsetX) * (rect.width / W);
+  const sy = rect.top  + (pos.y * viewScale + viewOffsetY) * (rect.height / H);
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = el.type === 'text' ? (el.text || '') : (el.label || '');
+  inp.style.cssText = `position:fixed;left:${sx-36}px;top:${sy-13}px;width:84px;
+    font:500 13px 'IBM Plex Sans',sans-serif;text-align:center;
+    background:#fff;border:1.5px solid #1a4a8a;border-radius:3px;
+    padding:2px 6px;z-index:200;outline:none;
+    box-shadow:0 2px 8px rgba(0,0,0,0.15);`;
+  document.body.appendChild(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = () => {
+    if (done) return; done = true;
+    const val = inp.value.trim();
+    if (inp.parentNode) inp.parentNode.removeChild(inp);
+    // Look the element up again: an undo while the box was open replaces objects.
+    const target = state.elements.find(x => x.id === el.id);
+    if (!target) return;
+    const key = target.type === 'text' ? 'text' : 'label';
+    if (opts.isNew) {
+      if (!val) { removeElementQuietly(target.id); return; }
+      saveUndo(opts.undoSnap);
+      target[key] = val;
+      renderProps(); redraw();
+      return;
+    }
+    if ((target[key] || '') === val) return;
+    saveUndo();
+    if (target.type === 'text' && !val) {
+      state.elements = state.elements.filter(x => x.id !== target.id);
+      state.selectedId = null;
+    } else {
+      target[key] = val;
+    }
+    renderCurveList(); renderProps(); redraw();
+  };
+  const cancel = () => {
+    if (done) return; done = true;
+    if (inp.parentNode) inp.parentNode.removeChild(inp);
+    if (opts.isNew) removeElementQuietly(el.id);
+  };
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') commit();
+    if (ev.key === 'Escape') cancel();
+    ev.stopPropagation();
+  });
+  inp.addEventListener('blur', commit);
+}
+
+function removeElementQuietly(id) {
+  state.elements = state.elements.filter(x => x.id !== id);
+  if (state.selectedId === id) state.selectedId = null;
+  renderProps(); redraw();
+}
+
+// ─── SNAP ─────────────────────────────────────────────────────
+function toggleSnap() {
+  snapEnabled = !snapEnabled;
+  const btn = document.getElementById('snap-btn');
+  btn.textContent = snapEnabled ? 'Snap: on' : 'Snap: off';
+  btn.classList.toggle('active', snapEnabled);
+}
+
+function toggleBW() {
+  bwMode = !bwMode;
+  const btn = document.getElementById('bw-btn');
+  btn.textContent = bwMode ? 'B/W' : 'Colour';
+  btn.classList.toggle('active', bwMode);
+  renderProps();
+  redraw();
+}
+
+function applyViewXform() {
+  ctx.setTransform(SCALE * viewScale, 0, 0, SCALE * viewScale, SCALE * viewOffsetX, SCALE * viewOffsetY);
+}
+
+function resetView() {
+  viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
+  updateZoomLabel(); redraw();
+}
+
+function zoomIn()  { changeZoom(1.2, W / 2, H / 2); }
+function zoomOut() { changeZoom(1 / 1.2, W / 2, H / 2); }
+
+function changeZoom(factor, rawCx, rawCy) {
+  const newScale = Math.max(0.25, Math.min(8, viewScale * factor));
+  const f = newScale / viewScale;
+  viewOffsetX = rawCx - (rawCx - viewOffsetX) * f;
+  viewOffsetY = rawCy - (rawCy - viewOffsetY) * f;
+  viewScale = newScale;
+  updateZoomLabel(); redraw();
+}
+
+function updateZoomLabel() {
+  const el = document.getElementById('zoom-label');
+  if (el) el.textContent = Math.round(viewScale * 100) + '%';
+  const hint = document.getElementById('pan-hint');
+  if (hint) hint.style.display = (viewScale > 1 && state.tool === 'select') ? '' : 'none';
+}
+
+function segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+  const rx = bx-ax, ry = by-ay, sx = dx-cx, sy = dy-cy;
+  const denom = rx*sy - ry*sx;
+  if (Math.abs(denom) < 0.001) return null;
+  const t = ((cx-ax)*sy - (cy-ay)*sx) / denom;
+  const u = ((cx-ax)*ry - (cy-ay)*rx) / denom;
+  if (t >= -0.01 && t <= 1.01 && u >= -0.01 && u <= 1.01)
+    return { x: ax + t*rx, y: ay + t*ry };
+  return null;
+}
+
+function closestPtOnSeg(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay, lenSq = dx*dx+dy*dy;
+  if (lenSq === 0) return { x: ax, y: ay };
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/lenSq));
+  return { x: ax+t*dx, y: ay+t*dy };
+}
+
+function getElSegments(el) {
+  if (isLinear(el)) {
+    const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+    return [[a.x, a.y, b.x, b.y]];
+  }
+  if (el.type === 'curve' && el.points.length >= 2) {
+    // Sample the smooth bezier curve (matching drawSmoothCurve) for accurate snap
+    const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    const sampled = [pts[0]];
+    const STEPS = 8;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i].x + pts[i+1].x) / 2;
+      const my = (pts[i].y + pts[i+1].y) / 2;
+      const prev = sampled[sampled.length - 1];
+      for (let s = 1; s <= STEPS; s++) {
+        const t = s / STEPS;
+        const u = 1 - t;
+        sampled.push({ x: u*u*prev.x + 2*u*t*pts[i].x + t*t*mx,
+                        y: u*u*prev.y + 2*u*t*pts[i].y + t*t*my });
+      }
+    }
+    // Final straight segment to last point (matching drawSmoothCurve's lineTo)
+    const lastPt = pts[pts.length - 1];
+    if (sampled[sampled.length-1].x !== lastPt.x || sampled[sampled.length-1].y !== lastPt.y)
+      sampled.push(lastPt);
+    const segs = [];
+    for (let i = 0; i < sampled.length - 1; i++)
+      segs.push([sampled[i].x, sampled[i].y, sampled[i+1].x, sampled[i+1].y]);
+    return segs;
+  }
+  return [];
+}
+
+function getSnapCandidate(cx, cy, includeOnSeg = false) {
+  if (!snapEnabled) return null;
+  const SNAP_R = 14;
+  const candidates = [];
+  const drawables = state.elements.filter(e => e.type === 'line' || e.type === 'curve');
+  const allSegs = drawables.flatMap(getElSegments);
+
+  // Endpoints
+  drawables.forEach(el => {
+    if (el.type === 'line') {
+      candidates.push(toCanvas(el.x1n, el.y1n));
+      candidates.push(toCanvas(el.x2n, el.y2n));
+    } else if (el.type === 'curve' && el.points.length) {
+      candidates.push(toCanvas(el.points[0].xn, el.points[0].yn));
+      candidates.push(toCanvas(el.points[el.points.length-1].xn, el.points[el.points.length-1].yn));
+    }
+  });
+
+  // Segment-segment intersections
+  for (let i = 0; i < allSegs.length; i++) {
+    for (let j = i+1; j < allSegs.length; j++) {
+      const [ax,ay,bx,by] = allSegs[i], [cx2,cy2,dx,dy] = allSegs[j];
+      const pt = segSegIntersect(ax,ay,bx,by,cx2,cy2,dx,dy);
+      if (pt && pt.x >= MARGIN.left-5 && pt.x <= MARGIN.left+PLOT_W+5
+              && pt.y >= MARGIN.top-5 && pt.y <= MARGIN.top+PLOT_H+5)
+        candidates.push(pt);
+    }
+  }
+
+  // Axis corners
+  candidates.push({ x: MARGIN.left, y: MARGIN.top+PLOT_H });
+  candidates.push({ x: MARGIN.left, y: MARGIN.top });
+  candidates.push({ x: MARGIN.left+PLOT_W, y: MARGIN.top+PLOT_H });
+
+  // Find nearest candidate
+  let best = null, bestDist = SNAP_R;
+  candidates.forEach(p => {
+    const d = Math.hypot(cx-p.x, cy-p.y);
+    if (d < bestDist) { bestDist = d; best = p; }
+  });
+
+  // Fallback: closest point on any segment (only when requested, e.g. for region drawing)
+  if (!best && includeOnSeg) {
+    const SEG_SNAP_R = 10;
+    allSegs.forEach(([ax,ay,bx,by]) => {
+      const p = closestPtOnSeg(cx, cy, ax, ay, bx, by);
+      const d = Math.hypot(cx-p.x, cy-p.y);
+      if (d < SEG_SNAP_R) { if (d < bestDist) { bestDist = d; best = p; } }
+    });
+  }
+
+  return best;
+}
+
+function drawSnapIndicator(x, y) {
+  ctx.save();
+  applyViewXform();
+  ctx.strokeStyle = '#1a4a8a'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x-10, y); ctx.lineTo(x+10, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y-10); ctx.lineTo(x, y+10); ctx.stroke();
+  ctx.restore();
+}
+
+// ─── NODE EDITING ─────────────────────────────────────────────
+function hitTestNode(cx, cy, el) {
+  if (!el) return null;
+  const R = 10;
+  if (isLinear(el)) {
+    const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+    if (Math.hypot(cx-a.x, cy-a.y) < R) return 'p1';
+    if (Math.hypot(cx-b.x, cy-b.y) < R) return 'p2';
+  } else if (el.type === 'curve' && el.points.length) {
+    const first = toCanvas(el.points[0].xn, el.points[0].yn);
+    const last  = toCanvas(el.points[el.points.length-1].xn, el.points[el.points.length-1].yn);
+    if (Math.hypot(cx-first.x, cy-first.y) < R) return 'first';
+    if (Math.hypot(cx-last.x,  cy-last.y)  < R) return 'last';
+  } else if (el.type === 'region' && el.points) {
+    for (let i = 0; i < el.points.length; i++) {
+      const p = toCanvas(el.points[i].xn, el.points[i].yn);
+      if (Math.hypot(cx-p.x, cy-p.y) < R) return i;
+    }
+  }
+  return null;
+}
+
+function applyNodeMove(el, node, cx, cy) {
+  const snap = getSnapCandidate(cx, cy);
+  const n = snap ? fromCanvas(snap.x, snap.y) : fromCanvas(cx, cy);
+  if (isLinear(el)) {
+    if (node === 'p1') { el.x1n = n.xn; el.y1n = n.yn; }
+    else               { el.x2n = n.xn; el.y2n = n.yn; }
+  } else if (el.type === 'curve') {
+    if (node === 'first') el.points[0] = { xn: n.xn, yn: n.yn };
+    else el.points[el.points.length-1] = { xn: n.xn, yn: n.yn };
+  } else if (el.type === 'region' && typeof node === 'number') {
+    el.points[node] = { xn: n.xn, yn: n.yn };
+  }
+  return snap;
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function pointInPolygon(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function drawPattern(pattern, color) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]);
+  const sp = 10;
+  if (pattern === 'hatch' || pattern === 'crosshatch') {
+    for (let d = -(H + W); d < W + H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d + H, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'crosshatch') {
+    for (let d = -(H + W); d < W + H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d + H, 0); ctx.lineTo(d, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'dots') {
+    const sp2 = 12;
+    for (let x = 0; x <= W; x += sp2) for (let y = 0; y <= H; y += sp2) {
+      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (pattern === 'bw-hatch45') {
+    for (let d = -(H+W); d < W+H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d+H, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-hatch135') {
+    for (let d = -(H+W); d < W+H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d+H, 0); ctx.lineTo(d, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-crosshatch') {
+    for (let d = -(H+W); d < W+H; d += sp) {
+      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d+H, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(d+H, 0); ctx.lineTo(d, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-dots') {
+    const sp2 = 12;
+    for (let x = 0; x <= W; x += sp2) for (let y = 0; y <= H; y += sp2) {
+      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  if (pattern === 'bw-vertical') {
+    for (let x = 0; x <= W; x += sp) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  }
+  if (pattern === 'bw-horizontal') {
+    for (let y = 0; y <= H; y += sp) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+}
+
+function drawRegionEl(el) {
+  if (!el.points || el.points.length < 3) return;
+  const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+  const color = bwMode ? '#1a1918' : (el.fillColor || COLORS[0]);
+  const pat = bwMode ? (el.bwPattern || 'bw-hatch45') : el.pattern;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  if (pat === 'solid') {
+    ctx.fillStyle = hexToRgba(color, el.fillOpacity ?? 0.25);
+    ctx.fill();
+  } else {
+    ctx.save(); ctx.clip();
+    drawPattern(pat, color);
+    ctx.restore();
+  }
+  ctx.restore();
+  // Label at centroid + offset
+  if (el.label) {
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    drawLabelAt(el.label, cx + (el.labelDx || 0), cy + (el.labelDy || 0), color);
+  }
+}
+
+function drawRegionPreview(mouseN) {
+  const allPts = mouseN ? [...curvePoints, mouseN] : curvePoints;
+  if (allPts.length < 2) return;
+  const pts = allPts.map(p => toCanvas(p.xn, p.yn));
+  ctx.save();
+  ctx.strokeStyle = state.drawColor; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+  if (allPts.length >= 3) { ctx.lineTo(pts[0].x, pts[0].y); } // close preview
+  ctx.stroke();
+  if (allPts.length >= 3) {
+    ctx.fillStyle = hexToRgba(state.drawColor, 0.10); ctx.fill();
+  }
+  curvePoints.forEach(p => {
+    const c = toCanvas(p.xn, p.yn);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = state.drawColor; ctx.setLineDash([]); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function getSnappedEnd(start, end, shift) {
+  if (!shift) return end;
+  const dxn = end.xn - start.xn, dyn = end.yn - start.yn;
+  const adx = Math.abs(dxn), ady = Math.abs(dyn);
+  const T = 0.4142; // tan(22.5°)
+  if (adx < ady * T) return { xn: start.xn, yn: end.yn };          // vertical
+  if (ady < adx * T) return { xn: end.xn,   yn: start.yn };         // horizontal
+  const m = Math.min(adx, ady);
+  return { xn: start.xn + Math.sign(dxn) * m, yn: start.yn + Math.sign(dyn) * m }; // 45°
+}
+
+function drawArrowhead(x1, y1, x2, y2, weight) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const size = 7 + weight * 1.5;
+  const spread = Math.PI / 6;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle - spread), y2 - size * Math.sin(angle - spread));
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle + spread), y2 - size * Math.sin(angle + spread));
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Shared by drawing and label placement so the label hit area matches the tip.
+function braceGeometry(ax, ay, bx, by, flip) {
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.max(Math.hypot(dx, dy), 0.0001);
+  // Perpendicular unit vector, flipped as needed
+  const f = flip ? 1 : -1;
+  const nx = (-dy / len) * f;
+  const ny = (dx / len) * f;
+  const h = Math.min(Math.max(10, len * 0.1), 35);
+  const mx = (ax + bx) / 2, my = (ay + by) / 2;
+  // Tip extends h*2 out from midpoint
+  return { dx, dy, len, nx, ny, h, mx, my, tip: { x: mx + nx * h * 2, y: my + ny * h * 2 } };
+}
+
+function drawBraceShape(ax, ay, bx, by, flip, color, weight) {
+  const { dx, dy, len, nx, ny, h, mx, my, tip } = braceGeometry(ax, ay, bx, by, flip);
+  if (len < 2) return;
+  const tx = tip.x, ty = tip.y;
+  // Inner rail control points at h from baseline
+  const cx1 = ax + nx * h, cy1 = ay + ny * h;
+  const cx2 = bx + nx * h, cy2 = by + ny * h;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = weight; ctx.setLineDash([]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.quadraticCurveTo(cx1, cy1, mx + nx * h - dx * 0.02, my + ny * h - dy * 0.02);
+  ctx.quadraticCurveTo(tx, ty, mx + nx * h + dx * 0.02, my + ny * h + dy * 0.02);
+  ctx.quadraticCurveTo(cx2, cy2, bx, by);
+  ctx.stroke();
+  ctx.restore();
+  // Return tip position for label
+  return { x: tx, y: ty };
+}
+
+// ─── DRAWING ─────────────────────────────────────────────────
+function syncTextInputs() {
+  state.title = document.getElementById('graph-title').value;
+  state.yLabel = document.getElementById('y-label').value;
+  state.xLabel = document.getElementById('x-label').value;
+}
+
+function redraw() {
+  syncTextInputs();
+  // Clear entire canvas with bg colour (no transform)
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#f5f4f0';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Apply view transform for all diagram drawing
+  applyViewXform();
+  drawBackground();
+  drawAxes();
+  drawElements();
+  drawSelectionHandles();
+  // Reset transform to base scale after drawing
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  scheduleAutosave();
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawAxes() {
+  ctx.save();
+  ctx.strokeStyle = '#1a1918';
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+
+  // Y axis
+  ctx.beginPath();
+  ctx.moveTo(MARGIN.left, MARGIN.top + PLOT_H);
+  ctx.lineTo(MARGIN.left, MARGIN.top);
+  ctx.stroke();
+
+  // X axis
+  ctx.beginPath();
+  ctx.moveTo(MARGIN.left, MARGIN.top + PLOT_H);
+  ctx.lineTo(MARGIN.left + PLOT_W, MARGIN.top + PLOT_H);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Axis labels at ends of axes
+  ctx.save();
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.fillStyle = '#1a1918';
+  // X label — below and right-aligned to the right end of x-axis
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, MARGIN.top + PLOT_H + 8 + state.xLabelDy);
+  // Y label — rotated 90° CCW, top-left of y-axis
+  ctx.save();
+  ctx.translate(MARGIN.left / 2 + state.yLabelDx, MARGIN.top + state.yLabelDy);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(state.yLabel, 0, 0);
+  ctx.restore();
+
+  // Title
+  ctx.font = '600 15px "IBM Plex Sans", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(state.title, W / 2, 26);
+
+  ctx.restore();
+}
+
+function drawElements() {
+  // Regions first so lines/curves draw on top
+  state.elements.forEach(el => {
+    if (el.type !== 'region' || el.id === state.selectedId) return;
+    drawElement(el);
+  });
+  state.elements.forEach(el => {
+    if (el.type === 'region' || el.id === state.selectedId) return;
+    drawElement(el);
+  });
+  if (state.selectedId) {
+    const el = state.elements.find(e => e.id === state.selectedId);
+    if (el) drawElement(el);
+  }
+}
+
+function drawElement(el) {
+  ctx.save();
+  const col = bwMode ? '#1a1918' : (el.color || '#1a1918');
+  ctx.strokeStyle = col;
+  ctx.lineWidth = el.weight || 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (el.dash) ctx.setLineDash(el.dash.split(',').map(Number));
+  else ctx.setLineDash([]);
+
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    if (el.type === 'arrow' || el.type === 'dbarrow') drawArrowhead(a.x, a.y, b.x, b.y, el.weight || 2.5);
+    if (el.type === 'dbarrow') drawArrowhead(b.x, b.y, a.x, a.y, el.weight || 2.5);
+    if (el.label) drawLineLabel(el);
+  } else if (el.type === 'brace') {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    drawBraceShape(a.x, a.y, b.x, b.y, el.flip, col, el.weight || 1.5);
+    if (el.label) {
+      const pos = getFullLabelPos(el);
+      drawLabelAt(el.label, pos.x, pos.y, col);
+    }
+  } else if (el.type === 'curve') {
+    if (el.points.length < 2) { ctx.restore(); return; }
+    const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    drawSmoothCurve(pts);
+    if (el.label) {
+      const pos = getFullLabelPos(el);
+      drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
+    }
+  } else if (el.type === 'region') {
+    ctx.restore();
+    drawRegionEl(el);
+    return;
+  } else if (el.type === 'dot') {
+    ctx.restore();
+    drawDotEl(el);
+    return;
+  } else if (el.type === 'text') {
+    ctx.restore();
+    drawTextEl(el);
+    return;
+  }
+  ctx.restore();
+}
+
+function drawSmoothCurve(pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2;
+    const my = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  const last = pts[pts.length - 1];
+  ctx.lineTo(last.x, last.y);
+  ctx.stroke();
+}
+
+function drawLineLabel(el) {
+  const pos = getFullLabelPos(el);
+  drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
+  // Dotted underline when selected to hint it's editable/draggable
+  if (el.id === state.selectedId) {
+    ctx.save();
+    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    const w = ctx.measureText(el.label).width;
+    ctx.strokeStyle = el.color || '#1a1918';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(pos.x - w / 2, pos.y + 8);
+    ctx.lineTo(pos.x + w / 2, pos.y + 8);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawLabelAt(text, x, y, color) {
+  ctx.save();
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  ctx.fillStyle = color || '#1a1918';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawTextEl(el) {
+  const p = toCanvas(el.xn, el.yn);
+  ctx.save();
+  ctx.font = `500 ${el.size || 13}px "IBM Plex Sans", sans-serif`;
+  ctx.fillStyle = bwMode ? '#1a1918' : (el.color || '#333');
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(el.text, p.x, p.y);
+  ctx.restore();
+}
+
+function drawDotEl(el) {
+  const p = toCanvas(el.xn, el.yn);
+  const axisL = toCanvas(0, el.yn);
+  const axisB = toCanvas(el.xn, 1.0);
+  const dotCol = bwMode ? '#1a1918' : (el.color || '#1a1918');
+  ctx.save();
+  ctx.strokeStyle = dotCol;
+  ctx.lineWidth = 1.4;
+  ctx.setLineDash([4, 3]);
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = dotCol;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  if (el.pLabel) {
+    ctx.save();
+    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    ctx.fillStyle = '#1a1918'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(el.pLabel, axisL.x - 6, axisL.y);
+    ctx.restore();
+  }
+  if (el.qLabel) {
+    ctx.save();
+    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+    ctx.fillStyle = '#1a1918'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(el.qLabel, axisB.x, axisB.y + 4);
+    ctx.restore();
+  }
+}
+
+function drawSelectionHandles() {
+  if (!state.selectedId) return;
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  ctx.save();
+  ctx.strokeStyle = '#1a4a8a';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  if (isLinear(el)) {
+    const a = toCanvas(el.x1n, el.y1n);
+    const b = toCanvas(el.x2n, el.y2n);
+    drawHandle(a.x, a.y);
+    drawHandle(b.x, b.y);
+  } else if (el.type === 'curve' && el.points.length > 0) {
+    const first = toCanvas(el.points[0].xn, el.points[0].yn);
+    const last = toCanvas(el.points[el.points.length - 1].xn, el.points[el.points.length - 1].yn);
+    drawHandle(first.x, first.y);
+    drawHandle(last.x, last.y);
+  } else if (el.type === 'region') {
+    if (el.points && el.points.length >= 3) {
+      const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+      pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath();
+      ctx.strokeStyle = '#1a4a8a'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]); ctx.stroke();
+      pts.forEach(p => drawHandle(p.x, p.y));
+    }
+  } else if (el.type === 'dot') {
+    const p = toCanvas(el.xn, el.yn);
+    drawHandle(p.x, p.y);
+  } else if (el.type === 'text') {
+    const p = toCanvas(el.xn, el.yn);
+    drawHandle(p.x, p.y);
+  }
+  ctx.restore();
+}
+
+function drawHandle(x, y) {
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.strokeStyle = '#1a4a8a';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(26,74,138,0.15)';
+  ctx.fill();
+}
+
+// Title and axis inputs: the snapshot is taken on focus, because by the time
+// `input` fires the box already holds the new text. One undo step per focus.
+let docTextSnap = null;
+function onDocTextFocus() { docTextSnap = snapshot(); }
+function onDocTextInput() {
+  if (docTextSnap) { saveUndo(docTextSnap); docTextSnap = null; }
+  redraw();
+}
+
+// ─── TOOLS ───────────────────────────────────────────────────
+function setTool(t) {
+  state.tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tool-' + t)?.classList.add('active');
+  canvas.style.cursor = t === 'select' ? 'default' : 'crosshair';
+  updateHint(t);
+  updateZoomLabel();
+  curvePoints = [];
+  drawing = false;
+}
+
+function updateHint(t) {
+  const hints = {
+    select: 'Click to select · double-click to edit label',
+    line: 'Click and drag · hold Shift to snap to H / V / 45°',
+    arrow: 'Click and drag to draw an arrow',
+    dbarrow: 'Click and drag to draw a double-headed arrow',
+    brace: 'Click and drag to draw a curly brace · Flip direction in properties',
+    curve: 'Click to add points · double-click to finish curve',
+    text: 'Click anywhere on the graph to add a label',
+    equil: 'Click to place equilibrium point with dotted drop lines',
+    region: 'Click vertices · double-click to close and fill region',
+  };
+  document.getElementById('hint-text').textContent = hints[t] || '';
+}
+
+function onMouseDown(e) {
+  const { rawCx, rawCy, cx, cy } = eventToLogical(e);
+  const n = fromCanvas(cx, cy);
+
+
+  if (state.tool === 'select') {
+    // Priority 1: axis label drag
+    const axisHit = hitTestAxisLabel(cx, cy);
+    if (axisHit) {
+      axisLabelDrag = { type: axisHit, startCx: cx, startCy: cy,
+        origDx: state[axisHit + 'Dx'], origDy: state[axisHit + 'Dy'], undoSnap: snapshot(), moved: false };
+      return;
+    }
+    // Priority 2: endpoint handles of the selected element. Checked before
+    // labels, because default labels sit right beside the endpoints.
+    if (state.selectedId) {
+      const selEl = state.elements.find(e => e.id === state.selectedId);
+      const nodeHit = hitTestNode(cx, cy, selEl);
+      if (nodeHit !== null) {
+        nodeDrag = { elId: selEl.id, node: nodeHit, undoSnap: snapshot(), moved: false };
+        return;
+      }
+    }
+    // Priority 3: label drag — check ALL elements with labels (allows single-click select+drag)
+    {
+      ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+      for (const el of state.elements) {
+        if (el.type === 'dot' || el.type === 'text') continue;
+        if (!el.label) continue;
+        const lpos = getFullLabelPos(el);
+        const hw = Math.max(22, ctx.measureText(el.label).width / 2 + 8);
+        if (Math.abs(cx - lpos.x) < hw && Math.abs(cy - lpos.y) < 14) {
+          state.selectedId = el.id;
+          renderProps();
+          labelDrag = { elId: el.id, startCx: cx, startCy: cy,
+            origDx: el.labelDx || 0, origDy: el.labelDy || 0, moved: false };
+          return;
+        }
+      }
+    }
+    // Priority 4: regular element select / drag
+    const hit = hitTest(cx, cy);
+    state.selectedId = hit ? hit.id : null;
+    renderProps();
+    redraw();
+    if (hit) {
+      drawing = true;
+      drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)), undoSnap: snapshot(), moved: false };
+    } else if (e.shiftKey || spaceHeld || e.button === 1) {
+      // Empty area + shift (or space/middle) — pan the view
+      isPanning = true;
+      panStartRaw = { x: rawCx, y: rawCy };
+      panStartOffset = { x: viewOffsetX, y: viewOffsetY };
+      canvas.style.cursor = 'grabbing';
+    }
+  } else if (isLinearTool(state.tool)) {
+    const snapStart = getSnapCandidate(cx, cy);
+    const startN = snapStart ? fromCanvas(snapStart.x, snapStart.y) : n;
+    drawing = true;
+    drawStart = { xn: startN.xn, yn: startN.yn };
+  } else if (state.tool === 'curve') {
+    // The second click of a double-click finishes the curve (onDblClick);
+    // it must not also add a duplicate point.
+    if (e.detail > 1) return;
+    curvePoints.push({ xn: n.xn, yn: n.yn });
+    if (curvePoints.length === 1) {
+      drawing = true;
+    }
+    redraw();
+    // preview
+    ctx.save(); applyViewXform();
+    drawCurvePreview();
+    ctx.restore();
+  } else if (state.tool === 'text') {
+    const undoSnap = snapshot();
+    const el = mkText(n.xn, n.yn, '');
+    state.elements.push(el);
+    redraw();
+    // Defer so this mousedown doesn't immediately blur the new input.
+    setTimeout(() => showInlineLabelEdit(el, { isNew: true, undoSnap }), 0);
+  } else if (state.tool === 'region') {
+    if (e.detail > 1) return;
+    const geoSnap = getSnapCandidate(cx, cy, true);
+    let finalN;
+    if (geoSnap) {
+      finalN = fromCanvas(geoSnap.x, geoSnap.y);
+    } else if (e.shiftKey && curvePoints.length > 0) {
+      finalN = getSnappedEnd(curvePoints[curvePoints.length - 1], n, true);
+    } else {
+      finalN = n;
+    }
+    curvePoints.push({ xn: finalN.xn, yn: finalN.yn });
+    if (curvePoints.length === 1) drawing = true;
+    redraw();
+    ctx.save(); applyViewXform();
+    drawRegionPreview();
+    ctx.restore();
+  } else if (state.tool === 'equil') {
+    const pLbl = prompt('Price label (leave blank to skip):', 'P');
+    if (pLbl === null) return;
+    const qLbl = prompt('Q* label (leave blank to skip):', 'Q*');
+    if (qLbl === null) return;
+    saveUndo();
+    const el = mkDot(n.xn, n.yn, state.drawColor, pLbl.trim(), qLbl.trim());
+    state.elements.push(el);
+    state.selectedId = el.id;
+    renderProps();
+    redraw();
+  }
+}
+
+function onMouseMove(e) {
+  const { rawCx, rawCy, cx, cy } = eventToLogical(e);
+  const n = fromCanvas(cx, cy);
+
+  if (isPanning) {
+    viewOffsetX = panStartOffset.x + (rawCx - panStartRaw.x);
+    viewOffsetY = panStartOffset.y + (rawCy - panStartRaw.y);
+    redraw(); return;
+  }
+
+  // Node drag
+  if (nodeDrag) {
+    const el = state.elements.find(e => e.id === nodeDrag.elId);
+    if (el) {
+      if (!nodeDrag.moved) { saveUndo(nodeDrag.undoSnap); nodeDrag.moved = true; }
+      const snap = applyNodeMove(el, nodeDrag.node, cx, cy);
+      redraw();
+      if (snap) drawSnapIndicator(snap.x, snap.y);
+    }
+    return;
+  }
+
+  // Handle special drags before tool logic
+  if (labelDrag) {
+    const el = state.elements.find(e => e.id === labelDrag.elId);
+    if (el) {
+      const dx = cx - labelDrag.startCx, dy = cy - labelDrag.startCy;
+      if (Math.hypot(dx, dy) > 4 && !labelDrag.moved) { saveUndo(); labelDrag.moved = true; }
+      if (labelDrag.moved) { el.labelDx = labelDrag.origDx + dx; el.labelDy = labelDrag.origDy + dy; redraw(); }
+    }
+    return;
+  }
+  if (axisLabelDrag) {
+    const dx = cx - axisLabelDrag.startCx, dy = cy - axisLabelDrag.startCy;
+    if (!axisLabelDrag.moved) { saveUndo(axisLabelDrag.undoSnap); axisLabelDrag.moved = true; }
+    state[axisLabelDrag.type + 'Dx'] = axisLabelDrag.origDx + dx;
+    state[axisLabelDrag.type + 'Dy'] = axisLabelDrag.origDy + dy;
+    redraw(); return;
+  }
+
+  if ((isLinearTool(state.tool)) && drawing && drawStart) {
+    const geoSnap = getSnapCandidate(cx, cy);
+    const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
+                         : getSnappedEnd(drawStart, n, e.shiftKey);
+    redraw();
+    const a = toCanvas(drawStart.xn, drawStart.yn);
+    const b = geoSnap ? { x: geoSnap.x, y: geoSnap.y } : toCanvas(endN.xn, endN.yn);
+    const w = parseFloat(document.getElementById('stroke-weight').value);
+    ctx.save(); applyViewXform();
+    if (state.tool === 'brace') {
+      drawBraceShape(a.x, a.y, b.x, b.y, false, state.drawColor, w);
+    } else {
+      ctx.strokeStyle = state.drawColor; ctx.lineWidth = w;
+      const dash = document.getElementById('stroke-dash').value;
+      if (dash) ctx.setLineDash(dash.split(',').map(Number));
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.restore();
+    if (state.tool === 'arrow' || state.tool === 'dbarrow') drawArrowhead(a.x, a.y, b.x, b.y, w);
+    if (state.tool === 'dbarrow') drawArrowhead(b.x, b.y, a.x, a.y, w);
+    if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
+  } else if (state.tool === 'curve' && drawing && curvePoints.length > 0) {
+    redraw();
+    ctx.save(); applyViewXform();
+    drawCurvePreview(n);
+    ctx.restore();
+  } else if (state.tool === 'region' && drawing && curvePoints.length > 0) {
+    const geoSnap = getSnapCandidate(cx, cy, true);
+    let previewN;
+    if (geoSnap) {
+      previewN = fromCanvas(geoSnap.x, geoSnap.y);
+    } else if (e.shiftKey && curvePoints.length > 0) {
+      previewN = getSnappedEnd(curvePoints[curvePoints.length - 1], n, true);
+    } else {
+      previewN = n;
+    }
+    redraw();
+    ctx.save(); applyViewXform();
+    drawRegionPreview(previewN);
+    ctx.restore();
+    if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
+  } else if (state.tool === 'select' && drawing && drawStart) {
+    // drag to move
+    const dx = cx - drawStart.cx;
+    const dy = cy - drawStart.cy;
+    const dxn = dx / PLOT_W;
+    const dyn = dy / PLOT_H;
+    const orig = drawStart.el;
+    const el = state.elements.find(e => e.id === state.selectedId);
+    if (!el) return;
+    if (!drawStart.moved) {
+      if (Math.hypot(dx, dy) < 2) return;
+      saveUndo(drawStart.undoSnap); drawStart.moved = true;
+    }
+    if (isLinear(el)) {
+      el.x1n = orig.x1n + dxn;
+      el.y1n = orig.y1n + dyn;
+      el.x2n = orig.x2n + dxn;
+      el.y2n = orig.y2n + dyn;
+    } else if (el.type === 'curve') {
+      el.points = orig.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
+    } else if (el.type === 'region') {
+      el.points = orig.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
+    } else if (el.type === 'dot') {
+      el.xn = orig.xn + dxn;
+      el.yn = orig.yn + dyn;
+    } else if (el.type === 'text') {
+      el.xn = orig.xn + dxn;
+      el.yn = orig.yn + dyn;
+    }
+    redraw();
+  }
+
+  // hover cursor
+  if (state.tool === 'select') {
+    const selEl = state.selectedId ? state.elements.find(e => e.id === state.selectedId) : null;
+    const nodeHit = selEl ? hitTestNode(cx, cy, selEl) : null;
+    if (nodeHit !== null) {
+      canvas.style.cursor = 'crosshair'; // node resize
+    } else {
+      const hit = hitTest(cx, cy);
+      const axisHit = hitTestAxisLabel(cx, cy);
+      let labelHit = false;
+      if (selEl && selEl.label && selEl.type !== 'dot') {
+        const lpos = getFullLabelPos(selEl);
+        if (Math.abs(cx - lpos.x) < 36 && Math.abs(cy - lpos.y) < 14) labelHit = true;
+      }
+      canvas.style.cursor = (hit || axisHit || labelHit) ? 'move' : 'default';
+    }
+  }
+  // Show snap indicator while hovering with drawing tools
+  if ((isLinearTool(state.tool) || state.tool === 'curve' || state.tool === 'region') && !drawing) {
+    const snap = getSnapCandidate(cx, cy);
+    if (snap) { redraw(); drawSnapIndicator(snap.x, snap.y); snapHoverActive = true; }
+    else if (snapHoverActive) { redraw(); snapHoverActive = false; }
+  }
+}
+
+function onMouseUp(e) {
+  const { rawCx, rawCy, cx, cy } = eventToLogical(e);
+  const n = fromCanvas(cx, cy);
+
+  if (isPanning) {
+    isPanning = false;
+    canvas.style.cursor = spaceHeld ? 'grab' : (state.tool === 'select' ? 'default' : 'crosshair');
+    return;
+  }
+
+  if (nodeDrag) { nodeDrag = null; redraw(); return; }
+
+  if (labelDrag) {
+    if (!labelDrag.moved) {
+      const el = state.elements.find(e => e.id === labelDrag.elId);
+      if (el) showInlineLabelEdit(el);
+    }
+    labelDrag = null; redraw(); return;
+  }
+  if (axisLabelDrag) { axisLabelDrag = null; return; }
+
+  if ((isLinearTool(state.tool)) && drawing && drawStart) {
+    const geoSnap = getSnapCandidate(cx, cy);
+    const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
+                         : getSnappedEnd(drawStart, n, e.shiftKey);
+    const dist = Math.hypot(endN.xn - drawStart.xn, endN.yn - drawStart.yn);
+    if (dist > 0.02) {
+      saveUndo();
+      const w = parseFloat(document.getElementById('stroke-weight').value);
+      const dash = document.getElementById('stroke-dash').value;
+      let el;
+      if (state.tool === 'arrow')        el = mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      else if (state.tool === 'dbarrow') el = mkDArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      else if (state.tool === 'brace')   el = mkBrace(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, '');
+      else                               el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      state.elements.push(el);
+      state.selectedId = el.id;
+      renderProps();
+    }
+    drawing = false;
+    drawStart = null;
+    redraw();
+  } else if (state.tool === 'select') {
+    drawing = false;
+    drawStart = null;
+  }
+}
+
+function onDblClick(e) {
+  const { rawCx, rawCy, cx, cy } = eventToLogical(e);
+
+  if (state.tool === 'curve' && drawing && curvePoints.length >= 2) {
+    saveUndo();
+    const el = mkCurve([...curvePoints], state.drawColor,
+      parseFloat(document.getElementById('stroke-weight').value),
+      document.getElementById('stroke-dash').value, '');
+    state.elements.push(el); state.selectedId = el.id;
+    curvePoints = []; drawing = false;
+    renderProps(); redraw(); return;
+  }
+
+  if (state.tool === 'region' && drawing && curvePoints.length >= 3) {
+    saveUndo();
+    const el = mkRegion([...curvePoints], state.drawColor, 'solid');
+    state.elements.push(el); state.selectedId = el.id;
+    curvePoints = []; drawing = false;
+    renderProps(); redraw();
+    setTimeout(() => showInlineLabelEdit(el), 80);
+    return;
+  }
+
+  if (state.tool === 'select') {
+    const hit = hitTest(cx, cy);
+    if (hit && hit.type !== 'dot') showInlineLabelEdit(hit);
+  }
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const { rawCx, rawCy } = eventToLogical(e);
+  changeZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, rawCx, rawCy);
+}
+
+function onKeyUp(e) {
+  if (e.key === ' ') {
+    spaceHeld = false;
+    if (!isPanning) canvas.style.cursor = state.tool === 'select' ? 'default' : 'crosshair';
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === ' ') {
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+    if (!spaceHeld) { spaceHeld = true; canvas.style.cursor = 'grab'; }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId) {
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
+    deleteSelected();
+  }
+  if (e.key === 'Escape') {
+    if (drawing && state.tool !== 'select') {
+      curvePoints = [];
+      drawing = false;
+      drawStart = null;
+      redraw();
+    }
+    state.selectedId = null;
+    renderProps();
+    redraw();
+  }
+}
+
+function drawCurvePreview(mouseN) {
+  const allPts = mouseN ? [...curvePoints, mouseN] : curvePoints;
+  if (allPts.length < 2) return;
+  const pts = allPts.map(p => toCanvas(p.xn, p.yn));
+  ctx.save();
+  ctx.strokeStyle = state.drawColor;
+  ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
+  const dash = document.getElementById('stroke-dash').value;
+  if (dash) ctx.setLineDash(dash.split(',').map(Number));
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  drawSmoothCurve(pts);
+  // draw control points
+  curvePoints.forEach(p => {
+    const c = toCanvas(p.xn, p.yn);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = state.drawColor;
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+// ─── HIT TESTING ─────────────────────────────────────────────
+function hitTest(cx, cy) {
+  // Non-region elements first (they render on top)
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type === 'region') continue;
+    if (isLinear(el)) {
+      const a = toCanvas(el.x1n, el.y1n);
+      const b = toCanvas(el.x2n, el.y2n);
+      if (distToSegment(cx, cy, a.x, a.y, b.x, b.y) < 8) return el;
+    } else if (el.type === 'curve') {
+      const segs = getElSegments(el);
+      for (let j = 0; j < segs.length; j++) {
+        if (distToSegment(cx, cy, segs[j][0], segs[j][1], segs[j][2], segs[j][3]) < 8) return el;
+      }
+    } else if (el.type === 'dot') {
+      const p = toCanvas(el.xn, el.yn);
+      if (Math.hypot(cx - p.x, cy - p.y) < 12) return el;
+    } else if (el.type === 'text') {
+      const p = toCanvas(el.xn, el.yn);
+      ctx.save();
+      ctx.font = `500 ${el.size || 13}px "IBM Plex Sans", sans-serif`;
+      const hw = Math.max(12, ctx.measureText(el.text || '').width / 2 + 4);
+      ctx.restore();
+      if (Math.abs(cx - p.x) < hw && Math.abs(cy - p.y) < (el.size || 13) * 0.6 + 4) return el;
+    }
+  }
+  // Region elements last
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type !== 'region') continue;
+    if (el.points && el.points.length >= 3) {
+      const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+      if (pointInPolygon(cx, cy, pts)) return el;
+    }
+  }
+  return null;
+}
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// ─── CURVE LIST ──────────────────────────────────────────────
+function renderCurveList() {
+  const list = document.getElementById('curve-list');
+  list.innerHTML = '';
+  state.curves.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'curve-item';
+    div.innerHTML = `
+      <div class="curve-swatch" style="background:${escapeHtml(c.color)}"></div>
+      <span class="curve-name">${escapeHtml(c.name)}</span>
+      <button class="curve-del" title="Remove" onclick="removeCurve(${i})">×</button>
+    `;
+    list.appendChild(div);
+  });
+  // Also show labeled regions
+  state.elements.filter(e => e.type === 'region' && e.label).forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'curve-item';
+    const col = /^#[0-9a-f]{6}$/i.test(e.fillColor || '') ? e.fillColor : COLORS[0];
+    div.innerHTML = `
+      <div class="curve-swatch" style="background:${hexToRgba(col, 0.5)};border:1px solid ${col}"></div>
+      <span class="curve-name">${escapeHtml(e.label)}</span>
+    `;
+    list.appendChild(div);
+  });
+}
+
+let modalColorSelected = COLORS[0];
+
+function openAddCurve() {
+  modalColorSelected = COLORS[0];
+  document.getElementById('modal-name').value = '';
+  buildModalColors();
+  document.getElementById('curve-modal').classList.add('open');
+  setTimeout(() => document.getElementById('modal-name').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('curve-modal').classList.remove('open');
+}
+
+function confirmAddCurve() {
+  const name = document.getElementById('modal-name').value.trim();
+  if (!name) return;
+  const colorEl = document.querySelector('#modal-colors .modal-col.active');
+  const color = colorEl ? colorEl.dataset.color : COLORS[0];
+  saveUndo();
+  state.curves.push({ name, color });
+  renderCurveList();
+  closeModal();
+}
+
+function removeCurve(i) {
+  saveUndo();
+  state.curves.splice(i, 1);
+  renderCurveList();
+}
+
+// ─── PROPS PANEL ─────────────────────────────────────────────
+// A <select> that always shows the element's true value: a value that is not
+// one of the standard options gets its own "Custom" entry instead of silently
+// displaying the first option.
+function selectHTML(options, current, onchange) {
+  const same = (a, b) => (typeof a === 'number' || typeof b === 'number')
+    ? Math.abs(Number(a) - Number(b)) < 1e-6 : String(a) === String(b);
+  let opts = options.map(([v, label]) =>
+    `<option value="${escapeHtml(v)}" ${same(v, current) ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+  if (current !== undefined && !options.some(([v]) => same(v, current)))
+    opts += `<option value="${escapeHtml(current)}" selected>Custom (${escapeHtml(current)})</option>`;
+  return `<select onchange="${onchange}">${opts}</select>`;
+}
+const WEIGHT_OPTS = [[1.5, 'Thin'], [2.5, 'Normal'], [4, 'Bold']];
+const DASH_OPTS = [['', 'Solid'], ['6,4', 'Dashed'], ['2,3', 'Dotted']];
+
+function textPropHTML(label, key, value, maxlength, placeholder) {
+  return `<div class="prop-row">
+      <label>${label}</label>
+      <input type="text" value="${escapeHtml(value)}" maxlength="${maxlength}" placeholder="${escapeHtml(placeholder || '')}"
+        oninput="updatePropLive('${key}', this.value)">
+    </div>`;
+}
+
+function renderProps() {
+  liveEditKey = null;
+  const form = document.getElementById('props-form');
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) {
+    form.innerHTML = '<div style="font-size:13px;color:var(--text);padding:4px 0;font-family:var(--sans);line-height:1.5">Nothing selected.<br><br>Click any line, curve, or region to edit its label, colour, or style.</div>';
+    return;
+  }
+  let html = '';
+
+  if (el.type === 'region') {
+    html += textPropHTML('Label', 'label', el.label, 20, 'e.g. Consumer surplus');
+    if (bwMode) {
+      html += `<div class="prop-row"><label>B/W Texture</label>${selectHTML([
+        ['bw-hatch45', '45° hatch'], ['bw-hatch135', '135° hatch'], ['bw-crosshatch', 'Crosshatch'],
+        ['bw-dots', 'Dots'], ['bw-vertical', 'Vertical lines'], ['bw-horizontal', 'Horizontal lines'],
+      ], el.bwPattern || 'bw-hatch45', "updateProp('bwPattern',this.value)")}</div>`;
+    }
+    html += `<div class="prop-row"><label>Fill</label>${selectHTML([
+      ['solid', 'Solid colour'], ['hatch', 'Hatch (45°)'], ['crosshatch', 'Cross-hatch'], ['dots', 'Dots'],
+    ], el.pattern || 'solid', "updateProp('pattern',this.value);renderProps()")}</div>
+    <div class="prop-row">
+      <label>Color</label>
+      ${colorSwatchHTML(el.fillColor || COLORS[0], 'fillColor')}
+    </div>`;
+    if ((el.pattern || 'solid') === 'solid') {
+      html += `<div class="prop-row"><label>Opacity</label>${selectHTML([
+        [0.10, '10%'], [0.20, '20%'], [0.25, '25%'], [0.30, '30%'], [0.45, '45%'],
+      ], el.fillOpacity ?? 0.25, "updateProp('fillOpacity',parseFloat(this.value))")}</div>`;
+    }
+  } else if (el.type === 'dot') {
+    html += textPropHTML('P* label', 'pLabel', el.pLabel, 10);
+    html += textPropHTML('Q* label', 'qLabel', el.qLabel, 10);
+    html += `<div class="prop-row">
+      <label>Color</label>
+      ${colorSwatchHTML(el.color || COLORS[0], 'color')}
+    </div>`;
+  } else if (el.type !== 'text') {
+    html += textPropHTML('Label', 'label', el.label, 16);
+    html += `<div class="prop-row">
+      <label>Color</label>
+      ${colorSwatchHTML(el.color || COLORS[0], 'color')}
+    </div>
+    <div class="prop-row"><label>Weight</label>${selectHTML(WEIGHT_OPTS, el.weight || 2.5, "updateProp('weight', parseFloat(this.value))")}</div>`;
+    if (el.type !== 'brace')
+      html += `<div class="prop-row"><label>Dash</label>${selectHTML(DASH_OPTS, el.dash || '', "updateProp('dash', this.value)")}</div>`;
+  } else {
+    html += textPropHTML('Text', 'text', el.text, 20);
+  }
+
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
+    html += `<button class="action-btn secondary" style="margin-top:4px" onclick="makeLineOrthogonal()">Make horizontal / vertical</button>`;
+  }
+  if (el.type === 'brace') {
+    html += `<button class="action-btn secondary" style="margin-top:4px" onclick="updateProp('flip', !${!!el.flip})">Flip direction</button>`;
+  }
+  html += `<button class="action-btn secondary" style="margin-top:4px" onclick="duplicateSelected()">Duplicate</button>`;
+  html += `<button class="action-btn danger" style="margin-top:4px" onclick="deleteSelected()">Delete element</button>`;
+  form.innerHTML = html;
+}
+
+// Text inputs commit on every keystroke: an `onchange` handler loses the edit
+// when clicking the canvas rebuilds the form before the blur event fires.
+// All keystrokes on one field collapse into a single undo entry.
+let liveEditKey = null;
+function updatePropLive(key, value) {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  const sig = el.id + ':' + key;
+  if (liveEditKey !== sig) { saveUndo(); liveEditKey = sig; }
+  el[key] = value;
+  if (key === 'label' || key === 'fillColor') renderCurveList();
+  redraw();
+}
+
+function updateProp(key, value) {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  saveUndo();
+  el[key] = value;
+  if (key === 'label' || key === 'fillColor') renderCurveList();
+  redraw();
+}
+
+function setPropColor(key, value) {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  saveUndo();
+  el[key] = value;
+  renderProps();
+  redraw();
+}
+
+function colorSwatchHTML(currentColor, propKey) {
+  return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${COLORS.map(c =>
+    `<div style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;box-sizing:border-box;border:3px solid ${c===currentColor?'#1a1918':'transparent'}"
+      onclick="setPropColor('${propKey}','${c}')"></div>`
+  ).join('')}</div>`;
+}
+
+function duplicateSelected() {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el) return;
+  saveUndo();
+  // Append '1' to original label
+  const origLabel = el.type === 'text' ? 'text' : (el.label || '');
+  if (el.type !== 'text' && origLabel !== '') el.label = origLabel + '1';
+  // Deep-copy as duplicate with new id, offset slightly, label + '2'
+  const dup = JSON.parse(JSON.stringify(el));
+  dup.id = nextId++;
+  const off = 0.03;
+  if (isLinear(dup)) {
+    dup.x1n += off; dup.y1n += off; dup.x2n += off; dup.y2n += off;
+  } else if (dup.type === 'curve') {
+    dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
+  } else if (dup.type === 'region') {
+    dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
+  } else if (dup.type === 'text' || dup.type === 'dot') {
+    dup.xn += off; dup.yn += off;
+  }
+  if (dup.type !== 'text') dup.label = origLabel + '2';
+  state.elements.push(dup);
+  state.selectedId = dup.id;
+  renderCurveList();
+  renderProps();
+  redraw();
+}
+
+function deleteSelected() {
+  saveUndo();
+  state.elements = state.elements.filter(e => e.id !== state.selectedId);
+  state.selectedId = null;
+  renderCurveList();
+  renderProps();
+  redraw();
+}
+
+function makeLineOrthogonal() {
+  const el = state.elements.find(e => e.id === state.selectedId);
+  if (!el || !isLinear(el)) return;
+  const a = toCanvas(el.x1n, el.y1n);
+  const b = toCanvas(el.x2n, el.y2n);
+  const SNAP_R = 14;
+  // Check if each endpoint is touching any other element's segment
+  const others = state.elements.filter(e => e.id !== el.id && (e.type === 'line' || e.type === 'arrow' || e.type === 'curve'));
+  let p1Anchored = false, p2Anchored = false;
+  for (const other of others) {
+    for (const [ax,ay,bx,by] of getElSegments(other)) {
+      if (distToSegment(a.x, a.y, ax, ay, bx, by) < SNAP_R) p1Anchored = true;
+      if (distToSegment(b.x, b.y, ax, ay, bx, by) < SNAP_R) p2Anchored = true;
+    }
+  }
+  const dx = Math.abs(el.x2n - el.x1n), dy = Math.abs(el.y2n - el.y1n);
+  const makeHoriz = dx >= dy;
+  saveUndo();
+  if (p2Anchored && !p1Anchored) {
+    if (makeHoriz) el.y1n = el.y2n; else el.x1n = el.x2n;
+  } else {
+    if (makeHoriz) el.y2n = el.y1n; else el.x2n = el.x1n;
+  }
+  redraw();
+}
+
+// ─── CANVAS ACTIONS ──────────────────────────────────────────
+function clearDiagram() {
+  loadTemplate('blank', { message: 'Diagram cleared.' });
+}
+
+// ─── TOAST ───────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, opts = {}) {
+  const t = document.getElementById('toast');
+  t.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  t.appendChild(span);
+  if (opts.undo) {
+    const b = document.createElement('button');
+    b.textContent = 'Undo';
+    b.onclick = () => { undo(); hideToast(); };
+    t.appendChild(b);
+  }
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, opts.ms || 6000);
+}
+function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+
+// ─── GOOGLE DRIVE ────────────────────────────────────────────
+// SETUP: paste your OAuth client ID from Google Cloud Console below.
+// Leave it empty and the Drive panel simply hides itself.
+const GOOGLE_CLIENT_ID = '164227206202-sduuhb15difgum84nvt91scjj7gbgjls.apps.googleusercontent.com';
+// Optional: restrict the account chooser to one Workspace domain, e.g. 'myschool.school.nz'.
+// This is a convenience filter, not a security control. Leave '' to allow any Google account.
+const GOOGLE_HOSTED_DOMAIN = '';
+
+const DRIVE_SCOPES = 'openid email profile https://www.googleapis.com/auth/drive.file';
+const DRIVE_FOLDER = 'ShiftWork Diagrams';
+const DRIVE_EXT = '.shiftwork.json';
+
+let driveToken = null;        // { access_token, expires_at }
+let driveTokenClient = null;
+let driveFolderId = null;
+let driveCurrentFile = null;  // { id, name } currently open
+let driveUser = '';
+
+function driveEnabled() { return !!GOOGLE_CLIENT_ID; }
+
+function driveMsg(text, isErr) {
+  const el = document.getElementById('drive-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('err', !!isErr);
+}
+
+function driveGranted() {
+  try { return localStorage.getItem('sw2_drive_granted') === '1'; } catch(e) { return false; }
+}
+
+function driveInitClient() {
+  if (driveTokenClient) return true;
+  if (!driveEnabled()) return false;
+  if (!window.google || !google.accounts || !google.accounts.oauth2) return false;
+  const cfg = { client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPES, callback: () => {} };
+  if (GOOGLE_HOSTED_DOMAIN) cfg.hosted_domain = GOOGLE_HOSTED_DOMAIN;
+  driveTokenClient = google.accounts.oauth2.initTokenClient(cfg);
+  return true;
+}
+
+// Requests an access token. `silent` reuses an existing grant without a popup.
+function driveRequestToken(silent) {
+  return new Promise((resolve, reject) => {
+    if (!driveInitClient()) return reject(new Error('Google sign-in is still loading. Try again in a moment.'));
+    driveTokenClient.callback = (resp) => {
+      if (resp.error) return reject(new Error(resp.error_description || resp.error));
+      // Google lets users untick individual permissions, so confirm Drive was actually granted.
+      const need = 'https://www.googleapis.com/auth/drive.file';
+      if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(resp, need)) {
+        try { localStorage.removeItem('sw2_drive_granted'); } catch(e) {}
+        return reject(new Error('Please leave the Google Drive permission ticked, or diagrams cannot be saved.'));
+      }
+      driveToken = { access_token: resp.access_token, expires_at: Date.now() + ((resp.expires_in || 3600) - 60) * 1000 };
+      try { localStorage.setItem('sw2_drive_granted', '1'); } catch(e) {}
+      resolve(driveToken);
+    };
+    driveTokenClient.error_callback = (err) => reject(new Error((err && err.type) === 'popup_closed' ? 'Sign-in cancelled.' : 'Sign-in failed.'));
+    driveTokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
+  });
+}
+
+async function driveEnsureToken() {
+  if (driveToken && Date.now() < driveToken.expires_at) return driveToken;
+  return driveRequestToken(driveGranted());
+}
+
+async function driveApi(url, opts) {
+  opts = opts || {};
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const t = await driveEnsureToken();
+    const headers = Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t.access_token });
+    const r = await fetch(url, Object.assign({}, opts, { headers }));
+    if (r.ok) return r;
+    if (r.status === 401 && attempt === 0) { driveToken = null; continue; }
+    let detail = '';
+    try {
+      const body = await r.clone().json();
+      detail = (body.error && (body.error.message || body.error.error_description)) || '';
+    } catch(e) {}
+    console.error('[ShiftWork] Drive ' + r.status + ' on ' + url.split('?')[0] + ': ' + (detail || '(no detail)'));
+    // A scope-related 403 means the stored grant is missing drive.file: force a fresh consent screen.
+    if (r.status === 403 && attempt === 0 && /insufficient|scope|permission/i.test(detail)) {
+      driveToken = null;
+      try { localStorage.removeItem('sw2_drive_granted'); } catch(e) {}
+      continue;
+    }
+    throw new Error(detail ? 'Drive: ' + detail : 'Drive error ' + r.status);
+  }
+  throw new Error('Drive authorisation failed. Try Sign out, then sign in again.');
+}
+
+async function driveGetFolder() {
+  if (driveFolderId) return driveFolderId;
+  const q = encodeURIComponent("name='" + DRIVE_FOLDER + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const r = await driveApi('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id)&pageSize=1');
+  const d = await r.json();
+  if (d.files && d.files.length) { driveFolderId = d.files[0].id; return driveFolderId; }
+  const c = await driveApi('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FOLDER, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  driveFolderId = (await c.json()).id;
+  return driveFolderId;
+}
+
+async function driveSignIn() {
+  if (!driveEnabled()) return;
+  driveMsg('Signing in…');
+  try {
+    await driveRequestToken(driveGranted());
+    try {
+      const r = await driveApi('https://www.googleapis.com/oauth2/v3/userinfo');
+      driveUser = (await r.json()).email || '';
+    } catch(e) { driveUser = ''; }
+    driveMsg('');
+    await driveLoadList();
+  } catch(e) {
+    driveMsg(e.message, true);
+  }
+  driveRefreshUI();
+}
+
+function driveSignOut() {
+  if (driveToken && window.google && google.accounts && google.accounts.oauth2) {
+    try { google.accounts.oauth2.revoke(driveToken.access_token, () => {}); } catch(e) {}
+  }
+  driveToken = null; driveUser = ''; driveFolderId = null; driveCurrentFile = null;
+  try { localStorage.removeItem('sw2_drive_granted'); } catch(e) {}
+  driveMsg('');
+  driveRefreshUI();
+}
+
+function driveSignedIn() { return !!(driveToken && Date.now() < driveToken.expires_at); }
+
+async function driveLoadList() {
+  const folder = await driveGetFolder();
+  const q = encodeURIComponent("'" + folder + "' in parents and trashed=false");
+  const order = encodeURIComponent('modifiedTime desc');
+  const r = await driveApi('https://www.googleapis.com/drive/v3/files?q=' + q +
+    '&fields=' + encodeURIComponent('files(id,name,modifiedTime)') + '&orderBy=' + order + '&pageSize=200');
+  const files = (await r.json()).files || [];
+  driveRenderList(files);
+}
+
+function driveRenderList(files) {
+  const box = document.getElementById('drive-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!files.length) {
+    box.innerHTML = '<div class="drive-empty">No saved diagrams yet.</div>';
+    return;
+  }
+  files.forEach(f => {
+    const name = f.name.endsWith(DRIVE_EXT) ? f.name.slice(0, -DRIVE_EXT.length) : f.name;
+    const row = document.createElement('div');
+    row.className = 'drive-item' + (driveCurrentFile && driveCurrentFile.id === f.id ? ' current' : '');
+    const d = new Date(f.modifiedTime);
+    const label = document.createElement('div');
+    label.className = 'drive-name';
+    label.textContent = name;
+    const date = document.createElement('div');
+    date.className = 'drive-date';
+    date.textContent = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const del = document.createElement('button');
+    del.className = 'drive-del';
+    del.title = 'Move to Drive bin';
+    del.textContent = '×';
+    del.onclick = (ev) => { ev.stopPropagation(); driveTrash(f.id, name); };
+    row.onclick = () => driveOpen(f.id, name);
+    row.appendChild(label); row.appendChild(date); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+async function driveOpen(id, name) {
+  driveMsg('Opening…');
+  try {
+    const r = await driveApi('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
+    const data = await r.json();
+    saveUndo();
+    applyGraphData(data);
+    driveCurrentFile = { id, name };
+    document.getElementById('drive-name').value = name;
+    driveMsg('Opened “' + name + '”.');
+    document.getElementById('save-modal').classList.remove('open');
+  } catch(e) {
+    driveMsg('Could not open that diagram.', true);
+  }
+}
+
+async function driveSave(asNew) {
+  const input = document.getElementById('drive-name');
+  let name = (input.value || '').trim();
+  if (!name) name = state.title || 'Untitled diagram';
+  name = name.replace(/[\\/]/g, '-');
+  input.value = name;
+  driveMsg('Saving…');
+  const body = JSON.stringify(currentGraphData(), null, 2);
+  try {
+    if (!asNew && driveCurrentFile) {
+      await driveApi('https://www.googleapis.com/upload/drive/v3/files/' + driveCurrentFile.id + '?uploadType=media',
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body });
+      if (name !== driveCurrentFile.name) {
+        await driveApi('https://www.googleapis.com/drive/v3/files/' + driveCurrentFile.id,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name + DRIVE_EXT }) });
+        driveCurrentFile.name = name;
+      }
+    } else {
+      const folder = await driveGetFolder();
+      const boundary = 'swb' + Math.random().toString(36).slice(2);
+      const meta = { name: name + DRIVE_EXT, parents: [folder], mimeType: 'application/json' };
+      const multipart =
+        '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n' +
+        '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + body + '\r\n' +
+        '--' + boundary + '--';
+      const r = await driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+        body: multipart
+      });
+      const f = await r.json();
+      driveCurrentFile = { id: f.id, name };
+    }
+    driveMsg('Saved to Drive at ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + '.');
+    await driveLoadList();
+  } catch(e) {
+    driveMsg('Could not save. Check your connection and try again.', true);
+  }
+}
+
+async function driveTrash(id, name) {
+  if (!confirm('Move “' + name + '” to your Drive bin?')) return;
+  driveMsg('Deleting…');
+  try {
+    await driveApi('https://www.googleapis.com/drive/v3/files/' + id,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+    if (driveCurrentFile && driveCurrentFile.id === id) driveCurrentFile = null;
+    driveMsg('Moved to your Drive bin.');
+    await driveLoadList();
+  } catch(e) {
+    driveMsg('Could not delete that diagram.', true);
+  }
+}
+
+function driveRefreshUI() {
+  const signedIn = driveSignedIn();
+
+  // Header button, which exists whether or not the modal is open.
+  const hBtn = document.getElementById('header-auth-btn');
+  const hUser = document.getElementById('header-user');
+  if (hBtn) {
+    if (!driveEnabled()) {
+      hBtn.style.display = 'none';
+      if (hUser) hUser.textContent = '';
+    } else {
+      hBtn.style.display = '';
+      hBtn.textContent = signedIn ? 'Sign out' : 'Sign in';
+      hBtn.onclick = signedIn ? driveSignOut : driveSignIn;
+      if (hUser) hUser.textContent = signedIn ? driveUser : '';
+    }
+  }
+
+  const box = document.getElementById('drive-box');
+  if (!box) return;
+  if (!driveEnabled()) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  document.getElementById('drive-signed-in').style.display = signedIn ? '' : 'none';
+  document.getElementById('drive-who').textContent = signedIn ? driveUser : 'Save diagrams to your own Google Drive';
+  const btn = document.getElementById('drive-auth-btn');
+  btn.textContent = signedIn ? 'Sign out' : 'Sign in';
+  btn.onclick = signedIn ? driveSignOut : driveSignIn;
+  const saveBtn = document.getElementById('drive-save-btn');
+  if (saveBtn) saveBtn.textContent = driveCurrentFile ? 'Save' : 'Save to Drive';
+  if (signedIn) {
+    const input = document.getElementById('drive-name');
+    if (!input.value) input.value = driveCurrentFile ? driveCurrentFile.name : (state.title || '');
+  }
+}
+
+// Restore a previous grant silently so returning students land signed in.
+window.addEventListener('load', () => {
+  if (!driveEnabled() || !driveGranted()) return;
+  setTimeout(() => {
+    driveRequestToken(true)
+      .then(async () => {
+        try {
+          const r = await driveApi('https://www.googleapis.com/oauth2/v3/userinfo');
+          driveUser = (await r.json()).email || '';
+        } catch(e) {}
+        driveRefreshUI();
+      })
+      .catch(() => {});
+  }, 600);
+});
+
+// ─── AUTOSAVE ────────────────────────────────────────────────
+// The open diagram is kept in localStorage so a refresh or closed tab loses
+// nothing. If storage is unavailable we fall back to a leave-page warning.
+const AUTOSAVE_KEY = 'sw2_autosave';
+let autosaveTimer = null, lastAutosave = '', autosaveFailed = false;
+
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(writeAutosave, 400);
+}
+
+function writeAutosave() {
+  const str = JSON.stringify({ graph: currentGraphData(), driveFile: driveCurrentFile });
+  if (str === lastAutosave) return;
+  try { localStorage.setItem(AUTOSAVE_KEY, str); lastAutosave = str; autosaveFailed = false; }
+  catch (e) { autosaveFailed = true; }
+}
+
+function restoreAutosave() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch (e) {}
+  const g = saved && saved.graph;
+  if (!g || !((g.elements && g.elements.length) || (g.curves && g.curves.length) || g.title)) return false;
+  applyGraphData(g);
+  driveCurrentFile = saved.driveFile || null;
+  return true;
+}
+
+window.addEventListener('beforeunload', e => {
+  if (!autosaveFailed || diagramIsEmpty()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+// ─── DOWNLOAD ────────────────────────────────────────────────
+// Version 2 adds the `v` field. Version 1 files (no `v`) still load.
+const SAVE_VERSION = 2;
+
+function currentGraphData() {
+  return {
+    v: SAVE_VERSION,
+    title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
+    curves: state.curves, elements: state.elements,
+    xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
+    yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
+  };
+}
+
+// Upgrades any saved diagram (v1 save codes, v1 Drive files) to the current
+// format. Later phases add their conversions here.
+function migrateGraphData(data) {
+  data = JSON.parse(JSON.stringify(data || {}));
+  data.elements = (data.elements || []).filter(e => e && e.type);
+  data.v = SAVE_VERSION;
+  return data;
+}
+
+function applyGraphData(data) {
+  data = migrateGraphData(data);
+  state.elements = data.elements || [];
+  state.curves = data.curves || [];
+  state.title = data.title || '';
+  state.yLabel = data.yLabel || 'Price ($/unit)';
+  state.xLabel = data.xLabel || 'Quantity (units/week)';
+  state.xLabelDx = data.xLabelDx || 0; state.xLabelDy = data.xLabelDy || 0;
+  state.yLabelDx = data.yLabelDx || 0; state.yLabelDy = data.yLabelDy || 0;
+  const maxId = state.elements.reduce((m, e) => Math.max(m, e.id || 0), 0);
+  nextId = maxId + 1;
+  document.getElementById('graph-title').value = state.title;
+  document.getElementById('y-label').value = state.yLabel;
+  document.getElementById('x-label').value = state.xLabel;
+  state.selectedId = null;
+  renderCurveList(); renderProps(); redraw();
+}
+
+function openSaveModal() {
+  document.getElementById('save-code').value = btoa(unescape(encodeURIComponent(JSON.stringify(currentGraphData()))));
+  document.getElementById('save-modal').classList.add('open');
+  driveRefreshUI();
+}
+
+function copySaveCode(btn) {
+  const code = document.getElementById('save-code').value;
+  navigator.clipboard.writeText(code).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function loadFromSaveModal() {
+  const str = document.getElementById('save-code').value.trim();
+  try {
+    saveUndo();
+    applyGraphData(JSON.parse(decodeURIComponent(escape(atob(str)))));
+    driveCurrentFile = null;
+    document.getElementById('save-modal').classList.remove('open');
+  } catch(e) {
+    alert('Could not load: please paste the complete save code without any changes.');
+  }
+}
+
+function downloadJPG(exportScale) {
+  exportScale = exportScale || SCALE;
+  // Hide selection handles for the export only; the selection is restored after.
+  const keepSelected = state.selectedId;
+  state.selectedId = null;
+  const sv = viewScale, sox = viewOffsetX, soy = viewOffsetY;
+  const origScale = SCALE;
+  viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
+  SCALE = exportScale;
+
+  // Collect legend items: named curves + labelled regions
+  const legendItems = [
+    ...state.curves.map(c => ({ name: c.name, color: c.color, type: 'line' })),
+    ...state.elements.filter(e => e.type === 'region' && e.label)
+      .map(e => ({ name: e.label, color: e.fillColor || COLORS[0], type: 'region' })),
+  ];
+
+  // Calculate legend height (in logical coords)
+  const itemW = 140, swatchW = 28, pad = 16, rowH = 24;
+  const cols = Math.max(1, Math.floor((W - pad * 2) / itemW));
+  const rows = legendItems.length > 0 ? Math.ceil(legendItems.length / cols) : 0;
+  const legendH = rows > 0 ? rows * rowH + pad * 2 + 8 : 0;
+
+  // Resize canvas for export
+  const origW = canvas.width, origHh = canvas.height;
+  canvas.width = W * exportScale;
+  canvas.height = (H + legendH) * exportScale;
+
+  redraw();
+
+  // Draw legend at export scale
+  ctx.setTransform(exportScale, 0, 0, exportScale, 0, 0);
+
+  if (legendH > 0) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, H, W, legendH);
+  }
+
+  if (legendItems.length > 0) {
+    ctx.save();
+    ctx.font = '500 12px "IBM Plex Sans", sans-serif';
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(MARGIN.left, H + 6); ctx.lineTo(W - MARGIN.right, H + 6); ctx.stroke();
+
+    legendItems.forEach((item, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = pad + col * itemW;
+      const y = H + pad + 8 + row * rowH + rowH / 2;
+
+      if (item.type === 'line') {
+        ctx.strokeStyle = item.color; ctx.lineWidth = 2; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + swatchW, y); ctx.stroke();
+      } else {
+        ctx.fillStyle = hexToRgba(item.color, 0.5);
+        ctx.fillRect(x, y - 7, swatchW, 14);
+        ctx.strokeStyle = item.color; ctx.lineWidth = 1;
+        ctx.strokeRect(x, y - 7, swatchW, 14);
+      }
+      ctx.fillStyle = '#1a1918'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(item.name, x + swatchW + 6, y);
+    });
+    ctx.restore();
+  }
+
+  // Export
+  const link = document.createElement('a');
+  const title = (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const suffix = exportScale > 1 ? '-hires' : '';
+  link.download = title + suffix + '.jpg';
+  link.href = canvas.toDataURL('image/jpeg', 0.97);
+  link.click();
+
+  // Restore canvas and state
+  SCALE = origScale;
+  canvas.width = origW;
+  canvas.height = origHh;
+  viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
+  state.selectedId = keepSelected;
+  redraw();
+}
+
+// ─── START ───────────────────────────────────────────────────
+init();
+</script>
+<script data-goatcounter="https://samsmasm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
