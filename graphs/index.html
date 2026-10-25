@@ -3869,21 +3869,32 @@ function duplicateSelected() {
 const SHIFT_BY = 0.15;
 const SHIFT_GAP = 6; // px between the shift arrow's ends and the two curves
 function shiftSelected(dir) {
-  const el = elById(state.selectedId);
+  let el = elById(state.selectedId);
   if (!el || (el.type !== 'line' && el.type !== 'curve')) return;
   saveUndo();
-  const copy = copyOf(el, SHIFT_BY * dir, 0);
+  // Shifting the same curve again goes one step further: if an earlier shift
+  // already put a copy here, shift that copy instead (D₁ → D₂, then D₂ → D₃).
+  let copy;
+  for (let i = 0; i < 20; i++) {
+    copy = copyOf(el, SHIFT_BY * dir, 0);
+    const twin = state.elements.find(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
+    if (!twin) break;
+    el = twin;
+  }
+  clipToAxes(copy);
   numberCopy(el, copy);
   const newDots = [];
   state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
-  // Arrow between the two, away from the middle where equilibria usually are,
-  // moved up or down the curve if it would overlap an arrow already there.
-  const t = shiftArrowT(el, copy);
-  const a = fromCanvas(pointAt(el, t).x, pointAt(el, t).y), b = fromCanvas(pointAt(copy, t).x, pointAt(copy, t).y);
-  const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
-  arrow.p1On = { id: el.id, t }; arrow.p2On = { id: copy.id, t };
-  arrow.gap = SHIFT_GAP;
-  state.elements.push(arrow);
+  // Arrow between the two (level, since the shift is sideways).
+  const ends = shiftArrowEnds(el, copy, SHIFT_BY * dir * PLOT_W);
+  if (ends) {
+    const a = fromCanvas(ends[0].x, ends[0].y), b = fromCanvas(ends[1].x, ends[1].y);
+    const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
+    arrow.p1On = { id: el.id, t: projectOnto(el, ends[0].x, ends[0].y).t };
+    arrow.p2On = { id: copy.id, t: projectOnto(copy, ends[1].x, ends[1].y).t };
+    arrow.gap = SHIFT_GAP;
+    state.elements.push(arrow);
+  }
   state.elements.filter(d => d.type === 'dot' && d.on && d.on.includes(el.id)).forEach(d => {
     const nd = copyOf(d, 0, 0);
     nd.on = d.on.map(id => id === el.id ? copy.id : id);
@@ -3898,20 +3909,83 @@ function shiftSelected(dir) {
   renderLegendList(); renderProps(); redraw();
 }
 
-// Where along the curve (t) the shift arrow goes: 0.8 unless an arrow is
-// already there, then the nearest free spot above or below it.
-function shiftArrowT(from, to) {
-  const arrows = state.elements.filter(e => e.type === 'arrow' || e.type === 'dbarrow')
-    .map(e => [toCanvas(e.x1n, e.y1n), toCanvas(e.x2n, e.y2n)]);
-  const clear = t => {
-    const a = pointAt(from, t), b = pointAt(to, t);
-    return a && b && arrows.every(([c, d]) => segDist(a, b, c, d) > 12);
+// The shift arrow's two ends (canvas px), level with each other. It carries
+// on from the height of an arrow that ends on `from` (so a run of shifts
+// reads D₁ → D₂ → D₃), or starts 0.8 along the curve; it moves up or down
+// only if it would run into an arrow already drawn.
+function shiftArrowEnds(from, to, dx) {
+  const arrows = state.elements.filter(e => e.type === 'arrow' || e.type === 'dbarrow').map(drawnSegment);
+  const into = state.elements.find(e => e.type === 'arrow' && e.p2On && e.p2On.id === from.id);
+  const base = into ? toCanvas(into.x2n, into.y2n) : pointAt(from, 0.8);
+  if (!base) return null;
+  const at = y => {
+    const a = levelPointOn(from, { x: base.x, y }, true, base);
+    const b = a && levelPointOn(to, a, true, { x: a.x + dx, y });
+    if (!a || !b || Math.abs(b.x - a.x) < 3 * SHIFT_GAP) return null;
+    const seg = trimSegment(a, b, SHIFT_GAP);
+    return arrows.every(([c, d]) => segDist(seg[0], seg[1], c, d) >= 8) ? [a, b] : null;
   };
-  for (const dt of [0, -0.08, 0.08, -0.16, 0.16, -0.24, -0.32, -0.4]) {
-    const t = 0.8 + dt;
-    if (t > 0 && t < 1 && clear(t)) return t;
+  for (const k of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]) {
+    const y = base.y + k * 28;
+    if (y < MARGIN.top || y > H - MARGIN.bottom) continue;
+    const ends = at(y);
+    if (ends) return ends;
   }
-  return 0.8;
+  return null;
+}
+// An arrow as drawn: shortened by its `gap` at ends attached to a curve.
+function drawnSegment(el) {
+  const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+  if (!el.gap) return [a, b];
+  const [ta, tb] = trimSegment(a, b, el.gap);
+  return [el.p1On ? ta : a, el.p2On ? tb : b];
+}
+function trimSegment(a, b, gap) {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len <= 4 * gap) return [a, b];
+  const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+  return [{ x: a.x + ux * gap, y: a.y + uy * gap }, { x: b.x - ux * gap, y: b.y - uy * gap }];
+}
+
+// Does `a` lie along `b` (an earlier copy in the same place)?
+function sameShape(a, b) {
+  // Sample along it: an end may lie past an axis, where `b` was cut off.
+  const pts = Array.from({ length: 11 }, (_, i) => pointAt(a, i / 10)).filter(Boolean);
+  const inside = pts.filter(p => p.x >= MARGIN.left && p.y <= H - MARGIN.bottom);
+  return inside.length >= 2 && inside.every(p => projectOnto(b, p.x, p.y).dist < 2);
+}
+
+// A shifted line or curve that now runs past the y-axis (or below the
+// x-axis) is cut off where it meets the axis.
+function clipToAxes(el) {
+  const out = p => p.xn < -1e-6 || p.yn > 1 + 1e-6;
+  // Where the segment p→q (p inside, q outside) meets the axis.
+  const cut = (p, q) => {
+    let f = 1;
+    if (q.xn < 0) f = Math.min(f, p.xn / (p.xn - q.xn));
+    if (q.yn > 1) f = Math.min(f, (1 - p.yn) / (q.yn - p.yn));
+    return { xn: Math.max(0, p.xn + (q.xn - p.xn) * f), yn: Math.min(1, p.yn + (q.yn - p.yn) * f) };
+  };
+  if (el.type === 'line') {
+    const p = { xn: el.x1n, yn: el.y1n }, q = { xn: el.x2n, yn: el.y2n };
+    if (out(p) === out(q)) return;
+    const c = out(q) ? cut(p, q) : cut(q, p);
+    if (out(q)) { el.x2n = c.xn; el.y2n = c.yn; } else { el.x1n = c.xn; el.y1n = c.yn; }
+    return;
+  }
+  if (el.type !== 'curve' || !el.points.some(out)) return;
+  // Walk the curve as drawn, keeping the part inside and the two crossings.
+  const poly = polyOf(el).map(c => fromCanvas(c.x, c.y));
+  let first = -1, last = -1;
+  poly.forEach((p, i) => { if (!out(p)) { if (first < 0) first = i; last = i; } });
+  if (first < 0) return;
+  const start = first > 0 ? cut(poly[first], poly[first - 1]) : null;
+  const end = last < poly.length - 1 ? cut(poly[last], poly[last + 1]) : null;
+  const near = (a, b) => Math.hypot(a.xn - b.xn, a.yn - b.yn) < 0.02;
+  let keep = el.points.filter(p => !out(p));
+  if (start) keep = [start, ...keep.filter(p => !near(p, start))];
+  if (end) keep = [...keep.filter(p => !near(p, end)), end];
+  if (keep.length >= 2) el.points = keep;
 }
 function segDist(a, b, c, d) {
   if (segSegIntersect(a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y)) return 0;

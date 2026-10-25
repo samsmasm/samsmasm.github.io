@@ -752,15 +752,40 @@ test('shift arrow leaves a small gap at each curve, and straightens while still 
   assert(Math.abs(b.y1n - b.y2n) < 1e-3, 'snapped back after redraw');
 });
 
-test('a second shift arrow moves along the curve instead of overlapping the first', async (page) => {
+test('shifting the same curve twice goes a step further, with the arrows in one line', async (page) => {
   await ev(page, `loadTemplate('sd'); const d = state.elements.find(e => e.label === 'D');
     state.selectedId = d.id; shiftSelected(1); state.selectedId = d.id; shiftSelected(1)`);
-  const ts = await ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => e.p1On.t)`);
-  eq(ts.length, 2, 'arrows');
-  assert(Math.abs(ts[0] - ts[1]) > 0.05, 'arrows at the same spot: ' + ts);
-  const apart = await ev(page, `(() => { const [a, b] = state.elements.filter(e => e.type === 'arrow');
-    return segDist(toCanvas(a.x1n, a.y1n), toCanvas(a.x2n, a.y2n), toCanvas(b.x1n, b.y1n), toCanvas(b.x2n, b.y2n)); })()`);
-  assert(apart > 12, 'arrows still overlap: ' + apart);
+  const ds = await ev(page, `state.elements.filter(e => /^D/.test(e.label || '')).map(e => [e.label, e.type === 'curve' ? e.points[0].xn : e.x1n])`);
+  eq(ds.map(d => d[0]).sort(), ['D₁', 'D₂', 'D₃'], 'labels');
+  const x = Object.fromEntries(ds);
+  assert(x['D₃'] > x['D₂'] + 0.1 && x['D₂'] > x['D₁'] + 0.1, 'not a step further: ' + JSON.stringify(ds));
+  const [a, b] = await ev(page, `state.elements.filter(e => e.type === 'arrow')`);
+  assert(Math.abs(a.y1n - b.y1n) < 1e-3 && Math.abs(a.y1n - a.y2n) < 1e-3, 'arrows not in one level line');
+  eq(b.p1On.id, a.p2On.id, 'second arrow does not start from D₂');
+});
+
+test('a shift arrow moves up or down only when it would run into another arrow', async (page) => {
+  // An arrow drawn by hand exactly where the shift arrow would go.
+  await ev(page, `loadTemplate('sd'); const d = state.elements.find(e => e.label === 'D');
+    const p = fromCanvas(pointAt(d, 0.8).x, pointAt(d, 0.8).y);
+    state.elements.push(mkArrow(p.xn - 0.02, p.yn, p.xn + 0.1, p.yn, '#1a1918', 1.5, '', ''));
+    state.selectedId = d.id; shiftSelected(1)`);
+  const gap = await ev(page, `(() => { const [hand, shift] = state.elements.filter(e => e.type === 'arrow');
+    return [Math.abs(hand.y1n - shift.y1n) * PLOT_H, segDist(...drawnSegment(hand), ...drawnSegment(shift))]; })()`);
+  assert(gap[0] > 10 && gap[1] >= 8, 'shift arrow not moved clear: ' + gap);
+});
+
+test('a curve shifted past the y-axis is cut at the axis', async (page) => {
+  await ev(page, `loadTemplate('sd'); const s = state.elements.find(e => e.label === 'S');
+    state.selectedId = s.id; shiftSelected(-1); state.selectedId = s.id; shiftSelected(-1)`);
+  const pts = await ev(page, `(() => { const e = state.elements.find(e => e.label === 'S₃');
+    return e.type === 'curve' ? e.points : [{ xn: e.x1n, yn: e.y1n }, { xn: e.x2n, yn: e.y2n }]; })()`);
+  assert(pts.every(p => p.xn >= -1e-6), 'runs past the y-axis: ' + JSON.stringify(pts));
+  assert(pts.some(p => Math.abs(p.xn) < 1e-6), 'not cut at the axis: ' + JSON.stringify(pts));
+  // As drawn, too.
+  eq(await ev(page, `polyOf(state.elements.find(e => e.label === 'S₃')).every(p => p.x >= MARGIN.left - 0.5)`), true, 'drawn past the axis');
+  // And S₃ is a step beyond the cut S₂, not on top of it.
+  eq(await ev(page, `sameShape(state.elements.find(e => e.label === 'S₃'), state.elements.find(e => e.label === 'S₂'))`), false, 'S₃ on top of S₂');
 });
 
 test('new axis labels move left (P) or down (Q) clear of existing ones', async (page) => {
