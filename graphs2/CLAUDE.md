@@ -149,11 +149,11 @@ One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/
 
 `TEMPLATES[key] = { group, name, sub, build }`. `build()` runs at load time and returns `{ title, yLabel, xLabel, elements }`, so builders can use any helper (they also run for thumbnails). `loadTemplate(key)` → `setDiagram(t)` (which `cloneElements()` to remap ids and links) and is undoable with a toast. Groups: Micro, Macro, Global (`TEMPLATE_GROUPS`).
 
-22 templates: blank, sd, tax, subsidy, ceiling, floor, ext_neg, ext_pos, merit, demerit, monopoly, perfcomp, ppc (Micro); adas, inflgap, deflgap, keyn, phillips, lorenz (Macro); tariff, quota, exrate (Global).
+23 templates: blank, sd, tax, subsidy, ceiling, floor, ext_neg, ext_pos, merit, demerit, monopoly, perfcomp, ppc (Micro); ad_sras (AD/AS), adas (AD/LRAS/SRAS), inflgap, deflgap, keyn, phillips, lorenz (Macro); tariff, quota, exrate (Global).
 
 Builder helpers: `mkEq(a, b, pLabel, qLabel)` for connected equilibria; `freePoint()` for points that are not crossings (Pp, monopoly Pm and AC); `footLabel(line, text)` for Yfe / NRU attached under a vertical line; `hLine`, `rectRegion`, `triRegion`; geometry `lineCross`, `lineXAt`, `lineYAt`, `curveYAt`, `curveLowest` so shaded areas and tangencies are exact. Shaded areas are plain regions, **not** connected: they stay put if a curve is moved.
 
-Picker: the sidebar keeps Blank and S&D, plus "All templates", which opens `#template-modal` (`openTemplatePicker`). Thumbnails are real renders via `templateThumb(key)` (temporarily swaps the diagram, `renderExport(0.5)`, restores; cached in `thumbCache`). Escape or clicking outside closes any dialog.
+Picker: the sidebar has Sam's three standard templates (S&D, AD/AS, AD/LRAS/SRAS) plus "All templates" (Blank is in there, and Clear diagram gives blank axes too), which opens `#template-modal` (`openTemplatePicker`). Thumbnails are real renders via `templateThumb(key)` (temporarily swaps the diagram, `renderExport(0.5)`, restores; cached in `thumbCache`). Escape or clicking outside closes any dialog.
 
 Points have `dropP` / `dropQ` to switch off either drop line (early betas had one `drops` switch; `showDropP/Q` read both).
 
