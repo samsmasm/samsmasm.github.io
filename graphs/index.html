@@ -283,18 +283,20 @@
 
   .canvas-wrap {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: auto;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
     background: #ffffff;
   }
 
-  /* An open white surface; the faint outline is what gets exported. */
+  /* Fills the space between the panels. The faint dashed outline (drawn on
+     the canvas, so it zooms with the diagram) is what gets exported. */
   #graph-canvas {
+    position: absolute;
+    left: 0; top: 0;
     touch-action: none;
     background: #ffffff;
-    outline: 1px dashed #d6d2c8;
     cursor: crosshair;
     display: block;
   }
@@ -743,7 +745,14 @@ const COLORS = [
 ];
 const MARGIN = { top: 50, right: 60, bottom: 60, left: 70 };
 const W = 680, H = 560;
-let SCALE = 2; // render scale — canvas pixels = W*SCALE × H*SCALE, logical coords stay W×H
+const SCALE = 2; // default export scale: picture pixels = W*SCALE × H*SCALE, logical coords stay W×H
+// The on-screen canvas fills the whole space between the panels. The W×H
+// export area (the "page") sits centred in it at `stageFit` CSS px per
+// logical unit, `stageX/Y` CSS px from its top-left. `baseK/X/Y` map logical
+// coords to canvas pixels before zoom/pan (set by fitCanvas, or renderExport).
+let stageFit = 1, stageX = 0, stageY = 0;
+let baseK = SCALE, baseX = 0, baseY = 0;
+const STAGE_PAD = 16;
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;
 // One style for every guide line: equilibrium drop lines, template guides and
@@ -868,27 +877,34 @@ function redo() {
 }
 
 const canvas = document.getElementById('graph-canvas');
-canvas.width = W * SCALE;
-canvas.height = H * SCALE;
 const ctx = canvas.getContext('2d');
 
-// Fit canvas to available space while preserving aspect ratio
+// The canvas fills the space between the panels; the export area is fitted
+// inside it (with a small gap so its outline shows) and zooms with the diagram.
 const canvasWrap = document.querySelector('.canvas-wrap');
 function fitCanvas() {
   const ww = canvasWrap.clientWidth;
   const wh = canvasWrap.clientHeight;
-  const aspect = W / H;
-  let cw, ch;
-  if (ww / wh > aspect) {
-    ch = wh;
-    cw = ch * aspect;
-  } else {
-    cw = ww;
-    ch = cw / aspect;
-  }
-  canvas.style.width = Math.floor(cw) + 'px';
-  canvas.style.height = Math.floor(ch) + 'px';
+  if (!ww || !wh) return;
+  const dpr = Math.max(2, window.devicePixelRatio || 1);
+  stageFit = Math.max(0.1, Math.min((ww - 2 * STAGE_PAD) / W, (wh - 2 * STAGE_PAD) / H));
+  stageX = (ww - W * stageFit) / 2;
+  stageY = (wh - H * stageFit) / 2;
+  canvas.style.width = ww + 'px';
+  canvas.style.height = wh + 'px';
+  canvas.width = Math.round(ww * dpr);
+  canvas.height = Math.round(wh * dpr);
+  baseK = dpr * stageFit; baseX = dpr * stageX; baseY = dpr * stageY;
+  redraw();
 }
+
+// Logical coords (before zoom/pan) ↔ page coords.
+function rawToClient(rawX, rawY) {
+  const r = canvas.getBoundingClientRect();
+  return { x: r.left + stageX + rawX * stageFit, y: r.top + stageY + rawY * stageFit };
+}
+// Diagram coords (after zoom/pan) → page coords.
+function logicalToClient(x, y) { return rawToClient(x * viewScale + viewOffsetX, y * viewScale + viewOffsetY); }
 new ResizeObserver(fitCanvas).observe(canvasWrap);
 
 // ─── INIT ────────────────────────────────────────────────────
@@ -1425,8 +1441,8 @@ function isLinearTool(t) { return LINEAR_TYPES.includes(t); }
 // diagram coords (after undoing it).
 function eventToLogical(e) {
   const r = canvas.getBoundingClientRect();
-  const rawCx = (e.clientX - r.left) * (W / r.width);
-  const rawCy = (e.clientY - r.top) * (H / r.height);
+  const rawCx = (e.clientX - r.left - stageX) / stageFit;
+  const rawCy = (e.clientY - r.top - stageY) / stageFit;
   return { rawCx, rawCy, cx: (rawCx - viewOffsetX) / viewScale, cy: (rawCy - viewOffsetY) / viewScale };
 }
 
@@ -1503,9 +1519,7 @@ function hitTestAxisLabel(cx, cy) {
 function showInlineLabelEdit(el, opts = {}) {
   const key = opts.key || (el.type === 'text' ? 'text' : 'label');
   const pos = opts.pos || getFullLabelPos(el);
-  const rect = canvas.getBoundingClientRect();
-  const sx = rect.left + (pos.x * viewScale + viewOffsetX) * (rect.width / W);
-  const sy = rect.top  + (pos.y * viewScale + viewOffsetY) * (rect.height / H);
+  const { x: sx, y: sy } = logicalToClient(pos.x, pos.y);
   const inp = document.createElement('input');
   inp.type = 'text';
   inp.className = 'inline-edit';
@@ -1720,7 +1734,7 @@ function styleDiagram(what, value) {
 }
 
 function applyViewXform() {
-  ctx.setTransform(SCALE * viewScale, 0, 0, SCALE * viewScale, SCALE * viewOffsetX, SCALE * viewOffsetY);
+  ctx.setTransform(baseK * viewScale, 0, 0, baseK * viewScale, baseX + baseK * viewOffsetX, baseY + baseK * viewOffsetY);
 }
 
 function resetView() {
@@ -2321,9 +2335,10 @@ function redraw() {
   drawBackground();
   drawAxes();
   drawElements();
+  drawExportFrame();
   drawSelectionHandles();
   // Reset transform to base scale after drawing
-  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  ctx.setTransform(baseK, 0, 0, baseK, baseX, baseY);
   scheduleAutosave();
 }
 
@@ -2331,6 +2346,19 @@ function drawBackground() {
   if (exporting && exportTransparent) return;
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, W, H);
+}
+
+// Faint dashed outline of what gets exported. Drawn in diagram coords so it
+// grows and shrinks with zoom, but always 1 screen px thick.
+function drawExportFrame() {
+  if (exporting) return;
+  const px = 1 / (stageFit * viewScale);
+  ctx.save();
+  ctx.strokeStyle = '#d6d2c8';
+  ctx.lineWidth = px;
+  ctx.setLineDash([4 * px, 4 * px]);
+  ctx.strokeRect(0, 0, W, H);
+  ctx.restore();
 }
 
 function drawAxes() {
@@ -3357,7 +3385,7 @@ function onWheel(e) {
   e.preventDefault();
   const trackpadScroll = !e.ctrlKey && (e.deltaX !== 0 || (e.deltaMode === 0 && Math.abs(e.deltaY) < 40));
   if (viewScale > 1 && trackpadScroll) {
-    const r = canvas.getBoundingClientRect(), k = W / r.width;
+    const k = 1 / stageFit;
     viewOffsetX -= e.deltaX * k; viewOffsetY -= e.deltaY * k;
     redraw();
     return;
@@ -4596,9 +4624,9 @@ function renderExport(exportScale, mime, quality) {
   state.selectedId = null;
   exporting = true;
   const sv = viewScale, sox = viewOffsetX, soy = viewOffsetY;
-  const origScale = SCALE;
+  const origBase = [baseK, baseX, baseY];
   viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
-  SCALE = exportScale;
+  baseK = exportScale; baseX = 0; baseY = 0;
 
   const legendItems = state.legend.show ? legendEntries() : [];
 
@@ -4644,7 +4672,7 @@ function renderExport(exportScale, mime, quality) {
   const url = canvas.toDataURL(mime, quality);
 
   // Restore canvas and state
-  SCALE = origScale;
+  [baseK, baseX, baseY] = origBase;
   canvas.width = origW;
   canvas.height = origHh;
   viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;

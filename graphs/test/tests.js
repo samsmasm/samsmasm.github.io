@@ -11,10 +11,7 @@ const test = (name, fn) => tests.push({ name, fn });
 
 // Logical canvas coords (680×560, no zoom) → page coords.
 async function pt(page, x, y) {
-  return page.evaluate((x, y) => {
-    const r = canvas.getBoundingClientRect();
-    return { x: r.left + (x * viewScale + viewOffsetX) * r.width / W, y: r.top + (y * viewScale + viewOffsetY) * r.height / H };
-  }, x, y);
+  return page.evaluate((x, y) => logicalToClient(x, y), x, y);
 }
 // Normalised plot coords → page coords.
 async function ptn(page, xn, yn) {
@@ -467,9 +464,9 @@ test('colour is chosen in one place: new lines take the next unused colour, arro
   eq(await ev(page, `!!document.getElementById('color-row')`), false, 'sidebar colour row still there');
   await ev(page, `loadTemplate('blank'); setTool('line')`);
   const draw = async (x1, y1, x2, y2) => {
-    const r = await page.$eval('#graph-canvas', c => { const b = c.getBoundingClientRect(); return { x: b.left, y: b.top, s: b.width / 680 }; });
-    await page.mouse.move(r.x + x1 * r.s, r.y + y1 * r.s); await page.mouse.down();
-    await page.mouse.move(r.x + x2 * r.s, r.y + y2 * r.s, { steps: 5 }); await page.mouse.up();
+    const a = await pt(page, x1, y1), b = await pt(page, x2, y2);
+    await page.mouse.move(a.x, a.y); await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 5 }); await page.mouse.up();
   };
   await draw(120, 100, 500, 450);
   await draw(120, 450, 500, 100);
@@ -566,9 +563,8 @@ test('a template replaces everything: curves, title, axis labels and legend', as
 
 test('Fill region click mode fills the area bounded by curves, drop lines and axes', async (page) => {
   await ev(page, `loadTemplate('sd'); setFillMode('click'); setTool('region')`);
-  const r = await page.$eval('#graph-canvas', c => { const b = c.getBoundingClientRect(); return { x: b.left, y: b.top, s: b.width / 680 }; });
-  const at = await ev(page, `toCanvas(0.1, 0.3)`); // inside consumer surplus
-  await page.mouse.click(r.x + at.x * r.s, r.y + at.y * r.s);
+  const at = await ptn(page, 0.1, 0.3); // inside consumer surplus
+  await page.mouse.click(at.x, at.y);
   await page.keyboard.press('Escape'); // close the label box
   const reg = await ev(page, `state.elements[0]`);
   eq(reg.type, 'region', 'no region made');
@@ -580,9 +576,10 @@ test('Fill region click mode fills the area bounded by curves, drop lines and ax
   assert(reg.points.length < 30, 'too many corners: ' + reg.points.length);
   // Off the plot, or in an area open to the top/right edge, nothing is filled.
   const n = await ev(page, `state.elements.length`);
-  await page.mouse.click(r.x + 10 * r.s, r.y + 10 * r.s);
-  const open = await ev(page, `toCanvas(0.9, 0.4)`); // right of the crossing, open to the right edge
-  await page.mouse.click(r.x + open.x * r.s, r.y + open.y * r.s);
+  const off = await pt(page, 10, 10);
+  await page.mouse.click(off.x, off.y);
+  const open = await ptn(page, 0.9, 0.4); // right of the crossing, open to the right edge
+  await page.mouse.click(open.x, open.y);
   eq(await ev(page, `state.elements.length`), n, 'filled off the plot or an open area');
 });
 
@@ -699,6 +696,25 @@ test('Google sign-in asks only for Drive access to its own files', async (page) 
   eq(await ev(page, `DRIVE_SCOPES`), 'https://www.googleapis.com/auth/drive.file', 'scopes');
 });
 
+test('canvas fills the space between the panels and the export outline zooms with the diagram', async (page) => {
+  await ev(page, `loadTemplate('sd')`);
+  const fill = await ev(page, `(() => { const w = canvasWrap.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+    return [Math.round(c.width - w.width), Math.round(c.height - w.height)]; })()`);
+  eq(fill, [0, 0], 'canvas does not fill the wrap');
+  const frame = () => ev(page, `(() => { const a = logicalToClient(0, 0), b = logicalToClient(W, H); return b.x - a.x; })()`);
+  const w1 = await frame();
+  await ev(page, `changeZoom(2, W / 2, H / 2)`);
+  assert(Math.abs(await frame() - 2 * w1) < 1, 'outline did not grow with zoom');
+  // A click still lands where the diagram is drawn, zoomed or not.
+  const d = await ptn(page, 0.5, 0.5);
+  const hit = await ev(page, `(() => { const p = eventToLogical({ clientX: ${d.x}, clientY: ${d.y} }), c = toCanvas(0.5, 0.5); return Math.hypot(p.cx - c.x, p.cy - c.y); })()`);
+  assert(hit < 0.01, 'click mapping off by ' + hit);
+  // Export is unchanged: the page only, no outline, no zoom.
+  const size = await ev(page, `new Promise(r => { const i = new Image(); i.onload = () => r([i.width, i.height]); i.src = renderExport(1, 'image/png'); })`);
+  eq(size, [680, 560], 'export size');
+  eq(await ev(page, `viewScale`), 2, 'zoom not restored after export');
+});
+
 test('when zoomed in, dragging empty space moves the view', async (page) => {
   await ev(page, `loadTemplate('blank'); setTool('select'); changeZoom(2, W / 2, H / 2)`);
   const before = await ev(page, `[viewOffsetX, viewOffsetY]`);
@@ -712,8 +728,7 @@ test('when zoomed in, dragging empty space moves the view', async (page) => {
 test('Point tool places a dot or cross; click the button again to switch; on a crossing it links', async (page) => {
   await ev(page, `loadTemplate('sd'); setPointMode('dot')`);
   const click = async (xn, yn) => {
-    const p = await ev(page, `(() => { const c = toCanvas(${xn}, ${yn}), b = canvas.getBoundingClientRect(), s = b.width / W;
-      return { x: b.left + (c.x * viewScale + viewOffsetX) * s, y: b.top + (c.y * viewScale + viewOffsetY) * s }; })()`);
+    const p = await ptn(page, xn, yn);
     await page.mouse.click(p.x, p.y);
   };
   await page.keyboard.press('p');
