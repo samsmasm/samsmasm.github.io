@@ -47,7 +47,7 @@ test('loading a template is undoable, and offers Undo when it replaced work', as
   await ev(page, `loadTemplate('adas')`);
   assert(await ev(page, `document.getElementById('toast').classList.contains('show')`), 'toast not shown');
   await ev(page, `undo()`);
-  eq(await ev(page, `state.curves.map(c => c.name)`), ['D', 'S'], 'undo did not restore S&D legend');
+  eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), ['D', 'S'], 'undo did not restore S&D');
 });
 
 test('template curves are deep-copied (editing one does not change the template)', async (page) => {
@@ -126,23 +126,29 @@ test('title edits are live and undoable in one step', async (page) => {
   eq(await ev(page, `state.title`), '', 'undo did not clear title');
 });
 
-test('legend changes are undoable', async (page) => {
-  await ev(page, `openAddCurve(); document.getElementById('modal-name').value = 'MSC'; confirmAddCurve();`);
-  eq(await ev(page, `state.curves.length`), 1, 'curve not added');
-  await ev(page, `undo()`);
-  eq(await ev(page, `state.curves.length`), 0, 'legend add not undone');
+test('legend is built from labels, off by default, and its changes are undoable', async (page) => {
+  await ev(page, `loadTemplate('ext_neg')`);
+  eq(await ev(page, `state.legend.show`), false, 'legend should start off');
+  eq(await ev(page, `[...document.querySelectorAll('#curve-list .curve-name')].map(e => e.textContent)`), ['MPB=D', 'MPC=S', 'MSC'], 'legend entries');
+  await page.click('#legend-show');
+  eq(await ev(page, `state.legend.show`), true, 'legend not switched on');
+  await page.click('#curve-list .curve-item:nth-child(3) input');
+  eq(await ev(page, `legendEntries().map(e => e.label)`), ['MPB=D', 'MPC=S'], 'unticked entry still in legend');
+  await ev(page, `undo(); undo();`);
+  eq(await ev(page, `[state.legend.show, state.legend.hidden.length]`), [false, 0], 'legend changes not undone');
 });
 
 test('autosave restores the diagram after a reload', async (page) => {
   await ev(page, `loadTemplate('ext_neg'); document.getElementById('graph-title').value = 'Smoking'; redraw(); writeAutosave();`);
   await page.reload({ waitUntil: 'load' });
   eq(await ev(page, `state.title`), 'Smoking', 'title not restored');
-  eq(await ev(page, `state.curves.map(c => c.name)`), ['MPB=D', 'MPC=S', 'MSC'], 'legend not restored');
+  eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), ['MPB=D', 'MPC=S', 'MSC'], 'diagram not restored');
 });
 
 test('labels and legend names from a save code are escaped', async (page) => {
-  await ev(page, `window.__pwned = 0; applyGraphData({ curves: [{ name: '<img src=x onerror="window.__pwned=1">', color: '#1a4a8a' }],
-    elements: [mkLine(0.1, 0.1, 0.5, 0.5, '#1a4a8a', 2.5, '', '"><img src=x onerror="window.__pwned=2">')] });
+  await ev(page, `window.__pwned = 0; applyGraphData({ v: 2,
+    elements: [mkLine(0.1, 0.1, 0.5, 0.5, '#1a4a8a', 2.5, '', '"><img src=x onerror="window.__pwned=2">'),
+               mkLine(0.1, 0.5, 0.5, 0.1, '#1a4a8a', 2.5, '', '<img src=x onerror="window.__pwned=1">')] });
     state.selectedId = state.elements[0].id; renderProps();`);
   await new Promise(r => setTimeout(r, 200));
   eq(await ev(page, `window.__pwned`), 0, 'markup executed');
@@ -150,7 +156,7 @@ test('labels and legend names from a save code are escaped', async (page) => {
 });
 
 test('property selects show true values (opacity 25%, custom dash)', async (page) => {
-  await ev(page, `state.elements = [mkRegion([{xn:.1,yn:.1},{xn:.5,yn:.1},{xn:.3,yn:.5}], '#1a4a8a', 'solid')]; state.selectedId = state.elements[0].id; bwMode = false; renderProps();`);
+  await ev(page, `state.elements = [mkRegion([{xn:.1,yn:.1},{xn:.5,yn:.1},{xn:.3,yn:.5}], '#1a4a8a', 'solid')]; state.selectedId = state.elements[0].id; renderProps();`);
   const op = await ev(page, `[...document.querySelectorAll('#props-form select')].pop().selectedOptions[0].textContent`);
   eq(op, '25%', 'opacity shown');
   await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.5, 0.5, '#1a4a8a', 1.5, '5,4', '')]; state.selectedId = state.elements[0].id; renderProps();`);
@@ -181,7 +187,7 @@ test('Label tool uses an inline box (no prompt) and an empty edit leaves nothing
 });
 
 test('export keeps the selection', async (page) => {
-  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements[0].id; downloadJPG(1);`);
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements[0].id; downloadImage('jpg');`);
   eq(await ev(page, `state.selectedId`), await ev(page, `state.elements[0].id`), 'selection lost');
 });
 
@@ -193,6 +199,7 @@ test('v1 save codes still load', async (page) => {
   const code = Buffer.from(encodeURIComponent(JSON.stringify(v1)).replace(/%([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))), 'binary').toString('base64');
   await ev(page, `openSaveModal(); document.getElementById('save-code').value = ${JSON.stringify(code)}; loadFromSaveModal();`);
   eq(await ev(page, `state.title`), 'Old', 'v1 code did not load');
+  eq(await ev(page, `state.legend.show`), true, 'v1 legend list should become a shown legend');
   eq(await ev(page, `currentGraphData().v`), 2, 'not upgraded to v2');
 });
 
@@ -228,11 +235,11 @@ test('feedback includes picture and diagram when ticked, and they open from the 
   const body = await ev(page, `window.__sent[0].body`);
   assert(/^data:image\/jpeg;base64,/.test(body.image || ''), 'image missing');
   const diagram = JSON.parse(body.diagram);
-  eq(diagram.curves.length, 3, 'diagram curves');
+  eq(diagram.elements.filter(e => e.label).length, 3, 'diagram curves');
   // Simulate the inbox's "Open this diagram" handoff.
   await ev(page, `loadTemplate('blank'); localStorage.setItem('sw2_open', ${JSON.stringify(body.diagram)});`);
   await page.reload({ waitUntil: 'load' });
-  eq(await ev(page, `state.curves.length`), 3, 'handoff did not open the diagram');
+  eq(await ev(page, `state.elements.filter(e => e.label).length`), 3, 'handoff did not open the diagram');
   eq(await ev(page, `localStorage.getItem('sw2_open')`), null, 'handoff key not cleared');
 });
 
@@ -396,6 +403,51 @@ test('exported picture has no warning marks', async (page) => {
   assert(await ev(page, `!!derived.get(state.elements[2].id).broken`), 'should be broken');
   await ev(page, `renderExport(1, 'image/png')`);
   eq(await ev(page, `exporting`), false, 'exporting flag left on');
+});
+
+
+// ─── PHASE 4: CONSOLIDATION ──────────────────────────────────
+
+test('regions have one fill setting, and v1 pattern/bwPattern migrate', async (page) => {
+  await ev(page, `applyGraphData({ elements: [
+    { id: 1, type: 'region', points: [{xn:.1,yn:.1},{xn:.5,yn:.1},{xn:.3,yn:.5}], fillColor: '#1a4a8a', pattern: 'solid', bwPattern: 'bw-dots', fillOpacity: 0.25, label: 'CS' },
+    { id: 2, type: 'region', points: [{xn:.1,yn:.6},{xn:.5,yn:.6},{xn:.3,yn:.9}], fillColor: '#1a4a8a', pattern: 'crosshatch', bwPattern: 'bw-hatch45', fillOpacity: 0.25, label: 'PS' }] })`);
+  eq(await ev(page, `state.elements.map(e => [e.fill, 'pattern' in e, 'bwPattern' in e])`), [['dots', false, false], ['crosshatch', false, false]], 'migrated fill');
+  await ev(page, `state.selectedId = 1; renderProps();`);
+  eq(await ev(page, `[...document.querySelectorAll('#props-form select')].length`), 1, 'one fill select (hatch has no strength)');
+});
+
+test('one Export menu: JPG, PNG and copy image', async (page) => {
+  await ev(page, `loadTemplate('sd'); window.__dl = []; HTMLAnchorElement.prototype.click = function () { window.__dl.push([this.download, this.href.split(';')[0]]); };
+    window.__clip = null; window.ClipboardItem = function (o) { this.o = o; }; navigator.clipboard.write = async items => { window.__clip = Object.keys(items[0].o); };`);
+  await page.click('#export-btn');
+  assert(await ev(page, `document.getElementById('export-menu').classList.contains('open')`), 'menu not open');
+  await page.click('#export-menu button:nth-child(2)');
+  await page.click('#export-btn');
+  await page.click('#export-menu button:nth-child(3)');
+  eq(await ev(page, `window.__dl`), [['economics-graph.jpg', 'data:image/jpeg'], ['economics-graph.png', 'data:image/png']], 'downloads');
+  await page.click('#export-btn');
+  await page.click('#export-menu button:nth-child(1)');
+  await new Promise(r => setTimeout(r, 100));
+  eq(await ev(page, `window.__clip`), ['image/png'], 'clipboard');
+  assert(!(await ev(page, `document.getElementById('export-menu').classList.contains('open')`)), 'menu left open');
+});
+
+test('exported picture grows a legend only when switched on', async (page) => {
+  await ev(page, `loadTemplate('sd')`);
+  const size = () => ev(page, `new Promise(r => { const i = new Image(); i.onload = () => r([i.width, i.height]); i.src = renderExport(1, 'image/png'); })`);
+  eq(await size(), [680, 560], 'no legend when off');
+  await ev(page, `setLegendShow(true)`);
+  const [w, h] = await size();
+  assert(w === 680 && h > 560, 'legend not added: ' + h);
+});
+
+test('header has no sign-in button; B/W mode notes that colours need Colour mode', async (page) => {
+  eq(await ev(page, `!!document.getElementById('header-auth-btn')`), false, 'header sign-in still there');
+  eq(await ev(page, `getComputedStyle(document.getElementById('header-user')).display`), 'none', 'status shown when signed out');
+  assert(await ev(page, `bwMode && document.getElementById('bw-color-note').style.display !== 'none'`), 'note hidden in B/W');
+  await ev(page, `toggleBW()`);
+  eq(await ev(page, `document.getElementById('bw-color-note').style.display`), 'none', 'note shown in colour mode');
 });
 
 // ─── RUNNER ──────────────────────────────────────────────────

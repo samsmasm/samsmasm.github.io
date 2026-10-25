@@ -412,6 +412,26 @@
   .fb-details { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
   .fb-details summary { cursor: pointer; }
 
+  /* EXPORT MENU */
+  .export-wrap { position: relative; }
+  .export-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 150;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18); min-width: 190px; padding: 4px;
+  }
+  .export-menu.open { display: block; }
+  header .export-menu button {
+    display: block; width: 100%; text-align: left; background: none; padding: 8px 10px; font-size: 12px; border-radius: 4px;
+  }
+  header .export-menu button:hover { background: var(--tag-bg); }
+  .export-menu button span { display: block; font-weight: 400; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .bw-note { font-size: 11px; line-height: 1.4; color: var(--muted); }
+  .legend-toggle { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; padding: 8px 14px 2px; cursor: pointer; line-height: 1.35; }
+  .legend-toggle input { margin-top: 2px; }
+  .curve-list.off { opacity: 0.5; }
+  .curve-item input { margin: 0; }
+  .legend-empty { font-size: 11px; color: var(--muted); padding: 4px 0; line-height: 1.4; }
+
   /* TOAST */
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
@@ -436,10 +456,15 @@
   <div class="header-actions">
     <button class="ghost" onclick="openFeedback()" title="Report a problem or suggest an idea">Feedback</button>
     <button onclick="openSaveModal()">Save / Load</button>
-    <button onclick="downloadJPG(1)">⬇ JPG</button>
-    <button onclick="downloadJPG(2)">⬇ Hi-res</button>
-    <span id="header-user"></span>
-    <button id="header-auth-btn" class="ghost" onclick="driveSignIn()">Sign in</button>
+    <div class="export-wrap">
+      <button id="export-btn" onclick="toggleExportMenu(event)" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
+      <div class="export-menu" id="export-menu" role="menu">
+        <button role="menuitem" onclick="copyImage()">Copy image<span>paste into Docs or Slides</span></button>
+        <button role="menuitem" onclick="downloadImage('jpg')">Download JPG</button>
+        <button role="menuitem" onclick="downloadImage('png')">Download PNG</button>
+      </div>
+    </div>
+    <button id="header-user" class="ghost" onclick="openSaveModal()" title="Signed in to Google Drive" style="display:none"></button>
   </div>
 </header>
 
@@ -506,6 +531,7 @@
 
     <div class="section-head" style="margin-top:2px">Line color</div>
     <div class="color-row" id="color-row"></div>
+    <div class="bw-note" id="bw-color-note" style="margin:0 14px 10px">Colours show in Colour mode. B/W draws everything in black.</div>
 
     <div class="section-head" style="margin-top:2px">Line style</div>
     <div class="stroke-row">
@@ -523,11 +549,9 @@
       </select>
     </div>
 
-    <div class="section-head" style="margin-top:2px">Legend <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:9px;opacity:0.7">(JPG export)</span></div>
+    <div class="section-head" style="margin-top:2px">Legend</div>
+    <label class="legend-toggle"><input type="checkbox" id="legend-show" onchange="setLegendShow(this.checked)"> Add a legend below the exported picture</label>
     <div class="curve-list" id="curve-list"></div>
-    <div class="add-curve-row">
-      <button class="add-curve-btn" onclick="openAddCurve()">+ Add / rename curve</button>
-    </div>
   </div>
 
   <!-- CANVAS -->
@@ -568,25 +592,6 @@
       <button class="action-btn danger" onclick="clearDiagram()">Clear diagram</button>
     </div>
 
-  </div>
-</div>
-
-<!-- ADD CURVE MODAL -->
-<div class="modal-overlay" id="curve-modal">
-  <div class="modal">
-    <h2>Add curve to legend</h2>
-    <div class="field">
-      <label>Curve name</label>
-      <input type="text" id="modal-name" placeholder="e.g. S₁" maxlength="12">
-    </div>
-    <div class="field">
-      <label>Color</label>
-      <div class="modal-colors" id="modal-colors"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-confirm" onclick="confirmAddCurve()">Add</button>
-    </div>
   </div>
 </div>
 
@@ -695,7 +700,7 @@ let state = {
   yLabel: 'Price ($/unit)',
   xLabel: 'Quantity (units/week)',
   elements: [],   // {type, ...}
-  curves: [],     // legend entries {name, color}
+  legend: { show: false, hidden: [] }, // automatic legend: on/off, unticked element ids
   selectedId: null,
   tool: 'select',
   drawColor: COLORS[0],
@@ -731,7 +736,7 @@ let redoStack = [];
 function snapshot() {
   syncTextInputs();
   return JSON.stringify({
-    elements: state.elements, curves: state.curves,
+    elements: state.elements, legend: state.legend,
     title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
     xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
     yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
@@ -745,7 +750,7 @@ function restoreSnapshot(snap) {
   document.getElementById('y-label').value = state.yLabel;
   document.getElementById('x-label').value = state.xLabel;
   if (state.selectedId && !state.elements.find(e => e.id === state.selectedId)) state.selectedId = null;
-  renderCurveList();
+  renderLegendList();
   renderProps();
   redraw();
 }
@@ -797,7 +802,6 @@ new ResizeObserver(fitCanvas).observe(canvasWrap);
 // ─── INIT ────────────────────────────────────────────────────
 function init() {
   buildColorRow();
-  buildModalColors();
   if (!restoreAutosave()) loadTemplate('blank', { record: false });
   openHandoffDiagram();
   fitCanvas();
@@ -841,22 +845,6 @@ function buildColorRow() {
   });
 }
 
-function buildModalColors() {
-  const row = document.getElementById('modal-colors');
-  row.innerHTML = '';
-  COLORS.forEach((c, i) => {
-    const d = document.createElement('div');
-    d.className = 'modal-col' + (i === 0 ? ' active' : '');
-    d.style.background = c;
-    d.dataset.color = c;
-    d.onclick = () => {
-      row.querySelectorAll('.modal-col').forEach(x => x.classList.remove('active'));
-      d.classList.add('active');
-    };
-    row.appendChild(d);
-  });
-}
-
 // ─── TEMPLATES ───────────────────────────────────────────────
 // Equilibria are connected points (`mkEq`), not hand-placed guide lines, so
 // they stay exact when a curve moves. Approximate positions are only a
@@ -864,14 +852,13 @@ function buildModalColors() {
 const TEMPLATES = {
   blank: {
     title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-    curves: [], elements: []
+    elements: []
   },
   sd: (() => {
     const D = mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D');
     const S = mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S');
     return {
       title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-      curves: [{ name: 'D', color: COLORS[0] }, { name: 'S', color: COLORS[2] }],
       elements: [D, S, mkEq(D, S, 'P', 'Q*', 0.4975, 0.4625)],
     };
   })(),
@@ -882,7 +869,6 @@ const TEMPLATES = {
     const LRAS = mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS');
     return {
       title: '', yLabel: 'Price level', xLabel: 'Real GDP',
-      curves: [{ name: 'AD', color: COLORS[0] }, { name: 'SRAS', color: COLORS[2] }, { name: 'LRAS', color: COLORS[1] }],
       elements: [AD, SRAS, LRAS, mkEq(AD, SRAS, 'PL', 'Yfe', 0.5012, 0.4793)],
     };
   })(),
@@ -900,7 +886,6 @@ const TEMPLATES = {
     yfeText.attach = { id: YFE.id, t: 1, dx: 0, dy: 0.05 * PLOT_H, dx0: 0, dy0: 0.05 * PLOT_H };
     return {
       title: '', yLabel: 'Price level', xLabel: 'Real GDP',
-      curves: [{ name: 'AD', color: COLORS[0] }, { name: 'AS', color: COLORS[2] }],
       elements: [AD, AS, YFE, yfeText, mkEq(AD, AS, 'P₁', 'Y₁', 0.20, 0.70)],
     };
   })(),
@@ -911,7 +896,6 @@ const TEMPLATES = {
     const MSC = mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC');
     return {
       title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-      curves: [{ name: 'MPB=D', color: COLORS[0] }, { name: 'MPC=S', color: COLORS[2] }, { name: 'MSC', color: COLORS[1] }],
       elements: [D, S, MSC, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(D, MSC, 'Ps', 'Qs', 0.3996, 0.3844)],
     };
   })(),
@@ -922,7 +906,6 @@ const TEMPLATES = {
     const MSB = mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB');
     return {
       title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-      curves: [{ name: 'MPC=S', color: COLORS[2] }, { name: 'MPB=D', color: COLORS[0] }, { name: 'MSB', color: COLORS[3] }],
       elements: [S, D, MSB, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(MSB, S, 'Ps', 'Qs', 0.5713, 0.4133)],
     };
   })(),
@@ -947,10 +930,9 @@ function mkEq(a, b, pLabel, qLabel, xn, yn) {
   d.on = [a.id, b.id];
   return d;
 }
-function mkRegion(points, fillColor, pattern) {
+function mkRegion(points, fillColor, fill) {
   return { id: nextId++, type: 'region', points, fillColor: fillColor || COLORS[0],
-           pattern: pattern || 'solid', fillOpacity: 0.25, label: '', labelDx: 0, labelDy: 0,
-           bwPattern: 'bw-hatch45' };
+           fill: fill || 'solid', fillOpacity: 0.25, label: '', labelDx: 0, labelDy: 0 };
 }
 function mkArrow(x1n, y1n, x2n, y2n, color, weight, dash, label) {
   return { id: nextId++, type: 'arrow', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
@@ -964,7 +946,7 @@ function mkBrace(x1n, y1n, x2n, y2n, color, weight, label, flip) {
 
 function diagramIsEmpty() {
   syncTextInputs();
-  return !state.elements.length && !state.curves.length && !state.title;
+  return !state.elements.length && !state.title;
 }
 
 // Loading is undoable rather than confirmed: a toast offers Undo when it
@@ -975,7 +957,7 @@ function loadTemplate(name, opts = {}) {
   if (opts.record !== false) saveUndo();
   // Deep copy: node edits mutate curve point arrays in place.
   state.elements = cloneElements(t.elements);
-  state.curves = JSON.parse(JSON.stringify(t.curves));
+  state.legend = { show: false, hidden: [] };
   state.title = t.title;
   state.yLabel = t.yLabel;
   state.xLabel = t.xLabel;
@@ -985,7 +967,7 @@ function loadTemplate(name, opts = {}) {
   document.getElementById('graph-title').value = t.title;
   document.getElementById('y-label').value = t.yLabel;
   document.getElementById('x-label').value = t.xLabel;
-  renderCurveList();
+  renderLegendList();
   renderProps();
   redraw();
   if (opts.record !== false && replacedWork)
@@ -1116,7 +1098,7 @@ function showInlineLabelEdit(el, opts = {}) {
     } else {
       target[key] = val;
     }
-    renderCurveList(); renderProps(); redraw();
+    renderLegendList(); renderProps(); redraw();
   };
   const cancel = () => {
     if (done) return; done = true;
@@ -1150,7 +1132,9 @@ function toggleBW() {
   const btn = document.getElementById('bw-btn');
   btn.textContent = bwMode ? 'B/W' : 'Colour';
   btn.classList.toggle('active', bwMode);
+  document.getElementById('bw-color-note').style.display = bwMode ? '' : 'none';
   renderProps();
+  renderLegendList();
   redraw();
 }
 
@@ -1587,64 +1571,47 @@ function pointInPolygon(px, py, pts) {
   return inside;
 }
 
-function drawPattern(pattern, color) {
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]);
+// One fill setting for both colour and B/W modes. Patterns are drawn over the
+// whole canvas and clipped by the caller. `c` lets legend swatches reuse it.
+const FILL_OPTS = [['solid', 'Shaded'], ['hatch45', 'Hatch ╱'], ['hatch135', 'Hatch ╲'], ['crosshatch', 'Cross-hatch'],
+  ['dots', 'Dots'], ['vertical', 'Vertical lines'], ['horizontal', 'Horizontal lines']];
+
+function drawPattern(pattern, color, c = ctx, w = W, h = H) {
+  c.strokeStyle = color; c.fillStyle = color; c.lineWidth = 1; c.setLineDash([]);
   const sp = 10;
-  if (pattern === 'hatch' || pattern === 'crosshatch') {
-    for (let d = -(H + W); d < W + H; d += sp) {
-      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d + H, H); ctx.stroke();
+  const diag = (down) => {
+    for (let d = -(h + w); d < w + h; d += sp) {
+      c.beginPath();
+      if (down) { c.moveTo(d, 0); c.lineTo(d + h, h); } else { c.moveTo(d + h, 0); c.lineTo(d, h); }
+      c.stroke();
     }
-  }
-  if (pattern === 'crosshatch') {
-    for (let d = -(H + W); d < W + H; d += sp) {
-      ctx.beginPath(); ctx.moveTo(d + H, 0); ctx.lineTo(d, H); ctx.stroke();
-    }
-  }
+  };
+  if (pattern === 'hatch45' || pattern === 'crosshatch') diag(false);
+  if (pattern === 'hatch135' || pattern === 'crosshatch') diag(true);
   if (pattern === 'dots') {
-    const sp2 = 12;
-    for (let x = 0; x <= W; x += sp2) for (let y = 0; y <= H; y += sp2) {
-      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+    for (let x = 0; x <= w; x += 12) for (let y = 0; y <= h; y += 12) {
+      c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill();
     }
   }
-  if (pattern === 'bw-hatch45') {
-    for (let d = -(H+W); d < W+H; d += sp) {
-      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d+H, H); ctx.stroke();
-    }
-  }
-  if (pattern === 'bw-hatch135') {
-    for (let d = -(H+W); d < W+H; d += sp) {
-      ctx.beginPath(); ctx.moveTo(d+H, 0); ctx.lineTo(d, H); ctx.stroke();
-    }
-  }
-  if (pattern === 'bw-crosshatch') {
-    for (let d = -(H+W); d < W+H; d += sp) {
-      ctx.beginPath(); ctx.moveTo(d, 0); ctx.lineTo(d+H, H); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(d+H, 0); ctx.lineTo(d, H); ctx.stroke();
-    }
-  }
-  if (pattern === 'bw-dots') {
-    const sp2 = 12;
-    for (let x = 0; x <= W; x += sp2) for (let y = 0; y <= H; y += sp2) {
-      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI*2); ctx.fill();
-    }
-  }
-  if (pattern === 'bw-vertical') {
-    for (let x = 0; x <= W; x += sp) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-  }
-  if (pattern === 'bw-horizontal') {
-    for (let y = 0; y <= H; y += sp) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-  }
+  if (pattern === 'vertical') for (let x = 0; x <= w; x += sp) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); }
+  if (pattern === 'horizontal') for (let y = 0; y <= h; y += sp) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
+}
+
+// v1 regions had two settings: `pattern` (colour mode) and `bwPattern` (B/W).
+// B/W was the default mode, so its choice wins unless a colour pattern was picked.
+function fillFromV1(el) {
+  const map = { hatch: 'hatch45', crosshatch: 'crosshatch', dots: 'dots',
+    'bw-hatch45': 'hatch45', 'bw-hatch135': 'hatch135', 'bw-crosshatch': 'crosshatch',
+    'bw-dots': 'dots', 'bw-vertical': 'vertical', 'bw-horizontal': 'horizontal' };
+  if (el.pattern && el.pattern !== 'solid' && map[el.pattern]) return map[el.pattern];
+  return map[el.bwPattern || 'bw-hatch45'] || 'hatch45';
 }
 
 function drawRegionEl(el) {
   if (!el.points || el.points.length < 3) return;
   const pts = el.points.map(p => toCanvas(p.xn, p.yn));
   const color = bwMode ? '#1a1918' : (el.fillColor || COLORS[0]);
-  const pat = bwMode ? (el.bwPattern || 'bw-hatch45') : el.pattern;
+  const pat = el.fill || 'solid';
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
@@ -2476,7 +2443,7 @@ function onDblClick(e) {
 
   if (state.tool === 'region' && drawing && curvePoints.length >= 3) {
     saveUndo();
-    const el = mkRegion([...curvePoints], state.drawColor, 'solid');
+    const el = mkRegion([...curvePoints], state.drawColor, bwMode ? 'hatch45' : 'solid');
     state.elements.push(el); state.selectedId = el.id;
     curvePoints = []; drawing = false;
     renderProps(); redraw();
@@ -2611,62 +2578,70 @@ function distToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-// ─── CURVE LIST ──────────────────────────────────────────────
-function renderCurveList() {
+// ─── LEGEND ──────────────────────────────────────────────────
+// Built automatically from labelled lines, curves and regions. Off by
+// default; each entry can be unticked. Drawn below the exported picture.
+function legendCandidates() {
+  return state.elements.filter(e => e.label && (e.type === 'line' || e.type === 'curve' || e.type === 'region'));
+}
+function legendEntries() {
+  const hidden = new Set(state.legend.hidden);
+  return legendCandidates().filter(e => !hidden.has(e.id));
+}
+
+// Small picture of a legend entry, matching how it is drawn (B/W aware).
+function drawLegendSwatch(c, el, x, y, w, h) {
+  const col = bwMode ? '#1a1918' : (el.type === 'region' ? (el.fillColor || COLORS[0]) : (el.color || '#1a1918'));
+  c.save();
+  if (el.type === 'region') {
+    c.beginPath(); c.rect(x, y, w, h);
+    if ((el.fill || 'solid') === 'solid') { c.fillStyle = hexToRgba(col, el.fillOpacity ?? 0.25); c.fill(); }
+    else { c.save(); c.clip(); c.translate(x, y); drawPattern(el.fill, col, c, w, h); c.restore(); }
+    c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([]); c.strokeRect(x, y, w, h);
+  } else {
+    c.strokeStyle = col; c.lineWidth = Math.min(el.weight || 2.5, 3); c.lineCap = 'round';
+    c.setLineDash(el.dash ? el.dash.split(',').map(Number) : []);
+    c.beginPath(); c.moveTo(x, y + h / 2); c.lineTo(x + w, y + h / 2); c.stroke();
+  }
+  c.restore();
+}
+
+function renderLegendList() {
+  document.getElementById('legend-show').checked = !!state.legend.show;
   const list = document.getElementById('curve-list');
+  const items = legendCandidates();
+  if (!items.length) {
+    list.innerHTML = '<div class="legend-empty">Give a curve or region a label and it appears here.</div>';
+    return;
+  }
+  const hidden = new Set(state.legend.hidden);
   list.innerHTML = '';
-  state.curves.forEach((c, i) => {
-    const div = document.createElement('div');
-    div.className = 'curve-item';
-    div.innerHTML = `
-      <div class="curve-swatch" style="background:${escapeHtml(c.color)}"></div>
-      <span class="curve-name">${escapeHtml(c.name)}</span>
-      <button class="curve-del" title="Remove" onclick="removeCurve(${i})">×</button>
-    `;
-    list.appendChild(div);
-  });
-  // Also show labeled regions
-  state.elements.filter(e => e.type === 'region' && e.label).forEach(e => {
-    const div = document.createElement('div');
-    div.className = 'curve-item';
-    const col = /^#[0-9a-f]{6}$/i.test(e.fillColor || '') ? e.fillColor : COLORS[0];
-    div.innerHTML = `
-      <div class="curve-swatch" style="background:${hexToRgba(col, 0.5)};border:1px solid ${col}"></div>
-      <span class="curve-name">${escapeHtml(e.label)}</span>
-    `;
-    list.appendChild(div);
+  list.classList.toggle('off', !state.legend.show);
+  items.forEach(el => {
+    const row = document.createElement('label');
+    row.className = 'curve-item';
+    row.innerHTML = `<input type="checkbox" ${hidden.has(el.id) ? '' : 'checked'} onchange="setLegendEntry(${el.id}, this.checked)">
+      <canvas width="56" height="28" style="width:28px;height:14px;flex-shrink:0"></canvas>
+      <span class="curve-name">${escapeHtml(el.label)}</span>`;
+    const sw = row.querySelector('canvas').getContext('2d');
+    sw.scale(2, 2);
+    drawLegendSwatch(sw, el, 1, 1, 26, 12);
+    list.appendChild(row);
   });
 }
 
-let modalColorSelected = COLORS[0];
-
-function openAddCurve() {
-  modalColorSelected = COLORS[0];
-  document.getElementById('modal-name').value = '';
-  buildModalColors();
-  document.getElementById('curve-modal').classList.add('open');
-  setTimeout(() => document.getElementById('modal-name').focus(), 50);
-}
-
-function closeModal() {
-  document.getElementById('curve-modal').classList.remove('open');
-}
-
-function confirmAddCurve() {
-  const name = document.getElementById('modal-name').value.trim();
-  if (!name) return;
-  const colorEl = document.querySelector('#modal-colors .modal-col.active');
-  const color = colorEl ? colorEl.dataset.color : COLORS[0];
+function setLegendShow(on) {
   saveUndo();
-  state.curves.push({ name, color });
-  renderCurveList();
-  closeModal();
+  state.legend = { ...state.legend, show: on };
+  renderLegendList();
 }
 
-function removeCurve(i) {
+function setLegendEntry(id, on) {
   saveUndo();
-  state.curves.splice(i, 1);
-  renderCurveList();
+  const hidden = state.legend.hidden.filter(h => h !== id);
+  if (!on) hidden.push(id);
+  state.legend = { ...state.legend, hidden };
+  renderLegendList();
 }
 
 // ─── PROPS PANEL ─────────────────────────────────────────────
@@ -2705,21 +2680,13 @@ function renderProps() {
 
   if (el.type === 'region') {
     html += textPropHTML('Label', 'label', el.label, 20, 'e.g. Consumer surplus');
-    if (bwMode) {
-      html += `<div class="prop-row"><label>B/W Texture</label>${selectHTML([
-        ['bw-hatch45', '45° hatch'], ['bw-hatch135', '135° hatch'], ['bw-crosshatch', 'Crosshatch'],
-        ['bw-dots', 'Dots'], ['bw-vertical', 'Vertical lines'], ['bw-horizontal', 'Horizontal lines'],
-      ], el.bwPattern || 'bw-hatch45', "updateProp('bwPattern',this.value)")}</div>`;
-    }
-    html += `<div class="prop-row"><label>Fill</label>${selectHTML([
-      ['solid', 'Solid colour'], ['hatch', 'Hatch (45°)'], ['crosshatch', 'Cross-hatch'], ['dots', 'Dots'],
-    ], el.pattern || 'solid', "updateProp('pattern',this.value);renderProps()")}</div>
+    html += `<div class="prop-row"><label>Fill</label>${selectHTML(FILL_OPTS, el.fill || 'solid', "updateProp('fill',this.value);renderProps()")}</div>
     <div class="prop-row">
       <label>Color</label>
       ${colorSwatchHTML(el.fillColor || COLORS[0], 'fillColor')}
     </div>`;
-    if ((el.pattern || 'solid') === 'solid') {
-      html += `<div class="prop-row"><label>Opacity</label>${selectHTML([
+    if ((el.fill || 'solid') === 'solid') {
+      html += `<div class="prop-row"><label>Strength</label>${selectHTML([
         [0.10, '10%'], [0.20, '20%'], [0.25, '25%'], [0.30, '30%'], [0.45, '45%'],
       ], el.fillOpacity ?? 0.25, "updateProp('fillOpacity',parseFloat(this.value))")}</div>`;
     }
@@ -2782,7 +2749,7 @@ function updatePropLive(key, value) {
   const sig = el.id + ':' + key;
   if (liveEditKey !== sig) { saveUndo(); liveEditKey = sig; }
   el[key] = value;
-  if (key === 'label' || key === 'fillColor') renderCurveList();
+  if (key === 'label' || key === 'fillColor') renderLegendList();
   redraw();
 }
 
@@ -2793,7 +2760,7 @@ function updateProp(key, value) {
   el[key] = value;
   // A dashed or dotted line is annotation: always thin.
   if (key === 'dash') { el.weight = value ? GUIDE.weight : 2.5; renderProps(); }
-  if (key === 'label' || key === 'fillColor') renderCurveList();
+  if (key === 'label' || key === 'fillColor') renderLegendList();
   redraw();
 }
 
@@ -2839,7 +2806,7 @@ function setPropColor(key, value) {
 }
 
 function colorSwatchHTML(currentColor, propKey) {
-  return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${COLORS.map(c =>
+  return (bwMode ? `<div class="bw-note">Colours show in Colour mode. B/W draws everything in black.</div>` : '') + `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${COLORS.map(c =>
     `<div style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;box-sizing:border-box;border:3px solid ${c===currentColor?'#1a1918':'transparent'}"
       onclick="setPropColor('${propKey}','${c}')"></div>`
   ).join('')}</div>`;
@@ -2871,7 +2838,7 @@ function duplicateSelected() {
   if (dup.type !== 'text') dup.label = origLabel + '2';
   state.elements.push(dup);
   state.selectedId = dup.id;
-  renderCurveList();
+  renderLegendList();
   renderProps();
   redraw();
 }
@@ -2880,7 +2847,7 @@ function deleteSelected() {
   saveUndo();
   removeWithDependents([state.selectedId]);
   state.selectedId = null;
-  renderCurveList();
+  renderLegendList();
   renderProps();
   redraw();
 }
@@ -3186,20 +3153,10 @@ async function driveTrash(id, name) {
 function driveRefreshUI() {
   const signedIn = driveSignedIn();
 
-  // Header button, which exists whether or not the modal is open.
-  const hBtn = document.getElementById('header-auth-btn');
+  // Signing in lives in the Save dialog; the header only shows the status.
   const hUser = document.getElementById('header-user');
-  if (hBtn) {
-    if (!driveEnabled()) {
-      hBtn.style.display = 'none';
-      if (hUser) hUser.textContent = '';
-    } else {
-      hBtn.style.display = '';
-      hBtn.textContent = signedIn ? 'Sign out' : 'Sign in';
-      hBtn.onclick = signedIn ? driveSignOut : driveSignIn;
-      if (hUser) hUser.textContent = signedIn ? driveUser : '';
-    }
-  }
+  hUser.style.display = driveEnabled() && signedIn ? '' : 'none';
+  hUser.textContent = signedIn ? 'Drive: ' + (driveUser || 'signed in') : '';
 
   const box = document.getElementById('drive-box');
   if (!box) return;
@@ -3356,7 +3313,7 @@ function restoreAutosave() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch (e) {}
   const g = saved && saved.graph;
-  if (!g || !((g.elements && g.elements.length) || (g.curves && g.curves.length) || g.title)) return false;
+  if (!g || !((g.elements && g.elements.length) || g.title)) return false;
   applyGraphData(g);
   driveCurrentFile = saved.driveFile || null;
   return true;
@@ -3376,7 +3333,7 @@ function currentGraphData() {
   return {
     v: SAVE_VERSION,
     title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
-    curves: state.curves, elements: state.elements,
+    legend: state.legend, elements: state.elements,
     xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
     yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
   };
@@ -3388,6 +3345,16 @@ function migrateGraphData(data) {
   data = JSON.parse(JSON.stringify(data || {}));
   data.elements = (data.elements || []).filter(e => e && e.type);
   if (!data.v || data.v < 2) connectV1(data.elements);
+  // Regions: one fill setting (v1 and early v2 betas had pattern + bwPattern).
+  data.elements.forEach(e => {
+    if (e.type !== 'region' || e.fill) return;
+    e.fill = fillFromV1(e);
+    delete e.pattern; delete e.bwPattern;
+  });
+  // The hand-made legend list became the automatic legend. A diagram that
+  // had one keeps a legend in its export.
+  if (!data.legend) data.legend = { show: !!(data.curves && data.curves.length), hidden: [] };
+  delete data.curves;
   data.v = SAVE_VERSION;
   return data;
 }
@@ -3439,7 +3406,7 @@ function connectV1(els) {
 function applyGraphData(data) {
   data = migrateGraphData(data);
   state.elements = data.elements || [];
-  state.curves = data.curves || [];
+  state.legend = data.legend || { show: false, hidden: [] };
   state.title = data.title || '';
   state.yLabel = data.yLabel || 'Price ($/unit)';
   state.xLabel = data.xLabel || 'Quantity (units/week)';
@@ -3451,7 +3418,7 @@ function applyGraphData(data) {
   document.getElementById('y-label').value = state.yLabel;
   document.getElementById('x-label').value = state.xLabel;
   state.selectedId = null;
-  renderCurveList(); renderProps(); redraw();
+  renderLegendList(); renderProps(); redraw();
 }
 
 function openSaveModal() {
@@ -3481,14 +3448,43 @@ function loadFromSaveModal() {
   }
 }
 
-function downloadJPG(exportScale) {
+// Exports are always 2× (1360 px wide): sharp in documents and on projectors.
+function exportFileName(ext) {
+  return (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.' + ext;
+}
+
+function downloadImage(ext) {
+  closeExportMenu();
   const link = document.createElement('a');
-  const title = (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
-  const suffix = exportScale > 1 ? '-hires' : '';
-  link.download = title + suffix + '.jpg';
-  link.href = renderExport(exportScale, 'image/jpeg', 0.97);
+  link.download = exportFileName(ext);
+  link.href = ext === 'png' ? renderExport(2, 'image/png') : renderExport(2, 'image/jpeg', 0.95);
   link.click();
 }
+
+async function copyImage() {
+  closeExportMenu();
+  try {
+    const url = renderExport(2, 'image/png');
+    const bytes = Uint8Array.from(atob(url.split(',')[1]), ch => ch.charCodeAt(0));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) })]);
+    showToast('Image copied. Paste it into your document.');
+  } catch (e) {
+    showToast('This browser would not copy the image. Use Download PNG instead.');
+  }
+}
+
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  const m = document.getElementById('export-menu');
+  const open = !m.classList.contains('open');
+  m.classList.toggle('open', open);
+  document.getElementById('export-btn').setAttribute('aria-expanded', open);
+}
+function closeExportMenu() {
+  document.getElementById('export-menu').classList.remove('open');
+  document.getElementById('export-btn').setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', e => { if (!e.target.closest('.export-wrap')) closeExportMenu(); });
 
 // Renders the diagram plus legend at `exportScale`, without selection handles
 // or zoom, and returns it as a data URL. Shared by export and feedback.
@@ -3503,12 +3499,7 @@ function renderExport(exportScale, mime, quality) {
   viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
   SCALE = exportScale;
 
-  // Collect legend items: named curves + labelled regions
-  const legendItems = [
-    ...state.curves.map(c => ({ name: c.name, color: c.color, type: 'line' })),
-    ...state.elements.filter(e => e.type === 'region' && e.label)
-      .map(e => ({ name: e.label, color: e.fillColor || COLORS[0], type: 'region' })),
-  ];
+  const legendItems = state.legend.show ? legendEntries() : [];
 
   // Calculate legend height (in logical coords)
   const itemW = 140, swatchW = 28, pad = 16, rowH = 24;
@@ -3542,18 +3533,9 @@ function renderExport(exportScale, mime, quality) {
       const row = Math.floor(i / cols);
       const x = pad + col * itemW;
       const y = H + pad + 8 + row * rowH + rowH / 2;
-
-      if (item.type === 'line') {
-        ctx.strokeStyle = item.color; ctx.lineWidth = 2; ctx.setLineDash([]);
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + swatchW, y); ctx.stroke();
-      } else {
-        ctx.fillStyle = hexToRgba(item.color, 0.5);
-        ctx.fillRect(x, y - 7, swatchW, 14);
-        ctx.strokeStyle = item.color; ctx.lineWidth = 1;
-        ctx.strokeRect(x, y - 7, swatchW, 14);
-      }
+      drawLegendSwatch(ctx, item, x, y - 7, swatchW, 14);
       ctx.fillStyle = '#1a1918'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(item.name, x + swatchW + 6, y);
+      ctx.fillText(item.label, x + swatchW + 6, y);
     });
     ctx.restore();
   }

@@ -172,4 +172,13 @@ All of 3a to 3e, with 13 new browser tests (34 in total). Calls made:
 - Guide lines use the curve colour rule: grey `#888` in colour mode, black in B/W like everything else.
 - Text auto-attaches when placed within 24 px of a line, curve or point. Free text can be attached later with "Attach to nearest".
 
-**Next: Phase 4 (consolidation).**
+### 2026-10-25: Phase 4 done (consolidation)
+
+- One fill setting per region (`fill`) for both modes. Migration: v1's B/W choice wins unless a colour pattern had been picked, because B/W is the default mode and most saves were made in it. "Opacity" renamed "Strength".
+- Automatic legend replaces "+ Add / rename curve" and its modal. A v1 diagram that had a legend list gets `show: true`, so its export still has a legend.
+- One "Export ▾" menu: Copy image, Download JPG, Download PNG, all at 2× (the old 1× JPG is gone; 2× is sharper everywhere and still small).
+- Header Sign in / Sign out removed; sign-in is in Save / Load. The header shows "Drive: email" when signed in.
+- B/W note under the sidebar colours and in the panel's colour pickers.
+- 4 new tests (38 in total).
+
+**Next: Phase 5 (big features).**

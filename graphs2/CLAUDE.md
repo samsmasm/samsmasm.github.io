@@ -129,17 +129,11 @@ All elements live in `state.elements`. Constructor helpers at lines ~799–817:
 
 ## Legend
 
-`state.curves` holds **named curve legend entries** `{ name, color }` — these are manually added by the user via "Add to legend" in the right panel, separate from actual drawn elements.
+Automatic (Phase 4). `state.legend = { show, hidden: [ids] }`. Entries are every labelled `line`, `curve` and `region` (`legendCandidates()`), minus unticked ids (`legendEntries()`). Off by default; the sidebar has the on/off box and a tickable list with swatches drawn by `drawLegendSwatch()` (B/W aware, same fill/dash as the diagram). `renderLegendList()` rebuilds the sidebar; call it when labels, colours, fills or the mode change. `renderExport()` adds the legend band below the picture only when `show` is on. v1 `curves` lists migrate to `show: true` and are dropped.
 
-`renderCurveList()` (line ~2011) renders the sidebar legend list. It shows:
-1. `state.curves` entries (line swatches)
-2. `state.elements` filtered to `type === 'region' && e.label` (filled swatches)
+## Export
 
-Call `renderCurveList()` whenever: curves are added/removed, a region label changes, a region color changes, or elements are deleted.
-
-In **JPG export** (`downloadJPG`, line ~2314), the canvas is temporarily expanded to fit both the graph and a legend row below. After `redraw()`, the legend area must be explicitly filled white before drawing legend items — `redraw()` only fills the graph area (680×560).
-
----
+One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/Slides), Download JPG, Download PNG. All at 2× via `renderExport(2, mime)`. Sign-in lives only in the Save dialog; the header shows "Drive: email" when signed in (click opens Save).
 
 ## Templates
 
@@ -153,12 +147,7 @@ Current templates: `blank`, `sd` (Supply & Demand), `adas` (New Classical AD/AS)
 
 ## B/W mode
 
-`bwMode` global. When true, all elements render in `#1a1918` (near-black). Regions use canvas pattern fills instead of colour fills — patterns defined in `drawPattern()` (line ~1143):
-- `bw-hatch45`, `bw-hatch135`, `bw-crosshatch`, `bw-dots`, `bw-vertical`, `bw-horizontal`
-
-Each region element stores `bwPattern` (which pattern to use in B/W) and `pattern` (colour-mode fill: `solid`, `hatch`, `crosshatch`, `dots`). Phase 4 merges these into one setting.
-
----
+`bwMode` global (on by default). Everything draws in `#1a1918`. Regions have **one** fill setting `fill` for both modes (`FILL_OPTS`: solid "Shaded", hatch45, hatch135, crosshatch, dots, vertical, horizontal); `drawPattern(pattern, color, c, w, h)`. Solid in B/W is a grey tint. New regions default to hatch45 in B/W and solid in colour. v1 `pattern`/`bwPattern` migrate via `fillFromV1()` (the B/W choice wins unless a colour pattern was picked). Colour pickers show a "Colours show in Colour mode" note in B/W.
 
 ## Key functions reference
 
