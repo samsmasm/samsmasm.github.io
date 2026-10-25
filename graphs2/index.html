@@ -884,35 +884,29 @@ function curveLowest(c) {
 function costCurves(qT, atcMin, qV = qT * 0.75, c = 0.6, colors = [COLORS[1], COLORS[2], COLORS[4]]) {
   const b = 2 * c * qV, F = 2 * c * qT * qT * (qT - qV);
   const a = atcMin - c * (qT - qV) * (3 * qT - qV) + c * qV * qV;
-  const mc = q => a - 2 * b * q + 3 * c * q * q, dmc = q => -2 * b + 6 * c * q;
-  const avc = q => a - b * q + c * q * q, davc = q => -b + 2 * c * q;
-  const atc = q => F / q + avc(q), datc = q => -F / (q * q) + davc(q);
-  // The drawn curve (drawSmoothCurve) passes through the midpoint of each
-  // pair of neighbouring control points, along the line joining them. So each
-  // knot gets two control points either side of it, along the true tangent:
-  // the drawn curve then goes exactly through every knot. The minimums are
-  // knots, so MC meets AVC and ATC exactly there.
-  const build = (f, df, from, to, exact) => {
-    let knots = [];
-    for (let i = 1; i < 24; i++) knots.push(from + (to - from) * i / 24);
-    knots = knots.filter(q => exact.every(e => Math.abs(q - e) > 0.015));
-    knots = [...knots, ...exact.filter(e => e > from && e < to)].sort((x, y) => x - y);
-    const pts = [{ xn: from, yn: 1 - f(from) }];
-    knots.forEach((q, i) => {
-      const gapL = q - (i ? knots[i - 1] : from), gapR = (i < knots.length - 1 ? knots[i + 1] : to) - q;
-      const h = 0.25 * Math.min(gapL, gapR);
-      pts.push({ xn: q - h, yn: 1 - (f(q) - h * df(q)) }, { xn: q + h, yn: 1 - (f(q) + h * df(q)) });
-    });
-    pts.push({ xn: to, yn: 1 - f(to) });
-    return pts;
-  };
+  const mc = q => a - 2 * b * q + 3 * c * q * q;
+  const avc = q => a - b * q + c * q * q;
+  const atc = q => F / q + avc(q);
+  // Curves pass through their points (`through`), so each curve needs only
+  // a few, which keeps them easy to edit. The two lowest points are points of
+  // MC as well as of AVC/ATC, so MC goes exactly through them. Each lowest
+  // point has neighbours at equal height either side, which makes the drawn
+  // curve flat (lowest) exactly there.
+  const pts = (f, qs) => qs.sort((x, y) => x - y)
+    .filter((q, i, s) => !i || q - s[i - 1] > 0.02)
+    .map(q => ({ xn: q, yn: 1 - f(q) }));
+  // Where f climbs back to `level` to the right of its lowest point qLow.
+  const sameHeight = (f, qLow, level) => { let lo = qLow, hi = 1.5; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (f(m) < level) lo = m; else hi = m; } return lo; };
   // Stop each curve where it leaves the top of the plot (cost 0.95).
   const lastBelow = (f, from) => { let q = from; while (q < 0.97 && f(q) <= 0.95) q += 0.005; return q - 0.005; };
   const firstBelow = (f, from) => { let q = from; while (f(q) > 0.95) q += 0.005; return q; };
+  const mcEnd = lastBelow(mc, qT), avcEnd = lastBelow(avc, qV), atcStart = firstBelow(atc, 0.02), atcEnd = lastBelow(atc, qT);
+  const dV = (qV - 0.05) / 2, dT = (qT - atcStart) / 3;
+  const atcR = sameHeight(atc, qT, atc(qT - dT));
   return {
-    MC: mkCurve(build(mc, dmc, 0.05, lastBelow(mc, qT), [qV, qT]), colors[0], 2.5, '', 'MC'),
-    ATC: mkCurve(build(atc, datc, firstBelow(atc, 0.02), lastBelow(atc, qT), [qT]), colors[1], 2.5, '', 'ATC'),
-    AVC: mkCurve(build(avc, davc, 0.05, lastBelow(avc, qV), [qV]), colors[2], 2.5, '', 'AVC'),
+    MC: mkCurve(pts(mc, [0.05, 2 * qV / 3, qV, qT, (qT + mcEnd) / 2, mcEnd]), colors[0], 2.5, '', 'MC'),
+    ATC: mkCurve(pts(atc, [atcStart, (atcStart + qT - dT) / 2, qT - dT, qT, atcR, ...(atcEnd > atcR + 0.04 ? [atcEnd] : [])]), colors[1], 2.5, '', 'ATC'),
+    AVC: mkCurve(pts(avc, [0.05, qV - dV, qV, qV + dV, ...(avcEnd > qV + dV + 0.04 ? [avcEnd] : [])]), colors[2], 2.5, '', 'AVC'),
     min: { xn: qT, yn: 1 - atcMin },
     avcMin: { xn: qV, yn: 1 - avc(qV) },
   };
@@ -1116,8 +1110,8 @@ const TEMPLATES = {
       const AD = mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD');
       // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
       const AS = mkCurve([
-        {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
-        {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
+        {xn: 0.05, yn: 0.72}, {xn: 0.30, yn: 0.72}, {xn: 0.45, yn: 0.71},
+        {xn: 0.58, yn: 0.63}, {xn: 0.67, yn: 0.40}, {xn: 0.71, yn: 0.05},
       ], COLORS[2], 2.5, '', 'AS');
       // YFE guide line, with its label attached below the axis end
       const YFE = mkLine(0.71, 0, 0.71, 1.0, COLORS[1], GUIDE.weight, GUIDE.dash, '');
@@ -1176,7 +1170,7 @@ function mkLine(x1n, y1n, x2n, y2n, color, weight, dash, label) {
   return { id: nextId++, type: 'line', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
 }
 function mkCurve(points, color, weight, dash, label) {
-  return { id: nextId++, type: 'curve', points, color, weight, dash, label, labelDx: 0, labelDy: 0 };
+  return { id: nextId++, type: 'curve', points, color, weight, dash, label, labelDx: 0, labelDy: 0, through: true };
 }
 function mkText(xn, yn, text) {
   return { id: nextId++, type: 'text', xn, yn, text, color: '#333', size: 13 };
@@ -1529,8 +1523,13 @@ function getElSegments(el) {
     return [[a.x, a.y, b.x, b.y]];
   }
   if (el.type === 'curve' && el.points.length >= 2) {
-    // Sample the smooth bezier curve (matching drawSmoothCurve) for accurate snap
+    // Sample the drawn curve (matching drawSmoothCurve) for accurate snap
     const pts = el.points.map(p => toCanvas(p.xn, p.yn));
+    if (el.through) {
+      const path = throughPath(pts), segs = [];
+      for (let i = 0; i < path.length - 1; i++) segs.push([path[i].x, path[i].y, path[i + 1].x, path[i + 1].y]);
+      return segs;
+    }
     const sampled = [pts[0]];
     const STEPS = 8;
     for (let i = 1; i < pts.length - 1; i++) {
@@ -2177,7 +2176,7 @@ function drawElement(el) {
   } else if (el.type === 'curve') {
     if (el.points.length < 2) { ctx.restore(); return; }
     const pts = el.points.map(p => toCanvas(p.xn, p.yn));
-    drawSmoothCurve(pts);
+    drawSmoothCurve(pts, el.through);
     if (el.label) {
       const pos = getFullLabelPos(el);
       drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
@@ -2198,7 +2197,47 @@ function drawElement(el) {
   ctx.restore();
 }
 
-function drawSmoothCurve(pts) {
+// Two kinds of curve. New curves (`through: true`) pass through every point
+// (a Catmull-Rom spline), so a few points are enough and each handle sits
+// on the curve. Curves saved before that bend towards their points
+// (quadratic through midpoints) and are kept exactly as they were.
+const THROUGH_STEPS = 16;
+// Each point's slope points from its previous to its next neighbour (so a
+// point between two at equal height is a flat top or bottom), scaled by the
+// segment's length so unevenly spaced points don't overshoot.
+function throughPath(pts) {
+  const n = pts.length, out = [pts[0]];
+  const len = i => Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y) || 1e-6;
+  // Slope at point i, for use on a segment of length `seg`.
+  const slope = (i, seg) => {
+    if (i === 0) return { x: (pts[1].x - pts[0].x) * 0.5, y: (pts[1].y - pts[0].y) * 0.5 };
+    if (i === n - 1) return { x: (pts[i].x - pts[i - 1].x) * 0.5, y: (pts[i].y - pts[i - 1].y) * 0.5 };
+    const k = seg / (len(i - 1) + len(i));
+    return { x: (pts[i + 1].x - pts[i - 1].x) * k, y: (pts[i + 1].y - pts[i - 1].y) * k };
+  };
+  for (let i = 0; i < n - 1; i++) {
+    const p1 = pts[i], p2 = pts[i + 1], seg = len(i);
+    let m1 = slope(i, seg), m2 = slope(i + 1, seg);
+    if (i === 0 && n > 2) m1 = { x: m1.x * 2 - m2.x * 0.5, y: m1.y * 2 - m2.y * 0.5 }; // gentler start
+    if (i === n - 2 && n > 2) m2 = { x: m2.x * 2 - m1.x * 0.5, y: m2.y * 2 - m1.y * 0.5 }; // gentler end
+    for (let s = 1; s <= THROUGH_STEPS; s++) {
+      const t = s / THROUGH_STEPS, t2 = t * t, t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      out.push({ x: h00 * p1.x + h10 * m1.x + h01 * p2.x + h11 * m2.x, y: h00 * p1.y + h10 * m1.y + h01 * p2.y + h11 * m2.y });
+    }
+  }
+  return out;
+}
+
+function drawSmoothCurve(pts, through) {
+  if (through) {
+    const path = throughPath(pts);
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    path.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+    return;
+  }
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length - 1; i++) {
@@ -3133,7 +3172,7 @@ function drawCurvePreview(mouseN) {
   if (dash) ctx.setLineDash(dash.split(',').map(Number));
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  drawSmoothCurve(pts);
+  drawSmoothCurve(pts, true);
   // draw control points
   curvePoints.forEach(p => {
     const c = toCanvas(p.xn, p.yn);
