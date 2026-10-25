@@ -492,7 +492,6 @@
   <span style="font-family:var(--sans);font-size:13px;color:#fff;opacity:0.7;margin-left:2px;margin-right:8px">economics graph maker</span>
   <span class="tag">v2.0</span>
   <a href="../graphsold/" style="font-size:11px;color:rgba(255,255,255,0.7);text-decoration:underline">Old version</a>
-  <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Drag empty space to move around</span>
   <div class="spacer"></div>
   <div class="header-actions">
     <button id="undo-btn" class="ghost" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
@@ -1803,8 +1802,6 @@ function changeZoom(factor, rawCx, rawCy) {
 function updateZoomLabel() {
   const el = document.getElementById('zoom-label');
   if (el) el.textContent = Math.round(viewScale * 100) + '%';
-  const hint = document.getElementById('pan-hint');
-  if (hint) hint.style.display = (viewScale > 1 && state.tool === 'select') ? '' : 'none';
 }
 
 function segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
@@ -2480,8 +2477,16 @@ function drawElement(el) {
   else ctx.setLineDash([]);
 
   if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
-    const a = toCanvas(el.x1n, el.y1n);
-    const b = toCanvas(el.x2n, el.y2n);
+    let a = toCanvas(el.x1n, el.y1n);
+    let b = toCanvas(el.x2n, el.y2n);
+    // `gap`: ends attached to a curve stop this many px short of it (drawing
+    // only; the attachment itself stays on the curve).
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (el.gap && len > 4 * el.gap) {
+      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+      if (el.p1On) a = { x: a.x + ux * el.gap, y: a.y + uy * el.gap };
+      if (el.p2On) b = { x: b.x - ux * el.gap, y: b.y - uy * el.gap };
+    }
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
@@ -3860,6 +3865,7 @@ function duplicateSelected() {
 // Shift curve: one click makes S₁ and S₂, an arrow between them that stays
 // attached to both, and a new equilibrium wherever the original had one.
 const SHIFT_BY = 0.15;
+const SHIFT_GAP = 6; // px between the shift arrow's ends and the two curves
 function shiftSelected(dir) {
   const el = elById(state.selectedId);
   if (!el || (el.type !== 'line' && el.type !== 'curve')) return;
@@ -3872,6 +3878,7 @@ function shiftSelected(dir) {
   const a = fromCanvas(pointAt(el, t).x, pointAt(el, t).y), b = fromCanvas(pointAt(copy, t).x, pointAt(copy, t).y);
   const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
   arrow.p1On = { id: el.id, t }; arrow.p2On = { id: copy.id, t };
+  arrow.gap = SHIFT_GAP;
   state.elements.push(arrow);
   state.elements.filter(d => d.type === 'dot' && d.on && d.on.includes(el.id)).forEach(d => {
     const nd = copyOf(d, 0, 0);
@@ -3965,15 +3972,42 @@ function makeLineOrthogonal() {
       if (distToSegment(b.x, b.y, ax, ay, bx, by) < SNAP_R) p2Anchored = true;
     }
   }
+  if (el.p1On) p1Anchored = true;
+  if (el.p2On) p2Anchored = true;
   const dx = Math.abs(el.x2n - el.x1n), dy = Math.abs(el.y2n - el.y1n);
   const makeHoriz = dx >= dy;
   saveUndo();
-  if (p2Anchored && !p1Anchored) {
-    if (makeHoriz) el.y1n = el.y2n; else el.x1n = el.x2n;
+  // Move the end that is free if only one is; otherwise move the second end.
+  const [k, xk, yk, fx, fy] = p2Anchored && !p1Anchored
+    ? ['p1On', 'x1n', 'y1n', el.x2n, el.y2n] : ['p2On', 'x2n', 'y2n', el.x1n, el.y1n];
+  const link = el[k], parent = link && elById(link.id);
+  // An end attached to a curve would be put back on it at every redraw, so
+  // slide it along the curve to where the curve meets the straightened line.
+  const meet = parent && levelPointOn(parent, toCanvas(fx, fy), makeHoriz, toCanvas(el[xk], el[yk]));
+  if (meet) {
+    link.t = projectOnto(parent, meet.x, meet.y).t;
   } else {
-    if (makeHoriz) el.y2n = el.y1n; else el.x2n = el.x1n;
+    if (link) delete el[k]; // the curve never reaches that level: let the end go
+    if (makeHoriz) el[yk] = fy; else el[xk] = fx;
   }
   redraw();
+}
+
+// Where `parent` crosses the horizontal (or vertical) line through `from`,
+// nearest to `near`, in canvas px; null if it never does.
+function levelPointOn(parent, from, horiz, near) {
+  const pts = polyOf(parent);
+  let best = null, bestD = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const [va, vb, level] = horiz ? [a.y, b.y, from.y] : [a.x, b.x, from.x];
+    if ((va - level) * (vb - level) > 0 || va === vb) continue;
+    const f = (level - va) / (vb - va);
+    const p = { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+    const d = Math.hypot(p.x - near.x, p.y - near.y);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
 }
 
 // ─── CANVAS ACTIONS ──────────────────────────────────────────

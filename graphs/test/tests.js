@@ -736,6 +736,22 @@ test('Backspace deletes the selected item without the browser going back', async
   eq(await ev(page, `state.elements.length`), m, 'deleted with nothing selected');
 });
 
+test('shift arrow leaves a small gap at each curve, and straightens while still attached', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'D').id; shiftSelected(1)`);
+  const arrow = await ev(page, `state.elements.find(e => e.type === 'arrow')`);
+  assert(arrow.gap > 0 && arrow.p1On && arrow.p2On, 'no gap or not attached');
+  // Tilt it by sliding one end down its curve, then straighten.
+  await ev(page, `(() => { const a = state.elements.find(e => e.type === 'arrow'); a.p2On.t = 0.76; redraw();
+    state.selectedId = a.id; makeLineOrthogonal(); })()`);
+  const a = await ev(page, `state.elements.find(e => e.type === 'arrow')`);
+  assert(a.p1On && a.p2On, 'ends came loose');
+  assert(Math.abs(a.y1n - a.y2n) < 1e-3, 'not horizontal: ' + a.y1n + ' vs ' + a.y2n);
+  // Still horizontal after the next redraw re-resolves attachments.
+  await ev(page, `redraw()`);
+  const b = await ev(page, `state.elements.find(e => e.type === 'arrow')`);
+  assert(Math.abs(b.y1n - b.y2n) < 1e-3, 'snapped back after redraw');
+});
+
 test('settings list the keyboard and mouse shortcuts', async (page) => {
   await page.click('header button.gear');
   const text = await ev(page, `document.getElementById('shortcuts').textContent`);
