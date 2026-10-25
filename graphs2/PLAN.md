@@ -161,4 +161,15 @@ Phase 1: all ten items done and covered by tests. Decisions taken along the way 
 - Tested: Worker locally (submit, honeypot, empty message, auth, CORS, rate limit, done, delete) and live (submit, list, delete, CORS); graphs2 with 3 browser tests (fetch stubbed).
 - Also: `renderExport()` now does the export drawing for both JPG download and feedback pictures; typing in any dialog no longer triggers canvas shortcuts (Backspace, Ctrl+Z).
 
-**Next: Phase 3 (connected diagrams).**
+### 2026-10-25: Phase 3 done (connected diagrams)
+
+All of 3a to 3e, with 13 new browser tests (34 in total). Calls made:
+- **Templates rebuilt on connected points now** (pulled forward from Phase 6), because the old hand-placed guide lines would otherwise stay disconnected. Label text is unchanged (P / Q*, PL / Yfe, Pm / Qm, Ps / Qs, P₁ / Y₁). The Keynesian YFE text is attached to the YFE line.
+- An attached point cannot be dragged on its own (the hint bar explains), because its position *is* the crossing. "Unlink from curves" in the panel frees it. A free point dropped onto a crossing links to it.
+- Dragging an arrow whose ends are on curves slides the ends along those curves, rather than tearing them off. Alt+drag detaches.
+- Deleting a curve deletes its equilibrium points (undoable). Attached text and arrow ends just become free.
+- Clicking a hidden dot needs to be within 7 px (12 px when shown), so the curves crossing there stay easy to grab. Clicking a drop line selects its point.
+- Guide lines use the curve colour rule: grey `#888` in colour mode, black in B/W like everything else.
+- Text auto-attaches when placed within 24 px of a line, curve or point. Free text can be attached later with "Attach to nearest".
+
+**Next: Phase 4 (consolidation).**

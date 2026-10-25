@@ -320,6 +320,8 @@
     padding: 5px 8px;
     color: var(--text);
   }
+  .prop-check { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+  .prop-note { font-size: 11.5px; line-height: 1.45; color: var(--muted); background: var(--tag-bg); border-radius: 4px; padding: 6px 8px; }
   .prop-row input:focus, .prop-row select:focus { outline: 2px solid var(--accent); border-color: transparent; }
 
   .action-btn {
@@ -683,6 +685,9 @@ const W = 680, H = 560;
 let SCALE = 2; // render scale — canvas pixels = W*SCALE × H*SCALE, logical coords stay W×H
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;
+// One style for every guide line: equilibrium drop lines, template guides and
+// the sidebar's "Dashed" choice.
+const GUIDE = { color: '#888', weight: 1.5, dash: '6,4' };
 
 // ─── STATE ───────────────────────────────────────────────────
 let state = {
@@ -815,16 +820,12 @@ function init() {
 }
 
 // Dashed and dotted lines are nearly always annotation rather than curves, so
-// default them to Thin to match the templates. Once the student picks a weight
-// themselves we stop overriding it.
+// choosing a dash always switches the weight to Thin (and Solid back to Normal).
 function initStrokeDefaults() {
   const weightSel = document.getElementById('stroke-weight');
   const dashSel = document.getElementById('stroke-dash');
-  let weightChosen = false;
-  weightSel.addEventListener('change', () => { weightChosen = true; });
   dashSel.addEventListener('change', () => {
-    if (weightChosen) return;
-    weightSel.value = dashSel.value ? '1.5' : '2.5';
+    weightSel.value = dashSel.value ? String(GUIDE.weight) : '2.5';
   });
 }
 
@@ -857,130 +858,74 @@ function buildModalColors() {
 }
 
 // ─── TEMPLATES ───────────────────────────────────────────────
+// Equilibria are connected points (`mkEq`), not hand-placed guide lines, so
+// they stay exact when a curve moves. Approximate positions are only a
+// starting guess; resolveAttachments() computes the real crossing.
 const TEMPLATES = {
   blank: {
     title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
     curves: [], elements: []
   },
-  sd: {
-    title: '',
-    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-    curves: [
-      { name: 'D', color: COLORS[0] },
-      { name: 'S', color: COLORS[2] },
-    ],
-    elements: [
-      // Demand: top-left to bottom-right
-      mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D'),
-      // Supply: bottom-left to top-right
-      mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S'),
-      // Equilibrium dotted lines at the exact D x S intersection
-      mkLine(0, 0.4625, 0.4975, 0.4625, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.4975, 0.4625, 0.4975, 1.0, '#aaa', 1.5, '5,4', ''),
-      // P* and Q* axis labels
-      mkText(0.4975, 1.02, 'Q*'),
-      mkText(-0.07, 0.4625, 'P'),
-    ]
-  },
-  adas: {
-    title: '',
-    yLabel: 'Price level', xLabel: 'Real GDP',
-    curves: [
-      { name: 'AD', color: COLORS[0] },
-      { name: 'SRAS', color: COLORS[2] },
-      { name: 'LRAS', color: COLORS[1] },
-    ],
-    elements: [
-      // AD: downward sloping
-      mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD'),
-      // SRAS: upward sloping
-      mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS'),
-      // LRAS: vertical through the AD x SRAS intersection
-      mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS'),
-      // Dotted to axes from the exact equilibrium
-      mkLine(0, 0.4793, 0.5012, 0.4793, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.5012, 0.4793, 0.5012, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.5012, 1.02, 'Yfe'),
-      mkText(-0.07, 0.4793, 'PL'),
-    ]
-  },
-  keyn: {
-    title: '',
-    yLabel: 'Price level', xLabel: 'Real GDP',
-    curves: [
-      { name: 'AD', color: COLORS[0] },
-      { name: 'AS', color: COLORS[2] },
-    ],
-    elements: [
-      // AD: downward sloping (high price at low GDP → low price at high GDP)
-      mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD'),
-      // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
-      mkCurve([
-        {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
-        {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
-      ], COLORS[2], 2.5, '', 'AS'),
-      // YFE vertical line (label placed below x-axis via mkText)
-      mkLine(0.71, 0, 0.71, 1.0, COLORS[1], 1.5, '5,4', ''),
-      mkText(0.71, 1.05, 'YFE'),
-      // Equilibrium: AD intersects flat part of AS at ~(0.20, 0.70)
-      mkLine(0, 0.70, 0.20, 0.70, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.20, 0.70, 0.20, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.20, 1.02, 'Y₁'),
-      mkText(-0.07, 0.70, 'P₁'),
-    ]
-  },
-  ext_neg: {
-    title: '',
-    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-    curves: [
-      { name: 'MPB=D', color: COLORS[0] },
-      { name: 'MPC=S', color: COLORS[2] },
-      { name: 'MSC', color: COLORS[1] },
-    ],
-    elements: [
-      // MPB = D downward
-      mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
-      // MPC = S upward
-      mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
-      // MSC above MPC (parallel, shifted up)
-      mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC'),
-      // Market eq: exact D x MPC intersection
-      mkLine(0, 0.4805, 0.5005, 0.4805, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.5005, 0.4805, 0.5005, 1.0, '#aaa', 1.5, '5,4', ''),
-      // Social optimum: exact D x MSC intersection
-      mkLine(0, 0.3844, 0.3996, 0.3844, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.3996, 0.3844, 0.3996, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.5005, 1.02, 'Qm'),
-      mkText(0.3996, 1.02, 'Qs'),
-      mkText(-0.07, 0.4805, 'Pm'),
-      mkText(-0.07, 0.3844, 'Ps'),
-    ]
-  },
-  ext_pos: {
-    title: '',
-    yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-    curves: [
-      { name: 'MPC=S', color: COLORS[2] },
-      { name: 'MPB=D', color: COLORS[0] },
-      { name: 'MSB', color: COLORS[3] },
-    ],
-    elements: [
-      mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S'),
-      mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D'),
-      // MSB shifted right of MPB
-      mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB'),
-      // Market eq: exact MPB x MPC intersection
-      mkLine(0, 0.4805, 0.5005, 0.4805, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.5005, 0.4805, 0.5005, 1.0, '#aaa', 1.5, '5,4', ''),
-      // Social optimum: exact MSB x MPC intersection
-      mkLine(0, 0.4133, 0.5713, 0.4133, '#aaa', 1.5, '5,4', ''),
-      mkLine(0.5713, 0.4133, 0.5713, 1.0, '#aaa', 1.5, '5,4', ''),
-      mkText(0.5005, 1.02, 'Qm'),
-      mkText(0.5713, 1.02, 'Qs'),
-      mkText(-0.07, 0.4805, 'Pm'),
-      mkText(-0.07, 0.4133, 'Ps'),
-    ]
-  }
+  sd: (() => {
+    const D = mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D');
+    const S = mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S');
+    return {
+      title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+      curves: [{ name: 'D', color: COLORS[0] }, { name: 'S', color: COLORS[2] }],
+      elements: [D, S, mkEq(D, S, 'P', 'Q*', 0.4975, 0.4625)],
+    };
+  })(),
+  adas: (() => {
+    const AD = mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD');
+    const SRAS = mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS');
+    // LRAS: vertical through the AD x SRAS intersection
+    const LRAS = mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS');
+    return {
+      title: '', yLabel: 'Price level', xLabel: 'Real GDP',
+      curves: [{ name: 'AD', color: COLORS[0] }, { name: 'SRAS', color: COLORS[2] }, { name: 'LRAS', color: COLORS[1] }],
+      elements: [AD, SRAS, LRAS, mkEq(AD, SRAS, 'PL', 'Yfe', 0.5012, 0.4793)],
+    };
+  })(),
+  keyn: (() => {
+    // AD: downward sloping (high price at low GDP → low price at high GDP)
+    const AD = mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD');
+    // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
+    const AS = mkCurve([
+      {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
+      {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
+    ], COLORS[2], 2.5, '', 'AS');
+    // YFE guide line, with its label attached below the axis end
+    const YFE = mkLine(0.71, 0, 0.71, 1.0, COLORS[1], GUIDE.weight, GUIDE.dash, '');
+    const yfeText = mkText(0.71, 1.05, 'YFE');
+    yfeText.attach = { id: YFE.id, t: 1, dx: 0, dy: 0.05 * PLOT_H, dx0: 0, dy0: 0.05 * PLOT_H };
+    return {
+      title: '', yLabel: 'Price level', xLabel: 'Real GDP',
+      curves: [{ name: 'AD', color: COLORS[0] }, { name: 'AS', color: COLORS[2] }],
+      elements: [AD, AS, YFE, yfeText, mkEq(AD, AS, 'P₁', 'Y₁', 0.20, 0.70)],
+    };
+  })(),
+  ext_neg: (() => {
+    const D = mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D');
+    const S = mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S');
+    // MSC above MPC (parallel, shifted up)
+    const MSC = mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC');
+    return {
+      title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+      curves: [{ name: 'MPB=D', color: COLORS[0] }, { name: 'MPC=S', color: COLORS[2] }, { name: 'MSC', color: COLORS[1] }],
+      elements: [D, S, MSC, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(D, MSC, 'Ps', 'Qs', 0.3996, 0.3844)],
+    };
+  })(),
+  ext_pos: (() => {
+    const S = mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S');
+    const D = mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D');
+    // MSB shifted right of MPB
+    const MSB = mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB');
+    return {
+      title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
+      curves: [{ name: 'MPC=S', color: COLORS[2] }, { name: 'MPB=D', color: COLORS[0] }, { name: 'MSB', color: COLORS[3] }],
+      elements: [S, D, MSB, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(MSB, S, 'Ps', 'Qs', 0.5713, 0.4133)],
+    };
+  })(),
 };
 
 function mkLine(x1n, y1n, x2n, y2n, color, weight, dash, label) {
@@ -993,7 +938,14 @@ function mkText(xn, yn, text) {
   return { id: nextId++, type: 'text', xn, yn, text, color: '#333', size: 13 };
 }
 function mkDot(xn, yn, color, pLabel, qLabel) {
-  return { id: nextId++, type: 'dot', xn, yn, color, pLabel, qLabel };
+  return { id: nextId++, type: 'dot', xn, yn, color, pLabel, qLabel, showDot: false,
+           pDx: 0, pDy: 0, qDx: 0, qDy: 0 };
+}
+// An equilibrium point connected to the crossing of curves a and b.
+function mkEq(a, b, pLabel, qLabel, xn, yn) {
+  const d = mkDot(xn ?? 0.5, yn ?? 0.5, GUIDE.color, pLabel, qLabel);
+  d.on = [a.id, b.id];
+  return d;
 }
 function mkRegion(points, fillColor, pattern) {
   return { id: nextId++, type: 'region', points, fillColor: fillColor || COLORS[0],
@@ -1022,7 +974,7 @@ function loadTemplate(name, opts = {}) {
   const replacedWork = !diagramIsEmpty();
   if (opts.record !== false) saveUndo();
   // Deep copy: node edits mutate curve point arrays in place.
-  state.elements = JSON.parse(JSON.stringify(t.elements)).map(e => ({ ...e, id: nextId++ }));
+  state.elements = cloneElements(t.elements);
   state.curves = JSON.parse(JSON.stringify(t.curves));
   state.title = t.title;
   state.yLabel = t.yLabel;
@@ -1125,13 +1077,15 @@ function hitTestAxisLabel(cx, cy) {
 // an empty or cancelled edit removes it, and `opts.undoSnap` is the state
 // before it existed.
 function showInlineLabelEdit(el, opts = {}) {
-  const pos = getFullLabelPos(el);
+  const key = opts.key || (el.type === 'text' ? 'text' : 'label');
+  const pos = opts.pos || getFullLabelPos(el);
   const rect = canvas.getBoundingClientRect();
   const sx = rect.left + (pos.x * viewScale + viewOffsetX) * (rect.width / W);
   const sy = rect.top  + (pos.y * viewScale + viewOffsetY) * (rect.height / H);
   const inp = document.createElement('input');
   inp.type = 'text';
-  inp.value = el.type === 'text' ? (el.text || '') : (el.label || '');
+  inp.className = 'inline-edit';
+  inp.value = el[key] || '';
   inp.style.cssText = `position:fixed;left:${sx-36}px;top:${sy-13}px;width:84px;
     font:500 13px 'IBM Plex Sans',sans-serif;text-align:center;
     background:#fff;border:1.5px solid #1a4a8a;border-radius:3px;
@@ -1147,7 +1101,6 @@ function showInlineLabelEdit(el, opts = {}) {
     // Look the element up again: an undo while the box was open replaces objects.
     const target = state.elements.find(x => x.id === el.id);
     if (!target) return;
-    const key = target.type === 'text' ? 'text' : 'label';
     if (opts.isNew) {
       if (!val) { removeElementQuietly(target.id); return; }
       saveUndo(opts.undoSnap);
@@ -1157,7 +1110,7 @@ function showInlineLabelEdit(el, opts = {}) {
     }
     if ((target[key] || '') === val) return;
     saveUndo();
-    if (target.type === 'text' && !val) {
+    if (key === 'text' && !val) {
       state.elements = state.elements.filter(x => x.id !== target.id);
       state.selectedId = null;
     } else {
@@ -1278,6 +1231,245 @@ function getElSegments(el) {
     return segs;
   }
   return [];
+}
+
+// ─── ATTACHMENTS ─────────────────────────────────────────────
+// Connected things move together. Positions of attached elements are derived
+// from their parents on every redraw (resolveAttachments), so moving a curve
+// carries its equilibrium points, their drop lines and labels, attached text
+// and the ends of arrows drawn onto it.
+//   dot.on = [idA, idB]            sits where A and B cross
+//   text.attach = { id, t, dx, dy } offset (canvas px) from point t along parent
+//   line.p1On / p2On = { id, t }   endpoint sits at point t along parent
+// t is the fraction of the parent's length (0 = first point, 1 = last).
+
+// Per-redraw facts about dots: { broken, skipP, skipQ }. Never saved.
+const derived = new Map();
+
+function elById(id) { return state.elements.find(e => e.id === id); }
+
+// Canvas polyline for anything with a length (lines, arrows, braces, curves).
+function polyOf(el) {
+  const segs = getElSegments(el);
+  if (!segs.length) return [];
+  const pts = [{ x: segs[0][0], y: segs[0][1] }];
+  segs.forEach(sg => pts.push({ x: sg[2], y: sg[3] }));
+  return pts;
+}
+
+function pointAt(el, t) {
+  if (el.type === 'dot' || el.type === 'text') return toCanvas(el.xn, el.yn);
+  if (el.type === 'region') return getLabelBasePos(el);
+  const pts = polyOf(el);
+  if (!pts.length) return null;
+  const lens = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y); lens.push(l); total += l; }
+  let d = Math.max(0, Math.min(1, t || 0)) * total;
+  for (let i = 0; i < lens.length; i++) {
+    if (d <= lens[i] || i === lens.length - 1) {
+      const f = lens[i] ? Math.min(1, d / lens[i]) : 0;
+      return { x: pts[i].x + (pts[i+1].x - pts[i].x) * f, y: pts[i].y + (pts[i+1].y - pts[i].y) * f };
+    }
+    d -= lens[i];
+  }
+  return pts[0];
+}
+
+// Nearest point on el to (x, y): { t, dist, x, y }.
+function projectOnto(el, x, y) {
+  if (el.type === 'dot' || el.type === 'text' || el.type === 'region') {
+    const c = pointAt(el, 0);
+    return { t: 0, dist: Math.hypot(x - c.x, y - c.y), x: c.x, y: c.y };
+  }
+  const pts = polyOf(el);
+  if (pts.length < 2) return { t: 0, dist: Infinity, x, y };
+  let total = 0, best = null, acc = 0;
+  const lens = [];
+  for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y); lens.push(l); total += l; }
+  for (let i = 0; i < lens.length; i++) {
+    const a = pts[i], b = pts[i+1];
+    const q = closestPtOnSeg(x, y, a.x, a.y, b.x, b.y);
+    const dist = Math.hypot(x - q.x, y - q.y);
+    if (!best || dist < best.dist) {
+      const along = acc + Math.hypot(q.x - a.x, q.y - a.y);
+      best = { t: total ? along / total : 0, dist, x: q.x, y: q.y };
+    }
+    acc += lens[i];
+  }
+  return best;
+}
+
+// Nearest element of the given kinds within `radius` px of (x, y), skipping
+// `excludeId` and anything that already depends on it (no cycles).
+const ATTACH_KINDS = ['line', 'arrow', 'dbarrow', 'brace', 'curve', 'dot'];
+function attachTarget(x, y, radius, excludeId, kinds = ATTACH_KINDS) {
+  let best = null;
+  state.elements.forEach(el => {
+    if (el.id === excludeId || !kinds.includes(el.type)) return;
+    if (excludeId != null && dependsOn(el, excludeId)) return;
+    const pr = projectOnto(el, x, y);
+    if (pr.dist < radius && (!best || pr.dist < best.dist)) best = { el, ...pr };
+  });
+  return best;
+}
+
+function parentIds(el) {
+  const ids = [];
+  if (el.on) ids.push(...el.on);
+  if (el.attach) ids.push(el.attach.id);
+  if (el.p1On) ids.push(el.p1On.id);
+  if (el.p2On) ids.push(el.p2On.id);
+  return ids;
+}
+
+function dependsOn(el, id, seen = new Set()) {
+  if (seen.has(el.id)) return false;
+  seen.add(el.id);
+  return parentIds(el).some(pid => {
+    if (pid === id) return true;
+    const p = elById(pid);
+    return p ? dependsOn(p, id, seen) : false;
+  });
+}
+
+const isVertical = el => isLinear(el) && Math.abs(el.x1n - el.x2n) < 1e-4;
+const isHorizontal = el => isLinear(el) && Math.abs(el.y1n - el.y2n) < 1e-4;
+
+// Every point where a and b cross (canvas coords), duplicates merged.
+function crossings(a, b) {
+  const out = [];
+  const sa = getElSegments(a), sb = getElSegments(b);
+  for (const [ax, ay, bx, by] of sa) for (const [cx, cy, dx, dy] of sb) {
+    const pt = segSegIntersect(ax, ay, bx, by, cx, cy, dx, dy);
+    if (pt && !out.some(o => Math.hypot(o.x - pt.x, o.y - pt.y) < 2)) out.push(pt);
+  }
+  return out;
+}
+
+// Curves an equilibrium can sit on.
+const CROSS_KINDS = ['line', 'curve'];
+function nearestCrossing(x, y, radius) {
+  const els = state.elements.filter(e => CROSS_KINDS.includes(e.type));
+  let best = null;
+  for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+    for (const pt of crossings(els[i], els[j])) {
+      const d = Math.hypot(pt.x - x, pt.y - y);
+      if (d < radius && (!best || d < best.d)) best = { x: pt.x, y: pt.y, d, a: els[i], b: els[j] };
+    }
+  }
+  return best;
+}
+
+function resolveAttachments() {
+  derived.clear();
+  const byId = new Map(state.elements.map(e => [e.id, e]));
+  const done = new Set(), busy = new Set();
+  const visit = el => {
+    if (done.has(el.id) || busy.has(el.id)) return; // busy = cycle guard
+    busy.add(el.id);
+    parentIds(el).forEach(id => { const p = byId.get(id); if (p) visit(p); });
+    resolveOne(el, byId);
+    busy.delete(el.id); done.add(el.id);
+  };
+  state.elements.forEach(visit);
+}
+
+function resolveOne(el, byId) {
+  if (isLinear(el)) {
+    for (const [k, xk, yk] of [['p1On', 'x1n', 'y1n'], ['p2On', 'x2n', 'y2n']]) {
+      const a = el[k];
+      if (!a) continue;
+      const p = byId.get(a.id);
+      if (!p || p === el) { delete el[k]; continue; }
+      const c = pointAt(p, a.t);
+      if (!c) continue;
+      const n = fromCanvas(c.x, c.y);
+      el[xk] = n.xn; el[yk] = n.yn;
+    }
+  } else if (el.type === 'dot' && el.on) {
+    const a = byId.get(el.on[0]), b = byId.get(el.on[1]);
+    if (!a || !b) { delete el.on; return; }
+    const skip = { skipQ: isVertical(a) || isVertical(b), skipP: isHorizontal(a) || isHorizontal(b) };
+    const hits = crossings(a, b);
+    if (!hits.length) { derived.set(el.id, { ...skip, broken: true }); return; }
+    // Curves can cross more than once: stay with the crossing nearest the last position.
+    const prev = toCanvas(el.xn, el.yn);
+    const best = hits.reduce((m, h) => Math.hypot(h.x - prev.x, h.y - prev.y) < Math.hypot(m.x - prev.x, m.y - prev.y) ? h : m);
+    const n = fromCanvas(best.x, best.y);
+    el.xn = n.xn; el.yn = n.yn;
+    derived.set(el.id, skip);
+  } else if (el.type === 'text' && el.attach) {
+    const p = byId.get(el.attach.id);
+    if (!p) { delete el.attach; return; }
+    const c = pointAt(p, el.attach.t);
+    if (!c) return;
+    const n = fromCanvas(c.x + el.attach.dx, c.y + el.attach.dy);
+    el.xn = n.xn; el.yn = n.yn;
+  }
+}
+
+// Attach text to whatever it sits beside (within `radius` px), keeping its position.
+function attachText(el, radius = 24) {
+  const p = toCanvas(el.xn, el.yn);
+  const tgt = attachTarget(p.x, p.y, radius, el.id);
+  if (!tgt) return false;
+  const c = pointAt(tgt.el, tgt.t);
+  const dx = p.x - c.x, dy = p.y - c.y;
+  el.attach = { id: tgt.el.id, t: tgt.t, dx, dy, dx0: dx, dy0: dy };
+  return true;
+}
+
+// After attached text has been moved by hand, keep its new offset.
+function reanchorText(el) {
+  const p = el.attach && elById(el.attach.id);
+  const c = p && pointAt(p, el.attach.t);
+  if (!c) return;
+  const q = toCanvas(el.xn, el.yn);
+  el.attach.dx = q.x - c.x; el.attach.dy = q.y - c.y;
+}
+
+// Attach a line endpoint to the element it touches, or detach it.
+function attachEnd(el, which, radius = 7) {
+  const key = which === 1 ? 'p1On' : 'p2On';
+  const c = which === 1 ? toCanvas(el.x1n, el.y1n) : toCanvas(el.x2n, el.y2n);
+  const tgt = attachTarget(c.x, c.y, radius, el.id, ['line', 'arrow', 'dbarrow', 'curve']);
+  if (tgt) el[key] = { id: tgt.el.id, t: tgt.t };
+  else delete el[key];
+}
+
+// While an attached line is dragged its ends slide along their parents.
+function slideEnds(el) {
+  for (const [k, xk, yk] of [['p1On', 'x1n', 'y1n'], ['p2On', 'x2n', 'y2n']]) {
+    const a = el[k], p = a && elById(a.id);
+    if (!p) continue;
+    const c = toCanvas(el[xk], el[yk]);
+    a.t = projectOnto(p, c.x, c.y).t;
+  }
+}
+
+// Remaps every id and every reference to one, for template loads and paste.
+function cloneElements(els) {
+  const copy = JSON.parse(JSON.stringify(els));
+  const map = new Map(copy.map(e => [e.id, nextId++]));
+  const re = id => map.has(id) ? map.get(id) : id;
+  copy.forEach(e => {
+    e.id = map.get(e.id);
+    if (e.on) e.on = e.on.map(re);
+    if (e.attach) e.attach.id = re(e.attach.id);
+    if (e.p1On) e.p1On.id = re(e.p1On.id);
+    if (e.p2On) e.p2On.id = re(e.p2On.id);
+  });
+  return copy;
+}
+
+// Deleting a curve also deletes the equilibrium points on it; text and arrow
+// ends attached to it simply become free (resolveOne drops dead links).
+function removeWithDependents(ids) {
+  const gone = new Set(ids);
+  state.elements.forEach(e => { if (e.on && e.on.some(id => gone.has(id))) gone.add(e.id); });
+  state.elements = state.elements.filter(e => !gone.has(e.id));
+  if (gone.has(state.selectedId)) state.selectedId = null;
 }
 
 function getSnapCandidate(cx, cy, includeOnSeg = false) {
@@ -1565,6 +1757,7 @@ function syncTextInputs() {
 
 function redraw() {
   syncTextInputs();
+  resolveAttachments();
   // Clear entire canvas with bg colour (no transform)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#f5f4f0';
@@ -1752,35 +1945,55 @@ function drawTextEl(el) {
   ctx.restore();
 }
 
+// Where a dot's P and Q labels sit: centre point plus size, for drawing,
+// hit testing and inline editing. Offsets pDx/pDy, qDx/qDy are hand nudges.
+function dotLabelBox(el, which) {
+  const text = which === 'p' ? el.pLabel : el.qLabel;
+  if (!text) return null;
+  ctx.save();
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  const w = ctx.measureText(text).width;
+  ctx.restore();
+  if (which === 'p') {
+    const a = toCanvas(0, el.yn);
+    return { text, w, h: 16, x: a.x - 6 - w / 2 + (el.pDx || 0), y: a.y + (el.pDy || 0) };
+  }
+  const a = toCanvas(el.xn, 1.0);
+  return { text, w, h: 16, x: a.x + (el.qDx || 0), y: a.y + 12 + (el.qDy || 0) };
+}
+
+let exporting = false; // hides on-screen-only marks (warnings, connectors)
+
 function drawDotEl(el) {
   const p = toCanvas(el.xn, el.yn);
   const axisL = toCanvas(0, el.yn);
   const axisB = toCanvas(el.xn, 1.0);
-  const dotCol = bwMode ? '#1a1918' : (el.color || '#1a1918');
+  const d = derived.get(el.id) || {};
+  const col = bwMode ? '#1a1918' : (el.color || GUIDE.color);
   ctx.save();
-  ctx.strokeStyle = dotCol;
-  ctx.lineWidth = 1.4;
-  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = GUIDE.weight;
+  ctx.setLineDash(GUIDE.dash.split(',').map(Number));
   ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = dotCol;
-  ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-  if (el.pLabel) {
-    ctx.save();
-    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
-    ctx.fillStyle = '#1a1918'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(el.pLabel, axisL.x - 6, axisL.y);
-    ctx.restore();
+  // A drop line along a vertical (or horizontal) curve would just sit on top
+  // of it, so it is skipped.
+  if (el.drops !== false) {
+    if (!d.skipP) { ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    if (!d.skipQ) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke(); }
   }
-  if (el.qLabel) {
-    ctx.save();
-    ctx.font = '500 13px "IBM Plex Sans", sans-serif';
-    ctx.fillStyle = '#1a1918'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(el.qLabel, axisB.x, axisB.y + 4);
-    ctx.restore();
+  ctx.setLineDash([]);
+  if (el.showDot !== false) {
+    ctx.fillStyle = bwMode ? '#1a1918' : (el.color && el.color !== GUIDE.color ? el.color : '#1a1918');
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+  if (d.broken && !exporting) {
+    ctx.strokeStyle = 'rgba(200,56,10,0.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+  for (const which of ['p', 'q']) {
+    const box = dotLabelBox(el, which);
+    if (box) drawLabelAt(box.text, box.x, box.y, '#1a1918');
   }
 }
 
@@ -1816,7 +2029,28 @@ function drawSelectionHandles() {
   } else if (el.type === 'text') {
     const p = toCanvas(el.xn, el.yn);
     drawHandle(p.x, p.y);
+    // Faint connector to what the text is attached to.
+    const par = el.attach && elById(el.attach.id);
+    const c = par && pointAt(par, el.attach.t);
+    if (c) {
+      ctx.strokeStyle = 'rgba(26,74,138,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(26,74,138,0.6)'; ctx.fill();
+    }
   }
+  // Small square handles on the element's own labels: they can be dragged on their own.
+  const labelPts = el.type === 'dot' ? ['p', 'q'].map(w => dotLabelBox(el, w)).filter(Boolean)
+    : (el.label && el.type !== 'region' ? [getFullLabelPos(el)] : []);
+  labelPts.forEach(lp => drawLabelHandle(lp.x, lp.y));
+  ctx.restore();
+}
+
+function drawLabelHandle(x, y) {
+  ctx.save();
+  ctx.setLineDash([]); ctx.strokeStyle = '#1a4a8a'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x - 3, y - 13, 6, 6); ctx.strokeRect(x - 3, y - 13, 6, 6);
   ctx.restore();
 }
 
@@ -1861,7 +2095,7 @@ function updateHint(t) {
     brace: 'Click and drag to draw a curly brace · Flip direction in properties',
     curve: 'Click to add points · double-click to finish curve',
     text: 'Click anywhere on the graph to add a label',
-    equil: 'Click to place equilibrium point with dotted drop lines',
+    equil: 'Click where two curves cross: adds dashed lines to both axes, labelled P and Q',
     region: 'Click vertices · double-click to close and fill region',
   };
   document.getElementById('hint-text').textContent = hints[t] || '';
@@ -1890,21 +2124,16 @@ function onMouseDown(e) {
         return;
       }
     }
-    // Priority 3: label drag — check ALL elements with labels (allows single-click select+drag)
+    // Priority 3: label drag. Dragging a label changes only its offset from
+    // its parent, so it keeps following the parent afterwards.
     {
-      ctx.font = '500 13px "IBM Plex Sans", sans-serif';
-      for (const el of state.elements) {
-        if (el.type === 'dot' || el.type === 'text') continue;
-        if (!el.label) continue;
-        const lpos = getFullLabelPos(el);
-        const hw = Math.max(22, ctx.measureText(el.label).width / 2 + 8);
-        if (Math.abs(cx - lpos.x) < hw && Math.abs(cy - lpos.y) < 14) {
-          state.selectedId = el.id;
-          renderProps();
-          labelDrag = { elId: el.id, startCx: cx, startCy: cy,
-            origDx: el.labelDx || 0, origDy: el.labelDy || 0, moved: false };
-          return;
-        }
+      const lh = hitTestLabel(cx, cy);
+      if (lh) {
+        state.selectedId = lh.el.id;
+        renderProps();
+        labelDrag = { elId: lh.el.id, keyX: lh.keyX, keyY: lh.keyY, editKey: lh.editKey, startCx: cx, startCy: cy,
+          origDx: lh.el[lh.keyX] || 0, origDy: lh.el[lh.keyY] || 0, undoSnap: snapshot(), moved: false };
+        return;
       }
     }
     // Priority 4: regular element select / drag
@@ -1914,7 +2143,7 @@ function onMouseDown(e) {
     redraw();
     if (hit) {
       drawing = true;
-      drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)), undoSnap: snapshot(), moved: false };
+      drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)), undoSnap: snapshot(), moved: false, alt: e.altKey };
     } else if (e.shiftKey || spaceHeld || e.button === 1) {
       // Empty area + shift (or space/middle) — pan the view
       isPanning = true;
@@ -1943,6 +2172,7 @@ function onMouseDown(e) {
   } else if (state.tool === 'text') {
     const undoSnap = snapshot();
     const el = mkText(n.xn, n.yn, '');
+    attachText(el);
     state.elements.push(el);
     redraw();
     // Defer so this mousedown doesn't immediately blur the new input.
@@ -1965,17 +2195,56 @@ function onMouseDown(e) {
     drawRegionPreview();
     ctx.restore();
   } else if (state.tool === 'equil') {
-    const pLbl = prompt('Price label (leave blank to skip):', 'P');
-    if (pLbl === null) return;
-    const qLbl = prompt('Q* label (leave blank to skip):', 'Q*');
-    if (qLbl === null) return;
+    // One click: snaps to the nearest crossing and connects to both curves.
     saveUndo();
-    const el = mkDot(n.xn, n.yn, state.drawColor, pLbl.trim(), qLbl.trim());
+    const [pl, ql] = nextEqLabels();
+    const el = mkDot(n.xn, n.yn, GUIDE.color, pl, ql);
+    const hitX = nearestCrossing(cx, cy, 16);
+    if (hitX) {
+      const hn = fromCanvas(hitX.x, hitX.y);
+      el.xn = hn.xn; el.yn = hn.yn;
+      el.on = [hitX.a.id, hitX.b.id];
+    }
     state.elements.push(el);
     state.selectedId = el.id;
     renderProps();
     redraw();
   }
+}
+
+// P₁/Q₁, P₂/Q₂… (PL/Y on macro axes), numbered by how many points exist.
+function nextEqLabels() {
+  const n = state.elements.filter(e => e.type === 'dot').length + 1;
+  const sub = String(n).split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
+  syncTextInputs();
+  const macro = /price level|\bPL\b|inflation/i.test(state.yLabel) || /GDP|output|national income/i.test(state.xLabel);
+  return macro ? ['PL' + sub, 'Y' + sub] : ['P' + sub, 'Q' + sub];
+}
+
+// Labels that can be dragged on their own: curve/line/region labels and a
+// dot's P and Q labels. Returns which offset fields the drag changes.
+function hitTestLabel(cx, cy) {
+  ctx.save();
+  ctx.font = '500 13px "IBM Plex Sans", sans-serif';
+  try {
+    for (let i = state.elements.length - 1; i >= 0; i--) {
+      const el = state.elements[i];
+      if (el.type === 'dot') {
+        for (const w of ['p', 'q']) {
+          const b = dotLabelBox(el, w);
+          if (b && Math.abs(cx - b.x) < b.w / 2 + 6 && Math.abs(cy - b.y) < 11)
+            return { el, keyX: w + 'Dx', keyY: w + 'Dy', editKey: w + 'Label', pos: b };
+        }
+        continue;
+      }
+      if (el.type === 'text' || !el.label) continue;
+      const lpos = getFullLabelPos(el);
+      const hw = Math.max(22, ctx.measureText(el.label).width / 2 + 8);
+      if (Math.abs(cx - lpos.x) < hw && Math.abs(cy - lpos.y) < 14)
+        return { el, keyX: 'labelDx', keyY: 'labelDy', editKey: 'label', pos: lpos };
+    }
+  } finally { ctx.restore(); }
+  return null;
 }
 
 function onMouseMove(e) {
@@ -1994,6 +2263,7 @@ function onMouseMove(e) {
     if (el) {
       if (!nodeDrag.moved) { saveUndo(nodeDrag.undoSnap); nodeDrag.moved = true; }
       const snap = applyNodeMove(el, nodeDrag.node, cx, cy);
+      if (isLinear(el)) attachEnd(el, nodeDrag.node === 'p1' ? 1 : 2);
       redraw();
       if (snap) drawSnapIndicator(snap.x, snap.y);
     }
@@ -2005,8 +2275,8 @@ function onMouseMove(e) {
     const el = state.elements.find(e => e.id === labelDrag.elId);
     if (el) {
       const dx = cx - labelDrag.startCx, dy = cy - labelDrag.startCy;
-      if (Math.hypot(dx, dy) > 4 && !labelDrag.moved) { saveUndo(); labelDrag.moved = true; }
-      if (labelDrag.moved) { el.labelDx = labelDrag.origDx + dx; el.labelDy = labelDrag.origDy + dy; redraw(); }
+      if (Math.hypot(dx, dy) > 4 && !labelDrag.moved) { saveUndo(labelDrag.undoSnap); labelDrag.moved = true; }
+      if (labelDrag.moved) { el[labelDrag.keyX] = labelDrag.origDx + dx; el[labelDrag.keyY] = labelDrag.origDy + dy; redraw(); }
     }
     return;
   }
@@ -2071,13 +2341,25 @@ function onMouseMove(e) {
     if (!el) return;
     if (!drawStart.moved) {
       if (Math.hypot(dx, dy) < 2) return;
+      if (el.type === 'dot' && el.on) {
+        // Its position is the crossing; it moves when the curves do.
+        document.getElementById('hint-text').textContent = 'This point follows its curves: drag a curve to move it';
+        drawing = false; drawStart = null;
+        return;
+      }
       saveUndo(drawStart.undoSnap); drawStart.moved = true;
+      if (drawStart.alt) {
+        // Alt+drag: move this element alone, leaving attached text behind.
+        state.elements.forEach(t => { if (t.attach && t.attach.id === el.id) delete t.attach; });
+        delete el.p1On; delete el.p2On;
+      }
     }
     if (isLinear(el)) {
       el.x1n = orig.x1n + dxn;
       el.y1n = orig.y1n + dyn;
       el.x2n = orig.x2n + dxn;
       el.y2n = orig.y2n + dyn;
+      slideEnds(el);
     } else if (el.type === 'curve') {
       el.points = orig.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
     } else if (el.type === 'region') {
@@ -2088,6 +2370,7 @@ function onMouseMove(e) {
     } else if (el.type === 'text') {
       el.xn = orig.xn + dxn;
       el.yn = orig.yn + dyn;
+      reanchorText(el);
     }
     redraw();
   }
@@ -2101,13 +2384,14 @@ function onMouseMove(e) {
     } else {
       const hit = hitTest(cx, cy);
       const axisHit = hitTestAxisLabel(cx, cy);
-      let labelHit = false;
-      if (selEl && selEl.label && selEl.type !== 'dot') {
-        const lpos = getFullLabelPos(selEl);
-        if (Math.abs(cx - lpos.x) < 36 && Math.abs(cy - lpos.y) < 14) labelHit = true;
-      }
+      const labelHit = !!hitTestLabel(cx, cy);
       canvas.style.cursor = (hit || axisHit || labelHit) ? 'move' : 'default';
     }
+  }
+  if (state.tool === 'equil') {
+    const hx = nearestCrossing(cx, cy, 16);
+    if (hx) { redraw(); drawSnapIndicator(hx.x, hx.y); snapHoverActive = true; }
+    else if (snapHoverActive) { redraw(); snapHoverActive = false; }
   }
   // Show snap indicator while hovering with drawing tools
   if ((isLinearTool(state.tool) || state.tool === 'curve' || state.tool === 'region') && !drawing) {
@@ -2132,7 +2416,10 @@ function onMouseUp(e) {
   if (labelDrag) {
     if (!labelDrag.moved) {
       const el = state.elements.find(e => e.id === labelDrag.elId);
-      if (el) showInlineLabelEdit(el);
+      if (el) {
+        const pos = el.type === 'dot' ? dotLabelBox(el, labelDrag.editKey[0]) : getFullLabelPos(el);
+        showInlineLabelEdit(el, { key: labelDrag.editKey, pos });
+      }
     }
     labelDrag = null; redraw(); return;
   }
@@ -2152,6 +2439,8 @@ function onMouseUp(e) {
       else if (state.tool === 'dbarrow') el = mkDArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
       else if (state.tool === 'brace')   el = mkBrace(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, '');
       else                               el = mkLine(drawStart.xn, drawStart.yn, endN.xn, endN.yn, state.drawColor, w, dash, '');
+      // Ends drawn onto a curve stay on it (e.g. a shift arrow between S₁ and S₂).
+      attachEnd(el, 1); attachEnd(el, 2);
       state.elements.push(el);
       state.selectedId = el.id;
       renderProps();
@@ -2160,6 +2449,13 @@ function onMouseUp(e) {
     drawStart = null;
     redraw();
   } else if (state.tool === 'select') {
+    // A free point dropped onto a crossing connects to it.
+    const el = drawStart && drawStart.moved && elById(state.selectedId);
+    if (el && el.type === 'dot' && !el.on) {
+      const p = toCanvas(el.xn, el.yn);
+      const hx = nearestCrossing(p.x, p.y, 10);
+      if (hx) { el.on = [hx.a.id, hx.b.id]; renderProps(); redraw(); }
+    }
     drawing = false;
     drawStart = null;
   }
@@ -2277,7 +2573,14 @@ function hitTest(cx, cy) {
       }
     } else if (el.type === 'dot') {
       const p = toCanvas(el.xn, el.yn);
-      if (Math.hypot(cx - p.x, cy - p.y) < 12) return el;
+      // Small radius when the dot is hidden, so the curves crossing there stay easy to grab.
+      if (Math.hypot(cx - p.x, cy - p.y) < (el.showDot === false ? 7 : 12)) return el;
+      // The drop lines select their point.
+      if (el.drops !== false) {
+        const d = derived.get(el.id) || {}, l = toCanvas(0, el.yn), b = toCanvas(el.xn, 1);
+        if (!d.skipP && distToSegment(cx, cy, l.x, l.y, p.x, p.y) < 4) return el;
+        if (!d.skipQ && distToSegment(cx, cy, p.x, p.y, b.x, b.y) < 4) return el;
+      }
     } else if (el.type === 'text') {
       const p = toCanvas(el.xn, el.yn);
       ctx.save();
@@ -2421,12 +2724,19 @@ function renderProps() {
       ], el.fillOpacity ?? 0.25, "updateProp('fillOpacity',parseFloat(this.value))")}</div>`;
     }
   } else if (el.type === 'dot') {
-    html += textPropHTML('P* label', 'pLabel', el.pLabel, 10);
-    html += textPropHTML('Q* label', 'qLabel', el.qLabel, 10);
+    const a = el.on && elById(el.on[0]), b = el.on && elById(el.on[1]);
+    if (a && b) html += `<div class="prop-note">Sits where <b>${escapeHtml(a.label || 'a curve')}</b> and <b>${escapeHtml(b.label || 'a curve')}</b> cross${(derived.get(el.id) || {}).broken ? ', but they no longer cross' : ''}. It moves when they do.</div>`;
+    html += textPropHTML('Price label (y-axis)', 'pLabel', el.pLabel, 10);
+    html += textPropHTML('Quantity label (x-axis)', 'qLabel', el.qLabel, 10);
+    html += checkPropHTML('Show dot', 'showDot', el.showDot !== false);
+    html += checkPropHTML('Lines to the axes', 'drops', el.drops !== false);
     html += `<div class="prop-row">
       <label>Color</label>
-      ${colorSwatchHTML(el.color || COLORS[0], 'color')}
+      ${colorSwatchHTML(el.color || GUIDE.color, 'color')}
     </div>`;
+    if (el.pDx || el.pDy || el.qDx || el.qDy)
+      html += `<button class="action-btn secondary" style="margin-top:4px" onclick="resetLabelPosition()">Reset label positions</button>`;
+    if (a && b) html += `<button class="action-btn secondary" style="margin-top:4px" onclick="detachSelected()">Unlink from curves</button>`;
   } else if (el.type !== 'text') {
     html += textPropHTML('Label', 'label', el.label, 16);
     html += `<div class="prop-row">
@@ -2438,7 +2748,18 @@ function renderProps() {
       html += `<div class="prop-row"><label>Dash</label>${selectHTML(DASH_OPTS, el.dash || '', "updateProp('dash', this.value)")}</div>`;
   } else {
     html += textPropHTML('Text', 'text', el.text, 20);
+    const par = el.attach && elById(el.attach.id);
+    if (par) {
+      html += `<div class="prop-note">Attached to <b>${escapeHtml(par.label || par.pLabel || par.type)}</b>, so it moves with it.</div>`;
+      if (Math.hypot(el.attach.dx - (el.attach.dx0 ?? el.attach.dx), el.attach.dy - (el.attach.dy0 ?? el.attach.dy)) > 0.5)
+        html += `<button class="action-btn secondary" style="margin-top:4px" onclick="resetLabelPosition()">Reset label position</button>`;
+      html += `<button class="action-btn secondary" style="margin-top:4px" onclick="detachSelected()">Detach</button>`;
+    } else {
+      html += `<button class="action-btn secondary" style="margin-top:4px" onclick="attachSelected()">Attach to nearest</button>`;
+    }
   }
+  if (el.label && (el.labelDx || el.labelDy) && el.type !== 'text' && el.type !== 'dot')
+    html += `<button class="action-btn secondary" style="margin-top:4px" onclick="resetLabelPosition()">Reset label position</button>`;
 
   if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
     html += `<button class="action-btn secondary" style="margin-top:4px" onclick="makeLineOrthogonal()">Make horizontal / vertical</button>`;
@@ -2470,8 +2791,42 @@ function updateProp(key, value) {
   if (!el) return;
   saveUndo();
   el[key] = value;
+  // A dashed or dotted line is annotation: always thin.
+  if (key === 'dash') { el.weight = value ? GUIDE.weight : 2.5; renderProps(); }
   if (key === 'label' || key === 'fillColor') renderCurveList();
   redraw();
+}
+
+function checkPropHTML(label, key, checked) {
+  return `<label class="prop-check"><input type="checkbox" ${checked ? 'checked' : ''}
+    onchange="updateProp('${key}', this.checked)"> ${label}</label>`;
+}
+
+function resetLabelPosition() {
+  const el = elById(state.selectedId);
+  if (!el) return;
+  saveUndo();
+  if (el.type === 'dot') { el.pDx = el.pDy = el.qDx = el.qDy = 0; }
+  else if (el.type === 'text' && el.attach) { el.attach.dx = el.attach.dx0 ?? 0; el.attach.dy = el.attach.dy0 ?? 0; }
+  else { el.labelDx = 0; el.labelDy = 0; }
+  renderProps(); redraw();
+}
+
+function detachSelected() {
+  const el = elById(state.selectedId);
+  if (!el) return;
+  saveUndo();
+  delete el.on; delete el.attach; delete el.p1On; delete el.p2On;
+  renderProps(); redraw();
+}
+
+function attachSelected() {
+  const el = elById(state.selectedId);
+  if (!el || el.type !== 'text') return;
+  const snap = snapshot();
+  if (!attachText(el, 60)) { showToast('Nothing close enough to attach to. Move the label next to a curve or point first.'); return; }
+  saveUndo(snap);
+  renderProps(); redraw();
 }
 
 function setPropColor(key, value) {
@@ -2510,6 +2865,9 @@ function duplicateSelected() {
   } else if (dup.type === 'text' || dup.type === 'dot') {
     dup.xn += off; dup.yn += off;
   }
+  // The copy starts free; it is not where the original's links put it.
+  delete dup.on; delete dup.p1On; delete dup.p2On;
+  if (dup.attach) { dup.attach.dx += off * PLOT_W; dup.attach.dy += off * PLOT_H; }
   if (dup.type !== 'text') dup.label = origLabel + '2';
   state.elements.push(dup);
   state.selectedId = dup.id;
@@ -2520,7 +2878,7 @@ function duplicateSelected() {
 
 function deleteSelected() {
   saveUndo();
-  state.elements = state.elements.filter(e => e.id !== state.selectedId);
+  removeWithDependents([state.selectedId]);
   state.selectedId = null;
   renderCurveList();
   renderProps();
@@ -3029,8 +3387,53 @@ function currentGraphData() {
 function migrateGraphData(data) {
   data = JSON.parse(JSON.stringify(data || {}));
   data.elements = (data.elements || []).filter(e => e && e.type);
+  if (!data.v || data.v < 2) connectV1(data.elements);
   data.v = SAVE_VERSION;
   return data;
+}
+
+// v1 diagrams drew equilibria by hand: two dashed lines from a crossing to
+// the axes, plus text labels beside the axes. Where that is unambiguous it
+// becomes one connected equilibrium point, so it follows the curves from now
+// on. Anything that doesn't clearly match is left exactly as it was.
+function connectV1(els) {
+  const isGuide = e => e.type === 'line' && e.dash && !e.label;
+  const mains = els.filter(e => (e.type === 'line' || e.type === 'curve') && !isGuide(e));
+  // The pair of main curves crossing at (xn, yn). Prefers sloped curves over
+  // vertical/horizontal ones (AD and SRAS, not LRAS, in a three-way crossing).
+  const pairAt = (xn, yn) => {
+    const c = toCanvas(xn, yn), found = [];
+    for (let i = 0; i < mains.length; i++) for (let j = i + 1; j < mains.length; j++)
+      if (crossings(mains[i], mains[j]).some(pt => Math.hypot(pt.x - c.x, pt.y - c.y) < 5)) found.push([mains[i], mains[j]]);
+    const sloped = found.filter(([a, b]) => !isVertical(a) && !isVertical(b) && !isHorizontal(a) && !isHorizontal(b));
+    return (sloped[0] || found[0]) || null;
+  };
+  let maxId = els.reduce((m, e) => Math.max(m, e.id || 0), 0);
+  // Old equilibrium dots: they showed a dot, so keep it, and connect them.
+  els.filter(e => e.type === 'dot' && !e.on).forEach(d => {
+    if (d.showDot === undefined) d.showDot = true;
+    const pair = pairAt(d.xn, d.yn);
+    if (pair) d.on = [pair[0].id, pair[1].id];
+  });
+  const remove = new Set();
+  const guides = els.filter(isGuide);
+  guides.forEach(h => {
+    if (remove.has(h.id) || Math.abs(h.y1n - h.y2n) > 0.002 || Math.min(h.x1n, h.x2n) > 0.01) return;
+    const x = Math.max(h.x1n, h.x2n), y = h.y1n;
+    const v = guides.find(g => !remove.has(g.id) && Math.abs(g.x1n - g.x2n) < 0.002 && Math.abs(g.x1n - x) < 0.004
+      && Math.max(g.y1n, g.y2n) > 0.99 && Math.abs(Math.min(g.y1n, g.y2n) - y) < 0.006);
+    if (!v) return;
+    const pair = pairAt(x, y);
+    if (!pair) return;
+    const texts = els.filter(t => t.type === 'text' && !remove.has(t.id));
+    const pT = texts.find(t => t.xn < 0 && Math.abs(t.yn - y) < 0.02);
+    const qT = texts.find(t => t.yn > 1 && t.yn < 1.1 && Math.abs(t.xn - x) < 0.02);
+    const d = { id: ++maxId, type: 'dot', xn: x, yn: y, color: GUIDE.color, on: [pair[0].id, pair[1].id],
+      pLabel: pT ? pT.text : '', qLabel: qT ? qT.text : '', showDot: false, pDx: 0, pDy: 0, qDx: 0, qDy: 0 };
+    els.push(d);
+    [h, v, pT, qT].forEach(e => e && remove.add(e.id));
+  });
+  for (let i = els.length - 1; i >= 0; i--) if (remove.has(els[i].id)) els.splice(i, 1);
 }
 
 function applyGraphData(data) {
@@ -3094,6 +3497,7 @@ function renderExport(exportScale, mime, quality) {
   // Hide selection handles for the export only; the selection is restored after.
   const keepSelected = state.selectedId;
   state.selectedId = null;
+  exporting = true;
   const sv = viewScale, sox = viewOffsetX, soy = viewOffsetY;
   const origScale = SCALE;
   viewScale = 1; viewOffsetX = 0; viewOffsetY = 0;
@@ -3162,6 +3566,7 @@ function renderExport(exportScale, mime, quality) {
   canvas.height = origHh;
   viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
   state.selectedId = keepSelected;
+  exporting = false;
   redraw();
   return url;
 }

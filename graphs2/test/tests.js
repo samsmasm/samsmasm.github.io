@@ -243,7 +243,159 @@ test('feedback needs a message, and typing in it does not trigger shortcuts', as
   eq(await ev(page, `window.__sent.length`), 0, 'sent an empty report');
   await page.type('#fb-message', 'abc');
   await page.keyboard.press('Backspace');
-  eq(await ev(page, `state.elements.length`), 6, 'Backspace deleted an element');
+  eq(await ev(page, `state.elements.length`), 3, 'Backspace deleted an element');
+});
+
+
+// ─── PHASE 3: CONNECTED DIAGRAMS ─────────────────────────────
+
+// Puts D and S on blank axes and returns their ids.
+const sdLines = `state.elements = [mkLine(0.1, 0.1, 0.9, 0.9, '#1a4a8a', 2.5, '', 'D'), mkLine(0.1, 0.9, 0.9, 0.1, '#1a7a4a', 2.5, '', 'S')]; redraw();`;
+
+test('equilibrium tool snaps to the crossing, connects, and numbers P₁/Q₁', async (page) => {
+  await ev(page, sdLines + `setTool('equil')`);
+  const p = await ptn(page, 0.51, 0.52);
+  await page.mouse.click(p.x, p.y);
+  const d = await ev(page, `state.elements.find(e => e.type === 'dot')`);
+  assert(d, 'no point created');
+  assert(near(d.xn, 0.5) && near(d.yn, 0.5), `not at crossing: ${d.xn},${d.yn}`);
+  eq(d.on, await ev(page, `state.elements.slice(0, 2).map(e => e.id)`), 'not connected');
+  eq([d.pLabel, d.qLabel], ['P₁', 'Q₁'], 'labels');
+  eq(d.showDot, false, 'dot should be hidden by default');
+  await page.mouse.click(p.x, p.y);
+  eq(await ev(page, `state.elements.filter(e => e.type === 'dot').pop().pLabel`), 'P₂', 'second point numbering');
+});
+
+test('macro axes give PL/Y labels', async (page) => {
+  await ev(page, `loadTemplate('blank'); document.getElementById('y-label').value = 'Price level'; document.getElementById('x-label').value = 'Real GDP';` + sdLines + `setTool('equil')`);
+  const p = await ptn(page, 0.5, 0.5);
+  await page.mouse.click(p.x, p.y);
+  eq(await ev(page, `[state.elements[2].pLabel, state.elements[2].qLabel]`), ['PL₁', 'Y₁'], 'macro labels');
+});
+
+test('dragging a curve carries its equilibrium point, and undo puts it back', async (page) => {
+  await ev(page, sdLines + `state.elements.push(mkEq(state.elements[0], state.elements[1], 'P', 'Q')); redraw();`);
+  const a = await ptn(page, 0.3, 0.7), b = await ptn(page, 0.4, 0.7); // on S, drag right by 0.1
+  await drag(page, a, b);
+  const d = await ev(page, `state.elements[2]`);
+  assert(near(d.xn, 0.55, 0.01) && near(d.yn, 0.55, 0.01), `point did not follow: ${d.xn},${d.yn}`);
+  await ev(page, `undo()`);
+  const d2 = await ev(page, `state.elements[2]`);
+  assert(near(d2.xn, 0.5) && near(d2.yn, 0.5), 'undo did not restore point');
+});
+
+test('no drop line along a vertical or horizontal curve', async (page) => {
+  await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.9, 0.9, '#1a4a8a', 2.5, '', 'AD'), mkLine(0.5, 0, 0.5, 1, '#c8380a', 2.5, '', 'LRAS'), mkLine(0, 0.3, 1, 0.3, '#888', 2.5, '', 'Pmax')];
+    state.elements.push(mkEq(state.elements[0], state.elements[1], 'P', 'Q'), mkEq(state.elements[0], state.elements[2], 'P', 'Q')); redraw();`);
+  eq(await ev(page, `derived.get(state.elements[3].id)`), { skipQ: true, skipP: false }, 'vertical: skip the down line');
+  eq(await ev(page, `derived.get(state.elements[4].id)`), { skipQ: false, skipP: true }, 'horizontal: skip the left line');
+});
+
+test('dragging a P label moves only the label, and it still follows afterwards', async (page) => {
+  await ev(page, sdLines + `state.elements.push(mkEq(state.elements[0], state.elements[1], 'Pe', 'Qe')); redraw();`);
+  const box = await ev(page, `dotLabelBox(state.elements[2], 'p')`);
+  const a = await pt(page, box.x, box.y), b = await pt(page, box.x - 10, box.y - 20);
+  await drag(page, a, b);
+  const d = await ev(page, `state.elements[2]`);
+  assert(Math.abs(d.pDy + 20) < 1.5 && near(d.yn, 0.5), `pDy=${d.pDy} yn=${d.yn}`);
+  await ev(page, `state.elements[1].y1n += 0.1; state.elements[1].y2n += 0.1; redraw();`);
+  const box2 = await ev(page, `dotLabelBox(state.elements[2], 'p')`);
+  assert(box2.y > box.y - 20 + 15, 'label did not follow the point');
+  await ev(page, `state.selectedId = state.elements[2].id; resetLabelPosition();`);
+  eq(await ev(page, `state.elements[2].pDy`), 0, 'reset label position');
+});
+
+test('clicking a label without dragging edits it inline', async (page) => {
+  await ev(page, sdLines + `state.elements.push(mkEq(state.elements[0], state.elements[1], 'P', 'Q')); redraw();`);
+  const box = await ev(page, `dotLabelBox(state.elements[2], 'q')`);
+  const a = await pt(page, box.x, box.y);
+  await page.mouse.click(a.x, a.y);
+  await page.keyboard.press('End');
+  await page.keyboard.type('e');
+  await page.keyboard.press('Enter');
+  eq(await ev(page, `state.elements[2].qLabel`), 'Qe', 'inline edit of Q label');
+});
+
+test('Label tool attaches text placed beside a curve, Alt+drag leaves it behind', async (page) => {
+  await ev(page, sdLines + `setTool('text')`);
+  const p = await ptn(page, 0.3, 0.27); // just above D at (0.3, 0.3)
+  await page.mouse.click(p.x, p.y);
+  await new Promise(r => setTimeout(r, 50));
+  await page.keyboard.type('Demand');
+  await page.keyboard.press('Enter');
+  const t = await ev(page, `state.elements.find(e => e.type === 'text')`);
+  assert(t.attach && t.attach.id === await ev(page, `state.elements[0].id`), 'not attached to D: ' + JSON.stringify(t.attach));
+  await ev(page, `setTool('select')`);
+  const a = await ptn(page, 0.7, 0.7), b = await ptn(page, 0.7, 0.6);
+  await drag(page, a, b);
+  const t2 = await ev(page, `state.elements.find(e => e.type === 'text')`);
+  assert(near(t2.yn, t.yn - 0.1, 0.01), 'text did not follow D');
+  await page.keyboard.down('Alt');
+  await drag(page, await ptn(page, 0.7, 0.6), await ptn(page, 0.7, 0.5));
+  await page.keyboard.up('Alt');
+  const t3 = await ev(page, `state.elements.find(e => e.type === 'text')`);
+  assert(near(t3.yn, t2.yn, 0.005) && !t3.attach, 'Alt+drag should leave the text behind');
+});
+
+test('an arrow drawn between two curves keeps its ends on them', async (page) => {
+  await ev(page, `snapEnabled = false; state.elements = [mkLine(0.1, 0.9, 0.5, 0.1, '#1a7a4a', 2.5, '', 'S1'), mkLine(0.3, 0.9, 0.7, 0.1, '#1a7a4a', 2.5, '', 'S2')]; redraw(); setTool('arrow');`);
+  await drag(page, await ptn(page, 0.3, 0.5), await ptn(page, 0.5, 0.5));
+  const ar = await ev(page, `state.elements[2]`);
+  assert(ar.p1On && ar.p2On, 'ends not attached: ' + JSON.stringify(ar));
+  await ev(page, `const s = state.elements[1]; s.x1n += 0.1; s.x2n += 0.1; redraw();`);
+  const ar2 = await ev(page, `state.elements[2]`);
+  assert(near(ar2.x2n, 0.6, 0.01), 'arrow end did not follow S2: ' + ar2.x2n);
+});
+
+test('deleting a curve deletes its equilibrium points', async (page) => {
+  await ev(page, sdLines + `state.elements.push(mkEq(state.elements[0], state.elements[1], 'P', 'Q')); state.selectedId = state.elements[0].id; deleteSelected();`);
+  eq(await ev(page, `state.elements.map(e => e.label)`), ['S'], 'point left behind');
+});
+
+test('templates load as connected points that follow their curves', async (page) => {
+  for (const name of ['sd', 'adas', 'keyn', 'ext_neg', 'ext_pos']) {
+    await ev(page, `loadTemplate('${name}')`);
+    const r = await ev(page, `state.elements.filter(e => e.type === 'dot').map(d => ({ on: d.on, broken: !!(derived.get(d.id) || {}).broken, ok: d.on.every(id => elById(id)) }))`);
+    assert(r.length, name + ': no points');
+    r.forEach(x => assert(x.ok && !x.broken, name + ': bad point ' + JSON.stringify(x)));
+  }
+  // keyn: YFE label follows the YFE line.
+  await ev(page, `loadTemplate('keyn'); const y = state.elements.find(e => e.type === 'line' && e.dash); y.x1n += 0.05; y.x2n += 0.05; redraw();`);
+  assert(near(await ev(page, `state.elements.find(e => e.text === 'YFE').xn`), 0.76), 'YFE label did not follow');
+});
+
+test('v1 hand-drawn equilibria become connected points', async (page) => {
+  // The v1.9 S&D template, verbatim.
+  const v1 = { title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)', curves: [], elements: [
+    { id: 1, type: 'line', x1n: 0.08, y1n: 0.05, x2n: 0.92, y2n: 0.88, color: '#1a4a8a', weight: 2.5, dash: '', label: 'D', labelDx: 0, labelDy: 0 },
+    { id: 2, type: 'line', x1n: 0.08, y1n: 0.88, x2n: 0.88, y2n: 0.08, color: '#1a7a4a', weight: 2.5, dash: '', label: 'S', labelDx: 0, labelDy: 0 },
+    { id: 3, type: 'line', x1n: 0, y1n: 0.4625, x2n: 0.4975, y2n: 0.4625, color: '#aaa', weight: 1.5, dash: '5,4', label: '', labelDx: 0, labelDy: 0 },
+    { id: 4, type: 'line', x1n: 0.4975, y1n: 0.4625, x2n: 0.4975, y2n: 1.0, color: '#aaa', weight: 1.5, dash: '5,4', label: '', labelDx: 0, labelDy: 0 },
+    { id: 5, type: 'text', xn: 0.4975, yn: 1.02, text: 'Q*', color: '#333', size: 13 },
+    { id: 6, type: 'text', xn: -0.07, yn: 0.4625, text: 'P', color: '#333', size: 13 },
+    { id: 7, type: 'text', xn: 0.7, yn: 0.3, text: 'Surplus', color: '#333', size: 13 },
+  ] };
+  await ev(page, `applyGraphData(${JSON.stringify(v1)})`);
+  const els = await ev(page, `state.elements.map(e => e.type + ':' + (e.label || e.text || e.pLabel + '/' + e.qLabel) + (e.on ? ':on' + e.on.join(',') : ''))`);
+  eq(els, ['line:D', 'line:S', 'text:Surplus', 'dot:P/Q*:on1,2'], 'converted elements');
+  // A v1 dot keeps showing its dot.
+  await ev(page, `applyGraphData({ elements: [{ id: 1, type: 'line', x1n: 0.1, y1n: 0.1, x2n: 0.9, y2n: 0.9, label: 'D' }, { id: 2, type: 'line', x1n: 0.1, y1n: 0.9, x2n: 0.9, y2n: 0.1, label: 'S' }, { id: 3, type: 'dot', xn: 0.5, yn: 0.5, color: '#1a1918', pLabel: 'P', qLabel: 'Q' }] })`);
+  eq(await ev(page, `[state.elements[2].showDot, state.elements[2].on]`), [true, [1, 2]], 'v1 dot');
+});
+
+test('choosing a dash makes the line thin, in the sidebar and in properties', async (page) => {
+  await page.select('#stroke-weight', '4');
+  await page.select('#stroke-dash', '6,4');
+  eq(await ev(page, `document.getElementById('stroke-weight').value`), '1.5', 'sidebar weight');
+  await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.5, 0.5, '#1a4a8a', 4, '', '')]; state.selectedId = state.elements[0].id; updateProp('dash', '2,3');`);
+  eq(await ev(page, `state.elements[0].weight`), 1.5, 'props weight');
+});
+
+test('exported picture has no warning marks', async (page) => {
+  await ev(page, sdLines + `state.elements.push(mkEq(state.elements[0], state.elements[1], 'P', 'Q')); state.elements[1].x1n = 0.95; state.elements[1].x2n = 0.99; redraw();`);
+  assert(await ev(page, `!!derived.get(state.elements[2].id).broken`), 'should be broken');
+  await ev(page, `renderExport(1, 'image/png')`);
+  eq(await ev(page, `exporting`), false, 'exporting flag left on');
 });
 
 // ─── RUNNER ──────────────────────────────────────────────────

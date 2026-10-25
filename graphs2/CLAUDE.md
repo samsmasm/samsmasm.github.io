@@ -37,6 +37,25 @@ graphs2/
 - Text editing is inline (`showInlineLabelEdit(el, opts)`); the edit modal and the Label tool's `prompt()` are gone. `getLabelBasePos` covers every type, including brace tips, text and dots.
 - **Feedback** (Phase 2): header button opens `#feedback-modal`; `sendFeedback()` POSTs to the shared `unisam-feedback` Worker (`../feedback/CLAUDE.md`). Picture and diagram file are opt-in. `renderExport(scale, mime, quality)` draws the export (used by JPG download and the feedback picture). `openHandoffDiagram()` opens a diagram passed from the inbox via localStorage `sw2_open`.
 
+## Connected diagrams (Phase 3)
+
+Positions of attached elements are **derived** on every redraw by `resolveAttachments()` (top of `redraw()`), in dependency order with a cycle guard. Never set an attached element's position directly and expect it to stick: change its attachment instead.
+
+| link | meaning | set by |
+|------|---------|--------|
+| `dot.on = [idA, idB]` | sits where A and B cross (nearest crossing to its last position) | Equilibrium tool (`nearestCrossing`), dropping a free dot on a crossing, `mkEq` in templates, v1 migration |
+| `text.attach = { id, t, dx, dy, dx0, dy0 }` | canvas-px offset from point `t` along the parent; `dx0/dy0` is the original offset for "Reset label position" | Label tool (`attachText`, 24 px), "Attach to nearest" |
+| `line.p1On / p2On = { id, t }` | endpoint sits at point `t` along the parent | drawing or dragging an endpoint onto a line/curve (`attachEnd`, 7 px) |
+
+- `t` is the fraction of the parent's length (`pointAt` / `projectOnto`, using `getElSegments` so curves match what is drawn).
+- `derived` (a Map, never saved) holds per-redraw facts for dots: `broken` (curves no longer cross: faint red ring, hidden in export via `exporting`), `skipP` / `skipQ` (a horizontal / vertical curve in the pair, so that drop line is not drawn).
+- Dots: `showDot` (false by default for new points; v1 dots keep `true`), `drops` (lines to axes), `pLabel`/`qLabel` with hand offsets `pDx,pDy,qDx,qDy`. `dotLabelBox(el, 'p'|'q')` is the single source for label position. Labels auto-number P₁/Q₁ (PL/Y on macro axes) via `nextEqLabels()`.
+- Dragging: a curve drags everything attached. A label drag (`hitTestLabel`) changes only its offset fields. Dragging an attached text changes its offset (`reanchorText`). Dragging an attached arrow slides its ends along their parents (`slideEnds`). An attached dot cannot be dragged (hint shown). **Alt+drag** moves an element alone and detaches text attached to it.
+- Deleting uses `removeWithDependents()`: points on a deleted curve go too; attached text and arrow ends become free.
+- Template elements reference each other by id; `cloneElements()` remaps ids and references on load. Build templates as IIFEs with `mkEq(a, b, pLabel, qLabel, xn, yn)`.
+- `GUIDE` (`#888`, weight 1.5, dash `6,4`) is the one guide-line style. Choosing any dash sets weight to Thin, in the sidebar and in properties.
+- v1 migration: `connectV1()` in `migrateGraphData()` turns a dashed horizontal guide from the y-axis plus a dashed vertical guide to the x-axis, meeting at a crossing of two main curves, into one connected point, taking adjacent axis texts as its P/Q labels. Anything ambiguous is left alone.
+
 ---
 
 ## Canvas & coordinate system
@@ -102,8 +121,8 @@ All elements live in `state.elements`. Constructor helpers at lines ~799–817:
 | `dbarrow` | same as line | arrowheads at both ends |
 | `brace` | `x1n,y1n,x2n,y2n, color,weight,label,labelDx,labelDy, flip` | curly brace; label at the tip (`braceGeometry`) |
 | `curve` | `points[{xn,yn}], color,weight,dash,label, labelDx,labelDy` | catmull-rom spline |
-| `text` | `xn,yn, text, color, size` | free text label |
-| `dot` | `xn,yn, color, pLabel, qLabel` | equilibrium dot with optional P*/Q* labels and dotted projection lines |
+| `text` | `xn,yn, text, color, size, attach` | text label, optionally attached |
+| `dot` | `xn,yn, color, pLabel, qLabel, on, showDot, drops, pDx..qDy` | equilibrium point: drop lines to both axes, P/Q labels; see Connected diagrams |
 | `region` | `points[{xn,yn}], fillColor, pattern, bwPattern, label, labelDx,labelDy` | filled polygon |
 
 ---
