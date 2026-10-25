@@ -742,7 +742,7 @@ test('shift arrow leaves a small gap at each curve, and straightens while still 
   assert(arrow.gap > 0 && arrow.p1On && arrow.p2On, 'no gap or not attached');
   // Tilt it by sliding one end down its curve, then straighten.
   await ev(page, `(() => { const a = state.elements.find(e => e.type === 'arrow'), c = elById(a.p2On.id), q = toCanvas(a.x2n, a.y2n);
-    const lower = levelPointOn(c, { x: q.x, y: q.y + 20 }, true, q); a.p2On.t = projectOnto(c, lower.x, lower.y).t; redraw();
+    const lower = levelPointOn(c, { x: q.x, y: q.y + 20 }, true, q); a.p2On.t = projectOnto(c, lower.x, lower.y).t; a.level = null; redraw();
     state.selectedId = a.id; makeLineOrthogonal(); })()`);
   const a = await ev(page, `state.elements.find(e => e.type === 'arrow')`);
   assert(a.p1On && a.p2On, 'ends came loose');
@@ -862,6 +862,31 @@ test('new axis labels move left (P) or down (Q) clear of existing ones', async (
   // Moved ones only ever go left or down.
   const offs = await ev(page, `state.elements.filter(e => e.type === 'dot').map(e => [e.pDx || 0, e.qDy || 0])`);
   assert(offs.every(([px, qy]) => px <= 0 && qy >= 0), 'moved the wrong way: ' + JSON.stringify(offs));
+});
+
+test('a level arrow stays level when a curve it is attached to is dragged, until its end is dragged to an angle', async (page) => {
+  await ev(page, `loadTemplate('sd'); setTool('select'); state.selectedId = state.elements.find(e => e.label === 'D').id; shiftSelected(1)`);
+  const arrow = () => ev(page, `state.elements.find(e => e.type === 'arrow')`);
+  const levelGap = a => Math.abs(a.y1n - a.y2n) * 450;
+  // Drag D₂ straight up (grab it away from its equilibrium).
+  const d2 = await ev(page, `state.elements.find(e => e.label === 'D₂')`);
+  const s = await ptn(page, d2.x1n + (d2.x2n - d2.x1n) * 0.2, d2.y1n + (d2.y2n - d2.y1n) * 0.2);
+  const k = await ev(page, `stageFit`);
+  await drag(page, s, { x: s.x, y: s.y - 50 * k });
+  let a = await arrow();
+  assert(levelGap(a) < 0.5, 'arrow tilted after dragging D₂: ' + levelGap(a));
+  assert(a.p1On && a.p2On, 'arrow came loose');
+  // Dragging D₁ (the end that holds) sideways and up/down: still level.
+  await ev(page, `moveElement(state.elements.find(e => e.label === 'D₁'), 0, 0.05); redraw()`);
+  a = await arrow();
+  assert(levelGap(a) < 0.5, 'arrow tilted after moving D₁: ' + levelGap(a));
+  // Dragging the arrow's own end to an angle frees it.
+  await ev(page, `state.selectedId = state.elements.find(e => e.type === 'arrow').id; redraw()`);
+  const tip = await pt(page, ...(await ev(page, `(() => { const e = state.elements.find(e => e.type === 'arrow'), c = toCanvas(e.x2n, e.y2n); return [c.x, c.y]; })()`)));
+  await drag(page, tip, { x: tip.x + 10 * k, y: tip.y + 60 * k });
+  a = await arrow();
+  eq(a.level, null, 'still locked after an angled drag');
+  assert(levelGap(a) > 20, 'end did not move to an angle: ' + levelGap(a));
 });
 
 test('settings list the keyboard and mouse shortcuts', async (page) => {

@@ -2002,6 +2002,53 @@ function resolveAttachments() {
   state.elements.forEach(visit);
 }
 
+// Arrows stay level ('h') or upright ('v') when the curves they are attached
+// to move, until an end is dragged to another angle (`level` null). Arrows
+// from before the flag existed get it from their shape the first time.
+const isArrow = el => !!el && (el.type === 'arrow' || el.type === 'dbarrow');
+function arrowLevel(el, tol = 1e-3) {
+  const a = toCanvas(el.x1n, el.y1n), b = toCanvas(el.x2n, el.y2n);
+  const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+  if (dx + dy < 1) return null;
+  return dy <= dx * tol ? 'h' : dx <= dy * tol ? 'v' : null;
+}
+function keepLevel(el, byId) {
+  if (el.level === undefined) el.level = arrowLevel(el);
+  if (!el.level) return;
+  const horiz = el.level === 'h';
+  // The first attached end holds; the other follows it.
+  const [hk, hx, hy, k, xk, yk] = el.p1On || !el.p2On
+    ? ['p1On', 'x1n', 'y1n', 'p2On', 'x2n', 'y2n'] : ['p2On', 'x2n', 'y2n', 'p1On', 'x1n', 'y1n'];
+  const link = el[k], parent = link && byId.get(link.id);
+  if (!parent) {
+    if (horiz) el[yk] = el[hy]; else el[xk] = el[hx];
+    return;
+  }
+  let from = toCanvas(el[hx], el[hy]);
+  // If the other curve doesn't reach that level, both ends move to the
+  // nearest level it does reach (the holding end sliding along its curve).
+  const axis = horiz ? 'y' : 'x';
+  const span = polyOf(parent).map(p => p[axis]);
+  const lo = Math.min(...span) + 1, hi = Math.max(...span) - 1;
+  if (from[axis] < lo || from[axis] > hi) {
+    const hlink = el[hk], hparent = hlink && byId.get(hlink.id);
+    if (!hparent || lo > hi) return;
+    const want = { ...from, [axis]: Math.max(lo, Math.min(hi, from[axis])) };
+    const moved = levelPointOn(hparent, want, horiz, from);
+    if (!moved) return;
+    hlink.t = projectOnto(hparent, moved.x, moved.y).t;
+    const hn = fromCanvas(moved.x, moved.y);
+    el[hx] = hn.xn; el[hy] = hn.yn;
+    from = moved;
+  }
+  // Slide along its curve to the level of the holding end, nearest where it was.
+  const meet = levelPointOn(parent, from, horiz, toCanvas(el[xk], el[yk]));
+  if (!meet) return;
+  link.t = projectOnto(parent, meet.x, meet.y).t;
+  const n = fromCanvas(meet.x, meet.y);
+  el[xk] = n.xn; el[yk] = n.yn;
+}
+
 function resolveOne(el, byId) {
   if (isLinear(el)) {
     for (const [k, xk, yk] of [['p1On', 'x1n', 'y1n'], ['p2On', 'x2n', 'y2n']]) {
@@ -2014,6 +2061,7 @@ function resolveOne(el, byId) {
       const n = fromCanvas(c.x, c.y);
       el[xk] = n.xn; el[yk] = n.yn;
     }
+    if (isArrow(el)) keepLevel(el, byId);
   } else if (el.type === 'dot' && el.on) {
     const a = byId.get(el.on[0]), b = byId.get(el.on[1]);
     if (!a || !b) { delete el.on; return; }
@@ -3201,6 +3249,7 @@ function onMouseMove(e) {
     const el = state.elements.find(e => e.id === nodeDrag.elId);
     if (el) {
       if (!nodeDrag.moved) { saveUndo(nodeDrag.undoSnap); nodeDrag.moved = true; }
+      if (isArrow(el)) el.level = null; // free while its end is dragged; set again on release
       const snap = applyNodeMove(el, nodeDrag.node, cx, cy);
       if (isLinear(el)) attachEnd(el, nodeDrag.node === 'p1' ? 1 : 2);
       redraw();
@@ -3353,7 +3402,12 @@ function onMouseUp(e) {
     return;
   }
 
-  if (nodeDrag) { nodeDrag = null; redraw(); return; }
+  if (nodeDrag) {
+    // An arrow left within 2° of level or upright snaps to it and stays so.
+    const el = elById(nodeDrag.elId);
+    if (nodeDrag.moved && isArrow(el)) el.level = arrowLevel(el, Math.tan(2 * Math.PI / 180));
+    nodeDrag = null; redraw(); return;
+  }
 
   if (labelDrag) {
     if (!labelDrag.moved) {
@@ -4135,6 +4189,7 @@ function makeLineOrthogonal() {
     if (link) delete el[k]; // the curve never reaches that level: let the end go
     if (makeHoriz) el[yk] = fy; else el[xk] = fx;
   }
+  if (isArrow(el)) el.level = makeHoriz ? 'h' : 'v';
   redraw();
 }
 
