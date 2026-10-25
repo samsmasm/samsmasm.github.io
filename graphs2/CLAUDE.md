@@ -56,6 +56,16 @@ Positions of attached elements are **derived** on every redraw by `resolveAttach
 - `GUIDE` (`#888`, weight 1.5, dash `6,4`) is the one guide-line style. Choosing any dash sets weight to Thin, in the sidebar and in properties.
 - v1 migration: `connectV1()` in `migrateGraphData()` turns a dashed horizontal guide from the y-axis plus a dashed vertical guide to the x-axis, meeting at a crossing of two main curves, into one connected point, taking adjacent axis texts as its P/Q labels. Anything ambiguous is left alone.
 
+## Phase 5 features
+
+- **Shift curve** (`shiftSelected(dir)`, buttons in the panel for lines and curves): copies the curve `SHIFT_BY` (0.15) left/right, numbers labels (`numberCopy`: S → S₁/S₂, S₂ → S₃), adds an arrow attached to both at t = 0.8, and copies every equilibrium on the original onto the new curve with numbered P/Q labels. One undo step.
+- **Subscripts**: `fmtLabel(text, loose)`. `S_1` → S₁ everywhere; `S1` → S₁ in curve and point labels only (free text keeps "Q1 2024"). Applied when a label is stored (`fmtFor`), so state holds the Unicode subscripts.
+- **Keyboard** (`onKeyDown`, ignored while typing in a field): V/L/A/C/T/R/E tools, arrows nudge 1 px (Shift 10 px, a run of nudges is one undo step), Ctrl+C / Ctrl+V (internal clipboard, pasted copies are free of links) and Ctrl+D duplicate. `moveElement()` and `copyOf()` are the shared helpers.
+- **Curve points**: every point of a selected curve has a handle (ends larger); `hitTestNode` returns a point index for curves.
+- **Label halo**: `haloText()` strokes white behind every label and text.
+- **Pointer events**: the canvas listens to `pointerdown/move/up/cancel` (with pointer capture) instead of mouse events, and `touch-action: none`. `clickCount` replaces `e.detail` (pointer events have none); a double tap on touch calls `onDblClick` from `onPointerDown`, and `lastDblAt` stops a native dblclick doubling it.
+- **Ready-made shapes** (`SHAPES`, `addShape`): MC/AC, PPC, J-curve (with zero line), Lorenz (with line of equality).
+
 ---
 
 ## Canvas & coordinate system

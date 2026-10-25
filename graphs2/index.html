@@ -289,6 +289,7 @@
   }
 
   #graph-canvas {
+    touch-action: none;
     background: #ffffff;
     box-shadow: 0 2px 16px rgba(0,0,0,0.10);
     border-radius: 4px;
@@ -320,6 +321,8 @@
     padding: 5px 8px;
     color: var(--text);
   }
+  .shift-row { display: flex; gap: 6px; margin-top: 4px; }
+  .shift-row .action-btn { padding: 8px 4px; }
   .prop-check { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
   .prop-note { font-size: 11.5px; line-height: 1.45; color: var(--muted); background: var(--tag-bg); border-radius: 4px; padding: 6px 8px; }
   .prop-row input:focus, .prop-row select:focus { outline: 2px solid var(--accent); border-color: transparent; }
@@ -500,13 +503,13 @@
 
     <div class="section-head" style="margin-top:4px">Drawing tool</div>
     <div class="tool-grid">
-      <button class="tool-btn active" id="tool-select" onclick="setTool('select')">
+      <button class="tool-btn active" id="tool-select" title="Shortcut: V" onclick="setTool('select')">
         <span class="icon">↖</span>Select
       </button>
-      <button class="tool-btn" id="tool-line" onclick="setTool('line')">
+      <button class="tool-btn" id="tool-line" title="Shortcut: L" onclick="setTool('line')">
         <span class="icon">╱</span>Straight line
       </button>
-      <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')">
+      <button class="tool-btn" id="tool-arrow" title="Shortcut: A" onclick="setTool('arrow')">
         <span class="icon">→</span>Arrow
       </button>
       <button class="tool-btn" id="tool-dbarrow" onclick="setTool('dbarrow')">
@@ -515,18 +518,26 @@
       <button class="tool-btn" id="tool-brace" onclick="setTool('brace')">
         <span class="icon">⌒</span>Brace
       </button>
-      <button class="tool-btn" id="tool-curve" onclick="setTool('curve')">
+      <button class="tool-btn" id="tool-curve" title="Shortcut: C" onclick="setTool('curve')">
         <span class="icon">∿</span>Curve
       </button>
-      <button class="tool-btn" id="tool-text" onclick="setTool('text')">
+      <button class="tool-btn" id="tool-text" title="Shortcut: T" onclick="setTool('text')">
         <span class="icon">T</span>Label
       </button>
-      <button class="tool-btn" id="tool-region" onclick="setTool('region')">
+      <button class="tool-btn" id="tool-region" title="Shortcut: R" onclick="setTool('region')">
         <span class="icon">▨</span>Fill region
       </button>
-      <button class="tool-btn" id="tool-equil" onclick="setTool('equil')" style="grid-column:span 2">
+      <button class="tool-btn" id="tool-equil" title="Shortcut: E" onclick="setTool('equil')" style="grid-column:span 2">
         <span class="icon">⊕</span>Equilibrium point
       </button>
+    </div>
+
+    <div class="section-head" style="margin-top:2px">Ready-made shapes</div>
+    <div class="tool-grid">
+      <button class="tool-btn" onclick="addShape('cost')" title="U-shaped MC and AC curves">MC / AC</button>
+      <button class="tool-btn" onclick="addShape('ppc')" title="Production possibility curve">PPC</button>
+      <button class="tool-btn" onclick="addShape('jcurve')" title="J-curve with a zero line">J-curve</button>
+      <button class="tool-btn" onclick="addShape('lorenz')" title="Lorenz curve with line of equality">Lorenz</button>
     </div>
 
     <div class="section-head" style="margin-top:2px">Line color</div>
@@ -805,9 +816,11 @@ function init() {
   if (!restoreAutosave()) loadTemplate('blank', { record: false });
   openHandoffDiagram();
   fitCanvas();
-  canvas.addEventListener('mousedown', onMouseDown);
-  canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mouseup', onMouseUp);
+  // Pointer events: one code path for mouse, touch screens and pens.
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onMouseMove);
+  canvas.addEventListener('pointerup', onMouseUp);
+  canvas.addEventListener('pointercancel', onMouseUp);
   canvas.addEventListener('dblclick', onDblClick);
   document.addEventListener('keydown', onKeyDown);
   canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -974,6 +987,42 @@ function loadTemplate(name, opts = {}) {
     showToast(opts.message || 'Template loaded.', { undo: true });
 }
 
+// ─── LABEL NUMBERING ─────────────────────────────────────────
+const SUBS = '₀₁₂₃₄₅₆₇₈₉';
+const toSub = n => String(n).split('').map(d => SUBS[d]).join('');
+
+// "S_1" → "S₁" everywhere; "S1" → "S₁" too in curve and point labels
+// (`loose`), but not in free text, where "Q1 2024" should stay as typed.
+function fmtLabel(t, loose) {
+  t = String(t ?? '').replace(/_(\d{1,3})/g, (_, d) => toSub(d));
+  if (loose) t = t.replace(/([A-Za-z*])(\d{1,2})(?!\d)/g, (_, c, d) => c + toSub(d));
+  return t;
+}
+const LABEL_KEYS = ['label', 'pLabel', 'qLabel', 'text'];
+const fmtFor = (key, value) => LABEL_KEYS.includes(key) ? fmtLabel(value, key !== 'text') : value;
+
+// "S₂" → { base: 'S', n: 2 }; "S" → { base: 'S', n: null }.
+function splitLabel(label) {
+  const m = String(label || '').match(/^(.*?)([₀-₉]+)$/);
+  if (!m) return { base: label || '', n: null };
+  return { base: m[1], n: parseInt(m[2].split('').map(c => SUBS.indexOf(c)).join(''), 10) };
+}
+function nextFreeIndex(base, keys = ['label']) {
+  let max = 0;
+  state.elements.forEach(e => keys.forEach(k => {
+    const sp = splitLabel(e[k]);
+    if (sp.base === base && sp.n) max = Math.max(max, sp.n);
+  }));
+  return max + 1;
+}
+// Gives an original and its copy numbered labels: S → S₁ and S₂; S₂ → S₃.
+function numberCopy(orig, copy, key = 'label') {
+  const { base, n } = splitLabel(orig[key]);
+  if (!base) return;
+  if (n == null) { orig[key] = base.replace(/\*$/, '') + toSub(1); copy[key] = base.replace(/\*$/, '') + toSub(2); }
+  else copy[key] = base + toSub(nextFreeIndex(base, [key]));
+}
+
 // ─── COORDINATE HELPERS ──────────────────────────────────────
 const LINEAR_TYPES = ['line', 'arrow', 'dbarrow', 'brace'];
 function isLinear(el) { return !!el && LINEAR_TYPES.includes(el.type); }
@@ -1078,7 +1127,7 @@ function showInlineLabelEdit(el, opts = {}) {
   let done = false;
   const commit = () => {
     if (done) return; done = true;
-    const val = inp.value.trim();
+    const val = fmtFor(key, inp.value.trim());
     if (inp.parentNode) inp.parentNode.removeChild(inp);
     // Look the element up again: an undo while the box was open replaces objects.
     const target = state.elements.find(x => x.id === el.id);
@@ -1529,10 +1578,13 @@ function hitTestNode(cx, cy, el) {
     if (Math.hypot(cx-a.x, cy-a.y) < R) return 'p1';
     if (Math.hypot(cx-b.x, cy-b.y) < R) return 'p2';
   } else if (el.type === 'curve' && el.points.length) {
-    const first = toCanvas(el.points[0].xn, el.points[0].yn);
-    const last  = toCanvas(el.points[el.points.length-1].xn, el.points[el.points.length-1].yn);
-    if (Math.hypot(cx-first.x, cy-first.y) < R) return 'first';
-    if (Math.hypot(cx-last.x,  cy-last.y)  < R) return 'last';
+    // Any point of a curve can be dragged, not just the ends: nearest wins.
+    let best = null, bestD = R;
+    el.points.forEach((pt, i) => {
+      const c = toCanvas(pt.xn, pt.yn), d = Math.hypot(cx - c.x, cy - c.y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
   } else if (el.type === 'region' && el.points) {
     for (let i = 0; i < el.points.length; i++) {
       const p = toCanvas(el.points[i].xn, el.points[i].yn);
@@ -1548,10 +1600,7 @@ function applyNodeMove(el, node, cx, cy) {
   if (isLinear(el)) {
     if (node === 'p1') { el.x1n = n.xn; el.y1n = n.yn; }
     else               { el.x2n = n.xn; el.y2n = n.yn; }
-  } else if (el.type === 'curve') {
-    if (node === 'first') el.points[0] = { xn: n.xn, yn: n.yn };
-    else el.points[el.points.length-1] = { xn: n.xn, yn: n.yn };
-  } else if (el.type === 'region' && typeof node === 'number') {
+  } else if ((el.type === 'curve' || el.type === 'region') && typeof node === 'number') {
     el.points[node] = { xn: n.xn, yn: n.yn };
   }
   return snap;
@@ -1891,12 +1940,22 @@ function drawLineLabel(el) {
   }
 }
 
+// Labels get a white halo so they stay readable over hatching and lines.
+function haloText(text, x, y) {
+  ctx.save();
+  ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+  ctx.strokeText(text, x, y);
+  ctx.restore();
+}
+
 function drawLabelAt(text, x, y, color) {
   ctx.save();
   ctx.font = '500 13px "IBM Plex Sans", sans-serif';
   ctx.fillStyle = color || '#1a1918';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  haloText(text, x, y);
   ctx.fillText(text, x, y);
   ctx.restore();
 }
@@ -1908,6 +1967,7 @@ function drawTextEl(el) {
   ctx.fillStyle = bwMode ? '#1a1918' : (el.color || '#333');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  haloText(el.text, p.x, p.y);
   ctx.fillText(el.text, p.x, p.y);
   ctx.restore();
 }
@@ -1978,10 +2038,10 @@ function drawSelectionHandles() {
     drawHandle(a.x, a.y);
     drawHandle(b.x, b.y);
   } else if (el.type === 'curve' && el.points.length > 0) {
-    const first = toCanvas(el.points[0].xn, el.points[0].yn);
-    const last = toCanvas(el.points[el.points.length - 1].xn, el.points[el.points.length - 1].yn);
-    drawHandle(first.x, first.y);
-    drawHandle(last.x, last.y);
+    el.points.forEach((pt, i) => {
+      const c = toCanvas(pt.xn, pt.yn);
+      drawHandle(c.x, c.y, i === 0 || i === el.points.length - 1 ? 5 : 3.5);
+    });
   } else if (el.type === 'region') {
     if (el.points && el.points.length >= 3) {
       const pts = el.points.map(p => toCanvas(p.xn, p.yn));
@@ -2021,9 +2081,9 @@ function drawLabelHandle(x, y) {
   ctx.restore();
 }
 
-function drawHandle(x, y) {
+function drawHandle(x, y, r = 5) {
   ctx.beginPath();
-  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.strokeStyle = '#1a4a8a';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([]);
@@ -2066,6 +2126,20 @@ function updateHint(t) {
     region: 'Click vertices · double-click to close and fill region',
   };
   document.getElementById('hint-text').textContent = hints[t] || '';
+}
+
+// Click counting is ours, because pointer events carry no click count and
+// touch screens fire no dblclick: a second tap in place within 450 ms is a
+// double tap.
+let lastDown = { t: 0, x: 0, y: 0 }, clickCount = 1, lastDblAt = 0;
+function onPointerDown(e) {
+  if (e.button === 2) return;
+  const now = performance.now();
+  clickCount = (now - lastDown.t < 450 && Math.hypot(e.clientX - lastDown.x, e.clientY - lastDown.y) < 8) ? clickCount + 1 : 1;
+  lastDown = { t: now, x: e.clientX, y: e.clientY };
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  onMouseDown(e);
+  if (e.pointerType !== 'mouse' && clickCount === 2) onDblClick(e);
 }
 
 function onMouseDown(e) {
@@ -2126,7 +2200,7 @@ function onMouseDown(e) {
   } else if (state.tool === 'curve') {
     // The second click of a double-click finishes the curve (onDblClick);
     // it must not also add a duplicate point.
-    if (e.detail > 1) return;
+    if (clickCount > 1) return;
     curvePoints.push({ xn: n.xn, yn: n.yn });
     if (curvePoints.length === 1) {
       drawing = true;
@@ -2145,7 +2219,7 @@ function onMouseDown(e) {
     // Defer so this mousedown doesn't immediately blur the new input.
     setTimeout(() => showInlineLabelEdit(el, { isNew: true, undoSnap }), 0);
   } else if (state.tool === 'region') {
-    if (e.detail > 1) return;
+    if (clickCount > 1) return;
     const geoSnap = getSnapCandidate(cx, cy, true);
     let finalN;
     if (geoSnap) {
@@ -2429,6 +2503,9 @@ function onMouseUp(e) {
 }
 
 function onDblClick(e) {
+  // A double tap is handled from pointerdown; ignore a native dblclick right after it.
+  if (performance.now() - lastDblAt < 300) return;
+  lastDblAt = performance.now();
   const { rawCx, rawCy, cx, cy } = eventToLogical(e);
 
   if (state.tool === 'curve' && drawing && curvePoints.length >= 2) {
@@ -2479,6 +2556,25 @@ function onKeyDown(e) {
     e.preventDefault();
     if (!spaceHeld) { spaceHeld = true; canvas.style.cursor = 'grab'; }
     return;
+  }
+  const focusedEl = document.activeElement;
+  const typing = focusedEl && /^(INPUT|TEXTAREA|SELECT)$/.test(focusedEl.tagName);
+  if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const tool = { v: 'select', l: 'line', a: 'arrow', c: 'curve', t: 'text', r: 'region', e: 'equil' }[e.key.toLowerCase()];
+    if (tool && !drawing) { setTool(tool); return; }
+    const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (arrows && state.selectedId) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      nudgeSelected(arrows[0] * step, arrows[1] * step);
+      return;
+    }
+  }
+  if (!typing && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    const k = e.key.toLowerCase();
+    if (k === 'c' && copySelected()) { e.preventDefault(); return; }
+    if (k === 'v' && copiedEl) { e.preventDefault(); pasteCopied(); return; }
+    if (k === 'd' && state.selectedId) { e.preventDefault(); duplicateSelected(); return; }
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
@@ -2728,6 +2824,10 @@ function renderProps() {
   if (el.label && (el.labelDx || el.labelDy) && el.type !== 'text' && el.type !== 'dot')
     html += `<button class="action-btn secondary" style="margin-top:4px" onclick="resetLabelPosition()">Reset label position</button>`;
 
+  if (el.type === 'line' || el.type === 'curve') {
+    html += `<div class="shift-row"><button class="action-btn primary" onclick="shiftSelected(-1)" title="Copy it to the left, with an arrow">← Shift left</button>
+      <button class="action-btn primary" onclick="shiftSelected(1)" title="Copy it to the right, with an arrow">Shift right →</button></div>`;
+  }
   if (el.type === 'line' || el.type === 'arrow' || el.type === 'dbarrow') {
     html += `<button class="action-btn secondary" style="margin-top:4px" onclick="makeLineOrthogonal()">Make horizontal / vertical</button>`;
   }
@@ -2748,7 +2848,7 @@ function updatePropLive(key, value) {
   if (!el) return;
   const sig = el.id + ':' + key;
   if (liveEditKey !== sig) { saveUndo(); liveEditKey = sig; }
-  el[key] = value;
+  el[key] = fmtFor(key, value);
   if (key === 'label' || key === 'fillColor') renderLegendList();
   redraw();
 }
@@ -2812,35 +2912,128 @@ function colorSwatchHTML(currentColor, propKey) {
   ).join('')}</div>`;
 }
 
+function moveElement(el, dxn, dyn) {
+  if (isLinear(el)) {
+    el.x1n += dxn; el.y1n += dyn; el.x2n += dxn; el.y2n += dyn;
+    slideEnds(el);
+  } else if (el.points) {
+    el.points = el.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
+  } else if (el.type === 'text' || (el.type === 'dot' && !el.on)) {
+    el.xn += dxn; el.yn += dyn;
+    if (el.type === 'text') reanchorText(el);
+  }
+}
+
+// A free copy of el (no links), offset by (dxn, dyn).
+function copyOf(el, dxn, dyn) {
+  const dup = JSON.parse(JSON.stringify(el));
+  dup.id = nextId++;
+  delete dup.on; delete dup.p1On; delete dup.p2On; delete dup.attach;
+  moveElement(dup, dxn, dyn);
+  return dup;
+}
+
 function duplicateSelected() {
   const el = state.elements.find(e => e.id === state.selectedId);
   if (!el) return;
   saveUndo();
-  // Append '1' to original label
-  const origLabel = el.type === 'text' ? 'text' : (el.label || '');
-  if (el.type !== 'text' && origLabel !== '') el.label = origLabel + '1';
-  // Deep-copy as duplicate with new id, offset slightly, label + '2'
-  const dup = JSON.parse(JSON.stringify(el));
-  dup.id = nextId++;
-  const off = 0.03;
-  if (isLinear(dup)) {
-    dup.x1n += off; dup.y1n += off; dup.x2n += off; dup.y2n += off;
-  } else if (dup.type === 'curve') {
-    dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
-  } else if (dup.type === 'region') {
-    dup.points = dup.points.map(p => ({ ...p, xn: p.xn + off, yn: p.yn + off }));
-  } else if (dup.type === 'text' || dup.type === 'dot') {
-    dup.xn += off; dup.yn += off;
-  }
-  // The copy starts free; it is not where the original's links put it.
-  delete dup.on; delete dup.p1On; delete dup.p2On;
-  if (dup.attach) { dup.attach.dx += off * PLOT_W; dup.attach.dy += off * PLOT_H; }
-  if (dup.type !== 'text') dup.label = origLabel + '2';
+  const dup = copyOf(el, 0.03, 0.03);
+  if (el.type === 'dot') { numberCopy(el, dup, 'pLabel'); numberCopy(el, dup, 'qLabel'); }
+  else if (el.type !== 'text') numberCopy(el, dup);
   state.elements.push(dup);
   state.selectedId = dup.id;
   renderLegendList();
   renderProps();
   redraw();
+}
+
+// Shift curve: one click makes S₁ and S₂, an arrow between them that stays
+// attached to both, and a new equilibrium wherever the original had one.
+const SHIFT_BY = 0.15;
+function shiftSelected(dir) {
+  const el = elById(state.selectedId);
+  if (!el || (el.type !== 'line' && el.type !== 'curve')) return;
+  saveUndo();
+  const copy = copyOf(el, SHIFT_BY * dir, 0);
+  numberCopy(el, copy);
+  state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
+  // Arrow between the two, away from the middle where equilibria usually are.
+  const t = 0.8;
+  const a = fromCanvas(pointAt(el, t).x, pointAt(el, t).y), b = fromCanvas(pointAt(copy, t).x, pointAt(copy, t).y);
+  const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
+  arrow.p1On = { id: el.id, t }; arrow.p2On = { id: copy.id, t };
+  state.elements.push(arrow);
+  state.elements.filter(d => d.type === 'dot' && d.on && d.on.includes(el.id)).forEach(d => {
+    const nd = copyOf(d, 0, 0);
+    nd.on = d.on.map(id => id === el.id ? copy.id : id);
+    nd.pDx = nd.pDy = nd.qDx = nd.qDy = 0;
+    numberCopy(d, nd, 'pLabel'); numberCopy(d, nd, 'qLabel');
+    state.elements.push(nd);
+  });
+  state.selectedId = copy.id;
+  renderLegendList(); renderProps(); redraw();
+}
+
+let copiedEl = null, pasteCount = 0;
+function copySelected() {
+  const el = elById(state.selectedId);
+  if (!el) return false;
+  copiedEl = JSON.parse(JSON.stringify(el)); pasteCount = 0;
+  return true;
+}
+function pasteCopied() {
+  if (!copiedEl) return;
+  saveUndo();
+  pasteCount++;
+  const dup = copyOf(copiedEl, 0.03 * pasteCount, 0.03 * pasteCount);
+  state.elements.push(dup);
+  state.selectedId = dup.id;
+  renderLegendList(); renderProps(); redraw();
+}
+
+// Arrow keys nudge by 1 px (Shift: 10 px). A run of nudges is one undo step.
+let lastNudge = { id: null, t: 0 };
+function nudgeSelected(dx, dy) {
+  const el = elById(state.selectedId);
+  if (!el || (el.type === 'dot' && el.on)) return;
+  const now = performance.now();
+  if (lastNudge.id !== el.id || now - lastNudge.t > 1000) saveUndo();
+  lastNudge = { id: el.id, t: now };
+  moveElement(el, dx / PLOT_W, dy / PLOT_H);
+  redraw();
+}
+
+// Ready-made shapes that are fiddly to draw by hand.
+const SHAPES = {
+  cost: () => [
+    mkCurve([{xn: 0.12, yn: 0.62}, {xn: 0.25, yn: 0.74}, {xn: 0.4, yn: 0.66}, {xn: 0.5, yn: 0.5}, {xn: 0.62, yn: 0.27}, {xn: 0.72, yn: 0.06}], COLORS[1], 2.5, '', 'MC'),
+    mkCurve([{xn: 0.1, yn: 0.12}, {xn: 0.24, yn: 0.38}, {xn: 0.4, yn: 0.5}, {xn: 0.52, yn: 0.53}, {xn: 0.66, yn: 0.48}, {xn: 0.82, yn: 0.32}, {xn: 0.92, yn: 0.14}], COLORS[0], 2.5, '', 'AC'),
+  ],
+  ppc: () => {
+    const ppc = mkCurve([0, 15, 30, 45, 60, 75, 90].map(deg => {
+      const r = deg * Math.PI / 180;
+      return { xn: 0.85 * Math.sin(r), yn: 1 - 0.85 * Math.cos(r) };
+    }), COLORS[0], 2.5, '', 'PPC');
+    ppc.labelDx = -101; ppc.labelDy = -315; // just outside the bow, not on the x-axis
+    return [ppc];
+  },
+  jcurve: () => [
+    mkLine(0, 0.45, 1, 0.45, GUIDE.color, GUIDE.weight, '', ''),
+    mkCurve([{xn: 0.05, yn: 0.45}, {xn: 0.18, yn: 0.68}, {xn: 0.3, yn: 0.74}, {xn: 0.45, yn: 0.55}, {xn: 0.65, yn: 0.3}, {xn: 0.92, yn: 0.18}], COLORS[0], 2.5, '', 'J-curve'),
+  ],
+  lorenz: () => {
+    const eq = mkLine(0, 1, 1, 0, GUIDE.color, GUIDE.weight, GUIDE.dash, 'Line of equality');
+    eq.labelDx = -228; eq.labelDy = 135; // above-left of the diagonal, clear of both lines
+    return [eq, mkCurve([0, 0.25, 0.5, 0.7, 0.85, 1].map(x => ({ xn: x, yn: 1 - Math.pow(x, 2.3) })), COLORS[0], 2.5, '', 'Lorenz curve')];
+  },
+};
+function addShape(name) {
+  saveUndo();
+  const els = SHAPES[name]();
+  state.elements.push(...els);
+  setTool('select');
+  state.selectedId = els[els.length - 1].id;
+  renderLegendList(); renderProps(); redraw();
 }
 
 function deleteSelected() {

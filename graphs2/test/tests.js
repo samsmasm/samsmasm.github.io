@@ -450,6 +450,74 @@ test('header has no sign-in button; B/W mode notes that colours need Colour mode
   eq(await ev(page, `document.getElementById('bw-color-note').style.display`), 'none', 'note shown in colour mode');
 });
 
+
+// ─── PHASE 5: BIG FEATURES ───────────────────────────────────
+
+test('Shift right makes S₁ and S₂, an attached arrow, and the new equilibrium', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements[1].id; renderProps();`);
+  await page.click('.shift-row button:nth-child(2)');
+  const r = await ev(page, `state.elements.map(e => ({ type: e.type, label: e.label, p: e.pLabel, q: e.qLabel, on: !!e.on, ends: !!(e.p1On && e.p2On) }))`);
+  eq(r.filter(e => e.type === 'line').map(e => e.label), ['D', 'S₁', 'S₂'], 'curve labels');
+  assert(r.some(e => e.type === 'arrow' && e.ends), 'no attached arrow');
+  eq(r.filter(e => e.type === 'dot').map(e => [e.p, e.q, e.on]), [['P₁', 'Q₁', true], ['P₂', 'Q₂', true]], 'equilibria');
+  const [d1, d2] = await ev(page, `state.elements.filter(e => e.type === 'dot')`);
+  assert(d2.xn > d1.xn + 0.03 && d2.yn > d1.yn + 0.03, 'new equilibrium should be lower right');
+  await ev(page, `undo()`);
+  eq(await ev(page, `state.elements.length`), 3, 'shift is one undo step');
+});
+
+test('S1 and S_1 become S₁ in labels; free text keeps plain digits', async (page) => {
+  await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.9, 0.9, '#1a4a8a', 2.5, '', 'D')]; state.selectedId = state.elements[0].id; renderProps();`);
+  await page.click('#props-form input[type=text]', { count: 3 });
+  await page.keyboard.type('AD1');
+  eq(await ev(page, `state.elements[0].label`), 'AD₁', 'loose subscript in curve label');
+  eq(await ev(page, `[fmtLabel('S_12', false), fmtLabel('Q1 2024', false), fmtLabel('MPC=S', true)]`), ['S₁₂', 'Q1 2024', 'MPC=S'], 'formatting rules');
+});
+
+test('keyboard: tool letters, arrow nudge as one undo step, Ctrl+C/V and Ctrl+D', async (page) => {
+  await ev(page, `state.elements = [mkLine(0.1, 0.5, 0.5, 0.5, '#1a4a8a', 2.5, '', 'S')]; state.selectedId = state.elements[0].id; undoStack = []; redraw();`);
+  await page.keyboard.press('l');
+  eq(await ev(page, `state.tool`), 'line', 'L picks line');
+  await page.keyboard.press('v');
+  eq(await ev(page, `state.tool`), 'select', 'V picks select');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.down('Shift'); await page.keyboard.press('ArrowRight'); await page.keyboard.up('Shift');
+  const x = await ev(page, `toCanvas(state.elements[0].x1n, 0).x - toCanvas(0.1, 0).x`);
+  assert(Math.abs(x - 11) < 0.01, 'nudged by ' + x);
+  eq(await ev(page, `undoStack.length`), 1, 'nudges should be one undo step');
+  await page.keyboard.down('Control'); await page.keyboard.press('c'); await page.keyboard.press('v'); await page.keyboard.press('d'); await page.keyboard.up('Control');
+  eq(await ev(page, `state.elements.length`), 3, 'paste + duplicate');
+});
+
+test('middle points of a curve can be dragged', async (page) => {
+  await ev(page, `state.elements = [mkCurve([{xn:.1,yn:.8},{xn:.4,yn:.5},{xn:.8,yn:.2}], '#1a4a8a', 2.5, '', 'C')]; state.selectedId = state.elements[0].id; redraw();`);
+  await drag(page, await ptn(page, 0.4, 0.5), await ptn(page, 0.4, 0.7));
+  const pts = await ev(page, `state.elements[0].points`);
+  assert(near(pts[1].yn, 0.7, 0.01) && near(pts[0].yn, 0.8) && near(pts[2].yn, 0.2), 'middle point did not move alone: ' + JSON.stringify(pts));
+});
+
+test('touch: drawing a line and double-tapping to finish a curve work', async (page) => {
+  await ev(page, `snapEnabled = false; setTool('line')`);
+  const a = await ptn(page, 0.2, 0.2), b = await ptn(page, 0.6, 0.6);
+  const cdp = await page.createCDPSession();
+  const touch = (type, p) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y }] : [] });
+  await touch('touchStart', a); await touch('touchMove', b); await touch('touchEnd');
+  eq(await ev(page, `state.elements.map(e => e.type)`), ['line'], 'line not drawn by touch');
+  await ev(page, `setTool('curve')`);
+  for (const [x, y] of [[0.1, 0.8], [0.4, 0.5]]) { const p = await ptn(page, x, y); await touch('touchStart', p); await touch('touchEnd'); await new Promise(r => setTimeout(r, 500)); }
+  const p = await ptn(page, 0.7, 0.2);
+  await touch('touchStart', p); await touch('touchEnd'); await touch('touchStart', p); await touch('touchEnd');
+  const c = await ev(page, `state.elements.find(e => e.type === 'curve')`);
+  assert(c && c.points.length === 3, 'curve by double tap: ' + JSON.stringify(c && c.points));
+});
+
+test('ready-made shapes add labelled curves', async (page) => {
+  for (const [k, labels] of [['cost', ['MC', 'AC']], ['ppc', ['PPC']], ['lorenz', ['Line of equality', 'Lorenz curve']]]) {
+    await ev(page, `loadTemplate('blank'); addShape('${k}')`);
+    eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), labels, k);
+  }
+});
+
 // ─── RUNNER ──────────────────────────────────────────────────
 (async () => {
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });

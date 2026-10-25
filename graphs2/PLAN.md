@@ -181,4 +181,12 @@ All of 3a to 3e, with 13 new browser tests (34 in total). Calls made:
 - B/W note under the sidebar colours and in the panel's colour pickers.
 - 4 new tests (38 in total).
 
-**Next: Phase 5 (big features).**
+### 2026-10-25: Phase 5 done (big features)
+
+All seven items, with 6 new tests (44 in total), including real touch events through Chrome's touch emulation.
+- Shift curve also creates the new equilibrium (the plan's "optional"), because otherwise students have to place it straight after anyway. Unnumbered labels get numbered: S → S₁/S₂, P/Q* → P₁/Q₁ and P₂/Q₂ (a trailing * is dropped when numbering).
+- Duplicate now numbers labels the same way (it used to append plain "1" and "2").
+- Subscript rule: "S1" → "S₁" only in curve and point labels, not free text, so text like "Q1 2024" is left alone. "S_1" works everywhere.
+- Ready-made shapes are a sidebar section under the tools, not a template, because they add to the current diagram. Axis labels are left as they are.
+
+**Next: Phase 6 (templates).**
