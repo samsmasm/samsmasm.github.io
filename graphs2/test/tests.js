@@ -50,10 +50,11 @@ test('loading a template is undoable, and offers Undo when it replaced work', as
   eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), ['D', 'S'], 'undo did not restore S&D');
 });
 
-test('template curves are deep-copied (editing one does not change the template)', async (page) => {
+test('templates are built fresh each load (editing one does not change the next)', async (page) => {
   await ev(page, `loadTemplate('keyn')`);
   await ev(page, `state.elements.find(e => e.type === 'curve').points[0].xn = 0.9`);
-  eq(await ev(page, `TEMPLATES.keyn.elements.find(e => e.type === 'curve').points[0].xn`), 0.05, 'template mutated');
+  await ev(page, `loadTemplate('keyn')`);
+  eq(await ev(page, `state.elements.find(e => e.type === 'curve').points[0].xn`), 0.05, 'template mutated');
 });
 
 test('a click with no movement adds no undo step and keeps redo', async (page) => {
@@ -360,9 +361,9 @@ test('deleting a curve deletes its equilibrium points', async (page) => {
 });
 
 test('templates load as connected points that follow their curves', async (page) => {
-  for (const name of ['sd', 'adas', 'keyn', 'ext_neg', 'ext_pos']) {
+  for (const name of await ev(page, `Object.keys(TEMPLATES).filter(k => !['blank', 'ppc', 'lorenz', 'phillips'].includes(k))`)) {
     await ev(page, `loadTemplate('${name}')`);
-    const r = await ev(page, `state.elements.filter(e => e.type === 'dot').map(d => ({ on: d.on, broken: !!(derived.get(d.id) || {}).broken, ok: d.on.every(id => elById(id)) }))`);
+    const r = await ev(page, `state.elements.filter(e => e.type === 'dot' && e.on).map(d => ({ on: d.on, broken: !!(derived.get(d.id) || {}).broken, ok: d.on.every(id => elById(id)) }))`);
     assert(r.length, name + ': no points');
     r.forEach(x => assert(x.ok && !x.broken, name + ': bad point ' + JSON.stringify(x)));
   }
@@ -516,6 +517,61 @@ test('ready-made shapes add labelled curves', async (page) => {
     await ev(page, `loadTemplate('blank'); addShape('${k}')`);
     eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), labels, k);
   }
+});
+
+
+// ─── PHASE 6: TEMPLATES ──────────────────────────────────────
+
+test('every template loads cleanly, with labelled curves, inside the canvas', async (page, errors) => {
+  const keys = await ev(page, `Object.keys(TEMPLATES)`);
+  assert(keys.length >= 22, 'only ' + keys.length + ' templates');
+  for (const k of keys) {
+    await ev(page, `loadTemplate('${k}')`);
+    const r = await ev(page, `(() => {
+      const out = [];
+      state.elements.forEach(e => {
+        const pts = isLinear(e) ? [[e.x1n, e.y1n], [e.x2n, e.y2n]] : e.points ? e.points.map(p => [p.xn, p.yn]) : [[e.xn, e.yn]];
+        pts.forEach(([x, y]) => { if (x < -0.13 || x > 1.1 || y < -0.1 || y > 1.1) out.push(e.type + ' ' + (e.label || e.text || '') + ' at ' + x.toFixed(2) + ',' + y.toFixed(2)); });
+      });
+      return out;
+    })()`);
+    eq(r, [], k + ': elements off the canvas');
+  }
+  eq(errors, [], 'errors');
+});
+
+test('tax template: the burden areas meet the equilibria exactly', async (page) => {
+  await ev(page, `loadTemplate('tax')`);
+  const r = await ev(page, `(() => {
+    const dots = state.elements.filter(e => e.type === 'dot');
+    const regs = state.elements.filter(e => e.type === 'region');
+    return { p1: dots[0].yn, pc: dots[1].yn, q2: dots[1].xn, pp: dots[2].yn,
+      cons: regs[0].points.map(p => p.yn), prod: regs[1].points.map(p => p.yn), right: regs[0].points[1].xn };
+  })()`);
+  assert(near(Math.min(...r.cons), r.pc) && near(Math.max(...r.cons), r.p1), 'consumer area edges');
+  assert(near(Math.min(...r.prod), r.p1) && near(Math.max(...r.prod), r.pp), 'producer area edges');
+  assert(near(r.right, r.q2), 'areas end at Q2');
+  assert(r.pc < r.p1 && r.p1 < r.pp, 'Pc above P1 above Pp');
+});
+
+test('monopoly: profit area sits between price and AC at MC = MR', async (page) => {
+  await ev(page, `loadTemplate('monopoly')`);
+  const r = await ev(page, `(() => { const m = state.elements.find(e => e.type === 'dot' && e.on); const reg = state.elements.find(e => e.type === 'region');
+    return { q: m.xn, right: reg.points[1].xn, top: Math.min(...reg.points.map(p => p.yn)), bottom: Math.max(...reg.points.map(p => p.yn)) }; })()`);
+  assert(near(r.q, r.right, 0.003), 'profit area does not end at the MC = MR quantity');
+  assert(r.top < r.bottom, 'price should be above AC (abnormal profit)');
+});
+
+test('template picker shows thumbnails by group and loads the choice', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements[0].id;`);
+  await page.click('.template-btn.browse');
+  await new Promise(r => setTimeout(r, 600));
+  eq(await ev(page, `[...document.querySelectorAll('#template-grid h3')].map(h => h.textContent)`), ['Micro', 'Macro', 'Global'], 'groups');
+  assert(await ev(page, `[...document.querySelectorAll('#template-grid img')].every(i => i.src.startsWith('data:image/png'))`), 'thumbnails missing');
+  eq(await ev(page, `[state.elements.length, state.selectedId === state.elements[0].id, undoStack.length]`), [3, true, 1], 'thumbnails disturbed the diagram');
+  await page.click('.tpl-card[onclick*="monopoly"]');
+  eq(await ev(page, `state.yLabel`), 'Price, costs, revenue ($)', 'monopoly not loaded');
+  assert(!(await ev(page, `document.getElementById('template-modal').classList.contains('open')`)), 'picker still open');
 });
 
 // ─── RUNNER ──────────────────────────────────────────────────

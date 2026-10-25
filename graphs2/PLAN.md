@@ -189,4 +189,14 @@ All seven items, with 6 new tests (44 in total), including real touch events thr
 - Subscript rule: "S1" → "S₁" only in curve and point labels, not free text, so text like "Q1 2024" is left alone. "S_1" works everywhere.
 - Ready-made shapes are a sidebar section under the tools, not a template, because they add to the current diagram. Axis labels are left as they are.
 
-**Next: Phase 6 (templates).**
+### 2026-10-25: Phase 6 done (templates)
+
+- 16 new templates (22 in total), all built on connected points: indirect tax (with consumer and producer burden), subsidy (cost), price ceiling (shortage), price floor (surplus), merit and demerit goods (welfare loss), monopoly (profit at MC = MR), perfect competition (long-run, P tangent to AC at MC), PPC, inflationary and deflationary gaps, Phillips curve (SRPC, LRPC, NRU), Lorenz curve, tariff (revenue), quota (rent), exchange rate.
+- Picker: a dialog with real thumbnails grouped Micro / Macro / Global. The sidebar keeps Blank and Supply & Demand as one-click buttons, plus "All templates".
+- Points that are not crossings of two curves (producer price Pp, monopoly Pm and AC, domestic Q₂ under a quota) are free points: they do not follow if curves are moved. Shaded areas don't follow either. Both could be connected later (a point "on curve X at the quantity of point Y").
+- Points now have separate on/off switches for the line to each axis (`dropP`, `dropQ`), which monopoly and trade diagrams need.
+- Lorenz sits under Macro (equity and income distribution); PPC under Micro (Unit 1).
+- 4 new tests (48 in total), including one that loads every template and checks nothing is off the canvas.
+- Economics needs Sam's eye before Phase 7: labels follow common IB usage (Pc/Pp, Pm/Qm with P*/Q* for the optimum, PL/Y, Yfe, NRU), but conventions vary by textbook.
+
+**Next: Phase 7 (promote).** Wait for Sam to try graphs2 first.

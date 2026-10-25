@@ -147,11 +147,15 @@ One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/
 
 ## Templates
 
-Defined in the `TEMPLATES` object (line ~660). Each template has `{ title, yLabel, xLabel, curves[], elements[] }`. Loaded via `loadTemplate(name)` which deep-copies elements and reassigns IDs.
+`TEMPLATES[key] = { group, name, sub, build }`. `build()` runs at load time and returns `{ title, yLabel, xLabel, elements }`, so builders can use any helper (they also run for thumbnails). `loadTemplate(key)` → `setDiagram(t)` (which `cloneElements()` to remap ids and links) and is undoable with a toast. Groups: Micro, Macro, Global (`TEMPLATE_GROUPS`).
 
-Current templates: `blank`, `sd` (Supply & Demand), `adas` (New Classical AD/AS), `keyn` (Keynesian AD/AS), `ext_neg`, `ext_pos`.
+22 templates: blank, sd, tax, subsidy, ceiling, floor, ext_neg, ext_pos, merit, demerit, monopoly, perfcomp, ppc (Micro); adas, inflgap, deflgap, keyn, phillips, lorenz (Macro); tariff, quota, exrate (Global).
 
-**Keynesian AD/AS** (`keyn`): AD is downward sloping — in normalised coords this means going from small-xn/small-yn (low GDP, high price) to large-xn/large-yn (high GDP, low price). The AS is a hockey-stick curve (flat Keynesian range, then steep near YFE). YFE label is placed via `mkText(xn, 1.05, 'YFE')` below the x-axis (not as a line label), consistent with Q* label placement.
+Builder helpers: `mkEq(a, b, pLabel, qLabel)` for connected equilibria; `freePoint()` for points that are not crossings (Pp, monopoly Pm and AC); `footLabel(line, text)` for Yfe / NRU attached under a vertical line; `hLine`, `rectRegion`, `triRegion`; geometry `lineCross`, `lineXAt`, `lineYAt`, `curveYAt`, `curveLowest` so shaded areas and tangencies are exact. Shaded areas are plain regions, **not** connected: they stay put if a curve is moved.
+
+Picker: the sidebar keeps Blank and S&D, plus "All templates", which opens `#template-modal` (`openTemplatePicker`). Thumbnails are real renders via `templateThumb(key)` (temporarily swaps the diagram, `renderExport(0.5)`, restores; cached in `thumbCache`). Escape or clicking outside closes any dialog.
+
+Points have `dropP` / `dropQ` to switch off either drop line (early betas had one `drops` switch; `showDropP/Q` read both).
 
 ---
 

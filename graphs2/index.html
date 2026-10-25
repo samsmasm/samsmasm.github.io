@@ -415,6 +415,24 @@
   .fb-details { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
   .fb-details summary { cursor: pointer; }
 
+  /* TEMPLATE PICKER */
+  .template-btn.browse { color: var(--accent); }
+  .template-modal { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto; }
+  .tpl-head { display: flex; align-items: center; justify-content: space-between; }
+  .tpl-head h2 { margin: 0; }
+  .tpl-head button { padding: 6px 14px; font: 600 12px var(--sans); border-radius: var(--radius); cursor: pointer; }
+  .template-modal h3 { font: 500 10px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+  .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .tpl-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+    background: var(--panel); border: 1.5px solid var(--border); border-radius: var(--radius);
+    padding: 8px; cursor: pointer; font-family: var(--sans); color: var(--text);
+  }
+  .tpl-card:hover, .tpl-card:focus-visible { border-color: var(--accent); }
+  .tpl-card img { width: 100%; aspect-ratio: 680 / 560; background: #fff; border-radius: 3px; margin-bottom: 4px; border: 1px solid var(--border2); }
+  .tpl-card strong { font-size: 12.5px; }
+  .tpl-card span { font-size: 11px; color: var(--muted); }
+
   /* EXPORT MENU */
   .export-wrap { position: relative; }
   .export-menu {
@@ -482,23 +500,11 @@
     </button>
     <button class="template-btn" onclick="loadTemplate('sd')">
       Supply &amp; Demand
-      <span class="sub">Micro market equilibrium</span>
+      <span class="sub">Market equilibrium</span>
     </button>
-    <button class="template-btn" onclick="loadTemplate('adas')">
-      New Classical AD/AS
-      <span class="sub">Macroeconomic equilibrium</span>
-    </button>
-    <button class="template-btn" onclick="loadTemplate('keyn')">
-      Keynesian AD/AS
-      <span class="sub">Horizontal AS with Keynesian range</span>
-    </button>
-    <button class="template-btn" onclick="loadTemplate('ext_neg')">
-      Negative Externality
-      <span class="sub">Market failure (overproduction)</span>
-    </button>
-    <button class="template-btn" onclick="loadTemplate('ext_pos')">
-      Positive Externality
-      <span class="sub">Market failure (underproduction)</span>
+    <button class="template-btn browse" onclick="openTemplatePicker()">
+      All templates
+      <span class="sub">Tax, subsidy, monopoly, AD/AS, trade and more</span>
     </button>
 
     <div class="section-head" style="margin-top:4px">Drawing tool</div>
@@ -603,6 +609,17 @@
       <button class="action-btn danger" onclick="clearDiagram()">Clear diagram</button>
     </div>
 
+  </div>
+</div>
+
+<!-- TEMPLATE PICKER -->
+<div class="modal-overlay" id="template-modal" onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="modal template-modal" role="dialog" aria-label="Templates">
+    <div class="tpl-head">
+      <h2>Templates</h2>
+      <button class="btn-cancel" onclick="document.getElementById('template-modal').classList.remove('open')">Close</button>
+    </div>
+    <div id="template-grid"></div>
   </div>
 </div>
 
@@ -859,70 +876,281 @@ function buildColorRow() {
 }
 
 // ─── TEMPLATES ───────────────────────────────────────────────
+// ─── TEMPLATES ───────────────────────────────────────────────
+// Each template has picker details and a `build()` that returns fresh
+// elements (built at load time, so builders can use any helper).
 // Equilibria are connected points (`mkEq`), not hand-placed guide lines, so
-// they stay exact when a curve moves. Approximate positions are only a
-// starting guess; resolveAttachments() computes the real crossing.
-const TEMPLATES = {
-  blank: {
-    title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-    elements: []
-  },
-  sd: (() => {
-    const D = mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D');
-    const S = mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S');
-    return {
-      title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-      elements: [D, S, mkEq(D, S, 'P', 'Q*', 0.4975, 0.4625)],
-    };
-  })(),
-  adas: (() => {
-    const AD = mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD');
-    const SRAS = mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS');
-    // LRAS: vertical through the AD x SRAS intersection
-    const LRAS = mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS');
-    return {
-      title: '', yLabel: 'Price level', xLabel: 'Real GDP',
-      elements: [AD, SRAS, LRAS, mkEq(AD, SRAS, 'PL', 'Yfe', 0.5012, 0.4793)],
-    };
-  })(),
-  keyn: (() => {
-    // AD: downward sloping (high price at low GDP → low price at high GDP)
-    const AD = mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD');
-    // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
-    const AS = mkCurve([
-      {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
-      {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
-    ], COLORS[2], 2.5, '', 'AS');
-    // YFE guide line, with its label attached below the axis end
-    const YFE = mkLine(0.71, 0, 0.71, 1.0, COLORS[1], GUIDE.weight, GUIDE.dash, '');
-    const yfeText = mkText(0.71, 1.05, 'YFE');
-    yfeText.attach = { id: YFE.id, t: 1, dx: 0, dy: 0.05 * PLOT_H, dx0: 0, dy0: 0.05 * PLOT_H };
-    return {
-      title: '', yLabel: 'Price level', xLabel: 'Real GDP',
-      elements: [AD, AS, YFE, yfeText, mkEq(AD, AS, 'P₁', 'Y₁', 0.20, 0.70)],
-    };
-  })(),
-  ext_neg: (() => {
-    const D = mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D');
-    const S = mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S');
-    // MSC above MPC (parallel, shifted up)
-    const MSC = mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC');
-    return {
-      title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-      elements: [D, S, MSC, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(D, MSC, 'Ps', 'Qs', 0.3996, 0.3844)],
-    };
-  })(),
-  ext_pos: (() => {
-    const S = mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S');
-    const D = mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D');
-    // MSB shifted right of MPB
-    const MSB = mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB');
-    return {
-      title: '', yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)',
-      elements: [S, D, MSB, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(MSB, S, 'Ps', 'Qs', 0.5713, 0.4133)],
-    };
-  })(),
+// they stay exact when a curve moves. Their xn/yn are only a starting guess;
+// resolveAttachments() computes the real crossing. Shaded areas are worked
+// out from the lines with lineCross / lineXAt / lineYAt.
+
+// Straight-line geometry in normalised coords, for building templates.
+function lineYAt(l, xn) { return l.y1n + (l.y2n - l.y1n) * (xn - l.x1n) / (l.x2n - l.x1n); }
+function lineXAt(l, yn) { return l.x1n + (l.x2n - l.x1n) * (yn - l.y1n) / (l.y2n - l.y1n); }
+function lineCross(a, b) {
+  const d = (a.x1n - a.x2n) * (b.y1n - b.y2n) - (a.y1n - a.y2n) * (b.x1n - b.x2n);
+  const p = a.x1n * a.y2n - a.y1n * a.x2n, q = b.x1n * b.y2n - b.y1n * b.x2n;
+  return { xn: (p * (b.x1n - b.x2n) - (a.x1n - a.x2n) * q) / d, yn: (p * (b.y1n - b.y2n) - (a.y1n - a.y2n) * q) / d };
+}
+// Height of a drawn curve at xn (from the same samples that are drawn).
+function curveYAt(c, xn) {
+  const x = toCanvas(xn, 0).x;
+  for (const [ax, ay, bx, by] of getElSegments(c))
+    if ((ax - x) * (bx - x) <= 0 && ax !== bx) return fromCanvas(x, ay + (by - ay) * (x - ax) / (bx - ax)).yn;
+  return null;
+}
+// Lowest point of a drawn curve (the bottom of a U).
+function curveLowest(c) {
+  let best = null;
+  getElSegments(c).forEach(([ax, ay]) => { if (!best || ay > best.y) best = { x: ax, y: ay }; });
+  return fromCanvas(best.x, best.y);
+}
+const hLine = (yn, color, label) => mkLine(0, yn, 1, yn, color, 2.5, '', label);
+const rectRegion = (x1, y1, x2, y2, color, fill, label) => {
+  const r = mkRegion([{ xn: x1, yn: y1 }, { xn: x2, yn: y1 }, { xn: x2, yn: y2 }, { xn: x1, yn: y2 }], color, fill);
+  r.label = label;
+  return r;
 };
+const triRegion = (pts, color, fill, label) => { const r = mkRegion(pts, color, fill); r.label = label; return r; };
+// A point that is not a crossing of two curves (e.g. producer price Pp).
+const freePoint = (xn, yn, pLabel, qLabel, extra) => Object.assign(mkDot(xn, yn, GUIDE.color, pLabel, qLabel), extra || {});
+// An axis-end label attached to the bottom of a vertical line (Yfe, NRU).
+function footLabel(line, text) {
+  const t = mkText(line.x2n, 1.05, text);
+  t.attach = { id: line.id, t: 1, dx: 0, dy: 0.05 * PLOT_H, dx0: 0, dy0: 0.05 * PLOT_H };
+  return t;
+}
+const stdD = (label = 'D') => mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', label);
+// Trade diagrams: D ends further left, so labels on the axis clear its title.
+const tradeD = () => mkLine(0.08, 0.08, 0.84, 0.88, COLORS[0], 2.5, '', 'D');
+const stdS = (label = 'S') => mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', label);
+const MICRO_AXES = { yLabel: 'Price ($/unit)', xLabel: 'Quantity (units/week)' };
+const MACRO_AXES = { yLabel: 'Price level', xLabel: 'Real GDP' };
+
+const TEMPLATES = {
+  blank: { group: 'Micro', name: 'Blank axes', sub: 'Start from scratch',
+    build: () => ({ title: '', ...MICRO_AXES, elements: [] }) },
+
+  sd: { group: 'Micro', name: 'Supply & Demand', sub: 'Market equilibrium',
+    build: () => {
+      const D = mkLine(0.08, 0.05, 0.92, 0.88, COLORS[0], 2.5, '', 'D');
+      const S = mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S');
+      return { title: '', ...MICRO_AXES, elements: [D, S, mkEq(D, S, 'P', 'Q*', 0.4975, 0.4625)] };
+    } },
+
+  tax: { group: 'Micro', name: 'Indirect tax', sub: 'Specific tax with incidence',
+    build: () => {
+      const D = stdD(), S = stdS(), St = mkLine(0.08, 0.68, 0.74, 0.02, COLORS[1], 2.5, '', 'S + tax');
+      const e2 = lineCross(D, St), pp = lineYAt(S, e2.xn), e1 = lineCross(D, S);
+      return { title: '', ...MICRO_AXES, elements: [
+        rectRegion(0, e2.yn, e2.xn, e1.yn, COLORS[0], 'hatch45', 'Paid by consumers'),
+        rectRegion(0, e1.yn, e2.xn, pp, COLORS[2], 'hatch135', 'Paid by producers'),
+        D, S, St, mkEq(D, S, 'P₁', 'Q₁', e1.xn, e1.yn), mkEq(D, St, 'Pc', 'Q₂', e2.xn, e2.yn),
+        freePoint(e2.xn, pp, 'Pp', '', { dropQ: false }),
+      ] };
+    } },
+
+  subsidy: { group: 'Micro', name: 'Subsidy', sub: 'Cost of the subsidy',
+    build: () => {
+      const D = stdD(), S = stdS(), Ss = mkLine(0.28, 0.88, 0.98, 0.18, COLORS[1], 2.5, '', 'S + subsidy');
+      const e2 = lineCross(D, Ss), pp = lineYAt(S, e2.xn);
+      return { title: '', ...MICRO_AXES, elements: [
+        rectRegion(0, pp, e2.xn, e2.yn, COLORS[3], 'hatch45', 'Cost of subsidy'),
+        D, S, Ss, mkEq(D, S, 'P₁', 'Q₁'), mkEq(D, Ss, 'Pc', 'Q₂', e2.xn, e2.yn),
+        freePoint(e2.xn, pp, 'Pp', ''),
+      ] };
+    } },
+
+  ceiling: { group: 'Micro', name: 'Price ceiling', sub: 'Maximum price and shortage',
+    build: () => {
+      const D = stdD(), S = stdS(), P = hLine(0.62, COLORS[1], 'Pmax');
+      const qs = lineXAt(S, 0.62), qd = lineXAt(D, 0.62);
+      return { title: '', ...MICRO_AXES, elements: [
+        D, S, P, mkEq(D, S, 'Pe', 'Qe'), mkEq(S, P, '', 'Qs', qs, 0.62), mkEq(D, P, '', 'Qd', qd, 0.62),
+        mkBrace(qs + 0.01, 0.645, qd - 0.01, 0.645, '#1a1918', 1.5, 'Shortage', true),
+      ] };
+    } },
+
+  floor: { group: 'Micro', name: 'Price floor', sub: 'Minimum price and surplus',
+    build: () => {
+      const D = stdD(), S = stdS(), P = hLine(0.3, COLORS[1], 'Pmin');
+      const qd = lineXAt(D, 0.3), qs = lineXAt(S, 0.3);
+      return { title: '', ...MICRO_AXES, elements: [
+        D, S, P, mkEq(D, S, 'Pe', 'Qe'), mkEq(D, P, '', 'Qd', qd, 0.3), mkEq(S, P, '', 'Qs', qs, 0.3),
+        mkBrace(qd + 0.01, 0.275, qs - 0.01, 0.275, '#1a1918', 1.5, 'Surplus', false),
+      ] };
+    } },
+
+  ext_neg: { group: 'Micro', name: 'Negative externality', sub: 'Of production (overproduction)',
+    build: () => {
+      const D = mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D');
+      const S = mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S');
+      // MSC above MPC (parallel, shifted up)
+      const MSC = mkLine(0.08, 0.68, 0.88, -0.06, COLORS[1], 2.5, '', 'MSC');
+      return { title: '', ...MICRO_AXES,
+        elements: [D, S, MSC, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(D, MSC, 'Ps', 'Qs', 0.3996, 0.3844)] };
+    } },
+
+  ext_pos: { group: 'Micro', name: 'Positive externality', sub: 'Of consumption (underconsumption)',
+    build: () => {
+      const S = mkLine(0.08, 0.88, 0.88, 0.12, COLORS[2], 2.5, '', 'MPC=S');
+      const D = mkLine(0.08, 0.08, 0.92, 0.88, COLORS[0], 2.5, '', 'MPB=D');
+      // MSB shifted right of MPB
+      const MSB = mkLine(0.22, 0.08, 1.0, 0.82, COLORS[3], 2.5, '', 'MSB');
+      return { title: '', ...MICRO_AXES,
+        elements: [S, D, MSB, mkEq(D, S, 'Pm', 'Qm', 0.5005, 0.4805), mkEq(MSB, S, 'Ps', 'Qs', 0.5713, 0.4133)] };
+    } },
+
+  merit: { group: 'Micro', name: 'Merit good', sub: 'Underconsumption and welfare loss',
+    build: () => {
+      const S = mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S = MPC = MSC');
+      const MPB = mkLine(0.08, 0.12, 0.8, 0.88, COLORS[0], 2.5, '', 'D = MPB');
+      const MSB = mkLine(0.26, 0.12, 0.98, 0.88, COLORS[3], 2.5, '', 'MSB');
+      const em = lineCross(MPB, S), eo = lineCross(MSB, S);
+      return { title: '', ...MICRO_AXES, elements: [
+        triRegion([em, eo, { xn: em.xn, yn: lineYAt(MSB, em.xn) }], COLORS[1], 'hatch45', 'Welfare loss'),
+        S, MPB, MSB, mkEq(MPB, S, 'Pm', 'Qm', em.xn, em.yn), mkEq(MSB, S, 'P*', 'Q*', eo.xn, eo.yn),
+      ] };
+    } },
+
+  demerit: { group: 'Micro', name: 'Demerit good', sub: 'Overconsumption and welfare loss',
+    build: () => {
+      const S = mkLine(0.08, 0.88, 0.88, 0.08, COLORS[2], 2.5, '', 'S = MPC = MSC');
+      const MPB = mkLine(0.2, 0.08, 0.95, 0.85, COLORS[0], 2.5, '', 'D = MPB');
+      const MSB = mkLine(0.02, 0.08, 0.77, 0.85, COLORS[3], 2.5, '', 'MSB');
+      const em = lineCross(MPB, S), eo = lineCross(MSB, S);
+      return { title: '', ...MICRO_AXES, elements: [
+        triRegion([eo, em, { xn: em.xn, yn: lineYAt(MSB, em.xn) }], COLORS[1], 'hatch45', 'Welfare loss'),
+        S, MPB, MSB, mkEq(MPB, S, 'Pm', 'Qm', em.xn, em.yn), mkEq(MSB, S, 'P*', 'Q*', eo.xn, eo.yn),
+      ] };
+    } },
+
+  monopoly: { group: 'Micro', name: 'Monopoly', sub: 'Profit maximising at MC = MR',
+    build: () => {
+      const D = mkLine(0.05, 0.05, 0.95, 0.85, COLORS[0], 2.5, '', 'D = AR');
+      const MR = mkLine(0.05, 0.05, 0.5, 0.85, COLORS[4], 2.5, '', 'MR');
+      MR.labelDx = 250; MR.labelDy = 366; // at the bottom end, clear of D = AR
+      const MC = mkLine(0.15, 0.9, 0.75, 0.05, COLORS[1], 2.5, '', 'MC');
+      const AC = mkCurve([{xn: 0.12, yn: 0.08}, {xn: 0.24, yn: 0.3}, {xn: 0.36, yn: 0.41}, {xn: 0.48, yn: 0.445},
+        {xn: 0.62, yn: 0.41}, {xn: 0.78, yn: 0.28}, {xn: 0.9, yn: 0.1}], COLORS[2], 2.5, '', 'AC');
+      const q = lineCross(MR, MC).xn, pm = lineYAt(D, q), c = curveYAt(AC, q);
+      const mrmc = mkEq(MR, MC, '', '');
+      mrmc.showDot = true; mrmc.dropP = false; mrmc.dropQ = false;
+      return { title: '', yLabel: 'Price, costs, revenue ($)', xLabel: 'Quantity', elements: [
+        rectRegion(0, pm, q, c, COLORS[2], 'hatch45', 'Abnormal profit'),
+        D, MR, MC, AC, mrmc,
+        freePoint(q, pm, 'Pm', 'Qm'), freePoint(q, c, 'AC', '', { dropQ: false }),
+      ] };
+    } },
+
+  perfcomp: { group: 'Micro', name: 'Perfect competition', sub: 'Firm in long-run equilibrium',
+    build: () => {
+      const AC = mkCurve([{xn: 0.1, yn: 0.1}, {xn: 0.25, yn: 0.4}, {xn: 0.45, yn: 0.56}, {xn: 0.65, yn: 0.43}, {xn: 0.85, yn: 0.12}],
+        COLORS[2], 2.5, '', 'AC');
+      const low = curveLowest(AC);
+      // MC cuts AC at its lowest point; price is tangent to AC there (normal profit).
+      const MC = mkLine(low.xn - 0.25, low.yn + 0.4, low.xn + 0.3, low.yn - 0.48, COLORS[1], 2.5, '', 'MC');
+      const P = hLine(low.yn, COLORS[0], 'P = MR = AR = D');
+      P.labelDx = -70; P.labelDy = -14;
+      return { title: '', yLabel: 'Price, costs ($)', xLabel: 'Quantity (firm)', elements: [
+        AC, MC, P, mkEq(MC, P, 'Pe', 'Qe', low.xn, low.yn),
+      ] };
+    } },
+
+  ppc: { group: 'Micro', name: 'Production possibilities', sub: 'PPC, bowed out',
+    build: () => ({ title: '', yLabel: 'Good B', xLabel: 'Good A', elements: SHAPES.ppc() }) },
+
+  adas: { group: 'Macro', name: 'New Classical AD/AS', sub: 'Long-run equilibrium at Yfe',
+    build: () => {
+      const AD = mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD');
+      const SRAS = mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS');
+      // LRAS: vertical through the AD x SRAS intersection
+      const LRAS = mkLine(0.5012, 0.0, 0.5012, 1.0, COLORS[1], 2.5, '', 'LRAS');
+      return { title: '', ...MACRO_AXES, elements: [AD, SRAS, LRAS, mkEq(AD, SRAS, 'PL', 'Yfe', 0.5012, 0.4793)] };
+    } },
+
+  inflgap: { group: 'Macro', name: 'Inflationary gap', sub: 'Output above full employment',
+    build: () => {
+      const AD = mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD');
+      const SRAS = mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS');
+      const LRAS = mkLine(0.38, 0, 0.38, 1, COLORS[1], 2.5, '', 'LRAS');
+      const e = lineCross(AD, SRAS);
+      return { title: '', ...MACRO_AXES, elements: [
+        AD, SRAS, LRAS, footLabel(LRAS, 'Yfe'), mkEq(AD, SRAS, 'PL₁', 'Y₁', e.xn, e.yn),
+        mkBrace(0.385, 0.95, e.xn - 0.005, 0.95, '#1a1918', 1.5, 'Inflationary gap', false),
+      ] };
+    } },
+
+  deflgap: { group: 'Macro', name: 'Deflationary gap', sub: 'Output below full employment',
+    build: () => {
+      const AD = mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD');
+      const SRAS = mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS');
+      const LRAS = mkLine(0.64, 0, 0.64, 1, COLORS[1], 2.5, '', 'LRAS');
+      const e = lineCross(AD, SRAS);
+      return { title: '', ...MACRO_AXES, elements: [
+        AD, SRAS, LRAS, footLabel(LRAS, 'Yfe'), mkEq(AD, SRAS, 'PL₁', 'Y₁', e.xn, e.yn),
+        mkBrace(e.xn + 0.005, 0.95, 0.635, 0.95, '#1a1918', 1.5, 'Deflationary gap', false),
+      ] };
+    } },
+
+  keyn: { group: 'Macro', name: 'Keynesian AD/AS', sub: 'AS with a Keynesian range',
+    build: () => {
+      // AD: downward sloping (high price at low GDP → low price at high GDP)
+      const AD = mkLine(0.05, 0.65, 0.80, 0.90, COLORS[0], 2.5, '', 'AD');
+      // Keynesian AS: hockey-stick — flat in Keynesian range, rises steeply near YFE
+      const AS = mkCurve([
+        {xn: 0.05, yn: 0.72}, {xn: 0.25, yn: 0.70},
+        {xn: 0.50, yn: 0.60}, {xn: 0.67, yn: 0.28}, {xn: 0.71, yn: 0.05},
+      ], COLORS[2], 2.5, '', 'AS');
+      // YFE guide line, with its label attached below the axis end
+      const YFE = mkLine(0.71, 0, 0.71, 1.0, COLORS[1], GUIDE.weight, GUIDE.dash, '');
+      return { title: '', ...MACRO_AXES, elements: [AD, AS, YFE, footLabel(YFE, 'YFE'), mkEq(AD, AS, 'P₁', 'Y₁', 0.20, 0.70)] };
+    } },
+
+  phillips: { group: 'Macro', name: 'Phillips curve', sub: 'Short-run and long-run',
+    build: () => {
+      const SRPC = mkCurve([{xn: 0.08, yn: 0.06}, {xn: 0.18, yn: 0.42}, {xn: 0.32, yn: 0.62}, {xn: 0.55, yn: 0.76}, {xn: 0.92, yn: 0.84}],
+        COLORS[0], 2.5, '', 'SRPC');
+      const LRPC = mkLine(0.45, 0, 0.45, 1, COLORS[1], 2.5, '', 'LRPC');
+      return { title: '', yLabel: 'Inflation rate (%)', xLabel: 'Unemployment rate (%)', elements: [SRPC, LRPC, footLabel(LRPC, 'NRU')] };
+    } },
+
+  lorenz: { group: 'Macro', name: 'Lorenz curve', sub: 'Income inequality',
+    build: () => ({ title: '', yLabel: 'Cumulative % of income', xLabel: 'Cumulative % of population', elements: SHAPES.lorenz() }) },
+
+  tariff: { group: 'Global', name: 'Tariff', sub: 'World price plus tariff',
+    build: () => {
+      const D = tradeD(), S = stdS(), Pw = hLine(0.7, COLORS[1], 'Pw'), Pt = hLine(0.55, COLORS[3], 'Pw + tariff');
+      return { title: '', ...MICRO_AXES, elements: [
+        rectRegion(lineXAt(S, 0.55), 0.55, lineXAt(D, 0.55), 0.7, COLORS[3], 'hatch45', 'Tariff revenue'),
+        D, S, Pw, Pt,
+        mkEq(S, Pw, '', 'Q₁', lineXAt(S, 0.7), 0.7), mkEq(S, Pt, '', 'Q₂', lineXAt(S, 0.55), 0.55),
+        mkEq(D, Pt, '', 'Q₃', lineXAt(D, 0.55), 0.55), mkEq(D, Pw, '', 'Q₄', lineXAt(D, 0.7), 0.7),
+      ] };
+    } },
+
+  quota: { group: 'Global', name: 'Quota', sub: 'Import quota and quota rent',
+    build: () => {
+      const D = tradeD(), S = stdS(), Pw = hLine(0.7, COLORS[1], 'Pw');
+      // Domestic supply plus the quota, from the world price upwards.
+      const x0 = lineXAt(S, 0.7) + 0.2;
+      const Sq = mkLine(x0, 0.7, 1, 0.7 - (1 - x0), COLORS[3], 2.5, '', 'S + quota');
+      const e = lineCross(D, Sq), q2 = lineXAt(S, e.yn);
+      return { title: '', ...MICRO_AXES, elements: [
+        rectRegion(q2, e.yn, e.xn, 0.7, COLORS[3], 'hatch135', 'Quota rent'),
+        D, S, Pw, Sq,
+        mkEq(S, Pw, '', 'Q₁', lineXAt(S, 0.7), 0.7), mkEq(D, Pw, '', 'Q₄', lineXAt(D, 0.7), 0.7),
+        mkEq(D, Sq, 'Pq', 'Q₃', e.xn, e.yn), freePoint(q2, e.yn, '', 'Q₂', { dropP: false }),
+      ] };
+    } },
+
+  exrate: { group: 'Global', name: 'Exchange rate', sub: 'Market for a currency',
+    build: () => {
+      const D = stdD('D€'), S = stdS('S€');
+      return { title: '', yLabel: 'Price of € in $', xLabel: 'Quantity of €', elements: [D, S, mkEq(D, S, 'ER₁', 'Q₁')] };
+    } },
+};
+const TEMPLATE_GROUPS = ['Micro', 'Macro', 'Global'];
 
 function mkLine(x1n, y1n, x2n, y2n, color, weight, dash, label) {
   return { id: nextId++, type: 'line', x1n, y1n, x2n, y2n, color, weight, dash, label, labelDx: 0, labelDy: 0 };
@@ -962,13 +1190,9 @@ function diagramIsEmpty() {
   return !state.elements.length && !state.title;
 }
 
-// Loading is undoable rather than confirmed: a toast offers Undo when it
-// replaced real work. `record: false` is for start-up only.
-function loadTemplate(name, opts = {}) {
-  const t = TEMPLATES[name];
-  const replacedWork = !diagramIsEmpty();
-  if (opts.record !== false) saveUndo();
-  // Deep copy: node edits mutate curve point arrays in place.
+// Replaces the whole diagram with `t` ({ title, yLabel, xLabel, elements }).
+function setDiagram(t) {
+  // Deep copy with fresh ids: node edits mutate point arrays in place.
   state.elements = cloneElements(t.elements);
   state.legend = { show: false, hidden: [] };
   state.title = t.title;
@@ -980,11 +1204,58 @@ function loadTemplate(name, opts = {}) {
   document.getElementById('graph-title').value = t.title;
   document.getElementById('y-label').value = t.yLabel;
   document.getElementById('x-label').value = t.xLabel;
+}
+
+// Loading is undoable rather than confirmed: a toast offers Undo when it
+// replaced real work. `record: false` is for start-up only.
+function loadTemplate(name, opts = {}) {
+  const t = TEMPLATES[name].build();
+  const replacedWork = !diagramIsEmpty();
+  if (opts.record !== false) saveUndo();
+  setDiagram(t);
   renderLegendList();
   renderProps();
   redraw();
   if (opts.record !== false && replacedWork)
     showToast(opts.message || 'Template loaded.', { undo: true });
+}
+
+// ─── TEMPLATE PICKER ─────────────────────────────────────────
+// Thumbnails are real renders of each template, drawn once (on the main
+// canvas, within one task so nothing flickers) and cached.
+const thumbCache = {};
+function templateThumb(key) {
+  if (thumbCache[key]) return thumbCache[key];
+  const snap = snapshot(), sel = state.selectedId;
+  setDiagram(TEMPLATES[key].build());
+  thumbCache[key] = renderExport(0.5, 'image/png');
+  restoreSnapshot(snap);
+  state.selectedId = sel;
+  renderProps(); redraw();
+  return thumbCache[key];
+}
+
+function openTemplatePicker() {
+  const box = document.getElementById('template-grid');
+  box.innerHTML = TEMPLATE_GROUPS.map(g => `<h3>${g}</h3><div class="tpl-grid">${
+    Object.entries(TEMPLATES).filter(([, t]) => t.group === g).map(([k, t]) => `
+      <button class="tpl-card" onclick="pickTemplate('${k}')">
+        <img data-key="${k}" alt="">
+        <strong>${escapeHtml(t.name)}</strong><span>${escapeHtml(t.sub)}</span>
+      </button>`).join('')}</div>`).join('');
+  document.getElementById('template-modal').classList.add('open');
+  // Fill thumbnails a few at a time so the dialog appears at once.
+  const imgs = [...box.querySelectorAll('img[data-key]')];
+  const step = () => {
+    imgs.splice(0, 3).forEach(img => { img.src = templateThumb(img.dataset.key); });
+    if (imgs.length) setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
+}
+
+function pickTemplate(key) {
+  document.getElementById('template-modal').classList.remove('open');
+  loadTemplate(key);
 }
 
 // ─── LABEL NUMBERING ─────────────────────────────────────────
@@ -1989,6 +2260,11 @@ function dotLabelBox(el, which) {
   return { text, w, h: 16, x: a.x + (el.qDx || 0), y: a.y + 12 + (el.qDy || 0) };
 }
 
+// Each drop line can be turned off on its own (`dropP`, `dropQ`); early
+// betas had one `drops` switch for both.
+const showDropP = (el, d) => el.drops !== false && el.dropP !== false && !d.skipP;
+const showDropQ = (el, d) => el.drops !== false && el.dropQ !== false && !d.skipQ;
+
 let exporting = false; // hides on-screen-only marks (warnings, connectors)
 
 function drawDotEl(el) {
@@ -2004,10 +2280,8 @@ function drawDotEl(el) {
   ctx.lineCap = 'round';
   // A drop line along a vertical (or horizontal) curve would just sit on top
   // of it, so it is skipped.
-  if (el.drops !== false) {
-    if (!d.skipP) { ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke(); }
-    if (!d.skipQ) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke(); }
-  }
+  if (showDropP(el, d)) { ctx.beginPath(); ctx.moveTo(axisL.x, axisL.y); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  if (showDropQ(el, d)) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke(); }
   ctx.setLineDash([]);
   if (el.showDot !== false) {
     ctx.fillStyle = bwMode ? '#1a1918' : (el.color && el.color !== GUIDE.color ? el.color : '#1a1918');
@@ -2548,6 +2822,10 @@ function onKeyUp(e) {
 }
 
 function onKeyDown(e) {
+  if (e.key === 'Escape') {
+    const open = document.querySelector('.modal-overlay.open');
+    if (open) { open.classList.remove('open'); return; }
+  }
   // Keys typed into a dialog (feedback, save code, legend name) belong to it.
   if (document.activeElement && document.activeElement.closest('.modal')) return;
   if (e.key === ' ') {
@@ -2639,11 +2917,9 @@ function hitTest(cx, cy) {
       // Small radius when the dot is hidden, so the curves crossing there stay easy to grab.
       if (Math.hypot(cx - p.x, cy - p.y) < (el.showDot === false ? 7 : 12)) return el;
       // The drop lines select their point.
-      if (el.drops !== false) {
-        const d = derived.get(el.id) || {}, l = toCanvas(0, el.yn), b = toCanvas(el.xn, 1);
-        if (!d.skipP && distToSegment(cx, cy, l.x, l.y, p.x, p.y) < 4) return el;
-        if (!d.skipQ && distToSegment(cx, cy, p.x, p.y, b.x, b.y) < 4) return el;
-      }
+      const d = derived.get(el.id) || {}, l = toCanvas(0, el.yn), b = toCanvas(el.xn, 1);
+      if (showDropP(el, d) && distToSegment(cx, cy, l.x, l.y, p.x, p.y) < 4) return el;
+      if (showDropQ(el, d) && distToSegment(cx, cy, p.x, p.y, b.x, b.y) < 4) return el;
     } else if (el.type === 'text') {
       const p = toCanvas(el.xn, el.yn);
       ctx.save();
@@ -2792,7 +3068,8 @@ function renderProps() {
     html += textPropHTML('Price label (y-axis)', 'pLabel', el.pLabel, 10);
     html += textPropHTML('Quantity label (x-axis)', 'qLabel', el.qLabel, 10);
     html += checkPropHTML('Show dot', 'showDot', el.showDot !== false);
-    html += checkPropHTML('Lines to the axes', 'drops', el.drops !== false);
+    html += checkPropHTML('Line to the price axis', 'dropP', el.drops !== false && el.dropP !== false);
+    html += checkPropHTML('Line to the quantity axis', 'dropQ', el.drops !== false && el.dropQ !== false);
     html += `<div class="prop-row">
       <label>Color</label>
       ${colorSwatchHTML(el.color || GUIDE.color, 'color')}
@@ -2860,6 +3137,10 @@ function updateProp(key, value) {
   el[key] = value;
   // A dashed or dotted line is annotation: always thin.
   if (key === 'dash') { el.weight = value ? GUIDE.weight : 2.5; renderProps(); }
+  if ((key === 'dropP' || key === 'dropQ') && el.drops === false) {
+    el[key === 'dropP' ? 'dropQ' : 'dropP'] = false; // the other one stays off
+    delete el.drops;
+  }
   if (key === 'label' || key === 'fillColor') renderLegendList();
   redraw();
 }
@@ -3024,7 +3305,9 @@ const SHAPES = {
   lorenz: () => {
     const eq = mkLine(0, 1, 1, 0, GUIDE.color, GUIDE.weight, GUIDE.dash, 'Line of equality');
     eq.labelDx = -228; eq.labelDy = 135; // above-left of the diagonal, clear of both lines
-    return [eq, mkCurve([0, 0.25, 0.5, 0.7, 0.85, 1].map(x => ({ xn: x, yn: 1 - Math.pow(x, 2.3) })), COLORS[0], 2.5, '', 'Lorenz curve')];
+    const lz = mkCurve([0, 0.25, 0.5, 0.7, 0.85, 1].map(x => ({ xn: x, yn: 1 - Math.pow(x, 2.3) })), COLORS[0], 2.5, '', 'Lorenz curve');
+    lz.labelDx = -107; lz.labelDy = 247; // below the curve, inside the plot
+    return [eq, lz];
   },
 };
 function addShape(name) {
