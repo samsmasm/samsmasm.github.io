@@ -160,7 +160,7 @@ Automatic (Phase 4). `state.legend = { show, hidden: [ids] }`. Entries are every
 
 ## Export
 
-One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/Slides), Download JPG, Download PNG. All at 2× via `renderExport(2, mime)`. Sign-in lives only in the Save dialog; the header shows "Drive: email" when signed in (click opens Save).
+One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/Slides), Download JPG, Download PNG. Size and PNG transparency come from Settings (`exportPNG`). Google Drive sign in / out: the header button `#header-user` (person icon + "Sign in"; once signed in, the email + an exit icon, click signs out; `headerAuthClick`) and the Save dialog. Sam asked for the header button on 2026-10-25, reversing the Phase 4 "Save dialog only" choice.
 
 ## Templates
 

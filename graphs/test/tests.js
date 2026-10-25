@@ -443,9 +443,15 @@ test('exported picture grows a legend only when switched on', async (page) => {
   assert(w === 680 && h > 560, 'legend not added: ' + h);
 });
 
-test('header has no sign-in button', async (page) => {
-  eq(await ev(page, `!!document.getElementById('header-auth-btn')`), false, 'header sign-in still there');
-  eq(await ev(page, `getComputedStyle(document.getElementById('header-user')).display`), 'none', 'status shown when signed out');
+test('header sign in / out button shows the state and does the right thing', async (page) => {
+  eq(await ev(page, `[getComputedStyle(document.getElementById('header-user')).display !== 'none', document.getElementById('header-user').textContent.trim()]`), [true, 'Sign in'], 'signed out');
+  // Pretend to be signed in.
+  await ev(page, `window.__signIns = 0; driveSignIn = () => { window.__signIns++; }; driveToken = { access_token: 'x', expires_at: Date.now() + 3600e3 }; driveUser = 'sam@example.com'; driveSignedIn = () => !!driveToken; driveRefreshUI()`);
+  eq(await ev(page, `document.querySelector('#header-user .hu-email').textContent`), 'sam@example.com', 'email');
+  await page.click('#header-user');
+  eq(await ev(page, `[driveToken, document.getElementById('header-user').textContent.trim()]`), [null, 'Sign in'], 'signed out by click');
+  await page.click('#header-user');
+  eq(await ev(page, `window.__signIns`), 1, 'sign-in not started');
 });
 
 test('colour is chosen in one place: new lines take the next unused colour, arrows are black', async (page) => {

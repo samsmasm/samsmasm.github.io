@@ -82,14 +82,12 @@
   header button:disabled { opacity: 0.35; cursor: default; }
   header button.ghost:disabled:hover { background: rgba(255,255,255,0.15); }
   .header-actions { display: flex; align-items: center; gap: 6px; }
-  #header-user {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: rgba(255,255,255,0.75);
-    max-width: 170px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* Google Drive sign in / out: a person icon, then the email and an exit icon once signed in. */
+  #header-user { gap: 6px; }
+  #header-user svg { width: 14px; height: 14px; flex-shrink: 0; }
+  #header-user .hu-email {
+    font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.8);
+    max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
   .app { display: flex; flex: 1; overflow: hidden; }
@@ -503,7 +501,7 @@
         <button role="menuitem" onclick="downloadImage('png')">Download PNG</button>
       </div>
     </div>
-    <button id="header-user" class="ghost" onclick="openSaveModal()" title="Signed in to Google Drive" style="display:none"></button>
+    <button id="header-user" class="ghost" onclick="headerAuthClick()" style="display:none"></button>
   </div>
 </header>
 
@@ -4156,13 +4154,27 @@ async function driveTrash(id, name) {
   }
 }
 
+const ICON_PERSON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.5" r="2.8"/><path d="M2.8 14c.6-2.7 2.7-4.2 5.2-4.2s4.6 1.5 5.2 4.2"/></svg>';
+const ICON_SIGN_OUT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5"/></svg>';
+
+function headerAuthClick() {
+  if (driveSignedIn()) { driveSignOut(); showToast('Signed out of Google Drive.'); }
+  else driveSignIn();
+}
+
 function driveRefreshUI() {
   const signedIn = driveSignedIn();
 
-  // Signing in lives in the Save dialog; the header only shows the status.
+  // Header sign in / out (also in the Save dialog).
   const hUser = document.getElementById('header-user');
-  hUser.style.display = driveEnabled() && signedIn ? '' : 'none';
-  hUser.textContent = signedIn ? 'Drive: ' + (driveUser || 'signed in') : '';
+  hUser.style.display = driveEnabled() ? '' : 'none';
+  hUser.innerHTML = signedIn
+    ? `${ICON_PERSON}<span class="hu-email">${escapeHtml(driveUser || 'Signed in')}</span>${ICON_SIGN_OUT}`
+    : `${ICON_PERSON}<span>Sign in</span>`;
+  hUser.title = signedIn
+    ? 'Sign out of Google Drive' + (driveUser ? ' (' + driveUser + ')' : '')
+    : 'Sign in to save diagrams to your own Google Drive';
+  hUser.setAttribute('aria-label', hUser.title);
 
   const box = document.getElementById('drive-box');
   if (!box) return;
