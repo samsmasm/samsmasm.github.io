@@ -3872,29 +3872,30 @@ function shiftSelected(dir) {
   let el = elById(state.selectedId);
   if (!el || (el.type !== 'line' && el.type !== 'curve')) return;
   saveUndo();
-  // Shifting the same curve again goes one step further: if an earlier shift
-  // already put a copy here, shift that copy instead (D₁ → D₂, then D₂ → D₃).
+  const dx = SHIFT_BY * dir * PLOT_W;
+  // The arrow always starts from this (the last) curve. If a curve already
+  // sits where the copy would go, it is reused: just an arrow to it (D₃ back
+  // to D₂). Only when this curve's latest arrow already goes to it (D₁ picked
+  // again and shifted again) does the shift go a step further (D₂ → D₃).
   let copy;
   for (let i = 0; i < 20; i++) {
     copy = copyOf(el, SHIFT_BY * dir, 0);
     const twin = state.elements.find(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
     if (!twin) break;
+    const latest = state.elements.filter(e => e.type === 'arrow' && ((e.p1On && e.p1On.id === el.id) || (e.p2On && e.p2On.id === el.id))).pop();
+    if (!(latest && latest.p1On && latest.p1On.id === el.id && latest.p2On && latest.p2On.id === twin.id)) {
+      addShiftArrow(el, twin, dx);
+      state.selectedId = twin.id;
+      renderLegendList(); renderProps(); redraw();
+      return;
+    }
     el = twin;
   }
-  clipToAxes(copy);
+  clipToPlot(copy);
   numberCopy(el, copy);
   const newDots = [];
   state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
-  // Arrow between the two (level, since the shift is sideways).
-  const ends = shiftArrowEnds(el, copy, SHIFT_BY * dir * PLOT_W);
-  if (ends) {
-    const a = fromCanvas(ends[0].x, ends[0].y), b = fromCanvas(ends[1].x, ends[1].y);
-    const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
-    arrow.p1On = { id: el.id, t: projectOnto(el, ends[0].x, ends[0].y).t };
-    arrow.p2On = { id: copy.id, t: projectOnto(copy, ends[1].x, ends[1].y).t };
-    arrow.gap = SHIFT_GAP;
-    state.elements.push(arrow);
-  }
+  addShiftArrow(el, copy, dx);
   state.elements.filter(d => d.type === 'dot' && d.on && d.on.includes(el.id)).forEach(d => {
     const nd = copyOf(d, 0, 0);
     nd.on = d.on.map(id => id === el.id ? copy.id : id);
@@ -3907,6 +3908,18 @@ function shiftSelected(dir) {
   resolveAttachments(); // new points need their real positions first
   newDots.forEach(clearAxisLabels);
   renderLegendList(); renderProps(); redraw();
+}
+
+// A level arrow from curve `from` to curve `to`, attached to both.
+function addShiftArrow(from, to, dx) {
+  const ends = shiftArrowEnds(from, to, dx);
+  if (!ends) return;
+  const a = fromCanvas(ends[0].x, ends[0].y), b = fromCanvas(ends[1].x, ends[1].y);
+  const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
+  arrow.p1On = { id: from.id, t: projectOnto(from, ends[0].x, ends[0].y).t };
+  arrow.p2On = { id: to.id, t: projectOnto(to, ends[1].x, ends[1].y).t };
+  arrow.gap = SHIFT_GAP;
+  state.elements.push(arrow);
 }
 
 // The shift arrow's two ends (canvas px), level with each other. It carries
@@ -3951,20 +3964,25 @@ function trimSegment(a, b, gap) {
 function sameShape(a, b) {
   // Sample along it: an end may lie past an axis, where `b` was cut off.
   const pts = Array.from({ length: 11 }, (_, i) => pointAt(a, i / 10)).filter(Boolean);
-  const inside = pts.filter(p => p.x >= MARGIN.left && p.y <= H - MARGIN.bottom);
+  const inside = pts.filter(p => p.x >= MARGIN.left && p.x <= W - MARGIN.right && p.y >= MARGIN.top && p.y <= H - MARGIN.bottom);
   return inside.length >= 2 && inside.every(p => projectOnto(b, p.x, p.y).dist < 2);
 }
 
-// A shifted line or curve that now runs past the y-axis (or below the
-// x-axis) is cut off where it meets the axis.
-function clipToAxes(el) {
-  const out = p => p.xn < -1e-6 || p.yn > 1 + 1e-6;
-  // Where the segment p→q (p inside, q outside) meets the axis.
+// A shifted line or curve that now runs out of the plot (past an axis, or
+// past the right or top edge, where its label would be lost) is cut off
+// where it leaves.
+function clipToPlot(el) {
+  const E = 1e-6;
+  const out = p => p.xn < -E || p.xn > 1 + E || p.yn < -E || p.yn > 1 + E;
+  const clamp = v => Math.max(0, Math.min(1, v));
+  // Where the segment p→q (p inside, q outside) leaves the plot.
   const cut = (p, q) => {
     let f = 1;
     if (q.xn < 0) f = Math.min(f, p.xn / (p.xn - q.xn));
+    if (q.xn > 1) f = Math.min(f, (1 - p.xn) / (q.xn - p.xn));
+    if (q.yn < 0) f = Math.min(f, p.yn / (p.yn - q.yn));
     if (q.yn > 1) f = Math.min(f, (1 - p.yn) / (q.yn - p.yn));
-    return { xn: Math.max(0, p.xn + (q.xn - p.xn) * f), yn: Math.min(1, p.yn + (q.yn - p.yn) * f) };
+    return { xn: clamp(p.xn + (q.xn - p.xn) * f), yn: clamp(p.yn + (q.yn - p.yn) * f) };
   };
   if (el.type === 'line') {
     const p = { xn: el.x1n, yn: el.y1n }, q = { xn: el.x2n, yn: el.y2n };

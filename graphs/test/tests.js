@@ -741,7 +741,8 @@ test('shift arrow leaves a small gap at each curve, and straightens while still 
   const arrow = await ev(page, `state.elements.find(e => e.type === 'arrow')`);
   assert(arrow.gap > 0 && arrow.p1On && arrow.p2On, 'no gap or not attached');
   // Tilt it by sliding one end down its curve, then straighten.
-  await ev(page, `(() => { const a = state.elements.find(e => e.type === 'arrow'); a.p2On.t = 0.76; redraw();
+  await ev(page, `(() => { const a = state.elements.find(e => e.type === 'arrow'), c = elById(a.p2On.id), q = toCanvas(a.x2n, a.y2n);
+    const lower = levelPointOn(c, { x: q.x, y: q.y + 20 }, true, q); a.p2On.t = projectOnto(c, lower.x, lower.y).t; redraw();
     state.selectedId = a.id; makeLineOrthogonal(); })()`);
   const a = await ev(page, `state.elements.find(e => e.type === 'arrow')`);
   assert(a.p1On && a.p2On, 'ends came loose');
@@ -754,11 +755,13 @@ test('shift arrow leaves a small gap at each curve, and straightens while still 
 
 test('shifting the same curve twice goes a step further, with the arrows in one line', async (page) => {
   await ev(page, `loadTemplate('sd'); const d = state.elements.find(e => e.label === 'D');
-    state.selectedId = d.id; shiftSelected(1); state.selectedId = d.id; shiftSelected(1)`);
-  const ds = await ev(page, `state.elements.filter(e => /^D/.test(e.label || '')).map(e => [e.label, e.type === 'curve' ? e.points[0].xn : e.x1n])`);
+    state.selectedId = d.id; shiftSelected(-1); state.selectedId = d.id; shiftSelected(-1)`);
+  // Leftwards, so both copies still reach the first arrow's height (their
+  // upper ends are cut at the y-axis); compare the lower right ends.
+  const ds = await ev(page, `state.elements.filter(e => /^D/.test(e.label || '')).map(e => [e.label, e.type === 'curve' ? e.points[e.points.length - 1].xn : e.x2n])`);
   eq(ds.map(d => d[0]).sort(), ['D₁', 'D₂', 'D₃'], 'labels');
   const x = Object.fromEntries(ds);
-  assert(x['D₃'] > x['D₂'] + 0.1 && x['D₂'] > x['D₁'] + 0.1, 'not a step further: ' + JSON.stringify(ds));
+  assert(x['D₃'] < x['D₂'] - 0.1 && x['D₂'] < x['D₁'] - 0.1, 'not a step further: ' + JSON.stringify(ds));
   const [a, b] = await ev(page, `state.elements.filter(e => e.type === 'arrow')`);
   assert(Math.abs(a.y1n - b.y1n) < 1e-3 && Math.abs(a.y1n - a.y2n) < 1e-3, 'arrows not in one level line');
   eq(b.p1On.id, a.p2On.id, 'second arrow does not start from D₂');
@@ -786,6 +789,34 @@ test('a curve shifted past the y-axis is cut at the axis', async (page) => {
   eq(await ev(page, `polyOf(state.elements.find(e => e.label === 'S₃')).every(p => p.x >= MARGIN.left - 0.5)`), true, 'drawn past the axis');
   // And S₃ is a step beyond the cut S₂, not on top of it.
   eq(await ev(page, `sameShape(state.elements.find(e => e.label === 'S₃'), state.elements.find(e => e.label === 'S₂'))`), false, 'S₃ on top of S₂');
+});
+
+test('a curve shifted past the right edge is cut there, so its label stays in the picture', async (page) => {
+  await ev(page, `loadTemplate('sd'); const d = state.elements.find(e => e.label === 'D');
+    state.selectedId = d.id; shiftSelected(1); state.selectedId = d.id; shiftSelected(1)`);
+  const d3 = await ev(page, `(() => { const e = state.elements.find(e => e.label === 'D₃');
+    return { pts: e.type === 'curve' ? e.points : [{ xn: e.x1n, yn: e.y1n }, { xn: e.x2n, yn: e.y2n }], label: getFullLabelPos(e) }; })()`);
+  assert(d3.pts.every(p => p.xn <= 1 + 1e-6), 'runs past the right edge: ' + JSON.stringify(d3.pts));
+  assert(d3.pts.some(p => Math.abs(p.xn - 1) < 1e-6), 'not cut at the edge');
+  assert(d3.label.x > 0 && d3.label.x < 680 && d3.label.y > 0 && d3.label.y < 560, 'label outside the picture: ' + JSON.stringify(d3.label));
+});
+
+test('shift left, left, right, left always starts from the last curve', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'D').id;
+    shiftSelected(-1); shiftSelected(-1); shiftSelected(1)`);
+  const lines = () => ev(page, `state.elements.filter(e => e.type === 'line' && /^D/.test(e.label)).length`);
+  eq(await lines(), 3, 'right should go back to D₂, not make a new curve');
+  const arrows = () => ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => [elById(e.p1On.id).label, elById(e.p2On.id).label])`);
+  eq(await arrows(), [['D₁', 'D₂'], ['D₂', 'D₃'], ['D₃', 'D₂']], 'arrows after right');
+  eq(await ev(page, `elById(state.selectedId).label`), 'D₂', 'selection');
+  await ev(page, `shiftSelected(-1)`);
+  eq(await lines(), 3, 'left should go back to D₃');
+  eq((await arrows()).pop(), ['D₂', 'D₃'], 'last arrow not from the last curve');
+  // No two shift arrows on top of each other.
+  const close = await ev(page, `(() => { const s = state.elements.filter(e => e.type === 'arrow').map(drawnSegment), bad = [];
+    for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) if (segDist(...s[i], ...s[j]) < 8) bad.push([i, j]);
+    return bad; })()`);
+  eq(close, [], 'overlapping arrows');
 });
 
 test('new axis labels move left (P) or down (Q) clear of existing ones', async (page) => {
