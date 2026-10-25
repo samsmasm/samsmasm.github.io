@@ -502,13 +502,13 @@
       Supply &amp; Demand
       <span class="sub">D and S, market equilibrium</span>
     </button>
-    <button class="template-btn" onclick="loadTemplate('ad_sras')">
-      AD/AS
-      <span class="sub">AD and SRAS</span>
+    <button class="template-btn" onclick="loadTemplate('keyn')">
+      Keynesian AD/AS
+      <span class="sub">AS with a Keynesian range</span>
     </button>
     <button class="template-btn" onclick="loadTemplate('adas')">
       AD/LRAS/SRAS
-      <span class="sub">Long-run equilibrium at Yfe</span>
+      <span class="sub">New Classical, equilibrium at Yfe</span>
     </button>
     <button class="template-btn browse" onclick="openTemplatePicker()">
       All templates
@@ -1075,14 +1075,6 @@ const TEMPLATES = {
 
   ppc: { group: 'Micro', name: 'Production possibilities', sub: 'PPC, bowed out',
     build: () => ({ title: '', yLabel: 'Good B', xLabel: 'Good A', elements: SHAPES.ppc() }) },
-
-  ad_sras: { group: 'Macro', name: 'AD/AS', sub: 'AD and SRAS, short-run equilibrium',
-    build: () => {
-      const AD = mkLine(0.05, 0.08, 0.92, 0.85, COLORS[0], 2.5, '', 'AD');
-      const SRAS = mkLine(0.08, 0.88, 0.90, 0.10, COLORS[2], 2.5, '', 'SRAS');
-      const e = lineCross(AD, SRAS);
-      return { title: '', ...MACRO_AXES, elements: [AD, SRAS, mkEq(AD, SRAS, 'PL', 'Y', e.xn, e.yn)] };
-    } },
 
   adas: { group: 'Macro', name: 'AD/LRAS/SRAS', sub: 'New Classical, long-run equilibrium at Yfe',
     build: () => {
@@ -3076,11 +3068,8 @@ function renderProps() {
 
   if (el.type === 'region') {
     html += textPropHTML('Label', 'label', el.label, 20, 'e.g. Consumer surplus');
-    html += `<div class="prop-row"><label>Fill</label>${selectHTML(FILL_OPTS, el.fill || 'solid', "updateProp('fill',this.value);renderProps()")}</div>
-    <div class="prop-row">
-      <label>Color</label>
-      ${colorSwatchHTML(el.fillColor || COLORS[0], 'fillColor')}
-    </div>`;
+    html += `<div class="prop-row"><label>Fill</label>${selectHTML(FILL_OPTS, el.fill || 'solid', "updateProp('fill',this.value);renderProps()")}</div>`;
+    html += colorRowHTML(el.fillColor || COLORS[0], 'fillColor');
     if ((el.fill || 'solid') === 'solid') {
       html += `<div class="prop-row"><label>Strength</label>${selectHTML([
         [0.10, '10%'], [0.20, '20%'], [0.25, '25%'], [0.30, '30%'], [0.45, '45%'],
@@ -3094,20 +3083,14 @@ function renderProps() {
     html += checkPropHTML('Show dot', 'showDot', el.showDot !== false);
     html += checkPropHTML('Line to the price axis', 'dropP', el.drops !== false && el.dropP !== false);
     html += checkPropHTML('Line to the quantity axis', 'dropQ', el.drops !== false && el.dropQ !== false);
-    html += `<div class="prop-row">
-      <label>Color</label>
-      ${colorSwatchHTML(el.color || GUIDE.color, 'color')}
-    </div>`;
+    html += colorRowHTML(el.color || GUIDE.color, 'color');
     if (el.pDx || el.pDy || el.qDx || el.qDy)
       html += `<button class="action-btn secondary" style="margin-top:4px" onclick="resetLabelPosition()">Reset label positions</button>`;
     if (a && b) html += `<button class="action-btn secondary" style="margin-top:4px" onclick="detachSelected()">Unlink from curves</button>`;
   } else if (el.type !== 'text') {
     html += textPropHTML('Label', 'label', el.label, 16);
-    html += `<div class="prop-row">
-      <label>Color</label>
-      ${colorSwatchHTML(el.color || COLORS[0], 'color')}
-    </div>
-    <div class="prop-row"><label>Weight</label>${selectHTML(WEIGHT_OPTS, el.weight || 2.5, "updateProp('weight', parseFloat(this.value))")}</div>`;
+    html += colorRowHTML(el.color || COLORS[0], 'color');
+    html += `<div class="prop-row"><label>Weight</label>${selectHTML(WEIGHT_OPTS, el.weight || 2.5, "updateProp('weight', parseFloat(this.value))")}</div>`;
     if (el.type !== 'brace')
       html += `<div class="prop-row"><label>Dash</label>${selectHTML(DASH_OPTS, el.dash || '', "updateProp('dash', this.value)")}</div>`;
   } else {
@@ -3210,8 +3193,17 @@ function setPropColor(key, value) {
   redraw();
 }
 
+// B/W draws everything in black, so the colour choice is hidden there.
+function colorRowHTML(currentColor, propKey) {
+  if (bwMode) return '';
+  return `<div class="prop-row">
+      <label>Color</label>
+      ${colorSwatchHTML(currentColor, propKey)}
+    </div>`;
+}
+
 function colorSwatchHTML(currentColor, propKey) {
-  return (bwMode ? `<div class="bw-note">Colours show in Colour mode. B/W draws everything in black.</div>` : '') + `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${COLORS.map(c =>
+  return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${COLORS.map(c =>
     `<div style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;box-sizing:border-box;border:3px solid ${c===currentColor?'#1a1918':'transparent'}"
       onclick="setPropColor('${propKey}','${c}')"></div>`
   ).join('')}</div>`;

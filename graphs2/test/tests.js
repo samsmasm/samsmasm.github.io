@@ -451,6 +451,15 @@ test('header has no sign-in button; B/W mode notes that colours need Colour mode
   eq(await ev(page, `document.getElementById('bw-color-note').style.display`), 'none', 'note shown in colour mode');
 });
 
+test('selected-object panel hides colour choice in B/W mode', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements[0].id; renderProps()`);
+  const hasColor = () => ev(page, `[...document.querySelectorAll('#props-form label')].some(l => l.textContent.trim() === 'Color')`);
+  assert(await ev(page, `bwMode`), 'expected B/W by default');
+  eq(await hasColor(), false, 'colour row shown in B/W');
+  await ev(page, `toggleBW()`);
+  eq(await hasColor(), true, 'colour row missing in Colour mode');
+});
+
 
 // ─── PHASE 5: BIG FEATURES ───────────────────────────────────
 
