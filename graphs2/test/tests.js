@@ -639,8 +639,13 @@ test('settings shape templates, new drawings and exports, and are saved', async 
   await set('transparent', 'Transparent (for coloured slides)');
   const px = await ev(page, `new Promise(res => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); res([img.width, x.getImageData(2, 2, 1, 1).data[3]]); }; img.src = exportPNG(); })`);
   eq(px, [2720, 0], 'export size / transparency');
+  // Switch to the defaults and back: saved choices come back.
+  await page.click('#prefs-switch');
+  eq(await ev(page, `[useDefaults, prefs.currency, GUIDE.dash, bwMode, document.querySelector('#settings-form select').disabled]`), [true, '$', '6,4', true, true], 'defaults');
+  await page.click('#prefs-switch');
+  eq(await ev(page, `[useDefaults, prefs.currency, GUIDE.dash, bwMode]`), [false, '€', '2,3', false], 'back to mine');
   await ev(page, `resetPrefs()`);
-  eq(await ev(page, `[prefs.currency, GUIDE.dash, bwMode]`), ['$', '6,4', true], 'reset');
+  eq(await ev(page, `[prefs.currency, GUIDE.dash, bwMode, myPrefs.currency]`), ['$', '6,4', true, '$'], 'reset');
 });
 
 test('when zoomed in, dragging empty space moves the view', async (page) => {

@@ -381,6 +381,11 @@
   header button.gear { font-size: 15px; padding: 2px 8px; }
   .settings-modal { width: 460px; max-height: 88vh; overflow-y: auto; }
   .settings-modal h3 { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
+  .set-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .set-head h2 { margin-bottom: 0; }
+  #prefs-switch .ms-track { background: var(--accent); }
+  #prefs-switch.bw .ms-track { background: #888; }
+  .set-row select:disabled { opacity: 0.55; cursor: default; }
   .set-note { font-size: 12px; color: var(--muted); line-height: 1.4; margin: -6px 0 4px; }
   .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; }
   .set-row select { font-family: var(--sans); font-size: 12px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; color: var(--text); max-width: 250px; }
@@ -669,11 +674,16 @@
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settings-modal" onclick="if (event.target === this) this.classList.remove('open')">
   <div class="modal settings-modal" role="dialog" aria-label="Settings">
-    <h2>Settings</h2>
+    <div class="set-head">
+      <h2>Settings</h2>
+      <button class="mode-switch" id="prefs-switch" role="switch" aria-checked="false" aria-label="Use the default settings" onclick="toggleUseDefaults()">
+        <span class="ms-label ms-off">My settings</span><span class="ms-track"><span class="ms-knob"></span></span><span class="ms-label ms-on">Defaults</span>
+      </button>
+    </div>
     <p class="set-note">Saved in this browser. They shape new drawings and templates. Diagrams you've already made keep their look, apart from text size and guide lines.</p>
     <div id="settings-form"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="resetPrefs()">Reset to defaults</button>
+      <button class="btn-cancel" id="prefs-reset" onclick="resetPrefs()">Reset my settings</button>
       <button class="btn-confirm" onclick="document.getElementById('settings-modal').classList.remove('open')">Done</button>
     </div>
   </div>
@@ -774,9 +784,21 @@ const PREF_DEFAULTS = {
   eqLabels: 'num', showDot: false, snap: true, start: 'last',
   axisUnits: true, currency: '$', exportSize: 2, transparent: false,
 };
-let prefs = { ...PREF_DEFAULTS };
-try { Object.assign(prefs, JSON.parse(localStorage.getItem('sw2_prefs') || '{}')); } catch (e) {}
-function savePrefs() { try { localStorage.setItem('sw2_prefs', JSON.stringify(prefs)); } catch (e) {} }
+// `myPrefs` are the saved choices; `prefs` is what is in use: either those
+// or the defaults (the switch at the top of Settings). Switching to the
+// defaults keeps the saved choices, so switching back restores them.
+let myPrefs = { ...PREF_DEFAULTS }, useDefaults = false;
+try {
+  Object.assign(myPrefs, JSON.parse(localStorage.getItem('sw2_prefs') || '{}'));
+  useDefaults = localStorage.getItem('sw2_prefsUseDefaults') === '1';
+} catch (e) {}
+let prefs = useDefaults ? { ...PREF_DEFAULTS } : { ...myPrefs };
+function savePrefs() {
+  try {
+    localStorage.setItem('sw2_prefs', JSON.stringify(myPrefs));
+    localStorage.setItem('sw2_prefsUseDefaults', useDefaults ? '1' : '0');
+  } catch (e) {}
+}
 const fontPx = n => Math.round(n * prefs.textSize * 10) / 10;
 const newFill = () => prefs.fill === 'hatch' ? 'hatch45' : prefs.fill === 'solid' ? 'solid' : (bwMode ? 'hatch45' : 'solid');
 
@@ -1578,34 +1600,47 @@ const PREF_FIELDS = [
 ];
 
 function openSettings() {
+  const sw = document.getElementById('prefs-switch');
+  sw.classList.toggle('bw', useDefaults);
+  sw.setAttribute('aria-checked', String(useDefaults));
   document.getElementById('settings-form').innerHTML = PREF_FIELDS.map(([group, fields]) =>
     `<h3>${group}</h3>` + fields.map(([key, label, opts]) =>
-      `<label class="set-row"><span>${label}</span><select onchange="setPref('${key}', this.selectedIndex)">${
+      `<label class="set-row"><span>${label}</span><select${useDefaults ? ' disabled' : ''} onchange="setPref('${key}', this.selectedIndex)">${
         opts.map(([v, t]) => `<option${v === prefs[key] ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')
       }</select></label>`).join('')).join('');
+  document.getElementById('prefs-reset').style.display = useDefaults ? 'none' : '';
   document.getElementById('settings-modal').classList.add('open');
+}
+
+// After `prefs` changes: the session follows the start-up choices too.
+function prefsChanged(keys) {
+  if (keys.includes('bw') && bwMode !== prefs.bw) toggleBW();
+  if (keys.includes('snap')) snapEnabled = prefs.snap;
+  applyPrefs();
+  Object.keys(thumbCache).forEach(k => delete thumbCache[k]);
+  redraw();
 }
 
 function setPref(key, index) {
   const field = PREF_FIELDS.flatMap(g => g[1]).find(f => f[0] === key);
-  prefs[key] = field[2][index][0];
+  myPrefs[key] = prefs[key] = field[2][index][0];
   savePrefs();
-  // The current session follows the start-up choices too.
-  if (key === 'bw' && bwMode !== prefs.bw) toggleBW();
-  if (key === 'snap') snapEnabled = prefs.snap;
-  applyPrefs();
-  Object.keys(thumbCache).forEach(k => delete thumbCache[k]);
-  redraw();
+  prefsChanged([key]);
+}
+
+function toggleUseDefaults() {
+  useDefaults = !useDefaults;
+  prefs = useDefaults ? { ...PREF_DEFAULTS } : { ...myPrefs };
+  savePrefs();
+  prefsChanged(Object.keys(PREF_DEFAULTS));
+  openSettings();
 }
 
 function resetPrefs() {
+  myPrefs = { ...PREF_DEFAULTS };
   prefs = { ...PREF_DEFAULTS };
   savePrefs();
-  if (bwMode !== prefs.bw) toggleBW();
-  snapEnabled = prefs.snap;
-  applyPrefs();
-  Object.keys(thumbCache).forEach(k => delete thumbCache[k]);
-  redraw();
+  prefsChanged(Object.keys(PREF_DEFAULTS));
   openSettings();
 }
 
