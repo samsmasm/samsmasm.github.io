@@ -208,4 +208,8 @@ Undo/Redo buttons; sidebar templates S&D, Keynesian AD/AS, AD/LRAS/SRAS; colour 
 - **Custom styles, shareable.** Saved style presets (weights, guide style, fills, colours, label style) that can be shared by link, e.g. a teacher sets the house style for a class. Builds on the settings (gear).
 - **Questions after a while.** Once someone has used the site for a while, ask: teacher / student / other, plus a few questions. Shelved (2026-10-25): Sam doubts the answers would be usable for design. Don't build unless he raises it again.
 
-**Next: Phase 7 (promote).** Wait for Sam to try graphs2 first.
+### 2026-10-25: Phase 7 done (promoted)
+
+Sam tried the beta and said go. `graphs/` (v1.9) moved to `graphsold/` (Sam's choice, rather than deleting it), noindex, with a link to the new version. `graphs2/` moved to `graphs/`: tag v2.0, indexable, "Old version" link, feedback `app: 'graphs'`. `graphs2/` is now a redirect to `/graphs/` keeping query and hash. localStorage keys stay `sw2_` so beta users keep their work. 60 tests.
+
+**v2 is done.** New work goes straight into `graphs/` (keep running `test/run.sh`).

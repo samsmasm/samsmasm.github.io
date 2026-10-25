@@ -34,9 +34,11 @@ const near = (a, b, tol = 0.002) => Math.abs(a - b) < tol;
 
 // ─── TESTS ───────────────────────────────────────────────────
 
-test('loads with no console errors and shows the beta tag', async (page, errors) => {
+test('loads with no console errors, shows v2.0 and links to the old version', async (page, errors) => {
   const tag = await ev(page, `document.querySelector('header .tag').textContent`);
-  assert(/beta/i.test(tag), 'beta tag missing: ' + tag);
+  eq(tag, 'v2.0', 'version tag');
+  eq(await ev(page, `!!document.querySelector('header a[href="../graphsold/"]')`), true, 'old version link');
+  eq(await ev(page, `!!document.querySelector('meta[name=robots]')`), false, 'still noindex');
   eq(errors.length, 0, 'console errors ' + errors.join(' | '));
 });
 
@@ -218,7 +220,7 @@ test('feedback sends no picture or diagram unless ticked', async (page) => {
   assert(sent[0].url === 'https://unisam.nz/feedback/api/report', 'url ' + sent[0].url);
   eq(sent[0].body.image, null, 'image sent without opt-in');
   eq(sent[0].body.diagram, null, 'diagram sent without opt-in');
-  eq(sent[0].body.app, 'graphs2', 'app');
+  eq(sent[0].body.app, 'graphs', 'app');
   eq(sent[0].body.type, 'bug', 'type');
   assert(sent[0].body.meta.version && sent[0].body.meta.browser, 'meta missing');
   assert(!(await ev(page, `document.getElementById('feedback-modal').classList.contains('open')`)), 'modal still open');

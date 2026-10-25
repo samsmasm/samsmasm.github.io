@@ -1,20 +1,88 @@
-# Economics Graph Drawer — Project Notes for Claude
+# ShiftWork (economics graph maker): Project Notes for Claude
 
-> **v2 is planned: read `../graphs2/PLAN.md` before any work.** v2 is built in `graphs2/` (a fork) and promoted over this folder only at the end. Do not make v2 changes here.
+> **This is the live app, v2.0, at unisam.nz/graphs/.** v2 was built as a fork in `graphs2/` and promoted here on 2026-10-25 (Phase 7). `PLAN.md` has the phases, Sam's decisions, the progress log and future ideas; read it before big changes. Line numbers in this file drift; grep for function names.
 >
-> **Philosophy changed (2026-10-25):** v1 kept some deliberate friction. That is dropped. Make it as easy as possible for students and teachers: connected things move together (curve, its label, its equilibrium points, their drop lines and P/Q labels), common IB moves are one click, no popups where inline edit or undo would do. When in doubt, the app does the work, not the student.
+> **Philosophy (2026-10-25):** make it as easy as possible for students and teachers. Connected things move together (curve, its label, its equilibrium points, their drop lines and P/Q labels), common IB moves are one click, no popups where inline edit or undo would do, and each setting lives in one place only. When in doubt, the app does the work, not the student.
 
 ## What this is
-A single self-contained HTML/CSS/JS file (`index.html`) that lets IB Economics students draw diagrams and export them as JPG. No build step, no dependencies, no separate CSS or JS files. Everything lives in `index.html`. Keep it that way.
+A single self-contained HTML/CSS/JS file (`index.html`) for drawing IB Economics diagrams and exporting them (copy image, PNG, JPG). No build step, no dependencies, no separate CSS or JS files. Keep it that way.
 
-Current version: **v1.9** (tag shown in the header UI, in the `<header>` block).
+Current version: **v2.0** (tag in the `<header>` block, which also links to the old version).
+
+## Related folders
+- `../graphsold/`: the frozen v1.9, at unisam.nz/graphsold/ (noindex). Don't develop it.
+- `../graphs2/`: just a redirect to `/graphs/` that keeps the query string and hash, so beta links and old feedback "Open this diagram" links still work.
+- `../feedback/`: the shared feedback inbox; ShiftWork reports arrive with `app: 'graphs'` (beta reports say `graphs2`, and still open via the redirect).
 
 ## File structure
 ```
 graphs/
-  index.html   ← the entire app (~2400 lines)
-  CLAUDE.md    ← this file
+  index.html      ← the entire app
+  CLAUDE.md       ← this file
+  PLAN.md         ← v2 plan, decisions, progress log, future ideas
+  test/run.sh     ← serves the repo and runs the browser tests (headless Chrome)
+  test/tests.js   ← the tests; one `test(name, fn)` per fix/feature
 ```
+
+## Tests
+
+`./test/run.sh` (optionally `./test/run.sh "name fragment"`). It needs `/usr/bin/google-chrome`; puppeteer-core is installed on first run into `~/.cache/sw-test`, outside the repo. Each test gets a fresh page with cleared localStorage. Page globals (`state`, `undoStack`, all functions) are reachable in `page.evaluate` because the app is one classic script. **Run before every commit and add a test for every fix or feature.** puppeteer's double-click is `page.mouse.click(x, y, { count: 2 })` (`clickCount` does not fire `dblclick`).
+
+## v2 conventions (added in Phase 0/1)
+
+- `isLinear(el)` / `isLinearTool(t)`: line, arrow, dbarrow, brace. Use instead of chained type checks.
+- `eventToLogical(e)` returns `{ rawCx, rawCy, cx, cy }` for any mouse event.
+- `escapeHtml()` for anything put into `innerHTML` or an attribute. Save codes are shared between students, so labels are untrusted.
+- `selectHTML(options, current, onchange)` for property dropdowns: shows a "Custom" entry for non-standard values instead of lying.
+- **Undo** snapshots the whole document (`snapshot()` / `restoreSnapshot()`): elements, legend, title, axis labels and offsets. Drags take a snapshot on mousedown and push it with `saveUndo(snap)` only once the pointer actually moves, so a plain click never adds an undo step or clears redo. Header Undo/Redo buttons (`#undo-btn`, `#redo-btn`) grey out via `updateUndoButtons()`, called from `saveUndo`, `undo` and `redo`; anything else that touches the stacks must call it too. Title/axis inputs snapshot on focus (`onDocTextFocus`) because `input` fires after the text changed.
+- No `confirm()` for destructive actions: they are undoable and show `showToast(msg, { undo: true })`. Loading a template over real work, and Clear diagram (which is just `loadTemplate('blank')`), do this.
+- **Autosave**: `redraw()` calls `scheduleAutosave()`, which writes `{ graph, driveFile }` to localStorage `sw2_autosave` (debounced, skipped when unchanged). `init()` restores it. A leave-page warning appears only if localStorage writes fail.
+- Saved data has `v: 2`. Every load goes through `migrateGraphData()`; put format conversions there.
+- localStorage keys are prefixed `sw2_` (from the beta; kept so beta users keep their autosave and settings). v1.9 used `sw_`, so the two versions never share state. Don't rename them.
+- Text editing is inline (`showInlineLabelEdit(el, opts)`); the edit modal and the Label tool's `prompt()` are gone. `getLabelBasePos` covers every type, including brace tips, text and dots.
+- **Feedback** (Phase 2): header button opens `#feedback-modal`; `sendFeedback()` POSTs to the shared `unisam-feedback` Worker (`../feedback/CLAUDE.md`). Picture and diagram file are opt-in. `renderExport(scale, mime, quality)` draws the export (used by JPG download and the feedback picture). `openHandoffDiagram()` opens a diagram passed from the inbox via localStorage `sw2_open`.
+
+## Connected diagrams (Phase 3)
+
+Positions of attached elements are **derived** on every redraw by `resolveAttachments()` (top of `redraw()`), in dependency order with a cycle guard. Never set an attached element's position directly and expect it to stick: change its attachment instead.
+
+| link | meaning | set by |
+|------|---------|--------|
+| `dot.on = [idA, idB]` | sits where A and B cross (nearest crossing to its last position) | Equilibrium tool (`nearestCrossing`), dropping a free dot on a crossing, `mkEq` in templates, v1 migration |
+| `text.attach = { id, t, dx, dy, dx0, dy0 }` | canvas-px offset from point `t` along the parent; `dx0/dy0` is the original offset for "Reset label position" | Label tool (`attachText`, 24 px), "Attach to nearest" |
+| `line.p1On / p2On = { id, t }` | endpoint sits at point `t` along the parent | drawing or dragging an endpoint onto a line/curve (`attachEnd`, 7 px) |
+
+- `t` is the fraction of the parent's length (`pointAt` / `projectOnto`, using `getElSegments` so curves match what is drawn).
+- `derived` (a Map, never saved) holds per-redraw facts for dots: `broken` (curves no longer cross: faint red ring, hidden in export via `exporting`), `skipP` / `skipQ` (a horizontal / vertical curve in the pair, so that drop line is not drawn).
+- Dots: `showDot` (false by default for new points; v1 dots keep `true`), `drops` (lines to axes), `pLabel`/`qLabel` with hand offsets `pDx,pDy,qDx,qDy`. `dotLabelBox(el, 'p'|'q')` is the single source for label position. Labels auto-number P₁/Q₁ (PL/Y on macro axes) via `nextEqLabels()`.
+- Dragging: a curve drags everything attached. A label drag (`hitTestLabel`) changes only its offset fields. Dragging an attached text changes its offset (`reanchorText`). Dragging an attached arrow slides its ends along their parents (`slideEnds`). An attached dot cannot be dragged (hint shown). **Alt+drag** moves an element alone and detaches text attached to it.
+- Deleting uses `removeWithDependents()`: points on a deleted curve go too; attached text and arrow ends become free.
+- Template elements reference each other by id; `cloneElements()` remaps ids and references on load. Build templates as IIFEs with `mkEq(a, b, pLabel, qLabel, xn, yn)`.
+- `GUIDE` (`#888`, weight 1.5, dash `6,4`) is the one guide-line style. Choosing any dash sets weight to Thin, in the sidebar and in properties.
+- v1 migration: `connectV1()` in `migrateGraphData()` turns a dashed horizontal guide from the y-axis plus a dashed vertical guide to the x-axis, meeting at a crossing of two main curves, into one connected point, taking adjacent axis texts as its P/Q labels. Anything ambiguous is left alone.
+
+## Phase 5 features
+
+- **Shift curve** (`shiftSelected(dir)`, buttons in the panel for lines and curves): copies the curve `SHIFT_BY` (0.15) left/right, numbers labels (`numberCopy`: S → S₁/S₂, S₂ → S₃), adds an arrow attached to both at t = 0.8, and copies every equilibrium on the original onto the new curve with numbered P/Q labels. One undo step.
+- **Subscripts**: `fmtLabel(text, loose)`. `S_1` → S₁ everywhere; `S1` → S₁ in curve and point labels only (free text keeps "Q1 2024"). Applied when a label is stored (`fmtFor`), so state holds the Unicode subscripts.
+- **Keyboard** (`onKeyDown`, ignored while typing in a field): V/L/A/C/T/R/E tools, arrows nudge 1 px (Shift 10 px, a run of nudges is one undo step), Ctrl+C / Ctrl+V (internal clipboard, pasted copies are free of links) and Ctrl+D duplicate. `moveElement()` and `copyOf()` are the shared helpers.
+- **Curve points**: every point of a selected curve has a handle (ends larger); `hitTestNode` returns a point index for curves.
+- **Label halo**: `haloText()` strokes white behind every label and text.
+- **Pointer events**: the canvas listens to `pointerdown/move/up/cancel` (with pointer capture) instead of mouse events, and `touch-action: none`. `clickCount` replaces `e.detail` (pointer events have none); a double tap on touch calls `onDblClick` from `onPointerDown`, and `lastDblAt` stops a native dblclick doubling it.
+- **Shapes** (`SHAPES`): MC/AC, PPC, J-curve (with zero line), Lorenz (with line of equality). Used only by templates (cost, ppc, jcurve, lorenz). There is deliberately no "add a shape" button: Sam found buttons that add to the page next to templates confusing. Every template replaces everything.
+- **Two kinds of curve.** New curves (`mkCurve`, the Curve tool) have `through: true` and pass through every point (`throughPath`: Hermite spline, slope from previous to next neighbour, scaled by segment length so uneven spacing doesn't overshoot). Curves in older saves have no flag and keep the old quadratic-through-midpoints look. `getElSegments` and `drawSmoothCurve(pts, through)` must stay in step.
+- **Cost curves** come from `costCurves(qT, atcMin, qV, c)`, one cubic cost function giving MC, AVC and ATC, about 6 points each so they stay editable (Sam rejected dozens of handles). Sam requires MC to go EXACTLY through the lowest points of AVC and ATC, as drawn: both minimums are points of MC too, and each minimum has neighbours at equal height so the drawn curve is flat exactly there. Never draw MC as a straight line. Monopoly finds Qm with `mrCrossesMC`. A test checks the drawn gap is under 0.5 px.
+- **Fill region has two modes**, switched by holding its button (`initFillModeButton`, 500 ms; `fillMode` saved in localStorage `sw2_fillMode`; label `#fill-mode-label`). `click` (default): `fillAt` → `fillAreaAt` draws lines, curves and dots' drop lines into an offscreen mask (2× res), carries line ends within 12% of the plot edge on to the edge (template lines stop short of the axes), flood-fills, refuses an area running along the open top/right edge ('open', toast), grows into the walls, then `traceOutline` (Moore) and `simplifyClosed` (Douglas-Peucker) give the polygon. New regions go to the front of `elements` (drawn behind). `sketch`: click corners, double-click to finish.
+- **Point tool** (`P`, `placePoint`): a plain marker, a `dot` with `mark: 'dot' | 'cross'`, `showDot: true`, no drop lines or labels. Placed within 10 px of a crossing it links (`on`). Hold the button to switch (`pointMode`, localStorage `sw2_pointMode`). Marked points don't count in `nextEqLabels`. Long presses share `onLongPress(btn, fn)`.
+- **B/W switch** (`#bw-btn.mode-switch`, class `bw` when on): a toggle switch, not a button.
+- **Settings** (gear in the header, `openSettings`, `PREF_FIELDS`, `PREF_DEFAULTS`). `myPrefs` (localStorage `sw2_prefs`) are the saved choices; `prefs` is what's in use: `myPrefs`, or the defaults when the "My settings / Defaults" switch is on (`useDefaults`, `sw2_prefsUseDefaults`), which keeps `myPrefs` so switching back restores them. Options: start-up (last diagram / blank / S&D, B/W, snap), new drawings and templates (line thickness, guide dashed/dotted via `GUIDE.dash`, shaded areas, equilibrium labels P₁/Pe/P*, dot at equilibria, axis titles with or without units, currency), text size (`fontPx`), export size (2×/4×) and transparent PNG (`exportPNG`). Templates go through `buildTemplate()` / `axisTitle()`, never `TEMPLATES[k].build()` directly. Text size and guide style apply to existing diagrams too; everything else only to new things. Future ideas (shareable custom styles; asking teacher/student after a while) are in PLAN.md.
+- **Style menu** (`#style-btn`, `styleDiagram(what, value)`), next to the B/W switch in the top bar (Sam's choice): Auto colour, Auto hatching, All lines thin/normal/thick. Whole diagram, one undo step each; guides (`isGuide`: dashed or grey) are left alone.
+- **Two-mode tools** (Point dot/cross, Fill region click/draw): clicking the button while the tool is selected switches mode (`toolClick`). No long press. Clicking an existing filled area with Fill region in click mode cycles it (`cycleRegion`: colour, or hatching in B/W).
+- **Moving around when zoomed**: drag empty space (select tool), two-finger trackpad scroll, or Shift/Space/middle drag. Mouse wheel and pinch zoom.
+- **Canvas**: the middle area is open white; a faint dashed outline on `#graph-canvas` shows the export area.
+- Keep tool hints short: a hint that wraps to two lines pushes the canvas down.
+- **Colour and line style are chosen in one place**, the selected-object panel. The sidebar has neither: new drawings are solid, Normal weight (`state.strokeWeight/strokeDash`).
+- **Colour**: the selected-object panel (hidden in B/W). There is no sidebar colour picker: `drawColor()` gives new lines, curves and regions the first palette colour not yet used, and arrows/braces black.
 
 ---
 
@@ -59,7 +127,6 @@ let state = {
   curves: [],        // legend entries { name, color } — shown in sidebar + JPG export
   selectedId: null,
   tool: 'select',
-  drawColor: COLORS[0],
   strokeWeight: 2.5,
   strokeDash: '',
   xLabelDx, xLabelDy, yLabelDx, yLabelDy,  // axis label offsets
@@ -78,45 +145,40 @@ All elements live in `state.elements`. Constructor helpers at lines ~799–817:
 |------|-----------|-------|
 | `line` | `x1n,y1n,x2n,y2n, color,weight,dash,label, labelDx,labelDy` | straight line |
 | `arrow` | same as line | line with arrowhead at (x2n,y2n) |
+| `dbarrow` | same as line | arrowheads at both ends |
+| `brace` | `x1n,y1n,x2n,y2n, color,weight,label,labelDx,labelDy, flip` | curly brace; label at the tip (`braceGeometry`) |
 | `curve` | `points[{xn,yn}], color,weight,dash,label, labelDx,labelDy` | catmull-rom spline |
-| `text` | `xn,yn, text, color, size` | free text label |
-| `dot` | `xn,yn, color, pLabel, qLabel` | equilibrium dot with optional P*/Q* labels and dotted projection lines |
+| `text` | `xn,yn, text, color, size, attach` | text label, optionally attached |
+| `dot` | `xn,yn, color, pLabel, qLabel, on, showDot, drops, pDx..qDy` | equilibrium point: drop lines to both axes, P/Q labels; see Connected diagrams |
 | `region` | `points[{xn,yn}], fillColor, pattern, bwPattern, label, labelDx,labelDy` | filled polygon |
 
 ---
 
 ## Legend
 
-`state.curves` holds **named curve legend entries** `{ name, color }` — these are manually added by the user via "Add to legend" in the right panel, separate from actual drawn elements.
+Automatic (Phase 4). `state.legend = { show, hidden: [ids] }`. Entries are every labelled `line`, `curve` and `region` (`legendCandidates()`), minus unticked ids (`legendEntries()`). Off by default; the sidebar has the on/off box and a tickable list with swatches drawn by `drawLegendSwatch()` (B/W aware, same fill/dash as the diagram). `renderLegendList()` rebuilds the sidebar; call it when labels, colours, fills or the mode change. `renderExport()` adds the legend band below the picture only when `show` is on. v1 `curves` lists migrate to `show: true` and are dropped.
 
-`renderCurveList()` (line ~2011) renders the sidebar legend list. It shows:
-1. `state.curves` entries (line swatches)
-2. `state.elements` filtered to `type === 'region' && e.label` (filled swatches)
+## Export
 
-Call `renderCurveList()` whenever: curves are added/removed, a region label changes, a region color changes, or elements are deleted.
-
-In **JPG export** (`downloadJPG`, line ~2314), the canvas is temporarily expanded to fit both the graph and a legend row below. After `redraw()`, the legend area must be explicitly filled white before drawing legend items — `redraw()` only fills the graph area (680×560).
-
----
+One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/Slides), Download JPG, Download PNG. All at 2× via `renderExport(2, mime)`. Sign-in lives only in the Save dialog; the header shows "Drive: email" when signed in (click opens Save).
 
 ## Templates
 
-Defined in the `TEMPLATES` object (line ~660). Each template has `{ title, yLabel, xLabel, curves[], elements[] }`. Loaded via `loadTemplate(name)` which deep-copies elements and reassigns IDs.
+`TEMPLATES[key] = { group, name, sub, build }`. `build()` runs at load time and returns `{ title, yLabel, xLabel, elements }`, so builders can use any helper (they also run for thumbnails). `loadTemplate(key)` → `setDiagram(t)` (which `cloneElements()` to remap ids and links) and is undoable with a toast. Groups: Micro, Macro, Global (`TEMPLATE_GROUPS`).
 
-Current templates: `blank`, `sd` (Supply & Demand), `adas` (New Classical AD/AS), `keyn` (Keynesian AD/AS), `ext_neg`, `ext_pos`.
+22 templates: blank, sd, tax, subsidy, ceiling, floor, ext_neg, ext_pos, merit, demerit, monopoly, perfcomp, ppc (Micro); adas (AD/LRAS/SRAS), inflgap, deflgap, keyn, phillips, lorenz (Macro); tariff, quota, exrate (Global).
 
-**Keynesian AD/AS** (`keyn`): AD is downward sloping — in normalised coords this means going from small-xn/small-yn (low GDP, high price) to large-xn/large-yn (high GDP, low price). The AS is a hockey-stick curve (flat Keynesian range, then steep near YFE). YFE label is placed via `mkText(xn, 1.05, 'YFE')` below the x-axis (not as a line label), consistent with Q* label placement.
+Builder helpers: `mkEq(a, b, pLabel, qLabel)` for connected equilibria; `freePoint()` for points that are not crossings (Pp, monopoly Pm and AC); `footLabel(line, text)` for Yfe / NRU attached under a vertical line; `hLine`, `rectRegion`, `triRegion`; geometry `lineCross`, `lineXAt`, `lineYAt`, `curveYAt`, `curveLowest` so shaded areas and tangencies are exact. Shaded areas are plain regions, **not** connected: they stay put if a curve is moved.
+
+Picker: the sidebar has Sam's three standard templates (S&D, Keynesian AD/AS, AD/LRAS/SRAS; Sam's school uses no plain AD/SRAS diagram) plus "All templates" (Blank is in there, and Clear diagram gives blank axes too), which opens `#template-modal` (`openTemplatePicker`). Thumbnails are real renders via `templateThumb(key)` (temporarily swaps the diagram, `renderExport(0.5)`, restores; cached in `thumbCache`). Escape or clicking outside closes any dialog.
+
+Points have `dropP` / `dropQ` to switch off either drop line (early betas had one `drops` switch; `showDropP/Q` read both).
 
 ---
 
 ## B/W mode
 
-`bwMode` global. When true, all elements render in `#1a1918` (near-black). Regions use canvas pattern fills instead of colour fills — patterns defined in `drawPattern()` (line ~1143):
-- `bw-hatch45`, `bw-hatch135`, `bw-crosshatch`, `bw-dots`, `bw-vertical`, `bw-horizontal`
-
-Each region element stores `bwPattern` (which pattern to use in B/W) and `pattern` (colour-mode fill style, currently unused — colour mode uses flat `fillColor`).
-
----
+`bwMode` global (on by default). Everything draws in `#1a1918`. Regions have **one** fill setting `fill` for both modes (`FILL_OPTS`: solid "Shaded", hatch45, hatch135, crosshatch, dots, vertical, horizontal); `drawPattern(pattern, color, c, w, h)`. Solid in B/W is a grey tint. New regions default to hatch45 in B/W and solid in colour. v1 `pattern`/`bwPattern` migrate via `fillFromV1()` (the B/W choice wins unless a colour pattern was picked). Colour pickers show a "Colours show in Colour mode" note in B/W.
 
 ## Key functions reference
 
@@ -158,7 +220,7 @@ Three-column flex layout: left sidebar → `.canvas-wrap` → right panel.
 - **Line label positions**: vertical lines get labels at the top by default. The exception is YFE-style labels — use `mkText(xn, 1.05, label)` to place below the x-axis instead.
 - **Property-panel text inputs must use `oninput` + `updatePropLive()`, never `onchange`**: `onchange` fires on blur, but clicking the canvas calls `renderProps()`, which replaces `form.innerHTML` and destroys the focused input before blur fires, silently discarding the edit. `updatePropLive()` collapses a run of keystrokes on one field into a single undo entry, reset by `renderProps()`.
 - **Template equilibria must be computed, not eyeballed**: dotted projection lines, axis labels and the LRAS position all have to sit on the true intersection of the curves, or they visibly miss. Solve the line pair algebraically and paste the exact values rather than estimating them.
-- **`saveUndo()` before every mutation**: undo/redo depends on this being called before `state.elements` or `state.curves` is changed.
+- **`saveUndo()` before every mutation**: undo/redo depends on this being called before the document changes. For drags, take `snapshot()` on mousedown and pass it to `saveUndo(snap)` on first real movement.
 
 ---
 
@@ -175,7 +237,7 @@ Config constants sit at the top of the Drive block: `GOOGLE_CLIENT_ID` (empty by
 
 - Scope is `openid email profile .../auth/drive.file`. All three are **non-sensitive**, so this needs only basic OAuth verification, not the sensitive-scope review. Do not widen to `drive` or `drive.readonly`, which are restricted and would trigger a security assessment.
 - `drive.file` only ever sees files this app created, so the folder lookup query reliably finds our own folder and nothing else in the student's Drive is visible to the app.
-- Uses the GIS **token model** (`initTokenClient`), not the ID-token/One Tap model. Tokens last ~1 hour; `driveEnsureToken()` refreshes silently using the `sw_drive_granted` localStorage flag to decide between `prompt:''` and `prompt:'consent'`.
+- Uses the GIS **token model** (`initTokenClient`), not the ID-token/One Tap model. Tokens last ~1 hour; `driveEnsureToken()` refreshes silently using the `sw2_drive_granted` localStorage flag to decide between `prompt:''` and `prompt:'consent'`.
 - `driveApi()` wraps fetch, attaching the bearer token and retrying once on a 401 after clearing the token.
 - Create uses a multipart upload; update uses `uploadType=media` PATCH; delete sets `trashed:true` rather than hard-deleting, so students can recover work from their Drive bin.
 - `GOOGLE_HOSTED_DOMAIN` maps to the `hosted_domain` param, which filters the account chooser only. It is **not** a security control. It does not need to be, because each student's data lives in their own Drive under their own credentials, so there is no shared store to protect.
@@ -188,4 +250,4 @@ Because every scope used is non-sensitive, an **External** consent screen publis
 
 ## Current status
 
-Working at v1.9. Actively used for IB Economics diagrams. Drive sync is code-complete but **untested end to end** until a `GOOGLE_CLIENT_ID` is filled in.
+v2.0 live at unisam.nz/graphs/ since 2026-10-25, with 60 headless-Chrome tests. Known limits: free points (Pp, monopoly Pm/ATC, quota Q₂) and shaded areas don't follow when curves move. Future ideas (shareable custom styles) are at the end of `PLAN.md`.

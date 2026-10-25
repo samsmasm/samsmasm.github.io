@@ -14,4 +14,4 @@ python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$ROOT" >/dev/null 2
 SERVER=$!
 trap 'kill $SERVER' EXIT
 sleep 0.6
-SW_MODS="$MODS" SW_URL="http://127.0.0.1:$PORT/graphs2/" node "$HERE/tests.js" "$@"
+SW_MODS="$MODS" SW_URL="http://127.0.0.1:$PORT/graphs/" node "$HERE/tests.js" "$@"

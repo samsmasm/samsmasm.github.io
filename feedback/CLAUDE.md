@@ -1,6 +1,6 @@
 # Feedback inbox (unisam-feedback)
 
-One feedback / fault-report service for any unisam.nz tool. Built 2026-10-25 for ShiftWork v2 (`graphs2/`), designed to be reused.
+One feedback / fault-report service for any unisam.nz tool. Built 2026-10-25 for ShiftWork v2 (now `graphs/`, app name `graphs`; beta reports say `graphs2`), designed to be reused.
 
 ## Pieces
 
@@ -24,6 +24,6 @@ Limits: 12 reports per IP per hour (soft, KV based), message 4000 chars, image 2
 
 ## Adding it to another tool
 
-POST to `https://unisam.nz/feedback/api/report` with a unique `app` name. Keep any screenshot or user content **opt-in and unticked by default**, and say in the form exactly what else is sent. See `graphs2/index.html` (search `FEEDBACK`) for a complete example, including the `recentErrors` ring buffer sent in `meta.errors`.
+POST to `https://unisam.nz/feedback/api/report` with a unique `app` name. Keep any screenshot or user content **opt-in and unticked by default**, and say in the form exactly what else is sent. See `graphs/index.html` (search `FEEDBACK`) for a complete example, including the `recentErrors` ring buffer sent in `meta.errors`.
 
 The "Open this diagram" handoff writes the diagram to localStorage `sw2_open` and opens `/<app>/`; ShiftWork reads and clears it on load. It only works when the inbox is opened on unisam.nz (same origin as the app).
