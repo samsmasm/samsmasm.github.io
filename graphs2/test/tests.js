@@ -569,20 +569,42 @@ test('Fill region click mode fills the area bounded by curves, drop lines and ax
   eq(await ev(page, `state.elements.length`), n, 'filled off the plot or an open area');
 });
 
-test('holding the Fill region button switches between click and sketch', async (page) => {
-  await ev(page, `setFillMode('click')`);
-  const b = await page.$('#tool-region');
-  const box = await b.boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await new Promise(res => setTimeout(res, 700));
-  await page.mouse.up();
-  eq(await ev(page, `[fillMode, state.tool, document.getElementById('fill-mode-label').textContent]`), ['sketch', 'region', 'sketch'], 'after hold');
+test('clicking a selected Fill region button switches between click and draw', async (page) => {
+  await ev(page, `setFillMode('click'); setTool('select')`);
   await page.click('#tool-region');
-  eq(await ev(page, `fillMode`), 'sketch', 'a plain click changed the mode');
+  eq(await ev(page, `[fillMode, state.tool]`), ['click', 'region'], 'first click only selects the tool');
+  await page.click('#tool-region');
+  eq(await ev(page, `[fillMode, state.tool, document.getElementById('fill-mode-label').textContent]`), ['draw', 'region', 'draw'], 'second click');
+  await page.click('#tool-region');
+  eq(await ev(page, `fillMode`), 'click', 'third click');
 });
 
-test('Point tool places a dot or cross; hold to switch; on a crossing it links', async (page) => {
+test('clicking a filled area again cycles its colour (or hatching in B/W)', async (page) => {
+  await ev(page, `loadTemplate('sd'); setFillMode('click'); setTool('region')`);
+  const at = await ev(page, `toCanvas(0.1, 0.3)`);
+  await ev(page, `fillAt(${at.x}, ${at.y}); document.querySelector('.inline-label-edit')?.blur()`);
+  const n = await ev(page, `state.elements.length`);
+  const f0 = await ev(page, `state.elements[0].fill`);
+  await ev(page, `fillAt(${at.x}, ${at.y})`);
+  eq(await ev(page, `state.elements.length`), n, 'made a second region');
+  assert(await ev(page, `state.elements[0].fill`) !== f0, 'B/W hatching did not change');
+  await ev(page, `toggleBW()`);
+  const c0 = await ev(page, `state.elements[0].fillColor`);
+  await ev(page, `fillAt(${at.x}, ${at.y})`);
+  assert(await ev(page, `state.elements[0].fillColor`) !== c0, 'colour did not change');
+});
+
+test('when zoomed in, dragging empty space moves the view', async (page) => {
+  await ev(page, `loadTemplate('blank'); setTool('select'); changeZoom(2, W / 2, H / 2)`);
+  const before = await ev(page, `[viewOffsetX, viewOffsetY]`);
+  const b = await page.$eval('#graph-canvas', c => { const r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(b.x, b.y); await page.mouse.down();
+  await page.mouse.move(b.x + 60, b.y + 40, { steps: 5 }); await page.mouse.up();
+  const after = await ev(page, `[viewOffsetX, viewOffsetY]`);
+  assert(after[0] > before[0] && after[1] > before[1], 'view did not move: ' + JSON.stringify([before, after]));
+});
+
+test('Point tool places a dot or cross; click the button again to switch; on a crossing it links', async (page) => {
   await ev(page, `loadTemplate('sd'); setPointMode('dot')`);
   const click = async (xn, yn) => {
     const p = await ev(page, `(() => { const c = toCanvas(${xn}, ${yn}), b = canvas.getBoundingClientRect(), s = b.width / W;
@@ -594,11 +616,9 @@ test('Point tool places a dot or cross; hold to switch; on a crossing it links',
   await click(0.2, 0.7);
   const free = await ev(page, `state.elements[state.elements.length - 1]`);
   eq([free.type, free.mark, free.showDot, free.dropP, free.dropQ, free.pLabel, !!free.on], ['dot', 'dot', true, false, false, '', false], 'free dot');
-  // Hold to switch to cross.
-  const box = await (await page.$('#tool-point')).boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down(); await new Promise(res => setTimeout(res, 700)); await page.mouse.up();
-  eq(await ev(page, `[pointMode, state.tool, document.getElementById('point-mode-label').textContent]`), ['cross', 'point', 'cross'], 'after hold');
+  // The tool is already selected, so clicking its button switches to cross.
+  await page.click('#tool-point');
+  eq(await ev(page, `[pointMode, state.tool, document.getElementById('point-mode-label').textContent]`), ['cross', 'point', 'cross'], 'after click');
   // On the D x S crossing it links.
   const x = await ev(page, `(() => { const d = state.elements.find(e => e.type === 'dot' && !e.mark); return [d.xn, d.yn]; })()`);
   await click(x[0] + 0.01, x[1]);

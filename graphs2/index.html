@@ -461,7 +461,7 @@
   <span style="font-family:var(--sans);font-size:13px;color:#fff;opacity:0.7;margin-left:2px;margin-right:8px">economics graph maker</span>
   <span class="tag">v2.0 beta</span>
   <a href="../graphs/" style="font-size:11px;color:rgba(255,255,255,0.7);text-decoration:underline">Back to stable version</a>
-  <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
+  <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Drag empty space to move around</span>
   <div class="spacer"></div>
   <div class="header-actions">
     <button id="undo-btn" class="ghost" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
@@ -525,10 +525,10 @@
       <button class="tool-btn" id="tool-text" title="Shortcut: T" onclick="setTool('text')">
         <span class="icon">T</span>Label
       </button>
-      <button class="tool-btn" id="tool-region" title="Shortcut: R · hold to switch between click-to-fill and sketch" onclick="setTool('region')">
+      <button class="tool-btn" id="tool-region" title="Shortcut: R · click again to switch between click-to-fill and draw" onclick="toolClick('region')">
         <span class="icon">▨</span>Fill region <span class="tool-mode" id="fill-mode-label">click</span>
       </button>
-      <button class="tool-btn" id="tool-point" title="Shortcut: P · hold to switch between dot and cross" onclick="setTool('point')">
+      <button class="tool-btn" id="tool-point" title="Shortcut: P · click again to switch between dot and cross" onclick="toolClick('point')">
         <span class="icon" id="point-mode-icon">●</span>Point <span class="tool-mode" id="point-mode-label">dot</span>
       </button>
       <button class="tool-btn" id="tool-equil" title="Shortcut: E" onclick="setTool('equil')">
@@ -823,8 +823,8 @@ function init() {
   document.addEventListener('keydown', onKeyDown);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keyup', onKeyUp);
-  initFillModeButton();
-  initPointModeButton();
+  setFillMode(fillMode);
+  setPointMode(pointMode);
   driveRefreshUI();
   // Canvas text doesn't wait for web fonts: redraw once IBM Plex is ready.
   if (document.fonts && document.fonts.load) {
@@ -2449,42 +2449,31 @@ function onDocTextInput() {
 
 // ─── TOOLS ───────────────────────────────────────────────────
 // ─── CLICK TO FILL ───────────────────────────────────────────
-// The Fill region tool has two modes, switched by holding its button:
-// 'click' fills the area around the click, bounded by lines, curves, the
-// dashed lines of equilibrium points and the axes; 'sketch' is clicking out
-// the corners by hand.
+// The Fill region tool has two modes: 'click' fills the area around the
+// click, bounded by lines, curves, the dashed lines of equilibrium points and
+// the axes; 'draw' is clicking out the corners by hand. Clicking the tool
+// button again while the tool is selected switches mode (toolClick).
 let fillMode = 'click';
-try { if (localStorage.getItem('sw2_fillMode') === 'sketch') fillMode = 'sketch'; } catch (e) {}
+try { if (/^(draw|sketch)$/.test(localStorage.getItem('sw2_fillMode'))) fillMode = 'draw'; } catch (e) {}
 
 function setFillMode(m) {
   fillMode = m;
   try { localStorage.setItem('sw2_fillMode', m); } catch (e) {}
-  document.getElementById('fill-mode-label').textContent = m === 'click' ? 'click' : 'sketch';
+  document.getElementById('fill-mode-label').textContent = m;
   curvePoints = []; drawing = false;
   if (state.tool === 'region') { updateHint('region'); redraw(); }
 }
 
-// Holding a tool button (500 ms) switches that tool's mode.
-function onLongPress(btn, fn) {
-  let timer = null;
-  const cancel = () => { clearTimeout(timer); timer = null; };
-  btn.addEventListener('pointerdown', () => { timer = setTimeout(() => { timer = null; fn(); }, 500); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, cancel));
-  btn.addEventListener('contextmenu', e => e.preventDefault()); // a long touch would open it
-}
-
-function initFillModeButton() {
-  onLongPress(document.getElementById('tool-region'), () => {
-    setFillMode(fillMode === 'click' ? 'sketch' : 'click');
-    setTool('region');
-    showToast(fillMode === 'click' ? 'Fill region: click inside an area to fill it.' : 'Fill region: click the corners, double-click to finish.');
-  });
-  setFillMode(fillMode);
+// Tool buttons with two modes switch mode when clicked while already selected.
+function toolClick(t) {
+  if (state.tool !== t) { setTool(t); return; }
+  if (t === 'region') setFillMode(fillMode === 'click' ? 'draw' : 'click');
+  if (t === 'point') setPointMode(pointMode === 'dot' ? 'cross' : 'dot');
 }
 
 // ─── POINT TOOL ──────────────────────────────────────────────
 // Places a plain marker (a dot like an equilibrium dot, or a cross), with no
-// dashed lines or labels. Hold the button to switch between dot and cross.
+// dashed lines or labels. Click the button again to switch dot / cross.
 // Placed on a crossing, it links to it and moves with the curves.
 let pointMode = 'dot';
 try { if (localStorage.getItem('sw2_pointMode') === 'cross') pointMode = 'cross'; } catch (e) {}
@@ -2495,15 +2484,6 @@ function setPointMode(m) {
   document.getElementById('point-mode-label').textContent = m;
   document.getElementById('point-mode-icon').textContent = m === 'cross' ? '×' : '●';
   if (state.tool === 'point') updateHint('point');
-}
-
-function initPointModeButton() {
-  onLongPress(document.getElementById('tool-point'), () => {
-    setPointMode(pointMode === 'dot' ? 'cross' : 'dot');
-    setTool('point');
-    showToast(pointMode === 'cross' ? 'Point: crosses.' : 'Point: dots.');
-  });
-  setPointMode(pointMode);
 }
 
 function placePoint(cx, cy) {
@@ -2643,9 +2623,28 @@ function simplifyClosed(pts, tol) {
   return [...a.slice(0, -1), ...b.slice(0, -1)];
 }
 
+// Clicking a filled area again cycles it: next colour in Colour mode, next
+// hatching in B/W (where colour doesn't show).
+const FILL_CYCLE_COLORS = COLORS.slice(0, 6);
+function cycleRegion(el) {
+  saveUndo();
+  if (bwMode) {
+    const keys = FILL_OPTS.map(o => o[0]);
+    el.fill = keys[(keys.indexOf(el.fill || 'solid') + 1) % keys.length];
+  } else {
+    const i = FILL_CYCLE_COLORS.indexOf(el.fillColor);
+    el.fillColor = FILL_CYCLE_COLORS[(i + 1) % FILL_CYCLE_COLORS.length];
+  }
+  state.selectedId = el.id;
+  renderLegendList(); renderProps(); redraw();
+}
+
 function fillAt(cx, cy) {
+  const hit = [...state.elements].reverse().find(e => e.type === 'region' && e.points && e.points.length >= 3 &&
+    pointInPolygon(cx, cy, e.points.map(p => toCanvas(p.xn, p.yn))));
+  if (hit) { cycleRegion(hit); return; }
   const pts = fillAreaAt(cx, cy);
-  if (pts === 'open') { showToast('That area isn’t closed in on all sides. Draw a line to close it, or hold Fill region to sketch it.'); return; }
+  if (pts === 'open') { showToast('That area isn’t closed in on all sides. Draw a line to close it, or click Fill region again to draw it.'); return; }
   if (!pts) { showToast('Click inside an area to fill it.'); return; }
   saveUndo();
   const el = mkRegion(pts, drawColor(), bwMode ? 'hatch45' : 'solid');
@@ -2677,10 +2676,10 @@ function updateHint(t) {
     curve: 'Click to add points · double-click to finish curve',
     text: 'Click anywhere on the graph to add a label',
     equil: 'Click where two curves cross: adds dashed lines to both axes, labelled P and Q',
-    point: 'Click to place a ' + pointMode + ' · hold the button for ' + (pointMode === 'dot' ? 'a cross' : 'a dot'),
+    point: 'Click to place a ' + pointMode + ' · button again for ' + (pointMode === 'dot' ? 'a cross' : 'a dot'),
     region: fillMode === 'click'
-      ? 'Click inside an area to fill it · hold the button to sketch'
-      : 'Click corners, double-click to finish · hold the button to click-fill',
+      ? 'Click an area to fill · again to restyle · button again to draw'
+      : 'Click corners, double-click to finish · button again to click-fill',
   };
   document.getElementById('hint-text').textContent = hints[t] || '';
 }
@@ -2742,8 +2741,9 @@ function onMouseDown(e) {
     if (hit) {
       drawing = true;
       drawStart = { cx, cy, el: JSON.parse(JSON.stringify(hit)), undoSnap: snapshot(), moved: false, alt: e.altKey };
-    } else if (e.shiftKey || spaceHeld || e.button === 1) {
-      // Empty area + shift (or space/middle) — pan the view
+    } else if (viewScale > 1 || e.shiftKey || spaceHeld || e.button === 1) {
+      // Dragging empty space moves the view when zoomed in (or with
+      // Shift / Space / middle button at any zoom).
       isPanning = true;
       panStartRaw = { x: rawCx, y: rawCy };
       panStartOffset = { x: viewOffsetX, y: viewOffsetY };
@@ -3095,8 +3095,17 @@ function onDblClick(e) {
   }
 }
 
+// Mouse wheel and pinch (ctrlKey) zoom. When zoomed in, a trackpad's
+// two-finger scroll (small or sideways steps) moves around instead.
 function onWheel(e) {
   e.preventDefault();
+  const trackpadScroll = !e.ctrlKey && (e.deltaX !== 0 || (e.deltaMode === 0 && Math.abs(e.deltaY) < 40));
+  if (viewScale > 1 && trackpadScroll) {
+    const r = canvas.getBoundingClientRect(), k = W / r.width;
+    viewOffsetX -= e.deltaX * k; viewOffsetY -= e.deltaY * k;
+    redraw();
+    return;
+  }
   const { rawCx, rawCy } = eventToLogical(e);
   changeZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, rawCx, rawCy);
 }
