@@ -159,6 +159,7 @@
     gap: 3px;
   }
   .tool-btn .icon { font-size: 16px; line-height: 1; }
+  .tool-btn .tool-mode { font-family: var(--mono); font-size: 9px; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; margin-top: -2px; }
   .tool-btn:hover { border-color: var(--accent); }
   .tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
@@ -516,8 +517,8 @@
       <button class="tool-btn" id="tool-text" title="Shortcut: T" onclick="setTool('text')">
         <span class="icon">T</span>Label
       </button>
-      <button class="tool-btn" id="tool-region" title="Shortcut: R" onclick="setTool('region')">
-        <span class="icon">▨</span>Fill region
+      <button class="tool-btn" id="tool-region" title="Shortcut: R · hold to switch between click-to-fill and sketch" onclick="setTool('region')">
+        <span class="icon">▨</span>Fill region <span class="tool-mode" id="fill-mode-label">click</span>
       </button>
       <button class="tool-btn" id="tool-equil" title="Shortcut: E" onclick="setTool('equil')" style="grid-column:span 2">
         <span class="icon">⊕</span>Equilibrium point
@@ -809,6 +810,7 @@ function init() {
   document.addEventListener('keydown', onKeyDown);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keyup', onKeyUp);
+  initFillModeButton();
   driveRefreshUI();
   // Canvas text doesn't wait for web fonts: redraw once IBM Plex is ready.
   if (document.fonts && document.fonts.load) {
@@ -2379,6 +2381,173 @@ function onDocTextInput() {
 }
 
 // ─── TOOLS ───────────────────────────────────────────────────
+// ─── CLICK TO FILL ───────────────────────────────────────────
+// The Fill region tool has two modes, switched by holding its button:
+// 'click' fills the area around the click, bounded by lines, curves, the
+// dashed lines of equilibrium points and the axes; 'sketch' is clicking out
+// the corners by hand.
+let fillMode = 'click';
+try { if (localStorage.getItem('sw2_fillMode') === 'sketch') fillMode = 'sketch'; } catch (e) {}
+
+function setFillMode(m) {
+  fillMode = m;
+  try { localStorage.setItem('sw2_fillMode', m); } catch (e) {}
+  document.getElementById('fill-mode-label').textContent = m === 'click' ? 'click' : 'sketch';
+  curvePoints = []; drawing = false;
+  if (state.tool === 'region') { updateHint('region'); redraw(); }
+}
+
+function initFillModeButton() {
+  const btn = document.getElementById('tool-region');
+  let timer = null;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  btn.addEventListener('pointerdown', () => {
+    timer = setTimeout(() => {
+      timer = null;
+      setFillMode(fillMode === 'click' ? 'sketch' : 'click');
+      setTool('region');
+      showToast(fillMode === 'click' ? 'Fill region: click inside an area to fill it.' : 'Fill region: click the corners, double-click to finish.');
+    }, 500);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, cancel));
+  btn.addEventListener('contextmenu', e => e.preventDefault()); // a long touch would open it
+  setFillMode(fillMode);
+}
+
+// Points (normalised) of the area around canvas point (cx, cy), or null.
+const FILL_RES = 2; // mask pixels per logical pixel
+function fillAreaAt(cx, cy) {
+  const w = PLOT_W * FILL_RES, h = PLOT_H * FILL_RES;
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const c = off.getContext('2d');
+  c.setTransform(FILL_RES, 0, 0, FILL_RES, -MARGIN.left * FILL_RES, -MARGIN.top * FILL_RES);
+  c.strokeStyle = '#000'; c.lineWidth = 2; c.lineCap = 'round';
+  const seg = (ax, ay, bx, by) => { c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); };
+  // Lines usually stop a little short of the axes (D starts just right of
+  // the y-axis), so an end near the plot edge is carried on to the edge;
+  // otherwise the fill leaks round it.
+  const L = MARGIN.left, T = MARGIN.top, R = L + PLOT_W, B = T + PLOT_H, REACH = 0.12 * PLOT_W;
+  const toEdge = (x, y, dx, dy) => {
+    const len = Math.hypot(dx, dy);
+    if (!len || x < L || x > R || y < T || y > B) return;
+    dx /= len; dy /= len;
+    const ts = [];
+    if (dx) ts.push(((dx > 0 ? R : L) - x) / dx);
+    if (dy) ts.push(((dy > 0 ? B : T) - y) / dy);
+    const t = Math.min(...ts);
+    if (t > 0 && t <= REACH) seg(x, y, x + dx * t, y + dy * t);
+  };
+  for (const el of state.elements) {
+    if (el.type === 'line' || el.type === 'curve') {
+      const segs = getElSegments(el);
+      segs.forEach(s => seg(...s));
+      if (!segs.length) continue;
+      const [ax, ay, bx, by] = segs[0], [cx2, cy2, dx2, dy2] = segs[segs.length - 1];
+      toEdge(ax, ay, ax - bx, ay - by);
+      toEdge(dx2, dy2, dx2 - cx2, dy2 - cy2);
+    } else if (el.type === 'dot') {
+      const d = derived.get(el.id) || {}, p = toCanvas(el.xn, el.yn);
+      if (showDropP(el, d)) seg(MARGIN.left, p.y, p.x, p.y);
+      if (showDropQ(el, d)) seg(p.x, p.y, p.x, MARGIN.top + PLOT_H);
+    }
+  }
+  const data = c.getImageData(0, 0, w, h).data;
+  const wall = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) wall[i] = data[i * 4 + 3] > 60 ? 1 : 0;
+  const sx = Math.round((cx - MARGIN.left) * FILL_RES), sy = Math.round((cy - MARGIN.top) * FILL_RES);
+  if (sx < 0 || sy < 0 || sx >= w || sy >= h || wall[sy * w + sx]) return null;
+  // Flood fill (4-connected) from the click.
+  const mask = new Uint8Array(w * h), stack = [sy * w + sx];
+  mask[sy * w + sx] = 1;
+  while (stack.length) {
+    const i = stack.pop(), x = i % w, y = (i - x) / w;
+    for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1])
+      if (j >= 0 && !mask[j] && !wall[j]) { mask[j] = 1; stack.push(j); }
+  }
+  // The top and right of the plot are not axes: an area running along them
+  // is not closed in, so filling it would be a misclick blob. (A short run is
+  // fine: a line carried on to the edge closes it off there.)
+  let open = 0;
+  for (let x = 0; x < w; x++) open += mask[x];
+  for (let y = 0; y < h; y++) open += mask[y * w + w - 1];
+  if (open > 0.08 * w) return 'open';
+  // Grow into the walls so the fill reaches the middle of each line.
+  for (let pass = 0; pass < FILL_RES; pass++) {
+    const grow = [];
+    for (let i = 0; i < w * h; i++) {
+      if (mask[i] || !wall[i]) continue;
+      const x = i % w;
+      if ((x > 0 && mask[i - 1]) || (x < w - 1 && mask[i + 1]) || mask[i - w] || mask[i + w]) grow.push(i);
+    }
+    grow.forEach(i => { mask[i] = 1; });
+  }
+  const outline = traceOutline(mask, w, h);
+  if (outline.length < 3) return null;
+  return simplifyClosed(outline, 0.6 * FILL_RES).map(([x, y]) => ({ xn: x / FILL_RES / PLOT_W, yn: y / FILL_RES / PLOT_H }));
+}
+
+// Outer boundary of a binary mask, in order (Moore-neighbour tracing).
+function traceOutline(mask, w, h) {
+  const DX = [1, 1, 0, -1, -1, -1, 0, 1], DY = [0, 1, 1, 1, 0, -1, -1, -1]; // clockwise from east
+  const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x];
+  const dirOf = (dx, dy) => { for (let k = 0; k < 8; k++) if (DX[k] === dx && DY[k] === dy) return k; return 0; };
+  let start = -1;
+  for (let i = 0; i < w * h; i++) if (mask[i]) { start = i; break; }
+  if (start < 0) return [];
+  const sx = start % w, sy = (start - sx) / w;
+  let x = sx, y = sy, back = 4; // came from the west
+  const firstBack = back, pts = [[x, y]];
+  for (let guard = 0; guard < w * h * 2; guard++) {
+    let k = -1;
+    for (let i = 1; i <= 8; i++) {
+      const d = (back + i) % 8;
+      if (on(x + DX[d], y + DY[d])) { k = d; break; }
+    }
+    if (k < 0) break; // a single pixel
+    const bx = x + DX[(k + 7) % 8], by = y + DY[(k + 7) % 8];
+    x += DX[k]; y += DY[k];
+    back = dirOf(bx - x, by - y);
+    if (x === sx && y === sy && back === firstBack) break;
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// Douglas-Peucker on a closed outline.
+function simplifyClosed(pts, tol) {
+  const dp = (a) => {
+    if (a.length < 3) return a;
+    const [x1, y1] = a[0], [x2, y2] = a[a.length - 1];
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    let far = 0, best = -1;
+    for (let i = 1; i < a.length - 1; i++) {
+      const d = Math.abs((x2 - x1) * (y1 - a[i][1]) - (x1 - a[i][0]) * (y2 - y1)) / len;
+      if (d > best) { best = d; far = i; }
+    }
+    if (best <= tol) return [a[0], a[a.length - 1]];
+    return [...dp(a.slice(0, far + 1)).slice(0, -1), ...dp(a.slice(far))];
+  };
+  // Split at the point farthest from the start so both halves are open paths.
+  let far = 0, best = -1;
+  pts.forEach(([x, y], i) => { const d = Math.hypot(x - pts[0][0], y - pts[0][1]); if (d > best) { best = d; far = i; } });
+  const a = dp(pts.slice(0, far + 1)), b = dp([...pts.slice(far), pts[0]]);
+  return [...a.slice(0, -1), ...b.slice(0, -1)];
+}
+
+function fillAt(cx, cy) {
+  const pts = fillAreaAt(cx, cy);
+  if (pts === 'open') { showToast('That area isn’t closed in on all sides. Draw a line to close it, or hold Fill region to sketch it.'); return; }
+  if (!pts) { showToast('Click inside an area to fill it.'); return; }
+  saveUndo();
+  const el = mkRegion(pts, drawColor(), bwMode ? 'hatch45' : 'solid');
+  // Behind the curves, so lines stay crisp on top of the fill.
+  state.elements.unshift(el);
+  state.selectedId = el.id;
+  renderLegendList(); renderProps(); redraw();
+  setTimeout(() => showInlineLabelEdit(el), 80);
+}
+
 function setTool(t) {
   state.tool = t;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -2400,7 +2569,9 @@ function updateHint(t) {
     curve: 'Click to add points · double-click to finish curve',
     text: 'Click anywhere on the graph to add a label',
     equil: 'Click where two curves cross: adds dashed lines to both axes, labelled P and Q',
-    region: 'Click vertices · double-click to close and fill region',
+    region: fillMode === 'click'
+      ? 'Click inside an area to fill it · hold the Fill region button to sketch instead'
+      : 'Click the corners · double-click to finish · hold the Fill region button to click-fill instead',
   };
   document.getElementById('hint-text').textContent = hints[t] || '';
 }
@@ -2495,6 +2666,8 @@ function onMouseDown(e) {
     redraw();
     // Defer so this mousedown doesn't immediately blur the new input.
     setTimeout(() => showInlineLabelEdit(el, { isNew: true, undoSnap }), 0);
+  } else if (state.tool === 'region' && fillMode === 'click') {
+    if (clickCount === 1) fillAt(cx, cy);
   } else if (state.tool === 'region') {
     if (clickCount > 1) return;
     const geoSnap = getSnapCandidate(cx, cy, true);

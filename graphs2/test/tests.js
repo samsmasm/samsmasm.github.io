@@ -547,6 +547,41 @@ test('a template replaces everything: curves, title, axis labels and legend', as
   eq(await ev(page, `typeof addShape`), 'undefined', 'add-shape still there');
 });
 
+test('Fill region click mode fills the area bounded by curves, drop lines and axes', async (page) => {
+  await ev(page, `loadTemplate('sd'); setFillMode('click'); setTool('region')`);
+  const r = await page.$eval('#graph-canvas', c => { const b = c.getBoundingClientRect(); return { x: b.left, y: b.top, s: b.width / 680 }; });
+  const at = await ev(page, `toCanvas(0.1, 0.3)`); // inside consumer surplus
+  await page.mouse.click(r.x + at.x * r.s, r.y + at.y * r.s);
+  await page.keyboard.press('Escape'); // close the label box
+  const reg = await ev(page, `state.elements[0]`);
+  eq(reg.type, 'region', 'no region made');
+  let a = 0;
+  reg.points.forEach((p, i) => { const q = reg.points[(i + 1) % reg.points.length]; a += p.xn * q.yn - q.xn * p.yn; });
+  a = Math.abs(a) / 2;
+  // y-axis, P line, D (carried on to the top edge): about 0.122 of the plot
+  assert(Math.abs(a - 0.122) < 0.008, 'area ' + a.toFixed(4));
+  assert(reg.points.length < 30, 'too many corners: ' + reg.points.length);
+  // Off the plot, or in an area open to the top/right edge, nothing is filled.
+  const n = await ev(page, `state.elements.length`);
+  await page.mouse.click(r.x + 10 * r.s, r.y + 10 * r.s);
+  const open = await ev(page, `toCanvas(0.9, 0.4)`); // right of the crossing, open to the right edge
+  await page.mouse.click(r.x + open.x * r.s, r.y + open.y * r.s);
+  eq(await ev(page, `state.elements.length`), n, 'filled off the plot or an open area');
+});
+
+test('holding the Fill region button switches between click and sketch', async (page) => {
+  await ev(page, `setFillMode('click')`);
+  const b = await page.$('#tool-region');
+  const box = await b.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await new Promise(res => setTimeout(res, 700));
+  await page.mouse.up();
+  eq(await ev(page, `[fillMode, state.tool, document.getElementById('fill-mode-label').textContent]`), ['sketch', 'region', 'sketch'], 'after hold');
+  await page.click('#tool-region');
+  eq(await ev(page, `fillMode`), 'sketch', 'a plain click changed the mode');
+});
+
 test('drawn MC passes exactly through the drawn lowest points of AVC and ATC', async (page) => {
   for (const [tpl, names] of [['cost', ['AVC', 'ATC']], ['perfcomp', ['ATC']], ['monopoly', ['ATC']]]) {
     await ev(page, `loadTemplate('${tpl}')`);
