@@ -16,7 +16,7 @@ When a choice comes up between "student does it by hand" and "the app does it fo
 ## Decisions
 
 1. Feedback alerts: **none**. Sam checks the reports page occasionally. No email binding needed in the Worker. (2026-10-25)
-2. Legend: **still open**, Sam wasn't sure what it is. Explain before Phase 4: today it is a manually typed key (name plus colour swatch) printed under the graph in the JPG only. Recommendation: build it automatically from labelled curves and regions, off by default.
+2. Legend: **build automatically** from labelled curves and regions, off by default, each entry tickable, follows B/W mode. Replaces the manual "+ Add / rename curve" list. (2026-10-25)
 3. Guide-line style: **dashed `6,4`**, thin. (2026-10-25)
 4. Equilibrium dot: **hidden by default**, toggle in props. (2026-10-25)
 
@@ -110,7 +110,7 @@ Every element can be attached to another, and positions are resolved from the at
 - One Clear, undoable, no confirm.
 - Sign-in lives in the Save modal only; header shows Drive status.
 - Colour picker shows "Colour mode only" in B/W mode.
-- Legend per decision 2. If automatic: built from labelled curves and regions, each tickable, follows B/W mode (black lines, patterns), removes "+ Add / rename curve".
+- Legend per decision 2: built from labelled curves and regions, each tickable, follows B/W mode (black lines, patterns), removes "+ Add / rename curve".
 
 ## Phase 5: Big features
 
