@@ -152,3 +152,13 @@ Phase 1: all ten items done and covered by tests. Decisions taken along the way 
 - **Edit modal removed and the Label tool's `prompt()` replaced** by the inline editor (pulled forward from Phase 4), because double-clicking a dot opened the modal on a field dots don't use, and inline editing also had to learn zoom/pan.
 - Also fixed while there: templates were shallow-copied, so editing a template curve's endpoint changed the template itself for the next load; inline edit box was mispositioned when zoomed; text hit area now matches the text width; Escape cancels any in-progress drawing (from Phase 5).
 - Brace dash dropdown hidden (braces always draw solid).
+
+### 2026-10-25: Phase 2 done (feedback button)
+
+- Worker `unisam-feedback` **deployed and live** at `unisam.nz/feedback/api/*` with KV storage. Inbox page at `unisam.nz/feedback/`. Everything is documented in `feedback/CLAUDE.md`, including where the admin key lives (`~/.config/unisam-feedback-admin-key`).
+- Changes from the plan: the inbox lives at `/feedback/` rather than `graphs2/reports.html`, because the service is shared by all tools. "Open this diagram" hands over through localStorage (`sw2_open`) rather than a long URL.
+- graphs2: "Feedback" button in the header. Form has type, message, optional email, and two opt-in boxes (picture with preview, diagram file), both unticked every time the form opens, and a "What else is sent" note. Metadata: version, page, browser, viewport, tool, colour mode, zoom, element count, last 8 page errors.
+- Tested: Worker locally (submit, honeypot, empty message, auth, CORS, rate limit, done, delete) and live (submit, list, delete, CORS); graphs2 with 3 browser tests (fetch stubbed).
+- Also: `renderExport()` now does the export drawing for both JPG download and feedback pictures; typing in any dialog no longer triggers canvas shortcuts (Backspace, Ctrl+Z).
+
+**Next: Phase 3 (connected diagrams).**

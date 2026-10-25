@@ -196,6 +196,56 @@ test('v1 save codes still load', async (page) => {
   eq(await ev(page, `currentGraphData().v`), 2, 'not upgraded to v2');
 });
 
+// Feedback: fetch is stubbed so nothing reaches the live inbox.
+const stubFetch = `window.__sent = []; window.fetch = async (url, opts) => { window.__sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 200, json: async () => ({ ok: true }) }; };`;
+
+test('feedback sends no picture or diagram unless ticked', async (page) => {
+  await ev(page, stubFetch + `loadTemplate('sd');`);
+  await page.click('header button[onclick="openFeedback()"]');
+  await page.type('#fb-message', 'The label stayed behind');
+  await page.click('#fb-send');
+  await new Promise(r => setTimeout(r, 100));
+  const sent = await ev(page, `window.__sent`);
+  eq(sent.length, 1, 'requests sent');
+  assert(sent[0].url === 'https://unisam.nz/feedback/api/report', 'url ' + sent[0].url);
+  eq(sent[0].body.image, null, 'image sent without opt-in');
+  eq(sent[0].body.diagram, null, 'diagram sent without opt-in');
+  eq(sent[0].body.app, 'graphs2', 'app');
+  eq(sent[0].body.type, 'bug', 'type');
+  assert(sent[0].body.meta.version && sent[0].body.meta.browser, 'meta missing');
+  assert(!(await ev(page, `document.getElementById('feedback-modal').classList.contains('open')`)), 'modal still open');
+});
+
+test('feedback includes picture and diagram when ticked, and they open from the inbox', async (page) => {
+  await ev(page, stubFetch + `loadTemplate('ext_neg');`);
+  await ev(page, `openFeedback()`);
+  await page.type('#fb-message', 'Check this');
+  await page.click('#fb-image');
+  assert(await ev(page, `document.getElementById('fb-preview').style.display !== 'none'`), 'no preview shown');
+  await page.click('#fb-diagram');
+  await page.click('#fb-send');
+  await new Promise(r => setTimeout(r, 100));
+  const body = await ev(page, `window.__sent[0].body`);
+  assert(/^data:image\/jpeg;base64,/.test(body.image || ''), 'image missing');
+  const diagram = JSON.parse(body.diagram);
+  eq(diagram.curves.length, 3, 'diagram curves');
+  // Simulate the inbox's "Open this diagram" handoff.
+  await ev(page, `loadTemplate('blank'); localStorage.setItem('sw2_open', ${JSON.stringify(body.diagram)});`);
+  await page.reload({ waitUntil: 'load' });
+  eq(await ev(page, `state.curves.length`), 3, 'handoff did not open the diagram');
+  eq(await ev(page, `localStorage.getItem('sw2_open')`), null, 'handoff key not cleared');
+});
+
+test('feedback needs a message, and typing in it does not trigger shortcuts', async (page) => {
+  await ev(page, stubFetch + `loadTemplate('sd'); state.selectedId = state.elements[0].id;`);
+  await ev(page, `openFeedback()`);
+  await page.click('#fb-send');
+  eq(await ev(page, `window.__sent.length`), 0, 'sent an empty report');
+  await page.type('#fb-message', 'abc');
+  await page.keyboard.press('Backspace');
+  eq(await ev(page, `state.elements.length`), 6, 'Backspace deleted an element');
+});
+
 // ─── RUNNER ──────────────────────────────────────────────────
 (async () => {
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });

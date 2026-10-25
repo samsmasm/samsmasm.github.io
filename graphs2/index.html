@@ -397,6 +397,19 @@
   .btn-confirm:hover { background: #143d72; }
   .btn-cancel { background: var(--tag-bg); color: var(--text); border: 1px solid var(--border); }
   .btn-cancel:hover { background: var(--border2); }
+  /* FEEDBACK */
+  .fb-types { display: flex; gap: 14px; margin-bottom: 12px; font-size: 13px; flex-wrap: wrap; }
+  .fb-types label, .fb-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .fb-check { font-size: 13px; margin: 8px 0; }
+  #feedback-modal textarea {
+    font: 13px var(--sans); background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 7px 10px; color: var(--text); resize: vertical; width: 100%;
+  }
+  #feedback-modal textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  #fb-preview { max-width: 100%; max-height: 160px; border: 1px solid var(--border); border-radius: 4px; margin: 0 0 4px 24px; }
+  .fb-details { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .fb-details summary { cursor: pointer; }
+
   /* TOAST */
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
@@ -419,6 +432,7 @@
   <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
   <div class="spacer"></div>
   <div class="header-actions">
+    <button class="ghost" onclick="openFeedback()" title="Report a problem or suggest an idea">Feedback</button>
     <button onclick="openSaveModal()">Save / Load</button>
     <button onclick="downloadJPG(1)">⬇ JPG</button>
     <button onclick="downloadJPG(2)">⬇ Hi-res</button>
@@ -611,9 +625,54 @@
   </div>
 </div>
 
+<!-- FEEDBACK MODAL -->
+<div class="modal-overlay" id="feedback-modal">
+  <div class="modal" style="width:440px">
+    <h2>Send feedback</h2>
+    <div class="fb-types" role="radiogroup" aria-label="Kind of feedback">
+      <label><input type="radio" name="fb-type" value="bug" checked> Something's wrong</label>
+      <label><input type="radio" name="fb-type" value="idea"> Idea</label>
+      <label><input type="radio" name="fb-type" value="other"> Other</label>
+    </div>
+    <div class="field">
+      <label for="fb-message">What happened, or what would help?</label>
+      <textarea id="fb-message" rows="4" maxlength="4000" placeholder="e.g. I dragged the supply curve and the label stayed behind"></textarea>
+    </div>
+    <div class="field">
+      <label for="fb-email">Your email (only if you'd like a reply)</label>
+      <input type="email" id="fb-email" maxlength="200" autocomplete="email">
+    </div>
+    <!-- Honeypot: hidden from people, filled in by spam bots. -->
+    <input type="text" id="fb-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">
+    <label class="fb-check"><input type="checkbox" id="fb-image" onchange="onFeedbackImageToggle()"> Include a picture of my diagram</label>
+    <img id="fb-preview" alt="The picture that will be sent" style="display:none">
+    <label class="fb-check"><input type="checkbox" id="fb-diagram"> Include my diagram file, so it can be opened and checked</label>
+    <details class="fb-details">
+      <summary>What else is sent</summary>
+      The app version, your browser and window size, the tool you had selected, and any recent error messages from the page. Nothing else: no name, no Google account, and the picture and diagram only if you tick them above.
+    </details>
+    <div class="drive-msg" id="fb-msg"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeFeedback()">Cancel</button>
+      <button class="btn-confirm" id="fb-send" onclick="sendFeedback()">Send</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
+// Recent page errors, sent with feedback reports so faults can be diagnosed.
+const recentErrors = [];
+function noteError(msg) {
+  recentErrors.push(new Date().toISOString().slice(11, 19) + ' ' + String(msg).slice(0, 300));
+  if (recentErrors.length > 8) recentErrors.shift();
+}
+window.addEventListener('error', e => noteError((e.message || 'error') + (e.lineno ? ' @' + e.lineno : '')));
+window.addEventListener('unhandledrejection', e => noteError('promise: ' + ((e.reason && e.reason.message) || e.reason)));
+
+const APP_VERSION = '2.0 beta';
+
 // ─── CONSTANTS ───────────────────────────────────────────────
 const COLORS = [
   '#1a4a8a','#c8380a','#1a7a4a','#8a1a6a','#8a6a1a',
@@ -735,6 +794,7 @@ function init() {
   buildColorRow();
   buildModalColors();
   if (!restoreAutosave()) loadTemplate('blank', { record: false });
+  openHandoffDiagram();
   fitCanvas();
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
@@ -2148,6 +2208,8 @@ function onKeyUp(e) {
 }
 
 function onKeyDown(e) {
+  // Keys typed into a dialog (feedback, save code, legend name) belong to it.
+  if (document.activeElement && document.activeElement.closest('.modal')) return;
   if (e.key === ' ') {
     const focused = document.activeElement;
     if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) return;
@@ -2814,6 +2876,106 @@ window.addEventListener('load', () => {
   }, 600);
 });
 
+// ─── FEEDBACK ────────────────────────────────────────────────
+// Reports go to the shared unisam-feedback Worker (see /feedback/). The
+// picture and the diagram file are strictly opt-in, unticked every time.
+const FEEDBACK_URL = 'https://unisam.nz/feedback/api/report';
+let feedbackImage = null;
+
+function openFeedback() {
+  document.getElementById('fb-message').value = '';
+  document.getElementById('fb-image').checked = false;
+  document.getElementById('fb-diagram').checked = false;
+  document.getElementById('fb-website').value = '';
+  document.getElementById('fb-preview').style.display = 'none';
+  document.getElementById('fb-send').disabled = false;
+  feedbackImage = null;
+  setFeedbackMsg('');
+  document.getElementById('feedback-modal').classList.add('open');
+  setTimeout(() => document.getElementById('fb-message').focus(), 50);
+}
+
+function closeFeedback() {
+  document.getElementById('feedback-modal').classList.remove('open');
+}
+
+function setFeedbackMsg(text, isErr) {
+  const el = document.getElementById('fb-msg');
+  el.textContent = text;
+  el.classList.toggle('err', !!isErr);
+}
+
+function onFeedbackImageToggle() {
+  const on = document.getElementById('fb-image').checked;
+  const img = document.getElementById('fb-preview');
+  feedbackImage = on ? renderExport(1, 'image/jpeg', 0.85) : null;
+  img.src = feedbackImage || '';
+  img.style.display = on ? '' : 'none';
+}
+
+function feedbackMeta() {
+  return {
+    version: APP_VERSION,
+    page: location.host + location.pathname,
+    browser: navigator.userAgent,
+    viewport: innerWidth + 'x' + innerHeight,
+    tool: state.tool,
+    colourMode: bwMode ? 'bw' : 'colour',
+    zoom: Math.round(viewScale * 100) + '%',
+    elements: state.elements.length,
+    errors: recentErrors.join('\n'),
+  };
+}
+
+async function sendFeedback() {
+  const message = document.getElementById('fb-message').value.trim();
+  if (!message) { setFeedbackMsg('Please write a sentence or two first.', true); return; }
+  const payload = {
+    app: 'graphs2',
+    type: (document.querySelector('input[name="fb-type"]:checked') || {}).value || 'other',
+    message,
+    email: document.getElementById('fb-email').value.trim(),
+    website: document.getElementById('fb-website').value,
+    image: document.getElementById('fb-image').checked ? feedbackImage : null,
+    diagram: document.getElementById('fb-diagram').checked ? JSON.stringify(currentGraphData()) : null,
+    meta: feedbackMeta(),
+  };
+  const btn = document.getElementById('fb-send');
+  btn.disabled = true;
+  setFeedbackMsg('Sending…');
+  try {
+    const r = await fetch(FEEDBACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (r.status === 429) throw new Error('Too many reports from here in the last hour. Please try again later.');
+    if (!r.ok) throw new Error('The report could not be sent (error ' + r.status + ').');
+    closeFeedback();
+    showToast('Thanks, your feedback was sent.');
+  } catch (e) {
+    btn.disabled = false;
+    setFeedbackMsg(e.message.startsWith('Too many') || e.message.startsWith('The report') ? e.message
+      : 'Could not reach the server. Check your connection and try again.', true);
+  }
+}
+
+// A diagram handed over from the feedback inbox (/feedback/, same origin)
+// opens on load, undoably, on top of whatever was autosaved.
+function openHandoffDiagram() {
+  let data = null;
+  try {
+    data = localStorage.getItem('sw2_open');
+    localStorage.removeItem('sw2_open');
+  } catch (e) {}
+  if (!data) return;
+  try {
+    const parsed = JSON.parse(data);
+    saveUndo();
+    applyGraphData(parsed);
+    driveCurrentFile = null;
+    showToast('Opened the diagram from a feedback report.', { undo: true });
+  } catch (e) {
+    showToast('That diagram could not be opened.');
+  }
+}
+
 // ─── AUTOSAVE ────────────────────────────────────────────────
 // The open diagram is kept in localStorage so a refresh or closed tab loses
 // nothing. If storage is unavailable we fall back to a leave-page warning.
@@ -2917,6 +3079,17 @@ function loadFromSaveModal() {
 }
 
 function downloadJPG(exportScale) {
+  const link = document.createElement('a');
+  const title = (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const suffix = exportScale > 1 ? '-hires' : '';
+  link.download = title + suffix + '.jpg';
+  link.href = renderExport(exportScale, 'image/jpeg', 0.97);
+  link.click();
+}
+
+// Renders the diagram plus legend at `exportScale`, without selection handles
+// or zoom, and returns it as a data URL. Shared by export and feedback.
+function renderExport(exportScale, mime, quality) {
   exportScale = exportScale || SCALE;
   // Hide selection handles for the export only; the selection is restored after.
   const keepSelected = state.selectedId;
@@ -2981,13 +3154,7 @@ function downloadJPG(exportScale) {
     ctx.restore();
   }
 
-  // Export
-  const link = document.createElement('a');
-  const title = (state.title || 'economics-graph').replace(/[^a-z0-9]/gi, '-').toLowerCase();
-  const suffix = exportScale > 1 ? '-hires' : '';
-  link.download = title + suffix + '.jpg';
-  link.href = canvas.toDataURL('image/jpeg', 0.97);
-  link.click();
+  const url = canvas.toDataURL(mime, quality);
 
   // Restore canvas and state
   SCALE = origScale;
@@ -2996,6 +3163,7 @@ function downloadJPG(exportScale) {
   viewScale = sv; viewOffsetX = sox; viewOffsetY = soy;
   state.selectedId = keepSelected;
   redraw();
+  return url;
 }
 
 // ─── START ───────────────────────────────────────────────────

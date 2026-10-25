@@ -35,6 +35,7 @@ graphs2/
 - Saved data has `v: 2`. Every load goes through `migrateGraphData()`; put format conversions there.
 - localStorage keys are prefixed `sw2_` so the fork never touches the live app's state.
 - Text editing is inline (`showInlineLabelEdit(el, opts)`); the edit modal and the Label tool's `prompt()` are gone. `getLabelBasePos` covers every type, including brace tips, text and dots.
+- **Feedback** (Phase 2): header button opens `#feedback-modal`; `sendFeedback()` POSTs to the shared `unisam-feedback` Worker (`../feedback/CLAUDE.md`). Picture and diagram file are opt-in. `renderExport(scale, mime, quality)` draws the export (used by JPG download and the feedback picture). `openHandoffDiagram()` opens a diagram passed from the inbox via localStorage `sw2_open`.
 
 ---
 
