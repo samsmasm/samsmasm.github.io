@@ -4,6 +4,8 @@ Weather tool for 152 cities. A sortable, searchable league table (feels like, te
 
 Built on Sam's phone in a Claude chat, then moved here. Single static file: `index.html` (CSS, markup and one script in an IIFE). No build step, no backend, no API key. Deploys on push to `main` like the rest of the repo, so follow the root `CLAUDE.md`. Keep it off the public index (`index.html`, `/tools`, `/experiments`) until Sam decides where it goes. Add files by name, never `git add -A`.
 
+GoatCounter (samsmasm.goatcounter.com, standard snippet before `</body>`, added 2026-10-25) counts page loads as `/weather/`. One view per load; switching cities or days is not counted. The jsdom tests don't load external scripts, so they send no hits.
+
 ## Status
 
 - **Live data tested against the real Open-Meteo API on 2026-10-20** (jsdom with real `fetch`): all 150 cities live, city detail live with all 8 models, no errors.
