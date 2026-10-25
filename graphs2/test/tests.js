@@ -594,6 +594,23 @@ test('clicking a filled area again cycles its colour (or hatching in B/W)', asyn
   assert(await ev(page, `state.elements[0].fillColor`) !== c0, 'colour did not change');
 });
 
+test('Style menu restyles the whole diagram in one undo step, leaving guides alone', async (page) => {
+  await ev(page, `loadTemplate('tax')`);
+  await page.click('#style-btn');
+  assert(await ev(page, `document.getElementById('style-menu').classList.contains('open')`), 'menu did not open');
+  await page.click('#style-menu button:last-child'); // All lines thick
+  eq(await ev(page, `state.elements.filter(e => (e.type === 'line' || e.type === 'curve') && !isGuide(e)).every(e => e.weight === 4)`), true, 'not all thick');
+  eq(await ev(page, `document.getElementById('style-menu').classList.contains('open')`), false, 'menu stayed open');
+  await ev(page, `styleDiagram('hatching')`);
+  const fills = await ev(page, `state.elements.filter(e => e.type === 'region').map(e => e.fill)`);
+  eq(new Set(fills).size, fills.length, 'hatching not distinct');
+  await ev(page, `styleDiagram('colours')`);
+  const cols = await ev(page, `state.elements.filter(e => (e.type === 'line' || e.type === 'curve') && !isGuide(e)).map(e => e.color)`);
+  eq(new Set(cols).size, cols.length, 'colours not distinct');
+  await ev(page, `undo(); undo(); undo()`);
+  eq(await ev(page, `state.elements.filter(e => e.type === 'line' && !isGuide(e)).every(e => e.weight === 2.5)`), true, 'undo did not restore');
+});
+
 test('when zoomed in, dragging empty space moves the view', async (page) => {
   await ev(page, `loadTemplate('blank'); setTool('select'); changeZoom(2, W / 2, H / 2)`);
   const before = await ev(page, `[viewOffsetX, viewOffsetY]`);

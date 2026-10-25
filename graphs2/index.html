@@ -267,6 +267,20 @@
   .mode-switch.bw .ms-knob { left: 16px; }
   .mode-switch:not(.bw) .ms-off, .mode-switch.bw .ms-on { color: var(--text); font-weight: 600; }
   .mode-switch:focus-visible .ms-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .style-wrap { position: relative; }
+  .tb-menu {
+    display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 150;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18); min-width: 230px; padding: 4px;
+  }
+  .tb-menu.open { display: block; }
+  .tb-menu button {
+    display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    padding: 7px 10px; font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--text); border-radius: 4px;
+  }
+  .tb-menu button:hover { background: var(--tag-bg); }
+  .tb-menu button span { display: block; font-weight: 400; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .tb-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 
   .canvas-wrap {
     flex: 1;
@@ -274,14 +288,14 @@
     align-items: center;
     justify-content: center;
     overflow: auto;
-    background: var(--bg);
+    background: #ffffff;
   }
 
+  /* An open white surface; the faint outline is what gets exported. */
   #graph-canvas {
     touch-action: none;
     background: #ffffff;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.10);
-    border-radius: 4px;
+    outline: 1px dashed #d6d2c8;
     cursor: crosshair;
     display: block;
   }
@@ -558,6 +572,17 @@
       <button class="mode-switch bw" id="bw-btn" role="switch" aria-checked="true" aria-label="Black and white" onclick="toggleBW()">
         <span class="ms-label ms-off">Colour</span><span class="ms-track"><span class="ms-knob"></span></span><span class="ms-label ms-on">B/W</span>
       </button>
+      <div class="style-wrap">
+        <button class="tb-toggle" id="style-btn" onclick="toggleStyleMenu(event)" aria-haspopup="menu" aria-expanded="false">Style ▾</button>
+        <div class="tb-menu" id="style-menu" role="menu">
+          <button role="menuitem" onclick="styleDiagram('colours')">Auto colour<span>a different colour for each curve and area</span></button>
+          <button role="menuitem" onclick="styleDiagram('hatching')">Auto hatching<span>a different pattern for each area</span></button>
+          <div class="tb-menu-sep"></div>
+          <button role="menuitem" onclick="styleDiagram('weight', 1.5)">All lines thin</button>
+          <button role="menuitem" onclick="styleDiagram('weight', 2.5)">All lines normal</button>
+          <button role="menuitem" onclick="styleDiagram('weight', 4)">All lines thick</button>
+        </div>
+      </div>
       <div class="sep"></div>
       <button class="tb-toggle" onclick="zoomOut()" title="Zoom out" style="padding:4px 8px;min-width:28px">−</button>
       <span id="zoom-label" style="font-size:11px;font-family:var(--mono);color:var(--muted);min-width:38px;text-align:center;user-select:none">100%</span>
@@ -1469,6 +1494,45 @@ function toggleBW() {
   renderProps();
   renderLegendList();
   redraw();
+}
+
+// ─── STYLE MENU ──────────────────────────────────────────────
+// Whole-diagram restyling, each one undo step. Guide lines (dashed or grey)
+// are left alone: they have their own fixed style.
+function toggleStyleMenu(e) {
+  e.stopPropagation();
+  const m = document.getElementById('style-menu');
+  const open = !m.classList.contains('open');
+  m.classList.toggle('open', open);
+  document.getElementById('style-btn').setAttribute('aria-expanded', open);
+}
+function closeStyleMenu() {
+  document.getElementById('style-menu').classList.remove('open');
+  document.getElementById('style-btn').setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', e => { if (!e.target.closest('.style-wrap')) closeStyleMenu(); });
+
+const isGuide = el => !!el.dash || el.color === GUIDE.color;
+const HATCHES = ['hatch45', 'hatch135', 'crosshatch', 'dots', 'vertical', 'horizontal'];
+function styleDiagram(what, value) {
+  closeStyleMenu();
+  const lines = state.elements.filter(e => (e.type === 'line' || e.type === 'curve') && !isGuide(e));
+  const regions = state.elements.filter(e => e.type === 'region');
+  if (!(what === 'weight' ? lines : what === 'hatching' ? regions : [...lines, ...regions]).length) {
+    showToast(what === 'hatching' ? 'There are no shaded areas to restyle.' : 'There are no lines to restyle.');
+    return;
+  }
+  saveUndo();
+  if (what === 'colours') {
+    lines.forEach((el, i) => { el.color = COLORS[i % 6]; });
+    regions.forEach((el, i) => { el.fillColor = COLORS[(i + 1) % 6]; });
+  } else if (what === 'hatching') {
+    regions.forEach((el, i) => { el.fill = HATCHES[i % HATCHES.length]; });
+  } else if (what === 'weight') {
+    lines.forEach(el => { el.weight = value; });
+  }
+  renderLegendList(); renderProps(); redraw();
+  showToast(what === 'colours' && bwMode ? 'Colours set. They show in Colour mode.' : 'Style applied.', { undo: true });
 }
 
 function applyViewXform() {
