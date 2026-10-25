@@ -84,6 +84,7 @@
   .header-actions { display: flex; align-items: center; gap: 6px; }
   /* Google Drive sign in / out: a person icon, then the email and an exit icon once signed in. */
   #header-user { gap: 6px; }
+  header button#header-user.confirm, header button#header-user.confirm:hover { background: #c8380a; color: #fff; }
   #header-user svg { width: 14px; height: 14px; flex-shrink: 0; }
   #header-user .hu-email {
     font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.8);
@@ -490,7 +491,6 @@
   <div class="header-actions">
     <button id="undo-btn" class="ghost" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button id="redo-btn" class="ghost" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
-    <button class="ghost gear" onclick="openSettings()" title="Settings" aria-label="Settings">⚙</button>
     <button class="ghost" onclick="openFeedback()" title="Report a problem or suggest an idea">Feedback</button>
     <button onclick="openSaveModal()">Save / Load</button>
     <div class="export-wrap">
@@ -501,7 +501,8 @@
         <button role="menuitem" onclick="downloadImage('png')">Download PNG</button>
       </div>
     </div>
-    <button id="header-user" class="ghost" onclick="headerAuthClick()" style="display:none"></button>
+    <button class="ghost gear" onclick="openSettings()" title="Settings" aria-label="Settings">⚙</button>
+    <button id="header-user" class="ghost" onclick="headerAuthClick(event)" style="display:none"></button>
   </div>
 </header>
 
@@ -4157,10 +4158,33 @@ async function driveTrash(id, name) {
 const ICON_PERSON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.5" r="2.8"/><path d="M2.8 14c.6-2.7 2.7-4.2 5.2-4.2s4.6 1.5 5.2 4.2"/></svg>';
 const ICON_SIGN_OUT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5"/></svg>';
 
-function headerAuthClick() {
-  if (driveSignedIn()) { driveSignOut(); showToast('Signed out of Google Drive.'); }
-  else driveSignIn();
+// Signing out asks first, in the button itself (no pop-up): the first click
+// turns it into "Sign out?"; a second click confirms. Clicking anywhere
+// else or waiting 4 s cancels.
+let signOutArmed = null;
+function disarmSignOut() {
+  if (!signOutArmed) return;
+  clearTimeout(signOutArmed);
+  signOutArmed = null;
+  document.getElementById('header-user').classList.remove('confirm');
+  driveRefreshUI();
 }
+function headerAuthClick(e) {
+  if (e) e.stopPropagation();
+  if (!driveSignedIn()) { driveSignIn(); return; }
+  if (signOutArmed) {
+    disarmSignOut();
+    driveSignOut();
+    showToast('Signed out of Google Drive.');
+    return;
+  }
+  const btn = document.getElementById('header-user');
+  btn.classList.add('confirm');
+  btn.innerHTML = `${ICON_SIGN_OUT}<span>Sign out?</span>`;
+  btn.title = 'Click again to sign out of Google Drive';
+  signOutArmed = setTimeout(disarmSignOut, 4000);
+}
+document.addEventListener('click', e => { if (!e.target.closest('#header-user')) disarmSignOut(); });
 
 function driveRefreshUI() {
   const signedIn = driveSignedIn();

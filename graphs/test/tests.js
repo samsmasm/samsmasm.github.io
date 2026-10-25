@@ -448,8 +448,17 @@ test('header sign in / out button shows the state and does the right thing', asy
   // Pretend to be signed in.
   await ev(page, `window.__signIns = 0; driveSignIn = () => { window.__signIns++; }; driveToken = { access_token: 'x', expires_at: Date.now() + 3600e3 }; driveUser = 'sam@example.com'; driveSignedIn = () => !!driveToken; driveRefreshUI()`);
   eq(await ev(page, `document.querySelector('#header-user .hu-email').textContent`), 'sam@example.com', 'email');
+  // First click asks; clicking elsewhere cancels.
   await page.click('#header-user');
-  eq(await ev(page, `[driveToken, document.getElementById('header-user').textContent.trim()]`), [null, 'Sign in'], 'signed out by click');
+  eq(await ev(page, `[!!driveToken, document.getElementById('header-user').textContent.trim()]`), [true, 'Sign out?'], 'asks first');
+  await page.click('.canvas-toolbar');
+  eq(await ev(page, `[!!driveToken, !!document.querySelector('#header-user .hu-email')]`), [true, true], 'click elsewhere did not cancel');
+  // Click, then confirm.
+  await page.click('#header-user');
+  await page.click('#header-user');
+  eq(await ev(page, `[driveToken, document.getElementById('header-user').textContent.trim()]`), [null, 'Sign in'], 'signed out after confirming');
+  // The gear sits right before it.
+  eq(await ev(page, `document.getElementById('header-user').previousElementSibling.classList.contains('gear')`), true, 'gear not next to sign in');
   await page.click('#header-user');
   eq(await ev(page, `window.__signIns`), 1, 'sign-in not started');
 });

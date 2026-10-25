@@ -160,7 +160,7 @@ Automatic (Phase 4). `state.legend = { show, hidden: [ids] }`. Entries are every
 
 ## Export
 
-One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/Slides), Download JPG, Download PNG. Size and PNG transparency come from Settings (`exportPNG`). Google Drive sign in / out: the header button `#header-user` (person icon + "Sign in"; once signed in, the email + an exit icon, click signs out; `headerAuthClick`) and the Save dialog. Sam asked for the header button on 2026-10-25, reversing the Phase 4 "Save dialog only" choice.
+One "Export ▾" header menu: Copy image (PNG to the clipboard, for Google Docs/Slides), Download JPG, Download PNG. Size and PNG transparency come from Settings (`exportPNG`). Google Drive sign in / out: the header button `#header-user` (person icon + "Sign in"; once signed in, the email + an exit icon; signing out needs a second click on the red "Sign out?" it turns into, cancelled by clicking elsewhere or 4 s; `headerAuthClick`, `disarmSignOut`), with the settings gear right before it and the Save dialog. Sam asked for the header button on 2026-10-25, reversing the Phase 4 "Save dialog only" choice.
 
 ## Templates
 
