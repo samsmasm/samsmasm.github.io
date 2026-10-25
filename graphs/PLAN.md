@@ -13,12 +13,12 @@ v1 deliberately kept some friction. **That is dropped.** The goal now is that Sh
 
 When a choice comes up between "student does it by hand" and "the app does it for them", pick the app.
 
-## Open decisions (ask Sam before the phase that needs them)
+## Decisions
 
-1. Feedback alerts: one email per report (recommended), a daily digest, or no alerts with a reports page only. Needed for Phase 2.
-2. Legend: automatic from labelled curves and regions, off by default (recommended), keep the manual one, or drop it. Needed for Phase 4.
-3. Guide-line style: dashed `6,4` (recommended, dots come out patchy in JPG) or dotted `2,3`. Needed for Phase 3.
-4. Equilibrium dot shown or hidden by default. Needed for Phase 3.
+1. Feedback alerts: **none**. Sam checks the reports page occasionally. No email binding needed in the Worker. (2026-10-25)
+2. Legend: **still open**, Sam wasn't sure what it is. Explain before Phase 4: today it is a manually typed key (name plus colour swatch) printed under the graph in the JPG only. Recommendation: build it automatically from labelled curves and regions, off by default.
+3. Guide-line style: **dashed `6,4`**, thin. (2026-10-25)
+4. Equilibrium dot: **hidden by default**, toggle in props. (2026-10-25)
 
 ---
 
@@ -60,7 +60,7 @@ Always sent, and listed openly in the form: app version, browser, viewport size,
 
 **Backend**: Cloudflare Worker `unisam-feedback`, reusable by any tool via an `app` field.
 - Store reports in KV (image in R2 or KV).
-- Alert per decision 1 via Cloudflare Email Routing send binding to Sam.
+- No alerts (decision 1): Sam checks the reports page.
 - `graphs2/reports.html` (secret key) lists reports with thumbnail, metadata, "Mark done", and "Open this diagram" which loads the attached save code into graphs2.
 - Per-IP rate limit plus honeypot field. Turnstile only if spam appears.
 - Cloudflare MCP is read-only: deploy via dashboard or wrangler. Write the code plus step-by-step deploy notes.
