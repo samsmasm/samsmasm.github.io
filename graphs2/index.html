@@ -79,6 +79,8 @@
     color: #fff;
   }
   header button.ghost:hover { background: rgba(255,255,255,0.28); }
+  header button:disabled { opacity: 0.35; cursor: default; }
+  header button.ghost:disabled:hover { background: rgba(255,255,255,0.15); }
   .header-actions { display: flex; align-items: center; gap: 6px; }
   #header-user {
     font-family: var(--mono);
@@ -475,6 +477,8 @@
   <span id="pan-hint" style="display:none;font-family:var(--sans);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:4px">Shift+drag to pan</span>
   <div class="spacer"></div>
   <div class="header-actions">
+    <button id="undo-btn" class="ghost" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+    <button id="redo-btn" class="ghost" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
     <button class="ghost" onclick="openFeedback()" title="Report a problem or suggest an idea">Feedback</button>
     <button onclick="openSaveModal()">Save / Load</button>
     <div class="export-wrap">
@@ -789,18 +793,26 @@ function saveUndo(snap) {
   undoStack.push(snap || snapshot());
   if (undoStack.length > 80) undoStack.shift();
   redoStack = [];
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  document.getElementById('undo-btn').disabled = !undoStack.length;
+  document.getElementById('redo-btn').disabled = !redoStack.length;
 }
 
 function undo() {
   if (!undoStack.length) return;
   redoStack.push(snapshot());
   restoreSnapshot(undoStack.pop());
+  updateUndoButtons();
 }
 
 function redo() {
   if (!redoStack.length) return;
   undoStack.push(snapshot());
   restoreSnapshot(redoStack.pop());
+  updateUndoButtons();
 }
 
 const canvas = document.getElementById('graph-canvas');

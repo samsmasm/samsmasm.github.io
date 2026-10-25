@@ -574,6 +574,19 @@ test('template picker shows thumbnails by group and loads the choice', async (pa
   assert(!(await ev(page, `document.getElementById('template-modal').classList.contains('open')`)), 'picker still open');
 });
 
+test('undo and redo buttons work and grey out when there is nothing to do', async (page) => {
+  await ev(page, `undoStack = []; redoStack = []; updateUndoButtons();`);
+  eq(await ev(page, `[document.getElementById('undo-btn').disabled, document.getElementById('redo-btn').disabled]`), [true, true], 'start state');
+  await ev(page, `loadTemplate('sd')`);
+  const n = await ev(page, `state.elements.length`);
+  await ev(page, `state.selectedId = state.elements[0].id; deleteSelected()`);
+  await page.click('#undo-btn');
+  eq(await ev(page, `state.elements.length`), n, 'undo did not restore');
+  assert(!(await ev(page, `document.getElementById('redo-btn').disabled`)), 'redo still greyed');
+  await page.click('#redo-btn');
+  assert(await ev(page, `state.elements.length < ${n}`), 'redo did not delete again');
+});
+
 // ─── RUNNER ──────────────────────────────────────────────────
 (async () => {
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
