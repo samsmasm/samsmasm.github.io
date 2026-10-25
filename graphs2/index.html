@@ -546,14 +546,6 @@
       </button>
     </div>
 
-    <div class="section-head" style="margin-top:2px">Ready-made shapes</div>
-    <div class="tool-grid">
-      <button class="tool-btn" onclick="addShape('cost')" title="U-shaped MC and AC curves">MC / AC</button>
-      <button class="tool-btn" onclick="addShape('ppc')" title="Production possibility curve">PPC</button>
-      <button class="tool-btn" onclick="addShape('jcurve')" title="J-curve with a zero line">J-curve</button>
-      <button class="tool-btn" onclick="addShape('lorenz')" title="Lorenz curve with line of equality">Lorenz</button>
-    </div>
-
     <div class="section-head" style="margin-top:2px">Line color</div>
     <div class="color-row" id="color-row"></div>
     <div class="bw-note" id="bw-color-note" style="margin:0 14px 10px">Colours show in Colour mode. B/W draws everything in black.</div>
@@ -921,6 +913,38 @@ function curveLowest(c) {
   getElSegments(c).forEach(([ax, ay]) => { if (!best || ay > best.y) best = { x: ax, y: ay }; });
   return fromCanvas(best.x, best.y);
 }
+// MC and AC from one cubic cost function, so MC is the usual tick shape
+// (dips, then rises steeply) and cuts AC exactly at AC's lowest point
+// (qMin, acMin). Cost is measured up from the x-axis: yn = 1 - cost.
+// MC = a - 2bq + 3cq², AC = F/q + a - bq + cq², with MC lowest at qMin/2.
+function costCurves(qMin, acMin, c = 0.6, colors = [COLORS[1], COLORS[2]]) {
+  const b = 1.5 * c * qMin, F = 0.5 * c * qMin ** 3, a = acMin;
+  const mc = q => a - 2 * b * q + 3 * c * q * q;
+  const ac = q => F / q + a - b * q + c * q * q;
+  const sample = (f, from, to) => {
+    const pts = [];
+    for (let i = 0; i <= 14; i++) {
+      const q = from + (to - from) * i / 14;
+      pts.push({ xn: q, yn: 1 - f(q) });
+    }
+    return pts;
+  };
+  // Stop each curve where it leaves the top of the plot (cost 0.95).
+  const lastBelow = (f, from, to) => { let q = from; while (q < to && f(q) <= 0.95) q += 0.005; return q - 0.005; };
+  const firstBelow = (f, from) => { let q = from; while (f(q) > 0.95) q += 0.005; return q; };
+  return {
+    MC: mkCurve(sample(mc, 0.06, lastBelow(mc, qMin, 0.98)), colors[0], 2.5, '', 'MC'),
+    AC: mkCurve(sample(ac, firstBelow(ac, 0.02), lastBelow(ac, qMin, 0.97)), colors[1], 2.5, '', 'AC'),
+    min: { xn: qMin, yn: 1 - acMin },
+    mcAt: q => 1 - mc(q), acAt: q => 1 - ac(q),
+  };
+}
+// Quantity where a straight MR meets a drawn MC curve (from the drawn samples).
+function mrCrossesMC(MR, MC) {
+  for (let q = 0.06; q < 0.95; q += 0.002)
+    if (curveYAt(MC, q) !== null && curveYAt(MC, q) <= lineYAt(MR, q)) return q;
+  return 0.4;
+}
 const hLine = (yn, color, label) => mkLine(0, yn, 1, yn, color, 2.5, '', label);
 const rectRegion = (x1, y1, x2, y2, color, fill, label) => {
   const r = mkRegion([{ xn: x1, yn: y1 }, { xn: x2, yn: y1 }, { xn: x2, yn: y2 }, { xn: x1, yn: y2 }], color, fill);
@@ -1046,10 +1070,9 @@ const TEMPLATES = {
       const D = mkLine(0.05, 0.05, 0.95, 0.85, COLORS[0], 2.5, '', 'D = AR');
       const MR = mkLine(0.05, 0.05, 0.5, 0.85, COLORS[4], 2.5, '', 'MR');
       MR.labelDx = 250; MR.labelDy = 366; // at the bottom end, clear of D = AR
-      const MC = mkLine(0.15, 0.9, 0.75, 0.05, COLORS[1], 2.5, '', 'MC');
-      const AC = mkCurve([{xn: 0.12, yn: 0.08}, {xn: 0.24, yn: 0.3}, {xn: 0.36, yn: 0.41}, {xn: 0.48, yn: 0.445},
-        {xn: 0.62, yn: 0.41}, {xn: 0.78, yn: 0.28}, {xn: 0.9, yn: 0.1}], COLORS[2], 2.5, '', 'AC');
-      const q = lineCross(MR, MC).xn, pm = lineYAt(D, q), c = curveYAt(AC, q);
+      // AC's lowest point sits well right of Qm, so MC = MR is clearly below AC.
+      const { MC, AC } = costCurves(0.6, 0.4);
+      const q = mrCrossesMC(MR, MC), pm = lineYAt(D, q), c = curveYAt(AC, q);
       const mrmc = mkEq(MR, MC, '', '');
       mrmc.showDot = true; mrmc.dropP = false; mrmc.dropQ = false;
       return { title: '', yLabel: 'Price, costs, revenue ($)', xLabel: 'Quantity', elements: [
@@ -1061,17 +1084,17 @@ const TEMPLATES = {
 
   perfcomp: { group: 'Micro', name: 'Perfect competition', sub: 'Firm in long-run equilibrium',
     build: () => {
-      const AC = mkCurve([{xn: 0.1, yn: 0.1}, {xn: 0.25, yn: 0.4}, {xn: 0.45, yn: 0.56}, {xn: 0.65, yn: 0.43}, {xn: 0.85, yn: 0.12}],
-        COLORS[2], 2.5, '', 'AC');
-      const low = curveLowest(AC);
       // MC cuts AC at its lowest point; price is tangent to AC there (normal profit).
-      const MC = mkLine(low.xn - 0.25, low.yn + 0.4, low.xn + 0.3, low.yn - 0.48, COLORS[1], 2.5, '', 'MC');
+      const { MC, AC, min: low } = costCurves(0.55, 0.45);
       const P = hLine(low.yn, COLORS[0], 'P = MR = AR = D');
       P.labelDx = -70; P.labelDy = -14;
       return { title: '', yLabel: 'Price, costs ($)', xLabel: 'Quantity (firm)', elements: [
         AC, MC, P, mkEq(MC, P, 'Pe', 'Qe', low.xn, low.yn),
       ] };
     } },
+
+  cost: { group: 'Micro', name: 'Cost curves', sub: 'MC cutting AC at its lowest point',
+    build: () => ({ title: '', yLabel: 'Costs ($)', xLabel: 'Quantity', elements: SHAPES.cost() }) },
 
   ppc: { group: 'Micro', name: 'Production possibilities', sub: 'PPC, bowed out',
     build: () => ({ title: '', yLabel: 'Good B', xLabel: 'Good A', elements: SHAPES.ppc() }) },
@@ -1159,6 +1182,9 @@ const TEMPLATES = {
         mkEq(D, Sq, 'Pq', 'Q₃', e.xn, e.yn), freePoint(q2, e.yn, '', 'Q₂', { dropP: false }),
       ] };
     } },
+
+  jcurve: { group: 'Global', name: 'J-curve', sub: 'Current account after a depreciation',
+    build: () => ({ title: '', yLabel: 'Current account balance', xLabel: 'Time', elements: SHAPES.jcurve() }) },
 
   exrate: { group: 'Global', name: 'Exchange rate', sub: 'Market for a currency',
     build: () => {
@@ -3300,12 +3326,11 @@ function nudgeSelected(dx, dy) {
   redraw();
 }
 
-// Ready-made shapes that are fiddly to draw by hand.
+// Fiddly shapes, used by templates. Templates always replace the whole
+// diagram; there is deliberately no "add a shape to this diagram" button,
+// because Sam found it confusing next to the templates.
 const SHAPES = {
-  cost: () => [
-    mkCurve([{xn: 0.12, yn: 0.62}, {xn: 0.25, yn: 0.74}, {xn: 0.4, yn: 0.66}, {xn: 0.5, yn: 0.5}, {xn: 0.62, yn: 0.27}, {xn: 0.72, yn: 0.06}], COLORS[1], 2.5, '', 'MC'),
-    mkCurve([{xn: 0.1, yn: 0.12}, {xn: 0.24, yn: 0.38}, {xn: 0.4, yn: 0.5}, {xn: 0.52, yn: 0.53}, {xn: 0.66, yn: 0.48}, {xn: 0.82, yn: 0.32}, {xn: 0.92, yn: 0.14}], COLORS[0], 2.5, '', 'AC'),
-  ],
+  cost: () => { const { MC, AC } = costCurves(0.55, 0.45, 0.6, [COLORS[1], COLORS[0]]); return [MC, AC]; },
   ppc: () => {
     const ppc = mkCurve([0, 15, 30, 45, 60, 75, 90].map(deg => {
       const r = deg * Math.PI / 180;
@@ -3326,15 +3351,6 @@ const SHAPES = {
     return [eq, lz];
   },
 };
-function addShape(name) {
-  saveUndo();
-  const els = SHAPES[name]();
-  state.elements.push(...els);
-  setTool('select');
-  state.selectedId = els[els.length - 1].id;
-  renderLegendList(); renderProps(); redraw();
-}
-
 function deleteSelected() {
   saveUndo();
   removeWithDependents([state.selectedId]);

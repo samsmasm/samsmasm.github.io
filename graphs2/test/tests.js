@@ -361,7 +361,7 @@ test('deleting a curve deletes its equilibrium points', async (page) => {
 });
 
 test('templates load as connected points that follow their curves', async (page) => {
-  for (const name of await ev(page, `Object.keys(TEMPLATES).filter(k => !['blank', 'ppc', 'lorenz', 'phillips'].includes(k))`)) {
+  for (const name of await ev(page, `Object.keys(TEMPLATES).filter(k => !['blank', 'ppc', 'lorenz', 'phillips', 'cost', 'jcurve'].includes(k))`)) {
     await ev(page, `loadTemplate('${name}')`);
     const r = await ev(page, `state.elements.filter(e => e.type === 'dot' && e.on).map(d => ({ on: d.on, broken: !!(derived.get(d.id) || {}).broken, ok: d.on.every(id => elById(id)) }))`);
     assert(r.length, name + ': no points');
@@ -521,11 +521,20 @@ test('touch: drawing a line and double-tapping to finish a curve work', async (p
   assert(c && c.points.length === 3, 'curve by double tap: ' + JSON.stringify(c && c.points));
 });
 
-test('ready-made shapes add labelled curves', async (page) => {
+test('shape templates (cost, ppc, lorenz) have their labelled curves', async (page) => {
   for (const [k, labels] of [['cost', ['MC', 'AC']], ['ppc', ['PPC']], ['lorenz', ['Line of equality', 'Lorenz curve']]]) {
-    await ev(page, `loadTemplate('blank'); addShape('${k}')`);
+    await ev(page, `loadTemplate('${k}')`);
     eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), labels, k);
   }
+});
+
+test('a template replaces everything: curves, title, axis labels and legend', async (page) => {
+  await ev(page, `loadTemplate('adas'); state.title = 'My AD'; state.xLabelDx = 30; setLegendShow(true); syncTextInputs()`);
+  await ev(page, `loadTemplate('cost')`);
+  eq(await ev(page, `[state.title, state.yLabel, state.xLabel, state.xLabelDx, state.legend.show, document.getElementById('y-label').value]`),
+    ['', 'Costs ($)', 'Quantity', 0, false, 'Costs ($)'], 'leftovers');
+  eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), ['MC', 'AC'], 'curves');
+  eq(await ev(page, `typeof addShape`), 'undefined', 'add-shape still there');
 });
 
 
