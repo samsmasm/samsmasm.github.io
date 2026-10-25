@@ -65,8 +65,9 @@ Positions of attached elements are **derived** on every redraw by `resolveAttach
 - **Label halo**: `haloText()` strokes white behind every label and text.
 - **Pointer events**: the canvas listens to `pointerdown/move/up/cancel` (with pointer capture) instead of mouse events, and `touch-action: none`. `clickCount` replaces `e.detail` (pointer events have none); a double tap on touch calls `onDblClick` from `onPointerDown`, and `lastDblAt` stops a native dblclick doubling it.
 - **Shapes** (`SHAPES`): MC/AC, PPC, J-curve (with zero line), Lorenz (with line of equality). Used only by templates (cost, ppc, jcurve, lorenz). There is deliberately no "add a shape" button: Sam found buttons that add to the page next to templates confusing. Every template replaces everything.
-- **Cost curves** come from `costCurves(qMin, acMin, c)`, one cubic cost function, so MC dips, rises, and cuts AC exactly at AC's minimum. Never draw MC as a straight line. Monopoly finds Qm with `mrCrossesMC`.
-- **Colour is chosen in one place**, the selected-object panel (hidden in B/W). There is no sidebar colour picker: `drawColor()` gives new lines, curves and regions the first palette colour not yet used, and arrows/braces black.
+- **Cost curves** come from `costCurves(qT, atcMin, qV, c)`, one cubic cost function giving MC, AVC and ATC. Sam requires MC to go EXACTLY through the lowest points of AVC and ATC, as drawn: `drawSmoothCurve` passes through the midpoint of each pair of neighbouring control points, so each knot gets two control points either side along the true tangent, and the two minimums are knots. Never draw MC as a straight line. Monopoly finds Qm with `mrCrossesMC`. A test checks the drawn gap is under 0.5 px.
+- **Colour and line style are chosen in one place**, the selected-object panel. The sidebar has neither: new drawings are solid, Normal weight (`state.strokeWeight/strokeDash`).
+- **Colour**: the selected-object panel (hidden in B/W). There is no sidebar colour picker: `drawColor()` gives new lines, curves and regions the first palette colour not yet used, and arrows/braces black.
 
 ---
 

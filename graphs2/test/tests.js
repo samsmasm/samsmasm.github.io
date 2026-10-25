@@ -391,10 +391,8 @@ test('v1 hand-drawn equilibria become connected points', async (page) => {
   eq(await ev(page, `[state.elements[2].showDot, state.elements[2].on]`), [true, [1, 2]], 'v1 dot');
 });
 
-test('choosing a dash makes the line thin, in the sidebar and in properties', async (page) => {
-  await page.select('#stroke-weight', '4');
-  await page.select('#stroke-dash', '6,4');
-  eq(await ev(page, `document.getElementById('stroke-weight').value`), '1.5', 'sidebar weight');
+test('choosing a dash makes the line thin; line style is set in one place', async (page) => {
+  eq(await ev(page, `!!document.getElementById('stroke-weight') || !!document.getElementById('stroke-dash')`), false, 'sidebar line style still there');
   await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.5, 0.5, '#1a4a8a', 4, '', '')]; state.selectedId = state.elements[0].id; updateProp('dash', '2,3');`);
   eq(await ev(page, `state.elements[0].weight`), 1.5, 'props weight');
 });
@@ -534,7 +532,7 @@ test('touch: drawing a line and double-tapping to finish a curve work', async (p
 });
 
 test('shape templates (cost, ppc, lorenz) have their labelled curves', async (page) => {
-  for (const [k, labels] of [['cost', ['MC', 'AC']], ['ppc', ['PPC']], ['lorenz', ['Line of equality', 'Lorenz curve']]]) {
+  for (const [k, labels] of [['cost', ['MC', 'ATC', 'AVC']], ['ppc', ['PPC']], ['lorenz', ['Line of equality', 'Lorenz curve']]]) {
     await ev(page, `loadTemplate('${k}')`);
     eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), labels, k);
   }
@@ -545,8 +543,23 @@ test('a template replaces everything: curves, title, axis labels and legend', as
   await ev(page, `loadTemplate('cost')`);
   eq(await ev(page, `[state.title, state.yLabel, state.xLabel, state.xLabelDx, state.legend.show, document.getElementById('y-label').value]`),
     ['', 'Costs ($)', 'Quantity', 0, false, 'Costs ($)'], 'leftovers');
-  eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), ['MC', 'AC'], 'curves');
+  eq(await ev(page, `state.elements.filter(e => e.label).map(e => e.label)`), ['MC', 'ATC', 'AVC'], 'curves');
   eq(await ev(page, `typeof addShape`), 'undefined', 'add-shape still there');
+});
+
+test('drawn MC passes exactly through the drawn lowest points of AVC and ATC', async (page) => {
+  for (const [tpl, names] of [['cost', ['AVC', 'ATC']], ['perfcomp', ['ATC']], ['monopoly', ['ATC']]]) {
+    await ev(page, `loadTemplate('${tpl}')`);
+    const gaps = await ev(page, `(() => {
+      const mc = state.elements.find(e => e.label === 'MC');
+      return ${JSON.stringify(names)}.map(n => {
+        const low = curveLowest(state.elements.find(e => e.label === n));
+        // vertical distance in canvas px between MC and the curve's lowest point
+        return Math.abs(toCanvas(0, curveYAt(mc, low.xn)).y - toCanvas(0, low.yn).y);
+      });
+    })()`);
+    gaps.forEach((g, i) => assert(g < 0.5, tpl + ' ' + names[i] + ': MC misses the lowest point by ' + g.toFixed(2) + 'px'));
+  }
 });
 
 
@@ -595,7 +608,7 @@ test('monopoly: profit area sits between price and AC at MC = MR', async (page) 
 test('template picker shows thumbnails by group and loads the choice', async (page) => {
   await ev(page, `loadTemplate('sd'); state.selectedId = state.elements[0].id;`);
   await page.click('.template-btn.browse');
-  await new Promise(r => setTimeout(r, 600));
+  await page.waitForFunction(() => { const i = [...document.querySelectorAll('#template-grid img')]; return i.length && i.every(x => x.src.startsWith('data:image/png')); }, { timeout: 5000 });
   eq(await ev(page, `[...document.querySelectorAll('#template-grid h3')].map(h => h.textContent)`), ['Micro', 'Macro', 'Global'], 'groups');
   assert(await ev(page, `[...document.querySelectorAll('#template-grid img')].every(i => i.src.startsWith('data:image/png'))`), 'thumbnails missing');
   eq(await ev(page, `[state.elements.length, state.selectedId === state.elements[0].id, undoStack.length]`), [3, true, 1], 'thumbnails disturbed the diagram');

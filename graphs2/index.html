@@ -214,18 +214,6 @@
   .add-curve-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 
-  .stroke-row { padding: 0 14px 10px; display: flex; align-items: center; gap: 8px; }
-  .stroke-row label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
-  .stroke-row select {
-    font-size: 11px;
-    font-family: var(--sans);
-    background: var(--tag-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 3px 6px;
-    color: var(--text);
-    cursor: pointer;
-  }
 
   /* CANVAS AREA */
   .canvas-area {
@@ -536,21 +524,6 @@
       </button>
     </div>
 
-    <div class="section-head" style="margin-top:2px">Line style</div>
-    <div class="stroke-row">
-      <label>Weight</label>
-      <select id="stroke-weight">
-        <option value="1.5">Thin</option>
-        <option value="2.5" selected>Normal</option>
-        <option value="4">Bold</option>
-      </select>
-      <label>Dash</label>
-      <select id="stroke-dash">
-        <option value="">Solid</option>
-        <option value="6,4">Dashed</option>
-        <option value="2,3">Dotted</option>
-      </select>
-    </div>
 
     <div class="section-head" style="margin-top:2px">Legend</div>
     <label class="legend-toggle"><input type="checkbox" id="legend-show" onchange="setLegendShow(this.checked)"> Add a legend below the exported picture</label>
@@ -717,6 +690,8 @@ let state = {
   legend: { show: false, hidden: [] }, // automatic legend: on/off, unticked element ids
   selectedId: null,
   tool: 'select',
+  // Every new drawing starts solid at Normal weight; style is changed in one
+  // place, the selected-object panel.
   strokeWeight: 2.5,
   strokeDash: '',
   xLabelDx: 0, xLabelDy: 0,
@@ -834,7 +809,6 @@ function init() {
   document.addEventListener('keydown', onKeyDown);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keyup', onKeyUp);
-  initStrokeDefaults();
   driveRefreshUI();
   // Canvas text doesn't wait for web fonts: redraw once IBM Plex is ready.
   if (document.fonts && document.fonts.load) {
@@ -845,15 +819,6 @@ function init() {
   }
 }
 
-// Dashed and dotted lines are nearly always annotation rather than curves, so
-// choosing a dash always switches the weight to Thin (and Solid back to Normal).
-function initStrokeDefaults() {
-  const weightSel = document.getElementById('stroke-weight');
-  const dashSel = document.getElementById('stroke-dash');
-  dashSel.addEventListener('change', () => {
-    weightSel.value = dashSel.value ? String(GUIDE.weight) : '2.5';
-  });
-}
 
 // Colour for the next thing drawn. Colour is chosen in one place only (the
 // selected-object panel), so new curves take the first palette colour not
@@ -894,30 +859,46 @@ function curveLowest(c) {
   getElSegments(c).forEach(([ax, ay]) => { if (!best || ay > best.y) best = { x: ax, y: ay }; });
   return fromCanvas(best.x, best.y);
 }
-// MC and AC from one cubic cost function, so MC is the usual tick shape
-// (dips, then rises steeply) and cuts AC exactly at AC's lowest point
-// (qMin, acMin). Cost is measured up from the x-axis: yn = 1 - cost.
-// MC = a - 2bq + 3cq², AC = F/q + a - bq + cq², with MC lowest at qMin/2.
-function costCurves(qMin, acMin, c = 0.6, colors = [COLORS[1], COLORS[2]]) {
-  const b = 1.5 * c * qMin, F = 0.5 * c * qMin ** 3, a = acMin;
-  const mc = q => a - 2 * b * q + 3 * c * q * q;
-  const ac = q => F / q + a - b * q + c * q * q;
-  const sample = (f, from, to) => {
-    const pts = [];
-    for (let i = 0; i <= 14; i++) {
-      const q = from + (to - from) * i / 14;
-      pts.push({ xn: q, yn: 1 - f(q) });
-    }
+// MC, AVC and ATC from one cubic cost function, so MC is the usual tick
+// shape (dips, then rises steeply) and cuts AVC and ATC exactly at their
+// lowest points. Cost is measured up from the x-axis: yn = 1 - cost.
+//   VC = aq - bq² + cq³, TC = F + VC
+//   AVC = a - bq + cq² (lowest at qV), MC = a - 2bq + 3cq²,
+//   ATC = F/q + AVC (lowest at qT, value atcMin).
+function costCurves(qT, atcMin, qV = qT * 0.75, c = 0.6, colors = [COLORS[1], COLORS[2], COLORS[4]]) {
+  const b = 2 * c * qV, F = 2 * c * qT * qT * (qT - qV);
+  const a = atcMin - c * (qT - qV) * (3 * qT - qV) + c * qV * qV;
+  const mc = q => a - 2 * b * q + 3 * c * q * q, dmc = q => -2 * b + 6 * c * q;
+  const avc = q => a - b * q + c * q * q, davc = q => -b + 2 * c * q;
+  const atc = q => F / q + avc(q), datc = q => -F / (q * q) + davc(q);
+  // The drawn curve (drawSmoothCurve) passes through the midpoint of each
+  // pair of neighbouring control points, along the line joining them. So each
+  // knot gets two control points either side of it, along the true tangent:
+  // the drawn curve then goes exactly through every knot. The minimums are
+  // knots, so MC meets AVC and ATC exactly there.
+  const build = (f, df, from, to, exact) => {
+    let knots = [];
+    for (let i = 1; i < 24; i++) knots.push(from + (to - from) * i / 24);
+    knots = knots.filter(q => exact.every(e => Math.abs(q - e) > 0.015));
+    knots = [...knots, ...exact.filter(e => e > from && e < to)].sort((x, y) => x - y);
+    const pts = [{ xn: from, yn: 1 - f(from) }];
+    knots.forEach((q, i) => {
+      const gapL = q - (i ? knots[i - 1] : from), gapR = (i < knots.length - 1 ? knots[i + 1] : to) - q;
+      const h = 0.25 * Math.min(gapL, gapR);
+      pts.push({ xn: q - h, yn: 1 - (f(q) - h * df(q)) }, { xn: q + h, yn: 1 - (f(q) + h * df(q)) });
+    });
+    pts.push({ xn: to, yn: 1 - f(to) });
     return pts;
   };
   // Stop each curve where it leaves the top of the plot (cost 0.95).
-  const lastBelow = (f, from, to) => { let q = from; while (q < to && f(q) <= 0.95) q += 0.005; return q - 0.005; };
+  const lastBelow = (f, from) => { let q = from; while (q < 0.97 && f(q) <= 0.95) q += 0.005; return q - 0.005; };
   const firstBelow = (f, from) => { let q = from; while (f(q) > 0.95) q += 0.005; return q; };
   return {
-    MC: mkCurve(sample(mc, 0.06, lastBelow(mc, qMin, 0.98)), colors[0], 2.5, '', 'MC'),
-    AC: mkCurve(sample(ac, firstBelow(ac, 0.02), lastBelow(ac, qMin, 0.97)), colors[1], 2.5, '', 'AC'),
-    min: { xn: qMin, yn: 1 - acMin },
-    mcAt: q => 1 - mc(q), acAt: q => 1 - ac(q),
+    MC: mkCurve(build(mc, dmc, 0.05, lastBelow(mc, qT), [qV, qT]), colors[0], 2.5, '', 'MC'),
+    ATC: mkCurve(build(atc, datc, firstBelow(atc, 0.02), lastBelow(atc, qT), [qT]), colors[1], 2.5, '', 'ATC'),
+    AVC: mkCurve(build(avc, davc, 0.05, lastBelow(avc, qV), [qV]), colors[2], 2.5, '', 'AVC'),
+    min: { xn: qT, yn: 1 - atcMin },
+    avcMin: { xn: qV, yn: 1 - avc(qV) },
   };
 }
 // Quantity where a straight MR meets a drawn MC curve (from the drawn samples).
@@ -1052,21 +1033,21 @@ const TEMPLATES = {
       const MR = mkLine(0.05, 0.05, 0.5, 0.85, COLORS[4], 2.5, '', 'MR');
       MR.labelDx = 250; MR.labelDy = 366; // at the bottom end, clear of D = AR
       // AC's lowest point sits well right of Qm, so MC = MR is clearly below AC.
-      const { MC, AC } = costCurves(0.6, 0.4);
+      const { MC, ATC: AC } = costCurves(0.6, 0.4);
       const q = mrCrossesMC(MR, MC), pm = lineYAt(D, q), c = curveYAt(AC, q);
       const mrmc = mkEq(MR, MC, '', '');
       mrmc.showDot = true; mrmc.dropP = false; mrmc.dropQ = false;
       return { title: '', yLabel: 'Price, costs, revenue ($)', xLabel: 'Quantity', elements: [
         rectRegion(0, pm, q, c, COLORS[2], 'hatch45', 'Abnormal profit'),
         D, MR, MC, AC, mrmc,
-        freePoint(q, pm, 'Pm', 'Qm'), freePoint(q, c, 'AC', '', { dropQ: false }),
+        freePoint(q, pm, 'Pm', 'Qm'), freePoint(q, c, 'ATC', '', { dropQ: false }),
       ] };
     } },
 
   perfcomp: { group: 'Micro', name: 'Perfect competition', sub: 'Firm in long-run equilibrium',
     build: () => {
       // MC cuts AC at its lowest point; price is tangent to AC there (normal profit).
-      const { MC, AC, min: low } = costCurves(0.55, 0.45);
+      const { MC, ATC: AC, min: low } = costCurves(0.55, 0.45);
       const P = hLine(low.yn, COLORS[0], 'P = MR = AR = D');
       P.labelDx = -70; P.labelDy = -14;
       return { title: '', yLabel: 'Price, costs ($)', xLabel: 'Quantity (firm)', elements: [
@@ -1074,7 +1055,7 @@ const TEMPLATES = {
       ] };
     } },
 
-  cost: { group: 'Micro', name: 'Cost curves', sub: 'MC cutting AC at its lowest point',
+  cost: { group: 'Micro', name: 'Cost curves', sub: 'MC through the lowest points of AVC and ATC',
     build: () => ({ title: '', yLabel: 'Costs ($)', xLabel: 'Quantity', elements: SHAPES.cost() }) },
 
   ppc: { group: 'Micro', name: 'Production possibilities', sub: 'PPC, bowed out',
@@ -2632,13 +2613,13 @@ function onMouseMove(e) {
     redraw();
     const a = toCanvas(drawStart.xn, drawStart.yn);
     const b = geoSnap ? { x: geoSnap.x, y: geoSnap.y } : toCanvas(endN.xn, endN.yn);
-    const w = parseFloat(document.getElementById('stroke-weight').value);
+    const w = state.strokeWeight;
     ctx.save(); applyViewXform();
     if (state.tool === 'brace') {
       drawBraceShape(a.x, a.y, b.x, b.y, false, drawColor(), w);
     } else {
       ctx.strokeStyle = drawColor(); ctx.lineWidth = w;
-      const dash = document.getElementById('stroke-dash').value;
+      const dash = state.strokeDash;
       if (dash) ctx.setLineDash(dash.split(',').map(Number));
       ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
@@ -2769,8 +2750,8 @@ function onMouseUp(e) {
     const dist = Math.hypot(endN.xn - drawStart.xn, endN.yn - drawStart.yn);
     if (dist > 0.02) {
       saveUndo();
-      const w = parseFloat(document.getElementById('stroke-weight').value);
-      const dash = document.getElementById('stroke-dash').value;
+      const w = state.strokeWeight;
+      const dash = state.strokeDash;
       let el;
       if (state.tool === 'arrow')        el = mkArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, drawColor(), w, dash, '');
       else if (state.tool === 'dbarrow') el = mkDArrow(drawStart.xn, drawStart.yn, endN.xn, endN.yn, drawColor(), w, dash, '');
@@ -2807,8 +2788,8 @@ function onDblClick(e) {
   if (state.tool === 'curve' && drawing && curvePoints.length >= 2) {
     saveUndo();
     const el = mkCurve([...curvePoints], drawColor(),
-      parseFloat(document.getElementById('stroke-weight').value),
-      document.getElementById('stroke-dash').value, '');
+      state.strokeWeight,
+      state.strokeDash, '');
     state.elements.push(el); state.selectedId = el.id;
     curvePoints = []; drawing = false;
     renderProps(); redraw(); return;
@@ -2902,8 +2883,8 @@ function drawCurvePreview(mouseN) {
   const pts = allPts.map(p => toCanvas(p.xn, p.yn));
   ctx.save();
   ctx.strokeStyle = drawColor();
-  ctx.lineWidth = parseFloat(document.getElementById('stroke-weight').value);
-  const dash = document.getElementById('stroke-dash').value;
+  ctx.lineWidth = state.strokeWeight;
+  const dash = state.strokeDash;
   if (dash) ctx.setLineDash(dash.split(',').map(Number));
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -3310,7 +3291,10 @@ function nudgeSelected(dx, dy) {
 // diagram; there is deliberately no "add a shape to this diagram" button,
 // because Sam found it confusing next to the templates.
 const SHAPES = {
-  cost: () => { const { MC, AC } = costCurves(0.55, 0.45, 0.6, [COLORS[1], COLORS[0]]); return [MC, AC]; },
+  cost: () => {
+    const { MC, ATC, AVC } = costCurves(0.6, 0.5, 0.42, 0.7, [COLORS[1], COLORS[0], COLORS[2]]);
+    return [MC, ATC, AVC];
+  },
   ppc: () => {
     const ppc = mkCurve([0, 15, 30, 45, 60, 75, 90].map(deg => {
       const r = deg * Math.PI / 180;
