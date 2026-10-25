@@ -752,6 +752,35 @@ test('shift arrow leaves a small gap at each curve, and straightens while still 
   assert(Math.abs(b.y1n - b.y2n) < 1e-3, 'snapped back after redraw');
 });
 
+test('a second shift arrow moves along the curve instead of overlapping the first', async (page) => {
+  await ev(page, `loadTemplate('sd'); const d = state.elements.find(e => e.label === 'D');
+    state.selectedId = d.id; shiftSelected(1); state.selectedId = d.id; shiftSelected(1)`);
+  const ts = await ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => e.p1On.t)`);
+  eq(ts.length, 2, 'arrows');
+  assert(Math.abs(ts[0] - ts[1]) > 0.05, 'arrows at the same spot: ' + ts);
+  const apart = await ev(page, `(() => { const [a, b] = state.elements.filter(e => e.type === 'arrow');
+    return segDist(toCanvas(a.x1n, a.y1n), toCanvas(a.x2n, a.y2n), toCanvas(b.x1n, b.y1n), toCanvas(b.x2n, b.y2n)); })()`);
+  assert(apart > 12, 'arrows still overlap: ' + apart);
+});
+
+test('new axis labels move left (P) or down (Q) clear of existing ones', async (page) => {
+  // Shift S right and D right: the new equilibria have Q labels near each other.
+  await ev(page, `loadTemplate('sd');
+    state.selectedId = state.elements.find(e => e.label === 'D').id; shiftSelected(1);
+    state.selectedId = state.elements.find(e => e.label === 'S').id; shiftSelected(1)`);
+  const clash = await ev(page, `(() => {
+    const dots = state.elements.filter(e => e.type === 'dot'), bad = [];
+    for (const w of ['p', 'q']) for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
+      const a = dotLabelBox(dots[i], w), b = dotLabelBox(dots[j], w);
+      if (a && b && Math.abs(a.x - b.x) < (a.w + b.w) / 2 && Math.abs(a.y - b.y) < (a.h + b.h) / 2) bad.push(a.text + '/' + b.text);
+    }
+    return bad; })()`);
+  eq(clash, [], 'overlapping axis labels');
+  // Moved ones only ever go left or down.
+  const offs = await ev(page, `state.elements.filter(e => e.type === 'dot').map(e => [e.pDx || 0, e.qDy || 0])`);
+  assert(offs.every(([px, qy]) => px <= 0 && qy >= 0), 'moved the wrong way: ' + JSON.stringify(offs));
+});
+
 test('settings list the keyboard and mouse shortcuts', async (page) => {
   await page.click('header button.gear');
   const text = await ev(page, `document.getElementById('shortcuts').textContent`);

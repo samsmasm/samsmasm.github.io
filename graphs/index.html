@@ -3139,6 +3139,8 @@ function onMouseDown(e) {
       el.on = [hitX.a.id, hitX.b.id];
     }
     state.elements.push(el);
+    resolveAttachments();
+    clearAxisLabels(el);
     state.selectedId = el.id;
     renderProps();
     redraw();
@@ -3872,9 +3874,11 @@ function shiftSelected(dir) {
   saveUndo();
   const copy = copyOf(el, SHIFT_BY * dir, 0);
   numberCopy(el, copy);
+  const newDots = [];
   state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
-  // Arrow between the two, away from the middle where equilibria usually are.
-  const t = 0.8;
+  // Arrow between the two, away from the middle where equilibria usually are,
+  // moved up or down the curve if it would overlap an arrow already there.
+  const t = shiftArrowT(el, copy);
   const a = fromCanvas(pointAt(el, t).x, pointAt(el, t).y), b = fromCanvas(pointAt(copy, t).x, pointAt(copy, t).y);
   const arrow = mkArrow(a.xn, a.yn, b.xn, b.yn, '#1a1918', GUIDE.weight, '', '');
   arrow.p1On = { id: el.id, t }; arrow.p2On = { id: copy.id, t };
@@ -3886,9 +3890,50 @@ function shiftSelected(dir) {
     nd.pDx = nd.pDy = nd.qDx = nd.qDy = 0;
     numberCopy(d, nd, 'pLabel'); numberCopy(d, nd, 'qLabel');
     state.elements.push(nd);
+    newDots.push(nd);
   });
   state.selectedId = copy.id;
+  resolveAttachments(); // new points need their real positions first
+  newDots.forEach(clearAxisLabels);
   renderLegendList(); renderProps(); redraw();
+}
+
+// Where along the curve (t) the shift arrow goes: 0.8 unless an arrow is
+// already there, then the nearest free spot above or below it.
+function shiftArrowT(from, to) {
+  const arrows = state.elements.filter(e => e.type === 'arrow' || e.type === 'dbarrow')
+    .map(e => [toCanvas(e.x1n, e.y1n), toCanvas(e.x2n, e.y2n)]);
+  const clear = t => {
+    const a = pointAt(from, t), b = pointAt(to, t);
+    return a && b && arrows.every(([c, d]) => segDist(a, b, c, d) > 12);
+  };
+  for (const dt of [0, -0.08, 0.08, -0.16, 0.16, -0.24, -0.32, -0.4]) {
+    const t = 0.8 + dt;
+    if (t > 0 && t < 1 && clear(t)) return t;
+  }
+  return 0.8;
+}
+function segDist(a, b, c, d) {
+  if (segSegIntersect(a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y)) return 0;
+  return Math.min(distToSegment(a.x, a.y, c.x, c.y, d.x, d.y), distToSegment(b.x, b.y, c.x, c.y, d.x, d.y),
+    distToSegment(c.x, c.y, a.x, a.y, b.x, b.y), distToSegment(d.x, d.y, a.x, a.y, b.x, b.y));
+}
+
+// A new point's axis labels move clear of other points' labels: P labels
+// further left along the y-axis, Q labels further down below the x-axis.
+function clearAxisLabels(dot) {
+  const others = state.elements.filter(e => e.type === 'dot' && e !== dot);
+  const hits = (which, box) => others.some(o => {
+    const ob = dotLabelBox(o, which);
+    return ob && Math.abs(ob.x - box.x) < (ob.w + box.w) / 2 + 3 && Math.abs(ob.y - box.y) < (ob.h + box.h) / 2;
+  });
+  for (const [which, key, step] of [['p', 'pDx', -2], ['q', 'qDy', 2]]) {
+    for (let i = 0; i < 60; i++) {
+      const box = dotLabelBox(dot, which);
+      if (!box || !hits(which, box)) break;
+      dot[key] = (dot[key] || 0) + step;
+    }
+  }
 }
 
 let copiedEl = null, pasteCount = 0;
