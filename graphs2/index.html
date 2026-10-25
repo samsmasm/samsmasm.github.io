@@ -259,6 +259,14 @@
   }
   .tb-toggle:hover { border-color: var(--accent); color: var(--accent); }
   .tb-toggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  /* Colour / B/W switch: the current side is bold, the knob slides to it. */
+  .mode-switch { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 2px 2px; cursor: pointer; font-family: var(--sans); font-size: 11px; color: var(--muted); }
+  .mode-switch .ms-track { position: relative; width: 30px; height: 16px; border-radius: 8px; background: #c0473a; transition: background 0.15s; }
+  .mode-switch.bw .ms-track { background: #1a1918; }
+  .mode-switch .ms-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left 0.15s; }
+  .mode-switch.bw .ms-knob { left: 16px; }
+  .mode-switch:not(.bw) .ms-off, .mode-switch.bw .ms-on { color: var(--text); font-weight: 600; }
+  .mode-switch:focus-visible .ms-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .canvas-wrap {
     flex: 1;
@@ -520,8 +528,11 @@
       <button class="tool-btn" id="tool-region" title="Shortcut: R · hold to switch between click-to-fill and sketch" onclick="setTool('region')">
         <span class="icon">▨</span>Fill region <span class="tool-mode" id="fill-mode-label">click</span>
       </button>
-      <button class="tool-btn" id="tool-equil" title="Shortcut: E" onclick="setTool('equil')" style="grid-column:span 2">
-        <span class="icon">⊕</span>Equilibrium point
+      <button class="tool-btn" id="tool-point" title="Shortcut: P · hold to switch between dot and cross" onclick="setTool('point')">
+        <span class="icon" id="point-mode-icon">●</span>Point <span class="tool-mode" id="point-mode-label">dot</span>
+      </button>
+      <button class="tool-btn" id="tool-equil" title="Shortcut: E" onclick="setTool('equil')">
+        <span class="icon">⊕</span>Equilibrium
       </button>
     </div>
 
@@ -544,7 +555,9 @@
       <input type="text" id="x-label" placeholder="Quantity (units/wk)" style="width:110px" onfocus="onDocTextFocus()" oninput="onDocTextInput()">
       <div class="sep"></div>
       <button class="tb-toggle active" id="snap-btn" onclick="toggleSnap()">Snap: on</button>
-      <button class="tb-toggle active" id="bw-btn" onclick="toggleBW()">B/W</button>
+      <button class="mode-switch bw" id="bw-btn" role="switch" aria-checked="true" aria-label="Black and white" onclick="toggleBW()">
+        <span class="ms-label ms-off">Colour</span><span class="ms-track"><span class="ms-knob"></span></span><span class="ms-label ms-on">B/W</span>
+      </button>
       <div class="sep"></div>
       <button class="tb-toggle" onclick="zoomOut()" title="Zoom out" style="padding:4px 8px;min-width:28px">−</button>
       <span id="zoom-label" style="font-size:11px;font-family:var(--mono);color:var(--muted);min-width:38px;text-align:center;user-select:none">100%</span>
@@ -811,6 +824,7 @@ function init() {
   canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keyup', onKeyUp);
   initFillModeButton();
+  initPointModeButton();
   driveRefreshUI();
   // Canvas text doesn't wait for web fonts: redraw once IBM Plex is ready.
   if (document.fonts && document.fonts.load) {
@@ -1456,8 +1470,8 @@ function toggleSnap() {
 function toggleBW() {
   bwMode = !bwMode;
   const btn = document.getElementById('bw-btn');
-  btn.textContent = bwMode ? 'B/W' : 'Colour';
-  btn.classList.toggle('active', bwMode);
+  btn.classList.toggle('bw', bwMode);
+  btn.setAttribute('aria-checked', String(bwMode));
   renderProps();
   renderLegendList();
   redraw();
@@ -2289,8 +2303,22 @@ function drawDotEl(el) {
   if (showDropQ(el, d)) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke(); }
   ctx.setLineDash([]);
   if (el.showDot !== false) {
-    ctx.fillStyle = bwMode ? '#1a1918' : (el.color && el.color !== GUIDE.color ? el.color : '#1a1918');
-    ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
+    const fill = bwMode ? '#1a1918' : (el.color && el.color !== GUIDE.color ? el.color : '#1a1918');
+    if (el.mark === 'cross') {
+      // A crisp × with a white halo so it reads on top of lines and fills.
+      const r = 5;
+      ctx.lineCap = 'round';
+      for (const [w, s] of [[5, '#fff'], [2.2, fill]]) {
+        ctx.strokeStyle = s; ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(p.x - r, p.y - r); ctx.lineTo(p.x + r, p.y + r);
+        ctx.moveTo(p.x + r, p.y - r); ctx.lineTo(p.x - r, p.y + r);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = fill;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
+    }
   }
   if (d.broken && !exporting) {
     ctx.strokeStyle = 'rgba(200,56,10,0.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
@@ -2397,21 +2425,62 @@ function setFillMode(m) {
   if (state.tool === 'region') { updateHint('region'); redraw(); }
 }
 
-function initFillModeButton() {
-  const btn = document.getElementById('tool-region');
+// Holding a tool button (500 ms) switches that tool's mode.
+function onLongPress(btn, fn) {
   let timer = null;
   const cancel = () => { clearTimeout(timer); timer = null; };
-  btn.addEventListener('pointerdown', () => {
-    timer = setTimeout(() => {
-      timer = null;
-      setFillMode(fillMode === 'click' ? 'sketch' : 'click');
-      setTool('region');
-      showToast(fillMode === 'click' ? 'Fill region: click inside an area to fill it.' : 'Fill region: click the corners, double-click to finish.');
-    }, 500);
-  });
+  btn.addEventListener('pointerdown', () => { timer = setTimeout(() => { timer = null; fn(); }, 500); });
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, cancel));
   btn.addEventListener('contextmenu', e => e.preventDefault()); // a long touch would open it
+}
+
+function initFillModeButton() {
+  onLongPress(document.getElementById('tool-region'), () => {
+    setFillMode(fillMode === 'click' ? 'sketch' : 'click');
+    setTool('region');
+    showToast(fillMode === 'click' ? 'Fill region: click inside an area to fill it.' : 'Fill region: click the corners, double-click to finish.');
+  });
   setFillMode(fillMode);
+}
+
+// ─── POINT TOOL ──────────────────────────────────────────────
+// Places a plain marker (a dot like an equilibrium dot, or a cross), with no
+// dashed lines or labels. Hold the button to switch between dot and cross.
+// Placed on a crossing, it links to it and moves with the curves.
+let pointMode = 'dot';
+try { if (localStorage.getItem('sw2_pointMode') === 'cross') pointMode = 'cross'; } catch (e) {}
+
+function setPointMode(m) {
+  pointMode = m;
+  try { localStorage.setItem('sw2_pointMode', m); } catch (e) {}
+  document.getElementById('point-mode-label').textContent = m;
+  document.getElementById('point-mode-icon').textContent = m === 'cross' ? '×' : '●';
+  if (state.tool === 'point') updateHint('point');
+}
+
+function initPointModeButton() {
+  onLongPress(document.getElementById('tool-point'), () => {
+    setPointMode(pointMode === 'dot' ? 'cross' : 'dot');
+    setTool('point');
+    showToast(pointMode === 'cross' ? 'Point: crosses.' : 'Point: dots.');
+  });
+  setPointMode(pointMode);
+}
+
+function placePoint(cx, cy) {
+  saveUndo();
+  const n = fromCanvas(cx, cy);
+  const el = mkDot(n.xn, n.yn, '#1a1918', '', '');
+  Object.assign(el, { mark: pointMode, showDot: true, dropP: false, dropQ: false });
+  const hitX = nearestCrossing(cx, cy, 10);
+  if (hitX) {
+    const hn = fromCanvas(hitX.x, hitX.y);
+    el.xn = hn.xn; el.yn = hn.yn;
+    el.on = [hitX.a.id, hitX.b.id];
+  }
+  state.elements.push(el);
+  state.selectedId = el.id;
+  renderProps(); redraw();
 }
 
 // Points (normalised) of the area around canvas point (cx, cy), or null.
@@ -2569,9 +2638,10 @@ function updateHint(t) {
     curve: 'Click to add points · double-click to finish curve',
     text: 'Click anywhere on the graph to add a label',
     equil: 'Click where two curves cross: adds dashed lines to both axes, labelled P and Q',
+    point: 'Click to place a ' + pointMode + ' · hold the button for ' + (pointMode === 'dot' ? 'a cross' : 'a dot'),
     region: fillMode === 'click'
-      ? 'Click inside an area to fill it · hold the Fill region button to sketch instead'
-      : 'Click the corners · double-click to finish · hold the Fill region button to click-fill instead',
+      ? 'Click inside an area to fill it · hold the button to sketch'
+      : 'Click corners, double-click to finish · hold the button to click-fill',
   };
   document.getElementById('hint-text').textContent = hints[t] || '';
 }
@@ -2666,6 +2736,8 @@ function onMouseDown(e) {
     redraw();
     // Defer so this mousedown doesn't immediately blur the new input.
     setTimeout(() => showInlineLabelEdit(el, { isNew: true, undoSnap }), 0);
+  } else if (state.tool === 'point') {
+    if (clickCount === 1) placePoint(cx, cy);
   } else if (state.tool === 'region' && fillMode === 'click') {
     if (clickCount === 1) fillAt(cx, cy);
   } else if (state.tool === 'region') {
@@ -2705,7 +2777,7 @@ function onMouseDown(e) {
 
 // P₁/Q₁, P₂/Q₂… (PL/Y on macro axes), numbered by how many points exist.
 function nextEqLabels() {
-  const n = state.elements.filter(e => e.type === 'dot').length + 1;
+  const n = state.elements.filter(e => e.type === 'dot' && !e.mark).length + 1; // plain points don't count
   const sub = String(n).split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
   syncTextInputs();
   const macro = /price level|\bPL\b|inflation/i.test(state.yLabel) || /GDP|output|national income/i.test(state.xLabel);
@@ -3014,7 +3086,7 @@ function onKeyDown(e) {
   const focusedEl = document.activeElement;
   const typing = focusedEl && /^(INPUT|TEXTAREA|SELECT)$/.test(focusedEl.tagName);
   if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    const tool = { v: 'select', l: 'line', a: 'arrow', c: 'curve', t: 'text', r: 'region', e: 'equil' }[e.key.toLowerCase()];
+    const tool = { v: 'select', l: 'line', a: 'arrow', c: 'curve', t: 'text', r: 'region', e: 'equil', p: 'point' }[e.key.toLowerCase()];
     if (tool && !drawing) { setTool(tool); return; }
     const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     if (arrows && state.selectedId) {
@@ -3240,7 +3312,8 @@ function renderProps() {
     if (a && b) html += `<div class="prop-note">Sits where <b>${escapeHtml(a.label || 'a curve')}</b> and <b>${escapeHtml(b.label || 'a curve')}</b> cross${(derived.get(el.id) || {}).broken ? ', but they no longer cross' : ''}. It moves when they do.</div>`;
     html += textPropHTML('Price label (y-axis)', 'pLabel', el.pLabel, 10);
     html += textPropHTML('Quantity label (x-axis)', 'qLabel', el.qLabel, 10);
-    html += checkPropHTML('Show dot', 'showDot', el.showDot !== false);
+    if (el.mark) html += `<div class="prop-row"><label>Shape</label>${selectHTML([['dot', 'Dot'], ['cross', 'Cross']], el.mark, "updateProp('mark',this.value)")}</div>`;
+    else html += checkPropHTML('Show dot', 'showDot', el.showDot !== false);
     html += checkPropHTML('Line to the price axis', 'dropP', el.drops !== false && el.dropP !== false);
     html += checkPropHTML('Line to the quantity axis', 'dropQ', el.drops !== false && el.dropQ !== false);
     html += colorRowHTML(el.color || GUIDE.color, 'color');

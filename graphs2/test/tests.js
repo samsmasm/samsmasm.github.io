@@ -582,6 +582,32 @@ test('holding the Fill region button switches between click and sketch', async (
   eq(await ev(page, `fillMode`), 'sketch', 'a plain click changed the mode');
 });
 
+test('Point tool places a dot or cross; hold to switch; on a crossing it links', async (page) => {
+  await ev(page, `loadTemplate('sd'); setPointMode('dot')`);
+  const click = async (xn, yn) => {
+    const p = await ev(page, `(() => { const c = toCanvas(${xn}, ${yn}), b = canvas.getBoundingClientRect(), s = b.width / W;
+      return { x: b.left + (c.x * viewScale + viewOffsetX) * s, y: b.top + (c.y * viewScale + viewOffsetY) * s }; })()`);
+    await page.mouse.click(p.x, p.y);
+  };
+  await page.keyboard.press('p');
+  eq(await ev(page, `state.tool`), 'point', 'P shortcut');
+  await click(0.2, 0.7);
+  const free = await ev(page, `state.elements[state.elements.length - 1]`);
+  eq([free.type, free.mark, free.showDot, free.dropP, free.dropQ, free.pLabel, !!free.on], ['dot', 'dot', true, false, false, '', false], 'free dot');
+  // Hold to switch to cross.
+  const box = await (await page.$('#tool-point')).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await new Promise(res => setTimeout(res, 700)); await page.mouse.up();
+  eq(await ev(page, `[pointMode, state.tool, document.getElementById('point-mode-label').textContent]`), ['cross', 'point', 'cross'], 'after hold');
+  // On the D x S crossing it links.
+  const x = await ev(page, `(() => { const d = state.elements.find(e => e.type === 'dot' && !e.mark); return [d.xn, d.yn]; })()`);
+  await click(x[0] + 0.01, x[1]);
+  const linked = await ev(page, `state.elements[state.elements.length - 1]`);
+  eq([linked.mark, linked.on && linked.on.length], ['cross', 2], 'linked cross');
+  // Plain points don't change equilibrium numbering.
+  eq(await ev(page, `nextEqLabels()`), ['P₂', 'Q₂'], 'eq numbering');
+});
+
 test('drawn MC passes exactly through the drawn lowest points of AVC and ATC', async (page) => {
   for (const [tpl, names] of [['cost', ['AVC', 'ATC']], ['perfcomp', ['ATC']], ['monopoly', ['ATC']]]) {
     await ev(page, `loadTemplate('${tpl}')`);
