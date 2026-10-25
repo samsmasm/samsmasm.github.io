@@ -1,6 +1,6 @@
 # Feedback inbox (unisam-feedback)
 
-One feedback / fault-report service for any unisam.nz tool. Built 2026-10-25 for ShiftWork v2 (now `graphs/`, app name `graphs`; beta reports say `graphs2`), designed to be reused.
+One feedback / fault-report service for any unisam.nz tool. Built 2026-10-25 for ShiftWork v2 (`graphs/`, app name `graphs`), designed to be reused.
 
 ## Pieces
 

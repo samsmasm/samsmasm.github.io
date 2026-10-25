@@ -11,8 +11,8 @@ Current version: **v2.0** (tag in the `<header>` block, which also links to the 
 
 ## Related folders
 - `../graphsold/`: the frozen v1.9, at unisam.nz/graphsold/ (noindex). Don't develop it.
-- `../graphs2/`: just a redirect to `/graphs/` that keeps the query string and hash, so beta links and old feedback "Open this diagram" links still work.
-- `../feedback/`: the shared feedback inbox; ShiftWork reports arrive with `app: 'graphs'` (beta reports say `graphs2`, and still open via the redirect).
+- `../feedback/`: the shared feedback inbox; ShiftWork reports arrive with `app: 'graphs'`.
+- `graphs2/` (the beta's folder) was deleted after promotion: nobody had visited it.
 
 ## File structure
 ```

@@ -212,4 +212,6 @@ Undo/Redo buttons; sidebar templates S&D, Keynesian AD/AS, AD/LRAS/SRAS; colour 
 
 Sam tried the beta and said go. `graphs/` (v1.9) moved to `graphsold/` (Sam's choice, rather than deleting it), noindex, with a link to the new version. `graphs2/` moved to `graphs/`: tag v2.0, indexable, "Old version" link, feedback `app: 'graphs'`. `graphs2/` is now a redirect to `/graphs/` keeping query and hash. localStorage keys stay `sw2_` so beta users keep their work. 60 tests.
 
+Later the same day Sam had `graphs2/` (the redirect) deleted: nobody had visited it.
+
 **v2 is done.** New work goes straight into `graphs/` (keep running `test/run.sh`).

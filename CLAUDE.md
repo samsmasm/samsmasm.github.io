@@ -25,9 +25,7 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   longcut/                ← Quiet-route A* pathfinder (Leaflet + OSM, single HTML)
   turtle/                 ← Turtle Artist: kids' turtle-graphics tool (single HTML, see CLAUDE.md inside)
   graphs/                 ← ShiftWork v2 economics graph maker (live). Read graphs/CLAUDE.md + PLAN.md first; run graphs/test/run.sh before committing
-  graphsold/              ← ShiftWork v1.9, frozen, noindex (kept for anyone who wants the old version)
-  graphs2/                ← redirect to /graphs/ (old beta URL; keeps query and hash)
-  feedback/               ← Shared feedback inbox: Worker unisam-feedback at /feedback/api/* + key-gated inbox page (see CLAUDE.md inside)
+  graphsold/              ← ShiftWork v1.9, frozen, noindex (kept for anyone who wants the old version)  feedback/               ← Shared feedback inbox: Worker unisam-feedback at /feedback/api/* + key-gated inbox page (see CLAUDE.md inside)
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
   checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore in coldwar-d8109, see SETUP.md inside)
                              NOTE: deliberately does NOT follow AESTHETIC.md. It is styled after ratibro/
