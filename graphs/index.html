@@ -1322,9 +1322,13 @@ function buildTemplate(name) {
 function axisTitle(s) {
   return s.replace(/\s*\(([^)]*)\)/g, (m, inner) => {
     if (!prefs.axisUnits && /\$|unit/.test(inner)) return '';
-    return m.replace(/\$/g, prefs.currency);
+    return m.split('$').join(currencyText(prefs.currency));
   });
 }
+// How a currency is written in axis titles. Dong amounts are large, so they
+// are given in thousands: "Price ('000s of đ/unit)". (₫ from early settings
+// counts as đ.)
+const currencyText = c => (c === 'đ' || c === '₫') ? "'000s of đ" : c;
 
 function loadTemplate(name, opts = {}) {
   const t = buildTemplate(name);
@@ -1572,6 +1576,7 @@ function syncSnapButton() {
 function applyPrefs() {
   GUIDE.dash = prefs.guide === 'dotted' ? '2,3' : '6,4';
   state.strokeWeight = prefs.weight;
+  document.getElementById('y-label').placeholder = axisTitle('Price ($/unit)');
   syncSnapButton();
   syncBWSwitch();
 }
@@ -1589,7 +1594,7 @@ const PREF_FIELDS = [
     ['eqLabels', 'Equilibrium labels', [['num', 'P₁ and Q₁'], ['e', 'Pe and Qe'], ['star', 'P* and Q*']]],
     ['showDot', 'Dot at equilibria', [[false, 'No'], [true, 'Yes']]],
     ['axisUnits', 'Axis titles', [[true, 'With units: Price ($/unit)'], [false, 'Plain: Price']]],
-    ['currency', 'Currency', [['$', '$'], ['€', '€'], ['£', '£'], ['¥', '¥'], ['₹', '₹'], ['₫', '₫']]],
+    ['currency', 'Currency', [['$', '$'], ['€', '€'], ['£', '£'], ['¥', '¥'], ['₹', '₹'], ['đ', "đ ('000s of đ)"]]],
   ]],
   ['Text and pictures', [
     ['textSize', 'Text size', [[0.85, 'Small'], [1, 'Normal'], [1.25, 'Large (for slides)']]],
@@ -1605,7 +1610,7 @@ function openSettings() {
   document.getElementById('settings-form').innerHTML = PREF_FIELDS.map(([group, fields]) =>
     `<h3>${group}</h3>` + fields.map(([key, label, opts]) =>
       `<label class="set-row"><span>${label}</span><select${useDefaults ? ' disabled' : ''} onchange="setPref('${key}', this.selectedIndex)">${
-        opts.map(([v, t]) => `<option${v === prefs[key] ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')
+        opts.map(([v, t]) => `<option${v === prefs[key] ? ' selected' : ''}>${escapeHtml(key === 'axisUnits' ? t.replace('$', currencyText(prefs.currency)) : t)}</option>`).join('')
       }</select></label>`).join('')).join('');
   document.getElementById('prefs-reset').style.display = useDefaults ? 'none' : '';
   document.getElementById('settings-modal').classList.add('open');
@@ -1622,9 +1627,27 @@ function prefsChanged(keys) {
 
 function setPref(key, index) {
   const field = PREF_FIELDS.flatMap(g => g[1]).find(f => f[0] === key);
+  const old = prefs[key];
   myPrefs[key] = prefs[key] = field[2][index][0];
   savePrefs();
+  if (key === 'currency') switchCurrency(old, prefs.currency);
   prefsChanged([key]);
+  if (key === 'currency') openSettings(); // option texts show the currency
+}
+
+// The diagram on screen follows a currency change too: "Price ($/unit)"
+// becomes "Price (€/unit)". Only bracketed units change, as in axisTitle.
+function switchCurrency(from, to) {
+  from = currencyText(from); to = currencyText(to);
+  if (from === to) return;
+  const swap = s => s.replace(/\(([^)]*)\)/g, m => m.split(from).join(to));
+  syncTextInputs();
+  const y = swap(state.yLabel), x = swap(state.xLabel);
+  if (y === state.yLabel && x === state.xLabel) return;
+  saveUndo();
+  state.yLabel = y; state.xLabel = x;
+  document.getElementById('y-label').value = y;
+  document.getElementById('x-label').value = x;
 }
 
 function toggleUseDefaults() {
@@ -4444,7 +4467,7 @@ function applyGraphData(data) {
   state.elements = data.elements || [];
   state.legend = data.legend || { show: false, hidden: [] };
   state.title = data.title || '';
-  state.yLabel = data.yLabel || 'Price ($/unit)';
+  state.yLabel = data.yLabel || axisTitle('Price ($/unit)');
   state.xLabel = data.xLabel || 'Quantity (units/week)';
   state.xLabelDx = data.xLabelDx || 0; state.xLabelDy = data.xLabelDy || 0;
   state.yLabelDx = data.yLabelDx || 0; state.yLabelDy = data.yLabelDy || 0;

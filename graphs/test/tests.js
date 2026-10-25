@@ -634,6 +634,17 @@ test('settings shape templates, new drawings and exports, and are saved', async 
   const set = (key, label) => ev(page, `(() => { const f = PREF_FIELDS.flatMap(g => g[1]).find(f => f[0] === '${key}'); setPref('${key}', f[2].findIndex(o => o[1] === ${JSON.stringify(label)})); })()`);
   await set('weight', 'Thick');
   await set('guide', 'Dotted · · ·');
+  // Changing currency updates the diagram on screen (undoably) and the hints.
+  await ev(page, `loadTemplate('monopoly')`);
+  await set('currency', '€');
+  eq(await ev(page, `[state.yLabel, document.getElementById('y-label').value, document.getElementById('y-label').placeholder]`),
+    ['Price, costs, revenue (€)', 'Price, costs, revenue (€)', 'Price (€/unit)'], 'currency on screen');
+  await set('currency', "đ ('000s of đ)");
+  eq(await ev(page, `state.yLabel`), "Price, costs, revenue ('000s of đ)", 'dong');
+  await ev(page, `loadTemplate('sd')`);
+  eq(await ev(page, `state.yLabel`), "Price ('000s of đ/unit)", 'dong template');
+  await ev(page, `undo(); undo()`);
+  eq(await ev(page, `state.yLabel`), 'Price, costs, revenue (€)', 'currency change not undoable');
   await set('currency', '€');
   await set('eqLabels', 'Pe and Qe');
   await set('showDot', 'Yes');
