@@ -206,6 +206,6 @@ Undo/Redo buttons; sidebar templates S&D, Keynesian AD/AS, AD/LRAS/SRAS; colour 
 ## Future ideas (Sam, 2026-10-25; not now)
 
 - **Custom styles, shareable.** Saved style presets (weights, guide style, fills, colours, label style) that can be shared by link, e.g. a teacher sets the house style for a class. Builds on the settings (gear).
-- **Questions after a while.** Once someone has used the site for a while, ask: teacher / student / other, plus a few questions. Not yet.
+- **Questions after a while.** Once someone has used the site for a while, ask: teacher / student / other, plus a few questions. Shelved (2026-10-25): Sam doubts the answers would be usable for design. Don't build unless he raises it again.
 
 **Next: Phase 7 (promote).** Wait for Sam to try graphs2 first.
