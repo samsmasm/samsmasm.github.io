@@ -825,6 +825,14 @@ test('S shift right then left makes S₃ on top of S₁, with its label clear of
   assert(Math.hypot(a.x - b.x, a.y - b.y) > 12, 'labels on top of each other');
   eq(await ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => [elById(e.p1On.id).label, elById(e.p2On.id).label])`),
     [['S₁', 'S₂'], ['S₂', 'S₃']], 'arrows');
+  // Exactly the same line as S₁ (S₂ was cut at the edge; S₃ must not be shorter).
+  const [s1, s3] = await ev(page, `['S₁', 'S₃'].map(l => { const e = state.elements.find(e => e.label === l); return [e.x1n, e.y1n, e.x2n, e.y2n]; })`);
+  eq(s3, s1, 'S₃ not the same as S₁');
+  // The next shift's label is back in the regular place (same offset as S₁).
+  await ev(page, `shiftSelected(-1)`);
+  const s4 = await ev(page, `(() => { const e = state.elements.find(e => e.label === 'S₄'), s = state.elements.find(e => e.label === 'S₁');
+    return [e.labelDx || 0, e.labelDy || 0, s.labelDx || 0, s.labelDy || 0, 'labelBase' in e]; })()`);
+  eq(s4, [s4[2], s4[3], s4[2], s4[3], false], 'S₄ label not in the regular place');
 });
 
 test('dragging a curve moves it straight sideways or up/down unless plainly diagonal', async (page) => {

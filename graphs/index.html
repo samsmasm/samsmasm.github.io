@@ -3951,10 +3951,21 @@ function shiftSelected(dir) {
     if (!(latest && latest.p1On && latest.p1On.id === el.id && latest.p2On && latest.p2On.id === twin.id)) break;
     el = twin;
   }
-  clipToPlot(copy);
+  // A label moved off an older curve's (below) goes back to normal on the
+  // next shift.
+  if (copy.labelBase) { copy.labelDx = copy.labelBase.dx; copy.labelDy = copy.labelBase.dy; delete copy.labelBase; }
+  if (twin) {
+    // On top of an older curve: take its exact shape (an edge cut would
+    // otherwise make it shorter), and put the label just below that one's.
+    if (copy.type === 'curve') copy.points = twin.points.map(p => ({ ...p }));
+    else Object.assign(copy, { x1n: twin.x1n, y1n: twin.y1n, x2n: twin.x2n, y2n: twin.y2n });
+    if (copy.label) {
+      copy.labelBase = { dx: copy.labelDx, dy: copy.labelDy };
+      copy.labelDx = twin.labelDx;
+      copy.labelDy = (twin.labelDy || 0) + fontPx(16);
+    }
+  } else clipToPlot(copy);
   numberCopy(el, copy);
-  // On top of an older curve: put its label just below that one's.
-  if (twin && copy.label) copy.labelDy = (twin.labelDy || 0) + fontPx(16);
   const newDots = [];
   state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
   addShiftArrow(el, copy, dx);
