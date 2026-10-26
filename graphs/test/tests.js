@@ -906,6 +906,43 @@ test('a level arrow stays level when a curve it is attached to is dragged, until
   assert(levelGap(a) > 20, 'end did not move to an angle: ' + levelGap(a));
 });
 
+test('a curve dragged out of the plot is cut at the edge, and dragged back gets its length back', async (page) => {
+  await ev(page, `loadTemplate('sd'); setTool('select')`);
+  const geo = () => ev(page, `(() => { const e = state.elements.find(e => e.label === 'S'); return [e.x1n, e.y1n, e.x2n, e.y2n].map(v => +v.toFixed(4)); })()`);
+  const start = await geo();
+  const s0 = await ev(page, `state.elements.find(e => e.label === 'S')`);
+  const grab = await ptn(page, s0.x1n + (s0.x2n - s0.x1n) * 0.8, s0.y1n + (s0.y2n - s0.y1n) * 0.8);
+  const k = await ev(page, `stageFit`);
+  // Drag left past the y-axis and let go.
+  await drag(page, grab, { x: grab.x - 150 * k, y: grab.y });
+  const cut = await geo();
+  assert(Math.min(cut[0], cut[2]) >= -1e-6 && Math.abs(Math.min(cut[0], cut[2])) < 1e-6, 'not cut at the y-axis: ' + cut);
+  // Drag it back (grab it where it now is).
+  const s1 = await ev(page, `state.elements.find(e => e.label === 'S')`);
+  const grab2 = await ptn(page, s1.x1n + (s1.x2n - s1.x1n) * 0.8, s1.y1n + (s1.y2n - s1.y1n) * 0.8);
+  await drag(page, grab2, { x: grab2.x + 150 * k, y: grab2.y });
+  const back = await geo();
+  assert(back.every((v, i) => Math.abs(v - start[i]) < 0.01), 'length not back: ' + back + ' vs ' + start);
+  eq(await ev(page, `'full' in state.elements.find(e => e.label === 'S')`), false, 'whole shape still stored when nothing is cut');
+});
+
+test('a curve dragged close on top of another of the same shape snaps on and shares the label', async (page) => {
+  await ev(page, `loadTemplate('sd'); setTool('select'); state.selectedId = state.elements.find(e => e.label === 'S').id; shiftSelected(1);
+    state.selectedId = null; redraw()`);
+  const s2 = await ev(page, `state.elements.find(e => e.label === 'S₂')`);
+  const grab = await ptn(page, s2.x1n + (s2.x2n - s2.x1n) * 0.3, s2.y1n + (s2.y2n - s2.y1n) * 0.3);
+  const k = await ev(page, `stageFit`);
+  // S₂ is 0.15 × 550 = 82.5 px right of S₁: drag it 78 px left (4.5 px short).
+  await drag(page, grab, { x: grab.x - 78 * k, y: grab.y });
+  eq(await ev(page, `sameShape(state.elements.find(e => e.label === 'S₂'), state.elements.find(e => e.label === 'S₁'))`), true, 'did not snap on');
+  eq(await ev(page, `['S₁', 'S₂'].map(l => shownLabel(state.elements.find(e => e.label === l)))`), ['S₁ = S₂', ''], 'shared label');
+  // Dragged well away again: own labels.
+  const s2b = await ev(page, `state.elements.find(e => e.label === 'S₂')`);
+  const g2 = await ptn(page, s2b.x1n + (s2b.x2n - s2b.x1n) * 0.3, s2b.y1n + (s2b.y2n - s2b.y1n) * 0.3);
+  await drag(page, g2, { x: g2.x + 60 * k, y: g2.y });
+  eq(await ev(page, `['S₁', 'S₂'].map(l => shownLabel(state.elements.find(e => e.label === l)))`), ['S₁', 'S₂'], 'labels after pulling apart');
+});
+
 test('settings list the keyboard and mouse shortcuts', async (page) => {
   await page.click('header button.gear');
   const text = await ev(page, `document.getElementById('shortcuts').textContent`);

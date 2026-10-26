@@ -1509,6 +1509,37 @@ function shownLabel(el) {
   return [el, ...same].map(e => e.label).join(' = ');
 }
 
+// Two curves now lying on each other share one label: the newer one points
+// at the oldest curve in that spot.
+function linkSame(a, b) {
+  const root = el => { const r = el.sameAs && elById(el.sameAs); return r && sameShape(el, r) ? r : el; };
+  const ra = root(a), rb = root(b);
+  if (ra === rb) return;
+  const [older, newer] = ra.id < rb.id ? [ra, rb] : [rb, ra];
+  newer.sameAs = older.id;
+  state.elements.forEach(e => { if (e.sameAs === newer.id) e.sameAs = older.id; });
+}
+
+// Dragging a line or curve to within SAME_SNAP px of lying exactly on
+// another of the same shape snaps it on: the offset to use and the curve.
+const SAME_SNAP = 8;
+function snapOntoSame(el, orig, dxn, dyn) {
+  const f = fullOf(orig);
+  const pts = f.points || [{ xn: f.x1n, yn: f.y1n }, { xn: f.x2n, yn: f.y2n }];
+  let best = null;
+  for (const o of state.elements) {
+    if (o === el || o.type !== el.type) continue;
+    const g = fullOf(o), q = g.points || [{ xn: g.x1n, yn: g.y1n }, { xn: g.x2n, yn: g.y2n }];
+    if (q.length !== pts.length) continue;
+    const ox = q[0].xn - pts[0].xn, oy = q[0].yn - pts[0].yn;
+    // The same shape: every point the same offset away.
+    if (!q.every((p, i) => Math.abs(p.xn - pts[i].xn - ox) < 1e-3 && Math.abs(p.yn - pts[i].yn - oy) < 1e-3)) continue;
+    const d = Math.hypot((ox - dxn) * PLOT_W, (oy - dyn) * PLOT_H);
+    if (d < SAME_SNAP && (!best || d < best.d)) best = { d, dxn: ox, dyn: oy, target: o };
+  }
+  return best;
+}
+
 // Where `shownLabel` is drawn: a longer combined label grows away from the
 // curve's end, so it doesn't run back over the line.
 function shownLabelPos(el, text) {
@@ -2265,6 +2296,7 @@ function hitTestNode(cx, cy, el) {
 }
 
 function applyNodeMove(el, node, cx, cy) {
+  delete el.full; // reshaped by hand: what is drawn is now the whole shape
   const snap = getSnapCandidate(cx, cy);
   const n = snap ? fromCanvas(snap.x, snap.y) : fromCanvas(cx, cy);
   if (isLinear(el)) {
@@ -3361,8 +3393,8 @@ function onMouseMove(e) {
     // Lines and curves move straight sideways or straight up/down, as a
     // shift does, unless the drag is plainly diagonal (between ~27° and ~63°).
     if (el.type === 'line' || el.type === 'curve') [dx, dy] = axisLock(dx, dy);
-    const dxn = dx / PLOT_W;
-    const dyn = dy / PLOT_H;
+    let dxn = dx / PLOT_W;
+    let dyn = dy / PLOT_H;
     if (!drawStart.moved) {
       if (Math.hypot(dx, dy) < 2) return;
       if (el.type === 'dot' && el.on) {
@@ -3378,7 +3410,15 @@ function onMouseMove(e) {
         delete el.p1On; delete el.p2On;
       }
     }
-    if (isLinear(el)) {
+    if (isShiftable(el)) {
+      // Snap on top of a curve of the same shape when close, sharing its
+      // label ("S₁ = S₂"); the whole shape moves and is cut at the edges.
+      const snap = snapOntoSame(el, orig, dxn, dyn);
+      if (snap) { dxn = snap.dxn; dyn = snap.dyn; }
+      setFull(el, offsetFull(fullOf(orig), dxn, dyn));
+      if (el.type === 'line') slideEnds(el);
+      if (snap) linkSame(el, snap.target);
+    } else if (isLinear(el)) {
       el.x1n = orig.x1n + dxn;
       el.y1n = orig.y1n + dyn;
       el.x2n = orig.x2n + dxn;
@@ -3926,8 +3966,32 @@ function axisLock(dx, dy) {
   return [dx, dy];
 }
 
+// Lines and curves remember their whole shape (`full`, only stored while it
+// differs from what is drawn) and are drawn cut at the plot edges, so moving
+// one out of the plot and back gives its length back.
+const isShiftable = el => !!el && (el.type === 'line' || el.type === 'curve');
+function fullOf(el) {
+  if (el.full) return JSON.parse(JSON.stringify(el.full));
+  return el.type === 'curve' ? { points: el.points.map(p => ({ xn: p.xn, yn: p.yn })) }
+    : { x1n: el.x1n, y1n: el.y1n, x2n: el.x2n, y2n: el.y2n };
+}
+function offsetFull(f, dxn, dyn) {
+  if (f.points) f.points = f.points.map(p => ({ xn: p.xn + dxn, yn: p.yn + dyn }));
+  else { f.x1n += dxn; f.y1n += dyn; f.x2n += dxn; f.y2n += dyn; }
+  return f;
+}
+function setFull(el, f) {
+  Object.assign(el, JSON.parse(JSON.stringify(f)));
+  delete el.full;
+  clipToPlot(el);
+  if (JSON.stringify(fullOf(el)) !== JSON.stringify(f)) el.full = f;
+}
+
 function moveElement(el, dxn, dyn) {
-  if (isLinear(el)) {
+  if (isShiftable(el)) {
+    setFull(el, offsetFull(fullOf(el), dxn, dyn));
+    if (el.type === 'line') slideEnds(el);
+  } else if (isLinear(el)) {
     el.x1n += dxn; el.y1n += dyn; el.x2n += dxn; el.y2n += dyn;
     slideEnds(el);
   } else if (el.points) {
@@ -3991,9 +4055,9 @@ function shiftSelected(dir) {
     // otherwise make it shorter) and share one label, "S₁ = S₃".
     if (copy.type === 'curve') copy.points = twin.points.map(p => ({ ...p }));
     else Object.assign(copy, { x1n: twin.x1n, y1n: twin.y1n, x2n: twin.x2n, y2n: twin.y2n });
-    const root = elById(twin.sameAs);
-    copy.sameAs = root && sameShape(twin, root) ? root.id : twin.id;
-  } else clipToPlot(copy);
+    if (twin.full) copy.full = JSON.parse(JSON.stringify(twin.full)); else delete copy.full;
+    linkSame(copy, twin);
+  }
   numberCopy(el, copy);
   const newDots = [];
   state.elements.splice(state.elements.indexOf(el) + 1, 0, copy);
@@ -4230,6 +4294,7 @@ function makeLineOrthogonal() {
     if (makeHoriz) el[yk] = fy; else el[xk] = fx;
   }
   if (isArrow(el)) el.level = makeHoriz ? 'h' : 'v';
+  delete el.full;
   redraw();
 }
 
