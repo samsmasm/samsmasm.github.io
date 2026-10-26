@@ -154,6 +154,11 @@ input[type=checkbox],input[type=radio]{width:1.15rem;height:1.15rem;accent-color
 .qm-note{margin:.3em 0 0;font-size:.95rem}
 .qmap figcaption{margin-top:12px;font-weight:700}
 @media (max-width:420px){ .qm{grid-template-columns:minmax(0,1fr) 5.6rem;column-gap:6px} .qm .r{padding-left:20px;font-size:.78rem} .qm-rq{margin:0 10%} }
+.ntform{display:grid;grid-template-columns:1.4fr .7fr 1fr 1fr;gap:0 10px;align-items:end}
+.ntform .field{margin:6px 0}
+.ntrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:8px}
+.ntname{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:1.1rem;font-weight:700;overflow-wrap:anywhere}
+@media (max-width:640px){ .ntform{grid-template-columns:1fr 1fr} }
 .trio{display:grid;gap:10px;margin:12px 0;max-width:72ch}
 .trio .it{background:var(--surface2);border-radius:8px;padding:10px 14px}
 .trio .it p{margin:.25em 0}
@@ -491,8 +496,25 @@ footer{margin-top:28px;color:var(--muted);font-size:.92rem}
           <h2>Where do I find it?</h2>
 
           <h3>1. Set up NoodleTools</h3>
+          <div class="box">
+            <span class="label">Your project title</span>
+            <div class="ntform">
+              <div class="field"><label for="nt-teacher">Teacher</label>
+                <select id="nt-teacher" data-k="ntTeacher">
+                  <option value="sgraham">Mr Graham (sgraham)</option>
+                  <option value="tredfern">Mr Redfern (tredfern)</option>
+                  <option value="dniedringhaus">Mr Niedringhaus (dniedringhaus)</option>
+                </select></div>
+              <div class="field"><label for="nt-block">Block</label>
+                <select id="nt-block" data-k="ntBlock"><option value="">Choose</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>H</option></select></div>
+              <div class="field"><label for="nt-first">First name</label><input type="text" id="nt-first" data-k="ntFirst" autocomplete="given-name"></div>
+              <div class="field"><label for="nt-last">Last name</label><input type="text" id="nt-last" data-k="ntLast" autocomplete="family-name"></div>
+            </div>
+            <div class="ntrow" id="ntHolder"><code class="ntname" id="ntName">sgraham-E-asia-FirstLast</code>
+              <button class="btn small" type="button" id="ntCopy">Copy</button> <span id="ntStatus" role="status"></span></div>
+          </div>
           <ul>
-            <li>Make a NoodleTools project with your <b>first and last name</b> in the title.</li>
+            <li>Make a NoodleTools project with this title.</li>
             <li>Share it to <b>G9 FMW Asia</b>.</li>
             <li>Add every source as you go. It builds your works cited list for you.</li>
             <li>Tag each note card with its voice: <b>Imperial</b>, <b>Local</b>, <b>Outside</b> or <b>Later</b>. Sort by tag to see which voice is missing.</li>
@@ -1167,7 +1189,21 @@ function onField(k){
   if(k === 'country'){ renderCountries(); renderSignals(); }
   if(k === 'rq') renderSignals();
   if(k === 'lens'){ renderLens(); renderRubricChecks(); }
+  if(/^nt/.test(k)) renderNT();
 }
+
+/* ---------- stage 3: NoodleTools project title, same pattern as fmwafrica ---------- */
+function renderNT(){
+  // Ḁ-ỿ keeps Vietnamese letters such as ạ and ố
+  var clean = function(s){ return (s || '').replace(/[^A-Za-zÀ-ɏḀ-ỿ'-]/g, ''); };
+  var first = clean(S.f.ntFirst), last = clean(S.f.ntLast);
+  var sel = $('#nt-teacher'); if(!sel.value) sel.value = 'sgraham';
+  var teacher = S.f.ntTeacher || 'sgraham', block = S.f.ntBlock || 'Block';
+  $('#ntName').textContent = teacher + '-' + block + '-asia-' + (first || 'First') + (last || 'Last');
+}
+$('#ntCopy').addEventListener('click', function(){
+  copyText($('#ntName').textContent, $('#ntStatus'), $('#ntHolder'), 'Copied. Paste it as your project title.');
+});
 
 /* ---------- stage 1 ---------- */
 function renderCountries(){
@@ -1500,7 +1536,7 @@ $('#f-script').addEventListener('input', renderScript);
 
 function renderAll(){
   renderRail(); renderCountries(); renderStems(); renderLens(); renderSignals();
-  renderQuiz(); renderScript(); renderRubricChecks(); renderHandIn();
+  renderQuiz(); renderScript(); renderRubricChecks(); renderHandIn(); renderNT();
 }
 function fromHash(){
   var h = ''; try{ h = (location.hash || '').replace('#',''); }catch(e){}

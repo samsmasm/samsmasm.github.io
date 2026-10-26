@@ -300,7 +300,7 @@ $('#doneBox').addEventListener('change', e => {
 
 // ---------- step 1: NoodleTools ----------
 function renderNT() {
-  const clean = s => (s || '').replace(/[^A-Za-z\u00C0-\u024F'-]/g, '');
+  const clean = s => (s || '').replace(/[^A-Za-z\u00C0-\u024F\u1E00-\u1EFF'-]/g, ''); // \u1E00-\u1EFF keeps Vietnamese letters such as \u1EA1 and \u1ED1
   const first = clean(state.nt.first), last = clean(state.nt.last);
   const teacher = state.nt.teacher || 'sgraham', block = state.nt.block || 'E';
   $('#ntName').textContent = `${teacher}-${block}-africa-${first || 'First'}${last || 'Last'}`;

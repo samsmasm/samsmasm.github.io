@@ -61,7 +61,11 @@ All in `index.html`:
 - Collapsing: only collapse extras (examples, practice, sample questions), never the steps themselves. The four voices quiz is a collapsed optional practice box.
 - No due date yet. `CONFIG.dueText` and `submitText` stay empty until Sam gives them.
 
+## NoodleTools title generator (stage 3)
+Same pattern as fmwafrica: teacher (sgraham, tredfern, dniedringhaus), block A to H, first and last name, giving `<teacher>-<block>-asia-FirstLast`. Fields are `data-k` keys `ntTeacher`, `ntBlock`, `ntFirst`, `ntLast`; `renderNT()` builds the title. Names keep accents, including Vietnamese letters (`Ḁ-ỿ`). Until a block is chosen the title shows "Block", not a real letter, so nobody copies the wrong one.
+
 ## Remind Sam later (at the start of a session on this site)
+- Confirm the teacher list for the title generator (copied from fmwafrica: Graham, Redfern, Niedringhaus) is right for Asia.
 - Confirm the NoodleTools note card box names: Direct quotation, Paraphrase, My ideas (used in stage 4).
 - Check every class link in `LINKS` still works (copied from last year's planner).
 - Due date and submission lines for `CONFIG`.
