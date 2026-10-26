@@ -45,6 +45,7 @@ All in `index.html`:
 - `QUIZ`, `RUBRIC`, `LEVELS`, `ACTIVITIES`, `LINKS`, `LENSES`, `STEMS1`, `STEMS2`.
 - Page text is plain HTML in the `<section id="view-...">` blocks. Paged tabs are built from `h3` headings by `buildPaged()`, so each `h3` becomes a rail item. Anchor ids such as `c-ways` are used by the pointer buttons (`data-goto` and `data-anchor`).
 - localStorage key is `asia-documentary-guide-v2`. Bump it if saved state changes shape.
+- `S.nav` remembers the last tab, Process stage and rail section per tab (saved only after boot). A bare URL with no hash reopens there; a hash in the URL always wins. "Clear what this page remembers" resets it.
 
 ## Open checks (not yet verified)
 - Class links in `LINKS` were copied from last year's planner. Check every one still works.

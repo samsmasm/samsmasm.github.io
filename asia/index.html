@@ -943,7 +943,7 @@ var LINKS = [
 ];
 
 /* ---------- state ---------- */
-function blank(){ return {f:{}, src:[], rub:{}, done:{}, quiz:{}, ck:{}}; }
+function blank(){ return {f:{}, src:[], rub:{}, done:{}, quiz:{}, ck:{}, nav:{v:'', st:1, sec:{}}}; }
 function load(){
   var d = blank();
   try{
@@ -953,6 +953,8 @@ function load(){
   return d;
 }
 var S = load();
+if(!S.nav || typeof S.nav !== 'object') S.nav = blank().nav;
+if(!S.nav.sec || typeof S.nav.sec !== 'object') S.nav.sec = {};
 var saveTimer = null;
 function persist(){
   clearTimeout(saveTimer);
@@ -998,6 +1000,7 @@ function showView(v){
     $('#tab-'+x).setAttribute('aria-selected', x === v ? 'true' : 'false');
   });
   try{ location.hash = (v === 'process') ? 'stage-'+curStage : v; }catch(e){}
+  if(booted){ S.nav.v = v; persist(); }
   renderRail();
   if(v === 'rubric') renderRubricChecks();
 }
@@ -1006,6 +1009,7 @@ function showStage(n){
   $$('.step').forEach(function(s){ s.hidden = (Number(s.dataset.step) !== curStage); });
   if(curView !== 'process') showView('process');
   else { try{ location.hash = 'stage-'+curStage; }catch(e){} }
+  if(booted){ S.nav.st = curStage; persist(); }
   renderRail();
   if(curStage === 5) renderScript();
   if(curStage === 6){ renderRubricChecks(); renderHandIn(); }
@@ -1409,6 +1413,7 @@ function showSec(view, i){
   $$('.frame', P.rail).forEach(function(b, k){
     if(k === P.cur) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current');
   });
+  if(booted){ S.nav.sec[view] = P.cur; persist(); }
   if(booted){ var top = $('.tabs'); if(top && top.scrollIntoView){ try{ top.scrollIntoView({block:'start'}); }catch(e){} } }
 }
 function buildPaged(view, headN, firstTitle){
@@ -1472,13 +1477,20 @@ function fromHash(){
     if(booted && curView === h) return;
     showView(h); return;
   }
-  if(!booted){ showView('overview'); }
+  if(!booted){
+    // No hash (for example a plain unisam.nz/asia): reopen where this browser last was.
+    var last = S.nav.v;
+    if(last === 'process') showStage(Number(S.nav.st) || 1);
+    else if(last && VIEWS.indexOf(last) >= 0) showView(last);
+    else showView('overview');
+  }
 }
 bindFields();
 if(!S.src.length) S.src.push({});
 renderRubricView(); renderLinks(); renderActs(); renderAll();
 buildPaged('overview', 3, 'Overview'); buildPaged('content', 3, 'Overview'); buildPaged('peers', 3, 'Activities');
 buildPaged('example', 4, 'The setting'); buildPaged('rubric', 3, 'In plain words');
+for(var pv in S.nav.sec){ if(PAGED[pv]) showSec(pv, Number(S.nav.sec[pv]) || 0); }
 renderRubricChecks();
 fromHash();
 booted = true;
