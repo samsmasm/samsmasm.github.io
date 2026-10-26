@@ -16,9 +16,10 @@ Students write their own research question and answer it in a 4 to 5 minute reco
 
 ## Structure of the site
 Seven tabs across the top: Overview, Process, Content, Peer sharing and reflection, Exemplar, Rubric, Links. Every tab except Links has a left rail of its sections, one section shown at a time. Hash tokens: `stage-1` to `stage-6`, `overview`, `content`, `peers`, `example`, `rubric`, `links`.
-- **Links**: every link, built from `LINKS`. Groups with an `id` (`l-primary`, `l-pictures`) can be targeted by pointer buttons (`data-goto="links" data-anchor="l-pictures"`). Never write "at the bottom of this page"; point to the Links tab.
+- **Links**: every link, built from `LINKS`. Groups: Your class, Where to look (`l-where`, search words by country plus finding guides), Starter sources for China (`l-starters`), Korea and Vietnam (cards from the Project, 2026-10-27), More primary sources (`l-primary`), Pictures (`l-pictures`). An item is `[title, url, description, voice, question]`: url may be `''` (book only, no link) or a list of `[label, url]` pairs; voice and question are optional. A group may have `note` (intro line) and `kw` (`[country, words]` lines). Groups with an `id` can be targeted by pointer buttons (`data-goto="links" data-anchor="l-pictures"`). Never write "at the bottom of this page"; point to the Links tab.
 - **Overview**: what students are making, how they get there (Big 6, link to the SSIS library Big 6 page), how it is marked, where work lives.
 - **Process**: the six Big 6 stages as the rail (Task definition, Information seeking strategies, Location and access, Use of information, Synthesis, Evaluation). Each stage is short: a brief intro, a few actions, one "Do this" box, and one-line pointers to Content or Peers. Includes a "Copy planning template" button, a question map diagram (stage 1), a collapsed optional voices quiz, a script word counter, and a rubric level-tap self-check. "Clear what this page remembers" is on Overview, under Using this site.
+- **Finding voices** (2026-10-27, from the Project): stage 2 step 3 points to the starter sources; stage 3 has "3. Look for the voices" (search words, "no voice found" is fine) and "4. Read an article without reading all of it" (five steps, sentence frame, collapsed Vietnam worked example from Mimi Do's 2002 thesis). Open question for Sam: stage 2 step 1 ("turn sub-questions into search words") may belong in stage 3.
 - **Content**: teaching ideas (big questions, five ways empire worked with citations from the project books, power/place/people, the three lenses, four voices, change and continuity, own-history note).
 - **Peer sharing and reflection**: reusable in-class activities written to work on any unit. Data is the `ACTIVITIES` array in the script.
 - **Exemplar**: Sarawak under the Brooke family, laid out by the six stages.
@@ -72,6 +73,9 @@ Same pattern as fmwafrica: teacher (sgraham, tredfern, dniedringhaus), block A t
 - Verify the country starters and the Sarawak exemplar against sources (see below).
 - Check publisher and year in the "Five ways" works cited list (Mishra edition least certain).
 - The Siam example in "Five ways" is thin and needs a source.
+- Test every starter source and Where to look link from a school network and a student account. From the server (2026-10-27): Hansard, Eastman Museum and Alpha History gave 403 (likely bot blocking), virtual-saigon.net timed out, the rest loaded. The USC Treaty of Nanjing link was dead (404), so the card uses worldjpn.net instead.
+- Check the Brocheux and Hémery starter cards (Ham Nghi, Phan Chu Trinh letter, 1908 tax protests) against the print book, including section titles.
+- Decide whether stage 2 step 1 (search words) moves to stage 3.
 
 ## Open checks (detail)
 - Country starters and the Sarawak exemplar were written from general knowledge and only partly verified. Sarawak facts checked so far: James Brooke arrived on the schooner Royalist in 1839, became Rajah in 1841, Japanese occupation 1941 to 1945, Vyner ceded Sarawak to Britain in 1946, the 1854 Singapore inquiry dismissed the charges, and Chinese gold miners at Bau rose in 1857.
