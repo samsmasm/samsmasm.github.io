@@ -133,6 +133,13 @@
                         <button onclick="setEpubFormat('markdown')" id="tabEpubMd" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">Markdown</button>
                         <button onclick="setEpubFormat('plain')" id="tabEpubPlain" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">Plain Text</button>
                     </div>
+                    <div id="epubExtRow" class="space-y-2">
+                        <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Save Markdown As</div>
+                        <div class="flex p-1 bg-slate-100 rounded-xl">
+                            <button onclick="setEpubExt('md')" id="tabEpubExtMd" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition">.md</button>
+                            <button onclick="setEpubExt('txt')" id="tabEpubExtTxt" class="flex-1 py-2 text-sm font-medium text-slate-500 transition">.txt</button>
+                        </div>
+                    </div>
 
                     <div class="space-y-3">
                         <div class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Blocks</div>
@@ -143,7 +150,7 @@
                     </div>
 
                     <div id="epubDownloadArea" class="hidden pt-4 border-t space-y-3">
-                        <button onclick="downloadEpubAllAsTxt()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download All as One .txt</button>
+                        <button onclick="downloadEpubAllAsTxt()" class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-semibold text-sm">Download All as One <span class="epub-ext-label">.md</span></button>
                         <button onclick="downloadEpubBlocksAsZip()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">One File Per Block (ZIP)</button>
                         <p class="text-[10px] text-slate-400 leading-relaxed">Uses your selection if any blocks are selected, otherwise all blocks. One-file-per-block is ideal for NotebookLM sources.</p>
                     </div>
@@ -151,7 +158,7 @@
                     <div id="epubPreviewArea" class="hidden pt-4 border-t space-y-3">
                         <p id="epubCharCount" class="text-[10px] text-slate-400 font-semibold"></p>
                         <button onclick="copyEpubPreview()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Copy Preview</button>
-                        <button onclick="downloadEpubPreview()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Download Preview .txt</button>
+                        <button onclick="downloadEpubPreview()" class="w-full py-3 bg-white border text-slate-600 rounded-xl font-semibold hover:bg-slate-50 text-sm">Download Preview <span class="epub-ext-label">.md</span></button>
                     </div>
                 </div>
             </div>
@@ -217,7 +224,8 @@
         let sourceFileHandle = null;
 
         // EPUB state
-        let epubBlocks = [], epubPreviewText = '', epubFormat = 'markdown';
+        let epubBlocks = [], epubPreviewText = '', epubFormat = 'markdown', epubMdExt = 'md';
+        const epubExt = () => epubFormat === 'markdown' ? epubMdExt : 'txt';
         let currentEpubFile = null, epubActiveBox = null, epubLastClickedIdx = null;
 
         // --- File upload ---
@@ -646,7 +654,7 @@
 
             const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
             setStatus('Exporting…', 'blue');
-            await saveText(text, `${baseName}.txt`);
+            await saveText(text, `${baseName}.${epubExt()}`);
             setStatus('Done', 'green');
         }
 
@@ -673,9 +681,9 @@
                     .replace(/\s+/g, ' ')
                     .trim()
                     .substring(0, 60) || `block${idx}`;
-                let fileName = `${String(idx).padStart(3, '0')}_${titleSlug}.txt`;
+                let fileName = `${String(idx).padStart(3, '0')}_${titleSlug}.${epubExt()}`;
                 if (usedNames[fileName]) {
-                    fileName = `${String(idx).padStart(3, '0')}_${titleSlug}_${usedNames[fileName]}.txt`;
+                    fileName = `${String(idx).padStart(3, '0')}_${titleSlug}_${usedNames[fileName]}.${epubExt()}`;
                 }
                 usedNames[fileName] = (usedNames[fileName] || 0) + 1;
 
@@ -720,7 +728,7 @@
         function downloadEpubPreview() {
             if (!epubPreviewText) return;
             const baseName = currentEpubFile?.name.replace(/\.epub$/i, '') || 'epub';
-            saveText(epubPreviewText, baseName + '_preview.txt');
+            saveText(epubPreviewText, `${baseName}_preview.${epubExt()}`);
         }
 
         function htmlToFormattedText(html, fmt) {
@@ -775,6 +783,23 @@
             document.getElementById('tabEpubPlain').className = fmt === 'plain'
                 ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
                 : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+            document.getElementById('epubExtRow').classList.toggle('hidden', fmt !== 'markdown');
+            updateEpubExtLabels();
+        }
+
+        function setEpubExt(ext) {
+            epubMdExt = ext;
+            document.getElementById('tabEpubExtMd').className = ext === 'md'
+                ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
+                : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+            document.getElementById('tabEpubExtTxt').className = ext === 'txt'
+                ? 'flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition'
+                : 'flex-1 py-2 text-sm font-medium text-slate-500 transition';
+            updateEpubExtLabels();
+        }
+
+        function updateEpubExtLabels() {
+            document.querySelectorAll('.epub-ext-label').forEach(el => el.textContent = '.' + epubExt());
         }
 
         function escapeHtml(str) {
@@ -955,7 +980,9 @@
                     const handle = await window.showSaveFilePicker({
                         suggestedName: name,
                         startIn: sourceFileHandle,
-                        types: [{ description: 'Text File', accept: { 'text/plain': ['.txt'] } }]
+                        types: name.endsWith('.md')
+                            ? [{ description: 'Markdown File', accept: { 'text/markdown': ['.md'] } }]
+                            : [{ description: 'Text File', accept: { 'text/plain': ['.txt'] } }]
                     });
                     const writable = await handle.createWritable();
                     await writable.write(text);
@@ -963,7 +990,7 @@
                     return;
                 } catch (e) { if (e.name === 'AbortError') return; }
             }
-            const blob = new Blob([text], { type: 'text/plain' });
+            const blob = new Blob([text], { type: name.endsWith('.md') ? 'text/markdown' : 'text/plain' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = name; a.click();
