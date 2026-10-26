@@ -17,7 +17,7 @@ Students write their own research question and answer it in a 4 to 5 minute reco
 ## Structure of the site
 Six tabs across the top: Overview, Process, Content, Peer sharing and reflection, Exemplar, Rubric. Every tab has a left rail of its sections, one section shown at a time. Hash tokens: `stage-1` to `stage-6`, `overview`, `content`, `peers`, `example`, `rubric`.
 - **Overview**: what students are making, how they get there (Big 6, link to the SSIS library Big 6 page), how it is marked, where work lives.
-- **Process**: the six Big 6 stages as the rail (Task definition, Information seeking strategies, Location and access, Use of information, Synthesis, Evaluation). Each stage is short: a brief intro, a few actions, one "Do this" box, and one-line pointers to Content or Peers. Includes a "Copy planning template" button, a source log, a voices quiz, a script word counter, and a rubric level-tap self-check. All links are at the bottom.
+- **Process**: the six Big 6 stages as the rail (Task definition, Information seeking strategies, Location and access, Use of information, Synthesis, Evaluation). Each stage is short: a brief intro, a few actions, one "Do this" box, and one-line pointers to Content or Peers. Includes a "Copy planning template" button, a question map diagram (stage 1), a collapsed optional voices quiz, a script word counter, and a rubric level-tap self-check. All links are at the bottom.
 - **Content**: teaching ideas (big questions, five ways empire worked with citations from the project books, power/place/people, the three lenses, four voices, change and continuity, own-history note).
 - **Peer sharing and reflection**: reusable in-class activities written to work on any unit. Data is the `ACTIVITIES` array in the script.
 - **Exemplar**: Sarawak under the Brooke family, laid out by the six stages.
@@ -25,7 +25,8 @@ Six tabs across the top: Overview, Process, Content, Peer sharing and reflection
 
 ## Design rules (decided with Sam)
 - Keep cognitive load low. Do not put everything from the class slides on one page. Process stages stay short; teaching content lives on the Content tab.
-- Do not give students boxes to write in unless there is a serious reason to structure the input (the question tester, source log, script counter). Everything else is written in their own Google Doc. Notes are made in NoodleTools, not on this site or in the Doc.
+- Do not give students boxes to write in unless there is a serious reason to structure the input (the question tester, script counter). Everything else is written in their own Google Doc. Notes are made in NoodleTools, not on this site or in the Doc. Sam removed the source log (2026-10-26) because it repeated NoodleTools; students tag note cards by voice there instead. Do not add tools that duplicate NoodleTools.
+- Keep it short. When adding anything, look for what could be removed and ask Sam.
 - The planning template (`buildTemplate()` in the script) must follow the six Big 6 stages and contain no in-class activities.
 - Honest about limits: the site does not save work reliably (localStorage only, wrapped in try/catch). Never imply it does.
 - Worked example comes from outside the students' choice set, so it shows the moves, not content to copy.
