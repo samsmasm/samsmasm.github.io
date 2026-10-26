@@ -1498,6 +1498,33 @@ function getLabelBasePos(el) {
   return { x: 0, y: 0 };
 }
 
+// The label as shown. A curve shifted back on top of an older one (`sameAs`)
+// shares that curve's label, "S₁ = S₃", while they still lie on each other;
+// its own label is hidden. Pulled apart, each shows its own again.
+function shownLabel(el) {
+  if (!el.label) return '';
+  const root = el.sameAs && elById(el.sameAs);
+  if (root && root.label && sameShape(el, root)) return '';
+  const same = state.elements.filter(e => e.sameAs === el.id && e.label && sameShape(e, el)).sort((a, b) => a.id - b.id);
+  return [el, ...same].map(e => e.label).join(' = ');
+}
+
+// Where `shownLabel` is drawn: a longer combined label grows away from the
+// curve's end, so it doesn't run back over the line.
+function shownLabelPos(el, text) {
+  const pos = getFullLabelPos(el);
+  if (text === el.label) return pos;
+  ctx.save();
+  ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
+  const extra = (ctx.measureText(text).width - ctx.measureText(el.label).width) / 2;
+  ctx.restore();
+  const ends = el.type === 'curve' ? [el.points[0], el.points[el.points.length - 1]].map(p => toCanvas(p.xn, p.yn))
+    : [toCanvas(el.x1n, el.y1n), toCanvas(el.x2n, el.y2n)];
+  const end = ends.reduce((a, b) => Math.hypot(b.x - pos.x, b.y - pos.y) < Math.hypot(a.x - pos.x, a.y - pos.y) ? b : a);
+  const side = Math.abs(pos.x - end.x) < 2 ? 0 : Math.sign(pos.x - end.x);
+  return { x: pos.x + side * extra, y: pos.y };
+}
+
 function getFullLabelPos(el) {
   const base = getLabelBasePos(el);
   return { x: base.x + (el.labelDx || 0), y: base.y + (el.labelDy || 0) };
@@ -2134,6 +2161,7 @@ function cloneElements(els) {
     if (e.attach) e.attach.id = re(e.attach.id);
     if (e.p1On) e.p1On.id = re(e.p1On.id);
     if (e.p2On) e.p2On.id = re(e.p2On.id);
+    if (e.sameAs) e.sameAs = re(e.sameAs);
   });
   return copy;
 }
@@ -2554,9 +2582,10 @@ function drawElement(el) {
     if (el.points.length < 2) { ctx.restore(); return; }
     const pts = el.points.map(p => toCanvas(p.xn, p.yn));
     drawSmoothCurve(pts, el.through);
-    if (el.label) {
-      const pos = getFullLabelPos(el);
-      drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
+    const text = shownLabel(el);
+    if (text) {
+      const pos = shownLabelPos(el, text);
+      drawLabelAt(text, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
     }
   } else if (el.type === 'region') {
     ctx.restore();
@@ -2628,13 +2657,15 @@ function drawSmoothCurve(pts, through) {
 }
 
 function drawLineLabel(el) {
-  const pos = getFullLabelPos(el);
-  drawLabelAt(el.label, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
+  const text = shownLabel(el);
+  if (!text) return;
+  const pos = shownLabelPos(el, text);
+  drawLabelAt(text, pos.x, pos.y, bwMode ? '#1a1918' : el.color);
   // Dotted underline when selected to hint it's editable/draggable
   if (el.id === state.selectedId) {
     ctx.save();
     ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
-    const w = ctx.measureText(el.label).width;
+    const w = ctx.measureText(text).width;
     ctx.strokeStyle = el.color || '#1a1918';
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 2]);
@@ -3225,8 +3256,10 @@ function hitTestLabel(cx, cy) {
         continue;
       }
       if (el.type === 'text' || !el.label) continue;
-      const lpos = getFullLabelPos(el);
-      const hw = Math.max(22, ctx.measureText(el.label).width / 2 + 8);
+      const shown = el.type === 'brace' ? el.label : shownLabel(el);
+      if (!shown) continue;
+      const lpos = shown === el.label ? getFullLabelPos(el) : shownLabelPos(el, shown);
+      const hw = Math.max(22, ctx.measureText(shown).width / 2 + 8);
       if (Math.abs(cx - lpos.x) < hw && Math.abs(cy - lpos.y) < 14)
         return { el, keyX: 'labelDx', keyY: 'labelDy', editKey: 'label', pos: lpos };
     }
@@ -3909,7 +3942,7 @@ function moveElement(el, dxn, dyn) {
 function copyOf(el, dxn, dyn) {
   const dup = JSON.parse(JSON.stringify(el));
   dup.id = nextId++;
-  delete dup.on; delete dup.p1On; delete dup.p2On; delete dup.attach;
+  delete dup.on; delete dup.p1On; delete dup.p2On; delete dup.attach; delete dup.sameAs;
   moveElement(dup, dxn, dyn);
   return dup;
 }
@@ -3945,25 +3978,21 @@ function shiftSelected(dir) {
   let copy, twin;
   for (let i = 0; i < 20; i++) {
     copy = copyOf(el, SHIFT_BY * dir, 0);
-    twin = state.elements.find(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
+    const twins = state.elements.filter(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
+    twin = twins[0];
     if (!twin) break;
     const latest = state.elements.filter(e => e.type === 'arrow' && ((e.p1On && e.p1On.id === el.id) || (e.p2On && e.p2On.id === el.id))).pop();
-    if (!(latest && latest.p1On && latest.p1On.id === el.id && latest.p2On && latest.p2On.id === twin.id)) break;
-    el = twin;
+    const next = latest && latest.p1On && latest.p1On.id === el.id && latest.p2On && twins.find(e => e.id === latest.p2On.id);
+    if (!next) break;
+    el = next;
   }
-  // A label moved off an older curve's (below) goes back to normal on the
-  // next shift.
-  if (copy.labelBase) { copy.labelDx = copy.labelBase.dx; copy.labelDy = copy.labelBase.dy; delete copy.labelBase; }
   if (twin) {
     // On top of an older curve: take its exact shape (an edge cut would
-    // otherwise make it shorter), and put the label just below that one's.
+    // otherwise make it shorter) and share one label, "S₁ = S₃".
     if (copy.type === 'curve') copy.points = twin.points.map(p => ({ ...p }));
     else Object.assign(copy, { x1n: twin.x1n, y1n: twin.y1n, x2n: twin.x2n, y2n: twin.y2n });
-    if (copy.label) {
-      copy.labelBase = { dx: copy.labelDx, dy: copy.labelDy };
-      copy.labelDx = twin.labelDx;
-      copy.labelDy = (twin.labelDy || 0) + fontPx(16);
-    }
+    const root = elById(twin.sameAs);
+    copy.sameAs = root && sameShape(twin, root) ? root.id : twin.id;
   } else clipToPlot(copy);
   numberCopy(el, copy);
   const newDots = [];

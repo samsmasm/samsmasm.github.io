@@ -817,22 +817,31 @@ test('shift left, left, right, left always starts from the last curve', async (p
   eq(close, [], 'overlapping arrows');
 });
 
-test('S shift right then left makes S₃ on top of S₁, with its label clear of S₁', async (page) => {
+test('S shift right then left makes S₃ on top of S₁, labelled "S₁ = S₃"', async (page) => {
   await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'S').id; shiftSelected(1); shiftSelected(-1)`);
   eq(await ev(page, `state.elements.filter(e => /^S/.test(e.label || '')).map(e => e.label).sort()`), ['S₁', 'S₂', 'S₃'], 'curves');
   eq(await ev(page, `sameShape(state.elements.find(e => e.label === 'S₃'), state.elements.find(e => e.label === 'S₁'))`), true, 'S₃ not on S₁');
-  const [a, b] = await ev(page, `['S₁', 'S₃'].map(l => getFullLabelPos(state.elements.find(e => e.label === l)))`);
-  assert(Math.hypot(a.x - b.x, a.y - b.y) > 12, 'labels on top of each other');
+  eq(await ev(page, `['S₁', 'S₂', 'S₃'].map(l => shownLabel(state.elements.find(e => e.label === l)))`), ['S₁ = S₃', 'S₂', ''], 'shown labels');
   eq(await ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => [elById(e.p1On.id).label, elById(e.p2On.id).label])`),
     [['S₁', 'S₂'], ['S₂', 'S₃']], 'arrows');
   // Exactly the same line as S₁ (S₂ was cut at the edge; S₃ must not be shorter).
   const [s1, s3] = await ev(page, `['S₁', 'S₃'].map(l => { const e = state.elements.find(e => e.label === l); return [e.x1n, e.y1n, e.x2n, e.y2n]; })`);
   eq(s3, s1, 'S₃ not the same as S₁');
-  // The next shift's label is back in the regular place (same offset as S₁).
+  // The next shift has its own plain label.
   await ev(page, `shiftSelected(-1)`);
-  const s4 = await ev(page, `(() => { const e = state.elements.find(e => e.label === 'S₄'), s = state.elements.find(e => e.label === 'S₁');
-    return [e.labelDx || 0, e.labelDy || 0, s.labelDx || 0, s.labelDy || 0, 'labelBase' in e]; })()`);
-  eq(s4, [s4[2], s4[3], s4[2], s4[3], false], 'S₄ label not in the regular place');
+  eq(await ev(page, `shownLabel(state.elements.find(e => e.label === 'S₄'))`), 'S₄', 'S₄ label');
+  // Pull S₃ away: each curve shows its own label again.
+  await ev(page, `moveElement(state.elements.find(e => e.label === 'S₃'), 0, 0.05); redraw()`);
+  eq(await ev(page, `['S₁', 'S₃'].map(l => shownLabel(state.elements.find(e => e.label === l)))`), ['S₁', 'S₃'], 'labels after pulling apart');
+});
+
+test('right, left, right, left gives "S₁ = S₃ = S₅" and "S₂ = S₄"', async (page) => {
+  await ev(page, `loadTemplate('sd'); state.selectedId = state.elements.find(e => e.label === 'S').id;
+    shiftSelected(1); shiftSelected(-1); shiftSelected(1); shiftSelected(-1); redraw()`);
+  eq(await ev(page, `['S₁', 'S₂', 'S₃', 'S₄', 'S₅'].map(l => shownLabel(state.elements.find(e => e.label === l)))`),
+    ['S₁ = S₃ = S₅', 'S₂ = S₄', '', '', ''], 'shown labels');
+  eq((await ev(page, `state.elements.filter(e => e.type === 'arrow').map(e => [elById(e.p1On.id).label, elById(e.p2On.id).label])`)).pop(),
+    ['S₄', 'S₅'], 'last arrow not from the last curve');
 });
 
 test('dragging a curve moves it straight sideways or up/down unless plainly diagonal', async (page) => {
