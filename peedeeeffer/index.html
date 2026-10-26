@@ -694,11 +694,8 @@
             if (!written) { setStatus('No text in selected blocks', 'amber'); return; }
 
             const blob = await zip.generateAsync({ type: 'blob' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${baseName}_blocks.zip`;
-            a.click();
-            setStatus(`Done — ${written} file${written !== 1 ? 's' : ''}`, 'green');
+            if (await saveZip(blob, `${baseName}_blocks.zip`))
+                setStatus(`Done — ${written} file${written !== 1 ? 's' : ''}`, 'green');
         }
 
         function runEpubPreview() {
@@ -1310,25 +1307,29 @@
                 zip.file(`${baseName}_chunk${i + 1}.pdf`, bytes);
             }
             const blob = await zip.generateAsync({ type: 'blob' });
+            if (await saveZip(blob, `${baseName}_chunks.zip`)) setStatus('Done', 'green');
+        }
+
+        // Returns false if the user cancelled the save dialog
+        async function saveZip(blob, name) {
             if (sourceFileHandle && window.showSaveFilePicker) {
                 try {
                     const handle = await window.showSaveFilePicker({
-                        suggestedName: `${baseName}_chunks.zip`,
+                        suggestedName: name,
                         startIn: sourceFileHandle,
                         types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }]
                     });
                     const writable = await handle.createWritable();
                     await writable.write(blob);
                     await writable.close();
-                    setStatus('Done', 'green');
-                    return;
-                } catch (e) { if (e.name === 'AbortError') { setStatus('Cancelled', 'slate'); return; } }
+                    return true;
+                } catch (e) { if (e.name === 'AbortError') { setStatus('Cancelled', 'slate'); return false; } }
             }
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `${baseName}_chunks.zip`;
+            a.download = name;
             a.click();
-            setStatus('Done', 'green');
+            return true;
         }
     </script>
 </body>
