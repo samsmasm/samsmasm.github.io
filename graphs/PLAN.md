@@ -215,3 +215,12 @@ Sam tried the beta and said go. `graphs/` (v1.9) moved to `graphsold/` (Sam's ch
 Later the same day Sam had `graphs2/` (the redirect) deleted: nobody had visited it.
 
 **v2 is done.** New work goes straight into `graphs/` (keep running `test/run.sh`).
+
+### 2026-10-25/26: polish round (Sam testing live)
+
+- Canvas fills the space between the panels; the export area's dashed outline is drawn on the canvas, so it zooms and pans with the diagram. No zooming out past 100% (re-centred there). "Drag empty space" header hint removed.
+- Settings lists keyboard and mouse shortcuts. Backspace/Delete outside a text box no longer sends the browser back.
+- Shift curve, after several rounds: always a new curve from the selected one; a copy landing on an older curve matches it exactly, label one line below (that once); re-shifting the same curve steps further; copies cut at all plot edges; arrows level with a small gap at each curve, chained D₁ → D₂ → D₃, moved up/down only on a real clash.
+- Arrows stay level/upright when their curves move (`level` flag) until an end is dragged to an angle; Make horizontal / vertical works on attached arrows.
+- New points' axis labels move clear of old ones (P left, Q down). Curve drags are axis-locked unless plainly diagonal.
+- 77 tests.

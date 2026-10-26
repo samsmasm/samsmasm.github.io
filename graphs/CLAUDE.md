@@ -257,4 +257,6 @@ Because every scope used is non-sensitive, an **External** consent screen publis
 
 ## Current status
 
-v2.0 live at unisam.nz/graphs/ since 2026-10-25, with 60 headless-Chrome tests. Known limits: free points (Pp, monopoly Pm/ATC, quota Q₂) and shaded areas don't follow when curves move. Future ideas (shareable custom styles) are at the end of `PLAN.md`.
+v2.0 live at unisam.nz/graphs/ since 2026-10-25, with 77 headless-Chrome tests (after the 2026-10-25/26 polish round: full-space canvas with zooming export outline, 100% zoom floor, shortcuts list, Backspace fix, shift-curve rules, level arrows, axis-locked drags; see the PLAN.md progress log). Known limits: free points (Pp, monopoly Pm/ATC, quota Q₂) and shaded areas don't follow when curves move; shifts are sideways only, by a fixed `SHIFT_BY`. Future ideas are at the end of `PLAN.md`.
+
+**Shift curve rules are Sam's, settled by trial over several rounds; don't "simplify" them without asking:** new curve every time, from the selected curve; step further only when re-shifting a curve whose latest arrow already goes there; copies on an older curve match it exactly with the label one line below (once); arrows level, chained, moved only on a real clash; copies cut at the plot edges.
