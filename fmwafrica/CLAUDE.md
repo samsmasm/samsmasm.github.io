@@ -26,11 +26,12 @@ Single page, hash routes. Views are `<section data-view>` in index.html; most wo
   plain-text search words; SSIS library page, Sources for African Imperialism doc; NoodleTools note categories.
 - `#step-3` Check your sources: Sam's seven questions, Yes/No, for Source 1 (probably Britannica or Gale),
   Source 2 (probably an academic article), Source 3 (optional).
-- `#step-4` Find two images: every archive from slide 66 in Sam's order, SSIS library suggestions first. No
-  per-country "Good for" picks (Sam removed them).
-- `#step-5` Write the thesis: textarea, self-checks, a starting frame, weak/better/strong Congo ladder. The strong
+- `#step-4` Write the thesis: textarea, self-checks, a starting frame, weak/better/strong Congo ladder. The strong
   example has no analysis under it and there is no "include resistance" tip under the ladder (Sam removed both: the
   Congo thesis is about international pressure, not local resistance).
+- `#step-5` Find two images: every archive from slide 66 in Sam's order, SSIS library suggestions first. No
+  per-country "Good for" picks (Sam removed them). Thesis comes first, then images to support it (Sam swapped
+  these on 2026-10-26; `state.swap45` in app.js migrates old "done" ticks once).
 - `#step-6` Analyse your images: OPCVL then Context/Observe/Symbols/Perspective/Link writer for two images, with
   Sam's template prompts, examples behind a click, sentence counter, copy button.
 - `#step-7` Put it in a poster: A3, doesn't need to be beautiful (rubric doesn't reward design), what goes on it
@@ -93,6 +94,4 @@ interception so tests never send real GoatCounter hits. Check 1280 and 390 width
 
 ## Pending
 - Exact submission instructions for the Hand it in page.
-- Sam has not decided whether to swap steps 4 (images) and 5 (thesis); swapping was recommended because step 4
-  says not to finalise images before the thesis.
 - Whether OPCVLs also go on the poster (the exemplar has one) or only get handed in separately.

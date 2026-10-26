@@ -11,8 +11,8 @@ const STEPS = [
   { id: 'step-1', label: 'Set up NoodleTools', desc: 'Name it, share it with your teacher' },
   { id: 'step-2', label: 'Choose and research', desc: 'Pick a country, find two (or three) academic sources' },
   { id: 'step-3', label: 'Check your sources', desc: 'Seven questions for each source' },
-  { id: 'step-4', label: 'Find two images', desc: 'From the time, and saying different things' },
-  { id: 'step-5', label: 'Write the thesis', desc: 'Answer the question, include resistance' },
+  { id: 'step-4', label: 'Write the thesis', desc: 'Answer the question, include resistance' },
+  { id: 'step-5', label: 'Find two images', desc: 'From the time, and saying different things' },
   { id: 'step-6', label: 'Analyse your images', desc: 'OPCVL, then five sentences each' },
   { id: 'step-7', label: 'Put it in a poster', desc: 'A3, Google Docs recommended. Not judged on looks' },
   { id: 'submit', label: 'Hand it in', desc: 'Poster, bibliography, OPCVLs' },
@@ -167,6 +167,12 @@ const KEY = 'fmwafrica';
 let state = {};
 try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { state = {}; }
 state.done = state.done || {};
+// Thesis (now step 4) and images (now step 5) swapped places; carry old ticks across once.
+if (!state.swap45) {
+  [state.done['step-4'], state.done['step-5']] = [state.done['step-5'], state.done['step-4']];
+  if (state.last === 'step-4') state.last = 'step-5'; else if (state.last === 'step-5') state.last = 'step-4';
+  state.swap45 = true;
+}
 state.nt = state.nt || {};
 state.srcs = state.srcs || [{}, {}, {}];
 state.tchecks = state.tchecks || {};
@@ -368,13 +374,13 @@ function srcVerdict(s) {
   return `<b>${flags} thing${flags > 1 ? 's' : ''} to watch.</b> You can still use it: explain ${flags > 1 ? 'them' : 'it'} in your Value and Limitation.`;
 }
 
-// ---------- step 4: images ----------
+// ---------- step 5: images ----------
 function renderArchives() {
   $('#archives').innerHTML = `<li><a href="https://sites.google.com/ssis.edu.vn/library/hs-research-sources/african-imperialism-9fmw?authuser=0" target="_blank" rel="noopener">SSIS library suggestions</a><span>Start here if you haven’t stumbled on images yet.</span></li>`
     + ARCHIVES.map(([n, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(n)}</a><span>${esc(d)}</span></li>`).join('');
 }
 
-// ---------- step 5: thesis ----------
+// ---------- step 4: thesis ----------
 const thesisEl = $('#thesis');
 thesisEl.value = state.thesis || '';
 thesisEl.addEventListener('input', () => { state.thesis = thesisEl.value; save(); });
@@ -390,7 +396,7 @@ renderChecks($('#submitChecks'), SUBMIT_CHECKS, state.schecks, esc);
 let curImg = 0;
 function renderThesisPin() {
   const t = (state.thesis || '').trim();
-  $('#thesisPin').innerHTML = t ? `<b>Your thesis</b>${esc(t)}` : `<b>Your thesis</b><a href="#step-5">Write it in step 5</a> first, so you can link back to it.`;
+  $('#thesisPin').innerHTML = t ? `<b>Your thesis</b>${esc(t)}` : `<b>Your thesis</b><a href="#step-4">Write it in step 4</a> first, so you can link back to it.`;
 }
 function sentences(text) {
   return (text.trim().match(/[^.!?]+[.!?]+(\s|$)/g) || (text.trim() ? [text] : [])).length;
