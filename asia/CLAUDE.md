@@ -49,9 +49,27 @@ All in `index.html`:
 - localStorage key is `asia-documentary-guide-v2`. Bump it if saved state changes shape.
 - `S.nav` remembers the last tab, Process stage and rail section per tab (saved only after boot). A bare URL with no hash reopens there; a hash in the URL always wins. "Clear what this page remembers" resets it.
 
-## Open checks (not yet verified)
-- Class links in `LINKS` were copied from last year's planner. Check every one still works.
-- `CONFIG` due date and submission lines are empty.
+## Next steps (Sam, 2026-10-26)
+1. Rebuild the exemplar with citations from the project books (request is in the vault's `to-projects.md`).
+2. Check the whole site for cognitive overload.
+3. The Evaluation stage (Process, stage 6) needs work.
+
+## Decisions taken (2026-10-26)
+- Keep the "power, place, people" step in stage 1. Its sample questions are collapsed under "A sample question for each".
+- Change and continuity (stage 4) stays and says it is its own rubric strand.
+- The class research question sheets (Block E and G) are removed everywhere, for now. Do not mention a question sheet.
+- Collapsing: only collapse extras (examples, practice, sample questions), never the steps themselves. The four voices quiz is a collapsed optional practice box.
+- No due date yet. `CONFIG.dueText` and `submitText` stay empty until Sam gives them.
+
+## Remind Sam later (at the start of a session on this site)
+- Confirm the NoodleTools note card box names: Direct quotation, Paraphrase, My ideas (used in stage 4).
+- Check every class link in `LINKS` still works (copied from last year's planner).
+- Due date and submission lines for `CONFIG`.
+- Verify the country starters and the Sarawak exemplar against sources (see below).
+- Check publisher and year in the "Five ways" works cited list (Mishra edition least certain).
+- The Siam example in "Five ways" is thin and needs a source.
+
+## Open checks (detail)
 - Country starters and the Sarawak exemplar were written from general knowledge and only partly verified. Sarawak facts checked so far: James Brooke arrived on the schooner Royalist in 1839, became Rajah in 1841, Japanese occupation 1941 to 1945, Vyner ceded Sarawak to Britain in 1946, the 1854 Singapore inquiry dismissed the charges, and Chinese gold miners at Bau rose in 1857.
 - The works cited list under "Five ways empire worked" has publisher and year written from memory. Check against Sam's copies. The Mishra edition is least certain.
 - The Siam example in "Five ways" is thin: the project books say little about Siam.
@@ -75,4 +93,5 @@ Content that needs the books is written by Claude in the Project "Imperialism in
 - `to-projects.md`: Claude Code writes requests here (what content, where it goes, length, which books).
 - `from-projects.md`: the Project writes finished content here with citations and a note on what was verified.
 - `status.md`: what is done, what is open.
+- `site-CLAUDE.md`: a copy of this file, so the Project can read the site's rules and plans. **Every time you edit this CLAUDE.md, copy it over `~/notes/asia/site-CLAUDE.md` and push the vault.** Never edit the copy directly.
 Each side only writes to its own file. Nothing is automatic: Sam tells each side when to look. Pull the vault before reading. Do not put book text in the vault.
