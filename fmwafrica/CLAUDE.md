@@ -18,15 +18,20 @@ Student-facing text says "your teacher", never "Sam" (other classes use it). The
 Single page, hash routes. Views are `<section data-view>` in index.html; most wording lives there.
 - `#home` The task: question, two countdowns, what you hand in, the steps list.
 - `#step-1` Set up NoodleTools: teacher dropdown (sgraham = Mr Graham, tredfern = Mr Redfern, dniedringhaus =
-  Mr Niedringhaus), block A to H, name, gives title `<teacher>-<block>-africa-FirstLast`. Five illustrated steps:
+  Mr Niedringhaus), block A to H, name, gives title `<teacher>-<block>-africa-FirstLast` (name cleaning keeps
+  accented and Vietnamese letters, À-ɏ and Ḁ-ỿ; asia/ uses the same rule). Five illustrated steps:
   sign in at noodletools.com with school Google Account, New Project, paste title and choose MLA + Junior, hover the
   project row under Sharing and click the + (nt3 has a grey + drawn and circled there), type "Africa" to find the
   teacher's inbox, check the block, Done (no inbox: ask your teacher). Link to noodletools.com/help.
 - `#step-2` Choose and research: four country cards (South Africa, Ethiopia, Namibia, Mali) with a starting point and
-  plain-text search words; SSIS library page, Sources for African Imperialism doc; NoodleTools note categories.
+  plain-text search words; NoodleTools note categories. Two research links, framed by Sam: the SSIS library page is
+  "start here" (links to Britannica and Gale, plus librarian-recommended extra sources for each country, "the best
+  ones to use"); the Sources for African Imperialism doc is "if you're feeling ambitious", not written for Grade 9.
+  The #docs page notes for both links say the same.
 - `#step-3` Check your sources: Sam's seven questions, Yes/No, for Source 1 (probably Britannica or Gale),
   Source 2 (probably an academic article), Source 3 (optional).
-- `#step-4` Write the thesis: textarea, self-checks, a starting frame, weak/better/strong Congo ladder. The strong
+- `#step-4` Write the thesis: the question repeated at the top (same `.question` style as home), then "Your thesis
+  is your one (or maybe two) sentence answer to this question"; textarea, self-checks, a starting frame, weak/better/strong Congo ladder. The strong
   example has no analysis under it and there is no "include resistance" tip under the ladder (Sam removed both: the
   Congo thesis is about international pressure, not local resistance).
 - `#step-5` Find two images: every archive from slide 66 in Sam's order, SSIS library suggestions first. No
@@ -94,4 +99,6 @@ interception so tests never send real GoatCounter hits. Check 1280 and 390 width
 
 ## Pending
 - Exact submission instructions for the Hand it in page.
+- The thesis step's desc in STEPS still says "include resistance", though Sam removed the resistance tip from the
+  ladder. Asked on 2026-10-26, no answer yet; leave it until Sam says.
 - Whether OPCVLs also go on the poster (the exemplar has one) or only get handed in separately.
