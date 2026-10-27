@@ -34,7 +34,7 @@ ibbm-src/
     pages/
       index.astro         ← homepage
       unit1/              ← 1-1 through 1-6, plus index
-      unit2/              ← 2-1, 2-2, 2-3, plus index
+      unit2/              ← 2-1, 2-2, 2-3, 2-4, plus index
       unit3/              ← 3-1 through 3-9 (+5-5 break-even), plus index
       unit4/              ← 4-1, 4-2, 4-3, 4-4, 4-5-{product,price,promotion,place,people,processes,physical}, 4-6, plus index
       unit5/              ← 5-1, 5-2, 5-3 (HL), 5-4, 5-6 (HL), 5-8 (HL), plus index (5.5 lives in unit3/)
@@ -87,7 +87,7 @@ Content should match the IB BM syllabus. `finsyl.md` is the Unit 3 checklist. Fo
 ## Nav structure (completed units)
 
 Unit 1: 1.1–1.6 (Business Org)
-Unit 2: 2.1–2.3 (HR, built 2026-10-24)
+Unit 2: 2.1–2.4 (HR, 2.1–2.3 built 2026-10-24, 2.4 2026-10-27)
 Unit 3: 3.1–3.9 + 5.5 (Finance — all built)
 Unit 4: 4.1–4.6 including 4.5 split into 7Ps (all built)
 Unit 5: 5.1, 5.2, 5.3, 5.4, 5.6, 5.8 (5.5 is under Unit 3)
@@ -116,7 +116,7 @@ Case studies are separate pages under `/casestudies/`.
 
 ## Current status
 
-Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.3), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.4–2.7, 5.7, 5.9 (no materials yet).
+Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.4), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.5–2.7, 5.7, 5.9 (no materials yet).
 
 ## Writing style
 
