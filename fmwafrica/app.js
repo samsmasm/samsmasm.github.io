@@ -451,7 +451,9 @@ $('#copyImg').addEventListener('click', () => {
   const lines = [`IMAGE ${curImg + 1}: ${d.title || ''}`, '', 'OPCVL'];
   WRITER_FIELDS.forEach(f => {
     if (f.key === 'ctx') lines.push('', 'ANALYSIS');
-    lines.push(`${f.label}: ${(d[f.key] || '').trim()}`);
+    const text = (d[f.key] || '').trim();
+    if (f.one) { if (text) lines.push(text); }
+    else lines.push(`${f.label}: ${text}`);
   });
   copyText(lines.join('\n'), `Image ${curImg + 1} copied. Paste it into your doc.`);
 });
