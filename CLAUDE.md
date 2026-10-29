@@ -109,6 +109,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `coldwar/`: Cold War classroom role-play game: nations, team goals, individual missions, live scoreboard.
 - `flare/`: Students press a button to signal the teacher (e.g. 'I'm lost'); when enough do, the teacher's screen plays a sound.
 - `flippinghard/`: Live coin-flip betting game: teacher runs flips, students join a session and bet their balance.
+- `grill/`: Grill (graph drill): IB Econ government intervention diagram drills (draw, label, shade, effects, HL calcs), generated markets, progress in localStorage. Has tests; read its CLAUDE.md.
 - `griz/`: **in use.** Jeopardy-style team quiz board from CSV (questions via Sam's custom GPT), point decay, pass/steal mode, times-table boards. Full notes in its CLAUDE.md.
 - `fmwafrica/`: FMW (Grade 9) African Imperialism museum poster companion (Graham, Redfern, Niedringhaus classes): the task in seven steps with small tools (NoodleTools title, source checker, thesis check, OPCVL writer, poster guide), Congo examples, rubric, GoatCounter per view. Own indigo/ochre design, not AESTHETIC.md. Read its CLAUDE.md.
 - `asia/`: FMW (Grade 9) Imperialism in Asia documentary guide: six-stop Overview path, Big 6 stages, content, Sarawak exemplar, rubric, starter sources by country (peer activities tab hidden). Book-based content comes from the Claude Project via the Obsidian vault folder `asia/`. Never commit `asia/sources/`. Read its CLAUDE.md.

@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grill · graph drill</title>
+<meta name="description" content="Drill IB Economics government intervention diagrams: price ceilings, price floors, indirect taxes and subsidies.">
+<link rel="icon" href="/unisamsq.png">
+<style>
+  :root {
+    --ec: #145c34; --ec-bg: #f0faf4; --ec-border: #b6e8cb; --ec-mid: #3d7a56;
+    --muted: #6b7a70; --rule: #f0e8ff; --good: #1f8a4c; --bad: #b3261e;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; color: #1d2a22; font-family: var(--sans); }
+  .mast {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    background:
+      radial-gradient(ellipse at 12% 40%, #d6ffe8 0%, transparent 50%),
+      radial-gradient(ellipse at 35% 85%, #fff3d6 0%, transparent 45%),
+      radial-gradient(ellipse at 60% 20%, #ffd6d6 0%, transparent 42%),
+      radial-gradient(ellipse at 85% 60%, #d6f0ff 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 50%, #e8d6ff 0%, transparent 60%),
+      #f3fff8;
+  }
+  .mast img { width: 56px; height: 56px; border-radius: 14px; background: rgba(255,255,255,.6); display: block; }
+  .brand { flex: 1; min-width: 0; }
+  .brand .title { font-family: Georgia, serif; font-size: 28px; color: var(--ec); line-height: 1; cursor: pointer; }
+  .brand .sub { font-size: 13px; color: var(--ec-mid); margin-top: 4px; }
+  .level { display: flex; gap: 2px; }
+  .level button {
+    font: 500 14px var(--sans); color: #666; background: none; border: none;
+    border-bottom: 3px solid transparent; padding: 6px 10px; cursor: pointer;
+  }
+  .level button.on { color: var(--ec); border-bottom-color: var(--ec); }
+  main { max-width: 760px; margin: 0 auto; padding: 18px 16px 40px; }
+  h2 { font-family: Georgia, serif; font-weight: normal; color: var(--ec); font-size: 22px; margin: 6px 0 4px; }
+  .lede { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .label-caps { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+  table.grid { width: 100%; border-collapse: collapse; margin: 8px 0 18px; }
+  .grid th { font: 500 12px var(--sans); color: var(--muted); text-align: center; padding: 6px 4px; letter-spacing: .04em; }
+  .grid th:first-child { text-align: left; }
+  .grid td { border-top: 1px solid var(--rule); padding: 0; text-align: center; }
+  .grid td.row { text-align: left; font-family: Georgia, serif; color: var(--ec); font-size: 16px; padding: 10px 4px; }
+  .grid button {
+    width: 100%; padding: 12px 2px; background: none; border: none; cursor: pointer;
+    font: 600 15px var(--sans); color: #aab;
+  }
+  .grid button:hover { background: var(--ec-bg); }
+  .s-good { color: var(--good) !important; } .s-mid { color: #b07a00 !important; } .s-bad { color: var(--bad) !important; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    font: 500 15px var(--sans); padding: 10px 16px; border-radius: 6px; cursor: pointer;
+    border: 1.5px solid var(--ec-border); background: var(--ec-bg); color: var(--ec);
+  }
+  .btn:hover { border-color: var(--ec); }
+  .btn.primary { background: var(--ec); border-color: var(--ec); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .reset { background: none; border: none; color: #bbb; font-size: 12px; cursor: pointer; margin-top: 22px; padding: 0; }
+
+  .crumb { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .crumb a { color: var(--ec); font-size: 14px; text-decoration: none; cursor: pointer; }
+  .streak { font-size: 13px; color: var(--muted); }
+  .streak b { color: var(--ec); font-size: 16px; }
+  .context { font-family: Georgia, serif; color: var(--ec); font-size: 15px; margin: 10px 0 2px; }
+  .prompt { font-size: 19px; font-weight: 600; margin: 4px 0 6px; line-height: 1.3; }
+  .eqs { font-family: Georgia, serif; font-size: 15px; color: #333; margin: 2px 0 4px; }
+  .stepcount { font-size: 12px; color: var(--muted); }
+  .chart { width: 100%; max-width: 640px; display: block; margin: 4px auto 0; user-select: none; -webkit-user-select: none; }
+  .chart text { font-family: var(--sans); }
+  .controls { margin: 10px 0; min-height: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: 600 15px var(--sans); padding: 7px 12px; border-radius: 6px; cursor: pointer;
+    border: 1.5px solid var(--ec-border); background: #fff; color: var(--ec);
+  }
+  .chip.sel { background: var(--ec); color: #fff; border-color: var(--ec); }
+  .chip.used { opacity: .3; }
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    text-align: left; font: 500 16px var(--sans); padding: 11px 14px; border-radius: 6px; cursor: pointer;
+    border: 1.5px solid var(--ec-border); background: #fff; color: #1d2a22;
+  }
+  .opt:hover:not(:disabled) { border-color: var(--ec); }
+  .opt.right { border-color: var(--good); background: #e6f6ec; }
+  .opt.wrong { border-color: var(--bad); background: #fdecea; }
+  .num { display: flex; gap: 8px; align-items: center; font-size: 18px; }
+  .num input { font: 500 18px var(--sans); width: 150px; padding: 8px 10px; border: 1.5px solid var(--ec-border); border-radius: 6px; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .feedback { margin: 10px 0; }
+  .verdict { font-size: 20px; font-weight: 600; }
+  .verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+  details { margin-top: 6px; font-size: 15px; color: #333; line-height: 1.5; }
+  summary { cursor: pointer; color: var(--ec); font-size: 14px; }
+  footer { text-align: center; font-size: 11px; color: #bbb; border-top: 1px solid var(--rule); padding: 14px 16px; }
+  footer a { color: #aaa; }
+
+  /* chart pieces */
+  .cand { cursor: pointer; }
+  .cand .vis { stroke: #c8cfca; stroke-width: 3; }
+  .cand:hover .vis { stroke: #8a958e; }
+  .cand.sel .vis { stroke: #111; }
+  .cand.right .vis { stroke: var(--good); }
+  .cand.wrong .vis { stroke: var(--bad); }
+  .cand .hit { stroke: transparent; stroke-width: 22; }
+  .cell { fill: transparent; cursor: pointer; }
+  .cell:hover { fill: rgba(20,92,52,.10); }
+  .cell.sel { fill: rgba(245,170,40,.55); }
+  .cell.right { fill: rgba(31,138,76,.45); }
+  .cell.missed { fill: rgba(31,138,76,.22); stroke: var(--good); stroke-width: 2; stroke-dasharray: 5 3; }
+  .cell.wrong { fill: rgba(179,38,30,.40); }
+  .slot { cursor: pointer; }
+  .slot rect { fill: #fff; stroke: var(--ec-border); stroke-width: 1.5; }
+  .slot:hover rect { stroke: var(--ec); }
+  .slot.right rect { stroke: var(--good); fill: #e6f6ec; }
+  .slot.wrong rect { stroke: var(--bad); fill: #fdecea; }
+  .noclick { pointer-events: none; }
+  @media (max-width: 520px) {
+    .brand .title { font-size: 24px; }
+    .prompt { font-size: 17px; }
+    .grid button { font-size: 13px; }
+    .grid td.row { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<header class="mast">
+  <a href="/"><img src="/unisamsq.png" alt="unisam.nz"></a>
+  <div class="brand">
+    <div class="title" onclick="showHome()">Grill</div>
+    <div class="sub">Graph drill: government intervention</div>
+  </div>
+  <nav class="level" aria-label="Level">
+    <button data-level="SL" onclick="setLevel('SL')">SL</button>
+    <button data-level="HL" onclick="setLevel('HL')">HL</button>
+  </nav>
+</header>
+
+<main id="home">
+  <h2>Pick a drill</h2>
+  <p class="lede">Scores are your last 10 tries. Tap a box to drill it.</p>
+  <table class="grid" id="grid"></table>
+  <div class="actions">
+    <button class="btn primary" onclick="startDrill('weak')">Practise my weakest</button>
+    <button class="btn" onclick="startDrill('mix')">Mix everything</button>
+  </div>
+  <button class="reset" id="reset-btn" onclick="resetProgress()">Reset my progress</button>
+</main>
+
+<main id="drill" hidden>
+  <div class="crumb">
+    <a onclick="showHome()">&larr; All drills</a>
+    <span class="streak" id="streak"></span>
+  </div>
+  <div class="context" id="context"></div>
+  <div class="prompt" id="prompt"></div>
+  <div class="eqs" id="eqs"></div>
+  <div class="stepcount" id="stepcount"></div>
+  <svg class="chart" id="chart" viewBox="0 0 610 452"></svg>
+  <div class="controls" id="controls"></div>
+  <div class="actions"><button class="btn primary" id="check-btn" onclick="check()">Check</button></div>
+  <div class="feedback" id="feedback"></div>
+  <div class="actions"><button class="btn primary" id="next-btn" onclick="nextStep()" hidden>Next</button></div>
+</main>
+
+<footer>Built by Sam G · all vibe coded · progress is saved in this browser only · <a href="/">unisam.nz</a></footer>
+
+<script>
+// ---------- basics ----------
+const GX = 12, GY = 14;                 // grid: x = quantity / 10, y = price in $
+const OX = 72, OY = 398, SX = 36, SY = 25;
+const X = x => OX + x * SX, Y = y => OY - y * SY;
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const isInt = v => Math.abs(v - Math.round(v)) < 1e-9;
+const money = v => '$' + fmt(v);
+const fmt = v => (Math.round(v * 100) / 100).toLocaleString('en-US');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor' };
+const SKILLS = { draw: 'Draw', label: 'Label', shade: 'Shade', effects: 'Effects', calc: 'Calculate' };
+const LS_KEY = 'grill_v1';
+
+let store = loadStore();
+function loadStore() {
+  try { const s = JSON.parse(localStorage.getItem(LS_KEY)); if (s && s.scores) return s; } catch (e) {}
+  return { level: 'SL', scores: {} };
+}
+function saveStore() { try { localStorage.setItem(LS_KEY, JSON.stringify(store)); } catch (e) {} }
+function record(key, ok) {
+  const a = store.scores[key] || [];
+  a.push(ok ? 1 : 0); while (a.length > 10) a.shift();
+  store.scores[key] = a; saveStore();
+}
+function skillList() { return Object.keys(SKILLS).filter(s => s !== 'calc' || store.level === 'HL'); }
+
+// ---------- lines ----------
+const fLine = (k, m) => ({ t: 'f', k, m });   // y = k + m x
+const hLine = y => ({ t: 'h', y });
+const vLine = x => ({ t: 'v', x });
+function seg(L) {
+  if (L.t === 'h') return [[0, L.y], [GX, L.y]];
+  if (L.t === 'v') return [[L.x, 0], [L.x, GY]];
+  let lo = 0, hi = GX;
+  if (L.m !== 0) {
+    const xa = (0 - L.k) / L.m, xb = (GY - L.k) / L.m;
+    lo = Math.max(lo, Math.min(xa, xb)); hi = Math.min(hi, Math.max(xa, xb));
+  } else if (L.k < 0 || L.k > GY) return null;
+  if (hi - lo < 1e-9) return null;
+  return [[lo, L.k + L.m * lo], [hi, L.k + L.m * hi]];
+}
+function abc(L) {
+  if (L.t === 'h') return [0, 1, -L.y];
+  if (L.t === 'v') return [1, 0, -L.x];
+  return [L.m, -1, L.k];
+}
+
+// ---------- markets ----------
+function baseMarket() {
+  for (;;) {
+    const b = pick([0.5, 1, 1, 2]), d = pick([0.5, 1, 1, 2]);
+    const xe = 4 + rnd(4), ye = 4 + rnd(5);
+    const a = ye + b * xe, c = ye - d * xe;
+    if (!isInt(a) || !isInt(c) || a > GY || c < 0) continue;
+    return { a, b, c, d, xe, ye };
+  }
+}
+const Dy = (s, x) => s.a - s.b * x, Sy = (s, x) => s.c + s.d * x;
+const Dx = (s, y) => (s.a - y) / s.b, Sx = (s, y) => (y - s.c) / s.d;
+
+function genTax() {
+  for (;;) {
+    const m = baseMarket(), k = pick([1, 2, 3]);
+    const xt = m.xe - k, Pc = m.ye + m.b * k, Pp = m.ye - m.d * k, t = k * (m.b + m.d);
+    if (xt < 2 || !isInt(Pc) || !isInt(Pp) || !isInt(t) || t > 6) continue;
+    return { ...m, kind: 'tax', xt, Pc, Pp, t };
+  }
+}
+function genSubsidy() {
+  for (;;) {
+    const m = baseMarket(), k = pick([1, 2, 3]);
+    const xs = m.xe + k, Pc = m.ye - m.b * k, Pp = m.ye + m.d * k, s = k * (m.b + m.d);
+    if (xs > 11 || Pc < 1 || Pp > GY - 1 || !isInt(Pc) || !isInt(Pp) || !isInt(s) || s > 6) continue;
+    return { ...m, kind: 'subsidy', xs, Pc, Pp, s };
+  }
+}
+function controlOK(m, P) {
+  const qs = Sx(m, P), qd = Dx(m, P);
+  return isInt(qs) && isInt(qd) && qs >= 1 && qd >= 1 && qs <= GX && qd <= GX && P >= 1 && P <= GY - 1;
+}
+function genControl(kind) {
+  for (;;) {
+    const m = baseMarket(), dir = kind === 'ceiling' ? -1 : 1;
+    const ok = [1, 2, 3, 4, 5].filter(g => controlOK(m, m.ye + dir * g) && Math.abs(Sx(m, m.ye + dir * g) - Dx(m, m.ye + dir * g)) >= 1);
+    if (!ok.length) continue;
+    const g = pick(ok);
+    const sc = { ...m, kind, gap: g };
+    setControl(sc, m.ye + dir * g);
+    const further = ok.filter(h => h > g);
+    sc.next = further.length ? m.ye + dir * pick(further) : null;
+    return sc;
+  }
+}
+function setControl(sc, P) { sc.P = P; sc.qs = Sx(sc, P); sc.qd = Dx(sc, P); }
+function gen(kind) {
+  return kind === 'tax' ? genTax() : kind === 'subsidy' ? genSubsidy() : genControl(kind);
+}
+
+// ---------- the finished diagram ----------
+function diagram(sc) {
+  const D = { line: fLine(sc.a, -sc.b), name: 'D' }, S = { line: fLine(sc.c, sc.d), name: 'S' };
+  const e = { x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' };
+  if (sc.kind === 'tax') return {
+    lines: [D, S, { line: fLine(sc.c + sc.t, sc.d), name: 'S + tax' }],
+    points: [e, { x: sc.xt, y: sc.Pc, pn: 'Pc', qn: 'Qt' }, { x: sc.xt, y: sc.Pp, pn: 'Pp' }], annos: []
+  };
+  if (sc.kind === 'subsidy') return {
+    lines: [D, S, { line: fLine(sc.c - sc.s, sc.d), name: 'S + subsidy' }],
+    points: [e, { x: sc.xs, y: sc.Pp, pn: 'Pp', qn: 'Q1' }, { x: sc.xs, y: sc.Pc, pn: 'Pc' }], annos: []
+  };
+  if (sc.kind === 'ceiling') return {
+    lines: [D, S, { line: hLine(sc.P), name: 'Price ceiling' }],
+    points: [e, { x: sc.qs, y: sc.P, pn: 'Pmax', qn: 'Qs' }, { x: sc.qd, y: sc.P, qn: 'Qd' }],
+    annos: [{ x1: sc.qs, x2: sc.qd, y: sc.P, name: 'Shortage', below: true }]
+  };
+  return {
+    lines: [D, S, { line: hLine(sc.P), name: 'Price floor' }],
+    points: [e, { x: sc.qd, y: sc.P, pn: 'Pmin', qn: 'Qd' }, { x: sc.qs, y: sc.P, qn: 'Qs' }],
+    annos: [{ x1: sc.qd, x2: sc.qs, y: sc.P, name: 'Surplus', below: false }]
+  };
+}
+function baseLines(sc) { return diagram(sc).lines.slice(0, 2); }
+
+// where a line's label goes (svg px)
+function labelSpots(lines) {
+  let topCount = 0;
+  return lines.map(l => {
+    const s = seg(l.line); const [x, y] = s[1];
+    if (l.line.t === 'h') return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start' };
+    if (Math.abs(y - GY) < 1e-6 && x < GX - 1e-6) { const p = { x: X(x), y: Y(GY) - 8 - 15 * topCount, anchor: 'middle' }; topCount++; return p; }
+    if (Math.abs(x - GX) < 1e-6) return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start' };
+    return { x: X(x) + 6, y: Y(y) - 6, anchor: 'start' };
+  });
+}
+
+// ---------- svg drawing ----------
+function svgAxes(ticks) {
+  let s = '';
+  for (let i = 1; i <= GX; i++) s += `<line x1="${X(i)}" y1="${Y(0)}" x2="${X(i)}" y2="${Y(GY)}" stroke="#eef4f0"/>`;
+  for (let j = 1; j <= GY; j++) s += `<line x1="${X(0)}" y1="${Y(j)}" x2="${X(GX)}" y2="${Y(j)}" stroke="#eef4f0"/>`;
+  if (ticks) {
+    for (let i = 0; i <= GX; i++) s += `<text x="${X(i)}" y="${OY + 15}" font-size="11" fill="#9aa59e" text-anchor="middle">${i * 10}</text>`;
+    for (let j = 1; j <= GY; j++) s += `<text x="${OX - 6}" y="${Y(j) + 4}" font-size="11" fill="#9aa59e" text-anchor="end">${j}</text>`;
+  }
+  s += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(GX) + 4}" y2="${Y(0)}" stroke="#222" stroke-width="1.6"/>`;
+  s += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(GY) - 4}" stroke="#222" stroke-width="1.6"/>`;
+  s += `<text x="${X(0) - 4}" y="${Y(GY) - 12}" font-size="12" fill="#555" text-anchor="end">Price ($)</text>`;
+  s += `<text x="${X(GX)}" y="${OY + 48}" font-size="12" fill="#555" text-anchor="end">Quantity (units)</text>`;
+  return s;
+}
+function svgLine(L, attrs) {
+  const s = seg(L); if (!s) return '';
+  return `<line x1="${X(s[0][0])}" y1="${Y(s[0][1])}" x2="${X(s[1][0])}" y2="${Y(s[1][1])}" ${attrs}/>`;
+}
+const LINE_COL = { 'D': '#1a5fb4', 'S': '#c4572a' };
+function lineColour(name) { return LINE_COL[name] || '#111'; }
+
+// Draws the finished diagram. opts: labels (true | 'slots'), ticks, slotState
+function svgDiagram(sc, opts) {
+  const dg = diagram(sc); let s = '';
+  // drop lines
+  for (const p of dg.points) {
+    if (p.pn) s += `<line x1="${X(0)}" y1="${Y(p.y)}" x2="${X(p.x)}" y2="${Y(p.y)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/>`;
+    if (p.qn) s += `<line x1="${X(p.x)}" y1="${Y(p.y)}" x2="${X(p.x)}" y2="${Y(0)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/>`;
+  }
+  dg.lines.forEach(l => s += svgLine(l.line, `stroke="${lineColour(l.name)}" stroke-width="2.6" stroke-linecap="round"`));
+  for (const a of dg.annos) {
+    const yy = Y(a.y) + (a.below ? 14 : -10);
+    s += `<line x1="${X(a.x1)}" y1="${yy}" x2="${X(a.x2)}" y2="${yy}" stroke="#555" stroke-width="1.2"/>`;
+    s += `<line x1="${X(a.x1)}" y1="${yy - 4}" x2="${X(a.x1)}" y2="${yy + 4}" stroke="#555"/><line x1="${X(a.x2)}" y1="${yy - 4}" x2="${X(a.x2)}" y2="${yy + 4}" stroke="#555"/>`;
+  }
+  for (const p of dg.points) s += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="3.2" fill="#222"/>`;
+  if (!opts.labels) return s;
+  const slots = labelSlots(sc);
+  for (const sl of slots) {
+    if (opts.labels === 'slots') {
+      const st = opts.slotState || {}; const val = st.filled ? st.filled[sl.id] : null;
+      const cls = st.marks ? (st.marks[sl.id] ? 'right' : 'wrong') : '';
+      const w = sl.w, rx = sl.anchor === 'start' ? sl.x - 2 : sl.anchor === 'end' ? sl.x - w + 2 : sl.x - w / 2;
+      const shown = st.marks && !st.marks[sl.id] ? sl.answer : val;
+      s += `<g class="slot ${cls}" data-slot="${sl.id}"><rect x="${rx}" y="${sl.y - 14}" width="${w}" height="20" rx="4"/>` +
+           `<text x="${rx + w / 2}" y="${sl.y + 1}" font-size="13" font-weight="600" text-anchor="middle" fill="${shown ? '#145c34' : '#bbb'}">${esc(shown || '?')}</text></g>`;
+    } else {
+      s += `<text x="${sl.x}" y="${sl.y}" font-size="13" font-weight="600" fill="${sl.kind === 'line' ? lineColour(sl.answer) : '#145c34'}" text-anchor="${sl.anchor}">${esc(sl.answer)}</text>`;
+    }
+  }
+  return s;
+}
+function labelSlots(sc) {
+  const dg = diagram(sc), out = [];
+  const spots = labelSpots(dg.lines);
+  dg.lines.forEach((l, i) => out.push({ id: 'l' + i, kind: 'line', answer: l.name, ...spots[i], w: l.name.length > 6 ? 92 : 40 }));
+  dg.points.forEach((p, i) => {
+    if (p.pn) out.push({ id: 'p' + i, kind: 'axis', answer: p.pn, x: OX - 24, y: Y(p.y) + 4, anchor: 'end', w: 42 });
+    if (p.qn) out.push({ id: 'q' + i, kind: 'axis', answer: p.qn, x: X(p.x), y: OY + 32, anchor: 'middle', w: 38 });
+  });
+  dg.annos.forEach((a, i) => out.push({ id: 'a' + i, kind: 'anno', answer: a.name, x: X((a.x1 + a.x2) / 2), y: Y(a.y) + (a.below ? 32 : -18), anchor: 'middle', w: 72 }));
+  return out;
+}
+
+// ---------- shading: cut the chart into cells along every line ----------
+function clipHalf(poly, A, B, C, sg) {
+  const out = [], f = p => sg * (A * p[0] + B * p[1] + C);
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length], fp = f(p), fq = f(q);
+    if (fp >= -1e-9) out.push(p);
+    if ((fp > 1e-9 && fq < -1e-9) || (fp < -1e-9 && fq > 1e-9)) { const t = fp / (fp - fq); out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]); }
+  }
+  return out;
+}
+function polyArea(p) { let s = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; s += p[i][0] * q[1] - q[0] * p[i][1]; } return Math.abs(s) / 2; }
+function inPoly(pt, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function keyValues(sc) {
+  const dg = diagram(sc), xs = new Set(), ys = new Set();
+  dg.points.forEach(p => { xs.add(p.x); ys.add(p.y); });
+  return { xs: [...xs], ys: [...ys] };
+}
+function buildCells(sc) {
+  const dg = diagram(sc), kv = keyValues(sc);
+  const lines = dg.lines.map(l => abc(l.line)).concat(kv.xs.map(x => abc(vLine(x))), kv.ys.map(y => abc(hLine(y))));
+  let cells = [[[0, 0], [GX, 0], [GX, GY], [0, GY]]];
+  for (const [A, B, C] of lines) {
+    const n = [];
+    for (const c of cells) for (const sg of [1, -1]) { const p = clipHalf(c, A, B, C, sg); if (p.length >= 3 && polyArea(p) > 1e-6) n.push(p); }
+    cells = n;
+  }
+  const concepts = conceptsFor(sc), groups = new Map(), maxX = Math.max(...kv.xs);
+  let solo = 0;
+  for (const c of cells) {
+    const cx = c.reduce((s, p) => s + p[0], 0) / c.length, cy = c.reduce((s, p) => s + p[1], 0) / c.length;
+    const sig = Object.keys(concepts).filter(k => inPoly([cx, cy], concepts[k].poly)).join(',');
+    let key;
+    if (sig) key = sig;
+    else if (cy < Dy(sc, cx) && cx < maxX) key = 'none' + (solo++);
+    else continue;
+    if (!groups.has(key)) groups.set(key, { key, sig: sig ? sig.split(',') : [], polys: [] });
+    groups.get(key).polys.push(c);
+  }
+  return [...groups.values()];
+}
+
+// Each concept: name, polygon in grid units, explanation
+function conceptsFor(sc) {
+  const { a, c, xe, ye } = sc, C = {};
+  const csB = [[0, a], [0, ye], [xe, ye]], psB = [[0, c], [0, ye], [xe, ye]];
+  if (sc.kind === 'tax') {
+    const { xt, Pc, Pp } = sc;
+    C.cs_after = { name: 'consumer surplus after the tax', poly: [[0, a], [0, Pc], [xt, Pc]], why: 'Consumer surplus is below demand and above the price consumers pay (Pc), up to the new quantity Qt.' };
+    C.ps_after = { name: 'producer surplus after the tax', poly: [[0, c], [0, Pp], [xt, Pp]], why: 'Producer surplus is above the original supply curve and below the price producers keep (Pp), up to Qt. Use S, not S + tax: S shows producers’ real costs.' };
+    C.gov = { name: 'government tax revenue', poly: [[0, Pp], [xt, Pp], [xt, Pc], [0, Pc]], why: 'Tax revenue = tax per unit (Pc − Pp) × quantity sold (Qt): the rectangle between Pc and Pp.' };
+    C.dwl = { name: 'the deadweight (welfare) loss', poly: [[xt, Pc], [xe, ye], [xt, Pp]], why: 'The units between Qt and Qe are no longer traded. The surplus they made is lost to everyone: the triangle pointing at the old equilibrium.' };
+    C.cs_before = { name: 'consumer surplus before the tax', poly: csB, why: 'Before the tax: below demand, above Pe, up to Qe.' };
+    C.ps_before = { name: 'producer surplus before the tax', poly: psB, why: 'Before the tax: above supply, below Pe, up to Qe.' };
+    C.exp_after = { name: 'consumer expenditure after the tax', poly: [[0, 0], [xt, 0], [xt, Pc], [0, Pc]], why: 'Consumers spend Pc × Qt: the whole rectangle from the origin up to Pc.' };
+    C.rev_after = { name: 'producer revenue after the tax (what producers keep)', poly: [[0, 0], [xt, 0], [xt, Pp], [0, Pp]], why: 'Producers keep Pp × Qt. The part between Pp and Pc goes to the government.' };
+    C.burden_c = { name: 'the part of the tax paid by consumers', poly: [[0, ye], [xt, ye], [xt, Pc], [0, Pc]], why: 'Consumers now pay Pc instead of Pe, so their share is (Pc − Pe) × Qt: the part of the tax box above Pe.' };
+    C.burden_p = { name: 'the part of the tax paid by producers', poly: [[0, Pp], [xt, Pp], [xt, ye], [0, ye]], why: 'Producers now keep Pp instead of Pe, so their share is (Pe − Pp) × Qt: the part of the tax box below Pe.' };
+  } else if (sc.kind === 'subsidy') {
+    const { xs, Pc, Pp } = sc;
+    C.cs_after = { name: 'consumer surplus after the subsidy', poly: [[0, a], [0, Pc], [xs, Pc]], why: 'Below demand, above the lower price consumers pay (Pc), up to Q1.' };
+    C.ps_after = { name: 'producer surplus after the subsidy', poly: [[0, c], [0, Pp], [xs, Pp]], why: 'Above the original supply curve, below the price producers receive (Pp), up to Q1.' };
+    C.gov = { name: 'government spending on the subsidy', poly: [[0, Pc], [xs, Pc], [xs, Pp], [0, Pp]], why: 'Subsidy cost = subsidy per unit (Pp − Pc) × Q1: the rectangle between Pp and Pc.' };
+    C.dwl = { name: 'the deadweight (welfare) loss', poly: [[xe, ye], [xs, Pp], [xs, Pc]], why: 'Units between Qe and Q1 cost more to make (supply) than consumers value them (demand). The triangle points back at the old equilibrium.' };
+    C.cs_before = { name: 'consumer surplus before the subsidy', poly: csB, why: 'Before the subsidy: below demand, above Pe, up to Qe.' };
+    C.ps_before = { name: 'producer surplus before the subsidy', poly: psB, why: 'Before the subsidy: above supply, below Pe, up to Qe.' };
+    C.exp_after = { name: 'consumer expenditure after the subsidy', poly: [[0, 0], [xs, 0], [xs, Pc], [0, Pc]], why: 'Consumers spend Pc × Q1.' };
+    C.rev_after = { name: 'producer revenue after the subsidy (including the subsidy)', poly: [[0, 0], [xs, 0], [xs, Pp], [0, Pp]], why: 'Producers receive Pp per unit (Pc from consumers plus the subsidy): Pp × Q1.' };
+  } else if (sc.kind === 'ceiling') {
+    const { P, qs } = sc, Dq = Dy(sc, qs);
+    C.cs_after = { name: 'consumer surplus after the ceiling', poly: [[0, a], [qs, Dq], [qs, P], [0, P]], why: 'Only Qs units are sold now. Consumer surplus is below demand and above Pmax, up to Qs.' };
+    C.ps_after = { name: 'producer surplus after the ceiling', poly: [[0, c], [0, P], [qs, P]], why: 'Above supply, below Pmax, up to Qs.' };
+    C.dwl = { name: 'the deadweight (welfare) loss', poly: [[qs, Dq], [xe, ye], [qs, P]], why: 'Units between Qs and Qe are no longer sold. The triangle between demand and supply from Qs to Qe is lost.' };
+    C.cs_before = { name: 'consumer surplus before the ceiling', poly: csB, why: 'Before the ceiling: below demand, above Pe, up to Qe.' };
+    C.ps_before = { name: 'producer surplus before the ceiling', poly: psB, why: 'Before the ceiling: above supply, below Pe, up to Qe.' };
+    C.exp_after = { name: 'consumer expenditure after the ceiling (= producer revenue)', poly: [[0, 0], [qs, 0], [qs, P], [0, P]], why: 'Only Qs is sold, at Pmax: Pmax × Qs. Quantity demanded is higher, but you can’t buy what isn’t supplied.' };
+    C.transfer = { name: 'the surplus transferred from producers to consumers', poly: [[0, P], [qs, P], [qs, ye], [0, ye]], why: 'On the Qs units still sold, consumers pay Pmax instead of Pe. That rectangle moves from producers to consumers.' };
+  } else {
+    const { P, qd, qs } = sc, Sq = Sy(sc, qd);
+    C.cs_after = { name: 'consumer surplus after the floor', poly: [[0, a], [0, P], [qd, P]], why: 'Consumers buy only Qd at Pmin. Below demand, above Pmin, up to Qd.' };
+    C.ps_after = { name: 'producer surplus after the floor (government does not buy the surplus)', poly: [[0, c], [0, P], [qd, P], [qd, Sq]], why: 'If only Qd is sold, producers get Pmin on Qd units: above supply, below Pmin, up to Qd.' };
+    C.dwl = { name: 'the deadweight (welfare) loss (government does not buy the surplus)', poly: [[qd, P], [xe, ye], [qd, Sq]], why: 'Units between Qd and Qe are no longer sold: the triangle between demand and supply from Qd to Qe.' };
+    C.cs_before = { name: 'consumer surplus before the floor', poly: csB, why: 'Before the floor: below demand, above Pe, up to Qe.' };
+    C.ps_before = { name: 'producer surplus before the floor', poly: psB, why: 'Before the floor: above supply, below Pe, up to Qe.' };
+    C.exp_after = { name: 'consumer expenditure after the floor', poly: [[0, 0], [qd, 0], [qd, P], [0, P]], why: 'Consumers buy Qd at Pmin: Pmin × Qd.' };
+    C.gov_buy = { name: 'government spending if it buys the surplus', poly: [[qd, 0], [qs, 0], [qs, P], [qd, P]], why: 'The surplus is Qs − Qd. Buying it at Pmin costs Pmin × (Qs − Qd): the rectangle under Pmin between Qd and Qs.' };
+    C.transfer = { name: 'the surplus transferred from consumers to producers', poly: [[0, ye], [qd, ye], [qd, P], [0, P]], why: 'On the Qd units still sold, consumers pay Pmin instead of Pe. That rectangle moves from consumers to producers.' };
+  }
+  return C;
+}
+
+// ---------- effects (multiple choice) ----------
+const UDN = ['Rises', 'Falls', 'No change'];
+function effectsFor(sc) {
+  const L = [];
+  if (sc.kind === 'tax') {
+    const cs = sc.Pc - sc.ye, ps = sc.ye - sc.Pp;
+    L.push(['What happens to the price consumers pay?', UDN, 'Rises', 'Supply shifts up, so the market price rises from Pe to Pc.']);
+    L.push(['What happens to the price producers keep?', UDN, 'Falls', 'Producers receive Pc but pass the tax to the government, keeping Pp, which is below Pe.']);
+    L.push(['What happens to the quantity traded?', UDN, 'Falls', 'Higher price for consumers, lower price for producers: quantity falls from Qe to Qt.']);
+    L.push(['What happens to consumer surplus?', UDN, 'Falls', 'Consumers pay more and buy less.']);
+    L.push(['What happens to producer surplus?', UDN, 'Falls', 'Producers keep less per unit and sell less.']);
+    L.push(['Who pays more of the tax in this market?', ['Consumers', 'Producers', 'Shared equally'], cs > ps ? 'Consumers' : cs < ps ? 'Producers' : 'Shared equally',
+      `Consumers pay ${money(cs)} more per unit (Pc − Pe); producers keep ${money(ps)} less (Pe − Pp). The steeper (more inelastic) side pays more.`]);
+    L.push(['Demand is much more price inelastic than supply. Who pays most of a tax?', ['Consumers', 'Producers', 'Shared equally'], 'Consumers', 'Inelastic demand means consumers keep buying, so producers can pass most of the tax on in a higher price.']);
+  } else if (sc.kind === 'subsidy') {
+    const cs = sc.ye - sc.Pc, ps = sc.Pp - sc.ye;
+    L.push(['What happens to the price consumers pay?', UDN, 'Falls', 'Supply shifts down, so the market price falls from Pe to Pc.']);
+    L.push(['What happens to the price producers receive?', UDN, 'Rises', 'Producers get Pc from consumers plus the subsidy: Pp, above Pe.']);
+    L.push(['What happens to the quantity traded?', UDN, 'Rises', 'Lower costs: supply shifts right, quantity rises from Qe to Q1.']);
+    L.push(['What happens to consumer surplus?', UDN, 'Rises', 'Consumers pay less and buy more.']);
+    L.push(['What happens to producer surplus?', UDN, 'Rises', 'Producers receive more per unit and sell more.']);
+    L.push(['Who gains more per unit from this subsidy?', ['Consumers', 'Producers', 'Shared equally'], cs > ps ? 'Consumers' : cs < ps ? 'Producers' : 'Shared equally',
+      `Consumers pay ${money(cs)} less per unit (Pe − Pc); producers receive ${money(ps)} more (Pp − Pe).`]);
+    L.push(['Which is an opportunity cost of a subsidy?', ['The government can’t spend that money elsewhere', 'Consumers pay a higher price', 'Producers sell less'], 'The government can’t spend that money elsewhere', 'Subsidy spending, (Pp − Pc) × Q1, could have gone on schools, health or lower taxes.']);
+  } else if (sc.kind === 'ceiling') {
+    L.push(['What happens to quantity supplied?', UDN, 'Falls', 'At the lower price Pmax, firms supply less: Qs.']);
+    L.push(['What happens to quantity demanded?', UDN, 'Rises', 'At the lower price Pmax, consumers want more: Qd.']);
+    L.push(['What does the ceiling create?', ['A shortage', 'A surplus', 'Neither'], 'A shortage', 'Qd > Qs at Pmax: excess demand.']);
+    L.push(['What happens to producer surplus?', UDN, 'Falls', 'Lower price and fewer units sold.']);
+    L.push(['What happens to consumer expenditure?', UDN, 'Falls', 'Both price (Pmax) and quantity sold (Qs) fall, so Pmax × Qs is smaller than Pe × Qe.']);
+    L.push(['The ceiling is set above Pe. What happens?', ['Nothing: it doesn’t bind', 'A shortage', 'A surplus'], 'Nothing: it doesn’t bind', 'A maximum price above equilibrium is never reached, so the market stays at Pe and Qe.']);
+    L.push(['Which is a likely consequence of a long-lasting shortage?', ['Black markets and queues', 'Stockpiles of unsold goods', 'Lower demand'], 'Black markets and queues', 'People who can’t buy at Pmax may pay more illegally, or wait.']);
+  } else {
+    L.push(['What happens to quantity supplied?', UDN, 'Rises', 'At the higher price Pmin, firms supply more: Qs.']);
+    L.push(['What happens to quantity demanded?', UDN, 'Falls', 'At the higher price Pmin, consumers want less: Qd.']);
+    L.push(['What does the floor create?', ['A surplus', 'A shortage', 'Neither'], 'A surplus', 'Qs > Qd at Pmin: excess supply.']);
+    L.push(['What happens to consumer surplus?', UDN, 'Falls', 'Consumers pay more and buy less.']);
+    L.push(['The government buys the surplus. What does it cost?', ['Pmin × (Qs − Qd)', 'Pe × (Qs − Qd)', 'Pmin × Qd'], 'Pmin × (Qs − Qd)', 'It buys every unsold unit (Qs − Qd) at the floor price.']);
+    L.push(['The floor is set below Pe. What happens?', ['Nothing: it doesn’t bind', 'A surplus', 'A shortage'], 'Nothing: it doesn’t bind', 'A minimum price below equilibrium is never reached, so the market stays at Pe and Qe.']);
+    L.push(['If the government buys the surplus, what happens to producer revenue?', UDN, 'Rises', 'Producers now sell all of Qs at Pmin, so revenue Pmin × Qs is above Pe × Qe.']);
+  }
+  return L.map(([q, opts, ans, why]) => ({ q, opts, ans, why }));
+}
+
+// ---------- calculations (HL) ----------
+function eqText(sc) {
+  const fmtEq = (lhs, k, m) => {
+    const parts = []; if (k) parts.push(fmt(k));
+    if (m > 0) parts.push((parts.length ? '+ ' : '') + fmt(m) + 'P'); else parts.push((parts.length ? '− ' : '−') + fmt(-m) + 'P');
+    return `${lhs} = ${parts.join(' ')}`;
+  };
+  const qd = fmtEq('Qd', 10 * sc.a / sc.b, -10 / sc.b);
+  const kS = -10 * sc.c / sc.d, mS = 10 / sc.d;
+  let qs = `Qs = ${kS ? '−' + fmt(-kS) + ' + ' : ''}${fmt(mS)}P`;
+  return `${qd}  ·  ${qs}`;
+}
+function calcsFor(sc) {
+  const Qe = sc.xe * 10, L = [];
+  if (sc.kind === 'tax') {
+    const Qt = sc.xt * 10, t = sc.t;
+    L.push(['Calculate the price consumers pay after the tax (Pc).', sc.Pc, '$', `With the tax, Qs = ${fmt(10 / sc.d)}(P − ${t})${sc.c ? ' − ' + fmt(10 * sc.c / sc.d) : ''}. Set it equal to Qd: P = ${money(sc.Pc)}.`]);
+    L.push(['Calculate the quantity traded after the tax.', Qt, 'units', `Put Pc = ${money(sc.Pc)} into Qd: ${Qt} units.`]);
+    L.push(['Calculate government tax revenue.', t * Qt, '$', `Tax per unit × quantity = ${money(t)} × ${Qt} = ${money(t * Qt)}.`]);
+    L.push(['Calculate consumer expenditure after the tax.', sc.Pc * Qt, '$', `Pc × Qt = ${money(sc.Pc)} × ${Qt} = ${money(sc.Pc * Qt)}.`]);
+    L.push(['Calculate producer revenue after the tax (what producers keep).', sc.Pp * Qt, '$', `Pp × Qt = ${money(sc.Pp)} × ${Qt} = ${money(sc.Pp * Qt)}.`]);
+    L.push(['How much of the tax revenue is paid by consumers?', (sc.Pc - sc.ye) * Qt, '$', `(Pc − Pe) × Qt = ${money(sc.Pc - sc.ye)} × ${Qt} = ${money((sc.Pc - sc.ye) * Qt)}.`]);
+    L.push(['Calculate the deadweight (welfare) loss.', 0.5 * t * (Qe - Qt), '$', `½ × tax × (Qe − Qt) = ½ × ${money(t)} × ${Qe - Qt} = ${money(0.5 * t * (Qe - Qt))}.`]);
+    L.push(['Calculate consumer surplus after the tax.', 0.5 * (sc.a - sc.Pc) * Qt, '$', `½ × (${money(sc.a)} − Pc) × Qt = ½ × ${money(sc.a - sc.Pc)} × ${Qt} = ${money(0.5 * (sc.a - sc.Pc) * Qt)}. (${money(sc.a)} is where demand meets the price axis.)`]);
+  } else if (sc.kind === 'subsidy') {
+    const Q1 = sc.xs * 10, s = sc.s;
+    L.push(['Calculate the price consumers pay after the subsidy (Pc).', sc.Pc, '$', `With the subsidy, supply shifts down by ${money(s)}. Set new Qs equal to Qd: P = ${money(sc.Pc)}.`]);
+    L.push(['Calculate the quantity traded after the subsidy.', Q1, 'units', `Put Pc = ${money(sc.Pc)} into Qd: ${Q1} units.`]);
+    L.push(['Calculate government spending on the subsidy.', s * Q1, '$', `Subsidy per unit × quantity = ${money(s)} × ${Q1} = ${money(s * Q1)}.`]);
+    L.push(['Calculate consumer expenditure after the subsidy.', sc.Pc * Q1, '$', `Pc × Q1 = ${money(sc.Pc)} × ${Q1} = ${money(sc.Pc * Q1)}.`]);
+    L.push(['Calculate producer revenue after the subsidy (including the subsidy).', sc.Pp * Q1, '$', `Pp × Q1 = ${money(sc.Pp)} × ${Q1} = ${money(sc.Pp * Q1)}.`]);
+    L.push(['Calculate the deadweight (welfare) loss.', 0.5 * s * (Q1 - Qe), '$', `½ × subsidy × (Q1 − Qe) = ½ × ${money(s)} × ${Q1 - Qe} = ${money(0.5 * s * (Q1 - Qe))}.`]);
+  } else if (sc.kind === 'ceiling') {
+    const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = Dy(sc, sc.qs) - P;
+    L.push([`The ceiling is ${money(P)}. Calculate the size of the shortage.`, Qd - Qs, 'units', `Qd − Qs = ${Qd} − ${Qs} = ${Qd - Qs} units.`]);
+    L.push([`The ceiling is ${money(P)}. Calculate consumer expenditure after the ceiling.`, P * Qs, '$', `Only Qs is sold: Pmax × Qs = ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
+    L.push([`The ceiling is ${money(P)}. By how much does consumer expenditure fall?`, sc.ye * Qe - P * Qs, '$', `Before: Pe × Qe = ${money(sc.ye)} × ${Qe} = ${money(sc.ye * Qe)}. After: ${money(P * Qs)}. Fall: ${money(sc.ye * Qe - P * Qs)}.`]);
+    L.push([`The ceiling is ${money(P)}. Calculate the deadweight (welfare) loss.`, 0.5 * h * (Qe - Qs), '$', `At Qs = ${Qs}, demand is at ${money(P + h)}. ½ × ${money(h)} × (Qe − Qs = ${Qe - Qs}) = ${money(0.5 * h * (Qe - Qs))}.`]);
+  } else {
+    const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = P - Sy(sc, sc.qd);
+    L.push([`The floor is ${money(P)}. Calculate the size of the surplus.`, Qs - Qd, 'units', `Qs − Qd = ${Qs} − ${Qd} = ${Qs - Qd} units.`]);
+    L.push([`The floor is ${money(P)}. The government buys the surplus. What does it spend?`, P * (Qs - Qd), '$', `Pmin × (Qs − Qd) = ${money(P)} × ${Qs - Qd} = ${money(P * (Qs - Qd))}.`]);
+    L.push([`The floor is ${money(P)}. The government buys the surplus. Calculate producer revenue.`, P * Qs, '$', `All of Qs is sold at Pmin: ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
+    L.push([`The floor is ${money(P)}. Calculate consumer expenditure.`, P * Qd, '$', `Pmin × Qd = ${money(P)} × ${Qd} = ${money(P * Qd)}.`]);
+    L.push([`The floor is ${money(P)}. The government does not buy the surplus. Calculate the deadweight loss.`, 0.5 * h * (Qe - Qd), '$', `At Qd = ${Qd}, supply is at ${money(P - h)}. ½ × ${money(h)} × (Qe − Qd = ${Qe - Qd}) = ${money(0.5 * h * (Qe - Qd))}.`]);
+  }
+  return L.map(([q, ans, unit, why]) => ({ q, ans, unit, why }));
+}
+
+// ---------- building questions ----------
+function contextText(sc) {
+  if (sc.kind === 'tax') return `A ${money(sc.t)} per unit indirect tax`;
+  if (sc.kind === 'subsidy') return `A ${money(sc.s)} per unit subsidy`;
+  if (sc.kind === 'ceiling') return `A maximum price (price ceiling) of ${money(sc.P)}`;
+  return `A minimum price (price floor) of ${money(sc.P)}`;
+}
+function lineCands(sc) {
+  const S = (k) => fLine(k, sc.d), D = (k) => fLine(k, -sc.b);
+  if (sc.kind === 'tax') {
+    const t = sc.t, c = [{ line: S(sc.c + t), ok: true }, { line: S(sc.c - t) }, { line: D(sc.a - t) }];
+    c.push({ line: sc.c + 2 * t < GY - 2 ? S(sc.c + 2 * t) : D(sc.a + t) });
+    return { prompt: `A ${money(sc.t)} per unit indirect tax is placed on producers. Tap the new supply curve.`, cands: c,
+      why: `The tax adds ${money(t)} to the cost of every unit, so supply shifts up by exactly ${money(t)} at every quantity, parallel to S.` };
+  }
+  if (sc.kind === 'subsidy') {
+    const s = sc.s, c = [{ line: S(sc.c - s), ok: true }, { line: S(sc.c + s) }, { line: D(sc.a + s) }, { line: D(sc.a - s) }];
+    return { prompt: `Producers get a ${money(s)} per unit subsidy. Tap the new supply curve.`, cands: c,
+      why: `The subsidy cuts the cost of every unit by ${money(s)}, so supply shifts down by exactly ${money(s)}, parallel to S.` };
+  }
+  const ceil = sc.kind === 'ceiling', other = ceil ? sc.ye + sc.gap : sc.ye - sc.gap;
+  const c = [{ line: hLine(sc.P), ok: true }, { line: vLine(ceil ? sc.qs : sc.qd) }];
+  if (other >= 1 && other <= GY - 1) c.push({ line: hLine(other) });
+  return { prompt: ceil ? 'The government sets a price ceiling that actually affects the market. Tap a line that could be it.' : 'The government sets a price floor that actually affects the market. Tap a line that could be it.',
+    cands: c, why: ceil ? 'A binding ceiling is a horizontal line BELOW Pe. Above Pe it changes nothing.' : 'A binding floor is a horizontal line ABOVE Pe. Below Pe it changes nothing.' };
+}
+function buildQuestion(kind, skill) {
+  const sc = gen(kind), steps = [];
+  if (skill === 'draw') {
+    const lc = lineCands(sc);
+    steps.push({ skill: 'draw', type: 'line', prompt: lc.prompt, cands: shuffle(lc.cands), context: [], why: lc.why });
+    if ((kind === 'ceiling' || kind === 'floor') && sc.next != null && Math.random() < 0.7) {
+      const ceil = kind === 'ceiling', P2 = sc.next;
+      const decoy = ceil ? sc.ye + 1 : sc.ye - 1;
+      const cands = [{ line: hLine(P2), ok: true }, { line: hLine(decoy) }];
+      steps.push({ skill: 'draw', type: 'line', prompt: ceil ? 'The government now LOWERS the ceiling. Tap the new ceiling.' : 'The government now RAISES the floor. Tap the new floor.',
+        cands: shuffle(cands), context: [hLine(sc.P)], why: ceil ? 'Lower ceiling: a horizontal line further below Pe.' : 'Higher floor: a horizontal line further above Pe.',
+        after: () => setControl(sc, P2) });
+      steps.push({ skill: 'effects', type: 'mc', q: ceil ? 'What happens to the shortage?' : 'What happens to the surplus?', opts: ['It gets bigger', 'It gets smaller', 'No change'], ans: 'It gets bigger',
+        why: ceil ? 'Lower price: Qs falls further and Qd rises further, so the gap widens.' : 'Higher price: Qs rises further and Qd falls further, so the gap widens.' });
+    }
+    steps.push({ skill: 'label', type: 'label', prompt: 'Now label it. Tap a label, then tap its box.' });
+  } else if (skill === 'label') {
+    steps.push({ skill: 'label', type: 'label', prompt: 'Label the diagram. Tap a label, then tap its box.' });
+  } else if (skill === 'shade') {
+    const cs = shuffle(Object.keys(conceptsFor(sc))).slice(0, 2);
+    cs.forEach(c => steps.push({ skill: 'shade', type: 'shade', concept: c }));
+  } else if (skill === 'effects') {
+    shuffle(effectsFor(sc)).slice(0, 3).forEach(e => steps.push({ skill: 'effects', type: 'mc', ...e }));
+  } else {
+    shuffle(calcsFor(sc)).slice(0, 2).forEach(e => steps.push({ skill: 'calc', type: 'num', ...e }));
+  }
+  return { kind, sc, steps, i: 0 };
+}
+
+// ---------- session ----------
+let session = null, Q = null, ui = null;
+function startDrill(mode, kind, skill) {
+  session = { mode, kind, skill, streak: 0 };
+  document.getElementById('home').hidden = true;
+  document.getElementById('drill').hidden = false;
+  newQuestion();
+}
+function weakest() {
+  let best = null, bestScore = 2;
+  for (const k of Object.keys(KINDS)) for (const s of skillList()) {
+    const a = store.scores[k + '.' + s] || [];
+    const sc = a.length ? a.reduce((x, y) => x + y, 0) / 10 : -1 + Math.random() * 0.1;
+    const v = sc + Math.random() * 0.05;
+    if (v < bestScore) { bestScore = v; best = [k, s]; }
+  }
+  return best;
+}
+function newQuestion() {
+  let kind = session.kind, skill = session.skill;
+  if (session.mode === 'mix') { kind = pick(Object.keys(KINDS)); skill = pick(skillList()); }
+  if (session.mode === 'weak') [kind, skill] = weakest();
+  Q = buildQuestion(kind, skill);
+  renderStep();
+}
+function nextStep() {
+  if (Q.i < Q.steps.length - 1) { Q.i++; renderStep(); } else newQuestion();
+}
+
+function renderStep() {
+  const st = Q.steps[Q.i], sc = Q.sc;
+  ui = { selected: null, filled: {}, cells: null, checked: false, chip: null };
+  document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
+  document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + SKILLS[st.skill] + (st.type === 'line' ? '' : ' · ' + contextText(sc));
+  document.getElementById('stepcount').textContent = Q.steps.length > 1 ? `Step ${Q.i + 1} of ${Q.steps.length}` : '';
+  document.getElementById('eqs').textContent = st.type === 'num' ? eqText(sc) : '';
+  document.getElementById('feedback').innerHTML = '';
+  document.getElementById('next-btn').hidden = true;
+  const checkBtn = document.getElementById('check-btn');
+  checkBtn.hidden = st.type === 'mc'; checkBtn.disabled = false;
+  let prompt = st.prompt || st.q || '';
+  if (st.type === 'shade') { prompt = `Shade ${conceptsFor(sc)[st.concept].name}.`; ui.cells = buildCells(sc); ui.sel = new Set(); }
+  document.getElementById('prompt').textContent = prompt;
+  const ctl = document.getElementById('controls');
+  if (st.type === 'label') {
+    const names = shuffle(labelSlots(sc).map(s => s.answer));
+    ctl.innerHTML = '<div class="chips">' + names.map((n, i) => `<button class="chip" data-chip="${i}">${esc(n)}</button>`).join('') + '</div>';
+    ui.chips = names;
+  } else if (st.type === 'mc') {
+    ctl.innerHTML = '<div class="opts">' + shuffle(st.opts).map(o => `<button class="opt" data-opt="${esc(o)}">${esc(o)}</button>`).join('') + '</div>';
+  } else if (st.type === 'num') {
+    ctl.innerHTML = `<div class="num">${st.unit === '$' ? '$' : ''}<input id="num-in" inputmode="decimal" autocomplete="off">${st.unit === 'units' ? ' units' : ''}</div>`;
+    const inp = document.getElementById('num-in'); inp.focus();
+  } else if (st.type === 'shade') {
+    ctl.innerHTML = '<div class="hint">Tap areas to shade them. Tap again to unshade.</div>';
+  } else ctl.innerHTML = '';
+  drawChart();
+}
+
+function drawChart() {
+  const st = Q.steps[Q.i], sc = Q.sc; let s = '';
+  if (st.type === 'line') {
+    s += svgAxes(true);
+    const e = { x: sc.xe, y: sc.ye };
+    s += `<line x1="${X(0)}" y1="${Y(e.y)}" x2="${X(e.x)}" y2="${Y(e.y)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/><line x1="${X(e.x)}" y1="${Y(e.y)}" x2="${X(e.x)}" y2="${Y(0)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/>`;
+    s += `<text x="${OX - 24}" y="${Y(e.y) + 4}" font-size="13" font-weight="600" fill="#145c34" text-anchor="end">Pe</text><text x="${X(e.x)}" y="${OY + 32}" font-size="13" font-weight="600" fill="#145c34" text-anchor="middle">Qe</text>`;
+    const base = baseLines(sc), spots = labelSpots(base);
+    base.forEach((l, i) => { s += svgLine(l.line, `stroke="${lineColour(l.name)}" stroke-width="2.6"`); s += `<text x="${spots[i].x}" y="${spots[i].y}" font-size="13" font-weight="600" fill="${lineColour(l.name)}" text-anchor="${spots[i].anchor}">${l.name}</text>`; });
+    st.context.forEach(L => s += svgLine(L, 'stroke="#111" stroke-width="2.6"'));
+    st.cands.forEach((c, i) => {
+      let cls = ui.selected === i ? 'sel' : '';
+      if (ui.checked) cls = c.ok ? 'right' : ui.selected === i ? 'wrong' : '';
+      if (ui.checked && !c.ok && ui.selected !== i) return;
+      s += `<g class="cand ${cls}" data-cand="${i}">${svgLine(c.line, 'class="vis" stroke-linecap="round"')}${svgLine(c.line, 'class="hit"')}</g>`;
+    });
+  } else if (st.type === 'label') {
+    s += svgAxes(false) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks } });
+  } else if (st.type === 'shade') {
+    s += svgAxes(true);
+    ui.cells.forEach((g, i) => {
+      const inAns = g.sig.includes(st.concept), on = ui.sel.has(i);
+      let cls = on ? 'sel' : '';
+      if (ui.checked) cls = inAns ? (on ? 'right' : 'missed') : (on ? 'wrong' : '');
+      const d = g.polys.map(p => 'M' + p.map(q => `${X(q[0]).toFixed(1)},${Y(q[1]).toFixed(1)}`).join('L') + 'Z').join('');
+      s += `<path class="cell ${cls}" data-cell="${i}" d="${d}"/>`;
+    });
+    s += `<g class="noclick">${svgDiagram(sc, { labels: true })}</g>`;
+  } else {
+    s += svgAxes(true) + svgDiagram(sc, { labels: true });
+  }
+  document.getElementById('chart').innerHTML = s;
+}
+
+// ---------- input ----------
+document.getElementById('chart').addEventListener('click', e => {
+  if (!Q || ui.checked) return;
+  const st = Q.steps[Q.i];
+  const cand = e.target.closest('[data-cand]'), cell = e.target.closest('[data-cell]'), slot = e.target.closest('[data-slot]');
+  if (cand && st.type === 'line') { ui.selected = +cand.dataset.cand; drawChart(); }
+  if (cell && st.type === 'shade') { const i = +cell.dataset.cell; ui.sel.has(i) ? ui.sel.delete(i) : ui.sel.add(i); drawChart(); }
+  if (slot && st.type === 'label') {
+    const id = slot.dataset.slot;
+    if (ui.chip != null) {
+      const name = ui.chips[ui.chip];
+      for (const k in ui.filled) if (ui.filled[k] === name) delete ui.filled[k];
+      ui.filled[id] = name; ui.chip = null;
+    } else delete ui.filled[id];
+    refreshChips(); drawChart();
+  }
+});
+document.getElementById('controls').addEventListener('click', e => {
+  if (!Q) return;
+  const st = Q.steps[Q.i];
+  const chip = e.target.closest('[data-chip]'), opt = e.target.closest('[data-opt]');
+  if (chip && !ui.checked) { const i = +chip.dataset.chip; ui.chip = ui.chip === i ? null : i; refreshChips(); }
+  if (opt && st.type === 'mc' && !ui.checked) { ui.answer = opt.dataset.opt; check(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || document.getElementById('drill').hidden) return;
+  if (e.target.tagName === 'BUTTON') return;   // the focused button handles Enter itself
+  if (!ui.checked) { if (Q.steps[Q.i].type !== 'mc') check(); } else nextStep();
+});
+function refreshChips() {
+  const used = new Set(Object.values(ui.filled));
+  document.querySelectorAll('[data-chip]').forEach(b => {
+    const i = +b.dataset.chip;
+    b.classList.toggle('sel', ui.chip === i);
+    b.classList.toggle('used', used.has(ui.chips[i]) && ui.chip !== i);
+  });
+}
+
+// ---------- marking ----------
+function check() {
+  const st = Q.steps[Q.i], sc = Q.sc;
+  let ok = false, why = st.why || '', answerText = '';
+  if (st.type === 'line') {
+    if (ui.selected == null) return hint('Tap a grey line first.');
+    ok = !!st.cands[ui.selected].ok;
+  } else if (st.type === 'label') {
+    const slots = labelSlots(sc);
+    if (Object.keys(ui.filled).length < slots.length) return hint('Fill every box first.');
+    ui.marks = {}; ok = true;
+    for (const s of slots) { ui.marks[s.id] = ui.filled[s.id] === s.answer; if (!ui.marks[s.id]) ok = false; }
+    why = labelWhy(sc);
+  } else if (st.type === 'shade') {
+    if (!ui.sel.size) return hint('Tap at least one area.');
+    ok = ui.cells.every((g, i) => g.sig.includes(st.concept) === ui.sel.has(i));
+    why = conceptsFor(sc)[st.concept].why;
+  } else if (st.type === 'mc') {
+    ok = ui.answer === st.ans;
+    document.querySelectorAll('[data-opt]').forEach(b => {
+      b.disabled = true;
+      if (b.dataset.opt === st.ans) b.classList.add('right'); else if (b.dataset.opt === ui.answer) b.classList.add('wrong');
+    });
+  } else if (st.type === 'num') {
+    const raw = document.getElementById('num-in').value.replace(/[$,\s]/g, '').replace(/units?$/i, '');
+    if (raw === '' || isNaN(+raw)) return hint('Type a number.');
+    ok = Math.abs(+raw - st.ans) < 0.011;
+    document.getElementById('num-in').disabled = true;
+    answerText = `Answer: ${st.unit === '$' ? money(st.ans) : fmt(st.ans) + ' units'}`;
+  }
+  ui.checked = true;
+  record(Q.kind + '.' + st.skill, ok);
+  session.streak = ok ? session.streak + 1 : 0;
+  if (st.after) st.after();
+  if (st.type === 'line' && st.after) { /* keep showing the step's own picture */ }
+  drawChart();
+  document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
+  document.getElementById('check-btn').hidden = true;
+  const fb = document.getElementById('feedback');
+  fb.innerHTML = `<div class="verdict ${ok ? 'good' : 'bad'}">${ok ? 'Correct' : 'Not quite'}</div>` +
+    (answerText ? `<div style="font-size:17px;margin-top:2px">${esc(answerText)}</div>` : '') +
+    (why ? `<details${ok ? '' : ' open'}><summary>Why</summary>${esc(why)}</details>` : '');
+  const nb = document.getElementById('next-btn');
+  nb.hidden = false; nb.textContent = Q.i < Q.steps.length - 1 ? 'Next step' : 'Next question'; nb.focus();
+}
+function hint(msg) { document.getElementById('feedback').innerHTML = `<div class="hint">${esc(msg)}</div>`; }
+function labelWhy(sc) {
+  if (sc.kind === 'tax') return 'Pc (consumers pay) is where S + tax meets demand. Pp (producers keep) is straight below it on the original S: Pc − Pp = the tax. Qt is the new quantity.';
+  if (sc.kind === 'subsidy') return 'Pc (consumers pay) is where S + subsidy meets demand. Pp (producers receive) is straight above it on the original S: Pp − Pc = the subsidy. Q1 is the new quantity.';
+  if (sc.kind === 'ceiling') return 'At Pmax, read Qs off supply and Qd off demand. Qd > Qs: the gap is the shortage.';
+  return 'At Pmin, read Qd off demand and Qs off supply. Qs > Qd: the gap is the surplus.';
+}
+
+// ---------- home ----------
+function scoreCell(k, s) {
+  const a = store.scores[k + '.' + s] || [];
+  if (!a.length) return { text: '–', cls: '' };
+  const n = a.reduce((x, y) => x + y, 0), frac = n / a.length;
+  return { text: `${n}/${a.length}`, cls: a.length >= 3 && frac >= 0.8 ? 's-good' : frac >= 0.5 ? 's-mid' : 's-bad' };
+}
+function renderHome() {
+  const sk = skillList();
+  let h = '<tr><th></th>' + sk.map(s => `<th>${SKILLS[s]}</th>`).join('') + '</tr>';
+  for (const k of Object.keys(KINDS)) {
+    h += `<tr><td class="row">${KINDS[k]}</td>` + sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}" onclick="startDrill('cell','${k}','${s}')" aria-label="${KINDS[k]} ${SKILLS[s]}">${c.text}</button></td>`; }).join('') + '</tr>';
+  }
+  document.getElementById('grid').innerHTML = h;
+  document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));
+}
+function showHome() {
+  document.getElementById('drill').hidden = true;
+  document.getElementById('home').hidden = false;
+  Q = null; renderHome();
+}
+function setLevel(l) {
+  store.level = l; saveStore(); renderHome();
+  if (session && session.skill === 'calc' && l === 'SL') showHome();
+}
+let resetArmed = null;
+function resetProgress() {
+  const b = document.getElementById('reset-btn');
+  if (!resetArmed) { b.textContent = 'Tap again to wipe all scores'; b.style.color = '#b3261e'; resetArmed = setTimeout(() => { resetArmed = null; b.textContent = 'Reset my progress'; b.style.color = ''; }, 4000); return; }
+  clearTimeout(resetArmed); resetArmed = null;
+  store.scores = {}; saveStore(); b.textContent = 'Reset my progress'; b.style.color = ''; renderHome();
+}
+renderHome();
+</script>
+</body>
+</html>
