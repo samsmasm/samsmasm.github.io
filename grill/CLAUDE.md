@@ -11,9 +11,12 @@ Drills IB Economics government intervention diagrams: indirect tax, subsidy, pri
 - `diagram(sc)`: the finished diagram (lines, points with P/Q axis names, Shortage/Surplus braces). Labels, slots and the drawn picture all come from it.
 - **Skills** (columns on the home grid): Draw (tap the right grey line; ceilings/floors may follow up with "raise/lower it" + an effects question, then a label step), Label (tap chip, tap box), Shade, Effects (multiple choice), Calculate (HL only, shows Qd/Qs functions).
 - **Shading**: `conceptsFor(sc)` lists each area as a polygon (CS/PS before and after, DWL, tax revenue, subsidy cost, expenditure, revenue, tax burden, transfers, government buying the surplus). `buildCells` cuts the chart along every line plus horizontals/verticals at the key points, and groups cells by which concepts contain them, so any concept is a whole number of tappable areas. To add an area, just add a concept polygon whose edges lie on those lines.
-- **Labels** match the IBecon diagrams: Pe, Qe, Pc, Pp, Qt (tax), Q1 (subsidy), S + tax, S + subsidy, plus Pmax/Pmin, Qs/Qd, Price ceiling/floor.
+- **Labels** match the IBecon diagrams: Pe, Qe, Pc, Pp, Qt (tax), Q2 (subsidy; Sam prefers Qe then Q2 over Q1), S + tax, S + subsidy, plus Pmax/Pmin, Qs/Qd, Price ceiling/floor.
 - **Wrong answers** (Sam, 2026-10-29): say "Not quite. Try again." and leave the step editable at once, mistakes in red (wrong line, red label boxes, red shaded areas, greyed MC option). Only the first attempt is scored; a later right answer says "Got it". "Show me the answer" (`finish(false)`) reveals. `check()` marks, `finish(ok)` closes the step.
 - **Don't give answers away on the graph**: multiple-choice steps draw the diagram without the Shortage/Surplus labels (`noAnno`). Sam spotted "What does the floor create?" with "Surplus" written on the graph.
+- **What-if questions** ("the ceiling is set above Pe...") contradict the drawn market, so they carry `noGraph`: no chart, no context line.
+- **Labels**: drag a chip (or a filled box) onto a box, or tap chip then box (`placeLabel`, pointer-event drag with a ghost chip). A wrong check sends the wrong labels back to the list and leaves their boxes empty and red.
+- **Skip question** button: new question, nothing scored.
 - **Progress**: localStorage `grill_v1` = `{ level, scores: { 'tax.shade': [last 10 as 1/0] } }`. "Practise my weakest" picks untried cells first, then the lowest score.
 - Floor welfare (CS/PS/DWL) assumes the government does NOT buy the surplus; the "government buys the surplus" questions say so.
 

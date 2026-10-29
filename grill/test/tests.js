@@ -157,6 +157,62 @@ test('effects questions never show Shortage/Surplus on the graph', async page =>
   }
 });
 
+test('labels can be dragged onto boxes and between boxes', async page => {
+  await page.evaluate(() => startDrill('cell', 'subsidy', 'label'));
+  const centre = sel => page.evaluate(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, sel);
+  const dragTo = async (from, to) => {
+    const [x1, y1] = await centre(from), [x2, y2] = await centre(to);
+    await page.mouse.move(x1, y1); await page.mouse.down();
+    await page.mouse.move((x1 + x2) / 2, (y1 + y2) / 2, { steps: 4 }); await page.mouse.move(x2, y2, { steps: 4 });
+    await page.mouse.up();
+  };
+  const slots = await page.evaluate(() => labelSlots(Q.sc).map(s => ({ id: s.id, answer: s.answer })));
+  const ci = await page.evaluate(a => ui.chips.indexOf(a), slots[0].answer);
+  await dragTo(`[data-chip="${ci}"]`, `[data-slot="${slots[1].id}"]`);
+  assert((await page.evaluate(id => ui.filled[id], slots[1].id)) === slots[0].answer, 'chip dropped in box');
+  await dragTo(`[data-slot="${slots[1].id}"]`, `[data-slot="${slots[0].id}"]`);
+  const f = await page.evaluate(() => ui.filled);
+  assert(f[slots[0].id] === slots[0].answer && !f[slots[1].id], 'moved between boxes: ' + JSON.stringify(f));
+  assert(!(await page.evaluate(() => document.querySelector('.dragghost'))), 'ghost removed');
+  assert((await page.evaluate(() => ui.chip)) === null, 'drag does not leave a chip selected');
+  for (const s of slots.slice(1)) {
+    const c = await page.evaluate(a => ui.chips.indexOf(a), s.answer);
+    await dragTo(`[data-chip="${c}"]`, `[data-slot="${s.id}"]`);
+  }
+  await page.click('#check-btn');
+  assert((await page.evaluate(() => document.querySelector('.verdict').textContent)) === 'Correct');
+});
+
+test('wrong labels go back to the list and can be put right', async page => {
+  await page.evaluate(() => startDrill('cell', 'tax', 'label'));
+  const slots = await page.evaluate(() => labelSlots(Q.sc).map(s => ({ id: s.id, answer: s.answer })));
+  const place = async (name, id) => {
+    await page.click(`[data-chip="${await page.evaluate(a => ui.chips.indexOf(a), name)}"]`);
+    await page.evaluate(id => document.querySelector(`[data-slot="${id}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true })), id);
+  };
+  // swap the first two, everything else right
+  await place(slots[1].answer, slots[0].id); await place(slots[0].answer, slots[1].id);
+  for (const s of slots.slice(2)) await place(s.answer, s.id);
+  await page.click('#check-btn');
+  const st = await page.evaluate(() => ({ filled: Object.keys(ui.filled).length, red: document.querySelectorAll('.slot.wrong').length, free: document.querySelectorAll('.chip:not(.used)').length }));
+  assert(st.red === 2 && st.free === 2 && st.filled === slots.length - 2, JSON.stringify(st));
+  await place(slots[0].answer, slots[0].id); await place(slots[1].answer, slots[1].id);
+  await page.click('#check-btn');
+  assert((await page.evaluate(() => document.querySelector('.verdict').textContent)) === 'Got it');
+});
+
+test('what-if questions hide the graph; skip moves on without scoring', async page => {
+  const hidden = await page.evaluate(() => {
+    startDrill('cell', 'ceiling', 'effects');
+    Q.steps = [{ skill: 'effects', type: 'mc', ...effectsFor(Q.sc).find(e => /above Pe/.test(e.q)) }]; Q.i = 0; renderStep();
+    return { chart: document.getElementById('chart').style.display, ctx: document.getElementById('context').textContent };
+  });
+  assert(hidden.chart === 'none' && !/\$/.test(hidden.ctx), JSON.stringify(hidden));
+  await page.click('#skip-btn');
+  const scores = await page.evaluate(() => JSON.stringify(store.scores));
+  assert(scores === '{}', 'skip records nothing: ' + scores);
+});
+
 test('SL hides the Calculate column', async page => {
   await page.evaluate(() => setLevel('SL'));
   const t = await page.evaluate(() => document.getElementById('grid').textContent);

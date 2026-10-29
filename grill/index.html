@@ -86,6 +86,9 @@
   }
   .chip.sel { background: var(--orange); color: #fff; }
   .chip.used { opacity: .25; }
+  .chip, .slot { touch-action: none; }
+  .dragghost { position: fixed; z-index: 10; pointer-events: none; transform: translate(-50%, -60%); background: var(--orange); color: #fff; }
+  .slot.over rect { fill: #ffd8a8; stroke-width: 3; }
   .opts { display: flex; flex-direction: column; gap: 8px; }
   .opt {
     text-align: left; font: 600 16px var(--sans); padding: 11px 14px; border-radius: 4px; cursor: pointer;
@@ -176,7 +179,10 @@
   <div class="stepcount" id="stepcount"></div>
   <svg class="chart" id="chart" viewBox="0 0 610 462"></svg>
   <div class="controls" id="controls"></div>
-  <div class="actions"><button class="btn primary" id="check-btn" onclick="check()">Check</button></div>
+  <div class="actions">
+    <button class="btn primary" id="check-btn" onclick="check()">Check</button>
+    <button class="btn" id="skip-btn" onclick="newQuestion()">Skip question</button>
+  </div>
   <div class="feedback" id="feedback"></div>
   <div class="actions"><button class="btn primary" id="next-btn" onclick="nextStep()" hidden>Next</button></div>
 </main>
@@ -295,7 +301,7 @@ function diagram(sc) {
   };
   if (sc.kind === 'subsidy') return {
     lines: [D, S, { line: fLine(sc.c - sc.s, sc.d), name: 'S + subsidy' }],
-    points: [e, { x: sc.xs, y: sc.Pp, pn: 'Pp', qn: 'Q1' }, { x: sc.xs, y: sc.Pc, pn: 'Pc' }], annos: []
+    points: [e, { x: sc.xs, y: sc.Pp, pn: 'Pp', qn: 'Q2' }, { x: sc.xs, y: sc.Pc, pn: 'Pc' }], annos: []
   };
   if (sc.kind === 'ceiling') return {
     lines: [D, S, { line: hLine(sc.P), name: 'Price ceiling' }],
@@ -453,14 +459,14 @@ function conceptsFor(sc) {
     C.burden_p = { name: 'the part of the tax paid by producers', poly: [[0, Pp], [xt, Pp], [xt, ye], [0, ye]], why: 'Producers now keep Pp instead of Pe, so their share is (Pe − Pp) × Qt: the part of the tax box below Pe.' };
   } else if (sc.kind === 'subsidy') {
     const { xs, Pc, Pp } = sc;
-    C.cs_after = { name: 'consumer surplus after the subsidy', poly: [[0, a], [0, Pc], [xs, Pc]], why: 'Below demand, above the lower price consumers pay (Pc), up to Q1.' };
-    C.ps_after = { name: 'producer surplus after the subsidy', poly: [[0, c], [0, Pp], [xs, Pp]], why: 'Above the original supply curve, below the price producers receive (Pp), up to Q1.' };
-    C.gov = { name: 'government spending on the subsidy', poly: [[0, Pc], [xs, Pc], [xs, Pp], [0, Pp]], why: 'Subsidy cost = subsidy per unit (Pp − Pc) × Q1: the rectangle between Pp and Pc.' };
-    C.dwl = { name: 'the deadweight (welfare) loss', poly: [[xe, ye], [xs, Pp], [xs, Pc]], why: 'Units between Qe and Q1 cost more to make (supply) than consumers value them (demand). The triangle points back at the old equilibrium.' };
+    C.cs_after = { name: 'consumer surplus after the subsidy', poly: [[0, a], [0, Pc], [xs, Pc]], why: 'Below demand, above the lower price consumers pay (Pc), up to Q2.' };
+    C.ps_after = { name: 'producer surplus after the subsidy', poly: [[0, c], [0, Pp], [xs, Pp]], why: 'Above the original supply curve, below the price producers receive (Pp), up to Q2.' };
+    C.gov = { name: 'government spending on the subsidy', poly: [[0, Pc], [xs, Pc], [xs, Pp], [0, Pp]], why: 'Subsidy cost = subsidy per unit (Pp − Pc) × Q2: the rectangle between Pp and Pc.' };
+    C.dwl = { name: 'the deadweight (welfare) loss', poly: [[xe, ye], [xs, Pp], [xs, Pc]], why: 'Units between Qe and Q2 cost more to make (supply) than consumers value them (demand). The triangle points back at the old equilibrium.' };
     C.cs_before = { name: 'consumer surplus before the subsidy', poly: csB, why: 'Before the subsidy: below demand, above Pe, up to Qe.' };
     C.ps_before = { name: 'producer surplus before the subsidy', poly: psB, why: 'Before the subsidy: above supply, below Pe, up to Qe.' };
-    C.exp_after = { name: 'consumer expenditure after the subsidy', poly: [[0, 0], [xs, 0], [xs, Pc], [0, Pc]], why: 'Consumers spend Pc × Q1.' };
-    C.rev_after = { name: 'producer revenue after the subsidy (including the subsidy)', poly: [[0, 0], [xs, 0], [xs, Pp], [0, Pp]], why: 'Producers receive Pp per unit (Pc from consumers plus the subsidy): Pp × Q1.' };
+    C.exp_after = { name: 'consumer expenditure after the subsidy', poly: [[0, 0], [xs, 0], [xs, Pc], [0, Pc]], why: 'Consumers spend Pc × Q2.' };
+    C.rev_after = { name: 'producer revenue after the subsidy (including the subsidy)', poly: [[0, 0], [xs, 0], [xs, Pp], [0, Pp]], why: 'Producers receive Pp per unit (Pc from consumers plus the subsidy): Pp × Q2.' };
   } else if (sc.kind === 'ceiling') {
     const { P, qs } = sc, Dq = Dy(sc, qs);
     C.cs_after = { name: 'consumer surplus after the ceiling', poly: [[0, a], [qs, Dq], [qs, P], [0, P]], why: 'Only Qs units are sold now. Consumer surplus is below demand and above Pmax, up to Qs.' };
@@ -497,24 +503,24 @@ function effectsFor(sc) {
     L.push(['What happens to producer surplus?', UDN, 'Falls', 'Producers keep less per unit and sell less.']);
     L.push(['Who pays more of the tax in this market?', ['Consumers', 'Producers', 'Shared equally'], cs > ps ? 'Consumers' : cs < ps ? 'Producers' : 'Shared equally',
       `Consumers pay ${money(cs)} more per unit (Pc − Pe); producers keep ${money(ps)} less (Pe − Pp). The steeper (more inelastic) side pays more.`]);
-    L.push(['Demand is much more price inelastic than supply. Who pays most of a tax?', ['Consumers', 'Producers', 'Shared equally'], 'Consumers', 'Inelastic demand means consumers keep buying, so producers can pass most of the tax on in a higher price.']);
+    L.push(['Demand is much more price inelastic than supply. Who pays most of a tax?', ['Consumers', 'Producers', 'Shared equally'], 'Consumers', 'Inelastic demand means consumers keep buying, so producers can pass most of the tax on in a higher price.', true]);
   } else if (sc.kind === 'subsidy') {
     const cs = sc.ye - sc.Pc, ps = sc.Pp - sc.ye;
     L.push(['What happens to the price consumers pay?', UDN, 'Falls', 'Supply shifts down, so the market price falls from Pe to Pc.']);
     L.push(['What happens to the price producers receive?', UDN, 'Rises', 'Producers get Pc from consumers plus the subsidy: Pp, above Pe.']);
-    L.push(['What happens to the quantity traded?', UDN, 'Rises', 'Lower costs: supply shifts right, quantity rises from Qe to Q1.']);
+    L.push(['What happens to the quantity traded?', UDN, 'Rises', 'Lower costs: supply shifts right, quantity rises from Qe to Q2.']);
     L.push(['What happens to consumer surplus?', UDN, 'Rises', 'Consumers pay less and buy more.']);
     L.push(['What happens to producer surplus?', UDN, 'Rises', 'Producers receive more per unit and sell more.']);
     L.push(['Who gains more per unit from this subsidy?', ['Consumers', 'Producers', 'Shared equally'], cs > ps ? 'Consumers' : cs < ps ? 'Producers' : 'Shared equally',
       `Consumers pay ${money(cs)} less per unit (Pe − Pc); producers receive ${money(ps)} more (Pp − Pe).`]);
-    L.push(['Which is an opportunity cost of a subsidy?', ['The government can’t spend that money elsewhere', 'Consumers pay a higher price', 'Producers sell less'], 'The government can’t spend that money elsewhere', 'Subsidy spending, (Pp − Pc) × Q1, could have gone on schools, health or lower taxes.']);
+    L.push(['Which is an opportunity cost of a subsidy?', ['The government can’t spend that money elsewhere', 'Consumers pay a higher price', 'Producers sell less'], 'The government can’t spend that money elsewhere', 'Subsidy spending, (Pp − Pc) × Q2, could have gone on schools, health or lower taxes.']);
   } else if (sc.kind === 'ceiling') {
     L.push(['What happens to quantity supplied?', UDN, 'Falls', 'At the lower price Pmax, firms supply less: Qs.']);
     L.push(['What happens to quantity demanded?', UDN, 'Rises', 'At the lower price Pmax, consumers want more: Qd.']);
     L.push(['What does the ceiling create?', ['A shortage', 'A surplus', 'Neither'], 'A shortage', 'Qd > Qs at Pmax: excess demand.']);
     L.push(['What happens to producer surplus?', UDN, 'Falls', 'Lower price and fewer units sold.']);
     L.push(['What happens to consumer expenditure?', UDN, 'Falls', 'Both price (Pmax) and quantity sold (Qs) fall, so Pmax × Qs is smaller than Pe × Qe.']);
-    L.push(['The ceiling is set above Pe. What happens?', ['Nothing: it doesn’t bind', 'A shortage', 'A surplus'], 'Nothing: it doesn’t bind', 'A maximum price above equilibrium is never reached, so the market stays at Pe and Qe.']);
+    L.push(['The ceiling is set above Pe. What happens?', ['Nothing: it doesn’t bind', 'A shortage', 'A surplus'], 'Nothing: it doesn’t bind', 'A maximum price above equilibrium is never reached, so the market stays at Pe and Qe.', true]);
     L.push(['Which is a likely consequence of a long-lasting shortage?', ['Black markets and queues', 'Stockpiles of unsold goods', 'Lower demand'], 'Black markets and queues', 'People who can’t buy at Pmax may pay more illegally, or wait.']);
   } else {
     L.push(['What happens to quantity supplied?', UDN, 'Rises', 'At the higher price Pmin, firms supply more: Qs.']);
@@ -522,10 +528,11 @@ function effectsFor(sc) {
     L.push(['What does the floor create?', ['A surplus', 'A shortage', 'Neither'], 'A surplus', 'Qs > Qd at Pmin: excess supply.']);
     L.push(['What happens to consumer surplus?', UDN, 'Falls', 'Consumers pay more and buy less.']);
     L.push(['The government buys the surplus. What does it cost?', ['Pmin × (Qs − Qd)', 'Pe × (Qs − Qd)', 'Pmin × Qd'], 'Pmin × (Qs − Qd)', 'It buys every unsold unit (Qs − Qd) at the floor price.']);
-    L.push(['The floor is set below Pe. What happens?', ['Nothing: it doesn’t bind', 'A surplus', 'A shortage'], 'Nothing: it doesn’t bind', 'A minimum price below equilibrium is never reached, so the market stays at Pe and Qe.']);
+    L.push(['The floor is set below Pe. What happens?', ['Nothing: it doesn’t bind', 'A surplus', 'A shortage'], 'Nothing: it doesn’t bind', 'A minimum price below equilibrium is never reached, so the market stays at Pe and Qe.', true]);
     L.push(['If the government buys the surplus, what happens to producer revenue?', UDN, 'Rises', 'Producers now sell all of Qs at Pmin, so revenue Pmin × Qs is above Pe × Qe.']);
   }
-  return L.map(([q, opts, ans, why]) => ({ q, opts, ans, why }));
+  // noGraph: "what if" questions about a different situation from the one drawn
+  return L.map(([q, opts, ans, why, noGraph]) => ({ q, opts, ans, why, noGraph: !!noGraph }));
 }
 
 // ---------- calculations (HL) ----------
@@ -553,13 +560,13 @@ function calcsFor(sc) {
     L.push(['Calculate the deadweight (welfare) loss.', 0.5 * t * (Qe - Qt), '$', `½ × tax × (Qe − Qt) = ½ × ${money(t)} × ${Qe - Qt} = ${money(0.5 * t * (Qe - Qt))}.`]);
     L.push(['Calculate consumer surplus after the tax.', 0.5 * (sc.a - sc.Pc) * Qt, '$', `½ × (${money(sc.a)} − Pc) × Qt = ½ × ${money(sc.a - sc.Pc)} × ${Qt} = ${money(0.5 * (sc.a - sc.Pc) * Qt)}. (${money(sc.a)} is where demand meets the price axis.)`]);
   } else if (sc.kind === 'subsidy') {
-    const Q1 = sc.xs * 10, s = sc.s;
+    const Q2 = sc.xs * 10, s = sc.s;
     L.push(['Calculate the price consumers pay after the subsidy (Pc).', sc.Pc, '$', `With the subsidy, supply shifts down by ${money(s)}. Set new Qs equal to Qd: P = ${money(sc.Pc)}.`]);
-    L.push(['Calculate the quantity traded after the subsidy.', Q1, 'units', `Put Pc = ${money(sc.Pc)} into Qd: ${Q1} units.`]);
-    L.push(['Calculate government spending on the subsidy.', s * Q1, '$', `Subsidy per unit × quantity = ${money(s)} × ${Q1} = ${money(s * Q1)}.`]);
-    L.push(['Calculate consumer expenditure after the subsidy.', sc.Pc * Q1, '$', `Pc × Q1 = ${money(sc.Pc)} × ${Q1} = ${money(sc.Pc * Q1)}.`]);
-    L.push(['Calculate producer revenue after the subsidy (including the subsidy).', sc.Pp * Q1, '$', `Pp × Q1 = ${money(sc.Pp)} × ${Q1} = ${money(sc.Pp * Q1)}.`]);
-    L.push(['Calculate the deadweight (welfare) loss.', 0.5 * s * (Q1 - Qe), '$', `½ × subsidy × (Q1 − Qe) = ½ × ${money(s)} × ${Q1 - Qe} = ${money(0.5 * s * (Q1 - Qe))}.`]);
+    L.push(['Calculate the quantity traded after the subsidy.', Q2, 'units', `Put Pc = ${money(sc.Pc)} into Qd: ${Q2} units.`]);
+    L.push(['Calculate government spending on the subsidy.', s * Q2, '$', `Subsidy per unit × quantity = ${money(s)} × ${Q2} = ${money(s * Q2)}.`]);
+    L.push(['Calculate consumer expenditure after the subsidy.', sc.Pc * Q2, '$', `Pc × Q2 = ${money(sc.Pc)} × ${Q2} = ${money(sc.Pc * Q2)}.`]);
+    L.push(['Calculate producer revenue after the subsidy (including the subsidy).', sc.Pp * Q2, '$', `Pp × Q2 = ${money(sc.Pp)} × ${Q2} = ${money(sc.Pp * Q2)}.`]);
+    L.push(['Calculate the deadweight (welfare) loss.', 0.5 * s * (Q2 - Qe), '$', `½ × subsidy × (Q2 − Qe) = ½ × ${money(s)} × ${Q2 - Qe} = ${money(0.5 * s * (Q2 - Qe))}.`]);
   } else if (sc.kind === 'ceiling') {
     const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = Dy(sc, sc.qs) - P;
     L.push([`The ceiling is ${money(P)}. Calculate the size of the shortage.`, Qd - Qs, 'units', `Qd − Qs = ${Qd} − ${Qs} = ${Qd - Qs} units.`]);
@@ -665,11 +672,12 @@ function renderStep() {
   const st = Q.steps[Q.i], sc = Q.sc;
   ui = { selected: null, filled: {}, cells: null, checked: false, revealed: false, chip: null, tries: 0, wrongC: new Set(), bad: new Set() };
   document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
-  document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + SKILLS[st.skill] + (st.type === 'line' ? '' : ' · ' + contextText(sc));
+  document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + SKILLS[st.skill] + (st.type === 'line' || st.noGraph ? '' : ' · ' + contextText(sc));
   document.getElementById('stepcount').textContent = Q.steps.length > 1 ? `Step ${Q.i + 1} of ${Q.steps.length}` : '';
   document.getElementById('eqs').textContent = st.type === 'num' ? eqText(sc) : '';
   document.getElementById('feedback').innerHTML = '';
   document.getElementById('next-btn').hidden = true;
+  document.getElementById('skip-btn').hidden = false;
   const checkBtn = document.getElementById('check-btn');
   checkBtn.hidden = st.type === 'mc'; checkBtn.disabled = false;
   let prompt = st.prompt || st.q || '';
@@ -678,7 +686,7 @@ function renderStep() {
   const ctl = document.getElementById('controls');
   if (st.type === 'label') {
     const names = shuffle(labelSlots(sc).map(s => s.answer));
-    ctl.innerHTML = '<div class="chips">' + names.map((n, i) => `<button class="chip" data-chip="${i}">${esc(n)}</button>`).join('') + '</div>';
+    ctl.innerHTML = '<div class="hint" style="margin:0 0 6px">Drag a label onto a box, or tap a label then a box.</div><div class="chips">' + names.map((n, i) => `<button class="chip" data-chip="${i}">${esc(n)}</button>`).join('') + '</div>';
     ui.chips = names;
   } else if (st.type === 'mc') {
     ctl.innerHTML = '<div class="opts">' + shuffle(st.opts).map(o => `<button class="opt" data-opt="${esc(o)}">${esc(o)}</button>`).join('') + '</div>';
@@ -723,7 +731,9 @@ function drawChart() {
     // multiple choice asks about the result, so the graph mustn't say "Shortage"/"Surplus"
     s += svgAxes(true) + svgDiagram(sc, { labels: true, noAnno: st.type === 'mc' });
   }
-  document.getElementById('chart').innerHTML = s;
+  const chart = document.getElementById('chart');
+  chart.innerHTML = st.noGraph ? '' : s;
+  chart.style.display = st.noGraph ? 'none' : '';
 }
 
 // ---------- input ----------
@@ -733,22 +743,62 @@ document.getElementById('chart').addEventListener('click', e => {
   const cand = e.target.closest('[data-cand]'), cell = e.target.closest('[data-cell]'), slot = e.target.closest('[data-slot]');
   if (cand && st.type === 'line' && !ui.wrongC.has(+cand.dataset.cand)) { ui.selected = +cand.dataset.cand; drawChart(); }
   if (cell && st.type === 'shade') { const i = +cell.dataset.cell; ui.bad.delete(i); ui.sel.has(i) ? ui.sel.delete(i) : ui.sel.add(i); drawChart(); }
-  if (slot && st.type === 'label') {
+  if (slot && st.type === 'label' && !dragJustEnded) {
     const id = slot.dataset.slot;
-    if (ui.marks) delete ui.marks[id];
-    if (ui.chip != null) {
-      const name = ui.chips[ui.chip];
-      for (const k in ui.filled) if (ui.filled[k] === name) { delete ui.filled[k]; if (ui.marks) delete ui.marks[k]; }
-      ui.filled[id] = name; ui.chip = null;
-    } else delete ui.filled[id];
+    if (ui.chip != null) { placeLabel(ui.chips[ui.chip], id); ui.chip = null; }
+    else { delete ui.filled[id]; if (ui.marks) delete ui.marks[id]; }
     refreshChips(); drawChart();
   }
 });
+function placeLabel(name, id) {
+  for (const k in ui.filled) if (ui.filled[k] === name) { delete ui.filled[k]; if (ui.marks) delete ui.marks[k]; }
+  if (ui.marks) delete ui.marks[id];
+  ui.filled[id] = name;
+}
+
+// Drag a chip (or a filled box) onto a box. A press that doesn't move is left to the click handlers.
+let drag = null, dragJustEnded = false;
+document.addEventListener('pointerdown', e => {
+  if (!Q || ui.checked || Q.steps[Q.i].type !== 'label' || e.button > 0) return;
+  const chip = e.target.closest('[data-chip]'), slot = e.target.closest('[data-slot]');
+  let name = null, from = null;
+  if (chip) name = ui.chips[+chip.dataset.chip];
+  else if (slot && ui.filled[slot.dataset.slot]) { from = slot.dataset.slot; name = ui.filled[from]; }
+  if (name) drag = { name, from, x: e.clientX, y: e.clientY, moved: false, ghost: null, over: null };
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+    drag.moved = true;
+    drag.ghost = document.createElement('div');
+    drag.ghost.className = 'chip dragghost'; drag.ghost.textContent = drag.name;
+    document.body.appendChild(drag.ghost);
+  }
+  e.preventDefault();
+  drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+  const el = document.elementFromPoint(e.clientX, e.clientY), slot = el && el.closest('[data-slot]');
+  if (drag.over && drag.over !== slot) drag.over.classList.remove('over');
+  if (slot) slot.classList.add('over');
+  drag.over = slot;
+});
+function endDrag(e, drop) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.moved) return;
+  d.ghost.remove();
+  dragJustEnded = true; setTimeout(() => dragJustEnded = false, 50);
+  const el = drop && document.elementFromPoint(e.clientX, e.clientY), slot = el && el.closest('[data-slot]');
+  if (slot && slot.dataset.slot !== d.from) { placeLabel(d.name, slot.dataset.slot); ui.chip = null; }
+  refreshChips(); drawChart();
+}
+document.addEventListener('pointerup', e => endDrag(e, true));
+document.addEventListener('pointercancel', e => endDrag(e, false));
 document.getElementById('controls').addEventListener('click', e => {
   if (!Q) return;
   const st = Q.steps[Q.i];
   const chip = e.target.closest('[data-chip]'), opt = e.target.closest('[data-opt]');
-  if (chip && !ui.checked) { const i = +chip.dataset.chip; ui.chip = ui.chip === i ? null : i; refreshChips(); }
+  if (chip && !ui.checked && !dragJustEnded) { const i = +chip.dataset.chip; ui.chip = ui.chip === i ? null : i; refreshChips(); }
   if (opt && st.type === 'mc' && !ui.checked) { ui.answer = opt.dataset.opt; check(); }
 });
 document.addEventListener('keydown', e => {
@@ -780,7 +830,12 @@ function check() {
     if (Object.keys(ui.filled).length < slots.length) return hint('Fill every box first.');
     ui.marks = {}; ok = true;
     for (const s of slots) { ui.marks[s.id] = ui.filled[s.id] === s.answer; if (!ui.marks[s.id]) ok = false; }
-    tip = 'The red boxes are wrong. Tap a label, then a red box to swap it in.';
+    if (!ok) {
+      // wrong labels go back to the list, so the red boxes are empty and ready to refill
+      for (const s of slots) if (!ui.marks[s.id]) delete ui.filled[s.id];
+      ui.chip = null; refreshChips();
+      tip = 'Wrong labels have gone back to the list. Put them in the red boxes.';
+    }
   } else if (st.type === 'shade') {
     if (!ui.sel.size) return hint('Tap at least one area.');
     ok = ui.cells.every((g, i) => g.sig.includes(st.concept) === ui.sel.has(i));
@@ -823,6 +878,7 @@ function finish(ok) {
   if (st.type === 'label') {
     why = labelWhy(sc);
     ui.marks = {}; for (const s of labelSlots(sc)) ui.marks[s.id] = ui.filled[s.id] === s.answer;
+    document.querySelectorAll('[data-chip]').forEach(b => b.classList.add('used'));
   }
   if (st.type === 'shade') why = conceptsFor(sc)[st.concept].why;
   if (st.type === 'mc') document.querySelectorAll('[data-opt]').forEach(b => { b.disabled = true; if (b.dataset.opt === st.ans) b.classList.add('right'); });
@@ -834,6 +890,7 @@ function finish(ok) {
   if (st.after) st.after();
   drawChart();
   document.getElementById('check-btn').hidden = true;
+  document.getElementById('skip-btn').hidden = Q.i === Q.steps.length - 1;
   const verdict = ok ? (ui.tries > 1 ? 'Got it' : 'Correct') : 'Here’s the answer';
   document.getElementById('feedback').innerHTML = `<div class="verdict ${ok ? 'good' : 'bad'}">${verdict}</div>` +
     (answerText ? `<div style="font-size:17px;margin-top:2px">${esc(answerText)}</div>` : '') +
@@ -844,7 +901,7 @@ function finish(ok) {
 function hint(msg) { document.getElementById('feedback').innerHTML = `<div class="hint">${esc(msg)}</div>`; }
 function labelWhy(sc) {
   if (sc.kind === 'tax') return 'Pc (consumers pay) is where S + tax meets demand. Pp (producers keep) is straight below it on the original S: Pc − Pp = the tax. Qt is the new quantity.';
-  if (sc.kind === 'subsidy') return 'Pc (consumers pay) is where S + subsidy meets demand. Pp (producers receive) is straight above it on the original S: Pp − Pc = the subsidy. Q1 is the new quantity.';
+  if (sc.kind === 'subsidy') return 'Pc (consumers pay) is where S + subsidy meets demand. Pp (producers receive) is straight above it on the original S: Pp − Pc = the subsidy. Q2 is the new quantity.';
   if (sc.kind === 'ceiling') return 'At Pmax, read Qs off supply and Qd off demand. Qd > Qs: the gap is the shortage.';
   return 'At Pmin, read Qd off demand and Qs off supply. Qs > Qd: the gap is the surplus.';
 }
