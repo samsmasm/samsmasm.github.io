@@ -123,6 +123,13 @@ test('SL hides the Calculate column', async page => {
   await page.evaluate(() => setLevel('HL'));
   const t2 = await page.evaluate(() => document.getElementById('grid').textContent);
   assert(t2.includes('Calculate'), t2);
+  if (shots) {
+    await page.screenshot({ path: `${shots}/home.png` });
+    await page.setViewport({ width: 390, height: 844 });
+    await page.screenshot({ path: `${shots}/home-phone.png` });
+    await page.evaluate(() => startDrill('cell', 'tax', 'shade'));
+    await page.screenshot({ path: `${shots}/drill-phone.png` });
+  }
 });
 
 (async () => {
