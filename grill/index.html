@@ -251,6 +251,8 @@ function record(key, ok) {
   store.scores[key] = a; saveStore();
 }
 function skillList() { return Object.keys(SKILLS); }
+// SL reads values off the graph instead of calculating (same column, same scores)
+function skillName(s) { return s === 'calc' && store.level === 'SL' ? 'Read graph' : SKILLS[s]; }
 
 // ---------- lines ----------
 const fLine = (k, m) => ({ t: 'f', k, m });   // y = k + m x
@@ -606,8 +608,6 @@ function calcsFor(sc) {
   const Qe = sc.xe * 10, L = [];
   if (sc.kind === 'tax') {
     const Qt = sc.xt * 10, t = sc.t;
-    L.push(['What price do consumers pay after the tax?', sc.Pc, '$', `Read across from where S + tax meets D: ${money(sc.Pc)}.`]);
-    L.push(['What quantity is traded after the tax?', Qt, 'units', `Read down from where S + tax meets D: ${Qt} units.`]);
     L.push(['What price do producers keep after the tax (Pp)?', sc.Pp, '$', `Pp = Pc − tax = ${money(sc.Pc)} − ${money(t)} = ${money(sc.Pp)}. It sits on the original S, straight below Pc.`]);
     L.push(['Calculate producer surplus after the tax.', 0.5 * (sc.Pp - sc.c) * Qt, '$', `½ × (Pp − ${money(sc.c)}) × Qt = ½ × ${money(sc.Pp - sc.c)} × ${Qt} = ${money(0.5 * (sc.Pp - sc.c) * Qt)}. (${money(sc.c)} is where S meets the price axis.)`]);
     L.push(['By how much does producer revenue fall?', sc.ye * Qe - sc.Pp * Qt, '$', `Before: Pe × Qe = ${money(sc.ye)} × ${Qe} = ${money(sc.ye * Qe)}. After: Pp × Qt = ${money(sc.Pp * Qt)}. Fall: ${money(sc.ye * Qe - sc.Pp * Qt)}.`]);
@@ -620,8 +620,6 @@ function calcsFor(sc) {
     L.push(['Calculate consumer surplus after the tax.', 0.5 * (sc.a - sc.Pc) * Qt, '$', `½ × (${money(sc.a)} − Pc) × Qt = ½ × ${money(sc.a - sc.Pc)} × ${Qt} = ${money(0.5 * (sc.a - sc.Pc) * Qt)}. (${money(sc.a)} is where demand meets the price axis.)`]);
   } else if (sc.kind === 'subsidy') {
     const Q2 = sc.xs * 10, s = sc.s;
-    L.push(['What price do consumers pay after the subsidy?', sc.Pc, '$', `Read across from where S + subsidy meets D: ${money(sc.Pc)}.`]);
-    L.push(['What quantity is traded after the subsidy?', Q2, 'units', `Read down from where S + subsidy meets D: ${Q2} units.`]);
     L.push(['What price do producers receive after the subsidy (Pp)?', sc.Pp, '$', `Pp = Pc + subsidy = ${money(sc.Pc)} + ${money(s)} = ${money(sc.Pp)}. It sits on the original S, straight above Pc.`]);
     L.push(['Calculate consumer surplus after the subsidy.', 0.5 * (sc.a - sc.Pc) * Q2, '$', `½ × (${money(sc.a)} − Pc) × Q2 = ½ × ${money(sc.a - sc.Pc)} × ${Q2} = ${money(0.5 * (sc.a - sc.Pc) * Q2)}. (${money(sc.a)} is where D meets the price axis.)`]);
     L.push(['How much of the subsidy goes to producers?', (sc.Pp - sc.ye) * Q2, '$', `(Pp − Pe) × Q2 = ${money(sc.Pp - sc.ye)} × ${Q2} = ${money((sc.Pp - sc.ye) * Q2)}.`]);
@@ -633,8 +631,6 @@ function calcsFor(sc) {
     L.push(['Calculate the deadweight (welfare) loss.', 0.5 * s * (Q2 - Qe), '$', `½ × subsidy × (Q2 − Qe) = ½ × ${money(s)} × ${Q2 - Qe} = ${money(0.5 * s * (Q2 - Qe))}.`]);
   } else if (sc.kind === 'ceiling') {
     const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = Dy(sc, sc.qs) - P;
-    L.push([`The ceiling is ${money(P)}. How much do firms supply?`, Qs, 'units', `Read down from where Pmax meets S: Qs = ${Qs} units.`]);
-    L.push([`The ceiling is ${money(P)}. How much do consumers want to buy?`, Qd, 'units', `Read down from where Pmax meets D: Qd = ${Qd} units.`]);
     L.push([`The ceiling is ${money(P)}. Calculate producer revenue.`, P * Qs, '$', `Firms sell Qs at Pmax: ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
     L.push([`The ceiling is ${money(P)}. Calculate the size of the shortage.`, Qd - Qs, 'units', `Qd − Qs = ${Qd} − ${Qs} = ${Qd - Qs} units.`]);
     L.push([`The ceiling is ${money(P)}. Calculate consumer expenditure after the ceiling.`, P * Qs, '$', `Only Qs is sold: Pmax × Qs = ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
@@ -645,8 +641,6 @@ function calcsFor(sc) {
     L.push([`The ceiling is ${money(P)}. Calculate the deadweight (welfare) loss.`, 0.5 * h * (Qe - Qs), '$', `At Qs = ${Qs}, demand is at ${money(P + h)}. ½ × ${money(h)} × (Qe − Qs = ${Qe - Qs}) = ${money(0.5 * h * (Qe - Qs))}.`]);
   } else {
     const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = P - Sy(sc, sc.qd);
-    L.push([`The floor is ${money(P)}. How much do firms supply?`, Qs, 'units', `Read down from where Pmin meets S: Qs = ${Qs} units.`]);
-    L.push([`The floor is ${money(P)}. How much do consumers buy?`, Qd, 'units', `Read down from where Pmin meets D: Qd = ${Qd} units.`]);
     L.push([`The floor is ${money(P)}. Calculate the size of the surplus.`, Qs - Qd, 'units', `Qs − Qd = ${Qs} − ${Qd} = ${Qs - Qd} units.`]);
     L.push([`The floor is ${money(P)}. The government buys the surplus. What does it spend?`, P * (Qs - Qd), '$', `Pmin × (Qs − Qd) = ${money(P)} × ${Qs - Qd} = ${money(P * (Qs - Qd))}.`]);
     L.push([`The floor is ${money(P)}. The government buys the surplus. Calculate producer revenue.`, P * Qs, '$', `All of Qs is sold at Pmin: ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
@@ -656,10 +650,22 @@ function calcsFor(sc) {
     L.push([`The floor is ${money(P)}. By how much does consumer expenditure change? (Use − for a fall.)`, P * Qd - sc.ye * Qe, '$', `After: Pmin × Qd = ${money(P * Qd)}. Before: Pe × Qe = ${money(sc.ye * Qe)}. Change: ${P * Qd - sc.ye * Qe < 0 ? '−' : ''}${money(Math.abs(P * Qd - sc.ye * Qe))}.`]);
     L.push([`The floor is ${money(P)}. The government does not buy the surplus. Calculate the deadweight loss.`, 0.5 * h * (Qe - Qd), '$', `At Qd = ${Qd}, supply is at ${money(P - h)}. ½ × ${money(h)} × (Qe − Qd = ${Qe - Qd}) = ${money(0.5 * h * (Qe - Qd))}.`]);
   }
-  // SL: prices, quantities, spending, revenue, government money, shortage/surplus size.
-  // HL adds surplus areas, deadweight loss, who pays/gets how much, and transfers.
-  const HL_ONLY = /consumer surplus|producer surplus|deadweight|paid by|goes to|surplus moves/i;
-  return L.map(([q, ans, unit, why]) => ({ q, ans, unit, why, hl: HL_ONLY.test(q) }));
+  return L.map(([q, ans, unit, why]) => ({ q, ans, unit, why }));
+}
+
+// SL does no calculations (Sam, 2026-10-29): it reads the labelled values off the graph instead.
+const READ_WHAT = {
+  Pe: 'the equilibrium price before the intervention', Qe: 'the equilibrium quantity before the intervention',
+  Pc: 'the price consumers pay', Pp: 'the price producers receive', Qt: 'the quantity traded after the tax', Q2: 'the quantity traded after the subsidy',
+  Pmax: 'the maximum price', Pmin: 'the minimum price', Qs: 'the quantity supplied', Qd: 'the quantity demanded',
+};
+function readsFor(sc) {
+  const L = [];
+  for (const p of diagram(sc).points) {
+    if (p.pn) L.push({ q: `What is ${p.pn}?`, ans: p.y, unit: '$', why: `${p.pn} is ${READ_WHAT[p.pn]}. Read across to the price axis: ${money(p.y)}.` });
+    if (p.qn) L.push({ q: `What is ${p.qn}?`, ans: p.x * 10, unit: 'units', why: `${p.qn} is ${READ_WHAT[p.qn]}. Read down to the quantity axis: ${p.x * 10} units.` });
+  }
+  return L;
 }
 
 // ---------- building questions ----------
@@ -714,7 +720,7 @@ function buildQuestion(kind, skill) {
   } else if (skill === 'effects') {
     shuffle(effectsFor(sc)).slice(0, 3).forEach(e => steps.push({ skill: 'effects', type: 'mc', ...e }));
   } else {
-    shuffle(calcsFor(sc).filter(c => store.level === 'HL' || !c.hl)).slice(0, 2).forEach(e => steps.push({ skill: 'calc', type: 'num', ...e }));
+    shuffle(store.level === 'HL' ? calcsFor(sc) : readsFor(sc)).slice(0, store.level === 'HL' ? 2 : 3).forEach(e => steps.push({ skill: 'calc', type: 'num', ...e }));
   }
   return { kind, sc, steps, i: 0 };
 }
@@ -753,9 +759,9 @@ function renderStep() {
   const st = Q.steps[Q.i], sc = Q.sc;
   ui = { selected: null, filled: {}, cells: null, checked: false, revealed: false, chip: null, tries: 0, wrongC: new Set(), bad: new Set() };
   document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
-  document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + SKILLS[st.skill] + (st.type === 'line' || st.noGraph ? '' : ' · ' + contextText(sc));
+  document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + skillName(st.skill) + (st.type === 'line' || st.noGraph ? '' : ' · ' + contextText(sc));
   document.getElementById('stepcount').textContent = Q.steps.length > 1 ? `Step ${Q.i + 1} of ${Q.steps.length}` : '';
-  document.getElementById('eqs').textContent = st.type === 'num' ? 'Use the graph.' : '';
+  document.getElementById('eqs').textContent = st.type === 'num' && store.level === 'HL' ? 'Use the graph.' : '';
   document.getElementById('feedback').innerHTML = '';
   document.getElementById('next-btn').hidden = true;
   document.getElementById('skip-btn').hidden = false;
@@ -1034,7 +1040,7 @@ async function sendReport() {
     diagram: JSON.stringify(question),
     meta: {
       page: location.host + location.pathname, browser: navigator.userAgent, viewport: innerWidth + 'x' + innerHeight,
-      level: store.level, topic: KINDS[Q.kind], skill: SKILLS[st.skill], stepType: st.type, prompt,
+      level: store.level, topic: KINDS[Q.kind], skill: skillName(st.skill), stepType: st.type, prompt,
     },
   };
   const btn = document.getElementById('report-send');
@@ -1060,9 +1066,9 @@ function scoreCell(k, s) {
 }
 function renderHome() {
   const sk = skillList();
-  let h = '<tr><th></th>' + sk.map(s => `<th><button class="skillbtn" onclick="startDrill('skill',null,'${s}')">${SKILLS[s]}</button></th>`).join('') + '</tr>';
+  let h = '<tr><th></th>' + sk.map(s => `<th><button class="skillbtn" onclick="startDrill('skill',null,'${s}')">${skillName(s)}</button></th>`).join('') + '</tr>';
   for (const k of Object.keys(KINDS)) {
-    h += `<tr><td class="row"><button class="topicbtn" onclick="startDrill('kind','${k}')">${KINDS[k]}</button></td>` + sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}" onclick="startDrill('cell','${k}','${s}')" aria-label="${KINDS[k]} ${SKILLS[s]}">${c.text}</button></td>`; }).join('') + '</tr>';
+    h += `<tr><td class="row"><button class="topicbtn" onclick="startDrill('kind','${k}')">${KINDS[k]}</button></td>` + sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}" onclick="startDrill('cell','${k}','${s}')" aria-label="${KINDS[k]} ${skillName(s)}">${c.text}</button></td>`; }).join('') + '</tr>';
   }
   document.getElementById('grid').innerHTML = h;
   document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));

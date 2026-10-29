@@ -266,25 +266,25 @@ test('what-if questions hide the graph; skip moves on without scoring', async pa
   assert(scores === '{}', 'skip records nothing: ' + scores);
 });
 
-test('SL gets number questions but not surplus, DWL or share calculations; no equations shown', async page => {
+test('SL reads labelled values off the graph and never calculates; no equations shown', async page => {
   await page.evaluate(() => setLevel('SL'));
   const t = await page.evaluate(() => document.getElementById('grid').textContent);
-  assert(t.includes('Calculate'), t);
+  assert(t.includes('Read graph') && !t.includes('Calculate'), t);
   const qs = await page.evaluate(() => {
     const seen = [];
     for (let i = 0; i < 40; i++) { startDrill('cell', ['tax', 'subsidy', 'ceiling', 'floor'][i % 4], 'calc'); Q.steps.forEach(s => seen.push(s.q)); }
     return { seen, eqs: document.getElementById('eqs').textContent };
   });
-  const bad = qs.seen.filter(q => /consumer surplus|producer surplus|deadweight|paid by|goes to|surplus moves/i.test(q));
+  const bad = qs.seen.filter(q => !/^What is (P|Q)\w+\?$/.test(q));
   assert(!bad.length, bad.join(' | '));
   assert(!/Qd =|Qs =/.test(qs.eqs), qs.eqs);
   for (let rep = 0; rep < 6; rep++) {
     await page.evaluate(k => startDrill('cell', k, 'calc'), KINDS_[rep % 4]);
-    for (let j = 0; j < 2; j++) { const v = await answerRight(page); assert(v === 'Correct', v); await page.click('#next-btn'); }
+    for (let j = 0; j < 3; j++) { const v = await answerRight(page); assert(v === 'Correct', v); await page.click('#next-btn'); }
   }
   await page.evaluate(() => setLevel('HL'));
-  const hl = await page.evaluate(() => { const s = new Set(); for (let i = 0; i < 80; i++) calcsFor(gen('tax')).forEach(c => s.add(c.hl)); return [...s]; });
-  assert(hl.includes(true) && hl.includes(false), 'HL has both kinds');
+  const t2 = await page.evaluate(() => document.getElementById('grid').textContent);
+  assert(t2.includes('Calculate'), t2);
   if (shots) {
     await page.screenshot({ path: `${shots}/home.png` });
     await page.setViewport({ width: 390, height: 844 });
