@@ -118,16 +118,17 @@
     const a = r.alloc;
     const order = partyOrder(r);
     const majority = Math.floor(a.house / 2) + 1;
-    // Left-leaning parties on the left of the bar, right-leaning on the right.
-    const barOrder = ['GRN', 'LAB', 'TPM', 'OPP', 'NZF', 'NAT', 'ACT'].filter(k => order.includes(k))
-      .concat(order.filter(k => !['GRN', 'LAB', 'TPM', 'OPP', 'NZF', 'NAT', 'ACT'].includes(k)));
+    // Left bloc on the left, Opportunity in the middle, right bloc on the right,
+    // with a line at the halfway point so you can see who gets over it.
+    const LR = ['GRN', 'LAB', 'TPM', 'OPP', 'NZF', 'ACT', 'NAT'];
+    const barOrder = LR.filter(k => order.includes(k)).concat(order.filter(k => !LR.includes(k)));
     $('#bar').innerHTML = barOrder.map(k => {
       const t = a.parties[k].total;
       return `<div style="flex:${t};background:${colour(k)};color:${textOn(colour(k))}" title="${esc(pname(k))}: ${t}">${t >= 4 ? t : ''}</div>`;
-    }).join('') + `<span class="maj" style="left:${(100 * majority / a.house).toFixed(2)}%" title="Majority: ${majority}"></span>`;
+    }).join('') + `<span class="half" title="Halfway: a majority needs ${majority}"></span>`;
 
     const over = Object.keys(a.parties).filter(k => a.parties[k].overhang > 0);
-    $('#house').innerHTML = `House of <strong>${a.house}</strong> seats; a majority needs <strong>${majority}</strong> (dashed line). ` +
+    $('#house').innerHTML = `House of <strong>${a.house}</strong> seats; a majority needs <strong>${majority}</strong> (the black line marks halfway). ` +
       (a.overhang > 0
         ? `That is ${a.overhang} more than 120 because of overhang: ${over.map(k => `${esc(pname(k))} wins ${a.parties[k].overhang} more electorate${a.parties[k].overhang > 1 ? 's' : ''} than its party vote entitles it to`).join('; ')}.`
         : 'No overhang.');

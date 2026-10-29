@@ -28,15 +28,22 @@
   }
 
   /* Weighted poll-of-polls.
-     Each poll is first rescaled to 100% (this removes undecideds), then weighted by
-     recency (exponential decay) and by the square root of its sample size.
-     The window is anchored on the newest poll in the data, not today's date, so an
-     old shared link reproduces the same average. */
+     Only each pollster's latest poll counts, so a pollster that polls more often
+     does not get more say. Each poll is rescaled to 100% (this removes undecideds),
+     then weighted by recency (exponential decay) and by the square root of its
+     sample size. The window is anchored on the newest poll in the data, not today's
+     date, so an old shared link reproduces the same average. */
   function pollAverage(polls, parties, excluded) {
     const ex = new Set(excluded || []);
     if (!polls.length) return null;
     const newest = polls.reduce((m, p) => (p.end > m ? p.end : m), polls[0].end);
-    const used = polls.filter(p => !ex.has(slug(p.pollster)) && days(newest, p.end) <= WINDOW_DAYS);
+    const latest = {};
+    for (const p of polls) {
+      if (ex.has(slug(p.pollster)) || days(newest, p.end) > WINDOW_DAYS) continue;
+      const cur = latest[p.pollster];
+      if (!cur || p.end > cur.end) latest[p.pollster] = p;
+    }
+    const used = Object.values(latest).sort((a, b) => (a.end < b.end ? 1 : -1));
     if (!used.length) return { avg: null, used, newest };
     const sums = Object.fromEntries(parties.map(k => [k, 0]));
     let sumOther = 0, sumW = 0;
@@ -52,8 +59,7 @@
     const avg = {};
     for (const k of parties) avg[k] = sums[k] / sumW;
     avg.OTH = sumOther / sumW;
-    const latest = used.reduce((m, p) => (p.end > m ? p.end : m), used[0].end);
-    return { avg, used, newest, latest };
+    return { avg, used, newest, latest: used[0].end };
   }
 
   /* Sainte-Laguë: divide each party's votes by 1, 3, 5, 7, ... and hand out

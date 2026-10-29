@@ -70,6 +70,16 @@ test('Poll average: all pollsters excluded gives no average', () => {
   assert.strictEqual(pa.avg, null);
 });
 
+test('Poll average uses only the latest poll from each pollster', () => {
+  const pa = M.pollAverage(data.polls, data.pollParties, []);
+  const names = pa.used.map(p => p.pollster);
+  assert.strictEqual(new Set(names).size, names.length);
+  for (const u of pa.used) {
+    const newer = data.polls.filter(p => p.pollster === u.pollster && p.end > u.end);
+    assert.strictEqual(newer.length, 0, u.pollster);
+  }
+});
+
 test('Poll average sums to 100', () => {
   const pa = M.pollAverage(data.polls, data.pollParties, []);
   const sum = Object.values(pa.avg).reduce((a, b) => a + b, 0);

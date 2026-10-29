@@ -11,6 +11,7 @@ Judgement calls made to ship V1 fast. Change any of these freely.
 - Pollster names are grouped: "Taxpayers' Union–Curia" and "Curia" are both **Curia**; 1 News–Verian is **1News Verian**; The Post/Freshwater Strategy is **Freshwater Strategy**.
 
 ## Model
+- Only the **latest poll from each pollster** counts (Sam, 29 Oct), so a pollster that polls more often gets no extra say. Before this, 1News Verian's 5 recent polls made up 44% of the average.
 - Poll window is anchored on the **newest poll in the data**, not today's date, so an old link gives the same average.
 - Polls with no published sample size are treated as n = 1000.
 - "Other" in each poll uses the Others column, or 100 minus the listed parties if blank.
