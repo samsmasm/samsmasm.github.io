@@ -38,7 +38,9 @@ Single page, hash routes. Views are `<section data-view>` in index.html; most wo
   per-country "Good for" picks (Sam removed them). Thesis comes first, then images to support it (Sam swapped
   these on 2026-10-26; `state.swap45` in app.js migrates old "done" ticks once).
 - `#step-6` Analyse your images: OPCVL then Context/Observe/Symbols/Perspective/Link writer for two images, with
-  Sam's template prompts, examples behind a click, sentence counter, copy button.
+  Sam's template prompts, examples behind a click, sentence counter, copy button. The copy keeps "Origin:" etc.
+  labels on OPCVL lines, but analysis lines (`one: true` fields) are the student's text only, one per line, no
+  "Context:"/"Observe:" labels, empty ones skipped (Sam's call, 2026-10-28).
 - `#step-7` Put it in a poster: A3, doesn't need to be beautiful (rubric doesn't reward design), what goes on it
   (title, name, thesis, two images with titles, analysis per image blended into a paragraph, in-text citations),
   Google Docs recommended (File > Page setup > A3) but anywhere is fine with no extra points, one example layout
