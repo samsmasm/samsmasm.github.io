@@ -1068,6 +1068,85 @@ test('undo and redo buttons work and grey out when there is nothing to do', asyn
   assert(await ev(page, `state.elements.length < ${n}`), 'redo did not delete again');
 });
 
+test('numbers: off by default, switch is undoable, saved, and templates turn it off', async (page) => {
+  eq(await ev(page, `[numbersOn(), document.getElementById('num-scale').style.display]`), [false, 'none'], 'off at start');
+  await page.click('#num-btn');
+  eq(await ev(page, `[numbersOn(), document.getElementById('num-scale').style.display, document.getElementById('num-yMax').value]`), [true, '', '10'], 'on, scale shown');
+  const data = await ev(page, `JSON.stringify(currentGraphData())`);
+  await ev(page, `undo()`);
+  eq(await ev(page, `[numbersOn(), document.getElementById('num-btn').getAttribute('aria-checked')]`), [false, 'false'], 'undo turns it off');
+  await ev(page, `applyGraphData(JSON.parse(${JSON.stringify(data)}))`);
+  eq(await ev(page, `numbersOn()`), true, 'loads from a save');
+  await ev(page, `loadTemplate('sd')`);
+  eq(await ev(page, `numbersOn()`), false, 'template has no numbers');
+});
+
+test('numbers: scale boxes change the scale, bad values go back', async (page) => {
+  await ev(page, `toggleNumbers()`);
+  await ev(page, `{ const i = document.getElementById('num-yMax'); i.value = '100'; setNumberScale(i, 'yMax'); }`);
+  eq(await ev(page, `[state.numbers.yMax, state.numbers.yStep, document.getElementById('num-yStep').value]`), [100, 10, '10'], 'y max (too many steps picks a round step)');
+  await ev(page, `{ const i = document.getElementById('num-yStep'); i.value = '5'; setNumberScale(i, 'yStep'); }`);
+  eq(await ev(page, `state.numbers.yStep`), 5, 'y step');
+  await ev(page, `{ const i = document.getElementById('num-yStep'); i.value = '1'; setNumberScale(i, 'yStep'); }`);
+  eq(await ev(page, `state.numbers.yStep`), 5, '100 steps refused');
+  await ev(page, `{ const i = document.getElementById('num-yStep'); i.value = '0'; setNumberScale(i, 'yStep'); }`);
+  eq(await ev(page, `[state.numbers.yStep, document.getElementById('num-yStep').value]`), [5, '5'], 'zero step refused');
+  await ev(page, `{ const i = document.getElementById('num-xStep'); i.value = '0.1'; setNumberScale(i, 'xStep'); }`);
+  eq(await ev(page, `state.numbers.xStep`), 1, 'more than 50 steps refused');
+  await ev(page, `undo(); undo();`);
+  eq(await ev(page, `[state.numbers.yMax, document.getElementById('num-yMax').value]`), [10, '10'], 'scale change undoable');
+});
+
+test('numbers: drawn lines and curve points snap to grid crossings; arrows do not', async (page) => {
+  await ev(page, `toggleNumbers(); setTool('line')`);
+  // Values (2.3, 3.2) → (7.7, 6.8) on a 0-10 grid.
+  await drag(page, await ptn(page, 0.23, 0.68), await ptn(page, 0.77, 0.32));
+  const l = await ev(page, `state.elements.at(-1)`);
+  assert(near(l.x1n, 0.2, 1e-6) && near(l.y1n, 0.7, 1e-6) && near(l.x2n, 0.8, 1e-6) && near(l.y2n, 0.3, 1e-6), 'line not on grid: ' + JSON.stringify(l));
+  await ev(page, `setTool('curve')`);
+  for (const [x, y] of [[0.12, 0.18], [0.48, 0.52]]) { const p = await ptn(page, x, y); await page.mouse.click(p.x, p.y); }
+  const last = await ptn(page, 0.83, 0.79);
+  await page.mouse.click(last.x, last.y, { count: 2 });
+  const c = await ev(page, `state.elements.at(-1)`);
+  eq(c.type, 'curve', 'curve made');
+  eq(c.points.map(p => [+p.xn.toFixed(6), +p.yn.toFixed(6)]), [[0.1, 0.2], [0.5, 0.5], [0.8, 0.8]], 'curve points on grid');
+  await ev(page, `setTool('arrow')`);
+  await drag(page, await ptn(page, 0.33, 0.95), await ptn(page, 0.57, 0.95));
+  assert(!near(await ev(page, `state.elements.at(-1).x1n`), 0.3, 1e-6), 'arrow snapped to the grid');
+  await ev(page, `toggleSnap(); setTool('line')`);
+  await drag(page, await ptn(page, 0.23, 0.68), await ptn(page, 0.77, 0.32));
+  assert(!near(await ev(page, `state.elements.at(-1).x1n`), 0.2, 1e-6), 'Snap off still snapped');
+});
+
+test('numbers: curves drag in whole steps; P/Q labels add their value; covered ticks hidden', async (page) => {
+  await ev(page, `state.elements = []; toggleNumbers();
+    const d = mkLine(0.1, 0.1, 0.9, 0.9, '#1a4a8a', 2.5, '', 'D'), s = mkLine(0.1, 0.9, 0.9, 0.1, '#c0473a', 2.5, '', 'S');
+    state.elements.push(d, s);
+    const e = mkDot(0.5, 0.5, '#888'); e.on = [d.id, s.id]; e.pLabel = 'P₁'; e.qLabel = 'Q₁'; e.showDot = true;
+    state.elements.push(e); redraw();`);
+  eq(await ev(page, `[dotLabelBox(state.elements[2], 'p').text, dotLabelBox(state.elements[2], 'q').text, state.elements[2].pLabel]`), ['P₁ = 5', 'Q₁ = 5', 'P₁'], 'labels');
+  // Drag S right by about 1.3 steps: it moves exactly 1.
+  await ev(page, `setTool('select')`);
+  await drag(page, await ptn(page, 0.3, 0.7), await ptn(page, 0.43, 0.7));
+  const s = await ev(page, `state.elements[1]`);
+  assert(near(s.x1n, 0.2, 1e-6) && near(s.y1n, 0.9, 1e-6), 'not one whole step: ' + JSON.stringify(s));
+  eq(await ev(page, `dotLabelBox(state.elements[2], 'p').text`), 'P₁ = 4.5', 'value follows the crossing');
+  await ev(page, `toggleNumbers()`);
+  eq(await ev(page, `dotLabelBox(state.elements[2], 'p').text`), 'P₁', 'plain label when off');
+});
+
+test('numbers: shift moves by whole steps; grid can be left out of pictures', async (page) => {
+  await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.7, 0.9, '#1a4a8a', 2.5, '', 'D')]; state.selectedId = state.elements[0].id; toggleNumbers(); shiftSelected(1);`);
+  const c = await ev(page, `state.elements.find(e => e.label === 'D₂')`);
+  assert(c && near(c.x1n, 0.3, 1e-6), 'shift not 2 steps: ' + JSON.stringify(c));
+  // A grid pixel inside an empty cell area: grid line at value 5 on x, high up.
+  const px = async () => ev(page, `(() => { const url = renderExport(1, 'image/png'); return new Promise(r => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); r(Array.from(x.getImageData(Math.round(toCanvas(0.5, 0).x), Math.round(toCanvas(0, 0.05).y), 1, 1).data.slice(0, 3))); }; im.src = url; }); })()`);
+  const withGrid = await px();
+  assert(withGrid[0] < 250, 'grid missing from picture: ' + withGrid);
+  await ev(page, `prefs.exportGrid = false`);
+  eq(await px(), [255, 255, 255], 'grid in picture when set to screen only');
+});
+
 // ─── RUNNER ──────────────────────────────────────────────────
 (async () => {
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });

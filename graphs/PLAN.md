@@ -206,7 +206,6 @@ Undo/Redo buttons; sidebar templates S&D, Keynesian AD/AS, AD/LRAS/SRAS; colour 
 ## Future ideas (Sam, 2026-10-25; not now)
 
 - **Custom styles, shareable.** Saved style presets (weights, guide style, fills, colours, label style) that can be shared by link, e.g. a teacher sets the house style for a class. Builds on the settings (gear).
-- **Numbered graphs** (Sam, 2026-10-29). Today diagrams are numberless (or whatever is typed into the axis titles). Add an option for numbered axes with faint grid lines, where line and curve points snap to the number points. For calculation diagrams (e.g. HL tax/subsidy with real prices and quantities).
 - **Questions after a while.** Once someone has used the site for a while, ask: teacher / student / other, plus a few questions. Shelved (2026-10-25): Sam doubts the answers would be usable for design. Don't build unless he raises it again.
 
 ### 2026-10-25: Phase 7 done (promoted)
@@ -225,3 +224,21 @@ Later the same day Sam had `graphs2/` (the redirect) deleted: nobody had visited
 - Arrows stay level/upright when their curves move (`level` flag) until an end is dragged to an angle; Make horizontal / vertical works on attached arrows.
 - New points' axis labels move clear of old ones (P left, Q down). Curve drags are axis-locked unless plainly diagonal.
 - 77 tests.
+
+## Numbered graphs (Sam, 2026-10-29)
+
+Until now diagrams were numberless (or whatever was typed into the axis titles). For calculation diagrams (e.g. HL tax/subsidy with real prices and quantities), a diagram can have numbered axes with a faint grid.
+
+Decisions (Sam's answers):
+- **Toggle, off by default.** A "Numbers" switch next to the B/W switch. When on, scale boxes show beside it.
+- **Scale:** each axis has its own max and step, always from 0 (default 0 to 10 by 1 on both).
+- **Snapping** (with Snap on): wherever you grab a line or curve, it moves in whole grid steps. New line ends, curve points and dragged handles snap to grid crossings. Arrows, braces, labels and points stay free (arrow ends need to land on curves). Shift curve moves by whole steps too. Snap off places freely.
+- **Equilibrium labels** keep their names and add the value: "P₁ = 40", "Q₁ = 25". The name stays editable. Tick numbers that a P/Q label would cover are hidden.
+- **Export:** the grid is in pictures by default; a setting turns that off (numbers always export).
+- **Existing diagrams:** turning numbers on moves nothing; only new drawing snaps. Templates have no numbers (loading one turns numbers off).
+- **No calculations** (areas, revenue): Sam said no.
+- The numbers setting is part of the diagram: saved, autosaved, undoable.
+
+### 2026-10-29: numbered axes built
+
+As above. Typing a new max that would give more than 50 steps picks a round step (0 to 100 by 1 becomes by 10), so the max can be typed first. 85 tests.

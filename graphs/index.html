@@ -266,6 +266,19 @@
   .mode-switch.bw .ms-knob { left: 16px; }
   .mode-switch:not(.bw) .ms-off, .mode-switch.bw .ms-on { color: var(--text); font-weight: 600; }
   .mode-switch:focus-visible .ms-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* On/off switch (Numbers): grey when off, dark when on. */
+  .mode-switch.onoff .ms-track { background: #c8c3b8; }
+  .mode-switch.onoff.on .ms-track { background: #1a1918; }
+  .mode-switch.onoff.on .ms-knob { left: 16px; }
+  .mode-switch.onoff.on .ms-on { color: var(--text); font-weight: 600; }
+  .num-scale { display: inline-flex; align-items: center; gap: 4px; }
+  .num-scale input {
+    width: 54px; font-size: 12px; font-family: var(--sans);
+    background: var(--tag-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 4px; color: var(--text);
+  }
+  .num-scale input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .num-scale .ns-gap { width: 6px; }
   .style-wrap { position: relative; }
   .tb-menu {
     display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 150;
@@ -589,6 +602,16 @@
       <button class="mode-switch bw" id="bw-btn" role="switch" aria-checked="true" aria-label="Black and white" onclick="toggleBW()">
         <span class="ms-label ms-off">Colour</span><span class="ms-track"><span class="ms-knob"></span></span><span class="ms-label ms-on">B/W</span>
       </button>
+      <button class="mode-switch onoff" id="num-btn" role="switch" aria-checked="false" aria-label="Numbered axes" title="Numbered axes with a faint grid" onclick="toggleNumbers()">
+        <span class="ms-track"><span class="ms-knob"></span></span><span class="ms-label ms-on">Numbers</span>
+      </button>
+      <span class="num-scale" id="num-scale" style="display:none">
+        <label>Y 0 to</label><input type="number" id="num-yMax" min="0" aria-label="Y-axis maximum" onchange="setNumberScale(this, 'yMax')">
+        <label>by</label><input type="number" id="num-yStep" min="0" aria-label="Y-axis step" onchange="setNumberScale(this, 'yStep')">
+        <span class="ns-gap"></span>
+        <label>X 0 to</label><input type="number" id="num-xMax" min="0" aria-label="X-axis maximum" onchange="setNumberScale(this, 'xMax')">
+        <label>by</label><input type="number" id="num-xStep" min="0" aria-label="X-axis step" onchange="setNumberScale(this, 'xStep')">
+      </span>
       <div class="style-wrap">
         <button class="tb-toggle" id="style-btn" onclick="toggleStyleMenu(event)" aria-haspopup="menu" aria-expanded="false">Style ▾</button>
         <div class="tb-menu" id="style-menu" role="menu">
@@ -764,8 +787,13 @@ const PLOT_H = H - MARGIN.top - MARGIN.bottom;
 // the sidebar's "Dashed" choice.
 const GUIDE = { color: '#888', weight: 1.5, dash: '6,4' }; // dash follows the guide setting (applyPrefs)
 
+// Numbered axes: off by default. Each axis counts from 0 to its max in steps,
+// with a faint grid line at every step. Part of the diagram (saved, undoable).
+const NUMBERS_DEFAULT = { on: false, xMax: 10, xStep: 1, yMax: 10, yStep: 1 };
+
 // ─── STATE ───────────────────────────────────────────────────
 let state = {
+  numbers: { ...NUMBERS_DEFAULT },
   title: '',
   yLabel: 'Price ($/unit)',
   xLabel: 'Quantity (units/week)',
@@ -795,7 +823,7 @@ let nodeDrag = null;
 const PREF_DEFAULTS = {
   bw: true, weight: 2.5, guide: 'dashed', fill: 'auto', textSize: 1,
   eqLabels: 'num', showDot: false, snap: true, start: 'last',
-  axisUnits: true, currency: '$', exportSize: 2, transparent: false,
+  axisUnits: true, currency: '$', exportSize: 2, transparent: false, exportGrid: true,
 };
 // `myPrefs` are the saved choices; `prefs` is what is in use: either those
 // or the defaults (the switch at the top of Settings). Switching to the
@@ -838,6 +866,7 @@ function snapshot() {
     title: state.title, yLabel: state.yLabel, xLabel: state.xLabel,
     xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
     yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
+    numbers: state.numbers,
   });
 }
 
@@ -847,6 +876,7 @@ function restoreSnapshot(snap) {
   document.getElementById('graph-title').value = state.title;
   document.getElementById('y-label').value = state.yLabel;
   document.getElementById('x-label').value = state.xLabel;
+  syncNumbersUI();
   if (state.selectedId && !state.elements.find(e => e.id === state.selectedId)) state.selectedId = null;
   renderLegendList();
   renderProps();
@@ -1319,9 +1349,12 @@ function setDiagram(t) {
   state.selectedId = null;
   state.xLabelDx = 0; state.xLabelDy = 0;
   state.yLabelDx = 0; state.yLabelDy = 0;
+  // Templates have no numbers; the scale is kept for switching back on.
+  state.numbers = { ...state.numbers, on: false };
   document.getElementById('graph-title').value = t.title;
   document.getElementById('y-label').value = t.yLabel;
   document.getElementById('x-label').value = t.xLabel;
+  syncNumbersUI();
 }
 
 // Loading is undoable rather than confirmed: a toast offers Undo when it
@@ -1565,11 +1598,11 @@ function hitTestAxisLabel(cx, cy) {
   ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   // X label: right-aligned to MARGIN.left+PLOT_W, below axis
   const xlx = MARGIN.left + PLOT_W + state.xLabelDx;
-  const xly = MARGIN.top + PLOT_H + 8 + state.xLabelDy;
+  const xly = xTitleY() + state.xLabelDy;
   const xw = ctx.measureText(state.xLabel).width;
   if (cx >= xlx - xw - 4 && cx <= xlx + 4 && Math.abs(cy - xly - 6) < 14) return 'xLabel';
   // Y label: rotated, top-left of y-axis; right-aligned so text ends at top
-  const ylx = MARGIN.left / 2 + state.yLabelDx;
+  const ylx = yTitleX() + state.yLabelDx;
   const yly = MARGIN.top + state.yLabelDy;
   const yw = ctx.measureText(state.yLabel).width;
   if (Math.abs(cx - ylx) < 12 && cy >= yly - 4 && cy <= yly + yw + 4) return 'yLabel';
@@ -1650,6 +1683,74 @@ function syncSnapButton() {
   btn.classList.toggle('active', snapEnabled);
 }
 
+// ─── NUMBERED AXES ───────────────────────────────────────────
+// With Snap on, new line ends, curve points and dragged handles go to grid
+// crossings, and lines and curves move in whole steps. Arrows, braces, labels
+// and points stay free (arrow ends need to land on curves).
+const numbersOn = () => !!(state.numbers && state.numbers.on);
+// One grid step in normalised units.
+const gridStepN = () => ({ x: state.numbers.xStep / state.numbers.xMax, y: state.numbers.yStep / state.numbers.yMax });
+const xValue = xn => xn * state.numbers.xMax;
+const yValue = yn => (1 - yn) * state.numbers.yMax;
+// "40", "2.5", "43.3": one decimal place more than the step has.
+function fmtNum(v, step) {
+  const dp = Math.min(3, (String(step).split('.')[1] || '').length + 1);
+  return String(+v.toFixed(dp));
+}
+
+function toggleNumbers() {
+  saveUndo();
+  state.numbers = { ...state.numbers, on: !numbersOn() };
+  syncNumbersUI();
+  redraw();
+}
+function syncNumbersUI() {
+  const nb = state.numbers;
+  const btn = document.getElementById('num-btn');
+  btn.classList.toggle('on', nb.on);
+  btn.setAttribute('aria-checked', String(nb.on));
+  document.getElementById('num-scale').style.display = nb.on ? '' : 'none';
+  for (const k of ['yMax', 'yStep', 'xMax', 'xStep']) document.getElementById('num-' + k).value = nb[k];
+}
+// A scale must be above 0 with at most 50 steps per axis; anything else
+// puts the box back as it was. A new max that would give too many steps
+// picks a round step for about 10 (0 to 100 by 1 becomes by 10), so the max
+// can be typed first. Nothing on the diagram moves.
+function setNumberScale(input, key) {
+  const v = parseFloat(input.value);
+  const nb = { ...state.numbers, [key]: v };
+  const a = key[0];
+  if (key.endsWith('Max') && v > 0 && v / nb[a + 'Step'] > 50) {
+    const raw = v / 10, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    nb[a + 'Step'] = +([1, 2, 5, 10].find(m => m * p >= raw - 1e-9) * p).toPrecision(6);
+  }
+  const ok = ['x', 'y'].every(a => nb[a + 'Max'] > 0 && nb[a + 'Step'] > 0 && nb[a + 'Max'] / nb[a + 'Step'] <= 50);
+  if (!ok || v === state.numbers[key]) {
+    input.value = state.numbers[key];
+    if (!ok) showToast('Use numbers above 0, with at most 50 steps on each axis.');
+    return;
+  }
+  saveUndo();
+  state.numbers = nb;
+  syncNumbersUI();
+  redraw();
+}
+
+// Nearest grid crossing inside the plot (canvas px), or null when numbers
+// or Snap are off. y counts up from the x-axis.
+function gridSnap(cx, cy) {
+  if (!snapEnabled || !numbersOn()) return null;
+  const s = gridStepN(), n = fromCanvas(cx, cy);
+  const fit = (v, step) => Math.min(Math.floor(1 / step + 1e-9) * step, Math.max(0, Math.round(v / step) * step));
+  return toCanvas(fit(n.xn, s.x), 1 - fit(1 - n.yn, s.y));
+}
+// A drag of a line or curve, rounded to whole grid steps.
+function gridDelta(dxn, dyn) {
+  if (!snapEnabled || !numbersOn()) return [dxn, dyn];
+  const s = gridStepN();
+  return [Math.round(dxn / s.x) * s.x, Math.round(dyn / s.y) * s.y];
+}
+
 // Settings that act on what is on screen now, as well as on start-up.
 function applyPrefs() {
   GUIDE.dash = prefs.guide === 'dotted' ? '2,3' : '6,4';
@@ -1678,6 +1779,7 @@ const PREF_FIELDS = [
     ['textSize', 'Text size', [[0.85, 'Small'], [1, 'Normal'], [1.25, 'Large (for slides)']]],
     ['exportSize', 'Picture size', [[2, 'Large (1360 px wide)'], [4, 'Extra large (2720 px wide)']]],
     ['transparent', 'PNG background', [[false, 'White'], [true, 'Transparent (for coloured slides)']]],
+    ['exportGrid', 'Grid on numbered diagrams', [[true, 'In pictures too'], [false, 'On screen only']]],
   ]],
 ];
 
@@ -2206,7 +2308,9 @@ function removeWithDependents(ids) {
   if (gone.has(state.selectedId)) state.selectedId = null;
 }
 
-function getSnapCandidate(cx, cy, includeOnSeg = false) {
+// `grid`: on numbered diagrams, also snap to the nearest grid crossing (for
+// lines and curves, not arrows).
+function getSnapCandidate(cx, cy, includeOnSeg = false, grid = false) {
   if (!snapEnabled) return null;
   const SNAP_R = 14;
   const candidates = [];
@@ -2246,6 +2350,10 @@ function getSnapCandidate(cx, cy, includeOnSeg = false) {
     const d = Math.hypot(cx-p.x, cy-p.y);
     if (d < bestDist) { bestDist = d; best = p; }
   });
+
+  // Numbered diagrams: a grid crossing, unless a crossing above is closer.
+  const g = grid && gridSnap(cx, cy);
+  if (g && (!best || Math.hypot(cx - g.x, cy - g.y) < bestDist)) best = g;
 
   // Fallback: closest point on any segment (only when requested, e.g. for region drawing)
   if (!best && includeOnSeg) {
@@ -2297,7 +2405,7 @@ function hitTestNode(cx, cy, el) {
 
 function applyNodeMove(el, node, cx, cy) {
   delete el.full; // reshaped by hand: what is drawn is now the whole shape
-  const snap = getSnapCandidate(cx, cy);
+  const snap = getSnapCandidate(cx, cy, false, isShiftable(el));
   const n = snap ? fromCanvas(snap.x, snap.y) : fromCanvas(cx, cy);
   if (isLinear(el)) {
     if (node === 'p1') { el.x1n = n.xn; el.y1n = n.yn; }
@@ -2484,6 +2592,7 @@ function redraw() {
   // Apply view transform for all diagram drawing
   applyViewXform();
   drawBackground();
+  drawGrid();
   drawAxes();
   drawElements();
   drawExportFrame();
@@ -2531,6 +2640,7 @@ function drawAxes() {
   ctx.stroke();
 
   ctx.restore();
+  drawAxisNumbers();
 
   // Axis labels at ends of axes
   ctx.save();
@@ -2539,10 +2649,10 @@ function drawAxes() {
   // X label — below and right-aligned to the right end of x-axis
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, MARGIN.top + PLOT_H + 8 + state.xLabelDy);
+  ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, xTitleY() + state.xLabelDy);
   // Y label — rotated 90° CCW, top-left of y-axis
   ctx.save();
-  ctx.translate(MARGIN.left / 2 + state.yLabelDx, MARGIN.top + state.yLabelDy);
+  ctx.translate(yTitleX() + state.yLabelDx, MARGIN.top + state.yLabelDy);
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -2555,6 +2665,66 @@ function drawAxes() {
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(state.title, W / 2, 26);
 
+  ctx.restore();
+}
+
+// Axis titles move clear of the numbers on numbered diagrams.
+const xTitleY = () => MARGIN.top + PLOT_H + (numbersOn() ? 26 : 8);
+const yTitleX = () => MARGIN.left / 2 - (numbersOn() ? 12 : 0);
+
+// Faint grid on numbered diagrams, one line per step. Settings can leave it
+// out of pictures (the numbers always go in).
+function drawGrid() {
+  if (!numbersOn() || (exporting && !prefs.exportGrid)) return;
+  const nb = state.numbers;
+  ctx.save();
+  ctx.strokeStyle = '#e4e0d8'; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath();
+  for (let i = 1; i * nb.xStep <= nb.xMax + 1e-9; i++) {
+    const x = toCanvas(i * nb.xStep / nb.xMax, 0).x;
+    ctx.moveTo(x, MARGIN.top); ctx.lineTo(x, MARGIN.top + PLOT_H);
+  }
+  for (let i = 1; i * nb.yStep <= nb.yMax + 1e-9; i++) {
+    const y = toCanvas(0, 1 - i * nb.yStep / nb.yMax).y;
+    ctx.moveTo(MARGIN.left, y); ctx.lineTo(MARGIN.left + PLOT_W, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Ticks and numbers on both axes. Crowded numbers are thinned (every 2nd,
+// 5th...), and a number a P/Q label would cover is left out: the label
+// already gives the value.
+function drawAxisNumbers() {
+  if (!numbersOn()) return;
+  const nb = state.numbers;
+  const covers = state.elements.filter(e => e.type === 'dot')
+    .flatMap(e => [dotLabelBox(e, 'p'), dotLabelBox(e, 'q')]).filter(Boolean);
+  const h = fontPx(11) + 2;
+  const free = (x, y, w) => !covers.some(b => Math.abs(b.x - x) < (b.w + w) / 2 + 2 && Math.abs(b.y - y) < (b.h + h) / 2);
+  const every = (px, need) => [1, 2, 5, 10, 20, 25, 50].find(k => k * px >= need) || 50;
+  const ox = MARGIN.left, oy = MARGIN.top + PLOT_H;
+  ctx.save();
+  ctx.font = `500 ${fontPx(11)}px "IBM Plex Sans", sans-serif`;
+  ctx.fillStyle = '#5a5650'; ctx.strokeStyle = '#1a1918'; ctx.lineWidth = 1.2;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const text = (s, x, y) => { const w = ctx.measureText(s).width; if (free(x, y, w)) ctx.fillText(s, x, y); };
+  const xs = [], ys = [];
+  for (let i = 1; i * nb.xStep <= nb.xMax + 1e-9; i++) xs.push(i);
+  for (let i = 1; i * nb.yStep <= nb.yMax + 1e-9; i++) ys.push(i);
+  const xw = Math.max(...xs.map(i => ctx.measureText(fmtNum(i * nb.xStep, nb.xStep)).width));
+  const kx = every(PLOT_W * nb.xStep / nb.xMax, xw + 6), ky = every(PLOT_H * nb.yStep / nb.yMax, h + 2);
+  ctx.beginPath();
+  xs.forEach(i => { const x = toCanvas(i * nb.xStep / nb.xMax, 0).x; ctx.moveTo(x, oy); ctx.lineTo(x, oy + 4); });
+  ys.forEach(i => { const y = toCanvas(0, 1 - i * nb.yStep / nb.yMax).y; ctx.moveTo(ox, y); ctx.lineTo(ox - 4, y); });
+  ctx.stroke();
+  xs.forEach(i => { if (i % kx === 0) text(fmtNum(i * nb.xStep, nb.xStep), toCanvas(i * nb.xStep / nb.xMax, 0).x, oy + 12); });
+  ys.forEach(i => {
+    if (i % ky) return;
+    const s = fmtNum(i * nb.yStep, nb.yStep), w = ctx.measureText(s).width;
+    text(s, ox - 8 - w / 2, toCanvas(0, 1 - i * nb.yStep / nb.yMax).y);
+  });
+  text('0', ox - 8 - ctx.measureText('0').width / 2, oy + 12);
   ctx.restore();
 }
 
@@ -2743,9 +2913,15 @@ function drawTextEl(el) {
 
 // Where a dot's P and Q labels sit: centre point plus size, for drawing,
 // hit testing and inline editing. Offsets pDx/pDy, qDx/qDy are hand nudges.
+// On numbered diagrams the label adds its value: "P₁ = 40" (only the name
+// is stored and edited).
 function dotLabelBox(el, which) {
-  const text = which === 'p' ? el.pLabel : el.qLabel;
+  let text = which === 'p' ? el.pLabel : el.qLabel;
   if (!text) return null;
+  if (numbersOn()) {
+    const nb = state.numbers;
+    text += ' = ' + (which === 'p' ? fmtNum(yValue(el.yn), nb.yStep) : fmtNum(xValue(el.xn), nb.xStep));
+  }
   ctx.save();
   ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
   const w = ctx.measureText(text).width;
@@ -3191,7 +3367,7 @@ function onMouseDown(e) {
       canvas.style.cursor = 'grabbing';
     }
   } else if (isLinearTool(state.tool)) {
-    const snapStart = getSnapCandidate(cx, cy);
+    const snapStart = getSnapCandidate(cx, cy, false, state.tool === 'line');
     const startN = snapStart ? fromCanvas(snapStart.x, snapStart.y) : n;
     drawing = true;
     drawStart = { xn: startN.xn, yn: startN.yn };
@@ -3199,7 +3375,9 @@ function onMouseDown(e) {
     // The second click of a double-click finishes the curve (onDblClick);
     // it must not also add a duplicate point.
     if (clickCount > 1) return;
-    curvePoints.push({ xn: n.xn, yn: n.yn });
+    const gs = gridSnap(cx, cy);
+    const pn = gs ? fromCanvas(gs.x, gs.y) : n;
+    curvePoints.push({ xn: pn.xn, yn: pn.yn });
     if (curvePoints.length === 1) {
       drawing = true;
     }
@@ -3342,7 +3520,7 @@ function onMouseMove(e) {
   }
 
   if ((isLinearTool(state.tool)) && drawing && drawStart) {
-    const geoSnap = getSnapCandidate(cx, cy);
+    const geoSnap = getSnapCandidate(cx, cy, false, state.tool === 'line');
     const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
                          : getSnappedEnd(drawStart, n, e.shiftKey);
     redraw();
@@ -3364,10 +3542,12 @@ function onMouseMove(e) {
     if (state.tool === 'dbarrow') drawArrowhead(b.x, b.y, a.x, a.y, w);
     if (geoSnap) drawSnapIndicator(geoSnap.x, geoSnap.y);
   } else if (state.tool === 'curve' && drawing && curvePoints.length > 0) {
+    const gs = gridSnap(cx, cy);
     redraw();
     ctx.save(); applyViewXform();
-    drawCurvePreview(n);
+    drawCurvePreview(gs ? fromCanvas(gs.x, gs.y) : n);
     ctx.restore();
+    if (gs) drawSnapIndicator(gs.x, gs.y);
   } else if (state.tool === 'region' && drawing && curvePoints.length > 0) {
     const geoSnap = getSnapCandidate(cx, cy, true);
     let previewN;
@@ -3395,6 +3575,8 @@ function onMouseMove(e) {
     if (el.type === 'line' || el.type === 'curve') [dx, dy] = axisLock(dx, dy);
     let dxn = dx / PLOT_W;
     let dyn = dy / PLOT_H;
+    // Numbered diagrams: lines and curves move in whole grid steps.
+    if (isShiftable(el)) [dxn, dyn] = gridDelta(dxn, dyn);
     if (!drawStart.moved) {
       if (Math.hypot(dx, dy) < 2) return;
       if (el.type === 'dot' && el.on) {
@@ -3459,7 +3641,7 @@ function onMouseMove(e) {
   }
   // Show snap indicator while hovering with drawing tools
   if ((isLinearTool(state.tool) || state.tool === 'curve' || state.tool === 'region') && !drawing) {
-    const snap = getSnapCandidate(cx, cy);
+    const snap = getSnapCandidate(cx, cy, false, state.tool === 'line' || state.tool === 'curve');
     if (snap) { redraw(); drawSnapIndicator(snap.x, snap.y); snapHoverActive = true; }
     else if (snapHoverActive) { redraw(); snapHoverActive = false; }
   }
@@ -3495,7 +3677,7 @@ function onMouseUp(e) {
   if (axisLabelDrag) { axisLabelDrag = null; return; }
 
   if ((isLinearTool(state.tool)) && drawing && drawStart) {
-    const geoSnap = getSnapCandidate(cx, cy);
+    const geoSnap = getSnapCandidate(cx, cy, false, state.tool === 'line');
     const endN = geoSnap ? fromCanvas(geoSnap.x, geoSnap.y)
                          : getSnappedEnd(drawStart, n, e.shiftKey);
     const dist = Math.hypot(endN.xn - drawStart.xn, endN.yn - drawStart.yn);
@@ -4033,7 +4215,9 @@ function shiftSelected(dir) {
   let el = elById(state.selectedId);
   if (!el || (el.type !== 'line' && el.type !== 'curve')) return;
   saveUndo();
-  const dx = SHIFT_BY * dir * PLOT_W;
+  // Numbered diagrams shift by whole grid steps (at least one).
+  const by = numbersOn() ? Math.max(1, Math.round(SHIFT_BY / gridStepN().x + 1e-9)) * gridStepN().x : SHIFT_BY;
+  const dx = by * dir * PLOT_W;
   // The arrow always starts from this (the last) curve and always makes a
   // new curve, even back on top of an older one (S₁ → S₂ → S₃, with S₃ where
   // S₁ is). Only when this curve's latest arrow already goes to a curve in
@@ -4041,7 +4225,7 @@ function shiftSelected(dir) {
   // further from there (D₂ → D₃) instead of stacking a second D₂.
   let copy, twin;
   for (let i = 0; i < 20; i++) {
-    copy = copyOf(el, SHIFT_BY * dir, 0);
+    copy = copyOf(el, by * dir, 0);
     const twins = state.elements.filter(e => e !== el && (e.type === 'line' || e.type === 'curve') && sameShape(copy, e));
     twin = twins[0];
     if (!twin) break;
@@ -4822,7 +5006,7 @@ function restoreAutosave() {
     }
   }
   const g = saved && saved.graph;
-  if (!g || !((g.elements && g.elements.length) || g.title)) return false;
+  if (!g || !((g.elements && g.elements.length) || g.title || (g.numbers && g.numbers.on))) return false;
   applyGraphData(g);
   driveCurrentFile = saved.driveFile || null;
   return true;
@@ -4845,6 +5029,7 @@ function currentGraphData() {
     legend: state.legend, elements: state.elements,
     xLabelDx: state.xLabelDx, xLabelDy: state.xLabelDy,
     yLabelDx: state.yLabelDx, yLabelDy: state.yLabelDy,
+    numbers: state.numbers,
   };
 }
 
@@ -4921,6 +5106,8 @@ function applyGraphData(data) {
   state.xLabel = data.xLabel || 'Quantity (units/week)';
   state.xLabelDx = data.xLabelDx || 0; state.xLabelDy = data.xLabelDy || 0;
   state.yLabelDx = data.yLabelDx || 0; state.yLabelDy = data.yLabelDy || 0;
+  state.numbers = { ...NUMBERS_DEFAULT, ...(data.numbers || {}) };
+  syncNumbersUI();
   const maxId = state.elements.reduce((m, e) => Math.max(m, e.id || 0), 0);
   nextId = maxId + 1;
   document.getElementById('graph-title').value = state.title;
