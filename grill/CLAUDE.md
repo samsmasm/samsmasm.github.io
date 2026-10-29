@@ -17,6 +17,11 @@ Drills IB Economics government intervention diagrams: indirect tax, subsidy, pri
 - **What-if questions** ("the ceiling is set above Pe...") contradict the drawn market, so they carry `noGraph`: no chart, no context line.
 - **Labels**: drag a chip (or a filled box) onto a box, or tap chip then box (`placeLabel`, pointer-event drag with a ghost chip). A wrong check sends the wrong labels back to the list and leaves their boxes empty and red.
 - **Skip question** button: new question, nothing scored.
+- **Choosing a drill**: Totally random (`mix`), Practise my weakest (`weak`), a topic row name (`kind`: random skill), a skill column name (`skill`: random topic), or one box (`cell`).
+- **Calculate is SL and HL** (Sam, 2026-10-29). SL: prices, quantities, spending, revenue, government money, shortage/surplus size. HL adds anything matching `HL_ONLY` in `calcsFor` (consumer/producer surplus, DWL, shares of the tax/subsidy, transfers). **No Qd/Qs functions anywhere**: the 2027 guide doesn't use them and Sam doesn't want students thinking they need them. Every value is read off the graph, so generators keep all needed points on gridlines (including the DWL corner for ceilings/floors).
+- **Shading** puts DWL in about half of shade questions (Sam wants DWL identification drilled).
+- **Report a problem**: link under each question opens an inline panel (reason chips + optional text) and POSTs to the shared feedback Worker with `app: 'grill'`; `diagram` holds the question, market and the student's answer as JSON (shown under "Attached data" in the inbox).
+- **Enter key**: marks the answer, then a second Enter moves on. The keydown handler calls `preventDefault()`, otherwise focus moves to Next during marking and the same Enter press clicks it (Sam hit this).
 - **Progress**: localStorage `grill_v1` = `{ level, scores: { 'tax.shade': [last 10 as 1/0] } }`. "Practise my weakest" picks untried cells first, then the lowest score.
 - Floor welfare (CS/PS/DWL) assumes the government does NOT buy the surplus; the "government buys the surplus" questions say so.
 

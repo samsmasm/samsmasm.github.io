@@ -26,4 +26,6 @@ Limits: 12 reports per IP per hour (soft, KV based), message 4000 chars, image 2
 
 POST to `https://unisam.nz/feedback/api/report` with a unique `app` name. Keep any screenshot or user content **opt-in and unticked by default**, and say in the form exactly what else is sent. See `graphs/index.html` (search `FEEDBACK`) for a complete example, including the `recentErrors` ring buffer sent in `meta.errors`.
 
+Tools in use: `graphs` (ShiftWork), `grill` (Grill sends the reported question, its market and the student's answer as JSON in `diagram`; the inbox shows non-ShiftWork `diagram` data under "Attached data").
+
 The "Open this diagram" handoff writes the diagram to localStorage `sw2_open` and opens `/<app>/`; ShiftWork reads and clears it on load. It only works when the inbox is opened on unisam.nz (same origin as the app).

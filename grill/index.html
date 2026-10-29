@@ -50,7 +50,17 @@
   .grid th { font: 400 14px var(--block); color: var(--deep); text-align: center; padding: 4px 2px; letter-spacing: .06em; text-transform: uppercase; }
   .grid th:first-child { text-align: left; }
   .grid td { padding: 0; text-align: center; }
-  .grid td.row { text-align: left; font: 400 18px var(--block); color: #fff; background: var(--deep); padding: 10px 10px; border-radius: 4px; letter-spacing: .03em; text-transform: uppercase; }
+  .grid td.row { padding: 0; }
+  .grid .topicbtn {
+    width: 100%; text-align: left; font: 400 18px var(--block); color: #fff; background: var(--deep); padding: 11px 10px;
+    border: 2.5px solid var(--deep); border-radius: 4px; letter-spacing: .03em; text-transform: uppercase;
+  }
+  .grid .topicbtn:hover { background: var(--red); }
+  .grid .skillbtn {
+    font: 400 14px var(--block); color: var(--deep); background: none; border: none; border-bottom: 3px solid var(--amber);
+    padding: 4px 2px; letter-spacing: .06em; text-transform: uppercase; width: auto;
+  }
+  .grid .skillbtn:hover { color: var(--orange); background: none; }
   .grid button {
     width: 100%; padding: 11px 2px; background: var(--tint); border: 2.5px solid var(--char); border-radius: 4px; cursor: pointer;
     font: 800 16px var(--sans); color: #b8a49c;
@@ -104,6 +114,11 @@
   .feedback { margin: 10px 0; }
   .verdict { font: 400 28px var(--block); letter-spacing: .04em; text-transform: uppercase; }
   .verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+  #report-link { margin-top: 26px; }
+  .report { margin-top: 22px; padding: 14px; border: 2.5px solid var(--char); border-radius: 4px; background: var(--tint); }
+  .report-title { font: 400 18px var(--block); color: var(--deep); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 8px; }
+  .report textarea { width: 100%; margin: 10px 0; font: 15px var(--sans); padding: 8px; border: 2px solid var(--char); border-radius: 4px; }
+  .report .chip { font-size: 14px; }
   .tip { font-size: 16px; font-weight: 600; margin-top: 2px; }
   .giveup { background: none; border: none; padding: 0; margin-top: 10px; font: 600 13px var(--sans); color: var(--muted); text-decoration: underline; cursor: pointer; }
   details { margin-top: 6px; font-size: 15px; color: #3a2a24; line-height: 1.5; }
@@ -159,12 +174,12 @@
 
 <main id="home">
   <h2>Pick a drill</h2>
-  <p class="lede">Scores are your last 10 tries. Tap a box to drill it.</p>
-  <table class="grid" id="grid"></table>
   <div class="actions">
-    <button class="btn primary" onclick="startDrill('weak')">Practise my weakest</button>
-    <button class="btn" onclick="startDrill('mix')">Mix everything</button>
+    <button class="btn primary" onclick="startDrill('mix')">Totally random</button>
+    <button class="btn" onclick="startDrill('weak')">Practise my weakest</button>
   </div>
+  <p class="lede" style="margin-top:16px">Or tap a topic, a skill, or one box. Scores are your last 10 tries.</p>
+  <table class="grid" id="grid"></table>
   <button class="reset" id="reset-btn" onclick="resetProgress()">Reset my progress</button>
 </main>
 
@@ -185,6 +200,24 @@
   </div>
   <div class="feedback" id="feedback"></div>
   <div class="actions"><button class="btn primary" id="next-btn" onclick="nextStep()" hidden>Next</button></div>
+  <button class="giveup" id="report-link" onclick="toggleReport()">Report a problem with this question</button>
+  <div class="report" id="report" hidden>
+    <div class="report-title">What’s wrong?</div>
+    <div class="chips" id="report-reasons">
+      <button class="chip" data-reason="The answer is wrong">The answer is wrong</button>
+      <button class="chip" data-reason="The graph looks wrong">The graph looks wrong</button>
+      <button class="chip" data-reason="The question is confusing">It’s confusing</button>
+      <button class="chip" data-reason="Something else">Something else</button>
+    </div>
+    <textarea id="report-text" rows="2" maxlength="1000" placeholder="Anything else? (optional)"></textarea>
+    <input id="report-website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+    <div class="actions">
+      <button class="btn primary" id="report-send" onclick="sendReport()">Send</button>
+      <button class="btn" onclick="toggleReport(false)">Cancel</button>
+    </div>
+    <div class="hint">Sends this question and your answer so far. Nothing else.</div>
+    <div class="hint" id="report-msg"></div>
+  </div>
 </main>
 
 <footer>Built by Sam G · all vibe coded · progress is saved in this browser only · <a href="/">unisam.nz</a></footer>
@@ -217,7 +250,7 @@ function record(key, ok) {
   a.push(ok ? 1 : 0); while (a.length > 10) a.shift();
   store.scores[key] = a; saveStore();
 }
-function skillList() { return Object.keys(SKILLS).filter(s => s !== 'calc' || store.level === 'HL'); }
+function skillList() { return Object.keys(SKILLS); }
 
 // ---------- lines ----------
 const fLine = (k, m) => ({ t: 'f', k, m });   // y = k + m x
@@ -276,7 +309,9 @@ function controlOK(m, P) {
 function genControl(kind) {
   for (;;) {
     const m = baseMarket(), dir = kind === 'ceiling' ? -1 : 1;
-    const ok = [1, 2, 3, 4, 5].filter(g => controlOK(m, m.ye + dir * g) && Math.abs(Sx(m, m.ye + dir * g) - Dx(m, m.ye + dir * g)) >= 1);
+    // the DWL corner (demand above Qs, or supply below Qd) must sit on a gridline so HL can read it
+    const corner = P => kind === 'ceiling' ? Dy(m, Sx(m, P)) : Sy(m, Dx(m, P));
+    const ok = [1, 2, 3, 4, 5].filter(g => controlOK(m, m.ye + dir * g) && Math.abs(Sx(m, m.ye + dir * g) - Dx(m, m.ye + dir * g)) >= 1 && isInt(corner(m.ye + dir * g)));
     if (!ok.length) continue;
     const g = pick(ok);
     const sc = { ...m, kind, gap: g };
@@ -503,6 +538,15 @@ function effectsFor(sc) {
     L.push(['What happens to producer surplus?', UDN, 'Falls', 'Producers keep less per unit and sell less.']);
     L.push(['Who pays more of the tax in this market?', ['Consumers', 'Producers', 'Shared equally'], cs > ps ? 'Consumers' : cs < ps ? 'Producers' : 'Shared equally',
       `Consumers pay ${money(cs)} more per unit (Pc − Pe); producers keep ${money(ps)} less (Pe − Pp). The steeper (more inelastic) side pays more.`]);
+    const dExp = sc.Pc * sc.xt - sc.ye * sc.xe;
+    L.push(['What happens to consumer expenditure in this market?', UDN, dExp > 0 ? 'Rises' : dExp < 0 ? 'Falls' : 'No change',
+      `Before: Pe × Qe = ${money(sc.ye)} × ${sc.xe * 10} = ${money(sc.ye * sc.xe * 10)}. After: Pc × Qt = ${money(sc.Pc)} × ${sc.xt * 10} = ${money(sc.Pc * sc.xt * 10)}. It depends on how elastic demand is.`]);
+    L.push(['What happens to producer revenue?', UDN, 'Falls', 'Producers keep a lower price (Pp) on fewer units (Qt).']);
+    L.push(['What happens to government revenue?', UDN, 'Rises', 'The government collects the tax on every unit sold: (Pc − Pp) × Qt.']);
+    L.push(['On the graph, the tax per unit is...', ['Pc − Pp', 'Pc − Pe', 'Pe − Pp'], 'Pc − Pp', 'The vertical gap between S + tax and S. Pc − Pe is only the consumers’ share.']);
+    L.push(['The triangle between Qt and Qe, between D and S, is...', ['Deadweight (welfare) loss', 'Tax revenue', 'Consumer surplus'], 'Deadweight (welfare) loss', 'Those units are no longer traded, so the surplus they made is lost to everyone.']);
+    L.push(['Supply is perfectly price inelastic. Who pays the tax?', ['Producers', 'Consumers', 'Shared equally'], 'Producers', 'Producers can’t cut output, so the price can’t rise: they absorb all of it.', true]);
+    L.push(['Why might a government put an indirect tax on a good?', ['To raise revenue and cut consumption', 'To raise output of the good', 'To lower prices for consumers'], 'To raise revenue and cut consumption', 'Taxes raise government revenue and, by raising the price, reduce consumption (e.g. of cigarettes).', true]);
     L.push(['Demand is much more price inelastic than supply. Who pays most of a tax?', ['Consumers', 'Producers', 'Shared equally'], 'Consumers', 'Inelastic demand means consumers keep buying, so producers can pass most of the tax on in a higher price.', true]);
   } else if (sc.kind === 'subsidy') {
     const cs = sc.ye - sc.Pc, ps = sc.Pp - sc.ye;
@@ -513,6 +557,14 @@ function effectsFor(sc) {
     L.push(['What happens to producer surplus?', UDN, 'Rises', 'Producers receive more per unit and sell more.']);
     L.push(['Who gains more per unit from this subsidy?', ['Consumers', 'Producers', 'Shared equally'], cs > ps ? 'Consumers' : cs < ps ? 'Producers' : 'Shared equally',
       `Consumers pay ${money(cs)} less per unit (Pe − Pc); producers receive ${money(ps)} more (Pp − Pe).`]);
+    const dExp = sc.Pc * sc.xs - sc.ye * sc.xe;
+    L.push(['What happens to consumer expenditure in this market?', UDN, dExp > 0 ? 'Rises' : dExp < 0 ? 'Falls' : 'No change',
+      `Before: Pe × Qe = ${money(sc.ye * sc.xe * 10)}. After: Pc × Q2 = ${money(sc.Pc)} × ${sc.xs * 10} = ${money(sc.Pc * sc.xs * 10)}. It depends on how elastic demand is.`]);
+    L.push(['What happens to producer revenue?', UDN, 'Rises', 'Producers receive a higher price (Pp) on more units (Q2).']);
+    L.push(['On the graph, the subsidy per unit is...', ['Pp − Pc', 'Pp − Pe', 'Pe − Pc'], 'Pp − Pc', 'The vertical gap between S and S + subsidy.']);
+    L.push(['Who pays for the subsidy?', ['Taxpayers', 'Consumers of the good', 'Producers of the good'], 'Taxpayers', 'Government spending comes from taxes (or borrowing).']);
+    L.push(['The triangle between Qe and Q2, between S and D, is...', ['Deadweight (welfare) loss', 'Producer surplus', 'Subsidy cost'], 'Deadweight (welfare) loss', 'Those extra units cost more to make than consumers value them: overallocation.']);
+    L.push(['Why might a government subsidise a good?', ['To raise output and lower the price', 'To raise tax revenue', 'To reduce consumption'], 'To raise output and lower the price', 'E.g. to support farmers, make essentials cheaper, or encourage green technology.', true]);
     L.push(['Which is an opportunity cost of a subsidy?', ['The government can’t spend that money elsewhere', 'Consumers pay a higher price', 'Producers sell less'], 'The government can’t spend that money elsewhere', 'Subsidy spending, (Pp − Pc) × Q2, could have gone on schools, health or lower taxes.']);
   } else if (sc.kind === 'ceiling') {
     L.push(['What happens to quantity supplied?', UDN, 'Falls', 'At the lower price Pmax, firms supply less: Qs.']);
@@ -521,6 +573,12 @@ function effectsFor(sc) {
     L.push(['What happens to producer surplus?', UDN, 'Falls', 'Lower price and fewer units sold.']);
     L.push(['What happens to consumer expenditure?', UDN, 'Falls', 'Both price (Pmax) and quantity sold (Qs) fall, so Pmax × Qs is smaller than Pe × Qe.']);
     L.push(['The ceiling is set above Pe. What happens?', ['Nothing: it doesn’t bind', 'A shortage', 'A surplus'], 'Nothing: it doesn’t bind', 'A maximum price above equilibrium is never reached, so the market stays at Pe and Qe.', true]);
+    L.push(['How much is actually bought and sold?', ['Qs', 'Qd', 'Qe'], 'Qs', 'Consumers want Qd, but they can only buy what firms supply: Qs.']);
+    L.push(['On the graph, the shortage is...', ['Qd − Qs', 'Qe − Qs', 'Qd − Qe'], 'Qd − Qs', 'Quantity demanded minus quantity supplied at Pmax.']);
+    L.push(['What happens to producer revenue?', UDN, 'Falls', 'Lower price (Pmax) and fewer units sold (Qs).']);
+    L.push(['Who gains from the ceiling?', ['Consumers who can still buy', 'Producers', 'Every consumer'], 'Consumers who can still buy', 'They pay less. Consumers who miss out because of the shortage lose.']);
+    L.push(['Which is a common example of a price ceiling?', ['Rent control', 'A minimum wage', 'A tax on fuel'], 'Rent control', 'A legal maximum on rents, meant to keep housing affordable.', true]);
+    L.push(['Why might a government set a maximum price?', ['To make essentials affordable', 'To raise farmers’ incomes', 'To raise tax revenue'], 'To make essentials affordable', 'E.g. rent, bread or fuel, to help low-income households.', true]);
     L.push(['Which is a likely consequence of a long-lasting shortage?', ['Black markets and queues', 'Stockpiles of unsold goods', 'Lower demand'], 'Black markets and queues', 'People who can’t buy at Pmax may pay more illegally, or wait.']);
   } else {
     L.push(['What happens to quantity supplied?', UDN, 'Rises', 'At the higher price Pmin, firms supply more: Qs.']);
@@ -529,6 +587,13 @@ function effectsFor(sc) {
     L.push(['What happens to consumer surplus?', UDN, 'Falls', 'Consumers pay more and buy less.']);
     L.push(['The government buys the surplus. What does it cost?', ['Pmin × (Qs − Qd)', 'Pe × (Qs − Qd)', 'Pmin × Qd'], 'Pmin × (Qs − Qd)', 'It buys every unsold unit (Qs − Qd) at the floor price.']);
     L.push(['The floor is set below Pe. What happens?', ['Nothing: it doesn’t bind', 'A surplus', 'A shortage'], 'Nothing: it doesn’t bind', 'A minimum price below equilibrium is never reached, so the market stays at Pe and Qe.', true]);
+    const dExp = sc.P * sc.qd - sc.ye * sc.xe;
+    L.push(['What happens to consumer expenditure in this market?', UDN, dExp > 0 ? 'Rises' : dExp < 0 ? 'Falls' : 'No change',
+      `Before: Pe × Qe = ${money(sc.ye * sc.xe * 10)}. After: Pmin × Qd = ${money(sc.P)} × ${sc.qd * 10} = ${money(sc.P * sc.qd * 10)}. It depends on how elastic demand is.`]);
+    L.push(['How much do consumers actually buy?', ['Qd', 'Qs', 'Qe'], 'Qd', 'At Pmin consumers only want Qd. The rest (Qs − Qd) is unsold.']);
+    L.push(['On the graph, the surplus is...', ['Qs − Qd', 'Qs − Qe', 'Qe − Qd'], 'Qs − Qd', 'Quantity supplied minus quantity demanded at Pmin.']);
+    L.push(['Which is a common example of a price floor?', ['A minimum wage', 'Rent control', 'A subsidy'], 'A minimum wage', 'A legal minimum price for labour.', true]);
+    L.push(['Why might a government set a minimum price for a crop?', ['To support farmers’ incomes', 'To make food cheaper', 'To reduce a surplus'], 'To support farmers’ incomes', 'A guaranteed higher price protects farmers from low or unstable prices.', true]);
     L.push(['If the government buys the surplus, what happens to producer revenue?', UDN, 'Rises', 'Producers now sell all of Qs at Pmin, so revenue Pmin × Qs is above Pe × Qe.']);
   }
   // noGraph: "what if" questions about a different situation from the one drawn
@@ -536,23 +601,17 @@ function effectsFor(sc) {
 }
 
 // ---------- calculations (HL) ----------
-function eqText(sc) {
-  const fmtEq = (lhs, k, m) => {
-    const parts = []; if (k) parts.push(fmt(k));
-    if (m > 0) parts.push((parts.length ? '+ ' : '') + fmt(m) + 'P'); else parts.push((parts.length ? '− ' : '−') + fmt(-m) + 'P');
-    return `${lhs} = ${parts.join(' ')}`;
-  };
-  const qd = fmtEq('Qd', 10 * sc.a / sc.b, -10 / sc.b);
-  const kS = -10 * sc.c / sc.d, mS = 10 / sc.d;
-  let qs = `Qs = ${kS ? '−' + fmt(-kS) + ' + ' : ''}${fmt(mS)}P`;
-  return `${qd}  ·  ${qs}`;
-}
+// Read off the graph only: the 2027 guide doesn't use demand/supply functions, so none are shown.
 function calcsFor(sc) {
   const Qe = sc.xe * 10, L = [];
   if (sc.kind === 'tax') {
     const Qt = sc.xt * 10, t = sc.t;
-    L.push(['Calculate the price consumers pay after the tax (Pc).', sc.Pc, '$', `With the tax, Qs = ${fmt(10 / sc.d)}(P − ${t})${sc.c ? ' − ' + fmt(10 * sc.c / sc.d) : ''}. Set it equal to Qd: P = ${money(sc.Pc)}.`]);
-    L.push(['Calculate the quantity traded after the tax.', Qt, 'units', `Put Pc = ${money(sc.Pc)} into Qd: ${Qt} units.`]);
+    L.push(['What price do consumers pay after the tax?', sc.Pc, '$', `Read across from where S + tax meets D: ${money(sc.Pc)}.`]);
+    L.push(['What quantity is traded after the tax?', Qt, 'units', `Read down from where S + tax meets D: ${Qt} units.`]);
+    L.push(['What price do producers keep after the tax (Pp)?', sc.Pp, '$', `Pp = Pc − tax = ${money(sc.Pc)} − ${money(t)} = ${money(sc.Pp)}. It sits on the original S, straight below Pc.`]);
+    L.push(['Calculate producer surplus after the tax.', 0.5 * (sc.Pp - sc.c) * Qt, '$', `½ × (Pp − ${money(sc.c)}) × Qt = ½ × ${money(sc.Pp - sc.c)} × ${Qt} = ${money(0.5 * (sc.Pp - sc.c) * Qt)}. (${money(sc.c)} is where S meets the price axis.)`]);
+    L.push(['By how much does producer revenue fall?', sc.ye * Qe - sc.Pp * Qt, '$', `Before: Pe × Qe = ${money(sc.ye)} × ${Qe} = ${money(sc.ye * Qe)}. After: Pp × Qt = ${money(sc.Pp * Qt)}. Fall: ${money(sc.ye * Qe - sc.Pp * Qt)}.`]);
+    L.push(['How much of the tax revenue is paid by producers?', (sc.ye - sc.Pp) * Qt, '$', `(Pe − Pp) × Qt = ${money(sc.ye - sc.Pp)} × ${Qt} = ${money((sc.ye - sc.Pp) * Qt)}.`]);
     L.push(['Calculate government tax revenue.', t * Qt, '$', `Tax per unit × quantity = ${money(t)} × ${Qt} = ${money(t * Qt)}.`]);
     L.push(['Calculate consumer expenditure after the tax.', sc.Pc * Qt, '$', `Pc × Qt = ${money(sc.Pc)} × ${Qt} = ${money(sc.Pc * Qt)}.`]);
     L.push(['Calculate producer revenue after the tax (what producers keep).', sc.Pp * Qt, '$', `Pp × Qt = ${money(sc.Pp)} × ${Qt} = ${money(sc.Pp * Qt)}.`]);
@@ -561,27 +620,46 @@ function calcsFor(sc) {
     L.push(['Calculate consumer surplus after the tax.', 0.5 * (sc.a - sc.Pc) * Qt, '$', `½ × (${money(sc.a)} − Pc) × Qt = ½ × ${money(sc.a - sc.Pc)} × ${Qt} = ${money(0.5 * (sc.a - sc.Pc) * Qt)}. (${money(sc.a)} is where demand meets the price axis.)`]);
   } else if (sc.kind === 'subsidy') {
     const Q2 = sc.xs * 10, s = sc.s;
-    L.push(['Calculate the price consumers pay after the subsidy (Pc).', sc.Pc, '$', `With the subsidy, supply shifts down by ${money(s)}. Set new Qs equal to Qd: P = ${money(sc.Pc)}.`]);
-    L.push(['Calculate the quantity traded after the subsidy.', Q2, 'units', `Put Pc = ${money(sc.Pc)} into Qd: ${Q2} units.`]);
+    L.push(['What price do consumers pay after the subsidy?', sc.Pc, '$', `Read across from where S + subsidy meets D: ${money(sc.Pc)}.`]);
+    L.push(['What quantity is traded after the subsidy?', Q2, 'units', `Read down from where S + subsidy meets D: ${Q2} units.`]);
+    L.push(['What price do producers receive after the subsidy (Pp)?', sc.Pp, '$', `Pp = Pc + subsidy = ${money(sc.Pc)} + ${money(s)} = ${money(sc.Pp)}. It sits on the original S, straight above Pc.`]);
+    L.push(['Calculate consumer surplus after the subsidy.', 0.5 * (sc.a - sc.Pc) * Q2, '$', `½ × (${money(sc.a)} − Pc) × Q2 = ½ × ${money(sc.a - sc.Pc)} × ${Q2} = ${money(0.5 * (sc.a - sc.Pc) * Q2)}. (${money(sc.a)} is where D meets the price axis.)`]);
+    L.push(['How much of the subsidy goes to producers?', (sc.Pp - sc.ye) * Q2, '$', `(Pp − Pe) × Q2 = ${money(sc.Pp - sc.ye)} × ${Q2} = ${money((sc.Pp - sc.ye) * Q2)}.`]);
+    L.push(['How much of the subsidy goes to consumers?', (sc.ye - sc.Pc) * Q2, '$', `(Pe − Pc) × Q2 = ${money(sc.ye - sc.Pc)} × ${Q2} = ${money((sc.ye - sc.Pc) * Q2)}.`]);
+    L.push(['By how much does producer revenue rise?', sc.Pp * Q2 - sc.ye * Qe, '$', `After: Pp × Q2 = ${money(sc.Pp * Q2)}. Before: Pe × Qe = ${money(sc.ye * Qe)}. Rise: ${money(sc.Pp * Q2 - sc.ye * Qe)}.`]);
     L.push(['Calculate government spending on the subsidy.', s * Q2, '$', `Subsidy per unit × quantity = ${money(s)} × ${Q2} = ${money(s * Q2)}.`]);
     L.push(['Calculate consumer expenditure after the subsidy.', sc.Pc * Q2, '$', `Pc × Q2 = ${money(sc.Pc)} × ${Q2} = ${money(sc.Pc * Q2)}.`]);
     L.push(['Calculate producer revenue after the subsidy (including the subsidy).', sc.Pp * Q2, '$', `Pp × Q2 = ${money(sc.Pp)} × ${Q2} = ${money(sc.Pp * Q2)}.`]);
     L.push(['Calculate the deadweight (welfare) loss.', 0.5 * s * (Q2 - Qe), '$', `½ × subsidy × (Q2 − Qe) = ½ × ${money(s)} × ${Q2 - Qe} = ${money(0.5 * s * (Q2 - Qe))}.`]);
   } else if (sc.kind === 'ceiling') {
     const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = Dy(sc, sc.qs) - P;
+    L.push([`The ceiling is ${money(P)}. How much do firms supply?`, Qs, 'units', `Read down from where Pmax meets S: Qs = ${Qs} units.`]);
+    L.push([`The ceiling is ${money(P)}. How much do consumers want to buy?`, Qd, 'units', `Read down from where Pmax meets D: Qd = ${Qd} units.`]);
+    L.push([`The ceiling is ${money(P)}. Calculate producer revenue.`, P * Qs, '$', `Firms sell Qs at Pmax: ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
     L.push([`The ceiling is ${money(P)}. Calculate the size of the shortage.`, Qd - Qs, 'units', `Qd − Qs = ${Qd} − ${Qs} = ${Qd - Qs} units.`]);
     L.push([`The ceiling is ${money(P)}. Calculate consumer expenditure after the ceiling.`, P * Qs, '$', `Only Qs is sold: Pmax × Qs = ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
     L.push([`The ceiling is ${money(P)}. By how much does consumer expenditure fall?`, sc.ye * Qe - P * Qs, '$', `Before: Pe × Qe = ${money(sc.ye)} × ${Qe} = ${money(sc.ye * Qe)}. After: ${money(P * Qs)}. Fall: ${money(sc.ye * Qe - P * Qs)}.`]);
+    L.push([`The ceiling is ${money(P)}. Calculate producer surplus after the ceiling.`, 0.5 * (P - sc.c) * Qs, '$', `½ × (Pmax − ${money(sc.c)}) × Qs = ½ × ${money(P - sc.c)} × ${Qs} = ${money(0.5 * (P - sc.c) * Qs)}. (${money(sc.c)} is where S meets the price axis.)`]);
+    L.push([`The ceiling is ${money(P)}. Calculate consumer surplus after the ceiling.`, ((sc.a - P) + h) / 2 * Qs, '$', `A trapezium from Pmax up to D, 0 to Qs: ½ × (${money(sc.a - P)} + ${money(h)}) × ${Qs} = ${money(((sc.a - P) + h) / 2 * Qs)}. (Or a rectangle plus a triangle.)`]);
+    L.push([`The ceiling is ${money(P)}. How much surplus moves from producers to consumers?`, (sc.ye - P) * Qs, '$', `On the Qs units still sold, consumers pay Pe − Pmax less: ${money(sc.ye - P)} × ${Qs} = ${money((sc.ye - P) * Qs)}.`]);
     L.push([`The ceiling is ${money(P)}. Calculate the deadweight (welfare) loss.`, 0.5 * h * (Qe - Qs), '$', `At Qs = ${Qs}, demand is at ${money(P + h)}. ½ × ${money(h)} × (Qe − Qs = ${Qe - Qs}) = ${money(0.5 * h * (Qe - Qs))}.`]);
   } else {
     const Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, h = P - Sy(sc, sc.qd);
+    L.push([`The floor is ${money(P)}. How much do firms supply?`, Qs, 'units', `Read down from where Pmin meets S: Qs = ${Qs} units.`]);
+    L.push([`The floor is ${money(P)}. How much do consumers buy?`, Qd, 'units', `Read down from where Pmin meets D: Qd = ${Qd} units.`]);
     L.push([`The floor is ${money(P)}. Calculate the size of the surplus.`, Qs - Qd, 'units', `Qs − Qd = ${Qs} − ${Qd} = ${Qs - Qd} units.`]);
     L.push([`The floor is ${money(P)}. The government buys the surplus. What does it spend?`, P * (Qs - Qd), '$', `Pmin × (Qs − Qd) = ${money(P)} × ${Qs - Qd} = ${money(P * (Qs - Qd))}.`]);
     L.push([`The floor is ${money(P)}. The government buys the surplus. Calculate producer revenue.`, P * Qs, '$', `All of Qs is sold at Pmin: ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
     L.push([`The floor is ${money(P)}. Calculate consumer expenditure.`, P * Qd, '$', `Pmin × Qd = ${money(P)} × ${Qd} = ${money(P * Qd)}.`]);
+    L.push([`The floor is ${money(P)}. Calculate consumer surplus after the floor.`, 0.5 * (sc.a - P) * Qd, '$', `½ × (${money(sc.a)} − Pmin) × Qd = ½ × ${money(sc.a - P)} × ${Qd} = ${money(0.5 * (sc.a - P) * Qd)}. (${money(sc.a)} is where D meets the price axis.)`]);
+    L.push([`The floor is ${money(P)}. How much surplus moves from consumers to producers?`, (P - sc.ye) * Qd, '$', `On the Qd units still bought, consumers pay Pmin − Pe more: ${money(P - sc.ye)} × ${Qd} = ${money((P - sc.ye) * Qd)}.`]);
+    L.push([`The floor is ${money(P)}. By how much does consumer expenditure change? (Use − for a fall.)`, P * Qd - sc.ye * Qe, '$', `After: Pmin × Qd = ${money(P * Qd)}. Before: Pe × Qe = ${money(sc.ye * Qe)}. Change: ${P * Qd - sc.ye * Qe < 0 ? '−' : ''}${money(Math.abs(P * Qd - sc.ye * Qe))}.`]);
     L.push([`The floor is ${money(P)}. The government does not buy the surplus. Calculate the deadweight loss.`, 0.5 * h * (Qe - Qd), '$', `At Qd = ${Qd}, supply is at ${money(P - h)}. ½ × ${money(h)} × (Qe − Qd = ${Qe - Qd}) = ${money(0.5 * h * (Qe - Qd))}.`]);
   }
-  return L.map(([q, ans, unit, why]) => ({ q, ans, unit, why }));
+  // SL: prices, quantities, spending, revenue, government money, shortage/surplus size.
+  // HL adds surplus areas, deadweight loss, who pays/gets how much, and transfers.
+  const HL_ONLY = /consumer surplus|producer surplus|deadweight|paid by|goes to|surplus moves/i;
+  return L.map(([q, ans, unit, why]) => ({ q, ans, unit, why, hl: HL_ONLY.test(q) }));
 }
 
 // ---------- building questions ----------
@@ -629,12 +707,14 @@ function buildQuestion(kind, skill) {
   } else if (skill === 'label') {
     steps.push({ skill: 'label', type: 'label', prompt: 'Label the diagram. Tap a label, then tap its box.' });
   } else if (skill === 'shade') {
-    const cs = shuffle(Object.keys(conceptsFor(sc))).slice(0, 2);
+    // DWL is the one students miss most, so it comes up in about half of shading questions
+    let cs = shuffle(Object.keys(conceptsFor(sc)).filter(c => c !== 'dwl')).slice(0, 2);
+    if (Math.random() < 0.5) cs[rnd(2)] = 'dwl';
     cs.forEach(c => steps.push({ skill: 'shade', type: 'shade', concept: c }));
   } else if (skill === 'effects') {
     shuffle(effectsFor(sc)).slice(0, 3).forEach(e => steps.push({ skill: 'effects', type: 'mc', ...e }));
   } else {
-    shuffle(calcsFor(sc)).slice(0, 2).forEach(e => steps.push({ skill: 'calc', type: 'num', ...e }));
+    shuffle(calcsFor(sc).filter(c => store.level === 'HL' || !c.hl)).slice(0, 2).forEach(e => steps.push({ skill: 'calc', type: 'num', ...e }));
   }
   return { kind, sc, steps, i: 0 };
 }
@@ -659,7 +739,8 @@ function weakest() {
 }
 function newQuestion() {
   let kind = session.kind, skill = session.skill;
-  if (session.mode === 'mix') { kind = pick(Object.keys(KINDS)); skill = pick(skillList()); }
+  if (session.mode === 'mix' || session.mode === 'skill') kind = pick(Object.keys(KINDS));
+  if (session.mode === 'mix' || session.mode === 'kind') skill = pick(skillList());
   if (session.mode === 'weak') [kind, skill] = weakest();
   Q = buildQuestion(kind, skill);
   renderStep();
@@ -674,10 +755,12 @@ function renderStep() {
   document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
   document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + SKILLS[st.skill] + (st.type === 'line' || st.noGraph ? '' : ' · ' + contextText(sc));
   document.getElementById('stepcount').textContent = Q.steps.length > 1 ? `Step ${Q.i + 1} of ${Q.steps.length}` : '';
-  document.getElementById('eqs').textContent = st.type === 'num' ? eqText(sc) : '';
+  document.getElementById('eqs').textContent = st.type === 'num' ? 'Use the graph.' : '';
   document.getElementById('feedback').innerHTML = '';
   document.getElementById('next-btn').hidden = true;
   document.getElementById('skip-btn').hidden = false;
+  toggleReport(false);
+  document.getElementById('report-link').textContent = 'Report a problem with this question';
   const checkBtn = document.getElementById('check-btn');
   checkBtn.hidden = st.type === 'mc'; checkBtn.disabled = false;
   let prompt = st.prompt || st.q || '';
@@ -803,7 +886,9 @@ document.getElementById('controls').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || document.getElementById('drill').hidden) return;
-  if (e.target.tagName === 'BUTTON') return;   // the focused button handles Enter itself
+  if (e.target.tagName === 'BUTTON' || e.target.tagName === 'TEXTAREA') return;   // the focused button handles Enter itself
+  // Without this, marking moves focus to Next and the same Enter press "clicks" it.
+  e.preventDefault();
   if (!ui.checked) { if (Q.steps[Q.i].type !== 'mc') check(); } else nextStep();
 });
 function refreshChips() {
@@ -854,7 +939,7 @@ function check() {
     }
   } else if (st.type === 'num') {
     const inp = document.getElementById('num-in');
-    const raw = inp.value.replace(/[$,\s]/g, '').replace(/units?$/i, '');
+    const raw = inp.value.replace(/[$,\s]/g, '').replace(/[−–]/g, '-').replace(/units?$/i, '');
     if (raw === '' || isNaN(+raw)) return hint('Type a number.');
     ok = Math.abs(+raw - st.ans) < 0.011;
     if (!ok) { tip = 'Check your working and type a new answer.'; inp.select(); }
@@ -906,6 +991,66 @@ function labelWhy(sc) {
   return 'At Pmin, read Qd off demand and Qs off supply. Qs > Qd: the gap is the surplus.';
 }
 
+// ---------- report a question (shared unisam-feedback inbox, see ../feedback/CLAUDE.md) ----------
+const FEEDBACK_URL = 'https://unisam.nz/feedback/api/report';
+let reportReason = null;
+function toggleReport(show) {
+  const box = document.getElementById('report');
+  show = show == null ? box.hidden : show;
+  box.hidden = !show;
+  document.getElementById('report-link').hidden = show;
+  if (show) {
+    reportReason = null;
+    document.getElementById('report-text').value = '';
+    document.getElementById('report-msg').textContent = '';
+    document.getElementById('report-send').disabled = false;
+    document.querySelectorAll('[data-reason]').forEach(b => b.classList.remove('sel'));
+  }
+}
+document.getElementById('report-reasons').addEventListener('click', e => {
+  const b = e.target.closest('[data-reason]'); if (!b) return;
+  reportReason = b.dataset.reason;
+  document.querySelectorAll('[data-reason]').forEach(x => x.classList.toggle('sel', x === b));
+});
+function currentAnswer() {
+  const st = Q.steps[Q.i];
+  if (st.type === 'line') return { selected: ui.selected, wrongTries: [...ui.wrongC] };
+  if (st.type === 'label') return { filled: ui.filled };
+  if (st.type === 'shade') return { shaded: [...(ui.sel || [])].map(i => ui.cells[i].key) };
+  if (st.type === 'mc') return { picked: ui.answer || null };
+  const inp = document.getElementById('num-in'); return { typed: inp ? inp.value : '' };
+}
+async function sendReport() {
+  const text = document.getElementById('report-text').value.trim();
+  const msgEl = document.getElementById('report-msg');
+  if (!reportReason && !text) { msgEl.textContent = 'Pick a reason or write a few words first.'; return; }
+  const st = Q.steps[Q.i];
+  const prompt = document.getElementById('prompt').textContent;
+  const question = { kind: Q.kind, level: store.level, stepIndex: Q.i, step: st, market: Q.sc, answer: currentAnswer(), tries: ui.tries, checked: ui.checked };
+  const payload = {
+    app: 'grill', type: 'bug',
+    message: (reportReason || 'Report') + (text ? ': ' + text : '') + '\n\nQuestion: ' + prompt,
+    website: document.getElementById('report-website').value,
+    diagram: JSON.stringify(question),
+    meta: {
+      page: location.host + location.pathname, browser: navigator.userAgent, viewport: innerWidth + 'x' + innerHeight,
+      level: store.level, topic: KINDS[Q.kind], skill: SKILLS[st.skill], stepType: st.type, prompt,
+    },
+  };
+  const btn = document.getElementById('report-send');
+  btn.disabled = true; msgEl.textContent = 'Sending…';
+  try {
+    const r = await fetch(FEEDBACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (r.status === 429) throw new Error('Too many reports from here in the last hour. Try again later.');
+    if (!r.ok) throw new Error('The report could not be sent (error ' + r.status + ').');
+    toggleReport(false);
+    document.getElementById('report-link').textContent = 'Thanks, report sent. Report another problem?';
+  } catch (e) {
+    btn.disabled = false;
+    msgEl.textContent = e.message.startsWith('Too many') || e.message.startsWith('The report') ? e.message : 'Could not reach the server. Check your connection and try again.';
+  }
+}
+
 // ---------- home ----------
 function scoreCell(k, s) {
   const a = store.scores[k + '.' + s] || [];
@@ -915,9 +1060,9 @@ function scoreCell(k, s) {
 }
 function renderHome() {
   const sk = skillList();
-  let h = '<tr><th></th>' + sk.map(s => `<th>${SKILLS[s]}</th>`).join('') + '</tr>';
+  let h = '<tr><th></th>' + sk.map(s => `<th><button class="skillbtn" onclick="startDrill('skill',null,'${s}')">${SKILLS[s]}</button></th>`).join('') + '</tr>';
   for (const k of Object.keys(KINDS)) {
-    h += `<tr><td class="row">${KINDS[k]}</td>` + sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}" onclick="startDrill('cell','${k}','${s}')" aria-label="${KINDS[k]} ${SKILLS[s]}">${c.text}</button></td>`; }).join('') + '</tr>';
+    h += `<tr><td class="row"><button class="topicbtn" onclick="startDrill('kind','${k}')">${KINDS[k]}</button></td>` + sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}" onclick="startDrill('cell','${k}','${s}')" aria-label="${KINDS[k]} ${SKILLS[s]}">${c.text}</button></td>`; }).join('') + '</tr>';
   }
   document.getElementById('grid').innerHTML = h;
   document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));
@@ -929,7 +1074,6 @@ function showHome() {
 }
 function setLevel(l) {
   store.level = l; saveStore(); renderHome();
-  if (session && session.skill === 'calc' && l === 'SL') showHome();
 }
 let resetArmed = null;
 function resetProgress() {

@@ -8,6 +8,7 @@ const test = (name, fn) => tests.push({ name, fn });
 const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 
 const KINDS = ['tax', 'subsidy', 'ceiling', 'floor'];
+const KINDS_ = KINDS;
 
 test('generators always give whole-number, on-chart markets', async page => {
   const bad = await page.evaluate(() => {
@@ -17,6 +18,9 @@ test('generators always give whole-number, on-chart markets', async page => {
       const pts = diagram(sc).points;
       for (const p of pts) if (!isInt(p.x) || !isInt(p.y) || p.x <= 0 || p.x > GX || p.y <= 0 || p.y >= GY) out.push([k, p]);
       for (const l of diagram(sc).lines) if (!seg(l.line)) out.push([k, 'line off chart']);
+      // every number a calculation needs must be readable off a gridline
+      if (k === 'ceiling' && !isInt(Dy(sc, sc.qs))) out.push([k, 'DWL corner off grid']);
+      if (k === 'floor' && !isInt(Sy(sc, sc.qd))) out.push([k, 'DWL corner off grid']);
     }
     return out.slice(0, 5);
   });
@@ -157,6 +161,55 @@ test('effects questions never show Shortage/Surplus on the graph', async page =>
   }
 });
 
+test('Enter after typing a number marks it and stays on the question', async page => {
+  await page.evaluate(() => startDrill('cell', 'tax', 'calc'));
+  const ans = await page.evaluate(() => Q.steps[Q.i].ans);
+  await page.type('#num-in', String(ans + 1));
+  await page.keyboard.press('Enter');
+  let s = await page.evaluate(() => ({ i: Q.i, v: document.querySelector('.verdict') && document.querySelector('.verdict').textContent }));
+  assert(s.i === 0 && s.v === 'Not quite. Try again.', JSON.stringify(s));
+  await page.evaluate(() => { document.getElementById('num-in').value = ''; });
+  await page.type('#num-in', String(ans));
+  await page.keyboard.press('Enter');
+  s = await page.evaluate(() => ({ i: Q.i, v: document.querySelector('.verdict').textContent, next: !document.getElementById('next-btn').hidden }));
+  assert(s.i === 0 && s.v === 'Got it' && s.next, JSON.stringify(s));
+  await page.keyboard.press('Enter');
+  assert((await page.evaluate(() => Q.i)) === 1, 'second Enter moves on');
+});
+
+test('topic and skill choices keep to that topic or skill', async page => {
+  const r = await page.evaluate(() => {
+    const kinds = new Set(), skills = new Set();
+    startDrill('kind', 'floor'); for (let i = 0; i < 30; i++) { kinds.add(Q.kind); skills.add(Q.steps[0].skill); newQuestion(); }
+    const k2 = new Set(), s2 = new Set();
+    startDrill('skill', null, 'shade'); for (let i = 0; i < 30; i++) { k2.add(Q.kind); s2.add(Q.steps[0].skill); newQuestion(); }
+    return { kinds: [...kinds], skills: skills.size, k2: k2.size, s2: [...s2] };
+  });
+  assert(r.kinds.join() === 'floor' && r.skills > 2, JSON.stringify(r));
+  assert(r.s2.join() === 'shade' && r.k2 > 2, JSON.stringify(r));
+});
+
+test('report sends the question to the feedback inbox', async page => {
+  await page.setRequestInterception(true);
+  let sent = null;
+  page.on('request', req => {
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST' };
+    if (req.url().includes('/feedback/api/report') && req.method() === 'OPTIONS') req.respond({ status: 204, headers: cors });
+    else if (req.url().includes('/feedback/api/report')) { sent = JSON.parse(req.postData()); req.respond({ status: 200, contentType: 'application/json', headers: cors, body: '{"ok":true}' }); }
+    else req.continue();
+  });
+  await page.evaluate(() => startDrill('cell', 'subsidy', 'shade'));
+  await page.click('#report-link');
+  await page.click('[data-reason="The graph looks wrong"]');
+  await page.type('#report-text', 'test note');
+  await page.click('#report-send');
+  await page.waitForFunction(() => document.getElementById('report').hidden);
+  assert(sent && sent.app === 'grill' && sent.message.startsWith('The graph looks wrong: test note'), JSON.stringify(sent));
+  const d = JSON.parse(sent.diagram);
+  assert(d.kind === 'subsidy' && d.market && d.step.type === 'shade', sent.diagram.slice(0, 200));
+  assert(sent.meta.topic === 'Subsidy' && typeof sent.meta.prompt === 'string', JSON.stringify(sent.meta));
+});
+
 test('labels can be dragged onto boxes and between boxes', async page => {
   await page.evaluate(() => startDrill('cell', 'subsidy', 'label'));
   const centre = sel => page.evaluate(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, sel);
@@ -194,7 +247,7 @@ test('wrong labels go back to the list and can be put right', async page => {
   await place(slots[1].answer, slots[0].id); await place(slots[0].answer, slots[1].id);
   for (const s of slots.slice(2)) await place(s.answer, s.id);
   await page.click('#check-btn');
-  const st = await page.evaluate(() => ({ filled: Object.keys(ui.filled).length, red: document.querySelectorAll('.slot.wrong').length, free: document.querySelectorAll('.chip:not(.used)').length }));
+  const st = await page.evaluate(() => ({ filled: Object.keys(ui.filled).length, red: document.querySelectorAll('.slot.wrong').length, free: document.querySelectorAll('[data-chip]:not(.used)').length }));
   assert(st.red === 2 && st.free === 2 && st.filled === slots.length - 2, JSON.stringify(st));
   await place(slots[0].answer, slots[0].id); await place(slots[1].answer, slots[1].id);
   await page.click('#check-btn');
@@ -213,13 +266,25 @@ test('what-if questions hide the graph; skip moves on without scoring', async pa
   assert(scores === '{}', 'skip records nothing: ' + scores);
 });
 
-test('SL hides the Calculate column', async page => {
+test('SL gets number questions but not surplus, DWL or share calculations; no equations shown', async page => {
   await page.evaluate(() => setLevel('SL'));
   const t = await page.evaluate(() => document.getElementById('grid').textContent);
-  assert(!t.includes('Calculate'), t);
+  assert(t.includes('Calculate'), t);
+  const qs = await page.evaluate(() => {
+    const seen = [];
+    for (let i = 0; i < 40; i++) { startDrill('cell', ['tax', 'subsidy', 'ceiling', 'floor'][i % 4], 'calc'); Q.steps.forEach(s => seen.push(s.q)); }
+    return { seen, eqs: document.getElementById('eqs').textContent };
+  });
+  const bad = qs.seen.filter(q => /consumer surplus|producer surplus|deadweight|paid by|goes to|surplus moves/i.test(q));
+  assert(!bad.length, bad.join(' | '));
+  assert(!/Qd =|Qs =/.test(qs.eqs), qs.eqs);
+  for (let rep = 0; rep < 6; rep++) {
+    await page.evaluate(k => startDrill('cell', k, 'calc'), KINDS_[rep % 4]);
+    for (let j = 0; j < 2; j++) { const v = await answerRight(page); assert(v === 'Correct', v); await page.click('#next-btn'); }
+  }
   await page.evaluate(() => setLevel('HL'));
-  const t2 = await page.evaluate(() => document.getElementById('grid').textContent);
-  assert(t2.includes('Calculate'), t2);
+  const hl = await page.evaluate(() => { const s = new Set(); for (let i = 0; i < 80; i++) calcsFor(gen('tax')).forEach(c => s.add(c.hl)); return [...s]; });
+  assert(hl.includes(true) && hl.includes(false), 'HL has both kinds');
   if (shots) {
     await page.screenshot({ path: `${shots}/home.png` });
     await page.setViewport({ width: 390, height: 844 });
