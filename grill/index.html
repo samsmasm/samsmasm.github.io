@@ -101,6 +101,8 @@
   .feedback { margin: 10px 0; }
   .verdict { font: 400 28px var(--block); letter-spacing: .04em; text-transform: uppercase; }
   .verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+  .tip { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .giveup { background: none; border: none; padding: 0; margin-top: 10px; font: 600 13px var(--sans); color: var(--muted); text-decoration: underline; cursor: pointer; }
   details { margin-top: 6px; font-size: 15px; color: #3a2a24; line-height: 1.5; }
   summary { cursor: pointer; color: var(--red); font-weight: 700; font-size: 14px; }
   footer { text-align: center; font-size: 11px; color: #c4b0a8; border-top: 6px solid var(--deep); padding: 14px 16px; }
@@ -351,20 +353,20 @@ function svgDiagram(sc, opts) {
     if (p.qn) s += `<line x1="${X(p.x)}" y1="${Y(p.y)}" x2="${X(p.x)}" y2="${Y(0)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/>`;
   }
   dg.lines.forEach(l => s += svgLine(l.line, `stroke="${lineColour(l.name)}" stroke-width="2.6" stroke-linecap="round"`));
-  for (const a of dg.annos) {
+  for (const a of opts.noAnno ? [] : dg.annos) {
     const yy = Y(a.y) + (a.below ? 14 : -10);
     s += `<line x1="${X(a.x1)}" y1="${yy}" x2="${X(a.x2)}" y2="${yy}" stroke="#555" stroke-width="1.2"/>`;
     s += `<line x1="${X(a.x1)}" y1="${yy - 4}" x2="${X(a.x1)}" y2="${yy + 4}" stroke="#555"/><line x1="${X(a.x2)}" y1="${yy - 4}" x2="${X(a.x2)}" y2="${yy + 4}" stroke="#555"/>`;
   }
   for (const p of dg.points) s += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="3.2" fill="#222"/>`;
   if (!opts.labels) return s;
-  const slots = labelSlots(sc);
+  const slots = labelSlots(sc).filter(sl => !(opts.noAnno && sl.kind === 'anno'));
   for (const sl of slots) {
     if (opts.labels === 'slots') {
       const st = opts.slotState || {}; const val = st.filled ? st.filled[sl.id] : null;
-      const cls = st.marks ? (st.marks[sl.id] ? 'right' : 'wrong') : '';
+      const cls = st.marks && sl.id in st.marks ? (st.marks[sl.id] ? 'right' : 'wrong') : '';
       const w = sl.w, rx = sl.anchor === 'start' ? sl.x - 2 : sl.anchor === 'end' ? sl.x - w + 2 : sl.x - w / 2;
-      const shown = st.marks && !st.marks[sl.id] ? sl.answer : val;
+      const shown = st.revealed && st.marks && !st.marks[sl.id] ? sl.answer : val;
       s += `<g class="slot ${cls}" data-slot="${sl.id}"><rect x="${rx}" y="${sl.y - 15}" width="${w}" height="22" rx="4"/>` +
            `<text x="${rx + w / 2}" y="${sl.y + 1.5}" font-size="15" font-weight="600" text-anchor="middle" fill="${shown ? '#7a1409' : '#bbb'}">${esc(shown || '?')}</text></g>`;
     } else {
@@ -661,7 +663,7 @@ function nextStep() {
 
 function renderStep() {
   const st = Q.steps[Q.i], sc = Q.sc;
-  ui = { selected: null, filled: {}, cells: null, checked: false, chip: null };
+  ui = { selected: null, filled: {}, cells: null, checked: false, revealed: false, chip: null, tries: 0, wrongC: new Set(), bad: new Set() };
   document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
   document.getElementById('context').textContent = KINDS[Q.kind] + ' · ' + SKILLS[st.skill] + (st.type === 'line' ? '' : ' · ' + contextText(sc));
   document.getElementById('stepcount').textContent = Q.steps.length > 1 ? `Step ${Q.i + 1} of ${Q.steps.length}` : '';
@@ -700,25 +702,26 @@ function drawChart() {
     base.forEach((l, i) => { s += svgLine(l.line, `stroke="${lineColour(l.name)}" stroke-width="2.6"`); s += `<text x="${spots[i].x}" y="${spots[i].y}" font-size="15" font-weight="600" fill="${lineColour(l.name)}" text-anchor="${spots[i].anchor}">${l.name}</text>`; });
     st.context.forEach(L => s += svgLine(L, 'stroke="#111" stroke-width="2.6"'));
     st.cands.forEach((c, i) => {
-      let cls = ui.selected === i ? 'sel' : '';
+      let cls = ui.wrongC.has(i) ? 'wrong' : ui.selected === i ? 'sel' : '';
       if (ui.checked) cls = c.ok ? 'right' : ui.selected === i ? 'wrong' : '';
       if (ui.checked && !c.ok && ui.selected !== i) return;
       s += `<g class="cand ${cls}" data-cand="${i}">${svgLine(c.line, 'class="vis" stroke-linecap="round"')}${svgLine(c.line, 'class="hit"')}</g>`;
     });
   } else if (st.type === 'label') {
-    s += svgAxes(false) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks } });
+    s += svgAxes(false) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks, revealed: ui.revealed } });
   } else if (st.type === 'shade') {
     s += svgAxes(true);
     ui.cells.forEach((g, i) => {
       const inAns = g.sig.includes(st.concept), on = ui.sel.has(i);
-      let cls = on ? 'sel' : '';
+      let cls = on ? (ui.bad.has(i) ? 'wrong' : 'sel') : '';
       if (ui.checked) cls = inAns ? (on ? 'right' : 'missed') : (on ? 'wrong' : '');
       const d = g.polys.map(p => 'M' + p.map(q => `${X(q[0]).toFixed(1)},${Y(q[1]).toFixed(1)}`).join('L') + 'Z').join('');
       s += `<path class="cell ${cls}" data-cell="${i}" d="${d}"/>`;
     });
     s += `<g class="noclick">${svgDiagram(sc, { labels: true })}</g>`;
   } else {
-    s += svgAxes(true) + svgDiagram(sc, { labels: true });
+    // multiple choice asks about the result, so the graph mustn't say "Shortage"/"Surplus"
+    s += svgAxes(true) + svgDiagram(sc, { labels: true, noAnno: st.type === 'mc' });
   }
   document.getElementById('chart').innerHTML = s;
 }
@@ -728,13 +731,14 @@ document.getElementById('chart').addEventListener('click', e => {
   if (!Q || ui.checked) return;
   const st = Q.steps[Q.i];
   const cand = e.target.closest('[data-cand]'), cell = e.target.closest('[data-cell]'), slot = e.target.closest('[data-slot]');
-  if (cand && st.type === 'line') { ui.selected = +cand.dataset.cand; drawChart(); }
-  if (cell && st.type === 'shade') { const i = +cell.dataset.cell; ui.sel.has(i) ? ui.sel.delete(i) : ui.sel.add(i); drawChart(); }
+  if (cand && st.type === 'line' && !ui.wrongC.has(+cand.dataset.cand)) { ui.selected = +cand.dataset.cand; drawChart(); }
+  if (cell && st.type === 'shade') { const i = +cell.dataset.cell; ui.bad.delete(i); ui.sel.has(i) ? ui.sel.delete(i) : ui.sel.add(i); drawChart(); }
   if (slot && st.type === 'label') {
     const id = slot.dataset.slot;
+    if (ui.marks) delete ui.marks[id];
     if (ui.chip != null) {
       const name = ui.chips[ui.chip];
-      for (const k in ui.filled) if (ui.filled[k] === name) delete ui.filled[k];
+      for (const k in ui.filled) if (ui.filled[k] === name) { delete ui.filled[k]; if (ui.marks) delete ui.marks[k]; }
       ui.filled[id] = name; ui.chip = null;
     } else delete ui.filled[id];
     refreshChips(); drawChart();
@@ -762,45 +766,76 @@ function refreshChips() {
 }
 
 // ---------- marking ----------
+// Only the first attempt at a step counts towards the score. A wrong answer leaves the step
+// open with the mistakes in red; "Show me the answer" gives up and reveals it.
 function check() {
   const st = Q.steps[Q.i], sc = Q.sc;
-  let ok = false, why = st.why || '', answerText = '';
+  let ok = false, tip = '';
   if (st.type === 'line') {
     if (ui.selected == null) return hint('Tap a grey line first.');
     ok = !!st.cands[ui.selected].ok;
+    if (!ok) { ui.wrongC.add(ui.selected); ui.selected = null; tip = 'The red line isn’t it. Tap another one.'; }
   } else if (st.type === 'label') {
     const slots = labelSlots(sc);
     if (Object.keys(ui.filled).length < slots.length) return hint('Fill every box first.');
     ui.marks = {}; ok = true;
     for (const s of slots) { ui.marks[s.id] = ui.filled[s.id] === s.answer; if (!ui.marks[s.id]) ok = false; }
-    why = labelWhy(sc);
+    tip = 'The red boxes are wrong. Tap a label, then a red box to swap it in.';
   } else if (st.type === 'shade') {
     if (!ui.sel.size) return hint('Tap at least one area.');
     ok = ui.cells.every((g, i) => g.sig.includes(st.concept) === ui.sel.has(i));
-    why = conceptsFor(sc)[st.concept].why;
+    if (!ok) {
+      ui.bad = new Set([...ui.sel].filter(i => !ui.cells[i].sig.includes(st.concept)));
+      const missed = ui.cells.some((g, i) => g.sig.includes(st.concept) && !ui.sel.has(i));
+      tip = ui.bad.size && missed ? 'Red areas shouldn’t be shaded, and some areas are missing.'
+          : ui.bad.size ? 'Red areas shouldn’t be shaded. Tap them to remove them.'
+          : 'Right so far, but some areas are missing.';
+    }
   } else if (st.type === 'mc') {
     ok = ui.answer === st.ans;
-    document.querySelectorAll('[data-opt]').forEach(b => {
-      b.disabled = true;
-      if (b.dataset.opt === st.ans) b.classList.add('right'); else if (b.dataset.opt === ui.answer) b.classList.add('wrong');
-    });
+    if (!ok) {
+      const b = [...document.querySelectorAll('[data-opt]')].find(b => b.dataset.opt === ui.answer);
+      b.classList.add('wrong'); b.disabled = true; tip = 'Pick another answer.';
+    }
   } else if (st.type === 'num') {
-    const raw = document.getElementById('num-in').value.replace(/[$,\s]/g, '').replace(/units?$/i, '');
+    const inp = document.getElementById('num-in');
+    const raw = inp.value.replace(/[$,\s]/g, '').replace(/units?$/i, '');
     if (raw === '' || isNaN(+raw)) return hint('Type a number.');
     ok = Math.abs(+raw - st.ans) < 0.011;
+    if (!ok) { tip = 'Check your working and type a new answer.'; inp.select(); }
+  }
+  if (!ui.tries) {
+    record(Q.kind + '.' + st.skill, ok);
+    session.streak = ok ? session.streak + 1 : 0;
+    document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
+  }
+  ui.tries++;
+  if (ok) return finish(true);
+  drawChart();
+  document.getElementById('feedback').innerHTML =
+    `<div class="verdict bad">Not quite. Try again.</div><div class="tip">${esc(tip)}</div>` +
+    `<button class="giveup" onclick="finish(false)">Show me the answer</button>`;
+}
+function finish(ok) {
+  const st = Q.steps[Q.i], sc = Q.sc;
+  let why = st.why || '', answerText = '';
+  ui.checked = true; ui.revealed = !ok;
+  if (st.type === 'label') {
+    why = labelWhy(sc);
+    ui.marks = {}; for (const s of labelSlots(sc)) ui.marks[s.id] = ui.filled[s.id] === s.answer;
+  }
+  if (st.type === 'shade') why = conceptsFor(sc)[st.concept].why;
+  if (st.type === 'mc') document.querySelectorAll('[data-opt]').forEach(b => { b.disabled = true; if (b.dataset.opt === st.ans) b.classList.add('right'); });
+  if (st.type === 'num') {
     document.getElementById('num-in').disabled = true;
     answerText = `Answer: ${st.unit === '$' ? money(st.ans) : fmt(st.ans) + ' units'}`;
   }
-  ui.checked = true;
-  record(Q.kind + '.' + st.skill, ok);
-  session.streak = ok ? session.streak + 1 : 0;
+  if (st.type === 'line' && !ok) ui.selected = null;
   if (st.after) st.after();
-  if (st.type === 'line' && st.after) { /* keep showing the step's own picture */ }
   drawChart();
-  document.getElementById('streak').innerHTML = session.streak ? `<b>${session.streak}</b> in a row` : '';
   document.getElementById('check-btn').hidden = true;
-  const fb = document.getElementById('feedback');
-  fb.innerHTML = `<div class="verdict ${ok ? 'good' : 'bad'}">${ok ? 'Correct' : 'Not quite'}</div>` +
+  const verdict = ok ? (ui.tries > 1 ? 'Got it' : 'Correct') : 'Here’s the answer';
+  document.getElementById('feedback').innerHTML = `<div class="verdict ${ok ? 'good' : 'bad'}">${verdict}</div>` +
     (answerText ? `<div style="font-size:17px;margin-top:2px">${esc(answerText)}</div>` : '') +
     (why ? `<details${ok ? '' : ' open'}><summary>Why</summary>${esc(why)}</details>` : '');
   const nb = document.getElementById('next-btn');

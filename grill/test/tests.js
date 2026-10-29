@@ -110,10 +110,51 @@ test('a wrong shade is marked wrong and the score shows on the home grid', async
   await page.evaluate(i => document.querySelector(`[data-cell="${i}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true })), wrong);
   await page.click('#check-btn');
   const v = await page.evaluate(() => document.querySelector('.verdict').textContent);
-  assert(v === 'Not quite', v);
+  assert(v === 'Not quite. Try again.', v);
+  // still editable straight away: the wrong area is red, untap it and shade the right ones
+  assert(await page.evaluate(i => document.querySelector(`[data-cell="${i}"]`).classList.contains('wrong'), wrong), 'wrong area red');
+  await page.evaluate(i => document.querySelector(`[data-cell="${i}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true })), wrong);
+  const v2 = await answerRight(page);
+  assert(v2 === 'Got it', v2);
   await page.evaluate(() => showHome());
   const txt = await page.evaluate(() => document.getElementById('grid').textContent);
-  assert(txt.includes('0/1'), txt);
+  assert(txt.includes('0/1'), 'only the first try counts: ' + txt);
+});
+
+test('wrong label boxes stay editable, and Show me the answer reveals', async page => {
+  await page.evaluate(() => startDrill('cell', 'tax', 'label'));
+  const slots = await page.evaluate(() => labelSlots(Q.sc).map(s => ({ id: s.id, answer: s.answer })));
+  // fill with everything shifted by one so all are wrong
+  for (let i = 0; i < slots.length; i++) {
+    const name = slots[(i + 1) % slots.length].answer;
+    const ci = await page.evaluate(a => ui.chips.indexOf(a), name);
+    await page.click(`[data-chip="${ci}"]`);
+    await page.evaluate(id => document.querySelector(`[data-slot="${id}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true })), slots[i].id);
+  }
+  await page.click('#check-btn');
+  const red = await page.evaluate(() => document.querySelectorAll('.slot.wrong').length);
+  assert(red === slots.length, 'all boxes red: ' + red);
+  assert(await page.evaluate(() => !document.getElementById('check-btn').hidden), 'check still available');
+  await page.click('.giveup');
+  const v = await page.evaluate(() => document.querySelector('.verdict').textContent);
+  assert(v === 'Here’s the answer', v);
+  assert(await page.evaluate(() => !document.getElementById('next-btn').hidden), 'next shown');
+});
+
+test('a wrong multiple-choice option greys out and another can be picked', async page => {
+  await page.evaluate(() => startDrill('cell', 'floor', 'effects'));
+  await page.evaluate(() => [...document.querySelectorAll('[data-opt]')].find(b => b.dataset.opt !== Q.steps[Q.i].ans).click());
+  assert((await page.evaluate(() => document.querySelector('.verdict').textContent)) === 'Not quite. Try again.');
+  await page.evaluate(() => [...document.querySelectorAll('[data-opt]')].find(b => b.dataset.opt === Q.steps[Q.i].ans).click());
+  assert((await page.evaluate(() => document.querySelector('.verdict').textContent)) === 'Got it');
+});
+
+test('effects questions never show Shortage/Surplus on the graph', async page => {
+  for (const k of ['ceiling', 'floor']) {
+    await page.evaluate(k => startDrill('cell', k, 'effects'), k);
+    const t = await page.evaluate(() => document.getElementById('chart').textContent);
+    assert(!/Shortage|Surplus/.test(t), k + ': ' + t);
+  }
 });
 
 test('SL hides the Calculate column', async page => {
