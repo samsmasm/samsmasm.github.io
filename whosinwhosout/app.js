@@ -9,11 +9,13 @@
   const DEFAULTS = { model: 'hold', excl: [] };
   const MODEL_TEXT = {
     hold: 'every seat holds as in 2023',
-    swing: 'uniform swing',
+    swing: 'uniform swing, with some seats called from electorate polls',
   };
   const MODEL_HINT = {
     hold: 'Each 2026 electorate goes to the party that won its closest 2023 seat. Simple and stable, but it ignores any shift in support since 2023.',
-    swing: 'Each party\'s change since 2023 in the poll average is added to its 2023 candidate vote in every seat. Crude: it misses personal votes (Epsom for ACT, for example) and local campaigns.',
+    swing: 'Each party\'s change since 2023 in the poll average is added to its 2023 candidate vote in every seat. Crude: it misses personal votes (Epsom for ACT, for example) and local campaigns. Exceptions, marked ● in the electorate table: '
+      + D.electorates.filter(e => e.swingCall).map(e => `${e.name} (${P[e.swingCall.party].name})`).join(', ')
+      + '. The Māori seats follow their latest electorate polls, and Tāmaki goes to National with its ACT MP retiring.',
   };
 
   // Pollsters in the data, with how many polls each has inside the averaging window.
@@ -166,7 +168,8 @@
     const row = w => {
       const flipped = w.party !== w.held2023;
       let note = '';
-      if (state.model === 'swing' && w.lead != null) note = `lead ${w.lead.toFixed(1)} pts` + (flipped ? ` · gain from ${esc(pname(w.held2023))}` : '');
+      if (w.call) note = `<span class="flag" title="Called by hand">●</span> ${esc(w.call)}`;
+      else if (state.model === 'swing' && w.lead != null) note = `lead ${w.lead.toFixed(1)} pts` + (flipped ? ` · gain from ${esc(pname(w.held2023))}` : '');
       else if (w.majority2023) note = `2023 majority ${w.majority2023.toLocaleString('en-NZ')}`;
       const flag = w.confidence !== 'high' ? ` <span class="flag" title="${esc('Mapping uncertain (' + w.confidence + '): ' + w.notes)}" tabindex="0">◆</span>` : '';
       return `<tr><td>${esc(w.name)}</td><td>${chip(w.party)}</td>

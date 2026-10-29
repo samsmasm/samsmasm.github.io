@@ -111,11 +111,15 @@
 
   /* Who wins each electorate.
      'hold':  the party that won the closest 2023 predecessor keeps it.
-     'swing': uniform swing on the predecessor's 2023 electorate (candidate) vote. */
+     'swing': uniform swing on the predecessor's 2023 electorate (candidate) vote,
+              except seats called by hand (e.swingCall) from electorate polls or news. */
   function electorateWinners(electorates, model, avg, national2023) {
     return electorates.map(e => {
-      let party, lead = null, shares = null;
-      if (model === 'swing' && e.shares2023.length) {
+      let party, lead = null, shares = null, call = null;
+      if (model === 'swing' && e.swingCall) {
+        party = e.swingCall.party;
+        call = e.swingCall.reason;
+      } else if (model === 'swing' && e.shares2023.length) {
         shares = e.shares2023.map(c => {
           const sw = (c.party in national2023 && avg && c.party in avg)
             ? avg[c.party] - national2023[c.party] : 0; // independents and minor parties get no swing
@@ -130,7 +134,7 @@
       const cand = e.candidates.find(c => c.party === party);
       return {
         name: e.name, pred: e.pred, confidence: e.confidence, notes: e.notes, maori: e.maori,
-        party, candidate: cand ? cand.name : null, lead, shares,
+        party, candidate: cand ? cand.name : null, lead, shares, call,
         held2023: e.win2023.party, majority2023: e.win2023.majority,
       };
     });

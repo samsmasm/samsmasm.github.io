@@ -17,6 +17,7 @@ Judgement calls made to ship V1 fast. Change any of these freely.
 - "Other" in each poll uses the Others column, or 100 minus the listed parties if blank.
 - **Hold 2023 gives a big overhang** (National holds 44 electorates on about 28% of the vote, so the House is about 134). That is what the assumption implies; the page explains overhang rather than hiding it.
 - Uniform swing: only the seven polled parties swing; independents and minor parties keep their 2023 share. If the predicted winner has no 2026 candidate (Labour in Tāmaki Makaurau under swing), the seat still goes to that party and shows "Candidate TBC (none listed)".
+- **Hand-called seats in the swing model** (Sam, 29 Oct): `data/manual/swing_calls.csv`. The Māori seats follow their latest electorate polls (Te Tai Tokerau to Green, Te Tai Tonga and Ikaroa-Rāwhiti to Labour), except Tāmaki Makaurau, whose polls are split and which stays with TPM. Tāmaki goes to National: Brooke van Velden (ACT) is retiring and the only published poll is a leaked, unverified one. Hold 2023 is unchanged.
 - If a party's list runs out, the seats show as unfilled (not reallocated).
 
 ## Boundary mapping (`data/manual/electorate_mapping.csv`)

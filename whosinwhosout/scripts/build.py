@@ -286,6 +286,13 @@ def main():
     with open(MANUAL / "electorate_mapping.csv", newline="") as f:
         mapping = list(csv.DictReader(f))
 
+    # Seats called by hand for the swing model (electorate polls, retirements).
+    with open(MANUAL / "swing_calls.csv", newline="") as f:
+        swing_calls = {r["electorate"]: {"party": r["party"], "reason": r["reason"]} for r in csv.DictReader(f)}
+    for name in swing_calls:
+        if name not in {r["new_electorate"] for r in mapping}:
+            print("PROBLEM swing call for unknown electorate", name)
+
     maori = {"Hauraki-Waikato", "Ikaroa-Rāwhiti", "Tāmaki Makaurau", "Te Tai Hauāuru",
              "Te Tai Tokerau", "Te Tai Tonga", "Waiariki"}
     electorates, problems = [], []
@@ -310,6 +317,7 @@ def main():
             "win2023": wins.get(pred),
             "shares2023": [{k: c[k] for k in ("cand", "party", "pct")} for c in (shares or [])],
             "candidates": cands.get(new, []),
+            "swingCall": swing_calls.get(new),
         })
 
     built = dt.date.today().isoformat()
