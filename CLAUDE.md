@@ -216,6 +216,16 @@ Read the folder's own CLAUDE.md before working in any of these.
 
 Every push to `main` deploys via GitHub Pages. The repo root is the site root. Subdirectory `ibbm/` and `ibecon/` are built Astro outputs — never edit those files directly; edit `ibbm-src/` and `ibecon-src/` then rebuild.
 
+### SSL / Error 526 (current status: Oct 2026)
+
+unisam.nz is GitHub Pages behind Cloudflare. GitHub's origin cert for unisam.nz (90-day Let's Encrypt) has twice failed to auto-renew (Jul 2026, 29 Oct 2026). With Cloudflare SSL mode on **Full (strict)**, an expired origin cert gives visitors Error 526.
+
+- **Now:** Cloudflare is on **Full** (not strict) as a stopgap. Visitors still get a valid Cloudflare cert. GitHub is retrying renewal ("Certificate Request Error ... will retry").
+- **Next:** when GitHub Pages settings show "Certificate Active", verify the cert GitHub actually serves before flipping back to Full (strict). GitHub's UI goes Active before the new cert is served, and flipping early causes a 526 again:
+  `echo | openssl s_client -connect samsmasm.github.io:443 -servername unisam.nz 2>/dev/null | openssl x509 -noout -dates`
+- **If renewal stays stuck:** do the CNAME reset (grey-cloud apex+www, remove CNAME, wait ~18 min, re-add, cert takes ~2.5h). Do it at a quiet time, because students see warnings meanwhile.
+- Cloudflare dashboard changes (SSL mode, proxy toggles) must be done by Sam; Claude's Cloudflare access is read-only. Full history is in `SSL_CERT_NOTES.md` (local, gitignored).
+
 ---
 
 ## Homepage index — planned future changes
