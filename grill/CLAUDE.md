@@ -25,6 +25,9 @@ Drills IB Economics government intervention diagrams: indirect tax, subsidy, pri
 - **Progress**: localStorage `grill_v1` = `{ level, scores: { 'tax.shade': [last 10 as 1/0] } }`. "Practise my weakest" picks untried cells first, then the lowest score.
 - Floor welfare (CS/PS/DWL) assumes the government does NOT buy the surplus; the "government buys the surplus" questions say so.
 
+## Analytics
+GoatCounter page views (samsmasm.goatcounter.com), same snippet as other unisam pages. Page views only; no per-question events.
+
 ## Look
 Sam asked (2026-10-29) for a bold, blocky barbecue look: deep reds, oranges, amber, charcoal, thick dark borders, Anton (Google Fonts) for headings and buttons. This deliberately departs from AESTHETIC.md's pastel style. `grilllogo.jpg` is Sam's original logo; `logo.jpg` is a square 256px crop of it used in the header and as the favicon. D stays deep blue so it reads clearly against the orange S.
 
