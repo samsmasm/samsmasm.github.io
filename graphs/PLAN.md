@@ -206,6 +206,7 @@ Undo/Redo buttons; sidebar templates S&D, Keynesian AD/AS, AD/LRAS/SRAS; colour 
 ## Future ideas (Sam, 2026-10-25; not now)
 
 - **Custom styles, shareable.** Saved style presets (weights, guide style, fills, colours, label style) that can be shared by link, e.g. a teacher sets the house style for a class. Builds on the settings (gear).
+- **Numbered graphs** (Sam, 2026-10-29). Today diagrams are numberless (or whatever is typed into the axis titles). Add an option for numbered axes with faint grid lines, where line and curve points snap to the number points. For calculation diagrams (e.g. HL tax/subsidy with real prices and quantities).
 - **Questions after a while.** Once someone has used the site for a while, ask: teacher / student / other, plus a few questions. Shelved (2026-10-25): Sam doubts the answers would be usable for design. Don't build unless he raises it again.
 
 ### 2026-10-25: Phase 7 done (promoted)
