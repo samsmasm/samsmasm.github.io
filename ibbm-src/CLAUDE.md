@@ -34,7 +34,7 @@ ibbm-src/
     pages/
       index.astro         ← homepage
       unit1/              ← 1-1 through 1-6, plus index
-      unit2/              ← 2-1, 2-2, 2-3, 2-4, plus index
+      unit2/              ← 2-1, 2-2, 2-3, 2-4 (SL), 2-4-hl (HL), plus index
       unit3/              ← 3-1 through 3-9 (+5-5 break-even), plus index
       unit4/              ← 4-1, 4-2, 4-3, 4-4, 4-5-{product,price,promotion,place,people,processes,physical}, 4-6, plus index
       unit5/              ← 5-1, 5-2, 5-3 (HL), 5-4, 5-6 (HL), 5-8 (HL), plus index (5.5 lives in unit3/)
@@ -87,7 +87,7 @@ Content should match the IB BM syllabus. `finsyl.md` is the Unit 3 checklist. Fo
 ## Nav structure (completed units)
 
 Unit 1: 1.1–1.6 (Business Org)
-Unit 2: 2.1–2.4 (HR, 2.1–2.3 built 2026-10-24, 2.4 2026-10-27)
+Unit 2: 2.1–2.4 (HR, 2.1–2.3 built 2026-10-24, 2.4 SL 2026-10-27, 2.4 HL 2026-10-29)
 Unit 3: 3.1–3.9 + 5.5 (Finance — all built)
 Unit 4: 4.1–4.6 including 4.5 split into 7Ps (all built)
 Unit 5: 5.1, 5.2, 5.3, 5.4, 5.6, 5.8 (5.5 is under Unit 3)
@@ -116,7 +116,17 @@ Case studies are separate pages under `/casestudies/`.
 
 ## Current status
 
-Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.4), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.5–2.7, 5.7, 5.9 (no materials yet).
+Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.4), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.5–2.7, 5.7, 5.9 (no materials yet). Within 2.4, labour turnover, appraisal and recruitment are not on the site yet: Sam hasn't taught them. Don't fill them in until he gives materials.
+
+## Splitting big sub-units
+
+A long sub-unit is split into separate pages rather than one huge page. 2.4 is the model: `2-4` (SL notes + "SL Activities" tab) and `2-4-hl` (HL notes + "HL Activities" tab). Later parts get their own page too (e.g. a future 2.4 appraisal page). Each new page needs a Nav entry (label "(SL)"/"(HL)"), a unit index card (`hl: true` for HL pages) and matching prev/next links.
+
+## Images and quotes
+
+- Slide images stay out (copyright), except diagrams Sam made himself (e.g. `public/img/sdt-flourishing.png`). Ask if unsure.
+- Quotes with swearing stay in, starred after the first letter (F***, s***).
+- Sort-grid activities (`.sort-grid` is 2 columns): order the cards so neither column is all one answer.
 
 ## Writing style
 
