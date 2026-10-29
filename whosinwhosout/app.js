@@ -6,7 +6,8 @@
   const P = D.parties;
   const $ = s => document.querySelector(s);
 
-  const DEFAULTS = { model: 'hold', excl: [] };
+  const DEFAULTS = { model: 'swing', excl: [] };
+  const LINK_VERSION = 2; // v2: default seat model changed from hold to swing
   const MODEL_TEXT = {
     hold: 'every seat holds as in 2023',
     swing: 'uniform swing, with some seats called from electorate polls',
@@ -41,17 +42,19 @@
   }
 
   // ---------- state <-> URL hash ----------
-  // Format: #v=1&model=swing&excl=Curia,RoyMorgan. Unknown keys are ignored so later
+  // Format: #v=2&model=hold&excl=Curia,RoyMorgan. Unknown keys are ignored so later
   // versions can add more (for example per-seat overrides) without breaking old links.
+  // v=1 links were made when hold was the default, so a v=1 link with no model means hold.
   function readHash() {
     const q = new URLSearchParams(location.hash.slice(1));
-    const model = q.get('model') in MODEL_TEXT ? q.get('model') : DEFAULTS.model;
+    const oldDefault = q.get('v') === '1' ? 'hold' : DEFAULTS.model;
+    const model = q.get('model') in MODEL_TEXT ? q.get('model') : oldDefault;
     const excl = (q.get('excl') || '').split(',').filter(s => s in pollsterBySlug);
     return { model, excl };
   }
   function writeHash(state) {
     const q = new URLSearchParams();
-    q.set('v', '1');
+    q.set('v', String(LINK_VERSION));
     if (state.model !== DEFAULTS.model) q.set('model', state.model);
     if (state.excl.length) q.set('excl', state.excl.join(','));
     const h = '#' + q.toString().replace(/%2C/g, ',');
@@ -132,7 +135,7 @@
     const over = Object.keys(a.parties).filter(k => a.parties[k].overhang > 0);
     $('#house').innerHTML = `House of <strong>${a.house}</strong> seats; a majority needs <strong>${majority}</strong> (the black line marks halfway). ` +
       (a.overhang > 0
-        ? `That is ${a.overhang} more than 120 because of overhang: ${over.map(k => `${esc(pname(k))} wins ${a.parties[k].overhang} more electorate${a.parties[k].overhang > 1 ? 's' : ''} than its party vote entitles it to`).join('; ')}.`
+        ? `That is ${a.overhang} more than 120 because of overhang: ${over.map(k => `${esc(pname(k))} wins ${a.parties[k].overhang} more electorate${a.parties[k].overhang > 1 ? 's' : ''} than its party vote entitles it to`).join('; ')}. In New Zealand the other parties get no extra seats to make up for it.`
         : 'No overhang.');
 
     const rows = Object.keys(a.parties).filter(k => k !== 'OTH')
@@ -207,7 +210,7 @@
     const excl = [...document.querySelectorAll('#pollsters input')].filter(i => !i.checked).map(i => i.value);
     update({ ...state, excl });
   });
-  window.addEventListener('hashchange', () => { state = readHash(); render(); });
+  window.addEventListener('hashchange', () => { state = readHash(); writeHash(state); render(); });
   $('#copy').addEventListener('click', async () => {
     writeHash(state);
     try { await navigator.clipboard.writeText(location.href); $('#copied').textContent = 'Copied.'; }
