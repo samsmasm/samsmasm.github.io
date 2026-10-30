@@ -7,11 +7,11 @@
 <link rel="icon" href="/unisamsq.png">
 <style>
   :root { --bm: #1a3a7a; --bm-bg: #f0f5ff; --bm-b: #b6cff5; --mid: #4a6aa8; --rule: #f0e8ff;
-    --good: #1d6b3a; --good-bg: #eaf7ef; --bad: #8a1c1c; --bad-bg: #fdeeee; }
+    --good: #1d6b3a; --good-bg: #eaf7ef; --bad: #8a1c1c; --bad-bg: #fdeeee; --amber: #7a5200; --amber-bg: #fff6dc; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #fff; color: #1d2433;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.45; }
-  header { display: flex; align-items: center; gap: 12px; padding: 8px 18px;
+  header { display: flex; align-items: center; gap: 12px; padding: 8px 18px; flex-wrap: wrap;
     background:
       radial-gradient(ellipse at 8% 50%, #ffd6e7 0%, transparent 50%),
       radial-gradient(ellipse at 35% 20%, #d6e6ff 0%, transparent 45%),
@@ -22,7 +22,10 @@
   header img { width: 44px; height: 44px; border-radius: 12px; }
   header h1 { font-family: Georgia, serif; font-weight: normal; font-size: 24px; margin: 0; color: var(--bm); }
   header .sub { font-size: 12px; color: var(--mid); letter-spacing: .08em; text-transform: uppercase; }
-  header a { margin-left: auto; color: var(--mid); font-size: 14px; }
+  header nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  header nav button, header nav a { background: none; border: 0; border-bottom: 3px solid transparent; color: #555; font-size: 14px;
+    padding: 6px 10px; font-weight: 500; text-decoration: none; border-radius: 0; }
+  header nav .on { color: var(--bm); border-bottom-color: var(--bm); }
   main { max-width: 1120px; margin: 0 auto; padding: 16px 18px 40px; }
   .cols { display: grid; grid-template-columns: 290px 1fr; gap: 26px; align-items: start; }
   @media (max-width: 760px) { .cols { grid-template-columns: 1fr; gap: 14px; } }
@@ -38,11 +41,12 @@
     .worker svg.av { width: 96px; height: 96px; margin: 0; }
   }
   .stats { margin: 10px 0 8px; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; font-size: 14px; }
-  .dots { display: flex; gap: 5px; align-items: center; }
-  .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--bm); }
-  .dot.on { background: var(--bm); }
+  .dots { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bm); }
+  .dot.zero { background: none; border: 2px dashed var(--bad); }
   .warn { width: 22px; height: 20px; }
-  .num { font-weight: 700; margin-left: 6px; color: var(--bm); }
+  .num { font-weight: 700; margin-left: 6px; color: var(--bm); font-size: 16px; }
+  .warns .num { color: var(--bad); font-size: 13px; }
   .tools { display: flex; gap: 8px; }
   .tools button { flex: 1; }
   .bubble { margin-top: 10px; background: #fff; border: 1.5px solid var(--bm-b); border-radius: 12px; padding: 8px 10px; font-size: 15px; position: relative; }
@@ -56,6 +60,8 @@
   .btn.main:hover { background: #26509f; }
   .btn.urgent { border-color: #e7a9a9; color: var(--bad); }
   .btn:disabled { opacity: .45; cursor: default; }
+  .btn.danger { border-color: #e7a9a9; color: var(--bad); }
+  .btn.danger.arm { background: var(--bad); color: #fff; }
 
   /* hub */
   .tag { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
@@ -84,6 +90,7 @@
   .chip.flat { color: var(--mid); background: #fff; border-color: var(--bm-b); }
   .msgs { font-size: 18px; margin: 0 0 12px; }
   .msgs p { margin: 4px 0; }
+  .fun { font-size: 18px; font-style: italic; color: #6a3fa0; margin: 0 0 12px; }
   .termline { font-size: 14px; color: var(--mid); margin-bottom: 14px; }
   details { margin: 12px 0; border-top: 1px solid var(--rule); padding-top: 8px; }
   summary { cursor: pointer; color: var(--mid); font-size: 14px; }
@@ -96,17 +103,27 @@
   .hr .who { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--mid); }
   .hr .ask { font-family: Georgia, serif; font-size: 24px; color: var(--bm); margin: 2px 0 12px; }
   .row { display: flex; flex-wrap: wrap; gap: 10px; }
-  .row .opt { flex: 1 1 180px; min-height: 0; text-align: center; font-weight: 600; }
+  .quizopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 600px) { .quizopts { grid-template-columns: 1fr; } }
+  .quizopts .opt { font-weight: 600; }
 
   /* pick */
-  .hires { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; margin-top: 12px; }
-  .hire { text-align: center; background: var(--bm-bg); border: 1.5px solid var(--bm-b); padding: 10px; }
+  .pickhead { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: end; }
+  .namebox label { display: block; font-size: 14px; color: var(--mid); }
+  .namebox input[type=text] { font: inherit; font-size: 18px; padding: 8px 10px; border: 1.5px solid var(--bm-b); border-radius: 10px; width: 260px; max-width: 100%; }
+  .namebox .small { font-size: 13px; color: var(--mid); display: block; margin-top: 4px; }
+  .namemsg { color: var(--bad); font-size: 14px; min-height: 0; }
+  .namewarn { background: var(--amber-bg); border: 1.5px solid #e3c47a; color: var(--amber); border-radius: 10px; padding: 6px 10px; margin-top: 6px; font-size: 14px; max-width: 520px; }
+  .namewarn:empty { display: none; }
+  .hires { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+  .hire { text-align: center; background: var(--bm-bg); border: 1.5px solid var(--bm-b); padding: 8px; }
   .hire:hover { border-color: var(--bm); transform: translateY(-2px); }
-  .hire svg { width: 120px; height: 120px; }
-  .hire .nm { font-family: Georgia, serif; font-size: 20px; color: var(--bm); }
+  .hire.cat { background: #fff6ea; border-color: #f2c48d; }
+  .hire svg { width: 110px; height: 110px; }
+  .hire .nm { font-family: Georgia, serif; font-size: 19px; color: var(--bm); }
   .hire .job { font-size: 13px; color: #33415e; min-height: 38px; }
   .hire .stats { justify-content: center; margin: 6px auto 0; width: max-content; font-size: 13px; text-align: left; }
-  .hire .dot { width: 13px; height: 13px; }
+  .hire .dot { width: 11px; height: 11px; }
   .lead { font-size: 18px; margin: 0; }
   .rules { max-width: 720px; }
 
@@ -115,8 +132,11 @@
   .endhead svg { width: 150px; height: 150px; }
   .big { font-family: Georgia, serif; font-size: 40px; margin: 0; }
   .big.win { color: var(--good); } .big.lose { color: var(--bad); }
-  .log { margin-top: 18px; }
-  .log .it { display: grid; grid-template-columns: 170px 1fr; gap: 4px 14px; padding: 10px 0; border-top: 1px solid var(--rule); }
+  .scoreline { font-size: 22px; margin: 4px 0 10px; }
+  .scoreline b { font-size: 30px; color: var(--bm); }
+  .endgrid { display: grid; grid-template-columns: 1fr 340px; gap: 26px; align-items: start; margin-top: 14px; }
+  @media (max-width: 860px) { .endgrid { grid-template-columns: 1fr; } }
+  .log .it { display: grid; grid-template-columns: 160px 1fr; gap: 4px 14px; padding: 10px 0; border-top: 1px solid var(--rule); }
   @media (max-width: 640px) { .log .it { grid-template-columns: 1fr; } }
   .log .h { font-family: Georgia, serif; color: var(--bm); }
   .log .d { font-size: 14px; color: var(--mid); }
@@ -128,13 +148,31 @@
   .box.good { border-color: #a8dcbb; background: var(--good-bg); }
   .box b { display: block; margin-bottom: 2px; }
 
+  /* leaderboard */
+  h3 { font-family: Georgia, serif; font-weight: normal; color: var(--bm); font-size: 22px; margin: 0 0 6px; }
+  ol.lb { list-style: none; margin: 8px 0; padding: 0; }
+  ol.lb li { display: grid; grid-template-columns: 34px 38px 1fr auto; gap: 0 10px; align-items: center; padding: 6px 4px; border-top: 1px solid var(--rule); }
+  ol.lb li.me { background: var(--amber-bg); }
+  ol.lb li.gap { display: block; text-align: center; color: var(--mid); border: 0; }
+  ol.lb .rk { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--bm-bg); color: var(--bm); font-size: 14px; }
+  ol.lb .rk1 { background: #ffd95e; color: #5a3a00; } ol.lb .rk2 { background: #dde3ea; color: #33404d; } ol.lb .rk3 { background: #f0b98a; color: #5a2e0a; }
+  ol.lb svg { width: 38px; height: 38px; }
+  ol.lb .nm { font-weight: 600; overflow-wrap: anywhere; }
+  ol.lb .meta { font-size: 13px; color: var(--mid); font-weight: normal; }
+  ol.lb .sc { font-weight: 700; font-size: 20px; color: var(--bm); }
+  .bigboard ol.lb li { font-size: 20px; padding: 10px 4px; }
+  .bigboard ol.lb svg { width: 52px; height: 52px; }
+  .bigboard ol.lb li { grid-template-columns: 40px 52px 1fr auto; }
+  .adm { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--rule); }
+  .adm .meta { font-size: 13px; color: var(--mid); }
+  .hint { color: var(--mid); font-size: 14px; }
+
   /* sort */
   .sortgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
   @media (max-width: 600px) { .sortgrid { grid-template-columns: 1fr; } }
 
   dialog { border: 1.5px solid var(--bm-b); border-radius: 12px; max-width: min(560px, 92vw); padding: 18px 20px; color: #1d2433; }
   dialog::backdrop { background: rgba(26, 58, 122, .25); }
-  dialog h3 { font-family: Georgia, serif; font-weight: normal; color: var(--bm); font-size: 22px; margin: 0 0 6px; }
   dialog .card { padding: 8px 0; border-top: 1px solid var(--rule); }
   dialog .card b { color: var(--bm); }
   dialog .x { float: right; }
@@ -146,7 +184,7 @@
 <header>
   <img src="/unisamsq.png" alt="">
   <div><h1>You're the Boss</h1><div class="sub">Pick a path · BM 2.4 Motivation</div></div>
-  <a href="/">unisam.nz</a>
+  <nav><button data-tab="play" class="on">Play</button><button data-tab="board">Leaderboard</button><button data-tab="teacher">Teacher</button><a href="/">unisam.nz</a></nav>
 </header>
 <main id="app"></main>
 <dialog id="dlg"></dialog>
@@ -157,6 +195,7 @@
 const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const DEFS = window.BOSS_DEFS || {};
+const hireOf = (id) => Boss.HIRES.find((h) => h.id === id);
 
 // ---------- key words with a "?" ----------
 const KW = [];
@@ -209,9 +248,32 @@ document.addEventListener('keydown', (e) => {
   if (q && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); showDef(q.dataset.t); }
 }, true);
 
-// ---------- worker drawing ----------
+// ---------- drawings ----------
+function catAvatar(L, m, W, cls) {
+  const eyes = m <= 1
+    ? '<path d="M76 92 L92 94 M124 92 L108 94" stroke="#2a1d14" stroke-width="3.5" stroke-linecap="round"/>'
+    : '<ellipse cx="84" cy="93" rx="7" ry="9" fill="#9ccc4a"/><ellipse cx="116" cy="93" rx="7" ry="9" fill="#9ccc4a"/>' +
+      '<ellipse cx="84" cy="94" rx="2.4" ry="' + (m >= 4 ? 8 : 6) + '" fill="#111"/><ellipse cx="116" cy="94" rx="2.4" ry="' + (m >= 4 ? 8 : 6) + '" fill="#111"/>';
+  const mouth = m >= 3 ? 'M90 116 Q95 122 100 115 Q105 122 110 116' : m === 2 ? 'M92 118 L108 118' : 'M90 122 Q100 112 110 122';
+  const blush = m >= 4 ? '<circle cx="72" cy="108" r="6" fill="#f29b9b" opacity=".6"/><circle cx="128" cy="108" r="6" fill="#f29b9b" opacity=".6"/>' : '';
+  const sweat = W >= 1 ? '<path d="M148 64 Q154 76 148 80 Q142 76 148 64Z" fill="#7cc4f0"/>' : '';
+  return '<svg class="av ' + (cls || '') + '" viewBox="0 0 200 200" aria-hidden="true">' +
+    '<path d="M150 196 Q190 180 178 140 Q172 124 160 132" stroke="' + L.fur + '" stroke-width="12" fill="none" stroke-linecap="round"/>' +
+    '<path d="M44 200 Q44 140 100 138 Q156 140 156 200Z" fill="' + L.fur + '"/>' +
+    '<path d="M60 74 L56 30 L94 56Z" fill="' + L.fur + '"/><path d="M140 74 L144 30 L106 56Z" fill="' + L.fur + '"/>' +
+    '<path d="M64 64 L62 42 L82 56Z" fill="#f4a7b0"/><path d="M136 64 L138 42 L118 56Z" fill="#f4a7b0"/>' +
+    '<ellipse cx="100" cy="96" rx="48" ry="42" fill="' + L.fur + '"/>' +
+    '<path d="M100 56 V70 M88 58 L90 70 M112 58 L110 70" stroke="' + L.stripe + '" stroke-width="4" stroke-linecap="round"/>' +
+    '<ellipse cx="100" cy="114" rx="20" ry="14" fill="#fbe3c8"/>' + eyes + blush +
+    '<path d="M95 107 L105 107 L100 113Z" fill="#e57a8a"/>' +
+    '<path d="' + mouth + '" stroke="#5a2a1a" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+    '<path d="M80 112 L48 106 M80 117 L48 120 M120 112 L152 106 M120 117 L152 120" stroke="#5a3a1a" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<path d="M64 136 Q100 150 136 136" stroke="' + L.collar + '" stroke-width="8" fill="none" stroke-linecap="round"/>' +
+    '<circle cx="100" cy="150" r="7" fill="#f2c94c" stroke="#b8902a" stroke-width="2"/>' + sweat + '</svg>';
+}
 function avatar(h, M, W, cls) {
   const L = h.look, m = M == null ? 3 : M;
+  if (L.style === 'cat') return catAvatar(L, m, W, cls);
   const mouth = m >= 3 ? 'M84 113 Q100 128 116 113' : m === 2 ? 'M88 117 L112 117' : 'M86 121 Q100 109 114 121';
   const brows = m <= 1 ? '<path d="M78 80 L92 84 M122 80 L108 84" stroke="#2a1d14" stroke-width="3" stroke-linecap="round"/>'
     : '<path d="M78 82 Q85 78 92 82 M108 82 Q115 78 122 82" stroke="#2a1d14" stroke-width="3" fill="none" stroke-linecap="round"/>';
@@ -236,30 +298,63 @@ function avatar(h, M, W, cls) {
     '<circle cx="85" cy="94" r="4.5" fill="#1d1712"/><circle cx="115" cy="94" r="4.5" fill="#1d1712"/>' + blush +
     '<path d="' + mouth + '" stroke="#5a2a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>' + sweat + '</svg>';
 }
-const dots = (n) => '<span class="dots">' + [1, 2, 3, 4].map((i) => '<span class="dot' + (i <= n ? ' on' : '') + '"></span>').join('') + '<span class="num">' + n + '</span></span>';
+// No ceiling: one dot per point up to 12, then the number carries on
+const dots = (n) => '<span class="dots">' + (n ? Array.from({ length: Math.min(n, 12) }, () => '<span class="dot"></span>').join('') : '<span class="dot zero"></span>') +
+  '<span class="num">' + n + '</span></span>';
 const warnIcon = (on) => '<svg class="warn" viewBox="0 0 24 22"><path d="M12 2 L23 21 H1Z" fill="' + (on ? '#c0392b' : 'none') + '" stroke="#8a1c1c" stroke-width="2" stroke-linejoin="round"/>' + (on ? '<path d="M12 8 V14 M12 17 V18" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>' : '') + '</svg>';
-const warns = (w) => '<span class="dots">' + warnIcon(w >= 1) + warnIcon(w >= 2) + '<span class="num">' + (w >= 1 ? 'One more and they quit' : '') + '</span></span>';
+const warns = (w) => '<span class="dots warns">' + warnIcon(w >= 1) + warnIcon(w >= 2) + '<span class="num">' + (w >= 1 ? 'One more and they quit' : '') + '</span></span>';
 
 // ---------- game ----------
-let G = { view: 'pick', st: null, bubble: null, q: null, sorted: false, sortOk: null };
+let tab = 'play';
+let G = { view: 'pick' };
+let player = { name: '', priv: false };
 
 function render() {
+  document.querySelectorAll('header nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   const app = $('#app');
-  if (G.view === 'pick') { app.innerHTML = pickView(); return; }
-  if (G.view === 'end') { app.innerHTML = endView(); window.scrollTo(0, 0); return; }
+  if (tab === 'board') { boardView(); return; }
+  if (tab === 'teacher') { teacherView(); return; }
+  if (G.view === 'pick') { app.innerHTML = pickView(); pickWire(); return; }
+  if (G.view === 'end') { app.innerHTML = endView(); window.scrollTo(0, 0); lbEnd(); return; }
   app.innerHTML = '<div class="cols">' + workerPanel() + '<section>' + mainView() + '</section></div>';
 }
+document.querySelectorAll('header nav button').forEach((b) => b.onclick = () => { tab = b.dataset.tab; render(); });
 
 function pickView() {
-  return '<h2>Pick your hire</h2><p class="lead">You run a small company. Hire one person, then make 15 calls. Keep them motivated, skilled and here.</p>' +
+  return '<div class="pickhead"><div><h2>Pick your hire</h2><p class="lead">Hire one, then make 15 calls. Keep them motivated, skilled and here.</p></div>' +
+    '<div class="namebox"><label for="nm">Your name or team name</label><input id="nm" type="text" maxlength="24" value="' + esc(player.name) + '" placeholder="e.g. Team Herzberg">' +
+    '<label class="small"><input type="checkbox" id="priv"' + (player.priv ? ' checked' : '') + '> Keep me off the class leaderboard</label>' +
+    '<div class="namemsg" id="nmMsg"></div></div></div><div class="namewarn" id="nmWarn"></div>' +
     '<div class="hires">' + Boss.HIRES.map((h) =>
-      '<button class="hire" onclick="pick(\'' + h.id + '\')">' + avatar(h, 3, 0) +
+      '<button class="hire' + (h.id === 'cat' ? ' cat' : '') + '" data-h="' + h.id + '">' + avatar(h, 3, 0) +
       '<div class="nm">' + h.name + ', ' + h.age + '</div><div class="job">' + esc(h.job) + '</div>' +
       '<div class="stats"><span>Motivation</span>' + dots(h.M) + '<span>Skills</span>' + dots(h.S) + '</div></button>').join('') + '</div>' +
     '<details class="rules"><summary>How it works</summary>' +
-    '<p><b>Motivation</b> hits 0: they are demotivated. <b>Skills</b> hit 0: they cannot do the job. <b>Two warnings</b>: they quit.</p>' +
+    '<p><b>Motivation</b> hits 0: they are demotivated. <b>Skills</b> hit 0: they cannot do the job. <b>Two warnings</b>: they quit. There is no top limit: keep growing them.</p>' +
     '<p>Every worker has a hidden need right now: security, belonging, esteem or growth. Rewards that match it work best. <b>Ask them</b> to find out (asking twice at one step annoys them). <b>Ask HR</b> for definitions.</p>' +
-    '<p>Sometimes HR asks you to name what you chose. Get it wrong and the paperwork costs you motivation.</p></details>';
+    '<p>Every few steps HR gives you a <b>pop quiz</b> on motivation theory (five in all). Right: motivation +1. Wrong: motivation -1.</p>' +
+    '<p><b>Score</b> = 10 for each motivation and skill point, 10 for each step reached, 20 for each quiz answer right, minus 10 per warning, plus a bonus if they stay: 150 promoted mentor, 100 loyal veteran, 50 fragile survivor.</p></details>';
+}
+
+// Names already on this week's leaderboard; a clash needs a second press
+let taken = new Set(), okName = null;
+function pickWire() {
+  const nameKey = () => $('#nm').value.trim().slice(0, 24).toLowerCase();
+  const warnName = () => {
+    const k = nameKey(), clash = k && taken.has(k) && !$('#priv').checked;
+    $('#nmWarn').innerHTML = clash ? 'Someone called <b>' + esc($('#nm').value.trim()) + '</b> is already on this week\'s leaderboard. If that is not you, change your name. If it is you, pick your hire again.' : '';
+    return clash;
+  };
+  lbFetch().then((d) => { taken = new Set(Object.values(d).filter((o) => o && typeof o.n === 'string').map((o) => o.n.trim().slice(0, 24).toLowerCase())); if ($('#nm')) warnName(); }).catch(() => {});
+  $('#nm').oninput = () => { $('#nmMsg').textContent = ''; okName = null; warnName(); };
+  $('#priv').onchange = warnName;
+  document.querySelectorAll('.hire').forEach((b) => b.onclick = () => {
+    const name = $('#nm').value.trim();
+    if (!name) { $('#nmMsg').textContent = 'Type your name or team name first.'; $('#nm').focus(); return; }
+    if (warnName() && okName !== nameKey()) { okName = nameKey(); $('#nm').focus(); return; }
+    player = { name: name.slice(0, 24), priv: $('#priv').checked };
+    pick(b.dataset.h);
+  });
 }
 
 function workerPanel() {
@@ -294,16 +389,28 @@ function mainView() {
       '<div class="sortgrid">' + s.items.map((i) => '<button class="opt' + (G.picks.has(i.id) ? ' on' : '') + '" onclick="togglePick(\'' + i.id + '\')">' + (G.picks.has(i.id) ? '✓ ' : '') + esc(i.label) + '</button>').join('') + '</div>' +
       '<button class="btn main" onclick="checkSort()">Check</button></div>';
   }
-  if (G.view === 'nameit') {
-    return '<div class="hr"><div class="who">HR</div><div class="ask">' + esc(G.q.ask) + '</div><div class="row">' +
-      G.q.choices.map((c, i) => '<button class="opt" onclick="nameIt(' + i + ')">' + esc(c) + '</button>').join('') + '</div></div>';
+  if (G.view === 'quiz') {
+    return '<div class="tag">Pop quiz ' + G.q.n + ' of 5</div><div class="bar"><i style="width:' + (G.q.n / 5 * 100) + '%"></i></div>' +
+      '<div class="hr"><div class="who">HR</div><div class="ask">' + rich(G.q.ask) + '</div><div class="quizopts">' +
+      G.q.shown.map((c, i) => '<button class="opt" onclick="answer(' + i + ')">' + esc(c) + '</button>').join('') + '</div>' +
+      '<p class="hint">Right: motivation +1 and 20 points. Wrong: motivation -1.</p></div>';
+  }
+  if (G.view === 'quizres') {
+    const e = st.log[st.log.length - 1], ok = e.quiz.ok;
+    return '<div class="tag">Pop quiz ' + G.q.n + ' of 5</div><h2>' + (ok ? 'Right!' : 'Not quite') + '</h2>' +
+      (ok ? '' : '<div class="named no">It was: ' + rich(e.quiz.answer) + '</div>') +
+      '<div class="chips">' + (chip('Motivation', e.after.M - e.before.M) || '<span class="chip flat">Motivation 0</span>') + '</div>' +
+      '<p class="msgs">' + rich(e.debrief) + '</p>' +
+      (st.dead ? '<p class="msgs">' + esc(st.dead.why) + '</p>' : '') +
+      '<button class="btn main" onclick="next()">' + (Boss.over(st) ? 'See how it ended' : 'Next') + '</button>';
   }
   if (G.view === 'result') return resultView();
   // hub
   let pre = '';
   if (G.sortOk != null && hub.sort) {
-    const top = hub.sort.items.find((i) => i.id === hub.sort.top[st.hire.id]);
-    pre = G.sortOk ? '<div class="box good"><b>Correct sort.</b>What bothers ' + st.hire.name + ' most: ' + esc(top.label.toLowerCase()) + '.</div>'
+    const id = st.hire.id, top = hub.sort.items.find((i) => i.id === hub.sort.top[id]);
+    const what = (hub.sort.topFor && hub.sort.topFor[id]) || top.label.toLowerCase();
+    pre = G.sortOk ? '<div class="box good"><b>Correct sort.</b>What bothers ' + st.hire.name + ' most: ' + esc(what) + '.</div>'
       : '<div class="box bad"><b>Wrong sort. Motivation -1.</b>Hygiene factors: pay, conditions, security, relationships. Recognition and responsibility are motivators.</div>';
   }
   return hubHead(hub) + pre + '<div class="opts">' + Boss.optionsAt(st).map((o) =>
@@ -320,15 +427,13 @@ function resultView() {
   const dM = e.after.M - e.before.M, dS = e.after.S - e.before.S, dW = e.after.W - e.before.W;
   let chips = chip('Motivation', dM) + chip('Skills', dS) + chip('Warnings', dW);
   if (!chips) chips = '<span class="chip flat">No change</span>';
-  let named = '';
-  if (e.named) named = '<div class="named ok">✓ ' + esc(e.named) + qBtn(e.named) + '</div>';
-  if (e.misnamed) named = '<div class="named no">✗ It was ' + esc(e.misnamed) + qBtn(e.misnamed) + '</div>';
   const dead = st.dead;
-  return '<div class="tag">' + esc(e.title) + '</div><h2>' + (dead ? Boss.DEATHS[dead.kind].title + '!' : 'Result') + '</h2>' + named +
+  return '<div class="tag">' + esc(e.title) + '</div><h2>' + (dead ? Boss.DEATHS[dead.kind].title + '!' : 'Result') + '</h2>' +
+    (e.fun ? '<p class="fun">' + esc(e.fun) + '</p>' : '') +
     '<div class="chips">' + chips + '</div>' +
     '<div class="msgs">' + e.msgs.concat(dead ? [dead.why] : []).map((m) => '<p>' + esc(m) + '</p>').join('') + '</div>' +
-    (named ? '' : '<div class="termline">You chose: ' + rich(e.term) + '</div>') +
-    '<button class="btn main" onclick="next()">' + (dead || st.hub === 'END' ? 'See how it ended' : 'Next') + '</button>' +
+    '<div class="termline">You chose: ' + rich(e.term) + '</div>' +
+    '<button class="btn main" onclick="next()">' + (st.pendingQ ? 'Next: pop quiz' : Boss.over(st) ? 'See how it ended' : 'Next') + '</button>' +
     (e.debrief ? '<details><summary>Why?</summary><p>' + rich(e.debrief) + '</p></details>' : '');
 }
 
@@ -342,7 +447,7 @@ function endView() {
   } else {
     head = '<p class="big ' + (st.ending.id === 'fragile' ? 'lose' : 'win') + '">' + st.ending.title + '</p><p class="lead">' + esc(st.ending.text) + '</p>';
   }
-  const better = st.log.filter((e) => e.better).length;
+  const better = st.log.filter((e) => e.better && !e.quiz).length;
   const rows = st.log.map((e) => {
     const d = ['M', 'S', 'W'].map((k) => {
       const v = e.after[k] - e.before[k];
@@ -351,57 +456,166 @@ function endView() {
       return '<span class="' + (good ? 'u' : 'n') + '">' + ({ M: 'Motivation', S: 'Skills', W: 'Warnings' })[k] + ' ' + (v > 0 ? '+' : '') + v + '</span>';
     }).filter(Boolean).join(' · ');
     return '<div class="it"><div class="h">' + esc(e.title) + '</div><div>' + esc(e.choice) +
-      '<div class="d">' + rich(e.term) + (d ? ' · <span class="deltas">' + d + '</span>' : '') + (e.misnamed ? ' · named wrong' : '') + '</div>' +
-      (e.better ? '<div class="better">Better: ' + esc(e.better) + ' (' + rich(e.betterTerm) + ')</div>' : '') +
-      '<details><summary>Why?</summary><p>' + rich(e.debrief || '') + '</p></details></div></div>';
+      '<div class="d">' + (e.quiz ? (e.quiz.ok ? 'Right' : 'Wrong') : rich(e.term)) + (d ? ' · <span class="deltas">' + d + '</span>' : '') + '</div>' +
+      (e.better ? '<div class="better">' + (e.quiz ? 'Answer: ' + rich(e.better) : 'Better: ' + esc(e.better) + ' (' + rich(e.betterTerm) + ')') + '</div>' : '') +
+      (e.debrief ? '<details><summary>Why?</summary><p>' + rich(e.debrief) + '</p></details>' : '') + '</div></div>';
   }).join('');
   return '<div class="endhead">' + avatar(h, st.dead ? 0 : st.M, st.W) + '<div>' + head +
+    '<p class="scoreline">Score <b>' + Boss.score(st) + '</b> <span class="muted" style="font-size:15px">(motivation ' + st.M + ', skills ' + st.S + ', step ' + Math.min(15, st.reached) + ' of 15)</span></p>' +
     '<button class="btn main" onclick="restart()">Play again</button></div></div>' + body +
-    '<h2 style="margin-top:22px">Your choices</h2><p class="muted">' + st.log.length + ' choices, ' + better + ' with a better option.</p><div class="log">' + rows + '</div>';
+    '<div class="endgrid"><div><h3>Your choices</h3><p class="muted">' + st.log.filter((e) => !e.quiz).length + ' choices, ' + better + ' with a better option. Quiz: ' + st.quizRight + ' of ' + st.quizIds.length + ' right.</p><div class="log">' + rows + '</div></div>' +
+    '<div><h3>Class leaderboard</h3><p class="hint">This week, best score per name.</p><div id="lbBox">Loading...</div></div></div>';
 }
 
 // ---------- actions ----------
-function pick(id) { G = { view: 'hub', st: Boss.newState(id), bubble: null, q: null, sortOk: null }; enterHub(); }
+function pick(id) { G = { view: 'hub', st: Boss.newState(id), bubble: null, q: null, sortOk: null, posted: false }; enterHub(); }
 function restart() { G = { view: 'pick' }; render(); window.scrollTo(0, 0); }
 function enterHub() {
   const hub = Boss.HUBS[G.st.hub];
   G.bubble = null;
-  G.view = hub.router ? 'router' : hub.sort && G.sortOk == null ? 'sort' : 'hub';
+  G.view = hub.router ? 'router' : hub.sort && !G.st.sorted ? 'sort' : 'hub';
   if (G.view === 'sort') G.picks = new Set();
   render();
 }
-function afterRisk() { if (G.st.dead) { G.view = 'end'; } render(); }
+function deathLog(choice) {
+  const st = G.st, e = { M: st.M, S: st.S, W: st.W };
+  st.log.push({ hub: st.hub, title: Boss.HUBS[st.hub].title, choice, term: 'Warning', msgs: [], before: e, after: e });
+}
+function afterRisk() { if (G.st.dead) G.view = 'end'; render(); }
 function askThem() {
   const st = G.st, before = st.W;
   const words = Boss.askThem(st);
   G.bubble = { html: '"' + esc(words) + '"' + (st.W > before ? '<br><b>They feel interrogated. Warning!</b>' : ''), bad: st.W > before };
-  if (st.dead) G.st.log.push({ hub: st.hub, title: Boss.HUBS[st.hub].title, choice: 'Asked them twice', term: 'Warning', msgs: [], before: { M: st.M, S: st.S, W: before }, after: { M: st.M, S: st.S, W: st.W } });
+  if (st.dead) deathLog('Asked them twice');
   afterRisk();
 }
 function askHR() {
   const st = G.st, hub = Boss.HUBS[st.hub];
   const cost = Boss.askHR(st);
+  if (st.dead) deathLog('Asked HR at an urgent moment');
   const cards = (hub.terms || []).map(defOf).filter(Boolean).map((d) =>
     '<div class="card"><b>' + esc(d.key) + '</b><br>' + esc(d.def) + '</div>').join('');
-  openDlg('<h3>HR definitions</h3>' + (cost ? '<p class="muted" style="color:#8a1c1c">This was urgent. Waiting cost you a warning.</p>' : '') + cards, afterRisk);
+  openDlg('<h3>HR definitions</h3>' + (cost ? '<p style="color:#8a1c1c">This was urgent. Waiting cost you a warning.</p>' : '') + cards, afterRisk);
 }
-function routeOn() { Boss.route(G.st); if (G.st.dead) { G.st.log.push({ hub: 'H3', title: 'Month-one check', choice: 'Month-one check', term: 'Commission', msgs: [], before: { M: G.st.M, S: G.st.S, W: G.st.W }, after: { M: G.st.M, S: G.st.S, W: G.st.W } }); G.view = 'end'; render(); return; } G.sortOk = null; enterHub(); }
+function routeOn() {
+  Boss.route(G.st);
+  if (G.st.dead) { deathLog('Month-one check'); G.view = 'end'; render(); return; }
+  G.sortOk = null; enterHub();
+}
 function togglePick(id) { G.picks.has(id) ? G.picks.delete(id) : G.picks.add(id); render(); }
 function checkSort() { G.sortOk = Boss.sortCheck(G.st, G.picks); if (G.st.dead) { G.view = 'end'; render(); return; } G.view = 'hub'; render(); }
 function choose(id) {
-  const q = Boss.choose(G.st, id);
+  Boss.choose(G.st, id);
   G.bubble = null;
-  if (q) {
-    const others = q.pool.filter((p) => p !== q.answer).sort(() => Math.random() - 0.5).slice(0, 2);
-    q.choices = others.concat(q.answer).sort(() => Math.random() - 0.5);
-    G.q = q; G.view = 'nameit';
-  } else G.view = 'result';
+  G.view = 'result';
   render();
 }
-function nameIt(i) { Boss.answerName(G.st, G.q, G.q.choices[i]); G.view = 'result'; render(); }
+function answer(i) { Boss.answerQuiz(G.st, G.q.shown[i]); G.view = 'quizres'; render(); }
 function next() {
-  if (G.st.dead || G.st.hub === 'END') { G.view = 'end'; render(); return; }
+  const q = G.st.pendingQ;
+  if (q) { G.q = Object.assign({}, q, { shown: q.choices.slice().sort(() => Math.random() - 0.5) }); G.view = 'quiz'; render(); window.scrollTo(0, 0); return; }
+  if (Boss.over(G.st)) { G.view = 'end'; render(); return; }
   G.sortOk = null; enterHub(); window.scrollTo(0, 0);
+}
+
+/* ---------- class leaderboard ----------
+   Same Realtime Database as /stockshock (coldwar-d8109), under boss/scores, through the REST API.
+   Each row stores the player's actions, and scores are always recomputed by replaying them.
+   Push keys are time ordered, so "last 7 days" is a key range query and needs no index rule. */
+const LB_URL = 'https://coldwar-d8109-default-rtdb.asia-southeast1.firebasedatabase.app/boss/scores';
+const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+function pushPrefix(ms) { let s = ''; for (let i = 0; i < 8; i++) { s = PUSH_CHARS.charAt(ms % 64) + s; ms = Math.floor(ms / 64); } return s; }
+async function lbFetch() {
+  if (!window.fetch) throw new Error('offline');
+  const r = await fetch(LB_URL + '.json?orderBy=%22$key%22&startAt=%22' + pushPrefix(Date.now() - 7 * 864e5) + '%22');
+  if (!r.ok) throw new Error('load ' + r.status);
+  return (await r.json()) || {};
+}
+function lbPost() {
+  if (G.posted || player.priv || !player.name || !window.fetch) return Promise.resolve(null);
+  G.posted = true;
+  const body = { n: player.name, c: G.st.hire.id, a: G.st.acts.join(','), at: { '.sv': 'timestamp' } };
+  return fetch(LB_URL + '.json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then((r) => { if (!r.ok) throw new Error('save ' + r.status); return true; });
+}
+function lbCheck(o) {
+  if (!o || typeof o.n !== 'string' || !o.n.trim() || typeof o.c !== 'string' || typeof o.a !== 'string') return null;
+  const st = Boss.replay(o.c, o.a.split(','));
+  if (!st) return null;
+  return { name: o.n.trim().slice(0, 24), hire: o.c, score: Boss.score(st), result: st.dead ? Boss.DEATHS[st.dead.kind].title : st.ending.title, at: o.at || 0 };
+}
+// Best score per name, with games played
+function lbAggregate(rows) {
+  const best = {};
+  rows.forEach((r) => {
+    const k = r.name.toLowerCase(), b = best[k];
+    if (!b) best[k] = Object.assign({ games: 1 }, r);
+    else { b.games++; if (r.score > b.score) Object.assign(b, r, { games: b.games }); }
+  });
+  return Object.values(best).sort((a, b) => b.score - a.score);
+}
+async function lbLoad() { return lbAggregate(Object.values(await lbFetch()).map(lbCheck).filter(Boolean)); }
+const isMe = (r) => !player.priv && player.name && r.name.toLowerCase() === player.name.toLowerCase();
+function lbList(rows, limit) {
+  if (!rows.length) return '<p>No scores yet this week. Be the first!</p>';
+  const li = (r, i) => '<li class="' + (isMe(r) ? 'me' : '') + '"><span class="rk' + (i < 3 ? ' rk' + (i + 1) : '') + '">' + (i + 1) + '</span>' + avatar(hireOf(r.hire), 3, 0) +
+    '<span class="nm">' + esc(r.name) + (isMe(r) ? ' (you)' : '') + '<div class="meta">' + esc(hireOf(r.hire).name) + ': ' + esc(r.result) + ' · ' + r.games + ' game' + (r.games > 1 ? 's' : '') + '</div></span>' +
+    '<span class="sc">' + r.score + '</span></li>';
+  let out = rows.slice(0, limit).map(li).join('');
+  const k = rows.findIndex(isMe);
+  if (k >= limit) out += '<li class="gap">...</li>' + li(rows[k], k);
+  return '<ol class="lb">' + out + '</ol>';
+}
+async function lbEnd() {
+  const g = G, box = () => (G === g ? $('#lbBox') : null);
+  let note = '';
+  if (player.priv) note = '<p class="hint">You chose to stay off the leaderboard, so this game was not added.</p>';
+  try { await lbPost(); } catch (e) { note = '<p class="hint">Could not save your score to the leaderboard.</p>'; }
+  try { const rows = await lbLoad(); if (box()) box().innerHTML = note + lbList(rows, 10); }
+  catch (e) { if (box()) box().innerHTML = note + '<p class="hint">The leaderboard needs an internet connection.</p>'; }
+}
+function boardView() {
+  $('#app').innerHTML = '<div class="bigboard"><h2>Class leaderboard</h2><p class="hint">This week, best score per name. Updates every 15 seconds.</p><div id="lbBig">Loading...</div></div>';
+  const load = () => lbLoad().then((rows) => { if (tab === 'board' && $('#lbBig')) $('#lbBig').innerHTML = lbList(rows, 30); })
+    .catch(() => { if ($('#lbBig')) $('#lbBig').innerHTML = '<p class="hint">The leaderboard needs an internet connection.</p>'; });
+  load();
+  clearInterval(boardView.t);
+  boardView.t = setInterval(() => { if (tab === 'board') load(); else clearInterval(boardView.t); }, 15000);
+}
+
+const TEACHER_CODE = '0987'; // low stakes: only unlocks deleting names, same code as /stockshock
+let teacherOK = false;
+function teacherView() {
+  if (!teacherOK) {
+    $('#app').innerHTML = '<h2>Teacher</h2><div class="namebox"><label for="tcode">Teacher code</label><input id="tcode" type="password" inputmode="numeric" maxlength="12" style="width:200px">' +
+      ' <button class="btn main" id="tgo">Unlock</button><p class="hint" id="tmsg"></p></div>';
+    const go = () => { if ($('#tcode').value.trim() === TEACHER_CODE) { teacherOK = true; teacherView(); } else $('#tmsg').textContent = 'That code is not right.'; };
+    $('#tgo').onclick = go; $('#tcode').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+    return;
+  }
+  $('#app').innerHTML = '<h2>Manage the class leaderboard</h2><p class="hint">Every game saved in the last 7 days, newest first. Delete removes it for everyone (press twice to confirm).</p><div id="lbAdmin">Loading...</div>';
+  lbAdmin();
+}
+async function lbAdmin() {
+  const box = () => $('#lbAdmin');
+  try {
+    const data = await lbFetch(), keys = Object.keys(data).reverse();
+    if (!box()) return;
+    if (!keys.length) { box().innerHTML = '<p>No games saved in the last 7 days.</p>'; return; }
+    box().innerHTML = keys.map((k) => {
+      const o = data[k], row = lbCheck(o), when = o && o.at ? new Date(o.at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+      return '<div class="adm" data-k="' + esc(k) + '"><div><b>' + esc(o && typeof o.n === 'string' ? o.n : '(no name)') + '</b><div class="meta">' +
+        (row ? esc(hireOf(row.hire).name) + ', ' + esc(row.result) + ', score ' + row.score : 'Unreadable entry') + (when ? ', ' + esc(when) : '') +
+        '</div></div><button class="btn danger">Delete</button></div>';
+    }).join('');
+    box().querySelectorAll('.adm button').forEach((b) => b.onclick = async () => {
+      if (!b.classList.contains('arm')) { b.classList.add('arm'); b.textContent = 'Confirm'; return; }
+      const row = b.closest('.adm'), k = row.getAttribute('data-k');
+      b.disabled = true; b.textContent = 'Deleting...';
+      try { const r = await fetch(LB_URL + '/' + encodeURIComponent(k) + '.json', { method: 'DELETE' }); if (!r.ok) throw new Error(r.status); row.remove(); }
+      catch (e) { b.disabled = false; b.textContent = 'Failed, try again'; }
+    });
+  } catch (e) { if (box()) box().innerHTML = '<p class="hint">The leaderboard needs an internet connection.</p>'; }
 }
 render();
 </script>
