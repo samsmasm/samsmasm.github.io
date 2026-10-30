@@ -197,11 +197,10 @@ Read the folder's own CLAUDE.md before working in any of these.
 ## Design system
 
 **Always read `AESTHETIC.md` before creating or editing any frontend.** Key rules:
-- Pastel watercolour header gradient (multi-radial). Never flat or linear.
-- Subject colours: Economics green (`#145c34`), BM blue (`#1a3a7a`), History orange (`#7a2d0a`), Tools purple (`#4a1a7a`), Experiments pink (`#7a1a4a`).
-- Georgia or system sans-serif. No Inter, no DM Sans, no Tailwind aesthetics.
-- No drop shadows, no pill buttons, no neutral grey card backgrounds, no dark mode toggle.
-- Logo: `/unisamsq.png`, 56–72px, border-radius 12–16px.
+- Two looks. **Option B "Paper and ink" is preferred** (Sam is moving the site to it): solid navy masthead `#1e2a4a` with an amber `#f4a629` rule, paper `#f7f6f2` page, Fraunces headings, Atkinson Hyperlegible body. Use it for all new pages and restyles. Option A (pastel watercolour gradient, Georgia) is the original look on older pages; do not start new pages in it.
+- Subject colours (both looks): Economics green (`#145c34`), BM blue (`#1a3a7a`), History orange (`#7a2d0a`), Tools purple (`#4a1a7a`), Experiments pink (`#7a1a4a`).
+- No Inter, no DM Sans, no Tailwind aesthetics. No drop shadows, no pill buttons or pill tags.
+- Logo: always the cartoon unicorn `/geocorn.png` (`/geocornsmall.png` for small sizes). **Never use `/unisamsq.png` or the other photo icons**; swap them out when you touch a page.
 
 ---
 

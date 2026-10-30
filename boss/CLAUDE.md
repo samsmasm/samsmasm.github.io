@@ -29,4 +29,4 @@ Maya 24, Tuan 26, Aisha 27, Kofi 44 (career change, teenagers at home, his mothe
 
 ## Style
 
-AESTHETIC.md, BM blue. Low text: decision first, debrief behind "Why?". No em dashes.
+AESTHETIC.md Option B (paper and ink), BM blue as section colour, geocorn logo. Low text: decision first, debrief behind "Why?". No em dashes.

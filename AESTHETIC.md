@@ -4,6 +4,85 @@ This document is the long-term reference for the visual language of unisam.nz an
 
 ---
 
+## Two looks (decided 2026-10-30)
+
+The site has two looks. **Option B is the direction Sam wants the site to move to.** Use it for every new page, and when restyling an old page. Option A is the original pastel look, kept here because most existing pages still use it; do not start new pages in it.
+
+| | Option A: Pastel watercolour (original) | Option B: Paper and ink (preferred) |
+|---|---|---|
+| Masthead | Multi-radial pastel gradient | Solid navy, amber rule underneath |
+| Page | White | Warm paper |
+| Headings | Georgia | Fraunces |
+| Body | System sans-serif | Atkinson Hyperlegible |
+| Feel | Whimsy, unicorn rainbow | Calm, editorial, dyslexia-friendly, a bit of warmth |
+| Examples | `/`, econnews, businews, most tools | ratibro, asia, fmwafrica, boss |
+
+### Logo (both looks)
+
+**Always use the cartoon unicorn: `/geocorn.png`** (or `/geocornsmall.png`, 200px, for small sizes). It is round artwork, so it needs no border radius or backing. 40 to 56px in a masthead.
+
+**Never use `/unisamsq.png`, `/unisamicon.png` or `/unisamicon2.png`** (the photo with the unicorn horn) on any page. Swap them for geocorn when you touch a page that still has them.
+
+Topic pages may use a topic logo instead, as fmwafrica does with its Africa silhouette.
+
+### Option B: Paper and ink
+
+The family look of ratibro, asia and fmwafrica: a solid dark masthead with one warm accent, warm paper underneath, a characterful serif for headings and a highly legible body font.
+
+**Colours**
+
+```css
+:root {
+  --masthead: #1e2a4a;      /* navy masthead, also primary buttons */
+  --masthead-ink: #ffffff;  /* text on the masthead */
+  --masthead-sub: #c9d2ea;  /* small text on the masthead */
+  --amber: #f4a629;         /* masthead rule, active tab underline, focus ring, highlights */
+  --amber-ink: #8a5a00;     /* amber as text on paper (plain --amber is too pale to read) */
+  --bg: #f7f6f2;            /* page paper */
+  --surface: #fffdf8;       /* cards and panels */
+  --surface-2: #efede6;     /* quiet fills, table stripes */
+  --line: #e3e0d8;          /* borders and dividers */
+  --ink: #1e2a4a;           /* body text */
+  --muted: #5b6680;         /* secondary text */
+  --ok: #18634f;  --ok-soft: #d9eee6;
+  --bad: #8a1c1c; --bad-soft: #f8e1e1;
+}
+```
+
+Subject colours still mark sections (Economics `#145c34`, BM `#1a3a7a`, History `#7a2d0a`, Tools `#4a1a7a`, Experiments `#7a1a4a`): use them for headings, links and accents inside a page, not for the masthead. A topic page may pick its own accent when there is a reason, as asia (indigo on archive paper) and fmwafrica (indigo and red ochre) do; write the reasoning in that page's CLAUDE.md, and avoid flag colours and cultural stereotypes.
+
+**Type**
+
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+```
+
+- Headings and the wordmark: `'Fraunces', Georgia, serif`, weight 500 to 700, `font-variant-numeric: lining-nums`.
+- Body and UI: `'Atkinson Hyperlegible', -apple-system, 'Segoe UI', sans-serif`, 16 to 18px, left-aligned, line-height 1.5. Bold (700) is allowed for key numbers and labels.
+- Small labels: uppercase, letter-spacing 0.08em, `--muted` or `--masthead-sub`.
+
+**Masthead**
+
+Solid `--masthead` background, `border-bottom: 4px solid var(--amber)`. Logo, then the page name in Fraunces in white, with an optional small uppercase line under it. Navigation sits on the right of the masthead as plain white text tabs; the active tab has a 3px amber underline. A plain "unisam.nz" link goes home.
+
+**Components**
+
+- Cards and panels: `--surface`, `1px solid var(--line)`, radius 10 to 12px, no shadow.
+- Primary button: `--masthead` fill, white text, radius 10px. Secondary: `--surface` with a `--line` border and `--ink` text. Never pill-shaped.
+- Focus: `outline: 3px solid var(--amber); outline-offset: 2px`.
+- Good and bad results use `--ok` / `--bad` with their soft fills, and always a word or icon too, never colour alone.
+
+**Dark mode** is optional in Option B. If a page has it, follow the system setting (`prefers-color-scheme`) through the CSS variables, as asia does. Pages do not need it.
+
+**Still applies from Option A:** no pill tags or labels, no Tailwind starter-kit look, no emoji in navigation, the tone section, and the footer.
+
+---
+
+Everything from here down describes **Option A** (the original pastel look), apart from the "What to avoid" and "Tone" sections, which apply to both.
+
+---
+
 ## Philosophy
 
 The site is serious under the hood and playful on the surface. It is built by a teacher, for students, and it should feel like neither a corporate SaaS product nor a bland school portal. The aesthetic reference points are:
@@ -73,10 +152,7 @@ Page background: white (`#fff`) or very light grey. Never beige, never warm/crea
 
 ## Logo
 
-The logo image is at `/unisamsq.png` (square crop). It appears in the header alongside the site title. It should be:
-- 56–72px square
-- `border-radius: 12–16px`
-- Optionally with a soft white semi-transparent backing if the header gradient makes it hard to read
+The logo is the cartoon unicorn, `/geocorn.png` (see "Logo (both looks)" above). It appears in the header alongside the site title, 56 to 72px, with no border radius (the art is already round). Never use the photo logo `/unisamsq.png`.
 
 Do not replace the logo with text, emoji, or a generated icon.
 
@@ -213,8 +289,8 @@ The subject colour for a sub-page should be the dominant colour for that page's 
 
 ### EconNews (`/econnews`)
 
-The reference implementation. Colours: `--accent: #145c34`, `--link: #145c34`, borders from the Economics green column. Masthead gradient leans green (`#d6ffe8` dominant). Logo `/unisamsq.png` with `border-radius: 10px` and white semi-transparent backing. Body font: Georgia serif. UI font: Inter.
+The reference implementation. Colours: `--accent: #145c34`, `--link: #145c34`, borders from the Economics green column. Masthead gradient leans green (`#d6ffe8` dominant). Logo: originally `/unisamsq.png`; replace with `/geocorn.png` when next touched. Body font: Georgia serif. UI font: Inter.
 
 ### BusiNews (`/businews`)
 
-Business Management weekly case studies. Colours: `--accent: #1a3a7a`, `--link: #1a3a7a`, `--link-hover: #0d2255`. Borders: `--border-mid: #b6cff5`, `--border-soft: #dce8f8`, `--border-pale: #eef4ff`. Muted text: `#3a4a6a`, light text: `#5a7298`. Masthead gradient leans blue (`#d6e8ff` dominant), base `#f0f5ff`. Curriculum tags: `background: #d6e8ff; color: #1a3a7a; border-radius: 4px` (soft pill, no border outline). Logo `/unisamsq.png` with `border-radius: 14px`.
+Business Management weekly case studies. Colours: `--accent: #1a3a7a`, `--link: #1a3a7a`, `--link-hover: #0d2255`. Borders: `--border-mid: #b6cff5`, `--border-soft: #dce8f8`, `--border-pale: #eef4ff`. Muted text: `#3a4a6a`, light text: `#5a7298`. Masthead gradient leans blue (`#d6e8ff` dominant), base `#f0f5ff`. Curriculum tags: `background: #d6e8ff; color: #1a3a7a; border-radius: 4px` (soft pill, no border outline). Logo: originally `/unisamsq.png`; replace with `/geocorn.png` when next touched.
