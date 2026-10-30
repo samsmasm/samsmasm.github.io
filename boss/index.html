@@ -137,6 +137,17 @@
   .big.win { color: var(--good); } .big.lose { color: var(--bad); }
   .scoreline { font-size: 22px; margin: 4px 0 10px; }
   .scoreline b { font-size: 30px; color: var(--bm); }
+  .breakdown { border-collapse: collapse; margin: 0 0 12px; font-size: 15px; }
+  .breakdown td { padding: 3px 10px 3px 0; border-top: 1px solid var(--rule); }
+  .breakdown td.n { text-align: right; color: var(--mid); }
+  .breakdown td.n b { color: var(--ink, #1e2a4a); }
+  .scorekey { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; margin: 12px 0 0; padding: 10px 14px;
+    background: var(--surface); border: 1px solid var(--line, #e3e0d8); border-left: 4px solid var(--amber-rule); border-radius: 10px; font-size: 15px; }
+  .scorekey b { width: 100%; font-family: var(--serif); color: var(--bm); font-size: 17px; }
+  .scorekey em { font-style: normal; font-weight: 700; color: var(--good); }
+  .scorekey .neg em { color: var(--bad); }
+  .ptswhy { list-style: none; padding: 0; margin: -6px 0 12px; font-size: 15px; color: var(--mid); }
+  .ptswhy b { color: var(--bm); display: inline-block; min-width: 38px; }
   .endgrid { display: grid; grid-template-columns: 1fr 340px; gap: 26px; align-items: start; margin-top: 14px; }
   @media (max-width: 860px) { .endgrid { grid-template-columns: 1fr; } }
   .log .it { display: grid; grid-template-columns: 160px 1fr; gap: 4px 14px; padding: 10px 0; border-top: 1px solid var(--rule); }
@@ -336,11 +347,19 @@ function pickView() {
       '<div class="nm">' + h.name + ', ' + h.age + '</div><div class="job">' + esc(h.job) + '</div>' +
       (h.note ? '<div class="note">' + esc(h.note) + '</div>' : '') +
       '<div class="stats"><span>Motivation</span>' + dots(h.M) + '<span>Skills</span>' + dots(h.S) + '</div></button>').join('') + '</div>' +
+    scoreKey() +
     '<details class="rules"><summary>How it works</summary>' +
     '<p><b>Motivation</b> hits 0: they are demotivated. <b>Skills</b> hit 0: they cannot do the job. <b>Two warnings</b>: they quit. There is no top limit: keep growing them.</p>' +
     '<p>Every worker has a hidden need right now: security, belonging, esteem or growth. Rewards that match it work best. <b>Ask them</b> to find out (asking twice at one step annoys them). <b>Ask HR</b> for definitions.</p>' +
     '<p>Every few steps HR gives you a <b>pop quiz</b> on motivation theory (five in all). Right: motivation +1. Wrong: motivation -1.</p>' +
-    '<p><b>Score</b> = 10 for each motivation and skill point, 10 for each step reached, 20 for each quiz answer right, minus 10 per warning, plus a bonus if they stay: 150 promoted mentor, 100 loyal veteran, 50 fragile survivor.</p></details>';
+    '<p><b>Why these points?</b> Maslow says a reward only motivates if it meets the need someone has right now, so a matched reward scores most and a reward they are not ready for loses points. A best call means no other option would have left them better off. Keeping your worker is the whole point of rewards and training, so every step they stay scores, and the ending adds a bonus: Promoted mentor 150, Loyal veteran 100, Fragile survivor 50.</p></details>';
+}
+// The scoring rules, shown before the game starts
+function scoreKey() {
+  return '<div class="scorekey"><b>How you score</b>' +
+    '<span><em>+30</em> reward matches their need right now</span><span><em>+20</em> quiz answer right</span>' +
+    '<span><em>+10</em> best call</span><span><em>+10</em> each step they stay</span>' +
+    '<span><em>+50 to 150</em> for how it ends</span><span class="neg"><em>-10</em> reward they are not ready for</span></div>';
 }
 
 // Names already on this week's leaderboard; a clash needs a second press
@@ -369,7 +388,8 @@ function workerPanel() {
   const urgent = hub && hub.urgent;
   return '<aside class="worker"><div class="top">' + avatar(h, st.M, st.W) +
     '<div><div class="nm">' + h.name + ', ' + esc(String(h.age).split(' ')[0]) + '</div><div class="job">' + esc(h.job) + '</div></div></div>' +
-    '<div class="stats"><span>Motivation</span>' + dots(st.M) + '<span>Skills</span>' + dots(st.S) + '<span>Warnings</span>' + warns(st.W) + '</div>' +
+    '<div class="stats"><span>Motivation</span>' + dots(st.M) + '<span>Skills</span>' + dots(st.S) + '<span>Warnings</span>' + warns(st.W) +
+    '<span>Score</span><span class="num" style="margin:0">' + Boss.score(st) + '</span></div>' +
     (G.view === 'hub' || G.view === 'router' || G.view === 'sort' ?
       '<div class="tools"><button class="btn" onclick="askThem()"' + (st.asked >= 2 ? ' disabled' : '') + '>' + (st.asked === 1 ? 'Ask them again' : 'Ask them') + '</button>' +
       '<button class="btn' + (urgent ? ' urgent' : '') + '" onclick="askHR()">' + (urgent ? 'Ask HR (costs a warning)' : 'Ask HR') + '</button></div>' : '') +
@@ -400,13 +420,13 @@ function mainView() {
     return '<div class="tag">Pop quiz ' + G.q.n + ' of 5</div><div class="bar"><i style="width:' + (G.q.n / 5 * 100) + '%"></i></div>' +
       '<div class="hr"><div class="who">HR</div><div class="ask">' + rich(G.q.ask) + '</div><div class="quizopts">' +
       G.q.shown.map((c, i) => '<button class="opt" onclick="answer(' + i + ')">' + esc(c) + '</button>').join('') + '</div>' +
-      '<p class="hint">Right: motivation +1 and 20 points. Wrong: motivation -1.</p></div>';
+      '<p class="hint">Right: +20 points and motivation +1. Wrong: motivation -1.</p></div>';
   }
   if (G.view === 'quizres') {
     const e = st.log[st.log.length - 1], ok = e.quiz.ok;
     return '<div class="tag">Pop quiz ' + G.q.n + ' of 5</div><h2>' + (ok ? 'Right!' : 'Not quite') + '</h2>' +
       (ok ? '' : '<div class="named no">It was: ' + rich(e.quiz.answer) + '</div>') +
-      '<div class="chips">' + (chip('Motivation', e.after.M - e.before.M) || '<span class="chip flat">Motivation 0</span>') + '</div>' +
+      '<div class="chips">' + ptsChip(e) + (chip('Motivation', e.after.M - e.before.M) || '<span class="chip flat">Motivation 0</span>') + '</div>' + ptsWhy(e) +
       '<p class="msgs">' + rich(e.debrief) + '</p>' +
       (st.dead ? '<p class="msgs">' + esc(st.dead.why) + '</p>' : '') +
       '<button class="btn main" onclick="next()">' + (Boss.over(st) ? 'See how it ended' : 'Next') + '</button>';
@@ -429,6 +449,9 @@ function chip(label, d) {
   const good = label === 'Warnings' ? d < 0 : d > 0;
   return '<span class="chip ' + (good ? 'up' : 'down') + '">' + label + ' ' + (d > 0 ? '+' : '') + d + '</span>';
 }
+// Points earned by one action, with the reasons
+const ptsChip = (e) => '<span class="chip pts ' + (e.pts < 0 ? 'down' : e.pts > 0 ? 'up' : 'flat') + '">' + (e.pts > 0 ? '+' : '') + e.pts + ' points</span>';
+const ptsWhy = (e) => (e.why && e.why.length ? '<ul class="ptswhy">' + e.why.map((w) => '<li><b>' + (w.pts > 0 ? '+' : '') + w.pts + '</b> ' + esc(w.label) + '</li>').join('') + '</ul>' : '');
 function resultView() {
   const st = G.st, e = st.log[st.log.length - 1];
   const dM = e.after.M - e.before.M, dS = e.after.S - e.before.S, dW = e.after.W - e.before.W;
@@ -437,7 +460,7 @@ function resultView() {
   const dead = st.dead;
   return '<div class="tag">' + esc(e.title) + '</div><h2>' + (dead ? Boss.DEATHS[dead.kind].title + '!' : 'Result') + '</h2>' +
     (e.fun ? '<p class="fun">' + esc(e.fun) + '</p>' : '') +
-    '<div class="chips">' + chips + '</div>' +
+    '<div class="chips">' + ptsChip(e) + chips + '</div>' + ptsWhy(e) +
     '<div class="msgs">' + e.msgs.concat(dead ? [dead.why] : []).map((m) => '<p>' + esc(m) + '</p>').join('') + '</div>' +
     '<div class="termline">You chose: ' + rich(e.term) + '</div>' +
     '<button class="btn main" onclick="next()">' + (st.pendingQ ? 'Next: pop quiz' : Boss.over(st) ? 'See how it ended' : 'Next') + '</button>' +
@@ -468,7 +491,8 @@ function endView() {
       (e.debrief ? '<details><summary>Why?</summary><p>' + rich(e.debrief) + '</p></details>' : '') + '</div></div>';
   }).join('');
   return '<div class="endhead">' + avatar(h, st.dead ? 0 : st.M, st.W) + '<div>' + head +
-    '<p class="scoreline">Score <b>' + Boss.score(st) + '</b> <span class="muted" style="font-size:15px">(motivation ' + st.M + ', skills ' + st.S + ', step ' + Math.min(15, st.reached) + ' of 15)</span></p>' +
+    '<p class="scoreline">Score <b>' + Boss.score(st) + '</b></p>' +
+    '<table class="breakdown">' + Boss.breakdown(st).filter((r) => r.n).map((r) => '<tr><td>' + esc(r.label) + '</td><td class="n">' + (r.label.startsWith('Ending') ? '' : r.n + ' x ' + r.each) + '</td><td class="n"><b>' + (r.pts > 0 ? '+' : '') + r.pts + '</b></td></tr>').join('') + '</table>' +
     '<button class="btn main" onclick="restart()">Play again</button></div></div>' + body +
     '<div class="endgrid"><div><h3>Your choices</h3><p class="muted">' + st.log.filter((e) => !e.quiz).length + ' choices, ' + better + ' with a better option. Quiz: ' + st.quizRight + ' of ' + st.quizIds.length + ' right.</p><div class="log">' + rows + '</div></div>' +
     '<div><h3>Class leaderboard</h3><p class="hint">This week, best score per name.</p><div id="lbBox">Loading...</div></div></div>';

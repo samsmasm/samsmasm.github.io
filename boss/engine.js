@@ -58,12 +58,14 @@
   // The Need engine
   function eng(st, tag) {
     if (tag === st.need) {
+      st.matched++;
       if (tag === 1) { add(st, 'M', 1); add(st, 'W', -1); say(st, 'That eased their worries.'); }
       else { add(st, 'M', 2); say(st, 'That really landed.'); }
       st.need = Math.min(4, st.need + 1);
     } else if (tag < st.need) {
       say(st, 'Already sorted for them, so no effect.');
     } else {
+      st.early++;
       add(st, 'M', -1); say(st, 'Not ready for this.');
     }
   }
@@ -527,6 +529,173 @@
       debrief: 'Match the reward to the need: profit-related pay and team rewards for belonging, PRP, shares and titles for esteem, and growth roles for self-fulfilment.',
     },
   };
+  // ---------- job-specific scenes and option wording ----------
+  // Merged into HUBS below. Same choices and effects for everyone; only the words fit each job.
+  // Labels at name-it hubs (H2, H7, H11, H13) must describe the scheme without naming it.
+  const JOBS = {
+    H1: {
+      scene: {
+        maya: 'Monday, 7:00. Maya arrives at the bike factory. The line is already running, and it is loud.',
+        tuan: 'Monday, 8:30. Tuan arrives in a sharp suit, already thinking about his sales target.',
+        aisha: 'Monday, 9:45. Aisha arrives at the startup. Nobody has set up her laptop.',
+        kofi: 'Monday, 10pm. Kofi starts his first night shift in a warehouse the size of three football pitches.',
+        rosa: 'Monday, 8:00. Rosa arrives at the logistics office with her own stapler. It is a good stapler.',
+      },
+      labels: {
+        induct: {
+          maya: 'Run a full induction day: tour of the line, safety gear, meet the team',
+          tuan: 'Run a full induction day: the product range, the customer database, meet the sales team',
+          aisha: 'Run a full induction day: laptop set-up, a tour of the code, meet the team',
+          kofi: 'Run a full induction: forklift safety, the scanner, the aisle layout, meet the night crew',
+          rosa: 'Run a full induction day: the systems, the policies, who does what',
+        },
+        buddy: {
+          maya: 'Pair her with an experienced line worker for the day',
+          tuan: 'Let him shadow the top sales rep on calls for the day',
+          aisha: 'Pair her with the lead developer for the day',
+          kofi: 'Pair him with a picker who knows every aisle',
+          rosa: 'Pair her with the office manager for the day',
+        },
+      },
+    },
+    H2: {
+      scene: {
+        maya: 'Offer letter time. Bikes come off the line one at a time, so her output is easy to count. The pay must suit the work.',
+        tuan: 'Offer letter time. His sales are easy to measure, but some months are much slower than others. The pay must suit the work.',
+        aisha: 'Offer letter time. Her work is creative and hard to count: one bug can take a week. The pay must suit the work.',
+        kofi: 'Offer letter time. Every pick is scanned, so his output is easy to count. He has two teenagers and rent to pay. The pay must suit the work.',
+        rosa: 'Offer letter time. Her work is steady and hard to count: emails, bookings, people. The pay must suit the work.',
+      },
+    },
+    H4: {
+      scene: {
+        maya: "Maya's bikes keep failing the brake check. How will you train her?",
+        tuan: "Tuan's product demos keep going wrong in front of customers. How will you train him?",
+        aisha: "Aisha's code keeps breaking the app. How will you train her?",
+        kofi: 'Kofi keeps picking the wrong items, and the scanner beeps at him all night. How will you train him?',
+        rosa: "Rosa's bookings keep clashing. How will you train her?",
+      },
+    },
+    H6: {
+      scene: {
+        maya: 'The line makes 40 bikes a day. The target is 50. How will you raise output?',
+        tuan: 'Sales are 20% below target this quarter. How will you raise them?',
+        aisha: 'The new feature is three weeks late. How will you speed things up?',
+        kofi: 'Picks per hour are below the warehouse target. How will you raise them?',
+        rosa: "Bookings are piling up in Rosa's inbox. How will you clear them faster?",
+      },
+      labels: {
+        tm: {
+          maya: 'Time-and-motion study: break wheel fitting into steps, train the best method, set a bikes-per-hour standard',
+          tuan: 'Time-and-motion study: script every sales call step by step and set a calls-per-hour standard',
+          aisha: 'Time-and-motion study: break coding into timed steps and set a lines-per-hour standard',
+          kofi: 'Time-and-motion study: map the fastest route through the aisles, train it, set a picks-per-hour standard',
+          rosa: 'Time-and-motion study: break each booking into steps, train the best method, set a bookings-per-hour standard',
+        },
+        monitor: {
+          maya: 'Watch the line closely and pay a bonus for every extra bike',
+          tuan: 'Listen in on every call and pay a bonus for every extra call made',
+          aisha: 'Track her keystrokes and pay a bonus for every extra line of code',
+          kofi: 'Track every scan and pay a bonus for every extra pick',
+          rosa: 'Check her screen every hour and pay a bonus for every extra booking',
+        },
+      },
+    },
+    H7: {
+      scene: {
+        maya: 'Fit a wheel. Fit a wheel. Fit a wheel. Three months in, Maya is restless.',
+        tuan: 'Same pitch, same clients, every day. Three months in, Tuan is restless.',
+        aisha: 'Another login screen. Three months in, Aisha is restless.',
+        kofi: 'Aisle 14, aisle 15, aisle 14 again. Three months in, Kofi is restless.',
+        rosa: 'Same bookings, same forms, every day. Three months in, Rosa is restless.',
+      },
+      labels: {
+        enlarge: {
+          maya: 'Add one more task at the same level of difficulty: she also fits the bells',
+          tuan: 'Add one more task at the same level of difficulty: he also answers the general enquiries line',
+          aisha: 'Add one more task at the same level of difficulty: she also fixes the office printer',
+          kofi: 'Add one more task at the same level of difficulty: he also sweeps the aisles',
+          rosa: 'Add one more task at the same level of difficulty: she also orders the stationery',
+        },
+        rotate: {
+          maya: 'Move her through different jobs: a month each on frames, wheels and paint',
+          tuan: 'Move him through different teams: a month each in marketing, customer support and sales',
+          aisha: 'Move her through different teams: a month each in design, testing and support',
+          kofi: 'Move him round the warehouse: a month each in goods in, picking and dispatch',
+          rosa: 'Move her through different departments: a month each in bookings, accounts and customer service',
+        },
+        empower: {
+          maya: 'Let her choose how to set up her own workstation and tools',
+          tuan: 'Let him choose which clients to chase and how',
+          aisha: 'Let her choose her own tools and how she builds',
+          kofi: 'Let him plan his own pick routes',
+          rosa: 'Let her redesign how the office runs',
+        },
+        purpose: {
+          maya: 'Show her a video of children learning to ride on her bikes',
+          tuan: 'Show him the small businesses that run on the gadgets he sells',
+          aisha: 'Show her the 10,000 people who use her app every day',
+          kofi: 'Show him the hospital that got its supplies on time because of his night shift',
+          rosa: 'Show her how her bookings get 200 trucks home on time every week',
+        },
+      },
+    },
+    H8: {
+      scene: {
+        maya: 'A rival bike maker across town has offered Maya more money. The answer is due Friday.',
+        tuan: 'A rival distributor has offered Tuan a bigger base salary and a better car. The answer is due Friday.',
+        aisha: 'A big tech company has offered Aisha a lot more money. The answer is due Friday.',
+        kofi: 'A rival warehouse has offered Kofi day shifts and more money. The answer is due Friday.',
+        rosa: 'A rival firm has offered Rosa more money and a shorter commute. The answer is due Friday.',
+      },
+    },
+    H10: {
+      scene: {
+        maya: 'A new supervisor reorganises the line. The team is tense, and Maya is caught in the middle.',
+        tuan: 'A star rep joins from a rival and grabs the best clients. The sales team is tense, and Tuan is caught in the middle.',
+        aisha: 'Two new developers join and argue about everything. Aisha is caught in the middle.',
+        kofi: 'The night crew has split into old hands and new temps. Kofi is caught in the middle.',
+        rosa: 'The office merges with another branch: new faces, new desks. Rosa is caught in the middle.',
+      },
+    },
+    H11: {
+      scene: {
+        maya: 'The factory made a record 1,200 bikes this month. You want to share the success.',
+        tuan: 'Sales are up 30%. You want to share the success.',
+        aisha: 'The app has passed 100,000 downloads. You want to share the success.',
+        kofi: 'The warehouse hit 99.9% picking accuracy this month. You want to share the success.',
+        rosa: 'The office has cleared its booking backlog. You want to share the success.',
+        cat: 'The warehouse went a whole month with no nibbled cheese. You want to share the success.',
+      },
+    },
+    H15: {
+      scene: {
+        maya: 'A record year for the factory, and no bikes came back with faulty brakes. Share the success as you wish.',
+        tuan: "Tuan closed the biggest deal in the company's history. Share the success as you wish.",
+        aisha: 'The app won a design award. Share the success as you wish.',
+        kofi: 'The warehouse went the whole year without an accident. Share the success as you wish.',
+        rosa: "Rosa's new booking system saved the firm thousands. Share the success as you wish.",
+        cat: 'Zero mice in the warehouse all year. The cheese is untouched. Share the success as you wish.',
+      },
+      labels: {
+        promote: {
+          maya: 'Promote her to train new line workers, with a new title',
+          tuan: 'Promote him to coach the junior sales reps, with a new title',
+          aisha: 'Promote her to mentor the junior developers, with a new title',
+          kofi: 'Promote him to night shift trainer, with a new title',
+          rosa: 'Promote her to train every new office starter, with a new title',
+        },
+      },
+    },
+  };
+  for (const [hubId, j] of Object.entries(JOBS)) {
+    const h = HUBS[hubId];
+    if (j.scene) h.sceneFor = Object.assign({}, j.scene, h.sceneFor);
+    for (const [optId, ls] of Object.entries(j.labels || {})) {
+      const o = h.options.find((x) => x.id === optId);
+      o.labels = Object.assign({}, ls, o.labels);
+    }
+  }
   for (const [id, h] of Object.entries(HUBS)) h.id = id;
 
   // ---------- pop quiz ----------
@@ -622,7 +791,7 @@
     const hire = HIRES.find((h) => h.id === hireId);
     if (!hire) throw new Error('no hire');
     return { hire, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
-      asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false, quizIds: [], quizRight: 0 };
+      asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false, quizIds: [], quizRight: 0, matched: 0, early: 0, best: 0 };
   }
 
   const label = (o, st) => (o.labels && o.labels[st.hire.id]) || (typeof o.label === 'function' ? o.label(st) : o.label);
@@ -668,7 +837,7 @@
     guard(opt);
     st.acts.push('c' + optId);
     const vals = opts.map((o) => ({ o, v: tryOpt(st, o) }));
-    const before = { M: st.M, S: st.S, W: st.W };
+    const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
     st.msgs = [];
     fx(st, opt.fx);
     check(st);
@@ -676,12 +845,17 @@
     const mine = value(st);
     const best = vals.reduce((a, b) => (b.v > a.v ? b : a));
     const better = best.v > mine + 0.01;
-    st.log.push({ hub: hub.id, opt: opt.id, title: hub.title, choice: label(opt, st), term: opt.term, msgs: st.msgs.slice(), fun: funFor(opt, st),
+    if (!better) st.best++;
+    const entry = { hub: hub.id, opt: opt.id, title: hub.title, choice: label(opt, st), term: opt.term, msgs: st.msgs.slice(), fun: funFor(opt, st),
       before, after: { M: st.M, S: st.S, W: st.W }, better: better ? label(best.o, st) : null,
-      betterTerm: better ? best.o.term : null, debrief: hub.debrief });
+      betterTerm: better ? best.o.term : null, debrief: hub.debrief };
+    st.log.push(entry);
+    if (!st.dead) {
+      if (opt.loop) { st.removed[hub.id + opt.id] = 1; goTo(st, hub.id); }
+      else { st.sorted = false; goTo(st, opt.next || hub.next); }
+    }
+    pointsFor(st, entry, was);
     if (st.dead) return null;
-    if (opt.loop) { st.removed[hub.id + opt.id] = 1; goTo(st, hub.id); }
-    else { st.sorted = false; goTo(st, opt.next || hub.next); }
     // A quiz falls due on reaching steps 3, 6, 9 and 12, and at the end, so a full game always has five
     if (QUIZ_AT.filter((n) => st.reached >= n).length > st.quizIds.length) {
       st.pendingQ = makeQuiz(st);
@@ -697,13 +871,15 @@
     st.pendingQ = null;
     const right = pick === q.answer;
     st.acts.push(right ? 'n1' : 'n0');
-    const before = { M: st.M, S: st.S, W: st.W };
+    const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
     if (right) st.quizRight++;
     add(st, 'M', right ? 1 : -1);
     check(st);
-    st.log.push({ hub: st.hub, title: 'Pop quiz ' + q.n, choice: q.ask, term: q.answer, quiz: { ok: right, answer: q.answer },
-      msgs: [], before, after: { M: st.M, S: st.S, W: st.W }, better: right ? null : q.answer, betterTerm: null, debrief: q.why });
+    const entry = { hub: st.hub, title: 'Pop quiz ' + q.n, choice: q.ask, term: q.answer, quiz: { ok: right, answer: q.answer },
+      msgs: [], before, after: { M: st.M, S: st.S, W: st.W }, better: right ? null : q.answer, betterTerm: null, debrief: q.why };
+    st.log.push(entry);
     if (st.hub === 'END') st.ending = st.dead ? null : ending(st);
+    pointsFor(st, entry, was);
     return right;
   }
 
@@ -752,11 +928,38 @@
     } catch (e) { return null; }
   }
 
+  // ---------- score ----------
+  // Each part rewards a bit of theory: matching rewards to needs (Maslow), choosing well, knowing the terms, keeping the worker.
+  const POINTS = [
+    { key: 'matched', each: 30, label: 'Reward matched their need right now' },
+    { key: 'early', each: -10, label: 'Reward they were not ready for' },
+    { key: 'best', each: 10, label: 'Best call (no option would have done better)' },
+    { key: 'quizRight', each: 20, label: 'Quiz answer right' },
+    { key: 'steps', each: 10, label: 'Steps they stayed' },
+  ];
   const ENDING_BONUS = { mentor: 150, loyal: 100, fragile: 50 };
-  // Score: 10 per motivation and skill point, 10 per step reached, 20 per quiz answer right,
-  // minus 10 per warning, plus a bonus for surviving
-  function score(st) {
-    return 10 * (st.M + st.S) + 10 * st.reached + 20 * st.quizRight - 10 * st.W + (st.ending ? ENDING_BONUS[st.ending.id] : 0);
+  function tally(st) {
+    const t = { matched: st.matched, early: st.early, best: st.best, quizRight: st.quizRight, steps: Math.min(15, st.reached) };
+    t.ending = st.ending ? ENDING_BONUS[st.ending.id] : 0;
+    return t;
+  }
+  function breakdown(st) {
+    const t = tally(st);
+    const rows = POINTS.map((p) => ({ label: p.label, n: t[p.key], each: p.each, pts: t[p.key] * p.each }));
+    if (st.ending) rows.push({ label: 'Ending: ' + st.ending.title, n: 1, each: t.ending, pts: t.ending });
+    return rows;
+  }
+  function score(st) { return breakdown(st).reduce((a, r) => a + r.pts, 0); }
+  // What one action earned, and why
+  function pointsFor(st, entry, was) {
+    const now = tally(st), why = [];
+    for (const p of POINTS) {
+      const d = now[p.key] - was[p.key];
+      if (d) why.push({ pts: d * p.each, label: p.label });
+    }
+    if (now.ending !== was.ending) why.push({ pts: now.ending - was.ending, label: st.ending ? 'Ending: ' + st.ending.title : 'Ending lost' });
+    entry.pts = why.reduce((a, w) => a + w.pts, 0);
+    entry.why = why;
   }
 
   function ending(st) {
@@ -778,7 +981,7 @@
   }
 
   const Boss = { HIRES, HUBS, DEATHS, QUIZ, newState, optionsAt, label, scene, choose, answerQuiz,
-    sortCheck, askThem, askHR, route, replay, score, over };
+    sortCheck, askThem, askHR, route, replay, score, breakdown, POINTS, ENDING_BONUS, over };
   if (typeof module !== 'undefined') module.exports = Boss;
   root.Boss = Boss;
 })(typeof window !== 'undefined' ? window : globalThis);
