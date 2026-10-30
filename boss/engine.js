@@ -34,7 +34,7 @@
   // Theories a player can give as the reason for a choice. hl: HL only in the IB guide.
   const THEORIES = {
     taylor: { name: 'Taylor', sum: 'Taylor: workers are motivated by money; managers set the one best method, supervise closely and pay by output.' },
-    maslow: { name: 'Maslow', sum: 'Maslow: needs come in levels (physiological, safety, social, esteem, self-actualisation); the lowest unmet need motivates.' },
+    maslow: { name: 'Maslow', sum: 'Maslow: needs come in levels (physiological, safety, belonging, esteem, self-actualisation); the lowest unmet need motivates.' },
     herzberg: { name: 'Herzberg', sum: 'Herzberg: hygiene factors (pay, conditions, security, relationships) only stop dissatisfaction; motivators (achievement, recognition, responsibility, the work itself, growth) motivate.' },
     mcclelland: { name: 'McClelland', hl: true, sum: 'McClelland: each person is driven mainly by achievement, affiliation or power, and is motivated by work that feeds that need.' },
     sdt: { name: 'Deci and Ryan', hl: true, sum: 'Deci and Ryan (self-determination theory): people are motivated from inside when they feel autonomy, competence and relatedness.' },
@@ -369,7 +369,7 @@
           fun: { cat: 'Biscuit chooses a project: the top shelf.' } },
         { id: 'life', label: '"That\'s life, keep working"', term: 'Ignoring needs', fx: { M: -1, W: 1 } },
       ],
-      debrief: "Maslow's hierarchy says people move through security, belonging, esteem and self-fulfilment needs, and that a lower need that is threatened returns to the top. The right reward depends on where the worker is now, not where they were last month.",
+      debrief: "Maslow's hierarchy says people move through physiological, safety, belonging, esteem and self-actualisation needs, and that a lower need that is threatened returns to the top. The right reward depends on where the worker is now, not where they were last month.",
     },
     H10: {
       title: 'The team shake-up',
@@ -514,7 +514,7 @@
             aisha: "Someone's phone rings halfway through. It is yours.", kofi: "Someone's phone rings halfway through. It is yours.",
             rosa: "Someone's phone rings halfway through. It is yours.", cat: 'Biscuit walks across the laptop halfway through and ends the slideshow.' } },
       ],
-      debrief: 'Match the reward to the need: profit-related pay and team rewards for belonging, PRP, shares and titles for esteem, and growth roles for self-fulfilment.',
+      debrief: 'Match the reward to the need: profit-related pay and team rewards for belonging, PRP, shares and titles for esteem, and growth roles for self-actualisation.',
     },
   };
   // ---------- more scenarios ----------
@@ -1178,7 +1178,7 @@
   }
 
   // After a reward they were not ready for: why did it not land? (Maslow). Not one of the five pop quizzes.
-  const LEVELS = { 1: 'safety (pay they can live on, a secure job)', 2: 'social needs (belonging to a team)', 3: 'esteem (recognition, respect)', 4: 'self-actualisation (growth, a challenge)' };
+  const LEVELS = { 1: 'physiological and safety needs (pay they can live on, a secure job)', 2: 'belonging (being part of a team)', 3: 'esteem (recognition, respect)', 4: 'self-actualisation (growth, a challenge)' };
   function missQuiz(st, e) {
     const m = st.missed;
     return { id: 'miss', miss: true, ask: st.hire.name + ' was not ready for "' + e.choice + '". Why did it not motivate them?',

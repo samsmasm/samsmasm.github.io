@@ -40,7 +40,7 @@ window.BOSS_DEFS = {
 
   // Theories
   'Scientific management': { also: ['Taylor', 'time-and-motion study'], def: 'Taylor: break work into steps, train the best method, monitor, and pay per unit.' },
-  "Maslow's hierarchy of needs": { also: ['Maslow'], def: 'Needs come in levels: security, belonging, esteem, self-fulfilment. A need only motivates once the ones below it are met.' },
+  "Maslow's hierarchy of needs": { also: ['Maslow'], def: 'Needs come in levels: physiological, safety, belonging, esteem, self-actualisation. A need only motivates once the ones below it are met.' },
   "Herzberg's two-factor theory": { also: ['Herzberg', 'two-factor theory'], def: 'Hygiene factors stop dissatisfaction; motivators create motivation.' },
   'Hygiene factors': { also: ['hygiene factor', 'hygiene', 'Herzberg hygiene factors'], def: 'Pay, conditions, security, relationships. Missing ones cause dissatisfaction; fixing them does not motivate.' },
   'Motivators': { also: ['Herzberg motivators'], def: 'The work itself, responsibility, growth, achievement, recognition.' },
