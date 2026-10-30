@@ -150,17 +150,31 @@
         ? `That is ${a.overhang} more than 120 because of overhang: ${over.map(k => `${esc(pname(k))} wins ${a.parties[k].overhang} more electorate${a.parties[k].overhang > 1 ? 's' : ''} than its party vote entitles it to`).join('; ')}. In New Zealand the other parties get no extra seats to make up for it.`
         : 'No overhang.');
 
-    const rows = Object.keys(a.parties).filter(k => k !== 'OTH')
+    const row = k => {
+      const p = a.parties[k];
+      const note = !p.qualifies ? 'Under 5% and no electorate: no seats'
+        : p.overhang ? `Overhang of ${p.overhang}`
+        : (p.vote < M.THRESHOLD ? 'Under 5%, in on an electorate' : '');
+      return `<tr class="${p.total ? '' : 'out'}"><td>${chip(k)}</td><td class="r">${pct(p.vote)}</td><td class="r">${p.electorates}</td>
+        <td class="r">${p.list}</td><td class="r"><strong>${p.total}</strong></td><td class="lead">${note}</td></tr>`;
+    };
+    // Right bloc and left bloc each get a subtotal; everyone else (Opportunity, any
+    // other listed party) sits below on their own.
+    const BLOCS = [['Right bloc', ['NAT', 'NZF', 'ACT']], ['Left bloc', ['LAB', 'GRN', 'TPM']]];
+    const blocRows = BLOCS.map(([label, ks]) => {
+      ks = ks.filter(k => a.parties[k]);
+      const sum = f => ks.reduce((s, k) => s + a.parties[k][f], 0);
+      const t = sum('total');
+      const note = t >= majority ? 'Majority' : `${majority - t} short of a majority`;
+      return ks.map(row).join('') +
+        `<tr class="subtotal"><td>${label}</td><td class="r">${pct(sum('vote'))}</td><td class="r">${sum('electorates')}</td>
+          <td class="r">${sum('list')}</td><td class="r"><strong>${t}</strong></td><td class="lead">${note}</td></tr>`;
+    }).join('');
+    const inBloc = new Set(BLOCS.flatMap(b => b[1]));
+    const rest = Object.keys(a.parties).filter(k => k !== 'OTH' && !inBloc.has(k))
       .sort((x, y) => a.parties[y].total - a.parties[x].total || a.parties[y].vote - a.parties[x].vote);
     $('#seat-table').innerHTML = `<tr><th>Party</th><th class="r">Party vote</th><th class="r">Electorates</th><th class="r">List</th><th class="r">Total</th><th>Note</th></tr>` +
-      rows.map(k => {
-        const p = a.parties[k];
-        const note = !p.qualifies ? 'Under 5% and no electorate: no seats'
-          : p.overhang ? `Overhang of ${p.overhang}`
-          : (p.vote < M.THRESHOLD ? 'Under 5%, in on an electorate' : '');
-        return `<tr class="${p.total ? '' : 'out'}"><td>${chip(k)}</td><td class="r">${pct(p.vote)}</td><td class="r">${p.electorates}</td>
-          <td class="r">${p.list}</td><td class="r"><strong>${p.total}</strong></td><td class="lead">${note}</td></tr>`;
-      }).join('') +
+      blocRows + rest.map(row).join('') +
       `<tr class="out"><td>${chip('OTH')}</td><td class="r">${pct(r.poll.avg.OTH)}</td><td class="r"></td><td class="r"></td><td class="r">0</td><td class="lead">Smaller parties, all under 5%</td></tr>`;
   }
 
