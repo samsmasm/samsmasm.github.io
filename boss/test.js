@@ -12,12 +12,21 @@ function reasonFor(st, o, right) {
   return all[Math.floor(Math.random() * all.length)];
 }
 
+// Choose an option with a first reason (right or random), then the right one and the follow-up, as the page does
+function pickWith(st, o, right, detailRight) {
+  const first = reasonFor(st, o, right);
+  if (first === undefined) return B.choose(st, o.id);
+  const final = B.reasonOk(st, o.id, first) ? first : reasonFor(st, o, true);
+  const d = B.detailFor(st, o.id, final);
+  return B.choose(st, o.id, first, final, d ? (detailRight ? '1' : '0') : undefined);
+}
+
 // Plays one game. pickOpt(st, opts) chooses; skill (0 to 1) is the chance of getting checks and reasons right.
 function play(h, level, pickOpt, skill) {
   const st = B.newState(h, Math.floor(Math.random() * 1e9), level);
   let n = 0;
   while (!B.over(st) || st.pendingQ) {
-    assert(++n < 80, 'stuck at ' + st.hub);
+    assert(++n < 400, 'stuck at ' + st.hub);
     if (st.pendingQ) { B.answerQuiz(st, Math.random() < skill ? st.pendingQ.answer : 'nope'); continue; }
     const hub = B.HUBS[st.hub];
     if (Math.random() < 0.1 && st.asked < 1) B.askThem(st);
@@ -25,7 +34,7 @@ function play(h, level, pickOpt, skill) {
     if (hub.sort && !st.sorted) B.sortCheck(st, new Set(Math.random() < skill ? HYGIENE : ['pay']));
     if (B.over(st)) break;
     const o = pickOpt(st, B.optionsAt(st));
-    B.choose(st, o.id, reasonFor(st, o, Math.random() < skill));
+    pickWith(st, o, Math.random() < skill, Math.random() < skill);
   }
   return st;
 }
@@ -39,9 +48,9 @@ function greedy(st, opts) {
       if (a === 'a') B.askThem(t); else if (a === 'h') B.askHR(t);
       else if (a[0] === 's') B.sortCheck(t, new Set(a === 's1' ? HYGIENE : []));
       else if (a[0] === 'n') B.answerQuiz(t, a === 'n1' ? t.pendingQ.answer : 'x');
-      else { const [id, th] = a.slice(1).split(':'); B.choose(t, id, th); }
+      else { const [id, th, f, d] = a.slice(1).split(':'); B.choose(t, id, th, f, d); }
     }
-    B.choose(t, o.id, reasonFor(t, o, true));
+    pickWith(t, o, true, true);
     const v = t.dead ? -100 : t.M * 2 + t.S - t.W * 3 + t.need + (o.id === 'promote' ? 5 : 0);
     if (v > bv) { bv = v; best = o; }
   }
@@ -57,6 +66,13 @@ for (const level of ['SL', 'HL']) {
       for (const o of hub.options) {
         const fits = Object.keys(o.why || {}).filter((k) => level === 'HL' || !B.THEORIES[k].hl);
         assert(fits.length || o.bad, level + ' ' + id + ' ' + o.id + ' has no reason');
+        // Every reason for a theory with a follow-up gives that follow-up an answer
+        if (!o.only || o.only.includes(h.id)) for (const k of fits) {
+          if (!['maslow', 'herzberg', 'sdt', 'mcclelland', 'expectancy'].includes(k)) continue;
+          st.hub = id;
+          const d = B.detailFor(st, o.id, k);
+          assert(d && d.answers.every((a) => d.choices.includes(a)), 'no follow-up answer: ' + id + ' ' + o.id + ' ' + k);
+        }
       }
     }
   }
@@ -74,7 +90,7 @@ for (let i = 0; i < 40; i++) {
 assert(decks.size === 40, 'decks repeat');
 
 const tally = {}, scores = {};
-let missTotal = 0;
+let missTotal = 0, halfTotal = 0;
 for (const [name, pick, skill, runs] of [['random', random, 0.6, 6000], ['greedy', greedy, 1, 48]]) {
   for (let i = 0; i < runs; i++) {
     const h = B.HIRES[i % B.HIRES.length].id, level = i % 12 < 6 ? 'HL' : 'SL';
@@ -86,6 +102,8 @@ for (const [name, pick, skill, runs] of [['random', random, 0.6, 6000], ['greedy
     const misses = st.log.filter((e) => e.title === 'Why did it not land?').length;
     assert(misses === st.early || (st.dead && misses === st.early - 1), 'miss questions ' + misses + ' for ' + st.early + ' early');
     missTotal += misses;
+    halfTotal += st.matchedHalf + st.bestHalf;
+    assert(st.matchedHalf + st.bestHalf <= st.whyWrong * 2, 'half points without a wrong reason');
     const k = name + ' ' + level + ' ' + h + ' ' + (st.dead ? 'dead:' + st.dead.kind : st.ending.id);
     tally[k] = (tally[k] || 0) + 1;
     (scores[name + ' ' + h] = scores[name + ' ' + h] || []).push(B.score(st) + ' M' + st.M + ' S' + st.S);
@@ -94,6 +112,32 @@ for (const [name, pick, skill, runs] of [['random', random, 0.6, 6000], ['greedy
 console.log(tally);
 console.log('why-did-it-not-land questions:', missTotal);
 assert(missTotal > 0, 'no miss questions asked');
+assert(halfTotal > 0, 'never gave half points');
+
+// Try again: a wrong answer keeps the question, only the first try scores
+{
+  const st = B.newState('aisha', 11, 'HL');
+  while (!st.pendingQ) { const o = B.optionsAt(st)[0]; if (B.HUBS[st.hub].sort && !st.sorted) B.sortCheck(st, new Set(HYGIENE)); else pickWith(st, o, true, true); }
+  const q = st.pendingQ, M = st.M;
+  assert(B.answerQuiz(st, 'nope') === false && st.pendingQ === q, 'wrong answer did not stay');
+  assert(B.answerQuiz(st, 'nope') === false && st.M === M - (q.miss ? 0 : 1), 'second wrong try scored again');
+  assert(B.answerQuiz(st, q.answer) === true && st.pendingQ !== q && st.log[st.log.length - 1].quiz.ok === false, 'first try not what counts');
+}
+
+// A wrong first reason must be followed by a right one
+{
+  const st = B.newState('maya', 3, 'HL');
+  while (!B.asksWhy(B.HUBS[st.hub]) || st.pendingQ) {
+    if (st.pendingQ) B.answerQuiz(st, st.pendingQ.answer);
+    else if (B.HUBS[st.hub].sort && !st.sorted) B.sortCheck(st, new Set(HYGIENE));
+    else pickWith(st, B.optionsAt(st)[0], true, true);
+  }
+  const o = B.optionsAt(st).find((x) => Object.keys(x.why || {}).length);
+  const wrong = B.theoriesFor(st).concat('none').find((t) => !B.reasonOk(st, o.id, t));
+  let threw = false;
+  try { B.choose(st, o.id, wrong, wrong); } catch (e) { threw = true; }
+  assert(threw, 'accepted a wrong final reason');
+}
 
 // A version 2 game (no miss questions) still replays under v2 rules
 {

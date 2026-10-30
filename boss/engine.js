@@ -871,7 +871,7 @@
     },
     H11: {
       indiv: { expectancy: 'A personal target with a reward raises instrumentality.', taylor: 'Taylor: pay for individual output.' },
-      team: { maslow: 'A team reward builds belonging.', expectancy: 'A clear target and reward for the team.' },
+      team: { maslow: 'A team reward builds belonging.', expectancy: 'A clear target and reward for the team raises instrumentality.' },
       profit: { maslow: 'Everyone sharing the success builds belonging.' },
       none: '!Success with no reward ignores recognition and pay. No theory backs it.',
     },
@@ -883,7 +883,7 @@
     },
     H15: {
       profit: { maslow: 'Everyone sharing the success builds belonging.' },
-      prp: { expectancy: 'Rewarding their own results links performance to reward.', taylor: 'Taylor: pay for output.' },
+      prp: { expectancy: 'Rewarding their own results links performance to reward: instrumentality.', taylor: 'Taylor: pay for output.' },
       shares: { maslow: 'Ownership meets esteem needs.' },
       gift: { maslow: 'A treat meets basic needs, if they are not met yet.' },
       promote: { maslow: 'A new role supports self-actualisation.', herzberg: 'Responsibility and advancement are motivators.', mcclelland: 'Teaching others feeds affiliation or power.' },
@@ -1169,23 +1169,44 @@
     const ageQ = QUIZ.find((q) => q.id === 'age');
     if ((+st.hire.age >= 40 || recent.some((e) => e.opt === 'skip')) && recent.some((e) => ageQ.hubs.includes(e.hub))) cands.unshift(ageQ);
     // Every game gets a Herzberg question: from the third quiz on, one jumps the queue if none has come up
-    if (st.quizIds.length >= 2 && !st.quizIds.some((id) => id.startsWith('herz'))) {
-      const herz = QUIZ.filter((c) => c.id.startsWith('herz'));
-      cands.unshift(...herz.filter((c) => recent.some((e) => c.hubs.includes(e.hub))), ...herz);
-    }
-    const q =cands.concat(QUIZ.filter((c) => st.level === 'HL' || !c.hl)).find((c) => c && !st.quizIds.includes(c.id));
+    // Questions this player saw in recent games (st.seen, from the page) go to the back
+    const fresh = (list) => { list = list.filter((c) => c && !st.quizIds.includes(c.id)); return list.find((c) => !st.seen.includes(c.id)) || list[0]; };
+    const herz = QUIZ.filter((c) => c.id.startsWith('herz'));
+    const needHerz = st.quizIds.length >= 2 && !st.quizIds.some((id) => id.startsWith('herz'));
+    const q = (needHerz && fresh(herz.filter((c) => recent.some((e) => c.hubs.includes(e.hub))).concat(herz)))
+      || fresh(cands.concat(QUIZ.filter((c) => st.level === 'HL' || !c.hl)));
     return { id: q.id, ask: typeof q.ask === 'function' ? q.ask(st) : q.ask, choices: q.choices.slice(), answer: q.choices[0], why: q.why, n: st.quizIds.length + 1 };
   }
 
   // After a reward they were not ready for: why did it not land? (Maslow). Not one of the five pop quizzes.
   const LEVELS = { 1: 'physiological and safety needs (pay they can live on, a secure job)', 2: 'belonging (being part of a team)', 3: 'esteem (recognition, respect)', 4: 'self-actualisation (growth, a challenge)' };
+  const LEVEL_NAMES = ['Physiological and safety', 'Belonging', 'Esteem', 'Self-actualisation'];
   function missQuiz(st, e) {
     const m = st.missed;
-    return { id: 'miss', miss: true, ask: st.hire.name + ' was not ready for "' + e.choice + '". Why did it not motivate them?',
-      choices: ['Maslow: a lower need is still unmet, so a higher reward cannot motivate yet', 'Maslow: they have already moved past this need',
-        'Taylor: only money motivates, and this was not money', 'Herzberg: it was a hygiene factor, so it only stops complaints'],
-      answer: 'Maslow: a lower need is still unmet, so a higher reward cannot motivate yet',
+    return { id: 'miss', miss: true, ask: st.hire.name + ' was not ready for "' + e.choice + '". In Maslow\'s hierarchy, which need were they still on?',
+      choices: LEVEL_NAMES.slice(), answer: LEVEL_NAMES[m.need - 1],
       why: 'The lowest unmet need is the one that motivates. This reward fed ' + LEVELS[m.tag] + ', but ' + st.hire.name + ' still needed ' + LEVELS[m.need] + '. Meet that first, then move up.' };
+  }
+
+  // Follow-up once the right theory is picked: how does that theory apply here? The answer is read from the reason text,
+  // so it always agrees with what the result screen shows. Reasons naming two (a mentor: relatedness and competence) accept either.
+  const DETAIL = {
+    maslow: { ask: 'Which level of the hierarchy does it meet?', pick: [['Physiological and safety', /physiolog|safety|basic|secur/i], ['Belonging', /belong|social/i], ['Esteem', /esteem/i], ['Self-actualisation', /self-actuali/i]] },
+    herzberg: { ask: 'Is it a hygiene factor or a motivator?', pick: [['Hygiene factor', /hygiene/i], ['Motivator', /motivator/i]] },
+    sdt: { ask: 'Which of the three needs does it meet?', pick: [['Autonomy', /autonom/i], ['Competence', /competen/i], ['Relatedness', /relatedness/i]] },
+    mcclelland: { ask: 'Which need does it feed?', pick: [['Achievement', /achiev/i], ['Affiliation', /affiliat/i], ['Power', /power/i]] },
+    expectancy: { ask: 'Which link does it strengthen?', pick: [['Expectancy: effort can reach the target', /expectancy/i], ['Instrumentality: the target brings the reward', /instrumental/i], ['Valence: they want the reward', /valence/i]] },
+  };
+  function detailFor(st, optId, theory) {
+    const d = DETAIL[theory], o = optionsAt(st).find((x) => x.id === optId), text = o && o.why && o.why[theory];
+    if (!d || !text) return null;
+    const answers = d.pick.filter(([, re]) => re.test(text)).map(([n]) => n);
+    return answers.length ? { ask: d.ask, choices: d.pick.map(([n]) => n), answers } : null;
+  }
+  // Is this theory a right reason for this option? ('none' is right only when no theory fits)
+  function reasonOk(st, optId, theory) {
+    const o = optionsAt(st).find((x) => x.id === optId), fits = o ? fitsFor(o, st) : [];
+    return theory === 'none' ? !fits.length : fits.includes(theory);
   }
 
   function market(st) {
@@ -1213,16 +1234,17 @@
     return ['H1', 'H2'].concat(shuffle(mid, r), ['H15']);
   }
 
-  // Rules version: 3 added the "why did it not land?" question. Version 2 games replay without it.
-  const VERSION = 3;
+  // Rules version: 3 added the "why did it not land?" question. 4 added try again, the follow-up question and
+  // half points for a decision without a right first reason. Older games replay under their own rules.
+  const VERSION = 4;
   function newState(hireId, seed, level, v) {
     const hire = HIRES.find((h) => h.id === hireId);
     if (!hire) throw new Error('no hire');
     seed = Number.isInteger(seed) ? seed : Math.floor(Math.random() * 1e9);
     level = level === 'SL' ? 'SL' : 'HL';
-    return { hire, seed, level, v: v === 2 ? 2 : VERSION, deck: makeDeck(hire, seed, level === 'HL'), step: 0, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
-      asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false,
-      quizIds: [], quizRight: 0, matched: 0, early: 0, missRight: 0, best: 0, whyRight: 0, whyWrong: 0 };
+    return { hire, seed, level, v: [2, 3].includes(v) ? v : VERSION, deck: makeDeck(hire, seed, level === 'HL'), step: 0, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
+      asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false, seen: [],
+      quizIds: [], quizRight: 0, matched: 0, matchedHalf: 0, early: 0, missRight: 0, best: 0, bestHalf: 0, whyRight: 0, whyWrong: 0, detailRight: 0 };
   }
 
   const label = (o, st) => (o.labels && o.labels[st.hire.id]) || (typeof o.label === 'function' ? o.label(st) : o.label);
@@ -1267,15 +1289,23 @@
   function guard(ok) { if (!ok) throw new Error('bad move'); }
 
   // Choose an option, and (where the hub asks) the theory behind it. Returns a pending quiz or null.
-  function choose(st, optId, theory) {
+  // theory is the first reason picked; final is the right one found after trying again, and detail ('1' or '0')
+  // whether the follow-up was right first time. final and detail are v4 only.
+  function choose(st, optId, theory, final, detail) {
     const hub = HUBS[st.hub];
     guard(!over(st) && !st.pendingQ && (!hub.sort || st.sorted));
     const opts = optionsAt(st);
     const opt = opts.find((o) => o.id === optId);
     guard(opt);
-    const why = asksWhy(hub);
-    guard(why ? theory === 'none' || theoriesFor(st).includes(theory) : !theory);
-    st.acts.push('c' + optId + (why ? ':' + theory : ''));
+    const why = asksWhy(hub), v4 = st.v >= 4;
+    const valid = (t) => t === 'none' || theoriesFor(st).includes(t);
+    guard(why ? valid(theory) : !theory);
+    if (why && v4) {
+      if (reasonOk(st, optId, theory)) final = theory;
+      guard(valid(final) && reasonOk(st, optId, final));
+      guard(detailFor(st, optId, final) ? detail === '1' || detail === '0' : !detail);
+    }
+    st.acts.push('c' + optId + (why ? ':' + theory + (v4 ? ':' + final + ':' + (detail || '') : '') : ''));
     const vals = opts.map((o) => ({ o, v: tryOpt(st, o) }));
     const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
     st.msgs = [];
@@ -1290,9 +1320,15 @@
     let reason = null;
     if (why) {
       const fits = fitsFor(opt, st);
-      const ok = theory === 'none' ? !fits.length : fits.includes(theory);
+      const ok = reasonOk(st, optId, theory);
       if (ok) st.whyRight++; else st.whyWrong++;
-      reason = { pick: theory, ok, fits: fits.map((k) => ({ id: k, name: THEORIES[k].name, text: opt.why[k] })), bad: fits.length ? null : opt.bad || 'No motivation theory backs this choice.',
+      // A decision you cannot justify with theory first time earns half points
+      if (!ok && v4) {
+        const m = st.matched - was.matched, b = st.best - was.best;
+        st.matched -= m; st.matchedHalf += m; st.best -= b; st.bestHalf += b;
+      }
+      if (detail === '1') st.detailRight++;
+      reason = { pick: theory, ok, final: v4 ? final : null, detail: detail || null, fits: fits.map((k) => ({ id: k, name: THEORIES[k].name, text: opt.why[k] })), bad: fits.length ? null : opt.bad || 'No motivation theory backs this choice.',
         pickSum: theory === 'none' ? null : THEORIES[theory].sum };
     }
     const entry = { hub: hub.id, opt: opt.id, title: hub.title, choice: label(opt, st), term: opt.term, msgs: st.msgs.slice(), fun: funFor(opt, st), reason,
@@ -1319,25 +1355,31 @@
 
   // Pop quiz answer: right is M+1, wrong is M-1. Returns true if right.
   // The "why did it not land?" question only scores points, and a pop quiz due at the same step follows it.
+  // From v4 a wrong answer is "try again": only the first try is scored, and the question stays until it is right.
   function answerQuiz(st, pick) {
     const q = st.pendingQ;
     guard(q);
-    st.pendingQ = null;
     const right = pick === q.answer;
     st.acts.push(right ? 'n1' : 'n0');
-    const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
-    if (q.miss) { if (right) st.missRight++; }
-    else {
-      if (right) st.quizRight++;
-      add(st, 'M', right ? 1 : -1);
-      check(st);
+    if (!q.tried) {
+      q.tried = true; q.first = right;
+      q.before = { M: st.M, S: st.S, W: st.W }; q.was = tally(st);
+      if (q.miss) { if (right) st.missRight++; }
+      else {
+        if (right) st.quizRight++;
+        add(st, 'M', right ? 1 : -1);
+        check(st);
+      }
     }
-    const entry = { hub: st.hub, title: q.miss ? 'Why did it not land?' : 'Pop quiz ' + q.n, choice: q.ask, term: q.answer, quiz: { ok: right, answer: q.answer },
-      msgs: [], before, after: { M: st.M, S: st.S, W: st.W }, better: right ? null : q.answer, betterTerm: null, debrief: q.why };
+    if (!right && st.v >= 4 && !st.dead) return false;
+    st.pendingQ = null;
+    const ok = q.first;
+    const entry = { hub: st.hub, title: q.miss ? 'Why did it not land?' : 'Pop quiz ' + q.n, choice: q.ask, term: q.answer, quiz: { ok, answer: q.answer },
+      msgs: [], before: q.before, after: { M: st.M, S: st.S, W: st.W }, better: ok ? null : q.answer, betterTerm: null, debrief: q.why };
     st.log.push(entry);
     if (st.hub === 'END') st.ending = st.dead ? null : ending(st);
-    pointsFor(st, entry, was);
-    if (q.miss) quizDue(st);
+    pointsFor(st, entry, q.was);
+    if (q.miss && !st.dead) quizDue(st);
     return right;
   }
 
@@ -1379,7 +1421,7 @@
         else if (a === 'h') guard(askHR(st));
         else if (a === 's1' || a === 's0') sortResult(st, a === 's1');
         else if (a === 'n1' || a === 'n0') answerQuiz(st, a === 'n1' ? st.pendingQ && st.pendingQ.answer : null);
-        else if (a[0] === 'c') { const [o, t] = a.slice(1).split(':'); choose(st, o, t); }
+        else if (a[0] === 'c') { const [o, t, f, d] = a.slice(1).split(':'); choose(st, o, t, f, d); }
         else return null;
       }
       return over(st) && !st.pendingQ ? st : null;
@@ -1390,17 +1432,20 @@
   // Each part rewards a bit of theory: matching rewards to needs (Maslow), choosing well, knowing the terms, keeping the worker.
   const POINTS = [
     { key: 'matched', each: 30, label: 'Reward matched their need right now' },
+    { key: 'matchedHalf', each: 15, label: 'Reward matched their need, but your first reason did not fit (half points)' },
     { key: 'early', each: -10, label: 'Reward they were not ready for' },
-    { key: 'missRight', each: 10, label: 'Explained why a reward did not land' },
+    { key: 'missRight', each: 10, label: 'Named the need they were still on' },
     { key: 'best', each: 10, label: 'Best call (no option would have done better)' },
-    { key: 'whyRight', each: 20, label: 'Right reason (theory) for your choice' },
-    { key: 'whyWrong', each: 5, label: 'Reason that did not fit (+5 for trying)' },
+    { key: 'bestHalf', each: 5, label: 'Best call, but your first reason did not fit (half points)' },
+    { key: 'whyRight', each: 20, label: 'Right reason (theory) first time' },
+    { key: 'whyWrong', each: 5, label: 'Reason that did not fit first time (+5 for trying)' },
+    { key: 'detailRight', each: 10, label: 'Knew how the theory applies' },
     { key: 'quizRight', each: 20, label: 'Quiz answer right' },
     { key: 'steps', each: 10, label: 'Steps they stayed' },
   ];
   const ENDING_BONUS = { mentor: 150, loyal: 100, fragile: 50 };
   function tally(st) {
-    const t = { matched: st.matched, early: st.early, missRight: st.missRight, best: st.best, whyRight: st.whyRight, whyWrong: st.whyWrong, quizRight: st.quizRight, steps: Math.min(st.deck.length, st.reached) };
+    const t = { matched: st.matched, matchedHalf: st.matchedHalf, early: st.early, missRight: st.missRight, best: st.best, bestHalf: st.bestHalf, detailRight: st.detailRight, whyRight: st.whyRight, whyWrong: st.whyWrong, quizRight: st.quizRight, steps: Math.min(st.deck.length, st.reached) };
     t.ending = st.ending ? ENDING_BONUS[st.ending.id] : 0;
     return t;
   }
@@ -1442,7 +1487,7 @@
   }
 
   const Boss = { HIRES, HUBS, DEATHS, QUIZ, newState, optionsAt, label, scene, choose, answerQuiz,
-    sortCheck, askThem, askHR, replay, THEORIES, theoriesFor, asksWhy, score, breakdown, POINTS, ENDING_BONUS, over };
+    sortCheck, askThem, askHR, replay, THEORIES, theoriesFor, asksWhy, reasonOk, detailFor, score, breakdown, POINTS, ENDING_BONUS, over };
   if (typeof module !== 'undefined') module.exports = Boss;
   root.Boss = Boss;
 })(typeof window !== 'undefined' ? window : globalThis);

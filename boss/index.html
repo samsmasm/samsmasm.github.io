@@ -77,6 +77,7 @@
   .opt { text-align: left; background: var(--surface); border: 1.5px solid var(--bm-b); padding: 12px 14px; font-size: 16px; color: #1d2433; min-height: 56px; }
   .opt:hover { background: var(--hover); border-color: var(--bm); }
   .opt.on { background: #e4e9f5; border-color: var(--bm); border-width: 2.5px; }
+  .opt.wrong, .opt.wrong:hover { background: var(--surface); border-color: #e0b4b4; color: #8a1c1c; opacity: .7; cursor: default; }
 
   /* key word ? */
   .q { display: inline-block; width: 18px; height: 18px; line-height: 16px; margin-left: 3px; border-radius: 50%;
@@ -370,15 +371,16 @@ function pickView() {
     '<details class="rules"><summary>How it works</summary>' +
     '<p><b>Motivation</b> hits 0: they are demotivated. <b>Skills</b> hit 0: they cannot do the job. <b>Two grievances</b> (complaints they raise about how you treat them): they quit. There is no top limit: keep growing them.</p>' +
     '<p>Every worker has a hidden need right now: physiological and safety, belonging, esteem or self-actualisation. Rewards that match it work best. <b>Ask them</b> to find out (asking twice at one step annoys them). <b>Ask HR</b> for definitions.</p>' +
-    '<p>Most steps ask <b>why</b>: pick the theory that backs your choice. More than one can be right, and some choices have no theory behind them at all. The steps come in a different order every game, and every worker has problems of their own.</p>' +
-    '<p>Every few steps HR gives you a <b>pop quiz</b> on motivation theory (five in all). Right: motivation +1. Wrong: motivation -1. After a reward they were not ready for, HR also asks why it did not land.</p>' +
+    '<p>Most steps ask you to <b>justify</b> your choice: pick the theory that backs it, then say how it applies. Your first try counts: a decision you cannot justify first time earns half points. More than one theory can be right, and some choices have no theory behind them at all. The steps come in a different order every game, and every worker has problems of their own.</p>' +
+    '<p>Every few steps HR gives you a <b>pop quiz</b> on motivation theory (five in all). Right first time: motivation +1. Wrong first time: motivation -1, then try again. After a reward they were not ready for, HR asks which need they were still on.</p>' +
     '<p><b>Why these points?</b> Maslow says a reward only motivates if it meets the need someone has right now, so a matched reward scores most and a reward they are not ready for loses points. A best call means no other option would have left them better off. Keeping your worker is the whole point of rewards and training, so every step they stay scores, and the ending adds a bonus: Promoted mentor 150, Loyal veteran 100, Fragile survivor 50.</p></details>';
 }
 // The scoring rules, shown before the game starts
 function scoreKey() {
   return '<div class="scorekey"><b>How you score</b>' +
-    '<span><em>+30</em> reward matches their need right now</span><span><em>+20</em> right theory for your choice (+5 if it does not fit)</span><span><em>+20</em> quiz answer right</span>' +
-    '<span><em>+10</em> best call</span><span><em>+10</em> each step they stay</span><span><em>+10</em> explain why a reward did not land</span>' +
+    '<span><em>+30</em> reward matches their need right now</span><span><em>+20</em> right theory first time (+5 if not)</span><span><em>+10</em> say how the theory applies</span><span><em>+20</em> quiz answer right first time</span>' +
+    '<span><em>+10</em> best call</span><span><em>+10</em> each step they stay</span><span><em>+10</em> name the need they were still on</span>' +
+    '<span class="neg"><em>Half</em> the decision points if your first reason does not fit</span>' +
     '<span><em>+50 to 150</em> for how it ends</span><span class="neg"><em>-10</em> reward they are not ready for</span></div>';
 }
 
@@ -426,13 +428,22 @@ function hubHead(hub) {
 function mainView() {
   const st = G.st, hub = Boss.HUBS[st.hub];
   if (G.view === 'why') {
-    const o = Boss.optionsAt(st).find((x) => x.id === G.pickOpt);
+    const o = Boss.optionsAt(st).find((x) => x.id === G.pickOpt), tried = G.tried.size > 0;
+    const btn = (k, html, cls) => '<button class="opt' + (cls || '') + (G.tried.has(k) ? ' wrong" disabled' : '"') + ' onclick="because(\'' + k + '\')">' + (G.tried.has(k) ? '✗ ' : '') + html + '</button>';
     return hubHead(hub) + '<div class="hr"><div class="who">You chose</div><div class="picked">' + rich(Boss.label(o, st)) +
-      ' <button class="btn" onclick="G.view = \'hub\'; render()">Change</button></div>' +
-      '<div class="ask">Because... which theory backs this?</div><div class="theories">' +
-      Boss.theoriesFor(st).map((k) => '<button class="opt" onclick="because(\'' + k + '\')">' + rich(Boss.THEORIES[k].name) + (Boss.THEORIES[k].hl ? ' <span class="hl">HL</span>' : '') + '</button>').join('') +
-      '<button class="opt none" onclick="because(\'none\')">No theory backs this</button></div>' +
-      '<p class="hint">Right reason: +20. A reason that does not fit: +5, and you will see why. More than one theory can be right.</p></div>';
+      (tried ? '' : ' <button class="btn" onclick="G.view = \'hub\'; render()">Change</button>') + '</div>' +
+      '<div class="ask">Justify it: which theory backs this?</div>' +
+      (tried ? '<div class="box bad"><b>Not quite. Try again.</b>This decision now earns half points.</div>' : '') + '<div class="theories">' +
+      Boss.theoriesFor(st).map((k) => btn(k, rich(Boss.THEORIES[k].name) + (Boss.THEORIES[k].hl ? ' <span class="hl">HL</span>' : ''))).join('') +
+      btn('none', 'No theory backs this', ' none') + '</div>' +
+      '<p class="hint">Right first time: +20 and full points for the decision. Not right first time: +5, half points for the decision, and try again. More than one theory can be right.</p></div>';
+  }
+  if (G.view === 'detail') {
+    const d = G.detail, T = Boss.THEORIES[G.final].name;
+    return hubHead(hub) + '<div class="hr"><div class="who">' + rich(T) + '</div><div class="ask">' + esc(d.ask) + '</div>' +
+      (G.detailTried.size ? '<div class="box bad"><b>Not quite. Try again.</b></div>' : '') + '<div class="quizopts">' +
+      d.choices.map((c, i) => '<button class="opt' + (G.detailTried.has(i) ? ' wrong" disabled' : '"') + ' onclick="detailPick(' + i + ')">' + (G.detailTried.has(i) ? '✗ ' : '') + esc(c) + '</button>').join('') + '</div>' +
+      '<p class="hint">Right first time: +10.</p></div>';
   }
   if (G.view === 'sort') {
     const s = hub.sort;
@@ -443,14 +454,15 @@ function mainView() {
   if (G.view === 'quiz') {
     const miss = G.q.miss;
     return (miss ? '<div class="tag">Why did it not land?</div>' : '<div class="tag">Pop quiz ' + G.q.n + ' of 5</div><div class="bar"><i style="width:' + (G.q.n / 5 * 100) + '%"></i></div>') +
-      '<div class="hr"><div class="who">HR</div><div class="ask">' + rich(G.q.ask) + '</div><div class="quizopts">' +
-      G.q.shown.map((c, i) => '<button class="opt" onclick="answer(' + i + ')">' + esc(c) + '</button>').join('') + '</div>' +
-      '<p class="hint">' + (miss ? 'Right: +10 points.' : 'Right: +20 points and motivation +1. Wrong: motivation -1.') + '</p></div>';
+      '<div class="hr"><div class="who">HR</div><div class="ask">' + rich(G.q.ask) + '</div>' +
+      (G.qTried.size ? '<div class="box bad"><b>Not quite. Try again.</b>' + (miss ? '' : 'Motivation -1 for the first try.') + '</div>' : '') + '<div class="quizopts">' +
+      G.q.shown.map((c, i) => '<button class="opt' + (G.qTried.has(i) ? ' wrong" disabled' : '"') + ' onclick="answer(' + i + ')">' + (G.qTried.has(i) ? '✗ ' : '') + esc(c) + '</button>').join('') + '</div>' +
+      '<p class="hint">' + (miss ? 'Right first time: +10 points.' : 'Right first time: +20 points and motivation +1. Wrong first time: motivation -1.') + ' Only your first try counts.</p></div>';
   }
   if (G.view === 'quizres') {
     const e = st.log[st.log.length - 1], ok = e.quiz.ok;
-    return '<div class="tag">' + (G.q.miss ? 'Why did it not land?' : 'Pop quiz ' + G.q.n + ' of 5') + '</div><h2>' + (ok ? 'Right!' : 'Not quite') + '</h2>' +
-      (ok ? '' : '<div class="named no">It was: ' + rich(e.quiz.answer) + '</div>') +
+    return '<div class="tag">' + (G.q.miss ? 'Why did it not land?' : 'Pop quiz ' + G.q.n + ' of 5') + '</div><h2>' + (st.dead ? 'Not quite' : ok ? 'Right first time!' : 'Got it') + '</h2>' +
+      (st.dead ? '' : '<div class="named">' + rich(e.quiz.answer) + '</div>') +
       '<div class="chips">' + ptsChip(e) + (G.q.miss ? '' : chip('Motivation', e.after.M - e.before.M) || '<span class="chip flat">Motivation 0</span>') + '</div>' + ptsWhy(e) +
       '<p class="msgs">' + rich(e.debrief) + '</p>' +
       (st.dead ? '<p class="msgs">' + esc(st.dead.why) + '</p>' : '') +
@@ -481,11 +493,14 @@ const ptsWhy = (e) => (e.why && e.why.length ? '<ul class="ptswhy">' + e.why.map
 function reasonBox(e) {
   const r = e.reason;
   if (!r) return '';
-  const pick = r.pick === 'none' ? 'No theory backs this' : Boss.THEORIES[r.pick].name;
-  let html = '<div class="box ' + (r.ok ? 'good' : 'bad') + '"><b>' + (r.ok ? '✓ Right reason: ' : '✗ Your reason does not fit: ') + rich(pick) + '</b>';
-  if (!r.ok && r.pickSum) html += '<p>' + rich(r.pickSum) + ' That does not explain this choice.</p>';
-  const mine = r.fits.find((f) => f.id === r.pick), others = r.fits.filter((f) => f.id !== r.pick);
+  const name = (k) => (k === 'none' ? 'No theory backs this' : Boss.THEORIES[k].name);
+  const final = r.final || r.pick;
+  let html = '<div class="box ' + (r.ok ? 'good' : 'bad') + '"><b>' + (r.ok ? '✓ Right reason first time: ' : '✗ Your first reason did not fit: ') + rich(name(r.pick)) + '</b>';
+  if (!r.ok) html += (r.pickSum ? '<p>' + rich(r.pickSum) + ' That does not explain this choice.</p>' : '') + '<p>Half points for this decision.' +
+    (r.final ? ' Then you found: <b>' + rich(name(r.final)) + '</b>.' : '') + '</p>';
+  const mine = r.fits.find((f) => f.id === final), others = r.fits.filter((f) => f.id !== final);
   if (mine) html += '<p>' + esc(mine.text) + '</p>';
+  if (r.detail) html += '<p>' + (r.detail === '1' ? '✓ Follow-up right first time.' : '✗ Follow-up not right first time.') + '</p>';
   if (others.length) html += '<p>' + (r.ok ? 'Other theories back it too:' : 'What backs it:') + '</p>' +
     '<ul class="fits">' + others.map((f) => '<li><b>' + rich(f.name) + '</b>: ' + esc(f.text) + '</li>').join('') + '</ul>';
   if (!r.fits.length) html += '<p>' + esc(r.bad) + '</p>';
@@ -528,7 +543,7 @@ function endView() {
       return '<span class="' + (good ? 'u' : 'n') + '">' + ({ M: 'Motivation', S: 'Skills', W: 'Grievances' })[k] + ' ' + (v > 0 ? '+' : '') + v + '</span>';
     }).filter(Boolean).join(' · ');
     return '<div class="it"><div class="h">' + esc(e.title) + '</div><div>' + esc(e.choice) +
-      '<div class="d">' + (e.quiz ? (e.quiz.ok ? 'Right' : 'Wrong') : rich(e.term)) + (d ? ' · <span class="deltas">' + d + '</span>' : '') + '</div>' +
+      '<div class="d">' + (e.quiz ? (e.quiz.ok ? 'Right first time' : 'Wrong first time') : rich(e.term)) + (d ? ' · <span class="deltas">' + d + '</span>' : '') + '</div>' +
       (e.reason ? '<div class="d">Because: ' + (e.reason.pick === 'none' ? 'no theory' : esc(Boss.THEORIES[e.reason.pick].name)) + (e.reason.ok ? ' ✓' : ' ✗ (fits: ' + (e.reason.fits.map((f) => esc(f.name)).join(', ') || 'no theory') + ')') + '</div>' : '') +
       (e.better ? '<div class="better">' + (e.quiz ? 'Answer: ' + rich(e.better) : 'Better: ' + esc(e.better) + ' (' + rich(e.betterTerm) + ')') + '</div>' : '') +
       whyLine(e) + '</div></div>';
@@ -542,7 +557,11 @@ function endView() {
 }
 
 // ---------- actions ----------
-function pick(id) { G = { view: 'hub', st: Boss.newState(id, undefined, player.level), bubble: null, q: null, sortOk: null, posted: false }; enterHub(); }
+function pick(id) {
+  G = { view: 'hub', st: Boss.newState(id, undefined, player.level), bubble: null, q: null, sortOk: null, posted: false };
+  G.st.seen = seenGet();
+  enterHub();
+}
 function setLevel(l) { player.name = $('#nm').value; player.priv = $('#priv').checked; player.level = l; render(); }
 function restart() { G = { view: 'pick' }; render(); window.scrollTo(0, 0); }
 function enterHub() {
@@ -575,24 +594,53 @@ function askHR() {
 function togglePick(id) { G.picks.has(id) ? G.picks.delete(id) : G.picks.add(id); render(); }
 function checkSort() { G.sortOk = Boss.sortCheck(G.st, G.picks); if (G.st.dead) { G.view = 'end'; render(); return; } G.view = 'hub'; render(); }
 // Steps that ask "because which theory?" take the reason before the result shows
+// Steps that ask "because which theory?": a wrong reason is try again (the first one is what scores),
+// then a follow-up on how the theory applies. Nothing happens to the worker until both are answered.
 function choose(id) {
-  if (Boss.asksWhy(Boss.HUBS[G.st.hub])) { G.pickOpt = id; G.view = 'why'; render(); return; }
+  if (Boss.asksWhy(Boss.HUBS[G.st.hub])) { G.pickOpt = id; G.first = null; G.tried = new Set(); G.view = 'why'; render(); return; }
   Boss.choose(G.st, id);
   G.bubble = null;
   G.view = 'result';
   render();
 }
 function because(theory) {
-  Boss.choose(G.st, G.pickOpt, theory);
+  if (!G.first) G.first = theory;
+  if (!Boss.reasonOk(G.st, G.pickOpt, theory)) { G.tried.add(theory); render(); return; }
+  G.final = theory;
+  G.detail = Boss.detailFor(G.st, G.pickOpt, theory);
+  if (G.detail) { G.detailFirst = null; G.detailTried = new Set(); G.view = 'detail'; render(); window.scrollTo(0, 0); return; }
+  commit();
+}
+function detailPick(i) {
+  const ok = G.detail.answers.includes(G.detail.choices[i]);
+  if (G.detailFirst == null) G.detailFirst = ok ? '1' : '0';
+  if (!ok) { G.detailTried.add(i); render(); return; }
+  commit();
+}
+function commit() {
+  Boss.choose(G.st, G.pickOpt, G.first, G.final, G.detail ? G.detailFirst : undefined);
   G.bubble = null;
   G.view = 'result';
   render();
   window.scrollTo(0, 0);
 }
-function answer(i) { Boss.answerQuiz(G.st, G.q.shown[i]); G.view = 'quizres'; render(); }
+// Wrong is "try again" while the question is still open; only the first try scores
+function answer(i) {
+  const right = Boss.answerQuiz(G.st, G.q.shown[i]);
+  if (!right && G.st.pendingQ && !G.st.dead) { G.qTried.add(i); render(); return; }
+  G.view = 'quizres'; render();
+}
+// Pop quiz questions seen in recent games, so the next game prefers new ones
+const SEEN_KEY = 'boss-seen';
+const seenGet = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY)) || []; } catch (e) { return []; } };
+function seenAdd(id) {
+  if (id === 'miss') return;
+  const s = seenGet().filter((x) => x !== id).concat(id).slice(-15);
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(s)); } catch (e) {}
+}
 function next() {
   const q = G.st.pendingQ;
-  if (q) { G.q = Object.assign({}, q, { shown: q.choices.slice().sort(() => Math.random() - 0.5) }); G.view = 'quiz'; render(); window.scrollTo(0, 0); return; }
+  if (q) { seenAdd(q.id); G.qTried = new Set(); G.q = Object.assign({}, q, { shown: q.choices.slice().sort(() => Math.random() - 0.5) }); G.view = 'quiz'; render(); window.scrollTo(0, 0); return; }
   if (Boss.over(G.st)) { G.view = 'end'; render(); return; }
   G.sortOk = null; enterHub(); window.scrollTo(0, 0);
 }
@@ -613,12 +661,12 @@ async function lbFetch() {
 function lbPost() {
   if (G.posted || player.priv || !player.name || !window.fetch) return Promise.resolve(null);
   G.posted = true;
-  const body = { v: 3, n: player.name, c: G.st.hire.id, d: G.st.seed, l: G.st.level, a: G.st.acts.join(','), at: { '.sv': 'timestamp' } };
+  const body = { v: 4, n: player.name, c: G.st.hire.id, d: G.st.seed, l: G.st.level, a: G.st.acts.join(','), at: { '.sv': 'timestamp' } };
   return fetch(LB_URL + '.json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then((r) => { if (!r.ok) throw new Error('save ' + r.status); return true; });
 }
 function lbCheck(o) {
-  if (!o || (o.v !== 2 && o.v !== 3) || typeof o.n !== 'string' || !o.n.trim() || typeof o.c !== 'string' || typeof o.a !== 'string') return null;
+  if (!o || ![2, 3, 4].includes(o.v) || typeof o.n !== 'string' || !o.n.trim() || typeof o.c !== 'string' || typeof o.a !== 'string') return null;
   const st = Boss.replay(o.c, o.d, o.l, o.a.split(','), o.v);
   if (!st) return null;
   return { name: o.n.trim().slice(0, 24), hire: o.c, level: st.level, score: Boss.score(st), result: st.dead ? Boss.DEATHS[st.dead.kind].title : st.ending.title, at: o.at || 0 };
