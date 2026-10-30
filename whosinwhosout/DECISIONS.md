@@ -34,6 +34,11 @@ Medium or low confidence, please review:
 
 2023 seat with no successor: Mana.
 
+## Seat overrides
+- Each electorate has a dropdown: the model's pick, or any party that came 1st, 2nd or 3rd in its 2023 predecessor (independents and minor parties skipped). Picked from the 2023 top three, not any party, to keep the list short and plausible.
+- The named MP is the chosen party's 2026 candidate in the seat ("Candidate TBC" if it has none).
+- Stored in the link as `seats=Slug:PARTY,...`. A link with an unknown seat or a party outside that seat's top three just drops it. Overrides beat both seat models and survive toggling between them.
+
 ## Site
 - Lives at `samsmasm.github.io/whosinwhosout/` (unisam.nz/whosinwhosout). The folder itself is the deployable site, so there is no separate `dist/`.
 - Data is shipped as `data.js` (a plain script) so the page also works opened from disk.

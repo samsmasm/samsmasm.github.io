@@ -109,11 +109,25 @@
     return { parties: rows, house, overhang: house - seats };
   }
 
+  /* The parties that came 1st, 2nd and 3rd in the seat's 2023 predecessor
+     (independents and minor parties skipped). These are the parties a user can
+     hand the seat to. */
+  function placings(e) {
+    const out = [];
+    for (const c of e.shares2023) {
+      if (c.party !== 'OTH' && !out.includes(c.party)) out.push(c.party);
+    }
+    if (!out.length && e.win2023.party !== 'OTH') out.push(e.win2023.party);
+    return out.slice(0, 3);
+  }
+
   /* Who wins each electorate.
      'hold':  the party that won the closest 2023 predecessor keeps it.
      'swing': uniform swing on the predecessor's 2023 electorate (candidate) vote,
-              except seats called by hand (e.swingCall) from electorate polls or news. */
-  function electorateWinners(electorates, model, avg, national2023) {
+              except seats called by hand (e.swingCall) from electorate polls or news.
+     overrides: {slug(seat name): party} set by the user; these beat either model. */
+  function electorateWinners(electorates, model, avg, national2023, overrides) {
+    const ov = overrides || {};
     return electorates.map(e => {
       let party, lead = null, shares = null, call = null;
       if (model === 'swing' && e.swingCall) {
@@ -130,11 +144,16 @@
       } else {
         party = e.win2023.party;
       }
+      const modelParty = party;
+      const over = ov[slug(e.name)];
+      const overridden = !!over && over !== party;
+      if (overridden) party = over;
       // The named person is the winning party's 2026 candidate in this seat.
       const cand = e.candidates.find(c => c.party === party);
       return {
         name: e.name, pred: e.pred, confidence: e.confidence, notes: e.notes, maori: e.maori,
-        party, candidate: cand ? cand.name : null, lead, shares, call,
+        party, candidate: cand ? cand.name : null, lead, shares, call, modelParty, overridden,
+        placings: placings(e),
         held2023: e.win2023.party, majority2023: e.win2023.majority,
       };
     });
@@ -163,7 +182,7 @@
   function run(data, state) {
     const pa = pollAverage(data.polls, data.pollParties, state.excl);
     if (!pa || !pa.avg) return { poll: pa, empty: true };
-    const winners = electorateWinners(data.electorates, state.model, pa.avg, data.national2023);
+    const winners = electorateWinners(data.electorates, state.model, pa.avg, data.national2023, state.seats);
     const counts = {};
     for (const w of winners) counts[w.party] = (counts[w.party] || 0) + 1;
     const alloc = allocate(pa.avg, counts);
@@ -172,7 +191,7 @@
   }
 
   const api = { WINDOW_DAYS, HALF_LIFE_DAYS, DEFAULT_SAMPLE, SEATS, THRESHOLD,
-    slug, norm, pollAverage, sainteLague, allocate, electorateWinners, fillSeats, run };
+    slug, norm, pollAverage, sainteLague, allocate, placings, electorateWinners, fillSeats, run };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.WIWO = api;
 })(typeof window !== 'undefined' ? window : this);

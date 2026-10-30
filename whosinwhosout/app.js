@@ -6,7 +6,7 @@
   const P = D.parties;
   const $ = s => document.querySelector(s);
 
-  const DEFAULTS = { model: 'swing', excl: [] };
+  const DEFAULTS = { model: 'swing', excl: [], seats: {} };
   const LINK_VERSION = 2; // v2: default seat model changed from hold to swing
   const MODEL_TEXT = {
     hold: 'every seat holds as in 2023',
@@ -27,6 +27,8 @@
     n: D.polls.filter(p => p.pollster === name && inWindow(p)).length,
   })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
   const pollsterBySlug = Object.fromEntries(pollsters.map(p => [p.slug, p]));
+  const seatBySlug = Object.fromEntries(D.electorates.map(e => [M.slug(e.name), e]));
+  const PLACE = ['1st', '2nd', '3rd'];
 
   // ---------- helpers ----------
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,22 +44,30 @@
   }
 
   // ---------- state <-> URL hash ----------
-  // Format: #v=2&model=hold&excl=Curia,RoyMorgan. Unknown keys are ignored so later
-  // versions can add more (for example per-seat overrides) without breaking old links.
+  // Format: #v=2&model=hold&excl=Curia,RoyMorgan&seats=Epsom:NAT,Nelson:NAT.
+  // Unknown keys are ignored so later versions can add more without breaking old links.
   // v=1 links were made when hold was the default, so a v=1 link with no model means hold.
   function readHash() {
     const q = new URLSearchParams(location.hash.slice(1));
     const oldDefault = q.get('v') === '1' ? 'hold' : DEFAULTS.model;
     const model = q.get('model') in MODEL_TEXT ? q.get('model') : oldDefault;
     const excl = (q.get('excl') || '').split(',').filter(s => s in pollsterBySlug);
-    return { model, excl };
+    // Only keep a seat override if the seat exists and the party was in its 2023 top three.
+    const seats = {};
+    for (const pair of (q.get('seats') || '').split(',')) {
+      const [s, k] = pair.split(':');
+      if (seatBySlug[s] && M.placings(seatBySlug[s]).includes(k)) seats[s] = k;
+    }
+    return { model, excl, seats };
   }
   function writeHash(state) {
     const q = new URLSearchParams();
     q.set('v', String(LINK_VERSION));
     if (state.model !== DEFAULTS.model) q.set('model', state.model);
     if (state.excl.length) q.set('excl', state.excl.join(','));
-    const h = '#' + q.toString().replace(/%2C/g, ',');
+    const seats = Object.entries(state.seats);
+    if (seats.length) q.set('seats', seats.map(([s, k]) => s + ':' + k).join(','));
+    const h = '#' + q.toString().replace(/%2C/g, ',').replace(/%3A/g, ':');
     if (location.hash !== h) history.replaceState(null, '', h);
   }
 
@@ -81,6 +91,8 @@
     const items = [];
     if (state.model !== DEFAULTS.model) items.push(`Seat model: ${MODEL_TEXT[state.model]} (default: ${MODEL_TEXT[DEFAULTS.model]})`);
     if (state.excl.length) items.push(`Pollsters excluded: ${state.excl.map(s => pollsterBySlug[s].name).join(', ')} (default: all included)`);
+    const seats = Object.entries(state.seats);
+    if (seats.length) items.push(`Electorates set by hand: ${seats.map(([s, k]) => `${seatBySlug[s].name} to ${pname(k)}`).join(', ')}`);
     box.hidden = false;
     if (!items.length) {
       box.className = 'default-note';
@@ -171,11 +183,21 @@
     const row = w => {
       const flipped = w.party !== w.held2023;
       let note = '';
-      if (w.call) note = `<span class="flag" title="Called by hand">●</span> ${esc(w.call)}`;
+      if (w.overridden) note = `Set by you · model says ${esc(pname(w.modelParty))}`;
+      else if (w.call) note = `<span class="flag" title="Called by hand">●</span> ${esc(w.call)}`;
       else if (state.model === 'swing' && w.lead != null) note = `lead ${w.lead.toFixed(1)} pts` + (flipped ? ` · gain from ${esc(pname(w.held2023))}` : '');
       else if (w.majority2023) note = `2023 majority ${w.majority2023.toLocaleString('en-NZ')}`;
       const flag = w.confidence !== 'high' ? ` <span class="flag" title="${esc('Mapping uncertain (' + w.confidence + '): ' + w.notes)}" tabindex="0">◆</span>` : '';
-      return `<tr><td>${esc(w.name)}</td><td>${chip(w.party)}</td>
+      // Winner picker: the model's call, or any party that came 1st to 3rd here in 2023.
+      const opts = [`<option value="">${esc(pname(w.modelParty))} (model)</option>`]
+        .concat(w.placings.filter(k => k !== w.modelParty).map(k => {
+          const i = w.placings.indexOf(k);
+          return `<option value="${k}"${w.overridden && w.party === k ? ' selected' : ''}>${esc(pname(k))} (${PLACE[i]} in 2023)</option>`;
+        }));
+      const pick = opts.length > 1
+        ? `<select class="pick${w.overridden ? ' set' : ''}" data-seat="${M.slug(w.name)}" aria-label="Winner of ${esc(w.name)}" style="border-left-color:${colour(w.party)}">${opts.join('')}</select>`
+        : chip(w.party);
+      return `<tr><td>${esc(w.name)}</td><td>${pick}</td>
         <td>${w.candidate ? esc(w.candidate) : `<span class="tbc">Candidate TBC (none listed)</span>`}</td>
         <td>${esc(w.pred)}${flag}</td><td class="lead">${note}</td></tr>`;
     };
@@ -199,7 +221,7 @@
   }
 
   function update(next) {
-    state = { model: next.model, excl: [...next.excl] };
+    state = { model: next.model, excl: [...next.excl], seats: { ...next.seats } };
     writeHash(state);
     render();
   }
@@ -209,6 +231,14 @@
   $('#pollsters').addEventListener('change', () => {
     const excl = [...document.querySelectorAll('#pollsters input')].filter(i => !i.checked).map(i => i.value);
     update({ ...state, excl });
+  });
+  $('#elec-table').addEventListener('change', e => {
+    const sel = e.target.closest('select.pick');
+    if (!sel) return;
+    const seats = { ...state.seats };
+    if (sel.value) seats[sel.dataset.seat] = sel.value; else delete seats[sel.dataset.seat];
+    update({ ...state, seats });
+    $(`select.pick[data-seat="${sel.dataset.seat}"]`).focus();
   });
   window.addEventListener('hashchange', () => { state = readHash(); writeHash(state); render(); });
   $('#copy').addEventListener('click', async () => {

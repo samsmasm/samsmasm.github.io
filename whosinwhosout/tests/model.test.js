@@ -95,4 +95,25 @@ test('Full run: both models give 71 electorates and a full House', () => {
   }
 });
 
+test('Seat override: hands the seat to the 2nd-place party and names its candidate', () => {
+  const e = data.electorates.find(x => x.name === 'Banks Peninsula');
+  assert.deepStrictEqual(M.placings(e), ['NAT', 'LAB', 'GRN']);
+  const base = M.run(data, { model: 'hold', excl: [] });
+  const r = M.run(data, { model: 'hold', excl: [], seats: { BanksPeninsula: 'LAB' } });
+  const w = r.winners.find(x => x.name === 'Banks Peninsula');
+  assert.strictEqual(w.party, 'LAB');
+  assert.ok(w.overridden);
+  assert.strictEqual(w.modelParty, 'NAT');
+  assert.strictEqual(w.candidate, 'Tracey McLellan');
+  assert.strictEqual(r.alloc.parties.LAB.electorates, base.alloc.parties.LAB.electorates + 1);
+  assert.ok(r.seats.LAB.mps.some(m => m.name === 'Tracey McLellan' && m.how === 'electorate'));
+});
+
+test('Placings: every seat offers 1 to 3 parties, none of them Other', () => {
+  for (const e of data.electorates) {
+    const p = M.placings(e);
+    assert.ok(p.length >= 1 && p.length <= 3 && !p.includes('OTH'), e.name);
+  }
+});
+
 console.log(`\n${passed} passed`);
