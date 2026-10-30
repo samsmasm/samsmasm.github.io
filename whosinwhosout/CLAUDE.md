@@ -178,6 +178,7 @@ Create `data/manual/electorate_mapping.csv` with columns:
 
 - The owner is in a hurry and happy for sensible judgement calls. Make the call, note it in a `DECISIONS.md` file, and keep going. Stop and ask only for things that cannot be undone or that need his login or files.
 - Never write em dashes in any text, including page copy, comments and commit messages.
+- Run `python3 stamp.py` before committing any change to the page, JS, CSS or data.js. unisam.nz caches JS for 4 hours, and new HTML with old JS leaves the page blank.
 - Do not invent data. If something cannot be found, show it as unknown and list it in the final report.
 - Do not claim the model is accurate. The disclaimer wording above stays.
 - Keep the first version small. Anything not listed under V1 is V2.
