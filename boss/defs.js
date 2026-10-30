@@ -35,6 +35,9 @@ window.BOSS_DEFS = {
   'Purpose': { def: 'Showing workers who benefits from their work, so it feels meaningful.' },
   'Teamwork': { def: 'Working in a group towards a shared goal.' },
 
+  // Law
+  'Age discrimination': { def: 'Treating someone worse at work (hiring, pay, training, promotion) because of their age. It is illegal in most countries. Age can still shape what someone wants, so ask them.' },
+
   // Theories
   'Scientific management': { also: ['Taylor', 'time-and-motion study'], def: 'Taylor: break work into steps, train the best method, monitor, and pay per unit.' },
   "Maslow's hierarchy of needs": { also: ['Maslow'], def: 'Needs come in levels: security, belonging, esteem, self-fulfilment. A need only motivates once the ones below it are met.' },

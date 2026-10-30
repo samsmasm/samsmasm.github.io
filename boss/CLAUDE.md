@@ -17,6 +17,10 @@ Pick-a-path game for IB BM 2.4 (motivation, rewards, training). Hire one of six 
 - "Ask HR first" at H8 is the Ask HR button, which costs a warning at urgent hubs.
 - The cat (`cat`): per-hire labels (`labels`), scenes (`sceneFor`), jokes (`fun`, `sceneFun`) and effects. Mousing is countable, so Taylor and piece rate work for it; commission kills it (nothing to sell); individual PRP sets Gaming (it imports mice).
 
+## Hires and age
+
+Maya 24, Tuan 26, Aisha 27, Kofi 44 (career change, teenagers at home, his mother moves in at H9), Rosa 63 (retires at 66), Biscuit the cat. Age changes preferences, never ability: Rosa wants pay now not shares (H2), long-vesting shares mean little to her (H13), she is great with new software (H12 joke). H12 has a Rosa-only trap option ("skip her training, she retires soon") that is flagged as illegal age discrimination (`only` on options). The `age` quiz question comes first for hires aged 40+ or after the trap. The pick screen says age discrimination is illegal but age can shape preferences.
+
 ## Score and leaderboard
 
 - Score = 10 x (M + S) + 10 x step reached (16 at the end) + 20 x quiz right - 10 x warnings + ending bonus (mentor 150, loyal 100, fragile 50).

@@ -6,12 +6,14 @@
       look: { skin: '#e9b98f', hair: '#3a2418', style: 'pony', shirt: '#2f6fb0' } },
     { id: 'tuan', name: 'Tuan', age: 26, job: 'Sales rep for a gadget distributor', M: 3, S: 2, need: 2,
       look: { skin: '#d9a273', hair: '#1c1410', style: 'short', shirt: '#c0392b' } },
-    { id: 'linh', name: 'Linh', age: 27, job: 'App developer at a 12-person startup', M: 2, S: 3, need: 3,
-      look: { skin: '#f0c7a0', hair: '#24160f', style: 'bob', shirt: '#6a3fa0' } },
-    { id: 'nam', name: 'Nam', age: 31, job: 'Warehouse picker on the night shift', M: 2, S: 1, need: 1,
-      look: { skin: '#c98f62', hair: '#2a1d14', style: 'cap', shirt: '#e08a1e' } },
-    { id: 'hoa', name: 'Hoa', age: 29, job: 'Office administrator at a logistics firm', M: 2, S: 2, need: 2,
-      look: { skin: '#eebd96', hair: '#3b2416', style: 'bun', shirt: '#1f8a6a' } },
+    { id: 'aisha', name: 'Aisha', age: 27, job: 'App developer at a 12-person startup', M: 2, S: 3, need: 3,
+      look: { skin: '#a8754e', hair: '#17110c', style: 'bob', shirt: '#6a3fa0' } },
+    { id: 'kofi', name: 'Kofi', age: 44, job: 'Warehouse picker on the night shift', M: 2, S: 1, need: 1,
+      note: 'New to warehouses after his factory closed. Two teenagers at home.',
+      look: { skin: '#7a4a2c', hair: '#17110c', style: 'cap', shirt: '#e08a1e', beard: true } },
+    { id: 'rosa', name: 'Rosa', age: 63, job: 'Office administrator at a logistics firm', M: 2, S: 3, need: 2,
+      note: 'Thirty years in offices. Plans to retire at 66.',
+      look: { skin: '#eebd96', hair: '#c9c4bd', style: 'bun', shirt: '#1f8a6a', glasses: true } },
     { id: 'cat', name: 'Biscuit', age: '4 (32 in cat years)', job: 'Rodent control officer at a cheese warehouse', M: 3, S: 3, need: 1,
       look: { fur: '#e8963a', stripe: '#c46f1c', collar: '#2f6fb0', style: 'cat' },
       needWords: {
@@ -66,7 +68,7 @@
     }
   }
 
-  const PER = ['maya', 'tuan', 'linh', 'nam', 'hoa', 'cat'];
+  const PER = ['maya', 'tuan', 'aisha', 'kofi', 'rosa', 'cat'];
   // Apply an effect spec: {M,S,W,need,flag,clearW,tag,msg,dead,why}, a per-hire table of specs, or a function
   function fx(st, s) {
     if (typeof s === 'function') return s(st);
@@ -91,7 +93,7 @@
   }
 
   const QUIT_RENT = { dead: 'quit', why: 'Nothing to sell, so no pay. Rent was due.' };
-  const isTaylorJob = (st) => ['maya', 'nam', 'cat'].includes(st.hire.id);
+  const isTaylorJob = (st) => ['maya', 'kofi', 'cat'].includes(st.hire.id);
 
   // ---------- hubs ----------
   // Option fields: label (or labels: {hire: text} overrides), term, fx, fun ({hire: joke} or one joke for all), next, loop.
@@ -104,13 +106,13 @@
       options: [
         { id: 'induct', label: 'Run a full induction day: tour, safety, systems, meet the team', term: 'Induction', fx: { M: 1, S: 1 }, next: 'H2',
           labels: { cat: 'Run a full induction day: tour of every sunbeam, safety talk (the shredder is not a bed), meet the team' },
-          fun: { nam: 'Highlight of the tour: the forklift. Nam names it Kevin.', hoa: "By 10am Hoa knows everyone's name, birthday and coffee order.",
+          fun: { kofi: 'Highlight of the tour: the forklift. Kofi names it Kevin.', rosa: "By 10am Rosa knows everyone's name, birthday and coffee order.",
             cat: 'Biscuit sniffs every member of staff and approves of three of them.' } },
         { id: 'buddy', label: 'Pair them with a buddy for the day', term: 'On-the-job training', fx: { S: 1 }, next: 'H2',
           labels: { cat: 'Pair Biscuit with Gerald, the warehouse dog, for the day' },
           fun: { cat: 'Gerald shows Biscuit where the mice live. Gerald has never caught one.' } },
         { id: 'keycard', label: 'Hand over a keycard and say "you\'ll pick it up"', term: 'No induction', fx: { S: -1, M: -1, msg: 'Lost on day one.' }, next: 'H2',
-          fun: { maya: 'Maya spends the morning in the supply cupboard. It is a nice cupboard.', linh: 'Nobody tells Linh the wifi password, so she hacks the printer instead.',
+          fun: { maya: 'Maya spends the morning in the supply cupboard. It is a nice cupboard.', aisha: 'Nobody tells Aisha the wifi password, so she hacks the printer instead.',
             cat: 'Biscuit cannot use a keycard. Biscuit spends the day yelling at the door.' } },
       ],
       debrief: 'Induction is on-the-job training for new starters. It introduces the business, the role, policies, safety and the people, so the worker settles in and the business avoids early mistakes.',
@@ -122,28 +124,28 @@
       terms: ['Salary', 'Time rate wage', 'Piece rate wage', 'Commission', 'Salary plus commission', 'Employee share ownership', 'Taylor'],
       options: [
         { id: 'salary', label: 'A fixed yearly amount, paid in equal instalments', term: 'Salary',
-          fx: { maya: { M: 1, need: 2 }, tuan: {}, linh: { M: 1 }, nam: { M: 1, need: 2 }, hoa: { M: 1 }, cat: { M: 1, need: 2 } },
+          fx: { maya: { M: 1, need: 2 }, tuan: {}, aisha: { M: 1 }, kofi: { M: 1, need: 2 }, rosa: { M: 1 }, cat: { M: 1, need: 2 } },
           fun: { tuan: 'Tuan asks where the leaderboard is.', cat: "Paid monthly, in tuna. Biscuit eats the whole month's pay by 9:05am." } },
         { id: 'time', label: 'Paid for every hour worked', term: 'Time rate wage',
-          fx: { maya: { M: 1, need: 2 }, tuan: {}, linh: { M: -1, msg: 'Clock-watching.' }, nam: { M: 1, need: 2 }, hoa: {},
+          fx: { maya: { M: 1, need: 2 }, tuan: {}, aisha: { M: -1, msg: 'Clock-watching.' }, kofi: { M: 1, need: 2 }, rosa: {},
             cat: { M: 1, need: 2, flag: 'OutputGap', msg: 'Paid for time, not for mice.' } },
           fun: { cat: 'Biscuit sleeps 16 hours a day. Payroll pays for every one of them.' } },
         { id: 'piece', label: 'Paid for every unit finished', term: 'Piece rate wage',
           fx: { maya: { M: 2, need: 2, flag: 'Rushing', msg: 'Fast, but rushing.' }, tuan: { M: -1, msg: 'There is no unit to count.' },
-            linh: { S: -1, M: -1, W: 1, msg: 'Quality collapses.' }, nam: { M: 2, need: 2, flag: 'Rushing', msg: 'Fast, but rushing.' }, hoa: { M: -1, W: 1 },
+            aisha: { S: -1, M: -1, W: 1, msg: 'Quality collapses.' }, kofi: { M: 2, need: 2, flag: 'Rushing', msg: 'Fast, but rushing.' }, rosa: { M: -1, W: 1 },
             cat: { M: 2, need: 2, flag: 'Rushing', msg: 'Countable output, so it works (Taylor). But rushing.' } },
-          fun: { linh: 'Linh ships 400 apps. They are all the same login button.',
+          fun: { aisha: 'Aisha ships 400 apps. They are all the same login button.',
             cat: 'One treat per mouse. By lunch there are 14 mice on your desk. Some of them are only half a mouse.' } },
         { id: 'comm', label: 'Only a percentage of what they sell', term: 'Commission',
-          fx: { maya: QUIT_RENT, tuan: { M: 1, flag: 'CommissionOnly' }, linh: QUIT_RENT, nam: QUIT_RENT, hoa: { M: -1 },
+          fx: { maya: QUIT_RENT, tuan: { M: 1, flag: 'CommissionOnly' }, aisha: QUIT_RENT, kofi: QUIT_RENT, rosa: { M: -1 },
             cat: { dead: 'quit', why: 'Biscuit tried to sell a mouse to a customer. No sale, no pay, no tuna. Biscuit left through the cat flap forever.' } },
           fun: { maya: 'Maya tries to sell half a bike to the security guard.' } },
         { id: 'salcomm', label: 'A fixed yearly amount plus a percentage of sales', term: 'Salary plus commission',
-          fx: { maya: { M: -1 }, tuan: { M: 1 }, linh: { M: -1 }, nam: { M: -1 }, hoa: {}, cat: { M: -1 } },
+          fx: { maya: { M: -1 }, tuan: { M: 1 }, aisha: { M: -1 }, kofi: { M: -1 }, rosa: {}, cat: { M: -1 } },
           fun: { cat: 'A percentage of what sales? Biscuit has never sold anything except guilt.' } },
         { id: 'shares', label: 'A low fixed amount plus shares in the company', term: 'Employee share ownership',
-          fx: { maya: { M: -1, W: 1 }, tuan: { M: -1, W: 1 }, linh: { M: 2, need: 4, msg: 'A stake in something new.' },
-            nam: { dead: 'quit', why: 'Shares do not pay rent.' }, hoa: {}, cat: { M: -1, W: 1, msg: 'Shares do not fill a food bowl.' } },
+          fx: { maya: { M: -1, W: 1 }, tuan: { M: -1, W: 1 }, aisha: { M: 2, need: 4, msg: 'A stake in something new.' },
+            kofi: { dead: 'quit', why: 'Shares do not pay rent. With two teenagers, he took a job with a proper wage.' }, rosa: { M: -1, msg: 'Close to retirement, she wants pay now, not shares that grow for years.' }, cat: { M: -1, W: 1, msg: 'Shares do not fill a food bowl.' } },
           fun: { cat: 'Biscuit eats the share certificate.' } },
       ],
       nameIt: {
@@ -174,25 +176,25 @@
         { id: 'inhouse', label: 'In-house course run by your own staff', term: 'In-house course', fx: { S: 1 },
           fun: { cat: 'A slideshow on mousing. Biscuit sits on the laptop for all of it.' } },
         { id: 'coach', label: 'Coaching: a supervisor guides them through the task', term: 'Coaching',
-          fx: { maya: { S: 1, M: 1 }, tuan: { S: 1 }, linh: { S: 1 }, nam: { S: 1, M: 1 }, hoa: { S: 1 }, cat: { S: 1, M: 1 } },
+          fx: { maya: { S: 1, M: 1 }, tuan: { S: 1 }, aisha: { S: 1 }, kofi: { S: 1, M: 1 }, rosa: { S: 1 }, cat: { S: 1, M: 1 } },
           fun: { cat: 'A supervisor demonstrates the pounce. Badly. Biscuit looks embarrassed for him.' } },
         { id: 'mentor', label: 'Mentoring: an experienced colleague they can talk to', term: 'Mentoring',
-          fx: { maya: { S: 1 }, tuan: { S: 1, M: 1 }, linh: { S: 1, M: 1 }, nam: { S: 1 }, hoa: { S: 1, M: 1 }, cat: { S: 1, M: 1 } },
+          fx: { maya: { S: 1 }, tuan: { S: 1, M: 1 }, aisha: { S: 1, M: 1 }, kofi: { S: 1 }, rosa: { S: 1, M: 1 }, cat: { S: 1, M: 1 } },
           fun: { cat: 'Old Tom, the retired warehouse cat, shares his secrets. Mostly about naps.' } },
         { id: 'appr', label: 'Apprenticeship: long training under an expert', term: 'Apprenticeship',
-          fx: { maya: { S: 2, M: -1, msg: 'Months of lower output.' }, tuan: { S: 2 }, linh: { S: 2 }, nam: { S: 2, M: -1, msg: 'Months of lower output.' }, hoa: { S: 2 },
+          fx: { maya: { S: 2, M: -1, msg: 'Months of lower output.' }, tuan: { S: 2 }, aisha: { S: 2 }, kofi: { S: 2, M: -1, msg: 'Months of lower output.' }, rosa: { S: 2 },
             cat: { S: 2, M: -1, msg: 'Two years under a master mouser. The mice multiply while it studies.' } } },
         { id: 'vest', label: 'A practice area copying the workplace', term: 'Vestibule training',
-          fx: { maya: { S: 2 }, tuan: { S: 1, msg: 'A role-play room.' }, linh: { msg: 'Nothing to copy.' }, nam: { S: 2 }, hoa: { msg: 'Nothing to copy.' }, cat: { S: 2 } },
+          fx: { maya: { S: 2 }, tuan: { S: 1, msg: 'A role-play room.' }, aisha: { msg: 'Nothing to copy.' }, kofi: { S: 2 }, rosa: { msg: 'Nothing to copy.' }, cat: { S: 2 } },
           fun: { tuan: 'Tuan sells a stapler to a mannequin. The mannequin buys two.',
             cat: 'A practice warehouse full of wind-up mice. Biscuit destroys every one. That was the point.' } },
         { id: 'sim', label: 'Simulator: equipment copying the real job', term: 'Simulator',
-          fx: { maya: { msg: 'No simulator exists for this.' }, tuan: { S: 1 }, linh: { S: 2, msg: 'Crash drills.' }, nam: { S: 2, msg: 'Forklift simulator.' }, hoa: { msg: 'No simulator exists for this.' },
+          fx: { maya: { msg: 'No simulator exists for this.' }, tuan: { S: 1 }, aisha: { S: 2, msg: 'Crash drills.' }, kofi: { S: 2, msg: 'Forklift simulator.' }, rosa: { msg: 'No simulator exists for this.' },
             cat: { S: 1, M: 1, msg: 'A laser-dot simulator.' } },
-          fun: { linh: 'The simulator crashes the servers 40 times. Linh is having the best day of her life.',
+          fun: { aisha: 'The simulator crashes the servers 40 times. Aisha is having the best day of her life.',
             cat: 'Biscuit has never been happier. The dot is never caught.' } },
         { id: 'lecture', label: 'Conference or lecture course away from work', term: 'Lecture or conference',
-          fx: { maya: { S: 1, M: -1, msg: 'Output falls.' }, tuan: { S: 1, M: 1 }, linh: { S: 1, M: 1 }, nam: { S: 1, M: -1, msg: 'Output falls.' }, hoa: { S: 1, M: 1 },
+          fx: { maya: { S: 1, M: -1, msg: 'Output falls.' }, tuan: { S: 1, M: 1 }, aisha: { S: 1, M: 1 }, kofi: { S: 1, M: -1, msg: 'Output falls.' }, rosa: { S: 1, M: 1 },
             cat: { M: -1, msg: 'Far from the real work, so nothing sticks. And nobody catches mice while it is away.' } },
           fun: { cat: 'A conference in another city. Biscuit spends it in the cat carrier, screaming.' } },
         { id: 'nothing', label: 'Nothing: they will work it out', term: 'No training',
@@ -214,7 +216,7 @@
           { id: 'recog', label: 'No recognition for good work', hygiene: false },
           { id: 'resp', label: 'No real responsibility', hygiene: false },
         ],
-        top: { maya: 'security', tuan: 'recog', linh: 'resp', nam: 'pay', hoa: 'boss', cat: 'noise' },
+        top: { maya: 'security', tuan: 'recog', aisha: 'resp', kofi: 'pay', rosa: 'boss', cat: 'noise' },
         topFor: { cat: 'the vacuum cleaner' },
       },
       terms: ['Herzberg hygiene factors', 'Herzberg motivators', 'Fringe payment'],
@@ -228,13 +230,13 @@
         { id: 'both', label: 'Fix the hygiene factors and add the motivators', term: 'Herzberg, both factors', fx: { M: 2, clearW: true } },
         { id: 'pay', label: 'Give a pay rise only', term: 'Herzberg hygiene factors', fx: { M: 1, flag: 'PayFade', msg: 'Nice for now.' } },
         { id: 'pizza', label: 'Buy everyone pizza', term: 'Fringe payment', fx: { msg: 'Nice lunch. Nothing changed.' },
-          fun: { maya: 'Pineapple. A heated debate breaks out.', tuan: 'Pineapple. A heated debate breaks out.', linh: 'Pineapple. A heated debate breaks out.',
-            nam: 'Pineapple. A heated debate breaks out.', hoa: 'Hoa collects the money and makes a spreadsheet of toppings.',
+          fun: { maya: 'Pineapple. A heated debate breaks out.', tuan: 'Pineapple. A heated debate breaks out.', aisha: 'Pineapple. A heated debate breaks out.',
+            kofi: 'Pineapple. A heated debate breaks out.', rosa: 'Rosa collects the money and makes a spreadsheet of toppings.',
             cat: "Biscuit eats the anchovies off everyone's slice. Everyone else is now also demotivated." } },
         { id: 'grateful', label: 'Tell them to be grateful to have a job', term: 'Herzberg hygiene factors',
           fx: { maya: { dead: 'demotivated', why: '"Be grateful" was the last straw.' }, tuan: { dead: 'demotivated', why: '"Be grateful" was the last straw.' },
-            linh: { dead: 'demotivated', why: '"Be grateful" was the last straw.' }, nam: { dead: 'demotivated', why: '"Be grateful" was the last straw.' },
-            hoa: { dead: 'demotivated', why: '"Be grateful" was the last straw.' },
+            aisha: { dead: 'demotivated', why: '"Be grateful" was the last straw.' }, kofi: { dead: 'demotivated', why: '"Be grateful" was the last straw.' },
+            rosa: { dead: 'demotivated', why: '"Be grateful" was the last straw.' },
             cat: { dead: 'demotivated', why: 'Biscuit stared at you, unblinking, knocked your coffee off the desk, and never caught another mouse.' } } },
       ],
       next: 'H6',
@@ -247,7 +249,7 @@
       terms: ['Taylor', 'Empowerment', 'Intrinsic motivation', 'Extrinsic motivation'],
       options: [
         { id: 'tm', label: 'Time-and-motion study: break the job into steps, train the best method, set a standard', term: 'Taylor',
-          fx: { maya: { S: 1, M: 1 }, tuan: { M: -1, msg: 'No standard exists for selling.' }, linh: { M: -2, msg: 'Creative work does not fit a stopwatch.' }, nam: { S: 1, M: 1 }, hoa: { S: 1 },
+          fx: { maya: { S: 1, M: 1 }, tuan: { M: -1, msg: 'No standard exists for selling.' }, aisha: { M: -2, msg: 'Creative work does not fit a stopwatch.' }, kofi: { S: 1, M: 1 }, rosa: { S: 1 },
             cat: { S: 1, M: 1, msg: 'Mousing is repetitive and countable, so Taylor works.' } },
           fun: { maya: "A man with a stopwatch times Maya's sneezes. She is now 4% more efficient at sneezing.",
             cat: 'The study finds the best pounce angle: 47 degrees. Biscuit already knew.' } },
@@ -257,19 +259,19 @@
             if (isTaylorJob(st)) {
               add(st, 'M', 1);
               if (st.flags.Rushing) { add(st, 'S', -1); say(st, 'Rushing even more: mistakes pile up.'); }
-            } else if (id === 'linh') { add(st, 'M', -2); say(st, 'Watched all day. Hates it.'); }
-            else if (id === 'hoa') { add(st, 'M', -1); add(st, 'W', 1); }
+            } else if (id === 'aisha') { add(st, 'M', -2); say(st, 'Watched all day. Hates it.'); }
+            else if (id === 'rosa') { add(st, 'M', -1); add(st, 'W', 1); }
             else add(st, 'M', -1);
           },
-          fun: { linh: "You put a camera on Linh's screen. She codes a bot that waves at it.",
+          fun: { aisha: "You put a camera on Aisha's screen. She codes a bot that waves at it.",
             cat: 'Biscuit loves being watched. Cats expect an audience.' } },
         { id: 'goal', label: 'Set a clear goal and leave them to it', term: 'Empowerment',
-          fx: { maya: { flag: 'OutputGap', msg: 'Happy enough, but output stays low.' }, tuan: { M: 1 }, linh: { M: 2, msg: 'Autonomy!' },
-            nam: { flag: 'OutputGap', msg: 'Happy enough, but output stays low.' }, hoa: { M: 1 },
+          fx: { maya: { flag: 'OutputGap', msg: 'Happy enough, but output stays low.' }, tuan: { M: 1 }, aisha: { M: 2, msg: 'Autonomy!' },
+            kofi: { flag: 'OutputGap', msg: 'Happy enough, but output stays low.' }, rosa: { M: 1 },
             cat: { flag: 'OutputGap', msg: 'Happy enough, but output stays low.' } },
           fun: { cat: 'Left to it, Biscuit finds a box and sleeps in it until Thursday.' } },
         { id: 'raise', label: 'Raise pay across the board', term: 'Extrinsic motivation',
-          fx: { maya: { M: 1, flag: 'PayFade' }, tuan: {}, linh: {}, nam: { M: 1, flag: 'PayFade' }, hoa: {}, cat: { M: 1, flag: 'PayFade' } },
+          fx: { maya: { M: 1, flag: 'PayFade' }, tuan: {}, aisha: {}, kofi: { M: 1, flag: 'PayFade' }, rosa: {}, cat: { M: 1, flag: 'PayFade' } },
           fun: { cat: 'More tuna. Biscuit gets fatter, not faster.' } },
       ],
       next: 'H7',
@@ -282,10 +284,11 @@
       terms: ['Job enrichment', 'Job enlargement', 'Job rotation', 'Empowerment', 'Purpose', 'Fringe payment', 'Intrinsic motivation', 'Extrinsic motivation'],
       options: [
         { id: 'enrich', term: 'Job enrichment',
-          label: (st) => 'Hand over a bigger, harder job: ' + ({ maya: 'judge the quality of finished bikes', tuan: 'lead a client pitch', linh: 'lead a feature end to end',
-            nam: 'run a stock audit', hoa: 'own the monthly report', cat: 'Head of Pest Strategy (birds too)' })[st.hire.id],
+          label: (st) => 'Hand over a bigger, harder job: ' + ({ maya: 'judge the quality of finished bikes', tuan: 'lead a client pitch', aisha: 'lead a feature end to end',
+            kofi: 'run a stock audit', rosa: 'own the monthly report', cat: 'Head of Pest Strategy (birds too)' })[st.hire.id],
           fx: (st) => st.S < 2 ? die(st, 'unskilled', 'A bigger job, but not the skills to do it.') : eng(st, 3), next: 'H8',
-          fun: { cat: 'Biscuit catches a pigeon and leaves it in the boardroom as a report.' } },
+          fun: { kofi: 'Kofi ran a team of twenty at the factory. The audit takes him one morning.',
+            cat: 'Biscuit catches a pigeon and leaves it in the boardroom as a report.' } },
         { id: 'enlarge', label: 'Add one more task at the same level of difficulty', term: 'Job enlargement',
           labels: { cat: 'Add one more task at the same level of difficulty: also chase the moths' },
           fx: { W: 1, msg: 'More of the same. The problem stays.' }, loop: true },
@@ -295,14 +298,14 @@
           fun: { cat: 'On reception, Biscuit sits on the keyboard and greets every visitor with a slow blink.' } },
         { id: 'empower', label: 'Let them choose how and with which tools they work', term: 'Empowerment', fx: { tag: 4 }, next: 'H9',
           labels: { cat: 'Let Biscuit choose how and where it works' },
-          fun: { linh: 'Linh picks a standing desk, a rubber duck and dark mode.', cat: 'Biscuit chooses the top of the fridge. It can see everything from there.' } },
+          fun: { aisha: 'Aisha picks a standing desk, a rubber duck and dark mode.', cat: 'Biscuit chooses the top of the fridge. It can see everything from there.' } },
         { id: 'purpose', label: 'Show them who benefits from their work', term: 'Purpose', fx: { tag: 4 }, next: 'H9',
           labels: { cat: 'Show Biscuit who benefits: a wall of cheese, not one bit nibbled' },
           fun: { cat: 'Biscuit stares at the cheese for an hour. It is a meaningful stare.' } },
         { id: 'fringe', label: 'Add free lunches and a gym pass', term: 'Fringe payment',
           labels: { cat: 'Add a heated bed and a scratching post' },
           fx: (st) => { eng(st, 1); say(st, 'The plateau remains.'); }, loop: true,
-          fun: { nam: 'Nam lifts boxes for eight hours a night. He uses the gym for the showers.',
+          fun: { kofi: 'Kofi lifts boxes for eight hours a night. He uses the gym for the showers.',
             cat: 'Biscuit sleeps in the heated bed and ignores the scratching post. Scratches the sofa.' } },
       ],
       nameIt: {
@@ -338,23 +341,23 @@
       title: 'The life event',
       scene: (st) => ({
         maya: 'Her rent goes up 20%.',
-        nam: 'His partner is expecting, and he needs predictable hours.',
-        hoa: 'Her closest colleague is leaving and she feels alone.',
+        kofi: 'His mother moves in and needs care in the evenings, so he needs predictable hours.',
+        rosa: 'Her closest colleague of 20 years retires, and she feels alone.',
         tuan: 'He wins the regional sales award and wants status.',
-        linh: 'She says the work has become too easy.',
+        aisha: 'She says the work has become too easy.',
         cat: 'A kitten has been hired. It is getting all the likes on the company Instagram.',
       })[st.hire.id],
       sceneFun: {
         maya: 'Her landlord has bought a jet ski.',
-        nam: 'He has already bought a tiny hi-vis vest.',
-        hoa: 'Her desk plant, Fernando, also looks sad.',
+        kofi: 'He has made a colour-coded care rota. The teenagers have ignored it.',
+        rosa: 'Her desk plant, Fernando, also looks sad.',
         tuan: 'He has the trophy engraved. Again. Bigger.',
-        linh: 'She finished the week\'s work on Tuesday and spent Wednesday rewriting it in a language nobody uses.',
+        aisha: 'She finished the week\'s work on Tuesday and spent Wednesday rewriting it in a language nobody uses.',
         cat: 'Biscuit has not blinked in four hours.',
       },
       enter(st) {
         // The cat's status is threatened, so esteem comes to the top
-        st.need = { maya: 1, nam: 1, hoa: 2, tuan: 3, linh: 4, cat: 3 }[st.hire.id];
+        st.need = { maya: 1, kofi: 1, rosa: 2, tuan: 3, aisha: 4, cat: 3 }[st.hire.id];
         if (st.M <= 1) st.need = Math.max(1, st.need - 1);
       },
       terms: ['Maslow', 'Fringe payment', 'Teamwork', 'Empowerment'],
@@ -421,27 +424,30 @@
     H12: {
       title: 'New skills needed',
       scene: (st) => 'You are launching something new, and the launch has a date. ' + ({
-        maya: 'Maya gets a new assembly machine.', tuan: 'Tuan gets a new product range.', linh: 'Linh gets a new platform to build on.',
-        nam: 'Nam gets a new scanning system.', hoa: 'Hoa gets new booking software.',
+        maya: 'Maya gets a new assembly machine.', tuan: 'Tuan gets a new product range.', aisha: 'Aisha gets a new platform to build on.',
+        kofi: 'Kofi gets a new scanning system.', rosa: 'Rosa gets new booking software.',
         cat: 'The warehouse buys a robot vacuum, and Biscuit must learn to work alongside it.' })[st.hire.id],
       terms: ['In-house course', 'Coaching', 'Mentoring', 'Job rotation', 'Apprenticeship', 'Vestibule training', 'Simulator', 'Lecture or conference'],
       options: [
-        { id: 'inhouse', label: 'In-house course run by your own staff', term: 'In-house course', fx: { S: 1 } },
+        { id: 'inhouse', label: 'In-house course run by your own staff', term: 'In-house course', fx: { S: 1 },
+          fun: { rosa: 'Rosa has learned five booking systems since 1993. She finds three bugs on day one.' } },
+        { id: 'skip', only: ['rosa'], label: 'Skip her training: she retires soon anyway', term: 'Age discrimination',
+          fx: { M: -1, W: 1, msg: 'Treating her worse because of her age is age discrimination, and it is illegal. Rosa calls HR.' } },
         { id: 'coach', label: 'Coaching from a supervisor', term: 'Coaching',
-          fx: { maya: { S: 1, M: 1 }, tuan: { S: 1 }, linh: { S: 1 }, nam: { S: 1, M: 1 }, hoa: { S: 1 }, cat: { S: 1, M: 1 } } },
+          fx: { maya: { S: 1, M: 1 }, tuan: { S: 1 }, aisha: { S: 1 }, kofi: { S: 1, M: 1 }, rosa: { S: 1 }, cat: { S: 1, M: 1 } } },
         { id: 'mentor', label: 'Mentoring by an experienced colleague', term: 'Mentoring',
-          fx: { maya: { S: 1 }, tuan: { S: 1, M: 1 }, linh: { S: 1, M: 1 }, nam: { S: 1 }, hoa: { S: 1, M: 1 }, cat: { S: 1 } } },
+          fx: { maya: { S: 1 }, tuan: { S: 1, M: 1 }, aisha: { S: 1, M: 1 }, kofi: { S: 1 }, rosa: { S: 1, M: 1 }, cat: { S: 1 } } },
         { id: 'rotate', label: 'Shadow the team already using it', term: 'Job rotation', fx: { S: 1, M: 1 },
           fun: { cat: 'Biscuit shadows the cleaners and the robot. By Friday Biscuit is riding it.' } },
         { id: 'appr', label: 'Apprenticeship under an expert', term: 'Apprenticeship', fx: { S: 2, M: -1, msg: 'The launch waits.' } },
         { id: 'vest', label: 'A practice area copying the workplace', term: 'Vestibule training',
-          fx: { maya: { S: 2 }, tuan: { S: 1 }, linh: { msg: 'Nothing useful to copy.' }, nam: { S: 2 }, hoa: { msg: 'Nothing useful to copy.' }, cat: { S: 2 } },
+          fx: { maya: { S: 2 }, tuan: { S: 1 }, aisha: { msg: 'Nothing useful to copy.' }, kofi: { S: 2 }, rosa: { msg: 'Nothing useful to copy.' }, cat: { S: 2 } },
           fun: { cat: 'A practice room with a second robot vacuum. Biscuit learns where it turns.' } },
         { id: 'sim', label: 'Simulator copying the real equipment', term: 'Simulator',
-          fx: { maya: { msg: 'No simulator exists for this.' }, tuan: { S: 1 }, linh: { S: 2 }, nam: { S: 2 }, hoa: { msg: 'No simulator exists for this.' }, cat: { S: 1 } },
+          fx: { maya: { msg: 'No simulator exists for this.' }, tuan: { S: 1 }, aisha: { S: 2 }, kofi: { S: 2 }, rosa: { msg: 'No simulator exists for this.' }, cat: { S: 1 } },
           fun: { cat: 'A robot vacuum video game. Biscuit mostly paws at the screen.' } },
         { id: 'lecture', label: 'Conference or lecture course away from work', term: 'Lecture or conference',
-          fx: { maya: { S: 1, M: -1, msg: 'Output falls.' }, tuan: { S: 1, M: 1 }, linh: { S: 1, M: 1 }, nam: { S: 1, M: -1, msg: 'Output falls.' }, hoa: { S: 1, M: 1 },
+          fx: { maya: { S: 1, M: -1, msg: 'Output falls.' }, tuan: { S: 1, M: 1 }, aisha: { S: 1, M: 1 }, kofi: { S: 1, M: -1, msg: 'Output falls.' }, rosa: { S: 1, M: 1 },
             cat: { S: 1, M: -1, msg: 'Output falls.' } },
           fun: { cat: 'A lecture on robotics. Biscuit sleeps through it, which is honestly fair.' } },
         { id: 'nothing', label: 'Nothing: they will work it out', term: 'No training',
@@ -456,11 +462,16 @@
       terms: ['Employee share ownership', 'Profit-related pay', 'Fringe payment'],
       options: [
         { id: 'grant', label: 'Grant shares that vest over four years', term: 'Employee share ownership',
-          fx: (st) => { eng(st, 3); market(st); },
+          fx: (st) => {
+            if (st.hire.id === 'rosa') say(st, 'Rosa retires before they vest, so they mean little to her. Ask what she wants instead.');
+            else eng(st, 3);
+            market(st);
+          },
           fun: { cat: 'Biscuit now owns 0.01% of the company and acts like it owns all of it.' } },
         { id: 'discount', label: 'Let them buy shares at a discount', term: 'Employee share ownership',
           fx: (st) => {
-            if (st.hire.id === 'tuan' || st.hire.id === 'linh') eng(st, 3);
+            if (st.hire.id === 'tuan' || st.hire.id === 'aisha') eng(st, 3);
+            else if (st.hire.id === 'rosa') { add(st, 'M', -1); say(st, 'Three years from retirement, she will not risk her savings on shares.'); }
             else { add(st, 'M', -1); add(st, 'W', 1); say(st, 'They cannot afford it.'); }
             market(st);
           },
@@ -487,7 +498,8 @@
         { id: 'health', label: 'Private health cover', term: 'Fringe payment', fx: { tag: 1 },
           fun: { cat: 'Biscuit hears the word "vet" and hides for two days.' } },
         { id: 'learn', label: 'A learning allowance for courses and books', term: 'Fringe payment (growth)', fx: { tag: 4 },
-          fun: { cat: 'Biscuit buys a book and sits on it. Learning by absorption.' } },
+          fun: { rosa: 'Rosa signs up for a course in data dashboards. She is the only one who finishes it.',
+            cat: 'Biscuit buys a book and sits on it. Learning by absorption.' } },
       ],
       next: 'H15',
       debrief: 'Fringe payments are extras given on top of pay. They are extrinsic and mostly hygiene factors (Herzberg), so they stop complaints but rarely motivate on their own. A learning allowance is a fringe payment that serves growth, so it can do more.',
@@ -504,12 +516,12 @@
           fun: { cat: 'A weekend trip. Biscuit spends it inside the box the tickets came in.' } },
         { id: 'promote', label: 'Promote them to a mentoring role with a new title', term: 'Maslow: growth', fx: { tag: 4, flag: 'Promoted' },
           labels: { cat: 'Promote Biscuit to mentor the kitten, with a new title' },
-          fun: { linh: 'Lesson one for the new hire: never deploy on a Friday.', cat: 'Lesson one for the kitten: knock things off tables, but only important things.' } },
+          fun: { aisha: 'Lesson one for the new hire: never deploy on a Friday.', rosa: 'Rosa has trained every new starter for thirty years. Now it comes with a title.', cat: 'Lesson one for the kitten: knock things off tables, but only important things.' } },
         { id: 'speech', label: 'A thank-you speech only', term: 'No reward',
           fx: (st) => { if (st.need >= 3) { add(st, 'M', -1); say(st, 'Words are not enough.'); } },
           fun: { maya: "Someone's phone rings halfway through. It is yours.", tuan: "Someone's phone rings halfway through. It is yours.",
-            linh: "Someone's phone rings halfway through. It is yours.", nam: "Someone's phone rings halfway through. It is yours.",
-            hoa: "Someone's phone rings halfway through. It is yours.", cat: 'Biscuit walks across the laptop halfway through and ends the slideshow.' } },
+            aisha: "Someone's phone rings halfway through. It is yours.", kofi: "Someone's phone rings halfway through. It is yours.",
+            rosa: "Someone's phone rings halfway through. It is yours.", cat: 'Biscuit walks across the laptop halfway through and ends the slideshow.' } },
       ],
       next: 'END',
       debrief: 'Match the reward to the need: profit-related pay and team rewards for belonging, PRP, shares and titles for esteem, and growth roles for self-fulfilment.',
@@ -569,6 +581,9 @@
     { id: 'train-risk', hubs: ['H12', 'H4'], ask: 'A risk to the business of training workers is that...',
       choices: ['They may leave for a rival with their new skills', 'Productivity falls forever', 'Workers become less flexible', 'It removes the need for pay'],
       why: 'Training costs money and time, and a rival may get the benefit if the worker leaves.' },
+    { id: 'age', hubs: ['H12', 'H13', 'H9'], ask: (st) => st.hire.name + ' is ' + String(st.hire.age).split(' ')[0] + '. Which of these is legal and sensible?',
+      choices: ['Ask what they want from rewards and training', 'Skip training them because of their age', 'Pay them less because of their age', 'Only promote people under 40'],
+      why: 'Treating someone worse because of their age is age discrimination, and it is illegal. But age can shape what people want (a pension, flexible hours, passing on skills), so ask rather than assume.' },
     { id: 'shares-why', hubs: ['H13', 'H2'], ask: 'Why might employee share ownership raise motivation?',
       choices: ['Workers gain when the company does well', 'It pays cash every month', 'It removes all risk', 'It is a hygiene factor'],
       why: 'Owning a stake links the worker to the firm\'s success. But shares can lose value and pay nothing today.' },
@@ -589,6 +604,9 @@
       const tq = QUIZ.filter((q) => q.hubs.includes(e.hub));
       if (lastWasName) cands.push(...tq, nq); else cands.push(nq, ...tq);
     }
+    // Older hires, or anyone who just discriminated on age, get the age question once it fits
+    const ageQ = QUIZ.find((q) => q.id === 'age');
+    if ((+st.hire.age >= 40 || recent.some((e) => e.opt === 'skip')) && recent.some((e) => ageQ.hubs.includes(e.hub))) cands.unshift(ageQ);
     const q = cands.concat(QUIZ).find((c) => c && !st.quizIds.includes(c.id));
     return { id: q.id, ask: typeof q.ask === 'function' ? q.ask(st) : q.ask, choices: q.choices.slice(), answer: q.choices[0], why: q.why, n: st.quizIds.length + 1 };
   }
@@ -614,7 +632,7 @@
   };
   const funFor = (o, st) => (typeof o.fun === 'string' ? o.fun : o.fun && o.fun[st.hire.id]) || null;
   const needWords = (st) => (st.hire.needWords || NEED_WORDS)[st.need];
-  const optionsAt = (st) => (HUBS[st.hub].options || []).filter((o) => !st.removed[st.hub + o.id]);
+  const optionsAt = (st) => (HUBS[st.hub].options || []).filter((o) => !st.removed[st.hub + o.id] && (!o.only || o.only.includes(st.hire.id)));
 
   function clone(st) {
     return Object.assign({}, st, { flags: Object.assign({}, st.flags), removed: Object.assign({}, st.removed), log: [], msgs: [], acts: [] });

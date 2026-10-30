@@ -122,6 +122,8 @@
   .hire svg { width: 110px; height: 110px; }
   .hire .nm { font-family: Georgia, serif; font-size: 19px; color: var(--bm); }
   .hire .job { font-size: 13px; color: #33415e; min-height: 38px; }
+  .hire .note { font-size: 12px; color: var(--mid); font-style: italic; margin-top: 2px; }
+  .agenote { font-size: 14px; color: var(--mid); margin: 8px 0 0; }
   .hire .stats { justify-content: center; margin: 6px auto 0; width: max-content; font-size: 13px; text-align: left; }
   .hire .dot { width: 11px; height: 11px; }
   .lead { font-size: 18px; margin: 0; }
@@ -290,13 +292,15 @@ function avatar(h, M, W, cls) {
   }
   const blush = m >= 4 ? '<circle cx="76" cy="104" r="7" fill="#f29b9b" opacity=".55"/><circle cx="124" cy="104" r="7" fill="#f29b9b" opacity=".55"/>' : '';
   const sweat = W >= 1 ? '<path d="M146 66 Q152 78 146 82 Q140 78 146 66Z" fill="#7cc4f0"/>' : '';
+  const beard = L.beard ? '<path d="M62 100 Q64 136 100 136 Q136 136 138 100 Q132 122 116 124 Q100 116 84 124 Q68 122 62 100Z" fill="' + L.hair + '"/>' : '';
+  const glasses = L.glasses ? '<g stroke="#5a3a1a" stroke-width="2.5" fill="none"><circle cx="85" cy="94" r="10"/><circle cx="115" cy="94" r="10"/><path d="M95 94 H105 M75 92 L60 88 M125 92 L140 88"/></g>' : '';
   return '<svg class="av ' + (cls || '') + '" viewBox="0 0 200 200" aria-hidden="true">' +
     '<path d="M36 200 Q36 142 100 140 Q164 142 164 200Z" fill="' + L.shirt + '"/>' +
     '<rect x="88" y="124" width="24" height="22" fill="' + L.skin + '"/>' + back +
     '<circle cx="100" cy="92" r="42" fill="' + L.skin + '"/>' +
     '<path d="' + front + '" fill="' + L.hair + '"/>' + cap + brows +
-    '<circle cx="85" cy="94" r="4.5" fill="#1d1712"/><circle cx="115" cy="94" r="4.5" fill="#1d1712"/>' + blush +
-    '<path d="' + mouth + '" stroke="#5a2a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>' + sweat + '</svg>';
+    '<circle cx="85" cy="94" r="4.5" fill="#1d1712"/><circle cx="115" cy="94" r="4.5" fill="#1d1712"/>' + glasses + blush + beard +
+    '<path d="' + mouth + '" stroke="' + (L.beard ? '#f3d9c6' : '#5a2a1a') + '" stroke-width="3.5" fill="none" stroke-linecap="round"/>' + sweat + '</svg>';
 }
 // No ceiling: one dot per point up to 12, then the number carries on
 const dots = (n) => '<span class="dots">' + (n ? Array.from({ length: Math.min(n, 12) }, () => '<span class="dot"></span>').join('') : '<span class="dot zero"></span>') +
@@ -325,9 +329,11 @@ function pickView() {
     '<div class="namebox"><label for="nm">Your name or team name</label><input id="nm" type="text" maxlength="24" value="' + esc(player.name) + '" placeholder="e.g. Team Herzberg">' +
     '<label class="small"><input type="checkbox" id="priv"' + (player.priv ? ' checked' : '') + '> Keep me off the class leaderboard</label>' +
     '<div class="namemsg" id="nmMsg"></div></div></div><div class="namewarn" id="nmWarn"></div>' +
+    '<p class="agenote">Age discrimination' + qBtn('Age discrimination') + ' is illegal. But age can shape what people want, so ask, don\'t assume.</p>' +
     '<div class="hires">' + Boss.HIRES.map((h) =>
       '<button class="hire' + (h.id === 'cat' ? ' cat' : '') + '" data-h="' + h.id + '">' + avatar(h, 3, 0) +
       '<div class="nm">' + h.name + ', ' + h.age + '</div><div class="job">' + esc(h.job) + '</div>' +
+      (h.note ? '<div class="note">' + esc(h.note) + '</div>' : '') +
       '<div class="stats"><span>Motivation</span>' + dots(h.M) + '<span>Skills</span>' + dots(h.S) + '</div></button>').join('') + '</div>' +
     '<details class="rules"><summary>How it works</summary>' +
     '<p><b>Motivation</b> hits 0: they are demotivated. <b>Skills</b> hit 0: they cannot do the job. <b>Two warnings</b>: they quit. There is no top limit: keep growing them.</p>' +
@@ -361,7 +367,7 @@ function workerPanel() {
   const st = G.st, h = st.hire, hub = Boss.HUBS[st.hub];
   const urgent = hub && hub.urgent;
   return '<aside class="worker"><div class="top">' + avatar(h, st.M, st.W) +
-    '<div><div class="nm">' + h.name + '</div><div class="job">' + esc(h.job) + '</div></div></div>' +
+    '<div><div class="nm">' + h.name + ', ' + esc(String(h.age).split(' ')[0]) + '</div><div class="job">' + esc(h.job) + '</div></div></div>' +
     '<div class="stats"><span>Motivation</span>' + dots(st.M) + '<span>Skills</span>' + dots(st.S) + '<span>Warnings</span>' + warns(st.W) + '</div>' +
     (G.view === 'hub' || G.view === 'router' || G.view === 'sort' ?
       '<div class="tools"><button class="btn" onclick="askThem()"' + (st.asked >= 2 ? ' disabled' : '') + '>' + (st.asked === 1 ? 'Ask them again' : 'Ask them') + '</button>' +
