@@ -42,5 +42,5 @@ Medium or low confidence, please review:
 ## Site
 - Lives at `samsmasm.github.io/whosinwhosout/` (unisam.nz/whosinwhosout). The folder itself is the deployable site, so there is no separate `dist/`.
 - Data is shipped as `data.js` (a plain script) so the page also works opened from disk.
-- Look borrowed from /asia (2026-10-30, Sam's request): archive paper, white panels, indigo accent, Barlow Condensed headings, Atkinson Hyperlegible body, dashed strip at the top, no subtitle. Party colours only on chips, the bar and the seat pickers. Ballot box favicon (favicon.svg). Dark mode follows the system setting.
+- Look borrowed from /asia (2026-10-30, Sam's request): archive paper, white panels, sepia brown accent (not asia's indigo, which was too close to National blue; no NZ party uses brown), Barlow Condensed headings, Atkinson Hyperlegible body, dashed strip at the top, no subtitle. Party colours only on chips, the bar and the seat pickers. Ballot box favicon (favicon.svg). Dark mode follows the system setting.
 - Not yet added to `/find` or any index page.
