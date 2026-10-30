@@ -74,6 +74,7 @@ for (let i = 0; i < 40; i++) {
 assert(decks.size === 40, 'decks repeat');
 
 const tally = {}, scores = {};
+let missTotal = 0;
 for (const [name, pick, skill, runs] of [['random', random, 0.6, 6000], ['greedy', greedy, 1, 48]]) {
   for (let i = 0; i < runs; i++) {
     const h = B.HIRES[i % B.HIRES.length].id, level = i % 12 < 6 ? 'HL' : 'SL';
@@ -81,12 +82,32 @@ for (const [name, pick, skill, runs] of [['random', random, 0.6, 6000], ['greedy
     const r = B.replay(h, st.seed, st.level, st.acts);
     assert(r && B.score(r) === B.score(st) && r.M === st.M, 'replay mismatch ' + h + ' ' + st.acts.join(','));
     if (!st.dead) assert(st.quizIds.length === 5 && new Set(st.quizIds).size === 5, 'quiz count ' + st.quizIds);
+    if (!st.dead) assert(st.quizIds.some((id) => id.startsWith('herz')), 'no Herzberg question ' + st.quizIds);
+    const misses = st.log.filter((e) => e.title === 'Why did it not land?').length;
+    assert(misses === st.early || (st.dead && misses === st.early - 1), 'miss questions ' + misses + ' for ' + st.early + ' early');
+    missTotal += misses;
     const k = name + ' ' + level + ' ' + h + ' ' + (st.dead ? 'dead:' + st.dead.kind : st.ending.id);
     tally[k] = (tally[k] || 0) + 1;
     (scores[name + ' ' + h] = scores[name + ' ' + h] || []).push(B.score(st) + ' M' + st.M + ' S' + st.S);
   }
 }
 console.log(tally);
+console.log('why-did-it-not-land questions:', missTotal);
+assert(missTotal > 0, 'no miss questions asked');
+
+// A version 2 game (no miss questions) still replays under v2 rules
+{
+  const st = B.newState('maya', 7, 'HL', 2);
+  let n = 0;
+  while ((!B.over(st) || st.pendingQ) && n++ < 80) {
+    if (st.pendingQ) { assert(!st.pendingQ.miss, 'miss question in v2'); B.answerQuiz(st, st.pendingQ.answer); continue; }
+    if (B.HUBS[st.hub].sort && !st.sorted) { B.sortCheck(st, new Set(HYGIENE)); continue; }
+    const o = random(st, B.optionsAt(st));
+    B.choose(st, o.id, reasonFor(st, o, true));
+  }
+  const r = B.replay('maya', 7, 'HL', st.acts, 2);
+  assert(r && B.score(r) === B.score(st), 'v2 replay');
+}
 for (const h of B.HIRES) console.log('greedy', h.id, scores['greedy ' + h.id].slice(0, 4).join(' | '));
 
 // Tampered or unfinished games are rejected

@@ -61,7 +61,7 @@
   };
 
   // ---------- state helpers ----------
-  // Motivation and skills have no ceiling; warnings count up to the second one.
+  // Motivation and skills have no ceiling; grievances (W) count up to the second one.
   function add(st, k, v) { st[k] = Math.max(0, st[k] + v); }
   function die(st, kind, why) { if (!st.dead) st.dead = { kind, why }; }
   function say(st, m) { st.msgs.push(m); }
@@ -77,6 +77,7 @@
       say(st, 'Already sorted for them, so no effect.');
     } else {
       st.early++;
+      st.missed = { tag, need: st.need };
       add(st, 'M', -1); say(st, 'Not ready for this.');
     }
   }
@@ -100,7 +101,7 @@
 
   function check(st) {
     if (st.dead) return;
-    if (st.W >= 2) die(st, 'quit', 'A second warning. They walked out.');
+    if (st.W >= 2) die(st, 'quit', 'A second grievance. They walked out.');
     else if (st.M <= 0) die(st, 'demotivated', 'Motivation hit zero.');
     else if (st.S <= 0) die(st, 'unskilled', 'Skills hit zero. They could not do the job.');
   }
@@ -1090,6 +1091,9 @@
     { id: 'herz-fix', hubs: ['H5', 'H14'], ask: 'According to Herzberg, what happens when you fix the hygiene factors?',
       choices: ['Dissatisfaction falls, but motivation does not rise much', 'Motivation rises a lot', 'Workers become self-actualised', 'Nothing changes at all'],
       why: 'Fixing hygiene factors removes complaints. To motivate, you need motivators.' },
+    { id: 'herz-two', hubs: ['H5', 'H8', 'H11', 'H14'], ask: "Herzberg's two-factor theory says a pay rise will most likely...",
+      choices: ['Stop complaints about pay, but not motivate for long', 'Motivate the worker for years', 'Have no effect at all', 'Meet their need for self-actualisation'],
+      why: 'Pay is a hygiene factor. Fixing it removes dissatisfaction. Lasting motivation comes from motivators: recognition, responsibility, achievement, the work itself, growth.' },
     { id: 'taylor-fit', hubs: ['H2', 'H6'], ask: "Taylor's scientific management fits best with which job?",
       choices: ['Repetitive work with countable output', 'Creative app design', 'Leading a team', 'Writing adverts'],
       why: 'Breaking work into steps and paying per unit only works when the work is repetitive and easy to count.' },
@@ -1147,11 +1151,11 @@
   );
   // The hire-only scenarios share the SL questions that fit them
   const EXTRA_TAGS = { 'taylor-fit': ['MQ'], 'maslow-first': ['MS', 'AC'], 'herz-hygiene': ['TQ', 'KF', 'RP', 'MS'], 'herz-motivator': ['TP', 'RK', 'CR', 'MQ'],
-    'intrinsic': ['AS'], 'maslow-social': ['KN'], 'age': ['RP'] };
+    'intrinsic': ['AS'], 'maslow-social': ['KN'], 'age': ['RP'], 'herz-two': ['TQ', 'KF'] };
   for (const [id, hubs] of Object.entries(EXTRA_TAGS)) QUIZ.find((q) => q.id === id).hubs.push(...hubs);
 
   function makeQuiz(st) {
-    const recent = st.log.slice(-3).reverse();
+    const recent = st.log.filter((e) => !e.quiz).slice(-3).reverse();
     const lastWasName = st.quizIds.length && st.quizIds[st.quizIds.length - 1].startsWith('name-');
     const cands = [];
     for (const e of recent) {
@@ -1164,8 +1168,24 @@
     // Older hires, or anyone who just discriminated on age, get the age question once it fits
     const ageQ = QUIZ.find((q) => q.id === 'age');
     if ((+st.hire.age >= 40 || recent.some((e) => e.opt === 'skip')) && recent.some((e) => ageQ.hubs.includes(e.hub))) cands.unshift(ageQ);
-    const q = cands.concat(QUIZ.filter((c) => st.level === 'HL' || !c.hl)).find((c) => c && !st.quizIds.includes(c.id));
+    // Every game gets a Herzberg question: from the third quiz on, one jumps the queue if none has come up
+    if (st.quizIds.length >= 2 && !st.quizIds.some((id) => id.startsWith('herz'))) {
+      const herz = QUIZ.filter((c) => c.id.startsWith('herz'));
+      cands.unshift(...herz.filter((c) => recent.some((e) => c.hubs.includes(e.hub))), ...herz);
+    }
+    const q =cands.concat(QUIZ.filter((c) => st.level === 'HL' || !c.hl)).find((c) => c && !st.quizIds.includes(c.id));
     return { id: q.id, ask: typeof q.ask === 'function' ? q.ask(st) : q.ask, choices: q.choices.slice(), answer: q.choices[0], why: q.why, n: st.quizIds.length + 1 };
+  }
+
+  // After a reward they were not ready for: why did it not land? (Maslow). Not one of the five pop quizzes.
+  const LEVELS = { 1: 'safety (pay they can live on, a secure job)', 2: 'social needs (belonging to a team)', 3: 'esteem (recognition, respect)', 4: 'self-actualisation (growth, a challenge)' };
+  function missQuiz(st, e) {
+    const m = st.missed;
+    return { id: 'miss', miss: true, ask: st.hire.name + ' was not ready for "' + e.choice + '". Why did it not motivate them?',
+      choices: ['Maslow: a lower need is still unmet, so a higher reward cannot motivate yet', 'Maslow: they have already moved past this need',
+        'Taylor: only money motivates, and this was not money', 'Herzberg: it was a hygiene factor, so it only stops complaints'],
+      answer: 'Maslow: a lower need is still unmet, so a higher reward cannot motivate yet',
+      why: 'The lowest unmet need is the one that motivates. This reward fed ' + LEVELS[m.tag] + ', but ' + st.hire.name + ' still needed ' + LEVELS[m.need] + '. Meet that first, then move up.' };
   }
 
   function market(st) {
@@ -1193,14 +1213,16 @@
     return ['H1', 'H2'].concat(shuffle(mid, r), ['H15']);
   }
 
-  function newState(hireId, seed, level) {
+  // Rules version: 3 added the "why did it not land?" question. Version 2 games replay without it.
+  const VERSION = 3;
+  function newState(hireId, seed, level, v) {
     const hire = HIRES.find((h) => h.id === hireId);
     if (!hire) throw new Error('no hire');
     seed = Number.isInteger(seed) ? seed : Math.floor(Math.random() * 1e9);
     level = level === 'SL' ? 'SL' : 'HL';
-    return { hire, seed, level, deck: makeDeck(hire, seed, level === 'HL'), step: 0, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
+    return { hire, seed, level, v: v === 2 ? 2 : VERSION, deck: makeDeck(hire, seed, level === 'HL'), step: 0, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
       asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false,
-      quizIds: [], quizRight: 0, matched: 0, early: 0, best: 0, whyRight: 0, whyWrong: 0 };
+      quizIds: [], quizRight: 0, matched: 0, early: 0, missRight: 0, best: 0, whyRight: 0, whyWrong: 0 };
   }
 
   const label = (o, st) => (o.labels && o.labels[st.hire.id]) || (typeof o.label === 'function' ? o.label(st) : o.label);
@@ -1257,6 +1279,7 @@
     const vals = opts.map((o) => ({ o, v: tryOpt(st, o) }));
     const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
     st.msgs = [];
+    st.missed = null;
     fx(st, opt.fx);
     check(st);
     st.decisions++;
@@ -1282,15 +1305,20 @@
     }
     pointsFor(st, entry, was);
     if (st.dead) return null;
-    // A quiz falls due on reaching steps 3, 6, 9 and 12, and at the end, so a full game always has five
+    if (st.missed && st.v >= 3) st.pendingQ = missQuiz(st, entry);
+    else quizDue(st);
+    return st.pendingQ;
+  }
+  // A quiz falls due on reaching steps 3, 6, 9 and 12, and at the end, so a full game always has five
+  function quizDue(st) {
     if ([3, 6, 9, 12, st.deck.length + 1].filter((n) => st.reached >= n).length > st.quizIds.length) {
       st.pendingQ = makeQuiz(st);
       st.quizIds.push(st.pendingQ.id);
     }
-    return st.pendingQ;
   }
 
   // Pop quiz answer: right is M+1, wrong is M-1. Returns true if right.
+  // The "why did it not land?" question only scores points, and a pop quiz due at the same step follows it.
   function answerQuiz(st, pick) {
     const q = st.pendingQ;
     guard(q);
@@ -1298,14 +1326,18 @@
     const right = pick === q.answer;
     st.acts.push(right ? 'n1' : 'n0');
     const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
-    if (right) st.quizRight++;
-    add(st, 'M', right ? 1 : -1);
-    check(st);
-    const entry = { hub: st.hub, title: 'Pop quiz ' + q.n, choice: q.ask, term: q.answer, quiz: { ok: right, answer: q.answer },
+    if (q.miss) { if (right) st.missRight++; }
+    else {
+      if (right) st.quizRight++;
+      add(st, 'M', right ? 1 : -1);
+      check(st);
+    }
+    const entry = { hub: st.hub, title: q.miss ? 'Why did it not land?' : 'Pop quiz ' + q.n, choice: q.ask, term: q.answer, quiz: { ok: right, answer: q.answer },
       msgs: [], before, after: { M: st.M, S: st.S, W: st.W }, better: right ? null : q.answer, betterTerm: null, debrief: q.why };
     st.log.push(entry);
     if (st.hub === 'END') st.ending = st.dead ? null : ending(st);
     pointsFor(st, entry, was);
+    if (q.miss) quizDue(st);
     return right;
   }
 
@@ -1321,7 +1353,7 @@
     return ok;
   }
 
-  // Ask them: the second use at one hub gives a warning, and there is no third
+  // Ask them: the second use at one hub raises a grievance, and there is no third
   function askThem(st) {
     guard(!over(st) && !st.pendingQ && st.asked < 2);
     st.acts.push('a');
@@ -1338,10 +1370,10 @@
   }
 
   // Rebuild a game from its recorded actions. Returns null if the actions are not a finished, legal game.
-  function replay(hireId, seed, level, acts) {
+  function replay(hireId, seed, level, acts, v) {
     try {
       guard(Number.isInteger(seed));
-      const st = newState(hireId, seed, level);
+      const st = newState(hireId, seed, level, v);
       for (const a of acts) {
         if (a === 'a') askThem(st);
         else if (a === 'h') guard(askHR(st));
@@ -1359,6 +1391,7 @@
   const POINTS = [
     { key: 'matched', each: 30, label: 'Reward matched their need right now' },
     { key: 'early', each: -10, label: 'Reward they were not ready for' },
+    { key: 'missRight', each: 10, label: 'Explained why a reward did not land' },
     { key: 'best', each: 10, label: 'Best call (no option would have done better)' },
     { key: 'whyRight', each: 20, label: 'Right reason (theory) for your choice' },
     { key: 'whyWrong', each: 5, label: 'Reason that did not fit (+5 for trying)' },
@@ -1367,7 +1400,7 @@
   ];
   const ENDING_BONUS = { mentor: 150, loyal: 100, fragile: 50 };
   function tally(st) {
-    const t = { matched: st.matched, early: st.early, best: st.best, whyRight: st.whyRight, whyWrong: st.whyWrong, quizRight: st.quizRight, steps: Math.min(st.deck.length, st.reached) };
+    const t = { matched: st.matched, early: st.early, missRight: st.missRight, best: st.best, whyRight: st.whyRight, whyWrong: st.whyWrong, quizRight: st.quizRight, steps: Math.min(st.deck.length, st.reached) };
     t.ending = st.ending ? ENDING_BONUS[st.ending.id] : 0;
     return t;
   }
