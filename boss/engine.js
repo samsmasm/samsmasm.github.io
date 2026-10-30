@@ -2,19 +2,19 @@
 // Spec: Obsidian vault, AIdeas/Pick a Path The Boss Game.md
 (function (root) {
   const HIRES = [
-    { id: 'maya', name: 'Maya', age: 24, job: 'Assembly line worker at a bike factory', M: 2, S: 2, need: 1,
+    { id: 'maya', name: 'Maya', age: 24, job: 'Assembly line worker at a bike factory', M: 2, S: 2, need: 1, mc: 'ach', values: 'cash for every perfect bike',
       look: { skin: '#e9b98f', hair: '#3a2418', style: 'pony', shirt: '#2f6fb0' } },
-    { id: 'tuan', name: 'Tuan', age: 26, job: 'Sales rep for a gadget distributor', M: 3, S: 2, need: 2,
+    { id: 'tuan', name: 'Tuan', age: 26, job: 'Sales rep for a gadget distributor', M: 3, S: 2, need: 2, mc: 'pow', values: 'a bigger commission and a top-seller trip',
       look: { skin: '#d9a273', hair: '#1c1410', style: 'short', shirt: '#c0392b' } },
-    { id: 'aisha', name: 'Aisha', age: 27, job: 'App developer at a 12-person startup', M: 2, S: 3, need: 3,
+    { id: 'aisha', name: 'Aisha', age: 27, job: 'App developer at a 12-person startup', M: 2, S: 3, need: 3, mc: 'ach', values: 'a week to build her own idea',
       look: { skin: '#a8754e', hair: '#17110c', style: 'bob', shirt: '#6a3fa0' } },
-    { id: 'kofi', name: 'Kofi', age: 44, job: 'Warehouse picker on the night shift', M: 2, S: 1, need: 1,
+    { id: 'kofi', name: 'Kofi', age: 44, job: 'Warehouse picker on the night shift', M: 2, S: 1, need: 1, mc: 'aff', values: 'guaranteed day shifts',
       note: 'New to warehouses after his factory closed. Two teenagers at home.',
       look: { skin: '#7a4a2c', hair: '#17110c', style: 'cap', shirt: '#e08a1e', beard: true } },
-    { id: 'rosa', name: 'Rosa', age: 63, job: 'Office administrator at a logistics firm', M: 2, S: 3, need: 2,
+    { id: 'rosa', name: 'Rosa', age: 63, job: 'Office administrator at a logistics firm', M: 2, S: 3, need: 2, mc: 'aff', values: 'Friday afternoons off',
       note: 'Thirty years in offices. Plans to retire at 66.',
       look: { skin: '#eebd96', hair: '#c9c4bd', style: 'bun', shirt: '#1f8a6a', glasses: true } },
-    { id: 'cat', name: 'Biscuit', age: '4 (32 in cat years)', job: 'Rodent control officer at a cheese warehouse', M: 3, S: 3, need: 1,
+    { id: 'cat', name: 'Biscuit', age: '4 (32 in cat years)', job: 'Rodent control officer at a cheese warehouse', M: 3, S: 3, need: 1, mc: 'pow', values: 'a tin of salmon',
       look: { fur: '#e8963a', stripe: '#c46f1c', collar: '#2f6fb0', style: 'cat' },
       needWords: {
         1: 'Mrrrow. (The bowl is empty. The bowl is always empty.)',
@@ -29,6 +29,17 @@
     2: "I'd like to feel part of the team.",
     3: 'I want people to notice my work.',
     4: 'I want to grow. Give me something that matters.',
+  };
+
+  // Theories a player can give as the reason for a choice. hl: HL only in the IB guide.
+  const THEORIES = {
+    taylor: { name: 'Taylor', sum: 'Taylor: workers are motivated by money; managers set the one best method, supervise closely and pay by output.' },
+    maslow: { name: 'Maslow', sum: 'Maslow: needs come in levels (physiological, safety, social, esteem, self-actualisation); the lowest unmet need motivates.' },
+    herzberg: { name: 'Herzberg', sum: 'Herzberg: hygiene factors (pay, conditions, security, relationships) only stop dissatisfaction; motivators (achievement, recognition, responsibility, the work itself, growth) motivate.' },
+    mcclelland: { name: 'McClelland', hl: true, sum: 'McClelland: each person is driven mainly by achievement, affiliation or power, and is motivated by work that feeds that need.' },
+    sdt: { name: 'Deci and Ryan', hl: true, sum: 'Deci and Ryan (self-determination theory): people are motivated from inside when they feel autonomy, competence and relatedness.' },
+    equity: { name: 'Equity theory', hl: true, sum: 'Equity theory (Adams): people compare what they put in and get out with others; unfairness demotivates until it is put right.' },
+    expectancy: { name: 'Expectancy theory', hl: true, sum: 'Expectancy theory (Vroom): people try hard only if effort can reach the target (expectancy), the target brings the reward (instrumentality) and they value the reward (valence).' },
   };
 
   const DEATHS = {
@@ -106,14 +117,14 @@
       sceneFor: { cat: 'Monday, 8:30. Your new hire arrives through the cat flap and looks around. Then sits down and washes a leg.' },
       terms: ['Induction', 'On-the-job training', 'Mentoring'],
       options: [
-        { id: 'induct', label: 'Run a full induction day: tour, safety, systems, meet the team', term: 'Induction', fx: { M: 1, S: 1 }, next: 'H2',
+        { id: 'induct', label: 'Run a full induction day: tour, safety, systems, meet the team', term: 'Induction', fx: { M: 1, S: 1 },
           labels: { cat: 'Run a full induction day: tour of every sunbeam, safety talk (the shredder is not a bed), meet the team' },
           fun: { kofi: 'Highlight of the tour: the forklift. Kofi names it Kevin.', rosa: "By 10am Rosa knows everyone's name, birthday and coffee order.",
             cat: 'Biscuit sniffs every member of staff and approves of three of them.' } },
-        { id: 'buddy', label: 'Pair them with a buddy for the day', term: 'On-the-job training', fx: { S: 1 }, next: 'H2',
+        { id: 'buddy', label: 'Pair them with a buddy for the day', term: 'On-the-job training', fx: { S: 1 },
           labels: { cat: 'Pair Biscuit with Gerald, the warehouse dog, for the day' },
           fun: { cat: 'Gerald shows Biscuit where the mice live. Gerald has never caught one.' } },
-        { id: 'keycard', label: 'Hand over a keycard and say "you\'ll pick it up"', term: 'No induction', fx: { S: -1, M: -1, msg: 'Lost on day one.' }, next: 'H2',
+        { id: 'keycard', label: 'Hand over a keycard and say "you\'ll pick it up"', term: 'No induction', fx: { S: -1, M: -1, msg: 'Lost on day one.' },
           fun: { maya: 'Maya spends the morning in the supply cupboard. It is a nice cupboard.', aisha: 'Nobody tells Aisha the wifi password, so she hacks the printer instead.',
             cat: 'Biscuit cannot use a keycard. Biscuit spends the day yelling at the door.' } },
       ],
@@ -155,20 +166,7 @@
         map: { salary: 'Salary', time: 'Time rate wage', piece: 'Piece rate wage', comm: 'Commission', salcomm: 'Salary plus commission', shares: 'Employee share ownership' },
         pool: ['Salary', 'Time rate wage', 'Piece rate wage', 'Commission', 'Salary plus commission', 'Employee share ownership'],
       },
-      next: 'H3',
       debrief: 'Salary suits work that is hard to measure. Time rate suits work needed during set hours. Piece rate suits repetitive, countable output (Taylor) but risks rushed quality. Commission suits sales but leaves income unstable. Employee share ownership gives a stake in future success but no cash today.',
-    },
-    H3: {
-      title: 'Month-one check',
-      scene: 'End of month one. Here is the scorecard.',
-      router: true,
-      terms: ['Maslow', 'Herzberg hygiene factors', 'Herzberg motivators'],
-      route(st) {
-        if (st.hire.id === 'tuan' && st.flags.CommissionOnly) { die(st, 'quit', 'A slow month on commission only, and the rent is due.'); return null; }
-        if (st.S <= 1) return 'H4';
-        if (st.M <= 1) return 'H5';
-        return 'H6';
-      },
     },
     H4: {
       title: 'Skills gap',
@@ -202,7 +200,6 @@
         { id: 'nothing', label: 'Nothing: they will work it out', term: 'No training',
           fx: (st) => st.S <= 1 ? die(st, 'unskilled', 'Left to work it out, they could not.') : add(st, 'W', 1) },
       ],
-      next: 'H3',
       debrief: 'On-the-job types are induction, coaching, mentoring, job rotation, apprenticeship and in-house courses. Off-the-job types are lectures and conferences, vestibule training and simulators. On-the-job training links closely to the real work. Off-the-job training reduces distraction but can be less relevant and takes the worker away from production.',
     },
     H5: {
@@ -241,7 +238,6 @@
             rosa: { dead: 'demotivated', why: '"Be grateful" was the last straw.' },
             cat: { dead: 'demotivated', why: 'Biscuit stared at you, unblinking, knocked your coffee off the desk, and never caught another mouse.' } } },
       ],
-      next: 'H6',
       debrief: "Herzberg's two-factor theory says hygiene factors (pay, conditions, security, relationships) cause dissatisfaction when missing, but fixing them does not create motivation. Motivators (the work itself, responsibility, growth, achievement, recognition) do.",
     },
     H6: {
@@ -276,7 +272,6 @@
           fx: { maya: { M: 1, flag: 'PayFade' }, tuan: {}, aisha: {}, kofi: { M: 1, flag: 'PayFade' }, rosa: {}, cat: { M: 1, flag: 'PayFade' } },
           fun: { cat: 'More tuna. Biscuit gets fatter, not faster.' } },
       ],
-      next: 'H7',
       debrief: 'Taylor claimed that breaking work into steps, training the best method, monitoring and paying incentives raise output. That fits assembly, picking and mousing. It fails for creative work, where close control and per-unit pay damage motivation.',
     },
     H7: {
@@ -288,7 +283,7 @@
         { id: 'enrich', term: 'Job enrichment',
           label: (st) => 'Hand over a bigger, harder job: ' + ({ maya: 'judge the quality of finished bikes', tuan: 'lead a client pitch', aisha: 'lead a feature end to end',
             kofi: 'run a stock audit', rosa: 'own the monthly report', cat: 'Head of Pest Strategy (birds too)' })[st.hire.id],
-          fx: (st) => st.S < 2 ? die(st, 'unskilled', 'A bigger job, but not the skills to do it.') : eng(st, 3), next: 'H8',
+          fx: (st) => st.S < 2 ? die(st, 'unskilled', 'A bigger job, but not the skills to do it.') : eng(st, 3),
           fun: { kofi: 'Kofi ran a team of twenty at the factory. The audit takes him one morning.',
             cat: 'Biscuit catches a pigeon and leaves it in the boardroom as a report.' } },
         { id: 'enlarge', label: 'Add one more task at the same level of difficulty', term: 'Job enlargement',
@@ -296,12 +291,12 @@
           fx: { W: 1, msg: 'More of the same. The problem stays.' }, loop: true },
         { id: 'rotate', label: 'Move them through different jobs, a month each quarter', term: 'Job rotation',
           labels: { cat: 'Move Biscuit through different jobs: a month on reception, a month in the loading bay' },
-          fx: { S: 1, tag: 2 }, next: 'H8',
+          fx: { S: 1, tag: 2 },
           fun: { cat: 'On reception, Biscuit sits on the keyboard and greets every visitor with a slow blink.' } },
-        { id: 'empower', label: 'Let them choose how and with which tools they work', term: 'Empowerment', fx: { tag: 4 }, next: 'H9',
+        { id: 'empower', label: 'Let them choose how and with which tools they work', term: 'Empowerment', fx: { tag: 4 },
           labels: { cat: 'Let Biscuit choose how and where it works' },
           fun: { aisha: 'Aisha picks a standing desk, a rubber duck and dark mode.', cat: 'Biscuit chooses the top of the fridge. It can see everything from there.' } },
-        { id: 'purpose', label: 'Show them who benefits from their work', term: 'Purpose', fx: { tag: 4 }, next: 'H9',
+        { id: 'purpose', label: 'Show them who benefits from their work', term: 'Purpose', fx: { tag: 4 },
           labels: { cat: 'Show Biscuit who benefits: a wall of cheese, not one bit nibbled' },
           fun: { cat: 'Biscuit stares at the cheese for an hour. It is a meaningful stare.' } },
         { id: 'fringe', label: 'Add free lunches and a gym pass', term: 'Fringe payment',
@@ -336,7 +331,6 @@
         { id: 'nomatch', label: 'Say "we can\'t match them"', term: 'Maslow: security',
           fx: (st) => st.need === 1 ? die(st, 'quit', st.hire.id === 'cat' ? 'Biscuit moved next door. You see it in their window every morning. Smug.' : 'They took the better-paid job.') : add(st, 'W', 1) },
       ],
-      next: 'H9',
       debrief: 'Pay matches only meet hygiene needs. A worker whose basic needs are met is more likely to be kept by esteem and growth rewards.',
     },
     H9: {
@@ -374,7 +368,6 @@
           fun: { cat: 'Biscuit chooses a project: the top shelf.' } },
         { id: 'life', label: '"That\'s life, keep working"', term: 'Ignoring needs', fx: { M: -1, W: 1 } },
       ],
-      next: 'H10',
       debrief: "Maslow's hierarchy says people move through security, belonging, esteem and self-fulfilment needs, and that a lower need that is threatened returns to the top. The right reward depends on where the worker is now, not where they were last month.",
     },
     H10: {
@@ -392,7 +385,6 @@
           fun: { cat: 'Biscuit was already sitting on that desk.' } },
         { id: 'ignore', label: 'Ignore it and hope it settles', term: 'Ignoring relationships', fx: { W: 1 } },
       ],
-      next: 'H11',
       debrief: 'Teamwork meets belonging needs and is a Herzberg relationship factor. Isolating a worker who needs people is a fast route to losing them.',
     },
     H11: {
@@ -420,7 +412,6 @@
         map: { indiv: 'Performance-related pay', team: 'Performance-related pay', profit: 'Profit-related pay' },
         pool: ['Performance-related pay', 'Profit-related pay', 'Commission'],
       },
-      next: 'H12',
       debrief: 'Performance-related pay rewards a target the worker or team controls, so it can raise effort but also encourage gaming. Profit-related pay shares company profit whatever each person did, so it builds loyalty and shared purpose but does not reward individual effort.',
     },
     H12: {
@@ -455,7 +446,6 @@
         { id: 'nothing', label: 'Nothing: they will work it out', term: 'No training',
           fx: (st) => st.S <= 2 ? die(st, 'unskilled', st.hire.id === 'cat' ? 'Biscuit attacked the robot vacuum. The robot vacuum won.' : 'Launch day came and they could not run the new system.') : add(st, 'M', -1) },
       ],
-      next: 'H13',
       debrief: 'Training helps the business (productivity, flexibility, new technology, fewer accidents) and the worker (value, promotion, resilience). Costs are fees, time away and the risk the worker takes the new skills to a rival.',
     },
     H13: {
@@ -485,7 +475,6 @@
         map: { grant: 'Employee share ownership', discount: 'Employee share ownership' },
         pool: ['Employee share ownership', 'Profit-related pay', 'Fringe payments'],
       },
-      next: 'H14',
       debrief: "Employee share ownership gives workers a stake in the business and builds loyalty, and suits startups that cannot pay high salaries. The disadvantages are that shares can lose value, they bring no cash today, and the owners' control is diluted.",
     },
     H14: {
@@ -503,7 +492,6 @@
           fun: { rosa: 'Rosa signs up for a course in data dashboards. She is the only one who finishes it.',
             cat: 'Biscuit buys a book and sits on it. Learning by absorption.' } },
       ],
-      next: 'H15',
       debrief: 'Fringe payments are extras given on top of pay. They are extrinsic and mostly hygiene factors (Herzberg), so they stop complaints but rarely motivate on their own. A learning allowance is a fringe payment that serves growth, so it can do more.',
     },
     H15: {
@@ -525,10 +513,389 @@
             aisha: "Someone's phone rings halfway through. It is yours.", kofi: "Someone's phone rings halfway through. It is yours.",
             rosa: "Someone's phone rings halfway through. It is yours.", cat: 'Biscuit walks across the laptop halfway through and ends the slideshow.' } },
       ],
-      next: 'END',
       debrief: 'Match the reward to the need: profit-related pay and team rewards for belonging, PRP, shares and titles for esteem, and growth roles for self-fulfilment.',
     },
   };
+  // ---------- more scenarios ----------
+  // General ones go in every hire's pool (hl: HL games only). Ones with `hire` belong to that hire alone.
+  // Each option's `why` lists the theories that back it, with the reason; `bad` explains why no theory does.
+  const mcIs = (k) => (st) => st.hire.mc === k;
+  Object.assign(HUBS, {
+    EQ: {
+      title: 'The pay gap', hl: true,
+      scene: (st) => st.hire.name + ' finds out that a new starter doing the same job is paid 15% more.',
+      sceneFor: { cat: 'Biscuit discovers that the kitten gets premium tuna. Biscuit gets the supermarket brand.' },
+      terms: ['Equity theory', 'Hygiene factors'],
+      options: [
+        { id: 'fix', label: 'Raise their pay to match, and explain how pay is set', term: 'Equity theory', fx: { M: 1, clearW: true, msg: 'Fair again.' },
+          labels: { cat: 'Give Biscuit premium tuna too, and explain the menu' },
+          why: { equity: 'They compare their pay with a colleague doing the same work. Matching it puts the balance right.',
+            herzberg: 'Unfair pay is a hygiene problem. Fixing it removes the dissatisfaction.' } },
+        { id: 'less', label: 'Let them work fewer hours instead of raising pay', term: 'Equity theory', fx: { M: 1, flag: 'OutputGap', msg: 'Balance restored by doing less. Output falls.' },
+          labels: { cat: 'Let Biscuit nap for longer instead' },
+          why: { equity: 'Equity theory says people restore fairness by putting in less. Fewer hours does exactly that, but the firm loses output.' } },
+        { id: 'once', label: 'Give a one-off bonus and leave the gap', term: 'One-off bonus', fx: { msg: 'Nice, but the gap is still there every month.' },
+          labels: { cat: 'One tin of salmon, once' },
+          bad: 'A one-off payment does not fix an unfairness that repeats every month, so they will still feel short-changed.' },
+        { id: 'secret', label: 'Tell them pay is confidential and to stop comparing', term: 'Ignoring fairness', fx: { M: -1, W: 1 },
+          labels: { cat: "Hide the kitten's bowl" }, fun: { cat: 'Biscuit finds the bowl in four minutes.' },
+          bad: 'People compare anyway. Hiding the unfairness makes it feel worse, and no theory recommends it.' },
+      ],
+      debrief: 'Equity theory (Adams): people compare their inputs (effort, skill, time) and outputs (pay, recognition) with others. If it feels unfair they put in less, ask for more, or leave. Restoring fairness restores motivation.',
+    },
+    EX: {
+      title: 'The target nobody believes in', hl: true,
+      scene: (st) => 'Head office sets a huge new target with a cash bonus. ' + st.hire.name + ' says: "I can\'t hit that. And I don\'t care about that bonus."',
+      sceneFor: { cat: 'Head office wants 100 mice a week, with a bonus of one biscuit. Biscuit looks at the target, then at the biscuit, then leaves.' },
+      terms: ['Expectancy theory', 'Taylor'],
+      options: [
+        { id: 'reset', label: (st) => 'Make the target reachable, help them reach it, and offer something they value: ' + st.hire.values, term: 'Expectancy theory', fx: { M: 2 },
+          why: { expectancy: 'Effort must reach the target (expectancy), the target must bring the reward (instrumentality), and the reward must be wanted (valence). This fixes all three.' } },
+        { id: 'double', label: 'Keep the target but double the bonus', term: 'Taylor', fx: { msg: 'They still do not believe they can hit it.' },
+          labels: { cat: 'Keep the target but offer two biscuits' },
+          why: { taylor: 'Taylor says money motivates, so a bigger bonus should mean more effort. Expectancy theory disagrees: if the target looks impossible, the bonus is worth nothing.' } },
+        { id: 'train', label: 'Keep the target and train them until they can reach it', term: 'Training', fx: { S: 1, M: 1 },
+          why: { expectancy: 'Training raises expectancy: they start to believe effort can hit the target.', sdt: 'Training builds competence, one of the three needs.' } },
+        { id: 'targets', label: 'Tell them targets are targets', term: 'Ignoring the problem', fx: { M: -1 },
+          bad: 'If they do not believe in the target or want the reward, nothing changes. No theory backs it.' },
+      ],
+      debrief: 'Expectancy theory (Vroom): motivation = expectancy (can I do it?) x instrumentality (will I get the reward?) x valence (do I want it?). If any one is zero, motivation is zero.',
+    },
+    SD: {
+      title: 'The new manager', hl: true,
+      scene: (st) => 'A new manager checks everything ' + st.hire.name + ' does.',
+      sceneFun: {
+        maya: 'Maya keeps getting the new brake fitting wrong, and the manager just says "again".',
+        tuan: 'Tuan now needs every email approved.',
+        aisha: 'Aisha says: "I could do this in half the time if he left me alone."',
+        kofi: 'On the night shift, Kofi has not spoken to anyone since Tuesday.',
+        rosa: 'Since the merger, Rosa eats lunch alone.',
+        cat: 'The manager has put Biscuit on a lead.',
+      },
+      terms: ['Deci and Ryan', 'Empowerment', 'Taylor'],
+      options: [
+        { id: 'auton', label: 'Let them decide how to work; the manager checks results, not every step', term: 'Autonomy',
+          fx: (st) => add(st, 'M', ['aisha', 'tuan', 'cat'].includes(st.hire.id) ? 2 : 1),
+          why: { sdt: 'Autonomy is one of the three needs in self-determination theory.', herzberg: 'Responsibility is a Herzberg motivator.' } },
+        { id: 'compet', label: 'Give clear feedback and coaching so they feel good at the job', term: 'Competence',
+          fx: (st) => { add(st, 'S', 1); if (st.hire.id === 'maya') add(st, 'M', 2); },
+          why: { sdt: 'Competence is one of the three needs in self-determination theory.', herzberg: 'Feeling of achievement is a Herzberg motivator.' } },
+        { id: 'relate', label: 'Set up a buddy and a weekly team check-in', term: 'Relatedness',
+          fx: (st) => add(st, 'M', ['kofi', 'rosa'].includes(st.hire.id) ? 2 : 1),
+          why: { sdt: 'Relatedness is one of the three needs in self-determination theory.', maslow: 'Belonging is a social need in Maslow\'s hierarchy.' } },
+        { id: 'checks', label: 'Back the manager: more checks mean fewer mistakes', term: 'Close supervision',
+          fx: (st) => add(st, 'M', ['aisha', 'cat'].includes(st.hire.id) ? -2 : -1),
+          why: { taylor: 'Taylor: managers supervise closely so workers stick to the one best method.' } },
+      ],
+      debrief: 'Deci and Ryan (self-determination theory): people are motivated from inside (intrinsically) when they have autonomy (control over how they work), competence (feeling good at it) and relatedness (connection to others). Find which one is missing.',
+    },
+    MC: {
+      title: 'One opportunity', hl: true,
+      scene: (st) => 'There is budget for one development opportunity for ' + st.hire.name + '.',
+      sceneFun: {
+        maya: 'Maya keeps a chart of her best day on the line.', tuan: 'Tuan wants to be the one everyone listens to.',
+        aisha: 'Aisha loves a hard problem with a clear finish line.', kofi: 'Kofi is the one who remembers everyone\'s birthday.',
+        rosa: 'Everyone stops at Rosa\'s desk to chat.', cat: 'Biscuit sits on the highest shelf and looks down on everyone.',
+      },
+      terms: ['McClelland', 'Maslow'],
+      options: [
+        { id: 'ach', label: 'A tough personal target with weekly feedback on progress', term: 'McClelland: achievement',
+          fx: (st) => add(st, 'M', mcIs('ach')(st) ? 2 : 0),
+          why: { mcclelland: 'Feeds the need for achievement: challenging goals and feedback.', herzberg: 'Achievement is a Herzberg motivator.' } },
+        { id: 'aff', label: 'Run the team social and help new starters settle in', term: 'McClelland: affiliation',
+          fx: (st) => add(st, 'M', mcIs('aff')(st) ? 2 : 0),
+          why: { mcclelland: 'Feeds the need for affiliation: good relationships and belonging.', maslow: 'Meets social (belonging) needs.' } },
+        { id: 'pow', label: 'Lead a small team and chair the weekly meeting', term: 'McClelland: power',
+          fx: (st) => add(st, 'M', mcIs('pow')(st) ? 2 : mcIs('aff')(st) ? -1 : 0),
+          why: { mcclelland: 'Feeds the need for power: influence over others.', maslow: 'Status and respect meet esteem needs.' } },
+        { id: 'none', label: 'Nothing this year: budgets are tight', term: 'No development', fx: { M: -1 },
+          bad: 'Every theory here says growth and development matter. Doing nothing feeds no need.' },
+      ],
+      debrief: "McClelland's acquired needs theory: people are driven mainly by achievement, affiliation or power. Read the clues about what each person enjoys, then give them work that feeds that need.",
+    },
+    AP: {
+      title: 'Appraisal time', hl: true,
+      scene: (st) => "It is time for " + st.hire.name + "'s appraisal. Which kind will you use?",
+      terms: ['Deci and Ryan', 'Herzberg'],
+      options: [
+        { id: 'form', label: 'Formative: short feedback chats all year, to help them improve', term: 'Formative appraisal',
+          fx: (st) => { add(st, 'S', 1); add(st, 'M', ['maya', 'kofi'].includes(st.hire.id) ? 2 : 1); },
+          why: { sdt: 'Regular feedback builds competence.', herzberg: 'It recognises progress, and recognition is a motivator.' } },
+        { id: 'summ', label: 'Summative: one end-of-year rating, linked to pay', term: 'Summative appraisal',
+          fx: (st) => add(st, 'M', st.hire.id === 'tuan' ? 1 : 0),
+          why: { expectancy: 'A clear link from rating to reward raises instrumentality.', taylor: 'Taylor links pay to measured performance.' } },
+        { id: 'r360', label: '360-degree: feedback from colleagues, customers and their manager', term: '360-degree feedback',
+          fx: (st) => add(st, 'M', st.hire.id === 'rosa' ? 2 : 1),
+          fun: { rosa: 'Fourteen colleagues say Rosa is the reason the office works.' },
+          why: { herzberg: 'Hearing praise from everyone is recognition, a motivator.', maslow: 'Respect from others meets esteem needs.' } },
+        { id: 'self', label: 'Self-appraisal: they review their own year first', term: 'Self-appraisal',
+          fx: (st) => add(st, 'M', ['aisha', 'cat'].includes(st.hire.id) ? 2 : 1),
+          fun: { cat: 'Biscuit rates itself 10 out of 10 in every category, then sits on the form.' },
+          why: { sdt: 'Judging your own work gives autonomy.' } },
+      ],
+      debrief: 'Formative appraisal is ongoing and helps people improve. Summative appraisal judges the year, often for pay. 360-degree feedback comes from everyone the person works with. Self-appraisal starts with the worker\'s own view.',
+    },
+
+    // --- two per hire ---
+    MQ: {
+      title: 'Speed or quality', hire: 'maya',
+      scene: "The line has been sped up. Maya's brake fittings are starting to fail the checks.",
+      terms: ['Taylor', 'Empowerment'],
+      options: [
+        { id: 'stop', label: 'Give her the authority to stop the line when something is wrong', term: 'Empowerment', fx: { M: 2, S: 1 },
+          why: { herzberg: 'Responsibility is a motivator.', sdt: 'Control over her own work gives autonomy.' } },
+        { id: 'pay', label: 'Pay more per bike to keep the speed up', term: 'Piece rate', fx: { M: 1, S: -1, msg: 'More bikes, more faults.' },
+          why: { taylor: 'Taylor: pay by output and workers will go faster. The catch is quality.' } },
+        { id: 'qc', label: 'Add an inspector at the end of the line', term: 'Quality control', fx: { S: 1, msg: 'Faults get caught, but nobody feels better about the work.' },
+          bad: 'Sensible for quality, but it is not about motivation, so no motivation theory backs it.' },
+        { id: 'slow', label: 'Slow the line back down, nothing else', term: 'Working conditions', fx: { M: 1 },
+          why: { herzberg: 'A sane pace is a working condition, a hygiene factor: it removes dissatisfaction.' } },
+      ],
+      debrief: 'Taylor-style speed and piece rates raise output but can wreck quality. Giving workers responsibility for quality (empowerment) motivates and fixes the faults at source.',
+    },
+    MS: {
+      title: 'The near miss', hire: 'maya',
+      scene: "A guard on Maya's machine fails and a wheel flies across the floor. Nobody is hurt. This time.",
+      terms: ['Maslow', 'Hygiene factors'],
+      options: [
+        { id: 'team', label: 'Fix the guard tonight, and ask the line to help design better safety', term: 'Safety and empowerment', fx: { M: 2, S: 1, clearW: true },
+          why: { maslow: 'Safety is a basic need: it must be met before anything else motivates.', herzberg: 'Safe working conditions are a hygiene factor.', sdt: 'A say in the fix gives autonomy.' } },
+        { id: 'fix', label: 'Fix the guard tonight', term: 'Safety', fx: { M: 1, clearW: true },
+          why: { maslow: 'Safety is a basic need.', herzberg: 'Safe working conditions are a hygiene factor.' } },
+        { id: 'danger', label: 'Pay danger money instead', term: 'Danger money', fx: { M: -1, W: 1, msg: 'Money does not stop a flying wheel.' },
+          why: { taylor: 'Taylor assumes money makes up for anything. Maslow would say safety comes first.' } },
+        { id: 'poster', label: 'Put up a "Safety first!" poster', term: 'Doing nothing', fx: { M: -1 }, fun: 'The poster falls off the wall.',
+          bad: 'A poster changes nothing. Safety is a basic need and a hygiene factor; this ignores both.' },
+      ],
+      debrief: 'Maslow puts safety near the bottom of the hierarchy: until people feel safe, higher rewards do not work. Herzberg lists working conditions as a hygiene factor.',
+    },
+    TQ: {
+      title: 'Who made the sale?', hire: 'tuan',
+      scene: 'A colleague claims the commission on a deal Tuan closed.',
+      terms: ['Equity theory', 'Commission'],
+      options: [
+        { id: 'check', label: 'Check the records and pay whoever made the sale', term: 'Fairness', fx: { M: 1 },
+          why: { equity: 'He compares what he put in with what he gets. Paying the right person keeps it fair.', herzberg: 'Fair pay is a hygiene factor.' } },
+        { id: 'split', label: 'Split it 50/50 to keep the peace', term: 'Unfair split', fx: { M: -1, W: 1 },
+          bad: 'He did all the work and gets half the reward. Equity theory predicts he will put in less.' },
+        { id: 'pool', label: 'Switch the team to a shared bonus pool', term: 'Team reward', fx: { M: -1, msg: 'Tuan wants to win, not share.' },
+          why: { maslow: 'Shared rewards build belonging, a social need. But Tuan is not driven by belonging.' } },
+        { id: 'ignore', label: 'Tell them to sort it out themselves', term: 'Ignoring the problem', fx: { W: 1 },
+          bad: 'An unfair reward left unfixed demotivates. No theory backs ignoring it.' },
+      ],
+      debrief: 'Commission ties pay to sales, so who gets credit matters a lot. Equity theory explains why an unfair split hits motivation hard.',
+    },
+    TP: {
+      title: 'Top of the leaderboard', hire: 'tuan',
+      scene: 'Tuan has been top seller three months running. He says he wants more than money.',
+      terms: ['McClelland', 'Maslow'],
+      options: [
+        { id: 'lead', label: 'Make him team leader for three junior reps', term: 'Promotion', fx: { M: 2 },
+          why: { mcclelland: 'Tuan is driven by power: influence over others feeds it.', maslow: 'Status meets esteem needs.', herzberg: 'Responsibility and advancement are motivators.' } },
+        { id: 'board', label: 'Put his name in lights on a sales leaderboard', term: 'Recognition', fx: { M: 1 }, fun: 'He photographs it from four angles.',
+          why: { herzberg: 'Recognition is a motivator.', maslow: 'Public recognition meets esteem needs.' } },
+        { id: 'cash', label: 'Give him a cash bonus', term: 'Bonus', fx: { msg: 'He said he wanted more than money.' },
+          why: { taylor: 'Taylor: money motivates. But he just told you it is not enough.' } },
+        { id: 'email', label: 'Thank him by email', term: 'Small thanks', fx: {},
+          why: { herzberg: 'Recognition is a motivator, but this is a very small one.' } },
+      ],
+      debrief: 'Once pay is fair, high performers often want status, responsibility or influence. McClelland calls this the need for power.',
+    },
+    AC: {
+      title: 'Crunch time', hire: 'aisha',
+      scene: 'The launch is in two weeks. Aisha has worked until midnight for ten days.',
+      terms: ['Maslow', 'Hygiene factors'],
+      options: [
+        { id: 'cut', label: 'Let her decide which features to cut to hit the date', term: 'Empowerment', fx: { M: 2, clearW: true },
+          why: { sdt: 'Her call on the scope gives autonomy.', herzberg: 'Responsibility is a motivator.' } },
+        { id: 'rest', label: 'Move the launch and send her home on time', term: 'Rest', fx: { M: 1, clearW: true },
+          why: { maslow: 'Sleep is a physiological need, the very bottom of the hierarchy.', herzberg: 'Sane hours are a working condition, a hygiene factor.' } },
+        { id: 'ot', label: 'Pay double overtime', term: 'Overtime pay', fx: { W: 1, msg: 'Richer and more exhausted.' },
+          why: { taylor: 'Taylor: more money for more hours. It does not fix exhaustion.' } },
+        { id: 'pizza', label: 'Order pizza for the late nights', term: 'Perk', fx: {}, fun: 'She codes with one hand and eats with the other.',
+          bad: 'Free food does not fix exhaustion. No theory says pizza beats sleep.' },
+      ],
+      debrief: 'Long hours attack the bottom of Maslow\'s hierarchy. Giving people control over how to hit a deadline often works better than paying them to suffer.',
+    },
+    AS: {
+      title: 'Her own idea', hire: 'aisha',
+      scene: 'Aisha has an idea for a feature nobody asked for. She lights up when she talks about it.',
+      terms: ['Intrinsic motivation', 'Deci and Ryan'],
+      options: [
+        { id: 'day', label: 'Give her one day a week to build it', term: 'Intrinsic motivation', fx: { M: 2 },
+          why: { maslow: 'Creating something of her own is self-actualisation.', sdt: 'Choosing her own project gives autonomy.', herzberg: 'The work itself and growth are motivators.' } },
+        { id: 'hack', label: 'Run a company hackathon where everyone pitches ideas', term: 'Hackathon', fx: { M: 1 },
+          why: { sdt: 'Autonomy and relatedness together.', mcclelland: 'A competition feeds the need for achievement.', herzberg: 'A chance to achieve and be recognised for ideas: motivators.' } },
+        { id: 'prize', label: 'Offer a cash prize if the idea makes money', term: 'Cash prize', fx: {},
+          why: { taylor: 'Taylor: money motivates. But she is already motivated from inside; money adds little.' } },
+        { id: 'later', label: 'Put it on the list for next year', term: 'Not now', fx: { M: -1 },
+          bad: 'Turning down intrinsic motivation wastes it. No theory backs it.' },
+      ],
+      debrief: 'Intrinsic motivation comes from the work itself. Deci and Ryan found that adding money to work people already love can even reduce their motivation.',
+    },
+    KN: {
+      title: 'Alone on the night shift', hire: 'kofi',
+      scene: 'Kofi works the quietest aisles alone, all night. He has started talking to the forklift.',
+      terms: ['Maslow', 'Teamwork'],
+      options: [
+        { id: 'crew', label: 'Put him in a picking team with a shared target', term: 'Teamwork', fx: { M: 2 },
+          why: { maslow: 'Belonging is a social need.', sdt: 'Working with others gives relatedness.', mcclelland: 'Kofi is driven by affiliation.' } },
+        { id: 'bonus', label: 'Pay a night-shift bonus', term: 'Shift premium', fx: { tag: 1 },
+          why: { maslow: 'Extra pay meets security needs, if they are not met yet.', herzberg: 'Pay is a hygiene factor.' } },
+        { id: 'pods', label: 'Give him headphones and a podcast subscription', term: 'Perk', fx: {}, fun: 'He is now an expert on Roman plumbing.',
+          why: { herzberg: 'Nicer conditions are a hygiene factor. He is still alone.' } },
+        { id: 'nothing', label: 'Night shift is night shift', term: 'Ignoring it', fx: { M: -1 },
+          bad: 'Isolation ignores belonging needs. No theory backs it.' },
+      ],
+      debrief: 'People who work alone miss the social side of work. Maslow calls it belonging, Deci and Ryan call it relatedness, McClelland calls it affiliation.',
+    },
+    KF: {
+      title: 'Day shift perks', hire: 'kofi',
+      scene: 'Day-shift staff get free lunch in the canteen. The canteen is closed at night.',
+      terms: ['Equity theory', 'Fringe payments'],
+      options: [
+        { id: 'equal', label: 'Give the night shift a meal allowance worth the same', term: 'Fairness', fx: { M: 1, clearW: true },
+          why: { equity: 'Same work, same perks: fairness restored.', herzberg: 'Perks are hygiene factors; unequal ones cause dissatisfaction.' } },
+        { id: 'swap', label: 'Let night staff swap onto day shifts in turn', term: 'Rotation', fx: (st) => { add(st, 'M', 1); eng(st, 1); },
+          why: { equity: 'Sharing out the better shifts balances the rewards.', maslow: 'Predictable hours meet security needs.' } },
+        { id: 'explain', label: 'Explain that the canteen cannot open at night', term: 'Explaining', fx: { M: -1 },
+          bad: 'The reason may be true, but the unfairness is still there.' },
+        { id: 'nothing', label: 'Nobody has complained, so do nothing', term: 'Ignoring it', fx: { W: 1 },
+          bad: 'Unfairness that nobody mentions still demotivates.' },
+      ],
+      debrief: 'Fringe payments are part of the reward package. When one group gets more for the same work, equity theory predicts resentment.',
+    },
+    RP: {
+      title: 'Four days a week', hire: 'rosa',
+      scene: 'Rosa asks to work four days a week until she retires.',
+      terms: ['Hygiene factors', 'Age discrimination'],
+      options: [
+        { id: 'yes', label: 'Agree, and plan her week with her', term: 'Flexible working', fx: { M: 2 },
+          why: { herzberg: 'Working conditions are a hygiene factor; meeting this removes a big source of dissatisfaction.', sdt: 'Planning her own week gives autonomy.' } },
+        { id: 'trial', label: 'Agree to a three-month trial', term: 'Flexible working', fx: { M: 1 },
+          why: { herzberg: 'Better working conditions, a hygiene factor.' } },
+        { id: 'no', label: 'Refuse: everyone works five days', term: 'Refusal', fx: { M: -1, W: 1 },
+          bad: 'A reasonable request turned down with no reason. No theory backs it.' },
+        { id: 'retire', label: 'Suggest she retires early instead', term: 'Age discrimination', fx: { M: -1, W: 1, msg: 'Pushing her out because of her age is age discrimination, and it is illegal.' },
+          bad: 'This is age discrimination, which is illegal. Age shaped her request; it must not shape how you treat her.' },
+      ],
+      debrief: 'Flexible working is a working condition (a hygiene factor). People near retirement often want it, and asking is the right move. Pushing someone out because of age is illegal.',
+    },
+    RK: {
+      title: 'Thirty years in her head', hire: 'rosa',
+      scene: 'Rosa knows how everything in the office works. Nobody else does.',
+      terms: ['Herzberg', 'Mentoring'],
+      options: [
+        { id: 'mentor', label: 'Ask her to train two colleagues, and credit her publicly', term: 'Mentoring and recognition', fx: { M: 2 },
+          why: { herzberg: 'Recognition and responsibility are motivators.', maslow: 'Respect meets esteem needs.', mcclelland: 'Rosa is driven by affiliation, and teaching is social.' } },
+        { id: 'video', label: 'Film her doing each task, to find the one best method', term: 'Scientific management', fx: {},
+          why: { taylor: 'Taylor: study the job, record the one best method, train everyone in it.' } },
+        { id: 'manual', label: 'Ask her to write a manual by Friday', term: 'Extra task', fx: { M: -1, msg: 'A chore, not a reward.' },
+          bad: 'An extra chore with no recognition. No theory backs it as motivation.' },
+        { id: 'bonus', label: 'Pay a bonus for writing everything down', term: 'Bonus', fx: {},
+          why: { taylor: 'Taylor: pay for output.' } },
+      ],
+      debrief: 'Experienced staff are a knowledge asset. Asking them to teach recognises their value (Herzberg) and suits people driven by affiliation (McClelland).',
+    },
+    CL: {
+      title: 'The red dot', hire: 'cat', hl: true,
+      scene: 'A new laser-pointer game is meant to keep Biscuit sharp. The red dot can never be caught.',
+      terms: ['Expectancy theory'],
+      options: [
+        { id: 'mouse', label: 'Swap in a toy mouse Biscuit can actually catch', term: 'Expectancy theory', fx: { M: 2, S: 1 },
+          why: { expectancy: 'Effort now leads to success, so expectancy is no longer zero.', sdt: 'Catching things builds competence.' } },
+        { id: 'treat', label: 'Give a treat after every session, caught or not', term: 'Reward', fx: { M: 1 },
+          why: { taylor: 'Taylor: reward the work done.' } },
+        { id: 'faster', label: 'Make the dot faster to keep it challenging', term: 'Harder target', fx: { M: -1 }, fun: 'Biscuit runs into the filing cabinet.',
+          bad: 'If effort can never succeed, expectancy theory says motivation falls to zero. Faster makes it worse.' },
+        { id: 'stop', label: 'Stop the game', term: 'Stop', fx: {},
+          bad: 'Nothing gained, nothing learned. No theory backs it.' },
+      ],
+      debrief: 'Expectancy theory in one cat: if effort never leads to the result, nobody keeps trying.',
+    },
+    CR: {
+      title: 'Nobody noticed', hire: 'cat',
+      scene: "Biscuit's mouse count is up 40% this month. Nobody has said a word. Biscuit has started leaving mice on the manager's chair.",
+      terms: ['Herzberg', 'Maslow'],
+      options: [
+        { id: 'wall', label: "Put Biscuit's photo on the Employee of the Month wall", term: 'Recognition', fx: { M: 2 }, fun: 'Biscuit sits under the photo all day, to make sure people see it.',
+          why: { herzberg: 'Recognition is a motivator.', maslow: 'Respect meets esteem needs.' } },
+        { id: 'boss', label: 'Put Biscuit in charge of the kitten\'s training', term: 'Responsibility', fx: { M: 2 },
+          why: { mcclelland: 'Biscuit is driven by power.', herzberg: 'Responsibility is a motivator.' } },
+        { id: 'tuna', label: 'An extra tin of tuna', term: 'Bonus', fx: { M: 1 },
+          why: { taylor: 'Taylor: reward output with pay. Tuna is Biscuit\'s pay.' } },
+        { id: 'chair', label: 'Move the manager\'s chair', term: 'Ignoring it', fx: { M: -1 }, fun: 'The mice follow the chair.',
+          bad: 'It ignores the real message: Biscuit wants to be noticed.' },
+      ],
+      debrief: 'Recognition is the cheapest motivator there is, and its absence is very noticeable.',
+    },
+  });
+
+  // "Because" reasons for the original hubs
+  const WHY = {
+    H6: {
+      tm: { taylor: 'Breaking the job into steps and setting a standard is scientific management.' },
+      monitor: { taylor: 'Close supervision and pay per unit are Taylor\'s methods.' },
+      goal: { sdt: 'Leaving them to it gives autonomy.', herzberg: 'Responsibility is a motivator.' },
+      raise: { taylor: 'Taylor: money is the motivator.' },
+    },
+    H7: {
+      enrich: { herzberg: 'More responsible, challenging work is a motivator (vertical loading).', maslow: 'A bigger role meets esteem needs.', mcclelland: 'A harder job feeds the need for achievement.' },
+      enlarge: '!More of the same work does not motivate. Herzberg called this horizontal loading.',
+      rotate: { sdt: 'Learning new jobs builds competence.', maslow: 'New skills and variety support growth (self-actualisation).' },
+      empower: { sdt: 'Choosing how to work gives autonomy.', herzberg: 'Responsibility is a motivator.', maslow: 'Control over your work supports self-actualisation.' },
+      purpose: { maslow: 'Meaningful work supports self-actualisation.', sdt: 'Seeing who you help builds relatedness.' },
+      fringe: '!Perks are hygiene factors. They stop complaints but do not cure boredom.',
+    },
+    H8: {
+      match: { taylor: 'Taylor: money is what keeps workers.', herzberg: 'Pay below the market is a hygiene problem.', maslow: 'Pay meets security needs.' },
+      shares: { maslow: 'A stake in the firm meets esteem needs.' },
+      growth: { maslow: 'Growth and challenge are self-actualisation.', sdt: 'Learning builds competence.', herzberg: 'Growth is a motivator.' },
+      prp: { expectancy: 'A clear link between performance and reward raises instrumentality.', taylor: 'Taylor links pay to output.' },
+      nomatch: '!Doing nothing about a pay gap ignores pay as a hygiene factor and a security need.',
+    },
+    H9: {
+      secure: { maslow: 'Guaranteed hours and pay meet safety and security needs.', herzberg: 'Job security and pay are hygiene factors.' },
+      belong: { maslow: 'A team and a buddy meet social needs.', sdt: 'They build relatedness.' },
+      esteem: { maslow: 'Recognition and status meet esteem needs.', herzberg: 'Recognition is a motivator.' },
+      grow: { maslow: 'Their own project supports self-actualisation.', sdt: 'Choosing it gives autonomy.' },
+      life: '!Ignoring a life event ignores the need it creates. No theory backs it.',
+    },
+    H10: {
+      shared: { maslow: 'Shared goals build belonging.', sdt: 'Working together builds relatedness.', mcclelland: 'Feeds the need for affiliation.' },
+      mentor: { sdt: 'A mentor builds relatedness and competence.', maslow: 'Meets belonging needs.' },
+      prize: { herzberg: 'Recognition is a motivator.', mcclelland: 'A contest feeds the need for achievement.' },
+      desk: '!Isolating someone in a tense team ignores belonging. No theory recommends it.',
+      ignore: '!Relationships at work are a hygiene factor. Ignoring the tension leaves the dissatisfaction.',
+    },
+    H11: {
+      indiv: { expectancy: 'A personal target with a reward raises instrumentality.', taylor: 'Taylor: pay for individual output.' },
+      team: { maslow: 'A team reward builds belonging.', expectancy: 'A clear target and reward for the team.' },
+      profit: { maslow: 'Everyone sharing the success builds belonging.' },
+      none: '!Success with no reward ignores recognition and pay. No theory backs it.',
+    },
+    H14: {
+      car: { maslow: 'Perks meet security needs, if those are not met yet.', herzberg: 'Perks are hygiene factors.' },
+      gym: { maslow: 'Perks meet basic needs, if those are not met yet.', herzberg: 'Perks are hygiene factors.' },
+      health: { maslow: 'Health cover meets safety needs.', herzberg: 'Perks are hygiene factors.' },
+      learn: { maslow: 'Learning supports self-actualisation.', sdt: 'Learning builds competence.', herzberg: 'Growth is a motivator.' },
+    },
+    H15: {
+      profit: { maslow: 'Everyone sharing the success builds belonging.' },
+      prp: { expectancy: 'Rewarding their own results links performance to reward.', taylor: 'Taylor: pay for output.' },
+      shares: { maslow: 'Ownership meets esteem needs.' },
+      gift: { maslow: 'A treat meets basic needs, if they are not met yet.' },
+      promote: { maslow: 'A new role supports self-actualisation.', herzberg: 'Responsibility and advancement are motivators.', mcclelland: 'Teaching others feeds affiliation or power.' },
+      speech: { herzberg: 'Recognition is a motivator, but a speech alone is small.' },
+    },
+  };
+  for (const [hubId, opts] of Object.entries(WHY)) {
+    for (const [optId, w] of Object.entries(opts)) {
+      const o = HUBS[hubId].options.find((x) => x.id === optId);
+      if (typeof w === 'string') o.bad = w.slice(1); else o.why = w;
+    }
+  }
+
   // ---------- job-specific scenes and option wording ----------
   // Merged into HUBS below. Same choices and effects for everyone; only the words fit each job.
   // Labels at name-it hubs (H2, H7, H11, H13) must describe the scheme without naming it.
@@ -702,7 +1069,7 @@
   // After every third decision (five in a full game). Questions are picked to fit the steps just played.
   // A quiz can also ask the player to name a scheme they just chose (the hub's nameIt).
   const QUIZ = [
-    { id: 'maslow-first', hubs: ['H1', 'H2', 'H3', 'H8'], ask: "In Maslow's hierarchy, which needs must be met first?",
+    { id: 'maslow-first', hubs: ['H1', 'H2', 'H8'], ask: "In Maslow's hierarchy, which needs must be met first?",
       choices: ['Physiological and safety needs', 'Esteem needs', 'Self-actualisation', 'Social needs'],
       why: 'Basic needs (food, shelter, a safe income) come first. Higher needs only motivate once these are met.' },
     { id: 'maslow-top', hubs: ['H7', 'H8', 'H15', 'H14'], ask: 'Giving a worker a challenging project so they can grow meets which Maslow need?',
@@ -761,7 +1128,28 @@
       why: 'Enrichment is deeper work. Enlargement is more tasks at the same level. Rotation is moving between jobs.' },
   ];
 
-  const QUIZ_AT = [3, 6, 9, 12, 16];
+  QUIZ.push(
+    { id: 'mcclelland', hl: true, hubs: ['MC', 'TP', 'KN', 'RK', 'CR'], ask: "McClelland's three acquired needs are...",
+      choices: ['Achievement, affiliation and power', 'Safety, social and esteem', 'Autonomy, competence and relatedness', 'Expectancy, instrumentality and valence'],
+      why: 'McClelland: achievement (challenge, feedback), affiliation (relationships) and power (influence). One usually dominates.' },
+    { id: 'sdt', hl: true, hubs: ['SD', 'AS', 'AC', 'AP'], ask: 'Deci and Ryan say people are motivated from inside when they have...',
+      choices: ['Autonomy, competence and relatedness', 'Achievement, affiliation and power', 'Pay, conditions and security', 'Expectancy, instrumentality and valence'],
+      why: 'Self-determination theory: autonomy (choice), competence (feeling capable) and relatedness (connection).' },
+    { id: 'equity', hl: true, hubs: ['EQ', 'TQ', 'KF'], ask: 'In equity theory, a worker who feels underpaid compared with a colleague will probably...',
+      choices: ['Put in less effort, or leave', 'Work harder to earn more', 'Feel more motivated', 'Not notice'],
+      why: 'Adams: people restore fairness by putting in less, asking for more, or leaving.' },
+    { id: 'expectancy', hl: true, hubs: ['EX', 'CL', 'H11'], ask: "In Vroom's expectancy theory, 'valence' means...",
+      choices: ['How much the person wants the reward', 'Whether effort can reach the target', 'Whether hitting the target brings the reward', 'How fair the pay is'],
+      why: 'Valence is how much the reward is wanted. Expectancy: can effort reach the target? Instrumentality: will the target bring the reward?' },
+    { id: 'appraisal', hl: true, hubs: ['AP'], ask: 'Feedback given regularly through the year to help someone improve is...',
+      choices: ['Formative appraisal', 'Summative appraisal', '360-degree feedback', 'Self-appraisal'],
+      why: 'Formative appraisal is ongoing and developmental. Summative judges the year, often for pay.' },
+  );
+  // The hire-only scenarios share the SL questions that fit them
+  const EXTRA_TAGS = { 'taylor-fit': ['MQ'], 'maslow-first': ['MS', 'AC'], 'herz-hygiene': ['TQ', 'KF', 'RP', 'MS'], 'herz-motivator': ['TP', 'RK', 'CR', 'MQ'],
+    'intrinsic': ['AS'], 'maslow-social': ['KN'], 'age': ['RP'] };
+  for (const [id, hubs] of Object.entries(EXTRA_TAGS)) QUIZ.find((q) => q.id === id).hubs.push(...hubs);
+
   function makeQuiz(st) {
     const recent = st.log.slice(-3).reverse();
     const lastWasName = st.quizIds.length && st.quizIds[st.quizIds.length - 1].startsWith('name-');
@@ -770,13 +1158,13 @@
       const hub = HUBS[e.hub], ans = hub.nameIt && hub.nameIt.map[e.opt];
       const nq = ans && { id: 'name-' + e.hub, ask: 'At "' + hub.title + '" you chose: ' + e.choice + '. ' + hub.nameIt.ask,
         choices: [ans].concat(hub.nameIt.pool.filter((p) => p !== ans).slice(0, 3)), why: ans + ': ' + (e.choice.endsWith('.') ? e.choice : e.choice + '.') };
-      const tq = QUIZ.filter((q) => q.hubs.includes(e.hub));
+      const tq = QUIZ.filter((q) => q.hubs.includes(e.hub) && (st.level === 'HL' || !q.hl));
       if (lastWasName) cands.push(...tq, nq); else cands.push(nq, ...tq);
     }
     // Older hires, or anyone who just discriminated on age, get the age question once it fits
     const ageQ = QUIZ.find((q) => q.id === 'age');
     if ((+st.hire.age >= 40 || recent.some((e) => e.opt === 'skip')) && recent.some((e) => ageQ.hubs.includes(e.hub))) cands.unshift(ageQ);
-    const q = cands.concat(QUIZ).find((c) => c && !st.quizIds.includes(c.id));
+    const q = cands.concat(QUIZ.filter((c) => st.level === 'HL' || !c.hl)).find((c) => c && !st.quizIds.includes(c.id));
     return { id: q.id, ask: typeof q.ask === 'function' ? q.ask(st) : q.ask, choices: q.choices.slice(), answer: q.choices[0], why: q.why, n: st.quizIds.length + 1 };
   }
 
@@ -786,12 +1174,33 @@
   }
 
   // ---------- flow ----------
-  // Every action is recorded in st.acts, so a saved game can be replayed and rescored (see replay).
-  function newState(hireId) {
+  // Every action is recorded in st.acts, so a saved game (hire, seed, level, actions) can be replayed and rescored.
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function shuffle(arr, r) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+  const SL_POOL = ['H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14'];
+  const HL_POOL = ['EQ', 'EX', 'SD', 'MC', 'AP'];
+  // Day one and the contract first, year-end last. Ten scenarios in between, shuffled:
+  // the hire's own ones, then (HL) three HL scenarios and the rest from the shared pool.
+  function makeDeck(hire, seed, hl) {
+    const r = rng(seed);
+    const pick = (pool, n) => shuffle(pool.slice(), r).slice(0, n);
+    const own = Object.keys(HUBS).filter((k) => HUBS[k].hire === hire.id && (hl || !HUBS[k].hl));
+    const theory = hl ? pick(HL_POOL, 3) : [];
+    const mid = own.concat(theory, pick(SL_POOL, 10 - own.length - theory.length));
+    return ['H1', 'H2'].concat(shuffle(mid, r), ['H15']);
+  }
+
+  function newState(hireId, seed, level) {
     const hire = HIRES.find((h) => h.id === hireId);
     if (!hire) throw new Error('no hire');
-    return { hire, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
-      asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false, quizIds: [], quizRight: 0, matched: 0, early: 0, best: 0 };
+    seed = Number.isInteger(seed) ? seed : Math.floor(Math.random() * 1e9);
+    level = level === 'SL' ? 'SL' : 'HL';
+    return { hire, seed, level, deck: makeDeck(hire, seed, level === 'HL'), step: 0, M: hire.M, S: hire.S, W: 0, need: hire.need, flags: {}, hub: 'H1', removed: {},
+      asked: 0, log: [], msgs: [], dead: null, ending: null, decisions: 0, reached: 1, acts: [], pendingQ: null, sorted: false,
+      quizIds: [], quizRight: 0, matched: 0, early: 0, best: 0, whyRight: 0, whyWrong: 0 };
   }
 
   const label = (o, st) => (o.labels && o.labels[st.hire.id]) || (typeof o.label === 'function' ? o.label(st) : o.label);
@@ -802,6 +1211,12 @@
   const funFor = (o, st) => (typeof o.fun === 'string' ? o.fun : o.fun && o.fun[st.hire.id]) || null;
   const needWords = (st) => (st.hire.needWords || NEED_WORDS)[st.need];
   const optionsAt = (st) => (HUBS[st.hub].options || []).filter((o) => !st.removed[st.hub + o.id] && (!o.only || o.only.includes(st.hire.id)));
+  // Theories the player may give as a reason at this level
+  const theoriesFor = (st) => Object.keys(THEORIES).filter((k) => st.level === 'HL' || !THEORIES[k].hl);
+  // Does this hub ask "because which theory?"
+  const asksWhy = (hub) => !!(hub.options && hub.options.some((o) => o.why || o.bad));
+  // The theories that back an option, at this level
+  const fitsFor = (o, st) => Object.keys(o.why || {}).filter((k) => st.level === 'HL' || !THEORIES[k].hl);
 
   function clone(st) {
     return Object.assign({}, st, { flags: Object.assign({}, st.flags), removed: Object.assign({}, st.removed), log: [], msgs: [], acts: [] });
@@ -810,32 +1225,35 @@
   function value(s) { return s.dead ? -100 : s.M * 2 + s.S - s.W * 3 + s.need * 0.5; }
   function tryOpt(st, o) { const c = clone(st); fx(c, o.fx); check(c); return value(c); }
 
-  function goTo(st, id) {
+  function arrive(st, id) {
     st.hub = id; st.asked = 0;
-    if (id === 'END') { st.reached = 16; st.ending = ending(st); return; }
-    st.reached = Math.max(st.reached, +id.slice(1));
+    if (id === 'END') { st.reached = st.deck.length + 1; st.ending = ending(st); return; }
+    st.reached = st.step + 1;
     if (HUBS[id].enter) HUBS[id].enter(st);
+  }
+  // Next step in the deck, unless skills or motivation have run low (then a remedial step comes first)
+  function advance(st) {
+    st.sorted = false;
+    if (st.flags.CommissionOnly) return die(st, 'quit', 'A slow month on commission only, and the rent is due.');
+    if (st.S <= 1) return arrive(st, 'H4');
+    if (st.M <= 1 && !st.flags.Audited) { st.flags.Audited = 1; return arrive(st, 'H5'); }
+    st.step++;
+    arrive(st, st.step < st.deck.length ? st.deck[st.step] : 'END');
   }
 
   const over = (st) => !!st.dead || st.hub === 'END';
   function guard(ok) { if (!ok) throw new Error('bad move'); }
 
-  // Router hubs (H3)
-  function route(st) {
-    guard(!over(st) && HUBS[st.hub].router && !st.pendingQ);
-    st.acts.push('r');
-    const next = HUBS[st.hub].route(st);
-    if (next) goTo(st, next);
-  }
-
-  // Returns a name-it question {ask, answer, pool} or null
-  function choose(st, optId) {
+  // Choose an option, and (where the hub asks) the theory behind it. Returns a pending quiz or null.
+  function choose(st, optId, theory) {
     const hub = HUBS[st.hub];
-    guard(!over(st) && !hub.router && !st.pendingQ && (!hub.sort || st.sorted));
+    guard(!over(st) && !st.pendingQ && (!hub.sort || st.sorted));
     const opts = optionsAt(st);
     const opt = opts.find((o) => o.id === optId);
     guard(opt);
-    st.acts.push('c' + optId);
+    const why = asksWhy(hub);
+    guard(why ? theory === 'none' || theoriesFor(st).includes(theory) : !theory);
+    st.acts.push('c' + optId + (why ? ':' + theory : ''));
     const vals = opts.map((o) => ({ o, v: tryOpt(st, o) }));
     const before = { M: st.M, S: st.S, W: st.W }, was = tally(st);
     st.msgs = [];
@@ -846,18 +1264,26 @@
     const best = vals.reduce((a, b) => (b.v > a.v ? b : a));
     const better = best.v > mine + 0.01;
     if (!better) st.best++;
-    const entry = { hub: hub.id, opt: opt.id, title: hub.title, choice: label(opt, st), term: opt.term, msgs: st.msgs.slice(), fun: funFor(opt, st),
+    let reason = null;
+    if (why) {
+      const fits = fitsFor(opt, st);
+      const ok = theory === 'none' ? !fits.length : fits.includes(theory);
+      if (ok) st.whyRight++; else st.whyWrong++;
+      reason = { pick: theory, ok, fits: fits.map((k) => ({ id: k, name: THEORIES[k].name, text: opt.why[k] })), bad: fits.length ? null : opt.bad || 'No motivation theory backs this choice.',
+        pickSum: theory === 'none' ? null : THEORIES[theory].sum };
+    }
+    const entry = { hub: hub.id, opt: opt.id, title: hub.title, choice: label(opt, st), term: opt.term, msgs: st.msgs.slice(), fun: funFor(opt, st), reason,
       before, after: { M: st.M, S: st.S, W: st.W }, better: better ? label(best.o, st) : null,
       betterTerm: better ? best.o.term : null, debrief: hub.debrief };
     st.log.push(entry);
     if (!st.dead) {
-      if (opt.loop) { st.removed[hub.id + opt.id] = 1; goTo(st, hub.id); }
-      else { st.sorted = false; goTo(st, opt.next || hub.next); }
+      if (opt.loop) { st.removed[hub.id + opt.id] = 1; arrive(st, hub.id); }
+      else advance(st);
     }
     pointsFor(st, entry, was);
     if (st.dead) return null;
     // A quiz falls due on reaching steps 3, 6, 9 and 12, and at the end, so a full game always has five
-    if (QUIZ_AT.filter((n) => st.reached >= n).length > st.quizIds.length) {
+    if ([3, 6, 9, 12, st.deck.length + 1].filter((n) => st.reached >= n).length > st.quizIds.length) {
       st.pendingQ = makeQuiz(st);
       st.quizIds.push(st.pendingQ.id);
     }
@@ -912,16 +1338,16 @@
   }
 
   // Rebuild a game from its recorded actions. Returns null if the actions are not a finished, legal game.
-  function replay(hireId, acts) {
+  function replay(hireId, seed, level, acts) {
     try {
-      const st = newState(hireId);
+      guard(Number.isInteger(seed));
+      const st = newState(hireId, seed, level);
       for (const a of acts) {
-        if (a === 'r') route(st);
-        else if (a === 'a') askThem(st);
+        if (a === 'a') askThem(st);
         else if (a === 'h') guard(askHR(st));
         else if (a === 's1' || a === 's0') sortResult(st, a === 's1');
         else if (a === 'n1' || a === 'n0') answerQuiz(st, a === 'n1' ? st.pendingQ && st.pendingQ.answer : null);
-        else if (a[0] === 'c') choose(st, a.slice(1));
+        else if (a[0] === 'c') { const [o, t] = a.slice(1).split(':'); choose(st, o, t); }
         else return null;
       }
       return over(st) && !st.pendingQ ? st : null;
@@ -934,12 +1360,14 @@
     { key: 'matched', each: 30, label: 'Reward matched their need right now' },
     { key: 'early', each: -10, label: 'Reward they were not ready for' },
     { key: 'best', each: 10, label: 'Best call (no option would have done better)' },
+    { key: 'whyRight', each: 20, label: 'Right reason (theory) for your choice' },
+    { key: 'whyWrong', each: 5, label: 'Reason that did not fit (+5 for trying)' },
     { key: 'quizRight', each: 20, label: 'Quiz answer right' },
     { key: 'steps', each: 10, label: 'Steps they stayed' },
   ];
   const ENDING_BONUS = { mentor: 150, loyal: 100, fragile: 50 };
   function tally(st) {
-    const t = { matched: st.matched, early: st.early, best: st.best, quizRight: st.quizRight, steps: Math.min(15, st.reached) };
+    const t = { matched: st.matched, early: st.early, best: st.best, whyRight: st.whyRight, whyWrong: st.whyWrong, quizRight: st.quizRight, steps: Math.min(st.deck.length, st.reached) };
     t.ending = st.ending ? ENDING_BONUS[st.ending.id] : 0;
     return t;
   }
@@ -981,7 +1409,7 @@
   }
 
   const Boss = { HIRES, HUBS, DEATHS, QUIZ, newState, optionsAt, label, scene, choose, answerQuiz,
-    sortCheck, askThem, askHR, route, replay, score, breakdown, POINTS, ENDING_BONUS, over };
+    sortCheck, askThem, askHR, replay, THEORIES, theoriesFor, asksWhy, score, breakdown, POINTS, ENDING_BONUS, over };
   if (typeof module !== 'undefined') module.exports = Boss;
   root.Boss = Boss;
 })(typeof window !== 'undefined' ? window : globalThis);

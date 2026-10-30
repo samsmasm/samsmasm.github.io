@@ -21,6 +21,7 @@
   header { display: flex; align-items: center; gap: 12px; padding: 8px 18px; flex-wrap: wrap;
     background: var(--masthead); border-bottom: 4px solid var(--amber-rule); }
   header img { width: 48px; height: 48px; }
+  header a.home { display: flex; align-items: center; gap: 12px; text-decoration: none; }
   header h1 { font-family: var(--serif); font-weight: 700; font-size: 26px; margin: 0; color: #fff; }
   header .sub { font-size: 12px; color: #c9d2ea; letter-spacing: .08em; text-transform: uppercase; }
   header nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
@@ -107,6 +108,19 @@
   .quizopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 600px) { .quizopts { grid-template-columns: 1fr; } }
   .quizopts .opt { font-weight: 600; }
+  .theories { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .theories .opt { min-height: 0; font-weight: 600; padding: 10px 12px; }
+  .theories .opt.none { font-weight: normal; font-style: italic; }
+  .hl { font-size: 11px; font-weight: 700; color: var(--amber); letter-spacing: .06em; }
+  .picked { font-size: 17px; margin: 2px 0 12px; }
+  .box p { margin: 6px 0; }
+  .box ul.fits { margin: 4px 0; padding-left: 18px; }
+  .box ul.fits b { display: inline; }
+  .betterline { color: var(--good); font-size: 15px; margin: 0 0 8px; }
+  .level { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--mid); }
+  .level .btn { padding: 4px 12px; }
+  .level .btn.on { background: var(--masthead); color: #fff; border-color: var(--masthead); }
+  .level .hint { font-size: 12px; max-width: 280px; }
 
   /* pick */
   .pickhead { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: end; }
@@ -196,8 +210,8 @@
 </head>
 <body>
 <header>
-  <img src="/geocornsmall.png" alt="">
-  <div><h1>You're the Boss</h1><div class="sub">Pick a path · BM 2.4 Motivation</div></div>
+  <a class="home" href="#" onclick="tab = 'play'; render(); return false;"><img src="/geocornsmall.png" alt="">
+  <div><h1>You're the Boss</h1><div class="sub">Pick a path · BM 2.4 Motivation</div></div></a>
   <nav><button data-tab="play" class="on">Play</button><button data-tab="board">Leaderboard</button><button data-tab="teacher">Teacher</button><a href="/">unisam.nz</a></nav>
 </header>
 <main id="app"></main>
@@ -323,7 +337,7 @@ const warns = (w) => '<span class="dots warns">' + warnIcon(w >= 1) + warnIcon(w
 // ---------- game ----------
 let tab = 'play';
 let G = { view: 'pick' };
-let player = { name: '', priv: false };
+let player = { name: '', priv: false, level: 'HL' };
 
 function render() {
   document.querySelectorAll('header nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -337,9 +351,11 @@ function render() {
 document.querySelectorAll('header nav button').forEach((b) => b.onclick = () => { tab = b.dataset.tab; render(); });
 
 function pickView() {
-  return '<div class="pickhead"><div><h2>Pick your hire</h2><p class="lead">Hire one, then make 15 calls. Keep them motivated, skilled and here.</p></div>' +
+  return '<div class="pickhead"><div><h2>Pick your hire</h2><p class="lead">Hire one, then make 13 calls. Keep them motivated, skilled and here.</p></div>' +
     '<div class="namebox"><label for="nm">Your name or team name</label><input id="nm" type="text" maxlength="24" value="' + esc(player.name) + '" placeholder="e.g. Team Herzberg">' +
     '<label class="small"><input type="checkbox" id="priv"' + (player.priv ? ' checked' : '') + '> Keep me off the class leaderboard</label>' +
+    '<div class="level">Level <button class="btn' + (player.level === 'SL' ? ' on' : '') + '" onclick="setLevel(\'SL\')">SL</button><button class="btn' + (player.level === 'HL' ? ' on' : '') + '" onclick="setLevel(\'HL\')">HL</button>' +
+    '<span class="hint">' + (player.level === 'HL' ? 'Taylor, Maslow, Herzberg, plus McClelland, Deci and Ryan, equity and expectancy' : 'Taylor, Maslow and Herzberg') + '</span></div>' +
     '<div class="namemsg" id="nmMsg"></div></div></div><div class="namewarn" id="nmWarn"></div>' +
     '<p class="agenote">Age discrimination' + qBtn('Age discrimination') + ' is illegal. But age can shape what people want, so ask, don\'t assume.</p>' +
     '<div class="hires">' + Boss.HIRES.map((h) =>
@@ -351,13 +367,14 @@ function pickView() {
     '<details class="rules"><summary>How it works</summary>' +
     '<p><b>Motivation</b> hits 0: they are demotivated. <b>Skills</b> hit 0: they cannot do the job. <b>Two warnings</b>: they quit. There is no top limit: keep growing them.</p>' +
     '<p>Every worker has a hidden need right now: security, belonging, esteem or growth. Rewards that match it work best. <b>Ask them</b> to find out (asking twice at one step annoys them). <b>Ask HR</b> for definitions.</p>' +
+    '<p>Most steps ask <b>why</b>: pick the theory that backs your choice. More than one can be right, and some choices have no theory behind them at all. The steps come in a different order every game, and every worker has problems of their own.</p>' +
     '<p>Every few steps HR gives you a <b>pop quiz</b> on motivation theory (five in all). Right: motivation +1. Wrong: motivation -1.</p>' +
     '<p><b>Why these points?</b> Maslow says a reward only motivates if it meets the need someone has right now, so a matched reward scores most and a reward they are not ready for loses points. A best call means no other option would have left them better off. Keeping your worker is the whole point of rewards and training, so every step they stay scores, and the ending adds a bonus: Promoted mentor 150, Loyal veteran 100, Fragile survivor 50.</p></details>';
 }
 // The scoring rules, shown before the game starts
 function scoreKey() {
   return '<div class="scorekey"><b>How you score</b>' +
-    '<span><em>+30</em> reward matches their need right now</span><span><em>+20</em> quiz answer right</span>' +
+    '<span><em>+30</em> reward matches their need right now</span><span><em>+20</em> right theory for your choice (+5 if it does not fit)</span><span><em>+20</em> quiz answer right</span>' +
     '<span><em>+10</em> best call</span><span><em>+10</em> each step they stay</span>' +
     '<span><em>+50 to 150</em> for how it ends</span><span class="neg"><em>-10</em> reward they are not ready for</span></div>';
 }
@@ -378,7 +395,7 @@ function pickWire() {
     const name = $('#nm').value.trim();
     if (!name) { $('#nmMsg').textContent = 'Type your name or team name first.'; $('#nm').focus(); return; }
     if (warnName() && okName !== nameKey()) { okName = nameKey(); $('#nm').focus(); return; }
-    player = { name: name.slice(0, 24), priv: $('#priv').checked };
+    player = { name: name.slice(0, 24), priv: $('#priv').checked, level: player.level };
     pick(b.dataset.h);
   });
 }
@@ -390,25 +407,29 @@ function workerPanel() {
     '<div><div class="nm">' + h.name + ', ' + esc(String(h.age).split(' ')[0]) + '</div><div class="job">' + esc(h.job) + '</div></div></div>' +
     '<div class="stats"><span>Motivation</span>' + dots(st.M) + '<span>Skills</span>' + dots(st.S) + '<span>Warnings</span>' + warns(st.W) +
     '<span>Score</span><span class="num" style="margin:0">' + Boss.score(st) + '</span></div>' +
-    (G.view === 'hub' || G.view === 'router' || G.view === 'sort' ?
+    (G.view === 'hub' || G.view === 'sort' ?
       '<div class="tools"><button class="btn" onclick="askThem()"' + (st.asked >= 2 ? ' disabled' : '') + '>' + (st.asked === 1 ? 'Ask them again' : 'Ask them') + '</button>' +
       '<button class="btn' + (urgent ? ' urgent' : '') + '" onclick="askHR()">' + (urgent ? 'Ask HR (costs a warning)' : 'Ask HR') + '</button></div>' : '') +
     (G.bubble ? '<div class="bubble' + (G.bubble.bad ? ' bad' : '') + '">' + G.bubble.html + '</div>' : '') + '</aside>';
 }
 
 function hubHead(hub) {
-  const n = Math.min(15, +hub.id.slice(1));
-  return '<div class="tag">Step ' + n + ' of 15' + (hub.urgent ? '<span class="urg">URGENT</span>' : '') + '</div>' +
-    '<div class="bar"><i style="width:' + (n / 15 * 100) + '%"></i></div>' +
+  const total = G.st.deck.length, n = Math.min(total, G.st.reached);
+  return '<div class="tag">Step ' + n + ' of ' + total + (hub.hl ? ' · HL' : '') + (hub.urgent ? '<span class="urg">URGENT</span>' : '') + '</div>' +
+    '<div class="bar"><i style="width:' + (n / total * 100) + '%"></i></div>' +
     '<h2>' + esc(hub.title) + '</h2><p class="scene">' + rich(Boss.scene(hub, G.st)) + '</p>';
 }
 
 function mainView() {
   const st = G.st, hub = Boss.HUBS[st.hub];
-  if (G.view === 'router') {
-    return hubHead(hub) + '<div class="chips"><span class="chip flat">Motivation ' + st.M + '</span><span class="chip flat">Skills ' + st.S + '</span><span class="chip ' + (st.W ? 'down' : 'flat') + '">Warnings ' + st.W + '</span></div>' +
-      '<p class="msgs">' + (st.S <= 1 ? 'Skills are low.' : st.M <= 1 ? 'Motivation is low.' : 'So far, so good.') + '</p>' +
-      '<button class="btn main" onclick="routeOn()">Continue</button>';
+  if (G.view === 'why') {
+    const o = Boss.optionsAt(st).find((x) => x.id === G.pickOpt);
+    return hubHead(hub) + '<div class="hr"><div class="who">You chose</div><div class="picked">' + rich(Boss.label(o, st)) +
+      ' <button class="btn" onclick="G.view = \'hub\'; render()">Change</button></div>' +
+      '<div class="ask">Because... which theory backs this?</div><div class="theories">' +
+      Boss.theoriesFor(st).map((k) => '<button class="opt" onclick="because(\'' + k + '\')">' + rich(Boss.THEORIES[k].name) + (Boss.THEORIES[k].hl ? ' <span class="hl">HL</span>' : '') + '</button>').join('') +
+      '<button class="opt none" onclick="because(\'none\')">No theory backs this</button></div>' +
+      '<p class="hint">Right reason: +20. A reason that does not fit: +5, and you will see why. More than one theory can be right.</p></div>';
   }
   if (G.view === 'sort') {
     const s = hub.sort;
@@ -452,6 +473,20 @@ function chip(label, d) {
 // Points earned by one action, with the reasons
 const ptsChip = (e) => '<span class="chip pts ' + (e.pts < 0 ? 'down' : e.pts > 0 ? 'up' : 'flat') + '">' + (e.pts > 0 ? '+' : '') + e.pts + ' points</span>';
 const ptsWhy = (e) => (e.why && e.why.length ? '<ul class="ptswhy">' + e.why.map((w) => '<li><b>' + (w.pts > 0 ? '+' : '') + w.pts + '</b> ' + esc(w.label) + '</li>').join('') + '</ul>' : '');
+// Feedback on the theory the player gave as their reason
+function reasonBox(e) {
+  const r = e.reason;
+  if (!r) return '';
+  const pick = r.pick === 'none' ? 'No theory backs this' : Boss.THEORIES[r.pick].name;
+  let html = '<div class="box ' + (r.ok ? 'good' : 'bad') + '"><b>' + (r.ok ? '✓ Right reason: ' : '✗ Your reason does not fit: ') + rich(pick) + '</b>';
+  if (!r.ok && r.pickSum) html += '<p>' + rich(r.pickSum) + ' That does not explain this choice.</p>';
+  const mine = r.fits.find((f) => f.id === r.pick), others = r.fits.filter((f) => f.id !== r.pick);
+  if (mine) html += '<p>' + esc(mine.text) + '</p>';
+  if (others.length) html += '<p>' + (r.ok ? 'Other theories back it too:' : 'What backs it:') + '</p>' +
+    '<ul class="fits">' + others.map((f) => '<li><b>' + rich(f.name) + '</b>: ' + esc(f.text) + '</li>').join('') + '</ul>';
+  if (!r.fits.length) html += '<p>' + esc(r.bad) + '</p>';
+  return html + '</div>';
+}
 function resultView() {
   const st = G.st, e = st.log[st.log.length - 1];
   const dM = e.after.M - e.before.M, dS = e.after.S - e.before.S, dW = e.after.W - e.before.W;
@@ -462,6 +497,8 @@ function resultView() {
     (e.fun ? '<p class="fun">' + esc(e.fun) + '</p>' : '') +
     '<div class="chips">' + ptsChip(e) + chips + '</div>' + ptsWhy(e) +
     '<div class="msgs">' + e.msgs.concat(dead ? [dead.why] : []).map((m) => '<p>' + esc(m) + '</p>').join('') + '</div>' +
+    reasonBox(e) +
+    (e.better && !dead ? '<p class="betterline">A better move: ' + esc(e.better) + '</p>' : '') +
     '<div class="termline">You chose: ' + rich(e.term) + '</div>' +
     '<button class="btn main" onclick="next()">' + (st.pendingQ ? 'Next: pop quiz' : Boss.over(st) ? 'See how it ended' : 'Next') + '</button>' +
     (e.debrief ? '<details><summary>Why?</summary><p>' + rich(e.debrief) + '</p></details>' : '');
@@ -487,6 +524,7 @@ function endView() {
     }).filter(Boolean).join(' · ');
     return '<div class="it"><div class="h">' + esc(e.title) + '</div><div>' + esc(e.choice) +
       '<div class="d">' + (e.quiz ? (e.quiz.ok ? 'Right' : 'Wrong') : rich(e.term)) + (d ? ' · <span class="deltas">' + d + '</span>' : '') + '</div>' +
+      (e.reason ? '<div class="d">Because: ' + (e.reason.pick === 'none' ? 'no theory' : esc(Boss.THEORIES[e.reason.pick].name)) + (e.reason.ok ? ' ✓' : ' ✗ (fits: ' + (e.reason.fits.map((f) => esc(f.name)).join(', ') || 'no theory') + ')') + '</div>' : '') +
       (e.better ? '<div class="better">' + (e.quiz ? 'Answer: ' + rich(e.better) : 'Better: ' + esc(e.better) + ' (' + rich(e.betterTerm) + ')') + '</div>' : '') +
       (e.debrief ? '<details><summary>Why?</summary><p>' + rich(e.debrief) + '</p></details>' : '') + '</div></div>';
   }).join('');
@@ -499,12 +537,13 @@ function endView() {
 }
 
 // ---------- actions ----------
-function pick(id) { G = { view: 'hub', st: Boss.newState(id), bubble: null, q: null, sortOk: null, posted: false }; enterHub(); }
+function pick(id) { G = { view: 'hub', st: Boss.newState(id, undefined, player.level), bubble: null, q: null, sortOk: null, posted: false }; enterHub(); }
+function setLevel(l) { player.name = $('#nm').value; player.priv = $('#priv').checked; player.level = l; render(); }
 function restart() { G = { view: 'pick' }; render(); window.scrollTo(0, 0); }
 function enterHub() {
   const hub = Boss.HUBS[G.st.hub];
   G.bubble = null;
-  G.view = hub.router ? 'router' : hub.sort && !G.st.sorted ? 'sort' : 'hub';
+  G.view = hub.sort && !G.st.sorted ? 'sort' : 'hub';
   if (G.view === 'sort') G.picks = new Set();
   render();
 }
@@ -528,18 +567,22 @@ function askHR() {
     '<div class="card"><b>' + esc(d.key) + '</b><br>' + esc(d.def) + '</div>').join('');
   openDlg('<h3>HR definitions</h3>' + (cost ? '<p style="color:#8a1c1c">This was urgent. Waiting cost you a warning.</p>' : '') + cards, afterRisk);
 }
-function routeOn() {
-  Boss.route(G.st);
-  if (G.st.dead) { deathLog('Month-one check'); G.view = 'end'; render(); return; }
-  G.sortOk = null; enterHub();
-}
 function togglePick(id) { G.picks.has(id) ? G.picks.delete(id) : G.picks.add(id); render(); }
 function checkSort() { G.sortOk = Boss.sortCheck(G.st, G.picks); if (G.st.dead) { G.view = 'end'; render(); return; } G.view = 'hub'; render(); }
+// Steps that ask "because which theory?" take the reason before the result shows
 function choose(id) {
+  if (Boss.asksWhy(Boss.HUBS[G.st.hub])) { G.pickOpt = id; G.view = 'why'; render(); return; }
   Boss.choose(G.st, id);
   G.bubble = null;
   G.view = 'result';
   render();
+}
+function because(theory) {
+  Boss.choose(G.st, G.pickOpt, theory);
+  G.bubble = null;
+  G.view = 'result';
+  render();
+  window.scrollTo(0, 0);
 }
 function answer(i) { Boss.answerQuiz(G.st, G.q.shown[i]); G.view = 'quizres'; render(); }
 function next() {
@@ -565,15 +608,15 @@ async function lbFetch() {
 function lbPost() {
   if (G.posted || player.priv || !player.name || !window.fetch) return Promise.resolve(null);
   G.posted = true;
-  const body = { n: player.name, c: G.st.hire.id, a: G.st.acts.join(','), at: { '.sv': 'timestamp' } };
+  const body = { v: 2, n: player.name, c: G.st.hire.id, d: G.st.seed, l: G.st.level, a: G.st.acts.join(','), at: { '.sv': 'timestamp' } };
   return fetch(LB_URL + '.json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then((r) => { if (!r.ok) throw new Error('save ' + r.status); return true; });
 }
 function lbCheck(o) {
-  if (!o || typeof o.n !== 'string' || !o.n.trim() || typeof o.c !== 'string' || typeof o.a !== 'string') return null;
-  const st = Boss.replay(o.c, o.a.split(','));
+  if (!o || o.v !== 2 || typeof o.n !== 'string' || !o.n.trim() || typeof o.c !== 'string' || typeof o.a !== 'string') return null;
+  const st = Boss.replay(o.c, o.d, o.l, o.a.split(','));
   if (!st) return null;
-  return { name: o.n.trim().slice(0, 24), hire: o.c, score: Boss.score(st), result: st.dead ? Boss.DEATHS[st.dead.kind].title : st.ending.title, at: o.at || 0 };
+  return { name: o.n.trim().slice(0, 24), hire: o.c, level: st.level, score: Boss.score(st), result: st.dead ? Boss.DEATHS[st.dead.kind].title : st.ending.title, at: o.at || 0 };
 }
 // Best score per name, with games played
 function lbAggregate(rows) {
@@ -590,7 +633,7 @@ const isMe = (r) => !player.priv && player.name && r.name.toLowerCase() === play
 function lbList(rows, limit) {
   if (!rows.length) return '<p>No scores yet this week. Be the first!</p>';
   const li = (r, i) => '<li class="' + (isMe(r) ? 'me' : '') + '"><span class="rk' + (i < 3 ? ' rk' + (i + 1) : '') + '">' + (i + 1) + '</span>' + avatar(hireOf(r.hire), 3, 0) +
-    '<span class="nm">' + esc(r.name) + (isMe(r) ? ' (you)' : '') + '<div class="meta">' + esc(hireOf(r.hire).name) + ': ' + esc(r.result) + ' · ' + r.games + ' game' + (r.games > 1 ? 's' : '') + '</div></span>' +
+    '<span class="nm">' + esc(r.name) + (isMe(r) ? ' (you)' : '') + '<div class="meta">' + esc(hireOf(r.hire).name) + ' (' + r.level + '): ' + esc(r.result) + ' · ' + r.games + ' game' + (r.games > 1 ? 's' : '') + '</div></span>' +
     '<span class="sc">' + r.score + '</span></li>';
   let out = rows.slice(0, limit).map(li).join('');
   const k = rows.findIndex(isMe);
