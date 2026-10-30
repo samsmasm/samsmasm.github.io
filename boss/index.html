@@ -433,7 +433,7 @@ function mainView() {
     return hubHead(hub) + '<div class="hr"><div class="who">You chose</div><div class="picked">' + rich(Boss.label(o, st)) +
       (tried ? '' : ' <button class="btn" onclick="G.view = \'hub\'; render()">Change</button>') + '</div>' +
       '<div class="ask">Justify it: which theory backs this?</div>' +
-      (tried ? '<div class="box bad"><b>Not quite. Try again.</b>This decision now earns half points.</div>' : '') + '<div class="theories">' +
+      (tried ? '<div class="box bad"><b>Not quite. Try again.</b>' + whyNot(o, G.lastWrong) + ' This decision now earns half points.</div>' : '') + '<div class="theories">' +
       Boss.theoriesFor(st).map((k) => btn(k, rich(Boss.THEORIES[k].name) + (Boss.THEORIES[k].hl ? ' <span class="hl">HL</span>' : ''))).join('') +
       btn('none', 'No theory backs this', ' none') + '</div>' +
       '<p class="hint">Right first time: +20 and full points for the decision. Not right first time: +5, half points for the decision, and try again. More than one theory can be right.</p></div>';
@@ -603,9 +603,15 @@ function choose(id) {
   G.view = 'result';
   render();
 }
+// Why a wrong reason does not fit: the option's own note (o.not[theory]) if it has one, else the theory in one line
+function whyNot(o, t) {
+  if (o.not && o.not[t]) return esc(o.not[t]);
+  if (t === 'none') return 'A theory does back this choice.';
+  return rich(Boss.THEORIES[t].sum) + ' That does not explain this choice.';
+}
 function because(theory) {
   if (!G.first) G.first = theory;
-  if (!Boss.reasonOk(G.st, G.pickOpt, theory)) { G.tried.add(theory); render(); return; }
+  if (!Boss.reasonOk(G.st, G.pickOpt, theory)) { G.tried.add(theory); G.lastWrong = theory; render(); return; }
   G.final = theory;
   G.detail = Boss.detailFor(G.st, G.pickOpt, theory);
   if (G.detail) { G.detailFirst = null; G.detailTried = new Set(); G.view = 'detail'; render(); window.scrollTo(0, 0); return; }

@@ -870,9 +870,11 @@
       ignore: '!Relationships at work are a hygiene factor. Ignoring the tension leaves the dissatisfaction.',
     },
     H11: {
-      indiv: { expectancy: 'A personal target with a reward raises instrumentality.', taylor: 'Taylor: pay for individual output.' },
+      indiv: { expectancy: 'A personal target with a reward raises instrumentality.', taylor: 'Taylor: pay for individual output.',
+        equity: 'Each person is rewarded for what they put in, which feels fair when they compare themselves with others.' },
       team: { maslow: 'A team reward builds belonging.', expectancy: 'A clear target and reward for the team raises instrumentality.' },
-      profit: { maslow: 'Everyone sharing the success builds belonging.' },
+      profit: { maslow: 'Everyone sharing the success builds belonging.',
+        equity: 'Nobody is left out, so it can feel fair. But equal is not always equitable: someone who put in more gets the same, and may feel under-rewarded.' },
       none: '!Success with no reward ignores recognition and pay. No theory backs it.',
     },
     H14: {
