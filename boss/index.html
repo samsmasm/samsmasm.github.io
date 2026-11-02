@@ -341,7 +341,7 @@ const warns = (w) => '<span class="dots warns">' + warnIcon(w >= 1) + warnIcon(w
 // ---------- game ----------
 let tab = 'play';
 let G = { view: 'pick' };
-let player = { name: '', priv: false, level: 'HL' };
+let player = { name: '', level: 'HL' };
 
 function render() {
   document.querySelectorAll('header nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -357,7 +357,6 @@ document.querySelectorAll('header nav button').forEach((b) => b.onclick = () => 
 function pickView() {
   return '<div class="pickhead"><div><h2>Pick your hire</h2><p class="lead">Hire one, then make 13 calls. Keep them motivated, skilled and here.</p></div>' +
     '<div class="namebox"><label for="nm">Your name or team name</label><input id="nm" type="text" maxlength="24" value="' + esc(player.name) + '" placeholder="e.g. Team Herzberg">' +
-    '<label class="small"><input type="checkbox" id="priv"' + (player.priv ? ' checked' : '') + '> Don\'t record my score on the leaderboard</label>' +
     '<div class="level">Level <button class="btn' + (player.level === 'SL' ? ' on' : '') + '" onclick="setLevel(\'SL\')">SL</button><button class="btn' + (player.level === 'HL' ? ' on' : '') + '" onclick="setLevel(\'HL\')">HL</button>' +
     '<span class="hint">' + (player.level === 'HL' ? 'Taylor, Maslow, Herzberg, plus McClelland, Deci and Ryan, equity and expectancy' : 'Taylor, Maslow and Herzberg') + '</span></div>' +
     '<div class="namemsg" id="nmMsg"></div></div></div><div class="namewarn" id="nmWarn"></div>' +
@@ -389,18 +388,17 @@ let taken = new Set(), okName = null;
 function pickWire() {
   const nameKey = () => $('#nm').value.trim().slice(0, 24).toLowerCase();
   const warnName = () => {
-    const k = nameKey(), clash = k && taken.has(k) && !$('#priv').checked;
+    const k = nameKey(), clash = k && taken.has(k);
     $('#nmWarn').innerHTML = clash ? 'Someone called <b>' + esc($('#nm').value.trim()) + '</b> is already on this week\'s leaderboard. If that is not you, change your name. If it is you, pick your hire again.' : '';
     return clash;
   };
   lbFetch().then((d) => { taken = new Set(Object.values(d).filter((o) => o && typeof o.n === 'string').map((o) => o.n.trim().slice(0, 24).toLowerCase())); if ($('#nm')) warnName(); }).catch(() => {});
   $('#nm').oninput = () => { $('#nmMsg').textContent = ''; okName = null; warnName(); };
-  $('#priv').onchange = warnName;
   document.querySelectorAll('.hire').forEach((b) => b.onclick = () => {
     const name = $('#nm').value.trim();
     if (!name) { $('#nmMsg').textContent = 'Type your name or team name first.'; $('#nm').focus(); return; }
     if (warnName() && okName !== nameKey()) { okName = nameKey(); $('#nm').focus(); return; }
-    player = { name: name.slice(0, 24), priv: $('#priv').checked, level: player.level };
+    player = { name: name.slice(0, 24), level: player.level };
     pick(b.dataset.h);
   });
 }
@@ -562,7 +560,7 @@ function pick(id) {
   G.st.seen = seenGet();
   enterHub();
 }
-function setLevel(l) { player.name = $('#nm').value; player.priv = $('#priv').checked; player.level = l; render(); }
+function setLevel(l) { player.name = $('#nm').value; player.level = l; render(); }
 function restart() { G = { view: 'pick' }; render(); window.scrollTo(0, 0); }
 function enterHub() {
   const hub = Boss.HUBS[G.st.hub];
@@ -664,12 +662,25 @@ async function lbFetch() {
   if (!r.ok) throw new Error('load ' + r.status);
   return (await r.json()) || {};
 }
+// Every finished game is recorded; the end screen then offers "Don't record my score", which deletes that row
 function lbPost() {
-  if (G.posted || player.priv || !player.name || !window.fetch) return Promise.resolve(null);
-  G.posted = true;
-  const body = { v: 4, n: player.name, c: G.st.hire.id, d: G.st.seed, l: G.st.level, a: G.st.acts.join(','), at: { '.sv': 'timestamp' } };
+  const g = G;
+  if (g.posted || !player.name || !window.fetch) return Promise.resolve(null);
+  g.posted = true;
+  const body = { v: 4, n: player.name, c: g.st.hire.id, d: g.st.seed, l: g.st.level, a: g.st.acts.join(','), at: { '.sv': 'timestamp' } };
   return fetch(LB_URL + '.json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    .then((r) => { if (!r.ok) throw new Error('save ' + r.status); return true; });
+    .then((r) => { if (!r.ok) throw new Error('save ' + r.status); return r.json(); })
+    .then((j) => { g.savedKey = j && j.name; return true; });
+}
+async function unrecord() {
+  const g = G;
+  if (!g.savedKey || g.unrecorded) return;
+  try {
+    const r = await fetch(LB_URL + '/' + encodeURIComponent(g.savedKey) + '.json', { method: 'DELETE' });
+    if (!r.ok) throw new Error(r.status);
+    g.unrecorded = true;
+  } catch (e) { g.unrecordFailed = true; }
+  lbEnd();
 }
 function lbCheck(o) {
   if (!o || ![2, 3, 4].includes(o.v) || typeof o.n !== 'string' || !o.n.trim() || typeof o.c !== 'string' || typeof o.a !== 'string') return null;
@@ -687,7 +698,7 @@ function lbAggregate(rows) {
   return Object.values(best).sort((a, b) => b.score - a.score);
 }
 async function lbLoad() { return lbAggregate(Object.values(await lbFetch()).map(lbCheck).filter(Boolean)); }
-const isMe = (r) => !player.priv && player.name && r.name.toLowerCase() === player.name.toLowerCase();
+const isMe = (r) => player.name && r.name.toLowerCase() === player.name.toLowerCase();
 function lbList(rows, limit) {
   if (!rows.length) return '<p>No scores yet this week. Be the first!</p>';
   const li = (r, i) => '<li class="' + (isMe(r) ? 'me' : '') + '"><span class="rk' + (i < 3 ? ' rk' + (i + 1) : '') + '">' + (i + 1) + '</span>' + avatar(hireOf(r.hire), 3, 0) +
@@ -701,8 +712,10 @@ function lbList(rows, limit) {
 async function lbEnd() {
   const g = G, box = () => (G === g ? $('#lbBox') : null);
   let note = '';
-  if (player.priv) note = '<p class="hint">You chose not to record your score, so this game was not added to the leaderboard.</p>';
   try { await lbPost(); } catch (e) { note = '<p class="hint">Could not save your score to the leaderboard.</p>'; }
+  if (g.unrecorded) note = '<p class="hint">Your score was not recorded. This game is off the leaderboard.</p>';
+  else if (g.savedKey) note = '<p class="hint">Your score is on the leaderboard. <button class="btn" onclick="unrecord()">Don\'t record my score</button></p>' +
+    (g.unrecordFailed ? '<p class="hint">Could not remove it. Try again.</p>' : '');
   try { const rows = await lbLoad(); if (box()) box().innerHTML = note + lbList(rows, 10); }
   catch (e) { if (box()) box().innerHTML = note + '<p class="hint">The leaderboard needs an internet connection.</p>'; }
 }
