@@ -1303,7 +1303,12 @@
     const valid = (t) => t === 'none' || theoriesFor(st).includes(t);
     guard(why ? valid(theory) : !theory);
     if (why && v4) {
-      if (reasonOk(st, optId, theory)) final = theory;
+      // A first reason that has since become right (reasons get added, as equity at H11 was) wins over the saved
+      // later try, so saved games still replay; the follow-up then only counts if that theory has one.
+      if (reasonOk(st, optId, theory) && final !== theory) {
+        final = theory;
+        detail = detailFor(st, optId, final) ? (detail === '1' ? '1' : '0') : undefined;
+      }
       guard(valid(final) && reasonOk(st, optId, final));
       guard(detailFor(st, optId, final) ? detail === '1' || detail === '0' : !detail);
     }
