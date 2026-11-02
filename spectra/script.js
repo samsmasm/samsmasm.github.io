@@ -65,17 +65,18 @@ function getStudentId() {
     return id;
 }
 
-function parseStatements(raw) {
-    return raw.trim().split(/\n\s*\n/)
-        .map(block => block.trim())
-        .filter(Boolean)
-        .map((block, i) => {
-            const match = block.match(/^([\s\S]+?)\s*\[([^\]]+)\]\s*$/);
-            if (!match) return null;
-            const categories = match[2].split(',').map(c => c.trim()).filter(Boolean);
-            return { id: i, text: match[1].trim(), categories };
-        })
-        .filter(Boolean);
+// Read the one-box-per-statement rows on the setup form
+function readStatementRows(useCategories) {
+    return [...document.querySelectorAll('#statement-rows .statement-row')]
+        .map(row => ({
+            text: row.querySelector('.statement-text-input').value.trim(),
+            categories: useCategories
+                ? row.querySelector('.statement-cat-input').value.split(',').map(c => c.trim()).filter(Boolean)
+                : [],
+            optional: row.querySelector('.statement-optional-input').checked
+        }))
+        .filter(s => s.text)
+        .map((s, i) => ({ id: i, ...s }));
 }
 
 // Backward-compat: old rooms stored category (string), new ones store categories (array)
@@ -83,6 +84,11 @@ function getCategories(statement) {
     if (Array.isArray(statement.categories) && statement.categories.length) return statement.categories;
     if (statement.category) return [statement.category];
     return ['Uncategorised'];
+}
+
+// Old rooms had no toggle and always used categories
+function usesCategories(config) {
+    return config.useCategories ?? true;
 }
 
 // Format a scale-end label: "Never (0)" or just "0"
@@ -188,6 +194,16 @@ function initTeacherSetup() {
         window.location.href = '.';
     });
 
+    const rowsEl = document.getElementById('statement-rows');
+    const catToggle = document.getElementById('categories-toggle');
+    for (let i = 0; i < 3; i++) addStatementRow();
+    document.getElementById('btn-add-statement').addEventListener('click', () => {
+        addStatementRow().querySelector('.statement-text-input').focus();
+    });
+    catToggle.addEventListener('change', () => {
+        rowsEl.classList.toggle('with-categories', catToggle.checked);
+    });
+
     document.getElementById('btn-start-session').addEventListener('click', createSession);
     document.getElementById('btn-rejoin').addEventListener('click', rejoinSession);
 
@@ -204,25 +220,47 @@ function initTeacherSetup() {
     });
 }
 
+function addStatementRow() {
+    const row = document.createElement('div');
+    row.className = 'statement-row';
+    row.innerHTML = `
+        <textarea class="statement-text-input" rows="2" placeholder="e.g. Homework should be banned."></textarea>
+        <input type="text" class="statement-cat-input" placeholder="Category, e.g. Education, Ethics" autocomplete="off">
+        <div class="statement-row-foot">
+            <label class="toggle-label small">
+                <input type="checkbox" class="statement-optional-input">
+                <span>Optional</span>
+            </label>
+            <button type="button" class="btn-link statement-remove" title="Remove statement">Remove</button>
+        </div>
+    `;
+    row.querySelector('.statement-remove').addEventListener('click', () => {
+        const rowsEl = document.getElementById('statement-rows');
+        if (rowsEl.children.length > 1) row.remove();
+        else row.querySelectorAll('textarea, input[type=text]').forEach(el => { el.value = ''; });
+    });
+    document.getElementById('statement-rows').appendChild(row);
+    return row;
+}
+
 async function createSession() {
     hideError('create-error');
 
     const roomName = document.getElementById('new-room-input').value.trim().toUpperCase();
     const pin = document.getElementById('new-pin-input').value.trim();
-    const raw = document.getElementById('statements-input').value;
     const scaleMin = parseInt(document.getElementById('scale-min-input').value) || 0;
     const scaleMax = parseInt(document.getElementById('scale-max-input').value) || 100;
     const shuffle = document.getElementById('shuffle-toggle').checked;
     const requireName = document.getElementById('require-name-toggle').checked;
+    const useCategories = document.getElementById('categories-toggle').checked;
+    const statements = readStatementRows(useCategories);
 
     if (!roomName) return showError('create-error', 'Please enter a room name.');
     if (!pin) return showError('create-error', 'Please enter a PIN.');
-    if (!raw.trim()) return showError('create-error', 'Please add some statements.');
+    if (statements.length === 0) return showError('create-error', 'Please add some statements.');
     if (scaleMax <= scaleMin) return showError('create-error', 'Scale max must be greater than scale min.');
-
-    const statements = parseStatements(raw);
-    if (statements.length === 0) {
-        return showError('create-error', 'No valid statements found. Use the format: Statement text [Category]');
+    if (useCategories && statements.some(s => s.categories.length === 0)) {
+        return showError('create-error', 'Give every statement a category, or untick Use categories.');
     }
 
     const indices = statements.map((_, i) => i);
@@ -232,7 +270,7 @@ async function createSession() {
     const context = document.getElementById('context-input').value.trim();
     const minLabel = document.getElementById('scale-min-label-input').value.trim();
     const maxLabel = document.getElementById('scale-max-label-input').value.trim();
-    const config = { pin: pinHash, scaleMin, scaleMax, minLabel, maxLabel, shuffle, statementOrder, statements, requireName, context };
+    const config = { pin: pinHash, scaleMin, scaleMax, minLabel, maxLabel, shuffle, statementOrder, statements, requireName, context, useCategories };
 
     const btn = document.getElementById('btn-start-session');
     btn.textContent = 'Creating…';
@@ -321,6 +359,9 @@ function initTeacherDashboard(roomName) {
     get(ref(db, `spectra/${roomName}/config`)).then(snap => {
         if (snap.exists()) {
             currentConfig = snap.val();
+            const catsOn = usesCategories(currentConfig);
+            document.querySelectorAll('.btn-mode[data-mode="organise"], .btn-mode[data-mode="reveal"]')
+                .forEach(b => b.classList.toggle('hidden', !catsOn));
             const ctx = currentConfig.context || '';
             const ctxEl = document.getElementById('context-text');
             if (ctx) {
@@ -759,31 +800,47 @@ function initStudentSliders() {
         ? `<span class="slider-max">${escapeHtml(maxLabel)}<br><small>${scaleMax}</small></span>`
         : `<span class="slider-max">${scaleMax}</span>`;
 
+    // Sliders start unanswered; a value only counts once the student touches it
     ordered.forEach(statement => {
-        const savedVal = prevValues[statement.id] ?? mid;
+        const savedVal = prevValues[statement.id];
+        const answered = savedVal !== undefined;
         const item = document.createElement('div');
-        item.className = 'slider-item';
+        item.className = 'slider-item' + (answered ? '' : ' unset');
         item.innerHTML = `
-            <div class="slider-statement-text">${escapeHtml(statement.text)}</div>
+            <div class="slider-statement-text">${escapeHtml(statement.text)}${statement.optional ? ' <span class="optional-tag">optional</span>' : ''}</div>
             <div class="slider-row">
                 ${minLabelHtml}
                 <input type="range" class="spectrum-slider"
                     min="${scaleMin}" max="${scaleMax}"
-                    value="${savedVal}">
+                    value="${answered ? savedVal : mid}">
                 ${maxLabelHtml}
-                <span class="slider-value">${savedVal}</span>
+                <span class="slider-value">${answered ? savedVal : '–'}</span>
             </div>
+            ${statement.optional ? '<button type="button" class="btn-link slider-clear">Clear</button>' : ''}
         `;
         container.appendChild(item);
 
         const slider = item.querySelector('.spectrum-slider');
         const valueEl = item.querySelector('.slider-value');
-        studentSliderValues[statement.id] = savedVal;
+        if (answered) studentSliderValues[statement.id] = savedVal;
 
-        slider.addEventListener('input', () => {
+        const record = () => {
             const v = Number(slider.value);
             studentSliderValues[statement.id] = v;
             valueEl.textContent = v;
+            item.classList.remove('unset', 'missing');
+        };
+        slider.addEventListener('input', record);
+        // Tapping the thumb at its current spot doesn't fire input, so count it too
+        slider.addEventListener('pointerup', record);
+        slider.addEventListener('keyup', record);
+
+        const clearBtn = item.querySelector('.slider-clear');
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            delete studentSliderValues[statement.id];
+            slider.value = mid;
+            valueEl.textContent = '–';
+            item.classList.add('unset');
         });
     });
 
@@ -814,6 +871,17 @@ function initStudentSliders() {
 }
 
 async function submitStudentResponses() {
+    hideError('submit-error');
+    const missing = studentConfig.statements.filter(s => !s.optional && studentSliderValues[s.id] === undefined);
+    if (missing.length) {
+        const missingIds = new Set(missing.map(s => s.id));
+        const items = document.querySelectorAll('#sliders-container .slider-item');
+        const ordered = studentConfig.statementOrder.map(i => studentConfig.statements[i]);
+        ordered.forEach((s, i) => items[i].classList.toggle('missing', missingIds.has(s.id)));
+        document.querySelector('#sliders-container .slider-item.missing').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return showError('submit-error', `Answer the highlighted statement${missing.length !== 1 ? 's' : ''} first.`);
+    }
+
     const studentId = getStudentId();
     const btn = document.getElementById('btn-submit-responses');
     btn.textContent = 'Submitting…';
@@ -825,6 +893,8 @@ async function submitStudentResponses() {
 
     try {
         await set(ref(db, `spectra/${studentRoom}/responses/${studentId}`), data);
+        btn.textContent = 'Submit Responses';
+        btn.disabled = false;
         document.getElementById('submit-bar').classList.add('hidden');
         document.getElementById('done-message').classList.remove('hidden');
     } catch (err) {

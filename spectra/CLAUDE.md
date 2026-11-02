@@ -47,6 +47,12 @@ Spectra, Pulse, and Dowser form a trio of live classroom tools sharing the same 
 
 ---
 
+## Statements (Nov 2026)
+
+- Setup has one box per statement (`#statement-rows`, `+ Add statement`). The old `Text [Category]` textarea format is gone.
+- **Use categories** toggle (`config.useCategories`). When on, each row shows a comma-separated category box and every statement needs one. When off, Organise and Reveal mode buttons are hidden. Old rooms have no flag and are treated as categories on.
+- Each statement has `optional: bool`. Student sliders start unanswered (faded thumb, value `–`); a value only counts once touched. Compulsory ones block submit and get a red border; optional ones can be left blank or cleared and are omitted from the response.
+
 ## Current status
 
 Working. No known bugs or planned features.
