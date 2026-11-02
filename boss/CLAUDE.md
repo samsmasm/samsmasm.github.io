@@ -4,11 +4,11 @@ Pick-a-path game for IB BM 2.4 (motivation, rewards, training). Hire one of six 
 
 ## Files
 
-- `engine.js`: all rules (hires, theories, scenarios, deck, Need engine, reasons, pop quiz, endings, score, replay). No DOM. `node test.js` checks every option has a reason at SL and HL, deck shape and variety, 6,000 random and 48 greedy games, replay matches, five quizzes per full game, tampered games rejected.
+- `engine.js`: all rules (hires, theories, scenarios, deck, Need engine, reasons, pop quiz, endings, score, replay). No DOM. `node test.js` checks every option has a reason at SL and HL, every reason has a follow-up answer, deck shape and variety, 6,000 random and 48 greedy games, replay matches (v4, plus a v2 game), five quizzes and a Herzberg question per full game, a miss question per early reward, half points only after a wrong reason, try again scores only the first try, a wrong final reason is refused, tampered games rejected.
 - `defs.js`: key word definitions. Every key (and its `also` spellings) gets a "?" wherever it appears. Sam will replace these draft definitions with his own; empty `def` shows "Definition coming soon."
-- `index.html`: UI. Views: pick, hub, why (choose the theory), sort (H5), result, quiz, quizres, end; tabs Play, Leaderboard, Teacher. Logo and title go back to Play.
+- `index.html`: UI. Views: pick, hub, why (choose the theory), detail (follow-up), sort (H5), result, quiz (pop quiz and miss question), quizres, end; tabs Play, Leaderboard, Teacher. Logo and title go back to Play.
 
-## How a game runs (rebuilt 2026-10-30 after Sam found two workers' paths "almost identical")
+## How a game runs (rebuilt 2026-10-30 after Sam found two workers' paths "almost identical"; made primarily a learning game the same day: justify, follow-up, try again)
 
 - **Level**: SL (Taylor, Maslow, Herzberg) or HL (adds McClelland, Deci and Ryan, equity, expectancy, and appraisal). Chosen on the pick screen, default HL. SL games never show HL scenarios, theories or quiz questions.
 - **Deck** (`makeDeck`, seeded): H1 Day one, H2 The contract, then 10 shuffled scenarios, then H15 Year-end. The 10 are the hire's own scenarios (`hire:` on the hub, two each; the cat's red dot is HL), plus in HL three from `HL_POOL` (EQ, EX, SD, MC, AP), then the rest from `SL_POOL` (H6 to H14).
@@ -24,6 +24,7 @@ Pick-a-path game for IB BM 2.4 (motivation, rewards, training). Hire one of six 
 
 ## Other rules
 
+- Maslow levels are always physiological, safety, belonging, esteem, self-actualisation (Sam's wording; British "s"). Never "security" or "self-fulfilment". The game's need 1 covers physiological and safety together, so in-game lists show four: "Physiological and safety", "Belonging", "Esteem", "Self-actualisation" (`LEVEL_NAMES`, `LEVELS`).
 - Motivation and skills have no ceiling. Need runs 1 to 4. Endings: Promoted mentor needs M 8+, S 5+, need 3+, the H15 promotion and no Gaming flag; Loyal veteran M 5+, S 4+.
 - Option labels at name-it hubs (H2, H7, H11, H13) describe the scheme without naming it.
 - **Grievances** (`W` in the code; renamed from "warnings" because that sounded like discipline against the worker): complaints the worker raises about how you treat them. Two and they quit. Fixes that solve the cause (`clearW`) wipe them.
@@ -40,6 +41,13 @@ Maya 24, Tuan 26, Aisha 27, Kofi 44 (career change, teenagers at home, his mothe
 - Score (Sam's "mix", explained on the pick screen, after every step and as an end breakdown): +30 reward matches the current need, -10 reward they were not ready for, +10 named the need they were on, +10 best call, +20 right reason first time, +5 reason that did not fit (and the decision's +30 and +10 become +15 and +5), +10 follow-up right first time, +20 quiz right, +10 per step reached (max 13), plus ending bonus (mentor 150, loyal 100, fragile 50). `POINTS`, `breakdown()`, `pointsFor()`.
 - Leaderboard: Realtime Database `coldwar-d8109`, path `boss/scores`, REST only. Rows `{v: 4, n, c: hire, d: seed, l: level, a: actions, at}`; scores are recomputed with `Boss.replay(hire, seed, level, acts, v)`. v2 and v3 rows replay under their own rules; other versions are ignored. Last 7 days, best per name. Teacher tab code `0987` lists rows with two-click Delete.
 - Tests must stub `fetch`: never write test rows to the real database. Screenshot scripts must write to the scratchpad by absolute path, never into this folder.
+- Checking the page without a browser (the Chrome extension is not always connected): run `defs.js`, `engine.js` and the inline script in a Node `vm` context with a stub `document` (only `#app` needs real `innerHTML`; everything else can be a Proxy that swallows calls) and stub `localStorage`. Then play games by calling the page's own functions (`pick`, `choose`, `because`, `detailPick`, `answer`, `next`, `checkSort`) based on `G.view`, assert no "undefined" or "NaN" in `#app`, and replay each finished game. Keep the script in the scratchpad.
+
+## Open ideas (not built)
+
+- Audit every option for theories students could reasonably argue for that are marked wrong, as a list for Sam to decide on (he disputed H11 profit share and equity). Don't add any without his say.
+- Option-specific `not` texts for the wrong picks students argue with most.
+- If games feel too long (about 10 justify steps, about 7 with a follow-up), ask the follow-up every other step.
 
 ## Style
 
