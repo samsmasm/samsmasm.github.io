@@ -357,7 +357,7 @@ document.querySelectorAll('header nav button').forEach((b) => b.onclick = () => 
 function pickView() {
   return '<div class="pickhead"><div><h2>Pick your hire</h2><p class="lead">Hire one, then make 13 calls. Keep them motivated, skilled and here.</p></div>' +
     '<div class="namebox"><label for="nm">Your name or team name</label><input id="nm" type="text" maxlength="24" value="' + esc(player.name) + '" placeholder="e.g. Team Herzberg">' +
-    '<label class="small"><input type="checkbox" id="priv"' + (player.priv ? ' checked' : '') + '> Keep me off the class leaderboard</label>' +
+    '<label class="small"><input type="checkbox" id="priv"' + (player.priv ? ' checked' : '') + '> Don\'t record my score on the leaderboard</label>' +
     '<div class="level">Level <button class="btn' + (player.level === 'SL' ? ' on' : '') + '" onclick="setLevel(\'SL\')">SL</button><button class="btn' + (player.level === 'HL' ? ' on' : '') + '" onclick="setLevel(\'HL\')">HL</button>' +
     '<span class="hint">' + (player.level === 'HL' ? 'Taylor, Maslow, Herzberg, plus McClelland, Deci and Ryan, equity and expectancy' : 'Taylor, Maslow and Herzberg') + '</span></div>' +
     '<div class="namemsg" id="nmMsg"></div></div></div><div class="namewarn" id="nmWarn"></div>' +
@@ -677,13 +677,12 @@ function lbCheck(o) {
   if (!st) return null;
   return { name: o.n.trim().slice(0, 24), hire: o.c, level: st.level, score: Boss.score(st), result: st.dead ? Boss.DEATHS[st.dead.kind].title : st.ending.title, at: o.at || 0 };
 }
-// Best score per name, with games played
+// Best score per name (how many games each person played is not shown)
 function lbAggregate(rows) {
   const best = {};
   rows.forEach((r) => {
-    const k = r.name.toLowerCase(), b = best[k];
-    if (!b) best[k] = Object.assign({ games: 1 }, r);
-    else { b.games++; if (r.score > b.score) Object.assign(b, r, { games: b.games }); }
+    const k = r.name.toLowerCase();
+    if (!best[k] || r.score > best[k].score) best[k] = r;
   });
   return Object.values(best).sort((a, b) => b.score - a.score);
 }
@@ -692,7 +691,7 @@ const isMe = (r) => !player.priv && player.name && r.name.toLowerCase() === play
 function lbList(rows, limit) {
   if (!rows.length) return '<p>No scores yet this week. Be the first!</p>';
   const li = (r, i) => '<li class="' + (isMe(r) ? 'me' : '') + '"><span class="rk' + (i < 3 ? ' rk' + (i + 1) : '') + '">' + (i + 1) + '</span>' + avatar(hireOf(r.hire), 3, 0) +
-    '<span class="nm">' + esc(r.name) + (isMe(r) ? ' (you)' : '') + '<div class="meta">' + esc(hireOf(r.hire).name) + ' (' + r.level + '): ' + esc(r.result) + ' · ' + r.games + ' game' + (r.games > 1 ? 's' : '') + '</div></span>' +
+    '<span class="nm">' + esc(r.name) + (isMe(r) ? ' (you)' : '') + '<div class="meta">' + esc(hireOf(r.hire).name) + ' (' + r.level + '): ' + esc(r.result) + '</div></span>' +
     '<span class="sc">' + r.score + '</span></li>';
   let out = rows.slice(0, limit).map(li).join('');
   const k = rows.findIndex(isMe);
@@ -702,7 +701,7 @@ function lbList(rows, limit) {
 async function lbEnd() {
   const g = G, box = () => (G === g ? $('#lbBox') : null);
   let note = '';
-  if (player.priv) note = '<p class="hint">You chose to stay off the leaderboard, so this game was not added.</p>';
+  if (player.priv) note = '<p class="hint">You chose not to record your score, so this game was not added to the leaderboard.</p>';
   try { await lbPost(); } catch (e) { note = '<p class="hint">Could not save your score to the leaderboard.</p>'; }
   try { const rows = await lbLoad(); if (box()) box().innerHTML = note + lbList(rows, 10); }
   catch (e) { if (box()) box().innerHTML = note + '<p class="hint">The leaderboard needs an internet connection.</p>'; }
