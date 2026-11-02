@@ -8,7 +8,7 @@ Daily dashboard: is the AI stock bubble popping? Built 2026-11-01. Sam wanted it
 - `manual.json`: hand-entered quarterly numbers (Big Tech capex guidance, Nvidia data-centre revenue, H100 rental price, private lab valuations). The page reads it directly, so a commit shows at once.
 - `app.js`: all rendering and **every threshold** (`SIGNALS`, `MEASURES`). `style.css`, `index.html`.
 - `test/run.sh`: headless-Chrome check of both tabs (`HP_SHOTS=<dir>` saves screenshots). Run before committing.
-- `.github/workflows/hasitpopped.yml` (repo root): runs `fetch.py` 22:30 UTC Mon-Fri and commits `data.json`.
+- `.github/workflows/hasitpopped.yml` (repo root): runs `fetch.py` 22:30 UTC Mon-Fri and commits `data.json`. **Not on GitHub yet** (2026-11-02): the git token lacks `workflow` scope, so the file sits uncommitted locally until Sam adds it through the GitHub web UI. Until then `data.json` is the 30 Oct 2026 snapshot; to refresh by hand, run `python3 hasitpopped/fetch.py` and commit `data.json`.
 
 ## Signals (overview)
 Eight lights: AI index from peak, QQQ/RSP from peak, % of AI stocks above 200-day, VXN, high-yield spread (auto); capex cuts, Nvidia DC growth, H100 rental price (manual). Red = 1, amber = ½: under 1.5 "Not yet.", under 3 "Wobbling.", under 4.5 "Hissing.", else "Popped.".

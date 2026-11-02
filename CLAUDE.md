@@ -71,6 +71,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `wb/`: minimal whiteboard, drawing layer + grid layer, no backend
 - `pdfwrite/`: upload a PDF and annotate it freehand
 - `newbiz/`: random-word business case generator with 3D drum spinner (chrome-free by design)
+- `hasitpopped/`: Has it popped? AI bubble dashboard: 8 traffic-light signals + 24 AI stocks. `fetch.py` (Yahoo + FRED) writes `data.json` daily via a GitHub Action; `manual.json` is hand-updated each earnings season. Run `test/run.sh` before committing. Not linked from any index yet.
 
 **Personal tools** (`sayso`, `moderntranslation`, `tote` are meant for the future private page; keep them off the public index)
 - `sayso/`: marking transcription app (Cloudflare Worker, live)
@@ -209,6 +210,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `econnews_scripts/` — Python scripts for the EconNews pipeline (RSS → Claude → GitHub Pages)
 - `businews_scripts/` — Python scripts for the BusiNews pipeline (see `businews/CLAUDE.md`)
 - `.github/workflows/` — workflow definitions
+- **Claude can't push workflow files.** The stored git token has no `workflow` scope, so any push touching `.github/workflows/` is rejected. Leave new workflow files uncommitted and ask Sam to add them via the GitHub web UI (or give the token workflow scope). Pending as of 2026-11-02: `hasitpopped.yml`.
 - `generate-feeds.py` / `generate-manifest.js` — feed generation utilities
 
 ---
