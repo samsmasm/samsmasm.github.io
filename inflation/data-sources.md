@@ -9,6 +9,8 @@ Download after each quarterly CPI/HLPI release (published ~6 weeks after quarter
 Drop the new CSVs into `inflation/data/`, then run `python3 inflation/data/process_data.py`.
 The old CSV with the same prefix can be deleted — the processor picks up the latest file automatically.
 
+Sam may download only recent years (e.g. 2020 on). Before deleting the old CSV, check the overlapping quarters match, then copy the old file's earlier quarter rows into the new file so the series still starts at 2016Q1.
+
 ### CPI — group: Consumers Price Index - CPI
 
 | Infoshare dataset name | File prefix | Used for |
