@@ -493,7 +493,7 @@
           fun: { rosa: 'Rosa signs up for a course in data dashboards. She is the only one who finishes it.',
             cat: 'Biscuit buys a book and sits on it. Learning by absorption.' } },
       ],
-      debrief: 'Fringe payments are extras given on top of pay. They are extrinsic and mostly hygiene factors (Herzberg), so they stop complaints but rarely motivate on their own. A learning allowance is a fringe payment that serves growth, so it can do more.',
+      debrief: 'Fringe payments are extras given on top of pay. They are extrinsic and mostly hygiene factors (Herzberg), so they stop complaints but rarely motivate on their own. In Maslow\'s terms, free meals and a gym meet physiological needs, and health cover meets safety. A learning allowance is a fringe payment that serves growth, so it can do more.',
     },
     H15: {
       title: 'Year-end',
@@ -742,7 +742,7 @@
         { id: 'crew', label: 'Put him in a picking team with a shared target', term: 'Teamwork', fx: { M: 2 },
           why: { maslow: 'Belonging is a social need.', sdt: 'Working with others gives relatedness.', mcclelland: 'Kofi is driven by affiliation.' } },
         { id: 'bonus', label: 'Pay a night-shift bonus', term: 'Shift premium', fx: { tag: 1 },
-          why: { maslow: 'Extra pay meets security needs, if they are not met yet.', herzberg: 'Pay is a hygiene factor.' } },
+          why: { maslow: 'Extra pay meets safety needs, if they are not met yet.', herzberg: 'Pay is a hygiene factor.' } },
         { id: 'pods', label: 'Give him headphones and a podcast subscription', term: 'Perk', fx: {}, fun: 'He is now an expert on Roman plumbing.',
           why: { herzberg: 'Nicer conditions are a hygiene factor. He is still alone.' } },
         { id: 'nothing', label: 'Night shift is night shift', term: 'Ignoring it', fx: { M: -1 },
@@ -878,8 +878,8 @@
       none: '!Success with no reward ignores recognition and pay. No theory backs it.',
     },
     H14: {
-      car: { maslow: 'Perks meet security needs, if those are not met yet.', herzberg: 'Perks are hygiene factors.' },
-      gym: { maslow: 'Perks meet basic needs, if those are not met yet.', herzberg: 'Perks are hygiene factors.' },
+      car: { maslow: 'Getting to work safely meets safety needs, if those are not met yet.', herzberg: 'Perks are hygiene factors.' },
+      gym: { maslow: 'Food and exercise meet physiological needs, if those are not met yet.', herzberg: 'Perks are hygiene factors.' },
       health: { maslow: 'Health cover meets safety needs.', herzberg: 'Perks are hygiene factors.' },
       learn: { maslow: 'Learning supports self-actualisation.', sdt: 'Learning builds competence.', herzberg: 'Growth is a motivator.' },
     },
