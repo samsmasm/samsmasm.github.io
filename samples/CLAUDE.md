@@ -1,7 +1,23 @@
 # Samples, `/samples`
 
-Proof of concept: IB model answers revealed step by step from hint to full paragraph.
+IB model answers revealed step by step: hint, prompt, starters, blanks (click a blank to reveal a word), full text. Linked from the homepage under Economics.
 
-- `index.html` plus `econ/` sample pages. Linked from the homepage under Economics.
+Static, no build step; deploys on push to `main`. AESTHETIC.md Option B (paper and ink).
 
-Static, no build step; deploys on push to `main`. Follow the root `CLAUDE.md` (and `AESTHETIC.md` for anything new).
+## Files
+- `samples.css` + `engine.js`: shared by every sample page. A page defines `window.SAMPLE = { parts: [...] }` and loads `engine.js`; it renders into `<main id="essay">`. The data format is documented at the top of `engine.js`.
+- `index.html`: ruled index of samples.
+- `econ/macro/poverty/`: 15-mark P1 essay (one part).
+- `econ/micro/price-floor/`: P1 (a) 10 + (b) 15, government intervention without externality (Thailand rice pledging, 2011 to 2014).
+- `econ/micro/carbon-tax/`: P1 (a) 10 + (b) 15, intervention with externality (British Columbia carbon tax, 2008 to 2025).
+
+## Sam's structures (2026-11-02)
+- **10 marks, DDEE**: Define, Diagram, Explain, Example (optional, generic, not real-world).
+- **15 marks, DDEEE**: Define, Diagram, Explain, Examples (real and required, integrated with the theory), Evaluate on different stakeholders (consumers, producers, government, workers, society, as in his decks), then a judgement.
+- Each part shows the checklist; each paragraph's `covers` lists which letters it hits.
+
+## Diagrams
+Reuse IBecon micro SVGs by absolute path (`/ibecon/graphs/micrographs/...`). New ones live next to the page that uses them, drawn in the micrographs house style (Georgia, teal curves, red MSC/DWL, purple controls): `price-floor-gov-buys.svg`, `pigouvian-tax.svg`. They are not yet in IBecon's `graphs.md`; copy them into `ibecon-src/public/graphs/micrographs/` (and add entries) if IBecon wants them.
+
+## Content status
+The two micro pages were drafted by Claude from Sam's Unit 2 decks; real-world facts are web-checked and listed under Sources on each page. **Pending Sam's review.** Real examples must be real.
