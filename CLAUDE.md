@@ -121,7 +121,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `printergoesbrrr/`: Classroom simulation of rate setting and lending rounds.
 - `quiz/`: The Talkonomics weekly economics quiz: latest edition plus archive.
 - `samples/`: Proof of concept: IB model answers revealed step by step from hint to full paragraph.
-- `stockshock/`: Stock Shock, JIT vs JIC stock control game for IB BM HL 5.6 (moved from `stockcontrol/`, which now only redirects) (cat food cans, cat customers, end-of-game replay). Single built `index.html` from `app.html` + `engine.js` via `build.py`; read its CLAUDE.md first. Not yet linked from any index.
+- `stockshock/`: Stock Shock, JIT vs JIC stock control game for IB BM HL 5.6 (moved from `stockcontrol/`, which now only redirects) (cat food cans, cat customers, end-of-game replay). Single built `index.html` from `app.html` + `engine.js` via `build.py`; read its CLAUDE.md first. Linked from the homepage Business menu and BM panel.
 - `stocksimulator/`: **in use.** Many random-walk price paths, then pick the 'most interesting' one to show patterns in noise. `index.html` (simple ±1 walk) and `index2.html` (log returns, drift, price mode). Full notes in its CLAUDE.md.
 - `supplyanddemand/`: Shift supply and demand curves and see the changes.
 - `uniquiz/`: Kahoot-style live quiz: teacher creates a quiz (CSV import), students join with a PIN.
@@ -233,7 +233,7 @@ unisam.nz is GitHub Pages behind Cloudflare. GitHub's origin cert for unisam.nz 
 
 ## Homepage index — planned future changes
 
-The homepage nav (`index.html`) currently exposes: This week, Economics (IBecon, Samples), Business (IBBM, RatIBro, Slop Study), Tools dropdown, Experiments, Old site. A sweep in August 2026 found ~46 top-level directories with a working `index.html` that are not linked from `index.html`, `/tools`, or `/experiments`. Outstanding decisions:
+The homepage nav (`index.html`) currently exposes: This week, Economics (IBecon, Samples), Business (IBBM, RatIBro, Slop Study, You're the Boss, Stock Shock), Tools dropdown, Experiments, Old site. A sweep in August 2026 found ~46 top-level directories with a working `index.html` that are not linked from `index.html`, `/tools`, or `/experiments`. Outstanding decisions:
 
 - **Games and toys.** A large batch of small games sits unlinked (`amoeba`, `walker`, `racecar2`, `spiral`, `flyswat`, `ipmemory`, `cookiejar-v2.0`, `findtreasure`, `mousechase-v2`, `flippinghard`, `turnright`, `spin`, `fnl`, `wc26`, `copythisone`, and old duplicates like `catjumpold`, `fractions-classic`, `treethree*`). Sam needs to go through these and check which are still live and worth surfacing before any get added to `/experiments`. Do not bulk-link them.
 - **Unlinked teaching resources** also pending review: `quiz` (Talkonomics weekly quiz), `ibeconinequality`, `inflation`, `supplyanddemand`, `stocksimulator`, `printergoesbrrr`, `causation`/`causation2`, `coldwar`, `hippiesandspies`, `heresy`, `mymaths`, `ask-v1.0`, `marketinghub`, `samples` sub-pages, `wingeometer`, `typeit`, `reports`, `ibnews`, `fmwskills`, `moa`, `mortgage`.
