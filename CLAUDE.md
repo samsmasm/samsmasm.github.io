@@ -41,6 +41,9 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
                              (copy prompt → chatbot → paste reply), share decks, run sessions. Firestore lineupDecks +
                              lineupRooms in coldwar-d8109; rules at the end of checkin/firestore.rules (Sam re-pastes
                              them into the console). See CLAUDE.md + SETUP.md inside. Run `python3 stamp.py` before committing.
+  dilemma/                ← The Long Game: repeated prisoner's dilemma tournament (Grade 9+). Strategies are JSON read by a
+                             fixed interpreter (builder or copy-paste AI prompt), round robin, replay, CSV. Firestore dilemmaRooms in
+                             coldwar-d8109; rules at the end of checkin/firestore.rules. Read its CLAUDE.md; run test/run.sh + stamp.py.
   ibgrind/                ← ibgrind: IB BM exam practice (class code + name). Public: index.html, app.html, css/, js/ only.
                              The case bank, tools, specs and Worker are PRIVATE (excluded + blocked by hooks); bank is served
                              by the Cloudflare Worker ibgrind-api at /ibgrind/api/*. Read ibgrind/CLAUDE.md first (local only).

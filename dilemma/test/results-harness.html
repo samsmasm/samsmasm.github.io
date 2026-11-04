@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results harness</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<!-- Draws a real tournament's results with no Firebase, for the browser tests
+     and for looking at the results screens. Open it from a local server. -->
+<main>
+  <div id="results">
+    <div class="rtabs"><button data-tab="board" aria-selected="true">Leaderboard</button></div>
+    <div data-pane="board"></div><div data-pane="h2h"></div><div data-pane="graphs"></div>
+    <div data-pane="replay"></div><div data-pane="export"></div>
+  </div>
+  <pre id="RESULTS"></pre>
+</main>
+<script type="module">
+  import * as K from './classics.js';
+  import { runTournament } from '../js/tournament.js';
+  import { renderResults } from '../js/results.js';
+  const out = [];
+  try {
+    const entries = K.all.map((s, i) => ({ id: 'e' + String(i).padStart(2, '0'), name: s.name, handle: 'test' + i, strategy: s }));
+    const res = await runTournament(entries, { rounds: 100, seed: 'harness', selfPlay: true });
+    const panes = {};
+    document.querySelectorAll('[data-pane]').forEach(p => { panes[p.dataset.pane] = p; });
+    panes.openReplay = (i, j) => panes.replay.pick(i, j);
+    renderResults(res, panes);
+    out.push('PASS rendered ' + res.ranking.length + ' rows, winner ' + res.ranking[0].name);
+    out.push(document.querySelectorAll('.h2h td[data-i]').length === 100 ? 'PASS h2h 10x10' : 'FAIL h2h cells');
+    document.querySelector('.h2h td[data-i="1"][data-j="0"]').click();
+    const total = document.querySelector('[data-pane="replay"] [data-ta]').textContent;
+    out.push(total === String(res.h2h[1][0]) ? 'PASS replay matches head to head' : `FAIL replay total ${total} vs ${res.h2h[1][0]}`);
+    document.querySelector('[data-pane="replay"] [data-first]').click();
+    out.push(document.querySelector('[data-pane="replay"] [data-round]').textContent === '1 of 100' ? 'PASS replay rewinds' : 'FAIL replay rewind');
+  } catch (e) {
+    out.push('FAIL ' + e.message + '\n' + e.stack);
+  }
+  out.push('DONE');
+  document.getElementById('RESULTS').textContent = out.join('\n');
+</script>
+</body>
+</html>

@@ -275,5 +275,63 @@ service cloud.firestore {
         allow delete: if realAccount() && lineupRoom().ownerUid == uid();
       }
     }
+
+    // ------------------------------------------------------------------------
+    // The Long Game (the /dilemma prisoner's dilemma tournament). Not part of
+    // Checkin: it shares this file only because a Firebase project has one
+    // Firestore ruleset. See dilemma/SETUP.md. Students are anonymous accounts
+    // that may send a few strategies to an open room and read back only their
+    // own; they can never change or delete one. Only the teacher who made the
+    // room reads it all.
+    // ------------------------------------------------------------------------
+    match /dilemmaRooms/{code} {
+      function dilemmaRoom() {
+        return get(/databases/$(database)/documents/dilemmaRooms/$(code)).data;
+      }
+      function dilemmaOwner() {
+        return realAccount() && dilemmaRoom().ownerUid == uid();
+      }
+
+      allow get: if signedIn();
+      allow list: if realAccount() && resource.data.ownerUid == uid();
+      allow create: if realAccount()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'title', 'open', 'createdAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 60
+        && request.resource.data.open is bool;
+      allow update: if realAccount()
+        && resource.data.ownerUid == uid()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['open', 'title']);
+      allow delete: if realAccount() && resource.data.ownerUid == uid();
+
+      // A student device writes to slots named {its uid}_1 to _5, once each.
+      match /strategies/{sid} {
+        allow read: if dilemmaOwner();
+        allow get: if signedIn() && sid.matches(uid() + '_[1-5]');
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly(['uid', 'handle', 'name', 'schemaVersion', 'json', 'createdAt'])
+          && request.resource.data.uid == uid()
+          && request.resource.data.handle is string
+          && request.resource.data.handle.matches('^[A-Za-z0-9 _.-]{1,24}$')
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 1
+          && request.resource.data.name.size() <= 40
+          && request.resource.data.schemaVersion is int
+          && request.resource.data.json is string
+          && request.resource.data.json.size() <= 8000
+          && request.resource.data.createdAt == request.time
+          && ((sid.matches(uid() + '_[1-5]') && dilemmaRoom().open == true)
+              || dilemmaOwner());
+        allow update: if false;
+        allow delete: if dilemmaOwner();
+      }
+
+      // Saved tournament runs, teacher only.
+      match /runs/{rid} {
+        allow read, create, delete: if dilemmaOwner();
+        allow update: if false;
+      }
+    }
   }
 }
