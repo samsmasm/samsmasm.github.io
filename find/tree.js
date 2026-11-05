@@ -18,7 +18,8 @@ window.TREE = {
                 { id: "devices", label: "Everyone on their own device", hint: "Students join with a PIN", tools: ["/uniquiz"] },
                 { id: "marked", label: "Question set I can mark", hint: "Multiple choice marks itself, written answers come to you", tools: ["/checkin"] },
                 { id: "times", label: "Times tables", hint: "Quick-fire maths as a team game", tools: ["/griz", "/multiplication-memory-v2.1"] },
-                { id: "guess", label: "Guess the picture", hint: "Reveal an image a square at a time", tools: ["/reveal"] }
+                { id: "guess", label: "Guess the picture", hint: "Reveal an image a square at a time", tools: ["/reveal"] },
+                { id: "groups", label: "Find the hidden groups", hint: "Sixteen cards, four groups: BM, Economics or young kids", tools: ["/birds"] }
               ] } },
             { id: "responses", label: "Show student responses", hint: "Get what students think up on the screen", next: {
               q: "What kind of response?",
@@ -49,7 +50,7 @@ window.TREE = {
             { id: "diagram", label: "Draw a diagram", tools: ["/graphs"] },
             { id: "ia", label: "The IA", tools: ["/econia", "/graphs"] },
             { id: "news", label: "News and current events", tools: ["/econnews"] },
-            { id: "show", label: "Something to show the class", tools: ["/stocksimulator", "/graphs"] }
+            { id: "show", label: "Something to show the class", tools: ["/stocksimulator", "/graphs", "/birds"] }
           ] } },
         { id: "bm", label: "Business Management", next: {
           q: "Business: what for?",
@@ -57,6 +58,7 @@ window.TREE = {
             { id: "review", label: "Course notes and revision", tools: ["/ibbm", "/qreview"] },
             { id: "finance", label: "Finance", hint: "Ratios, accounts, Unit 3", tools: ["/ratibro", "/slopstudy"] },
             { id: "cases", label: "Case studies", tools: ["/slopstudy", "/businews", "/newbiz"] },
+            { id: "game", label: "A class game", hint: "Find the hidden groups of terms", tools: ["/birds"] },
             { id: "ia", label: "The IA", tools: ["/busia"] },
             { id: "news", label: "News and current events", tools: ["/businews"] }
           ] } },

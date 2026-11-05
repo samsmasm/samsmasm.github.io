@@ -108,6 +108,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 
 **Teaching tools**
 - `ask-v1.0/`: Early student question-submission tool with a teacher login.
+- `birds/`: Birds of a Feather (was Class Connections): grouping puzzle, sixteen cards hide four groups, BM, Economics and Kids sets. `index.html` is built from `src/template.html` + `data/` via `build.py`; read its CLAUDE.md first. Linked from /tools and /find.
 - `busia/`: Student guide to the IB Business Management Internal Assessment, start to finish, one page per stage.
 - `causation/`: Practise explaining how one event caused another: random sentence pairs, with an optional checking mode for typed answers.
 - `causation2/`: Levelled version of the causation trainer with AI checking of answers.
