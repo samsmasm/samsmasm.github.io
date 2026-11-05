@@ -70,7 +70,8 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 - The day changes at 23:00 UTC (`dayKey`), which is 6am in Vietnam all year. Sam wanted the change between 9pm and 7am Vietnam time, at night for as many IB students as possible. The Americas are never at night in that window, so 6am keeps the change out of the school day for the US, Europe and most of Asia.
 - It always uses every SL topic (`dailyCodes`), whatever is ticked. The ticks and the SL/HL toggle only apply to extra puzzles.
 - Finishing it, win or lose, stores the day in localStorage as `birds-done-<set>`. Until the next day, opening or refreshing that set gives a random extra puzzle. This is a loose lock on purpose: refreshing mid-game restarts the daily, and another browser gets round it.
-- If a daily is unfinished, the Topics panel shows a Today's puzzle button to get back to it from an extra puzzle.
+- The title says "Daily puzzle: Economics" with an amber underline and the date beside it, or "Extra puzzle: Economics" with "Today's daily is done". Menu cards say "Daily puzzle ready" or "done" for each set.
+- If a daily is unfinished, the Topics panel shows a Daily puzzle button to get back to it from an extra puzzle.
 - Editing a bank changes the daily puzzles from then on, including today's, so push bank changes in the evening Vietnam time if it matters.
 
 ## Interaction

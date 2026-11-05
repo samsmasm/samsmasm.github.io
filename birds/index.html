@@ -100,6 +100,7 @@ body {
 /* Game header */
 .bar { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
 #dayLabel { color: var(--muted); font-weight: 700; }
+#modeTitle.isdaily { border-bottom: 5px solid var(--t1); }
 .bar h2 { font-family: var(--display); font-weight: 700; font-size: clamp(24px, 3vw, 34px); margin: 0; flex: 1; line-height: 1.05; }
 
 .btn {
@@ -265,7 +266,7 @@ details#topics[open] summary::before { content: "\2212"; }
   <section id="game" class="screen" hidden>
     <header class="bar">
       <button id="backBtn" class="btn quiet" type="button">Menu</button>
-      <h2 id="gameTitle"></h2>
+      <h2><span id="modeTitle"></span>: <span id="gameTitle"></span></h2>
       <span id="dayLabel"></span>
       <div class="stripes small" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     </header>
@@ -278,7 +279,7 @@ details#topics[open] summary::before { content: "\2212"; }
           <button id="lvlHL" class="btn" type="button" aria-pressed="false">HL</button>
         </span>
         <button id="newBtn" class="btn" type="button">New puzzle</button>
-        <button id="todayBtn" class="btn" type="button" hidden>Today's puzzle</button>
+        <button id="todayBtn" class="btn" type="button" hidden>Daily puzzle</button>
         <span id="newAsk" hidden>Are you sure? This puzzle will be lost.
           <button id="newYes" class="btn" type="button">Yes, new puzzle</button>
           <button id="newNo" class="btn" type="button">No, keep playing</button>
@@ -447,8 +448,15 @@ const els = new Map();
 prepare(BANKS.bm); prepare(BANKS.econ); prepare(BANKS.kids);
 
 /* ---------- screens ---------- */
+function syncMenu() {
+  Object.keys(TITLES).forEach(k => {
+    $(k + 'Count').textContent = 'Daily puzzle ' + (doneToday(k) ? 'done' : 'ready');
+  });
+}
+
 function showScreen(name) {
   S.screen = name;
+  if (name === 'menu') syncMenu();
   $('menu').hidden = name !== 'menu';
   $('game').hidden = name !== 'game';
   window.scrollTo(0, 0);
@@ -644,9 +652,11 @@ function updateButtons() {
   $('shuffleBtn').hidden = !playing;
   $('againBtn').hidden = playing;
   $('todayBtn').hidden = !!S.day || doneToday(S.set);
+  $('modeTitle').textContent = S.day ? 'Daily puzzle' : 'Extra puzzle';
+  $('modeTitle').classList.toggle('isdaily', !!S.day);
   $('dayLabel').textContent = S.day
-    ? "Today's puzzle, " + new Date(S.day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-    : 'Extra puzzle';
+    ? new Date(S.day).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' })
+    : doneToday(S.set) ? "Today's daily is done" : '';
 }
 
 function askNew(on) {
@@ -747,7 +757,7 @@ function render() {
   });
 
   $('status').textContent = !S.puzzle ? ''
-    : S.over === 'won' ? 'All four found!'
+    : S.over === 'won' ? (S.day ? 'Daily puzzle done!' : 'All four found!')
     : S.over === 'lost' ? 'Out of lives.'
     : S.note || (alreadyTried() ? 'Already tried.' : '');
   updateButtons();
@@ -876,9 +886,6 @@ function start(data) {
   ['bm', 'econ', 'kids'].forEach(k => {
     S.ticked[k] = levelTicks(k);
   });
-  $('bmCount').textContent = BANKS.bm.categories.length + ' categories';
-  $('econCount').textContent = BANKS.econ.categories.length + ' categories';
-  $('kidsCount').textContent = BANKS.kids.categories.length + ' categories';
   if (data.set && data.ticked) {
     S.ticked.bm = new Set(data.ticked.bm || [...S.ticked.bm]);
     S.ticked.econ = new Set(data.ticked.econ || [...S.ticked.econ]);
