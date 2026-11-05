@@ -9,7 +9,7 @@ const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8')
 let failed = false;
 for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]]]) {
   const bank = load(f); api.prepare(bank);
-  const on = new Set(bank.meta.topics.filter(t => t.defaultOn !== false).map(t => t.code));
+  const on = new Set(bank.meta.topics.map(t => t.code));
   let ok = 0;
   for (let i = 0; i < 2000; i++) {
     const p = api.buildPuzzle(bank, on, { n, per, tiers });

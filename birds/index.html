@@ -126,6 +126,7 @@ details#topics summary::before { content: "+"; font-weight: 700; width: 1ch; }
 details#topics[open] summary::before { content: "\2212"; }
 .count { color: var(--muted); font-weight: 600; font-size: 15px; }
 #topicBody { padding: 4px 16px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px 24px; }
+.tall { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; }
 .tgroup h3 { font-family: var(--display); font-size: 17px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 .tgroup h3 span { flex: 1; }
 .mini { font: inherit; font-size: 13px; font-weight: 700; background: none; border: 1.5px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer; color: var(--ink); }
@@ -230,7 +231,7 @@ details#topics[open] summary::before { content: "\2212"; }
       </button>
       <button class="choice" id="pickEcon" type="button">
         <span class="choice-title">Economics</span>
-        <span class="choice-desc">IB Economics, Units 1 to 4, with a tick box for every topic. HL-only topics start unticked.</span>
+        <span class="choice-desc">IB Economics SL and HL, Units 1 to 4, with a tick box for every topic.</span>
         <span class="choice-meta" id="econCount"></span>
         <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </button>
@@ -396,6 +397,22 @@ function buildTopics() {
   const bank = BANKS[S.set];
   const body = $('topicBody');
   body.innerHTML = '';
+  const setAll = on => {
+    body.querySelectorAll('input').forEach(cb => {
+      cb.checked = on;
+      on ? S.ticked[S.set].add(cb.dataset.code) : S.ticked[S.set].delete(cb.dataset.code);
+    });
+    updateTopicCount();
+  };
+  const top = document.createElement('div');
+  top.className = 'tall';
+  [['Select all', true], ['Select none', false]].forEach(([label, on]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn'; b.textContent = label;
+    b.addEventListener('click', () => setAll(on));
+    top.appendChild(b);
+  });
+  body.appendChild(top);
   const groups = [];
   bank.meta.topics.forEach(t => {
     let g = groups.find(x => x.name === t.group);
@@ -662,7 +679,7 @@ function snapshot() {
 function start(data) {
   data = data || {};
   ['bm', 'econ', 'kids'].forEach(k => {
-    BANKS[k].meta.topics.forEach(t => { if (t.defaultOn !== false) S.ticked[k].add(t.code); });
+    BANKS[k].meta.topics.forEach(t => S.ticked[k].add(t.code));
   });
   $('bmCount').textContent = BANKS.bm.categories.length + ' categories';
   $('econCount').textContent = BANKS.econ.categories.length + ' categories';

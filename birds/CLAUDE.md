@@ -2,7 +2,7 @@
 
 A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. Single HTML page, no server, no accounts, nothing saved. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
 
-Sets: Business Management (IB SL), Economics (IB, HL-only topics start unticked) and Kids (ages 5 to 7, emoji on every card, optional read-aloud).
+Sets: Business Management (IB SL), Economics (IB, HL topics have their own tick boxes) and Kids (ages 5 to 7, emoji on every card, optional read-aloud).
 
 Live at unisam.nz/birds. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. An older private copy is a Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3).
 
@@ -40,7 +40,7 @@ Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then 
 ```
 
 - `tier` 1 to 4 maps to amber, coral, teal, navy (CSS `--t1` to `--t4`). Tier 4 is wordplay (`___ capital`, abbreviations) or deliberate traps.
-- `topics`: a category is only used when every one of its topics is ticked. `defaultOn: false` topics start unticked (used for Economics HL content).
+- `topics`: a category is only used when every one of its topics is ticked. Every topic starts ticked (Sam's choice), and the panel has Select all and Select none for the whole set plus All and None per unit. `defaultOn` in the banks is no longer read.
 - `words`: 4 to 10 items. The site draws 4 at random each time, so longer lists give more variety. Cards should be short (under about 28 characters).
 - `clashesWith`: ids of categories that make a word ambiguous. The site treats it as two-way. Any two categories that share a word must list each other (`check_banks.py` enforces this).
 - Kids bank: each category also has `emoji`, same length as `words` (empty string where there is no good emoji). Kids "topics" are themes, not syllabus codes.
@@ -69,7 +69,7 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 - IB course guides: do not copy guide text into the bank or the vault. Topic titles and standard terms only.
   - BM: `~/samsmasm.github.io/ibbmsyllabus.md`
   - Econ: `~/samsmasm.github.io/ibecon-src/refdocs/ibeconsyll.txt`
-- Topic codes follow the vault's syllabus map (`/CLAUDE.md` at the vault root). BM SL only plus toolkit and concepts; Econ includes HL as separate unticked codes such as `2.5 HL`.
+- Topic codes follow the vault's syllabus map (`/CLAUDE.md` at the vault root). BM SL only plus toolkit and concepts; Econ includes HL as separate codes such as `2.5 HL`.
 - BM bank was checked against the project's Business Management course guide and Kognity notes. The Econ bank was built in the Economics Claude project from its guide. The Kids bank is original. Skim tiers 3 and 4 before class use.
 
 ## Working style (Sam's preferences)
