@@ -24,7 +24,7 @@ window.TOOLS = [
   { name: "Spectra", url: "/spectra", s: "any", desc: "Post statements, students rate on a scale, see the full spectrum of class opinion.", tags: "poll opinion agree disagree vote" },
   { name: "Pulse", url: "/pulse", s: "any", desc: "Students plot themselves on your variables and see the class spread in real time.", tags: "poll scatter response" },
   { name: "Flare", url: "/flare", s: "any", desc: "Real-time help signals from students. See at a glance when your class needs support.", tags: "help lost signal alarm" },
-  { name: "Birds of a Feather", url: "/birds", s: "any", desc: "Sixteen cards hide four groups. Sort them as a class, then reveal the groups. Sets for BM, Economics and young kids.", tags: "grouping puzzle starter revision vocabulary kids connections categories" },
+  { name: "Birds of a Feather", url: "/birds", s: "any", desc: "Sixteen cards hide four groups. Pick four that belong together, with four lives. Sets for BM, Economics and young kids.", tags: "grouping puzzle starter revision vocabulary kids connections categories" },
   { name: "Picture Reveal", url: "/reveal", s: "any", desc: "Click squares to reveal the hidden image underneath.", tags: "guess image starter tiles" },
   { name: "Argument Mapper", url: "/argmap", s: "any", desc: "Build structured argument maps: claims, reasons, objections, rebuttals, evidence.", tags: "essay plan argument map debate" },
   { name: "Dowser", url: "/dowser", s: "any", desc: "Freeform canvas of moveable post-its, lines, and arrows for brainstorming.", tags: "sticky notes brainstorm board post-it" },

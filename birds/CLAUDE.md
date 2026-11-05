@@ -1,10 +1,10 @@
 # Birds of a Feather, `/birds`
 
-A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Students drag cards into rows, then the teacher reveals the groups one at a time or all at once. Single HTML page, no server, no accounts, nothing saved. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
+A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. Single HTML page, no server, no accounts, nothing saved. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
 
 Sets: Business Management (IB SL), Economics (IB, HL-only topics start unticked) and Kids (ages 5 to 7, emoji on every card, optional read-aloud).
 
-Live at unisam.nz/birds. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, with the masthead on the menu only so the game keeps the full projector height. An older private copy is a Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3).
+Live at unisam.nz/birds. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. An older private copy is a Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3).
 
 ## Layout
 
@@ -51,16 +51,17 @@ Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then 
 1. Filter categories to those whose topics are all ticked and that have enough words.
 2. Pick one category per tier (amber to navy), preferring the exact tier and borrowing the nearest tier if empty.
 3. Reject a pick if it clashes with a chosen category or shares any word (case-insensitive, full word lists) with one.
-4. Draw 4 random words from each (3 groups of 3 in Kids age 5 mode), shuffle all cards.
+4. Draw 4 random words from each, shuffle all cards. Every set is 4 by 4, including Kids.
 5. If 400 attempts fail, show "not enough categories" and ask for more ticks. Single topics often cannot make a full puzzle; a whole unit always can.
 
 The logic block is pure functions so the Node test can load it. Keep it free of DOM calls.
 
 ## Interaction
 
-- Drag a card onto another to swap (pointer events, works with touch). Tap one card then another to swap.
-- "Reveal next group" shows amber first, then coral, teal, navy. Revealed groups move to the top as coloured rows with the category name and syllabus ref.
-- There is no guess checking, scoring or history by design.
+- Click or tap cards to pick up to four, and again to unpick. No dragging. Clear unpicks all. Shuffle keeps the picks.
+- Check is enabled at four picks. Right: the group moves to the top as a coloured row with the category name and syllabus ref. Wrong: "Not quite.", one feather lost, the cards shake and the picks clear. It never says how close a guess was.
+- Four lives. At zero the remaining groups appear in tier order. There is no score or history by design.
+- Kids has the same game, plus read-aloud when tapped.
 - The page registers `window.claude.hot.snapshot` so an open viewer keeps its puzzle across a republish. This is harmless outside the Claude viewer.
 
 ## Sources of truth for content
