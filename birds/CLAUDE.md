@@ -2,9 +2,15 @@
 
 A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. Single HTML page, no server, no accounts, nothing saved. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
 
-Sets: Business Management (IB SL), Economics (IB, HL topics have their own tick boxes) and Kids (ages 5 to 7, emoji on every card, optional read-aloud).
+Sets: Business Management (IB SL), Economics (IB, HL topics have their own tick boxes) and Kids (ages 5 to 7, emoji on every card). All three play the same 4 by 4 game and all have the Voice toggle.
 
-Live at unisam.nz/birds. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. An older private copy is a Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3).
+Live at unisam.nz/birds, with direct links `#business`, `#economics` and `#kids`. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. The private Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3) is out of date, with the old gameplay: do not treat it as live.
+
+## Where the code lives
+
+- **Source of truth: `~/samsmasm.github.io/birds/`.** Pushing `main` there deploys the site.
+- **Vault hand-off copy: `temp/connections/` in the notes vault.** Its `CLAUDE.md` is a copy of this file. Its code is the old Class Connections version (drag and reveal), so do not build or deploy from it. Sessions without the site repo can still work on the JSON banks there, then those banks get merged here.
+- **Not merged yet:** vault commit `ce797ab` grew the BM bank there to 313 categories covering every subtopic in Units 1 to 5 including HL, and added `tests/test_units.js` (each unit alone and the HL-only set can make a puzzle). This repo still has the 105 category SL bank. In that bank HL-only subtopics get their own code (`2.5`, `3.6`, `5.9`) and HL extensions inside SL subtopics use a suffix (`2.4 HL`, `4.5 HL`, `Toolkit HL`). To merge: copy the bank and the test here, change the BM menu text, build and run all tests. Every topic starts ticked on this site, so BM HL would then be on by default too.
 
 ## Layout
 
@@ -17,10 +23,10 @@ data/bm_categories.json     Business Management bank (105 categories)
 data/econ_categories.json   Economics bank (110 categories)
 data/kids_categories.json   Kids bank (20 categories, has a parallel "emoji" array)
 tests/check_banks.py        validates the banks (schema, topic codes, clash links, undeclared shared words)
-tests/test_generation.js    runs the generator 2000 times per bank, checks no repeated words
+tests/test_generation.js    runs the generator 2000 times per bank, checks no repeated words, checks guessResult and pickVoice
 ```
 
-Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then `python3 tests/check_banks.py` and `node tests/test_generation.js`. Only commit `index.html` after the build.
+Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then `python3 tests/check_banks.py` and `node tests/test_generation.js`. Only commit `index.html` after the build. Stage this folder by name (never `git add -A` in this repo) and `git pull --rebase` before pushing, because bots commit to `main`.
 
 ## Data format (all three banks)
 
@@ -58,8 +64,7 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 
 ## Interaction
 
-- Direct links: `/birds#business`, `/birds#economics`, `/birds#kids`. The hash drives the screen (`route()`), so the browser Back button works. Going to the menu and back into the same set resumes the puzzle.
-
+- Direct links: `/birds#business`, `/birds#economics`, `/birds#kids`. The hash drives the screen (`route()`), so the browser Back button works. Going to the menu and back into the same set resumes the puzzle. Opening a different set starts a new one.
 - Click or tap cards to pick up to four, and again to unpick. No dragging. Shuffle is a normal button and keeps the picks.
 - New puzzle lives inside the closed Topics panel so kids do not press it by accident, with an inline "Are you sure?" (no browser dialog or modal). When a game ends or no puzzle can be made, a big New puzzle button replaces Check, with no confirmation.
 - Check is the big amber button, centred on the page, and is enabled at four picks. Right: the group moves to the top as a coloured row with the category name and syllabus ref. Wrong: "Not quite.", one feather lost, the cards shake and the picks clear. It never says how close a guess was.
