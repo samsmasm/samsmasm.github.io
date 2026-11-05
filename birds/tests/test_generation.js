@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const logic = html.split('/*LOGIC_START*/')[1].split('/*LOGIC_END*/')[0];
-eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice};');
+eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice,shuffle,seededRandom,dayKey,dailyCodes};');
 const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8'));
 let failed = false;
 for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]]]) {
@@ -29,6 +29,30 @@ const keyOk = api.guessKey(['2-1', '0-3', '1-0', '3-2']) === api.guessKey(['3-2'
   && api.guessKey(['2-1', '0-3', '1-0', '3-2']) !== api.guessKey(['2-1', '0-3', '1-0', '3-1']);
 console.log('guessKey', keyOk ? 'ok' : 'FAILED');
 if (!keyOk) failed = true;
+// Daily puzzle: day boundary at 23:00 UTC, same puzzle for the same day, always possible, SL only
+const dk = s => api.dayKey(new Date(s));
+const dayOk = dk('2026-11-05T22:59:59Z') === '2026-11-05' && dk('2026-11-05T23:00:00Z') === '2026-11-06'
+  && dk('2026-12-31T23:30:00Z') === '2027-01-01' && dk('2026-11-06T22:59:59Z') === '2026-11-06';
+console.log('dayKey', dayOk ? 'ok' : 'FAILED');
+if (!dayOk) failed = true;
+for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.json']) {
+  const bank = load(f); api.prepare(bank);
+  const make = key => {
+    const rand = api.seededRandom(key);
+    const p = api.buildPuzzle(bank, api.dailyCodes(bank), { n: 4, per: 4, tiers: [1, 2, 3, 4] }, rand);
+    return p && { p, order: api.shuffle([...Array(16).keys()], rand) };
+  };
+  let bad = 0, hl = 0; const seen = new Set();
+  for (let d = 0; d < 1000; d++) {
+    const key = new Date(Date.UTC(2026, 10, 6 + d)).toISOString().slice(0, 10) + ':' + f;
+    const a = make(key), b = make(key);
+    if (!a || JSON.stringify(a) !== JSON.stringify(b)) { bad++; continue; }
+    hl += a.p.groups.filter(g => g.level === 'HL').length;
+    seen.add(a.p.groups.map(g => g.name).join());
+  }
+  console.log(f, 'daily over 1000 days:', bad, 'failed,', hl, 'HL groups,', seen.size, 'different category sets');
+  if (bad || hl || seen.size < 900) failed = true;
+}
 const V = (name, lang) => ({ name, lang });
 const voiceOk = api.pickVoice([V('Daniel', 'en-GB'), V('Samantha', 'en-US'), V('Thomas', 'fr-FR')]).name === 'Samantha'
   && api.pickVoice([V('Fred', 'en-US'), V('Oliver', 'en-GB')]).name === 'Oliver'

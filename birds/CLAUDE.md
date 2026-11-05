@@ -1,6 +1,6 @@
 # Birds of a Feather, `/birds`
 
-A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. Single HTML page, no server, no accounts, nothing saved. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
+A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. There is one daily puzzle per set, then random extras. Single HTML page, no server, no accounts, and the only thing saved is a note in the browser that today's puzzle is done. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
 
 Sets: Business Management and Economics (IB, with an SL/HL toggle) and Kids (ages 5 to 7, emoji on every card). All three play the same 4 by 4 game and all have the Voice toggle.
 
@@ -23,7 +23,7 @@ data/bm_categories.json     Business Management bank (313 categories, every subt
 data/econ_categories.json   Economics bank (110 categories)
 data/kids_categories.json   Kids bank (40 categories, has a parallel "emoji" array)
 tests/check_banks.py        validates the banks (schema, topic codes, clash links, undeclared shared words, level and HL refs)
-tests/test_generation.js    runs the generator 2000 times per bank, checks no repeated words, checks guessResult and pickVoice
+tests/test_generation.js    runs the generator 2000 times per bank, checks no repeated words, the guess helpers, pickVoice and 1000 days of daily puzzles
 tests/test_units.js         checks each unit alone can make a puzzle, at SL and HL, and that SL never shows an HL group
 ```
 
@@ -63,6 +63,15 @@ Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then 
 5. If 400 attempts fail, show "not enough categories" and ask for more ticks. Single topics often cannot make a full puzzle; a whole unit always can.
 
 The logic block is pure functions so the Node test can load it. Keep it free of DOM calls.
+
+## Daily puzzle
+
+- Opening a set starts today's puzzle: the same 16 cards in the same order for everyone, made by the normal generator with `seededRandom(day + ':' + set)` in place of `Math.random`. Sam is happy with the generator as it is: cards that could fit two groups are part of the game, and the only thing to avoid is the exact same word twice, which it already blocks.
+- The day changes at 23:00 UTC (`dayKey`), which is 6am in Vietnam all year. Sam wanted the change between 9pm and 7am Vietnam time, at night for as many IB students as possible. The Americas are never at night in that window, so 6am keeps the change out of the school day for the US, Europe and most of Asia.
+- It always uses every SL topic (`dailyCodes`), whatever is ticked. The ticks and the SL/HL toggle only apply to extra puzzles.
+- Finishing it, win or lose, stores the day in localStorage as `birds-done-<set>`. Until the next day, opening or refreshing that set gives a random extra puzzle. This is a loose lock on purpose: refreshing mid-game restarts the daily, and another browser gets round it.
+- If a daily is unfinished, the Topics panel shows a Today's puzzle button to get back to it from an extra puzzle.
+- Editing a bank changes the daily puzzles from then on, including today's, so push bank changes in the evening Vietnam time if it matters.
 
 ## Interaction
 
