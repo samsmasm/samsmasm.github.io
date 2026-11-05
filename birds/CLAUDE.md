@@ -58,10 +58,11 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 
 ## Interaction
 
-- Click or tap cards to pick up to four, and again to unpick. No dragging. Clear unpicks all. Shuffle keeps the picks.
-- Check is enabled at four picks. Right: the group moves to the top as a coloured row with the category name and syllabus ref. Wrong: "Not quite.", one feather lost, the cards shake and the picks clear. It never says how close a guess was.
+- Click or tap cards to pick up to four, and again to unpick. No dragging. Shuffle is a small text link and keeps the picks.
+- New puzzle lives inside the closed Topics panel so kids do not press it by accident, with an inline "Are you sure?" (no browser dialog or modal). When a game ends or no puzzle can be made, a big New puzzle button replaces Check, with no confirmation.
+- Check is the big amber button and is enabled at four picks. Right: the group moves to the top as a coloured row with the category name and syllabus ref. Wrong: "Not quite.", one feather lost, the cards shake and the picks clear. It never says how close a guess was.
 - Four lives. At zero the remaining groups appear in tier order. There is no score or history by design.
-- Kids has the same game, plus read-aloud when tapped.
+- Kids has the same game, plus read-aloud when tapped. `pickVoice` prefers lighter named English voices, with pitch 1.25 and rate 0.9, because device defaults sounded deep. What it sounds like depends on the voices installed on each device.
 - The page registers `window.claude.hot.snapshot` so an open viewer keeps its puzzle across a republish. This is harmless outside the Claude viewer.
 
 ## Sources of truth for content

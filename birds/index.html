@@ -110,7 +110,14 @@ body {
 }
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* Check is the one big thing to press. It lights up fully at four picks. */
+.btn.big {
+  min-height: 76px; min-width: clamp(200px, 28vw, 340px); padding: 12px 32px;
+  font-family: var(--display); font-size: clamp(26px, 3.2vw, 36px);
+  background: var(--t1); color: var(--on-group); border: 3px solid var(--on-group);
+}
+.btn.big:disabled { opacity: .5; }
+.btn.small { min-height: 36px; padding: 6px 10px; font-size: 15px; font-weight: 400; background: none; border-color: transparent; color: var(--muted); text-decoration: underline; }
 .btn.quiet { border-color: var(--line); }
 .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .btn:disabled { opacity: .45; cursor: default; transform: none; }
@@ -127,6 +134,8 @@ details#topics[open] summary::before { content: "\2212"; }
 .count { color: var(--muted); font-weight: 600; font-size: 15px; }
 #topicBody { padding: 4px 16px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px 24px; }
 .tall { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; }
+.newrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 4px 16px 10px; font-weight: 700; }
+.newrow > span { display: flex; gap: 10px; align-items: center; }
 .tgroup h3 { font-family: var(--display); font-size: 17px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 .tgroup h3 span { flex: 1; }
 .mini { font: inherit; font-size: 13px; font-weight: 700; background: none; border: 1.5px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer; color: var(--ink); }
@@ -255,6 +264,13 @@ details#topics[open] summary::before { content: "\2212"; }
 
     <details id="topics">
       <summary><span id="topicLabel">Topics</span><span id="topicCount" class="count"></span></summary>
+      <div class="newrow">
+        <button id="newBtn" class="btn" type="button">New puzzle</button>
+        <span id="newAsk" hidden>Are you sure? This puzzle will be lost.
+          <button id="newYes" class="btn" type="button">Yes, new puzzle</button>
+          <button id="newNo" class="btn" type="button">No, keep playing</button>
+        </span>
+      </div>
       <div id="topicBody"></div>
     </details>
 
@@ -263,10 +279,9 @@ details#topics[open] summary::before { content: "\2212"; }
     </div>
 
     <div class="toolbar">
-      <button id="checkBtn" class="btn primary" type="button">Check</button>
-      <button id="clearBtn" class="btn" type="button">Clear</button>
-      <button id="shuffleBtn" class="btn" type="button">Shuffle</button>
-      <button id="newBtn" class="btn" type="button">New puzzle</button>
+      <button id="checkBtn" class="btn big" type="button">Check</button>
+      <button id="againBtn" class="btn big" type="button" hidden>New puzzle</button>
+      <button id="shuffleBtn" class="btn small" type="button">Shuffle</button>
       <span id="status" role="status" aria-live="polite"></span>
       <span id="lives" role="img"></span>
     </div>
@@ -339,6 +354,17 @@ function buildPuzzle(bank, ticked, cfg) {
 function guessResult(ids) {
   const groups = new Set(ids.map(id => id.split('-')[0]));
   return groups.size === 1 ? Number([...groups][0]) : -1;
+}
+
+/* Devices often default to a deep voice, so prefer lighter named voices, then any English one. */
+const NICE_VOICES = ['Sonia', 'Libby', 'Natasha', 'Aria', 'Jenny', 'Google UK English Female', 'Samantha', 'Karen', 'Serena', 'Moira', 'Tessa', 'Hazel', 'Zira', 'Google US English'];
+function pickVoice(voices) {
+  const english = voices.filter(v => /^en/i.test(v.lang));
+  for (const name of NICE_VOICES) {
+    const v = english.find(x => x.name.includes(name));
+    if (v) return v;
+  }
+  return english.find(v => /female/i.test(v.name)) || english.find(v => /^en[-_](GB|AU|NZ)/i.test(v.lang)) || english[0] || null;
 }
 /*LOGIC_END*/
 
@@ -475,6 +501,7 @@ function newPuzzle() {
   const p = buildPuzzle(BANKS[S.set], S.ticked[S.set], CFG);
   const msg = $('msg');
   S.selected = []; S.lives = LIVES; S.over = null; S.note = ''; S.busy = false;
+  askNew(false);
   if (!p) {
     msg.hidden = false;
     msg.textContent = 'There are not enough categories for a puzzle with these ticks. Tick more topics and choose New puzzle.';
@@ -484,6 +511,7 @@ function newPuzzle() {
     return;
   }
   msg.hidden = true;
+  $('topics').open = false;
   S.puzzle = p;
   const ids = [];
   p.groups.forEach((g, gi) => g.words.forEach((_, wi) => ids.push(gi + '-' + wi)));
@@ -498,10 +526,15 @@ function updateButtons() {
   const playing = !!S.puzzle && !S.over;
   const free = playing && !S.busy;
   $('checkBtn').disabled = !free || S.selected.length !== CFG.per;
-  $('clearBtn').disabled = !free || !S.selected.length;
   $('shuffleBtn').disabled = !free;
-  $('checkBtn').classList.toggle('primary', playing);
-  $('newBtn').classList.toggle('primary', !playing);
+  $('checkBtn').hidden = !playing;
+  $('shuffleBtn').hidden = !playing;
+  $('againBtn').hidden = playing;
+}
+
+function askNew(on) {
+  $('newBtn').hidden = on;
+  $('newAsk').hidden = !on;
 }
 
 function renderLives() {
@@ -635,7 +668,10 @@ function speak(word) {
     if (!S.read || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(word);
-    u.rate = 0.8;
+    const voice = pickVoice(window.speechSynthesis.getVoices());
+    if (voice) { u.voice = voice; u.lang = voice.lang; }
+    u.pitch = 1.25;
+    u.rate = 0.9;
     window.speechSynthesis.speak(u);
   } catch (e) { /* speech is optional */ }
 }
@@ -661,9 +697,11 @@ $('pickBm').addEventListener('click', () => openSet('bm'));
 $('pickEcon').addEventListener('click', () => openSet('econ'));
 $('pickKids').addEventListener('click', () => openSet('kids'));
 $('backBtn').addEventListener('click', () => { showScreen('menu'); });
-$('newBtn').addEventListener('click', newPuzzle);
+$('newBtn').addEventListener('click', () => { S.puzzle && !S.over ? askNew(true) : newPuzzle(); });
+$('newYes').addEventListener('click', newPuzzle);
+$('newNo').addEventListener('click', () => askNew(false));
+$('againBtn').addEventListener('click', newPuzzle);
 $('checkBtn').addEventListener('click', check);
-$('clearBtn').addEventListener('click', () => { S.selected = []; S.note = ''; render(); });
 $('shuffleBtn').addEventListener('click', () => { S.order = shuffle(S.order); render(); });
 $('readBtn').addEventListener('click', () => { S.read = !S.read; syncKidsButtons(); });
 

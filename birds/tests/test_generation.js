@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const logic = html.split('/*LOGIC_START*/')[1].split('/*LOGIC_END*/')[0];
-eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult};');
+eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,pickVoice};');
 const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8'));
 let failed = false;
 for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]]]) {
@@ -25,4 +25,11 @@ const right = api.guessResult(['2-0', '2-1', '2-2', '2-3']) === 2 && api.guessRe
 const wrong = api.guessResult(['2-0', '2-1', '2-2', '1-3']) === -1;
 console.log('guessResult', right && wrong ? 'ok' : 'FAILED');
 if (!right || !wrong) failed = true;
+const V = (name, lang) => ({ name, lang });
+const voiceOk = api.pickVoice([V('Daniel', 'en-GB'), V('Samantha', 'en-US'), V('Thomas', 'fr-FR')]).name === 'Samantha'
+  && api.pickVoice([V('Fred', 'en-US'), V('Oliver', 'en-GB')]).name === 'Oliver'
+  && api.pickVoice([V('Thomas', 'fr-FR')]) === null
+  && api.pickVoice([]) === null;
+console.log('pickVoice', voiceOk ? 'ok' : 'FAILED');
+if (!voiceOk) failed = true;
 process.exit(failed ? 1 : 0);
