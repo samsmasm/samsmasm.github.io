@@ -133,7 +133,8 @@ export function readback(s) {
   if (mem.length) {
     extras.push('Memory numbers, which start at: ' + mem.map(([k, n]) => `"${k}" = ${n}`).join(', ') + '.');
   }
-  if (s.slip) extras.push(`Random slips: ${s.slip}% of the time (${chanceWord(s.slip)}) you do the opposite of what you meant.`);
+  if (s.slip >= 100) extras.push('Random slips: every move is a coin flip, so none of the above is used.');
+  else if (s.slip) extras.push(`Random slips: ${s.slip}% of the time (${chanceWord(s.slip)}) a coin flip picks your move instead.`);
   return { first, rules, fallback, extras };
 }
 

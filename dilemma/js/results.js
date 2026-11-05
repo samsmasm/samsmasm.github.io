@@ -1,8 +1,8 @@
 // The Long Game - drawing a tournament's results, and CSV export.
 
-import { playPair } from './tournament.js?v=20261105-092415';
-import { mountReplay } from './replay.js?v=20261105-092415';
-import { rulePhrase } from './readback.js?v=20261105-092415';
+import { playPair } from './tournament.js?v=20261105-092620';
+import { mountReplay } from './replay.js?v=20261105-092620';
+import { rulePhrase } from './readback.js?v=20261105-092620';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pct = x => Math.round(x * 100) + '%';

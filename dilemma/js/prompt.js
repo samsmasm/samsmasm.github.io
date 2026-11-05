@@ -1,9 +1,9 @@
 // The Long Game - the prompt a student pastes into any AI chat.
 // Bump PROMPT_VERSION whenever the wording changes.
 
-import { LIMITS } from './validate.js?v=20261105-092415';
+import { LIMITS } from './validate.js?v=20261105-092620';
 
-export const PROMPT_VERSION = '1.1';
+export const PROMPT_VERSION = '1.2';
 
 const SCHEMA_TEXT = `THE GAME
 Two prisoners play each other many times in a row (usually 100 rounds, but the teacher can change it). Each round both choose at the same time: "cooperate" (stay loyal) or "defect" (betray the other).
@@ -23,7 +23,7 @@ A strategy is one JSON object:
   "fallback": DECISION,             // used when no rule fits
   "memory": { "name": 0 },          // optional, at most ${LIMITS.memory} whole-number memory slots with starting values
   "pattern": ["cooperate", "defect"], // optional, 1 to ${LIMITS.pattern} moves, needed if any "do" is "pattern"
-  "slip": 5,                        // optional, 0 to ${LIMITS.slip}: percent of rounds you accidentally do the opposite
+  "slip": 5,                        // optional, 0 to ${LIMITS.slip}: percent of rounds a coin flip picks your move instead (100 = totally random)
   "approximations": "optional note" // REQUIRED if you could not build exactly what the student asked for
 }
 

@@ -29,7 +29,7 @@ Years in jail, fewer is better: both cooperate 2 each, both defect 4 each, a def
 | `fallback` | yes | A decision used when no rule fits. Cannot be `nextRule`. |
 | `memory` | no | Up to 3 whole-number slots with starting values: `{ "grudge": 0 }`. Each match starts fresh. Values are clamped to -1000..1000. |
 | `pattern` | no | 1 to 10 moves. Needed if anything uses `pattern`. Indexed by round number: round 1 is the first move, and it loops. |
-| `slip` | no | 0 to 20. Percent of rounds the chosen move is flipped. Applied last, after every rule. The game itself has no noise. |
+| `slip` | no | 0 to 100. Percent of rounds a coin flip replaces the chosen move (so half of those rounds change). 100 is a fully random player. Applied last, after every rule. The game itself has no noise. |
 | `approximations` | no | Up to 400 characters. Where the AI says what it could not build exactly. Shown beside the readback. |
 | `builder` | no | The builder's answers, so a strategy can be reopened in the builder. Opaque to the engine, max 4000 bytes. |
 

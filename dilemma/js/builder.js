@@ -6,8 +6,8 @@
 // English readback is made from the compiled JSON, so the two cannot disagree.
 // A V2 option is a new entry here plus a few lines in compile().
 
-import { SCHEMA_VERSION } from './engine.js?v=20261105-092415';
-import { LIMITS } from './validate.js?v=20261105-092415';
+import { SCHEMA_VERSION } from './engine.js?v=20261105-092620';
+import { LIMITS } from './validate.js?v=20261105-092620';
 
 const C = 'cooperate', D = 'defect';
 
@@ -90,7 +90,7 @@ export const QUESTIONS = [
   },
   {
     id: 'slip', section: 'twist', title: 'Random slips',
-    ask: 'Sometimes you do the opposite of what you meant.',
+    ask: 'Sometimes a coin flip picks your move instead. 100% is totally random.',
     fields: [{ key: 'chance', type: 'percent', label: 'Slip chance', max: LIMITS.slip }]
   },
   {

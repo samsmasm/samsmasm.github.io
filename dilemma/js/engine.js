@@ -175,12 +175,13 @@ export function chooseMove(player, v) {
     if (intended === null) intended = decide(s.fallback, s, v, rng) || 'cooperate';
   }
 
+  // A slip hands the move to a coin flip, so slip 100 is a fully random
+  // player. It only counts as slipped when the coin changed the move.
   let move = intended;
-  let slipped = false;
   if (s.slip > 0 && rng() * 100 < s.slip) {
-    move = other(intended);
-    slipped = true;
+    move = rng() < 0.5 ? 'cooperate' : 'defect';
   }
+  const slipped = move !== intended;
   return { move, intended, rule, slipped };
 }
 

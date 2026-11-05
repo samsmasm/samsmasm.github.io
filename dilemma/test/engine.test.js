@@ -108,12 +108,16 @@ await test('same seed, same match; different seed, different match', () => {
   assert.ok(coop > 70 && coop < 130, 'roughly half: ' + coop);
 });
 
-await test('random slips flip the intended move and are logged', () => {
-  const sloppy = { ...K.alwaysCooperate, name: 'Sloppy', slip: 20 };
+await test('random slips hand the move to a coin flip and are logged', () => {
+  const sloppy = { ...K.alwaysCooperate, name: 'Sloppy', slip: 40 };
   const m = playMatch(sloppy, K.alwaysCooperate, { rounds: 500, log: true, seed: 's' });
   const slips = m.log.filter(r => r.a.slipped);
-  assert.ok(slips.length > 60 && slips.length < 140, 'about 20%: ' + slips.length);
+  assert.ok(slips.length > 60 && slips.length < 140, 'about 20% changed: ' + slips.length);
   assert.ok(slips.every(r => r.a.intended === 'cooperate' && r.a.move === 'defect'));
+  // 100% slip is a fully random player, whatever its rules say.
+  const chaos = playMatch({ ...K.alwaysDefect, slip: 100 }, K.alwaysCooperate, { rounds: 500, seed: 's' });
+  const coop = chaos.movesA.filter(x => x === 'cooperate').length;
+  assert.ok(coop > 200 && coop < 300, 'about half: ' + coop);
 });
 
 await test('chance with otherwise nextRule falls through', () => {

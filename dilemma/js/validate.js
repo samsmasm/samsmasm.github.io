@@ -3,7 +3,7 @@
 // AI output drifts, so nothing is trusted. Every problem gets a message a
 // Grade 9 student can act on, naming where it is and what to change.
 
-import { SCHEMA_VERSION, CHECKS, MOVE_CHECKS, NUMBER_OPS, ACTIONS } from './engine.js?v=20261105-092415';
+import { SCHEMA_VERSION, CHECKS, MOVE_CHECKS, NUMBER_OPS, ACTIONS } from './engine.js?v=20261105-092620';
 
 export const LIMITS = {
   rules: 8,
@@ -14,7 +14,7 @@ export const LIMITS = {
   description: 140,
   label: 50,
   approximations: 400,
-  slip: 20,
+  slip: 100,
   memoryValue: 1000,
   builderBytes: 4000
 };

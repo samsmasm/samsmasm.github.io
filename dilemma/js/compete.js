@@ -4,11 +4,11 @@
 // settings (taken from its official standings), so anyone who runs the same
 // thing gets the same result.
 
-import { publicRooms, publicStrategies, publicStandings } from './firebase.js?v=20261105-092415';
-import { fromStored, parsePasted, validate } from './validate.js?v=20261105-092415';
-import { runTournament, toEntries } from './tournament.js?v=20261105-092415';
-import { renderResults } from './results.js?v=20261105-092415';
-import { DEFAULTS, makeRng } from './engine.js?v=20261105-092415';
+import { publicRooms, publicStrategies, publicStandings } from './firebase.js?v=20261105-092620';
+import { fromStored, parsePasted, validate } from './validate.js?v=20261105-092620';
+import { runTournament, toEntries } from './tournament.js?v=20261105-092620';
+import { renderResults } from './results.js?v=20261105-092620';
+import { DEFAULTS, makeRng } from './engine.js?v=20261105-092620';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
