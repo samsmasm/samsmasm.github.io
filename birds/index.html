@@ -396,6 +396,7 @@ const UNIT_NAMES = {
   }
 };
 const TITLES = { bm: 'Business Management', econ: 'Economics', kids: 'Kids' };
+const LINKS = { bm: 'business', econ: 'economics', kids: 'kids' };
 const S = {
   screen: 'menu', set: null, read: false,
   ticked: { bm: new Set(), econ: new Set(), kids: new Set() },
@@ -413,7 +414,21 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
+/* The address is the source of truth: #business, #economics, #kids, or nothing for the menu */
+function route() {
+  const hash = location.hash.slice(1).toLowerCase();
+  const set = Object.keys(LINKS).find(k => LINKS[k] === hash);
+  if (set) openSet(set);
+  else showScreen('menu');
+}
+
+function goMenu() {
+  history.pushState(null, '', location.pathname + location.search);
+  route();
+}
+
 function openSet(set) {
+  if (S.set === set && S.puzzle) { showScreen('game'); return; } /* carry on with the same puzzle */
   S.set = set;
   $('gameTitle').textContent = TITLES[set];
   $('topicLabel').textContent = set === 'kids' ? 'Themes' : 'Topics';
@@ -699,10 +714,11 @@ function syncVoice() {
   $('readBtn').textContent = 'Voice: ' + (S.read ? 'on' : 'off');
 }
 
-$('pickBm').addEventListener('click', () => openSet('bm'));
-$('pickEcon').addEventListener('click', () => openSet('econ'));
-$('pickKids').addEventListener('click', () => openSet('kids'));
-$('backBtn').addEventListener('click', () => { showScreen('menu'); });
+$('pickBm').addEventListener('click', () => { location.hash = LINKS.bm; });
+$('pickEcon').addEventListener('click', () => { location.hash = LINKS.econ; });
+$('pickKids').addEventListener('click', () => { location.hash = LINKS.kids; });
+$('backBtn').addEventListener('click', goMenu);
+window.addEventListener('hashchange', route);
 $('newBtn').addEventListener('click', () => { S.puzzle && !S.over ? askNew(true) : newPuzzle(); });
 $('newYes').addEventListener('click', newPuzzle);
 $('newNo').addEventListener('click', () => askNew(false));
@@ -744,6 +760,8 @@ function start(data) {
       render();
     }
     showScreen(data.screen === 'game' ? 'game' : 'menu');
+  } else {
+    route();
   }
 }
 try { window.claude?.hot?.snapshot?.(snapshot); } catch (e) { /* not in the viewer */ }

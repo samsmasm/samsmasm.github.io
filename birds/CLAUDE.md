@@ -58,6 +58,8 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 
 ## Interaction
 
+- Direct links: `/birds#business`, `/birds#economics`, `/birds#kids`. The hash drives the screen (`route()`), so the browser Back button works. Going to the menu and back into the same set resumes the puzzle.
+
 - Click or tap cards to pick up to four, and again to unpick. No dragging. Shuffle is a normal button and keeps the picks.
 - New puzzle lives inside the closed Topics panel so kids do not press it by accident, with an inline "Are you sure?" (no browser dialog or modal). When a game ends or no puzzle can be made, a big New puzzle button replaces Check, with no confirmation.
 - Check is the big amber button, centred on the page, and is enabled at four picks. Right: the group moves to the top as a coloured row with the category name and syllabus ref. Wrong: "Not quite.", one feather lost, the cards shake and the picks clear. It never says how close a guess was.
