@@ -1,13 +1,13 @@
 // The Long Game - the build page: guided builder, AI route, review, test, send.
 
-import { playMatch, DEFAULTS } from './engine.js?v=20261105-074708';
-import { validate, parsePasted, LIMITS } from './validate.js?v=20261105-074708';
-import { readback, chanceWord, actionPhrase } from './readback.js?v=20261105-074708';
-import { QUESTIONS, SPECIAL_KINDS, INVERSE, defaultAnswers, compile, builderAnswersFor } from './builder.js?v=20261105-074708';
-import { strategyPrompt, extendPrompt } from './prompt.js?v=20261105-074708';
-import { TEST_OPPONENTS } from './opponents.js?v=20261105-074708';
-import { mountReplay } from './replay.js?v=20261105-074708';
-import { roomInfo, submitStrategy, publicRooms, cleanHandle, cleanCode } from './firebase.js?v=20261105-074708';
+import { playMatch, DEFAULTS } from './engine.js?v=20261105-092415';
+import { validate, parsePasted, LIMITS } from './validate.js?v=20261105-092415';
+import { readback, chanceWord, actionPhrase } from './readback.js?v=20261105-092415';
+import { QUESTIONS, SPECIAL_KINDS, INVERSE, defaultAnswers, compile, builderAnswersFor } from './builder.js?v=20261105-092415';
+import { strategyPrompt, extendPrompt } from './prompt.js?v=20261105-092415';
+import { TEST_OPPONENTS } from './opponents.js?v=20261105-092415';
+import { mountReplay } from './replay.js?v=20261105-092415';
+import { roomInfo, submitStrategy, publicRooms, cleanHandle, cleanCode } from './firebase.js?v=20261105-092415';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

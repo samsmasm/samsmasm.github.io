@@ -1,7 +1,7 @@
 // The Long Game - the prompt a student pastes into any AI chat.
 // Bump PROMPT_VERSION whenever the wording changes.
 
-import { LIMITS } from './validate.js?v=20261105-074708';
+import { LIMITS } from './validate.js?v=20261105-092415';
 
 export const PROMPT_VERSION = '1.1';
 

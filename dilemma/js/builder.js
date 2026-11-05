@@ -6,8 +6,8 @@
 // English readback is made from the compiled JSON, so the two cannot disagree.
 // A V2 option is a new entry here plus a few lines in compile().
 
-import { SCHEMA_VERSION } from './engine.js?v=20261105-074708';
-import { LIMITS } from './validate.js?v=20261105-074708';
+import { SCHEMA_VERSION } from './engine.js?v=20261105-092415';
+import { LIMITS } from './validate.js?v=20261105-092415';
 
 const C = 'cooperate', D = 'defect';
 
@@ -44,8 +44,7 @@ export const QUESTIONS = [
     ask: 'They defected last round. You...',
     fields: [{ key: 'do', type: 'choice', chance: true, choices: [
       { value: D, label: 'Defect back', tip: 'An eye for an eye.' },
-      { value: C, label: 'Cooperate anyway', tip: 'Turn the other cheek.' },
-      { value: 'copy', label: 'Copy them', tip: 'Do exactly what they did.' }
+      { value: C, label: 'Cooperate anyway', tip: 'Turn the other cheek.' }
     ] }]
   },
   {
