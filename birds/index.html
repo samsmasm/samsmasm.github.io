@@ -370,6 +370,11 @@ function guessResult(ids) {
   return groups.size === 1 ? Number([...groups][0]) : -1;
 }
 
+/* The same four cards in any order give the same key */
+function guessKey(ids) {
+  return [...ids].sort().join();
+}
+
 /* Devices often default to a deep voice, so prefer lighter named voices, then any English one. */
 const NICE_VOICES = ['Sonia', 'Libby', 'Natasha', 'Aria', 'Jenny', 'Google UK English Female', 'Samantha', 'Karen', 'Serena', 'Moira', 'Tessa', 'Hazel', 'Zira', 'Google US English'];
 function pickVoice(voices) {
@@ -408,7 +413,7 @@ const S = {
   screen: 'menu', set: null, read: false,
   ticked: { bm: new Set(), econ: new Set(), kids: new Set() },
   level: { bm: 'SL', econ: 'SL' }, /* Kids has no level */
-  puzzle: null, order: [], revealed: [], selected: [], lives: LIVES, over: null, note: '', busy: false
+  puzzle: null, order: [], revealed: [], selected: [], tried: [], lives: LIVES, over: null, note: '', busy: false
 };
 const els = new Map();
 
@@ -556,7 +561,7 @@ function updateTopicCount() {
 function newPuzzle() {
   const p = buildPuzzle(BANKS[S.set], S.ticked[S.set], CFG);
   const msg = $('msg');
-  S.selected = []; S.lives = LIVES; S.over = null; S.note = ''; S.busy = false;
+  S.selected = []; S.tried = []; S.lives = LIVES; S.over = null; S.note = ''; S.busy = false;
   askNew(false);
   if (!p) {
     msg.hidden = false;
@@ -578,10 +583,12 @@ function newPuzzle() {
   render();
 }
 
+const alreadyTried = () => S.selected.length === CFG.per && S.tried.includes(guessKey(S.selected));
+
 function updateButtons() {
   const playing = !!S.puzzle && !S.over;
   const free = playing && !S.busy;
-  $('checkBtn').disabled = !free || S.selected.length !== CFG.per;
+  $('checkBtn').disabled = !free || S.selected.length !== CFG.per || alreadyTried();
   $('shuffleBtn').disabled = !free;
   $('checkBtn').hidden = !playing;
   $('shuffleBtn').hidden = !playing;
@@ -688,7 +695,7 @@ function render() {
   $('status').textContent = !S.puzzle ? ''
     : S.over === 'won' ? 'All four found!'
     : S.over === 'lost' ? 'Out of lives.'
-    : S.note;
+    : S.note || (alreadyTried() ? 'Already tried.' : '');
   updateButtons();
   renderLives();
 }
@@ -722,7 +729,7 @@ function play(notes) {
 }
 
 function check() {
-  if (S.busy || S.over || S.selected.length !== CFG.per) return;
+  if (S.busy || S.over || S.selected.length !== CFG.per || alreadyTried()) return;
   const gi = guessResult(S.selected);
   S.note = '';
   if (gi >= 0) {
@@ -735,6 +742,7 @@ function check() {
   }
   const p = S.puzzle, wrong = S.selected;
   play(SAD);
+  S.tried = S.tried.concat(guessKey(wrong));
   S.lives--;
   S.note = 'Not quite.';
   S.busy = true;
@@ -744,8 +752,8 @@ function check() {
     if (S.puzzle !== p) return;
     wrong.forEach(id => els.get(id).classList.remove('no'));
     S.busy = false;
-    S.selected = [];
     if (S.lives === 0) {
+      S.selected = [];
       S.over = 'lost';
       S.revealed = S.revealed.concat(p.groups.map((_, i) => i).filter(i => !S.revealed.includes(i)));
     }
