@@ -50,7 +50,7 @@ const SUBJECTS = {
   theirDefectStreak: 'the number of times in a row they have just defected',
   theirCoopStreak: 'the number of times in a row they have just cooperated',
   myDefections: 'the number of times you have defected',
-  scoreLead: 'your lead in points (below 0 means you are behind)'
+  scoreLead: 'how many fewer years you have than them (below 0 means you have more)'
 };
 
 const AGO = { theirLast: 'last round', theirLast2: 'two rounds ago', theirLast3: 'three rounds ago' };
@@ -86,11 +86,11 @@ export function conditionPhrase(c) {
       break;
     }
     case 'scoreLead':
-      if ((op === 'moreThan' && n === 0) || (op === 'atLeast' && n === 1)) return 'you are ahead on points';
-      if ((op === 'lessThan' && n === 0) || (op === 'atMost' && n === -1)) return 'you are behind on points';
-      if (op === 'atLeast' && n > 0) return `you are ahead by ${n} points or more`;
-      if (op === 'atMost' && n < 0) return `you are behind by ${-n} points or more`;
-      if (op === 'equals' && n === 0) return 'the scores are level';
+      if ((op === 'moreThan' && n === 0) || (op === 'atLeast' && n === 1)) return 'you have fewer years than them';
+      if ((op === 'lessThan' && n === 0) || (op === 'atMost' && n === -1)) return 'you have more years than them';
+      if (op === 'atLeast' && n > 0) return `you have at least ${n} fewer years than them`;
+      if (op === 'atMost' && n < 0) return `you have at least ${-n} more years than them`;
+      if (op === 'equals' && n === 0) return 'you both have the same years';
       break;
   }
   if (c.check.startsWith('memory.')) return `your memory number "${c.check.slice(7)}" ${OPS[op](n)}`;

@@ -1,11 +1,11 @@
 // The Long Game - the teacher page: rooms, strategies, running a tournament.
 
-import { teacherApp } from './firebase.js?v=20261105-065547';
-import { validate, parsePasted } from './validate.js?v=20261105-065547';
-import { readback } from './readback.js?v=20261105-065547';
-import { runTournament, FORMATS } from './tournament.js?v=20261105-065547';
-import { renderResults } from './results.js?v=20261105-065547';
-import { DEFAULTS } from './engine.js?v=20261105-065547';
+import { teacherApp } from './firebase.js?v=20261105-074708';
+import { validate, parsePasted, fromStored } from './validate.js?v=20261105-074708';
+import { readback } from './readback.js?v=20261105-074708';
+import { runTournament, FORMATS, toEntries } from './tournament.js?v=20261105-074708';
+import { renderResults } from './results.js?v=20261105-074708';
+import { DEFAULTS } from './engine.js?v=20261105-074708';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -80,7 +80,7 @@ function openRoom(code) {
   paintOpen();
   if (!$('#t-seed').value) $('#t-seed').value = newSeed();
   if (unwatch) unwatch();
-  unwatch = fb.watchStrategies(code, list => { subs = list.map(prepare); paintSubs(); },
+  unwatch = fb.watchStrategies(code, list => { subs = list.map(fromStored); paintSubs(); },
     e => { $('#subs').innerHTML = `<p class="errors small">Could not load strategies: ${esc(e.code || e.message)}</p>`; });
   loadRuns();
 }
@@ -88,7 +88,26 @@ function openRoom(code) {
 function paintOpen() {
   $('#room-open').textContent = room.open ? 'Close to new strategies' : 'Open to new strategies';
   $('#room-state').textContent = room.open ? 'Open: students can send.' : 'Closed: nothing new can arrive.';
+  $('#room-public').textContent = room.public ? 'Make it private' : 'Make it a public competition';
+  $('#room-public-state').textContent = room.public ? 'Public: listed on the Compete page.' : 'Private: only you can see it.';
 }
+
+// Going public shows every strategy already sent, so it takes two clicks.
+$('#room-public').onclick = async () => {
+  const b = $('#room-public');
+  if (!room.public && !b.dataset.armed) {
+    b.dataset.armed = '1';
+    b.textContent = `Click again: all ${subs.length} strategies become public`;
+    setTimeout(() => { delete b.dataset.armed; paintOpen(); }, 5000);
+    return;
+  }
+  delete b.dataset.armed;
+  try {
+    await fb.setPublic(room.code, !room.public);
+    room.public = !room.public;
+    paintOpen();
+  } catch (e) { alertBox('#room-public-state', 'Could not change it: ' + (e.code || e.message)); }
+};
 $('#room-open').onclick = async () => {
   try {
     await fb.setOpen(room.code, !room.open);
@@ -103,17 +122,6 @@ function alertBox(sel, text) { $(sel).textContent = text; }
 // Strategies
 // ---------------------------------------------------------------------------
 
-// Every stored strategy is checked again here. Anything that fails is shown
-// but left out of the tournament.
-function prepare(d) {
-  let strategy = null, errors = [];
-  try {
-    strategy = JSON.parse(d.json);
-    const v = validate(strategy);
-    if (!v.ok) errors = v.errors;
-  } catch { errors = ['The stored JSON cannot be read.']; }
-  return { id: d.id, handle: d.handle, name: d.name, strategy, errors, at: d.createdAt?.toDate?.() };
-}
 
 function paintSubs() {
   const ok = subs.filter(s => !s.errors.length);
@@ -182,10 +190,7 @@ function settings() {
 async function run(opts, onlyIds) {
   let pool = subs.filter(s => !s.errors.length);
   if (onlyIds) pool = pool.filter(s => onlyIds.includes(s.id));
-  // Sorted by id, so who plays as side A never depends on arrival order and
-  // a saved run replays exactly.
-  const entries = pool.map(s => ({ id: s.id, name: s.name, handle: s.handle, strategy: s.strategy }))
-    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  const entries = toEntries(pool);
   if (entries.length < 2) { $('#t-summary').textContent = 'Needs at least 2 strategies.'; return; }
 
   $('#t-run').disabled = true;
@@ -213,7 +218,7 @@ const panes = {};
 document.querySelectorAll('[data-pane]').forEach(p => { panes[p.dataset.pane] = p; });
 function showTab(name) {
   document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-  Object.entries(panes).forEach(([k, p]) => p.classList.toggle('hidden', k !== name));
+  document.querySelectorAll('[data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== name));
 }
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 panes.openReplay = (i, j) => { showTab('replay'); panes.replay.pick(i, j); };
@@ -231,7 +236,22 @@ function showResults(res) {
 
 function saveRunButton(res) {
   const p = $('#t-progress-text');
-  p.innerHTML = `Done. <button class="btn small" id="t-save">Save this run</button>`;
+  const everyone = res.entries.length === subs.filter(s => !s.errors.length).length;
+  p.innerHTML = `Done. <button class="btn small" id="t-save">Save this run</button>
+    ${room.public && everyone ? '<button class="btn small" id="t-publish">Publish as official standings</button>' : ''}`;
+  const pub = $('#t-publish');
+  if (pub) pub.onclick = async () => {
+    try {
+      await fb.publishStandings(room.code, {
+        rounds: res.opts.rounds, seed: res.opts.seed, selfPlay: res.opts.selfPlay, format: res.opts.format,
+        ranking: res.ranking.map(t => ({
+          id: t.id, name: t.name, handle: t.handle, total: t.total,
+          average: Math.round(t.average * 1000) / 1000, coopRate: Math.round(t.coopRate * 1000) / 1000
+        }))
+      });
+      p.textContent = 'Published. The Compete page now shows these standings.';
+    } catch (e) { p.textContent = 'Could not publish: ' + (e.code || e.message); }
+  };
   $('#t-save').onclick = async () => {
     try {
       await fb.saveRun(room.code, {

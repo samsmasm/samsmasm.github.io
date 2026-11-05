@@ -39,7 +39,7 @@ export function cleanCode(c) {
 }
 
 // ---------------------------------------------------------------------------
-// Students: an anonymous account in a separately named app, so a Google
+// Students and the public: an anonymous account in a separately named app, so a Google
 // sign-in for another tool on a shared Chromebook is never used here.
 // ---------------------------------------------------------------------------
 
@@ -60,6 +60,30 @@ export async function roomInfo(code) {
   const { db, ready } = studentApp();
   await ready;
   const snap = await getDoc(doc(db, ROOMS, code));
+  return snap.exists() ? snap.data() : null;
+}
+
+// Public competitions are ordinary rooms whose owner has made them public.
+// Anyone can list them, read their strategies and their official standings.
+export async function publicRooms() {
+  const { db, ready } = studentApp();
+  await ready;
+  const snap = await getDocs(query(collection(db, ROOMS), where('public', '==', true)));
+  return snap.docs.map(d => ({ code: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+}
+
+export async function publicStrategies(code) {
+  const { db, ready } = studentApp();
+  await ready;
+  const snap = await getDocs(collection(db, ROOMS, code, 'strategies'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function publicStandings(code) {
+  const { db, ready } = studentApp();
+  await ready;
+  const snap = await getDoc(doc(db, ROOMS, code, 'standings', 'current'));
   return snap.exists() ? snap.data() : null;
 }
 
@@ -123,13 +147,19 @@ export function teacherApp() {
         for (let i = 0; i < 5; i++) code += abc[Math.floor(Math.random() * abc.length)];
         const ref = roomRef(code);
         if ((await getDoc(ref).catch(() => null))?.exists()) continue;
-        await setDoc(ref, { ownerUid: uid(), title: String(title || '').slice(0, 60), open: true, createdAt: serverTimestamp() });
+        await setDoc(ref, { ownerUid: uid(), title: String(title || '').slice(0, 60), open: true, public: false, createdAt: serverTimestamp() });
         return code;
       }
       throw new Error('Could not make a room code. Try again.');
     },
 
     setOpen: (code, open) => updateDoc(roomRef(code), { open }),
+    setPublic: (code, isPublic) => updateDoc(roomRef(code), { public: isPublic }),
+
+    // The official standings of a public competition: one full run, which
+    // everyone sees and which "against the top 20" uses.
+    publishStandings: (code, standings) =>
+      setDoc(doc(db, ROOMS, code, 'standings', 'current'), { ...standings, updatedAt: serverTimestamp() }),
     deleteRoom: code => deleteDoc(roomRef(code)),
 
     watchStrategies(code, cb, onError) {

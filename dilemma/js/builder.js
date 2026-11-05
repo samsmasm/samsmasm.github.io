@@ -6,8 +6,8 @@
 // English readback is made from the compiled JSON, so the two cannot disagree.
 // A V2 option is a new entry here plus a few lines in compile().
 
-import { SCHEMA_VERSION } from './engine.js?v=20261105-065547';
-import { LIMITS } from './validate.js?v=20261105-065547';
+import { SCHEMA_VERSION } from './engine.js?v=20261105-074708';
+import { LIMITS } from './validate.js?v=20261105-074708';
 
 const C = 'cooperate', D = 'defect';
 
@@ -27,15 +27,15 @@ export const QUESTIONS = [
     ask: 'Round 1. What do you do?',
     fields: [{ key: 'do', type: 'choice', chance: true, choices: [
       { value: C, label: 'Cooperate', tip: 'Start nice. Most winning strategies do.' },
-      { value: D, label: 'Defect', tip: 'Start mean and grab 5 points if they cooperate.' }
+      { value: D, label: 'Defect', tip: 'Start mean: walk free if they cooperate.' }
     ] }]
   },
   {
     id: 'onCoop', section: 'core', title: 'When they cooperate',
     ask: 'They cooperated last round. You...',
     fields: [{ key: 'do', type: 'choice', chance: true, choices: [
-      { value: C, label: 'Cooperate back', tip: 'Keep the good times going: 3 points each.' },
-      { value: D, label: 'Defect', tip: 'Take advantage: 5 points for you, 0 for them.' },
+      { value: C, label: 'Cooperate back', tip: 'Stay loyal: 2 years each.' },
+      { value: D, label: 'Defect', tip: 'Take advantage: 0 years for you, 5 for them.' },
       { value: 'repeat', label: 'Repeat my last move', tip: 'Do whatever you did last round.' }
     ] }]
   },
@@ -122,13 +122,13 @@ export const QUESTIONS = [
   },
   {
     id: 'scoreboard', section: 'twist', title: 'Scoreboard',
-    ask: 'Change what you do when the scores get far apart.',
+    ask: 'Change what you do when your years and theirs get far apart.',
     fields: [
       { key: 'when', type: 'choice', choices: [
-        { value: 'behind', label: 'When I am behind', tip: 'Fight back when losing.' },
-        { value: 'ahead', label: 'When I am ahead', tip: 'Change tactics when winning.' }
+        { value: 'behind', label: 'When I have more years', tip: 'Fight back when losing.' },
+        { value: 'ahead', label: 'When I have fewer years', tip: 'Change tactics when winning.' }
       ] },
-      { key: 'by', type: 'number', label: 'By at least (points)', min: 1, max: 500 },
+      { key: 'by', type: 'number', label: 'By at least (years)', min: 1, max: 500 },
       { key: 'do', type: 'choice', chance: true, label: 'Then', choices: MOVE_CHOICES }
     ]
   },

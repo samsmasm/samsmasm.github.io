@@ -1,16 +1,16 @@
 // The Long Game - the prompt a student pastes into any AI chat.
 // Bump PROMPT_VERSION whenever the wording changes.
 
-import { LIMITS } from './validate.js?v=20261105-065547';
+import { LIMITS } from './validate.js?v=20261105-074708';
 
-export const PROMPT_VERSION = '1.0';
+export const PROMPT_VERSION = '1.1';
 
 const SCHEMA_TEXT = `THE GAME
-Two players play the same opponent many times in a row (usually 100 rounds, but the teacher can change it). Each round both choose at the same time: "cooperate" or "defect".
-- Both cooperate: 3 points each.
-- Both defect: 1 point each.
-- One defects, one cooperates: the defector gets 5, the cooperator gets 0.
-The aim is the most points in total across a whole tournament against everyone in the class.
+Two prisoners play each other many times in a row (usually 100 rounds, but the teacher can change it). Each round both choose at the same time: "cooperate" (stay loyal) or "defect" (betray the other).
+- Both cooperate: 2 years in jail each.
+- Both defect: 4 years each.
+- One defects, one cooperates: the defector gets 0 years, the cooperator gets 5.
+The aim is the FEWEST years in total across a whole tournament against everyone else.
 
 THE STRATEGY FORMAT (schemaVersion 1)
 A strategy is one JSON object:
@@ -64,7 +64,7 @@ CONDITION: { "check": WHAT, COMPARISON: VALUE } with exactly ONE comparison.
     "theirCoopStreak"       how many times in a row they have just cooperated
     "theirCooperationRate"  percent of rounds they have cooperated so far, 0 to 100
     "myDefections"          how many times I have defected so far
-    "scoreLead"             my points minus their points (negative when I am behind)
+    "scoreLead"             their years minus my years, so positive means I am doing better (fewer years)
     "memory.NAME"           a memory slot from "memory"
   A random check: { "check": "chance", "percent": 10 } is true 10% of the time.
 
@@ -97,7 +97,7 @@ const STEPS = `HOW TO HELP ME
 Keep your questions and explanations short and friendly. I am in Grade 9 or above.`;
 
 export function strategyPrompt() {
-  return `You are helping a student design a strategy for the repeated prisoner's dilemma, for a class tournament on a website called The Long Game. Prompt version ${PROMPT_VERSION}.
+  return `You are helping a student design a strategy for the repeated prisoner's dilemma, for a tournament on a website called The Long Game. Prompt version ${PROMPT_VERSION}.
 
 ${SCHEMA_TEXT}
 
@@ -109,7 +109,7 @@ Start now with step 1.`;
 // For a strategy made in the builder that the student wants to take further.
 export function extendPrompt(strategy) {
   const { builder, ...plain } = strategy;
-  return `You are helping a student improve a strategy for the repeated prisoner's dilemma, for a class tournament on a website called The Long Game. Prompt version ${PROMPT_VERSION}.
+  return `You are helping a student improve a strategy for the repeated prisoner's dilemma, for a tournament on a website called The Long Game. Prompt version ${PROMPT_VERSION}.
 
 ${SCHEMA_TEXT}
 

@@ -1,8 +1,8 @@
 // The Long Game - drawing a tournament's results, and CSV export.
 
-import { playPair } from './tournament.js?v=20261105-065547';
-import { mountReplay } from './replay.js?v=20261105-065547';
-import { rulePhrase } from './readback.js?v=20261105-065547';
+import { playPair } from './tournament.js?v=20261105-074708';
+import { mountReplay } from './replay.js?v=20261105-074708';
+import { rulePhrase } from './readback.js?v=20261105-074708';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pct = x => Math.round(x * 100) + '%';
@@ -18,42 +18,49 @@ function tooltip(evt, html) {
   tip.style.top = (evt.clientY + 14) + 'px';
 }
 
-export function renderResults(res, panes) {
-  board(res, panes.board);
+// opts.mine: the entry id to pick out as "you" (the competitions page).
+export function renderResults(res, panes, opts = {}) {
+  board(res, panes.board, opts.mine);
   headToHead(res, panes.h2h, panes);
-  graphs(res, panes.graphs);
-  replayPicker(res, panes.replay);
+  graphs(res, panes.graphs, opts.mine);
+  replayPicker(res, panes.replay, opts.mine);
   exporter(res, panes.export);
 }
 
 // ---------------------------------------------------------------------------
 
-function board(res, el) {
-  const max = res.ranking[0]?.total || 1;
+function board(res, el, mine) {
+  const max = Math.max(1, ...res.table.map(t => t.total));
   let lastTotal = null, shown = 0;
   el.innerHTML = `<div class="panel scroller"><table>
-    <thead><tr><th class="n">#</th><th>Strategy</th><th>By</th><th class="n">Total</th><th style="width:28%"></th><th class="n">Per round</th><th class="n">Cooperates</th></tr></thead>
+    <thead><tr><th class="n">#</th><th>Strategy</th><th>By</th><th class="n">Years</th><th style="width:28%"></th><th class="n">Per round</th><th class="n">Cooperates</th></tr></thead>
     <tbody>${res.ranking.map((t, k) => {
       if (t.total !== lastTotal) shown = k + 1;
       lastTotal = t.total;
-      return `<tr>
-        <td class="n">${shown}</td><td><strong>${esc(t.name)}</strong></td><td>${esc(t.handle)}</td>
+      return `<tr${t.id === mine ? ' class="mine"' : ''}>
+        <td class="n">${shown}</td><td><strong>${esc(t.name)}</strong>${t.id === mine ? ' <span class="label" style="color:var(--amber-ink)">you</span>' : ''}</td><td>${esc(t.handle)}</td>
         <td class="n"><strong>${t.total}</strong></td>
         <td><div class="bar" style="width:${(100 * t.total / max).toFixed(1)}%"></div></td>
         <td class="n">${t.average.toFixed(2)}</td><td class="n">${pct(t.coopRate)}</td></tr>`;
     }).join('')}</tbody></table>
-    <p class="small muted" style="margin-top:10px">${res.entries.length} strategies, ${res.matches.length} matches of ${res.opts.rounds} rounds, seed "${esc(res.opts.seed)}", ${res.opts.selfPlay ? 'including' : 'not including'} self play. Per round: 3 is steady cooperation, 1 is steady defection.</p></div>`;
+    <p class="small muted" style="margin-top:10px"><strong>Fewest years wins.</strong> ${res.entries.length} strategies, ${res.matches.length} matches of ${res.opts.rounds} rounds, seed "${esc(res.opts.seed)}", ${res.opts.selfPlay ? 'including' : 'not including'} self play. Per round: 2 is steady cooperation, 4 is steady defection.</p></div>`;
 }
 
 // ---------------------------------------------------------------------------
 
+const H2H_MAX = 40;
+
 function headToHead(res, el, panes) {
+  if (res.entries.length > H2H_MAX) {
+    el.innerHTML = `<div class="panel"><p>Too many strategies to draw (${res.entries.length}). Download the head to head CSV from Export, or watch any pair in Replay.</p></div>`;
+    return;
+  }
   const order = res.ranking.map(t => t.index);
   const R = res.opts.rounds;
-  // Sequential: one hue, light to dark, for average points per round 0 to 5.
+  // Sequential: one hue, light to dark, for average years per round 0 to 5.
   const fill = v => `color-mix(in srgb, var(--series-a) ${Math.round(8 + 82 * v / 5)}%, #fffdf8)`;
   el.innerHTML = `<div class="panel">
-    <p class="small muted">Each row's average points per round against each column. Darker means more points. Click a square to watch that match.</p>
+    <p class="small muted">Each row's average years per round against each column. Darker means more years in jail. Click a square to watch that match.</p>
     <div class="scroller"><table class="h2h" style="width:auto">
       <thead><tr><th></th>${order.map(j => `<th class="colh" title="${esc(res.table[j].name)}">${esc(res.table[j].name.length > 22 ? res.table[j].name.slice(0, 21) + '...' : res.table[j].name)}</th>`).join('')}</tr></thead>
       <tbody>${order.map(i => `<tr><th class="rowh">${esc(res.table[i].name)}</th>${order.map(j => {
@@ -63,11 +70,11 @@ function headToHead(res, el, panes) {
         return `<td data-i="${i}" data-j="${j}" style="background:${fill(v)};color:${v >= 3.5 ? '#fff' : 'var(--ink)'};cursor:pointer">${v.toFixed(1)}</td>`;
       }).join('')}</tr>`).join('')}</tbody>
     </table></div>
-    <p class="small muted" style="margin-top:8px">Scale: <span style="background:${fill(0)};padding:2px 6px">0</span> <span style="background:${fill(1)};padding:2px 6px">1</span> <span style="background:${fill(3)};padding:2px 6px">3</span> <span style="background:${fill(5)};padding:2px 6px;color:#fff">5</span> points per round</p>
+    <p class="small muted" style="margin-top:8px">Scale: <span style="background:${fill(0)};padding:2px 6px">0</span> <span style="background:${fill(1)};padding:2px 6px">1</span> <span style="background:${fill(3)};padding:2px 6px">3</span> <span style="background:${fill(5)};padding:2px 6px;color:#fff">5</span> years per round</p>
   </div>`;
   el.querySelectorAll('td[data-i]').forEach(td => {
     const i = +td.dataset.i, j = +td.dataset.j;
-    td.onmousemove = e => tooltip(e, `<strong>${esc(res.table[i].name)}</strong> ${res.h2h[i][j]}<br><strong>${esc(res.table[j].name)}</strong> ${res.h2h[j][i]}`);
+    td.onmousemove = e => tooltip(e, `<strong>${esc(res.table[i].name)}</strong> ${res.h2h[i][j]} years<br><strong>${esc(res.table[j].name)}</strong> ${res.h2h[j][i]} years`);
     td.onmouseleave = () => tooltip(null);
     td.onclick = () => { tooltip(null); panes.openReplay(i, j); };
   });
@@ -75,14 +82,15 @@ function headToHead(res, el, panes) {
 
 // ---------------------------------------------------------------------------
 
-function graphs(res, el) {
+function graphs(res, el, mine) {
   const R = res.opts.rounds;
+  const mineIndex = res.table.find(t => t.id === mine)?.index;
   el.innerHTML = `<div class="panel">
       <div class="row" style="justify-content:space-between">
-        <h3 style="margin:0">Points per round, through the match</h3>
-        <label class="small">Highlight <select data-hl>${res.ranking.map(t => `<option value="${t.index}">${esc(t.name)}</option>`).join('')}</select></label>
+        <h3 style="margin:0">Years per round, through the match</h3>
+        <label class="small">Highlight <select data-hl>${res.ranking.map(t => `<option value="${t.index}" ${t.index === mineIndex ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
       </div>
-      <p class="small muted">Averaged over every match. A drop near the end means defecting as the game runs out. Grey lines are everyone else. Smoothed over 5 rounds; hover for exact values.</p>
+      <p class="small muted">Averaged over every match. Lower is better. A rise near the end means defecting as the game runs out. Grey lines are everyone else. Smoothed over 5 rounds; hover for exact values.</p>
       <div class="chart" data-lines></div>
     </div>
     <div class="panel">
@@ -106,8 +114,8 @@ function graphs(res, el) {
   const lines = el.querySelector('[data-lines]');
   function drawLines(hl) {
     const h = res.table[hl];
-    lines.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Average points per round for each strategy">
-      <g class="grid">${[0, 1, 3, 5].map(v => `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('')}</g>
+    lines.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Average years per round for each strategy">
+      <g class="grid">${[0, 2, 4, 5].map(v => `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('')}</g>
       <text x="${L}" y="${H - 6}">round 1</text><text x="${W - Rm}" y="${H - 6}" text-anchor="end">${R}</text>
       ${res.table.filter(t => t.index !== hl).map(t => `<polyline points="${path(t)}" fill="none" stroke="#c9c5ba" stroke-width="1"/>`).join('')}
       <polyline points="${path(h)}" fill="none" stroke="var(--series-a)" stroke-width="2.5"/>
@@ -142,13 +150,17 @@ function graphs(res, el) {
 
 // ---------------------------------------------------------------------------
 
-function replayPicker(res, el) {
+function replayPicker(res, el, mine) {
   const opts = res.ranking.map(t => `<option value="${t.index}">${esc(label(t))}</option>`).join('');
   el.innerHTML = `<div class="panel">
     <div class="row"><select data-a>${opts}</select><span>vs</span><select data-b>${opts}</select></div>
     <div data-view style="margin-top:12px"></div></div>`;
   const a = el.querySelector('[data-a]'), b = el.querySelector('[data-b]');
-  if (res.ranking[1]) b.value = res.ranking[1].index;
+  const me = res.table.find(t => t.id === mine);
+  if (me) {
+    a.value = me.index;
+    b.value = (res.ranking.find(t => t !== me) || me).index;
+  } else if (res.ranking[1]) b.value = res.ranking[1].index;
   const show = () => openMatch(res, +a.value, +b.value, el.querySelector('[data-view]'));
   a.onchange = b.onchange = show;
   el.pick = (i, j) => { a.value = i; b.value = j; show(); };
@@ -207,14 +219,14 @@ function exporter(res, el) {
     return m.log.map(r => [A.name, Bn.name, r.round, res.opts.rounds - r.round, r.a.move, r.b.move, r.ptsA, r.ptsB, r.totalA, r.totalB,
       why(A.strategy, r.a), why(Bn.strategy, r.b), r.a.slipped ? 'yes' : '', r.b.slipped ? 'yes' : '']);
   };
-  const head = ['strategy A', 'strategy B', 'round', 'rounds left after', 'A move', 'B move', 'A points', 'B points', 'A total', 'B total', 'A reason', 'B reason', 'A slipped', 'B slipped'];
+  const head = ['strategy A', 'strategy B', 'round', 'rounds left after', 'A move', 'B move', 'A years', 'B years', 'A total years', 'B total years', 'A reason', 'B reason', 'A slipped', 'B slipped'];
 
   el.querySelector('[data-x="board"]').onclick = () => download(`leaderboard-${stamp}.csv`, csv([
     ['rank', 'strategy', 'handle', 'total', 'average per round', 'cooperation rate', 'matches'],
     ...res.ranking.map((t, k) => [k + 1, t.name, t.handle, t.total, t.average.toFixed(3), t.coopRate.toFixed(3), t.matches])
   ]));
   el.querySelector('[data-x="h2h"]').onclick = () => download(`head-to-head-${stamp}.csv`, csv([
-    ['row scored against column', ...res.table.map(t => t.name)],
+    ['years for row against column', ...res.table.map(t => t.name)],
     ...res.table.map((t, i) => [t.name, ...res.h2h[i]])
   ]));
   el.querySelector('[data-x="match"]').onclick = () => {

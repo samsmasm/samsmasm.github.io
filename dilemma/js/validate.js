@@ -3,7 +3,7 @@
 // AI output drifts, so nothing is trusted. Every problem gets a message a
 // Grade 9 student can act on, naming where it is and what to change.
 
-import { SCHEMA_VERSION, CHECKS, MOVE_CHECKS, NUMBER_OPS, ACTIONS } from './engine.js?v=20261105-065547';
+import { SCHEMA_VERSION, CHECKS, MOVE_CHECKS, NUMBER_OPS, ACTIONS } from './engine.js?v=20261105-074708';
 
 export const LIMITS = {
   rules: 8,
@@ -40,6 +40,18 @@ export function parsePasted(text) {
   } catch (e) {
     return { error: 'The JSON is broken, so it cannot be read. Check you copied everything from the first { to the last }. If it still fails, ask the AI to "output the JSON again, valid JSON only". (' + e.message + ')' };
   }
+}
+
+// A strategy as stored in Firestore, parsed and checked again. Anything that
+// fails is shown but left out of tournaments.
+export function fromStored(d) {
+  let strategy = null, errors = [];
+  try {
+    strategy = JSON.parse(d.json);
+    const v = validate(strategy);
+    if (!v.ok) errors = v.errors;
+  } catch { errors = ['The stored JSON cannot be read.']; }
+  return { id: d.id, handle: d.handle, name: d.name, strategy, errors, at: d.createdAt?.toDate?.() };
 }
 
 function distance(a, b) {

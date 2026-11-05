@@ -18,9 +18,21 @@ page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await page.setViewport({ width: 1280, height: 900 });
 
+// Firebase is replaced by test/fake-firebase.js, so sending and the
+// competitions page run with no network and their writes can be read back.
+const fakeFirebase = (await import('node:fs')).readFileSync(new URL('./fake-firebase.js', import.meta.url), 'utf8')
+  .replace("from './classics.js'", "from '/dilemma/test/classics.js'");
+await page.setRequestInterception(true);
+page.on('request', req => {
+  if (/\/dilemma\/js\/firebase\.js/.test(req.url())) {
+    req.respond({ status: 200, contentType: 'application/javascript', body: fakeFirebase });
+  } else req.continue();
+});
+
 // Home
 await page.goto(BASE + 'index.html', { waitUntil: 'networkidle0' });
-ok(await page.$eval('#m-dc', e => e.textContent.trim().startsWith('5')), 'home: payoff matrix filled from config');
+ok(await page.$eval('#m-cc', e => e.textContent.trim().startsWith('2')), 'home: matrix in years, from config');
+ok(await page.$eval('#m-dc', e => e.textContent.trim().startsWith('0')), 'home: defecting on a cooperator is 0 years');
 if (SHOTS) await page.screenshot({ path: SHOTS + '/home.png', fullPage: true });
 
 // Builder: defaults are Tit for Tat
@@ -53,14 +65,40 @@ if (SHOTS) await page.screenshot({ path: SHOTS + '/builder-over.png', fullPage: 
 for (const id of ['testing', 'switching', 'reading', 'startup']) await page.click(`[data-k="card-${id}"]`);
 ok(!(await page.$eval('#b-test', b => b.disabled)), 'builder: back under the cap');
 
+ok(await page.$eval('#stepbar [aria-current="step"]', e => e.dataset.step) === '1', 'steps: on step 1 while building');
 await page.type('#b-name', 'Grudge Bot');
-await page.click('#b-test');
+await page.click('#b-next');
 await page.waitForSelector('#review:not(.hidden)');
-ok(await page.$eval('#r-tests', e => e.querySelectorAll('.panel').length) === 2, 'review: two test matches');
+ok(await page.$eval('#stepbar [aria-current="step"]', e => e.dataset.step) === '2', 'steps: the bottom button goes to step 2');
+ok(await page.$eval('#r-tests', e => e.querySelectorAll('.panel').length) === 3, 'review: three test matches');
+const cards = await page.$$eval('#r-tests .panel', els => els.map(e => e.textContent.replace(/\s+/g, ' ')));
+ok(/vs Random/.test(cards[2]), 'review: Random is a test opponent');
+ok(cards.every(c => /You ?\d+ years/.test(c)), 'review: your years shown by name', cards[0]);
+ok(/Tit for Tat ?\d+ years/.test(cards[0]), 'review: their years shown by name', cards[0]);
+ok(cards.every(c => /got less time in jail|Same time in jail/.test(c)), 'review: verdict in jail words', cards.join(' | '));
+ok(!cards.some(c => /scored/.test(c)), 'review: no "scored"');
 ok(await page.$eval('#r-replay [data-round]', e => e.textContent) === '100 of 100', 'review: replay shown');
 const why = await page.$eval('#r-replay [data-wa]', e => e.textContent);
 ok(/Rule \d/.test(why) || /First move/.test(why) || /fallback/.test(why), 'review: replay says which rule fired', why);
 if (SHOTS) await page.screenshot({ path: SHOTS + '/review.png', fullPage: true });
+
+// Sending: class by code, public by list
+await page.click('#s-send');
+ok(/Pick a handle/.test(await page.$eval('#s-msg', e => e.textContent)), 'send: needs a handle first');
+await page.type('#s-handle', 'Shark 7!');
+await page.type('#s-code', 'class1');
+await page.click('#s-send');
+await page.waitForFunction(() => /Sent|There is no|closed/.test(document.querySelector('#s-msg').textContent));
+let sent = await page.evaluate(() => window.__sent);
+ok(sent.length === 1 && sent[0].code === 'CLASS1' && sent[0].handle === 'Shark 7', 'send: to class, handle cleaned', JSON.stringify(sent));
+ok(await page.$eval('#stepbar [aria-current="step"]', e => e.dataset.step) === '3', 'steps: step 3 after sending');
+const publicOpts = await page.$$eval('#s-public option', os => os.map(o => o.textContent));
+ok(publicOpts.length === 1 && publicOpts[0] === 'The Open', 'send: public list shows open competitions only', publicOpts.join());
+await page.click('#s-send-public');
+await page.waitForFunction(() => window.__sent.length === 2);
+sent = await page.evaluate(() => window.__sent);
+ok(sent[1].code === 'OPEN1', 'send: to the public competition');
+ok(/See the competition/.test(await page.$eval('#s-msg', e => e.textContent)), 'send: links to the competition');
 
 // Back to the builder keeps the answers
 await page.click('#r-edit');
@@ -103,6 +141,31 @@ await page.waitForFunction(() => document.getElementById('RESULTS').textContent.
 const lines = (await page.$eval('#RESULTS', e => e.textContent)).split('\n').filter(l => l !== 'DONE');
 for (const l of lines) ok(l.startsWith('PASS'), 'results: ' + l.replace(/^(PASS|FAIL) /, ''));
 if (SHOTS) await page.screenshot({ path: SHOTS + '/results.png', fullPage: true });
+
+// Competitions page. "Sneaky" (the AI route) was the last strategy tested on this device.
+await page.goto(BASE + 'compete.html', { waitUntil: 'networkidle0' });
+await page.waitForSelector('.comp-item');
+ok(await page.$$eval('.comp-item', els => els.length) === 2, 'compete: lists public competitions');
+ok(/Official standings: top 10/.test(await page.$eval('#c-standings', e => e.textContent)), 'compete: shows official standings');
+await page.click('#run-all');
+await page.waitForSelector('#results:not(.hidden)');
+ok(await page.$$eval('[data-pane="board"] tbody tr', r => r.length) === 10, 'compete: everyone runs');
+await page.select('#y-source', 'last');
+ok(/Sneaky/.test(await page.$eval('#y-status', e => e.textContent)), 'compete: picks up the last tested strategy');
+await page.click('#run-top');
+await page.waitForFunction(() => /You came/.test(document.querySelector('#progress-text').textContent));
+ok(await page.$$eval('[data-pane="board"] tbody tr', r => r.length) === 11, 'compete: you against the top (10 here)');
+ok(await page.$$eval('tr.mine', r => r.length) === 1, 'compete: your row picked out');
+await page.select('#s-size', '10');
+await page.$eval('#s-seed', e => { e.value = 'abc'; });
+await page.click('#run-sample');
+await page.waitForFunction(() => /sample "abc"/.test(document.querySelector('#results-title').textContent));
+const first = await page.$$eval('[data-pane="board"] tbody tr td:nth-child(2)', t => t.map(x => x.textContent).sort().join());
+await page.click('#run-sample');
+await page.waitForFunction(() => !document.querySelector('#run-all').disabled);
+const again = await page.$$eval('[data-pane="board"] tbody tr td:nth-child(2)', t => t.map(x => x.textContent).sort().join());
+ok(first === again, 'compete: the same sample seed picks the same sample');
+if (SHOTS) await page.screenshot({ path: SHOTS + '/compete.png', fullPage: true });
 
 // Teacher page loads to its sign-in
 await page.goto(BASE + 'teacher.html', { waitUntil: 'networkidle0' });

@@ -282,7 +282,9 @@ service cloud.firestore {
     // Firestore ruleset. See dilemma/SETUP.md. Students are anonymous accounts
     // that may send a few strategies to an open room and read back only their
     // own; they can never change or delete one. Only the teacher who made the
-    // room reads it all.
+    // room reads it all, unless they make it a public competition, when
+    // anyone signed in (anonymous included) can read its strategies and
+    // standings.
     // ------------------------------------------------------------------------
     match /dilemmaRooms/{code} {
       function dilemmaRoom() {
@@ -291,23 +293,32 @@ service cloud.firestore {
       function dilemmaOwner() {
         return realAccount() && dilemmaRoom().ownerUid == uid();
       }
+      function dilemmaPublic() {
+        return signedIn() && dilemmaRoom().get('public', false) == true;
+      }
 
       allow get: if signedIn();
-      allow list: if realAccount() && resource.data.ownerUid == uid();
+      // Owner first, so a teacher's own-rooms query never trips on a room
+      // with no public field. The public query filters on public == true.
+      allow list: if signedIn()
+        && ((realAccount() && resource.data.ownerUid == uid())
+            || resource.data.public == true);
       allow create: if realAccount()
         && request.resource.data.ownerUid == uid()
-        && request.resource.data.keys().hasOnly(['ownerUid', 'title', 'open', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'title', 'open', 'public', 'createdAt'])
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 60
-        && request.resource.data.open is bool;
+        && request.resource.data.open is bool
+        && request.resource.data.get('public', false) is bool;
       allow update: if realAccount()
         && resource.data.ownerUid == uid()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['open', 'title']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['open', 'title', 'public'])
+        && request.resource.data.get('public', false) is bool;
       allow delete: if realAccount() && resource.data.ownerUid == uid();
 
       // A student device writes to slots named {its uid}_1 to _5, once each.
       match /strategies/{sid} {
-        allow read: if dilemmaOwner();
+        allow read: if dilemmaOwner() || dilemmaPublic();
         allow get: if signedIn() && sid.matches(uid() + '_[1-5]');
         allow create: if signedIn()
           && request.resource.data.keys().hasOnly(['uid', 'handle', 'name', 'schemaVersion', 'json', 'createdAt'])
@@ -331,6 +342,16 @@ service cloud.firestore {
       match /runs/{rid} {
         allow read, create, delete: if dilemmaOwner();
         allow update: if false;
+      }
+
+      // Official standings of a public competition, one document.
+      match /standings/{sid} {
+        allow get: if dilemmaOwner() || dilemmaPublic();
+        allow create, update: if dilemmaOwner()
+          && sid == 'current'
+          && request.resource.data.ranking is list
+          && request.resource.data.ranking.size() <= 3000;
+        allow delete: if dilemmaOwner();
       }
     }
   }

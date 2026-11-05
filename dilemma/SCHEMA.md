@@ -2,6 +2,10 @@
 
 A strategy is one JSON object. The engine (`js/engine.js`) reads it; nothing in it is ever run as code. `js/validate.js` checks it, `js/readback.js` turns it into plain English, and the AI prompt (`js/prompt.js`) carries a student-friendly copy of this page. **Change all four together.**
 
+## Scoring
+
+Years in jail, fewer is better: both cooperate 2 each, both defect 4 each, a defector against a cooperator 0 and 5. These are the literature's points (3, 1, 5, 0) as 5 minus points, so rankings match the classic results. `PAYOFFS` in `js/engine.js`.
+
 ## Shape
 
 ```json
@@ -75,7 +79,7 @@ Unknown fields are an error, with a "did you mean" suggestion.
 | `theirDefectStreak`, `theirCoopStreak` | number | Run length ending last round. |
 | `theirCooperationRate` | number | Percent, 0 to 100, rounded. |
 | `myDefections` | number | Total so far. |
-| `scoreLead` | number | My points minus theirs. |
+| `scoreLead` | number | Their years in jail minus mine, so positive means I am doing better. |
 | `memory.NAME` | number | A slot declared in `memory`. |
 | `chance` | special | `{ "check": "chance", "percent": 10 }`, one random draw. |
 

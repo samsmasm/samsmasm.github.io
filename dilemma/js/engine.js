@@ -7,10 +7,12 @@
 
 export const SCHEMA_VERSION = 1;
 
-// Points for [my move][their move]. The standard values from the literature.
+// Years in jail for [my move][their move]. Fewer is better. These are the
+// standard points from the literature (3, 0, 5, 1) turned into years as
+// 5 minus points, so the game and every strategy's ranking are unchanged.
 export const PAYOFFS = {
-  cooperate: { cooperate: 3, defect: 0 },
-  defect:    { cooperate: 5, defect: 1 }
+  cooperate: { cooperate: 2, defect: 5 },
+  defect:    { cooperate: 0, defect: 4 }
 };
 
 export const DEFAULTS = {
@@ -73,7 +75,8 @@ export const CHECKS = {
     ? Math.round(100 * v.them.filter(m => m === 'cooperate').length / v.them.length)
     : 0,
   myDefections:         v => v.me.filter(m => m === 'defect').length,
-  scoreLead:            v => v.myScore - v.theirScore
+  // How far ahead I am: their years minus mine. Below 0 means I am behind.
+  scoreLead:            v => v.theirScore - v.myScore
 };
 
 export const MOVE_CHECKS = ['theirLast', 'theirLast2', 'theirLast3', 'myLast'];

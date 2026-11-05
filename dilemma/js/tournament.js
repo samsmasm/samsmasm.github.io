@@ -4,7 +4,7 @@
 // format (knockout, evolutionary) is a new entry in FORMATS returning pairs,
 // with the scoring below left as it is.
 
-import { playMatch, PAYOFFS, DEFAULTS } from './engine.js?v=20261105-065547';
+import { playMatch, PAYOFFS, DEFAULTS } from './engine.js?v=20261105-074708';
 
 export const FORMATS = {
   roundRobin: {
@@ -22,6 +22,14 @@ export const FORMATS = {
     }
   }
 };
+
+// Turns checked strategies into tournament entries, sorted by id, so who
+// plays as side A never depends on arrival order and any run replays exactly.
+// The teacher page and the competitions page must both build entries here.
+export function toEntries(list) {
+  return list.map(s => ({ id: s.id, name: s.name, handle: s.handle, strategy: s.strategy }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
 
 // The seed for one match depends only on the tournament seed and the two
 // strategies, so adding a strategy never changes anyone else's matches.
@@ -94,7 +102,8 @@ export async function runTournament(entries, options = {}, onProgress = () => {}
     t.coopRate = t.rounds ? t.cooperations / t.rounds : 0;
     for (let r = 0; r < R; r++) t.perRound[r] = t.matches ? t.perRound[r] / t.matches : 0;
   }
-  const ranking = [...table].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  // Fewest years in jail wins.
+  const ranking = [...table].sort((a, b) => a.total - b.total || a.name.localeCompare(b.name));
   ranking.forEach((t, k) => { t.rank = k + 1; });
 
   return { opts, entries, table, ranking, h2h, matches };

@@ -1,13 +1,13 @@
 // The Long Game - the build page: guided builder, AI route, review, test, send.
 
-import { playMatch, DEFAULTS } from './engine.js?v=20261105-065547';
-import { validate, parsePasted, LIMITS } from './validate.js?v=20261105-065547';
-import { readback, chanceWord, actionPhrase } from './readback.js?v=20261105-065547';
-import { QUESTIONS, SPECIAL_KINDS, INVERSE, defaultAnswers, compile, builderAnswersFor } from './builder.js?v=20261105-065547';
-import { strategyPrompt, extendPrompt } from './prompt.js?v=20261105-065547';
-import { TEST_OPPONENTS } from './opponents.js?v=20261105-065547';
-import { mountReplay } from './replay.js?v=20261105-065547';
-import { roomInfo, submitStrategy, cleanHandle, cleanCode } from './firebase.js?v=20261105-065547';
+import { playMatch, DEFAULTS } from './engine.js?v=20261105-074708';
+import { validate, parsePasted, LIMITS } from './validate.js?v=20261105-074708';
+import { readback, chanceWord, actionPhrase } from './readback.js?v=20261105-074708';
+import { QUESTIONS, SPECIAL_KINDS, INVERSE, defaultAnswers, compile, builderAnswersFor } from './builder.js?v=20261105-074708';
+import { strategyPrompt, extendPrompt } from './prompt.js?v=20261105-074708';
+import { TEST_OPPONENTS } from './opponents.js?v=20261105-074708';
+import { mountReplay } from './replay.js?v=20261105-074708';
+import { roomInfo, submitStrategy, publicRooms, cleanHandle, cleanCode } from './firebase.js?v=20261105-074708';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -36,6 +36,7 @@ function showRoute(name) {
   $('#route-builder').classList.toggle('hidden', name !== 'builder');
   $('#route-ai').classList.toggle('hidden', name !== 'ai');
   $('#review').classList.add('hidden');
+  setStep(1);
 }
 document.querySelectorAll('[data-route]').forEach(b => b.onclick = () => showRoute(b.dataset.route));
 
@@ -154,6 +155,8 @@ function updateReadback() {
   $('#b-readback').innerHTML = readbackHtml(s);
   $('#b-errors').innerHTML = v.ok ? '' : `<div class="errors small"><strong>Not ready yet</strong><ul>${v.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>${n > LIMITS.rules ? '<p style="margin:6px 0 0">Turn off a twist to get back under the limit.</p>' : ''}</div>`;
   $('#b-test').disabled = !v.ok;
+  $('#b-next').disabled = !v.ok;
+  $('#b-next').nextElementSibling.textContent = v.ok ? 'Then you can send it.' : 'Fix the problems shown beside "Your strategy" first.';
 }
 
 function readbackHtml(s) {
@@ -317,10 +320,15 @@ function openReview(s) {
     const m = playMatch(s, opp, { rounds: DEFAULTS.rounds, seed: 'test', log: true });
     const card = document.createElement('div');
     card.className = 'panel';
-    const won = m.scoreA > m.scoreB ? 'You scored more' : m.scoreA < m.scoreB ? 'They scored more' : 'Level';
+    const verdict = m.scoreA < m.scoreB ? ['win', 'You got less time in jail']
+      : m.scoreA > m.scoreB ? ['lose', `${opp.name} got less time in jail`]
+      : ['', 'Same time in jail'];
     card.innerHTML = `<div class="label">vs ${esc(opp.name)}</div>
-      <div class="score-line"><span><span class="big num">${m.scoreA}</span> <span class="muted">to ${m.scoreB}</span></span><span class="small muted">${won}</span></div>
-      <p class="small muted" style="margin:0 0 6px">${esc(opp.description)}</p>
+      <p class="small muted" style="margin:2px 0 8px">${esc(opp.description)}</p>
+      <div class="vs-row"><span class="who">You</span><span class="yrs">${m.scoreA} <small>years</small></span></div>
+      <div class="vs-row"><span class="who">${esc(opp.name)}</span><span class="yrs">${m.scoreB} <small>years</small></span></div>
+      <p class="verdict ${verdict[0]}">${esc(verdict[1])}</p>
+      <div class="label" style="margin-bottom:4px">Your moves</div>
       <div class="strip">${m.movesA.map(x => `<i class="${x === 'defect' ? 'd' : ''}"></i>`).join('')}</div>
       <button class="btn small" style="margin-top:10px">Watch it round by round</button>`;
     card.querySelector('button').onclick = () => showReplay(s, opp, m);
@@ -328,8 +336,20 @@ function openReview(s) {
     if (i === 0) showReplay(s, opp, m);
   });
 
+  // Kept so the competitions page can offer "the one you last tested".
+  localStorage.setItem('longgame.lastTested', JSON.stringify(s));
+
   $('#s-msg').innerHTML = '';
+  setStep(2);
   window.scrollTo({ top: $('#review').offsetTop - 10, behavior: 'smooth' });
+}
+
+function setStep(n) {
+  document.querySelectorAll('#stepbar li').forEach(li => {
+    const k = +li.dataset.step;
+    if (k === n) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+    li.classList.toggle('done', k < n);
+  });
 }
 
 function showReplay(s, opp, m) {
@@ -347,35 +367,69 @@ const params = new URLSearchParams(location.search);
 $('#s-code').value = cleanCode(params.get('room') || localStorage.getItem('longgame.room') || '');
 $('#s-handle').value = localStorage.getItem('longgame.handle') || '';
 
-$('#s-send').onclick = async () => {
+// Class rooms and public competitions are the same kind of room; only how
+// the student names it differs (a code, or a pick from the list).
+async function send(code, btn, where) {
   const msg = $('#s-msg');
-  const code = cleanCode($('#s-code').value);
   const handle = cleanHandle($('#s-handle').value);
   $('#s-handle').value = handle;
-  if (code.length < 4) { msg.innerHTML = '<div class="errors">Type the room code your teacher gave you.</div>'; return; }
-  if (handle.length < 2) { msg.innerHTML = '<div class="errors">Pick a handle: a nickname of 2 to 24 letters or numbers. Not your real name.</div>'; return; }
+  if (handle.length < 2) { msg.innerHTML = '<div class="errors">Pick a handle first: a nickname of 2 to 24 letters or numbers. Not your real name.</div>'; return; }
   const v = validate(current);
   if (!v.ok) { msg.innerHTML = '<div class="errors">This strategy has problems. Go back and fix them first.</div>'; return; }
 
-  const btn = $('#s-send');
+  const label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Sending...';
   try {
     const room = await roomInfo(code);
     if (!room) throw new Error(`There is no room ${code}. Check the code with your teacher.`);
-    if (!room.open) throw new Error('This room is closed. Your teacher is not taking strategies right now.');
+    if (!room.open) throw new Error(where === 'class'
+      ? 'This room is closed. Your teacher is not taking strategies right now.'
+      : 'This competition is closed to new entries.');
     await submitStrategy(code, current, handle);
-    localStorage.setItem('longgame.room', code);
+    if (where === 'class') localStorage.setItem('longgame.room', code);
     localStorage.setItem('longgame.handle', handle);
-    msg.innerHTML = `<div class="good"><strong>Sent.</strong> "${esc(current.name)}" by ${esc(handle)} is in room ${code}. Good luck.</div>`;
+    setStep(3);
+    msg.innerHTML = `<div class="good"><strong>Sent.</strong> "${esc(current.name)}" by ${esc(handle)} is in ${where === 'class' ? 'room ' + code : esc(room.title || 'the competition')}. Good luck.
+      ${room.public ? `<br><a href="compete.html?c=${code}">See the competition</a>` : ''}</div>`;
   } catch (err) {
     const text = err.code === 'permission-denied'
-      ? 'The room would not accept it. It may be closed, or you may have sent the most allowed. Ask your teacher.'
+      ? 'It would not accept it. It may be closed, or you may have sent the most allowed (5).'
       : (err.code ? 'Could not send: check your internet and try again.' : err.message);
     msg.innerHTML = `<div class="errors">${esc(text)}</div>`;
   } finally {
-    btn.disabled = false; btn.textContent = 'Send';
+    btn.disabled = false; btn.textContent = label;
   }
+}
+
+$('#s-send').onclick = () => {
+  const code = cleanCode($('#s-code').value);
+  if (cleanHandle($('#s-handle').value).length < 2) return send(code, $('#s-send'), 'class');
+  if (code.length < 4) { $('#s-msg').innerHTML = '<div class="errors">Type the room code your teacher gave you.</div>'; return; }
+  send(code, $('#s-send'), 'class');
+};
+$('#s-send-public').onclick = () => {
+  const code = $('#s-public').value;
+  if (!code) { $('#s-msg').innerHTML = '<div class="errors">There is no public competition to send to yet.</div>'; return; }
+  send(code, $('#s-send-public'), 'public');
 };
 
+async function loadPublicList() {
+  const sel = $('#s-public');
+  try {
+    const list = (await publicRooms()).filter(r => r.open);
+    sel.innerHTML = list.length
+      ? list.map(r => `<option value="${r.code}">${esc(r.title || r.code)}</option>`).join('')
+      : '<option value="">None open right now</option>';
+    const wanted = params.get('c');
+    if (wanted && list.some(r => r.code === wanted)) sel.value = wanted;
+  } catch {
+    sel.innerHTML = '<option value="">Could not load competitions</option>';
+  }
+}
+
+$('#b-next').onclick = () => $('#b-test').click();
+
 renderBuilder();
+setStep(1);
 if (params.get('route') === 'ai') showRoute('ai');
+loadPublicList();

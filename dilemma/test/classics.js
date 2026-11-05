@@ -9,8 +9,8 @@ export const alwaysCooperate = {
 };
 
 // The site's own test opponents, so the tests cover exactly what students meet.
-import { alwaysDefect, titForTat } from '../js/opponents.js';
-export { alwaysDefect, titForTat };
+import { alwaysDefect, titForTat, random } from '../js/opponents.js';
+export { alwaysDefect, titForTat, random };
 
 export const titForTwoTats = {
   schemaVersion: 1, name: 'Tit for Two Tats',
@@ -34,13 +34,6 @@ export const pavlov = {
   firstMove: { do: C },
   rules: [{ when: [{ check: 'theirLast', is: C }], do: 'repeat' }],
   fallback: { do: 'switch' }
-};
-
-export const random = {
-  schemaVersion: 1, name: 'Random',
-  firstMove: { do: C, chance: 50, otherwise: D },
-  rules: [],
-  fallback: { do: C, chance: 50, otherwise: D }
 };
 
 // Tit for Tat that punishes for three rounds, using a memory number.

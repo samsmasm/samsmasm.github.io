@@ -21,17 +21,17 @@ await test('every classic strategy is valid', () => {
   }
 });
 
-await test('Tit for Tat vs Always Defect: 0 + 1 per round after', () => {
+await test('Tit for Tat vs Always Defect: 5 years, then 4 a round', () => {
   const m = playMatch(K.titForTat, K.alwaysDefect, { rounds: 100 });
-  assert.equal(m.scoreA, 99);
-  assert.equal(m.scoreB, 104);
+  assert.equal(m.scoreA, 401);
+  assert.equal(m.scoreB, 396);
   assert.equal(str(m.movesA).slice(0, 3), 'CDD');
 });
 
 await test('Tit for Tat vs Tit for Tat cooperates throughout', () => {
   const m = playMatch(K.titForTat, K.titForTat, { rounds: 100 });
-  assert.equal(m.scoreA, 300);
-  assert.equal(m.scoreB, 300);
+  assert.equal(m.scoreA, 200);
+  assert.equal(m.scoreB, 200);
 });
 
 await test('Grudger never forgives', () => {
@@ -79,6 +79,18 @@ await test('last round behaviour uses rounds left, whatever the length', () => {
   }
 });
 
+await test('scoreLead: behind means more years than them', () => {
+  const s = {
+    schemaVersion: 1, name: 'Fights back when behind',
+    firstMove: { do: 'cooperate' },
+    rules: [{ when: [{ check: 'scoreLead', atMost: -5 }], do: 'defect' }],
+    fallback: { do: 'cooperate' }
+  };
+  // Round 1: 5 years to their 0, so behind by 5 and defects from round 2.
+  assert.equal(str(playMatch(s, K.alwaysDefect, { rounds: 4 }).movesA), 'CDDD');
+  assert.equal(str(playMatch(s, K.alwaysCooperate, { rounds: 4 }).movesA), 'CCCC');
+});
+
 await test('pattern repeats C C D', () => {
   const m = playMatch(K.ccd, K.alwaysCooperate, { rounds: 7 });
   assert.equal(str(m.movesA), 'CCDCCDC');
@@ -123,16 +135,19 @@ await test('round robin tournament: totals, self play, head to head', async () =
   const entries = [K.titForTat, K.alwaysDefect, K.alwaysCooperate].map((s, i) => ({ id: 'e' + i, name: s.name, strategy: s }));
   const r = await runTournament(entries, { rounds: 10, seed: 't', selfPlay: true });
   assert.equal(r.matches.length, 6);
-  // TFT: self 30, vs AllD 9, vs AllC 30
-  assert.equal(r.table[0].total, 69);
-  // AllD: self 10, vs TFT 14, vs AllC 50
-  assert.equal(r.table[1].total, 74);
-  assert.equal(r.ranking[0].name, 'Always Defect');
-  assert.equal(r.h2h[0][1], 9);
-  assert.equal(r.h2h[1][0], 14);
+  // Years. TFT: self 20, vs AllD 41, vs AllC 20
+  assert.equal(r.table[0].total, 81);
+  // AllD: self 40, vs TFT 36, vs AllC 0
+  assert.equal(r.table[1].total, 76);
+  // AllC: self 20, vs TFT 20, vs AllD 50
+  assert.equal(r.table[2].total, 90);
+  assert.equal(r.ranking[0].name, 'Always Defect', 'fewest years ranks first');
+  assert.equal(r.ranking[2].name, 'Always Cooperate');
+  assert.equal(r.h2h[0][1], 41);
+  assert.equal(r.h2h[1][0], 36);
   const noSelf = await runTournament(entries, { rounds: 10, seed: 't', selfPlay: false });
   assert.equal(noSelf.matches.length, 3);
-  assert.equal(noSelf.table[0].total, 39);
+  assert.equal(noSelf.table[0].total, 61);
 });
 
 await test('tournament is reproducible from its seed', async () => {

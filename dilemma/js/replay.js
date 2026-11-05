@@ -1,8 +1,8 @@
 // The Long Game - step through one match round by round.
 // Used by the build page (test matches) and the teacher page (any match).
 
-import { playMatch } from './engine.js?v=20261105-065547';
-import { rulePhrase, decisionPhrase } from './readback.js?v=20261105-065547';
+import { playMatch } from './engine.js?v=20261105-074708';
+import { rulePhrase, decisionPhrase } from './readback.js?v=20261105-074708';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const letter = m => (m === 'cooperate' ? 'C' : 'D');
@@ -65,7 +65,7 @@ export function mountReplay(el, opts) {
   const y = v => T + (H - T - B) * (1 - v / maxY);
   const pts = key => m.log.map(r => `${x(r.round).toFixed(1)},${y(r[key]).toFixed(1)}`).join(' ');
   const ticks = [0, Math.round(maxY / 2), maxY];
-  chart.innerHTML = `<div class="label">Running total</div>
+  chart.innerHTML = `<div class="label">Years in jail so far (lower is better)</div>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running totals for both players">
       <g class="grid">${ticks.map(t => `<line x1="${L}" x2="${W - Rm}" y1="${y(t)}" y2="${y(t)}"/><text x="${L - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`).join('')}</g>
       <text x="${L}" y="${H - 6}">1</text><text x="${W - Rm}" y="${H - 6}" text-anchor="end">${R}</text>
@@ -92,8 +92,8 @@ export function mountReplay(el, opts) {
     const mvA = $('[data-a]'), mvB = $('[data-b]');
     mvA.className = 'mv ' + letter(r.a.move).toLowerCase(); mvA.textContent = letter(r.a.move);
     mvB.className = 'mv ' + letter(r.b.move).toLowerCase(); mvB.textContent = letter(r.b.move);
-    $('[data-ta]').textContent = r.totalA;
-    $('[data-tb]').textContent = r.totalB;
+    $('[data-ta]').textContent = `${r.totalA} years`;
+    $('[data-tb]').textContent = `${r.totalB} years`;
     $('[data-pa]').textContent = `+${r.ptsA} this round`;
     $('[data-pb]').textContent = `+${r.ptsB} this round`;
     $('[data-round]').textContent = `${at} of ${R}`;
