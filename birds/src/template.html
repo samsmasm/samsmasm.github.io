@@ -142,12 +142,12 @@ details#topics[open] summary::before { content: "\2212"; }
 .titem { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; cursor: pointer; font-size: 16px; }
 .titem input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
 
-.opts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
-.opts .label { font-weight: 700; color: var(--muted); margin-right: 4px; }
-
-.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-#status { color: var(--muted); font-weight: 700; font-size: 20px; margin-left: 4px; }
-#lives { display: flex; align-items: center; gap: 4px; margin-left: auto; font-weight: 700; }
+/* Equal side columns keep Check in the true centre of the page */
+.toolbar { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-bottom: 16px; }
+.tleft, .tright { display: flex; gap: 10px; align-items: center; }
+.tright { justify-content: flex-end; }
+#status { color: var(--muted); font-weight: 700; font-size: 20px; text-align: right; }
+#lives { display: flex; align-items: center; gap: 4px; flex: none; font-weight: 700; }
 #lives svg { width: 30px; height: 30px; fill: var(--t1); stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 #lives svg.gone { fill: none; stroke: var(--card-line); }
 
@@ -209,6 +209,10 @@ details#topics[open] summary::before { content: "\2212"; }
 
 .msg { background: var(--surface); border: 1.5px solid var(--ink); border-radius: 10px; padding: 14px 16px; margin-top: 16px; font-weight: 600; }
 
+@media (max-width: 760px) {
+  .toolbar { grid-template-columns: 1fr 1fr; }
+  .tmid { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+}
 @media (max-width: 560px) {
   body { font-size: 16px; }
   .board { gap: 6px; }
@@ -274,16 +278,19 @@ details#topics[open] summary::before { content: "\2212"; }
       <div id="topicBody"></div>
     </details>
 
-    <div id="kidsOpts" class="opts" hidden>
-      <button class="btn" id="readBtn" type="button" aria-pressed="false">Read aloud when tapped: off</button>
-    </div>
-
     <div class="toolbar">
-      <button id="checkBtn" class="btn big" type="button">Check</button>
-      <button id="againBtn" class="btn big" type="button" hidden>New puzzle</button>
-      <button id="shuffleBtn" class="btn small" type="button">Shuffle</button>
-      <span id="status" role="status" aria-live="polite"></span>
-      <span id="lives" role="img"></span>
+      <div class="tleft">
+        <button id="shuffleBtn" class="btn" type="button">Shuffle</button>
+        <button id="readBtn" class="btn small" type="button" aria-pressed="false">Voice: off</button>
+      </div>
+      <div class="tmid">
+        <button id="checkBtn" class="btn big" type="button">Check</button>
+        <button id="againBtn" class="btn big" type="button" hidden>New puzzle</button>
+      </div>
+      <div class="tright">
+        <span id="status" role="status" aria-live="polite"></span>
+        <span id="lives" role="img"></span>
+      </div>
     </div>
 
     <div id="board" class="board" aria-label="Puzzle cards"></div>
@@ -410,9 +417,8 @@ function openSet(set) {
   S.set = set;
   $('gameTitle').textContent = TITLES[set];
   $('topicLabel').textContent = set === 'kids' ? 'Themes' : 'Topics';
-  $('kidsOpts').hidden = set !== 'kids';
   document.body.classList.toggle('kids', set === 'kids');
-  syncKidsButtons();
+  syncVoice();
   buildTopics();
   showScreen('game');
   newPuzzle();
@@ -688,9 +694,9 @@ $('board').addEventListener('click', e => {
 });
 
 /* ---------- controls ---------- */
-function syncKidsButtons() {
+function syncVoice() {
   $('readBtn').setAttribute('aria-pressed', String(S.read));
-  $('readBtn').textContent = 'Read aloud when tapped: ' + (S.read ? 'on' : 'off');
+  $('readBtn').textContent = 'Voice: ' + (S.read ? 'on' : 'off');
 }
 
 $('pickBm').addEventListener('click', () => openSet('bm'));
@@ -703,7 +709,7 @@ $('newNo').addEventListener('click', () => askNew(false));
 $('againBtn').addEventListener('click', newPuzzle);
 $('checkBtn').addEventListener('click', check);
 $('shuffleBtn').addEventListener('click', () => { S.order = shuffle(S.order); render(); });
-$('readBtn').addEventListener('click', () => { S.read = !S.read; syncKidsButtons(); });
+$('readBtn').addEventListener('click', () => { S.read = !S.read; syncVoice(); });
 
 /* ---------- start-up and republish snapshot ---------- */
 function snapshot() {
@@ -730,9 +736,8 @@ function start(data) {
     S.lives = data.lives ?? LIVES; S.over = data.over || null;
     $('gameTitle').textContent = TITLES[S.set];
     $('topicLabel').textContent = S.set === 'kids' ? 'Themes' : 'Topics';
-    $('kidsOpts').hidden = S.set !== 'kids';
     document.body.classList.toggle('kids', S.set === 'kids');
-    syncKidsButtons();
+    syncVoice();
     buildTopics();
     if (data.puzzle) {
       S.puzzle = data.puzzle; S.order = data.order || []; S.revealed = data.revealed || [];
