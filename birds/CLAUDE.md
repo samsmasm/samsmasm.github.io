@@ -10,7 +10,12 @@ Live at unisam.nz/birds, with direct links `#business`, `#economics` and `#kids`
 
 - **Source of truth: `~/samsmasm.github.io/birds/`.** Pushing `main` there deploys the site.
 - **Vault hand-off copy: `temp/connections/` in the notes vault.** Its `CLAUDE.md` is a copy of this file. Its code is the old Class Connections version (drag and reveal), so do not build or deploy from it. Sessions without the site repo can still work on the JSON banks there, then those banks get merged here.
-- **Not merged yet:** vault commit `ce797ab` grew the BM bank there to 313 categories covering every subtopic in Units 1 to 5 including HL, and added `tests/test_units.js` (each unit alone and the HL-only set can make a puzzle). This repo still has the 105 category SL bank. In that bank HL-only subtopics get their own code (`2.5`, `3.6`, `5.9`) and HL extensions inside SL subtopics use a suffix (`2.4 HL`, `4.5 HL`, `Toolkit HL`). To merge: copy the bank and the test here, change the BM menu text, build and run all tests. Every topic starts ticked on this site, so BM HL would then be on by default too.
+- **Not merged yet:** vault commits `ce797ab` and `69788ef` changed the banks there, and this repo does not have them:
+  - BM grew to 313 categories covering every subtopic in Units 1 to 5 including HL (105 here, SL only). Kids grew to 40 categories (20 here). Econ gained HL flags.
+  - Every HL topic code ends in `HL` (whole HL-only subtopics such as BM `2.5 HL`, `3.6 HL`, `5.9 HL`, and extensions such as `2.4 HL`, `Toolkit HL`).
+  - Every BM and Econ category has `level` ("SL" or "HL", HL when any of its topics is HL; set it from the topics, do not hand-edit it). An HL category's `ref` ends with HL so the revealed banner shows it. The vault's `tests/check_banks.py` enforces this.
+  - New `tests/test_units.js` checks each unit alone and the HL-only set can make a puzzle.
+  - To merge: copy the three banks and both test files here, change the BM menu text, build and run all tests. Every topic starts ticked on this site, so BM HL would then be on by default too.
 
 ## Layout
 
