@@ -18,6 +18,12 @@ for name in ["bm_categories.json", "econ_categories.json", "kids_categories.json
         if len(c["words"]) < 3: errs.append(f"{c['id']} has fewer than 3 words")
         if "emoji" in c and len(c["emoji"]) != len(c["words"]): errs.append(f"{c['id']} emoji length mismatch")
         errs += [f"{c['id']} unknown topic {t}" for t in c["topics"] if t not in codes]
+        if "level" in c:
+            off = {t["code"] for t in d["meta"]["topics"] if t.get("defaultOn") is False}
+            want = "HL" if any(t in off for t in c["topics"]) else "SL"
+            if c["level"] != want: errs.append(f"{c['id']} level {c['level']} should be {want}")
+            if c["level"] == "HL" and not c["ref"].endswith("HL"): errs.append(f"{c['id']} HL ref should end with HL")
+        elif name != "kids_categories.json": errs.append(f"{c['id']} missing level")
         errs += [f"{c['id']} unknown clash {x}" for x in c["clashesWith"] if x not in set(ids)]
     # shared words between categories must be declared as clashes
     for i, a in enumerate(cats):

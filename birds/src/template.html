@@ -140,6 +140,7 @@ details#topics[open] summary::before { content: "\2212"; }
 .tgroup h3 span { flex: 1; }
 .mini { font: inherit; font-size: 13px; font-weight: 700; background: none; border: 1.5px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer; color: var(--ink); }
 .titem { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; cursor: pointer; font-size: 16px; }
+.titem.off { opacity: .45; cursor: default; }
 .titem input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
 
 /* Equal side columns keep Check in the true centre of the page */
@@ -203,6 +204,7 @@ details#topics[open] summary::before { content: "\2212"; }
   animation: rise .45s ease both;
 }
 .banner:first-child { margin-top: 0; }
+.banner .lvl { font-family: var(--body); font-size: .6em; letter-spacing: .08em; margin-left: 8px; }
 .banner small { font-family: var(--body); font-weight: 700; font-size: 15px; opacity: .8; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes shake { 0%, 100% { translate: 0; } 25% { translate: -7px; } 50% { translate: 7px; } 75% { translate: -4px; } }
@@ -238,7 +240,7 @@ details#topics[open] summary::before { content: "\2212"; }
     <div class="choices">
       <button class="choice" id="pickBm" type="button">
         <span class="choice-title">Business Management</span>
-        <span class="choice-desc">IB SL, Units 1 to 5, with a tick box for every topic.</span>
+        <span class="choice-desc">IB SL and HL, Units 1 to 5, with a tick box for every topic.</span>
         <span class="choice-meta" id="bmCount"></span>
         <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </button>
@@ -269,6 +271,10 @@ details#topics[open] summary::before { content: "\2212"; }
     <details id="topics">
       <summary><span id="topicLabel">Topics</span><span id="topicCount" class="count"></span></summary>
       <div class="newrow">
+        <span id="levelBox">Level
+          <button id="lvlSL" class="btn" type="button" aria-pressed="true">SL</button>
+          <button id="lvlHL" class="btn" type="button" aria-pressed="false">HL</button>
+        </span>
         <button id="newBtn" class="btn" type="button">New puzzle</button>
         <span id="newAsk" hidden>Are you sure? This puzzle will be lost.
           <button id="newYes" class="btn" type="button">Yes, new puzzle</button>
@@ -349,6 +355,7 @@ function buildPuzzle(bank, ticked, cfg) {
           slot,
           name: c.name,
           ref: c.ref || '',
+          level: c.level || '',
           words: idx.map(i => ({ w: c.words[i], e: c.emoji ? (c.emoji[i] || '') : '' }))
         };
       })
@@ -400,6 +407,7 @@ const LINKS = { bm: 'business', econ: 'economics', kids: 'kids' };
 const S = {
   screen: 'menu', set: null, read: false,
   ticked: { bm: new Set(), econ: new Set(), kids: new Set() },
+  level: { bm: 'SL', econ: 'SL' }, /* Kids has no level */
   puzzle: null, order: [], revealed: [], selected: [], lives: LIVES, over: null, note: '', busy: false
 };
 const els = new Map();
@@ -434,9 +442,33 @@ function openSet(set) {
   $('topicLabel').textContent = set === 'kids' ? 'Themes' : 'Topics';
   document.body.classList.toggle('kids', set === 'kids');
   syncVoice();
+  syncLevel();
   buildTopics();
   showScreen('game');
   newPuzzle();
+}
+
+/* ---------- SL and HL ---------- */
+/* SL shows SL topics only, so HL boxes are locked. HL includes SL, because the HL course does. */
+const locked = (set, t) => S.level[set] === 'SL' && /HL$/.test(t.code);
+
+function levelTicks(set) {
+  return new Set(BANKS[set].meta.topics.filter(t => !locked(set, t)).map(t => t.code));
+}
+
+function syncLevel() {
+  const level = S.level[S.set];
+  $('levelBox').hidden = !level;
+  $('lvlSL').setAttribute('aria-pressed', String(level === 'SL'));
+  $('lvlHL').setAttribute('aria-pressed', String(level === 'HL'));
+}
+
+/* Only moves the tick boxes. The puzzle changes when New puzzle is pressed. */
+function setLevel(level) {
+  S.level[S.set] = level;
+  S.ticked[S.set] = levelTicks(S.set);
+  syncLevel();
+  buildTopics();
 }
 
 /* ---------- topic tick boxes ---------- */
@@ -445,7 +477,7 @@ function buildTopics() {
   const body = $('topicBody');
   body.innerHTML = '';
   const setAll = on => {
-    body.querySelectorAll('input').forEach(cb => {
+    body.querySelectorAll('input:not(:disabled)').forEach(cb => {
       cb.checked = on;
       on ? S.ticked[S.set].add(cb.dataset.code) : S.ticked[S.set].delete(cb.dataset.code);
     });
@@ -486,6 +518,8 @@ function buildTopics() {
       cb.id = 'topic-' + S.set + '-' + t.code.replace(/[^\w]/g, '_');
       cb.dataset.code = t.code;
       cb.checked = S.ticked[S.set].has(t.code);
+      cb.disabled = locked(S.set, t);
+      lab.classList.toggle('off', cb.disabled);
       cb.addEventListener('change', () => {
         cb.checked ? S.ticked[S.set].add(t.code) : S.ticked[S.set].delete(t.code);
         updateTopicCount();
@@ -496,7 +530,7 @@ function buildTopics() {
       wrap.appendChild(lab);
     });
     const setGroup = on => {
-      wrap.querySelectorAll('input').forEach(cb => {
+      wrap.querySelectorAll('input:not(:disabled)').forEach(cb => {
         cb.checked = on;
         on ? S.ticked[S.set].add(cb.dataset.code) : S.ticked[S.set].delete(cb.dataset.code);
       });
@@ -511,10 +545,11 @@ function buildTopics() {
 
 function updateTopicCount() {
   const bank = BANKS[S.set];
-  const total = bank.meta.topics.length;
+  const total = bank.meta.topics.filter(t => !locked(S.set, t)).length;
   const on = bank.meta.topics.filter(t => S.ticked[S.set].has(t.code)).length;
+  const level = S.level[S.set] ? S.level[S.set] + ': ' : '';
   const avail = eligibleFor(bank, S.ticked[S.set], CFG.per).length;
-  $('topicCount').textContent = on + ' of ' + total + ' ticked, ' + avail + ' categories available. Choose New puzzle to apply.';
+  $('topicCount').textContent = level + on + ' of ' + total + ' ticked, ' + avail + ' categories available. Choose New puzzle to apply.';
 }
 
 /* ---------- puzzle ---------- */
@@ -588,6 +623,11 @@ function makeEl(d) {
     el.dataset.key = d.key;
     const t = document.createElement('span');
     t.textContent = P.groups[d.gi].name;
+    if (P.groups[d.gi].level === 'HL') {
+      const h = document.createElement('span');
+      h.className = 'lvl'; h.textContent = 'HL';
+      t.appendChild(h);
+    }
     el.appendChild(t);
     if (P.groups[d.gi].ref) {
       const s = document.createElement('small');
@@ -749,6 +789,8 @@ $('pickEcon').addEventListener('click', () => { location.hash = LINKS.econ; });
 $('pickKids').addEventListener('click', () => { location.hash = LINKS.kids; });
 $('backBtn').addEventListener('click', goMenu);
 window.addEventListener('hashchange', route);
+$('lvlSL').addEventListener('click', () => setLevel('SL'));
+$('lvlHL').addEventListener('click', () => setLevel('HL'));
 $('newBtn').addEventListener('click', () => { S.puzzle && !S.over ? askNew(true) : newPuzzle(); });
 $('newYes').addEventListener('click', newPuzzle);
 $('newNo').addEventListener('click', () => askNew(false));
@@ -760,7 +802,7 @@ $('readBtn').addEventListener('click', () => { S.read = !S.read; syncVoice(); })
 /* ---------- start-up and republish snapshot ---------- */
 function snapshot() {
   return {
-    screen: S.screen, set: S.set, read: S.read, lives: S.lives, over: S.over,
+    screen: S.screen, set: S.set, read: S.read, lives: S.lives, over: S.over, level: S.level,
     ticked: { bm: [...S.ticked.bm], econ: [...S.ticked.econ], kids: [...S.ticked.kids] },
     puzzle: S.puzzle, order: S.order, revealed: S.revealed
   };
@@ -769,7 +811,7 @@ function snapshot() {
 function start(data) {
   data = data || {};
   ['bm', 'econ', 'kids'].forEach(k => {
-    BANKS[k].meta.topics.forEach(t => S.ticked[k].add(t.code));
+    S.ticked[k] = levelTicks(k);
   });
   $('bmCount').textContent = BANKS.bm.categories.length + ' categories';
   $('econCount').textContent = BANKS.econ.categories.length + ' categories';
@@ -779,11 +821,13 @@ function start(data) {
     S.ticked.econ = new Set(data.ticked.econ || [...S.ticked.econ]);
     S.ticked.kids = new Set(data.ticked.kids || [...S.ticked.kids]);
     S.set = data.set; S.read = !!data.read;
+    if (data.level) S.level = data.level;
     S.lives = data.lives ?? LIVES; S.over = data.over || null;
     $('gameTitle').textContent = TITLES[S.set];
     $('topicLabel').textContent = S.set === 'kids' ? 'Themes' : 'Topics';
     document.body.classList.toggle('kids', S.set === 'kids');
     syncVoice();
+    syncLevel();
     buildTopics();
     if (data.puzzle) {
       S.puzzle = data.puzzle; S.order = data.order || []; S.revealed = data.revealed || [];
