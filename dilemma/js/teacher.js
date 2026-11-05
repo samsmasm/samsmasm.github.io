@@ -1,11 +1,11 @@
 // The Long Game - the teacher page: rooms, strategies, running a tournament.
 
-import { teacherApp } from './firebase.js?v=20261105-092620';
-import { validate, parsePasted, fromStored } from './validate.js?v=20261105-092620';
-import { readback } from './readback.js?v=20261105-092620';
-import { runTournament, FORMATS, toEntries } from './tournament.js?v=20261105-092620';
-import { renderResults } from './results.js?v=20261105-092620';
-import { DEFAULTS } from './engine.js?v=20261105-092620';
+import { teacherApp } from './firebase.js?v=20261105-093143';
+import { validate, parsePasted, fromStored } from './validate.js?v=20261105-093143';
+import { readback } from './readback.js?v=20261105-093143';
+import { runTournament, FORMATS, toEntries } from './tournament.js?v=20261105-093143';
+import { renderResults } from './results.js?v=20261105-093143';
+import { DEFAULTS } from './engine.js?v=20261105-093143';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

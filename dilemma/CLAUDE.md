@@ -7,9 +7,11 @@ The name is Claude's; Sam may rename it. The original spec is in Sam's vault: `~
 ## Decisions Sam made (2026-11-05)
 
 - **Years in jail, fewer is better**, everywhere (he asked for "got less time in jail"). Payoffs are the classic points as 5 minus points: 2/2, 4/4, 0/5. `scoreLead` is their years minus mine.
-- Test matches are against **Tit for Tat, Always Defect and Random**, with each side's years named and a verdict in jail words.
+- Test matches are against **Tit for Tat, Always Cooperate, Always Defect and Random**, with each side's years named and a verdict in jail words.
 - The flow is **build, test, send**, shown as a step bar; sending is how you enter (he could not find "save").
 - **Any teacher can make a room public**; public rooms are the competitions. Entries appear straight away; the owner removes bad ones.
+- **Random slips run 0 to 100%**: a slip is a coin flip, so 100% is a fully random player.
+- **Spot a pattern** twist: a You/Them grid over the last 3 rounds, each box C, D or blank (not looked at). Compiles to one `recent` condition per pattern.
 - **Top 20 comes from official standings** the owner publishes after a full run. Runs on the Compete page use those standings' settings.
 
 ## Rules that matter
@@ -27,7 +29,7 @@ The name is Claude's; Sam may rename it. The original spec is in Sam's vault: `~
 | File | What |
 |---|---|
 | `index.html` | How it works, matrix in years (drawn from `PAYOFFS`) |
-| `build.html` + `js/build.js` | Step bar, builder, AI route, review (readback, 3 test matches, replay), send to class or public |
+| `build.html` + `js/build.js` | Step bar, builder, AI route, review (readback, 4 test matches, replay), send to class or public |
 | `compete.html` + `js/compete.js` | Public competitions, official standings, run everyone / top 20 / sample, your strategy optional |
 | `teacher.html` + `js/teacher.js` | Google sign-in, rooms, open/closed, public/private, strategies, run, saved runs, publish standings |
 | `js/engine.js` | Payoffs, seeded RNG, checks, actions, `chooseMove`, `playMatch` |
@@ -38,7 +40,7 @@ The name is Claude's; Sam may rename it. The original spec is in Sam's vault: `~
 | `js/prompt.js` | The copy-paste AI prompt and the "take it further" prompt |
 | `js/replay.js` | Round-by-round replay, shared |
 | `js/results.js` | Leaderboard, head to head (hidden over 40 entries), graphs, replay picker, CSV; `opts.mine` picks out "you" |
-| `js/opponents.js` | The three test opponents |
+| `js/opponents.js` | The four test opponents |
 | `js/firebase.js` | The only file that knows the Firebase project. See `SETUP.md` |
 
 ## How the builder maps to rules

@@ -10,6 +10,11 @@ export const alwaysDefect = {
   firstMove: { do: 'defect' }, rules: [], fallback: { do: 'defect' }
 };
 
+export const alwaysCooperate = {
+  schemaVersion: 1, name: 'Always Cooperate', description: 'Cooperates every round, no matter what.',
+  firstMove: { do: 'cooperate' }, rules: [], fallback: { do: 'cooperate' }
+};
+
 export const random = {
   schemaVersion: 1, name: 'Random', description: 'Flips a coin every round.',
   firstMove: { do: 'cooperate', chance: 50, otherwise: 'defect' },
@@ -17,4 +22,4 @@ export const random = {
   fallback: { do: 'cooperate', chance: 50, otherwise: 'defect' }
 };
 
-export const TEST_OPPONENTS = [titForTat, alwaysDefect, random];
+export const TEST_OPPONENTS = [titForTat, alwaysCooperate, alwaysDefect, random];

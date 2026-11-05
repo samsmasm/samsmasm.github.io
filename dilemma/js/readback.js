@@ -54,11 +54,25 @@ const SUBJECTS = {
 };
 
 const AGO = { theirLast: 'last round', theirLast2: 'two rounds ago', theirLast3: 'three rounds ago' };
+const AGO_N = ['last round', 'two rounds ago', 'three rounds ago'];
+
+// Most recent first, them before you within a round.
+function recentPhrase(c) {
+  const parts = [];
+  for (let i = 0; i < AGO_N.length; i++) {
+    for (const [who, list] of [['they', c.them], ['you', c.me]]) {
+      const m = list?.[i];
+      if (m === 'cooperate' || m === 'defect') parts.push(`${who} ${m === 'defect' ? 'defected' : 'cooperated'} ${AGO_N[i]}`);
+    }
+  }
+  return parts.join(' and ');
+}
 
 export function conditionPhrase(c) {
   const op = Object.keys(c).find(k => k !== 'check');
   const n = c[op];
   switch (c.check) {
+    case 'recent': return recentPhrase(c);
     case 'chance': return `a ${c.percent}% chance comes up (${chanceWord(c.percent)})`;
     case 'theirLast': case 'theirLast2': case 'theirLast3':
       return `they ${c.is === 'defect' ? 'defected' : 'cooperated'} ${AGO[c.check]}`;

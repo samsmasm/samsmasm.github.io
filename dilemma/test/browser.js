@@ -65,14 +65,25 @@ if (SHOTS) await page.screenshot({ path: SHOTS + '/builder-over.png', fullPage: 
 for (const id of ['testing', 'switching', 'reading', 'startup']) await page.click(`[data-k="card-${id}"]`);
 ok(!(await page.$eval('#b-test', b => b.disabled)), 'builder: back under the cap');
 
+await page.click('[data-k="card-spot"]');
+rb = await page.$eval('#b-readback', e => e.textContent);
+ok(/they cooperated last round and you defected two rounds ago: defect/.test(rb), 'spot: pattern in readback', rb);
+await page.click('[data-k="spot-entries-0-them-0"]');
+await page.click('[data-k="spot-entries-0-them-2"]');
+rb = await page.$eval('#b-readback', e => e.textContent);
+ok(/they defected last round and you defected two rounds ago and they cooperated three rounds ago/.test(rb), 'spot: cells cycle C, D, blank', rb);
+if (SHOTS) await page.screenshot({ path: SHOTS + '/spot.png', fullPage: true });
+await page.click('[data-k="card-spot"]');
+
 ok(await page.$eval('#stepbar [aria-current="step"]', e => e.dataset.step) === '1', 'steps: on step 1 while building');
 await page.type('#b-name', 'Grudge Bot');
 await page.click('#b-next');
 await page.waitForSelector('#review:not(.hidden)');
 ok(await page.$eval('#stepbar [aria-current="step"]', e => e.dataset.step) === '2', 'steps: the bottom button goes to step 2');
-ok(await page.$eval('#r-tests', e => e.querySelectorAll('.panel').length) === 3, 'review: three test matches');
+ok(await page.$eval('#r-tests', e => e.querySelectorAll('.panel').length) === 4, 'review: four test matches');
 const cards = await page.$$eval('#r-tests .panel', els => els.map(e => e.textContent.replace(/\s+/g, ' ')));
-ok(/vs Random/.test(cards[2]), 'review: Random is a test opponent');
+ok(/vs Always Cooperate/.test(cards[1]), 'review: Always Cooperate is a test opponent');
+ok(/vs Random/.test(cards[3]), 'review: Random is a test opponent');
 ok(cards.every(c => /You ?\d+ years/.test(c)), 'review: your years shown by name', cards[0]);
 ok(/Tit for Tat ?\d+ years/.test(cards[0]), 'review: their years shown by name', cards[0]);
 ok(cards.every(c => /got less time in jail|Same time in jail/.test(c)), 'review: verdict in jail words', cards.join(' | '));

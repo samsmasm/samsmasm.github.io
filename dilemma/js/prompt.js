@@ -1,9 +1,9 @@
 // The Long Game - the prompt a student pastes into any AI chat.
 // Bump PROMPT_VERSION whenever the wording changes.
 
-import { LIMITS } from './validate.js?v=20261105-092620';
+import { LIMITS } from './validate.js?v=20261105-093143';
 
-export const PROMPT_VERSION = '1.2';
+export const PROMPT_VERSION = '1.3';
 
 const SCHEMA_TEXT = `THE GAME
 Two prisoners play each other many times in a row (usually 100 rounds, but the teacher can change it). Each round both choose at the same time: "cooperate" (stay loyal) or "defect" (betray the other).
@@ -67,6 +67,9 @@ CONDITION: { "check": WHAT, COMPARISON: VALUE } with exactly ONE comparison.
     "scoreLead"             their years minus my years, so positive means I am doing better (fewer years)
     "memory.NAME"           a memory slot from "memory"
   A random check: { "check": "chance", "percent": 10 } is true 10% of the time.
+  A pattern check looks at several past moves at once, and counts as ONE condition:
+    { "check": "recent", "them": ["cooperate"], "me": ["any", "defect"] }
+    means they cooperated last round AND I defected two rounds ago. Each list starts at last round and goes back, at most 3 long. Each entry is "cooperate", "defect" or "any" (not looked at). Leave out "me" or "them" to ignore that player.
 
 NOT POSSIBLE (say so in "approximations" if the student wants these):
   recognising who the opponent is, seeing their full history beyond the checks above, anything from other matches, more than 2 conditions in one rule, more than ${LIMITS.rules} rules.

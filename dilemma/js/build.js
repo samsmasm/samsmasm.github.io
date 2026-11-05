@@ -1,13 +1,13 @@
 // The Long Game - the build page: guided builder, AI route, review, test, send.
 
-import { playMatch, DEFAULTS } from './engine.js?v=20261105-092620';
-import { validate, parsePasted, LIMITS } from './validate.js?v=20261105-092620';
-import { readback, chanceWord, actionPhrase } from './readback.js?v=20261105-092620';
-import { QUESTIONS, SPECIAL_KINDS, INVERSE, defaultAnswers, compile, builderAnswersFor } from './builder.js?v=20261105-092620';
-import { strategyPrompt, extendPrompt } from './prompt.js?v=20261105-092620';
-import { TEST_OPPONENTS } from './opponents.js?v=20261105-092620';
-import { mountReplay } from './replay.js?v=20261105-092620';
-import { roomInfo, submitStrategy, publicRooms, cleanHandle, cleanCode } from './firebase.js?v=20261105-092620';
+import { playMatch, DEFAULTS } from './engine.js?v=20261105-093143';
+import { validate, parsePasted, LIMITS } from './validate.js?v=20261105-093143';
+import { readback, chanceWord, actionPhrase } from './readback.js?v=20261105-093143';
+import { QUESTIONS, SPECIAL_KINDS, INVERSE, defaultAnswers, newSpot, compile, builderAnswersFor } from './builder.js?v=20261105-093143';
+import { strategyPrompt, extendPrompt } from './prompt.js?v=20261105-093143';
+import { TEST_OPPONENTS } from './opponents.js?v=20261105-093143';
+import { mountReplay } from './replay.js?v=20261105-093143';
+import { roomInfo, submitStrategy, publicRooms, cleanHandle, cleanCode } from './firebase.js?v=20261105-093143';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -94,6 +94,31 @@ function fieldHtml(q, f, a) {
         </div>`;
       }).join('') + (a.entries.length < f.max
         ? `<button class="btn small" style="margin-top:8px" data-k="${k}-spadd" data-act="spadd">+ add a round</button>`
+        : '');
+    case 'recent':
+      // Oldest round on the left, so it reads like the game going by.
+      return a.entries.map((e, i) => {
+        const cells = who => [2, 1, 0].map(ago => {
+          const m = e[who][ago];
+          const cls = m === 'defect' ? 'd' : m === 'cooperate' ? 'c' : 'any';
+          const txt = m === 'defect' ? 'D' : m === 'cooperate' ? 'C' : '';
+          return `<button class="mv ${cls}" title="Click: C, D or not looked at" aria-label="${who === 'me' ? 'You' : 'Them'}, ${['last round', '2 rounds ago', '3 rounds ago'][ago]}: ${m === 'any' ? 'not looked at' : m}" data-k="${k}-${i}-${who}-${ago}" data-act="cell" data-i="${i}" data-who="${who}" data-ago="${ago}">${txt}</button>`;
+        }).join('');
+        return `<div class="spot-row">
+          <div class="spot-grid">
+            <span></span><span class="small muted">3 ago</span><span class="small muted">2 ago</span><span class="small muted">last</span>
+            <span class="small"><strong>Them</strong></span>${cells('them')}
+            <span class="small"><strong>You</strong></span>${cells('me')}
+          </div>
+          <div class="spot-then">
+            <span>then you</span>
+            <select data-k="${k}-${i}-do" data-act="sp" data-i="${i}" data-f="do"><option value="defect" ${e.do === 'defect' ? 'selected' : ''}>defect</option><option value="cooperate" ${e.do === 'cooperate' ? 'selected' : ''}>cooperate</option></select>
+            <input type="number" min="5" max="100" step="5" value="${e.chance ?? 100}" data-k="${k}-${i}-chance" data-act="spnum" data-i="${i}" data-f="chance" aria-label="percent of the time"><span class="small">% of the time</span>
+            ${a.entries.length > 1 ? `<button class="btn quiet small" data-k="${k}-${i}-x" data-act="spdel" data-i="${i}">remove</button>` : ''}
+          </div>
+        </div>`;
+      }).join('') + `<p class="small muted" style="margin-top:6px">Click a box: C, D, or blank for "not looked at".</p>` + (a.entries.length < f.max
+        ? `<button class="btn small" style="margin-top:8px" data-k="${k}-spotadd" data-act="spotadd">+ add a pattern</button>`
         : '');
   }
   return '';
@@ -207,6 +232,13 @@ function onBuilderEvent(e) {
     }
     case 'spadd': a.entries.push({ kind: 'round', a: 50, b: 60, do: 'defect', chance: 100 }); break;
     case 'spdel': a.entries.splice(+t.dataset.i, 1); break;
+    case 'spotadd': a.entries.push(newSpot()); break;
+    case 'cell': {
+      const list = a.entries[+t.dataset.i][t.dataset.who];
+      const ago = +t.dataset.ago;
+      list[ago] = { any: 'cooperate', cooperate: 'defect', defect: 'any' }[list[ago]] || 'any';
+      break;
+    }
   }
 
   if (isInput) {

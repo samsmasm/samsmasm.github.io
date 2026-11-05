@@ -6,8 +6,8 @@
 // English readback is made from the compiled JSON, so the two cannot disagree.
 // A V2 option is a new entry here plus a few lines in compile().
 
-import { SCHEMA_VERSION } from './engine.js?v=20261105-092620';
-import { LIMITS } from './validate.js?v=20261105-092620';
+import { SCHEMA_VERSION } from './engine.js?v=20261105-093143';
+import { LIMITS } from './validate.js?v=20261105-093143';
 
 const C = 'cooperate', D = 'defect';
 
@@ -19,7 +19,8 @@ export const MOVE_CHOICES = [
   { value: D, label: 'Defect' }
 ];
 
-// type: 'choice' (pick one), 'number', 'moves' (a list of C/D), 'special' (special rounds list)
+// type: 'choice' (pick one), 'number', 'moves' (a list of C/D), 'special' (special rounds list),
+// 'recent' (patterns of past moves to spot)
 // chance: true when the answer can be "a chance of" rather than always.
 export const QUESTIONS = [
   {
@@ -160,6 +161,11 @@ export const QUESTIONS = [
     ]
   },
   {
+    id: 'spot', section: 'twist', title: 'Spot a pattern',
+    ask: 'If the last few rounds look like this, do something.',
+    fields: [{ key: 'entries', type: 'recent', max: 4 }]
+  },
+  {
     id: 'special', section: 'twist', title: 'Special rounds',
     ask: 'Any rounds where you always want to do the same thing?',
     fields: [{ key: 'entries', type: 'special', max: 5 }]
@@ -191,6 +197,22 @@ export const SPECIAL_KINDS = [
   { value: 'every', label: 'Every ...th round', nums: ['a'] }
 ];
 
+// A pattern to spot. Lists start at last round, like the "recent" check.
+export function newSpot() {
+  return { them: [C, 'any', 'any'], me: ['any', D, 'any'], do: D, chance: 100 };
+}
+
+// The "recent" condition for a spotted pattern, with unlooked-at moves trimmed.
+function recentCond(e) {
+  const c = { check: 'recent' };
+  for (const who of ['them', 'me']) {
+    const list = [...e[who]];
+    while (list.length && list[list.length - 1] === 'any') list.pop();
+    if (list.length) c[who] = list;
+  }
+  return c;
+}
+
 export function defaultAnswers() {
   return {
     first: { do: C, chance: 100 },
@@ -205,6 +227,7 @@ export function defaultAnswers() {
     scoreboard: { on: false, when: 'behind', by: 10, do: D, chance: 100 },
     switching: { on: false, kind: 'round', n: 50, do: D },
     reading: { on: false, above: 50, do: C, elseDo: 'none' },
+    spot: { on: false, entries: [newSpot()] },
     special: { on: false, entries: [{ kind: 'final', a: 1, b: 1, do: D, chance: 100 }] },
     startup: { on: false, moves: [C, D] },
     fallback: { do: C, chance: 100 },
@@ -263,7 +286,7 @@ export function compile(ans) {
     }
   }
 
-  // 2. Switching, scoreboard, reading the opponent
+  // 2. Switching, scoreboard, reading the opponent, spotted patterns
   if (A.switching.on) {
     const c = A.switching.kind === 'round'
       ? cond('round', 'atLeast', A.switching.n)
@@ -281,6 +304,9 @@ export function compile(ans) {
     if (A.reading.elseDo !== 'none') {
       push('Reading them', { when: [cond('theirCooperationRate', 'atMost', A.reading.above)], do: A.reading.elseDo });
     }
+  }
+  if (A.spot.on) {
+    for (const e of A.spot.entries) push('Pattern spotted', { when: [recentCond(e)], ...dec(e) });
   }
 
   if (!patternAlone) {

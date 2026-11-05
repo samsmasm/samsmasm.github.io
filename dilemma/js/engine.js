@@ -82,8 +82,19 @@ export const CHECKS = {
 export const MOVE_CHECKS = ['theirLast', 'theirLast2', 'theirLast3', 'myLast'];
 export const NUMBER_OPS = ['equals', 'atLeast', 'atMost', 'moreThan', 'lessThan', 'multipleOf'];
 
+// How far back a "recent" check can look.
+export const RECENT_MAX = 3;
+
+// A "recent" check matches a pattern of past moves. Each list starts at last
+// round and goes back; "any" means that move is not looked at.
+function matchRecent(c, v) {
+  const fits = (want = [], moves) => want.every((m, i) => m === 'any' || moves[moves.length - 1 - i] === m);
+  return fits(c.me, v.me) && fits(c.them, v.them);
+}
+
 function testCondition(c, v, rng) {
   if (c.check === 'chance') return rng() * 100 < c.percent;
+  if (c.check === 'recent') return matchRecent(c, v);
   const value = c.check.startsWith('memory.')
     ? (v.memory[c.check.slice(7)] ?? 0)
     : CHECKS[c.check](v);

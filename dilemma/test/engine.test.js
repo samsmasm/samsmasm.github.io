@@ -108,6 +108,24 @@ await test('same seed, same match; different seed, different match', () => {
   assert.ok(coop > 70 && coop < 130, 'roughly half: ' + coop);
 });
 
+await test('recent: spots a pattern of past moves on both sides', () => {
+  // Defect when they cooperated last round and I defected two rounds ago.
+  const s = {
+    schemaVersion: 1, name: 'Spotter',
+    firstMove: { do: 'defect' },
+    rules: [{ when: [{ check: 'recent', them: ['cooperate'], me: ['any', 'defect'] }], do: 'defect' }],
+    fallback: { do: 'cooperate' }
+  };
+  assert.equal(validate(s).ok, true);
+  // R1 D. R2: no round 0, so fallback C. R3: me two ago = D, them last = C, so D. R4: me two ago = C, so C.
+  assert.equal(str(playMatch(s, K.alwaysCooperate, { rounds: 5 }).movesA), 'DCDCD');
+  const bad = { ...s, rules: [{ when: [{ check: 'recent', me: ['any'] }], do: 'defect' }] };
+  assert.ok(validate(bad).errors.some(e => /at least one C or D/.test(e)));
+  const long = { ...s, rules: [{ when: [{ check: 'recent', them: ['defect', 'defect', 'defect', 'defect'] }], do: 'defect' }] };
+  assert.ok(validate(long).errors.some(e => /1 to 3 moves/.test(e)));
+  assert.match(readbackText(s), /they cooperated last round and you defected two rounds ago: defect/);
+});
+
 await test('random slips hand the move to a coin flip and are logged', () => {
   const sloppy = { ...K.alwaysCooperate, name: 'Sloppy', slip: 40 };
   const m = playMatch(sloppy, K.alwaysCooperate, { rounds: 500, log: true, seed: 's' });

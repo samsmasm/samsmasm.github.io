@@ -4,7 +4,7 @@
 // format (knockout, evolutionary) is a new entry in FORMATS returning pairs,
 // with the scoring below left as it is.
 
-import { playMatch, PAYOFFS, DEFAULTS } from './engine.js?v=20261105-092620';
+import { playMatch, PAYOFFS, DEFAULTS } from './engine.js?v=20261105-093143';
 
 export const FORMATS = {
   roundRobin: {

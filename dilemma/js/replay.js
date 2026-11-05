@@ -1,8 +1,8 @@
 // The Long Game - step through one match round by round.
 // Used by the build page (test matches) and the teacher page (any match).
 
-import { playMatch } from './engine.js?v=20261105-092620';
-import { rulePhrase, decisionPhrase } from './readback.js?v=20261105-092620';
+import { playMatch } from './engine.js?v=20261105-093143';
+import { rulePhrase, decisionPhrase } from './readback.js?v=20261105-093143';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const letter = m => (m === 'cooperate' ? 'C' : 'D');

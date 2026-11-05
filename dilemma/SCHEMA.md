@@ -82,6 +82,7 @@ Unknown fields are an error, with a "did you mean" suggestion.
 | `scoreLead` | number | Their years in jail minus mine, so positive means I am doing better. |
 | `memory.NAME` | number | A slot declared in `memory`. |
 | `chance` | special | `{ "check": "chance", "percent": 10 }`, one random draw. |
+| `recent` | special | `{ "check": "recent", "them": ["cooperate"], "me": ["any", "defect"] }`. A pattern of past moves, one condition. Each list starts at last round, 1 to 3 long, entries `cooperate`, `defect` or `any`. Either list may be left out; at least one entry must not be `any`. Rounds before the match started match nothing. |
 
 Number comparisons: `equals`, `atLeast`, `atMost`, `moreThan`, `lessThan`, `multipleOf`. Values are whole numbers. A range uses both conditions.
 
@@ -96,6 +97,7 @@ Every match has a seed: `tournamentSeed|idA|idB`. Each side gets its own generat
 ## Adding V2 without breaking V1
 
 - New checks, actions or fields: add them, bump `schemaVersion` to 2, and accept both in the validator. Old submissions keep their `1` and their meaning.
+- Purely additive checks that change nothing an old strategy means (`recent`, added 2026-11-05) stayed at 1.
 - Cheap talk: a new optional `messages` block plus new checks (`theirLastMessage`, `theirMessagesHonest`); the replay log already has per-round slots to carry them.
 - Noise: a tournament option applied after `slip`, in `playMatch`.
 - Evolutionary mode: a new entry in `FORMATS` in `js/tournament.js`.

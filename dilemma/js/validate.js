@@ -3,7 +3,7 @@
 // AI output drifts, so nothing is trusted. Every problem gets a message a
 // Grade 9 student can act on, naming where it is and what to change.
 
-import { SCHEMA_VERSION, CHECKS, MOVE_CHECKS, NUMBER_OPS, ACTIONS } from './engine.js?v=20261105-092620';
+import { SCHEMA_VERSION, CHECKS, MOVE_CHECKS, NUMBER_OPS, ACTIONS, RECENT_MAX } from './engine.js?v=20261105-093143';
 
 export const LIMITS = {
   rules: 8,
@@ -161,7 +161,7 @@ export function validate(s) {
     if (!isObj(c)) { err(where, 'each condition should look like { "check": "theirLast", "is": "defect" }.'); return; }
     const what = c.check;
     const isMem = typeof what === 'string' && what.startsWith('memory.');
-    const known = Object.keys(CHECKS).concat('chance');
+    const known = Object.keys(CHECKS).concat('chance', 'recent');
     if (typeof what !== 'string' || (!isMem && !known.includes(what))) {
       err(where, `"${what}" is not something a strategy can look at.${suggest(what, known)}`);
       return;
@@ -172,6 +172,24 @@ export function validate(s) {
     const ops = Object.keys(c).filter(k => k !== 'check');
     if (what === 'chance') {
       if (ops.length !== 1 || ops[0] !== 'percent' || !isPercent(c.percent)) err(where, 'a chance check looks like { "check": "chance", "percent": 10 }.');
+      return;
+    }
+    if (what === 'recent') {
+      const shape = 'a recent check looks like { "check": "recent", "them": ["cooperate"], "me": ["any", "defect"] }.';
+      if (!ops.length || ops.some(k => k !== 'me' && k !== 'them')) { err(where, shape); return; }
+      let looks = 0;
+      for (const who of ops) {
+        const list = c[who];
+        if (!Array.isArray(list) || !list.length || list.length > RECENT_MAX) {
+          err(where, `"${who}" should be a list of 1 to ${RECENT_MAX} moves, starting with last round.`);
+          continue;
+        }
+        list.forEach((m, i) => {
+          if (![...MOVES, 'any'].includes(m)) err(where, `"${who}" move ${i + 1} is "${m}". Use "cooperate", "defect" or "any".`);
+          else if (m !== 'any') looks++;
+        });
+      }
+      if (!looks) err(where, 'the pattern does not look at any move. Pick at least one C or D.');
       return;
     }
     if (ops.length !== 1) {
