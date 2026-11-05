@@ -653,11 +653,40 @@ function render() {
   renderLives();
 }
 
+/* ---------- sounds, made in the browser so there are no files ---------- */
+/* Each note is [frequency, start, length, wave, volume] */
+const SPARKLE = [
+  [1047, 0, .4, 'sine', .12], [1319, .06, .4, 'sine', .12], [1568, .12, .4, 'sine', .12],
+  [2093, .18, .5, 'sine', .1], [2637, .24, .6, 'sine', .08], [3136, .3, .7, 'triangle', .04], [4186, .36, .7, 'triangle', .03]
+];
+const SAD = [[330, 0, .32, 'triangle', .16], [262, .24, .55, 'triangle', .16]];
+let audio = null;
+
+function play(notes) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume();
+    const t0 = audio.currentTime + .01;
+    notes.forEach(([freq, at, len, wave, vol]) => {
+      const o = audio.createOscillator(), g = audio.createGain(), t = t0 + at;
+      o.type = wave;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + .012);
+      g.gain.exponentialRampToValueAtTime(.0001, t + len);
+      o.connect(g).connect(audio.destination);
+      o.start(t);
+      o.stop(t + len + .02);
+    });
+  } catch (e) { /* sound is optional */ }
+}
+
 function check() {
   if (S.busy || S.over || S.selected.length !== CFG.per) return;
   const gi = guessResult(S.selected);
   S.note = '';
   if (gi >= 0) {
+    play(SPARKLE);
     S.revealed = S.revealed.concat(gi);
     S.selected = [];
     if (S.revealed.length === CFG.n) S.over = 'won';
@@ -665,6 +694,7 @@ function check() {
     return;
   }
   const p = S.puzzle, wrong = S.selected;
+  play(SAD);
   S.lives--;
   S.note = 'Not quite.';
   S.busy = true;
