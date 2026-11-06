@@ -71,7 +71,11 @@ under Settings → Variables, and add the route `unisam.nz/typeit/*`.)
 
 ## Limits / notes
 
-- Model: `gemini-3-flash-preview`, temperature 0 for fidelity.
+- Model: `gemini-3-flash-preview`, default temperature. Do not set it to 0: Google
+  warns that going below 1.0 on Gemini 3 can cause looping.
+- Timeouts: the worker gives a page 100s (PDF 240s), the browser 120s (PDF 300s).
+  Each page shows in the result as soon as it returns. A failed page gets a Retry
+  button, and so does one still waiting after 40s (PDF 90s).
 - Per-page cap: 25 MB after decode. Multi-page PDFs are sent whole (Gemini reads
   all pages in one call). PDFs that already carry a text layer still go through
   the model; extracting that layer directly with pdf.js is the obvious next

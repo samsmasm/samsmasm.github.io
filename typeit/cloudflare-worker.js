@@ -20,12 +20,18 @@
 // Bump on every paste-deploy. Readable without the password at
 // /typeit/api/version, so "is the new worker actually live?" is one curl away
 // rather than guesswork. This worker is deployed by hand, so the answer matters.
-const VERSION = '2026-08-11.diagnostics';
+const VERSION = '2026-11-06.timeouts';
 
 const COOKIE = 'typeitauth';
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const MODEL = 'gemini-3-flash-preview';
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB per page, after base64 decode
+// Total time allowed for one page, retries included. Without this a stalled
+// Gemini call never returns and the page hangs on "transcribing" for good. PDFs
+// get longer because they can hold many pages. The browser's own limits in
+// index.html sit just above these, so the reason given here reaches the user.
+const IMAGE_LIMIT_MS = 100 * 1000;
+const PDF_LIMIT_MS = 240 * 1000;
 
 // --- prompts --------------------------------------------------------------
 // Three source types, because handwriting and print want opposite things.
@@ -213,9 +219,14 @@ async function transcribe(env, mimeType, dataB64, source, option) {
         { inlineData: { mimeType, data: dataB64 } },
       ],
     }],
-    // temperature 0 for fidelity; low thinking keeps OCR fast and avoids timeouts.
-    generationConfig: { temperature: 0, thinkingConfig: { thinkingLevel: 'low' } },
+    // Low thinking keeps OCR fast. Temperature stays at the default on purpose:
+    // Google warns that going below 1.0 on Gemini 3 can cause looping, and a
+    // looping transcription runs on for minutes.
+    generationConfig: { thinkingConfig: { thinkingLevel: 'low' } },
   };
+
+  const limitMs = mimeType === 'application/pdf' ? PDF_LIMIT_MS : IMAGE_LIMIT_MS;
+  const signal = AbortSignal.timeout(limitMs); // shared, so it covers every attempt
 
   let lastErr = '';
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -224,6 +235,7 @@ async function transcribe(env, mimeType, dataB64, source, option) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
       body: JSON.stringify(body),
+      signal,
     });
     if (res.ok) {
       const data = await res.json();
@@ -302,6 +314,11 @@ export default {
         const text = await transcribe(env, mimeType, data, src, option === true || ignoreTyped === true);
         return json({ text });
       } catch (e) {
+        if (e?.name === 'TimeoutError') {
+          // Metadata only, no page content.
+          console.log('typeit: timed out', JSON.stringify({ source: src, mimeType, bytes: Math.round(data.length * 3 / 4) }));
+          return json({ error: 'Gemini did not finish in time. Try again.' }, 504);
+        }
         return json({ error: String(e.message || e) }, 502);
       }
     }

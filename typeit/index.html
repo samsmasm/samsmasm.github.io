@@ -103,6 +103,9 @@
   .file .status.working{color:var(--purple)}
   .file .status.done{color:var(--ok)}
   .file .status.error{color:var(--err)}
+  .file .retry{flex:none; border:1px solid var(--purple); background:#fff; color:var(--purple);
+    border-radius:7px; font-size:12px; font-weight:700; padding:4px 9px; cursor:pointer}
+  .file .retry:hover{background:var(--purple); color:#fff}
   .file .moves{display:flex; flex-direction:column; gap:1px; flex:none}
   .file .moves button{border:0; background:none; color:var(--purple); cursor:pointer; font-size:13px;
     line-height:1; padding:2px 4px}
@@ -144,6 +147,7 @@
   }
   .result .page-head:first-child{border-top:0; padding-top:0; margin-top:0}
   .result .perr{color:var(--err)}
+  .result .pwait{color:var(--muted)}
   .copied{color:var(--ok); font-size:13px; font-weight:600; margin-left:4px}
   footer{margin-top:30px; color:var(--muted); font-size:12px; text-align:center}
   footer a{color:var(--purple)}
@@ -274,6 +278,13 @@
 const CONCURRENCY = 3;
 const API = '/typeit/api/transcribe';
 const SOURCE_KEY = 'typeit.source';
+// How long to wait on one page. `slow` is when its Retry button appears; `limit`
+// is when we give up and mark it failed. The limits sit just above the Worker's
+// own (100s / 240s), so its reason normally arrives first.
+const WAIT = {
+  image: { slow: 40000, limit: 120000 },
+  pdf:   { slow: 90000, limit: 300000 },
+};
 
 // Per-source settings. maxEdge is the longest side we downscale to before
 // upload: handwriting is big and forgiving, print can be 9pt with footnotes,
@@ -307,7 +318,10 @@ let view = 'combined';
 let unwrap = false;
 let mode = 'upload';
 let source = 'handwriting';
-let done = 0;
+let waiting = [];         // pages queued but not yet sent
+let active = 0;           // pages being sent right now
+let batch = new Set();    // every page in the current run, for the progress bar
+let scrollOnResult = false;
 
 const $ = id => document.getElementById(id);
 const filesEl = $('files'), controls = $('controls'), out = $('out'), resultEl = $('result');
@@ -432,7 +446,6 @@ async function shootSingle(){
   if (it){
     out.classList.add('show');
     await transcribeOne(it);
-    renderResult(); render();
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   btn.disabled = false;
@@ -495,7 +508,7 @@ function render(){
   items.forEach((it, i) => {
     const li = document.createElement('li');
     li.className = 'file';
-    const statusText = { pending:'ready', working:'transcribing…', done:'done',
+    const statusText = { pending:'ready', working: it.slow ? 'still waiting…' : 'transcribing…', done:'done',
                          error: (it.error || 'error').slice(0, 40) }[it.status];
     const thumb = it.thumb
       ? `<img class="thumb" src="${it.thumb}" alt="">`
@@ -510,6 +523,14 @@ function render(){
        </div>
        <span class="status ${it.status}">${statusText}</span>`;
     li.querySelector('.name').textContent = it.name;
+
+    // outside the !running block: a stuck page is exactly when this is needed
+    if (it.status === 'error' || (it.status === 'working' && it.slow)){
+      const r = document.createElement('button');
+      r.className = 'retry'; r.textContent = 'Retry';
+      r.addEventListener('click', () => retry(it));
+      li.appendChild(r);
+    }
 
     if (!running){
       const moves = document.createElement('div');
@@ -589,70 +610,123 @@ async function prepareImage(file){
   } catch { return null; }
 }
 
-async function transcribeOne(it){
-  it.status = 'working'; render();
+async function sendPage(it, signal){
+  let mimeType = it.mime, data;
+  if ((it.mime||'').startsWith('image/')) {
+    const shrunk = await prepareImage(it.file);
+    if (shrunk) { mimeType = shrunk.mime; data = shrunk.data; }
+  }
+  if (data === undefined) data = await fileToBase64(it.file);
+  const res = await fetch(API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+    body: JSON.stringify({ mimeType, data, source, option: $('opt-extra').checked }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+  return body.text || '';
+}
+
+// One try at a page. Always settles: the race means nothing it waits on, even a
+// stalled image decode, can leave the page on "transcribing" for good.
+async function attempt(it){
+  const wait = (it.mime||'').includes('pdf') ? WAIT.pdf : WAIT.image;
+  const ctrl = new AbortController();
+  it.ctrl = ctrl; it.slow = false; it.status = 'working'; it.error = '';
+  redraw();
+  const slowTimer = setTimeout(() => { it.slow = true; render(); }, wait.slow);
+  const limitTimer = setTimeout(() => ctrl.abort(
+    new Error(`No reply after ${wait.limit/60000} minutes`)), wait.limit);
+  const aborted = new Promise((_, reject) =>
+    ctrl.signal.addEventListener('abort', () => reject(ctrl.signal.reason)));
   try {
-    let mimeType = it.mime, data;
-    if ((it.mime||'').startsWith('image/')) {
-      const shrunk = await prepareImage(it.file);
-      if (shrunk) { mimeType = shrunk.mime; data = shrunk.data; }
-    }
-    if (data === undefined) data = await fileToBase64(it.file);
-    const res = await fetch(API, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mimeType, data, source, option: $('opt-extra').checked }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
-    it.text = body.text || '';
+    it.text = await Promise.race([sendPage(it, ctrl.signal), aborted]);
     it.status = 'done';
+    it.retryNow = false; // the reply beat the Retry click, so keep it
   } catch (e) {
-    it.status = 'error';
-    // Kept long: the reason Gemini gives is the whole diagnostic. The narrow
-    // status chip truncates its own copy in render().
-    it.error = String(e.message || e).slice(0, 300);
-  }
-  render();
-}
-
-function updateProgress(total){
-  $('progress-text').textContent = `Transcribing… ${done} of ${total} page${total===1?'':'s'} done`;
-  $('progress-bar').style.width = total ? (done/total*100) + '%' : '0';
-}
-
-async function run(){
-  const queue = items.filter(i => i.status === 'pending' || i.status === 'error');
-  if (running || !queue.length) return;
-  stopCamera(); // free the camera once we start sending
-  running = true; done = 0;
-  $('progress').style.display = 'block';
-  updateProgress(queue.length);
-  render();
-
-  let cursor = 0;
-  async function worker(){
-    while (cursor < queue.length){
-      const it = queue[cursor++];
-      await transcribeOne(it);
-      done++; updateProgress(queue.length);
+    if (!it.retryNow){
+      it.status = 'error';
+      // Kept long: the reason Gemini gives is the whole diagnostic. The narrow
+      // status chip truncates its own copy in render().
+      it.error = String(e.message || e).slice(0, 300);
     }
+  } finally {
+    clearTimeout(slowTimer); clearTimeout(limitTimer);
+    it.slow = false;
   }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
+}
 
+// Retrying a stuck page reruns it here, so it keeps its place in the queue.
+async function transcribeOne(it){
+  do { it.retryNow = false; await attempt(it); } while (it.retryNow);
+  redraw();
+  if (scrollOnResult && it.status === 'done') scrollToResult();
+}
+
+function retry(it){
+  if (it.status === 'working'){ it.retryNow = true; it.ctrl.abort(); }
+  else enqueue([it]);
+}
+
+function scrollToResult(){
+  scrollOnResult = false;
+  out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function updateProgress(){
+  const total = batch.size;
+  const finished = [...batch].filter(i => i.status === 'done' || i.status === 'error').length;
+  $('progress-text').textContent = `Transcribing… ${finished} of ${total} page${total===1?'':'s'} done`;
+  $('progress-bar').style.width = total ? (finished/total*100) + '%' : '0';
+}
+
+function enqueue(list){
+  if (!running) batch = new Set();
+  running = true;
+  for (const it of list){
+    it.status = 'pending'; it.error = '';
+    waiting.push(it); batch.add(it);
+  }
+  $('progress').style.display = 'block';
+  out.classList.add('show');
+  redraw();
+  pump();
+}
+
+function pump(){
+  while (active < CONCURRENCY && waiting.length){
+    const it = waiting.shift();
+    active++;
+    transcribeOne(it).finally(() => { active--; pump(); });
+  }
+  if (active) updateProgress(); else finish();
+}
+
+function finish(){
   running = false;
   render();
   const ok = items.filter(i => i.status === 'done').length;
+  $('progress-bar').style.width = '100%';
   $('progress-text').textContent = `Done — ${ok} of ${items.length} page${items.length===1?'':'s'} transcribed`;
-  renderResult();
-  out.classList.add('show');
-  out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (scrollOnResult) scrollToResult();
+}
+
+function run(){
+  const queue = items.filter(i => i.status === 'pending' || i.status === 'error');
+  if (running || !queue.length) return;
+  stopCamera(); // free the camera once we start sending
+  scrollOnResult = true;
+  enqueue(queue);
 }
 $('go').addEventListener('click', run);
 
 // ---- output --------------------------------------------------------------
+function placeholder(it){
+  return { pending: '[not transcribed yet]', working: '[transcribing…]' }[it.status]
+      || `[not transcribed: ${it.error || it.status}]`;
+}
+
 function pageBody(it){
-  return it.status === 'done' ? present(it.text || '[empty response from the model]')
-       : `[not transcribed: ${it.error || it.status}]`;
+  return it.status === 'done' ? present(it.text || '[empty response from the model]') : placeholder(it);
 }
 
 // A single page is the common case now, and it doesn't need a page separator
@@ -666,7 +740,13 @@ function combinedText(md){
   }).join('\n\n');
 }
 
+function redraw(){
+  render();
+  if (out.classList.contains('show')) renderResult();
+}
+
 function renderResult(){
+  const top = resultEl.scrollTop; // pages land while you read, so hold your place
   resultEl.innerHTML = '';
   items.forEach((it, i) => {
     const h = document.createElement('div');
@@ -674,10 +754,11 @@ function renderResult(){
     h.textContent = view === 'combined' ? `${i+1}. ${it.name}` : `Page ${i+1} — ${it.name}`;
     resultEl.appendChild(h);
     const p = document.createElement('div');
-    if (it.status === 'done'){ p.textContent = present(it.text || '[empty response from the model]'); }
-    else { p.className = 'perr'; p.textContent = `[${it.status==='working'?'transcribing…':'not transcribed: ' + (it.error || it.status)}]`; }
+    if (it.status !== 'done') p.className = it.status === 'error' ? 'perr' : 'pwait';
+    p.textContent = pageBody(it);
     resultEl.appendChild(p);
   });
+  resultEl.scrollTop = top;
 }
 
 $('t-combined').addEventListener('click', () => setView('combined'));
