@@ -16,21 +16,21 @@
   .quiet:hover { background: none; color: #000; }
   h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #555; margin: 28px 0 8px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
-  .p { border: 1px solid #000; background: #fff; min-height: 84px; padding: 12px; text-align: left;
+  .p { border: 1px solid #000; background: #fff; }
+  .p > button { border: 0; width: 100%; min-height: 84px; padding: 12px; text-align: left;
        display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
   .p b { font-weight: 600; }
-  .p i { font-style: normal; font-size: 13px; color: #555; align-self: flex-end; }
-  .p:hover i { color: #fff; }
+  .p > button i { font-style: normal; font-size: 13px; color: #555; align-self: flex-end; }
+  .p > button:hover i { color: #fff; }
+  .p.open { grid-column: 1 / -1; border-width: 2px; }
+  .p.open > button { min-height: 0; flex-direction: row; align-items: baseline; }
+  .more { padding: 0 12px 16px; max-width: 640px; }
+  .more .meta { font-size: 13px; color: #555; margin-bottom: 12px; }
+  .more h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 4px; }
+  .more p, .more ul { margin: 0; }
+  .more ul { padding-left: 20px; }
+  .more a { color: #000; }
   #msg { color: #555; }
-  dialog { border: 1px solid #000; padding: 24px; max-width: 560px; width: calc(100% - 32px); }
-  dialog::backdrop { background: rgba(255,255,255,.85); }
-  dialog h3 { margin: 0 0 4px; font-size: 20px; }
-  dialog .meta { font-size: 13px; color: #555; margin-bottom: 16px; }
-  dialog h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 16px 0 4px; }
-  dialog p, dialog ul { margin: 0; }
-  dialog ul { padding-left: 20px; }
-  dialog a { color: #000; }
-  .close { float: right; }
 </style>
 </head>
 <body>
@@ -41,8 +41,6 @@
 <p id="msg">Loading.</p>
 <button id="in" hidden>Sign in with Google</button>
 <main id="wall"></main>
-
-<dialog id="detail"></dialog>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -66,6 +64,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const daysSince = t => t ? Math.max(0, Math.floor((Date.now() - Date.parse(t)) / 86400000)) : null;
 let projects = [];
+let openIdx = null; // the one panel shown expanded, if any
 
 $('in').onclick = () => signInWithPopup(auth, provider).catch(e => { $('msg').textContent = 'Sign-in failed: ' + e.code; });
 $('out').onclick = () => signOut(auth);
@@ -94,34 +93,33 @@ function paint() {
     if (!list.length) return '';
     return `<h2>${label}</h2><div class="grid">` + list.map(([p, i]) => {
       const d = daysSince(p.touched);
-      return `<button class="p" data-i="${i}"><b>${esc(p.name)}</b>${d != null ? `<i>${d}d</i>` : ''}</button>`;
+      const open = i === openIdx;
+      return `<div class="p${open ? ' open' : ''}"><button data-i="${i}" aria-expanded="${open}">` +
+        `<b>${esc(p.name)}</b>${d != null ? `<i>${d}d</i>` : ''}</button>${open ? details(p) : ''}</div>`;
     }).join('') + '</div>';
   }).join('');
 }
 
+// Click a name to open it across the row; click again (or another) to close.
 $('wall').onclick = e => {
-  const b = e.target.closest('.p');
-  if (b) open(projects[b.dataset.i]);
+  const b = e.target.closest('.p > button');
+  if (!b) return;
+  const i = Number(b.dataset.i);
+  openIdx = openIdx === i ? null : i;
+  paint();
+  if (openIdx !== null) $('wall').querySelector('.p.open').scrollIntoView({ block: 'nearest' });
 };
 
-function open(p) {
-  const d = daysSince(p.touched);
-  const label = (GROUPS.find(g => g[0] === p.status) || [, p.status])[1];
+function details(p) {
   const link = p.url ? (p.url.startsWith('/') ? `<a href="${esc(p.url)}">${esc(p.url)}</a>` : esc(p.url)) : '';
   const feats = (p.features || []).length ? '<ul>' + p.features.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>' : '<p>None listed.</p>';
-  $('detail').innerHTML = `
-    <button class="quiet close" autofocus>Close</button>
-    <h3>${esc(p.name)}</h3>
-    <div class="meta">${esc(label)}${d != null ? ' · touched ' + d + 'd ago' : ''}${link ? ' · ' + link : ''}</div>
+  return `<div class="more">
+    ${link ? `<div class="meta">${link}</div>` : ''}
     <p>${esc(p.summary)}</p>
     <h4>Last thing done</h4><p>${esc(p.last || 'Not recorded.')}</p>
     <h4>Needed to work at all</h4><p>${esc(p.functional || 'Not recorded.')}</p>
-    <h4>Next features</h4>${feats}`;
-  $('detail').querySelector('.close').onclick = () => $('detail').close();
-  $('detail').showModal();
+    <h4>Next features</h4>${feats}</div>`;
 }
-// Click outside the box closes it.
-$('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
 </script>
 </body>
 </html>
