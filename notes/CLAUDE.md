@@ -2,7 +2,7 @@
 
 ## What this is
 
-**Idea network viewer** at `unisam.nz/notes`: a single self-contained `index.html` (HTML, CSS and JS, no build step on this repo) that draws a network map, article view and timeline from Sam's node markdown files. It is a personal tool, marked `noindex` and not linked from any index.
+**Idea network viewer** at `unisam.nz/notes`: a single self-contained `index.html` (HTML, CSS and JS, no build step on this repo) that draws a network map (with a dynamic mode and article sidebar), article view, timeline and sources list from Sam's node markdown files. It is a personal tool, marked `noindex` and not linked from any index.
 
 ## Data and privacy
 

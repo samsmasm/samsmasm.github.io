@@ -17,6 +17,7 @@
   --font:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   --size:16px;         /* base text size */
   --article-width:680px;
+  --side-width:min(440px,46%); /* article sidebar on the map (phones get a bottom panel instead) */
 }
 /* ================================================================================ */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -40,13 +41,29 @@ main{flex:1;position:relative;overflow:hidden}
 .chip.main{font-weight:600}
 #sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--ink);padding:12px 14px calc(14px + env(safe-area-inset-bottom));max-height:45%;overflow:auto;display:none;z-index:20}
 #sheet h2{margin:0;font-size:18px}
-#sheet .meta,#article .meta{color:var(--mute);font-size:13px;margin:2px 0 6px}
+#sheet .meta,.art .meta{color:var(--mute);font-size:13px;margin:2px 0 6px}
 #sheet button.open{margin-top:8px;padding:8px 14px;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;font-size:15px;font-family:inherit}
 #article{position:absolute;inset:0;overflow:auto;padding:16px 16px 60px;display:none}
 #article .wrap{max-width:var(--article-width);margin:0 auto}
-#article h2{font-size:26px;margin:4px 0 2px}
-#article .meta{font-size:14px;margin-bottom:14px}
-#article h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:22px 0 6px;border-top:1px solid var(--line);padding-top:12px}
+.art h2{font-size:26px;margin:4px 0 2px}
+.art .meta{font-size:14px;margin-bottom:14px}
+.art h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:22px 0 6px;border-top:1px solid var(--line);padding-top:12px}
+#side{position:absolute;top:0;right:0;bottom:0;width:var(--side-width);background:var(--card);border-left:1px solid var(--ink);overflow:auto;padding:10px 16px 40px;display:none;z-index:20}
+#side .bar{display:flex;justify-content:flex-end;position:sticky;top:0}
+#side .art h2{font-size:22px}
+main.side-open .tool,main.side-open #filters{right:calc(var(--side-width) + 8px)}
+@media(max-width:719px){
+  #side{top:auto;left:0;width:auto;height:60%;border-left:0;border-top:1px solid var(--ink)}
+  main.side-open #filters{right:8px}
+  main.side-open .tool{right:8px;bottom:calc(60% + 8px)}
+}
+#sources{position:absolute;inset:0;overflow:auto;padding:16px 16px 60px;display:none}
+#sources .wrap{max-width:var(--article-width);margin:0 auto}
+.src{border-top:1px solid var(--line);padding:12px 0}
+.src h2{font-size:18px;margin:0}
+.src h2 a{color:var(--link)}
+.src .meta{color:var(--mute);font-size:13px;margin:2px 0 6px}
+.src p{margin:6px 0;font-size:14px}
 a.wl{color:var(--link);text-decoration:underline;text-decoration-style:dotted;cursor:pointer}
 a.wl.missing{color:var(--mute);text-decoration-style:dashed}
 sup.fn{color:var(--link)}
@@ -96,14 +113,16 @@ ol.notes{font-size:14px;color:var(--mute);padding-left:20px}
     <div id="lstatus"></div>
     <button id="l-close" class="chip">Close</button>
   </div></div>
-  <nav><button data-v="map" class="on">Map</button><button data-v="article">Article</button><button data-v="timeline">Timeline</button></nav>
+  <nav><button data-v="map" class="on">Map</button><button data-v="article">Article</button><button data-v="timeline">Timeline</button><button data-v="sources">Sources</button></nav>
   <main>
     <canvas id="map"></canvas>
     <div id="filters"></div>
     <div class="tool"><button id="zin">+</button><button id="zout">-</button><button id="fit">&#9635;</button></div>
     <div id="sheet"></div>
-    <div id="article"><div class="wrap"></div></div>
+    <div id="side"><div class="bar"><button id="sideclose" class="chip">Close</button></div><div class="art"></div></div>
+    <div id="article"><div class="wrap art"></div></div>
     <div id="timeline"></div>
+    <div id="sources"><div class="wrap"></div></div>
   </main>
 </div>
 <script>
@@ -125,11 +144,17 @@ const CONFIG = {
   gravity: 0.006,             // pull towards the centre
   startTicks: 500,            // layout steps before first draw
   focusOnSelect: true,        // fade everything except the tapped node and its neighbours
+  dynamicMode: true,          // tapped node glides to the centre and the network reshapes around it
+  ringSpacing: 120,           // dynamic mode: gap between rings (neighbours, then their neighbours, and so on)
+  ringGap: 46,                // dynamic mode: room each node gets around its ring, so busy rings grow
+  ringPull: 0.12,             // dynamic mode: how firmly nodes are held on their ring
+  maxSpeed: 14,               // fastest a node can move per frame, keeps the reshaping smooth
   arrowMode: "flow",          // "flow" = arrow shows direction of influence/action. "sentence" = arrow follows how the link is written
   filtersOpen: false          // show the filter chips on start
 };
 /* ================================================================================================= */
-let NODES = [{"id": "n-d4e5f6a7", "title": "Brain-computer interfaces", "type": "technology", "aliases": ["BCI", "BCIs"], "when": "", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Technology that links a brain to a computer. A recurring theme in transhumanist writing, including [[Nick Bostrom]] style debates about enhancement.", "notes": [], "links": [{"type": "supports", "target": "Extropy", "direction": "none", "strength": "low", "status": "provisional", "source": "S002"}]}, {"id": "n-a1b2c3d4", "title": "Elon Musk", "type": "person", "aliases": ["Musk", "Elon"], "when": "1971", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Entrepreneur who founded [[SpaceX]] and is linked to [[Neuralink]]. Often discussed alongside [[Extropy]] and ideas about [[Brain-computer interfaces]].", "notes": [], "links": [{"type": "founded", "target": "SpaceX", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}, {"type": "founded", "target": "Neuralink", "direction": "out", "strength": "medium", "status": "approved", "source": "own thinking"}, {"type": "influenced by", "target": "Extropy", "direction": "out", "strength": "low", "status": "provisional", "source": "S001 @ 12:30"}]}, {"id": "n-a7b8c9d0", "title": "Extropy Institute", "type": "organisation", "aliases": [], "when": "1992", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Organisation promoting [[Extropy]].", "notes": [], "links": [{"type": "supports", "target": "Extropy", "direction": "out", "strength": "medium", "status": "approved", "source": "own thinking"}]}, {"id": "n-e5f6a7b8", "title": "Extropy", "type": "idea", "aliases": ["Extropianism"], "when": "1988", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. A strand of transhumanist thought developed by [[Max More]] and promoted through the [[Extropy Institute]].", "notes": [], "links": [{"type": "developed by", "target": "Max More", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-f6a7b8c9", "title": "Max More", "type": "person", "aliases": ["More"], "when": "1964", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Philosopher associated with [[Extropy]] and the [[Extropy Institute]].", "notes": [], "links": [{"type": "founded", "target": "Extropy Institute", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-c3d4e5f6", "title": "Neuralink", "type": "organisation", "aliases": [], "when": "2016", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Company working on [[Brain-computer interfaces]].", "notes": [], "links": [{"type": "developed", "target": "Brain-computer interfaces", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-b8c9d0e1", "title": "Nick Bostrom", "type": "person", "aliases": ["Bostrom"], "when": "1973", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Philosopher who wrote [[Superintelligence]].", "notes": [], "links": [{"type": "authored", "target": "Superintelligence", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-b2c3d4e5", "title": "SpaceX", "type": "organisation", "aliases": ["Space Exploration Technologies"], "when": "2002", "status": "approved", "confidence": "high", "source": ["own thinking"], "text": "SAMPLE NODE. Launch company founded by [[Elon Musk]].", "notes": [], "links": [{"type": "related to", "target": "Elon Musk", "direction": "in", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-c9d0e1f2", "title": "Superintelligence", "type": "work", "aliases": [], "when": "2014", "status": "approved", "confidence": "high", "source": ["own thinking"], "text": "SAMPLE NODE. Book by [[Nick Bostrom]].", "notes": [], "links": []}];
+let NODES = [{"id": "n-d4e5f6a7", "title": "Brain-computer interfaces", "type": "technology", "aliases": ["BCI", "BCIs"], "when": "", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Technology that links a brain to a computer. A recurring theme in transhumanist writing, including [[Nick Bostrom]] style debates about enhancement.", "notes": [], "links": [{"type": "supports", "target": "Extropy", "direction": "none", "strength": "low", "status": "provisional", "source": "S002"}]}, {"id": "n-a1b2c3d4", "title": "Elon Musk", "type": "person", "aliases": ["Musk", "Elon"], "when": "1971", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Entrepreneur who founded [[SpaceX]] and is linked to [[Neuralink]]. Often discussed alongside [[Extropy]] and ideas about [[Brain-computer interfaces]].", "notes": [], "links": [{"type": "founded", "target": "SpaceX", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}, {"type": "founded", "target": "Neuralink", "direction": "out", "strength": "medium", "status": "approved", "source": "own thinking"}, {"type": "influenced by", "target": "Extropy", "direction": "out", "strength": "low", "status": "provisional", "source": "S001 @ 12:30"}]}, {"id": "n-a7b8c9d0", "title": "Extropy Institute", "type": "organisation", "aliases": [], "when": "1992", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Organisation promoting [[Extropy]].", "notes": [], "links": [{"type": "supports", "target": "Extropy", "direction": "out", "strength": "medium", "status": "approved", "source": "own thinking"}]}, {"id": "n-e5f6a7b8", "title": "Extropy", "type": "idea", "aliases": ["Extropianism"], "when": "1988", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. A strand of transhumanist thought developed by [[Max More]] and promoted through the [[Extropy Institute]].", "notes": [], "links": [{"type": "developed by", "target": "Max More", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-f6a7b8c9", "title": "Max More", "type": "person", "aliases": ["More"], "when": "1964", "status": "approved", "confidence": "medium", "source": ["S001 @ sample passage"], "text": "SAMPLE NODE. Philosopher associated with [[Extropy]] and the [[Extropy Institute]].", "notes": [], "links": [{"type": "founded", "target": "Extropy Institute", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-c3d4e5f6", "title": "Neuralink", "type": "organisation", "aliases": [], "when": "2016", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Company working on [[Brain-computer interfaces]].", "notes": [], "links": [{"type": "developed", "target": "Brain-computer interfaces", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-b8c9d0e1", "title": "Nick Bostrom", "type": "person", "aliases": ["Bostrom"], "when": "1973", "status": "approved", "confidence": "medium", "source": ["own thinking"], "text": "SAMPLE NODE. Philosopher who wrote [[Superintelligence]].", "notes": [], "links": [{"type": "authored", "target": "Superintelligence", "direction": "out", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-b2c3d4e5", "title": "SpaceX", "type": "organisation", "aliases": ["Space Exploration Technologies"], "when": "2002", "status": "approved", "confidence": "high", "source": ["own thinking"], "text": "SAMPLE NODE. Launch company founded by [[Elon Musk]].", "notes": [], "links": [{"type": "related to", "target": "Elon Musk", "direction": "in", "strength": "high", "status": "approved", "source": "own thinking"}]}, {"id": "n-c9d0e1f2", "title": "Superintelligence", "type": "work", "aliases": [], "when": "2014", "status": "approved", "confidence": "high", "source": ["own thinking"], "text": "SAMPLE NODE. Book by [[Nick Bostrom]].", "notes": [], "links": []}];
+let SOURCES = [{"id": "S001", "title": "SAMPLE SOURCE: An invented history of extropy", "type": "book", "link": "https://example.com", "author or speaker": "A. Sample", "date": "2026", "added": "2026-11-07", "notes": "Invented to show how the Sources tab looks."}];
 const LINKTYPES = {"founded": {"flow": "forward", "inverse": "founded by"}, "works at": {"flow": "forward", "inverse": "employs"}, "authored": {"flow": "forward", "inverse": "authored by"}, "influenced by": {"flow": "reverse", "inverse": "influenced"}, "supports": {"flow": "forward", "inverse": "supported by"}, "disputes": {"flow": "forward", "inverse": "disputed by"}, "developed": {"flow": "forward", "inverse": "developed by"}, "member of": {"flow": "forward", "inverse": "has member"}, "appears in": {"flow": "forward", "inverse": "features"}, "related to": {"flow": "none", "inverse": "related to"}, "developed by": {"flow": "reverse", "inverse": "developed"}};
 const PALETTE = CONFIG.palette;
 let types = [], byTitle = new Map(), byId = new Map(), edges = [], incoming = new Map(), nbrs = new Map();
@@ -155,7 +180,7 @@ const ltype = t => LINKTYPES[t] || {flow:"forward", inverse:""};
 
 index();
 
-const state = {hideProv:false, hiddenTypes:new Set(), view:"map", sel:null, history:[], current:null, arrow:CONFIG.arrowMode, focus:CONFIG.focusOnSelect, filtersOpen:CONFIG.filtersOpen};
+const state = {hideProv:false, hiddenTypes:new Set(), view:"map", sel:null, history:[], current:null, arrow:CONFIG.arrowMode, focus:CONFIG.focusOnSelect, filtersOpen:CONFIG.filtersOpen, dyn:CONFIG.dynamicMode, sideOpen:false, sideNode:null, sideHist:[]};
 const nodeVisible = n => !state.hiddenTypes.has(n.type) && !(state.hideProv && n.status === "provisional");
 const edgeVisible = e => nodeVisible(e.a) && nodeVisible(e.b) && !(state.hideProv && e.status === "provisional");
 
@@ -175,6 +200,8 @@ const cv = document.getElementById("map"), ctx = cv.getContext("2d");
 let W = 0, H = 0, dpr = 1;
 const view = {x:0, y:0, k:1};
 let alpha = 1;
+let rings = null, ringR1 = 0, cam = null; // dynamic mode: node -> ring radius; camera glide target
+const mainEl = document.querySelector("main"), sheetEl = document.getElementById("sheet"), sideEl = document.getElementById("side");
 function initLayout(){ alpha = 1; NODES.forEach((n,i) => { const a = i/NODES.length*6.283, r = 40 + 14*Math.sqrt(NODES.length); n.x = Math.cos(a)*r; n.y = Math.sin(a)*r; n.vx = n.vy = 0; }); }
 initLayout();
 function tick(){
@@ -187,8 +214,59 @@ function tick(){
     let dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, d=Math.sqrt(dx*dx+dy*dy)+0.01;
     const f=(d-CONFIG.linkDistance)*0.02*alpha; dx/=d; dy/=d; e.a.vx+=dx*f; e.a.vy+=dy*f; e.b.vx-=dx*f; e.b.vy-=dy*f;
   });
-  vis.forEach(n => { n.vx -= n.x*CONFIG.gravity*alpha; n.vy -= n.y*CONFIG.gravity*alpha; n.vx*=0.8; n.vy*=0.8; n.x+=n.vx; n.y+=n.vy; });
+  vis.forEach(n => {
+    if (rings && n===state.sel){ n.x = n.y = n.vx = n.vy = 0; return; } // the chosen node stays put at the centre
+    if (rings){ const d = Math.hypot(n.x,n.y)+.01, f = (rings.get(n)-d)*CONFIG.ringPull*alpha; n.vx += n.x/d*f; n.vy += n.y/d*f; }
+    else { n.vx -= n.x*CONFIG.gravity*alpha; n.vy -= n.y*CONFIG.gravity*alpha; }
+    n.vx*=0.8; n.vy*=0.8;
+    const sp = Math.hypot(n.vx,n.vy); if (sp>CONFIG.maxSpeed){ n.vx*=CONFIG.maxSpeed/sp; n.vy*=CONFIG.maxSpeed/sp; }
+    n.x+=n.vx; n.y+=n.vy;
+  });
   alpha = Math.max(alpha*0.985, 0.015);
+}
+// dynamic mode: each node gets a ring by how many links it is from the chosen node. Unconnected nodes go outermost
+function setRings(){
+  rings = null; const c = state.sel;
+  if (!state.dyn || !c || !nodeVisible(c)) return;
+  const adj = new Map(), add = (a,b) => { if (!adj.has(a)) adj.set(a,[]); adj.get(a).push(b); };
+  edges.filter(edgeVisible).forEach(e => { add(e.a,e.b); add(e.b,e.a); });
+  const hop = new Map([[c,0]]); let q = [c];
+  while (q.length){ const nx = []; q.forEach(n => (adj.get(n)||[]).forEach(m => { if (!hop.has(m)){ hop.set(m,hop.get(n)+1); nx.push(m); } })); q = nx; }
+  const vis = NODES.filter(nodeVisible), last = Math.max(...hop.values())+1, count = [];
+  vis.forEach(n => { const h = hop.has(n) ? hop.get(n) : last; count[h] = (count[h]||0)+1; });
+  const radius = [0]; let r = 0;
+  for (let h=1; h<=last; h++){ if (count[h]) r = Math.max(r+CONFIG.ringSpacing, count[h]*CONFIG.ringGap/6.283); radius[h] = r; }
+  ringR1 = radius[1] || CONFIG.ringSpacing;
+  rings = new Map(vis.map(n => [n, radius[hop.has(n) ? hop.get(n) : last]]));
+}
+// move the whole network so the chosen node sits at the origin, without anything shifting on screen
+function reorigin(n){ const ox=n.x, oy=n.y; NODES.forEach(m => { m.x-=ox; m.y-=oy; }); view.x+=ox*view.k; view.y+=oy*view.k; }
+// the part of the map not covered by the filters, sidebar or sheet
+function mapArea(){
+  let w = W, h = H; const top = 44, s = sideEl.offsetHeight;
+  if (s){ if (s>=H-1) w -= sideEl.offsetWidth; else h -= s; }
+  h -= sheetEl.offsetHeight;
+  return {x:w/2, y:top+(h-top)/2, w, h:h-top};
+}
+function camStep(){
+  if (!cam) return;
+  const a = mapArea(); let t;
+  if (cam.fit){ t = fitTarget(); if (!t || alpha<.03){ cam = null; return; } }
+  else {
+    const k = rings ? Math.min(1.5, Math.max(.3, (Math.min(a.w,a.h)/2-36)/ringR1)) : view.k;
+    t = {k, x:a.x-cam.node.x*k, y:a.y-cam.node.y*k};
+  }
+  view.k += (t.k-view.k)*.12; view.x += (t.x-view.x)*.12; view.y += (t.y-view.y)*.12;
+  if (cam.node && Math.hypot(t.x-view.x,t.y-view.y)<.5 && Math.abs(t.k-view.k)<.002) cam = null;
+}
+// choose a node (or null). pan = move the camera to it even with dynamic mode off
+function pick(n, pan){
+  const changed = n!==state.sel; state.sel = n; renderSheet();
+  if (state.dyn && changed){
+    if (n && nodeVisible(n)) reorigin(n);
+    setRings(); alpha = Math.max(alpha, n ? .7 : .5);
+  }
+  cam = n && (state.dyn||pan) ? {node:n} : null;
 }
 const sx = x => x*view.k + view.x, sy = y => y*view.k + view.y;
 const degree = n => nbrs.get(n.id).size;
@@ -239,23 +317,25 @@ function draw(){
     ctx.lineWidth = 3; ctx.strokeStyle = "rgba(250,249,246,.85)"; ctx.strokeText(n.title, x, y); ctx.fillText(n.title, x, y);
   });
 }
-function loop(){ if (state.view==="map"){ tick(); draw(); } requestAnimationFrame(loop); }
+function loop(){ if (state.view==="map"){ tick(); camStep(); draw(); } requestAnimationFrame(loop); }
 function resize(){
   dpr = window.devicePixelRatio||1; const r = cv.parentElement.getBoundingClientRect(); W = r.width; H = r.height;
   cv.width = W*dpr; cv.height = H*dpr;
+  if (state.sel && state.dyn) cam = {node:state.sel};
 }
-function fit(){
-  const vis = NODES.filter(nodeVisible); if (!vis.length || !W) return;
-  const xs = vis.map(n=>n.x), ys = vis.map(n=>n.y), minx=Math.min(...xs), maxx=Math.max(...xs), miny=Math.min(...ys), maxy=Math.max(...ys);
-  view.k = Math.min(2, Math.min((W-60)/Math.max(maxx-minx,1), (H-110)/Math.max(maxy-miny,1)));
-  view.x = W/2 - (minx+maxx)/2*view.k; view.y = H/2 - (miny+maxy)/2*view.k + 20;
+function fitTarget(){
+  const vis = NODES.filter(nodeVisible); if (!vis.length || !W) return null;
+  const a = mapArea(), xs = vis.map(n=>n.x), ys = vis.map(n=>n.y), minx=Math.min(...xs), maxx=Math.max(...xs), miny=Math.min(...ys), maxy=Math.max(...ys);
+  const k = Math.min(2, Math.min((a.w-60)/Math.max(maxx-minx,1), (a.h-66)/Math.max(maxy-miny,1)));
+  return {k, x:a.x-(minx+maxx)/2*k, y:a.y-(miny+maxy)/2*k};
 }
-function zoomAt(px,py,f){ const nk = Math.min(6,Math.max(.15,view.k*f)); view.x = px-(px-view.x)*nk/view.k; view.y = py-(py-view.y)*nk/view.k; view.k = nk; }
+function fit(){ const t = fitTarget(); if (t) Object.assign(view, t); }
+function zoomAt(px,py,f){ cam = null; const nk = Math.min(6,Math.max(.15,view.k*f)); view.x = px-(px-view.x)*nk/view.k; view.y = py-(py-view.y)*nk/view.k; view.k = nk; }
 const ptrs = new Map(); let moved = 0, lastDist = 0;
 cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY}); moved = 0; lastDist = 0; });
 cv.addEventListener("pointermove", e => {
   const p = ptrs.get(e.pointerId); if (!p) return;
-  if (ptrs.size===1){ view.x += e.offsetX-p.x; view.y += e.offsetY-p.y; moved += Math.abs(e.offsetX-p.x)+Math.abs(e.offsetY-p.y); }
+  if (ptrs.size===1){ view.x += e.offsetX-p.x; view.y += e.offsetY-p.y; moved += Math.abs(e.offsetX-p.x)+Math.abs(e.offsetY-p.y); if (moved>=6) cam = null; }
   p.x = e.offsetX; p.y = e.offsetY;
   if (ptrs.size===2){ const [a,b] = [...ptrs.values()], d = Math.hypot(a.x-b.x,a.y-b.y); if (lastDist) zoomAt((a.x+b.x)/2,(a.y+b.y)/2,d/lastDist); lastDist = d; moved += 10; }
 });
@@ -264,19 +344,23 @@ cv.addEventListener("pointercancel", e => { ptrs.delete(e.pointerId); });
 cv.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.offsetX,e.offsetY,e.deltaY<0?1.15:.87); }, {passive:false});
 document.getElementById("zin").onclick = () => zoomAt(W/2,H/2,1.3);
 document.getElementById("zout").onclick = () => zoomAt(W/2,H/2,.77);
-document.getElementById("fit").onclick = () => { state.sel = null; renderSheet(); fit(); };
+document.getElementById("fit").onclick = () => { closeSide(); pick(null); if (state.dyn){ alpha = Math.max(alpha,.2); cam = {fit:true}; } else fit(); };
+document.getElementById("sideclose").onclick = () => closeSide();
 function tap(x,y){
   let best=null, bd=1e9;
   NODES.filter(nodeVisible).forEach(n => { const d = Math.hypot(sx(n.x)-x, sy(n.y)-y); if (d < Math.max(drawR(n),16)+8 && d<bd){ bd=d; best=n; } });
-  state.sel = best; renderSheet();
+  if (!best){ closeSide(); pick(null); }
+  else if (state.sideOpen) openSide(best);
+  else pick(best);
 }
 function renderSheet(){
-  const el = document.getElementById("sheet"), n = state.sel;
-  if (!n){ el.style.display="none"; return; }
+  const el = sheetEl, n = state.sel, tools = document.querySelector(".tool");
+  if (!n || state.sideOpen){ el.style.display="none"; tools.style.bottom = ""; return; }
   const gist = n.text.replace(/\[\^[^\]]+\]/g,"").replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,a,b)=>b||a);
   const ns = [...nbrs.get(n.id)].map(id => byId.get(id)).filter(nodeVisible);
-  el.innerHTML = `<h2>${esc(n.title)}</h2><div class="meta">${esc(n.type)}${n.when?" &middot; "+esc(n.when):""} &middot; ${esc(n.status)} &middot; ${ns.length} linked</div><div>${esc(gist)}</div><button class="open">Open article</button>`;
-  el.style.display="block"; el.querySelector(".open").onclick = () => openArticle(n);
+  el.innerHTML = `<h2>${esc(n.title)}</h2><div class="meta">${esc(n.type)}${n.when?" &middot; "+esc(n.when):""} &middot; ${esc(n.status)} &middot; ${ns.length} linked</div><div>${esc(gist)}</div><button class="open">Read the article</button>`;
+  el.style.display="block"; el.querySelector(".open").onclick = () => openSide(n);
+  tools.style.bottom = el.offsetHeight+8+"px"; // keep zoom and fit clickable above the sheet
 }
 
 // ---------- filters ----------
@@ -284,9 +368,14 @@ function renderFilters(){
   const f = document.getElementById("filters"); f.innerHTML = "";
   const add = (html, cls, fn) => { const c = document.createElement("button"); c.className = "chip "+(cls||""); c.innerHTML = html; c.onclick = fn; f.appendChild(c); return c; };
   add(state.filtersOpen ? "Filters &#9652;" : "Filters &#9662;", "main", () => { state.filtersOpen = !state.filtersOpen; renderFilters(); });
+  add("Dynamic: "+(state.dyn?"on":"off"), state.dyn?"":"off", () => {
+    state.dyn = !state.dyn; alpha = Math.max(alpha,.5);
+    if (state.dyn && state.sel && nodeVisible(state.sel)){ reorigin(state.sel); cam = {node:state.sel}; }
+    setRings(); renderFilters();
+  });
   if (!state.filtersOpen) return;
-  types.forEach(t => add(`<i style="background:${colour(t)}"></i>${esc(t)}`, state.hiddenTypes.has(t)?"off":"", () => { state.hiddenTypes.has(t) ? state.hiddenTypes.delete(t) : state.hiddenTypes.add(t); alpha=.5; renderFilters(); renderTimeline(); }));
-  add(state.hideProv ? "provisional hidden" : "provisional shown", state.hideProv?"off":"", () => { state.hideProv = !state.hideProv; alpha=.5; renderFilters(); renderTimeline(); });
+  types.forEach(t => add(`<i style="background:${colour(t)}"></i>${esc(t)}`, state.hiddenTypes.has(t)?"off":"", () => { state.hiddenTypes.has(t) ? state.hiddenTypes.delete(t) : state.hiddenTypes.add(t); alpha=.5; setRings(); renderFilters(); renderTimeline(); }));
+  add(state.hideProv ? "provisional hidden" : "provisional shown", state.hideProv?"off":"", () => { state.hideProv = !state.hideProv; alpha=.5; setRings(); renderFilters(); renderTimeline(); });
   add("arrows: "+state.arrow, "", () => { state.arrow = state.arrow==="flow" ? "sentence" : "flow"; renderFilters(); });
   add("focus: "+(state.focus?"on":"off"), "", () => { state.focus = !state.focus; renderFilters(); });
 }
@@ -304,6 +393,32 @@ function openArticle(n, noPush){
   if (!n) return;
   if (!noPush && state.current && state.current!==n) state.history.push(state.current);
   state.current = n; setView("article");
+  mountArticle(document.querySelector("#article .wrap"), n, state.history.length>0, t => openArticle(t), () => openArticle(state.history.pop(), true));
+  document.getElementById("article").scrollTop = 0;
+}
+// the article in the sidebar: the map stays open and follows whatever is being read
+function openSide(n, noPush){
+  if (!n) return;
+  if (!noPush && state.sideNode && state.sideNode!==n) state.sideHist.push(state.sideNode);
+  state.sideOpen = true; state.sideNode = n;
+  mainEl.classList.add("side-open"); sideEl.style.display = "block";
+  mountArticle(sideEl.querySelector(".art"), n, state.sideHist.length>0, t => openSide(t), () => openSide(state.sideHist.pop(), true));
+  sideEl.scrollTop = 0;
+  pick(n, true);
+}
+function closeSide(){
+  if (!state.sideOpen) return;
+  Object.assign(state, {sideOpen:false, sideNode:null, sideHist:[]});
+  mainEl.classList.remove("side-open"); sideEl.style.display = "none";
+  renderSheet();
+  if (state.sel) cam = {node:state.sel};
+}
+function mountArticle(w, n, hasBack, go, back){
+  w.innerHTML = (hasBack?`<span class="back">&larr; Back</span><br>`:"") + articleHtml(n);
+  w.querySelectorAll("a.wl[data-id]").forEach(a => a.onclick = () => go(byId.get(a.dataset.id)));
+  const b = w.querySelector(".back"); if (b) b.onclick = back;
+}
+function articleHtml(n){
   const out = n.links.map(l => ({l, t:find(l.target)})).filter(x => x.t);
   const groups = {}; out.forEach(x => (groups[x.l.type] = groups[x.l.type]||[]).push(x));
   let see = "";
@@ -317,14 +432,24 @@ function openArticle(n, noPush){
   const ig = {}; inc.forEach(e => { const k = ltype(e.type).inverse || (e.type+" (from)"); (ig[k] = ig[k]||[]).push(e); });
   const incHtml = inc.length ? `<h3>Linked from</h3>` + Object.keys(ig).sort().map(k => `<div><b>${esc(k)}</b><ul class="see">` + ig[k].map(e => `<li class="${e.status==="provisional"?"faded":""}"><a class="wl" data-id="${e.a.id}">${esc(e.a.title)}</a>${e.status==="provisional"?" (provisional)":""}</li>`).join("") + "</ul></div>").join("") : "";
   const notes = n.notes.length ? `<h3>Notes</h3><ol class="notes">` + n.notes.map(x => `<li>${esc(x.text)}</li>`).join("") + "</ol>" : "";
-  const w = document.querySelector("#article .wrap");
-  w.innerHTML = (state.history.length?`<span class="back">&larr; Back</span><br>`:"") +
-    `<h2>${esc(n.title)}</h2><div class="meta">${esc(n.type)}${n.when?" &middot; "+esc(n.when):""} &middot; ${esc(n.status)} &middot; confidence ${esc(n.confidence)}${n.aliases.length?" &middot; also: "+esc(n.aliases.join(", ")):""}</div>` +
+  return `<h2>${esc(n.title)}</h2><div class="meta">${esc(n.type)}${n.when?" &middot; "+esc(n.when):""} &middot; ${esc(n.status)} &middot; confidence ${esc(n.confidence)}${n.aliases.length?" &middot; also: "+esc(n.aliases.join(", ")):""}</div>` +
     bodyHtml(n) + (see?`<h3>See also</h3>${see}`:"") + incHtml + notes +
     (n.source.length?`<h3>Source</h3><div style="font-size:14px">${esc(n.source.join("; "))}</div>`:"");
+}
+
+// ---------- sources: one entry per row of the project's Sources.md, with the nodes that cite it ----------
+function renderSources(){
+  const w = document.querySelector("#sources .wrap");
+  if (!SOURCES.length){ w.innerHTML = `<p>No sources list found.</p><p style="color:var(--mute);font-size:13px">Sources are read from Sources.md, next to the Nodes folder.</p>`; return; }
+  const cites = (n, id) => [...n.source, ...n.links.map(l => l.source)].some(s => s.split(/[\s@,;]+/).includes(id));
+  w.innerHTML = `<div class="meta" style="color:var(--mute);font-size:13px;margin-bottom:8px">${SOURCES.length} source${SOURCES.length===1?"":"s"}</div>` + SOURCES.map(s => {
+    const title = esc(s.title||s.id), link = /^https?:\/\//i.test(s.link||"") ? `<a href="${esc(s.link)}" target="_blank" rel="noopener">${title}</a>` : title;
+    const meta = [s.id, s.type, s["author or speaker"], s.date].filter(Boolean).map(esc).join(" &middot; ");
+    const used = NODES.filter(n => cites(n, s.id));
+    return `<div class="src"><h2>${link}</h2><div class="meta">${meta}</div>${s.notes?`<p>${esc(s.notes)}</p>`:""}` +
+      (used.length ? `<p><b>Cited by ${used.length} node${used.length===1?"":"s"}:</b> ` + used.map(n => `<a class="wl" data-id="${n.id}">${esc(n.title)}</a>`).join(", ") + `</p>` : "") + `</div>`;
+  }).join("");
   w.querySelectorAll("a.wl[data-id]").forEach(a => a.onclick = () => openArticle(byId.get(a.dataset.id)));
-  const b = w.querySelector(".back"); if (b) b.onclick = () => openArticle(state.history.pop(), true);
-  document.getElementById("article").scrollTop = 0;
 }
 
 // ---------- timeline: one lane per type, nodes without "when" are left out ----------
@@ -403,6 +528,13 @@ function parseMd(title, raw){
     status: s(meta.status).toLowerCase() || "approved", confidence: s(meta.confidence).toLowerCase() || "medium", source: asList(meta.source),
     text: textLines.join("\n").trim(), notes, links};
 }
+function parseSources(raw){
+  const rows = raw.replace(/\r\n/g, "\n").split("\n").filter(l => l.trim().startsWith("|"));
+  const cells = l => l.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+  if (rows.length < 3) return [];
+  const head = cells(rows[0]).map(h => h.toLowerCase());
+  return rows.slice(2).map(l => { const c = cells(l), o = {}; head.forEach((h,i) => o[h] = c[i]||""); return o; }).filter(o => o.id);
+}
 function finishNodes(nodes){
   nodes = nodes.filter(n => n.status !== "rejected");
   nodes.forEach(n => n.links = n.links.filter(l => l.status !== "rejected"));
@@ -417,7 +549,7 @@ async function loadGithub({repo, path, branch, token}){
   if (!r.ok) throw new Error(r.status === 401 ? "GitHub rejected the token." : r.status === 404 ? "Not found. Check the repository and folder, and that the token can read this repository." : `GitHub returned ${r.status}.`);
   const listing = await r.json();
   if (!Array.isArray(listing)) throw new Error("That path is a file, not a folder.");
-  const files = listing.filter(f => f.type === "file" && /\.md$/i.test(f.name));
+  const files = listing.filter(f => f.type === "file" && /\.md$/i.test(f.name) && !/^sources\.md$/i.test(f.name));
   if (!files.length) throw new Error("No .md files in that folder.");
   const nodes = []; let next = 0, done = 0;
   async function worker(){
@@ -430,11 +562,17 @@ async function loadGithub({repo, path, branch, token}){
     }
   }
   await Promise.all(Array.from({length: 6}, worker));
-  return nodes;
+  // Sources.md sits next to the Nodes folder. A project without one still loads
+  let sources = [];
+  const up = path.split("/").filter(Boolean).slice(0, -1).join("/");
+  const sr = await fetch(`https://api.github.com/repos/${enc(repo)}/contents/${enc(up ? up+"/Sources.md" : "Sources.md")}` + (branch ? `?ref=${encodeURIComponent(branch)}` : ""), {headers: {...h, Accept: "application/vnd.github.raw+json"}}).catch(() => null);
+  if (sr && sr.ok) sources = parseSources(await sr.text());
+  return {nodes, sources};
 }
-function setData(nodes, label){
+function setData(nodes, label, sources){
   if (!nodes.length) throw new Error("No nodes found.");
-  NODES = finishNodes(nodes); index(); initLayout();
+  NODES = finishNodes(nodes); SOURCES = sources || []; index(); initLayout();
+  closeSide(); rings = null; cam = null;
   Object.assign(state, {sel:null, current:null, history:[], hiddenTypes:new Set()});
   document.getElementById("title").textContent = label || "Idea network";
   document.title = label || "Idea network";
@@ -456,12 +594,13 @@ $("g-go").onclick = async () => {
   store.set("dn-repo", cfg.repo); store.set("dn-path", cfg.path); store.set("dn-branch", cfg.branch);
   store.set("dn-token", $("g-remember").checked ? cfg.token : "");
   setStatus("Loading...");
-  try { const nodes = await loadGithub(cfg); setData(nodes, cfg.path.split("/").filter(Boolean).slice(-2, -1)[0] || cfg.repo); panel.style.display = "none"; }
+  try { const {nodes, sources} = await loadGithub(cfg); setData(nodes, cfg.path.split("/").filter(Boolean).slice(-2, -1)[0] || cfg.repo, sources); panel.style.display = "none"; }
   catch(e){ setStatus(e.message || String(e), true); }
 };
 $("f-files").onchange = async e => {
   const files = [...e.target.files].filter(f => /\.md$/i.test(f.name)); if (!files.length){ setStatus("Choose .md files.", true); return; }
-  try { const nodes = await Promise.all(files.map(async f => parseMd(f.name.replace(/\.md$/i, ""), await f.text()))); setData(nodes, "My notes"); panel.style.display = "none"; }
+  const isSrc = f => /^sources\.md$/i.test(f.name), srcFile = files.find(isSrc);
+  try { const nodes = await Promise.all(files.filter(f => !isSrc(f)).map(async f => parseMd(f.name.replace(/\.md$/i, ""), await f.text()))); setData(nodes, "My notes", srcFile ? parseSources(await srcFile.text()) : []); panel.style.display = "none"; }
   catch(err){ setStatus(err.message || String(err), true); }
 };
 
@@ -472,14 +611,20 @@ function setView(v){
   cv.style.display = v==="map"?"block":"none";
   document.getElementById("filters").style.display = v==="map"?"flex":"none";
   document.querySelector(".tool").style.display = v==="map"?"flex":"none";
-  document.getElementById("sheet").style.display = v==="map" && state.sel ? "block":"none";
+  sheetEl.style.display = v==="map" && state.sel && !state.sideOpen ? "block":"none";
+  sideEl.style.display = v==="map" && state.sideOpen ? "block":"none";
   document.getElementById("article").style.display = v==="article"?"block":"none";
   document.getElementById("timeline").style.display = v==="timeline"?"block":"none";
+  document.getElementById("sources").style.display = v==="sources"?"block":"none";
   if (v==="article" && !state.current) openArticle(state.sel || NODES[0], true);
   if (v==="timeline") renderTimeline();
+  if (v==="sources") renderSources();
   if (v==="map") resize();
 }
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => setView(b.dataset.v));
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  if (b.dataset.v==="article" && state.sel && state.sel!==state.current) openArticle(state.sel); // Article tab follows the node chosen on the map
+  else setView(b.dataset.v);
+});
 const sInput = document.getElementById("search"), sRes = document.getElementById("results");
 sInput.addEventListener("input", () => {
   const q = sInput.value.trim().toLowerCase(); if (!q){ sRes.style.display="none"; return; }
@@ -490,7 +635,7 @@ sInput.addEventListener("input", () => {
   sRes.style.display = "block";
   sRes.querySelectorAll("div[data-id]").forEach(d => d.onclick = () => {
     sRes.style.display="none"; sInput.value=""; const n = byId.get(d.dataset.id);
-    if (state.view==="map"){ state.sel = n; renderSheet(); view.x = W/2 - n.x*view.k; view.y = H/2 - n.y*view.k - 40; } else openArticle(n);
+    if (state.view!=="map") openArticle(n); else if (state.sideOpen) openSide(n); else pick(n, true);
   });
 });
 window.addEventListener("resize", () => { resize(); if (state.view==="timeline") renderTimeline(); });
