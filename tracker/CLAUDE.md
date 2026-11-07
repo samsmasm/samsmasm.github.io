@@ -1,6 +1,6 @@
 # Tracker, `/tracker`
 
-Sam's private wall of projects: plain black and white panels with just the name and days since last touched. Click one for a summary, the last thing done, what it needs to work at all, and next features. Built 2026-11-07 because Sam starts projects, gets distracted and forgets them. Noindex, not linked from any index.
+Sam's private wall of projects: plain black and white panels with just the name and days since last touched, grouped under small headings (Needs work, Works, To check, Ideas). Click one and it **expands in place** across the full row (summary, link, last thing done, what it needs to work at all, next features); click again to close, one open at a time. **No pop-ups or modals**: Sam rejected the first version's dialog. Built 2026-11-07 because Sam starts projects, gets distracted and forgets them. Noindex, not linked from any index.
 
 ## Pieces
 
@@ -9,6 +9,7 @@ Sam's private wall of projects: plain black and white panels with just the name 
 - `projects.md`: **the private list, never committed** (in `.git/info/exclude` and blocked by the pre-commit and pre-push hooks). Format is explained at its top.
 - `publish.py`: parses `projects.md`, adds each project's last git commit date (`folder` in this repo, or `note` in ~/notes, ignoring pure renames) and PUTs it to the Worker. `--dry-run` prints the JSON.
 - `test/verify.test.mjs`: tests for the token check. Run `node tracker/test/verify.test.mjs` after touching the Worker.
+- Checking `index.html` without signing in: headless Chrome never gets past Firebase's "Loading.". Copy the page to the scratchpad, add an import map pointing the two gstatic Firebase URLs at stub modules (fake signed-in user with `getIdToken`), serve a sample JSON at `tracker/api/projects`, and screenshot with `google-chrome --headless=new --screenshot`.
 - Admin key: Worker secret `ADMIN_KEY`, value only in `~/.config/unisam-tracker-admin-key` (mode 600).
 
 ## Keeping it up to date
@@ -18,7 +19,7 @@ Sam's private wall of projects: plain black and white panels with just the name 
 3. **Occasionally** (when Sam asks, or when working on the tracker): look through `~/notes/Projects/` in the Obsidian vault for new or changed project notes and bring the list in line.
 4. Statuses: `needs-work` (not functional yet), `works` (has next steps), `check` (Sam to look at and decide), `idea` (not started).
 
-Sam's choices (2026-11-07): You're the Boss and the colouring book pipeline are off the list; Report comments is "check" (paid version undecided); Talkonomics stays as a project; the tracker itself is not on its own list.
+Sam's choices (2026-11-07): You're the Boss and the colouring book pipeline are off the list; Report comments is "check" (paid version undecided); Talkonomics stays as a project; the tracker itself is not on its own list. Has it popped? added the same day.
 
 ## E-paper board (later)
 

@@ -220,7 +220,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 
 - `econnews_scripts/` — Python scripts for the EconNews pipeline (RSS → Claude → GitHub Pages)
 - `businews_scripts/` — Python scripts for the BusiNews pipeline (see `businews/CLAUDE.md`)
-- `.github/workflows/` — workflow definitions
+- `.github/workflows/` — workflow definitions: `econnews.yml`, `businews.yml`, `quiz.yml`, `manifest.yml`, `hasitpopped.yml` (runs `hasitpopped/fetch.py` 22:30 UTC Mon-Fri, commits `data.json`)
 - **Claude can't push workflow files.** The stored git token has no `workflow` scope, so any push touching `.github/workflows/` is rejected. Leave new workflow files uncommitted and ask Sam to add them via the GitHub web UI (or give the token workflow scope). When Sam pastes one in, warn him that GitHub's editor can indent every line after the first by two spaces, which breaks the YAML (happened with `hasitpopped.yml` on 2026-11-07); after pasting, `name:`, `on:` and `jobs:` must all start at the left edge. Nothing pending.
 - `generate-feeds.py` / `generate-manifest.js` — feed generation utilities
 
