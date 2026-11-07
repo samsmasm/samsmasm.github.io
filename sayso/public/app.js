@@ -220,8 +220,8 @@ function setupTranscriptActions() {
     }
   });
 
-  // Send to Tote — pushes the full transcript as one note into the shared
-  // Firebase Realtime DB that unisam.nz/tote reads (see the module in index.html).
+  // Send to Tote — saves the full transcript as one encrypted Tote note
+  // via /tote/client.js (see the module in index.html).
   const toteBtn = document.getElementById("send-tote");
   const toteOpen = document.getElementById("tote-open");
   toteBtn.addEventListener("click", async () => {
@@ -243,6 +243,11 @@ function setupTranscriptActions() {
       toteOpen.hidden = false;
       window.saysoToast("Sent to Tote.");
     } catch (err) {
+      if (err.code === "tote-locked") {
+        toteOpen.hidden = false;
+        window.saysoToast("Unlock Tote first (open it, sign in, enter your passphrase).");
+        return;
+      }
       window.saysoToast("Could not send to Tote: " + (err.message || err));
     } finally {
       setTimeout(() => {

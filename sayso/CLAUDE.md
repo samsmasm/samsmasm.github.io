@@ -23,8 +23,9 @@
   drag/fly-away/grow-back animation; running **cost estimate** (audio time × rate,
   per model, persisted in localStorage, resettable); **session restore on reload**
   (last session reopened from KV for the retention period); **Send to Tote**
-  button (pushes `fullText` as one note into the same Firebase Realtime DB that
-  `unisam.nz/tote` reads, matching the integration in `typeit/`).
+  button (saves `fullText` as one end-to-end encrypted Tote note through
+  `/tote/client.js`, same as `typeit/`; needs Tote signed in and unlocked in that
+  browser. Until 2026-11-07 it wrote plain text to an open Firebase DB).
 - **Known operational note:** the Worker runs at the Cloudflare edge nearest the
   user, so from an OpenAI-geo-blocked region transcription fails — the owner uses
   a **NZ VPN** to relocate the edge. No simple Worker egress-region pin exists.
