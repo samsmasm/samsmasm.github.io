@@ -235,6 +235,7 @@ function questionHtml(c, q, label, examMode, plan) {
   return `<div class="q" data-c="${c.id}" data-q="${q.id}">
     <div class="q-head"><div class="q-text"><span class="q-num">${esc(label)}</span>${esc(q.text)}</div><div class="q-marks">[${q.marks}]</div></div>
     <textarea placeholder="Your answer" ${locked ? 'readonly' : ''}>${esc(val)}</textarea>
+    <div class="ans-print">${esc(val)}</div>
     <div class="q-actions">
       <button class="btn btn-ghost ms-btn" ${examMode ? 'disabled title="Finish the set to see markschemes"' : ''}>Markscheme</button>
       ${plan.finished ? '' : '<button class="btn btn-ghost rr-btn" title="Swap for a similar question">Swap question</button>'}
@@ -249,8 +250,12 @@ function wirePractice(plan, cases, examMode) {
   view.querySelectorAll('.q').forEach((el) => {
     const { c, q } = el.dataset;
     const ta = el.querySelector('textarea');
+    const pr = el.querySelector('.ans-print');
     let t;
-    ta.oninput = () => { clearTimeout(t); t = setTimeout(() => store.set(ansKey(c, q), ta.value), 300); };
+    ta.oninput = () => {
+      pr.textContent = ta.value; // printed copy of the answer (textareas don't print well)
+      clearTimeout(t); t = setTimeout(() => store.set(ansKey(c, q), ta.value), 300);
+    };
     el.querySelector('.ms-btn').onclick = () => { const ms = el.querySelector('.ms'); ms.hidden = !ms.hidden; };
     const rr = el.querySelector('.rr-btn');
     if (rr) rr.onclick = () => swapQuestion(plan, c, q);
@@ -365,9 +370,9 @@ function renderStudentHelp() {
       <li><b>Exam mode</b> hides markschemes until you press <b>Finish</b>. Add <b>Start timer</b> for real exam pressure.</li>
       <li><b>Swap question</b> gives a similar question instead.</li></ul>`)}
     ${helpCard('4. Hand in or keep', `<ul>
-      <li><b>Print paper</b> prints a clean paper (no answers) to write on by hand.</li>
+      <li><b>Print paper</b> prints the questions with your typed answers. Choose “Save as PDF” to hand in a file.</li>
+      <li>Nothing typed yet? It prints a clean paper to write on by hand.</li>
       <li><b>Print markscheme</b> prints the markschemes on their own.</li>
-      <li>Typed answers do not print. To hand them in, copy them into a document.</li>
       <li><b>History</b> reopens your recent sets. A different device or browser will not have them.</li></ul>`)}
     ${helpCard('Something wrong?', `<p>Press <b>Report a problem</b> under any question. Your teacher sees it.</p>`)}`;
 }
@@ -383,7 +388,7 @@ function renderTeacherHelp() {
       <li>A sign-in lasts 60 days. Each student can open up to 120 cases a day.</li></ul>`)}
     ${helpCard('What you can and cannot see', `<ul>
       <li>Student answers stay <b>on their own device</b>. You cannot see their work in the app.</li>
-      <li>To collect work: <b>Print paper</b> gives a clean paper to answer by hand. Typed answers do not print, so students copy them into a document to hand in.</li>
+      <li>To collect work, students use <b>Print paper</b> and “Save as PDF”. It includes their typed answers. With nothing typed it gives a clean paper to answer by hand.</li>
       <li>When a student presses <b>Report a problem</b>, the report goes to Sam with the question it is about.</li></ul>`)}
     ${helpCard('Using it in class', `<ul>
       <li><b>Tell students which units to tick</b> on the Practise page, so they only get topics you have taught.</li>
