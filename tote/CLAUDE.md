@@ -21,9 +21,13 @@
 - The server can still see note count, sizes and save times, not content.
 - KV `list` is eventually consistent (up to ~60s), so a just-saved/deleted note can lag on another device's refresh.
 
-## Old Firebase Tote (being retired)
+## Old Firebase Tote (retired 2026-11-07)
 
-Until 2026-11-07 Tote stored plain text in Firebase Realtime DB `notes-ff975`, **world-readable** with open rules. `importOldNotes()` in `index.html` (marked TEMPORARY) offers to move any old notes in, encrypted, and deletes them from Firebase. Old notes were moved 2026-11-07 (`notes` is empty). Sayso deployed with the new client 2026-11-07. Still open: Sam to lock this DB. **The same DB holds MOA's visit counter under `moa/`**, so don't lock the whole DB: rules must be `{"rules": {".read": false, ".write": false, "moa": {".read": true, ".write": true}}}`. Then remove the import block. /sayso also uses `client.js` for Send to Tote.
+Until 2026-11-07 Tote stored plain text in Firebase Realtime DB `notes-ff975`, world-readable. The old notes were moved in (encrypted) and deleted there, the one-off importer was removed, and the DB is locked: rules `{"rules": {".read": false, ".write": false, "moa": {".read": true, ".write": true}}}`, because **MOA's visit counter lives under `moa/`** in the same DB. Verified: root and `notes` read/write give 401, `moa` still readable. /typeit and /sayso both save through `client.js` (Sayso is its own Worker; redeploy it after changing its Tote code).
+
+## Current status
+
+Finished. No planned features.
 
 ## UI behaviour
 

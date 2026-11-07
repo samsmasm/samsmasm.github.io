@@ -568,7 +568,6 @@
     document.body.classList.remove("locked", "signed-out");
     showPanel(loading);
     await loadNotes();
-    await importOldNotes();
   }
 
   onUser(async user => {
@@ -921,34 +920,6 @@
       msg.textContent = "Error loading notes: " + err.message;
       loading.appendChild(msg);
     }
-  }
-
-  // ── One-off move from the old, unencrypted Firebase Tote (TEMPORARY) ──
-  // The old database was world-readable. Once its notes are moved and its rules are locked,
-  // this fetch fails quietly; remove this block then.
-  const OLD_DB = "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app/notes";
-  async function importOldNotes() {
-    let data;
-    try {
-      const r = await fetch(OLD_DB + ".json");
-      if (!r.ok) return;
-      data = await r.json();
-    } catch { return; }
-    const old = Object.entries(data || {}).filter(([, v]) => v && typeof v.content === "string" && v.content.trim());
-    if (!old.length || !key) return;
-    if (!confirm(`Move ${old.length} note${old.length === 1 ? "" : "s"} from the old unencrypted Tote into this one? They'll be encrypted here, get a fresh 96 hours, and be deleted from the old database.`)) return;
-    let moved = 0;
-    for (const [oldId, v] of old) {
-      try {
-        await putNote(key, newId(), v.content);
-        await fetch(`${OLD_DB}/${oldId}.json`, { method: "DELETE" });
-        moved++;
-      } catch (err) {
-        alert(`Moved ${moved} of ${old.length}, then failed: ${err.message}`);
-        break;
-      }
-    }
-    await loadNotes();
   }
 
   // ── Mobile sidebar ──
