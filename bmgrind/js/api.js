@@ -1,12 +1,12 @@
-// ibgrind API client and local storage helpers. Shared by every page.
+// bmgrind API client and local storage helpers. Shared by every page.
 // The API lives at ./api/ on the same origin (a Cloudflare Worker route), so the site can move
 // to another domain without code changes.
 
 // On a local dev server, use the live API (the Worker allows localhost origins).
 const API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
-  ? 'https://www.unisam.nz/ibgrind/api/'
+  ? 'https://www.unisam.nz/bmgrind/api/'
   : new URL('api/', document.baseURI).href;
-const SESSION_KEY = 'ibgrind.session';
+const SESSION_KEY = 'bmgrind.session';
 
 export function getSession() {
   try {
@@ -48,10 +48,10 @@ export const api = {
 // small persistent store for per-device data (answers, preferences, history)
 export const store = {
   get(key, fallback) {
-    try { const v = localStorage.getItem('ibgrind.' + key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
+    try { const v = localStorage.getItem('bmgrind.' + key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
   },
   set(key, value) {
-    try { localStorage.setItem('ibgrind.' + key, JSON.stringify(value)); } catch { /* quota or private mode */ }
+    try { localStorage.setItem('bmgrind.' + key, JSON.stringify(value)); } catch { /* quota or private mode */ }
   },
 };
 

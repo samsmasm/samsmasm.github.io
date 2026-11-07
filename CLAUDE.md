@@ -50,9 +50,10 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   dilemma/                ← The Long Game: repeated prisoner's dilemma tournament (Grade 9+). Strategies are JSON read by a
                              fixed interpreter (builder or copy-paste AI prompt), round robin, replay, CSV. Firestore dilemmaRooms in
                              coldwar-d8109; rules at the end of checkin/firestore.rules. Read its CLAUDE.md; run test/run.sh + stamp.py.
-  ibgrind/                ← ibgrind: IB BM exam practice (class code + name). Public: index.html, app.html, css/, js/ only.
+  bmgrind/                ← bmgrind (was ibgrind): IB BM exam practice (class code + name). Public: index.html, app.html, css/, js/ only.
                              The case bank, tools, specs and Worker are PRIVATE (excluded + blocked by hooks); bank is served
-                             by the Cloudflare Worker ibgrind-api at /ibgrind/api/*. Read ibgrind/CLAUDE.md first (local only).
+                             by the Cloudflare Worker ibgrind-api at /bmgrind/api/*. Read bmgrind/CLAUDE.md first (local only).
+  ibgrind/                ← redirect stubs only, to /bmgrind/
   covers/                 ← Covers (was Door Cover): find and print book covers, page sizes, multi-cover sheet with
                              auto arrange and drag to rearrange. Single HTML, linked from /tools (see CLAUDE.md inside)
   ai/                     ← "How I Use AI": landing, full statement, Click-on-me bobblehead (see CLAUDE.md inside;

@@ -1,4 +1,4 @@
-// ibgrind app controller: home (presets), adjust, practice, history, about. Hash routes.
+// bmgrind app controller: home (presets), adjust, practice, history, about. Hash routes.
 import { api, getSession, clearSession, store, initTheme, toggleTheme } from './api.js';
 import { PRESETS, makeBuilder } from './builder.js';
 import { esc, p1Stimulus, p3Stimulus, chunkHtml, disclaimer, markscheme } from './render.js';
@@ -69,6 +69,8 @@ async function route() {
   document.body.classList.remove('print-ms');
   const [name, arg] = (location.hash.slice(1) || 'home').split('/');
   setNav(name === 'adjust' ? 'home' : name);
+  if (name === 'student-help') return renderStudentHelp();
+  if (name === 'teacher-help') return renderTeacherHelp();
   try {
     await loadCatalog();
   } catch { return; }
@@ -337,12 +339,59 @@ function renderHistory() {
 }
 
 function renderAbout() {
-  view.innerHTML = `<div class="page-head"><h1>About ibgrind</h1></div>
+  view.innerHTML = `<div class="page-head"><h1>About bmgrind</h1></div>
     <div class="card">
-      <p>ibgrind gives you original practice cases in the style of the IB Business Management exams: Paper 1 case studies, Paper 2 data questions and extended responses, and Paper 3 social enterprise cases for HL.</p>
+      <p>bmgrind gives you original practice cases in the style of the IB Business Management exams: Paper 1 case studies, Paper 2 data questions and extended responses, and Paper 3 social enterprise cases for HL.</p>
       <p style="margin-top:10px">Every case and question is newly written for practice. They are not IB past papers and are not endorsed by the IB. Markschemes show how answers are likely to be marked, but they are a guide, not an official judgement.</p>
       <p style="margin-top:10px">Your answers are saved in this browser only. Use “Report a problem” if a question or markscheme looks wrong.</p>
     </div>`;
+}
+
+// ---------- help ----------
+const helpCard = (title, body) => `<div class="section-title">${title}</div><div class="card help">${body}</div>`;
+
+function renderStudentHelp() {
+  view.innerHTML = `<div class="page-head"><h1>Student help</h1><p>How to get a practice set, answer it and check it.</p></div>
+    ${helpCard('1. Set up', `<ul>
+      <li>On <b>Practise</b>, pick <b>SL or HL</b>.</li>
+      <li>Tick only the <b>units you have covered</b>. Questions come from those units only.</li></ul>`)}
+    ${helpCard('2. Pick a practice type', `<ul>
+      <li><b>Quick 10 minutes</b> or <b>One 10-marker</b>: short, good for a starter or homework.</li>
+      <li><b>Topic drill</b>, <b>Calculation drill</b>, <b>Definitions</b>, <b>Explain with context</b>: choose topics and length first.</li>
+      <li><b>Full Paper 1, 2 or 3</b>: a whole paper at real exam length.</li></ul>`)}
+    ${helpCard('3. Answer', `<ul>
+      <li>Type in the boxes. Answers <b>save automatically</b>, on this device only.</li>
+      <li><b>Markscheme</b> shows how a question is marked.</li>
+      <li><b>Exam mode</b> hides markschemes until you press <b>Finish</b>. Add <b>Start timer</b> for real exam pressure.</li>
+      <li><b>Swap question</b> gives a similar question instead.</li></ul>`)}
+    ${helpCard('4. Hand in or keep', `<ul>
+      <li><b>Print paper</b> prints a clean paper (no answers) to write on by hand.</li>
+      <li><b>Print markscheme</b> prints the markschemes on their own.</li>
+      <li>Typed answers do not print. To hand them in, copy them into a document.</li>
+      <li><b>History</b> reopens your recent sets. A different device or browser will not have them.</li></ul>`)}
+    ${helpCard('Something wrong?', `<p>Press <b>Report a problem</b> under any question. Your teacher sees it.</p>`)}`;
+}
+
+function renderTeacherHelp() {
+  view.innerHTML = `<div class="page-head"><h1>Teacher help</h1><p>Class codes, what students see, and ways to use it in class.</p></div>
+    ${helpCard('Class codes', `<ul>
+      <li>Students sign in at <b>unisam.nz/bmgrind</b> with a <b>class code</b> and their <b>name</b>. No accounts or passwords.</li>
+      <li>Make <b>one code per class</b>, e.g. one for each block. Codes are made by Sam; there is no admin page yet.</li>
+      <li><b>Sam:</b> open Claude Code and ask “make a bmgrind class code for 12BM Block C”. Ask it the same way to list codes, turn one off or show reports.</li>
+      <li>Turning a code off <b>signs out everyone</b> using it. Use this if a code leaks, then make a new one.</li>
+      <li>Ask students to use <b>first name and last initial</b>, the same way every time.</li>
+      <li>A sign-in lasts 60 days. Each student can open up to 120 cases a day.</li></ul>`)}
+    ${helpCard('What you can and cannot see', `<ul>
+      <li>Student answers stay <b>on their own device</b>. You cannot see their work in the app.</li>
+      <li>To collect work: <b>Print paper</b> gives a clean paper to answer by hand. Typed answers do not print, so students copy them into a document to hand in.</li>
+      <li>When a student presses <b>Report a problem</b>, the report goes to Sam with the question it is about.</li></ul>`)}
+    ${helpCard('Using it in class', `<ul>
+      <li><b>Tell students which units to tick</b> on the Practise page, so they only get topics you have taught.</li>
+      <li><b>Starter or homework:</b> Quick 10 minutes, or One 10-marker.</li>
+      <li><b>Straight after a topic:</b> Topic drill with that topic ticked and “Exact topic match”.</li>
+      <li><b>Timed practice:</b> a full paper with Exam mode and the timer on. When time runs out the answers lock.</li>
+      <li><b>On paper:</b> build a set, then Print paper and Print markscheme separately.</li></ul>`)}
+    ${helpCard('About the questions', `<p>All cases are newly written in IB style, not past papers. Markschemes are a guide. Please report anything that looks wrong.</p>`)}`;
 }
 
 void route();
