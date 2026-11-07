@@ -85,6 +85,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `cluitar/`: classical guitar practice path
 - `wc26/`: World Cup 2026 office sweepstake leaderboard, scored from ESPN's API
 - `tree/`: family tree viewer (sheet, chart, places, map, records). Data is exported from ~/tools/family-tree; read ~/tools/family-tree/CLAUDE.md first. Living and private people must never appear in public data.
+- `notes/`: idea network viewer (map, articles, timeline, sources, search). Ships with sample data only; real notes load in the browser from the private `samsmasm/notes` repo and must never be committed here. Built from source in that repo, so read notes/CLAUDE.md first. Noindex, not linked from any index.
 
 **Public tools**
 - `mapping/`: Mapping tools suite (hub page plus one folder per tool, see mapping/CLAUDE.md).
