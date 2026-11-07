@@ -23,7 +23,7 @@
 
 ## Old Firebase Tote (being retired)
 
-Until 2026-11-07 Tote stored plain text in Firebase Realtime DB `notes-ff975`, **world-readable** with open rules. `importOldNotes()` in `index.html` (marked TEMPORARY) offers to move any old notes in, encrypted, and deletes them from Firebase. Old notes were moved 2026-11-07 (`notes` is empty). Still open as of then: Sam to deploy the Sayso Worker and lock this DB. **The same DB holds MOA's visit counter under `moa/`**, so don't lock the whole DB: rules must be `{"rules": {".read": false, ".write": false, "moa": {".read": true, ".write": true}}}`. Then remove the import block. /sayso also uses `client.js` for Send to Tote.
+Until 2026-11-07 Tote stored plain text in Firebase Realtime DB `notes-ff975`, **world-readable** with open rules. `importOldNotes()` in `index.html` (marked TEMPORARY) offers to move any old notes in, encrypted, and deletes them from Firebase. Old notes were moved 2026-11-07 (`notes` is empty). Sayso deployed with the new client 2026-11-07. Still open: Sam to lock this DB. **The same DB holds MOA's visit counter under `moa/`**, so don't lock the whole DB: rules must be `{"rules": {".read": false, ".write": false, "moa": {".read": true, ".write": true}}}`. Then remove the import block. /sayso also uses `client.js` for Send to Tote.
 
 ## UI behaviour
 
