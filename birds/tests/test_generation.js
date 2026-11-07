@@ -7,7 +7,7 @@ const logic = html.split('/*LOGIC_START*/')[1].split('/*LOGIC_END*/')[0];
 eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice,shuffle,seededRandom,dayKey,dailyCodes};');
 const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8'));
 let failed = false;
-for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]], ['sound_categories.json', 4, 4, [1,2,3,4]]]) {
+for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]], ['sound_categories.json', 3, 3, [1,2,3,4]]]) {
   const bank = load(f); api.prepare(bank);
   const on = new Set(bank.meta.topics.map(t => t.code));
   let ok = 0;
@@ -25,21 +25,25 @@ for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['eco
 {
   const bank = load('sound_categories.json'); api.prepare(bank);
   const on = new Set(bank.meta.topics.map(t => t.code));
-  let over = 0, total = 0, pics = 0; const varied = new Map();
+  let over = 0, total = 0, pics = 0, badSize = 0; const varied = new Map(), tierSets = new Set();
+  const tierOf = new Map(bank.categories.map(c => [c.name, c.tier]));
   for (let i = 0; i < 5000; i++) {
-    const p = api.buildPuzzle(bank, on, { n: 4, per: 4, tiers: [1, 2, 3, 4] });
+    const p = api.buildPuzzle(bank, on, bank.meta.grid);
+    if (p.groups.length !== 3 || p.groups.some(g => g.words.length !== 3)) badSize++;
+    tierSets.add(p.groups.map(g => tierOf.get(g.name)).join());
     const counts = p.groups.map(g => g.words.filter(w => w.e).length);
     // the worst case for any stage is the groups with the most pictures being the ones left
     const worst = [...counts].sort((a, b) => b - a);
-    worst.forEach((_, k) => { if (worst.slice(0, k + 1).reduce((a, b) => a + b) > (k + 1) * 2) over++; });
-    total += 16; pics += counts.reduce((a, b) => a + b);
+    worst.forEach((_, k) => { if (worst.slice(0, k + 1).reduce((a, b) => a + b) * 2 > (k + 1) * 3) over++; });
+    total += 9; pics += counts.reduce((a, b) => a + b);
     p.groups.forEach(g => g.words.forEach(w => {
       const s = varied.get(w.w) || new Set(); s.add(!!w.e); varied.set(w.w, s);
     }));
   }
   const both = [...varied.values()].filter(s => s.size === 2).length;
   console.log('pictures: over half at any stage', over, 'times, average', (pics / total * 100).toFixed(0) + '% of cards,', both, 'words seen with and without one');
-  if (over || !pics || !both) failed = true;
+  console.log('3 by 3 grid: wrong size', badSize, 'times,', tierSets.size, 'tier combinations (want 4)');
+  if (over || !pics || !both || badSize || tierSets.size !== 4) failed = true;
   // The limit is only for banks that ask for it: Kids keeps a picture on every card that has one
   const kids = load('kids_categories.json'); api.prepare(kids);
   const emojiOf = new Map(kids.categories.flatMap(c => c.words.map((w, i) => [c.id + w, c.emoji[i]])));
@@ -70,7 +74,7 @@ for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.
   const bank = load(f); api.prepare(bank);
   const make = key => {
     const rand = api.seededRandom(key);
-    const p = api.buildPuzzle(bank, api.dailyCodes(bank), { n: 4, per: 4, tiers: [1, 2, 3, 4] }, rand);
+    const p = api.buildPuzzle(bank, api.dailyCodes(bank), bank.meta.grid || { n: 4, per: 4, tiers: [1, 2, 3, 4] }, rand);
     return p && { p, order: api.shuffle([...Array(16).keys()], rand) };
   };
   let bad = 0, hl = 0; const seen = new Set();

@@ -2,9 +2,9 @@
 
 A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. There is one daily puzzle per set, then random extras. Single HTML page, no server, no accounts, and the only thing saved is a note in the browser that today's puzzle is done. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
 
-Sets: Business Management and Economics (IB, with an SL/HL toggle), and two kids modes: Picture words (set key `kids`, ages 5 to 7, emoji on every card) and Sound it out (set key `sound`, for Sam's 5 year old learning to read). All four play the same 4 by 4 game. The menu has an IB section and a Kids section, and Sam plans more kids modes: add a card to the Kids section, a bank, and the set key to `TITLES`, `LINKS`, `KIDS_SETS` and `BANKS`.
+Sets: Business Management and Economics (IB, with an SL/HL toggle), and two kids modes: Picture words (set key `kids`, ages 5 to 7, emoji on every card) and Sound it out (set key `sound`, for Sam's 5 year old learning to read). All play the same game, on a 4 by 4 board except Sound it out, which is 3 by 3. The menu has an IB section and a Kids section, and Sam plans more kids modes: add a card to the Kids section, a bank, and the set key to `TITLES`, `LINKS`, `KIDS_SETS` and `BANKS`.
 
-Sound it out: every word can be sounded out, mostly 3 letters, and no more than half the cards left on the board ever have a picture. `meta.picturesPerGroup` (2) does this in `limitPictures`: a limit per group holds at every stage of the game, and which words get a picture changes each puzzle. Many words have no good emoji, so a puzzle averages about 5 pictures, not 8. There is no Voice toggle here, because reading the word aloud would defeat the point. Tier 4 is always a word family (`-at`, `-ock`). Sam is happy with 4-letter families like `-ill` and `-ock`.
+Sound it out: a 3 by 3 board, because Sam found 16 words too many to sound out. `meta.grid` in the bank sets the size (`grid()` in the page, Sam's idea: same word list, just fewer drawn). Each puzzle uses three of the four tiers at random, three words from each, so about a quarter of puzzles have no word family. Every word can be sounded out, mostly 3 letters, and no more than half the cards left on the board ever have a picture. `meta.picturesPerGroup` (1) does this in `limitPictures`: a limit per group holds at every stage of the game (2 of 3 would break it on the last group), and which words get a picture changes each puzzle. There is no Voice toggle here, because reading the word aloud would defeat the point. Tier 4 is always a word family (`-at`, `-ock`). Sam is happy with 4-letter families like `-ill` and `-ock`.
 
 Live at unisam.nz/birds, with direct links `#business`, `#economics`, `#kids` and `#sound`. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. The private Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3) is out of date, with the old gameplay: do not treat it as live.
 
@@ -62,7 +62,7 @@ Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then 
 1. Filter categories to those whose topics are all ticked and that have enough words.
 2. Pick one category per tier (amber to navy), preferring the exact tier and borrowing the nearest tier if empty.
 3. Reject a pick if it clashes with a chosen category or shares any word (case-insensitive, full word lists) with one.
-4. Draw 4 random words from each, shuffle all cards. Every set is 4 by 4, including Kids.
+4. Draw 4 random words from each, shuffle all cards. Every set is 4 by 4 except Sound it out (3 by 3, from `meta.grid`).
 5. If 400 attempts fail, show "not enough categories" and ask for more ticks. Single topics often cannot make a full puzzle; a whole unit always can.
 
 The logic block is pure functions so the Node test can load it. Keep it free of DOM calls.
