@@ -31,15 +31,32 @@
   .more ul { padding-left: 20px; }
   .more a { color: #000; }
   #msg { color: #555; }
+  header nav { display: flex; gap: 16px; }
+  #addform { border: 1px solid #000; padding: 12px; max-width: 640px; margin-bottom: 8px; }
+  #addform label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 10px 0 4px; }
+  #addform label:first-child { margin-top: 0; }
+  #addform input, #addform select, #addform textarea { font: inherit; width: 100%; border: 1px solid #000; padding: 6px; background: #fff; color: #000; border-radius: 0; }
+  #addform .row { display: flex; gap: 12px; margin-top: 14px; align-items: baseline; }
+  #adderr { color: #000; font-weight: 600; }
+  .more .del { margin-top: 18px; font-size: 13px; padding: 4px 10px; }
 </style>
 </head>
 <body>
 <header>
   <h1>Projects</h1>
-  <button id="out" class="quiet" hidden>Sign out</button>
+  <nav><button id="add" class="quiet" hidden>Add project</button><button id="out" class="quiet" hidden>Sign out</button></nav>
 </header>
 <p id="msg">Loading.</p>
 <button id="in" hidden>Sign in with Google</button>
+<form id="addform" hidden>
+  <label for="f-name">Name</label><input id="f-name" required maxlength="80">
+  <label for="f-status">Status</label>
+  <select id="f-status"><option value="idea">Idea</option><option value="needs-work">Needs work</option><option value="works">Works</option><option value="check">To check</option></select>
+  <label for="f-url">Link (optional)</label><input id="f-url" maxlength="300" placeholder="/folder or https://...">
+  <label for="f-summary">Summary (optional)</label><input id="f-summary" maxlength="600">
+  <label for="f-features">Next features (optional, one per line)</label><textarea id="f-features" rows="3"></textarea>
+  <div class="row"><button type="submit">Add</button><button type="button" id="f-cancel" class="quiet">Cancel</button><span id="adderr"></span></div>
+</form>
 <main id="wall"></main>
 
 <script type="module">
@@ -73,6 +90,8 @@ onAuthStateChanged(auth, async user => {
   $('wall').innerHTML = '';
   $('in').hidden = !!user;
   $('out').hidden = !user;
+  $('add').hidden = !user;
+  $('addform').hidden = true;
   if (!user) { $('msg').textContent = 'Private. Sign in to see your projects.'; return; }
   $('msg').textContent = 'Loading.';
   try {
@@ -100,8 +119,42 @@ function paint() {
   }).join('');
 }
 
+// Add and delete go straight to the Worker; publish.py later writes them into projects.md.
+async function send(method, body) {
+  const res = await fetch(API, { method, headers: {
+    Authorization: 'Bearer ' + await auth.currentUser.getIdToken(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body) });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error || res.status);
+  projects = out.projects;
+  $('msg').textContent = projects.length ? '' : 'No projects published yet.';
+}
+
+$('add').onclick = () => { $('addform').hidden = !$('addform').hidden; if (!$('addform').hidden) $('f-name').focus(); };
+$('f-cancel').onclick = () => { $('addform').reset(); $('addform').hidden = true; $('adderr').textContent = ''; };
+$('addform').onsubmit = async e => {
+  e.preventDefault();
+  $('adderr').textContent = 'Adding.';
+  try {
+    await send('POST', { project: { name: $('f-name').value, status: $('f-status').value, url: $('f-url').value,
+      summary: $('f-summary').value, features: $('f-features').value } });
+    $('f-cancel').onclick();
+    openIdx = null;
+    paint();
+  } catch (err) { $('adderr').textContent = 'Not added: ' + err.message + '.'; }
+};
+
 // Click a name to open it across the row; click again (or another) to close.
-$('wall').onclick = e => {
+$('wall').onclick = async e => {
+  const del = e.target.closest('.del');
+  if (del) {
+    // Two clicks, no dialog: the first one asks, the second deletes.
+    if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Click again to delete'; return; }
+    del.textContent = 'Deleting.';
+    try { await send('DELETE', { name: projects[openIdx].name }); openIdx = null; paint(); }
+    catch (err) { del.textContent = 'Not deleted: ' + err.message; }
+    return;
+  }
   const b = e.target.closest('.p > button');
   if (!b) return;
   const i = Number(b.dataset.i);
@@ -118,7 +171,8 @@ function details(p) {
     <p>${esc(p.summary)}</p>
     <h4>Last thing done</h4><p>${esc(p.last || 'Not recorded.')}</p>
     <h4>Needed to work at all</h4><p>${esc(p.functional || 'Not recorded.')}</p>
-    <h4>Next features</h4>${feats}</div>`;
+    <h4>Next features</h4>${feats}
+    <button class="del" type="button">Delete</button></div>`;
 }
 </script>
 </body>

@@ -1,7 +1,11 @@
 // unisam-tracker Worker.
 //
 //   GET /tracker/api/projects   Firebase ID token of ALLOWED_EMAIL: the project list
-//   PUT /tracker/api/projects   ADMIN_KEY: replace the list (from tracker/publish.py)
+//   POST /tracker/api/projects  ID token: add one project {project}
+//   DELETE /tracker/api/projects ID token: delete one project {name}
+//   GET /tracker/api/changes    ADMIN_KEY: web adds/deletes not yet in projects.md
+//   PUT /tracker/api/projects   ADMIN_KEY: replace the list (from tracker/publish.py);
+//                               `applied` lists change ids now in projects.md
 //   GET /tracker/api/board?key= DEVICE_KEY: plain names-only page for the e-paper board
 //
 // Sign-in is Google via Firebase Auth (project FIREBASE_PROJECT). The ID token is
@@ -32,8 +36,45 @@ export default {
         let body;
         try { body = JSON.parse(text); } catch (e) { return json({ error: 'bad json' }, 400, cors); }
         if (!Array.isArray(body.projects)) return json({ error: 'need projects array' }, 400, cors);
+        // publish.py has written these web changes into projects.md: drop them from the log.
+        const applied = new Set(Array.isArray(body.applied) ? body.applied : []);
+        delete body.applied;
         await env.TRACKER_KV.put('projects', JSON.stringify(body));
+        if (applied.size) {
+          const log = await readJson(env, 'changes', []);
+          await env.TRACKER_KV.put('changes', JSON.stringify(log.filter(c => !applied.has(c.id))));
+        }
         return json({ ok: true, count: body.projects.length }, 200, cors);
+      }
+      if (path === '/changes' && request.method === 'GET') {
+        if (!sameSecret(bearer(request), env.ADMIN_KEY)) return json({ error: 'unauthorised' }, 401, cors);
+        return json({ changes: await readJson(env, 'changes', []) }, 200, cors);
+      }
+      // Adding and deleting from the page. The list is changed straight away and the
+      // change is logged, so the next publish.py run writes it into projects.md.
+      if (path === '/projects' && (request.method === 'POST' || request.method === 'DELETE')) {
+        const who = await verifyIdToken(bearer(request), env);
+        if (!who) return json({ error: 'unauthorised' }, 401, cors);
+        const text = await request.text();
+        if (text.length > 20_000) return json({ error: 'too large' }, 413, cors);
+        let body;
+        try { body = JSON.parse(text); } catch (e) { return json({ error: 'bad json' }, 400, cors); }
+        const data = await readJson(env, 'projects', { projects: [] });
+        const log = await readJson(env, 'changes', []);
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        let result;
+        if (request.method === 'POST') {
+          result = addProject(data, body.project);
+          if (result.error) return json(result, 400, cors);
+          log.push({ id, op: 'add', project: result.project });
+        } else {
+          result = deleteProject(data, body.name);
+          if (result.error) return json(result, 404, cors);
+          log.push({ id, op: 'delete', name: result.name });
+        }
+        await env.TRACKER_KV.put('projects', JSON.stringify(data));
+        await env.TRACKER_KV.put('changes', JSON.stringify(log));
+        return json({ ok: true, projects: data.projects }, 200, cors);
       }
       if (path === '/board' && request.method === 'GET') {
         if (!sameSecret(url.searchParams.get('key') || '', env.DEVICE_KEY)) return new Response('unauthorised', { status: 401 });
@@ -48,9 +89,47 @@ export default {
   },
 };
 
+async function readJson(env, key, fallback) {
+  const raw = await env.TRACKER_KV.get(key);
+  return raw ? JSON.parse(raw) : fallback;
+}
+
+// ---- Adding and deleting (pure, tested in test/edit.test.mjs) ----
+
+export const STATUSES = ['needs-work', 'works', 'check', 'idea'];
+// Every value ends up as one `- key: value` line in projects.md, so no newlines.
+const line = (s, max) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+export function addProject(data, raw) {
+  if (!raw || typeof raw !== 'object') return { error: 'need project' };
+  const name = line(raw.name, 80).replace(/^#+\s*/, '');
+  if (!name) return { error: 'need a name' };
+  if (!STATUSES.includes(raw.status)) return { error: 'bad status' };
+  if (data.projects.some(p => p.name.toLowerCase() === name.toLowerCase())) return { error: 'name already used' };
+  const p = { name, status: raw.status };
+  for (const k of ['url', 'summary', 'last', 'functional']) {
+    const v = line(raw[k], k === 'url' ? 300 : 600);
+    if (v) p[k] = v;
+  }
+  const feats = (Array.isArray(raw.features) ? raw.features : String(raw.features || '').split(/[\n;]/))
+    .map(f => line(f, 200).replace(/;/g, ',')).filter(Boolean).slice(0, 30);
+  if (feats.length) p.features = feats;
+  p.added = new Date().toISOString().slice(0, 10);
+  p.touched = p.added;
+  data.projects.push(p);
+  return { project: p };
+}
+
+export function deleteProject(data, name) {
+  const i = data.projects.findIndex(p => p.name === name);
+  if (i < 0) return { error: 'no such project' };
+  data.projects.splice(i, 1);
+  return { name };
+}
+
 function corsHeaders(origin) {
   const h = {
-    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
