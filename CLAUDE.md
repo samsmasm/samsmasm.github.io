@@ -85,7 +85,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 **Personal tools** (`sayso`, `moderntranslation`, `tote` are meant for the future private page; keep them off the public index)
 - `sayso/`: marking transcription app (Cloudflare Worker, live)
 - `moderntranslation/`: password-gated classic-text modernizer (Cloudflare Worker)
-- `tote/`: tiny shared notes, Firebase Realtime DB, notes expire after 96h
+- `tote/`: private notes, Google sign-in + passphrase end-to-end encryption, Worker unisam-tote + KV, notes expire after 96h. /typeit saves into it via `tote/client.js`. Read its CLAUDE.md.
 - `mortgage/`: mortgage payoff calculator built from Sam's tracking spreadsheet
 - `fnl/`: Friday Night Live open mic scheduler
 - `cluitar/`: classical guitar practice path

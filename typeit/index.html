@@ -254,22 +254,11 @@
   <footer>typeit &middot; on <a href="/">unisam.nz</a></footer>
 </div>
 
-<!-- Tote integration: writes a note into the same Firebase Realtime DB that
-     samsmasm.github.io/tote reads from. Public config, same as the Tote app. -->
+<!-- Tote integration: encrypts the text with Tote's remembered key and saves it as a new note.
+     Works when Tote is signed in and unlocked in this browser (same origin, shared sign-in and key). -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getDatabase, ref, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-  const firebaseConfig = {
-    apiKey:            "AIzaSyCOSkL0C9_P8VeqpefXJbGCeOfXYwMMegE",
-    authDomain:        "notes-ff975.firebaseapp.com",
-    databaseURL:       "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId:         "notes-ff975",
-    storageBucket:     "notes-ff975.firebasestorage.app",
-    messagingSenderId: "977644569179",
-    appId:             "1:977644569179:web:5c23a086bb411bd1dfb57e",
-  };
-  const db = getDatabase(initializeApp(firebaseConfig));
-  window.saveToTote = (content) => push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
+  import { saveToTote } from "/tote/client.js";
+  window.saveToTote = saveToTote;
 </script>
 
 <script>
@@ -790,6 +779,12 @@ $('tote').addEventListener('click', async () => {
     setTimeout(() => { b.textContent = label; b.disabled = false; }, 2500);
   } catch (e){
     b.textContent = label; b.disabled = false;
+    if (e.code === 'tote-locked'){
+      b.textContent = 'Unlock Tote first';
+      $('tote-open').style.display = 'inline';
+      setTimeout(() => { b.textContent = label; }, 4000);
+      return;
+    }
     alert('Could not save to Tote: ' + (e.message || e));
   }
 });

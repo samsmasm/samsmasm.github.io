@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
   <title>Tote</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -99,6 +101,8 @@
 
     #refresh-btn.spinning { animation: spin 0.7s linear infinite; }
 
+    body.locked .header-actions { visibility: hidden; }
+
     #note-list {
       flex: 1;
       overflow-y: auto;
@@ -149,7 +153,27 @@
       font-size: 11px;
       color: #444;
       border-top: 1px solid #2a2a2a;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      align-items: center;
     }
+
+    #sidebar-footer span { flex: 1 1 100%; }
+
+    .footer-link {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 11px;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    .footer-link:hover { color: #fff; }
+    body.locked .footer-link.when-unlocked,
+    body.signed-out .footer-link { display: none; }
 
     /* ── Main area ── */
     #main {
@@ -252,6 +276,7 @@
 
     .btn-primary { background: var(--accent); color: #000; }
     .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.5; cursor: default; }
     .btn-ghost { background: #eee; color: #555; }
     .btn-ghost:hover { background: #e0e0e0; }
 
@@ -267,6 +292,53 @@
     }
 
     #empty-state p { font-size: 14px; }
+
+    /* ── Sign-in / passphrase gate ── */
+    #gate {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      gap: 14px;
+      text-align: center;
+    }
+
+    #gate-msg { font-size: 14px; color: #555; max-width: 340px; line-height: 1.5; }
+
+    #pass-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    #pass-form input[type=password] {
+      font: inherit;
+      font-size: 15px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    #pass-form input[type=password]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+    #pass-error { font-size: 13px; color: #c33; min-height: 1em; }
+
+    #forgot-btn {
+      background: none;
+      border: none;
+      color: #999;
+      font-size: 12px;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    #forgot-btn:hover { color: #c33; }
 
     /* ── Mobile overlay ── */
     #sidebar-overlay {
@@ -321,7 +393,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-<body>
+<body class="locked signed-out">
 
 <!-- Sidebar overlay for mobile -->
 <div id="sidebar-overlay"></div>
@@ -338,14 +410,18 @@
   <div id="note-list">
     <div id="empty-list">No notes yet.</div>
   </div>
-  <div id="sidebar-footer">Notes expire after 96 hours</div>
+  <div id="sidebar-footer">
+    <span>Encrypted. Notes expire after 96 hours.</span>
+    <button class="footer-link when-unlocked" id="lock-btn" title="Forget the passphrase on this device">Lock</button>
+    <button class="footer-link" id="signout-btn">Sign out</button>
+  </div>
 </nav>
 
 <!-- Main -->
 <div id="main">
   <div id="toolbar">
     <button id="hamburger" aria-label="Toggle menu">&#9776;</button>
-    <div id="note-title-display">Select a note</div>
+    <div id="note-title-display">Tote</div>
     <span id="expires-label"></span>
     <button class="btn btn-ghost" id="copy-btn" style="display:none" title="Copy note to clipboard">Copy</button>
     <button class="btn btn-ghost" id="renew-btn" style="display:none" title="Reset expiry to 96 hours">&#8635; Renew</button>
@@ -353,6 +429,19 @@
 
   <div id="note-area">
     <div id="loading"><div class="spinner"></div> Loading…</div>
+
+    <div id="gate" style="display:none">
+      <p id="gate-msg"></p>
+      <button class="btn btn-primary" id="signin-btn" style="display:none">Sign in with Google</button>
+      <form id="pass-form" style="display:none" autocomplete="on">
+        <input type="text" id="pass-user" name="username" autocomplete="username" hidden>
+        <input type="password" id="pass" placeholder="Passphrase" autocomplete="current-password" required>
+        <input type="password" id="pass2" placeholder="Type it again" autocomplete="new-password">
+        <div id="pass-error"></div>
+        <button class="btn btn-primary" type="submit" id="pass-btn">Unlock</button>
+        <button type="button" id="forgot-btn">Forgot it? Wipe all notes and start again</button>
+      </form>
+    </div>
 
     <div id="empty-state" style="display:none">
       <p>No note selected.</p>
@@ -371,35 +460,18 @@
   </div>
 </div>
 
-<!-- Firebase SDKs (CDN) -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getDatabase, ref, push, get, set, remove, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-
-  // ── Firebase config ──────────────────────────────────────────────────
-  const firebaseConfig = {
-    apiKey:            "AIzaSyCOSkL0C9_P8VeqpefXJbGCeOfXYwMMegE",
-    authDomain:        "notes-ff975.firebaseapp.com",
-    databaseURL:       "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId:         "notes-ff975",
-    storageBucket:     "notes-ff975.firebasestorage.app",
-    messagingSenderId: "977644569179",
-    appId:             "1:977644569179:web:5c23a086bb411bd1dfb57e",
-    measurementId:     "G-XN70GR5GNW"
-  };
-  // ────────────────────────────────────────────────────────────────────
-
-  const EXPIRY_MS = 96 * 60 * 60 * 1000; // 96 hours
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
+    EXPIRY_MS, onUser, signIn, signOut, forgetKey, getMeta, readyKey, unlock, setPassphrase, wipeAll,
+    listNotes, putNote, renewNote as apiRenew, deleteNote as apiDelete, newId, encrypt, decrypt
+  } from "./client.js";
 
   // ── State ──
-  let notes = [];         // [{id, content, createdAt}]
+  let notes = [];         // [{id, content, expires}]
   let activeId = null;
   let isEditing = false;
+  let key = null;         // AES-GCM CryptoKey once unlocked
+  let meta = null;        // {salt, check} from the server, null before a passphrase is set
 
   // ── DOM refs ──
   const noteList       = document.getElementById("note-list");
@@ -415,6 +487,15 @@
   const copyBtn        = document.getElementById("copy-btn");
   const sidebar        = document.getElementById("sidebar");
   const overlay        = document.getElementById("sidebar-overlay");
+  const gate           = document.getElementById("gate");
+  const gateMsg        = document.getElementById("gate-msg");
+  const signinBtn      = document.getElementById("signin-btn");
+  const passForm       = document.getElementById("pass-form");
+  const passInput      = document.getElementById("pass");
+  const pass2Input     = document.getElementById("pass2");
+  const passError      = document.getElementById("pass-error");
+  const passBtn        = document.getElementById("pass-btn");
+  const forgotBtn      = document.getElementById("forgot-btn");
 
   // ── Helpers ──
 
@@ -423,15 +504,14 @@
     return words.length < content.trim().length ? words + "…" : words;
   }
 
-  function expiryColor(createdAt) {
-    const ratio = Math.max(0, Math.min(1, (Date.now() - createdAt) / EXPIRY_MS));
+  function expiryColor(expires) {
+    const ratio = Math.max(0, Math.min(1, 1 - (expires - Date.now()) / EXPIRY_MS));
     const hue = Math.round(120 * (1 - ratio));
     return `hsl(${hue}, 70%, 42%)`;
   }
 
-  function formatExpiry(createdAt) {
-    const expiresAt = new Date(createdAt + EXPIRY_MS);
-    const diff = expiresAt - Date.now();
+  function formatExpiry(expires) {
+    const diff = expires - Date.now();
     if (diff <= 0) return "expired";
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
@@ -443,6 +523,7 @@
     emptyState.style.display = "none";
     noteView.style.display   = "none";
     noteEditor.style.display = "none";
+    gate.style.display       = "none";
     if (panel !== noteView) {
       renewBtn.style.display = "none";
       copyBtn.style.display  = "none";
@@ -451,13 +532,124 @@
     if (panel === noteView) noteView.style.display = "block";
   }
 
+  // ── Gate: sign in, then passphrase ──
+  // mode: "signin" | "forbidden" | "unlock" | "setup" | "error"
+  function showGate(mode, detail) {
+    key = null;
+    notes = [];
+    activeId = null;
+    isEditing = false;
+    document.body.classList.add("locked");
+    document.body.classList.toggle("signed-out", mode === "signin");
+    renderList();
+    titleDisplay.textContent = "Tote";
+    expiresLabel.textContent = "";
+    signinBtn.style.display = mode === "signin" ? "inline-block" : "none";
+    passForm.style.display = (mode === "unlock" || mode === "setup") ? "flex" : "none";
+    pass2Input.style.display = mode === "setup" ? "block" : "none";
+    pass2Input.required = mode === "setup";
+    forgotBtn.style.display = mode === "unlock" ? "inline" : "none";
+    passBtn.textContent = mode === "setup" ? "Set passphrase" : "Unlock";
+    passInput.autocomplete = mode === "setup" ? "new-password" : "current-password";
+    passInput.value = pass2Input.value = "";
+    passError.textContent = "";
+    gateMsg.textContent = {
+      signin: "Tote is private. Sign in to continue.",
+      forbidden: `${detail} isn't allowed here.`,
+      unlock: "Enter your passphrase. This device remembers it until you press Lock.",
+      setup: "Choose a passphrase. Notes are encrypted with it before they leave this device, so nobody else, not even the server, can read them. If you forget it, the notes are gone.",
+      error: "Couldn't reach Tote: " + detail,
+    }[mode];
+    showPanel(gate);
+    if (mode === "unlock" || mode === "setup") passInput.focus();
+  }
+
+  async function opened() {
+    document.body.classList.remove("locked", "signed-out");
+    showPanel(loading);
+    await loadNotes();
+    await importOldNotes();
+  }
+
+  onUser(async user => {
+    if (!user) { showGate("signin"); return; }
+    document.getElementById("pass-user").value = user.email;
+    document.body.classList.remove("signed-out");
+    showPanel(loading);
+    try {
+      meta = await getMeta();
+    } catch (err) {
+      if (err.code === "tote-forbidden") showGate("forbidden", user.email);
+      else showGate("error", err.message);
+      return;
+    }
+    key = await readyKey(meta);
+    if (key) await opened();
+    else showGate(meta ? "unlock" : "setup");
+  });
+
+  signinBtn.addEventListener("click", () => {
+    signIn().catch(err => { gateMsg.textContent = "Sign-in failed: " + (err.code || err.message); });
+  });
+
+  passForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const pass = passInput.value;
+    passError.textContent = "";
+    if (!meta) {
+      if (pass.length < 8) { passError.textContent = "Use at least 8 characters."; return; }
+      if (pass !== pass2Input.value) { passError.textContent = "Those don't match."; return; }
+    }
+    passBtn.disabled = true;
+    const label = passBtn.textContent;
+    passBtn.textContent = meta ? "Unlocking…" : "Setting up…";
+    try {
+      const k = meta ? await unlock(pass, meta) : await setPassphrase(pass);
+      if (!k) { passError.textContent = "Wrong passphrase."; passInput.select(); return; }
+      if (!meta) meta = await getMeta();
+      key = k;
+      passInput.value = pass2Input.value = "";
+      await opened();
+    } catch (err) {
+      passError.textContent = "Failed: " + err.message;
+    } finally {
+      passBtn.disabled = false;
+      passBtn.textContent = label;
+    }
+  });
+
+  forgotBtn.addEventListener("click", async () => {
+    if (!confirm("Delete every Tote note and the passphrase? Without the passphrase the notes can't be read, so they can't be recovered.")) return;
+    try {
+      await wipeAll();
+      clearDraft();
+      meta = null;
+      showGate("setup");
+    } catch (err) {
+      alert("Failed to wipe: " + err.message);
+    }
+  });
+
+  async function lockNow() {
+    if (!(await leaveEdit())) return;
+    await forgetKey();
+    closeSidebar();
+    showGate(meta ? "unlock" : "setup");
+  }
+
+  async function signOutNow() {
+    if (!(await leaveEdit())) return;
+    closeSidebar();
+    await signOut(); // also forgets the key; onUser then shows the sign-in gate
+  }
+
   // ── Render sidebar ──
   function renderList() {
     // Remove old items (keep emptyList)
     [...noteList.querySelectorAll(".note-item")].forEach(el => el.remove());
 
     if (notes.length === 0) {
-      emptyList.style.display = "block";
+      emptyList.style.display = key ? "block" : "none";
       return;
     }
     emptyList.style.display = "none";
@@ -466,7 +658,7 @@
       const item = document.createElement("div");
       item.className = "note-item" + (note.id === activeId ? " active" : "");
       item.dataset.id = note.id;
-      item.style.borderLeftColor = expiryColor(note.createdAt);
+      item.style.borderLeftColor = expiryColor(note.expires);
 
       const prev = document.createElement("span");
       prev.className = "preview";
@@ -500,7 +692,7 @@
 
     noteView.textContent = note.content;
     titleDisplay.textContent = preview(note.content) || "(empty)";
-    expiresLabel.textContent = formatExpiry(note.createdAt);
+    expiresLabel.textContent = formatExpiry(note.expires);
     renewBtn.style.display = "inline-flex";
     copyBtn.style.display  = "inline-flex";
     showPanel(noteView);
@@ -518,6 +710,7 @@
   }
 
   function startNewNote() {
+    if (!key) return;
     activeId = null;
     isEditing = true;
     noteTextarea.value = "";
@@ -530,8 +723,8 @@
   }
 
   // ── Save ──
-  // Writes the editor contents to the DB without changing the UI. Writes are
-  // chained so overlapping saves (e.g. tab hidden mid-save) never double-push.
+  // Writes the editor contents to the server without changing the UI. Writes are
+  // chained so overlapping saves (e.g. tab hidden mid-save) never create a note twice.
   let writeChain = Promise.resolve();
   function writeEdit() {
     const run = writeChain.then(doWrite);
@@ -540,20 +733,23 @@
   }
 
   async function doWrite() {
+    if (!key) return;
     const content = noteTextarea.value.trim();
     const existing = notes.find(n => n.id === activeId);
     if (!content || (existing && existing.content === content)) { clearDraft(content); return; }
 
     if (existing) {
-      // Update existing note in place
-      await set(ref(db, "notes/" + activeId), { content, createdAt: serverTimestamp() });
-      notes = notes.map(n => n.id === activeId ? { ...n, content } : n);
+      // Update existing note in place (saving also renews it)
+      const expires = await putNote(key, activeId, content);
+      notes = notes.map(n => n.id === activeId ? { ...n, content, expires } : n);
     } else {
       // New note
-      const newRef = await push(ref(db, "notes"), { content, createdAt: serverTimestamp() });
-      notes.unshift({ id: newRef.key, content, createdAt: Date.now() });
-      activeId = newRef.key;
+      const id = newId();
+      const expires = await putNote(key, id, content);
+      notes.unshift({ id, content, expires });
+      activeId = id;
     }
+    notes.sort((a, b) => b.expires - a.expires);
     clearDraft(content);
     renderList();
   }
@@ -591,22 +787,38 @@
   }
 
   // ── Local draft (safety net if the tab closes before a save lands) ──
+  // Stored encrypted with the same key, so the draft is no more readable than the notes.
   const DRAFT_KEY = "tote-draft";
+  let draftSeq = 0;
 
-  function saveDraft() {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ id: activeId, content: noteTextarea.value })); } catch {}
+  async function saveDraft() {
+    if (!key) return;
+    const seq = ++draftSeq;
+    const box = await encrypt(key, "draft", JSON.stringify({ id: activeId, content: noteTextarea.value }));
+    if (seq !== draftSeq) return; // a newer keystroke already won
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(box)); } catch {}
   }
 
-  function clearDraft(savedContent) {
+  async function readDraft() {
     try {
-      const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
-      if (savedContent === undefined || !d || d.content.trim() === savedContent) localStorage.removeItem(DRAFT_KEY);
-    } catch {}
+      const box = JSON.parse(localStorage.getItem(DRAFT_KEY));
+      if (box && !box.iv) { localStorage.removeItem(DRAFT_KEY); return null; } // plain-text draft from the old Tote
+      if (!box || !key) return null;
+      return JSON.parse(await decrypt(key, "draft", box));
+    } catch { return null; }
   }
 
-  function restoreDraft() {
-    let d;
-    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch {}
+  async function clearDraft(savedContent) {
+    if (savedContent === undefined) { draftSeq++; try { localStorage.removeItem(DRAFT_KEY); } catch {} return; }
+    const seq = draftSeq;
+    const d = await readDraft();
+    if (seq === draftSeq && (!d || d.content.trim() === savedContent)) {
+      try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    }
+  }
+
+  async function restoreDraft() {
+    const d = await readDraft();
     if (!d || !d.content || !d.content.trim()) return false;
     const note = notes.find(n => n.id === d.id);
     if (note && note.content === d.content.trim()) { clearDraft(); return false; }
@@ -651,11 +863,10 @@
   async function renewNote() {
     if (!activeId) return;
     try {
-      await set(ref(db, "notes/" + activeId + "/createdAt"), serverTimestamp());
-      const now = Date.now();
-      notes = notes.map(n => n.id === activeId ? { ...n, createdAt: now } : n);
-      notes.sort((a, b) => b.createdAt - a.createdAt);
-      expiresLabel.textContent = formatExpiry(now);
+      const expires = await apiRenew(activeId);
+      notes = notes.map(n => n.id === activeId ? { ...n, expires } : n);
+      notes.sort((a, b) => b.expires - a.expires);
+      expiresLabel.textContent = formatExpiry(expires);
       renderList();
     } catch (err) {
       alert("Failed to renew: " + err.message);
@@ -667,7 +878,7 @@
     if (!confirm("Delete this note?")) return;
     if (id !== activeId && !(await leaveEdit())) return;
     try {
-      await remove(ref(db, "notes/" + id));
+      await apiDelete(id);
       notes = notes.filter(n => n.id !== id);
       if (activeId === id) {
         activeId = null;
@@ -687,43 +898,57 @@
     }
   }
 
-  // ── Load from Realtime Database ──
+  // ── Load ──
   async function loadNotes() {
+    if (!key) return;
     try {
-      const snap = await get(ref(db, "notes"));
-      const now = Date.now();
-      const toDelete = [];
-
-      notes = [];
-      if (snap.exists()) {
-        snap.forEach(child => {
-          const data = child.val();
-          const createdAt = data.createdAt ?? now;
-          if (now - createdAt > EXPIRY_MS) {
-            toDelete.push(child.key);
-          } else {
-            notes.push({ id: child.key, content: data.content, createdAt });
-          }
-        });
-      }
-
-      // Sort newest first
-      notes.sort((a, b) => b.createdAt - a.createdAt);
-
-      // Clean up expired notes quietly
-      toDelete.forEach(id => remove(ref(db, "notes/" + id)).catch(() => {}));
-
+      const res = await listNotes(key);
+      notes = res.notes;
       renderList();
-      if (restoreDraft()) {
+      if (await restoreDraft()) {
         // reopened in the editor with the unsaved text
       } else if (notes.length > 0) {
         selectNote(notes[0].id);
       } else {
+        titleDisplay.textContent = "Select a note";
         showPanel(emptyState);
       }
     } catch (err) {
-      loading.innerHTML = `<span style="color:#e55">Error loading notes: ${err.message}</span>`;
+      showPanel(loading);
+      loading.innerHTML = "";
+      const msg = document.createElement("span");
+      msg.style.color = "#e55";
+      msg.textContent = "Error loading notes: " + err.message;
+      loading.appendChild(msg);
     }
+  }
+
+  // ── One-off move from the old, unencrypted Firebase Tote (TEMPORARY) ──
+  // The old database was world-readable. Once its notes are moved and its rules are locked,
+  // this fetch fails quietly; remove this block then.
+  const OLD_DB = "https://notes-ff975-default-rtdb.asia-southeast1.firebasedatabase.app/notes";
+  async function importOldNotes() {
+    let data;
+    try {
+      const r = await fetch(OLD_DB + ".json");
+      if (!r.ok) return;
+      data = await r.json();
+    } catch { return; }
+    const old = Object.entries(data || {}).filter(([, v]) => v && typeof v.content === "string" && v.content.trim());
+    if (!old.length || !key) return;
+    if (!confirm(`Move ${old.length} note${old.length === 1 ? "" : "s"} from the old unencrypted Tote into this one? They'll be encrypted here, get a fresh 96 hours, and be deleted from the old database.`)) return;
+    let moved = 0;
+    for (const [oldId, v] of old) {
+      try {
+        await putNote(key, newId(), v.content);
+        await fetch(`${OLD_DB}/${oldId}.json`, { method: "DELETE" });
+        moved++;
+      } catch (err) {
+        alert(`Moved ${moved} of ${old.length}, then failed: ${err.message}`);
+        break;
+      }
+    }
+    await loadNotes();
   }
 
   // ── Mobile sidebar ──
@@ -745,7 +970,7 @@
   document.getElementById("new-note-btn").addEventListener("click", newNoteClicked);
   document.getElementById("refresh-btn").addEventListener("click", async (e) => {
     const btn = e.currentTarget;
-    if (!(await leaveEdit())) return;
+    if (!key || !(await leaveEdit())) return;
     btn.classList.add("spinning");
     await loadNotes();
     btn.classList.remove("spinning");
@@ -753,6 +978,8 @@
   document.getElementById("empty-new-btn").addEventListener("click", newNoteClicked);
   document.getElementById("save-btn").addEventListener("click", saveNote);
   document.getElementById("cancel-btn").addEventListener("click", cancelEdit);
+  document.getElementById("lock-btn").addEventListener("click", lockNow);
+  document.getElementById("signout-btn").addEventListener("click", signOutNow);
   document.getElementById("hamburger").addEventListener("click", openSidebar);
   renewBtn.addEventListener("click", renewNote);
   copyBtn.addEventListener("click", copyNote);
@@ -765,10 +992,10 @@
   window.addEventListener("pagehide", autosaveOnHide);
   overlay.addEventListener("click", closeSidebar);
 
-  // Global keyboard shortcuts (not while typing in textarea)
+  // Global keyboard shortcuts (not while typing, and not while locked)
   document.addEventListener("keydown", e => {
-    if (isEditing) return;
-    if (e.target === noteTextarea) return;
+    if (isEditing || !key) return;
+    if (e.target === noteTextarea || e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
     if (e.key === "Enter") {
       e.preventDefault();
       startNewNote();
@@ -797,9 +1024,6 @@
       if (note) startEdit(note);
     }
   });
-
-  // ── Init ──
-  loadNotes();
 </script>
 </body>
 </html>
