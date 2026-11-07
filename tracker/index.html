@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Projects</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #fff; color: #000; font: 16px/1.4 system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  button { font: inherit; background: #fff; color: #000; border: 1px solid #000; padding: 6px 14px; cursor: pointer; }
+  button:hover { background: #000; color: #fff; }
+  .quiet { border: 0; padding: 0; text-decoration: underline; font-size: 14px; }
+  .quiet:hover { background: none; color: #000; }
+  h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #555; margin: 28px 0 8px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .p { border: 1px solid #000; background: #fff; min-height: 84px; padding: 12px; text-align: left;
+       display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+  .p b { font-weight: 600; }
+  .p i { font-style: normal; font-size: 13px; color: #555; align-self: flex-end; }
+  .p:hover i { color: #fff; }
+  #msg { color: #555; }
+  dialog { border: 1px solid #000; padding: 24px; max-width: 560px; width: calc(100% - 32px); }
+  dialog::backdrop { background: rgba(255,255,255,.85); }
+  dialog h3 { margin: 0 0 4px; font-size: 20px; }
+  dialog .meta { font-size: 13px; color: #555; margin-bottom: 16px; }
+  dialog h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 16px 0 4px; }
+  dialog p, dialog ul { margin: 0; }
+  dialog ul { padding-left: 20px; }
+  dialog a { color: #000; }
+  .close { float: right; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Projects</h1>
+  <button id="out" class="quiet" hidden>Sign out</button>
+</header>
+<p id="msg">Loading.</p>
+<button id="in" hidden>Sign in with Google</button>
+<main id="wall"></main>
+
+<dialog id="detail"></dialog>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+// Same Firebase project as Checkin; only its Google sign-in is used here.
+const app = initializeApp({
+  apiKey: "AIzaSyDMlxhx94WHh-nVOyLPDEfEIY-ohGX7KRY",
+  authDomain: "coldwar-d8109.firebaseapp.com",
+  projectId: "coldwar-d8109",
+  appId: "1:329049097500:web:fd7184fb4c0ba011db66d9"
+});
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+
+const API = '/tracker/api/projects';
+const GROUPS = [['needs-work', 'Needs work'], ['works', 'Works'], ['check', 'To check'], ['idea', 'Ideas']];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const daysSince = t => t ? Math.max(0, Math.floor((Date.now() - Date.parse(t)) / 86400000)) : null;
+let projects = [];
+
+$('in').onclick = () => signInWithPopup(auth, provider).catch(e => { $('msg').textContent = 'Sign-in failed: ' + e.code; });
+$('out').onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  $('wall').innerHTML = '';
+  $('in').hidden = !!user;
+  $('out').hidden = !user;
+  if (!user) { $('msg').textContent = 'Private. Sign in to see your projects.'; return; }
+  $('msg').textContent = 'Loading.';
+  try {
+    const res = await fetch(API, { headers: { Authorization: 'Bearer ' + await user.getIdToken() } });
+    if (res.status === 401) { $('msg').textContent = 'This account (' + user.email + ') is not allowed.'; return; }
+    if (!res.ok) throw new Error(res.status);
+    projects = (await res.json()).projects || [];
+    $('msg').textContent = projects.length ? '' : 'No projects published yet.';
+    paint();
+  } catch (e) {
+    $('msg').textContent = 'Could not load the list (' + e.message + ').';
+  }
+});
+
+function paint() {
+  $('wall').innerHTML = GROUPS.map(([key, label]) => {
+    const list = projects.map((p, i) => [p, i]).filter(([p]) => p.status === key);
+    if (!list.length) return '';
+    return `<h2>${label}</h2><div class="grid">` + list.map(([p, i]) => {
+      const d = daysSince(p.touched);
+      return `<button class="p" data-i="${i}"><b>${esc(p.name)}</b>${d != null ? `<i>${d}d</i>` : ''}</button>`;
+    }).join('') + '</div>';
+  }).join('');
+}
+
+$('wall').onclick = e => {
+  const b = e.target.closest('.p');
+  if (b) open(projects[b.dataset.i]);
+};
+
+function open(p) {
+  const d = daysSince(p.touched);
+  const label = (GROUPS.find(g => g[0] === p.status) || [, p.status])[1];
+  const link = p.url ? (p.url.startsWith('/') ? `<a href="${esc(p.url)}">${esc(p.url)}</a>` : esc(p.url)) : '';
+  const feats = (p.features || []).length ? '<ul>' + p.features.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>' : '<p>None listed.</p>';
+  $('detail').innerHTML = `
+    <button class="quiet close" autofocus>Close</button>
+    <h3>${esc(p.name)}</h3>
+    <div class="meta">${esc(label)}${d != null ? ' · touched ' + d + 'd ago' : ''}${link ? ' · ' + link : ''}</div>
+    <p>${esc(p.summary)}</p>
+    <h4>Last thing done</h4><p>${esc(p.last || 'Not recorded.')}</p>
+    <h4>Needed to work at all</h4><p>${esc(p.functional || 'Not recorded.')}</p>
+    <h4>Next features</h4>${feats}`;
+  $('detail').querySelector('.close').onclick = () => $('detail').close();
+  $('detail').showModal();
+}
+// Click outside the box closes it.
+$('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
+</script>
+</body>
+</html>

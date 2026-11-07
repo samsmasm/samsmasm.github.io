@@ -4,6 +4,10 @@
 
 The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students. Static HTML/CSS/JS deployed directly from this repo. No bundler at the root level. Individual subdirectory projects may have their own build steps (Astro for `ibbm-src` → `ibbm/` and `ibecon-src` → `ibecon/`).
 
+## Always: update the project tracker
+
+**Whenever you make or change anything in this repo**, update that project's entry in `tracker/projects.md` (private, never committed) and run `python3 tracker/publish.py` after committing. New project: add an entry. See `tracker/CLAUDE.md` for the format. This is how Sam keeps track of what is underway at unisam.nz/tracker.
+
 ---
 
 ## Repo layout
@@ -27,6 +31,8 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
   graphs/                 ← ShiftWork v2 economics graph maker (live; optional numbered axes with grid). Read graphs/CLAUDE.md + PLAN.md first; run graphs/test/run.sh before committing
   graphsold/              ← ShiftWork v1.9, frozen, noindex (kept for anyone who wants the old version)
   feedback/               ← Shared feedback inbox: Worker unisam-feedback at /feedback/api/* + key-gated inbox page (see CLAUDE.md inside)
+  tracker/                ← Sam's private project wall (Google sign-in, Worker unisam-tracker at /tracker/api/*). projects.md is
+                             PRIVATE and never committed. Read its CLAUDE.md; update it after every project change (see above).
   pulse/                  ← Live classroom response tool (Firebase Realtime DB)
   checkin/                ← Checkin: class question sets and marking (Google sign-in + Firestore in coldwar-d8109, see SETUP.md inside)
                              NOTE: deliberately does NOT follow AESTHETIC.md. It is styled after ratibro/
