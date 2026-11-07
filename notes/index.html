@@ -18,6 +18,8 @@
   --size:16px;         /* base text size */
   --article-width:680px;
   --side-width:min(440px,46%); /* article sidebar on the map (phones get a bottom panel instead) */
+  --hit:#f4a629;       /* search match ring (also hitColour in CONFIG) */
+  --hit-soft:#f4a62966;/* search match highlight in the results list */
 }
 /* ================================================================================ */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -29,9 +31,12 @@ header h1{font-size:15px;margin:0;font-weight:600;flex:0 0 auto;max-width:40%;ov
 nav{display:flex;border-bottom:1px solid var(--line);background:var(--card)}
 nav button{flex:1;padding:10px;border:0;background:none;font-size:15px;color:var(--mute);border-bottom:2px solid transparent;font-family:inherit}
 nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
-#results{position:absolute;top:52px;left:8px;right:8px;background:var(--card);border:1px solid var(--line);border-radius:8px;z-index:30;max-height:55%;overflow:auto;display:none}
-#results div{padding:10px 12px;border-bottom:1px solid var(--line)}
-#results small{color:var(--mute)}
+button.hit{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 0;font:inherit;color:inherit;cursor:pointer}
+button.hit small{color:var(--mute)}
+button.hit span{display:block;font-size:14px;color:var(--mute)}
+mark{background:var(--hit-soft);color:inherit}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;border:4px solid var(--hit);margin-right:6px;vertical-align:-1px}
+.sw.soft{border-width:2px}
 main{flex:1;position:relative;overflow:hidden}
 #map{position:absolute;inset:0;touch-action:none;display:block;width:100%;height:100%}
 #filters{position:absolute;top:8px;left:8px;right:8px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none;z-index:5}
@@ -95,8 +100,7 @@ ol.notes{font-size:14px;color:var(--mute);padding-left:20px}
 </head>
 <body>
 <div id="app">
-  <header><h1 id="title">Idea network (sample data)</h1><button id="loadbtn" class="chip main">Load</button><input id="search" type="search" placeholder="Search names, aliases, text" autocomplete="off"></header>
-  <div id="results"></div>
+  <header><h1 id="title">Idea network (sample data)</h1><button id="loadbtn" class="chip main">Load</button><input id="search" type="search" placeholder="Search titles and articles" autocomplete="off"></header>
   <div id="loadpanel"><div class="box">
     <h2>Load notes</h2>
     <p class="hint">Notes are read in your browser and are not stored anywhere. Nothing is sent except requests to GitHub.</p>
@@ -149,6 +153,8 @@ const CONFIG = {
   ringGap: 46,                // dynamic mode: room each node gets around its ring, so busy rings grow
   ringPull: 0.12,             // dynamic mode: how firmly nodes are held on their ring
   maxSpeed: 14,               // fastest a node can move per frame, keeps the reshaping smooth
+  hitColour: "#f4a629",       // ring around search matches
+  hitWidth: { hard: 4, soft: 2 }, // ring thickness: match in the title, match in the article
   arrowMode: "flow",          // "flow" = arrow shows direction of influence/action. "sentence" = arrow follows how the link is written
   filtersOpen: false          // show the filter chips on start
 };
@@ -180,7 +186,7 @@ const ltype = t => LINKTYPES[t] || {flow:"forward", inverse:""};
 
 index();
 
-const state = {hideProv:false, hiddenTypes:new Set(), view:"map", sel:null, history:[], current:null, arrow:CONFIG.arrowMode, focus:CONFIG.focusOnSelect, filtersOpen:CONFIG.filtersOpen, dyn:CONFIG.dynamicMode, sideOpen:false, sideNode:null, sideHist:[]};
+const state = {hideProv:false, hiddenTypes:new Set(), view:"map", sel:null, history:[], current:null, arrow:CONFIG.arrowMode, focus:CONFIG.focusOnSelect, menu:CONFIG.filtersOpen?"filters":null, dyn:CONFIG.dynamicMode, sideOpen:false, sideNode:null, sideHist:[], q:""};
 const nodeVisible = n => !state.hiddenTypes.has(n.type) && !(state.hideProv && n.status === "provisional");
 const edgeVisible = e => nodeVisible(e.a) && nodeVisible(e.b) && !(state.hideProv && e.status === "provisional");
 
@@ -201,6 +207,8 @@ let W = 0, H = 0, dpr = 1;
 const view = {x:0, y:0, k:1};
 let alpha = 1;
 let rings = null, ringR1 = 0, cam = null; // dynamic mode: node -> ring radius; camera glide target
+let hits = new Map(); // search: node -> "hard" (title or alias) or "soft" (article text)
+const hitRank = n => hits.get(n)==="hard" ? 2 : hits.has(n) ? 1 : 0;
 const mainEl = document.querySelector("main"), sheetEl = document.getElementById("sheet"), sideEl = document.getElementById("side");
 function initLayout(){ alpha = 1; NODES.forEach((n,i) => { const a = i/NODES.length*6.283, r = 40 + 14*Math.sqrt(NODES.length); n.x = Math.cos(a)*r; n.y = Math.sin(a)*r; n.vx = n.vy = 0; }); }
 initLayout();
@@ -272,12 +280,12 @@ const sx = x => x*view.k + view.x, sy = y => y*view.k + view.y;
 const degree = n => nbrs.get(n.id).size;
 const radius = n => Math.min(CONFIG.nodeRadiusMax, CONFIG.nodeRadius + degree(n)*CONFIG.nodeGrowth);
 const drawR = n => radius(n)*Math.min(Math.max(view.k,.6),1.6);
-function inFocus(n){ return !state.focus || !state.sel || n===state.sel || nbrs.get(state.sel.id).has(n.id); }
+function inFocus(n){ if (state.q) return hits.has(n) || n===state.sel; return !state.focus || !state.sel || n===state.sel || nbrs.get(state.sel.id).has(n.id); }
 function draw(){
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const sel = state.focus ? state.sel : null;
   edges.filter(edgeVisible).forEach(e => {
-    const touch = !sel || e.a===sel || e.b===sel;
+    const touch = sel ? e.a===sel || e.b===sel : !state.q;
     ctx.globalAlpha = touch ? 1 : CONFIG.dimAlpha;
     ctx.beginPath(); ctx.moveTo(sx(e.a.x), sy(e.a.y)); ctx.lineTo(sx(e.b.x), sy(e.b.y));
     ctx.lineWidth = CONFIG.edgeWidth[e.strength] || CONFIG.edgeWidth.medium;
@@ -301,12 +309,13 @@ function draw(){
     ctx.save(); ctx.globalAlpha *= prov ? CONFIG.provisionalAlpha : 1; ctx.fillStyle = colour(n.type); ctx.fill(); ctx.restore();
     ctx.lineWidth = n===state.sel ? 3 : 1.5; ctx.strokeStyle = n===state.sel ? "#000" : "#fff";
     if (prov && n!==state.sel){ ctx.setLineDash([3,3]); ctx.strokeStyle = colour(n.type); } ctx.stroke(); ctx.setLineDash([]);
+    if (hits.has(n)){ ctx.beginPath(); ctx.arc(x,y,r+5,0,6.283); ctx.lineWidth = CONFIG.hitWidth[hits.get(n)]; ctx.strokeStyle = CONFIG.hitColour; ctx.stroke(); }
   });
   // labels: selected and neighbours first, then biggest nodes; skip any that would overlap
   ctx.font = CONFIG.labelFont; ctx.textAlign = "center"; ctx.globalAlpha = 1;
   const placed = [];
   const order = vis.filter(n => sx(n.x)>-60 && sx(n.x)<W+60 && sy(n.y)>-20 && sy(n.y)<H+20)
-    .sort((a,b) => ((b===state.sel)-(a===state.sel)) || ((nbrs.get(state.sel?state.sel.id:"")||new Set()).has(b.id)-(nbrs.get(state.sel?state.sel.id:"")||new Set()).has(a.id)) || degree(b)-degree(a));
+    .sort((a,b) => ((b===state.sel)-(a===state.sel)) || (hitRank(b)-hitRank(a)) || ((nbrs.get(state.sel?state.sel.id:"")||new Set()).has(b.id)-(nbrs.get(state.sel?state.sel.id:"")||new Set()).has(a.id)) || degree(b)-degree(a));
   order.forEach(n => {
     if (!inFocus(n)) return;
     const w = ctx.measureText(n.title).width, x = sx(n.x), y = sy(n.y)+drawR(n)+13, box = [x-w/2-2, y-11, x+w/2+2, y+3];
@@ -344,20 +353,23 @@ cv.addEventListener("pointercancel", e => { ptrs.delete(e.pointerId); });
 cv.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.offsetX,e.offsetY,e.deltaY<0?1.15:.87); }, {passive:false});
 document.getElementById("zin").onclick = () => zoomAt(W/2,H/2,1.3);
 document.getElementById("zout").onclick = () => zoomAt(W/2,H/2,.77);
-document.getElementById("fit").onclick = () => { closeSide(); pick(null); if (state.dyn){ alpha = Math.max(alpha,.2); cam = {fit:true}; } else fit(); };
+document.getElementById("fit").onclick = () => { clearPick(); if (state.dyn){ alpha = Math.max(alpha,.2); cam = {fit:true}; } else fit(); };
 document.getElementById("sideclose").onclick = () => closeSide();
 function tap(x,y){
   let best=null, bd=1e9;
   NODES.filter(nodeVisible).forEach(n => { const d = Math.hypot(sx(n.x)-x, sy(n.y)-y); if (d < Math.max(drawR(n),16)+8 && d<bd){ bd=d; best=n; } });
-  if (!best){ closeSide(); pick(null); }
+  if (!best) clearPick();
   else if (state.sideOpen) openSide(best);
   else pick(best);
 }
+// nothing chosen: a running search goes back to its results, otherwise the sidebar closes
+function clearPick(){ if (state.q) showResults(); else closeSide(); pick(null); }
+const plain = n => n.text.replace(/\[\^[^\]]+\]/g,"").replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,a,b)=>b||a);
 function renderSheet(){
   const el = sheetEl, n = state.sel, tools = document.querySelector(".tool");
   if (!n || state.sideOpen){ el.style.display="none"; tools.style.bottom = ""; return; }
-  const gist = n.text.replace(/\[\^[^\]]+\]/g,"").replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,a,b)=>b||a);
-  const ns = [...nbrs.get(n.id)].map(id => byId.get(id)).filter(nodeVisible);
+  const gist = plain(n);
+  const ns =[...nbrs.get(n.id)].map(id => byId.get(id)).filter(nodeVisible);
   el.innerHTML = `<h2>${esc(n.title)}</h2><div class="meta">${esc(n.type)}${n.when?" &middot; "+esc(n.when):""} &middot; ${esc(n.status)} &middot; ${ns.length} linked</div><div>${esc(gist)}</div><button class="open">Read the article</button>`;
   el.style.display="block"; el.querySelector(".open").onclick = () => openSide(n);
   tools.style.bottom = el.offsetHeight+8+"px"; // keep zoom and fit clickable above the sheet
@@ -367,17 +379,20 @@ function renderSheet(){
 function renderFilters(){
   const f = document.getElementById("filters"); f.innerHTML = "";
   const add = (html, cls, fn) => { const c = document.createElement("button"); c.className = "chip "+(cls||""); c.innerHTML = html; c.onclick = fn; f.appendChild(c); return c; };
-  add(state.filtersOpen ? "Filters &#9652;" : "Filters &#9662;", "main", () => { state.filtersOpen = !state.filtersOpen; renderFilters(); });
-  add("Dynamic: "+(state.dyn?"on":"off"), state.dyn?"":"off", () => {
-    state.dyn = !state.dyn; alpha = Math.max(alpha,.5);
-    if (state.dyn && state.sel && nodeVisible(state.sel)){ reorigin(state.sel); cam = {node:state.sel}; }
-    setRings(); renderFilters();
-  });
-  if (!state.filtersOpen) return;
+  const menu = (id, label) => add(label+(state.menu===id?" &#9652;":" &#9662;"), "main", () => { state.menu = state.menu===id ? null : id; renderFilters(); });
+  menu("filters", "Filters"); menu("display", "Display");
+  if (state.menu==="display"){
+    add("dynamic: "+(state.dyn?"on":"off"), "", () => {
+      state.dyn = !state.dyn; alpha = Math.max(alpha,.5);
+      if (state.dyn && state.sel && nodeVisible(state.sel)){ reorigin(state.sel); cam = {node:state.sel}; }
+      setRings(); renderFilters();
+    });
+    add("arrows: "+state.arrow, "", () => { state.arrow = state.arrow==="flow" ? "sentence" : "flow"; renderFilters(); });
+    add("focus: "+(state.focus?"on":"off"), "", () => { state.focus = !state.focus; renderFilters(); });
+  }
+  if (state.menu!=="filters") return;
   types.forEach(t => add(`<i style="background:${colour(t)}"></i>${esc(t)}`, state.hiddenTypes.has(t)?"off":"", () => { state.hiddenTypes.has(t) ? state.hiddenTypes.delete(t) : state.hiddenTypes.add(t); alpha=.5; setRings(); renderFilters(); renderTimeline(); }));
   add(state.hideProv ? "provisional hidden" : "provisional shown", state.hideProv?"off":"", () => { state.hideProv = !state.hideProv; alpha=.5; setRings(); renderFilters(); renderTimeline(); });
-  add("arrows: "+state.arrow, "", () => { state.arrow = state.arrow==="flow" ? "sentence" : "flow"; renderFilters(); });
-  add("focus: "+(state.focus?"on":"off"), "", () => { state.focus = !state.focus; renderFilters(); });
 }
 
 // ---------- article ----------
@@ -402,16 +417,55 @@ function openSide(n, noPush){
   if (!noPush && state.sideNode && state.sideNode!==n) state.sideHist.push(state.sideNode);
   state.sideOpen = true; state.sideNode = n;
   mainEl.classList.add("side-open"); sideEl.style.display = "block";
-  mountArticle(sideEl.querySelector(".art"), n, state.sideHist.length>0, t => openSide(t), () => openSide(state.sideHist.pop(), true));
+  mountArticle(sideEl.querySelector(".art"), n, state.sideHist.length>0 || !!state.q, t => openSide(t), () => state.sideHist.length ? openSide(state.sideHist.pop(), true) : showResults());
   sideEl.scrollTop = 0;
   pick(n, true);
 }
 function closeSide(){
   if (!state.sideOpen) return;
-  Object.assign(state, {sideOpen:false, sideNode:null, sideHist:[]});
+  Object.assign(state, {sideOpen:false, sideNode:null, sideHist:[], q:""});
+  hits = new Map(); sInput.value = "";
   mainEl.classList.remove("side-open"); sideEl.style.display = "none";
   renderSheet();
   if (state.sel) cam = {node:state.sel};
+}
+// ---------- search: hard = title or alias, soft = article text. Matches ring on the map and list in the sidebar ----------
+const fold = s => s.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase(); // so "emile" finds "Émile"
+function markHit(text, q){
+  const i = fold(text).indexOf(q);
+  return i<0 ? esc(text) : esc(text.slice(0,i)) + "<mark>" + esc(text.slice(i,i+q.length)) + "</mark>" + esc(text.slice(i+q.length));
+}
+function snippet(text, q){
+  const i = fold(text).indexOf(q), a = Math.max(0,i-50), b = Math.min(text.length,i+q.length+70);
+  return (a?"...":"") + markHit(text.slice(a,b), q) + (b<text.length?"...":"");
+}
+function runSearch(raw){
+  const q = fold(raw.trim()), starting = q && !state.q;
+  state.q = q; hits = new Map();
+  if (!q){ if (state.sideOpen && !state.sideNode) closeSide(); return; }
+  NODES.forEach(n => {
+    if ([n.title, ...n.aliases].some(t => fold(t).includes(q))) hits.set(n, "hard");
+    else if (fold(plain(n)).includes(q)) hits.set(n, "soft");
+  });
+  if (state.view!=="map") setView("map");
+  if (starting) pick(null); // start from the whole network so every match can be seen
+  showResults();
+  if (starting){ alpha = Math.max(alpha,.2); cam = {fit:true}; }
+}
+function showResults(){
+  if (!state.q) return closeSide();
+  Object.assign(state, {sideOpen:true, sideNode:null, sideHist:[]});
+  mainEl.classList.add("side-open"); sideEl.style.display = "block"; renderSheet();
+  const q = state.q, list = kind => [...hits.keys()].filter(n => hits.get(n)===kind).sort((a,b) => a.title.localeCompare(b.title));
+  const hard = list("hard"), soft = list("soft");
+  const row = (n, extra) => `<button class="hit" data-id="${esc(n.id)}">${markHit(n.title,q)} <small>${esc(n.type)}</small>${extra?`<span>${extra}</span>`:""}</button>`;
+  const alias = n => fold(n.title).includes(q) ? "" : "also: " + markHit(n.aliases.find(a => fold(a).includes(q)), q);
+  const w = sideEl.querySelector(".art");
+  w.innerHTML = !hits.size ? `<p>No match.</p>` :
+    `<h3><i class="sw"></i>In the title (${hard.length})</h3>` + hard.map(n => row(n, alias(n))).join("") +
+    `<h3><i class="sw soft"></i>In the article (${soft.length})</h3>` + soft.map(n => row(n, snippet(plain(n),q))).join("");
+  w.querySelectorAll("button.hit").forEach(b => b.onclick = () => openSide(byId.get(b.dataset.id)));
+  sideEl.scrollTop = 0;
 }
 function mountArticle(w, n, hasBack, go, back){
   w.innerHTML = (hasBack?`<span class="back">&larr; Back</span><br>`:"") + articleHtml(n);
@@ -573,7 +627,8 @@ function setData(nodes, label, sources){
   if (!nodes.length) throw new Error("No nodes found.");
   NODES = finishNodes(nodes); SOURCES = sources || []; index(); initLayout();
   closeSide(); rings = null; cam = null;
-  Object.assign(state, {sel:null, current:null, history:[], hiddenTypes:new Set()});
+  Object.assign(state, {sel:null, current:null, history:[], hiddenTypes:new Set(), q:""});
+  hits = new Map(); sInput.value = "";
   document.getElementById("title").textContent = label || "Idea network";
   document.title = label || "Idea network";
   renderSheet(); renderFilters(); renderTimeline();
@@ -625,19 +680,8 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.v==="article" && state.sel && state.sel!==state.current) openArticle(state.sel); // Article tab follows the node chosen on the map
   else setView(b.dataset.v);
 });
-const sInput = document.getElementById("search"), sRes = document.getElementById("results");
-sInput.addEventListener("input", () => {
-  const q = sInput.value.trim().toLowerCase(); if (!q){ sRes.style.display="none"; return; }
-  const nameHits = NODES.filter(n => n.title.toLowerCase().includes(q) || n.aliases.some(a => a.toLowerCase().includes(q)));
-  const textHits = NODES.filter(n => !nameHits.includes(n) && n.text.toLowerCase().includes(q));
-  const rows = nameHits.slice(0,8).map(n => [n,""]).concat(textHits.slice(0,6).map(n => [n,"in text"]));
-  sRes.innerHTML = rows.map(([n,why]) => `<div data-id="${n.id}">${esc(n.title)} <small>${esc(n.type)}${why?" &middot; "+why:""}</small></div>`).join("") || "<div><small>No match</small></div>";
-  sRes.style.display = "block";
-  sRes.querySelectorAll("div[data-id]").forEach(d => d.onclick = () => {
-    sRes.style.display="none"; sInput.value=""; const n = byId.get(d.dataset.id);
-    if (state.view!=="map") openArticle(n); else if (state.sideOpen) openSide(n); else pick(n, true);
-  });
-});
+const sInput = document.getElementById("search");
+sInput.addEventListener("input", () => runSearch(sInput.value));
 window.addEventListener("resize", () => { resize(); if (state.view==="timeline") renderTimeline(); });
 renderFilters(); resize(); for (let i=0;i<CONFIG.startTicks;i++) tick(); fit(); setView("map"); requestAnimationFrame(loop);
 </script>
