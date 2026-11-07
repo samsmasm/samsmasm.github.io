@@ -2,9 +2,11 @@
 
 A classroom grouping puzzle for Sam's students (was Class Connections). Sixteen cards hide four groups of four. Players pick four cards and press Check, with four lives. There is one daily puzzle per set, then random extras. Single HTML page, no server, no accounts, and the only thing saved is a note in the browser that today's puzzle is done. Keep it clearly its own thing: do not bring back the NYT game's name or its yellow, green, blue and purple.
 
-Sets: Business Management and Economics (IB, with an SL/HL toggle) and Kids (ages 5 to 7, emoji on every card). All three play the same 4 by 4 game and all have the Voice toggle.
+Sets: Business Management and Economics (IB, with an SL/HL toggle), and two kids modes: Picture words (set key `kids`, ages 5 to 7, emoji on every card) and Sound it out (set key `sound`, for Sam's 5 year old learning to read). All four play the same 4 by 4 game. The menu has an IB section and a Kids section, and Sam plans more kids modes: add a card to the Kids section, a bank, and the set key to `TITLES`, `LINKS`, `KIDS_SETS` and `BANKS`.
 
-Live at unisam.nz/birds, with direct links `#business`, `#economics` and `#kids`. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. The private Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3) is out of date, with the old gameplay: do not treat it as live.
+Sound it out: every word can be sounded out, mostly 3 letters, and no more than half the cards left on the board ever have a picture. `meta.picturesPerGroup` (2) does this in `limitPictures`: a limit per group holds at every stage of the game, and which words get a picture changes each puzzle. Many words have no good emoji, so a puzzle averages about 5 pictures, not 8. There is no Voice toggle here, because reading the word aloud would defeat the point. Tier 4 is always a word family (`-at`, `-ock`). Sam is happy with 4-letter families like `-ill` and `-ock`.
+
+Live at unisam.nz/birds, with direct links `#business`, `#economics`, `#kids` and `#sound`. Linked from `/tools` and `/find`. Look: `AESTHETIC.md` Option B, masthead on every screen (Sam asked to keep it in games). Found groups are shorter than live cards so the rest stays on screen. The private Claude artifact (https://claude.ai/artifact/M1PxwvJuuyzNCVjKdnT3P3) is out of date, with the old gameplay: do not treat it as live.
 
 ## Where the code lives
 
@@ -17,19 +19,20 @@ Live at unisam.nz/birds, with direct links `#business`, `#economics` and `#kids`
 ```
 CLAUDE.md                   this file
 index.html                  BUILT output, the whole site. Do not edit by hand.
-build.py                    embeds the three JSON banks into src/template.html -> index.html
-src/template.html           all HTML, CSS and JS. Placeholders: __BM_JSON__ __ECON_JSON__ __KIDS_JSON__
+build.py                    embeds the four JSON banks into src/template.html -> index.html
+src/template.html           all HTML, CSS and JS. Placeholders: __BM_JSON__ __ECON_JSON__ __KIDS_JSON__ __SOUND_JSON__
 data/bm_categories.json     Business Management bank (313 categories, every subtopic in Units 1 to 5 including HL)
 data/econ_categories.json   Economics bank (110 categories)
-data/kids_categories.json   Kids bank (40 categories, has a parallel "emoji" array)
-tests/check_banks.py        validates the banks (schema, topic codes, clash links, undeclared shared words, level and HL refs)
-tests/test_generation.js    runs the generator 2000 times per bank, checks no repeated words, the guess helpers, pickVoice and 1000 days of daily puzzles
+data/kids_categories.json   Picture words bank (40 categories, has a parallel "emoji" array)
+data/sound_categories.json  Sound it out bank (53 categories, 331 words, each word used once, so clashesWith stays empty)
+tests/check_banks.py        validates the banks (schema, topic codes, clash links, undeclared shared words, level and HL refs), and for Sound it out: decodable patterns, word length, no repeats
+tests/test_generation.js    runs the generator 2000 times per bank, checks no repeated words, the picture limit, the guess helpers, pickVoice and 1000 days of daily puzzles
 tests/test_units.js         checks each unit alone can make a puzzle, at SL and HL, and that SL never shows an HL group
 ```
 
 Workflow: edit `src/template.html` or a JSON bank, run `python3 build.py`, then `python3 tests/check_banks.py`, `node tests/test_generation.js` and `node tests/test_units.js`. Only commit `index.html` after the build. Stage this folder by name (never `git add -A` in this repo) and `git pull --rebase` before pushing, because bots commit to `main`.
 
-## Data format (all three banks)
+## Data format (all four banks)
 
 ```json
 {
@@ -76,7 +79,7 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 
 ## Interaction
 
-- Direct links: `/birds#business`, `/birds#economics`, `/birds#kids`. The hash drives the screen (`route()`), so the browser Back button works. Going to the menu and back into the same set resumes the puzzle. Opening a different set starts a new one.
+- Direct links: `/birds#business`, `/birds#economics`, `/birds#kids`, `/birds#sound`. The hash drives the screen (`route()`), so the browser Back button works. Going to the menu and back into the same set resumes the puzzle. Opening a different set starts a new one.
 - Click or tap cards to pick up to four, and again to unpick. No dragging. Shuffle is a normal button and keeps the picks.
 - New puzzle lives inside the closed Topics panel so kids do not press it by accident, with an inline "Are you sure?" (no browser dialog or modal). When a game ends or no puzzle can be made, a big New puzzle button replaces Check, with no confirmation.
 - Check is the big amber button, centred on the page, and is enabled at four picks. Right: the group moves to the top as a coloured row with the category name and syllabus ref. Wrong: "Not quite.", one feather lost, the cards shake and stay picked so one or two can be swapped. A wrong four cannot be tried again in that puzzle, in any order: Check stays disabled and it says "Already tried.", with no life lost (`S.tried`, `guessKey`). It never says how close a guess was.
@@ -84,7 +87,7 @@ The logic block is pure functions so the Node test can load it. Keep it free of 
 - SL/HL toggle: in the Topics panel for BM and Econ, hidden for Kids, remembered per set in `S.level` while the page is open (no localStorage). SL is the default: every SL topic ticked, HL boxes unticked and locked, and Select all or All skip them, so a student cannot get HL by accident. HL ticks everything, because the HL course includes SL, and boxes can then be changed one by one. The toggle only moves ticks: the puzzle changes on New puzzle, and the generator is unchanged. Sam first asked for everything ticked by default, then the toggle brief said SL by default, so SL with all SL ticked covers both.
 - Revealed HL groups show a plain "HL" after the name (plain text, not a pill, per `AESTHETIC.md`).
 - Four lives. At zero the remaining groups appear in tier order. There is no score or history by design.
-- All three sets play the same game. A small Voice on/off toggle next to Shuffle reads a card aloud when it is tapped, in every set; it starts off and stays as set when switching sets. `pickVoice` prefers lighter named English voices, with pitch 1.25 and rate 0.9, because device defaults sounded deep. What it sounds like depends on the voices installed on each device.
+- All four sets play the same game. A small Voice on/off toggle next to Shuffle reads a card aloud when it is tapped, in every set except Sound it out; it starts off and stays as set when switching sets. `pickVoice` prefers lighter named English voices, with pitch 1.25 and rate 0.9, because device defaults sounded deep. What it sounds like depends on the voices installed on each device.
 - The page registers `window.claude.hot.snapshot` so an open viewer keeps its puzzle across a republish. This is harmless outside the Claude viewer.
 
 ## Sources of truth for content

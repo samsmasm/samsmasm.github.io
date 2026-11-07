@@ -7,7 +7,7 @@ const logic = html.split('/*LOGIC_START*/')[1].split('/*LOGIC_END*/')[0];
 eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice,shuffle,seededRandom,dayKey,dailyCodes};');
 const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8'));
 let failed = false;
-for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]]]) {
+for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]], ['sound_categories.json', 4, 4, [1,2,3,4]]]) {
   const bank = load(f); api.prepare(bank);
   const on = new Set(bank.meta.topics.map(t => t.code));
   let ok = 0;
@@ -20,6 +20,37 @@ for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['eco
   }
   console.log(f, n + 'x' + per, ok + '/2000 ok');
   if (ok < 2000) failed = true;
+}
+// Sound it out: at every stage of a game, no more than half the cards left may have a picture.
+{
+  const bank = load('sound_categories.json'); api.prepare(bank);
+  const on = new Set(bank.meta.topics.map(t => t.code));
+  let over = 0, total = 0, pics = 0; const varied = new Map();
+  for (let i = 0; i < 5000; i++) {
+    const p = api.buildPuzzle(bank, on, { n: 4, per: 4, tiers: [1, 2, 3, 4] });
+    const counts = p.groups.map(g => g.words.filter(w => w.e).length);
+    // the worst case for any stage is the groups with the most pictures being the ones left
+    const worst = [...counts].sort((a, b) => b - a);
+    worst.forEach((_, k) => { if (worst.slice(0, k + 1).reduce((a, b) => a + b) > (k + 1) * 2) over++; });
+    total += 16; pics += counts.reduce((a, b) => a + b);
+    p.groups.forEach(g => g.words.forEach(w => {
+      const s = varied.get(w.w) || new Set(); s.add(!!w.e); varied.set(w.w, s);
+    }));
+  }
+  const both = [...varied.values()].filter(s => s.size === 2).length;
+  console.log('pictures: over half at any stage', over, 'times, average', (pics / total * 100).toFixed(0) + '% of cards,', both, 'words seen with and without one');
+  if (over || !pics || !both) failed = true;
+  // The limit is only for banks that ask for it: Kids keeps a picture on every card that has one
+  const kids = load('kids_categories.json'); api.prepare(kids);
+  const emojiOf = new Map(kids.categories.flatMap(c => c.words.map((w, i) => [c.id + w, c.emoji[i]])));
+  const nameToId = new Map(kids.categories.map(c => [c.name, c.id]));
+  let kidsOk = true;
+  for (let i = 0; i < 2000; i++) {
+    const kp = api.buildPuzzle(kids, new Set(kids.meta.topics.map(t => t.code)), { n: 4, per: 4, tiers: [1, 2, 3, 4] });
+    for (const g of kp.groups) for (const w of g.words) if (w.e !== emojiOf.get(nameToId.get(g.name) + w.w)) kidsOk = false;
+  }
+  console.log('kids pictures unchanged', kidsOk ? 'ok' : 'FAILED');
+  if (!kidsOk) failed = true;
 }
 const right = api.guessResult(['2-0', '2-1', '2-2', '2-3']) === 2 && api.guessResult(['0-0', '0-1', '0-2', '0-3']) === 0;
 const wrong = api.guessResult(['2-0', '2-1', '2-2', '1-3']) === -1;
@@ -35,7 +66,7 @@ const dayOk = dk('2026-11-05T22:59:59Z') === '2026-11-05' && dk('2026-11-05T23:0
   && dk('2026-12-31T23:30:00Z') === '2027-01-01' && dk('2026-11-06T22:59:59Z') === '2026-11-06';
 console.log('dayKey', dayOk ? 'ok' : 'FAILED');
 if (!dayOk) failed = true;
-for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.json']) {
+for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.json', 'sound_categories.json']) {
   const bank = load(f); api.prepare(bank);
   const make = key => {
     const rand = api.seededRandom(key);

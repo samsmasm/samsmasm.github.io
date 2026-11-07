@@ -1,4 +1,4 @@
-"""Build index.html: embeds the three category banks into src/template.html.
+"""Build index.html: embeds the four category banks into src/template.html.
 
 Run from anywhere:  python3 build.py
 """
@@ -17,6 +17,7 @@ def bank(name):
 html = (template
         .replace("__BM_JSON__", bank("bm_categories.json"))
         .replace("__ECON_JSON__", bank("econ_categories.json"))
-        .replace("__KIDS_JSON__", bank("kids_categories.json")))
+        .replace("__KIDS_JSON__", bank("kids_categories.json"))
+        .replace("__SOUND_JSON__", bank("sound_categories.json")))
 (root / "index.html").write_text(html, encoding="utf-8")
 print("index.html", len(html), "bytes")

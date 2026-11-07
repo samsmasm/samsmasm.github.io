@@ -94,6 +94,7 @@ body {
 .choice-desc { color: var(--muted); }
 .choice-meta { font-size: 14px; font-weight: 700; letter-spacing: .02em; color: var(--ink); }
 .choice .stripes { margin-top: 10px; }
+.sethead { font-family: var(--display); font-weight: 700; font-size: clamp(20px, 2.4vw, 24px); margin: 24px 0 10px; }
 .fine { color: var(--muted); font-size: 15px; margin-top: 32px; }
 .foot { color: var(--muted); font-size: 13px; margin-top: 28px; padding-top: 10px; border-top: 1px solid var(--line); }
 
@@ -186,6 +187,8 @@ details#topics[open] summary::before { content: "\2212"; }
 .card .emoji { font-size: 1.9em; line-height: 1; font-family: system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
 .kids .card { font-size: clamp(20px, 2.5vw + .4vh, 40px); min-height: clamp(84px, 13vh, 150px); }
 .kids .card .emoji { font-size: 1.7em; }
+.sound .card .word { font-size: 1.2em; letter-spacing: .03em; } /* the word is the point here, so it leads */
+.sound .card.rev .word { font-size: 1em; }
 .card.sel { background: var(--sel); outline: 4px solid var(--accent); outline-offset: 2px; transform: translateY(-3px); }
 .card.no { animation: shake .4s ease; }
 /* Found groups are shorter than live cards, so what is left stays on screen */
@@ -221,6 +224,7 @@ details#topics[open] summary::before { content: "\2212"; }
   body { font-size: 16px; }
   .board { gap: 6px; }
   .card { padding: 6px 4px; border-radius: 8px; }
+  .sound .card .word { font-size: 1.05em; letter-spacing: 0; } /* keeps five-letter words on one line */
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -239,6 +243,7 @@ details#topics[open] summary::before { content: "\2212"; }
 
   <section id="menu" class="screen">
     <p class="lead">Sixteen cards hide four groups. Pick four that belong together, then check. You have four lives.</p>
+    <h2 class="sethead">IB</h2>
     <div class="choices">
       <button class="choice" id="pickBm" type="button">
         <span class="choice-title">Business Management</span>
@@ -252,10 +257,19 @@ details#topics[open] summary::before { content: "\2212"; }
         <span class="choice-meta" id="econCount"></span>
         <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </button>
+    </div>
+    <h2 class="sethead">Kids</h2>
+    <div class="choices">
       <button class="choice" id="pickKids" type="button">
-        <span class="choice-title">Kids</span>
+        <span class="choice-title">Picture words</span>
         <span class="choice-desc">Ages 5 to 7. Every card has a picture, and words can be read aloud.</span>
         <span class="choice-meta" id="kidsCount"></span>
+        <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </button>
+      <button class="choice" id="pickSound" type="button">
+        <span class="choice-title">Sound it out</span>
+        <span class="choice-desc">For new readers. Short words to sound out, and no more than half have a picture.</span>
+        <span class="choice-meta" id="soundCount"></span>
         <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </button>
     </div>
@@ -310,7 +324,7 @@ details#topics[open] summary::before { content: "\2212"; }
 </div>
 
 <script>
-const BANKS = { bm: __BM_JSON__, econ: __ECON_JSON__, kids: __KIDS_JSON__ };
+const BANKS = { bm: __BM_JSON__, econ: __ECON_JSON__, kids: __KIDS_JSON__, sound: __SOUND_JSON__ };
 
 /*LOGIC_START*/
 /* The daily puzzle passes in rand from seededRandom, so every device makes the same choices */
@@ -339,6 +353,14 @@ function compatible(c, chosen) {
   return true;
 }
 
+/* A limit per group means no more than half the cards left have a picture, however many groups are found.
+   Banks with no limit skip this, so it uses no random numbers and their daily puzzles stay the same. */
+function limitPictures(words, limit, rand) {
+  if (limit === undefined) return words;
+  const keep = new Set(shuffle(words.filter(x => x.e), rand).slice(0, limit));
+  return words.map(x => keep.has(x) ? x : { w: x.w, e: '' });
+}
+
 function buildPuzzle(bank, ticked, cfg, rand = Math.random) {
   const eligible = eligibleFor(bank, ticked, cfg.per);
   if (eligible.length < cfg.tiers.length) return null;
@@ -361,7 +383,7 @@ function buildPuzzle(bank, ticked, cfg, rand = Math.random) {
           name: c.name,
           ref: c.ref || '',
           level: c.level || '',
-          words: idx.map(i => ({ w: c.words[i], e: c.emoji ? (c.emoji[i] || '') : '' }))
+          words: limitPictures(idx.map(i => ({ w: c.words[i], e: c.emoji ? (c.emoji[i] || '') : '' })), bank.meta.picturesPerGroup, rand)
         };
       })
     };
@@ -434,18 +456,19 @@ const UNIT_NAMES = {
     'Unit 4': 'Unit 4: The global economy'
   }
 };
-const TITLES = { bm: 'Business Management', econ: 'Economics', kids: 'Kids' };
-const LINKS = { bm: 'business', econ: 'economics', kids: 'kids' };
+const TITLES = { bm: 'Business Management', econ: 'Economics', kids: 'Picture words', sound: 'Sound it out' };
+const LINKS = { bm: 'business', econ: 'economics', kids: 'kids', sound: 'sound' };
+const KIDS_SETS = ['kids', 'sound'];
 const S = {
   screen: 'menu', set: null, read: false,
-  ticked: { bm: new Set(), econ: new Set(), kids: new Set() },
-  level: { bm: 'SL', econ: 'SL' }, /* Kids has no level */
+  ticked: { bm: new Set(), econ: new Set(), kids: new Set(), sound: new Set() },
+  level: { bm: 'SL', econ: 'SL' }, /* the kids sets have no level */
   puzzle: null, day: null, /* day is set while the puzzle is a daily one */
   order: [], revealed: [], selected: [], tried: [], lives: LIVES, over: null, note: '', busy: false
 };
 const els = new Map();
 
-prepare(BANKS.bm); prepare(BANKS.econ); prepare(BANKS.kids);
+Object.values(BANKS).forEach(prepare);
 
 /* ---------- screens ---------- */
 function syncMenu() {
@@ -462,7 +485,7 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
-/* The address is the source of truth: #business, #economics, #kids, or nothing for the menu */
+/* The address is the source of truth: #business, #economics, #kids, #sound, or nothing for the menu */
 function route() {
   const hash = location.hash.slice(1).toLowerCase();
   const set = Object.keys(LINKS).find(k => LINKS[k] === hash);
@@ -475,16 +498,22 @@ function goMenu() {
   route();
 }
 
+function dressSet() {
+  const kids = KIDS_SETS.includes(S.set);
+  $('gameTitle').textContent = TITLES[S.set];
+  $('topicLabel').textContent = kids ? 'Themes' : 'Topics';
+  document.body.classList.toggle('kids', kids);
+  document.body.classList.toggle('sound', S.set === 'sound');
+  syncVoice();
+  syncLevel();
+  buildTopics();
+}
+
 function openSet(set) {
   const stale = S.day && S.day !== dayKey(new Date());
   if (S.set === set && S.puzzle && !stale) { showScreen('game'); return; } /* carry on with the same puzzle */
   S.set = set;
-  $('gameTitle').textContent = TITLES[set];
-  $('topicLabel').textContent = set === 'kids' ? 'Themes' : 'Topics';
-  document.body.classList.toggle('kids', set === 'kids');
-  syncVoice();
-  syncLevel();
-  buildTopics();
+  dressSet();
   showScreen('game');
   doneToday(set) ? newPuzzle() : dailyPuzzle();
 }
@@ -828,7 +857,7 @@ function check() {
 /* ---------- selecting ---------- */
 function speak(word) {
   try {
-    if (!S.read || !window.speechSynthesis) return;
+    if (!S.read || S.set === 'sound' || !window.speechSynthesis) return; /* Sound it out is for reading the word yourself */
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(word);
     const voice = pickVoice(window.speechSynthesis.getVoices());
@@ -852,6 +881,7 @@ $('board').addEventListener('click', e => {
 
 /* ---------- controls ---------- */
 function syncVoice() {
+  $('readBtn').hidden = S.set === 'sound';
   $('readBtn').setAttribute('aria-pressed', String(S.read));
   $('readBtn').textContent = 'Voice: ' + (S.read ? 'on' : 'off');
 }
@@ -859,6 +889,7 @@ function syncVoice() {
 $('pickBm').addEventListener('click', () => { location.hash = LINKS.bm; });
 $('pickEcon').addEventListener('click', () => { location.hash = LINKS.econ; });
 $('pickKids').addEventListener('click', () => { location.hash = LINKS.kids; });
+$('pickSound').addEventListener('click', () => { location.hash = LINKS.sound; });
 $('backBtn').addEventListener('click', goMenu);
 window.addEventListener('hashchange', route);
 $('lvlSL').addEventListener('click', () => setLevel('SL'));
@@ -876,29 +907,22 @@ $('readBtn').addEventListener('click', () => { S.read = !S.read; syncVoice(); })
 function snapshot() {
   return {
     screen: S.screen, set: S.set, read: S.read, lives: S.lives, over: S.over, level: S.level,
-    ticked: { bm: [...S.ticked.bm], econ: [...S.ticked.econ], kids: [...S.ticked.kids] },
+    ticked: { bm: [...S.ticked.bm], econ: [...S.ticked.econ], kids: [...S.ticked.kids], sound: [...S.ticked.sound] },
     puzzle: S.puzzle, order: S.order, revealed: S.revealed
   };
 }
 
 function start(data) {
   data = data || {};
-  ['bm', 'econ', 'kids'].forEach(k => {
+  Object.keys(BANKS).forEach(k => {
     S.ticked[k] = levelTicks(k);
   });
   if (data.set && data.ticked) {
-    S.ticked.bm = new Set(data.ticked.bm || [...S.ticked.bm]);
-    S.ticked.econ = new Set(data.ticked.econ || [...S.ticked.econ]);
-    S.ticked.kids = new Set(data.ticked.kids || [...S.ticked.kids]);
+    Object.keys(BANKS).forEach(k => { S.ticked[k] = new Set(data.ticked[k] || [...S.ticked[k]]); });
     S.set = data.set; S.read = !!data.read;
     if (data.level) S.level = data.level;
     S.lives = data.lives ?? LIVES; S.over = data.over || null;
-    $('gameTitle').textContent = TITLES[S.set];
-    $('topicLabel').textContent = S.set === 'kids' ? 'Themes' : 'Topics';
-    document.body.classList.toggle('kids', S.set === 'kids');
-    syncVoice();
-    syncLevel();
-    buildTopics();
+    dressSet();
     if (data.puzzle) {
       S.puzzle = data.puzzle; S.order = data.order || []; S.revealed = data.revealed || [];
       render();
