@@ -24,7 +24,7 @@
   }
 
   function list(items, cls) {
-    return '<ul class="para-text ' + cls + '">' + items.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul>';
+    return '<div class="para-text ' + cls + '">' + items.map(function (h) { return '<div class="starter-line">' + esc(h) + '</div>'; }).join('') + '</div>';
   }
 
   function renderPara(p, idx) {
@@ -39,6 +39,7 @@
         '<span class="para-label">' + esc(p.label) + '</span>' +
         '<span class="para-covers">' + (p.covers ? esc(p.covers.join(' · ')) : '') + '</span>' +
         '<button class="para-reset" data-act="reset" title="Hide this paragraph again">Reset</button>' +
+        '<button class="para-back" data-act="back" title="Go back one step" disabled>Back</button>' +
         '<button class="para-adv" data-act="adv">Show hint</button>' +
       '</div>' +
       '<div class="level-content" data-l="1">' + list(p.hint, 'hint') + '</div>' +
@@ -60,6 +61,7 @@
     var btn = b.querySelector('.para-adv');
     btn.textContent = ADV_LABELS[level];
     btn.disabled = level === MAX_LEVEL;
+    b.querySelector('.para-back').disabled = level === 0;
     if (level === 0) b.querySelectorAll('.blank').forEach(resetBlank);
   }
 
@@ -122,6 +124,7 @@
       var idx = +btn.closest('.para-block').dataset.idx;
       var lv = +block(idx).dataset.level;
       if (btn.dataset.act === 'adv' && lv < MAX_LEVEL) setLevel(idx, lv + 1);
+      if (btn.dataset.act === 'back' && lv > 0) setLevel(idx, lv - 1);
       if (btn.dataset.act === 'reset') setLevel(idx, 0);
     });
     main.addEventListener('keydown', function (e) {
