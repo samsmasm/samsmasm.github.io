@@ -20,7 +20,7 @@ Sam's private wall of projects: plain black and white panels with just the name 
 3. **Occasionally** (when Sam asks, or when working on the tracker): look through `~/notes/Projects/` in the Obsidian vault for new or changed project notes and bring the list in line.
 4. Statuses: `needs-work` (not functional yet), `works` (has next steps), `check` (Sam to look at and decide), `idea` (not started).
 
-Sam's choices (2026-11-07): You're the Boss and the colouring book pipeline are off the list; Report comments is "check" (paid version undecided); Talkonomics stays as a project; the tracker itself is not on its own list. Has it popped? added the same day.
+Sam's choices (2026-11-07): You're the Boss and the colouring book pipeline are off the list; Report comments is "check" (paid version undecided); Talkonomics stays as a project; the tracker itself is not on its own list. Has it popped? added the same day. Exception: "Tracker and Obsidian coordination" (idea) is on the list at Sam's request, to work out a tidier way of keeping projects.md and `~/notes/Projects/` in line than doing it by hand.
 
 ## E-paper board (later)
 
