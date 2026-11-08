@@ -1,5 +1,6 @@
 /* Samples reveal engine.
-   A page defines window.SAMPLE = { parts: [ { title, marks, question, checklist?, paras: [...] } ] }
+   A page defines window.SAMPLE = { parts: [ { title, marks, question, checklist?, checked?, unchecked?, paras: [...] } ] }
+   checked: true shows "Checked by Sam"; unchecked: true shows the bright "Not checked by Sam" box for that part.
    then loads this file. Each para: { label, covers?, hint[], prompt[], starters[], text, graph? }
    In text, {curly braces} mark a blank that reveals one word per click.
    graph: { src, alt, caption } */
@@ -101,6 +102,8 @@
       sec.className = 'part';
       var head = '';
       if (part.title) head += '<div class="part-head"><h2>' + esc(part.title) + '</h2><span class="marks">' + esc(part.marks) + ' marks</span></div>';
+      if (part.checked) head += '<div class="checked" role="note">&#10003; Checked by Sam</div>';
+      if (part.unchecked) head += '<div class="unchecked" role="note"><strong>Not checked by Sam</strong><span>Sam hasn\'t checked this part yet, so it may contain mistakes. Use it with care.</span></div>';
       if (part.question) head += '<p class="question">&#8220;' + esc(part.question) + '&#8221;</p>';
       if (part.checklist) {
         head += '<div class="checklist"><div class="label">Checklist: ' + esc(part.checklist.map(function (c) { return c[0].charAt(0); }).join('')) + '</div><ol>' +
