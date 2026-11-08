@@ -22,3 +22,5 @@ Reuse IBecon micro SVGs by absolute path (`/ibecon/graphs/micrographs/...`). New
 
 ## Content status
 The two micro pages were drafted by Claude from Sam's Unit 2 decks; real-world facts are web-checked and listed under Sources on each page. **Pending Sam's review.** Real examples must be real.
+
+Every page Sam hasn't checked carries a bright `<div class="unchecked">` "Not checked by Sam" box under the page head (poverty, price floors, carbon taxes as of 2026-11-08). Indirect tax is Sam's own answer, so it has no box. New Claude-drafted pages get the box; remove it only when Sam says a page is checked.
