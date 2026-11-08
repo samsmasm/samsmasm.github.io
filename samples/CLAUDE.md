@@ -10,6 +10,7 @@ Static, no build step; deploys on push to `main`. AESTHETIC.md Option B (paper a
 - `econ/macro/poverty/`: 15-mark P1 essay (one part).
 - `econ/micro/price-floor/`: P1 (a) 10 + (b) 15, government intervention without externality (Thailand rice pledging, 2011 to 2014).
 - `econ/micro/carbon-tax/`: P1 (a) 10 + (b) 15, intervention with externality (British Columbia carbon tax, 2008 to 2025).
+- `econ/micro/indirect-tax/`: P1 (a) 10 only, two reasons for an indirect tax. **Sam's own answer**, copied verbatim from his vault (`Classes/IB Economics/Sample answers/P1 10marksindirecttax.md`), including his SVG (`indirect-tax.svg`, not the house style). Only the hints, prompts and starters were drafted by Claude. Never reword the `text` fields.
 
 ## Sam's structures (2026-11-02)
 - **10 marks, DDEE**: Define, Diagram, Explain, Example (optional, generic, not real-world).
