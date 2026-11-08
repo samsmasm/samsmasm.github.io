@@ -101,9 +101,9 @@
       var sec = document.createElement('section');
       sec.className = 'part';
       var head = '';
+      if (part.unchecked) head += '<div class="unchecked" role="note"><strong>Not checked by Sam</strong><span>Sam hasn\'t checked this part yet, so it may contain mistakes. Use it with care.</span></div>';
       if (part.title) head += '<div class="part-head"><h2>' + esc(part.title) + '</h2><span class="marks">' + esc(part.marks) + ' marks</span></div>';
       if (part.checked) head += '<div class="checked" role="note">&#10003; Checked by Sam</div>';
-      if (part.unchecked) head += '<div class="unchecked" role="note"><strong>Not checked by Sam</strong><span>Sam hasn\'t checked this part yet, so it may contain mistakes. Use it with care.</span></div>';
       if (part.question) head += '<p class="question">&#8220;' + esc(part.question) + '&#8221;</p>';
       if (part.checklist) {
         head += '<div class="checklist"><div class="label">Checklist: ' + esc(part.checklist.map(function (c) { return c[0].charAt(0); }).join('')) + '</div><ol>' +
