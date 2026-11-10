@@ -10,6 +10,7 @@ Static, no build step; deploys on push to `main`. AESTHETIC.md Option B (paper a
 - `econ/macro/poverty/`: 15-mark P1 essay (one part). Not checked by Sam.
 - `econ/micro/indirect-tax/`: P1 (a) 10 only, two reasons for an indirect tax. **Sam's own answer**, with his SVG (`indirect-tax.svg`, not the house style). No warning box.
 - `econ/micro/price-floor/`: P1 (a) 10 + (b) 15, government intervention without externality. Part (a) was rewritten by Sam in the vault (price, quantity and spending/revenue, diagram `price-floor-revenue.svg` with areas R and G, producer effects with and without the government buying the surplus, price stability point). **(a) checked by Sam; (b) not checked** (Claude-drafted, Thailand rice pledging 2011 to 2014).
+- `econ/micro/subsidy/`: P1 (a) 10 only, two reasons for a subsidy (merit goods, producers' incomes, PED add-on). Claude-drafted (2026-11-10) as a close mirror of Sam's indirect tax answer, with `subsidy.svg` drawn in the same style as `indirect-tax.svg`. Not checked by Sam. Vault note: `P1 10markssubsidy.md`.
 - `econ/micro/carbon-tax/`: P1 (a) 10 + (b) 15, intervention with externality (British Columbia carbon tax, 2008 to 2025). Claude-drafted, not checked by Sam.
 
 ## The vault is the source for Sam's answers
