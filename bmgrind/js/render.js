@@ -102,6 +102,7 @@ export function markscheme(q) {
   if (m.model) h += `<p><b>Model answer:</b> ${esc(m.model)}</p>`;
   if (m.indicative?.length) h += `<b>Possible points:</b><ul>${m.indicative.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`;
   if (m.notes?.length) h += `<ul>${m.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`;
+  if (m.caps?.length) h += `<b>Mark caps:</b><ul>${m.caps.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>`;
   if (q.marks >= 10 && q.marks < 17) h += `<p class="small muted">10-mark answers are marked with markbands: the top band needs a clear focus on the question, accurate use of business tools and theories, case evidence woven into balanced arguments, and an explained limitation of the case information.</p>`;
   return h;
 }
