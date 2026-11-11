@@ -106,7 +106,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `amoeba/`: organisms with four heritable genes compete for food
 - `trees/`: forest evolution, 11 genes, climate controls
 - `walker/`: bone-and-muscle creatures learn to walk (custom Verlet physics)
-- `racecar/`: evolving polygon cars on Planck.js tracks
+- `racecar/`: evolving polygon cars on Planck.js tracks, whole population races at once, background evolution across worker threads. Shared `sim.js`; run `racecar/test/run.sh` before committing. (`racecar2/` is now a redirect here.)
 
 ### Smaller projects (each has a brief CLAUDE.md)
 
@@ -179,7 +179,6 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `unichase/`: Joystick-controlled unicorn chase game with a best-time record.
 
 **Simulations**
-- `racecar2/`: Variant of `racecar/` where the whole population races at once: tournament selection, crossover, evolvable drivetrain.
 - `spiral/`: Factions claim numbers on a square spiral by turn; watch the patterns that emerge.
 
 **Jokes**
@@ -247,7 +246,7 @@ unisam.nz is GitHub Pages behind Cloudflare. GitHub's origin cert for unisam.nz 
 
 The homepage nav (`index.html`) currently exposes: This week, Economics (IBEcon, Econia, ShiftWork, Grill, Econ News), Business (IBBM, Busia, RatIBro, Review Questions, Slop Study, You're the Boss, Stock Shock, BusiNews), FMW, Tools dropdown, Experiments, Old site. **Rule:** the Economics, Business and FMW dropdowns must list the same sites as the matching subject panels in the right sidebar; change both together. A sweep in August 2026 found ~46 top-level directories with a working `index.html` that are not linked from `index.html`, `/tools`, or `/experiments`. Outstanding decisions:
 
-- **Games and toys.** A large batch of small games sits unlinked (`amoeba`, `walker`, `racecar2`, `spiral`, `flyswat`, `ipmemory`, `cookiejar-v2.0`, `findtreasure`, `mousechase-v2`, `flippinghard`, `turnright`, `spin`, `fnl`, `wc26`, `copythisone`, and old duplicates like `catjumpold`, `fractions-classic`, `treethree*`). Sam needs to go through these and check which are still live and worth surfacing before any get added to `/experiments`. Do not bulk-link them.
+- **Games and toys.** A large batch of small games sits unlinked (`amoeba`, `walker`, `spiral`, `flyswat`, `ipmemory`, `cookiejar-v2.0`, `findtreasure`, `mousechase-v2`, `flippinghard`, `turnright`, `spin`, `fnl`, `wc26`, `copythisone`, and old duplicates like `catjumpold`, `fractions-classic`, `treethree*`). Sam needs to go through these and check which are still live and worth surfacing before any get added to `/experiments`. Do not bulk-link them.
 - **Unlinked teaching resources** also pending review: `quiz` (Talkonomics weekly quiz), `ibeconinequality`, `inflation`, `supplyanddemand`, `stocksimulator`, `printergoesbrrr`, `causation`/`causation2`, `coldwar`, `hippiesandspies`, `heresy`, `mymaths`, `ask-v1.0`, `marketinghub`, `wingeometer`, `typeit`, `reports`, `ibnews`, `fmwskills`, `moa`, `mortgage`.
 - **Private resources page.** Sam may add a password-protected page for personal, non-public tools — `sayso`, `moderntranslation`, and `tote` are the intended contents. These should stay off the public index until that page exists.
 

@@ -1,678 +1,352 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" type="image/png" href="/unisamicon2.png">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Designer - Evolutionary Simulator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Using Planck just for Vec2 and Math helpers if needed, though we can do most math natively for the designer to keep it light -->
-    <script src="https://unpkg.com/planck-js@0.3.31/dist/planck.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; background: #e5e7eb; font-family: 'Segoe UI', sans-serif; }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
-        
-        .slider-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.25rem;
-        }
-        .slider-label {
-            font-size: 0.7rem;
-            width: 2.5rem; /* Adjusted for input box */
-            color: #4b5563;
-            flex-shrink: 0;
-        }
-        /* Number inputs styling */
-        input[type=number] {
-            width: 3.5rem;
-            font-size: 0.75rem;
-            padding: 2px 4px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            text-align: right;
-        }
-        /* Slider styling */
-        input[type=range] {
-            flex-grow: 1;
-            height: 4px;
-            border-radius: 2px;
-            background: #d1d5db;
-            appearance: none;
-            cursor: pointer;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            appearance: none;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #3b82f6;
-            cursor: pointer;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Racecar designer</title>
+<link rel="icon" type="image/png" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<script src="sim.js"></script>
+<style>
+:root {
+  --masthead: #1e2a4a; --masthead-sub: #c9d2ea; --amber: #f4a629;
+  --bg: #f7f6f2; --surface: #fffdf8; --surface-2: #efede6; --line: #e3e0d8;
+  --ink: #1e2a4a; --muted: #5b6680; --bad: #8a1c1c; --exp: #7a1a4a;
+  --mast-h: 64px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 'Atkinson Hyperlegible', -apple-system, 'Segoe UI', sans-serif; }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.mast { height: var(--mast-h); background: var(--masthead); color: #fff; border-bottom: 4px solid var(--amber); display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand img { width: 40px; height: 40px; }
+.brand-name { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 22px; line-height: 1; }
+.brand-sub { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--masthead-sub); margin-top: 3px; }
+.mast a.back { margin-left: auto; color: var(--masthead-sub); text-decoration: none; }
+.mast a.back:hover { color: #fff; }
+
+.layout { display: grid; grid-template-columns: 1fr 380px; height: calc(100% - var(--mast-h)); }
+.view { position: relative; min-width: 0; }
+#canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dyno { position: absolute; left: 12px; bottom: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 220px; }
+.side { background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 16px 40px; }
+
+h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 17px; margin: 0; }
+.label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 1px 12px; margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+.stats dt { color: var(--muted); }
+.stats dd { margin: 0; text-align: right; font-weight: 700; }
+
+.section { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 5px 10px; cursor: pointer; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--masthead); border-color: var(--masthead); color: #fff; }
+.btn.primary:hover { background: #2b3a63; }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.item { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; background: var(--bg); }
+.item.hot { border-color: var(--amber); }
+.item-title { font-size: 12px; font-weight: 700; color: var(--muted); }
+.ctl { display: grid; grid-template-columns: 62px 1fr 64px; gap: 8px; align-items: center; font-size: 13px; }
+.ctl span { color: var(--muted); }
+.ctl input[type=range] { width: 100%; accent-color: var(--masthead); }
+.ctl input[type=number] { width: 64px; border: 1px solid var(--line); border-radius: 6px; padding: 1px 4px; text-align: right; background: var(--surface); }
+.hint { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+textarea { width: 100%; height: 70px; font: 11px/1.3 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: var(--bg); resize: vertical; margin-top: 6px; }
+#ioStatus { font-size: 13px; min-height: 1.2em; margin-top: 4px; }
+#ioStatus.err { color: var(--bad); }
+details summary { cursor: pointer; font-weight: 700; }
+details p { margin: 6px 0; font-size: 14px; }
+
+@media (max-width: 800px) {
+  body { overflow: auto; }
+  .layout { grid-template-columns: 1fr; height: auto; }
+  .view { height: 55vh; }
+  .side { border-left: 0; border-top: 1px solid var(--line); }
+  .brand-sub { display: none; }
+}
+</style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden">
+<body>
+<header class="mast">
+  <a class="brand" href="/"><img src="/geocornsmall.png" alt="unisam.nz home"><div><div class="brand-name">Racecar designer</div><div class="brand-sub">Build a car by hand</div></div></a>
+  <a class="back" href="index.html">Back to the race</a>
+</header>
 
-    <!-- 1. LEFT: Guidance Panel -->
-    <div class="w-64 bg-gray-900 text-gray-300 flex flex-col border-r border-gray-700 z-30 shrink-0">
-        <div class="p-4 border-b border-gray-800 bg-gray-800">
-            <h2 class="font-bold text-sm text-white flex items-center gap-2">
-                📘 Design Handbook
-            </h2>
-        </div>
-        <div class="flex-grow overflow-y-auto p-4 space-y-6 text-xs leading-relaxed">
-            
-            <section>
-                <h3 class="font-bold text-blue-400 mb-1">Body Geometry (Vertices)</h3>
-                <p>The "Chassis" is the engine of your car. Its <strong>Area</strong> determines its power.</p>
-                <ul class="list-disc pl-4 mt-2 space-y-1 text-gray-400">
-                    <li><strong>Larger Area:</strong> Produces massive <strong>Torque</strong> (pushing power). Great for hills.</li>
-                    <li><strong>Smaller Area:</strong> Produces very little power, but is lightweight.</li>
-                    <li><strong>Trade-off:</strong> A massive body is heavy (Density 2.0). If it's too big, the engine spends all its power just moving itself!</li>
-                </ul>
-            </section>
+<div class="layout">
+  <div class="view">
+    <canvas id="canvas" aria-label="Car preview"></canvas>
+    <div class="dyno">
+      <div class="label">Dyno</div>
+      <dl class="stats">
+        <dt>Body area</dt><dd id="statArea">-</dd>
+        <dt>Mass</dt><dd id="statMass">-</dd>
+        <dt>Engine torque</dt><dd id="statTorque">-</dd>
+        <dt>Torque per kg</dt><dd id="statRatio">-</dd>
+      </dl>
+    </div>
+  </div>
 
-            <section>
-                <h3 class="font-bold text-yellow-400 mb-1">Wheels</h3>
-                <p>Wheels transfer power to the ground. They are lighter (Density 1.0) than the body.</p>
-                <ul class="list-disc pl-4 mt-2 space-y-1 text-gray-400">
-                    <li><strong>Large Radius:</strong> Higher <strong>Top Speed</strong> and better ground clearance. Good for rough terrain.</li>
-                    <li><strong>Small Radius:</strong> Faster <strong>Acceleration</strong> but low top speed. Risk of chassis dragging.</li>
-                    <li><strong>Trade-off:</strong> Big wheels are heavy. A small body (weak engine) cannot spin giant wheels efficiently.</li>
-                </ul>
-            </section>
+  <aside class="side">
+    <div class="btns">
+      <button class="btn primary" id="btnRace">Race this car</button>
+      <button class="btn" id="btnCopy">Copy JSON</button>
+      <button class="btn" id="btnLoad">Load JSON from the box</button>
+    </div>
+    <textarea id="io" placeholder="Paste a car's JSON here, then press Load" aria-label="Car JSON"></textarea>
+    <div id="ioStatus" aria-live="polite"></div>
 
-            <section>
-                <h3 class="font-bold text-green-400 mb-1">Winning Strategies</h3>
-                <div class="space-y-2 mt-2">
-                    <p><strong class="text-white">🏁 Flat Sprint:</strong> Aim for high Power-to-Weight. Medium body, medium-small wheels for snap acceleration.</p>
-                    <p><strong class="text-white">⛰️ Hill Climb:</strong> Torque is king. You need a large body to generate power, and large wheels to grip the slope without flipping.</p>
-                </div>
-            </section>
-
-        </div>
+    <div class="section">
+      <div class="head"><h2>Engine and suspension</h2></div>
+      <div id="tuning"></div>
+      <p class="hint">Gearing is top wheel speed. Light bodies accelerate harder but grip less. Soft suspension (low Hz) soaks up bumps.</p>
     </div>
 
-    <!-- 2. MIDDLE: Canvas Visualizer -->
-    <div class="flex-grow relative bg-gray-50 flex flex-col min-w-0">
-        <div class="absolute top-4 left-4 z-10 bg-white/90 p-3 rounded shadow border border-gray-300 pointer-events-none">
-            <h1 class="font-bold text-gray-800">Car Visualizer</h1>
-            <p class="text-xs text-gray-500">Live preview</p>
-        </div>
-        
-        <!-- Dyno Stats -->
-        <div class="absolute bottom-4 left-4 z-10 bg-white/90 p-4 rounded shadow border border-gray-300 w-64 pointer-events-none">
-            <h2 class="font-bold text-gray-800 border-b pb-1 mb-2 text-sm">Dyno Stats</h2>
-            <div class="space-y-1 text-xs">
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Body Area:</span>
-                    <span id="statArea" class="font-mono">0.00 m²</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Total Mass:</span>
-                    <span id="statMass" class="font-mono font-bold">0.00 kg</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Total Torque:</span>
-                    <span id="statTorque" class="font-mono text-blue-600 font-bold">0.0 Nm</span>
-                </div>
-                <div class="flex justify-between border-t pt-1 mt-1">
-                    <span class="text-gray-600">Est. Power/Weight:</span>
-                    <span id="statRatio" class="font-mono">0.00</span>
-                </div>
-            </div>
-        </div>
-
-        <canvas id="canvas" class="flex-grow w-full h-full"></canvas>
+    <div class="section">
+      <div class="head"><h2>Body corners</h2><div class="btns"><button class="btn" id="btnAddPoint" aria-label="Add a corner">Add</button><button class="btn" id="btnRemPoint" aria-label="Remove the last corner">Remove</button></div></div>
+      <div id="pointsList"></div>
+      <p class="hint">Bigger body, more engine torque, but more weight. Corners re-sort by angle when you let go.</p>
     </div>
 
-    <!-- 3. RIGHT: Engineer's Panel -->
-    <div class="w-96 bg-white shadow-2xl border-l border-gray-300 flex flex-col z-20 shrink-0 h-full">
-        <div class="p-4 border-b bg-gray-100 flex justify-between items-center shrink-0">
-            <h2 class="font-bold text-lg text-gray-800">Engineer's Panel</h2>
-            <div class="flex gap-2">
-                <button id="btnExport" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded shadow transition">
-                    Copy JSON
-                </button>
-                <button id="btnImport" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded shadow transition">
-                    Paste JSON
-                </button>
-            </div>
-        </div>
-
-        <!-- Added h-full and overflow-y-auto here to ensure scrolling works -->
-        <div class="flex-grow overflow-y-auto p-4 space-y-6">
-            
-            <!-- Global Settings -->
-            <div class="space-y-2">
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Chassis Color</h3>
-                <div class="flex items-center gap-2">
-                    <div id="colorPreview" class="w-6 h-6 rounded border border-gray-300"></div>
-                    <input type="range" id="inputHue" min="0" max="360" value="0" class="flex-grow">
-                </div>
-            </div>
-
-            <!-- Vertices Control -->
-            <div class="space-y-2">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Geometry Points</h3>
-                    <div class="flex gap-1">
-                        <button id="btnAddPoint" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">+</button>
-                        <button id="btnRemPoint" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">-</button>
-                    </div>
-                </div>
-                
-                <div class="flex items-center gap-2 mb-2">
-                    <input type="checkbox" id="checkAutoSort" checked class="w-4 h-4 text-blue-600 rounded">
-                    <label for="checkAutoSort" class="text-xs text-gray-600">Auto-sort angles (prevent twisting)</label>
-                </div>
-
-                <div id="pointsList" class="space-y-3">
-                    <!-- Point Controls injected here -->
-                </div>
-            </div>
-
-            <!-- Wheels Control -->
-            <div class="space-y-2">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Wheels</h3>
-                    <div class="flex gap-1">
-                        <button id="btnAddWheel" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">+</button>
-                        <button id="btnRemWheel" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">-</button>
-                    </div>
-                </div>
-                
-                <div id="wheelsList" class="space-y-3">
-                    <!-- Wheel Controls injected here -->
-                </div>
-            </div>
-
-            <!-- Bottom Spacer for easy scrolling -->
-            <div class="h-8"></div>
-
-        </div>
+    <div class="section">
+      <div class="head"><h2>Wheels</h2><div class="btns"><button class="btn" id="btnAddWheel" aria-label="Add a wheel">Add</button><button class="btn" id="btnRemWheel" aria-label="Remove the last wheel">Remove</button></div></div>
+      <div id="wheelsList"></div>
+      <p class="hint">A wheel sits where its angle meets the body's edge, so it stays put when you change corners. 0° is straight ahead, 270° straight down.</p>
     </div>
+
+    <div class="section">
+      <div class="label">Colour</div>
+      <div class="ctl" style="margin-top:4px"><span>Hue</span><input type="range" id="inputHue" min="0" max="359" value="0" aria-label="Hue"><span id="swatch" style="height:20px;border-radius:6px"></span></div>
+    </div>
+
+    <details class="section">
+      <summary>How the cars work</summary>
+      <p>Engine torque comes from body area, shared between the wheels. A big body is strong but heavy.</p>
+      <p>Big wheels give more clearance and speed for the same gearing; small wheels push harder.</p>
+      <p>On the sprint, a light car with high gearing tends to win. Hills want torque and grip. Rough ground rewards soft suspension and a long, low wheelbase.</p>
+    </details>
+  </aside>
+</div>
 
 <script>
-    // --- CONSTANTS (Must match Game) ---
-    const CONFIG = {
-        SCALE: 60, // Zoomed in for designer
-        POWER_DENSITY: 80.0,
-        BODY_DENSITY: 2.0,
-        WHEEL_DENSITY: 1.0
+(function () {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const DEG = 180 / Math.PI;
+const D = RC.DEFAULTS;
+
+let car = RC.fromData({
+    hue: 205,
+    points: [{ angle: 0.1, radius: 1.6 }, { angle: 1.2, radius: 0.8 }, { angle: 2.6, radius: 1.3 }, { angle: 3.6, radius: 1.2 }, { angle: 5.3, radius: 1.0 }],
+    wheels: [{ angle: 3.6, radius: 0.45 }, { angle: 5.6, radius: 0.45 }],
+    motorSpeed: 15, density: 2, suspHz: 4, suspDamp: 0.7
+});
+let hot = null;            // { kind: 'point'|'wheel', idx } highlighted in the preview
+let spin = 0;
+let canvas, ctx, dpr = 1;
+
+const TUNING = [
+    { key: 'motorSpeed', label: 'Gearing', min: D.MOTOR_MIN, max: D.MOTOR_MAX, step: 0.5, unit: 'rad/s' },
+    { key: 'density', label: 'Density', min: D.DENSITY_MIN, max: D.DENSITY_MAX, step: 0.05 },
+    { key: 'suspHz', label: 'Springs', min: D.SUSPHZ_MIN, max: D.SUSPHZ_MAX, step: 0.1, unit: 'Hz' },
+    { key: 'suspDamp', label: 'Damping', min: D.SUSPDAMP_MIN, max: D.SUSPDAMP_MAX, step: 0.01 }
+];
+
+// One labelled slider + number box, kept in sync.
+function control(label, value, min, max, step, onInput, onChange) {
+    const row = document.createElement('div');
+    row.className = 'ctl';
+    row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" aria-label="${label}"><input type="number" min="${min}" max="${max}" step="${step}" aria-label="${label}">`;
+    const [range, num] = row.querySelectorAll('input');
+    const decimals = step < 0.1 ? 2 : (step < 1 ? 1 : 0);
+    range.value = value; num.value = (+value).toFixed(decimals);
+    const set = (v, from) => {
+        v = RC.clamp(v, min, max);
+        if (from !== range) range.value = v;
+        if (from !== num) num.value = v.toFixed(decimals);
+        onInput(v);
+        refresh();
     };
+    range.addEventListener('input', () => set(parseFloat(range.value), range));
+    num.addEventListener('input', () => { const v = parseFloat(num.value); if (!isNaN(v)) set(v, num); });
+    if (onChange) { range.addEventListener('change', onChange); num.addEventListener('change', onChange); }
+    return row;
+}
 
-    // --- STATE ---
-    // Matches the Genome structure from index.html
-    const genome = {
-        hue: 0,
-        points: [
-            { angle: 0, radius: 1.0 },
-            { angle: 2.0, radius: 1.0 },
-            { angle: 4.0, radius: 1.0 }
-        ],
-        wheels: [
-            { vertexIndex: 0, radius: 0.4 },
-            { vertexIndex: 1, radius: 0.4 }
-        ]
-    };
+function item(title, kind, idx) {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `<div class="item-title">${title}</div>`;
+    const on = () => { hot = { kind, idx }; div.classList.add('hot'); };
+    const off = () => { hot = null; div.classList.remove('hot'); };
+    div.addEventListener('pointerenter', on); div.addEventListener('pointerleave', off);
+    div.addEventListener('focusin', on); div.addEventListener('focusout', off);
+    return div;
+}
 
-    let canvas, ctx;
+const resort = () => { RC.normalize(car); renderAll(); };
+const toDeg = (rad) => Math.round(rad * DEG);
 
-    // --- INIT ---
-    window.onload = function() {
-        canvas = document.getElementById('canvas');
-        ctx = canvas.getContext('2d');
-        
-        // Resize Handler
-        const resize = () => {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
-            draw();
-        };
-        window.addEventListener('resize', resize);
-        resize();
+function renderTuning() {
+    const box = $('tuning'); box.innerHTML = '';
+    TUNING.forEach(t => box.appendChild(control(t.label, car[t.key], t.min, t.max, t.step, (v) => { car[t.key] = v; })));
+}
 
-        // Bind Global Inputs
-        document.getElementById('inputHue').addEventListener('input', (e) => {
-            genome.hue = parseInt(e.target.value);
-            updateUI();
-            draw();
-        });
+function renderPoints() {
+    const box = $('pointsList'); box.innerHTML = '';
+    car.points.forEach((p, i) => {
+        const div = item(`Corner ${i + 1}`, 'point', i);
+        div.appendChild(control('Length', p.radius, D.POINT_R_MIN, D.POINT_R_MAX, 0.05, (v) => { p.radius = v; }));
+        div.appendChild(control('Angle °', toDeg(p.angle), 0, 359, 1, (v) => { p.angle = v / DEG; }, resort));
+        box.appendChild(div);
+    });
+}
 
-        document.getElementById('checkAutoSort').addEventListener('change', () => {
-            if(document.getElementById('checkAutoSort').checked) {
-                sortPoints();
-                renderPointsUI();
-                draw();
-            }
-        });
+function renderWheels() {
+    const box = $('wheelsList'); box.innerHTML = '';
+    if (!car.wheels.length) box.innerHTML = '<p class="hint">No wheels. It will just slide.</p>';
+    car.wheels.forEach((w, i) => {
+        const div = item(`Wheel ${i + 1}`, 'wheel', i);
+        div.appendChild(control('Size', w.radius, D.WHEEL_R_MIN, D.WHEEL_R_MAX, 0.05, (v) => { w.radius = v; }));
+        div.appendChild(control('Angle °', toDeg(w.angle), 0, 359, 1, (v) => { w.angle = v / DEG; }));
+        box.appendChild(div);
+    });
+}
 
-        // Buttons
-        document.getElementById('btnAddPoint').onclick = addPoint;
-        document.getElementById('btnRemPoint').onclick = remPoint;
-        document.getElementById('btnAddWheel').onclick = addWheel;
-        document.getElementById('btnRemWheel').onclick = remWheel;
-        
-        document.getElementById('btnExport').onclick = exportJSON;
-        document.getElementById('btnImport').onclick = importJSON;
+function renderAll() {
+    renderTuning(); renderPoints(); renderWheels();
+    $('inputHue').value = car.hue;
+    refresh();
+}
 
-        // Initial Render
-        renderPointsUI();
-        renderWheelsUI();
-        updateUI();
-        draw();
-        
-        // Animation Loop (just for spinning wheels visual)
-        requestAnimationFrame(animate);
-    };
+function refresh() {
+    const s = RC.stats(car);
+    $('statArea').textContent = s.area.toFixed(2) + ' m²';
+    $('statMass').textContent = s.mass.toFixed(1) + ' kg';
+    $('statTorque').textContent = s.torque.toFixed(0) + ' Nm';
+    $('statRatio').textContent = s.ratio.toFixed(1);
+    $('swatch').style.background = `hsl(${car.hue}, 70%, 50%)`;
+}
 
-    // --- LOGIC ---
+function setIo(msg, err) { $('ioStatus').textContent = msg; $('ioStatus').className = err ? 'err' : ''; }
 
-    function sortPoints() {
-        // Sorts points by angle to ensure convex-ish polygon
-        genome.points.sort((a,b) => a.angle - b.angle);
-    }
+function load(text) {
+    try { car = RC.fromData(JSON.parse(text)); renderAll(); setIo('Loaded.'); return true; }
+    catch (e) { setIo("That isn't a car this page can read (" + e.message + ').', true); return false; }
+}
 
-    function addPoint() {
-        if(genome.points.length >= 20) return;
-        // Add random point
-        genome.points.push({ 
-            angle: Math.random() * 6.28, 
-            radius: 1.0 
-        });
-        if(document.getElementById('checkAutoSort').checked) sortPoints();
-        renderPointsUI();
-        // Vital: Refresh wheels dropdown so new points appear in list
-        renderWheelsUI(); 
-        updateUI();
-        draw();
-    }
+/* ---------- preview ---------- */
 
-    function remPoint() {
-        if(genome.points.length <= 3) return;
-        genome.points.pop();
-        // Clamp wheel indices
-        genome.wheels.forEach(w => {
-            if(w.vertexIndex >= genome.points.length) w.vertexIndex = genome.points.length - 1;
-        });
-        renderPointsUI();
-        renderWheelsUI(); 
-        updateUI();
-        draw();
-    }
+function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+}
 
-    function addWheel() {
-        if(genome.wheels.length >= 8) return;
-        genome.wheels.push({ vertexIndex: 0, radius: 0.4 });
-        renderWheelsUI();
-        updateUI();
-        draw();
-    }
+function draw() {
+    const r = canvas.getBoundingClientRect(), W = r.width, H = r.height;
+    const S = Math.max(30, Math.min(70, Math.min(W, H) / 9));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
 
-    function remWheel() {
-        if(genome.wheels.length <= 0) return;
-        genome.wheels.pop();
-        renderWheelsUI();
-        updateUI();
-        draw();
-    }
+    // ground guide, 3 m below the centre
+    const cy = H * 0.45;
+    ctx.strokeStyle = '#c9c4b6'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.moveTo(0, cy + 3 * S); ctx.lineTo(W, cy + 3 * S); ctx.stroke(); ctx.setLineDash([]);
 
-    function calculateStats() {
-        // Calculate Area (Shoelace formula for triangles from center)
-        let area = 0;
-        const pts = genome.points.map(p => ({
-            x: p.radius * Math.cos(p.angle),
-            y: p.radius * Math.sin(p.angle)
-        }));
-        
-        for(let i=0; i<pts.length; i++) {
-            const p1 = pts[i];
-            const p2 = pts[(i+1)%pts.length];
-            // Triangle area with (0,0) is 0.5 * |x1y2 - y1x2|
-            area += 0.5 * Math.abs(p1.x * p2.y - p1.y * p2.x);
-        }
+    ctx.translate(W / 2, cy);
+    ctx.scale(1, -1);
 
-        // Calculate Mass
-        const bodyMass = area * CONFIG.BODY_DENSITY;
-        let wheelMass = 0;
-        genome.wheels.forEach(w => {
-            wheelMass += Math.PI * w.radius * w.radius * CONFIG.WHEEL_DENSITY;
-        });
-        const totalMass = bodyMass + wheelMass;
-
-        // Calculate Torque
-        const torque = area * CONFIG.POWER_DENSITY;
-
-        return { area, totalMass, torque };
-    }
-
-    // --- UI RENDERING ---
-
-    function updateUI() {
-        // Color Preview
-        document.getElementById('colorPreview').style.backgroundColor = `hsl(${genome.hue}, 70%, 50%)`;
-        
-        // Stats
-        const stats = calculateStats();
-        document.getElementById('statArea').innerText = stats.area.toFixed(2) + " m²";
-        document.getElementById('statMass').innerText = stats.totalMass.toFixed(1) + " kg";
-        document.getElementById('statTorque').innerText = stats.torque.toFixed(1) + " Nm";
-        
-        const ratio = (stats.totalMass > 0) ? (stats.torque / stats.totalMass) : 0;
-        document.getElementById('statRatio').innerText = ratio.toFixed(2);
-    }
-
-    function renderPointsUI() {
-        const container = document.getElementById('pointsList');
-        container.innerHTML = '';
-
-        genome.points.forEach((p, idx) => {
-            const div = document.createElement('div');
-            div.className = "bg-gray-50 p-2 rounded border border-gray-200";
-            
-            const degrees = Math.round(p.angle * 57.2958);
-
-            div.innerHTML = `
-                <div class="flex justify-between mb-1 text-[10px] font-bold text-gray-500">
-                    <span>Vertex #${idx + 1}</span>
-                </div>
-                <div class="slider-group">
-                    <span class="slider-label">Len:</span>
-                    <input type="number" min="0.2" max="3.5" step="0.1" value="${p.radius.toFixed(2)}" data-idx="${idx}" class="input-radius-num">
-                    <input type="range" min="0.2" max="3.5" step="0.1" value="${p.radius}" data-idx="${idx}" class="input-radius-range">
-                </div>
-                <div class="slider-group">
-                    <span class="slider-label">Ang:</span>
-                    <input type="number" min="0" max="360" step="1" value="${degrees}" data-idx="${idx}" class="input-angle-num">
-                    <input type="range" min="0" max="6.28" step="0.05" value="${p.angle}" data-idx="${idx}" class="input-angle-range">
-                </div>
-            `;
-            container.appendChild(div);
-        });
-
-        // --- Bind Events for Radius ---
-        // Range Slider
-        document.querySelectorAll('.input-radius-range').forEach(el => {
-            el.addEventListener('input', (e) => {
-                const idx = e.target.dataset.idx;
-                const val = parseFloat(e.target.value);
-                genome.points[idx].radius = val;
-                // Sync number box
-                e.target.parentElement.querySelector('.input-radius-num').value = val.toFixed(2);
-                updateUI();
-                draw();
-            });
-        });
-        // Number Input
-        document.querySelectorAll('.input-radius-num').forEach(el => {
-            el.addEventListener('input', (e) => {
-                const idx = e.target.dataset.idx;
-                let val = parseFloat(e.target.value);
-                if(isNaN(val)) return;
-                // Clamp
-                if(val < 0.2) val = 0.2;
-                if(val > 3.5) val = 3.5;
-                genome.points[idx].radius = val;
-                // Sync slider
-                e.target.parentElement.querySelector('.input-radius-range').value = val;
-                updateUI();
-                draw();
-            });
-        });
-
-        // --- Bind Events for Angle ---
-        // Range Slider
-        document.querySelectorAll('.input-angle-range').forEach(el => {
-            const handleInput = (e) => {
-                const idx = e.target.dataset.idx;
-                genome.points[idx].angle = parseFloat(e.target.value);
-                // Sync number box (convert rad to deg)
-                const deg = Math.round(genome.points[idx].angle * 57.2958);
-                e.target.parentElement.querySelector('.input-angle-num').value = deg;
-                updateUI();
-                draw();
-            };
-            el.addEventListener('input', handleInput);
-            
-            // Auto-sort logic on release
-            el.addEventListener('change', () => {
-                if(document.getElementById('checkAutoSort').checked) {
-                    sortPoints();
-                    renderPointsUI();
-                    draw();
-                }
-            });
-        });
-        
-        // Number Input (Degrees)
-        document.querySelectorAll('.input-angle-num').forEach(el => {
-            const handleInput = (e) => {
-                const idx = e.target.dataset.idx;
-                let deg = parseFloat(e.target.value);
-                if(isNaN(deg)) return;
-                // Clamp 0-360
-                if(deg < 0) deg = 0; 
-                if(deg > 360) deg = 360;
-                
-                const rad = deg / 57.2958;
-                genome.points[idx].angle = rad;
-                
-                // Sync slider
-                e.target.parentElement.querySelector('.input-angle-range').value = rad;
-                updateUI();
-                draw();
-            };
-            el.addEventListener('input', handleInput);
-            
-            // Auto-sort on blur/enter? Or just change?
-            el.addEventListener('change', () => {
-                if(document.getElementById('checkAutoSort').checked) {
-                    sortPoints();
-                    renderPointsUI();
-                    draw();
-                }
-            });
-        });
-    }
-
-    function renderWheelsUI() {
-        const container = document.getElementById('wheelsList');
-        container.innerHTML = '';
-
-        genome.wheels.forEach((w, idx) => {
-            const div = document.createElement('div');
-            div.className = "bg-gray-50 p-2 rounded border border-gray-200";
-            
-            // Build options for Vertex Dropdown
-            let options = '';
-            genome.points.forEach((_, pIdx) => {
-                const sel = (pIdx === w.vertexIndex) ? 'selected' : '';
-                options += `<option value="${pIdx}" ${sel}>Vertex ${pIdx + 1}</option>`;
-            });
-
-            div.innerHTML = `
-                <div class="flex justify-between mb-1 text-[10px] font-bold text-gray-500">
-                    <span>Wheel #${idx + 1}</span>
-                </div>
-                <div class="slider-group">
-                    <span class="slider-label">Size:</span>
-                    <input type="number" min="0.1" max="1.5" step="0.05" value="${w.radius.toFixed(2)}" data-idx="${idx}" class="input-wheel-num">
-                    <input type="range" min="0.1" max="1.5" step="0.05" value="${w.radius}" data-idx="${idx}" class="input-wheel-range">
-                </div>
-                <div class="flex items-center gap-2 mt-1">
-                    <span class="slider-label">Mount:</span>
-                    <select class="text-xs border rounded p-1 w-full input-wheel-idx" data-idx="${idx}">
-                        ${options}
-                    </select>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-
-        // Bind Range
-        document.querySelectorAll('.input-wheel-range').forEach(el => {
-            el.addEventListener('input', (e) => {
-                const idx = e.target.dataset.idx;
-                const val = parseFloat(e.target.value);
-                genome.wheels[idx].radius = val;
-                // Sync num
-                e.target.parentElement.querySelector('.input-wheel-num').value = val.toFixed(2);
-                updateUI();
-                draw();
-            });
-        });
-        
-        // Bind Number
-        document.querySelectorAll('.input-wheel-num').forEach(el => {
-            el.addEventListener('input', (e) => {
-                const idx = e.target.dataset.idx;
-                let val = parseFloat(e.target.value);
-                if(isNaN(val)) return;
-                if(val < 0.1) val = 0.1;
-                if(val > 1.5) val = 1.5;
-                genome.wheels[idx].radius = val;
-                // Sync slider
-                e.target.parentElement.querySelector('.input-wheel-range').value = val;
-                updateUI();
-                draw();
-            });
-        });
-
-        document.querySelectorAll('.input-wheel-idx').forEach(el => {
-            el.addEventListener('change', (e) => {
-                const idx = e.target.dataset.idx;
-                genome.wheels[idx].vertexIndex = parseInt(e.target.value);
-                updateUI();
-                draw();
-            });
-        });
-    }
-
-    function exportJSON() {
-        const json = JSON.stringify(genome);
-        navigator.clipboard.writeText(json).then(() => {
-            alert("Car Genome copied to clipboard!\nPaste it into the game's 'Import' box.");
-        });
-    }
-
-    function importJSON() {
-        const text = prompt("Paste car JSON here:");
-        if(!text) return;
-        try {
-            const data = JSON.parse(text);
-            if(!data.points || !data.wheels) throw new Error("Invalid Format");
-            
-            // Load
-            genome.hue = data.hue || 0;
-            genome.points = data.points;
-            genome.wheels = data.wheels;
-            
-            renderPointsUI();
-            renderWheelsUI();
-            updateUI();
-            draw();
-        } catch(e) {
-            alert("Error: " + e.message);
-        }
-    }
-
-    // --- CANVAS VISUALIZER ---
-    let spinAngle = 0;
-
-    function animate() {
-        spinAngle -= 0.05; // Rotate wheels slowly
-        draw();
-        requestAnimationFrame(animate);
-    }
-
-    function draw() {
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-
-        // Center Coordinate System
-        ctx.save();
-        ctx.translate(w/2, h/2);
-        ctx.scale(1, -1); // Flip Y to match physics
-        
-        // Calculate Cartesian Points
-        const poly = genome.points.map(p => ({
-            x: p.radius * Math.cos(p.angle) * CONFIG.SCALE,
-            y: p.radius * Math.sin(p.angle) * CONFIG.SCALE
-        }));
-
-        // Draw Body (Pizza Slices)
-        for(let i=0; i<poly.length; i++) {
-            const p1 = poly[i];
-            const p2 = poly[(i+1)%poly.length];
-            
-            ctx.beginPath();
-            ctx.moveTo(0,0);
-            ctx.lineTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.closePath();
-            
-            // Color logic from game
-            const lightness = 50 + (i % 2) * 10;
-            ctx.fillStyle = `hsl(${genome.hue}, 70%, ${lightness}%)`;
-            ctx.fill();
-            ctx.strokeStyle = '#1f2937'; // Dark border
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-
-        // Draw Center of Mass / Origin
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, 6.28);
+    const pts = car.points.map(p => RC.cornerXY(p));
+    pts.forEach((p1, i) => {
+        const p2 = pts[(i + 1) % pts.length];
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(p1.x * S, p1.y * S); ctx.lineTo(p2.x * S, p2.y * S); ctx.closePath();
+        ctx.fillStyle = `hsl(${car.hue}, 70%, ${50 + (i % 2) * 10}%)`;
         ctx.fill();
+        ctx.strokeStyle = '#1e2a4a'; ctx.lineWidth = 1.5; ctx.stroke();
+    });
 
-        // Draw Wheels
-        genome.wheels.forEach(wh => {
-            const mount = poly[wh.vertexIndex]; // Already scaled
-            const r = wh.radius * CONFIG.SCALE;
-            
-            ctx.save();
-            ctx.translate(mount.x, mount.y);
-            ctx.rotate(spinAngle); // Spin animation
-            
-            // Wheel Body
-            ctx.fillStyle = '#374151'; // Dark Gray
-            ctx.beginPath();
-            ctx.arc(0, 0, r, 0, 6.28);
-            ctx.fill();
-            
-            // Spoke (Visual spin)
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(r, 0); // Spoke 1
-            ctx.moveTo(0, 0);
-            ctx.lineTo(0, r); // Spoke 2 (90 deg)
-            ctx.stroke();
-            
-            ctx.restore();
+    // corner numbers and the highlighted corner
+    ctx.save(); ctx.scale(1, -1);
+    ctx.font = '12px "Atkinson Hyperlegible", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    pts.forEach((p, i) => {
+        const isHot = hot && hot.kind === 'point' && hot.idx === i;
+        ctx.fillStyle = isHot ? '#f4a629' : '#fffdf8';
+        ctx.beginPath(); ctx.arc(p.x * S, -p.y * S, isHot ? 11 : 9, 0, RC.TAU); ctx.fill();
+        ctx.strokeStyle = '#1e2a4a'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = '#1e2a4a'; ctx.fillText(String(i + 1), p.x * S, -p.y * S + 1);
+    });
+    ctx.restore();
+
+    car.wheels.forEach((w, i) => {
+        const m = RC.mountPoint(car.points, w.angle), r = w.radius * S;
+        const isHot = hot && hot.kind === 'wheel' && hot.idx === i;
+        ctx.save();
+        ctx.translate(m.x * S, m.y * S);
+        ctx.fillStyle = '#1e2a4a';
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, RC.TAU); ctx.fill();
+        if (isHot) { ctx.strokeStyle = '#f4a629'; ctx.lineWidth = 4; ctx.stroke(); }
+        ctx.rotate(spin);
+        ctx.strokeStyle = '#fffdf8'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, 0); ctx.moveTo(0, 0); ctx.lineTo(0, r); ctx.stroke();
+        ctx.restore();
+    });
+
+    ctx.fillStyle = '#fffdf8';
+    ctx.beginPath(); ctx.arc(0, 0, 3, 0, RC.TAU); ctx.fill();
+}
+
+function animate() { spin -= 0.04; draw(); requestAnimationFrame(animate); }
+
+/* ---------- wiring ---------- */
+
+window.addEventListener('load', () => {
+    canvas = $('canvas'); ctx = canvas.getContext('2d');
+    window.addEventListener('resize', resize); resize();
+
+    $('inputHue').addEventListener('input', (e) => { car.hue = parseInt(e.target.value, 10); refresh(); });
+    $('btnAddPoint').onclick = () => {
+        if (car.points.length >= 20) return;
+        // put the new corner in the middle of the widest gap
+        let best = 0, at = 0;
+        car.points.forEach((p, i) => {
+            const next = i + 1 < car.points.length ? car.points[i + 1].angle : car.points[0].angle + RC.TAU;
+            if (next - p.angle > best) { best = next - p.angle; at = p.angle + best / 2; }
         });
+        car.points.push({ angle: at, radius: RC.clamp(RC.outlineRadius(car.points, at), D.POINT_R_MIN, D.POINT_R_MAX) });
+        resort();
+    };
+    $('btnRemPoint').onclick = () => { if (car.points.length > 3) { car.points.pop(); renderAll(); } };
+    $('btnAddWheel').onclick = () => { if (car.wheels.length < 8) { car.wheels.push({ angle: 270 / DEG, radius: 0.4 }); renderAll(); } };
+    $('btnRemWheel').onclick = () => { car.wheels.pop(); renderAll(); };
 
-        // Draw Ground Line
-        ctx.restore(); // Back to screen coords for simple line
-        ctx.beginPath();
-        const groundY = h/2 + 3.0 * CONFIG.SCALE; // 3m below center
-        ctx.moveTo(0, groundY);
-        ctx.lineTo(w, groundY);
-        ctx.strokeStyle = '#9ca3af';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
+    $('btnCopy').onclick = () => {
+        const json = JSON.stringify(RC.toData(car));
+        $('io').value = json;
+        if (navigator.clipboard) navigator.clipboard.writeText(json).then(() => setIo('Copied to your clipboard.'), () => setIo('The JSON is in the box.'));
+        else setIo('The JSON is in the box.');
+    };
+    $('btnLoad').onclick = () => load($('io').value);
+    $('btnRace').onclick = () => { location.href = 'index.html#car=' + encodeURIComponent(JSON.stringify(RC.toData(car))); };
 
+    // index.html sends its leader as #car=<json>
+    const m = location.hash.match(/^#car=(.+)$/);
+    if (m) {
+        const text = decodeURIComponent(m[1]);
+        $('io').value = text;
+        window.history.replaceState(null, '', location.pathname);
+        if (load(text)) setIo("Loaded the race leader.");
+        else renderAll();
+    } else renderAll();
+
+    requestAnimationFrame(animate);
+});
+})();
 </script>
 </body>
 </html>

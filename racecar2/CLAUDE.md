@@ -1,7 +1,3 @@
-# Evolutionary Cars: Arena Edition, `/racecar2`
+# `/racecar2`: redirect only
 
-Variant of `racecar/` where the whole population races at once: tournament selection, crossover, evolvable drivetrain.
-
-- Single `index.html`. Tailwind CDN + Planck.js. See `racecar/CLAUDE.md` for the shared physics model.
-
-Static, no build step; deploys on push to `main`. Follow the root `CLAUDE.md` (and `AESTHETIC.md` for anything new).
+The Arena Edition moved to `/racecar` on 2026-11-11. `index.html` here just redirects (keeping query and hash). Work in `racecar/` and read its CLAUDE.md.
