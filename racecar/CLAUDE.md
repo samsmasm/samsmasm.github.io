@@ -46,6 +46,18 @@ flat (fastest to 100 m), hill (`y = x²/1000`), jump (ski ramp, gap 50 to 65 m),
 
 "Evolve" spreads each generation across `hardwareConcurrency - 1` workers (max 8), each racing its slice of the population in its own world with the same terrain seed, then evolves on the main thread. Cars never touch, so on smooth tracks this gives identical results (tested). On rough and jump, Planck's contact order depends on which cars share a world and bumps amplify float differences, so a car never repeats its exact run there (true in the live arena too). Measured: about 1 s per sprint generation in the browser versus 10 to 60 s watching at 4x. Workers need http(s); opening index.html as a file shows a message instead.
 
+## Page details
+
+- Track tabs live in the masthead (no start screen, no modals). Switching track after generation 5 asks with `confirm()`, then restarts from random cars and abandons any background run.
+- Designer and race hand cars to each other in the URL hash: `index.html#car=<json>` and `designer.html#car=<json>` (cleared from the address bar after loading).
+- Click a row in "Best each generation" to put that generation's champion in the Save box.
+- Below 860px the side panels hide behind a Controls button and the track tabs drop to a second masthead row (`--mast-h` goes from 64px to 100px).
+- In `app.js` the generation list is a variable called `history`, which shadows `window.history`. Use `window.history` explicitly.
+
+## Checking in a browser
+
+Workers need http, so serve the repo root with `python3 -m http.server 8765 --bind 127.0.0.1` and open `/racecar/`. If the Chrome extension isn't connected, use Puppeteer: `require('/home/sam/.cache/sw-test/node_modules/puppeteer-core')` with `executablePath: '/usr/bin/google-chrome'`, accept dialogs with `page.on('dialog', d => d.accept())`, and wait for a background run with `waitForFunction(() => btnFast.textContent === 'Evolve')`.
+
 ## Status
 
 Working and tested 2026-11-11 (Node tests + headless Chrome: live race, 10-generation background run, track switch mid-run, legacy JSON load, designer to race hand-off, phone layout). Deferred idea (Sam not yet asked): evolve a small "driver" network for throttle and mid-air leaning.
