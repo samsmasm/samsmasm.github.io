@@ -404,9 +404,6 @@
   .shortcuts .sc-group { grid-column: 1 / -1; font-weight: 600; margin-top: 6px; }
   .shortcuts .sc-keys { white-space: nowrap; }
   .shortcuts kbd { font-family: var(--mono); font-size: 11px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; }
-  .help-modal ol, .help-modal ul { font-size: 13px; line-height: 1.45; padding-left: 20px; }
-  .help-modal li { margin-bottom: 5px; }
-  .help-modal code { font-family: var(--mono); font-size: 12px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 3px; padding: 0 3px; }
   .set-note { font-size: 12px; color: var(--muted); line-height: 1.4; margin: -6px 0 4px; }
   .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; }
   .set-row select { font-family: var(--sans); font-size: 12px; background: var(--tag-bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; color: var(--text); max-width: 250px; }
@@ -512,7 +509,6 @@
   <div class="header-actions">
     <button id="undo-btn" class="ghost" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button id="redo-btn" class="ghost" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
-    <button class="ghost" id="help-btn" onclick="document.getElementById('help-modal').classList.add('open')" title="How to use ShiftWork">Help</button>
     <button class="ghost" onclick="openFeedback()" title="Report a problem or suggest an idea">Feedback</button>
     <button onclick="openSaveModal()">Save / Load</button>
     <div class="export-wrap">
@@ -698,35 +694,6 @@
       <button class="btn-cancel" onclick="document.getElementById('save-modal').classList.remove('open')">Close</button>
       <button class="btn-confirm" onclick="copySaveCode(this)">Copy code</button>
       <button class="btn-confirm" onclick="loadFromSaveModal()">Load from code</button>
-    </div>
-  </div>
-</div>
-
-<!-- HELP MODAL -->
-<div class="modal-overlay" id="help-modal" onclick="if (event.target === this) this.classList.remove('open')">
-  <div class="modal settings-modal help-modal" role="dialog" aria-label="Help">
-    <h2>How to use ShiftWork</h2>
-    <ol>
-      <li>Pick a template on the left, or start from blank axes.</li>
-      <li>Draw with the tools: line, curve, arrow, label, fill, point.</li>
-      <li>Click anything to select it and change it in the right-hand panel.</li>
-      <li>Export ▾ to copy the picture into Docs or Slides, or download it.</li>
-    </ol>
-    <h3>Handy things you might miss</h3>
-    <ul>
-      <li><b>Subscripts:</b> type <code>S_1</code> for S₁. In curve and point labels plain <code>S1</code> works too.</li>
-      <li><b>Shift a curve:</b> select it, then Shift left / Shift right. You get S₂, the arrow and the new equilibrium.</li>
-      <li><b>Equilibrium tool:</b> click where two curves cross for a point with drop lines and P/Q labels that follow the curves.</li>
-      <li><b>Edit a label:</b> click or double-click it and type. Drag a label to move it.</li>
-      <li><b>Fill region:</b> click inside an area to shade it, click again to change the colour or hatching. Click the tool button again to draw corners by hand.</li>
-      <li><b>Move one thing alone:</b> hold Alt (Option) while dragging.</li>
-      <li><b>Numbers</b> switch (top bar) adds numbered axes and a grid.</li>
-      <li><b>Style</b> menu makes the whole diagram coloured, hatched, thin or thick in one go.</li>
-      <li>Everything can be undone (Ctrl+Z), and your last diagram reopens when you come back.</li>
-      <li>More shortcuts are in Settings ⚙.</li>
-    </ul>
-    <div class="modal-actions">
-      <button class="btn-confirm" onclick="document.getElementById('help-modal').classList.remove('open')">Done</button>
     </div>
   </div>
 </div>
@@ -1615,7 +1582,7 @@ function shownLabelPos(el, text) {
   if (text === el.label) return pos;
   ctx.save();
   ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
-  const extra = (ctx.measureText(text).width - ctx.measureText(el.label).width) / 2;
+  const extra = (richWidth(text) - richWidth(el.label)) / 2;
   ctx.restore();
   const ends = el.type === 'curve' ? [el.points[0], el.points[el.points.length - 1]].map(p => toCanvas(p.xn, p.yn))
     : [toCanvas(el.x1n, el.y1n), toCanvas(el.x2n, el.y2n)];
@@ -1634,12 +1601,12 @@ function hitTestAxisLabel(cx, cy) {
   // X label: right-aligned to MARGIN.left+PLOT_W, below axis
   const xlx = MARGIN.left + PLOT_W + state.xLabelDx;
   const xly = xTitleY() + state.xLabelDy;
-  const xw = ctx.measureText(state.xLabel).width;
+  const xw = richWidth(state.xLabel);
   if (cx >= xlx - xw - 4 && cx <= xlx + 4 && Math.abs(cy - xly - 6) < 14) return 'xLabel';
   // Y label: rotated, top-left of y-axis; right-aligned so text ends at top
   const ylx = yTitleX() + state.yLabelDx;
   const yly = MARGIN.top + state.yLabelDy;
-  const yw = ctx.measureText(state.yLabel).width;
+  const yw = richWidth(state.yLabel);
   if (Math.abs(cx - ylx) < 12 && cy >= yly - 4 && cy <= yly + yw + 4) return 'yLabel';
   return null;
 }
@@ -1841,6 +1808,9 @@ const SHORTCUTS = [
   ['Drawing', [
     [['Shift'], 'Hold while drawing a line to keep it level, upright or at 45°'],
     ['Double-click', 'Finish a curve'],
+  ]],
+  ['Typing labels', [
+    [['_'], 'Subscript: S_1 gives S₁, P_M gives P with a small M'],
   ]],
   ['Moving around', [
     ['Scroll wheel', 'Zoom in and out (or pinch)'],
@@ -2697,21 +2667,21 @@ function drawAxes() {
   // X label — below and right-aligned to the right end of x-axis
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.fillText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, xTitleY() + state.xLabelDy);
+  richText(state.xLabel, MARGIN.left + PLOT_W + state.xLabelDx, xTitleY() + state.xLabelDy);
   // Y label — rotated 90° CCW, top-left of y-axis
   ctx.save();
   ctx.translate(yTitleX() + state.yLabelDx, MARGIN.top + state.yLabelDy);
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  ctx.fillText(state.yLabel, 0, 0);
+  richText(state.yLabel, 0, 0);
   ctx.restore();
 
   // Title
   ctx.font = `600 ${fontPx(15)}px "IBM Plex Sans", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(state.title, W / 2, 26);
+  richText(state.title, W / 2, 26);
 
   ctx.restore();
 }
@@ -2915,7 +2885,7 @@ function drawLineLabel(el) {
   if (el.id === state.selectedId) {
     ctx.save();
     ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
-    const w = ctx.measureText(text).width;
+    const w = richWidth(text);
     ctx.strokeStyle = el.color || '#1a1918';
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 2]);
@@ -2927,12 +2897,60 @@ function drawLineLabel(el) {
   }
 }
 
+// Letter subscripts: "P_M" draws M smaller and lower. Unicode has no capital
+// subscript letters, so these are drawn rather than converted (digits are
+// converted by fmtLabel). "_" takes the letters/digits up to a space or symbol.
+function textRuns(s) {
+  const runs = [], re = /_([A-Za-z0-9₀-₉]+)/g;
+  let i = 0, m;
+  while ((m = re.exec(s))) {
+    if (m.index > i) runs.push([s.slice(i, m.index), false]);
+    runs.push([m[1], true]);
+    i = re.lastIndex;
+  }
+  if (i < s.length) runs.push([s.slice(i), false]);
+  return runs;
+}
+const SUB_SIZE = 0.72, SUB_DROP = 0.3;
+const fontSize = () => +(/(\d+(?:\.\d+)?)px/.exec(ctx.font) || [0, 13])[1];
+const subFont = (font, sz) => font.replace(/\d+(?:\.\d+)?px/, (sz * SUB_SIZE).toFixed(1) + 'px');
+function richWidth(s) {
+  s = String(s ?? '');
+  if (!/_[A-Za-z0-9₀-₉]/.test(s)) return ctx.measureText(s).width;
+  const font = ctx.font, sz = fontSize();
+  let w = 0;
+  for (const [t, sub] of textRuns(s)) {
+    if (sub) ctx.font = subFont(font, sz);
+    w += ctx.measureText(t).width;
+    ctx.font = font;
+  }
+  return w;
+}
+// fillText / strokeText with letter subscripts, honouring ctx.textAlign.
+function richText(s, x, y, stroke) {
+  s = String(s ?? '');
+  if (!/_[A-Za-z0-9₀-₉]/.test(s)) return stroke ? ctx.strokeText(s, x, y) : ctx.fillText(s, x, y);
+  const font = ctx.font, sz = fontSize(), align = ctx.textAlign, w = richWidth(s);
+  let cx = align === 'center' ? x - w / 2 : (align === 'right' || align === 'end') ? x - w : x;
+  ctx.textAlign = 'left';
+  for (const [t, sub] of textRuns(s)) {
+    if (sub) ctx.font = subFont(font, sz);
+    const dy = sub ? sz * SUB_DROP : 0;
+    if (stroke) ctx.strokeText(t, cx, y + dy); else ctx.fillText(t, cx, y + dy);
+    cx += ctx.measureText(t).width;
+    ctx.font = font;
+  }
+  ctx.textAlign = align;
+}
+// Same for HTML (legend list): escaped, with <sub> for the subscript runs.
+const richHtml = s => textRuns(String(s ?? '')).map(([t, sub]) => sub ? `<sub>${escapeHtml(t)}</sub>` : escapeHtml(t)).join('');
+
 // Labels get a white halo so they stay readable over hatching and lines.
 function haloText(text, x, y) {
   ctx.save();
   ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.setLineDash([]);
   ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-  ctx.strokeText(text, x, y);
+  richText(text, x, y, true);
   ctx.restore();
 }
 
@@ -2943,7 +2961,7 @@ function drawLabelAt(text, x, y, color) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   haloText(text, x, y);
-  ctx.fillText(text, x, y);
+  richText(text, x, y);
   ctx.restore();
 }
 
@@ -2955,7 +2973,7 @@ function drawTextEl(el) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   haloText(el.text, p.x, p.y);
-  ctx.fillText(el.text, p.x, p.y);
+  richText(el.text, p.x, p.y);
   ctx.restore();
 }
 
@@ -2972,7 +2990,7 @@ function dotLabelBox(el, which) {
   }
   ctx.save();
   ctx.font = `500 ${fontPx(13)}px "IBM Plex Sans", sans-serif`;
-  const w = ctx.measureText(text).width;
+  const w = richWidth(text);
   ctx.restore();
   if (which === 'p') {
     const a = toCanvas(0, el.yn);
@@ -3517,7 +3535,7 @@ function hitTestLabel(cx, cy) {
       const shown = el.type === 'brace' ? el.label : shownLabel(el);
       if (!shown) continue;
       const lpos = shown === el.label ? getFullLabelPos(el) : shownLabelPos(el, shown);
-      const hw = Math.max(22, ctx.measureText(shown).width / 2 + 8);
+      const hw = Math.max(22, richWidth(shown) / 2 + 8);
       if (Math.abs(cx - lpos.x) < hw && Math.abs(cy - lpos.y) < 14)
         return { el, keyX: 'labelDx', keyY: 'labelDy', editKey: 'label', pos: lpos };
     }
@@ -3919,7 +3937,7 @@ function hitTest(cx, cy) {
       const p = toCanvas(el.xn, el.yn);
       ctx.save();
       ctx.font = `500 ${fontPx(el.size || 13)}px "IBM Plex Sans", sans-serif`;
-      const hw = Math.max(12, ctx.measureText(el.text || '').width / 2 + 4);
+      const hw = Math.max(12, richWidth(el.text) / 2 + 4);
       ctx.restore();
       if (Math.abs(cx - p.x) < hw && Math.abs(cy - p.y) < (el.size || 13) * 0.6 + 4) return el;
     }
@@ -3989,7 +4007,7 @@ function renderLegendList() {
     row.className = 'curve-item';
     row.innerHTML = `<input type="checkbox" ${hidden.has(el.id) ? '' : 'checked'} onchange="setLegendEntry(${el.id}, this.checked)">
       <canvas width="56" height="28" style="width:28px;height:14px;flex-shrink:0"></canvas>
-      <span class="curve-name">${escapeHtml(el.label)}</span>`;
+      <span class="curve-name">${richHtml(el.label)}</span>`;
     const sw = row.querySelector('canvas').getContext('2d');
     sw.scale(2, 2);
     drawLegendSwatch(sw, el, 1, 1, 26, 12);
@@ -5292,7 +5310,7 @@ function renderExport(exportScale, mime, quality) {
       const y = H + pad + 8 + row * rowH + rowH / 2;
       drawLegendSwatch(ctx, item, x, y - 7, swatchW, 14);
       ctx.fillStyle = '#1a1918'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(item.label, x + swatchW + 6, y);
+      richText(item.label, x + swatchW + 6, y);
     });
     ctx.restore();
   }

@@ -521,12 +521,24 @@ test('axis titles and title: Q_1 becomes Q₁ while typing, Q1 stays plain', asy
   eq(await ev(page, `state.yLabel`), 'P₁₀', 'y title');
 });
 
-test('Help button opens a short how-to that mentions subscripts; Escape closes it', async (page) => {
-  await page.click('#help-btn');
-  eq(await ev(page, `document.getElementById('help-modal').classList.contains('open')`), true, 'opens');
-  assert((await ev(page, `document.getElementById('help-modal').textContent`)).includes('S_1'), 'mentions subscripts');
-  await page.keyboard.press('Escape');
-  eq(await ev(page, `document.getElementById('help-modal').classList.contains('open')`), false, 'Escape closes');
+test('letter subscripts: P_M draws M small and low, in axis titles, labels and the legend', async (page) => {
+  eq(await ev(page, `!!document.getElementById('help-btn')`), false, 'no Help button (shortcuts are in Settings)');
+  await ev(page, `openSettings()`);
+  assert((await ev(page, `document.getElementById('shortcuts').textContent`)).includes('P_M'), 'Settings lists subscripts');
+  await ev(page, `document.getElementById('settings-modal').classList.remove('open')`);
+  eq(await ev(page, `textRuns('P_M and Q_e1 x')`), [['P', false], ['M', true], [' and Q', false], ['e1', true], [' x', false]], 'runs');
+  await page.click('#y-label', { count: 3 });
+  await page.keyboard.type('P_M');
+  eq(await ev(page, `state.yLabel`), 'P_M', 'stored as typed');
+  // Drawn: two fillText calls, the M smaller and lower than the P.
+  const calls = await ev(page, `(() => { const out = [], f = ctx.fillText; ctx.fillText = function (t, x, y) { out.push([t, ctx.font, y]); return f.apply(this, arguments); }; redraw(); ctx.fillText = f; return out.filter(c => c[0] === 'P' || c[0] === 'M'); })()`);
+  const P = calls.find(c => c[0] === 'P'), M = calls.find(c => c[0] === 'M');
+  assert(P && M, 'P and M drawn separately: ' + JSON.stringify(calls));
+  assert(parseFloat(/[\d.]+px/.exec(M[1])[0]) < parseFloat(/[\d.]+px/.exec(P[1])[0]), 'M smaller');
+  assert(M[2] > P[2], 'M lower');
+  eq(await ev(page, `richWidth('P_M') < ctx.measureText('P_M').width`), true, 'measured without the underscore');
+  await ev(page, `state.elements = [mkLine(0.1, 0.1, 0.9, 0.9, '#1a4a8a', 2.5, '', 'MC_P')]; state.legend.show = true; renderLegendList();`);
+  assert((await ev(page, `document.getElementById('legend-list') ? document.getElementById('legend-list').innerHTML : document.body.innerHTML`)).includes('MC<sub>P</sub>'), 'legend list uses <sub>');
 });
 
 test('Drive: just Save until the diagram has a file, then Save and Save as… (a copy)', async (page) => {
