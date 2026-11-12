@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sleeping Beauty · Riddles</title>
+<meta name="description" content="A probability riddle with no agreed answer: woken up, how likely is heads?">
+<link rel="icon" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../riddles.css?v=20261112-201747">
+<style>
+.plot { max-width: 540px; margin: 0 auto; width: 100%; }
+.sw.h { background: var(--a); }
+.sw.t { background: var(--b); }
+.week { display: grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 6px 10px; align-items: center; font-size: 15px; }
+.week .hd { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.week .wake { font-weight: 700; }
+.week .no { color: var(--muted); }
+.contested { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--amber-ink); }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sides > div { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.sides .who { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sides .v { font-family: var(--font-display); font-size: 30px; font-weight: 700; }
+.sides p { font-size: 15px; }
+.twobars { display: flex; flex-direction: column; gap: 10px; }
+.twobars .lab { font-size: 15px; margin-bottom: 4px; }
+.bar2 { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.bar2 div { transition: width 0.3s; }
+@media (max-width: 480px) { .sides { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header class="masthead"><div class="masthead-inner">
+  <a href="/"><img src="/geocornsmall.png" alt="unisam.nz home"></a>
+  <div><a class="wordmark" href="../">Riddles</a><div class="msub">Guess first, then watch</div></div>
+  <a class="home" href="../">All riddles</a>
+</div></header>
+
+<main>
+  <div><div class="kicker">Riddle · still argued</div><h1 class="title">Sleeping Beauty</h1></div>
+  <ol class="stepper" id="stepper" aria-label="Progress">
+    <li>Riddle</li><li>Guess</li><li>Watch</li><li>Describe</li><li>Answer</li>
+  </ol>
+
+  <section class="card step" id="s0">
+    <h2>The riddle</h2>
+    <p class="riddle">On Sunday night, Sleeping Beauty goes to sleep. Then a fair coin is flipped.</p>
+    <div class="week" aria-label="When she is woken">
+      <span></span><span class="hd">Monday</span><span class="hd">Tuesday</span><span></span>
+      <span class="wake" style="color:var(--a)">Heads</span><span class="wake">Woken</span><span class="no">Sleeps</span><span></span>
+      <span class="wake" style="color:var(--b)">Tails</span><span class="wake">Woken</span><span class="wake">Woken</span><span></span>
+    </div>
+    <p class="riddle">After each waking she is put back to sleep with a drug that wipes her memory of being awake. So every waking feels like the first.</p>
+    <p class="riddle">She knows all of this. Now she wakes up.</p>
+    <p class="question">How likely should she think it is that the coin landed heads?</p>
+    <button type="button" class="btn" data-go="1">Make a guess</button>
+  </section>
+
+  <section class="card step" id="s1" hidden>
+    <h2>Your guess</h2>
+    <p class="sub">The chance of heads, from her point of view as she wakes.</p>
+    <div id="guess-host"></div>
+    <button type="button" class="btn" id="go-watch" data-go="2">Lock it in</button>
+  </section>
+
+  <section class="card step" id="s2" hidden>
+    <h2>Watch</h2>
+    <div id="viz-home"><div id="viz">
+      <p class="kicker" id="w-step" style="text-align:center"></p>
+      <p class="caption" id="caption" aria-live="polite"></p>
+      <div class="plot"><canvas id="watch" role="img" aria-label="1,000 runs of the experiment: coin flips, then every waking."></canvas></div>
+      <div class="legend">
+        <div><span class="sw h"></span>Heads</div>
+        <div><span class="sw t"></span>Tails</div>
+      </div>
+    </div></div>
+    <div class="btnrow">
+      <button type="button" class="btn2" id="w-back">Back</button>
+      <button type="button" class="btn" id="w-next">Next</button>
+      <button type="button" class="btn" id="go-describe" data-go="3" hidden>What did you see?</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s3" hidden>
+    <h2>What do you see?</h2>
+    <div id="viz-slot"></div>
+    <p class="sub">Which of these is true?</p>
+    <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
+      <button type="button" class="opt" data-i="0">About half of the coin flips were heads</button>
+      <button type="button" class="opt" data-i="1">About a third of the wakings were heads wakings</button>
+      <button type="button" class="opt" data-i="2">Both</button>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
+      <button type="button" class="btn2" data-go="2">Watch again</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s4" hidden>
+    <h2>The answer</h2>
+    <p class="contested">Nobody agrees</p>
+    <p class="answerline">Both counts are true. The argument is about which count answers her question.</p>
+    <div id="scale"></div>
+    <div class="sides">
+      <div><div class="who">Halfers say</div><div class="v" style="color:var(--a)">1/2</div>
+        <p>Count coin flips. She knew it was 50:50 before she slept, and waking up tells her nothing new: she was always going to wake up.</p></div>
+      <div><div class="who">Thirders say</div><div class="v" style="color:var(--b)">1/3</div>
+        <p>Count wakings. Only 1 waking in 3 is a heads waking. If she bet "tails" every time she woke, she would win twice as often.</p></div>
+    </div>
+    <div class="seen" id="seen"></div>
+    <ul class="why" id="why"></ul>
+    <details><summary>Show the calculation</summary><div class="formula" id="formula"></div></details>
+    <p class="sub" style="font-weight:700">Which side are you on?</p>
+    <div class="btnrow" role="group" aria-label="Pick a side">
+      <button type="button" class="btn2" id="side-h" aria-pressed="false">Halfer: 1/2</button>
+      <button type="button" class="btn2" id="side-t" aria-pressed="false">Thirder: 1/3</button>
+    </div>
+    <p class="seen" id="against" hidden></p>
+    <div class="btnrow">
+      <button type="button" class="btn" id="try">Wake her more often</button>
+      <button type="button" class="btn2" id="restart">Start over</button>
+    </div>
+  </section>
+
+  <section class="card" id="explore" hidden>
+    <h2>Wake her more often</h2>
+    <div class="control">
+      <div class="row"><label for="wakes">If tails, how many times she is woken</label><span class="val" id="wakes-val"></span></div>
+      <input type="range" id="wakes" min="1" max="10" step="1" value="2">
+    </div>
+    <div class="twobars">
+      <div><div class="lab">Counting coin flips (halfers): heads <b id="ph"></b></div>
+        <div class="bar2"><div id="bh1" style="background:var(--a)"></div><div id="bt1" style="background:var(--b)"></div></div></div>
+      <div><div class="lab">Counting wakings (thirders): heads <b id="pt"></b></div>
+        <div class="bar2"><div id="bh2" style="background:var(--a)"></div><div id="bt2" style="background:var(--b)"></div></div></div>
+    </div>
+  </section>
+</main>
+<footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
+
+<script src="../riddles.js?v=20261112-201747"></script>
+<script>
+(function () {
+  var $ = R.$;
+  var N = 1000, COLS = 50;
+
+  function flips(seed) { var rnd = R.rng(seed), f = []; for (var i = 0; i < N; i++) f.push(rnd() < 0.5); return f; }
+  /* a run with heads close to half, so the two counts are clean */
+  var SEED = 1, FL = flips(SEED);
+  function heads(f) { return f.filter(Boolean).length; }
+  while (Math.abs(heads(FL) - 500) > 3) FL = flips(++SEED);
+  var H = heads(FL), T = N - H, WAKES = H + 2 * T;
+
+  /* every waking: which run it came from, which coin, and whether it is the run's second waking */
+  var wakes = [];
+  FL.forEach(function (h, i) { wakes.push({ run: i, h: h, second: false }); if (!h) wakes.push({ run: i, h: false, second: true }); });
+  /* in the lined-up view, heads wakings first then tails wakings */
+  var hk = 0, tk = 0;
+  wakes.forEach(function (w) { w.line = w.h ? hk++ : H + tk++; });
+
+  /* phases: 0 coins, 1 each coin becomes its wakings, 2 wakings lined up, 3 the two counts as bars */
+  var fr = { a: 0, b: 0, u: 1 };
+  function draw() {
+    var f = R.fitCanvas($("watch"), 0.98);
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, cell = w / COLS, u = R.ease(fr.u), top = w * 0.04;
+    var A = R.cssVar("--a"), B = R.cssVar("--b"), ink = R.cssVar("--ink"), muted = R.cssVar("--muted"), line = R.cssVar("--line");
+    function pos(wk, ph) {
+      if (ph === 0) { var i = wk.run; return [(i % COLS + 0.5) * cell, top + (Math.floor(i / COLS) + 0.5) * cell, 0.4 * cell, wk.second ? 0 : 1]; }
+      if (ph === 1) { var j = wk.run, dx = wk.h ? 0 : (wk.second ? 0.22 : -0.22) * cell; return [(j % COLS + 0.5) * cell + dx, top + (Math.floor(j / COLS) + 0.5) * cell, (wk.h ? 0.4 : 0.22) * cell, 1]; }
+      var k = wk.line; return [(k % COLS + 0.5) * cell, top + (Math.floor(k / COLS) + 0.5) * cell, 0.36 * cell, 1];
+    }
+    wakes.forEach(function (wk) {
+      var P = pos(wk, fr.a), Q = pos(wk, fr.b);
+      var x = P[0] + (Q[0] - P[0]) * u, y = P[1] + (Q[1] - P[1]) * u, r = P[2] + (Q[2] - P[2]) * u, al = P[3] + (Q[3] - P[3]) * u;
+      if (al < 0.01) return;
+      ctx.globalAlpha = al; ctx.fillStyle = wk.h ? A : B;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    /* bars under the dots once the counts are being compared */
+    function barA(ph) { return ph === 3 ? 1 : 0; }
+    var ba = barA(fr.a) + (barA(fr.b) - barA(fr.a)) * u;
+    if (ba > 0.01) {
+      ctx.globalAlpha = ba;
+      var y0 = top + (Math.ceil(WAKES / COLS) + 1) * cell, bh = w * 0.05, x0 = 0, bwid = w;
+      ctx.font = "700 " + Math.max(12, Math.round(w * 0.032)) + "px 'Atkinson Hyperlegible', sans-serif"; ctx.textBaseline = "bottom"; ctx.textAlign = "left";
+      [[H, N, "Coin flips: heads " + H + " of " + R.fmtInt(N) + " = " + R.fmtPct(H / N)], [H, WAKES, "Wakings: heads " + H + " of " + R.fmtInt(WAKES) + " = " + R.fmtPct(H / WAKES)]].forEach(function (b, i) {
+        var y = y0 + i * (bh + w * 0.09) + w * 0.06;
+        ctx.fillStyle = ink; ctx.fillText(b[2], x0, y - 4);
+        ctx.fillStyle = A; ctx.fillRect(x0, y, bwid * b[0] / b[1], bh);
+        ctx.fillStyle = B; ctx.fillRect(x0 + bwid * b[0] / b[1], y, bwid * (1 - b[0] / b[1]), bh);
+        ctx.strokeStyle = line; ctx.strokeRect(x0, y, bwid, bh);
+      });
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  var tl = null;
+  var walk = R.walk([
+    "Run the experiment 1,000 times. Each dot is one coin flip: " + H + " heads, " + T + " tails.",
+    "Now count her wakings. Each heads coin wakes her once. Each tails coin wakes her twice.",
+    "Line up every waking: " + H + " heads wakings and " + R.fmtInt(2 * T) + " tails wakings.",
+    "Two ways to count heads. They give different answers."
+  ], function (from, to) {
+    if (tl) tl.cancel();
+    tl = R.timeline();
+    if (from === to) { fr = { a: to, b: to, u: 1 }; draw(); return; }
+    tl.tween(1100, function (u) { fr = { a: from, b: to, u: u }; draw(); });
+  });
+  var steps = R.steps({
+    onEnter: { 2: walk.start, 4: renderAnswer },
+    onLeave: function (prev) { if (prev === 2 && tl) tl.cancel(); }
+  });
+  var guess = R.guess($("guess-host"), {
+    label: "chance of heads, percent", min: 0, max: 100, step: 0.1, mode: "pct", suffix: "%", nudgeFrom: 0,
+    button: $("go-watch"), endLabels: ["0%", "100%"]
+  });
+  var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
+
+  function renderAnswer() {
+    var g = guess.value == null ? 0 : guess.value;
+    R.scale($("scale"), {
+      min: 0, max: 100, guess: g, fmt: function (v) { return Number(v.toFixed(1)) + "%"; },
+      answers: [{ v: 100 / 3, label: "Thirders" }, { v: 50, label: "Halfers" }]
+    });
+    $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
+    $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
+    $("seen").children[1].textContent = (desc.value === 2 ? "Right, both are true. " : "In fact both are true. ") +
+      H + " of " + R.fmtInt(N) + " coins were heads (" + R.fmtPct(H / N) + "). " + H + " of " + R.fmtInt(WAKES) + " wakings were heads wakings (" + R.fmtPct(H / WAKES) + ").";
+    R.list($("why"), [
+      "The simulation cannot settle it: it shows both counts, and both are correct.",
+      "The question is what \"how likely\" means for someone who cannot tell which waking this is.",
+      "Philosophers have argued about this puzzle since Adam Elga wrote about it in 2000. They still disagree."
+    ]);
+    $("formula").textContent =
+      "Count by coin flips:\n" +
+      "  heads " + H + ", tails " + T + "\n" +
+      "  " + H + " / " + R.fmtInt(N) + " = " + R.fmtPct(H / N) + ", about 1/2\n\n" +
+      "Count by wakings:\n" +
+      "  heads wakings " + H + " (one each), tails wakings " + T + " x 2 = " + R.fmtInt(2 * T) + "\n" +
+      "  " + H + " / (" + H + " + " + R.fmtInt(2 * T) + ") = " + H + " / " + R.fmtInt(WAKES) + " = " + R.fmtPct(H / WAKES) + ", about 1/3";
+    R.markDone("sleepingbeauty", { guess: g });
+  }
+
+  /* picking a side shows the best point against it */
+  var AGAINST = {
+    h: "A thirder would ask you: if she is paid $1 for every correct guess when she wakes, which guess earns more? \"Tails\" wins on 2 of every 3 wakings. Should her belief and her best bet disagree?",
+    t: "A halfer would ask you: on Sunday she says 1/2. On Monday she learns nothing she did not already know, since she was sure to wake. So what new evidence made her change her mind?"
+  };
+  ["h", "t"].forEach(function (k) {
+    $("side-" + k).addEventListener("click", function () {
+      $("side-h").setAttribute("aria-pressed", k === "h" ? "true" : "false");
+      $("side-t").setAttribute("aria-pressed", k === "t" ? "true" : "false");
+      $("against").hidden = false;
+      $("against").textContent = AGAINST[k];
+    });
+  });
+
+  $("restart").addEventListener("click", function () {
+    guess.reset(); desc.reset();
+    $("go-answer").disabled = true;
+    $("explore").hidden = true; $("against").hidden = true;
+    $("side-h").setAttribute("aria-pressed", "false"); $("side-t").setAttribute("aria-pressed", "false");
+    steps.show(0);
+  });
+
+  /* ---------- free play ---------- */
+  function renderPlay() {
+    var n = Number($("wakes").value), th = 1 / (1 + n);
+    $("wakes-val").textContent = n === 1 ? "once (same as heads)" : n + " times";
+    $("ph").textContent = "50%";
+    $("pt").textContent = "1 in " + (1 + n) + " = " + R.fmtPct(th);
+    $("bh1").style.width = "50%"; $("bt1").style.width = "50%";
+    $("bh2").style.width = (th * 100) + "%"; $("bt2").style.width = ((1 - th) * 100) + "%";
+  }
+  $("wakes").addEventListener("input", renderPlay);
+  $("try").addEventListener("click", function () {
+    $("explore").hidden = false;
+    renderPlay();
+    $("explore").scrollIntoView({ block: "start" });
+  });
+
+  R.onResize($("watch"), draw);
+  steps.show(0, true);
+})();
+</script>
+</body>
+</html>

@@ -6,7 +6,9 @@ Every riddle runs the same five steps: Riddle, Guess, Watch, Describe ("what do 
 
 ## Status (2026-11-12)
 
-Built (8 of 12): `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`, `simpson/`, then `streak/` (Due a tails, gambler's fallacy), `galton/` (Falling balls), `dna/` (prosecutor's fallacy), `regression/` (Top of the class). Still "Soon": The fair game (gambler's ruin), Infinite money (St Petersburg), Two children, Sleeping Beauty (last, contested). Not linked from any index or `/find` yet; ask Sam first.
+All 12 built: `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`, `simpson/`, `streak/` (Due a tails, gambler's fallacy), `galton/` (Falling balls), `dna/` (prosecutor's fallacy), `regression/` (Top of the class), `ruin/` (The fair game, gambler's ruin), `stpetersburg/` (Infinite money), `twochildren/`, `sleepingbeauty/` (contested: the answer shows halfers and thirders side by side, `R.scale` with `answers`, plus "Which side are you on?" showing the best point against your side). Not linked from any index or `/find` yet; ask Sam first.
+
+Seeds: `ruin` uses seed 5, found offline (searching at load costs 2 million flips per try). Others search a few cheap seeds at load.
 
 Front page is built from the `GROUPS` list in `index.html` (thumbnails in `THUMB`). A ruled list on phones; from 720px wide it becomes tiles (picture, name, hook, Play/Done at the foot; Soon tiles dashed). Adding a riddle = one entry in `GROUPS` plus a `THUMB` function.
 

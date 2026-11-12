@@ -45,7 +45,7 @@ async function play(slug, guessFn, descIndex, checks, tryBtn, watchFn) {
   const qs = await page.evaluate(() => [document.querySelector('#s0 .question').textContent, (document.querySelector('#s4 .recall p') || {}).textContent]);
   ok(qs[0] === qs[1], `${tag}: the answer repeats the question`, qs.join(' | '));
   const calc = await page.$eval('#s4', e => e.textContent);
-  ok(!/P\(|sens|spec\b|prev\b|HHH/.test(calc), `${tag}: no shorthand in the answer`);
+  ok(!/P\(|\bsens\b|\bspec\b|\bprev\b|HHH/.test(calc), `${tag}: no shorthand in the answer`, (calc.match(/P\(|\bsens\b|\bspec\b|\bprev\b|HHH/) || [''])[0]);
   await checks(tag);
   await page.click(tryBtn);
   ok(await visible('#explore'), `${tag}: free play opens`);
@@ -183,6 +183,43 @@ await page.$eval('#luck', e => { e.value = 0; e.dispatchEvent(new Event('input')
 const nl = (await text('#plive')).match(/(\d+) on test 1, (\d+) on test 2/);
 ok(nl && Math.abs(+nl[1] - +nl[2]) <= 1, 'regression: no luck, no slipping back', await text('#plive'));
 
+// The fair game
+await play('ruin', async () => { await page.type('#guess-host .numin', '50'); }, 2, async (tag) => {
+  ok(/Answer: 100%/.test(await text('#scale')), `${tag}: answer 100%`, await text('#scale'));
+  ok(/By 20,000: 9\d\./.test(await text('#seen')), `${tag}: about 94 broke`, await text('#seen'));
+}, '#try');
+await page.click('[data-r="1000"]');
+ok(/after 1,000 rounds: \d+ of 100 broke/.test(await text('#plive')), 'ruin: free play rounds', await text('#plive'));
+
+// Infinite money
+await play('stpetersburg', async () => { await page.type('#guess-host .numin', '10'); }, 1, async (tag) => {
+  ok(/You said\$10/.test(await text('#cmp')) && /Infinite/.test(await text('#cmp')), `${tag}: compare`, await text('#cmp'));
+  ok(/[\d,]+ of the 10,000 games paid just \$2\. One paid \$32,768/.test(await text('#seen')), `${tag}: seen box`, await text('#seen'));
+}, '#try');
+ok((await text('#live')) === '$21', 'stpetersburg: $1 million limit gives $21', await text('#live'));
+await page.click('.presets button[data-c="10"]');
+ok((await text('#live')) === '$11', 'stpetersburg: $1,000 limit gives $11', await text('#live'));
+
+// Two children
+await play('twochildren', async () => { await page.type('#guess-host .numin', '50'); }, 1, async (tag) => {
+  ok(/Answer: 33.3%/.test(await text('#scale')), `${tag}: answer 33.3%`, await text('#scale'));
+  const m = (await text('#seen')).match(/(\d+) of the (\d+) families/);
+  ok(m && Math.abs(+m[1] / +m[2] - 1 / 3) < 0.01, `${tag}: one in three`, await text('#seen'));
+}, '#try', walkThrough(5));
+await page.click('[data-f="2"]');
+ok(/= 4\d|= 5\d/.test(await text('#plive')), 'twochildren: older is a boy gives about 50%', await text('#plive'));
+
+// Sleeping Beauty
+await play('sleepingbeauty', async () => { await page.type('#guess-host .numin', '50'); }, 2, async (tag) => {
+  const sc = await text('#scale');
+  ok(/Thirders: 33.3%/.test(sc) && /Halfers: 50%/.test(sc), `${tag}: both answers on the scale`, sc);
+  ok(/both are true/.test(await text('#seen')), `${tag}: seen box`, await text('#seen'));
+  await page.click('#side-h');
+  ok(/thirder would ask you/.test(await text('#against')), `${tag}: picking a side shows the other side`);
+}, '#try', walkThrough(4));
+await page.$eval('#wakes', e => { e.value = 9; e.dispatchEvent(new Event('input')); });
+ok(/1 in 10 = 10%/.test(await text('#pt')), 'sleepingbeauty: nine wakings gives 1 in 10', await text('#pt'));
+
 // Desktop width pass, and light even when the system asks for dark
 await page.setViewport({ width: 1280, height: 900 });
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
@@ -194,7 +231,7 @@ await page.emulateMediaFeatures([]);
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 await page.goto(BASE, { waitUntil: 'networkidle0' });
 const statuses = await page.$$eval('a.item .status', s => s.map(x => x.textContent));
-ok(statuses.length === 8 && statuses.every(s => /Done/.test(s)), 'front page: all eight marked done', statuses.join(','));
+ok(statuses.length === 12 && statuses.every(s => /Done/.test(s)), 'front page: all twelve marked done', statuses.join(','));
 ok(await page.$eval('a.item', e => getComputedStyle(e).borderTopStyle === 'none'), 'front page: a plain list on a phone');
 await shot('index');
 await page.evaluate(() => localStorage.clear());
@@ -207,7 +244,7 @@ for (const [wd, name] of [[820, 'tablet'], [1366, 'laptop']]) {
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 
 // No horizontal scroll at phone width on any page
-for (const p of ['', 'positive/', 'montyhall/', 'birthday/', 'simpson/', 'streak/', 'galton/', 'dna/', 'regression/']) {
+for (const p of ['', 'positive/', 'montyhall/', 'birthday/', 'simpson/', 'streak/', 'galton/', 'dna/', 'regression/', 'ruin/', 'stpetersburg/', 'twochildren/', 'sleepingbeauty/']) {
   await page.goto(BASE + p, { waitUntil: 'networkidle0' });
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   ok(over <= 0, `no sideways scroll: /${p}`, over);

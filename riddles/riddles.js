@@ -311,25 +311,33 @@
   };
 
   /* ---------- guess versus truth on one scale ---------- */
+  /* o.answer (one truth) or o.answers = [{ v, label }] when the answer is argued over */
   R.scale = function (host, o) {
     var span = o.max - o.min;
     function pos(v) { return (R.clamp(v, o.min, o.max) - o.min) / span * 100; }
+    var answers = o.answers || [{ v: o.answer, label: "Answer" }];
     host.innerHTML =
-      '<div class="scalerow" aria-hidden="true"><span></span><div class="tr">' +
-      '<div class="mk g"></div><div class="mk a"></div><span class="ml g"></span><span class="ml a"></span>' +
-      '</div><span></span></div><p class="sr-only"></p>';
+      '<div class="scalerow" aria-hidden="true"><span></span><div class="tr"><div class="mk g"></div><span class="ml g"></span></div><span></span></div><p class="sr-only"></p>';
+    var row = host.querySelector(".scalerow");
+    if (answers.length > 1) row.style.marginBottom = (36 + (answers.length - 1) * 20) + "px";
+    var tr = host.querySelector(".tr");
     var ends = host.querySelectorAll(".scalerow > span");
     ends[0].textContent = o.fmt(o.min);
     ends[1].textContent = o.fmt(o.max);
-    var g = pos(o.guess), a = pos(o.answer);
+    var g = pos(o.guess);
     host.querySelector(".mk.g").style.left = g + "%";
-    host.querySelector(".mk.a").style.left = a + "%";
-    var lg = host.querySelector(".ml.g"), la = host.querySelector(".ml.a");
+    var lg = host.querySelector(".ml.g");
     lg.textContent = "You: " + o.fmt(o.guess);
-    la.textContent = "Answer: " + o.fmt(o.answer);
     lg.style.left = R.clamp(g, 10, 90) + "%";
-    la.style.left = R.clamp(a, 13, 87) + "%";
-    host.querySelector(".sr-only").textContent = "Your guess " + o.fmt(o.guess) + ". The answer " + o.fmt(o.answer) + ".";
+    answers.forEach(function (a, i) {
+      var p = pos(a.v), mk = document.createElement("div"), ml = document.createElement("span");
+      mk.className = "mk a"; mk.style.left = p + "%";
+      ml.className = "ml a"; ml.style.left = R.clamp(p, 13, 87) + "%"; ml.style.top = (22 + i * 20) + "px";
+      ml.textContent = a.label + ": " + o.fmt(a.v);
+      tr.appendChild(mk); tr.appendChild(ml);
+    });
+    host.querySelector(".sr-only").textContent = "Your guess " + o.fmt(o.guess) + ". " +
+      answers.map(function (a) { return a.label + " " + o.fmt(a.v); }).join(". ") + ".";
   };
 
   /* guess versus truth for a choice: two boxes side by side */
