@@ -182,6 +182,18 @@ await play('regression', async () => { await page.type('#guess-host .numin', '85
 await page.$eval('#luck', e => { e.value = 0; e.dispatchEvent(new Event('input')); });
 const nl = (await text('#plive')).match(/(\d+) on test 1, (\d+) on test 2/);
 ok(nl && Math.abs(+nl[1] - +nl[2]) <= 1, 'regression: no luck, no slipping back', await text('#plive'));
+await page.$eval('#luck', e => { e.value = 10; e.dispatchEvent(new Event('input')); });
+await runAgain('regression', async () => page.$eval('#play', c => c.toDataURL()));
+
+// "Run again" must give a new run without reloading
+async function runAgain(tag, snapshot) {
+  const before = await snapshot();
+  await page.click('#again');
+  await sleep(50);
+  const after = await snapshot();
+  ok(before !== after, `${tag}: run again gives a new run`);
+  ok(/Run 2/.test(await text('#run-n')), `${tag}: run number goes up`, await text('#run-n'));
+}
 
 // The fair game
 await play('ruin', async () => { await page.type('#guess-host .numin', '50'); }, 2, async (tag) => {
@@ -190,6 +202,8 @@ await play('ruin', async () => { await page.type('#guess-host .numin', '50'); },
 }, '#try');
 await page.click('[data-r="1000"]');
 ok(/after 1,000 rounds: \d+ of 100 broke/.test(await text('#plive')), 'ruin: free play rounds', await text('#plive'));
+await page.click('[data-r="100000"]');
+await runAgain('ruin', async () => page.$eval('#play', c => c.toDataURL()));
 
 // Infinite money
 await play('stpetersburg', async () => { await page.type('#guess-host .numin', '10'); }, 1, async (tag) => {
@@ -199,6 +213,8 @@ await play('stpetersburg', async () => { await page.type('#guess-host .numin', '
 ok((await text('#live')) === '$21', 'stpetersburg: $1 million limit gives $21', await text('#live'));
 await page.click('.presets button[data-c="10"]');
 ok((await text('#live')) === '$11', 'stpetersburg: $1,000 limit gives $11', await text('#live'));
+ok(/average win \$\d/.test(await text('#psim')), 'stpetersburg: free play runs games', await text('#psim'));
+await runAgain('stpetersburg', async () => text('#psim'));
 
 // Two children
 await play('twochildren', async () => { await page.type('#guess-host .numin', '50'); }, 1, async (tag) => {
