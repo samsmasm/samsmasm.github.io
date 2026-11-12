@@ -20,6 +20,11 @@
     };
   };
   R.int = function (rnd, n) { return Math.floor(rnd() * n); };
+  /* a genuinely fresh seed, different every time (for games the student plays) */
+  R.freshSeed = function () {
+    try { var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0]; }
+    catch (e) { return Math.floor(Math.random() * 4294967296); }
+  };
   R.shuffle = function (arr, rnd) {
     for (var i = arr.length - 1; i > 0; i--) {
       var j = Math.floor(rnd() * (i + 1));

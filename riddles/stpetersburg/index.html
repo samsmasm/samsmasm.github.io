@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Infinite Money · Riddles</title>
-<meta name="description" content="A probability riddle: a coin game whose average prize is infinite. What would you pay to play?">
+<meta name="description" content="A probability riddle: a coin game whose average prize is infinite.">
 <link rel="icon" href="/geocornsmall.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../riddles.css?v=20261112-210519">
+<link rel="stylesheet" href="../riddles.css?v=20261112-211443">
 <style>
 .plot { max-width: 560px; margin: 0 auto; width: 100%; }
 .coins { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; min-height: 40px; align-items: center; }
@@ -34,7 +34,7 @@
 <main>
   <div><div class="kicker">Riddle</div><h1 class="title">Infinite money</h1></div>
   <ol class="stepper" id="stepper" aria-label="Progress">
-    <li>Riddle</li><li>Guess</li><li>Watch</li><li>Describe</li><li>Answer</li>
+    <li>Riddle</li><li>Guess</li><li>Play</li><li>Describe</li><li>Answer</li>
   </ol>
 
   <section class="card step" id="s0">
@@ -62,17 +62,27 @@
   </section>
 
   <section class="card step" id="s2" hidden>
-    <h2>Watch</h2>
+    <h2>Play</h2>
+    <p class="sub small">You flip the coin. Tails doubles the prize. Heads ends the game and you win the prize.</p>
     <div id="viz-home"><div id="viz">
+      <p class="kicker" id="w-round" style="text-align:center"></p>
       <p class="caption" id="caption" aria-live="polite"></p>
       <div class="coins" id="coins" aria-hidden="true"></div>
+      <div class="btnrow" id="w-flip-row" style="justify-content:center">
+        <button type="button" class="btn" id="w-flip">Flip the coin</button>
+      </div>
+      <div class="btnrow" id="w-ask" style="justify-content:center" hidden>
+        <button type="button" class="btn" id="w-yes">Yes, play to 10,000 games</button>
+        <button type="button" class="btn2" id="w-no">No, I'll play 5 more</button>
+      </div>
+      <p class="sub small" id="w-mine" style="text-align:center"></p>
       <p class="counter">Games: <b id="c-n">0</b> · average win: <b id="c-avg">$0</b> · biggest win: <b id="c-max">$0</b></p>
       <div class="plot"><canvas id="watch" role="img" aria-label="The average win so far, as more and more games are played."></canvas></div>
-      <p class="randnote"><b>Made at random.</b> Every coin flip is random, so another 10,000 games would give a different average, and a different biggest win.</p>
+      <p class="randnote"><b>Truly random.</b> Every flip is new each time you play, so your run will differ from everyone else's: a different average, and a different biggest win.</p>
     </div></div>
     <div class="btnrow">
       <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
-      <button type="button" class="btn2" id="replay">Replay</button>
+      <button type="button" class="btn2" id="replay">Start again</button>
     </div>
   </section>
 
@@ -87,7 +97,7 @@
     </div>
     <div class="btnrow">
       <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
-      <button type="button" class="btn2" data-go="2">Watch again</button>
+      <button type="button" class="btn2" data-go="2">Play again</button>
     </div>
   </section>
 
@@ -135,78 +145,87 @@ What a game is worth to you depends on how you feel about risk.</div></details>
     <p class="liveres" aria-live="polite">Average prize per game (the expected value): <b id="live"></b></p>
     <p class="sub small">How much you would pay to play is up to you: someone who hates risk might pay $3, a thrill-seeker might pay more than the average. Neither is wrong.</p>
     <p class="liveres" id="psim" aria-live="polite"></p>
+    <div class="plot"><canvas id="play" role="img" aria-label="The average win over 10,000 games with the casino's limit, against the expected value."></canvas></div>
     <div class="btnrow"><button type="button" class="btn2" id="again">Run again: 10,000 new games</button><span class="sub small" id="run-n"></span></div>
   </section>
 </main>
 <footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
 
-<script src="../riddles.js?v=20261112-210519"></script>
+<script src="../riddles.js?v=20261112-211443"></script>
 <script>
 (function () {
   var $ = R.$;
-  var GAMES = 10000, SLOW = 5;
+  var GAMES = 10000, FIRST_ASK = 5, ASK_EVERY = 5;
 
   /* one game: number of flips until heads, and the prize 2^flips */
   function play(rnd) { var k = 1; while (rnd() >= 0.5 && k < 60) k++; return k; }
-  function runAll(seed) {
-    var rnd = R.rng(seed), flips = [], sum = 0, avg = [], max = 0, maxAt = 0;
-    for (var i = 0; i < GAMES; i++) {
-      var k = play(rnd), p = Math.pow(2, k);
-      flips.push(k); sum += p; avg.push(sum / (i + 1));
-      if (p > max) { max = p; maxAt = i; }
-    }
-    return { flips: flips, avg: avg, max: max, maxAt: maxAt };
+
+  /* the student's run, built as it is played: every prize, the running average, the biggest win and when */
+  var S = null;
+  function newRun() { S = { prizes: [], avg: [], sum: 0, max: 0, maxAt: 0 }; }
+  function record(p) {
+    S.prizes.push(p); S.sum += p; S.avg.push(S.sum / S.prizes.length);
+    if (p > S.max) { S.max = p; S.maxAt = S.prizes.length - 1; }
   }
-  /* a run with one clear big jump in the middle, and a typical final average */
-  var SEED = 1, S;
-  for (;; SEED++) {
-    S = runAll(SEED);
-    var fin = S.avg[GAMES - 1];
-    if (S.max >= 8192 && S.max <= 65536 && S.maxAt > 1500 && S.maxAt < 8000 && fin > 12 && fin < 25 && S.flips[0] === 1) break;
-  }
+  newRun();
 
   function prize(k) { return Math.pow(2, k); }
   function money(v) { return "$" + (v >= 100 ? R.fmtInt(v) : v.toFixed(2).replace(/\.00$/, "")); }
 
-  function draw(n) {
-    var f = R.fitCanvas($("watch"), 0.62);
+  function draw(n) { drawAvg($("watch"), S, n); }
+  /* the running average of a run of games, with an optional dashed line at the expected value */
+  function drawAvg(canvas, run, n, ev) {
+    var f = R.fitCanvas(canvas, 0.62);
     if (!f) return;
     var ctx = f.ctx, w = f.w, h = f.h, L = 50, B = 30, T = 10, Rm = 26, pw = w - L - Rm, ph = h - T - B;
-    var ymax = 0;
-    for (var i = 9; i < GAMES; i++) if (S.avg[i] > ymax) ymax = S.avg[i];
-    ymax = Math.ceil(ymax * 1.15 / 5) * 5;
+    /* the scale grows with the run, so a big jump is never cut off */
+    var ymax = ev ? ev : 10;
+    for (var i = Math.min(9, n - 1); i < n; i++) if (i >= 0 && run.avg[i] > ymax) ymax = run.avg[i];
+    ymax = Math.ceil(ymax * 1.15 / 10) * 10;
+    var mx = 0, mxAt = 0;
+    for (i = 0; i < n; i++) if (run.prizes[i] > mx) { mx = run.prizes[i]; mxAt = i; }
     var muted = R.cssVar("--muted"), line = R.cssVar("--line"), ink = R.cssVar("--ink"), amber = R.cssVar("--amber-ink");
     function X(g) { return L + g / GAMES * pw; }
     function Y(v) { return T + (1 - Math.min(v, ymax) / ymax) * ph; }
     ctx.font = "12px 'Atkinson Hyperlegible Mono', monospace"; ctx.fillStyle = muted; ctx.strokeStyle = line; ctx.lineWidth = 1;
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
-    for (var v = 0; v <= ymax; v += 10) { ctx.fillText("$" + v, L - 6, Y(v)); ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(L + pw, Y(v)); ctx.stroke(); }
+    var ystep = ymax <= 60 ? 10 : ymax <= 200 ? 50 : Math.pow(10, Math.floor(Math.log10(ymax)));
+    for (var v = 0; v <= ymax; v += ystep) { ctx.fillText("$" + R.fmtInt(v), L - 6, Y(v)); ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(L + pw, Y(v)); ctx.stroke(); }
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     [0, 2500, 5000, 7500, 10000].forEach(function (g) { ctx.fillText(R.fmtInt(g), X(g), h - B + 6); });
+    if (ev) {
+      ctx.strokeStyle = R.cssVar("--a"); ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.moveTo(L, Y(ev)); ctx.lineTo(L + pw, Y(ev)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = R.cssVar("--a"); ctx.font = "700 13px 'Atkinson Hyperlegible', sans-serif";
+      ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+      ctx.fillText("Expected value: $" + ev, L + pw, Y(ev) - 4);
+    }
     if (n < 1) return;
     ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.lineJoin = "round";
     ctx.beginPath();
     var stride = Math.max(1, Math.floor(n / 1200));
-    for (i = 0; i < n; i += stride) { if (i === 0) ctx.moveTo(X(1), Y(S.avg[0])); else ctx.lineTo(X(i + 1), Y(S.avg[i])); }
-    ctx.lineTo(X(n), Y(S.avg[n - 1]));
+    for (i = 0; i < n; i += stride) { if (i === 0) ctx.moveTo(X(1), Y(run.avg[0])); else ctx.lineTo(X(i + 1), Y(run.avg[i])); }
+    ctx.lineTo(X(n), Y(run.avg[n - 1]));
     ctx.stroke();
-    if (n > S.maxAt) {
-      ctx.fillStyle = amber; ctx.beginPath(); ctx.arc(X(S.maxAt + 1), Y(S.avg[S.maxAt]), 5, 0, 6.2832); ctx.fill();
-      ctx.font = "700 13px 'Atkinson Hyperlegible', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.fillText("One game paid " + money(S.max), X(S.maxAt + 1) + 8, Y(S.avg[S.maxAt]) - 4);
+    if (n > 20 && mx >= 256) {
+      var lx = X(mxAt + 1), right = lx > L + pw * 0.6;
+      ctx.fillStyle = amber; ctx.beginPath(); ctx.arc(lx, Y(run.avg[mxAt]), 5, 0, 6.2832); ctx.fill();
+      ctx.font = "700 13px 'Atkinson Hyperlegible', sans-serif"; ctx.textAlign = right ? "right" : "left"; ctx.textBaseline = "bottom";
+      ctx.fillText("One game paid " + money(mx), lx + (right ? -8 : 8), Y(run.avg[mxAt]) - 4);
     }
   }
   function counters(n) {
     var mx = 0;
-    for (var i = 0; i < n; i++) if (prize(S.flips[i]) > mx) mx = prize(S.flips[i]);
+    for (var i = 0; i < n; i++) if (S.prizes[i] > mx) mx = S.prizes[i];
     $("c-n").textContent = R.fmtInt(n);
     $("c-avg").textContent = n ? money(S.avg[n - 1]) : "$0";
     $("c-max").textContent = money(mx);
   }
-  function showCoins(k, upTo) {
+  /* coins flipped so far this game: T for each tails, then H if it has ended */
+  function showCoins(tails, ended) {
     var html = "";
-    for (var i = 1; i <= upTo; i++) html += '<span class="coin' + (i === k ? " h" : "") + '">' + (i === k ? "H" : "T") + "</span>";
-    if (upTo === k) html += '<span class="prize">= ' + money(prize(k)) + "</span>";
+    for (var i = 0; i < tails; i++) html += '<span class="coin">T</span>';
+    if (ended) html += '<span class="coin h">H</span>';
     $("coins").innerHTML = html;
   }
 
@@ -221,49 +240,107 @@ What a game is worth to you depends on how you feel about risk.</div></details>
   var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
   $("replay").addEventListener("click", playWatch);
 
+  /* ---------- play: the student flips game by game, then chooses when to let the rest run ---------- */
+  var rnd = null, G = null;
+  function cap(s) { $("caption").textContent = s; }
+  function show(id, on) { $(id).hidden = !on; }
+  function refresh() { shown = S.prizes.length; draw(shown); counters(shown); }
+
   function playWatch() {
     if (tl) tl.cancel();
     tl = R.timeline();
-    var cap = function (s) { $("caption").textContent = s; }, t = 600;
+    rnd = R.rng(R.freshSeed());
+    $("watch").parentNode.hidden = true;   /* the graph appears once the automatic games start */
+    newRun();
+    G = { tails: 0, phase: "flip", nextAsk: FIRST_ASK };
     $("go-describe").disabled = true;
-    shown = 0; draw(0); counters(0); $("coins").innerHTML = "";
-    cap("Game 1.");
-    /* the first games flip by flip */
-    for (var g = 0; g < SLOW; g++) {
-      (function (g) {
-        var k = S.flips[g];
-        tl.after(t, function () { cap("Game " + (g + 1) + "."); showCoins(k, 0); });
-        for (var f = 1; f <= k; f++) (function (f) { t += 450; tl.after(t, function () { showCoins(k, f); }); })(f);
-        t += 300;
-        tl.after(t, function () { shown = g + 1; draw(shown); counters(shown); cap("Game " + (g + 1) + ": heads on flip " + k + ". You win " + money(prize(k)) + "."); });
-        t += 1300;
-      })(g);
-    }
-    tl.after(t, function () {
-      cap("Now 10,000 games. The line is the average win so far.");
-      $("coins").innerHTML = "";
-      var said = false;
-      tl.tween(11000, function (u) {
-        shown = Math.max(SLOW, Math.round(SLOW + (GAMES - SLOW) * u));
-        draw(shown); counters(shown);
-        if (!said && shown > S.maxAt) { said = true; cap("One lucky game paid " + money(S.max) + "!"); }
-      }, function () {
-        shown = GAMES; draw(GAMES); counters(GAMES);
-        cap("10,000 games. Average win: " + money(S.avg[GAMES - 1]) + ".");
-        $("go-describe").disabled = false;
-      });
-    });
+    $("w-mine").textContent = "";
+    refresh();
+    newGame();
   }
+  function newGame() {
+    show("w-ask", false);
+    var n = S.prizes.length;
+    if (n >= GAMES) return endPlay();
+    if (n === G.nextAsk) {
+      G.phase = "ask";
+      show("w-flip-row", false);
+      $("w-round").textContent = n + " games played";
+      cap("Shall we automatically play the rest?");
+      show("w-ask", true);
+      return;
+    }
+    G.tails = 0; G.phase = "flip";
+    $("w-round").textContent = "Game " + (n + 1) + " · prize now $2";
+    cap(n === 0 ? "Flip the coin. Heads, you win $2. Tails, the prize doubles." : "Flip the coin.");
+    showCoins(0, false);
+    show("w-flip-row", true);
+    $("w-flip").disabled = false;
+  }
+  function flip() {
+    if (G.phase !== "flip") return;
+    var heads = rnd() < 0.5 || G.tails >= 59;
+    var p = prize(G.tails + 1);
+    if (!heads) {
+      G.tails++;
+      showCoins(G.tails, false);
+      $("w-round").textContent = "Game " + (S.prizes.length + 1) + " · prize now " + money(prize(G.tails + 1));
+      cap("Tails! The prize doubles to " + money(prize(G.tails + 1)) + ". Flip again.");
+      return;
+    }
+    G.phase = "shown";
+    $("w-flip").disabled = true;
+    showCoins(G.tails, true);
+    record(p);
+    refresh();
+    cap("Heads. You win " + money(p) + ".");
+    $("w-mine").textContent = "Your games: " + S.prizes.map(money).join(", ");
+    tl.after(1500, newGame);
+  }
+  function autoplay() {
+    show("w-ask", false); show("w-flip-row", false);
+    G.phase = "auto";
+    $("watch").parentNode.hidden = false;
+    $("coins").innerHTML = "";
+    var from = S.prizes.length, biggest = S.max;
+    while (S.prizes.length < GAMES) record(prize(play(rnd)));
+    var said = 0;
+    cap("Playing the rest. The line is your average win so far.");
+    tl.tween(11000, function (u) {
+      shown = Math.round(from + (GAMES - from) * u);
+      draw(shown); counters(shown);
+      $("w-round").textContent = "Game " + R.fmtInt(shown);
+      /* call out each new record win as it arrives */
+      for (var i = said || from; i < shown; i++) {
+        if (S.prizes[i] > biggest) { biggest = S.prizes[i]; if (biggest >= 1024) cap("Game " + R.fmtInt(i + 1) + " paid " + money(biggest) + "!"); }
+      }
+      said = shown;
+    }, endPlay);
+  }
+  function endPlay() {
+    G.phase = "done";
+    show("w-ask", false); show("w-flip-row", false);
+    refresh();
+    $("w-round").textContent = "";
+    cap(R.fmtInt(GAMES) + " games. Average win: " + money(S.avg[GAMES - 1]) + ".");
+    $("go-describe").disabled = false;
+  }
+  $("w-flip").addEventListener("click", flip);
+  $("w-yes").addEventListener("click", autoplay);
+  $("w-no").addEventListener("click", function () { G.nextAsk = S.prizes.length + ASK_EVERY; newGame(); });
 
   function renderAnswer() {
     var g = guess.value == null ? 0 : guess.value;
     R.compare($("cmp"), "$" + g + " a game", "No limit: it keeps climbing");
-    var before = S.avg[S.maxAt - 1], after = S.avg[S.maxAt];
+    var n = S.prizes.length, twos = S.prizes.filter(function (p) { return p === 2; }).length;
+    var jump = S.maxAt > 0
+      ? "Your biggest win, " + money(S.max) + " in game " + R.fmtInt(S.maxAt + 1) + ", lifted the average from " + money(S.avg[S.maxAt - 1]) + " to " + money(S.avg[S.maxAt]) + ". "
+      : "Your biggest win, " + money(S.max) + ", came in the very first game. ";
     $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
     $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
-    $("seen").children[1].textContent = (desc.value === 2 ? "Right. " : "Look again. ") +
-      "The average was about " + money(before) + " until game " + R.fmtInt(S.maxAt + 1) + " paid " + money(S.max) +
-      ". That one game lifted it to " + money(after) + ". After 10,000 games it was " + money(S.avg[GAMES - 1]) + ", and the next rare giant win would lift it again.";
+    $("seen").children[1].textContent = (desc.value === 2 ? "Right. " : "Look again. ") + jump +
+      R.fmtInt(twos) + " of your " + R.fmtInt(n) + " games paid just $2. After " + R.fmtInt(n) + " games your average was " + money(S.avg[n - 1]) +
+      ", and the next rare giant win would lift it again. Everyone's run is different.";
     R.list($("why"), [
       "Each row of the prize table adds $1 to the average: half the games pay $2, a quarter pay $4, an eighth pay $8, and the rows never end.",
       "So the more games you play, the bigger the rare prize that turns up, and the higher the average climbs. It never settles.",
@@ -291,17 +368,20 @@ What a game is worth to you depends on how you feel about risk.</div></details>
     $("cap-val").textContent = label;
     $("live").textContent = "$" + (c + 1);
     /* 10,000 games where no prize can go above the limit */
-    var rnd = R.rng(pseed), sum = 0, max = 0, twos = 0;
+    var rnd = R.rng(pseed), sum = 0, max = 0, twos = 0, games = { prizes: [], avg: [] };
     for (var g = 0; g < GAMES; g++) {
       var p = Math.min(prize(play(rnd)), cap);
       sum += p; if (p > max) max = p; if (p === 2) twos++;
+      games.prizes.push(p); games.avg.push(sum / (g + 1));
     }
+    lastGames = games; lastEv = c + 1;
+    drawAvg($("play"), games, GAMES, c + 1);
     $("psim").innerHTML = "This run of 10,000 games: average win <b>" + money(sum / GAMES) + "</b>, biggest win <b>" + money(max) + "</b>, and " + R.fmtInt(twos) + " games paid $2.";
     $("run-n").textContent = "Run " + run;
   }
-  var pseed = 900, run = 1;
+  var pseed = R.freshSeed(), run = 1, lastGames = null, lastEv = 0;
   $("cap").addEventListener("input", renderPlay);
-  $("again").addEventListener("click", function () { pseed++; run++; renderPlay(); });
+  $("again").addEventListener("click", function () { pseed = R.freshSeed(); run++; renderPlay(); });
   R.all(".presets button").forEach(function (b) {
     b.addEventListener("click", function () { $("cap").value = b.getAttribute("data-c"); renderPlay(); });
   });
@@ -312,6 +392,7 @@ What a game is worth to you depends on how you feel about risk.</div></details>
   });
 
   R.onResize($("watch"), function () { draw(shown); });
+  R.onResize($("play"), function () { if (lastGames) drawAvg($("play"), lastGames, GAMES, lastEv); });
   steps.show(0, true);
 })();
 </script>

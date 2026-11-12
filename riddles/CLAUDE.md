@@ -43,6 +43,13 @@ The question, the Describe options and the answer must all be about the same thi
 
 Never say "fair price" or claim one right amount to pay. The maths gives the expected value (the average prize); what someone should pay depends on their taste for risk, and different prices are reasonable. A test checks for "fair price".
 
+## Random numbers must be honest (Sam, 2026-11-12)
+
+- Every simulated visual says so: a `.randnote` inside `#viz` ("Made at random. ... near 100 each, not exactly"). Real data (Simpson) says "Real data, not a simulation"; DNA says 10 is the expected number. A test checks each Describe step has one.
+- Played riddles (`montyhall`, `stpetersburg`) use `R.freshSeed()` (crypto) so every play is genuinely different; their note says "Truly random". Auto-playing Watch steps still use one fixed typical seed each. Sam has not yet been asked whether those should become fresh too.
+- Three doors: each game goes in the row for the choice made (Stayed / Switched, 50 each). Filled dot = car, thick ring = goat, faint dot = not played. Stay or switch by clicking a door (no buttons). Autoplay fills Stayed first, then Switched.
+- Infinite money: played by hand (Flip the coin), asks after 5 games and every 5 after a "no", then plays to 10,000. Free play draws the running average against a dashed expected-value line.
+
 ## Free play reruns (Sam, 2026-11-12)
 
 Any free play built on a simulation gets a "Run again: <n> new <things>" button (`#again`), so students can rerun without refreshing. Where the count may not change visibly, show "Run N" (`#run-n`). Watch steps stay on fixed, typical seeds on purpose.

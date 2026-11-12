@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../riddles.css?v=20261112-210519">
+<link rel="stylesheet" href="../riddles.css?v=20261112-211443">
 <style>
 .doors { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
 .door {
@@ -38,14 +38,29 @@
 button.door:not(:disabled):hover { border-color: var(--ink); }
 button.door:disabled { cursor: default; }
 .lanes { display: flex; flex-direction: column; gap: 12px; max-width: 460px; margin: 0 auto; width: 100%; }
-.lane { display: grid; grid-template-columns: 76px 1fr; gap: 10px; align-items: center; }
+.lane { display: flex; flex-direction: column; gap: 6px; }
 .lname { font-weight: 700; font-size: 15px; }
 .lname.s { color: var(--a); }
 .lname.w { color: var(--b); }
-.tally { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
-.tally span { aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--line); }
-.tally.s span.on { background: var(--a); border-color: var(--a); }
-.tally.w span.on { background: var(--b); border-color: var(--b); }
+/* each row: 50 games. Filled = won the car, thick empty ring = got a goat, faint dot = not played yet */
+.tally { display: grid; grid-template-columns: repeat(25, 1fr); gap: 4px; }
+.tally span { aspect-ratio: 1; border-radius: 50%; background: var(--line); transform: scale(0.45); }
+.tally span.won, .tally span.lost { transform: none; }
+.tally.s span.won { background: var(--a); }
+.tally.w span.won { background: var(--b); }
+.tally span.lost { background: transparent; border: 2.5px solid; }
+.tally.s span.lost { border-color: var(--a); }
+.tally.w span.lost { border-color: var(--b); }
+.lcount { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--muted); }
+.key { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+.key.won { background: var(--ink); }
+.key.lost { border: 2.5px solid var(--ink); }
+.key.todo { background: var(--line); transform: scale(0.5); }
+button.door.can { border-style: solid; }
+.rates { display: flex; flex-direction: column; gap: 10px; }
+.rates .lab { font-size: 15px; margin-bottom: 4px; }
+.rates .track { height: 22px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.rates .fill { height: 100%; }
 .big2 { font-size: 18px; padding: 12px 28px; border-width: 2px; font-weight: 700; }
 .record { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .record > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--bg); }
@@ -89,26 +104,25 @@ button.door:disabled { cursor: default; }
 
   <section class="card step" id="s2" hidden>
     <h2>Play</h2>
-    <p class="sub small">You pick the door. Then two players take over: the stayer keeps your door, the switcher swaps. You choose too.</p>
+    <p class="sub small">Pick a door. After the host opens a goat door, click a door to stay or switch. Every game goes in the row for what you chose.</p>
     <div id="viz-home"><div id="viz">
     <p class="kicker" id="w-round" style="text-align:center"></p>
     <div class="doors" id="w-doors"></div>
     <p class="caption" id="caption" aria-live="polite"></p>
-    <div class="btnrow" id="w-choose" style="justify-content:center" hidden>
-      <button type="button" class="btn2 big2" id="w-stay" style="border-color:var(--a)">Stay</button>
-      <button type="button" class="btn2 big2" id="w-switch" style="border-color:var(--b)">Switch</button>
-    </div>
     <div class="btnrow" id="w-ask" style="justify-content:center" hidden>
       <button type="button" class="btn" id="w-yes">Yes, play the rest</button>
       <button type="button" class="btn2" id="w-no">No, I'll play 4 more</button>
     </div>
-    <p class="sub small" id="w-you" style="text-align:center"></p>
     <div class="lanes" aria-hidden="true">
-      <div class="lane"><span class="lname s">Stayer</span><div class="tally s" id="t-stay"></div></div>
-      <div class="lane"><span class="lname w">Switcher</span><div class="tally w" id="t-switch"></div></div>
+      <div class="lane"><span class="lname s">Stayed <span class="lcount" id="n-stay"></span></span><div class="tally s" id="t-stay"></div></div>
+      <div class="lane"><span class="lname w">Switched <span class="lcount" id="n-switch"></span></span><div class="tally w" id="t-switch"></div></div>
     </div>
-    <p class="sub small" style="text-align:center">Each dot is a car won.</p>
-    <p class="randnote"><b>Made at random.</b> The car is hidden at random every round, so the two rows come out near 1 in 3 and 2 in 3, not exactly.</p>
+    <div class="legend">
+      <div><span class="key won"></span>Won the car</div>
+      <div><span class="key lost"></span>Got a goat</div>
+      <div><span class="key todo"></span>Not played yet</div>
+    </div>
+    <p class="randnote"><b>Truly random.</b> The car is hidden at random every game, and differently each time you play. So the rows come out near 1 in 3 and 2 in 3, not exactly.</p>
     </div></div>
     <div class="btnrow">
       <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
@@ -119,10 +133,10 @@ button.door:disabled { cursor: default; }
   <section class="card step" id="s3" hidden>
     <h2>What do you see?</h2>
     <div id="viz-slot"></div>
-    <p class="sub">Look at the two rows of dots.</p>
+    <p class="sub">Look at the filled dots: the cars won. Which row has more?</p>
     <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
-      <button type="button" class="opt" data-i="0">The stayer won more cars</button>
-      <button type="button" class="opt" data-i="1">The switcher won more cars</button>
+      <button type="button" class="opt" data-i="0">Staying won more cars</button>
+      <button type="button" class="opt" data-i="1">Switching won more cars</button>
       <button type="button" class="opt" data-i="2">About the same</button>
     </div>
     <div class="btnrow">
@@ -136,10 +150,7 @@ button.door:disabled { cursor: default; }
     <p class="answerline"><b>Switch.</b> Switching wins 2 games in 3.</p>
     <div id="cmp"></div>
     <div class="seen" id="seen"></div>
-    <div>
-      <div class="splitbar" role="img" id="bar" aria-label=""><div id="bar-s" style="background:var(--a)"></div><div id="bar-w" style="background:var(--b)"></div></div>
-      <div class="barlabels"><span id="lab-s"></span><span id="lab-w"></span></div>
-    </div>
+    <div class="rates" id="rates"></div>
     <ul class="why" id="why"></ul>
     <details><summary>Show every case</summary><div class="formula">You pick door 1.
 
@@ -164,10 +175,6 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
     </div>
     <p class="caption" id="p-cap" aria-live="polite"></p>
     <div class="doors" id="p-doors"></div>
-    <div class="btnrow" id="p-choose" hidden>
-      <button type="button" class="btn2" id="p-stay" style="border-color:var(--a)">Stay</button>
-      <button type="button" class="btn2" id="p-switch" style="border-color:var(--b)">Switch</button>
-    </div>
     <button type="button" class="btn" id="p-again" hidden>Play again</button>
     <div class="record">
       <div><div class="lab" style="color:var(--a)">When you stayed</div><div class="n" id="r-stay">0 of 0 won</div></div>
@@ -177,12 +184,12 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
 </main>
 <footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
 
-<script src="../riddles.js?v=20261112-210519"></script>
+<script src="../riddles.js?v=20261112-211443"></script>
 <script>
 (function () {
   var $ = R.$;
 
-  var SEED = 2026, GAMES = 100, FIRST_ASK = 6, ASK_EVERY = 4;
+  var GAMES = 100, FIRST_ASK = 6, ASK_EVERY = 4;
 
   /* doors: st = { n, pick, other, opened (bool: host has opened the rest), reveal, tags, click } */
   function drawDoors(host, st, g) {
@@ -198,8 +205,10 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
       if (g.pick === i) d.className += " pick";
       if (st.tags && g.other === i) d.className += " other";
       if (st.tags) {
-        if (i === g.pick) d.insertAdjacentHTML("beforeend", '<span class="tag s">Stayer</span>');
-        if (i === g.other) d.insertAdjacentHTML("beforeend", '<span class="tag w">Switcher</span>');
+        /* tag text: default player names, or "" for no tag on that door */
+        var ts = st.tagS == null ? "Stayer" : st.tagS, tw = st.tagW == null ? "Switcher" : st.tagW;
+        if (i === g.pick && ts) d.insertAdjacentHTML("beforeend", '<span class="tag s">' + ts + "</span>");
+        if (i === g.other && tw) d.insertAdjacentHTML("beforeend", '<span class="tag w">' + tw + "</span>");
       }
       if (st.click) {
         d.type = "button";
@@ -211,12 +220,18 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
     }
   }
 
-  function makeTally(el) {
+  /* a row of PER games: each slot shows won (filled), lost (thick ring) or not played yet (faint dot) */
+  var PER = 50;
+  function makeTally(el, countEl) {
     el.innerHTML = "";
-    for (var i = 0; i < 100; i++) el.appendChild(document.createElement("span"));
-    return function (k) { Array.prototype.forEach.call(el.children, function (c, i) { c.className = i < k ? "on" : ""; }); };
+    for (var i = 0; i < PER; i++) el.appendChild(document.createElement("span"));
+    return function (games) {
+      Array.prototype.forEach.call(el.children, function (c, i) { c.className = i < games.length ? (games[i] ? "won" : "lost") : ""; });
+      var won = games.filter(Boolean).length;
+      countEl.textContent = games.length ? "· won " + won + " of " + games.length : "";
+    };
   }
-  var tStay = makeTally($("t-stay")), tSwitch = makeTally($("t-switch"));
+  var tStay = makeTally($("t-stay"), $("n-stay")), tSwitch = makeTally($("t-switch"), $("n-switch"));
 
   /* ---------- steps ---------- */
   var tl = null, result = { stay: 0, sw: 0 };
@@ -228,41 +243,49 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
   var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
   $("replay").addEventListener("click", playWatch);
 
-  /* ---------- play: the student plays the first rounds, then chooses when to let the rest run ----------
-     After FIRST_ASK rounds, and every ASK_EVERY rounds after a "no", it asks to play the rest automatically.
-     Every round scores both players: the stayer keeps the first pick, the switcher swaps, so exactly one wins. */
+  /* ---------- play: the student plays the first games, then chooses when to let the rest run ----------
+     Each game goes in the row for the choice made: Stayed or Switched, PER games each.
+     After FIRST_ASK games, and every ASK_EVERY games after a "no", it asks to play the rest automatically:
+     first it fills the Stayed row, then the Switched row. Every play uses a fresh random seed. */
   var W = null, rnd = null;
   function cap(s) { $("caption").textContent = s; }
   function show(id, on) { $(id).hidden = !on; }
+  function played() { return W.stay.length + W.sw.length; }
+  function tallies() { tStay(W.stay); tSwitch(W.sw); }
   function playWatch() {
     if (tl) tl.cancel();
     tl = R.timeline();
-    rnd = R.rng(SEED);
-    W = { n: 0, stay: 0, sw: 0, you: [0, 0], g: null, phase: "pick", nextAsk: FIRST_ASK };
-    tStay(0); tSwitch(0);
+    rnd = R.rng(R.freshSeed());
+    W = { stay: [], sw: [], g: null, phase: "pick", nextAsk: FIRST_ASK };
+    tallies();
     $("go-describe").disabled = true;
-    $("w-you").textContent = "";
     newRound();
   }
   function draw(st) {
     st.n = 3;
     if (W.phase === "pick") { st.click = function () { return true; }; st.onClick = pickDoor; }
+    /* stay or switch by clicking a door: your door to stay, the other closed door to switch. A full row cannot take more. */
+    if (W.phase === "choose") {
+      st.click = function (i) { return (i === W.g.pick && W.stay.length < PER) || (i === W.g.other && W.sw.length < PER); };
+      st.onClick = function (i) { choose(i === W.g.other); };
+      st.tagS = "Stay"; st.tagW = "Switch";
+    }
     drawDoors($("w-doors"), st, W.g);
   }
   function newRound() {
-    show("w-choose", false); show("w-ask", false);
-    if (W.n >= GAMES) return endPlay();
-    if (W.n === W.nextAsk) {
+    show("w-ask", false);
+    if (played() >= GAMES) return endPlay();
+    if (played() === W.nextAsk) {
       W.phase = "ask";
-      $("w-round").textContent = W.n + " rounds played";
+      $("w-round").textContent = played() + " games played";
       cap("Shall we automatically play the rest?");
       show("w-ask", true);
       return;
     }
     W.g = { car: R.int(rnd, 3), pick: -1, other: -1 };
     W.phase = "pick";
-    $("w-round").textContent = "Round " + (W.n + 1);
-    cap(W.n === 0 ? "A car hides behind one door. Pick a door." : "Pick a door.");
+    $("w-round").textContent = "Game " + (played() + 1);
+    cap(played() === 0 ? "A car hides behind one door. Pick a door." : "Pick a door.");
     draw({});
   }
   function hostOpens(g) {
@@ -273,55 +296,54 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
     W.g.pick = i;
     hostOpens(W.g);
     W.phase = "choose";
-    cap(W.n === 0 ? "The host knows where the car is. He opens a goat door. Stay or switch?" : "The host opens a goat door. Stay or switch?");
+    var full = W.stay.length >= PER ? " Your Stayed row is full, so switch this time." : W.sw.length >= PER ? " Your Switched row is full, so stay this time." : "";
+    cap((played() === 0
+      ? "The host knows where the car is. He opens a goat door. Click your door to stay, or the other closed door to switch."
+      : "The host opens a goat door. Click a door: stay or switch.") + full);
     draw({ opened: true, tags: true });
-    show("w-choose", true);
-    $("w-stay").focus({ preventScroll: true });
-  }
-  function score(g) {
-    W.n++;
-    if (g.pick === g.car) W.stay++; else W.sw++;
-    tStay(W.stay); tSwitch(W.sw);
+    var mine = $("w-doors").children[W.g.pick];
+    if (mine) mine.focus({ preventScroll: true });
   }
   function choose(switched) {
     var g = W.g;
-    show("w-choose", false);
     W.phase = "shown";
-    score(g);
     var won = switched ? g.other === g.car : g.pick === g.car;
-    W.you[0]++; if (won) W.you[1]++;
-    $("w-you").textContent = "You won " + W.you[1] + " of the " + W.you[0] + " rounds you played.";
-    cap((won ? "You win the car. " : "A goat. ") + (g.pick === g.car ? "The stayer wins this round." : "The switcher wins this round."));
-    draw({ reveal: true, tags: true });
+    (switched ? W.sw : W.stay).push(won);
+    tallies();
+    cap((won ? "You win the car! " : "A goat. ") + "That goes in the " + (switched ? "Switched" : "Stayed") + " row.");
+    draw({ reveal: true, tags: true, tagS: switched ? "" : "You stayed", tagW: switched ? "You switched" : "" });
     tl.after(1800, newRound);
   }
+  /* the rest: every remaining Stayed game first, then every remaining Switched game */
   function autoplay() {
     show("w-ask", false);
     W.phase = "auto";
-    cap("Playing the rest.");
+    cap("Playing the rest of the Stayed games.");
     (function step() {
-      if (W.n >= GAMES) return endPlay();
+      if (played() >= GAMES) return endPlay();
+      var switched = W.stay.length >= PER;
+      if (switched && !W.saidSwitch) { W.saidSwitch = true; cap("Now the rest of the Switched games."); }
       var g = { car: R.int(rnd, 3), pick: R.int(rnd, 3), other: -1 };
       hostOpens(g);
       W.g = g;
-      score(g);
-      $("w-round").textContent = "Round " + W.n;
-      draw({ reveal: true, tags: true });
-      tl.after(60, step);
+      (switched ? W.sw : W.stay).push(switched ? g.other === g.car : g.pick === g.car);
+      tallies();
+      $("w-round").textContent = "Game " + played();
+      draw({ reveal: true, tags: true, tagS: switched ? "" : "Stay", tagW: switched ? "Switch" : "" });
+      tl.after(70, step);
     })();
   }
   function endPlay() {
     W.phase = "done";
-    show("w-choose", false); show("w-ask", false);
+    show("w-ask", false);
     $("w-round").textContent = "";
-    cap(GAMES + " rounds played.");
-    result = { stay: W.stay, sw: W.sw, you: W.you };
+    var sWon = W.stay.filter(Boolean).length, wWon = W.sw.filter(Boolean).length;
+    cap(GAMES + " games played. Staying won " + sWon + " of " + PER + ". Switching won " + wWon + " of " + PER + ".");
+    result = { stay: sWon, sw: wWon };
     $("go-describe").disabled = false;
   }
-  $("w-stay").addEventListener("click", function () { if (W.phase === "choose") choose(false); });
-  $("w-switch").addEventListener("click", function () { if (W.phase === "choose") choose(true); });
   $("w-yes").addEventListener("click", autoplay);
-  $("w-no").addEventListener("click", function () { W.nextAsk = W.n + ASK_EVERY; newRound(); });
+  $("w-no").addEventListener("click", function () { W.nextAsk = played() + ASK_EVERY; newRound(); });
 
   /* ---------- answer ---------- */
   var guessText = ["Staying", "Switching", "No difference"];
@@ -330,17 +352,15 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
     $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
     $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
     $("seen").children[1].textContent = (desc.value === 1 ? "Right. " : "Count again. ") +
-      "The stayer won " + result.stay + " cars. The switcher won " + result.sw + "." +
-      (result.you && result.you[0] ? " You won " + result.you[1] + " of the " + result.you[0] + " rounds you played." : "");
-    $("bar-s").style.width = result.stay + "%";
-    $("bar-w").style.width = result.sw + "%";
-    $("bar").setAttribute("aria-label", "Stayer won " + result.stay + ", switcher won " + result.sw);
-    $("lab-s").textContent = "Stayer " + result.stay;
-    $("lab-w").textContent = "Switcher " + result.sw;
+      "Staying won " + result.stay + " of " + PER + " games. Switching won " + result.sw + " of " + PER + ".";
+    $("rates").innerHTML = [["Stayed", result.stay, "a"], ["Switched", result.sw, "b"]].map(function (r) {
+      return '<div><div class="lab"><b style="color:var(--' + r[2] + ')">' + r[0] + "</b>: won " + r[1] + " of " + PER + " (" + Math.round(r[1] / PER * 100) + "%)</div>" +
+        '<div class="track"><div class="fill" style="width:' + (r[1] / PER * 100) + "%;background:var(--" + r[2] + ')"></div></div></div>';
+    }).join("");
     R.list($("why"), [
       "Your first pick is right only 1 time in 3. Staying wins only then.",
       "The other 2 times, the car is behind a door you did not pick. The host must open the goat one, so the last closed door has the car.",
-      "In every game exactly one player wins. The switcher wins whenever the stayer loses.",
+      "So whenever staying would lose, switching would win, and the other way round.",
       "Still unsure? Picture 100 doors. You pick one, the host opens 98 goats. Would you keep yours?",
       "This is the Monty Hall problem, named after a TV game show host."
     ]);
@@ -355,19 +375,19 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
   });
 
   /* ---------- free play ---------- */
-  var P = { n: 3, g: null, phase: "pick", seed: 7001, rec: { stay: [0, 0], sw: [0, 0] } };
-  var prnd = R.rng(P.seed);
+  var P = { n: 3, g: null, phase: "pick", rec: { stay: [0, 0], sw: [0, 0] } };
+  var prnd = R.rng(R.freshSeed());
   function newGame() {
     P.g = { car: R.int(prnd, P.n), pick: -1, other: -1 };
     P.phase = "pick";
     $("p-cap").textContent = "Pick a door.";
-    $("p-choose").hidden = true; $("p-again").hidden = true;
+    $("p-again").hidden = true;
     drawPlay();
   }
   function drawPlay() {
     var g = P.g;
     drawDoors($("p-doors"), {
-      n: P.n, opened: P.phase !== "pick", reveal: P.phase === "done", tags: false,
+      n: P.n, opened: P.phase !== "pick", reveal: P.phase === "done", tags: P.phase === "choose", tagS: "Stay", tagW: "Switch",
       click: function (i, shown) { return P.phase === "pick" || (P.phase === "choose" && (i === g.pick || i === g.other)); },
       onClick: function (i) {
         if (P.phase === "pick") return choosePick(i);
@@ -381,8 +401,8 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
     if (i !== g.car) g.other = g.car;
     else { g.other = R.int(prnd, P.n - 1); if (g.other >= i) g.other++; }
     P.phase = "choose";
-    $("p-cap").textContent = P.n > 3 ? "The host opened 98 goat doors. Two are left." : "The host opened a goat door.";
-    $("p-choose").hidden = false;
+    $("p-cap").textContent = (P.n > 3 ? "The host opened 98 goat doors. Two are left." : "The host opened a goat door.") +
+      " Click your door to stay, or the other closed door to switch.";
     drawPlay();
   }
   function finish(switched) {
@@ -395,11 +415,9 @@ Staying wins 1 case in 3. Switching wins 2.</div></details>
     $("r-switch").textContent = P.rec.sw[1] + " of " + P.rec.sw[0] + " won";
     P.phase = "done";
     $("p-cap").textContent = won ? "You won the car." : "A goat.";
-    $("p-choose").hidden = true; $("p-again").hidden = false;
+    $("p-again").hidden = false;
     drawPlay();
   }
-  $("p-stay").addEventListener("click", function () { finish(false); });
-  $("p-switch").addEventListener("click", function () { finish(true); });
   $("p-again").addEventListener("click", newGame);
   function setN(n) {
     P.n = n;

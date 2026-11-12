@@ -74,32 +74,43 @@ await play('montyhall', async () => {
   await page.click('#guess-opts .opt[data-i="2"]');
 }, 1, async (tag) => {
   const seen = await text('#seen');
-  const m = seen.match(/stayer won (\d+) cars\. The switcher won (\d+)/);
-  ok(m && +m[1] + +m[2] === 100 && +m[2] > +m[1], `${tag}: tallies add to 100, switcher ahead`, seen);
+  const m = seen.match(/Staying won (\d+) of 50 games\. Switching won (\d+) of 50/);
+  ok(m && +m[2] > +m[1], `${tag}: switching won more of its 50`, seen);
   ok(/No difference/.test(await text('#cmp')), `${tag}: compare shows guess`);
-  ok(/You won \d+ of the 10 rounds you played/.test(seen), `${tag}: own record in seen box`, seen);
+  ok(/Stayed: won \d+ of 50/.test(await text('#rates')), `${tag}: win-rate bars`, await text('#rates'));
 }, '#try-100', async (tag) => {
-  // play a round by hand: pick a door, then stay or switch
-  async function round(k) {
+  // one game by hand: pick a door, then click a door to stay (your door) or switch (the other closed door)
+  let stays = 0, switches = 0;
+  async function game(k) {
     await page.waitForSelector('#w-doors button.door:not(:disabled)', { timeout: 5000 });
     await page.click(`#w-doors button.door:nth-child(${(k % 3) + 1})`);
-    ok(await page.$$eval('#w-doors .door.open', d => d.length) === 1, `${tag}: round ${k + 1} host opens one door`);
-    await page.click(k % 2 ? '#w-switch' : '#w-stay');
+    ok(await page.$$eval('#w-doors .door.open', d => d.length) === 1, `${tag}: game ${k + 1} host opens one door`);
+    const sw = k % 2 === 1;
+    await page.evaluate((cls) => document.querySelector('#w-doors .tag.' + cls).closest('button').click(), sw ? 'w' : 's');
+    if (sw) switches++; else stays++;
   }
-  for (let k = 0; k < 6; k++) await round(k);
+  for (let k = 0; k < 6; k++) await game(k);
   await page.waitForFunction(() => !document.getElementById('w-ask').hidden, { timeout: 5000 });
-  ok(/automatically play the rest/.test(await text('#caption')), `${tag}: asks after 6 rounds`);
+  ok(/automatically play the rest/.test(await text('#caption')), `${tag}: asks after 6 games`);
+  const rows = await page.evaluate(() => ['#t-stay', '#t-switch'].map(s => document.querySelectorAll(s + ' span.won, ' + s + ' span.lost').length));
+  ok(rows[0] === stays && rows[1] === switches, `${tag}: each game lands in the row for the choice`, rows.join(','));
   await shot(`${tag}-2a-ask`);
   await page.click('#w-no');
-  for (let k = 6; k < 10; k++) await round(k);
+  for (let k = 6; k < 10; k++) await game(k);
   await page.waitForFunction(() => !document.getElementById('w-ask').hidden, { timeout: 5000 });
-  ok(/10 rounds played/.test(await text('#w-round')), `${tag}: asks again after 4 more`, await text('#w-round'));
+  ok(/10 games played/.test(await text('#w-round')), `${tag}: asks again after 4 more`, await text('#w-round'));
   await page.click('#w-yes');
+  // the Stayed row fills completely before any automatic Switched game
+  await page.waitForFunction(() => /Switched games/.test(document.getElementById('caption').textContent), { timeout: 10000 });
+  const mid = await page.evaluate(() => ['#t-stay', '#t-switch'].map(s => document.querySelectorAll(s + ' span.won, ' + s + ' span.lost').length));
+  ok(mid[0] === 50 && mid[1] < 50, `${tag}: autoplay fills Stayed first`, mid.join(','));
+  await page.waitForFunction(() => !document.getElementById('go-describe').disabled, { timeout: 20000 });
+  ok(await page.$$eval('#t-stay span.lost', s => s.length) > 15, `${tag}: goats shown as rings in the Stayed row`);
 }, '#try-100');
 ok(await page.$$eval('#p-doors .door', d => d.length) === 100, 'montyhall: 100 doors in play');
 await page.click('#p-doors .door:nth-child(5)');
 ok(await page.$$eval('#p-doors .door.open', d => d.length) === 98, 'montyhall: host opens 98');
-await page.click('#p-switch');
+await page.evaluate(() => [...document.querySelectorAll('#p-doors button.door:not(:disabled)')].find(b => !b.classList.contains('pick')).click());
 ok(/1 of 1 won|0 of 1 won/.test(await text('#r-switch')), 'montyhall: switch recorded', await text('#r-switch'));
 await shot('montyhall-6-100doors');
 
@@ -207,16 +218,35 @@ await page.click('[data-r="100000"]');
 await runAgain('ruin', async () => page.$eval('#play', c => c.toDataURL()));
 
 // Infinite money
+const playedRuns = [];
 await play('stpetersburg', async () => { await page.type('#guess-host .numin', '10'); }, 2, async (tag) => {
   ok(/You said\$10 a game/.test(await text('#cmp')) && /No limit/.test(await text('#cmp')), `${tag}: compare`, await text('#cmp'));
-  ok(/^You saw: No: it drifted.*Right\. The average was about \$\d+(\.\d+)? until game [\d,]+ paid \$32,768/.test(await text('#seen')), `${tag}: seen box matches the describe question`, await text('#seen'));
+  ok(/^You saw: No: it drifted.*Right\. Your biggest win, \$[\d,]+.*of your 10,000 games paid just \$2/.test(await text('#seen')), `${tag}: seen box describes this run`, await text('#seen'));
   ok(/average win per game/.test(await text('#s4 .recall')), `${tag}: question asks about the average`, await text('#s4 .recall'));
   ok(!/fair price/i.test(await page.evaluate(() => document.body.textContent)), `${tag}: never claims a fair price`);
-}, '#try');
+}, '#try', async (tag) => {
+  // flip by hand: keep flipping until heads, five games
+  async function game(k) {
+    await page.waitForFunction(() => !document.getElementById('w-flip').disabled && !document.getElementById('w-flip-row').hidden, { timeout: 5000 });
+    for (let f = 0; f < 60; f++) {
+      await page.click('#w-flip');
+      if (/^Heads/.test(await text('#caption'))) break;
+    }
+    ok(new RegExp(`Your games: (\\$[\\d,]+(, )?){${k + 1}}$`).test(await text('#w-mine')), `${tag}: game ${k + 1} recorded`, await text('#w-mine'));
+  }
+  for (let k = 0; k < 5; k++) await game(k);
+  playedRuns.push(await text('#w-mine'));
+  await page.waitForFunction(() => !document.getElementById('w-ask').hidden, { timeout: 5000 });
+  ok(/5 games played/.test(await text('#w-round')), `${tag}: asks after 5 games`);
+  await shot(`${tag}-2a-ask`);
+  await page.click('#w-yes');
+});
 ok((await text('#live')) === '$21', 'stpetersburg: $1 million limit gives $21', await text('#live'));
 await page.click('.presets button[data-c="10"]');
 ok((await text('#live')) === '$11', 'stpetersburg: $1,000 limit gives $11', await text('#live'));
 ok(/average win \$\d/.test(await text('#psim')), 'stpetersburg: free play runs games', await text('#psim'));
+ok(await page.$eval('#play', c => c.clientHeight > 100), 'stpetersburg: free play draws a graph');
+await shot('stpetersburg-6-limit');
 await runAgain('stpetersburg', async () => text('#psim'));
 
 // Two children
