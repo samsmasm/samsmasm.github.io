@@ -99,6 +99,18 @@ test('externality welfare, revenue and external cost answers equal the shaded ar
   assert(bad.length === 0, JSON.stringify(bad));
 });
 
+test('externality shading lets every area of the chart be tapped', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    for (const k of EXT_KINDS) for (let i = 0; i < 30; i++) {
+      const sc = gen(k), area = buildCells(sc).reduce((s, g) => s + g.polys.reduce((t, p) => t + polyArea(p), 0), 0);
+      if (Math.abs(area - GX * GY) > 1e-6) out.push([k, sc.iv, area]);
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
 test('the mixed externality row picks all four types and shows their combined score', async page => {
   const seen = await page.evaluate(() => {
     const s = new Set();
