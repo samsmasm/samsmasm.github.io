@@ -42,3 +42,4 @@ Watch styles: auto-playing (positive, birthday, streak, galton), played by hand 
 - Colours: red and violet for sick and false alarm (amber next to red was rejected as too similar); blue `--a` and orange `--b` for two-way comparisons. Always a word or letter beside colour.
 - All randomness is seeded. Honour reduced motion (the timeline already does).
 - No em dashes anywhere. Run `test/run.sh` before committing.
+- **Run `python3 riddles/stamp.py` before committing.** unisam.nz caches for 4 hours, so a new page with an old cached `riddles.js` breaks (it blanked "Their average is" on Top of the class, 2026-11-12). The stamp changes the `?v=` on the shared links in every page.
