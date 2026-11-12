@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three Doors · Riddles</title>
+<meta name="description" content="A probability riddle: three doors, one car. Stay or switch?">
+<link rel="icon" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../riddles.css">
+<style>
+.doors { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.door {
+  position: relative; width: 84px; height: 118px; border-radius: 10px 10px 4px 4px;
+  background: var(--surface-2); border: 2px solid var(--line); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; font-size: 40px; padding: 0;
+  font-family: var(--font-display); transition: background 0.25s, opacity 0.25s;
+}
+.door .num { font-size: 28px; font-weight: 600; color: var(--muted); }
+.door::after { content: ""; position: absolute; right: 12px; top: 54%; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.door.open { background: var(--bg); border-style: dashed; }
+.door.open::after { display: none; }
+.door.goat .e { opacity: 0.5; }
+.door.goat:not(.pick):not(.other) { border-color: var(--line); }
+.door.pick { border-color: var(--a); box-shadow: inset 0 0 0 2px var(--a); }
+.door.other { border-color: var(--b); box-shadow: inset 0 0 0 2px var(--b); }
+.door .tag { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); font-family: var(--font-body); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.door .tag.s { color: var(--a); }
+.door .tag.w { color: var(--b); }
+.doors.tagged { margin-bottom: 22px; }
+.doors.many { gap: 5px; max-width: 420px; margin: 0 auto; }
+.doors.many .door { width: 34px; height: 46px; font-size: 18px; border-radius: 6px 6px 2px 2px; border-width: 1.5px; }
+.doors.many .door::after { right: 5px; width: 4px; height: 4px; }
+.doors.many .door .num { display: none; }
+.doors.many .door .tag { display: none; }
+button.door:not(:disabled):hover { border-color: var(--ink); }
+button.door:disabled { cursor: default; }
+.lanes { display: flex; flex-direction: column; gap: 12px; max-width: 460px; margin: 0 auto; width: 100%; }
+.lane { display: grid; grid-template-columns: 76px 1fr; gap: 10px; align-items: center; }
+.lname { font-weight: 700; font-size: 15px; }
+.lname.s { color: var(--a); }
+.lname.w { color: var(--b); }
+.tally { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+.tally span { aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--line); }
+.tally.s span.on { background: var(--a); border-color: var(--a); }
+.tally.w span.on { background: var(--b); border-color: var(--b); }
+.record { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.record > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--bg); }
+.record .lab { font-weight: 700; }
+.record .n { font-family: var(--font-mono); font-size: 20px; }
+</style>
+</head>
+<body>
+<header class="masthead"><div class="masthead-inner">
+  <a href="/"><img src="/geocornsmall.png" alt="unisam.nz home"></a>
+  <div><a class="wordmark" href="../">Riddles</a><div class="msub">Guess first, then watch</div></div>
+  <a class="home" href="../">All riddles</a>
+</div></header>
+
+<main>
+  <div><div class="kicker">Riddle</div><h1 class="title">Three doors</h1></div>
+  <ol class="stepper" id="stepper" aria-label="Progress">
+    <li>Riddle</li><li>Guess</li><li>Watch</li><li>Describe</li><li>Answer</li>
+  </ol>
+
+  <section class="card step" id="s0">
+    <h2>The riddle</h2>
+    <div class="doors" aria-hidden="true"><div class="door"><span class="num">1</span></div><div class="door"><span class="num">2</span></div><div class="door"><span class="num">3</span></div></div>
+    <p class="riddle">A car is behind one door. Goats are behind the other two.</p>
+    <p class="riddle">You pick a door. The host knows where the car is. He opens one of the other doors and shows you a goat.</p>
+    <p class="riddle">Then he asks: do you want to switch to the last closed door?</p>
+    <p class="question">Should you stay or switch?</p>
+    <button type="button" class="btn" data-go="1">Make a guess</button>
+  </section>
+
+  <section class="card step" id="s1" hidden>
+    <h2>Your guess</h2>
+    <p class="sub">Which wins the car more often?</p>
+    <div class="opts" role="radiogroup" aria-label="Your guess" id="guess-opts">
+      <button type="button" class="opt" data-i="0">Staying</button>
+      <button type="button" class="opt" data-i="1">Switching</button>
+      <button type="button" class="opt" data-i="2">No difference</button>
+    </div>
+    <button type="button" class="btn" id="go-watch" data-go="2" disabled>Lock it in</button>
+  </section>
+
+  <section class="card step" id="s2" hidden>
+    <h2>Watch</h2>
+    <p class="sub small">Two players play the same game. One always stays. One always switches.</p>
+    <div class="doors" id="w-doors" aria-hidden="true"></div>
+    <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="lanes" aria-hidden="true">
+      <div class="lane"><span class="lname s">Stayer</span><div class="tally s" id="t-stay"></div></div>
+      <div class="lane"><span class="lname w">Switcher</span><div class="tally w" id="t-switch"></div></div>
+    </div>
+    <p class="sub small" style="text-align:center">Each dot is a car won.</p>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
+      <button type="button" class="btn2" id="replay">Replay</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s3" hidden>
+    <h2>What do you see?</h2>
+    <p class="sub">Look at the two rows of dots.</p>
+    <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
+      <button type="button" class="opt" data-i="0">The stayer won more cars</button>
+      <button type="button" class="opt" data-i="1">The switcher won more cars</button>
+      <button type="button" class="opt" data-i="2">About the same</button>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
+      <button type="button" class="btn2" data-go="2">Watch again</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s4" hidden>
+    <h2>The answer</h2>
+    <p class="answerline"><b>Switch.</b> Switching wins 2 games in 3.</p>
+    <div id="cmp"></div>
+    <div class="seen" id="seen"></div>
+    <div>
+      <div class="splitbar" role="img" id="bar" aria-label=""><div id="bar-s" style="background:var(--a)"></div><div id="bar-w" style="background:var(--b)"></div></div>
+      <div class="barlabels"><span id="lab-s"></span><span id="lab-w"></span></div>
+    </div>
+    <ul class="why" id="why"></ul>
+    <details><summary>Show every case</summary><div class="formula">You pick door 1.
+
+Car behind   Host opens   Stay wins   Switch wins
+Door 1       2 or 3       yes         no
+Door 2       3            no          yes
+Door 3       2            no          yes
+
+Staying wins 1 case in 3. Switching wins 2.</div></details>
+    <div class="btnrow">
+      <button type="button" class="btn" id="try-100">Try it with 100 doors</button>
+      <button type="button" class="btn2" id="try-3">Play 3 doors yourself</button>
+      <button type="button" class="btn2" id="restart">Start over</button>
+    </div>
+  </section>
+
+  <section class="card" id="explore" hidden>
+    <h2>Play it yourself</h2>
+    <div class="btnrow" role="group" aria-label="Number of doors">
+      <button type="button" class="btn2" id="n3" aria-pressed="true">3 doors</button>
+      <button type="button" class="btn2" id="n100" aria-pressed="false">100 doors</button>
+    </div>
+    <p class="caption" id="p-cap" aria-live="polite"></p>
+    <div class="doors" id="p-doors"></div>
+    <div class="btnrow" id="p-choose" hidden>
+      <button type="button" class="btn2" id="p-stay" style="border-color:var(--a)">Stay</button>
+      <button type="button" class="btn2" id="p-switch" style="border-color:var(--b)">Switch</button>
+    </div>
+    <button type="button" class="btn" id="p-again" hidden>Play again</button>
+    <div class="record">
+      <div><div class="lab" style="color:var(--a)">When you stayed</div><div class="n" id="r-stay">0 of 0 won</div></div>
+      <div><div class="lab" style="color:var(--b)">When you switched</div><div class="n" id="r-switch">0 of 0 won</div></div>
+    </div>
+  </section>
+</main>
+<footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
+
+<script src="../riddles.js"></script>
+<script>
+(function () {
+  var $ = R.$;
+
+  /* one game: the car, your pick, and the one door the host leaves closed */
+  function game(rnd, n) {
+    var car = R.int(rnd, n), pick = R.int(rnd, n), other;
+    if (pick !== car) other = car;
+    else { other = R.int(rnd, n - 1); if (other >= pick) other++; }
+    return { car: car, pick: pick, other: other };
+  }
+  /* a seed whose 100 games land near the long-run split, so the replay is fair to the maths */
+  function stayWins(seed) {
+    var rnd = R.rng(seed), s = 0;
+    for (var i = 0; i < 100; i++) { var g = game(rnd, 3); if (g.pick === g.car) s++; }
+    return s;
+  }
+  var SEED = 1;
+  while (Math.abs(stayWins(SEED) - 33) > 1) SEED++;
+
+  /* doors: st = { n, pick, other, opened (bool: host has opened the rest), reveal, tags, click } */
+  function drawDoors(host, st, g) {
+    host.innerHTML = "";
+    host.className = "doors" + (st.n > 3 ? " many" : "") + (st.tags ? " tagged" : "");
+    for (var i = 0; i < st.n; i++) {
+      var d = document.createElement(st.click ? "button" : "div");
+      d.className = "door";
+      var hostOpened = st.opened && i !== g.pick && i !== g.other;
+      var shown = st.reveal || hostOpened;
+      if (shown) { d.className += " open" + (i === g.car ? "" : " goat"); d.innerHTML = '<span class="e">' + (i === g.car ? "🚗" : "🐐") + "</span>"; }
+      else d.innerHTML = '<span class="num">' + (i + 1) + "</span>";
+      if (g.pick === i) d.className += " pick";
+      if (st.tags && g.other === i) d.className += " other";
+      if (st.tags) {
+        if (i === g.pick) d.insertAdjacentHTML("beforeend", '<span class="tag s">Stayer</span>');
+        if (i === g.other) d.insertAdjacentHTML("beforeend", '<span class="tag w">Switcher</span>');
+      }
+      if (st.click) {
+        d.type = "button";
+        d.setAttribute("aria-label", "Door " + (i + 1) + (shown ? (i === g.car ? ", car" : ", goat") : ""));
+        d.disabled = !st.click(i, shown);
+        (function (k) { d.addEventListener("click", function () { st.onClick(k); }); })(i);
+      }
+      host.appendChild(d);
+    }
+  }
+
+  function makeTally(el) {
+    el.innerHTML = "";
+    for (var i = 0; i < 100; i++) el.appendChild(document.createElement("span"));
+    return function (k) { Array.prototype.forEach.call(el.children, function (c, i) { c.className = i < k ? "on" : ""; }); };
+  }
+  var tStay = makeTally($("t-stay")), tSwitch = makeTally($("t-switch"));
+
+  /* ---------- steps ---------- */
+  var tl = null, result = { stay: 0, sw: 0 };
+  var steps = R.steps({
+    onEnter: { 2: playWatch, 4: renderAnswer },
+    onLeave: function (prev) { if (prev === 2 && tl) tl.cancel(); }
+  });
+  var guess = R.choices($("guess-opts"), function () { $("go-watch").disabled = false; });
+  var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
+  $("replay").addEventListener("click", playWatch);
+
+  /* ---------- watch ---------- */
+  function playWatch() {
+    if (tl) tl.cancel();
+    tl = R.timeline();
+    var T = tl, t = 0;
+    $("go-describe").disabled = true;
+    var rnd = R.rng(SEED), games = [], i;
+    for (i = 0; i < 100; i++) games.push(game(rnd, 3));
+    var stay = 0, sw = 0;
+    tStay(0); tSwitch(0);
+    var host = $("w-doors"), cap = function (s) { $("caption").textContent = s; };
+    function score(g) { if (g.pick === g.car) stay++; else sw++; tStay(stay); tSwitch(sw); }
+    function at(ms, fn) { t += ms; T.after(t, fn); }
+    var none = { pick: -1, other: -1, car: -1 };
+    cap("A car hides behind one door.");
+    drawDoors(host, { n: 3 }, none);
+
+    var g0 = games[0];
+    at(1800, function () { cap("Both players pick the same door."); drawDoors(host, { n: 3 }, g0); });
+    at(2000, function () { cap("The host opens a goat door. He knows where the car is."); drawDoors(host, { n: 3, opened: true }, g0); });
+    at(2600, function () { cap("The stayer keeps their door. The switcher swaps."); drawDoors(host, { n: 3, opened: true, tags: true }, g0); });
+    at(2600, function () {
+      cap(g0.pick === g0.car ? "The stayer wins this one." : "The switcher wins this one.");
+      drawDoors(host, { n: 3, reveal: true, tags: true }, g0); score(g0);
+    });
+    [1, 2].forEach(function (k) {
+      var g = games[k];
+      at(2600, function () { cap("Again."); drawDoors(host, { n: 3 }, g); });
+      at(800, function () { drawDoors(host, { n: 3, opened: true, tags: true }, g); });
+      at(900, function () { drawDoors(host, { n: 3, reveal: true, tags: true }, g); score(g); });
+    });
+    at(1800, function () { cap("Now 100 games, fast."); });
+    for (i = 3; i < 100; i++) {
+      (function (g) { at(i === 3 ? 1400 : 75, function () { drawDoors(host, { n: 3, reveal: true, tags: true }, g); score(g); }); })(games[i]);
+    }
+    at(600, function () {
+      cap("100 games played.");
+      result = { stay: stay, sw: sw };
+      $("go-describe").disabled = false;
+    });
+  }
+
+  /* ---------- answer ---------- */
+  var guessText = ["Staying", "Switching", "No difference"];
+  function renderAnswer() {
+    R.compare($("cmp"), guessText[guess.value] || "No guess", "Switching");
+    $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
+    $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
+    $("seen").children[1].textContent = (desc.value === 1 ? "Right. " : "Count again. ") +
+      "The stayer won " + result.stay + " cars. The switcher won " + result.sw + ".";
+    $("bar-s").style.width = result.stay + "%";
+    $("bar-w").style.width = result.sw + "%";
+    $("bar").setAttribute("aria-label", "Stayer won " + result.stay + ", switcher won " + result.sw);
+    $("lab-s").textContent = "Stayer " + result.stay;
+    $("lab-w").textContent = "Switcher " + result.sw;
+    R.list($("why"), [
+      "Your first pick is right only 1 time in 3. Staying wins only then.",
+      "The other 2 times, the car is behind a door you did not pick. The host must open the goat one, so the last closed door has the car.",
+      "In every game exactly one player wins. The switcher wins whenever the stayer loses.",
+      "Still unsure? Picture 100 doors. You pick one, the host opens 98 goats. Would you keep yours?",
+      "This is the Monty Hall problem, named after a TV game show host."
+    ]);
+    R.markDone("montyhall", { guess: guessText[guess.value], right: guess.value === 1 });
+  }
+
+  $("restart").addEventListener("click", function () {
+    guess.reset(); desc.reset();
+    $("go-watch").disabled = true; $("go-answer").disabled = true;
+    $("explore").hidden = true;
+    steps.show(0);
+  });
+
+  /* ---------- free play ---------- */
+  var P = { n: 3, g: null, phase: "pick", seed: 7001, rec: { stay: [0, 0], sw: [0, 0] } };
+  var prnd = R.rng(P.seed);
+  function newGame() {
+    P.g = { car: R.int(prnd, P.n), pick: -1, other: -1 };
+    P.phase = "pick";
+    $("p-cap").textContent = "Pick a door.";
+    $("p-choose").hidden = true; $("p-again").hidden = true;
+    drawPlay();
+  }
+  function drawPlay() {
+    var g = P.g;
+    drawDoors($("p-doors"), {
+      n: P.n, opened: P.phase !== "pick", reveal: P.phase === "done", tags: false,
+      click: function (i, shown) { return P.phase === "pick" || (P.phase === "choose" && (i === g.pick || i === g.other)); },
+      onClick: function (i) {
+        if (P.phase === "pick") return choosePick(i);
+        if (P.phase === "choose") finish(i === g.other);
+      }
+    }, g);
+  }
+  function choosePick(i) {
+    var g = P.g;
+    g.pick = i;
+    if (i !== g.car) g.other = g.car;
+    else { g.other = R.int(prnd, P.n - 1); if (g.other >= i) g.other++; }
+    P.phase = "choose";
+    $("p-cap").textContent = P.n > 3 ? "The host opened 98 goat doors. Two are left." : "The host opened a goat door.";
+    $("p-choose").hidden = false;
+    drawPlay();
+  }
+  function finish(switched) {
+    var g = P.g;
+    if (switched) { var t = g.pick; g.pick = g.other; g.other = t; }
+    var won = g.pick === g.car;
+    var r = switched ? P.rec.sw : P.rec.stay;
+    r[0]++; if (won) r[1]++;
+    $("r-stay").textContent = P.rec.stay[1] + " of " + P.rec.stay[0] + " won";
+    $("r-switch").textContent = P.rec.sw[1] + " of " + P.rec.sw[0] + " won";
+    P.phase = "done";
+    $("p-cap").textContent = won ? "You won the car." : "A goat.";
+    $("p-choose").hidden = true; $("p-again").hidden = false;
+    drawPlay();
+  }
+  $("p-stay").addEventListener("click", function () { finish(false); });
+  $("p-switch").addEventListener("click", function () { finish(true); });
+  $("p-again").addEventListener("click", newGame);
+  function setN(n) {
+    P.n = n;
+    $("n3").setAttribute("aria-pressed", n === 3 ? "true" : "false");
+    $("n100").setAttribute("aria-pressed", n === 100 ? "true" : "false");
+    P.rec = { stay: [0, 0], sw: [0, 0] };
+    $("r-stay").textContent = "0 of 0 won"; $("r-switch").textContent = "0 of 0 won";
+    newGame();
+  }
+  $("n3").addEventListener("click", function () { setN(3); });
+  $("n100").addEventListener("click", function () { setN(100); });
+  function openPlay(n) {
+    $("explore").hidden = false;
+    setN(n);
+    $("explore").scrollIntoView({ block: "start" });
+  }
+  $("try-100").addEventListener("click", function () { openPlay(100); });
+  $("try-3").addEventListener("click", function () { openPlay(3); });
+
+  steps.show(0, true);
+})();
+</script>
+</body>
+</html>

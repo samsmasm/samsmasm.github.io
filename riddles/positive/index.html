@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Positive Test · Riddles</title>
+<meta name="description" content="A probability riddle: you test positive for a rare disease. How likely is it that you are sick?">
+<link rel="icon" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../riddles.css">
+<style>
+.dots { max-width: 520px; margin: 0 auto; width: 100%; }
+.dots canvas { border: 1px solid var(--line); background: var(--bg); }
+.sw.tp { background: var(--red); }
+.sw.fn { border: 2px solid var(--red); }
+.sw.fp { background: var(--violet); }
+.sw.tn { background: var(--dot); }
+.answerbig.sick { color: var(--red); }
+.barlabels .la::before, .barlabels .lb::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.barlabels .la::before { background: var(--red); }
+.barlabels .lb::before { background: var(--violet); }
+</style>
+</head>
+<body>
+<header class="masthead"><div class="masthead-inner">
+  <a href="/"><img src="/geocornsmall.png" alt="unisam.nz home"></a>
+  <div><a class="wordmark" href="../">Riddles</a><div class="msub">Guess first, then watch</div></div>
+  <a class="home" href="../">All riddles</a>
+</div></header>
+
+<main>
+  <div><div class="kicker">Riddle</div><h1 class="title">The positive test</h1></div>
+  <ol class="stepper" id="stepper" aria-label="Progress">
+    <li>Riddle</li><li>Guess</li><li>Watch</li><li>Describe</li><li>Answer</li>
+  </ol>
+
+  <section class="card step" id="s0">
+    <h2>The riddle</h2>
+    <p class="riddle">1 in 1,000 people has a disease.</p>
+    <p class="riddle">A test spots 99% of sick people and clears 99% of healthy people.</p>
+    <p class="riddle">You take the test. It comes back positive.</p>
+    <p class="question">How likely is it that you are sick?</p>
+    <button type="button" class="btn" data-go="1">Make a guess</button>
+  </section>
+
+  <section class="card step" id="s1" hidden>
+    <h2>Your guess</h2>
+    <p class="sub">The chance you are sick, given a positive test.</p>
+    <div id="guess-host"></div>
+    <p class="sub small">Type a number or use the arrows. Near 0% or 100% the arrows move in 0.01% steps.</p>
+    <button type="button" class="btn" id="go-watch" data-go="2">Lock it in</button>
+  </section>
+
+  <section class="card step" id="s2" hidden>
+    <h2>Watch</h2>
+    <div class="dots"><canvas id="watch" role="img" aria-label="A grid of 10,000 dots, one per person, shown being tested."></canvas></div>
+    <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="legend">
+      <div><span class="sw tp"></span>Sick</div>
+      <div><span class="sw fp"></span>Healthy, tested positive</div>
+      <div><span class="sw tn"></span>Healthy, tested negative</div>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
+      <button type="button" class="btn2" id="replay">Replay</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s3" hidden>
+    <h2>What do you see?</h2>
+    <p class="sub">Look at everyone who tested positive.</p>
+    <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
+      <button type="button" class="opt" data-i="0">Nearly all of them are sick</button>
+      <button type="button" class="opt" data-i="1">More sick than healthy</button>
+      <button type="button" class="opt" data-i="2">About half and half</button>
+      <button type="button" class="opt" data-i="3">More healthy than sick</button>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
+      <button type="button" class="btn2" data-go="2">Watch again</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s4" hidden>
+    <h2>The answer</h2>
+    <div class="answerbig sick" id="ans-big"></div>
+    <div id="scale"></div>
+    <div class="seen" id="seen"></div>
+    <div>
+      <div class="splitbar" id="bar" role="img" aria-label="Positive results split into sick and healthy"><div id="bar-a" style="background:var(--red)"></div><div id="bar-b" style="background:var(--violet)"></div></div>
+      <div class="barlabels"><span class="la" id="lab-a"></span><span class="lb" id="lab-b"></span></div>
+    </div>
+    <ul class="why" id="why"></ul>
+    <details><summary>Show the calculation</summary><div class="formula" id="formula"></div></details>
+    <div class="btnrow">
+      <button type="button" class="btn" id="try-nums">Change the numbers</button>
+      <button type="button" class="btn2" id="restart">Start over</button>
+    </div>
+  </section>
+
+  <section class="card" id="explore" hidden>
+    <h2>Change the numbers</h2>
+    <div class="presets" role="group" aria-label="Presets">
+      <button type="button" class="btn2" data-p="0.001" data-se="99" data-sp="99">The riddle</button>
+      <button type="button" class="btn2" data-p="0.1" data-se="99" data-sp="99">A common disease</button>
+      <button type="button" class="btn2" data-p="0.001" data-se="99.9" data-sp="99.9">A better test</button>
+    </div>
+    <div class="control">
+      <div class="row"><label for="prev">How common is the disease</label><span class="val" id="prev-val"></span></div>
+      <input type="range" id="prev" min="0" max="1000" step="1" value="100">
+    </div>
+    <div class="control">
+      <div class="row"><label for="sens">Sick people who test positive</label><span id="sens-field"></span></div>
+      <input type="range" id="sens" min="0" max="99.9" step="0.1" value="99">
+    </div>
+    <div class="control">
+      <div class="row"><label for="spec">Healthy people who test negative</label><span id="spec-field"></span></div>
+      <input type="range" id="spec" min="0" max="99.9" step="0.1" value="99">
+    </div>
+    <p class="liveres" aria-live="polite">Chance you are sick after a positive: <b id="live-res"></b></p>
+    <div class="dots"><canvas id="play" role="img" aria-label="A grid of 10,000 dots coloured by sickness and test result."></canvas></div>
+    <div class="legend">
+      <div><span class="sw tp"></span>Sick, positive <span class="n" id="n-tp"></span></div>
+      <div><span class="sw fn"></span>Sick, negative <span class="n" id="n-fn"></span></div>
+      <div><span class="sw fp"></span>Healthy, positive <span class="n" id="n-fp"></span></div>
+      <div><span class="sw tn"></span>Healthy, negative <span class="n" id="n-tn"></span></div>
+    </div>
+  </section>
+</main>
+<footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
+
+<script src="../riddles.js"></script>
+<script>
+(function () {
+  var $ = R.$;
+  var N = 10000, COLS = 100;
+  var RIDDLE = { p: 0.001, sens: 0.99, spec: 0.99 };
+
+  function counts(p, se, sp) {
+    var sick = Math.round(N * p);
+    var tp = Math.round(sick * se), fn = sick - tp;
+    var healthy = N - sick;
+    var fp = Math.round(healthy * (1 - sp)), tn = healthy - fp;
+    var num = se * p, den = se * p + (1 - sp) * (1 - p);
+    return { sick: sick, healthy: healthy, tp: tp, fn: fn, fp: fp, tn: tn, num: num, den: den, post: num / den };
+  }
+
+  /* Dot styles. Categories: 0 sick+positive, 1 sick+negative, 2 healthy+positive, 3 healthy+negative.
+     Phases: 0 everyone, 1 the sick revealed, 2 results, 3 only positives stay bright. */
+  var G = { c: "--dot", a: 1, r: 0.34 };
+  var RED = { c: "--red", a: 1, r: 0.6 };
+  var RING = { c: "--red", a: 1, r: 0.55, ring: true };
+  var VIO = { c: "--violet", a: 1, r: 0.6 };
+  var RINGF = { c: "--red", a: 0.12, r: 0.55, ring: true };
+  var GF = { c: "--dot", a: 0.1, r: 0.34 };
+  var S = [[G, G, G, G], [RED, RED, G, G], [RED, RING, VIO, G], [RED, RINGF, VIO, GF]];
+
+  /* seeded shuffle so dots keep their places */
+  var perm = [];
+  for (var i = 0; i < N; i++) perm.push(i);
+  R.shuffle(perm, R.rng(20261112));
+
+  function makeView(canvas) {
+    var posCat = new Uint8Array(N);
+    var view = { frame: { from: S[0], to: S[0], u: 1 } };
+    view.setCounts = function (c) {
+      var idx = 0, groups = [c.tp, c.fn, c.fp, c.tn];
+      for (var cat = 0; cat < 4; cat++) for (var k = 0; k < groups[cat]; k++) posCat[perm[idx++]] = cat;
+    };
+    view.paint = function () {
+      var f = R.fitCanvas(canvas, 1);
+      if (!f) return;
+      var ctx = f.ctx, cell = f.w / COLS;
+      var cols = { "--red": R.cssVar("--red"), "--violet": R.cssVar("--violet"), "--dot": R.cssVar("--dot") };
+      var fr = view.frame, u = fr.u;
+      function dot(x, y, s, mul) {
+        var a = s.a * mul;
+        if (a <= 0.005) return;
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        ctx.arc(x, y, cell * s.r, 0, 6.2832);
+        if (s.ring) { ctx.strokeStyle = cols[s.c]; ctx.lineWidth = Math.max(1.5, cell * 0.22); ctx.stroke(); }
+        else { ctx.fillStyle = cols[s.c]; ctx.fill(); }
+      }
+      for (var pass = 0; pass < 2; pass++) {
+        for (var k = 0; k < N; k++) {
+          var cat = posCat[k];
+          if ((pass === 0) !== (cat === 3)) continue;
+          var x = (k % COLS + 0.5) * cell, y = (Math.floor(k / COLS) + 0.5) * cell;
+          if (u < 1) dot(x, y, fr.from[cat], 1 - u);
+          if (u > 0) dot(x, y, fr.to[cat], u);
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+    view.show = function (from, to, u) { view.frame = { from: from, to: to, u: u }; view.paint(); };
+    R.onResize(canvas, view.paint);
+    return view;
+  }
+
+  var watchView = makeView($("watch")), playView = makeView($("play"));
+  var base = counts(RIDDLE.p, RIDDLE.sens, RIDDLE.spec);
+  watchView.setCounts(base);
+
+  /* ---------- steps ---------- */
+  var tl = null;
+  var steps = R.steps({
+    onEnter: { 2: playWatch, 4: renderAnswer },
+    onLeave: function (prev) { if (prev === 2 && tl) tl.cancel(); }
+  });
+  var guess = R.guess($("guess-host"), {
+    label: "your guess, percent", min: 0, max: 100, step: 0.1, mode: "pct", suffix: "%", nudgeFrom: 0,
+    button: $("go-watch"), endLabels: ["0%", "100%"]
+  });
+  var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
+  $("replay").addEventListener("click", playWatch);
+
+  var captions = ["10,000 people.", base.sick + " are sick.", "Everyone takes the test.", "Only the positives stay bright."];
+  function playWatch() {
+    if (tl) tl.cancel();
+    tl = R.timeline();
+    var T = tl;
+    $("go-describe").disabled = true;
+    $("caption").textContent = captions[0];
+    watchView.show(S[0], S[0], 1);
+    function go(n) {
+      $("caption").textContent = captions[n];
+      T.tween(800, function (u) { watchView.show(S[n - 1], S[n], R.ease(u)); }, function () {
+        if (n < 3) T.after(1500, function () { go(n + 1); });
+        else $("go-describe").disabled = false;
+      });
+    }
+    T.after(1500, function () { go(1); });
+  }
+
+  function renderAnswer() {
+    var c = base, g = guess.value == null ? 0 : guess.value;
+    $("ans-big").textContent = R.fmtPct(c.post);
+    R.scale($("scale"), { min: 0, max: 100, guess: g, answer: Math.round(c.post * 1000) / 10, fmt: function (v) { return Number(v.toFixed(2)) + "%"; } });
+    $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
+    $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
+    $("seen").children[1].textContent = (desc.value === 3 ? "That matches the dots: " : "Count again: ") + c.fp + " violet, " + c.tp + " red.";
+    $("bar-a").style.width = (c.post * 100) + "%";
+    $("bar-b").style.width = ((1 - c.post) * 100) + "%";
+    $("lab-a").textContent = c.tp + " sick";
+    $("lab-b").textContent = c.fp + " healthy";
+    R.list($("why"), [
+      "Only " + c.sick + " in " + R.fmtInt(N) + " people are sick.",
+      "1% of the " + R.fmtInt(c.healthy) + " healthy people still test positive. That is about " + c.fp + ".",
+      "So about " + c.tp + " of the " + (c.tp + c.fp) + " positives are sick."
+    ]);
+    $("formula").textContent =
+      "P(sick | positive) = sens x prev / (sens x prev + (1 - spec) x (1 - prev))\n" +
+      "                   = 0.99 x 0.001 / (0.99 x 0.001 + 0.01 x 0.999)\n" +
+      "                   = " + c.num.toFixed(5) + " / " + c.den.toFixed(5) + "\n" +
+      "                   = " + (c.post * 100).toFixed(1) + "%";
+    R.markDone("positive", { guess: g, answer: Math.round(c.post * 1000) / 10 });
+  }
+
+  $("restart").addEventListener("click", function () {
+    guess.reset(); desc.reset();
+    $("go-answer").disabled = true;
+    $("explore").hidden = true;
+    steps.show(0);
+  });
+
+  /* ---------- free play ---------- */
+  var ex = { p: RIDDLE.p, sens: RIDDLE.sens, spec: RIDDLE.spec };
+  var prev = $("prev"), sens = $("sens"), spec = $("spec");
+  function prevFromSlider(v) { return Number((0.0005 * Math.pow(1000, v / 1000)).toPrecision(2)); }
+  function sliderFromPrev(p) { return Math.round(1000 * Math.log(p / 0.0005) / Math.log(1000)); }
+  function renderPlay() {
+    var c = counts(ex.p, ex.sens, ex.spec);
+    $("prev-val").textContent = "1 in " + R.fmtInt(Math.round(1 / ex.p)) + " (" + Number((ex.p * 100).toPrecision(2)) + "%)";
+    $("live-res").textContent = R.fmtPct(c.post);
+    $("n-tp").textContent = R.fmtInt(c.tp);
+    $("n-fn").textContent = R.fmtInt(c.fn);
+    $("n-fp").textContent = R.fmtInt(c.fp);
+    $("n-tn").textContent = R.fmtInt(c.tn);
+    playView.setCounts(c);
+    playView.show(S[2], S[2], 1);
+  }
+  var pending = false;
+  function schedulePlay() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; renderPlay(); });
+  }
+  prev.value = sliderFromPrev(ex.p);
+  prev.addEventListener("input", function () { ex.p = prevFromSlider(Number(prev.value)); schedulePlay(); });
+  var sensField = R.field($("sens-field"), {
+    label: "sensitivity, percent", min: 0, max: 99.99, value: 99, mode: "pct", suffix: "%",
+    onChange: function (v) { ex.sens = v / 100; sens.value = v; schedulePlay(); }
+  });
+  var specField = R.field($("spec-field"), {
+    label: "specificity, percent", min: 0, max: 99.99, value: 99, mode: "pct", suffix: "%",
+    onChange: function (v) { ex.spec = v / 100; spec.value = v; schedulePlay(); }
+  });
+  sens.addEventListener("input", function () { var v = R.round2(Number(sens.value)); ex.sens = v / 100; sensField.set(v); schedulePlay(); });
+  spec.addEventListener("input", function () { var v = R.round2(Number(spec.value)); ex.spec = v / 100; specField.set(v); schedulePlay(); });
+  R.all(".presets button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      ex.p = Number(b.getAttribute("data-p"));
+      ex.sens = Number(b.getAttribute("data-se")) / 100;
+      ex.spec = Number(b.getAttribute("data-sp")) / 100;
+      prev.value = sliderFromPrev(ex.p);
+      sens.value = ex.sens * 100; spec.value = ex.spec * 100;
+      sensField.set(ex.sens * 100); specField.set(ex.spec * 100);
+      schedulePlay();
+    });
+  });
+  $("try-nums").addEventListener("click", function () {
+    $("explore").hidden = false;
+    renderPlay();
+    $("explore").scrollIntoView({ block: "start" });
+  });
+
+  R.onTheme(function () { watchView.paint(); playView.paint(); });
+  steps.show(0, true);
+})();
+</script>
+</body>
+</html>

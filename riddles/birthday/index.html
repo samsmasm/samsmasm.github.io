@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared Birthdays · Riddles</title>
+<meta name="description" content="A probability riddle: how many people until two share a birthday?">
+<link rel="icon" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../riddles.css">
+<style>
+.ringwrap { max-width: 340px; margin: 0 auto; width: 100%; }
+.counter { text-align: center; font-size: 15px; color: var(--muted); }
+.counter b { font-family: var(--font-mono); font-size: 22px; color: var(--ink); }
+.curvelab { font-size: 13px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<header class="masthead"><div class="masthead-inner">
+  <a href="/"><img src="/geocornsmall.png" alt="unisam.nz home"></a>
+  <div><a class="wordmark" href="../">Riddles</a><div class="msub">Guess first, then watch</div></div>
+  <a class="home" href="../">All riddles</a>
+</div></header>
+
+<main>
+  <div><div class="kicker">Riddle</div><h1 class="title">Shared birthdays</h1></div>
+  <ol class="stepper" id="stepper" aria-label="Progress">
+    <li>Riddle</li><li>Guess</li><li>Watch</li><li>Describe</li><li>Answer</li>
+  </ol>
+
+  <section class="card step" id="s0">
+    <h2>The riddle</h2>
+    <p class="riddle">People walk into an empty room, one at a time.</p>
+    <p class="riddle">Each person's birthday is random. Ignore 29 February.</p>
+    <p class="question">How many people do you need for a 50% chance that two of them share a birthday?</p>
+    <button type="button" class="btn" data-go="1">Make a guess</button>
+  </section>
+
+  <section class="card step" id="s1" hidden>
+    <h2>Your guess</h2>
+    <p class="sub">People in the room for an even chance of a shared birthday.</p>
+    <div id="guess-host"></div>
+    <button type="button" class="btn" id="go-watch" data-go="2">Lock it in</button>
+  </section>
+
+  <section class="card step" id="s2" hidden>
+    <h2>Watch</h2>
+    <div class="ringwrap"><canvas id="ring" role="img" aria-label="A ring of the 365 days of the year. Each person is a dot on their birthday."></canvas></div>
+    <p class="counter">People in the room: <b id="count">0</b></p>
+    <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="stage">
+      <p class="curvelab">Rooms with a shared birthday, out of 2,000 rooms</p>
+      <canvas id="curve" role="img" aria-label="A curve of how many rooms have a shared birthday as people arrive."></canvas>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
+      <button type="button" class="btn2" id="replay">Replay</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s3" hidden>
+    <h2>What do you see?</h2>
+    <p class="sub">When did the curve cross the halfway line?</p>
+    <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
+      <button type="button" class="opt" data-i="0">Before 10 people</button>
+      <button type="button" class="opt" data-i="1">At about 20 to 25 people</button>
+      <button type="button" class="opt" data-i="2">At about 50 people</button>
+      <button type="button" class="opt" data-i="3">It never got there</button>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
+      <button type="button" class="btn2" data-go="2">Watch again</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s4" hidden>
+    <h2>The answer</h2>
+    <div class="answerbig">23 <span style="font-size:0.4em">people</span></div>
+    <div id="scale"></div>
+    <div class="seen" id="seen"></div>
+    <ul class="why" id="why"></ul>
+    <details><summary>Show the calculation</summary><div class="formula">Work out the chance of NO match, then flip it.
+
+Person 2 must miss person 1:      364/365
+Person 3 must miss both:          363/365
+...
+Person 23 must miss all 22:       343/365
+
+No match = 364/365 x 363/365 x ... x 343/365 = 0.493
+Match    = 1 - 0.493 = 0.507, just over half
+
+Pairs among 23 people = 23 x 22 / 2 = 253</div></details>
+    <div class="btnrow">
+      <button type="button" class="btn" id="try">Change the room size</button>
+      <button type="button" class="btn2" id="restart">Start over</button>
+    </div>
+  </section>
+
+  <section class="card" id="explore" hidden>
+    <h2>Change the room size</h2>
+    <div class="control">
+      <div class="row"><label for="size">People in the room</label><span class="val" id="size-val"></span></div>
+      <input type="range" id="size" min="2" max="100" step="1" value="23">
+    </div>
+    <p class="liveres" aria-live="polite">Chance of a shared birthday: <b id="live"></b></p>
+    <div class="ringwrap"><canvas id="pring" role="img" aria-label="One random room on the birthday ring."></canvas></div>
+    <p class="counter" id="ptally"></p>
+    <div class="btnrow">
+      <button type="button" class="btn2" id="one">Make a room</button>
+      <button type="button" class="btn2" id="hundred">Make 100 rooms</button>
+    </div>
+  </section>
+</main>
+<footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
+
+<script src="../riddles.js"></script>
+<script>
+(function () {
+  var $ = R.$;
+  var DAYS = 365, ROOMS = 2000, MAXN = 70;
+  var MONTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31], ML = "JFMAMJJASOND";
+
+  /* ---------- simulation ---------- */
+  function room(rnd, n) { var a = []; for (var i = 0; i < n; i++) a.push(R.int(rnd, DAYS)); return a; }
+  function firstMatch(days) {
+    var seen = {};
+    for (var i = 0; i < days.length; i++) { if (seen[days[i]]) return i + 1; seen[days[i]] = 1; }
+    return Infinity;
+  }
+  /* 2,000 rooms of 70: share with a match by each size */
+  var curve = (function () {
+    var rnd = R.rng(20261112), hits = new Array(MAXN + 1).fill(0);
+    for (var r = 0; r < ROOMS; r++) {
+      var k = firstMatch(room(rnd, MAXN));
+      if (k <= MAXN) hits[k]++;
+    }
+    var out = [0], c = 0;
+    for (var n = 1; n <= MAXN; n++) { c += hits[n]; out.push(c / ROOMS); }
+    return out;
+  })();
+  /* the example room: a seed whose first match comes at a typical size */
+  var EX = (function () {
+    for (var s = 1; ; s++) {
+      var d = room(R.rng(s), MAXN), k = firstMatch(d);
+      if (k >= 19 && k <= 26) return d;
+    }
+  })();
+  function exact(n) { var p = 1; for (var i = 0; i < n; i++) p *= (DAYS - i) / DAYS; return 1 - p; }
+
+  /* ---------- ring ---------- */
+  function drawRing(canvas, days, n) {
+    var f = R.fitCanvas(canvas, 1);
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, cx = w / 2, cy = w / 2, r = w * 0.36;
+    var ink = R.cssVar("--muted"), line = R.cssVar("--line"), A = R.cssVar("--a"), B = R.cssVar("--b");
+    ctx.strokeStyle = line; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.2832); ctx.stroke();
+    var start = 0;
+    ctx.fillStyle = ink;
+    ctx.font = "600 " + Math.round(w * 0.04) + "px 'Atkinson Hyperlegible', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    MONTHS.forEach(function (len, m) {
+      var a0 = start / DAYS * 6.2832 - 1.5708;
+      ctx.strokeStyle = ink; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a0) * (r - 5), cy + Math.sin(a0) * (r - 5)); ctx.lineTo(cx + Math.cos(a0) * (r + 5), cy + Math.sin(a0) * (r + 5)); ctx.stroke();
+      var am = (start + len / 2) / DAYS * 6.2832 - 1.5708;
+      ctx.fillText(ML[m], cx + Math.cos(am) * (r - w * 0.07), cy + Math.sin(am) * (r - w * 0.07));
+      start += len;
+    });
+    var count = {}, i, d;
+    for (i = 0; i < n; i++) { d = days[i]; count[d] = (count[d] || 0) + 1; }
+    var placed = {}, dotR = Math.max(3, w * 0.014);
+    for (i = 0; i < n; i++) {
+      d = days[i];
+      var j = placed[d] || 0; placed[d] = j + 1;
+      var a = (d + 0.5) / DAYS * 6.2832 - 1.5708, rr = r + dotR * 1.4 + j * dotR * 2.3;
+      var match = count[d] > 1;
+      ctx.fillStyle = match ? B : A;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, match ? dotR * 1.25 : dotR, 0, 6.2832); ctx.fill();
+      if (match && j === 0) {
+        ctx.strokeStyle = B; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (r - 8), cy + Math.sin(a) * (r - 8)); ctx.lineTo(cx + Math.cos(a) * (r - 22), cy + Math.sin(a) * (r - 22)); ctx.stroke();
+      }
+    }
+  }
+
+  /* ---------- curve: share of rooms with a match by size ---------- */
+  function drawCurve(canvas, upTo) {
+    var f = R.fitCanvas(canvas, 0.55);
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, h = f.h;
+    var L = 38, Rm = 10, T = 10, Bm = 28, pw = w - L - Rm, ph = h - T - Bm;
+    var ink = R.cssVar("--ink"), muted = R.cssVar("--muted"), line = R.cssVar("--line"), amber = R.cssVar("--amber");
+    function X(n) { return L + (n / MAXN) * pw; }
+    function Y(p) { return T + (1 - p) * ph; }
+    ctx.font = "12px 'Atkinson Hyperlegible Mono', monospace";
+    ctx.fillStyle = muted; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    [0, 0.5, 1].forEach(function (p) { ctx.fillText(p === 0 ? "0" : p === 1 ? "all" : "half", L - 6, Y(p)); });
+    ctx.strokeStyle = line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.moveTo(L, Y(1)); ctx.lineTo(L + pw, Y(1)); ctx.stroke();
+    ctx.strokeStyle = amber; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.moveTo(L, Y(0.5)); ctx.lineTo(L + pw, Y(0.5)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = muted;
+    for (var t = 0; t <= MAXN; t += 10) {
+      ctx.fillText(String(t), X(t), Y(0) + 8);
+      ctx.strokeStyle = line; ctx.beginPath(); ctx.moveTo(X(t), Y(0)); ctx.lineTo(X(t), Y(0) + 4); ctx.stroke();
+    }
+    if (upTo < 1) return;
+    ctx.strokeStyle = ink; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    for (var n = 1; n <= upTo; n++) ctx.lineTo(X(n), Y(curve[n]));
+    ctx.stroke();
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(X(upTo), Y(curve[upTo]), 4, 0, 6.2832); ctx.fill();
+  }
+
+  /* ---------- steps ---------- */
+  var tl = null, shownN = 0;
+  var steps = R.steps({
+    onEnter: { 2: playWatch, 4: renderAnswer },
+    onLeave: function (prev) { if (prev === 2 && tl) tl.cancel(); }
+  });
+  var guess = R.guess($("guess-host"), {
+    label: "people", min: 2, max: 366, mode: "int", nudgeFrom: 2, button: $("go-watch"), endLabels: ["2", "366"]
+  });
+  var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
+  $("replay").addEventListener("click", playWatch);
+
+  function paintWatch() { drawRing($("ring"), EX, shownN); drawCurve($("curve"), shownN); $("count").textContent = shownN; }
+
+  function playWatch() {
+    if (tl) tl.cancel();
+    tl = R.timeline();
+    var T = tl, t = 1600, k = firstMatch(EX);
+    $("go-describe").disabled = true;
+    shownN = 0; paintWatch();
+    var cap = function (s) { $("caption").textContent = s; };
+    cap("One room. Each dot is a person, on their birthday.");
+    for (var n = 1; n <= MAXN; n++) {
+      (function (n) {
+        T.after(t, function () {
+          shownN = n; paintWatch();
+          if (n === 4) cap("The line below tracks 2,000 rooms like this one.");
+          if (n === k) cap("Two people share a birthday!");
+          if (n === k + 6) cap("More people, more chances.");
+          if (n === MAXN) { cap("70 people."); $("go-describe").disabled = false; }
+        });
+      })(n);
+      t += n < 6 ? 650 : n === k ? 2200 : n < 40 ? 260 : 120;
+    }
+  }
+
+  function renderAnswer() {
+    var g = guess.value == null ? 0 : guess.value;
+    R.scale($("scale"), { min: 0, max: 366, guess: g, answer: 23, fmt: function (v) { return String(v); } });
+    $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
+    $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
+    var by23 = Math.round(curve[23] * ROOMS);
+    $("seen").children[1].textContent = (desc.value === 1 ? "Right. " : "Look again. ") +
+      "With 23 people, " + R.fmtInt(by23) + " of the 2,000 rooms had a shared birthday.";
+    R.list($("why"), [
+      "You need any two people to match, not someone to match you.",
+      "23 people make 253 pairs. Each pair is a small chance, and 253 small chances add up.",
+      "For a 50% chance that someone shares your birthday, you need 253 other people.",
+      "With 70 people a match is almost certain: over 99%."
+    ]);
+    R.markDone("birthday", { guess: g, answer: 23 });
+  }
+
+  $("restart").addEventListener("click", function () {
+    guess.reset(); desc.reset();
+    $("go-answer").disabled = true;
+    $("explore").hidden = true;
+    steps.show(0);
+  });
+
+  /* ---------- free play ---------- */
+  var prnd = R.rng(424242), pDays = [], made = 0, matched = 0;
+  function pSize() { return Number($("size").value); }
+  function makeRooms(k) {
+    for (var i = 0; i < k; i++) {
+      pDays = room(prnd, pSize());
+      made++; if (firstMatch(pDays) <= pDays.length) matched++;
+    }
+    renderPlay();
+  }
+  function renderPlay() {
+    var n = pSize();
+    $("size-val").textContent = n;
+    $("live").textContent = R.fmtPct(exact(n));
+    drawRing($("pring"), pDays, pDays.length);
+    $("ptally").innerHTML = made ? "Rooms made: <b>" + made + "</b> · with a match: <b>" + matched + "</b>" : "";
+  }
+  $("size").addEventListener("input", function () { made = 0; matched = 0; pDays = room(prnd, pSize()); made = 1; matched = firstMatch(pDays) <= pDays.length ? 1 : 0; renderPlay(); });
+  $("one").addEventListener("click", function () { makeRooms(1); });
+  $("hundred").addEventListener("click", function () { makeRooms(100); });
+  $("try").addEventListener("click", function () {
+    $("explore").hidden = false;
+    if (!made) makeRooms(1); else renderPlay();
+    $("explore").scrollIntoView({ block: "start" });
+  });
+
+  R.onResize($("ring"), paintWatch);
+  R.onResize($("pring"), renderPlay);
+  R.onTheme(function () { paintWatch(); if (!$("explore").hidden) renderPlay(); });
+  steps.show(0, true);
+})();
+</script>
+</body>
+</html>
