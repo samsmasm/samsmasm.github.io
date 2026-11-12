@@ -7,7 +7,7 @@ const logic = html.split('/*LOGIC_START*/')[1].split('/*LOGIC_END*/')[0];
 eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice,shuffle,seededRandom,dayKey,dailyCodes};');
 const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8'));
 let failed = false;
-for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]], ['sound_categories.json', 3, 3, [1,2,3,4]]]) {
+for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]], ['sound_categories.json', 3, 3, [1,2,3,4]], ['fmw_categories.json', 4, 4, [1,2,3,4]]]) {
   const bank = load(f); api.prepare(bank);
   const on = new Set(bank.meta.topics.map(t => t.code));
   let ok = 0;
@@ -70,7 +70,7 @@ const dayOk = dk('2026-11-05T22:59:59Z') === '2026-11-05' && dk('2026-11-05T23:0
   && dk('2026-12-31T23:30:00Z') === '2027-01-01' && dk('2026-11-06T22:59:59Z') === '2026-11-06';
 console.log('dayKey', dayOk ? 'ok' : 'FAILED');
 if (!dayOk) failed = true;
-for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.json', 'sound_categories.json']) {
+for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.json', 'sound_categories.json', 'fmw_categories.json']) {
   const bank = load(f); api.prepare(bank);
   const make = key => {
     const rand = api.seededRandom(key);

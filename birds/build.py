@@ -18,6 +18,7 @@ html = (template
         .replace("__BM_JSON__", bank("bm_categories.json"))
         .replace("__ECON_JSON__", bank("econ_categories.json"))
         .replace("__KIDS_JSON__", bank("kids_categories.json"))
-        .replace("__SOUND_JSON__", bank("sound_categories.json")))
+        .replace("__SOUND_JSON__", bank("sound_categories.json"))
+        .replace("__FMW_JSON__", bank("fmw_categories.json")))
 (root / "index.html").write_text(html, encoding="utf-8")
 print("index.html", len(html), "bytes")

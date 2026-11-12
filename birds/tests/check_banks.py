@@ -1,11 +1,11 @@
-"""Validate all four category banks. Run: python3 tests/check_banks.py"""
+"""Validate all five category banks. Run: python3 tests/check_banks.py"""
 import json, re, sys
 from collections import Counter
 from pathlib import Path
 
 data = Path(__file__).resolve().parent.parent / "data"
 problems = 0
-KIDS_BANKS = ["kids_categories.json", "sound_categories.json"]
+KIDS_BANKS = ["kids_categories.json", "sound_categories.json", "fmw_categories.json"]  # banks with no SL/HL level
 
 # Sound it out: words over 4 letters must be on this list, and each one must be easy to sound out.
 SOUND_LONG = {"chick", "squid", "dress", "truck", "drill", "brush", "swing", "frost",
@@ -24,7 +24,7 @@ def sound_errors(d):
     if three < .55: errs.append("most words should have 3 letters")
     return errs
 
-for name in ["bm_categories.json", "econ_categories.json", "kids_categories.json", "sound_categories.json"]:
+for name in ["bm_categories.json", "econ_categories.json", "kids_categories.json", "sound_categories.json", "fmw_categories.json"]:
     d = json.loads((data / name).read_text(encoding="utf-8"))
     cats = d["categories"]
     ids = [c["id"] for c in cats]
