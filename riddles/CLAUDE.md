@@ -28,6 +28,13 @@ Watch styles: auto-playing (positive, birthday, streak, galton), played by hand 
 - **Birthday free play** shows a dot per room made (orange matched, blue not, the room on the ring is circled), latest 400.
 - **Better every time** is clicked through (Back / Next, 4 steps) with numbers on every block ("81 of 87 worked") and percentages on the bars.
 
+## Sam's feedback (2026-11-12, round 2), all done
+
+- The Answer step repeats the riddle's question at the top (`R.steps` copies `#s0 .question` into a `.recall` box).
+- Calculations in plain words, no shorthand (no `P(A | B)`, `sens`, `spec`, `HHHHH`). Prefer whole numbers of people. Tests check the Answer step for this shorthand.
+- Give students what they need to guess well (Top of the class now states the class average). Axes start at 0 for scores out of 100.
+- Pick seeds that land near the expected result, so one run cannot teach the wrong lesson (streak, regression).
+
 ## Files
 
 | File | What |
