@@ -508,6 +508,19 @@ test('S1 and S_1 become S₁ in labels; free text keeps plain digits', async (pa
   eq(await ev(page, `[fmtLabel('S_12', false), fmtLabel('Q1 2024', false), fmtLabel('MPC=S', true)]`), ['S₁₂', 'Q1 2024', 'MPC=S'], 'formatting rules');
 });
 
+test('axis titles and title: Q_1 becomes Q₁ while typing, Q1 stays plain', async (page) => {
+  await page.click('#x-label', { count: 3 });
+  await page.keyboard.type('Real GDP_1 (Y_e) Q1');
+  eq(await ev(page, `state.xLabel`), 'Real GDP₁ (Y_e) Q1', 'x title');
+  eq(await ev(page, `document.getElementById('x-label').value`), await ev(page, `state.xLabel`), 'box matches state');
+  await page.keyboard.press('Home');
+  await page.keyboard.type('X_2 ');
+  eq(await ev(page, `state.xLabel`), 'X₂ Real GDP₁ (Y_e) Q1', 'caret kept when editing mid-text');
+  await page.click('#y-label', { count: 3 });
+  await page.keyboard.type('P_10');
+  eq(await ev(page, `state.yLabel`), 'P₁₀', 'y title');
+});
+
 test('keyboard: tool letters, arrow nudge as one undo step, Ctrl+C/V and Ctrl+D', async (page) => {
   await ev(page, `state.elements = [mkLine(0.1, 0.5, 0.5, 0.5, '#1a4a8a', 2.5, '', 'S')]; state.selectedId = state.elements[0].id; undoStack = []; redraw();`);
   await page.keyboard.press('l');

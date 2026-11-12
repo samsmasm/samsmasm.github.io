@@ -1442,6 +1442,8 @@ const toSub = n => String(n).split('').map(d => SUBS[d]).join('');
 // (`loose`), but not in free text, where "Q1 2024" should stay as typed.
 function fmtLabel(t, loose) {
   t = String(t ?? '').replace(/_(\d{1,3})/g, (_, d) => toSub(d));
+  // Typing live, "_1" converts before the next digit arrives: "P₁" + "0" → "P₁₀".
+  while (/[₀-₉]\d/.test(t)) t = t.replace(/([₀-₉])(\d)/g, (_, s, d) => s + toSub(d));
   if (loose) t = t.replace(/([A-Za-z*])(\d{1,2})(?!\d)/g, (_, c, d) => c + toSub(d));
   return t;
 }
@@ -2575,10 +2577,23 @@ function drawBraceShape(ax, ay, bx, by, flip, color, weight) {
 }
 
 // ─── DRAWING ─────────────────────────────────────────────────
+// Title and axis titles: "Q_1" → "Q₁" (strict rule, so "Q1 2024" stays).
+// Rewrites the box as you type, keeping the caret where it was.
+function subscriptInput(id) {
+  const inp = document.getElementById(id);
+  const v = fmtLabel(inp.value, false);
+  if (v !== inp.value) {
+    const caret = inp.selectionStart == null ? v.length
+      : inp.selectionStart - (inp.value.length - v.length);
+    inp.value = v;
+    if (document.activeElement === inp) inp.setSelectionRange(caret, caret);
+  }
+  return v;
+}
 function syncTextInputs() {
-  state.title = document.getElementById('graph-title').value;
-  state.yLabel = document.getElementById('y-label').value;
-  state.xLabel = document.getElementById('x-label').value;
+  state.title = subscriptInput('graph-title');
+  state.yLabel = subscriptInput('y-label');
+  state.xLabel = subscriptInput('x-label');
 }
 
 function redraw() {
