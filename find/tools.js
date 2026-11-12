@@ -32,7 +32,7 @@ window.TOOLS = [
   { name: "Cultivar", url: "/cultivar", s: "any", desc: "Vocabulary flashcards with spaced repetition for language learners.", tags: "flashcards vocab language vietnamese spaced repetition" },
   { name: "PeeDeeEffer", url: "/peedeeeffer", s: "any", desc: "Merge, split, and extract text from PDFs privately, entirely on your own device.", tags: "pdf merge split epub" },
   { name: "PDF Annotator", url: "/pdfwrite", s: "any", desc: "Annotate a PDF and download your marked-up copy.", tags: "pdf draw mark up" },
-  { name: "Covers", url: "/covers", s: "any", desc: "Find a book's cover and print it big enough for a classroom door.", tags: "book cover print door poster" },
+  { name: "Book Cover Printer", url: "/covers", s: "any", desc: "Find a book's cover and print it big enough for a classroom door.", tags: "book cover print door poster" },
   { name: "Longcut", url: "/longcut", s: "any", desc: "Find a walking or cycling route that favours quiet back streets and paths over main roads.", tags: "map route walk bike quiet" },
   { name: "GPS Fixer", url: "/mapping/gpsfixer/", s: "any", desc: "Redraw the bit of a run or ride where your GPS dropped out, then upload the fixed GPX to Strava.", tags: "gpx strava gps run ride map repair track" },
   { name: "Mapic", url: "/mapping/mapic/", s: "any", desc: "Draw a picture on the map, or trace an image, and turn it into a route along real roads for GPS art.", tags: "gps art strava drawing picture route map trace gpx run ride" },

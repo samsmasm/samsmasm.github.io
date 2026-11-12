@@ -1,17 +1,25 @@
-# Covers, `/covers`
+# Book Cover Printer, `/covers`
 
 Find a book's cover and print it big for a classroom door, alone or several to a page.
 No login, no backend: one self-contained file, `covers/index.html` (inline `<style>` and
-`<script>`). Linked from `/tools` under "Document utilities". Was called "Door Cover";
-the `localStorage` keys still say `doorcover` and `doorcover-sheet`. Don't rename them,
-or saved settings and sheets are lost.
+`<script>`). Linked from `/tools` under "Document utilities". Was called "Door Cover",
+then "Covers"; the `localStorage` keys still say `doorcover` and `doorcover-sheet`.
+Don't rename them, or saved settings and sheets are lost.
+
+**Standalone (2026-11-12):** Sam's school website mirrors this page, so it carries no
+unisam.nz branding: no logo, no "unisam.nz" text, no links back to the site (no `/`,
+no `/tools`), and no root-relative paths. The favicon is an inline SVG data URI. Keep it
+that way. The footer ("Built by Sam G ...") stays.
 
 ## Design
 
-Follows `AESTHETIC.md`: watercolour header, `/geocornsmall.png` unicorn logo (not
-`/unisamsq.png`), Tools purple (`#4a1a7a`, tint `#f5f0ff`, border `#d0b6f5`), Georgia
-headings, standard footer. No shadows, no pills, no dark mode. Example searches are
-plain links separated by middots, not chips.
+The **sophisticated** look (Option B in `AESTHETIC.md`): navy masthead `#1e2a4a` with a
+4px amber `#f4a629` rule, paper `#f7f6f2` page, `#fffdf8` surfaces, Fraunces headings,
+Atkinson Hyperlegible body, navy primary buttons, amber active tab and focus ring.
+Masthead holds only the title "Book Cover Printer" and the italic subtitle "Do judge a
+door by its cover" (Sam's exact words, no full stop). Page previews in the Sheet stay
+pure white so they read as paper. No shadows, no pills, no dark mode. Example searches
+are plain links separated by middots, not chips.
 
 Two views, underline tabs: **Find covers** and **Sheet (n)**. The Paper setting (A4 or
 Letter) is always visible next to the tabs.

@@ -54,8 +54,9 @@ The GitHub Pages repo for **unisam.nz** — a teacher-built site for IB students
                              The case bank, tools, specs and Worker are PRIVATE (excluded + blocked by hooks); bank is served
                              by the Cloudflare Worker ibgrind-api at /bmgrind/api/*. Read bmgrind/CLAUDE.md first (local only).
   ibgrind/                ← redirect stubs only, to /bmgrind/
-  covers/                 ← Covers (was Door Cover): find and print book covers, page sizes, multi-cover sheet with
-                             auto arrange and drag to rearrange. Single HTML, linked from /tools (see CLAUDE.md inside)
+  covers/                 ← Book Cover Printer (was Covers, Door Cover): find and print book covers, page sizes, multi-cover
+                             sheet with auto arrange and drag to rearrange. Single HTML, linked from /tools (see CLAUDE.md inside).
+                             Standalone for mirroring on Sam's school site: no unisam.nz branding, logo or links.
   ai/                     ← "How I Use AI": landing, full statement, Click-on-me bobblehead (see CLAUDE.md inside;
                              NEVER commit ai/me.jpg, ai/id.jpg or the bobble-* mockups)
   find/                   ← Find: clickable flowchart ("Teaching or something else? Subject or general?...") that ends at the
@@ -209,7 +210,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 ## Design system
 
 **Always read `AESTHETIC.md` before creating or editing any frontend.** Key rules:
-- Two looks. **Option B "Paper and ink" is preferred** (Sam is moving the site to it): solid navy masthead `#1e2a4a` with an amber `#f4a629` rule, paper `#f7f6f2` page, Fraunces headings, Atkinson Hyperlegible body. Use it for all new pages and restyles. Option A (pastel watercolour gradient, Georgia) is the original look on older pages; do not start new pages in it.
+- Two looks. **Option B "Sophisticated" (paper and ink) is preferred; "the sophisticated aesthetic" means this** (Sam is moving the site to it): solid navy masthead `#1e2a4a` with an amber `#f4a629` rule, paper `#f7f6f2` page, Fraunces headings, Atkinson Hyperlegible body. Use it for all new pages and restyles. Option A (pastel watercolour gradient, Georgia) is the original look on older pages; do not start new pages in it.
 - Subject colours (both looks): Economics green (`#145c34`), BM blue (`#1a3a7a`), History orange (`#7a2d0a`), Tools purple (`#4a1a7a`), Experiments pink (`#7a1a4a`).
 - No Inter, no DM Sans, no Tailwind aesthetics. No drop shadows, no pill buttons or pill tags.
 - Logo: always the cartoon unicorn `/geocorn.png` (`/geocornsmall.png` for small sizes). **Never use `/unisamsq.png` or the other photo icons**; swap them out when you touch a page.

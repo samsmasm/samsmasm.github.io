@@ -8,14 +8,16 @@ This document is the long-term reference for the visual language of unisam.nz an
 
 The site has two looks. **Option B is the direction Sam wants the site to move to.** Use it for every new page, and when restyling an old page. Option A is the original pastel look, kept here because most existing pages still use it; do not start new pages in it.
 
-| | Option A: Pastel watercolour (original) | Option B: Paper and ink (preferred) |
+**Names Sam uses:** Option B is **"sophisticated"** (also "paper and ink"). When Sam says "the sophisticated aesthetic", he means Option B. Option A is the pastel or watercolour look.
+
+| | Option A: Pastel watercolour (original) | Option B: Sophisticated, paper and ink (preferred) |
 |---|---|---|
 | Masthead | Multi-radial pastel gradient | Solid navy, amber rule underneath |
 | Page | White | Warm paper |
 | Headings | Georgia | Fraunces |
 | Body | System sans-serif | Atkinson Hyperlegible |
 | Feel | Whimsy, unicorn rainbow | Calm, editorial, dyslexia-friendly, a bit of warmth |
-| Examples | `/`, econnews, businews, most tools | ratibro, asia, fmwafrica, boss |
+| Examples | `/`, econnews, businews, most tools | ratibro, asia, fmwafrica, boss, covers |
 
 ### Logo (both looks)
 
@@ -25,7 +27,7 @@ The site has two looks. **Option B is the direction Sam wants the site to move t
 
 Topic pages may use a topic logo instead, as fmwafrica does with its Africa silhouette.
 
-### Option B: Paper and ink
+### Option B: Sophisticated (paper and ink)
 
 The family look of ratibro, asia and fmwafrica: a solid dark masthead with one warm accent, warm paper underneath, a characterful serif for headings and a highly legible body font.
 
