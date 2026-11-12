@@ -134,6 +134,32 @@
     return api;
   };
 
+  /* ---------- click-through Watch: Back / Next over a list of captions ----------
+     Needs #w-back, #w-next, #w-step, #caption, #go-describe. onGo(from, to) draws the change. */
+  R.walk = function (caps, onGo) {
+    var api = { at: 0 }, last = caps.length - 1;
+    function go(n) {
+      var from = api.at;
+      api.at = n;
+      R.$("caption").textContent = typeof caps[n] === "function" ? caps[n]() : caps[n];
+      R.$("w-step").textContent = "Step " + (n + 1) + " of " + caps.length;
+      R.$("w-back").disabled = n === 0;
+      R.$("w-next").hidden = n === last;
+      R.$("go-describe").hidden = n !== last;
+      onGo(from, n);
+    }
+    R.$("w-next").addEventListener("click", function () { if (api.at < last) go(api.at + 1); });
+    R.$("w-back").addEventListener("click", function () { if (api.at > 0) go(api.at - 1); });
+    api.start = function () { api.at = 0; go(0); };
+    return api;
+  };
+
+  /* normal random numbers (Box-Muller) from a seeded generator */
+  R.normal = function (rnd) {
+    var u = 1 - rnd(), v = rnd();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.283185307 * v);
+  };
+
   /* ---------- editable number field with nudge arrows ----------
      mode "pct": arrows step 0.1, or 0.01 below 0.1 and above 99.9.
      mode "int": arrows step 1.  value null starts empty (no anchor). */

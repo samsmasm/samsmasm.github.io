@@ -6,7 +6,11 @@ Every riddle runs the same five steps: Riddle, Guess, Watch, Describe ("what do 
 
 ## Status (2026-11-12)
 
-Built: `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`, `simpson/`. The other eight show as "Soon" rows on the front page. Not linked from any index or `/find` yet; ask Sam first.
+Built (8 of 12): `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`, `simpson/`, then `streak/` (Due a tails, gambler's fallacy), `galton/` (Falling balls), `dna/` (prosecutor's fallacy), `regression/` (Top of the class). Still "Soon": The fair game (gambler's ruin), Infinite money (St Petersburg), Two children, Sleeping Beauty (last, contested). Not linked from any index or `/find` yet; ask Sam first.
+
+Front page is built from the `GROUPS` list in `index.html` (thumbnails in `THUMB`). A ruled list on phones; from 720px wide it becomes tiles (picture, name, hook, Play/Done at the foot; Soon tiles dashed). Adding a riddle = one entry in `GROUPS` plus a `THUMB` function.
+
+Watch styles: auto-playing (positive, birthday, streak, galton), played by hand (montyhall), or click-through with `R.walk` and Back/Next (simpson has its own copy; dna and regression use `R.walk`). Click-through suits riddles that need explaining step by step; Sam asked for numbers on everything in those.
 
 ## Decisions made without Sam (open to change)
 
@@ -29,7 +33,7 @@ Built: `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`,
 | File | What |
 |---|---|
 | `riddles.css` | Shared look: Option B paper and ink, light only |
-| `riddles.js` | `window.R`: seeded `rng`, `timeline` (cancellable timers and tweens; `?speed=N` speeds it up), `steps`, `field`, `guess`, `choices`, `scale`, `compare`, `fitCanvas`, `onTheme`, `progress`/`markDone` |
+| `riddles.js` | `window.R`: seeded `rng` and `normal`, `timeline` (cancellable timers and tweens; `?speed=N` speeds it up), `steps` (also moves `#viz` into Describe), `walk` (Back/Next click-through), `field`, `guess`, `choices`, `scale`, `compare`, `fitCanvas`, `progress`/`markDone` |
 | `<slug>/index.html` | One riddle each; markup for the five steps plus a page script. `[data-go="n"]` buttons move between steps |
 | `test/run.sh` | Plays every riddle in headless Chrome (phone and desktop), including playing Three doors by hand. `test/run.sh /folder` saves screenshots |
 

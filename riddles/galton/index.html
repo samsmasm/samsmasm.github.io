@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Falling Balls · Riddles</title>
+<meta name="description" content="A probability riddle: 1,000 balls bounce through pegs. What shape is the pile?">
+<link rel="icon" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../riddles.css">
+<style>
+.board { max-width: 520px; margin: 0 auto; width: 100%; }
+.opt.shape { display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center; }
+.opt.shape svg { width: 64px; height: 36px; display: block; }
+</style>
+</head>
+<body>
+<header class="masthead"><div class="masthead-inner">
+  <a href="/"><img src="/geocornsmall.png" alt="unisam.nz home"></a>
+  <div><a class="wordmark" href="../">Riddles</a><div class="msub">Guess first, then watch</div></div>
+  <a class="home" href="../">All riddles</a>
+</div></header>
+
+<main>
+  <div><div class="kicker">Riddle</div><h1 class="title">Falling balls</h1></div>
+  <ol class="stepper" id="stepper" aria-label="Progress">
+    <li>Riddle</li><li>Guess</li><li>Watch</li><li>Describe</li><li>Answer</li>
+  </ol>
+
+  <section class="card step" id="s0">
+    <h2>The riddle</h2>
+    <p class="riddle">A ball drops through 12 rows of pegs.</p>
+    <p class="riddle">At every peg it bounces left or right, 50:50. At the bottom it lands in one of 13 bins.</p>
+    <p class="question">Drop 1,000 balls. What shape will the piles make?</p>
+    <button type="button" class="btn" data-go="1">Make a guess</button>
+  </section>
+
+  <section class="card step" id="s1" hidden>
+    <h2>Your guess</h2>
+    <p class="sub">Pick the shape.</p>
+    <div class="opts" role="radiogroup" aria-label="Your guess" id="guess-opts"></div>
+    <button type="button" class="btn" id="go-watch" data-go="2" disabled>Lock it in</button>
+  </section>
+
+  <section class="card step" id="s2" hidden>
+    <h2>Watch</h2>
+    <div id="viz-home"><div id="viz">
+      <p class="caption" id="caption" aria-live="polite"></p>
+      <div class="board"><canvas id="watch" role="img" aria-label="Balls falling through a triangle of pegs into 13 bins."></canvas></div>
+    </div></div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
+      <button type="button" class="btn2" id="replay">Replay</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s3" hidden>
+    <h2>What do you see?</h2>
+    <div id="viz-slot"></div>
+    <p class="sub">What shape did the piles make?</p>
+    <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts"></div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
+      <button type="button" class="btn2" data-go="2">Watch again</button>
+    </div>
+  </section>
+
+  <section class="card step" id="s4" hidden>
+    <h2>The answer</h2>
+    <p class="answerline"><b>A hump in the middle</b>, the famous bell shape.</p>
+    <div id="cmp"></div>
+    <div class="seen" id="seen"></div>
+    <ul class="why" id="why"></ul>
+    <details><summary>Show the paths</summary><div class="formula" id="formula"></div></details>
+    <div class="btnrow">
+      <button type="button" class="btn" id="try">Change the board</button>
+      <button type="button" class="btn2" id="restart">Start over</button>
+    </div>
+  </section>
+
+  <section class="card" id="explore" hidden>
+    <h2>Change the board</h2>
+    <div class="control">
+      <div class="row"><label for="rows">Rows of pegs</label><span class="val" id="rows-val"></span></div>
+      <input type="range" id="rows" min="2" max="20" step="1" value="12">
+    </div>
+    <div class="control">
+      <div class="row"><label for="lean">Chance of bouncing right</label><span class="val" id="lean-val"></span></div>
+      <input type="range" id="lean" min="10" max="90" step="5" value="50">
+    </div>
+    <div class="board"><canvas id="play" role="img" aria-label="Where 1,000 balls landed."></canvas></div>
+    <div class="btnrow"><button type="button" class="btn2" id="again">Drop 1,000 more</button></div>
+  </section>
+</main>
+<footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
+
+<script src="../riddles.js"></script>
+<script>
+(function () {
+  var $ = R.$;
+  var BALLS = 1000, ROWS = 12;
+
+  /* the four shapes, as little bar sketches */
+  var SHAPES = [
+    { t: "Flat: about the same in every bin", h: [5, 5, 5, 5, 5, 5, 5] },
+    { t: "A hump in the middle", h: [1, 2, 4, 6, 4, 2, 1] },
+    { t: "Two humps, one each side", h: [2, 5, 3, 1, 3, 5, 2] },
+    { t: "A V: most at the edges", h: [6, 4, 2, 1, 2, 4, 6] }
+  ];
+  function sketch(h) {
+    var s = '<svg viewBox="0 0 64 36" aria-hidden="true">';
+    h.forEach(function (v, i) { s += '<rect x="' + (2 + i * 9) + '" y="' + (34 - v * 5) + '" width="7" height="' + (v * 5) + '" fill="var(--a)"/>'; });
+    return s + '<rect x="0" y="34" width="64" height="2" fill="var(--muted)"/></svg>';
+  }
+  ["guess-opts", "desc-opts"].forEach(function (id) {
+    $(id).innerHTML = SHAPES.map(function (s, i) {
+      return '<button type="button" class="opt shape" data-i="' + i + '">' + sketch(s.h) + "<span>" + s.t + "</span></button>";
+    }).join("");
+  });
+
+  function drop(rnd, rows, pRight, n) {
+    var balls = [], bins = new Array(rows + 1).fill(0);
+    for (var i = 0; i < n; i++) {
+      var path = [], r = 0;
+      for (var k = 0; k < rows; k++) { var right = rnd() < pRight; path.push(right); if (right) r++; }
+      balls.push({ path: path, bin: r });
+      bins[r]++;
+    }
+    return { balls: balls, bins: bins };
+  }
+  var SIM = drop(R.rng(1212), ROWS, 0.5, BALLS);
+
+  /* board geometry, shared by Watch and free play */
+  function geo(w, rows) {
+    var s = w / (rows + 2), top = w * 0.06, vy = Math.min(s * 0.85, w * 0.42 / rows);
+    return { w: w, s: s, top: top, vy: vy, cx: w / 2, rows: rows, binTop: top + rows * vy + s * 0.6, h: w * 1.15 };
+  }
+  function drawBoard(ctx, g, bins, maxCount, showNums) {
+    var muted = R.cssVar("--muted"), line = R.cssVar("--line"), A = R.cssVar("--a"), ink = R.cssVar("--ink");
+    ctx.fillStyle = muted;
+    for (var r = 0; r < g.rows; r++) for (var k = 0; k <= r; k++) {
+      var x = g.cx + (k - r / 2) * g.s, y = g.top + (r + 0.5) * g.vy;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, g.s * 0.08), 0, 6.2832); ctx.fill();
+    }
+    var base = g.h - 22, binH = base - g.binTop;
+    ctx.strokeStyle = line; ctx.lineWidth = 1;
+    for (var b = 0; b <= g.rows + 1; b++) {
+      var xl = g.cx + (b - 0.5 - g.rows / 2) * g.s;
+      ctx.beginPath(); ctx.moveTo(xl, g.binTop); ctx.lineTo(xl, base); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(g.cx - (g.rows / 2 + 0.5) * g.s, base); ctx.lineTo(g.cx + (g.rows / 2 + 0.5) * g.s, base); ctx.stroke();
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = Math.max(9, Math.min(13, Math.round(g.s * 0.42))) + "px 'Atkinson Hyperlegible Mono', monospace";
+    bins.forEach(function (c, b) {
+      var x = g.cx + (b - g.rows / 2) * g.s, hgt = c / maxCount * binH;
+      ctx.fillStyle = A; ctx.fillRect(x - g.s * 0.4, base - hgt, g.s * 0.8, hgt);
+      if (showNums && g.s > 16) { ctx.fillStyle = ink; ctx.fillText(String(c), x, base + 5); }
+    });
+  }
+  /* where a ball is at progress p (0 = top, rows = last peg, rows + 1 = in its bin) */
+  function ballAt(g, ball, p) {
+    var k = Math.floor(p), f = p - k, rights = 0, i;
+    for (i = 0; i < Math.min(k, ball.path.length); i++) if (ball.path[i]) rights++;
+    var x0 = g.cx + (rights - Math.min(k, g.rows) / 2) * g.s;
+    if (k >= g.rows) return [x0, g.top + (g.rows - 0.5) * g.vy + f * (g.binTop - g.top - (g.rows - 0.5) * g.vy)];
+    var dir = ball.path[k] ? 0.5 : -0.5;
+    var y = g.top + (k - 0.5) * g.vy + f * g.vy - Math.sin(Math.PI * f) * g.vy * 0.35;
+    return [x0 + dir * g.s * f, y];
+  }
+
+  /* timing: the first balls fall slowly one by one, then the rest pour */
+  var SLOW = 8;
+  function spawn(i) { return i < SLOW ? i * 900 : SLOW * 900 + (i - SLOW) * 7; }
+  function fall(i) { return i < SLOW ? 1700 : 650; }
+  var TOTAL = spawn(BALLS - 1) + fall(BALLS - 1) + 300;
+  var MAXC = Math.max.apply(null, SIM.bins);
+
+  function paintWatch(t) {
+    var f = R.fitCanvas($("watch"), 1.15);
+    if (!f) return;
+    var g = geo(f.w, ROWS), bins = new Array(ROWS + 1).fill(0), ctx = f.ctx, ink = R.cssVar("--ink"), B = R.cssVar("--b");
+    var flying = [];
+    for (var i = 0; i < BALLS; i++) {
+      var s = spawn(i);
+      if (t < s) break;
+      var p = (t - s) / fall(i) * (ROWS + 1);
+      if (p >= ROWS + 1) bins[SIM.balls[i].bin]++;
+      else flying.push(ballAt(g, SIM.balls[i], p));
+    }
+    drawBoard(ctx, g, bins, MAXC * 1.1, t >= TOTAL);
+    ctx.fillStyle = B;
+    flying.forEach(function (q) { ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(2.5, g.s * 0.16), 0, 6.2832); ctx.fill(); });
+    var landed = bins.reduce(function (a, b) { return a + b; }, 0);
+    ctx.fillStyle = ink; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.font = "700 14px 'Atkinson Hyperlegible', sans-serif";
+    ctx.fillText(R.fmtInt(landed) + " landed", 4, 4);
+    return landed;
+  }
+
+  var tl = null, lastT = 0;
+  var steps = R.steps({
+    onEnter: { 2: playWatch, 4: renderAnswer },
+    onLeave: function (prev) { if (prev === 2 && tl) tl.cancel(); }
+  });
+  var guess = R.choices($("guess-opts"), function () { $("go-watch").disabled = false; });
+  var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
+  $("replay").addEventListener("click", playWatch);
+
+  function playWatch() {
+    if (tl) tl.cancel();
+    tl = R.timeline();
+    var cap = function (s) { $("caption").textContent = s; }, said = 0;
+    $("go-describe").disabled = true;
+    cap("Each ball bounces left or right at every peg.");
+    lastT = 0; paintWatch(0);
+    tl.tween(TOTAL, function (u) {
+      lastT = u * TOTAL;
+      var landed = paintWatch(lastT);
+      if (said === 0 && landed >= SLOW) { said = 1; cap("Now the other 992."); }
+    }, function () {
+      lastT = TOTAL; paintWatch(TOTAL);
+      cap("1,000 balls.");
+      $("go-describe").disabled = false;
+    });
+  }
+
+  function choose(n, k) { var r = 1; for (var i = 1; i <= k; i++) r = r * (n - k + i) / i; return Math.round(r); }
+  function renderAnswer() {
+    R.compare($("cmp"), guess.value >= 0 ? SHAPES[guess.value].t : "No guess", SHAPES[1].t);
+    $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
+    $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
+    $("seen").children[1].textContent = (desc.value === 1 ? "Right. " : "Look again. ") +
+      "The middle bin got " + SIM.bins[6] + " balls. The two end bins got " + SIM.bins[0] + " and " + SIM.bins[12] + ".";
+    R.list($("why"), [
+      "To reach an end bin, a ball must bounce the same way 12 times in a row: 1 path out of 4,096.",
+      "There are 924 different paths to the middle bin. Lots of left-right mixes all end up there.",
+      "Add up many small random nudges and you get this bell shape. Heights, test scores and measuring errors pile up like this too.",
+      "This board is called a Galton board, after Francis Galton, 1889."
+    ]);
+    var lines = ["Bin   Paths   Out of 4,096", ""];
+    for (var b = 0; b <= ROWS; b++) lines.push(String(b).padStart(3) + "   " + String(choose(ROWS, b)).padStart(5) + "   " + (choose(ROWS, b) / 4096 * 100).toFixed(1) + "%");
+    $("formula").textContent = lines.join("\n");
+    R.markDone("galton", { guess: guess.value >= 0 ? SHAPES[guess.value].t : "", right: guess.value === 1 });
+  }
+
+  $("restart").addEventListener("click", function () {
+    guess.reset(); desc.reset();
+    $("go-watch").disabled = true; $("go-answer").disabled = true;
+    $("explore").hidden = true;
+    steps.show(0);
+  });
+
+  /* ---------- free play ---------- */
+  var pseed = 77;
+  function renderPlay() {
+    var rows = Number($("rows").value), lean = Number($("lean").value) / 100;
+    $("rows-val").textContent = rows;
+    $("lean-val").textContent = Math.round(lean * 100) + "%";
+    var s = drop(R.rng(pseed), rows, lean, BALLS);
+    var f = R.fitCanvas($("play"), 1.15);
+    if (!f) return;
+    drawBoard(f.ctx, geo(f.w, rows), s.bins, Math.max.apply(null, s.bins) * 1.1, true);
+  }
+  $("rows").addEventListener("input", renderPlay);
+  $("lean").addEventListener("input", renderPlay);
+  $("again").addEventListener("click", function () { pseed++; renderPlay(); });
+  $("try").addEventListener("click", function () {
+    $("explore").hidden = false;
+    renderPlay();
+    $("explore").scrollIntoView({ block: "start" });
+  });
+
+  R.onResize($("watch"), function () { paintWatch(lastT); });
+  R.onResize($("play"), function () { if (!$("explore").hidden) renderPlay(); });
+  steps.show(0, true);
+})();
+</script>
+</body>
+</html>

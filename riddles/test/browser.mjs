@@ -136,6 +136,49 @@ ok(/winner: A/.test(await text('#live')), 'simpson: same mix gives A', await tex
 await page.click('#v-all');
 await shot('simpson-6-combined');
 
+// Click-through riddles: press Next until "What did you see?" shows
+const walkThrough = (n) => async (tag) => {
+  ok(await page.$eval('#w-back', b => b.disabled), `${tag}: back disabled on step 1`);
+  for (let k = 0; k < n - 1; k++) { await page.click('#w-next'); await sleep(150); await shot(`${tag}-2-step${k + 2}`); }
+  ok(new RegExp(`Step ${n} of ${n}`).test(await text('#w-step')), `${tag}: reached the last step`);
+};
+
+// Due a tails
+await play('streak', async () => { await page.type('#guess-host .numin', '30'); }, 2, async (tag) => {
+  ok(/You: 30%/.test(await text('#scale')) && /Answer: 50%/.test(await text('#scale')), `${tag}: scale`, await text('#scale'));
+  const m = (await text('#seen')).match(/Of (\d+) people with five heads, (\d+) flipped heads next and (\d+)/);
+  ok(m && +m[2] + +m[3] === +m[1] && +m[1] > 250 && +m[1] < 380, `${tag}: about 312 streaks, heads plus tails add up`, await text('#seen'));
+}, '#try');
+await page.$eval('#len', e => { e.value = 1; e.dispatchEvent(new Event('input')); });
+ok(/started with 1 heads/.test(await text('#plive')), 'streak: free play streak of 1', await text('#plive'));
+
+// Falling balls
+await play('galton', async () => { await page.click('#guess-opts .opt[data-i="0"]'); }, 1, async (tag) => {
+  ok(/Flat/.test(await text('#cmp')) && /hump/.test(await text('#cmp')), `${tag}: compare`, await text('#cmp'));
+  const m = (await text('#seen')).match(/middle bin got (\d+) balls\. The two end bins got (\d+) and (\d+)/);
+  ok(m && +m[1] > 180 && +m[2] < 10 && +m[3] < 10, `${tag}: bell shape counts`, await text('#seen'));
+}, '#try');
+await page.$eval('#lean', e => { e.value = 80; e.dispatchEvent(new Event('input')); });
+await shot('galton-6-lean');
+
+// The DNA match
+await play('dna', async () => { await page.type('#guess-host .numin', '0.0001'); }, 2, async (tag) => {
+  ok(/Answer: 91%/.test(await text('#scale')), `${tag}: answer 91%`, await text('#scale'));
+}, '#try', walkThrough(4));
+ok((await text('#live-p')) === '91%', 'dna: riddle numbers give 91%', await text('#live-p'));
+await page.click('.presets button[data-pop="3"]');
+ok((await text('#live-p')) === '0.10%', 'dna: town of 1,000 gives 0.10%', await text('#live-p'));
+
+// Top of the class
+await play('regression', async () => { await page.type('#guess-host .numin', '85'); }, 2, async (tag) => {
+  const big = +(await text('#ans-big'));
+  ok(big > 65 && big < 78, `${tag}: gold stars fall back to about 72`, big);
+  ok(/Gold stars went from 8\d to 7\d/.test(await text('#seen')), `${tag}: seen box`, await text('#seen'));
+}, '#try', walkThrough(4));
+await page.$eval('#luck', e => { e.value = 0; e.dispatchEvent(new Event('input')); });
+const nl = (await text('#plive')).match(/(\d+) on test 1, (\d+) on test 2/);
+ok(nl && Math.abs(+nl[1] - +nl[2]) <= 1, 'regression: no luck, no slipping back', await text('#plive'));
+
 // Desktop width pass, and light even when the system asks for dark
 await page.setViewport({ width: 1280, height: 900 });
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
@@ -146,12 +189,21 @@ await page.emulateMediaFeatures([]);
 // Front page shows progress
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 await page.goto(BASE, { waitUntil: 'networkidle0' });
-const statuses = await page.$$eval('a.row .status', s => s.map(x => x.textContent));
-ok(statuses.every(s => /Done/.test(s)), 'front page: all four marked done', statuses.join(','));
+const statuses = await page.$$eval('a.item .status', s => s.map(x => x.textContent));
+ok(statuses.length === 8 && statuses.every(s => /Done/.test(s)), 'front page: all eight marked done', statuses.join(','));
+ok(await page.$eval('a.item', e => getComputedStyle(e).borderTopStyle === 'none'), 'front page: a plain list on a phone');
 await shot('index');
+await page.evaluate(() => localStorage.clear());
+for (const [wd, name] of [[820, 'tablet'], [1366, 'laptop']]) {
+  await page.setViewport({ width: wd, height: 1000 });
+  await page.goto(BASE, { waitUntil: 'networkidle0' });
+  ok(await page.$eval('a.item', e => getComputedStyle(e).borderTopStyle === 'solid'), `front page: tiles on a ${name}`);
+  await shot(`index-${name}`);
+}
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 
 // No horizontal scroll at phone width on any page
-for (const p of ['', 'positive/', 'montyhall/', 'birthday/', 'simpson/']) {
+for (const p of ['', 'positive/', 'montyhall/', 'birthday/', 'simpson/', 'streak/', 'galton/', 'dna/', 'regression/']) {
   await page.goto(BASE + p, { waitUntil: 'networkidle0' });
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   ok(over <= 0, `no sideways scroll: /${p}`, over);
