@@ -8,8 +8,15 @@ Don't rename them, or saved settings and sheets are lost.
 
 **Standalone (2026-11-12):** Sam's school website mirrors this page, so it carries no
 unisam.nz branding: no logo, no "unisam.nz" text, no links back to the site (no `/`,
-no `/tools`), and no root-relative paths. The favicon is an inline SVG data URI. Keep it
-that way. The footer ("Built by Sam G ...") stays.
+no `/tools`), and no root-relative paths. Keep it that way. The footer ("Built by Sam G
+...") stays.
+
+**Logo (2026-11-12):** a navy book whose cover swings open like a door, amber panels and
+knob, amber light through the gap. Redrawn flat from Sam's green draft (in the vault at
+`temp/door-logo/`). Files, all relative: `logo.svg` (masthead, 72px on a paper tile;
+viewBox cropped to the art), `favicon.svg` (simplified 64px version, no title lines),
+`favicon.ico` (16/32/48) and `apple-touch-icon.png` (180, paper background). The PNG and
+ICO were rendered from the SVGs with headless Chrome; re-render if the SVGs change.
 
 ## Design
 
