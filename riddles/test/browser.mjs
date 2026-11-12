@@ -306,7 +306,7 @@ await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 
 // Feedback form: opens inline, needs words, posts to the shared inbox as app "riddles"
 await page.goto(BASE + 'galton/', { waitUntil: 'networkidle0' });
-ok(/Send feedback/.test(await text('footer')), 'feedback: link in the footer');
+ok(/Found a problem\? Send feedback\./.test(await text('footer')) && !/tell Sam/.test(await text('footer')), 'feedback: footer reads "Found a problem? Send feedback."', await text('footer'));
 await page.click('#fb-open');
 ok(await visible('#fb'), 'feedback: form opens on the page');
 await page.click('#fb-send');

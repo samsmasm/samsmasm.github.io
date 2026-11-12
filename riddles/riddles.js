@@ -381,8 +381,17 @@
     if (!foot || !main) return;
     var link = document.createElement("button");
     link.type = "button"; link.className = "fb-link"; link.id = "fb-open"; link.textContent = "Send feedback";
-    foot.appendChild(document.createTextNode(" · "));
-    foot.appendChild(link);
+    /* "found a problem? tell Sam." in the footer becomes "Found a problem? [Send feedback]." */
+    var OLD = "found a problem? tell Sam.", placed = false;
+    Array.prototype.slice.call(foot.childNodes).forEach(function (n) {
+      if (placed || n.nodeType !== 3 || n.nodeValue.indexOf(OLD) < 0) return;
+      var i = n.nodeValue.indexOf(OLD), rest = n.nodeValue.slice(i + OLD.length);
+      n.nodeValue = n.nodeValue.slice(0, i) + "Found a problem? ";
+      foot.insertBefore(link, n.nextSibling);
+      foot.insertBefore(document.createTextNode("." + rest), link.nextSibling);
+      placed = true;
+    });
+    if (!placed) { foot.appendChild(document.createTextNode(" · Found a problem? ")); foot.appendChild(link); foot.appendChild(document.createTextNode(".")); }
     var box = document.createElement("section");
     box.className = "card fbk"; box.id = "fb"; box.hidden = true;
     box.innerHTML =
@@ -431,7 +440,7 @@
           if (r.status === 429) throw new Error("Too many messages from here in the last hour. Try again later.");
           if (!r.ok) throw new Error("It could not be sent (error " + r.status + ").");
           open(false);
-          link.textContent = "Thanks, sent! Send more feedback";
+          link.textContent = "Thanks, sent! Send more";
         })
         .catch(function (e) {
           R.$("fb-send").disabled = false;
