@@ -20,10 +20,11 @@ const shot = async (name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS
 const text = (sel) => page.$eval(sel, e => e.textContent);
 const visible = (sel) => page.$eval(sel, e => !e.closest('[hidden]'));
 
-async function play(slug, guessFn, descIndex, checks, tryBtn, theme) {
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function play(slug, guessFn, descIndex, checks, tryBtn, watchFn) {
   await page.goto(`${BASE}${slug}/?speed=25`, { waitUntil: 'networkidle0' });
-  if (theme) await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
-  const tag = `${slug}${theme ? '-' + theme : ''}`;
+  const tag = slug;
   await shot(`${tag}-0-riddle`);
   await page.click('[data-go="1"]');
   ok(await page.$eval('#go-watch', b => b.disabled), `${tag}: lock disabled before a guess`);
@@ -31,10 +32,13 @@ async function play(slug, guessFn, descIndex, checks, tryBtn, theme) {
   ok(!(await page.$eval('#go-watch', b => b.disabled)), `${tag}: lock enabled after a guess`);
   await shot(`${tag}-1-guess`);
   await page.click('#go-watch');
-  await page.waitForFunction(() => !document.getElementById('go-describe').disabled, { timeout: 20000 });
+  if (watchFn) await watchFn(tag);
+  await page.waitForFunction(() => { const b = document.getElementById('go-describe'); return !b.disabled && !b.hidden; }, { timeout: 20000 });
   ok(true, `${tag}: watch finished`);
   await shot(`${tag}-2-watch`);
   await page.click('#go-describe');
+  ok(await page.$eval('#viz', e => !!e.closest('#s3')), `${tag}: the visual sits in the describe step`);
+  await shot(`${tag}-3-describe`);
   await page.click(`#desc-opts .opt[data-i="${descIndex}"]`);
   await page.click('#go-answer');
   await shot(`${tag}-4-answer`);
@@ -68,6 +72,24 @@ await play('montyhall', async () => {
   const m = seen.match(/stayer won (\d+) cars\. The switcher won (\d+)/);
   ok(m && +m[1] + +m[2] === 100 && +m[2] > +m[1], `${tag}: tallies add to 100, switcher ahead`, seen);
   ok(/No difference/.test(await text('#cmp')), `${tag}: compare shows guess`);
+  ok(/You won \d+ of the 10 rounds you played/.test(seen), `${tag}: own record in seen box`, seen);
+}, '#try-100', async (tag) => {
+  // play a round by hand: pick a door, then stay or switch
+  async function round(k) {
+    await page.waitForSelector('#w-doors button.door:not(:disabled)', { timeout: 5000 });
+    await page.click(`#w-doors button.door:nth-child(${(k % 3) + 1})`);
+    ok(await page.$$eval('#w-doors .door.open', d => d.length) === 1, `${tag}: round ${k + 1} host opens one door`);
+    await page.click(k % 2 ? '#w-switch' : '#w-stay');
+  }
+  for (let k = 0; k < 6; k++) await round(k);
+  await page.waitForFunction(() => !document.getElementById('w-ask').hidden, { timeout: 5000 });
+  ok(/automatically play the rest/.test(await text('#caption')), `${tag}: asks after 6 rounds`);
+  await shot(`${tag}-2a-ask`);
+  await page.click('#w-no');
+  for (let k = 6; k < 10; k++) await round(k);
+  await page.waitForFunction(() => !document.getElementById('w-ask').hidden, { timeout: 5000 });
+  ok(/10 rounds played/.test(await text('#w-round')), `${tag}: asks again after 4 more`, await text('#w-round'));
+  await page.click('#w-yes');
 }, '#try-100');
 ok(await page.$$eval('#p-doors .door', d => d.length) === 100, 'montyhall: 100 doors in play');
 await page.click('#p-doors .door:nth-child(5)');
@@ -86,23 +108,40 @@ await play('birthday', async () => {
 ok((await text('#live')) === '51%', 'birthday: 23 people is 51%', await text('#live'));
 await page.click('#hundred');
 ok(/Rooms made: 10[01]/.test(await text('#ptally')), 'birthday: 100 rooms made', await text('#ptally'));
+const rd = await page.$$eval('#roomdots span', s => [s.length, s.filter(x => x.classList.contains('m')).length, s.filter(x => x.classList.contains('last')).length]);
+ok(rd[0] >= 100 && rd[1] > 30 && rd[1] < 75 && rd[2] === 1, 'birthday: a dot per room, about half orange, one ringed', rd.join(','));
+await shot('birthday-6-rooms');
 
 // Simpson
 await play('simpson', async () => {
   await page.click('#guess-opts .opt[data-i="0"]');
 }, 1, async (tag) => {
   ok(/You saidA/.test(await text('#cmp')) && /AnswerB/.test(await text('#cmp')), `${tag}: compare`, await text('#cmp'));
-}, '#try');
+}, '#try', async (tag) => {
+  ok(await page.$eval('#go-describe', b => b.hidden), `${tag}: describe hidden until the last step`);
+  ok(await page.$eval('#w-back', b => b.disabled), `${tag}: back disabled on step 1`);
+  for (let k = 0; k < 3; k++) {
+    await page.click('#w-next');
+    await sleep(150);
+    await shot(`${tag}-2-step${k + 2}`);
+  }
+  ok(/Step 4 of 4/.test(await text('#w-step')), `${tag}: reached step 4`);
+  await page.click('#w-back'); await sleep(150);
+  ok(/Step 3 of 4/.test(await text('#w-step')), `${tag}: back works`);
+  await page.click('#w-next'); await sleep(150);
+});
 ok(/A 78%.*B 83%.*winner: B/.test(await text('#live')), 'simpson: real mix gives B', await text('#live'));
 await page.click('#v-fair');
 ok(/winner: A/.test(await text('#live')), 'simpson: same mix gives A', await text('#live'));
 await page.click('#v-all');
 await shot('simpson-6-combined');
 
-// Dark theme pass on two riddles, desktop width
+// Desktop width pass, and light even when the system asks for dark
 await page.setViewport({ width: 1280, height: 900 });
-await play('positive', async () => { await page.type('#guess-host .numin', '80'); }, 0, async () => {}, '#try-nums', 'dark');
-await play('simpson', async () => { await page.click('#guess-opts .opt[data-i="1"]'); }, 1, async () => {}, '#try', 'dark');
+await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+await play('positive', async () => { await page.type('#guess-host .numin', '80'); }, 0, async () => {}, '#try-nums');
+ok(await page.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(247, 246, 242)', 'paper background under system dark mode');
+await page.emulateMediaFeatures([]);
 
 // Front page shows progress
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
@@ -110,8 +149,6 @@ await page.goto(BASE, { waitUntil: 'networkidle0' });
 const statuses = await page.$$eval('a.row .status', s => s.map(x => x.textContent));
 ok(statuses.every(s => /Done/.test(s)), 'front page: all four marked done', statuses.join(','));
 await shot('index');
-await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
-await shot('index-dark');
 
 // No horizontal scroll at phone width on any page
 for (const p of ['', 'positive/', 'montyhall/', 'birthday/', 'simpson/']) {

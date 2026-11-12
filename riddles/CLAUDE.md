@@ -13,18 +13,25 @@ Built: `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`,
 - **Front page**: grouped ruled index (four themes), one hook line and a small SVG thumbnail per riddle, "Done" ticks from localStorage. The brief asked for 2 or 3 directions; this is the grouped-doors one.
 - **Riddle titles avoid famous names** so students cannot look up the answer: "Three doors", "Shared birthdays", "Better every time". The famous name appears in the answer step.
 - **No anchoring**: number guesses start empty and the slider thumb is hidden until used; "Lock it in" stays disabled until a guess exists.
-- Monty Hall Watch: one shared game slowly, two more, then 97 fast; each game exactly one of stayer/switcher wins. Seed is chosen so the 100 games land near 33/67.
 - Birthday Watch: one example room on a calendar ring (seed chosen so its first match is at 19 to 26) plus a curve over 2,000 seeded rooms. Axis to 70.
 - Simpson uses the real Charig 1986 kidney stone numbers. Free play changes each treatment's share of large stones with subgroup rates fixed.
+
+## Sam's feedback (2026-11-12, round 1), all done
+
+- **Light only.** Dark mode removed, to match the sophisticated look.
+- **Describe sits under the visual**: `R.steps` moves `#viz` from `#viz-home` (Watch) into `#viz-slot` (Describe) and back. Any new riddle wraps its Watch visual the same way.
+- **Three doors is played, not watched** (step label "Play"). The student picks a door, the host opens a goat, they choose Stay or Switch; every round scores both the stayer (kept the pick) and the switcher. After 6 rounds it asks "Shall we automatically play the rest?"; "No" plays 4 more and asks again; "Yes" runs the rest to 100 fast. Their own record shows too.
+- **Birthday free play** shows a dot per room made (orange matched, blue not, the room on the ring is circled), latest 400.
+- **Better every time** is clicked through (Back / Next, 4 steps) with numbers on every block ("81 of 87 worked") and percentages on the bars.
 
 ## Files
 
 | File | What |
 |---|---|
-| `riddles.css` | Shared look: Option B paper and ink, plus a designed dark theme (system setting, or `data-theme`) |
+| `riddles.css` | Shared look: Option B paper and ink, light only |
 | `riddles.js` | `window.R`: seeded `rng`, `timeline` (cancellable timers and tweens; `?speed=N` speeds it up), `steps`, `field`, `guess`, `choices`, `scale`, `compare`, `fitCanvas`, `onTheme`, `progress`/`markDone` |
 | `<slug>/index.html` | One riddle each; markup for the five steps plus a page script. `[data-go="n"]` buttons move between steps |
-| `test/run.sh` | Plays every riddle in headless Chrome (phone and desktop, light and dark). `test/run.sh /folder` saves screenshots |
+| `test/run.sh` | Plays every riddle in headless Chrome (phone and desktop), including playing Three doors by hand. `test/run.sh /folder` saves screenshots |
 
 ## Rules
 

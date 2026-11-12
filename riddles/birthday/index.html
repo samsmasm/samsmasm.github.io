@@ -15,6 +15,10 @@
 .counter { text-align: center; font-size: 15px; color: var(--muted); }
 .counter b { font-family: var(--font-mono); font-size: 22px; color: var(--ink); }
 .curvelab { font-size: 13px; color: var(--muted); text-align: center; }
+.roomdots { display: grid; grid-template-columns: repeat(25, 1fr); gap: 4px; max-width: 340px; width: 100%; margin: 0 auto; }
+.roomdots span { aspect-ratio: 1; border-radius: 50%; background: var(--a); }
+.roomdots span.m { background: var(--b); }
+.roomdots span.last { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
 </style>
 </head>
 <body>
@@ -47,6 +51,7 @@
 
   <section class="card step" id="s2" hidden>
     <h2>Watch</h2>
+    <div id="viz-home"><div id="viz">
     <div class="ringwrap"><canvas id="ring" role="img" aria-label="A ring of the 365 days of the year. Each person is a dot on their birthday."></canvas></div>
     <p class="counter">People in the room: <b id="count">0</b></p>
     <p class="caption" id="caption" aria-live="polite"></p>
@@ -54,6 +59,7 @@
       <p class="curvelab">Rooms with a shared birthday, out of 2,000 rooms</p>
       <canvas id="curve" role="img" aria-label="A curve of how many rooms have a shared birthday as people arrive."></canvas>
     </div>
+    </div></div>
     <div class="btnrow">
       <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
       <button type="button" class="btn2" id="replay">Replay</button>
@@ -62,6 +68,7 @@
 
   <section class="card step" id="s3" hidden>
     <h2>What do you see?</h2>
+    <div id="viz-slot"></div>
     <p class="sub">When did the curve cross the halfway line?</p>
     <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
       <button type="button" class="opt" data-i="0">Before 10 people</button>
@@ -105,8 +112,14 @@ Pairs among 23 people = 23 x 22 / 2 = 253</div></details>
       <input type="range" id="size" min="2" max="100" step="1" value="23">
     </div>
     <p class="liveres" aria-live="polite">Chance of a shared birthday: <b id="live"></b></p>
-    <div class="ringwrap"><canvas id="pring" role="img" aria-label="One random room on the birthday ring."></canvas></div>
+    <div class="ringwrap"><canvas id="pring" role="img" aria-label="The latest room on the birthday ring."></canvas></div>
     <p class="counter" id="ptally"></p>
+    <div class="roomdots" id="roomdots" aria-hidden="true"></div>
+    <div class="legend" id="roomlegend" hidden>
+      <div><span class="sw" style="background:var(--b)"></span>A room with a shared birthday</div>
+      <div><span class="sw" style="background:var(--a)"></span>No match</div>
+      <div><span class="sw" style="box-shadow:0 0 0 2px var(--ink);background:var(--surface)"></span>The room on the ring</div>
+    </div>
     <div class="btnrow">
       <button type="button" class="btn2" id="one">Make a room</button>
       <button type="button" class="btn2" id="hundred">Make 100 rooms</button>
@@ -278,28 +291,34 @@ Pairs among 23 people = 23 x 22 / 2 = 253</div></details>
   });
 
   /* ---------- free play ---------- */
-  var prnd = R.rng(424242), pDays = [], made = 0, matched = 0;
+  /* every room made at this size: true if it had a shared birthday. The last one is on the ring. */
+  var prnd = R.rng(424242), pDays = [], hist = [], SHOW = 400;
   function pSize() { return Number($("size").value); }
   function makeRooms(k) {
     for (var i = 0; i < k; i++) {
       pDays = room(prnd, pSize());
-      made++; if (firstMatch(pDays) <= pDays.length) matched++;
+      hist.push(firstMatch(pDays) <= pDays.length);
     }
     renderPlay();
   }
   function renderPlay() {
-    var n = pSize();
+    var n = pSize(), matched = 0, i;
     $("size-val").textContent = n;
     $("live").textContent = R.fmtPct(exact(n));
     drawRing($("pring"), pDays, pDays.length);
-    $("ptally").innerHTML = made ? "Rooms made: <b>" + made + "</b> · with a match: <b>" + matched + "</b>" : "";
+    for (i = 0; i < hist.length; i++) if (hist[i]) matched++;
+    $("ptally").innerHTML = hist.length ? "Rooms made: <b>" + hist.length + "</b> · with a match: <b>" + matched + "</b>" : "";
+    var box = $("roomdots"), from = Math.max(0, hist.length - SHOW), html = "";
+    for (i = from; i < hist.length; i++) html += "<span class='" + (hist[i] ? "m" : "") + (i === hist.length - 1 ? " last" : "") + "'></span>";
+    box.innerHTML = html;
+    $("roomlegend").hidden = !hist.length;
   }
-  $("size").addEventListener("input", function () { made = 0; matched = 0; pDays = room(prnd, pSize()); made = 1; matched = firstMatch(pDays) <= pDays.length ? 1 : 0; renderPlay(); });
+  $("size").addEventListener("input", function () { hist = []; makeRooms(1); });
   $("one").addEventListener("click", function () { makeRooms(1); });
   $("hundred").addEventListener("click", function () { makeRooms(100); });
   $("try").addEventListener("click", function () {
     $("explore").hidden = false;
-    if (!made) makeRooms(1); else renderPlay();
+    if (!hist.length) makeRooms(1); else renderPlay();
     $("explore").scrollIntoView({ block: "start" });
   });
 

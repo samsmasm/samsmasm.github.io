@@ -57,16 +57,21 @@
 
   <section class="card step" id="s2" hidden>
     <h2>Watch</h2>
-    <div class="stage"><canvas id="watch" role="img" aria-label="Dots for 700 patients, split by treatment and stone size, then merged."></canvas></div>
+    <div id="viz-home"><div id="viz">
+    <p class="kicker" id="w-step" style="text-align:center"></p>
     <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="stage"><canvas id="watch" role="img" aria-label="Dots for 700 patients, split by treatment and stone size, then merged."></canvas></div>
+    </div></div>
     <div class="btnrow">
-      <button type="button" class="btn" id="go-describe" data-go="3" disabled>What did you see?</button>
-      <button type="button" class="btn2" id="replay">Replay</button>
+      <button type="button" class="btn2" id="w-back">Back</button>
+      <button type="button" class="btn" id="w-next">Next</button>
+      <button type="button" class="btn" id="go-describe" data-go="3" hidden>What did you see?</button>
     </div>
   </section>
 
   <section class="card step" id="s3" hidden>
     <h2>What do you see?</h2>
+    <div id="viz-slot"></div>
     <p class="sub">Look at the bars after the groups merged.</p>
     <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
       <button type="button" class="opt" data-i="0">A still came out ahead</button>
@@ -163,7 +168,7 @@
     var view = { d: REAL, pts: patients(REAL), frame: { a: 0, b: 0, u: 1 } };
     function geo(W) {
       var gapX = W * 0.06, pw = (W - gapX) / 2, c = pw / COLS;
-      var g = { W: W, gapX: gapX, pw: pw, c: c, hh: 2.2 * c, lh: 1.7 * c };
+      var g = { W: W, gapX: gapX, pw: pw, c: c, hh: 2.2 * c, lh: 2.8 * c };
       g.dotsBottom = g.hh + 2 * g.lh + 0.4 * c + (rows(N) + 2) * c;
       g.barsTop = g.dotsBottom + 0.8 * c;
       return g;
@@ -175,14 +180,16 @@
       else { i = p.i1; if (p.z === 1) top += rows(view.d[p.t][0].n) * g.c + g.lh + 0.4 * g.c; }
       return [x0 + (i % COLS + 0.5) * g.c, top + (Math.floor(i / COLS) + 0.5) * g.c];
     }
+    /* each block gets a name and a number line: patients before outcomes are shown, "x of n worked" after */
     function labels(ph, g) {
-      var out = [];
+      var out = [], d = view.d;
+      function num(b) { return ph < 2 ? b.n + " patients" : b.s + " of " + b.n + " worked"; }
       for (var t = 0; t < 2; t++) {
-        var x0 = t * (g.pw + g.gapX);
+        var x0 = t * (g.pw + g.gapX), S = d[t][0], L = d[t][1], y0 = g.hh + g.c * 0.6;
         if (ph === 1 || ph === 2) {
-          out.push({ s: "Small stones", x: x0, y: g.hh + g.lh * 0.55 });
-          out.push({ s: "Large stones", x: x0, y: g.hh + g.lh + rows(view.d[t][0].n) * g.c + g.lh * 0.55 + 0.4 * g.c });
-        } else if (ph === 3) out.push({ s: "All patients", x: x0, y: g.hh + g.lh * 0.55 });
+          out.push({ s: "Small stones", n: num(S), x: x0, y: y0 });
+          out.push({ s: "Large stones", n: num(L), x: x0, y: y0 + g.lh + rows(S.n) * g.c + 0.4 * g.c });
+        } else out.push({ s: "All patients", n: num({ n: S.n + L.n, s: S.s + L.s }), x: x0, y: y0 });
       }
       return out;
     }
@@ -200,7 +207,7 @@
       return out;
     }
     view.paint = function () {
-      var f = R.fitCanvas(canvas, 1.1);
+      var f = R.fitCanvas(canvas, 1.16);
       if (!f) return;
       var ctx = f.ctx, g = geo(f.w), fr = view.frame, u = R.ease(fr.u);
       var col = [R.cssVar("--a"), R.cssVar("--b")], dot = R.cssVar("--dot"), muted = R.cssVar("--muted"), ink = R.cssVar("--ink"), line = R.cssVar("--line");
@@ -208,8 +215,17 @@
       ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.font = "700 " + Math.round(g.c * 1.5) + "px Fraunces, Georgia, serif";
       ["Treatment A", "Treatment B"].forEach(function (s, t) { ctx.fillStyle = col[t]; ctx.fillText(s, t * (g.pw + g.gapX), g.hh * 0.45); });
-      ctx.font = Math.round(g.c * 0.95) + "px 'Atkinson Hyperlegible', sans-serif";
-      function drawLabels(list, a) { if (a <= 0.01) return; ctx.globalAlpha = a; ctx.fillStyle = muted; list.forEach(function (l) { ctx.fillText(l.s, l.x, l.y); }); ctx.globalAlpha = 1; }
+      var fsz = Math.max(11, Math.round(g.c * 0.95)), font = fsz + "px 'Atkinson Hyperlegible', sans-serif", bold = "700 " + font;
+      function drawLabels(list, a) {
+        if (a <= 0.01) return;
+        ctx.globalAlpha = a;
+        list.forEach(function (l) {
+          ctx.font = font; ctx.fillStyle = muted; ctx.fillText(l.s, l.x, l.y);
+          ctx.font = bold; ctx.fillStyle = ink; ctx.fillText(l.n, l.x, l.y + fsz * 1.2);
+        });
+        ctx.font = font;
+        ctx.globalAlpha = 1;
+      }
       var la = labels(fr.a, g), lb = labels(fr.b, g);
       if (fr.a === fr.b) drawLabels(lb, 1); else { drawLabels(la, 1 - u); drawLabels(lb, u); }
       function style(p, ph, a) {
@@ -227,7 +243,7 @@
         if (sa === sb) style(p, fr.b, 1); else { style(p, fr.a, 1 - u); style(p, fr.b, u); }
       });
       ctx.globalAlpha = 1;
-      var lw = g.W * 0.16, bw = g.W - lw - g.c * 1.6, bh = g.c * 1.1;
+      var lw = g.W * 0.16, bw = g.W - lw - fsz * 4.2, bh = g.c * 1.1;
       function drawBars(list, a) {
         if (a <= 0.01 || !list.length) return;
         ctx.globalAlpha = a;
@@ -235,9 +251,9 @@
         list.forEach(function (b) {
           ctx.fillStyle = muted; ctx.fillText(b.lab, 0, b.y + bh / 2);
           ctx.fillStyle = col[b.t]; ctx.fillRect(lw, b.y, bw * b.r, bh);
-          ctx.font = "700 " + Math.round(g.c * 0.95) + "px 'Atkinson Hyperlegible', sans-serif";
-          ctx.fillText(b.t ? "B" : "A", lw + bw * b.r + g.c * 0.4, b.y + bh / 2);
-          ctx.font = Math.round(g.c * 0.95) + "px 'Atkinson Hyperlegible', sans-serif";
+          ctx.font = bold;
+          ctx.fillText((b.t ? "B " : "A ") + Math.round(b.r * 100) + "%", lw + bw * b.r + g.c * 0.4, b.y + bh / 2);
+          ctx.font = font;
         });
         ctx.globalAlpha = 1;
       }
@@ -260,28 +276,33 @@
   });
   var guess = R.choices($("guess-opts"), function () { $("go-watch").disabled = false; });
   var desc = R.choices($("desc-opts"), function () { $("go-answer").disabled = false; });
-  $("replay").addEventListener("click", playWatch);
-
-  function playWatch() {
+  /* Watch is stepped by the student: Back and Next move between the four views */
+  var CAPS = [
+    "700 patients. 350 got A, 350 got B.",
+    "Split each side by stone size. Who got which?",
+    "Filled dot: the treatment worked. Compare the bars for small stones, then large.",
+    "Now put each treatment's patients back together."
+  ];
+  var wp = 0;
+  function goTo(n) {
     if (tl) tl.cancel();
     tl = R.timeline();
-    var T = tl, cap = function (s) { $("caption").textContent = s; };
-    $("go-describe").disabled = true;
-    watchView.show(0, 0, 1);
-    cap("700 patients. 350 got A, 350 got B.");
-    function go(a, b, text, wait, next) {
-      T.after(wait, function () {
-        cap(text);
-        T.tween(1100, function (u) { watchView.show(a, b, u); }, next);
-      });
-    }
-    go(0, 1, "Split each side by stone size.", 2400, function () {
-      go(1, 2, "Filled dot: the treatment worked. A wins for small stones, and for large.", 3000, function () {
-        go(2, 3, "Now put each treatment's patients back together.", 4200, function () {
-          T.after(1400, function () { $("go-describe").disabled = false; });
-        });
-      });
-    });
+    var from = wp;
+    wp = n;
+    $("caption").textContent = CAPS[n];
+    $("w-step").textContent = "Step " + (n + 1) + " of 4";
+    $("w-back").disabled = n === 0;
+    $("w-next").hidden = n === 3;
+    $("go-describe").hidden = n !== 3;
+    if (from === n) watchView.show(n, n, 1);
+    else tl.tween(900, function (u) { watchView.show(from, n, u); });
+  }
+  $("w-next").addEventListener("click", function () { if (wp < 3) goTo(wp + 1); });
+  $("w-back").addEventListener("click", function () { if (wp > 0) goTo(wp - 1); });
+
+  function playWatch() {
+    wp = 0;
+    goTo(0);
   }
 
   var guessText = ["A", "B", "Exactly level"];

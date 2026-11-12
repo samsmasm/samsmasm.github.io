@@ -113,6 +113,12 @@
         li.className = i < n ? "done" : "";
         if (i === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
       });
+      /* the Watch visual (#viz) moves into the Describe step (#viz-slot), so students describe what is in front of them */
+      var viz = R.$("viz"), home = R.$("viz-home"), slot = R.$("viz-slot");
+      if (viz && home && slot) {
+        if (n === 3) slot.appendChild(viz);
+        else if (viz.parentNode !== home) home.appendChild(viz);
+      }
       if (o.onLeave && prev !== n) o.onLeave(prev, n);
       if (o.onEnter && o.onEnter[n]) o.onEnter[n]();
       if (!quiet) {
