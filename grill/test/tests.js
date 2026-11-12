@@ -27,6 +27,24 @@ test('generators always give whole-number, on-chart markets', async page => {
   assert(bad.length === 0, JSON.stringify(bad));
 });
 
+test('label boxes never overlap (D leaving the chart at the ceiling price hid a box)', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    const box = sl => { const rx = sl.anchor === 'start' ? sl.x - 2 : sl.anchor === 'end' ? sl.x - sl.w + 2 : sl.x - sl.w / 2; return [rx, sl.y - 15, rx + sl.w, sl.y + 7]; };
+    const scs = [{ a: 10, b: 0.5, c: 0, d: 2, xe: 4, ye: 8, kind: 'ceiling', gap: 4, P: 4, qs: 2, qd: 12, next: null }];
+    for (const k of ['tax', 'subsidy', 'ceiling', 'floor']) for (let i = 0; i < 300; i++) scs.push(gen(k));
+    for (const sc of scs) {
+      const sl = labelSlots(sc).map(box);
+      for (let i = 0; i < sl.length; i++) for (let j = i + 1; j < sl.length; j++) {
+        const [a, b] = [sl[i], sl[j]];
+        if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) out.push([sc.kind, labelSlots(sc)[i].answer, labelSlots(sc)[j].answer, JSON.stringify(sc)]);
+      }
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
 test('every shading concept is a whole number of clickable areas', async page => {
   const bad = await page.evaluate(() => {
     const out = [];

@@ -354,16 +354,31 @@ function diagram(sc) {
 }
 function baseLines(sc) { return diagram(sc).lines.slice(0, 2); }
 
+const slotWidth = name => name.length > 6 ? 92 : 40;
 // where a line's label goes (svg px)
 function labelSpots(lines) {
-  let topCount = 0;
-  return lines.map(l => {
+  const tops = [];
+  const spots = lines.map(l => {
     const s = seg(l.line); const [x, y] = s[1];
-    if (l.line.t === 'h') return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start' };
-    if (Math.abs(y - GY) < 1e-6 && x < GX - 1e-6) { const p = { x: X(x), y: Y(GY) - 8 - 15 * topCount, anchor: 'middle' }; topCount++; return p; }
-    if (Math.abs(x - GX) < 1e-6) return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start' };
+    if (l.line.t === 'h') return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start', fixed: true };
+    if (Math.abs(y - GY) < 1e-6 && x < GX - 1e-6) {
+      // stack top labels only when their boxes would touch
+      const half = slotWidth(l.name) / 2, p = { x: X(x), y: Y(GY) - 8, anchor: 'middle', half };
+      while (tops.some(q => Math.abs(q.x - p.x) < q.half + half + 4 && Math.abs(q.y - p.y) < 24)) p.y -= 24;
+      tops.push(p); return p;
+    }
+    if (Math.abs(x - GX) < 1e-6) return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start', dir: l.line.m < 0 ? 1 : -1 };
     return { x: X(x) + 6, y: Y(y) - 6, anchor: 'start' };
   });
+  // right-edge labels can land on the same spot (D leaving the chart at the ceiling price):
+  // slide a sloped line's label along its own direction until its box is clear
+  const edge = spots.filter(p => p.anchor === 'start' && p.x === X(GX) + 6);
+  const placed = edge.filter(p => p.fixed);
+  for (const p of edge.filter(p => !p.fixed)) {
+    while (placed.some(q => Math.abs(q.y - p.y) < 24)) p.y += 24 * p.dir;
+    placed.push(p);
+  }
+  return spots.map(({ x, y, anchor }) => ({ x, y, anchor }));
 }
 
 // ---------- svg drawing ----------
@@ -422,7 +437,7 @@ function svgDiagram(sc, opts) {
 function labelSlots(sc) {
   const dg = diagram(sc), out = [];
   const spots = labelSpots(dg.lines);
-  dg.lines.forEach((l, i) => out.push({ id: 'l' + i, kind: 'line', answer: l.name, ...spots[i], w: l.name.length > 6 ? 92 : 40 }));
+  dg.lines.forEach((l, i) => out.push({ id: 'l' + i, kind: 'line', answer: l.name, ...spots[i], w: slotWidth(l.name) }));
   dg.points.forEach((p, i) => {
     if (p.pn) out.push({ id: 'p' + i, kind: 'axis', answer: p.pn, x: OX - 24, y: Y(p.y) + 4, anchor: 'end', w: 42 });
     if (p.qn) out.push({ id: 'q' + i, kind: 'axis', answer: p.qn, x: X(p.x), y: OY + 32, anchor: 'middle', w: 33 });
