@@ -250,6 +250,7 @@ Config constants sit at the top of the Drive block: `GOOGLE_CLIENT_ID` (empty by
 - `drive.file` only ever sees files this app created, so the folder lookup query reliably finds our own folder and nothing else in the student's Drive is visible to the app.
 - Uses the GIS **token model** (`initTokenClient`), not the ID-token/One Tap model. Tokens last ~1 hour; `driveEnsureToken()` refreshes silently using the `sw2_drive_granted` localStorage flag to decide between `prompt:''` and `prompt:'consent'`.
 - `driveApi()` wraps fetch, attaching the bearer token and retrying once on a 401 after clearing the token.
+- Buttons (Sam, 2026-11-12): traditional **Save** and **Save as…**. Until the diagram has a Drive file (`driveCurrentFile`) only Save shows (it creates the file); after that Save overwrites it and Save as… makes a separate copy, adding " copy" if the name box is unchanged. `driveRefreshUI()` shows/hides `#drive-saveas-btn`; call it after anything that sets or clears `driveCurrentFile`.
 - Create uses a multipart upload; update uses `uploadType=media` PATCH; delete sets `trashed:true` rather than hard-deleting, so students can recover work from their Drive bin.
 - `GOOGLE_HOSTED_DOMAIN` maps to the `hosted_domain` param, which filters the account chooser only. It is **not** a security control. It does not need to be, because each student's data lives in their own Drive under their own credentials, so there is no shared store to protect.
 

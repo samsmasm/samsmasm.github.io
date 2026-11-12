@@ -683,7 +683,7 @@
         </div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
           <button class="drive-btn primary" style="flex:1" id="drive-save-btn" onclick="driveSave(false)">Save</button>
-          <button class="drive-btn" style="flex:1" onclick="driveSave(true)">Save as new</button>
+          <button class="drive-btn" style="flex:1" id="drive-saveas-btn" onclick="driveSave(true)" title="Save a separate copy, leaving this file as it is">Save as…</button>
         </div>
         <div class="drive-list" id="drive-list"></div>
       </div>
@@ -4795,6 +4795,8 @@ async function driveSave(asNew) {
   let name = (input.value || '').trim();
   if (!name) name = state.title || 'Untitled diagram';
   name = name.replace(/[\\/]/g, '-');
+  // Save as… with the name unchanged would give two files called the same.
+  if (asNew && driveCurrentFile && name === driveCurrentFile.name) name += ' copy';
   input.value = name;
   driveMsg('Saving…');
   const body = JSON.stringify(currentGraphData(), null, 2);
@@ -4824,6 +4826,7 @@ async function driveSave(asNew) {
       driveCurrentFile = { id: f.id, name };
     }
     driveMsg('Saved to Drive at ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + '.');
+    driveRefreshUI();
     await driveLoadList();
   } catch(e) {
     driveMsg('Could not save. Check your connection and try again.', true);
@@ -4838,6 +4841,7 @@ async function driveTrash(id, name) {
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
     if (driveCurrentFile && driveCurrentFile.id === id) driveCurrentFile = null;
     driveMsg('Moved to your Drive bin.');
+    driveRefreshUI();
     await driveLoadList();
   } catch(e) {
     driveMsg('Could not delete that diagram.', true);
@@ -4898,8 +4902,9 @@ function driveRefreshUI() {
   const btn = document.getElementById('drive-auth-btn');
   btn.textContent = signedIn ? 'Sign out' : 'Sign in';
   btn.onclick = signedIn ? driveSignOut : driveSignIn;
-  const saveBtn = document.getElementById('drive-save-btn');
-  if (saveBtn) saveBtn.textContent = driveCurrentFile ? 'Save' : 'Save to Drive';
+  // Traditional pair: just "Save" until the diagram has a file, then "Save" + "Save as…".
+  const saveAsBtn = document.getElementById('drive-saveas-btn');
+  if (saveAsBtn) saveAsBtn.style.display = driveCurrentFile ? '' : 'none';
   if (signedIn) {
     const input = document.getElementById('drive-name');
     if (!input.value) input.value = driveCurrentFile ? driveCurrentFile.name : (state.title || '');

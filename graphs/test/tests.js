@@ -529,6 +529,24 @@ test('Help button opens a short how-to that mentions subscripts; Escape closes i
   eq(await ev(page, `document.getElementById('help-modal').classList.contains('open')`), false, 'Escape closes');
 });
 
+test('Drive: just Save until the diagram has a file, then Save and Save as… (a copy)', async (page) => {
+  await ev(page, `driveToken = { access_token: 'x', expires_at: Date.now() + 3600e3 }; driveUser = 'sam@example.com'; driveSignedIn = () => !!driveToken;
+    window.__calls = []; let n = 0;
+    driveApi = async (url, opts) => { window.__calls.push([opts && opts.method, url]); return { json: async () => ({ id: 'f' + (++n) }) }; };
+    driveGetFolder = async () => 'folder'; driveLoadList = async () => {}; driveRefreshUI();`);
+  const shown = id => ev(page, `getComputedStyle(document.getElementById('${id}')).display !== 'none'`);
+  eq([await ev(page, `document.getElementById('drive-save-btn').textContent`), await shown('drive-saveas-btn')], ['Save', false], 'first save: just Save');
+  await ev(page, `document.getElementById('drive-name').value = 'Demand'; driveSave(false)`);
+  await page.waitForFunction(`driveCurrentFile && driveCurrentFile.id === 'f1'`);
+  eq(await shown('drive-saveas-btn'), true, 'Save as… appears once saved');
+  await ev(page, `driveSave(false)`);
+  await page.waitForFunction(`__calls.length === 2`);
+  eq(await ev(page, `[__calls[1][0], driveCurrentFile.id]`), ['PATCH', 'f1'], 'Save overwrites the same file');
+  await ev(page, `driveSave(true)`);
+  await page.waitForFunction(`driveCurrentFile.id === 'f2'`);
+  eq(await ev(page, `[driveCurrentFile.name, document.getElementById('drive-name').value]`), ['Demand copy', 'Demand copy'], 'Save as… with the same name adds "copy"');
+});
+
 test('keyboard: tool letters, arrow nudge as one undo step, Ctrl+C/V and Ctrl+D', async (page) => {
   await ev(page, `state.elements = [mkLine(0.1, 0.5, 0.5, 0.5, '#1a4a8a', 2.5, '', 'S')]; state.selectedId = state.elements[0].id; undoStack = []; redraw();`);
   await page.keyboard.press('l');
