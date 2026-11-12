@@ -206,9 +206,11 @@ await page.click('[data-r="100000"]');
 await runAgain('ruin', async () => page.$eval('#play', c => c.toDataURL()));
 
 // Infinite money
-await play('stpetersburg', async () => { await page.type('#guess-host .numin', '10'); }, 1, async (tag) => {
-  ok(/You said\$10/.test(await text('#cmp')) && /Infinite/.test(await text('#cmp')), `${tag}: compare`, await text('#cmp'));
-  ok(/[\d,]+ of the 10,000 games paid just \$2\. One paid \$32,768/.test(await text('#seen')), `${tag}: seen box`, await text('#seen'));
+await play('stpetersburg', async () => { await page.type('#guess-host .numin', '10'); }, 2, async (tag) => {
+  ok(/You said\$10 a game/.test(await text('#cmp')) && /No limit/.test(await text('#cmp')), `${tag}: compare`, await text('#cmp'));
+  ok(/^You saw: No: it drifted.*Right\. The average was about \$\d+(\.\d+)? until game [\d,]+ paid \$32,768/.test(await text('#seen')), `${tag}: seen box matches the describe question`, await text('#seen'));
+  ok(/average win per game/.test(await text('#s4 .recall')), `${tag}: question asks about the average`, await text('#s4 .recall'));
+  ok(!/fair price/i.test(await page.evaluate(() => document.body.textContent)), `${tag}: never claims a fair price`);
 }, '#try');
 ok((await text('#live')) === '$21', 'stpetersburg: $1 million limit gives $21', await text('#live'));
 await page.click('.presets button[data-c="10"]');

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../riddles.css?v=20261112-205453">
+<link rel="stylesheet" href="../riddles.css?v=20261112-205924">
 <style>
 .plot { max-width: 560px; margin: 0 auto; width: 100%; }
 .coins { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; min-height: 40px; align-items: center; }
@@ -50,13 +50,13 @@
         <tr><td>and so on, forever</td><td></td><td></td></tr>
       </tbody>
     </table>
-    <p class="question">What is the most you would pay to play this game once?</p>
+    <p class="question">If you played this game over and over, what would your average win per game be?</p>
     <button type="button" class="btn" data-go="1">Make a guess</button>
   </section>
 
   <section class="card step" id="s1" hidden>
-    <h2>Your price</h2>
-    <p class="sub">The most you would pay for one game, in dollars.</p>
+    <h2>Your guess</h2>
+    <p class="sub">Your average win per game, in dollars, over many games.</p>
     <div id="guess-host"></div>
     <button type="button" class="btn" id="go-watch" data-go="2">Lock it in</button>
   </section>
@@ -78,11 +78,11 @@
   <section class="card step" id="s3" hidden>
     <h2>What do you see?</h2>
     <div id="viz-slot"></div>
-    <p class="sub">How did the average win behave as more games were played?</p>
+    <p class="sub">Did the average win settle on a number?</p>
     <div class="opts" role="radiogroup" aria-label="What you saw" id="desc-opts">
-      <button type="button" class="opt" data-i="0">It settled down at a steady value</button>
-      <button type="button" class="opt" data-i="1">It stayed small, then jumped when a rare huge win came</button>
-      <button type="button" class="opt" data-i="2">It rose smoothly and quickly</button>
+      <button type="button" class="opt" data-i="0">Yes, it settled near $2</button>
+      <button type="button" class="opt" data-i="1">Yes, it settled near $10</button>
+      <button type="button" class="opt" data-i="2">No: it drifted, then jumped up when a rare huge win came</button>
     </div>
     <div class="btnrow">
       <button type="button" class="btn" id="go-answer" data-go="4" disabled>Show the answer</button>
@@ -92,7 +92,7 @@
 
   <section class="card step" id="s4" hidden>
     <h2>The answer</h2>
-    <p class="answerline">The average prize is <b>infinite</b>. Yet half of all games pay just $2, and almost nobody would pay more than about $20.</p>
+    <p class="answerline"><b>There is no number.</b> The more games you play, the higher your average win climbs, with no limit. Mathematicians call this long-run average the expected value, and here it is infinite.</p>
     <div id="cmp"></div>
     <div class="seen" id="seen"></div>
     <ul class="why" id="why"></ul>
@@ -108,7 +108,10 @@ So the average prize is $1 + $1 + $1 + ... = infinite.
 
 But a real casino cannot pay more than it has.
 If it can pay at most $1 million (about 2 to the power 20),
-only about 20 rows count, so a fair price is about $21.</div></details>
+only about 20 rows count, so the expected value is about $21.
+
+That is the average prize, not the right price to pay.
+What a game is worth to you depends on how you feel about risk.</div></details>
     <div class="btnrow">
       <button type="button" class="btn" id="try">Give the casino a limit</button>
       <button type="button" class="btn2" id="restart">Start over</button>
@@ -128,14 +131,15 @@ only about 20 rows count, so a fair price is about $21.</div></details>
       <div class="row"><label for="cap">The most the casino can pay</label><span class="val" id="cap-val"></span></div>
       <input type="range" id="cap" min="2" max="50" step="1" value="20">
     </div>
-    <p class="liveres" aria-live="polite">Average prize, and so a fair price: <b id="live"></b></p>
+    <p class="liveres" aria-live="polite">Average prize per game (the expected value): <b id="live"></b></p>
+    <p class="sub small">How much you would pay to play is up to you: someone who hates risk might pay $3, a thrill-seeker might pay more than the average. Neither is wrong.</p>
     <p class="liveres" id="psim" aria-live="polite"></p>
     <div class="btnrow"><button type="button" class="btn2" id="again">Run again: 10,000 new games</button><span class="sub small" id="run-n"></span></div>
   </section>
 </main>
 <footer>Built by Sam G · all vibe coded · found a problem? tell Sam. · <a href="../">All riddles</a></footer>
 
-<script src="../riddles.js?v=20261112-205453"></script>
+<script src="../riddles.js?v=20261112-205924"></script>
 <script>
 (function () {
   var $ = R.$;
@@ -252,17 +256,19 @@ only about 20 rows count, so a fair price is about $21.</div></details>
 
   function renderAnswer() {
     var g = guess.value == null ? 0 : guess.value;
-    var twos = S.flips.filter(function (k) { return k === 1; }).length;
-    R.compare($("cmp"), "$" + g, "Infinite on average");
+    R.compare($("cmp"), "$" + g + " a game", "No limit: it keeps climbing");
+    var before = S.avg[S.maxAt - 1], after = S.avg[S.maxAt];
     $("seen").innerHTML = "<div>You saw: <b></b></div><div></div>";
     $("seen").querySelector("b").textContent = desc.text(desc.value) || "nothing picked";
-    $("seen").children[1].textContent = (desc.value === 1 ? "Right. " : "Look again. ") +
-      R.fmtInt(twos) + " of the 10,000 games paid just $2. One paid " + money(S.max) + ", and that one game lifted the whole average.";
+    $("seen").children[1].textContent = (desc.value === 2 ? "Right. " : "Look again. ") +
+      "The average was about " + money(before) + " until game " + R.fmtInt(S.maxAt + 1) + " paid " + money(S.max) +
+      ". That one game lifted it to " + money(after) + ". After 10,000 games it was " + money(S.avg[GAMES - 1]) + ", and the next rare giant win would lift it again.";
     R.list($("why"), [
-      "Each row of the prize table adds $1 to the average prize, and the rows never stop. So the average is infinite.",
-      "But the giant prizes are so rare that you will almost never see one. Half of all games pay $2.",
-      "That is why sensible people only pay a few dollars, even though the maths says any price is a bargain.",
-      "Daniel Bernoulli's answer, in 1738: an extra dollar matters less to you the more money you already have. Economists call this diminishing marginal utility, and it explains why people avoid risk.",
+      "Each row of the prize table adds $1 to the average: half the games pay $2, a quarter pay $4, an eighth pay $8, and the rows never end.",
+      "So the more games you play, the bigger the rare prize that turns up, and the higher the average climbs. It never settles.",
+      "Here is the paradox: going by the average alone, the game is worth any price. Would you pay $100 for one game? Half of all games pay just $2. Most people would pay only a few dollars, and that is not a mistake.",
+      "Daniel Bernoulli's explanation, in 1738: an extra dollar matters less to you the more money you already have. Economists call this diminishing marginal utility. It is why people value a gamble at less than its average prize.",
+      "There is no single correct price. How much less depends on your taste for risk, so a careful saver and a thrill-seeker can both be reasonable.",
       "This puzzle is called the St Petersburg paradox."
     ]);
     R.markDone("stpetersburg", { guess: g });

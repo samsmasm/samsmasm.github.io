@@ -37,6 +37,12 @@ Watch styles: auto-playing (positive, birthday, streak, galton), played by hand 
 - Give students what they need to guess well (Top of the class now states the class average). Axes start at 0 for scores out of 100.
 - Pick seeds that land near the expected result, so one run cannot teach the wrong lesson (streak, regression).
 
+## Keep each riddle about one quantity (Sam, 2026-11-12)
+
+The question, the Describe options and the answer must all be about the same thing. Infinite money first asked "what would you pay?" (an opinion), described the running average, then answered "infinite": three different things. Now all three are about the average win per game, and "what would you pay" is the paradox inside the explanation.
+
+Never say "fair price" or claim one right amount to pay. The maths gives the expected value (the average prize); what someone should pay depends on their taste for risk, and different prices are reasonable. A test checks for "fair price".
+
 ## Free play reruns (Sam, 2026-11-12)
 
 Any free play built on a simulation gets a "Run again: <n> new <things>" button (`#again`), so students can rerun without refreshing. Where the count may not change visibly, show "Run N" (`#run-n`). Watch steps stay on fixed, typical seeds on purpose.
