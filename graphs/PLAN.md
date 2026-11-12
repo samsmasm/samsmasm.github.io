@@ -242,3 +242,12 @@ Decisions (Sam's answers):
 ### 2026-10-29: numbered axes built
 
 As above. Typing a new max that would give more than 50 steps picks a round step (0 to 100 by 1 becomes by 10), so the max can be typed first. 85 tests.
+
+### 2026-11-12: subscripts everywhere, Save / Save as…
+
+- **Subscripts in the title and axis titles:** `Q_1` → Q₁ as you type (strict rule, so "Q1 2024" stays). Digits typed after a subscript digit join it (`P_10` → P₁₀).
+- **Letter subscripts:** `P_M` draws a small, lowered M (Unicode has no capital subscripts), in every label, the titles and the legend.
+- **Drive buttons:** traditional Save and Save as…; only Save until the diagram has a file.
+- **Help dialog tried and dropped:** Sam found it repeated the Settings shortcuts and explained buttons that already say what they do. Subscripts are a row in the Settings shortcuts instead.
+- Still open (offered, not answered): loading a template or Clear diagram keeps the open Drive file, so Save would overwrite it with an unrelated diagram.
+- 88 tests.
