@@ -34,7 +34,7 @@ ibbm-src/
     pages/
       index.astro         ← homepage
       unit1/              ← 1-1 through 1-6, plus index
-      unit2/              ← 2-1, 2-2, 2-3, 2-4 (SL), 2-4-hl (HL), plus index
+      unit2/              ← 2-1, 2-2, 2-3, 2-4 (SL), 2-4-hl (HL), 2-5 (HL), plus index
       unit3/              ← 3-1 through 3-9 (+5-5 break-even), plus index
       unit4/              ← 4-1, 4-2, 4-3, 4-4, 4-5-{product,price,promotion,place,people,processes,physical}, 4-6, plus index
       unit5/              ← 5-1, 5-2, 5-3 (HL), 5-4, 5-6 (HL), 5-8 (HL), plus index (5.5 lives in unit3/)
@@ -116,7 +116,9 @@ Case studies are separate pages under `/casestudies/`.
 
 ## Current status
 
-Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.4), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.5–2.7, 5.7, 5.9 (no materials yet). Within 2.4, labour turnover, appraisal and recruitment are not on the site yet: Sam hasn't taught them. Don't fill them in until he gives materials.
+Built: Units 1, 3, 4 (all), Unit 2 (2.1–2.5), Unit 5 (5.1–5.4, 5.6, 5.8). Not built: 2.6–2.7, 5.7, 5.9 (no materials yet). Appraisal and recruitment are not on the site yet: Sam hasn't taught them. Don't fill them in until he gives materials. Labour turnover appears only as a 5.6 warm-up drill (from the HL deck), not yet in 2.1.
+
+2026-11-12: 2.5 HL (organisational culture) built from "IB BM HR HL.pptx" slides 79 to 91 + "IB BM HR or culture hand out_exercises.docx"; gods detail, ways to reduce a clash and Hofstede filled in and flagged. 5.6 got make or buy (crossover, operating leverage, FT AI article, drills, AI start-up case; case text invented to fit the figures, flagged) from slides 61 to 78. 2.4 SL got the training methods from the SL deck's diagrams (diagram PNGs not used: unconfirmed whether Sam made them).
 
 ## Splitting big sub-units
 
