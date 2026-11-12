@@ -1,6 +1,14 @@
 # Grill (graph drill), `/grill`
 
-Drills IB Economics government intervention diagrams: indirect tax, subsidy, price ceiling, price floor (2.7 in the 2027 guide: diagrams SL/HL, calculations HL only). No externalities yet. Built 2026-10-29 as a quick prototype for a class test a few days later; later plans are more micro graphs, then macro.
+Drills IB Economics government intervention diagrams: indirect tax, subsidy, price ceiling, price floor (2.7 in the 2027 guide: diagrams SL/HL, calculations HL only), and since 2026-11-12 the four externalities with their interventions (2.8). Built 2026-10-29 as a quick prototype for a class test a few days later; later plans are more micro graphs, then macro.
+
+## Externalities (added 2026-11-12, Sam's spec)
+- Home grid has two sections. Externality rows: negative/positive production/consumption (`negprod` `posprod` `negcons` `poscons`), plus an amber **All four mixed** row (pseudo-kind `ext`): it picks a random type each question and its cells show the four rows' scores added together. Scores are always recorded under the real type.
+- Each question picks an intervention (`sc.iv`) at random from `EXT_IVS[kind]` (`none` twice, so the plain market failure comes up most): neg prod: tax, partial tax, quota, regulation; pos prod: subsidy, partial subsidy; neg cons: tax, partial tax, quota, regulation, education; pos cons: subsidy, partial subsidy, direct provision, advertising. Sam ticked all of these.
+- Labels follow IBecon's graphs.md: production `MSB = D`, `MPC = S`, `MSC`; consumption `MPB = D`, `MSC = S`, `MSB`; points Pm/Qm (market), P*/Q* (optimum). Social curves are red. A full tax/subsidy on production lies exactly on MSC, so it is one line named MSC. Partial: `S + tax` with Qt, `S + subsidy` with Q2 (as the tax/subsidy drills). Regulation = rules that cut the harm per unit: MSC₁ → MSC₂ (or MSB₁ → MSB₂), Q*₁ → Q*₂, market stays at Qm (Sam's "regulations that can reduce the externality"). Quota = vertical line at Q*. Direct provision = `S₂` through D at Q*, price P₂. Education/advertising = MPB₁ → MPB₂ part of the way to MSB, new market P₂/Q₂ (as IBecon 2.8). Tradable permits, bans and compulsory-consumption laws are Effects questions only (no graph).
+- `genExt` keeps every labelled value and every corner of every shading area on a gridline inside the chart, and rejects markets whose label boxes touch (`labelsFit`, including the "Price, cost, benefit ($)" axis title box). HL calcs that match a shading area carry `concept`; a test checks the answer equals the area.
+- Code: `diagramExt`, `conceptsExt`, `effectsExt`, `calcsExt`, `lineCandsExt`, `labelWhyExt`, `contextExt`; the shared functions dispatch to these with `isExt(sc)`.
+- "Totally random", "Practise my weakest" and the skill column buttons cover all eight topics, so weakest will send students to untried externality boxes first.
 
 ## Files
 - `index.html`: the whole app (inline CSS/JS, SVG, no libraries).

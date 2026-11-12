@@ -7,13 +7,13 @@ const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 
-const KINDS = ['tax', 'subsidy', 'ceiling', 'floor'];
+const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons'];
 const KINDS_ = KINDS;
 
 test('generators always give whole-number, on-chart markets', async page => {
   const bad = await page.evaluate(() => {
     const out = [];
-    for (const k of ['tax', 'subsidy', 'ceiling', 'floor']) for (let i = 0; i < 300; i++) {
+    for (const k of Object.keys(KINDS)) for (let i = 0; i < 300; i++) {
       const sc = gen(k);
       const pts = diagram(sc).points;
       for (const p of pts) if (!isInt(p.x) || !isInt(p.y) || p.x <= 0 || p.x > GX || p.y <= 0 || p.y >= GY) out.push([k, p]);
@@ -32,7 +32,7 @@ test('label boxes never overlap (D leaving the chart at the ceiling price hid a 
     const out = [];
     const box = sl => { const rx = sl.anchor === 'start' ? sl.x - 2 : sl.anchor === 'end' ? sl.x - sl.w + 2 : sl.x - sl.w / 2; return [rx, sl.y - 15, rx + sl.w, sl.y + 7]; };
     const scs = [{ a: 10, b: 0.5, c: 0, d: 2, xe: 4, ye: 8, kind: 'ceiling', gap: 4, P: 4, qs: 2, qd: 12, next: null }];
-    for (const k of ['tax', 'subsidy', 'ceiling', 'floor']) for (let i = 0; i < 300; i++) scs.push(gen(k));
+    for (const k of Object.keys(KINDS)) for (let i = 0; i < 300; i++) scs.push(gen(k));
     for (const sc of scs) {
       const sl = labelSlots(sc).map(box);
       for (let i = 0; i < sl.length; i++) for (let j = i + 1; j < sl.length; j++) {
@@ -48,7 +48,7 @@ test('label boxes never overlap (D leaving the chart at the ceiling price hid a 
 test('every shading concept is a whole number of clickable areas', async page => {
   const bad = await page.evaluate(() => {
     const out = [];
-    for (const k of ['tax', 'subsidy', 'ceiling', 'floor']) for (let i = 0; i < 60; i++) {
+    for (const k of Object.keys(KINDS)) for (let i = 0; i < 60; i++) {
       const sc = gen(k), cells = buildCells(sc), C = conceptsFor(sc);
       for (const c in C) {
         const area = cells.filter(g => g.sig.includes(c)).reduce((s, g) => s + g.polys.reduce((t, p) => t + polyArea(p), 0), 0);
@@ -59,6 +59,54 @@ test('every shading concept is a whole number of clickable areas', async page =>
     return out.slice(0, 5);
   });
   assert(bad.length === 0, JSON.stringify(bad));
+});
+
+test('every externality intervention generates, draws and labels cleanly', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    for (const k of EXT_KINDS) for (const iv of new Set(EXT_IVS[k])) for (let i = 0; i < 40; i++) {
+      const sc = gen(k, iv), lc = lineCands(sc);
+      if (lc.cands.filter(c => c.ok).length !== 1 || lc.cands.length < 3) out.push([k, iv, 'draw cands', lc.cands.length]);
+      const names = labelSlots(sc).map(s => s.answer);
+      if (new Set(names).size !== names.length) out.push([k, iv, 'duplicate labels', names]);
+      for (const n of names) if (!/^[PQ]/.test(n) && n.length > 12) out.push([k, iv, 'long label', n]);
+      if (Object.keys(conceptsFor(sc)).length < 3) out.push([k, iv, 'too few shading areas']);
+      if (calcsFor(sc).length < 3 || effectsFor(sc).length < 4 || readsFor(sc).length < 3) out.push([k, iv, 'too few questions']);
+      if (!labelsFit(sc)) out.push([k, iv, 'labels']);
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
+test('externality welfare, revenue and external cost answers equal the shaded areas', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    for (const k of EXT_KINDS) for (const iv of new Set(EXT_IVS[k])) for (let i = 0; i < 40; i++) {
+      const sc = gen(k, iv), C = conceptsFor(sc);
+      for (const q of calcsFor(sc)) if (q.concept) {
+        const area = polyArea(C[q.concept].poly) * 10;   // x is quantity / 10
+        if (Math.abs(area - q.ans) > 1e-6) out.push([k, iv, q.q, area, q.ans]);
+      }
+      // a full tax or subsidy leaves the market exactly at the social optimum
+      if (iv === 'tax' || iv === 'sub') { const p = diagram(sc).points[1]; if (Math.abs(msbE(sc, p.x, sc.e) - mscE(sc, p.x, sc.e)) > 1e-9) out.push([k, iv, 'not at Q*']); }
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
+test('the mixed externality row picks all four types and shows their combined score', async page => {
+  const seen = await page.evaluate(() => {
+    const s = new Set();
+    startDrill('cell', 'ext', 'effects');
+    for (let i = 0; i < 60; i++) { s.add(Q.kind); newQuestion(); }
+    return [...s].sort();
+  });
+  assert(seen.join() === 'negcons,negprod,poscons,posprod', seen.join());
+  await page.evaluate(() => { store.scores['negprod.shade'] = [1, 1]; store.scores['poscons.shade'] = [0]; showHome(); });
+  const cell = await page.evaluate(() => document.querySelector('[aria-label="All four mixed Shade"]').textContent);
+  assert(cell === '2/3', cell);
 });
 
 test('calculation answers match the drawn diagram', async page => {
@@ -290,14 +338,14 @@ test('SL reads labelled values off the graph and never calculates; no equations 
   assert(t.includes('Read graph') && !t.includes('Calculate'), t);
   const qs = await page.evaluate(() => {
     const seen = [];
-    for (let i = 0; i < 40; i++) { startDrill('cell', ['tax', 'subsidy', 'ceiling', 'floor'][i % 4], 'calc'); Q.steps.forEach(s => seen.push(s.q)); }
+    for (let i = 0; i < 40; i++) { startDrill('cell', Object.keys(KINDS)[i % 8], 'calc'); Q.steps.forEach(s => seen.push(s.q)); }
     return { seen, eqs: document.getElementById('eqs').textContent };
   });
-  const bad = qs.seen.filter(q => !/^What is (P|Q)\w+\?$/.test(q));
+  const bad = qs.seen.filter(q => !/^What is (P|Q)[\w*₁₂]+\?$/.test(q));
   assert(!bad.length, bad.join(' | '));
   assert(!/Qd =|Qs =/.test(qs.eqs), qs.eqs);
-  for (let rep = 0; rep < 6; rep++) {
-    await page.evaluate(k => startDrill('cell', k, 'calc'), KINDS_[rep % 4]);
+  for (let rep = 0; rep < 8; rep++) {
+    await page.evaluate(k => startDrill('cell', k, 'calc'), KINDS_[rep % 8]);
     for (let j = 0; j < 3; j++) { const v = await answerRight(page); assert(v === 'Correct', v); await page.click('#next-btn'); }
   }
   await page.evaluate(() => setLevel('HL'));

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grill · graph drill</title>
-<meta name="description" content="Drill IB Economics government intervention diagrams: price ceilings, price floors, indirect taxes and subsidies.">
+<meta name="description" content="Drill IB Economics government intervention diagrams: price ceilings, price floors, indirect taxes, subsidies and the four kinds of externality.">
 <link rel="icon" href="logo.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,6 +66,10 @@
     font: 800 16px var(--sans); color: #b8a49c;
   }
   .grid button:hover { background: #ffd8a8; }
+  .grid th.sect { text-align: left; font-size: 15px; color: var(--orange); padding: 12px 2px 0; }
+  .grid .topicbtn.mix { background: var(--amber); color: var(--char); border-color: var(--char); }
+  .grid .topicbtn.mix:hover { background: #ffc94d; }
+  .grid button.mix { background: #ffe3a3; }
   .s-good { color: var(--good) !important; } .s-mid { color: var(--orange) !important; } .s-bad { color: var(--bad) !important; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .btn {
@@ -164,7 +168,7 @@
   <a href="./" onclick="showHome(); return false;"><img src="logo.jpg" alt="Grill"></a>
   <div class="brand">
     <div class="title" onclick="showHome()">Grill</div>
-    <div class="sub">Graph drill: government intervention</div>
+    <div class="sub">Graph drill: intervention and externalities</div>
   </div>
   <nav class="level" aria-label="Level">
     <button data-level="SL" onclick="setLevel('SL')">SL</button>
@@ -236,7 +240,9 @@ const money = v => '$' + fmt(v);
 const fmt = v => (Math.round(v * 100) / 100).toLocaleString('en-US');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor' };
+const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor',
+  negprod: 'Negative production externality', posprod: 'Positive production externality', negcons: 'Negative consumption externality', poscons: 'Positive consumption externality' };
+const PRICE_KINDS = ['tax', 'subsidy', 'ceiling', 'floor'];
 const SKILLS = { draw: 'Draw', label: 'Label', shade: 'Shade', effects: 'Effects', calc: 'Calculate' };
 const LS_KEY = 'grill_v1';
 
@@ -325,13 +331,143 @@ function genControl(kind) {
   }
 }
 function setControl(sc, P) { sc.P = P; sc.qs = Sx(sc, P); sc.qd = Dx(sc, P); }
-function gen(kind) {
+function gen(kind, iv) {
+  if (EXT_KINDS.includes(kind)) return genExt(kind, iv);
   return kind === 'tax' ? genTax() : kind === 'subsidy' ? genSubsidy() : genControl(kind);
+}
+
+// ---------- externalities ----------
+// Production: MSB = D, MPC = S, MSC = MPC ± e. Consumption: MPB = D, MSC = S, MSB = MPB ∓ e (labels as IBecon).
+// e is the external cost/benefit per unit, a constant vertical gap. sg = +1 negative externality, −1 positive.
+// Each question picks one intervention (iv) for its type. 'none' is the plain market failure diagram.
+const EXT_KINDS = ['negprod', 'posprod', 'negcons', 'poscons'];
+const isExt = sc => EXT_KINDS.includes(sc.kind);
+const EXT_IVS = {
+  negprod: ['none', 'none', 'tax', 'ptax', 'quota', 'reg'],
+  posprod: ['none', 'none', 'sub', 'psub'],
+  negcons: ['none', 'none', 'tax', 'ptax', 'quota', 'reg', 'edu'],
+  poscons: ['none', 'none', 'sub', 'psub', 'prov', 'adv'],
+};
+const IV_THE = { tax: 'the tax', ptax: 'the tax', sub: 'the subsidy', psub: 'the subsidy', quota: 'the quota', reg: 'the regulation', prov: 'direct provision', edu: 'the education campaign', adv: 'the advertising campaign' };
+const PARTIAL = ['ptax', 'psub', 'reg', 'edu', 'adv'];   // these move the market only part of the way to Q*
+const sgOf = sc => sc.neg ? 1 : -1;
+const mscE = (sc, x, e) => sc.prod ? Sy(sc, x) + sgOf(sc) * e : Sy(sc, x);
+const msbE = (sc, x, e) => sc.prod ? Dy(sc, x) : Dy(sc, x) - sgOf(sc) * e;
+const extNames = sc => sc.prod ? { D: 'MSB = D', S: 'MPC = S', soc: 'MSC', other: 'MSB', priv: 'MPC' } : { D: 'MPB = D', S: 'MSC = S', soc: 'MSB', other: 'MSC', priv: 'MPB' };
+const costWord = sc => sc.neg ? 'external cost' : 'external benefit';
+
+function genExt(kind, iv) {
+  for (let n = 0; ; n++) {
+    if (n > 50000) throw new Error('no market for ' + kind + ' ' + iv);
+    const m = baseMarket(), neg = kind.startsWith('neg'), prod = kind.endsWith('prod'), sg = neg ? 1 : -1;
+    const v = iv || pick(EXT_IVS[kind]);
+    const k = pick([1, 2, 3]), e = k * (m.b + m.d);
+    if (!isInt(e) || e > 6) continue;
+    const part = PARTIAL.includes(v);
+    if (part && k < 2) continue;
+    const j = part ? 1 + rnd(k - 1) : 0, e2 = j * (m.b + m.d);
+    if (!isInt(e2)) continue;
+    const sc = { ...m, kind, iv: v, neg, prod, e, e2, xm: m.xe, Pm: m.ye, xo: m.xe - sg * k, x2: m.xe - sg * j };
+    sc.Po = prod ? Dy(sc, sc.xo) : Sy(sc, sc.xo);
+    if (extOK(sc)) return sc;
+  }
+}
+// Every labelled value and every corner of every shading area must sit on a gridline inside the chart,
+// so SL can read them and HL can calculate from them; labels must not collide.
+function extOK(sc) {
+  const dg = diagramExt(sc), inBox = (x, y) => x >= 0 && x <= GX && y >= 0 && y <= GY;
+  if (dg.lines.some(l => !seg(l.line))) return false;
+  for (const p of dg.points) if (!isInt(p.x) || !isInt(p.y) || p.x <= 0 || p.x >= GX || p.y <= 0 || p.y >= GY) return false;
+  const pys = dg.points.filter(p => p.pn).map(p => p.y), qxs = dg.points.filter(p => p.qn).map(p => p.x);
+  if (new Set(pys).size < pys.length || new Set(qxs).size < qxs.length) return false;
+  for (const c of Object.values(conceptsExt(sc))) for (const [x, y] of c.poly) if (!isInt(x) || !isInt(y) || !inBox(x, y)) return false;
+  return labelsFit(sc);
+}
+
+function diagramExt(sc) {
+  const { a, b, c, d, e, e2, xm, xo, x2, Po } = sc, sg = sgOf(sc), N = extNames(sc);
+  const D = { line: fLine(a, -b), name: N.D }, S = { line: fLine(c, d), name: N.S };
+  const soc = (ee, name) => ({ line: sc.prod ? fLine(c + sg * ee, d) : fLine(a - sg * ee, -b), name: name || N.soc });
+  const m = { x: xm, y: sc.Pm, pn: 'Pm', qn: 'Qm' }, out = { annos: [] };
+  const withName = sc.iv === 'tax' || sc.iv === 'ptax' ? 'S + tax' : 'S + subsidy';
+  switch (sc.iv) {
+    case 'none':
+      out.lines = [D, S, soc(e)]; out.points = [m, { x: xo, y: Po, pn: 'P*', qn: 'Q*' }]; break;
+    case 'tax': case 'sub':
+      // production: the tax/subsidy equals e, so MPC + tax lies exactly on MSC (one line)
+      out.lines = sc.prod ? [D, S, soc(e)] : [D, S, soc(e), { line: fLine(c + sg * e, d), name: withName }];
+      out.points = [m, { x: xo, y: Dy(sc, xo), pn: 'Pc', qn: 'Q*' }, { x: xo, y: Sy(sc, xo), pn: 'Pp' }]; break;
+    case 'ptax': case 'psub':
+      out.lines = [D, S, soc(e), { line: fLine(c + sg * e2, d), name: withName }];
+      out.points = [m, { x: xo, y: Po, qn: 'Q*' }, { x: x2, y: Dy(sc, x2), pn: 'Pc', qn: sc.iv === 'ptax' ? 'Qt' : 'Q2' }, { x: x2, y: Sy(sc, x2), pn: 'Pp' }]; break;
+    case 'quota':
+      out.lines = [D, S, soc(e), { line: vLine(xo), name: 'Quota' }]; out.points = [m, { x: xo, y: Po, pn: 'P*', qn: 'Q*' }]; break;
+    case 'reg':
+      // the rule cuts the harm per unit: the social curve moves toward the private one
+      out.lines = [D, S, soc(e, N.soc + '₁'), soc(e2, N.soc + '₂')];
+      out.points = [m, { x: xo, y: Po, qn: 'Q*₁' }, { x: x2, y: sc.prod ? Dy(sc, x2) : Sy(sc, x2), qn: 'Q*₂' }]; break;
+    case 'prov':
+      out.lines = [D, S, soc(e), { line: fLine(Dy(sc, xo) - d * xo, d), name: 'S₂' }];
+      out.points = [m, { x: xo, y: Dy(sc, xo), pn: 'P₂', qn: 'Q*' }, { x: xo, y: Po }]; break;
+    case 'edu': case 'adv':
+      out.lines = [{ ...D, name: 'MPB₁' }, S, soc(e), { line: fLine(a - sg * e2, -b), name: 'MPB₂' }];
+      out.points = [m, { x: x2, y: Sy(sc, x2), pn: 'P₂', qn: 'Q₂' }, { x: xo, y: Po, qn: 'Q*' }]; break;
+  }
+  out.base = out.lines.slice(0, sc.iv === 'none' ? 2 : 3);   // what the Draw step starts from
+  return out;
+}
+
+function conceptsExt(sc) {
+  const { e, e2, xm, xo, x2, Po } = sc, C = {}, cw = costWord(sc), the = IV_THE[sc.iv], N = extNames(sc), iv = sc.iv;
+  const priv = x => sc.prod ? Sy(sc, x) : Dy(sc, x);
+  const socAt = (x, ee) => sc.prod ? mscE(sc, x, ee) : msbE(sc, x, ee);
+  const band = (q, ee) => [[0, priv(0)], [q, priv(q)], [q, socAt(q, ee)], [0, socAt(0, ee)]];
+  const tri = (q, ox, oy, ee) => [[ox, oy], [q, mscE(sc, q, ee)], [q, msbE(sc, q, ee)]];
+  const quad = (q1, q2, ee) => [[q1, mscE(sc, q1, ee)], [q1, msbE(sc, q1, ee)], [q2, msbE(sc, q2, ee)], [q2, mscE(sc, q2, ee)]];
+  const bandWhy = q => `The ${cw} per unit is the gap between ${N.priv} and ${N.soc}. Over ${q} units it is the band between them from 0 to ${q}.`;
+  const dwlWhy = sc.neg ? 'Units between Q* and Qm cost society more (MSC) than they are worth to it (MSB): the triangle between MSC and MSB.'
+    : 'Units between Qm and Q* are worth more to society (MSB) than they cost (MSC), but the market doesn’t make them: the triangle between MSB and MSC.';
+  const gov = q => {
+    const lo = Math.min(Dy(sc, q), Sy(sc, q)), hi = Math.max(Dy(sc, q), Sy(sc, q)), tax = iv === 'tax' || iv === 'ptax';
+    return { name: tax ? 'government tax revenue' : 'government spending on the subsidy', poly: [[0, lo], [q, lo], [q, hi], [0, hi]],
+      why: `${tax ? 'Tax' : 'Subsidy'} per unit (the gap between Pc and Pp) × the quantity: the rectangle between Pc and Pp.` };
+  };
+  const qNew = iv === 'ptax' ? 'Qt' : iv === 'psub' ? 'Q2' : 'Q₂';
+  if (iv === 'none') {
+    C.dwl = { name: 'the welfare (deadweight) loss', poly: tri(xm, xo, Po, e), why: dwlWhy };
+    C.ext = { name: `the total ${cw} at Qm`, poly: band(xm, e), why: bandWhy('Qm') };
+    C.ext_opt = { name: `the total ${cw} at Q*`, poly: band(xo, e), why: bandWhy('Q*') + (sc.neg ? ' Even the optimum has some: cutting it to zero would cost society more than it saves.' : '') };
+  } else if (['tax', 'sub', 'quota', 'prov'].includes(iv)) {
+    C.dwl = { name: `the welfare loss that ${the} removes`, poly: tri(xm, xo, Po, e), why: dwlWhy + ` With ${the} the market is at Q*, so this loss is gone.` };
+    if (iv === 'tax' || iv === 'sub') C.gov = gov(xo);
+    C.ext_before = { name: `the total ${cw} before ${the}`, poly: band(xm, e), why: bandWhy('Qm') };
+    C.ext_after = { name: `the total ${cw} after ${the}`, poly: band(xo, e), why: bandWhy('Q*') };
+  } else if (iv === 'ptax' || iv === 'psub') {
+    C.dwl = { name: `the welfare loss that remains after ${the}`, poly: tri(x2, xo, Po, e), why: `${'T' + the.slice(1)} is smaller than the ${cw}, so the market only gets to ${qNew}, not Q*. The triangle between MSC and MSB from ${qNew} to Q* is still lost.` };
+    C.dwl_before = { name: `the welfare loss before ${the}`, poly: tri(xm, xo, Po, e), why: dwlWhy };
+    C.gain = { name: `the welfare gained from ${the}`, poly: quad(xm, x2, e), why: `The part of the old welfare loss between Qm and ${qNew}: those units are now ${sc.neg ? 'not made' : 'made'}.` };
+    C.gov = gov(x2);
+    C.ext_before = { name: `the total ${cw} before ${the}`, poly: band(xm, e), why: bandWhy('Qm') };
+    C.ext_after = { name: `the total ${cw} after ${the}`, poly: band(x2, e), why: bandWhy(qNew) };
+  } else if (iv === 'reg') {
+    const P2o = sc.prod ? Dy(sc, x2) : Sy(sc, x2);
+    C.dwl = { name: 'the welfare loss after the regulation', poly: tri(xm, x2, P2o, e2), why: `The ${cw} per unit is smaller now (${N.soc}₂), so the triangle between ${N.soc}₂ and ${N.other} from Q*₂ to Qm is smaller.` };
+    C.dwl_before = { name: 'the welfare loss before the regulation', poly: tri(xm, xo, Po, e), why: dwlWhy.replace(/MSC|MSB/, m => m + '₁') };
+    C.gain = { name: 'the welfare gained from the regulation', poly: [[xo, Po], [xm, socAt(xm, e)], [xm, socAt(xm, e2)], [x2, P2o]], why: `The old welfare loss (with ${N.soc}₁) minus the new one (with ${N.soc}₂).` };
+    C.ext_before = { name: `the total ${cw} before the regulation`, poly: band(xm, e), why: bandWhy('Qm') };
+    C.ext_after = { name: `the total ${cw} after the regulation`, poly: band(xm, e2), why: `The market still makes Qm, but each unit does less harm: the band between ${N.priv} and ${N.soc}₂ from 0 to Qm.` };
+  } else {   // edu, adv: MPB moves part of the way toward MSB
+    C.dwl = { name: `the welfare loss that remains after ${the}`, poly: tri(x2, xo, Po, e), why: `The market moves from Qm to Q₂, but MPB₂ still isn’t MSB. The triangle between MSB and MSC from Q₂ to Q* is still lost.` };
+    C.dwl_before = { name: `the welfare loss before ${the}`, poly: tri(xm, xo, Po, e), why: dwlWhy };
+    C.gain = { name: `the welfare gained from ${the}`, poly: quad(xm, x2, e), why: 'The part of the old welfare loss between Qm and Q₂.' };
+  }
+  return C;
 }
 
 // ---------- the finished diagram ----------
 function diagram(sc) {
-  const D = { line: fLine(sc.a, -sc.b), name: 'D' }, S = { line: fLine(sc.c, sc.d), name: 'S' };
+  if (isExt(sc)) return diagramExt(sc);
+  const D ={ line: fLine(sc.a, -sc.b), name: 'D' }, S = { line: fLine(sc.c, sc.d), name: 'S' };
   const e = { x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' };
   if (sc.kind === 'tax') return {
     lines: [D, S, { line: fLine(sc.c + sc.t, sc.d), name: 'S + tax' }],
@@ -352,37 +488,52 @@ function diagram(sc) {
     annos: [{ x1: sc.qd, x2: sc.qs, y: sc.P, name: 'Surplus', below: false }]
   };
 }
-function baseLines(sc) { return diagram(sc).lines.slice(0, 2); }
+// the lines and point shown before a Draw step
+function drawBase(sc) {
+  if (isExt(sc)) return { lines: diagramExt(sc).base, pt: { x: sc.xm, y: sc.Pm, pn: 'Pm', qn: 'Qm' } };
+  return { lines: diagram(sc).lines.slice(0, 2), pt: { x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' } };
+}
 
-const slotWidth = name => name.length > 6 ? 92 : 40;
-// where a line's label goes (svg px)
+const slotWidth = name => name.length > 6 ? 92 : name.length > 4 ? 52 : 40;
+// a label box in svg px: [left, top, right, bottom]
+function slotBox(sl) {
+  const rx = sl.anchor === 'start' ? sl.x - 2 : sl.anchor === 'end' ? sl.x - sl.w + 2 : sl.x - sl.w / 2;
+  return [rx, sl.y - 15, rx + sl.w, sl.y + 7];
+}
+const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+const VIEW_W = 610, VIEW_H = 462;
+const EXT_AXIS_BOX = [2, 18, 150, 34];   // "Price, cost, benefit ($)" above the price axis
+// where a line's label goes (svg px). Labels that would touch slide along their line (up for
+// rising lines and the top edge, down for falling ones) until clear; horizontal lines stay put.
 function labelSpots(lines) {
-  const tops = [];
   const spots = lines.map(l => {
-    const s = seg(l.line); const [x, y] = s[1];
-    if (l.line.t === 'h') return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start', fixed: true };
-    if (Math.abs(y - GY) < 1e-6 && x < GX - 1e-6) {
-      // stack top labels only when their boxes would touch
-      const half = slotWidth(l.name) / 2, p = { x: X(x), y: Y(GY) - 8, anchor: 'middle', half };
-      while (tops.some(q => Math.abs(q.x - p.x) < q.half + half + 4 && Math.abs(q.y - p.y) < 24)) p.y -= 24;
-      tops.push(p); return p;
-    }
-    if (Math.abs(x - GX) < 1e-6) return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start', dir: l.line.m < 0 ? 1 : -1 };
-    return { x: X(x) + 6, y: Y(y) - 6, anchor: 'start' };
+    const s = seg(l.line); const [x, y] = s[1], w = slotWidth(l.name);
+    if (l.line.t === 'h') return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start', w, fixed: true };
+    if (Math.abs(y - GY) < 1e-6 && x < GX - 1e-6) return { x: X(x), y: Y(GY) - 8, anchor: 'middle', w, dir: -1 };
+    if (Math.abs(x - GX) < 1e-6) return { x: X(GX) + 6, y: Y(y) + 4, anchor: 'start', w, dir: l.line.m < 0 ? 1 : -1 };
+    return { x: X(x) + 6, y: Y(y) - 6, anchor: 'start', w, dir: -1 };
   });
-  // right-edge labels can land on the same spot (D leaving the chart at the ceiling price):
-  // slide a sloped line's label along its own direction until its box is clear
-  const edge = spots.filter(p => p.anchor === 'start' && p.x === X(GX) + 6);
-  const placed = edge.filter(p => p.fixed);
-  for (const p of edge.filter(p => !p.fixed)) {
-    while (placed.some(q => Math.abs(q.y - p.y) < 24)) p.y += 24 * p.dir;
-    placed.push(p);
+  const placed = spots.filter(p => p.fixed).map(slotBox);
+  for (const p of spots.filter(p => !p.fixed)) {
+    for (let n = 0; n < 6 && placed.some(b => overlaps(b, slotBox(p))); n++) p.y += 24 * p.dir;
+    placed.push(slotBox(p));
   }
   return spots.map(({ x, y, anchor }) => ({ x, y, anchor }));
 }
+// generated markets are rejected if any two label boxes touch or one leaves the chart
+function labelsFit(sc) {
+  const boxes = labelSlots(sc).map(slotBox);
+  if (isExt(sc)) boxes.push(EXT_AXIS_BOX);
+  for (let i = 0; i < boxes.length; i++) {
+    const b = boxes[i];
+    if (b[0] < 0 || b[1] < 0 || b[2] > VIEW_W || b[3] > VIEW_H) return false;
+    for (let j = i + 1; j < boxes.length; j++) if (overlaps(b, boxes[j])) return false;
+  }
+  return true;
+}
 
 // ---------- svg drawing ----------
-function svgAxes(ticks) {
+function svgAxes(ticks, ext) {
   let s = '';
   for (let i = 1; i <= GX; i++) s += `<line x1="${X(i)}" y1="${Y(0)}" x2="${X(i)}" y2="${Y(GY)}" stroke="#f7ece7"/>`;
   for (let j = 1; j <= GY; j++) s += `<line x1="${X(0)}" y1="${Y(j)}" x2="${X(GX)}" y2="${Y(j)}" stroke="#f7ece7"/>`;
@@ -392,7 +543,8 @@ function svgAxes(ticks) {
   }
   s += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(GX) + 4}" y2="${Y(0)}" stroke="#222" stroke-width="1.6"/>`;
   s += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(GY) - 4}" stroke="#222" stroke-width="1.6"/>`;
-  s += `<text x="${X(0) - 4}" y="${Y(GY) - 12}" font-size="12" fill="#555" text-anchor="end">Price ($)</text>`;
+  s += ext ? `<text x="${EXT_AXIS_BOX[0] + 2}" y="${EXT_AXIS_BOX[3] - 4}" font-size="12" fill="#555">Price, cost, benefit ($)</text>`
+    : `<text x="${X(0) - 4}" y="${Y(GY) - 12}" font-size="12" fill="#555" text-anchor="end">Price ($)</text>`;
   s += `<text x="${X(GX)}" y="${OY + 58}" font-size="12" fill="#555" text-anchor="end">Quantity (units)</text>`;
   return s;
 }
@@ -400,8 +552,9 @@ function svgLine(L, attrs) {
   const s = seg(L); if (!s) return '';
   return `<line x1="${X(s[0][0])}" y1="${Y(s[0][1])}" x2="${X(s[1][0])}" y2="${Y(s[1][1])}" ${attrs}/>`;
 }
-const LINE_COL = { 'D': '#1d4e89', 'S': '#e8590c' };
-function lineColour(name) { return LINE_COL[name] || '#111'; }
+// demand-side private curves blue, supply-side orange, social curves red (as IBecon), interventions black
+const LINE_COL = { 'D': '#1d4e89', 'MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
+function lineColour(name) { return LINE_COL[name] || (/^MS[BC][₁₂]?$/.test(name) ? '#c0281b' : '#111'); }
 
 // Draws the finished diagram. opts: labels (true | 'slots'), ticks, slotState
 function svgDiagram(sc, opts) {
@@ -496,6 +649,7 @@ function buildCells(sc) {
 
 // Each concept: name, polygon in grid units, explanation
 function conceptsFor(sc) {
+  if (isExt(sc)) return conceptsExt(sc);
   const { a, c, xe, ye } = sc, C = {};
   const csB = [[0, a], [0, ye], [xe, ye]], psB = [[0, c], [0, ye], [xe, ye]];
   if (sc.kind === 'tax') {
@@ -546,6 +700,7 @@ function conceptsFor(sc) {
 // ---------- effects (multiple choice) ----------
 const UDN = ['Rises', 'Falls', 'No change'];
 function effectsFor(sc) {
+  if (isExt(sc)) return effectsExt(sc);
   const L = [];
   if (sc.kind === 'tax') {
     const cs = sc.Pc - sc.ye, ps = sc.ye - sc.Pp;
@@ -621,6 +776,7 @@ function effectsFor(sc) {
 // ---------- calculations (HL) ----------
 // Read off the graph only: the 2027 guide doesn't use demand/supply functions, so none are shown.
 function calcsFor(sc) {
+  if (isExt(sc)) return calcsExt(sc);
   const Qe = sc.xe * 10, L = [];
   if (sc.kind === 'tax') {
     const Qt = sc.xt * 10, t = sc.t;
@@ -669,11 +825,183 @@ function calcsFor(sc) {
   return L.map(([q, ans, unit, why]) => ({ q, ans, unit, why }));
 }
 
+// ---------- externalities: effects, calculations, drawing, explanations ----------
+function effectsExt(sc) {
+  const L = [], cw = costWord(sc), N = extNames(sc), iv = sc.iv, neg = sc.neg;
+  const amt = sc.prod ? ['Overproduces', 'Underproduces', 'Produces the socially optimal amount'] : ['Overconsumes', 'Underconsumes', 'Consumes the socially optimal amount'];
+  const taxy = iv === 'tax' || iv === 'ptax', thing = taxy ? 'tax' : 'subsidy';
+  if (iv === 'none') {
+    L.push(['Compared with the social optimum, the market...', amt, amt[neg ? 0 : 1], neg ? 'Qm > Q*: buyers and sellers ignore the external cost, so too much is traded.' : 'Qm < Q*: buyers and sellers ignore the external benefit, so too little is traded.']);
+    L.push(['At Qm, how does MSB compare with MSC?', ['MSC > MSB', 'MSB > MSC', 'They are equal'], neg ? 'MSC > MSB' : 'MSB > MSC', neg ? 'The last units traded cost society more than they are worth to it.' : 'One more unit would be worth more to society than it costs.']);
+    L.push(['Where does the market settle?', ['Where MPC = MPB', 'Where MSC = MSB', 'Where MSC = MPB'], 'Where MPC = MPB', 'Buyers and sellers only weigh their own (private) costs and benefits, so the market stops at Qm.']);
+    L.push(['Is the market allocatively efficient at Qm?', ['No', 'Yes'], 'No', 'Allocative efficiency needs MSB = MSC, which only happens at Q*.']);
+    if (sc.prod && neg) L.push(['Why is MSC above MPC?', ['Production imposes costs on third parties', 'Firms pay taxes on their output', 'Consumers value the good more than it costs'], 'Production imposes costs on third parties', 'E.g. people downstream of a polluting factory bear costs the firm doesn’t pay.']);
+    if (sc.prod && !neg) L.push(['Why is MSC below MPC?', ['Production creates benefits for third parties', 'Firms get a subsidy', 'Costs fall as firms grow'], 'Production creates benefits for third parties', 'E.g. a firm trains workers who later work elsewhere: society’s cost is lower than the firm’s.']);
+    if (!sc.prod && neg) L.push(['Why is MSB below MPB?', ['Consumption harms third parties', 'Consumers enjoy it less than they expected', 'The price is too high'], 'Consumption harms third parties', 'E.g. second-hand smoke: the smoker gains more than society does.']);
+    if (!sc.prod && !neg) L.push(['Why is MSB above MPB?', ['Consumption benefits third parties', 'Consumers enjoy it more than they expected', 'The price is too low'], 'Consumption benefits third parties', 'E.g. a vaccinated person also protects the people around them.']);
+    const ex = { negprod: 'A factory polluting a river', posprod: 'A firm’s research that other firms can use', negcons: 'Playing loud music late at night', poscons: 'Getting vaccinated' };
+    L.push([`Which is ${neg ? 'a negative' : 'a positive'} ${sc.prod ? 'production' : 'consumption'} externality?`, shuffle(Object.values(ex)).filter(x => x !== ex[sc.kind]).slice(0, 2).concat(ex[sc.kind]), ex[sc.kind], `${ex[sc.kind]}: the ${cw} falls on third parties when the good is ${sc.prod ? 'produced' : 'consumed'}.`, true]);
+    L.push(['Which policy would move this market toward Q*?', neg ? ['A tax on the good', 'A subsidy for the good', 'A maximum price'] : ['A subsidy for the good', 'A tax on the good', 'A minimum price'], neg ? 'A tax on the good' : 'A subsidy for the good', neg ? 'A tax raises the price and cuts the quantity toward Q*.' : 'A subsidy lowers the price and raises the quantity toward Q*.']);
+  } else if (iv === 'tax' || iv === 'sub') {
+    L.push(['What happens to the quantity?', UDN, neg ? 'Falls' : 'Rises', `It ${neg ? 'falls' : 'rises'} from Qm to Q*, the social optimum.`]);
+    L.push([`The ${thing} per unit is set equal to...`, [`The ${cw} per unit`, 'The market price', 'The price consumers pay'], `The ${cw} per unit`, 'Then the market pays (or gets) the full social cost (or benefit): the externality is internalised.']);
+    L.push([`After the ${thing}, is there still a welfare loss?`, ['No: the externality is fully internalised', 'Yes, but a smaller one', 'Yes, a bigger one'], 'No: the externality is fully internalised', 'The market is now at Q*, where MSC = MSB.']);
+    L.push(['What happens to the price consumers pay?', UDN, neg ? 'Rises' : 'Falls', neg ? 'Supply shifts up, so consumers pay Pc, above Pm.' : 'Supply shifts down, so consumers pay Pc, below Pm.']);
+    if (neg) L.push(['What is the hardest part of setting this tax?', ['Putting a money value on the external cost', 'Collecting the revenue', 'Finding the market price'], 'Putting a money value on the external cost', 'If the tax is too small or too big, the market misses Q*.']);
+    else L.push(['Which is a drawback of the subsidy?', ['Opportunity cost: the money can’t be spent elsewhere', 'It raises the price', 'It cuts output'], 'Opportunity cost: the money can’t be spent elsewhere', 'Government spending = subsidy × Q*, which could have gone on something else.']);
+    L.push([neg ? 'What happens to government revenue?' : 'What happens to government spending?', UDN, 'Rises', neg ? 'It collects the tax on every unit: tax × Q*.' : 'It pays the subsidy on every unit: subsidy × Q*.']);
+  } else if (taxy || iv === 'psub') {
+    L.push([`Does this ${thing} fully internalise the externality?`, [`No: it is smaller than the ${cw}`, 'Yes', `No: it is bigger than the ${cw}`], `No: it is smaller than the ${cw}`, `A ${thing} equal to the ${cw} per unit would take the market all the way to Q*.`]);
+    L.push(['What happens to the welfare loss?', ['It gets smaller', 'It disappears', 'It gets bigger'], 'It gets smaller', `The quantity moves from Qm toward Q*, but stops at ${taxy ? 'Qt' : 'Q2'}.`]);
+    L.push([`Where is the new quantity ${taxy ? 'Qt' : 'Q2'}?`, ['Between Q* and Qm', 'Exactly at Q*', neg ? 'Above Qm' : 'Below Qm'], 'Between Q* and Qm', `The ${thing} only covers part of the ${cw}.`]);
+    L.push([`What ${thing} would fully internalise the externality?`, [`One equal to the ${cw} per unit`, 'One equal to the market price', `Any ${thing} at all`], `One equal to the ${cw} per unit`, `Then the curve with the ${thing} meets ${sc.prod ? 'MSB' : 'MPB'} exactly at Q*.`]);
+    L.push(['What happens to the quantity?', UDN, neg ? 'Falls' : 'Rises', `From Qm to ${taxy ? 'Qt' : 'Q2'}.`]);
+  } else if (iv === 'quota') {
+    L.push(['Where should the quota be set?', ['At Q*', 'At Qm', 'Above Qm'], 'At Q*', 'Q* is where MSC = MSB.']);
+    L.push(['What happens to the price consumers pay?', UDN, 'Rises', 'Less is available, so consumers pay what MPB shows at Q*.']);
+    L.push(['If the quota is set at Q*, what happens to the welfare loss?', ['It disappears', 'It gets bigger', 'No change'], 'It disappears', 'The market can’t go past Q*, where MSC = MSB.']);
+    L.push(['Which is a drawback of a quota?', ['It must be enforced, and can lead to black markets', 'It raises tax revenue', 'It raises output'], 'It must be enforced, and can lead to black markets', 'Firms or buyers who want more than the quota may break the rules.']);
+    if (sc.prod) L.push(['Tradable permits (cap and trade): what does the government fix?', ['The total amount of pollution allowed', 'The price of the good', 'The number of firms'], 'The total amount of pollution allowed', 'The cap is a quota on pollution. Firms that can cut pollution cheaply sell their spare permits to firms that can’t.', true]);
+    else L.push(['A complete ban on the good sets the quantity to...', ['Zero', 'Q*', 'Qm'], 'Zero', 'A ban goes further than Q*: it also removes the private benefit, so it only makes sense when the harm is very large.', true]);
+  } else if (iv === 'reg') {
+    L.push(['What does the regulation change on the graph?', sc.prod ? ['MSC moves closer to MPC', 'MPC moves up', 'MSB moves down'] : ['MSB moves closer to MPB', 'MPB moves down', 'MSC moves up'], sc.prod ? 'MSC moves closer to MPC' : 'MSB moves closer to MPB', `It cuts the ${cw} per unit, so the gap shrinks.`]);
+    L.push(['What happens to the welfare loss?', ['It gets smaller', 'It disappears', 'It gets bigger'], 'It gets smaller', 'The gap between MSC and MSB at Qm is smaller, and Q* moves closer to Qm.']);
+    L.push(['What happens to the socially optimal quantity?', UDN, 'Rises', 'With less harm per unit, more of the good is worth having: Q*₁ moves to Q*₂.']);
+    L.push(['Which is an example of this kind of regulation?', sc.prod ? ['Requiring factories to fit pollution filters', 'A tax on petrol', 'A subsidy for buses'] : ['Banning smoking in indoor public places', 'A tax on cigarettes', 'Free vaccinations'], sc.prod ? 'Requiring factories to fit pollution filters' : 'Banning smoking in indoor public places', 'It cuts the harm each unit does, rather than putting a price on it.']);
+    L.push(['Which is a drawback of regulation?', ['Checking and enforcing it costs money', 'It raises tax revenue', 'It always cuts output to zero'], 'Checking and enforcing it costs money', 'Inspectors, fines and courts all cost the government money.']);
+  } else if (iv === 'prov') {
+    L.push(['What happens to the quantity?', UDN, 'Rises', 'The government adds its own supply: S shifts right to S₂ and the quantity rises to Q*.']);
+    L.push(['What happens on the graph?', ['Supply shifts right', 'Demand shifts right', 'MSB shifts down'], 'Supply shifts right', 'More is supplied at every price.']);
+    L.push(['What happens to the price consumers pay?', UDN, 'Falls', 'More supply: the price falls from Pm to P₂ (some things, like state schools, are free).']);
+    L.push(['Who pays for direct provision?', ['Taxpayers', 'Only the people who use it', 'Private producers'], 'Taxpayers', 'It is paid for out of government spending, which has an opportunity cost.']);
+    L.push(['Which is an example of direct provision?', ['State schools and public hospitals', 'Rent control', 'A carbon tax'], 'State schools and public hospitals', 'The government supplies the good itself, often free.', true]);
+    L.push(['A law makes vaccination compulsory. What happens to consumption?', ['It rises toward Q*', 'It falls', 'No change'], 'It rises toward Q*', 'Legislation can force consumption up to the social optimum, but it costs money to enforce and limits personal freedom.', true]);
+  } else {   // edu, adv
+    const up = iv === 'adv';
+    L.push([`What does the ${up ? 'advertising' : 'education'} campaign shift?`, [`MPB, ${up ? 'up' : 'down'} toward MSB`, `MSC, ${up ? 'down' : 'up'}`, `MSB, ${up ? 'up' : 'down'}`], `MPB, ${up ? 'up' : 'down'} toward MSB`, up ? 'People learn about the benefits, so they value the good more.' : 'People learn about the harm, so they value the good less.']);
+    L.push(['What happens to the quantity?', UDN, up ? 'Rises' : 'Falls', 'From Qm to Q₂.']);
+    L.push(['What happens to the price?', UDN, up ? 'Rises' : 'Falls', `Demand ${up ? 'rises' : 'falls'}, so the price moves from Pm to P₂.`]);
+    L.push(['Is the welfare loss removed?', [`Not fully: MPB₂ is still ${up ? 'below' : 'above'} MSB`, 'Yes, completely', 'No: it gets bigger'], `Not fully: MPB₂ is still ${up ? 'below' : 'above'} MSB`, 'The market moves to Q₂, part of the way to Q*.']);
+    L.push(['Which is a drawback of a campaign like this?', ['It is slow and its effect is uncertain', 'It raises the price for everyone', 'It creates a shortage'], 'It is slow and its effect is uncertain', 'Changing what people value takes time, and some people ignore it.']);
+  }
+  return L.map(([q, opts, ans, why, noGraph]) => ({ q, opts, ans, why, noGraph: !!noGraph }));
+}
+
+function calcsExt(sc) {
+  const { e, e2, xm, xo, x2, iv } = sc, cw = costWord(sc), L = [];
+  const Qm = xm * 10, Qo = xo * 10, Q2 = x2 * 10, gap = Math.abs(Qm - Qo), dwl0 = 0.5 * e * gap;
+  const dwlLine = `½ × ${money(e)} (the gap between MSC and MSB at Qm) × ${gap} (between Q* and Qm) = ${money(dwl0)}.`;
+  const tn = iv === 'ptax' ? 'Qt' : iv === 'psub' ? 'Q2' : 'Q₂';
+  if (iv === 'none') {
+    L.push(['Calculate the welfare (deadweight) loss.', dwl0, '$', dwlLine, 'dwl']);
+    L.push([`Calculate the total ${cw} at Qm.`, e * Qm, '$', `${money(e)} per unit × Qm (${Qm}) = ${money(e * Qm)}.`, 'ext']);
+    L.push([`By how many units does the market ${sc.neg ? 'over' : 'under'}${sc.prod ? 'produce' : 'consume'}?`, gap, 'units', `The gap between Qm (${Qm}) and Q* (${Qo}): ${gap} units.`]);
+    L.push([`Calculate the total ${cw} at Q*.`, e * Qo, '$', `${money(e)} per unit × Q* (${Qo}) = ${money(e * Qo)}.`, 'ext_opt']);
+  } else if (iv === 'tax' || iv === 'sub') {
+    const tax = iv === 'tax';
+    L.push([tax ? 'Calculate government tax revenue.' : 'Calculate government spending on the subsidy.', e * Qo, '$', `${money(e)} per unit × Q* (${Qo}) = ${money(e * Qo)}.`, 'gov']);
+    L.push([`Calculate the welfare loss that the ${tax ? 'tax' : 'subsidy'} removes.`, dwl0, '$', dwlLine, 'dwl']);
+    L.push([`By how much does the price consumers pay ${tax ? 'rise' : 'fall'}?`, Math.abs(Dy(sc, xo) - sc.Pm), '$', `Pc − Pm: ${money(Dy(sc, xo))} and ${money(sc.Pm)}, a difference of ${money(Math.abs(Dy(sc, xo) - sc.Pm))}.`]);
+    L.push([`By how many units does the quantity ${tax ? 'fall' : 'rise'}?`, gap, 'units', `From Qm (${Qm}) to Q* (${Qo}): ${gap} units.`]);
+  } else if (iv === 'ptax' || iv === 'psub') {
+    const tax = iv === 'ptax', left = 0.5 * (e - e2) * Math.abs(Q2 - Qo);
+    L.push([tax ? 'Calculate government tax revenue.' : 'Calculate government spending on the subsidy.', e2 * Q2, '$', `${money(e2)} per unit × ${tn} (${Q2}) = ${money(e2 * Q2)}.`, 'gov']);
+    L.push(['Calculate the welfare loss that remains.', left, '$', `At ${tn} the gap between MSC and MSB is ${money(e)} − ${money(e2)} = ${money(e - e2)}. ½ × ${money(e - e2)} × ${Math.abs(Q2 - Qo)} (between ${tn} and Q*) = ${money(left)}.`, 'dwl']);
+    L.push([`Calculate the welfare gained from the ${tax ? 'tax' : 'subsidy'}.`, dwl0 - left, '$', `Loss before: ${dwlLine.replace(/\.$/, '')}. Loss now: ${money(left)}. Gain: ${money(dwl0 - left)}.`, 'gain']);
+    L.push([`How much more ${tax ? 'tax' : 'subsidy'} per unit would fully internalise the externality?`, e - e2, '$', `The ${cw} is ${money(e)} per unit; the ${tax ? 'tax' : 'subsidy'} is ${money(e2)}. ${money(e - e2)} more.`]);
+  } else if (iv === 'quota') {
+    L.push(['Calculate the welfare loss that the quota removes.', dwl0, '$', dwlLine, 'dwl']);
+    L.push(['By how many units does the quota cut the quantity?', gap, 'units', `From Qm (${Qm}) to Q* (${Qo}): ${gap} units.`]);
+    L.push([`By how much does the total ${cw} fall?`, e * gap, '$', `${money(e)} per unit × ${gap} fewer units = ${money(e * gap)}.`]);
+  } else if (iv === 'reg') {
+    const left = 0.5 * e2 * (Qm - Q2);
+    L.push(['Calculate the welfare loss before the regulation.', dwl0, '$', dwlLine, 'dwl_before']);
+    L.push(['Calculate the welfare loss after the regulation.', left, '$', `½ × ${money(e2)} (the new gap at Qm) × ${Qm - Q2} (between Q*₂ and Qm) = ${money(left)}.`, 'dwl']);
+    L.push(['Calculate the welfare gained from the regulation.', dwl0 - left, '$', `${money(dwl0)} before − ${money(left)} after = ${money(dwl0 - left)}.`, 'gain']);
+    L.push([`By how much does the total ${cw} fall?`, (e - e2) * Qm, '$', `The ${cw} per unit falls from ${money(e)} to ${money(e2)} on all ${Qm} units: ${money(e - e2)} × ${Qm} = ${money((e - e2) * Qm)}.`]);
+  } else if (iv === 'prov') {
+    L.push(['Calculate the welfare loss that direct provision removes.', dwl0, '$', dwlLine, 'dwl']);
+    L.push(['By how many units does the quantity rise?', gap, 'units', `From Qm (${Qm}) to Q* (${Qo}): ${gap} units.`]);
+    L.push(['By how much does the price fall?', sc.Pm - Dy(sc, xo), '$', `From Pm (${money(sc.Pm)}) to P₂ (${money(Dy(sc, xo))}): ${money(sc.Pm - Dy(sc, xo))}.`]);
+  } else {
+    const left = 0.5 * (e - e2) * Math.abs(Q2 - Qo);
+    L.push([`Calculate the welfare loss before the campaign.`, dwl0, '$', dwlLine, 'dwl_before']);
+    L.push(['Calculate the welfare loss that remains.', left, '$', `At Q₂ the gap between MSB and MSC is ${money(e - e2)}. ½ × ${money(e - e2)} × ${Math.abs(Q2 - Qo)} (between Q₂ and Q*) = ${money(left)}.`, 'dwl']);
+    L.push(['Calculate the welfare gained from the campaign.', dwl0 - left, '$', `${money(dwl0)} before − ${money(left)} after = ${money(dwl0 - left)}.`, 'gain']);
+    L.push([`By how many units does the quantity ${iv === 'adv' ? 'rise' : 'fall'}?`, Math.abs(Qm - Q2), 'units', `From Qm (${Qm}) to Q₂ (${Q2}): ${Math.abs(Qm - Q2)} units.`]);
+  }
+  return L.map(([q, ans, unit, why, concept]) => ({ q, ans, unit, why, concept }));
+}
+
+function contextExt(sc) {
+  let s = `${sc.neg ? 'External cost' : 'External benefit'} ${money(sc.e)} per unit`;
+  const add = { tax: `, tax ${money(sc.e)} per unit`, ptax: `, tax ${money(sc.e2)} per unit`, sub: `, subsidy ${money(sc.e)} per unit`, psub: `, subsidy ${money(sc.e2)} per unit`,
+    quota: ', quota at Q*', reg: `, regulation cuts it to ${money(sc.e2)}`, prov: ', government provides it', edu: `, education cuts MPB by ${money(sc.e2)}`, adv: `, advertising raises MPB by ${money(sc.e2)}` };
+  return s + (add[sc.iv] || '');
+}
+
+function lineCandsExt(sc) {
+  const { a, b, c, d, e, e2, xm, xo, iv } = sc, sg = sgOf(sc), N = extNames(sc);
+  const Sf = k => fLine(k, d), Df = k => fLine(k, -b);
+  let ok, decoys, prompt, why;
+  if (iv === 'none') {
+    ok = sc.prod ? Sf(c + sg * e) : Df(a - sg * e);
+    decoys = sc.prod ? [Sf(c - sg * e), Df(a + e), Df(a - e)] : [Df(a + sg * e), Sf(c + e), Sf(c - e)];
+    prompt = `${sc.prod ? 'Production' : 'Consumption'} creates an ${costWord(sc)} of ${money(e)} per unit. Tap the ${N.soc} curve.`;
+    why = `${N.soc} = ${N.priv} ${sc.prod === sc.neg ? '+' : '−'} ${money(e)} at every quantity, so it sits ${money(e)} ${sc.prod === sc.neg ? 'above' : 'below'} ${N.priv}, parallel to it.`;
+  } else if (['tax', 'ptax', 'sub', 'psub'].includes(iv)) {
+    const tax = iv === 'tax' || iv === 'ptax', t = iv === 'tax' || iv === 'sub' ? e : e2, dir = tax ? 1 : -1;
+    ok = Sf(c + dir * t); decoys = [Sf(c - dir * t), Df(a + dir * t), Df(a - dir * t)];
+    if (t < e) decoys.push(Sf(c + dir * e));
+    prompt = t === e ? `The government ${tax ? 'taxes producers' : 'gives producers a subsidy'} equal to the ${costWord(sc)}: ${money(t)} per unit. Tap the new supply curve.`
+      : `The government ${tax ? 'taxes producers' : 'gives producers a subsidy of'} ${money(t)} per unit. Tap the new supply curve.`;
+    why = `The ${tax ? 'tax adds' : 'subsidy takes'} ${money(t)} ${tax ? 'to' : 'off'} the cost of every unit, so supply shifts ${tax ? 'up' : 'down'} by ${money(t)}, parallel to ${N.S.split(' ')[0]}.` + (t === e && sc.prod ? ' It lands exactly on MSC.' : '');
+  } else if (iv === 'quota') {
+    ok = vLine(xo); decoys = [vLine(xm), vLine(xm + (xm - xo)), hLine(sc.Po)];
+    prompt = `The government limits ${sc.prod ? 'output' : 'consumption'} to the socially optimal quantity. Tap the quota.`;
+    why = 'A quota is a vertical line: no more than Q* can be sold. Q* is where MSC = MSB.';
+  } else if (iv === 'reg') {
+    ok = sc.prod ? Sf(c + e2) : Df(a - e2);
+    decoys = sc.prod ? [Sf(c + 2 * e - e2), Sf(c - e2), Df(a - e2)] : [Df(a - 2 * e + e2), Df(a + e2), Sf(c + e2)];
+    prompt = `New rules cut the ${costWord(sc)} to ${money(e2)} per unit. Tap the new ${N.soc} curve.`;
+    why = `${N.soc} is now ${money(e2)} ${sc.prod ? 'above MPC' : 'below MPB'}: closer to it than before.`;
+  } else if (iv === 'prov') {
+    const c2 = Dy(sc, xo) - d * xo;
+    ok = Sf(c2); decoys = [Sf(c + (c - c2)), Df(a + (c - c2)), Df(a - (c - c2))];
+    prompt = 'The government provides extra units itself, free or cheap. Tap the new supply curve.';
+    why = 'Government supply adds to private supply, so S shifts right (down), parallel. It meets demand at Q*.';
+  } else {
+    const up = iv === 'adv';
+    ok = Df(a - sg * e2); decoys = [Df(a + sg * e2), Sf(c - sg * e2), Sf(c + sg * e2)];
+    prompt = `${up ? 'An advertising campaign raises' : 'An education campaign cuts'} the private benefit by ${money(e2)} per unit. Tap the new MPB curve.`;
+    why = `MPB shifts ${up ? 'up' : 'down'} by ${money(e2)}, parallel: part of the way toward MSB.`;
+  }
+  // drop decoys that are off the chart, repeat another line, or sit on a line already drawn
+  const key = L => JSON.stringify(L), seen = new Set(drawBase(sc).lines.map(l => key(l.line)).concat(key(ok)));
+  const cands = [{ line: ok, ok: true }];
+  for (const L of decoys) if (seg(L) && !seen.has(key(L)) && !(L.t === 'v' && (L.x < 1 || L.x > GX - 1))) { seen.add(key(L)); cands.push({ line: L }); }
+  return { prompt, cands, why };
+}
+
+function labelWhyExt(sc) {
+  const N = extNames(sc), cw = costWord(sc), iv = sc.iv;
+  if (iv === 'none') return `${N.D} and ${N.S} are the private curves the market sees. ${N.soc} is ${N.priv} ${sc.prod === sc.neg ? 'plus' : 'minus'} the ${cw} per unit. The market settles at Qm; the social optimum Q* is where MSC = MSB.`;
+  if (iv === 'tax' || iv === 'sub') return (sc.prod ? `The ${iv === 'tax' ? 'tax' : 'subsidy'} equals the ${cw}, so supply with the ${iv === 'tax' ? 'tax' : 'subsidy'} lies exactly on MSC.` : `${iv === 'tax' ? 'S + tax' : 'S + subsidy'} meets MPB = D exactly at Q*, because the ${iv === 'tax' ? 'tax' : 'subsidy'} equals the ${cw}.`) + ` Consumers pay Pc (on D); producers ${iv === 'tax' ? 'keep' : 'receive'} Pp (on ${N.S.split(' ')[0]}), straight ${iv === 'tax' ? 'below' : 'above'}.`;
+  if (iv === 'ptax' || iv === 'psub') { const t = iv === 'ptax'; return `The ${t ? 'tax' : 'subsidy'} is smaller than the ${cw}, so the market moves only part of the way from Qm toward Q*: to ${t ? 'Qt' : 'Q2'}. Pc is on D; Pp is on ${N.S.split(' ')[0]}, straight ${t ? 'below' : 'above'}.`; }
+  if (iv === 'quota') return 'The quota is a vertical line at Q*, where MSC = MSB: no more than that can be sold.';
+  if (iv === 'reg') return `${N.soc}₁ is the old social curve; ${N.soc}₂ is the new one, closer to ${N.priv}. Q*₁ and Q*₂ are where each meets ${N.other}. The market itself stays at Qm.`;
+  if (iv === 'prov') return 'S₂ is supply after the government adds its own units. It meets D at Q*, at the lower price P₂.';
+  return 'MPB₁ is demand before the campaign; MPB₂ is after. The market moves from Qm to Q₂, where MPB₂ meets S. Q* is still where MSB = MSC.';
+}
+
 // SL does no calculations (Sam, 2026-10-29): it reads the labelled values off the graph instead.
 const READ_WHAT = {
   Pe: 'the equilibrium price before the intervention', Qe: 'the equilibrium quantity before the intervention',
   Pc: 'the price consumers pay', Pp: 'the price producers receive', Qt: 'the quantity traded after the tax', Q2: 'the quantity traded after the subsidy',
   Pmax: 'the maximum price', Pmin: 'the minimum price', Qs: 'the quantity supplied', Qd: 'the quantity demanded',
+  Pm: 'the market price', Qm: 'the market quantity', 'P*': 'the price at the social optimum', 'Q*': 'the socially optimal quantity',
+  'Q*₁': 'the socially optimal quantity before the regulation', 'Q*₂': 'the socially optimal quantity after the regulation',
+  'P₂': 'the new market price', 'Q₂': 'the new market quantity',
 };
 function readsFor(sc) {
   const L = [];
@@ -686,13 +1014,15 @@ function readsFor(sc) {
 
 // ---------- building questions ----------
 function contextText(sc) {
+  if (isExt(sc)) return contextExt(sc);
   if (sc.kind === 'tax') return `A ${money(sc.t)} per unit indirect tax`;
   if (sc.kind === 'subsidy') return `A ${money(sc.s)} per unit subsidy`;
   if (sc.kind === 'ceiling') return `A maximum price (price ceiling) of ${money(sc.P)}`;
   return `A minimum price (price floor) of ${money(sc.P)}`;
 }
 function lineCands(sc) {
-  const S = (k) => fLine(k, sc.d), D = (k) => fLine(k, -sc.b);
+  if (isExt(sc)) return lineCandsExt(sc);
+  const S =(k) => fLine(k, sc.d), D = (k) => fLine(k, -sc.b);
   if (sc.kind === 'tax') {
     const t = sc.t, c = [{ line: S(sc.c + t), ok: true }, { line: S(sc.c - t) }, { line: D(sc.a - t) }];
     c.push({ line: sc.c + 2 * t < GY - 2 ? S(sc.c + 2 * t) : D(sc.a + t) });
@@ -764,6 +1094,7 @@ function newQuestion() {
   if (session.mode === 'mix' || session.mode === 'skill') kind = pick(Object.keys(KINDS));
   if (session.mode === 'mix' || session.mode === 'kind') skill = pick(skillList());
   if (session.mode === 'weak') [kind, skill] = weakest();
+  if (kind === 'ext') kind = pick(EXT_KINDS);   // the "All four mixed" row
   Q = buildQuestion(kind, skill);
   renderStep();
 }
@@ -805,13 +1136,13 @@ function renderStep() {
 }
 
 function drawChart() {
-  const st = Q.steps[Q.i], sc = Q.sc; let s = '';
+  const st = Q.steps[Q.i], sc = Q.sc, ext = isExt(sc); let s = '';
   if (st.type === 'line') {
-    s += svgAxes(true);
-    const e = { x: sc.xe, y: sc.ye };
+    s += svgAxes(true, ext);
+    const db = drawBase(sc), e = db.pt;
     s += `<line x1="${X(0)}" y1="${Y(e.y)}" x2="${X(e.x)}" y2="${Y(e.y)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/><line x1="${X(e.x)}" y1="${Y(e.y)}" x2="${X(e.x)}" y2="${Y(0)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/>`;
-    s += `<text x="${OX - 24}" y="${Y(e.y) + 4}" font-size="15" font-weight="600" fill="#7a1409" text-anchor="end">Pe</text><text x="${X(e.x)}" y="${OY + 32}" font-size="15" font-weight="600" fill="#7a1409" text-anchor="middle">Qe</text>`;
-    const base = baseLines(sc), spots = labelSpots(base);
+    s += `<text x="${OX - 24}" y="${Y(e.y) + 4}" font-size="15" font-weight="600" fill="#7a1409" text-anchor="end">${e.pn}</text><text x="${X(e.x)}" y="${OY + 32}" font-size="15" font-weight="600" fill="#7a1409" text-anchor="middle">${e.qn}</text>`;
+    const base = db.lines, spots = labelSpots(base);
     base.forEach((l, i) => { s += svgLine(l.line, `stroke="${lineColour(l.name)}" stroke-width="2.6"`); s += `<text x="${spots[i].x}" y="${spots[i].y}" font-size="15" font-weight="600" fill="${lineColour(l.name)}" text-anchor="${spots[i].anchor}">${l.name}</text>`; });
     st.context.forEach(L => s += svgLine(L, 'stroke="#111" stroke-width="2.6"'));
     st.cands.forEach((c, i) => {
@@ -821,9 +1152,9 @@ function drawChart() {
       s += `<g class="cand ${cls}" data-cand="${i}">${svgLine(c.line, 'class="vis" stroke-linecap="round"')}${svgLine(c.line, 'class="hit"')}</g>`;
     });
   } else if (st.type === 'label') {
-    s += svgAxes(false) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks, revealed: ui.revealed } });
+    s += svgAxes(false, ext) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks, revealed: ui.revealed } });
   } else if (st.type === 'shade') {
-    s += svgAxes(true);
+    s += svgAxes(true, ext);
     ui.cells.forEach((g, i) => {
       const inAns = g.sig.includes(st.concept), on = ui.sel.has(i);
       let cls = on ? (ui.bad.has(i) ? 'wrong' : 'sel') : '';
@@ -834,7 +1165,7 @@ function drawChart() {
     s += `<g class="noclick">${svgDiagram(sc, { labels: true })}</g>`;
   } else {
     // multiple choice asks about the result, so the graph mustn't say "Shortage"/"Surplus"
-    s += svgAxes(true) + svgDiagram(sc, { labels: true, noAnno: st.type === 'mc' });
+    s += svgAxes(true, ext) + svgDiagram(sc, { labels: true, noAnno: st.type === 'mc' });
   }
   const chart = document.getElementById('chart');
   chart.innerHTML = st.noGraph ? '' : s;
@@ -1007,6 +1338,7 @@ function finish(ok) {
 }
 function hint(msg) { document.getElementById('feedback').innerHTML = `<div class="hint">${esc(msg)}</div>`; }
 function labelWhy(sc) {
+  if (isExt(sc)) return labelWhyExt(sc);
   if (sc.kind === 'tax') return 'Pc (consumers pay) is where S + tax meets demand. Pp (producers keep) is straight below it on the original S: Pc − Pp = the tax. Qt is the new quantity.';
   if (sc.kind === 'subsidy') return 'Pc (consumers pay) is where S + subsidy meets demand. Pp (producers receive) is straight above it on the original S: Pp − Pc = the subsidy. Q2 is the new quantity.';
   if (sc.kind === 'ceiling') return 'At Pmax, read Qs off supply and Qd off demand. Qd > Qs: the gap is the shortage.';
@@ -1074,18 +1406,23 @@ async function sendReport() {
 }
 
 // ---------- home ----------
+// the mixed row ('ext') shows the four externality rows' scores added together
 function scoreCell(k, s) {
-  const a = store.scores[k + '.' + s] || [];
+  const a = k === 'ext' ? EXT_KINDS.flatMap(x => store.scores[x + '.' + s] || []) : store.scores[k + '.' + s] || [];
   if (!a.length) return { text: '–', cls: '' };
   const n = a.reduce((x, y) => x + y, 0), frac = n / a.length;
   return { text: `${n}/${a.length}`, cls: a.length >= 3 && frac >= 0.8 ? 's-good' : frac >= 0.5 ? 's-mid' : 's-bad' };
 }
 function renderHome() {
   const sk = skillList();
+  const row = (k, name, mix) => `<tr><td class="row"><button class="topicbtn${mix ? ' mix' : ''}" onclick="startDrill('kind','${k}')">${name}</button></td>` +
+    sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}${mix ? ' mix' : ''}" onclick="startDrill('cell','${k}','${s}')" aria-label="${name} ${skillName(s)}">${c.text}</button></td>`; }).join('') + '</tr>';
   let h = '<tr><th></th>' + sk.map(s => `<th><button class="skillbtn" onclick="startDrill('skill',null,'${s}')">${skillName(s)}</button></th>`).join('') + '</tr>';
-  for (const k of Object.keys(KINDS)) {
-    h += `<tr><td class="row"><button class="topicbtn" onclick="startDrill('kind','${k}')">${KINDS[k]}</button></td>` + sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}" onclick="startDrill('cell','${k}','${s}')" aria-label="${KINDS[k]} ${skillName(s)}">${c.text}</button></td>`; }).join('') + '</tr>';
-  }
+  h += `<tr><th colspan="${sk.length + 1}" class="sect">Taxes, subsidies, price controls</th></tr>`;
+  for (const k of PRICE_KINDS) h += row(k, KINDS[k]);
+  h += `<tr><th colspan="${sk.length + 1}" class="sect">Externalities</th></tr>`;
+  for (const k of EXT_KINDS) h += row(k, KINDS[k].replace(' externality', ''));
+  h += row('ext', 'All four mixed', true);
   document.getElementById('grid').innerHTML = h;
   document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));
 }
