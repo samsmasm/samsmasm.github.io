@@ -38,7 +38,8 @@ async function play(slug, guessFn, descIndex, checks, tryBtn, watchFn) {
   await shot(`${tag}-2-watch`);
   await page.click('#go-describe');
   ok(await page.$eval('#viz', e => !!e.closest('#s3')), `${tag}: the visual sits in the describe step`);
-  if (slug !== 'positive') ok(!!(await page.$('#s3 .randnote')), `${tag}: says whether the numbers are random or real`);
+  const note = await page.$eval('#s3 .randnote', e => e.textContent).catch(() => '');
+  ok(/^(Truly random|Exactly as expected|Real data)/.test(note), `${tag}: says whether the numbers are random, exact or real`, note);
   await shot(`${tag}-3-describe`);
   await page.click(`#desc-opts .opt[data-i="${descIndex}"]`);
   await page.click('#go-answer');
@@ -188,8 +189,8 @@ ok((await text('#live-p')) === '0.10%', 'dna: town of 1,000 gives 0.10%', await 
 // Top of the class
 await play('regression', async () => { await page.type('#guess-host .numin', '85'); }, 2, async (tag) => {
   const big = +(await text('#ans-big'));
-  ok(big > 65 && big < 78, `${tag}: gold stars fall back to about 72`, big);
-  ok(/Gold stars went from 8\d to 7\d/.test(await text('#seen')), `${tag}: seen box`, await text('#seen'));
+  ok(big > 66 && big < 80, `${tag}: gold stars fall back to about 72`, big);
+  ok(/Gold stars went from 8\d to (6\d|7\d)/.test(await text('#seen')), `${tag}: seen box`, await text('#seen'));
 }, '#try', walkThrough(4));
 await page.$eval('#luck', e => { e.value = 0; e.dispatchEvent(new Event('input')); });
 const nl = (await text('#plive')).match(/(\d+) on test 1, (\d+) on test 2/);
@@ -210,7 +211,7 @@ async function runAgain(tag, snapshot) {
 // The fair game
 await play('ruin', async () => { await page.type('#guess-host .numin', '50'); }, 2, async (tag) => {
   ok(/Answer: 100%/.test(await text('#scale')), `${tag}: answer 100%`, await text('#scale'));
-  ok(/By 20,000: 9\d\./.test(await text('#seen')), `${tag}: about 94 broke`, await text('#seen'));
+  ok(/By 20,000: (8[5-9]|9\d|100)\./.test(await text('#seen')), `${tag}: about 94 broke`, await text('#seen'));
 }, '#try');
 await page.click('[data-r="1000"]');
 ok(/after 1,000 rounds: \d+ of 100 broke/.test(await text('#plive')), 'ruin: free play rounds', await text('#plive'));

@@ -8,7 +8,7 @@ Every riddle runs the same five steps: Riddle, Guess, Watch, Describe ("what do 
 
 All 12 built: `positive/` (ported from the vault prototype), `montyhall/`, `birthday/`, `simpson/`, `streak/` (Due a tails, gambler's fallacy), `galton/` (Falling balls), `dna/` (prosecutor's fallacy), `regression/` (Top of the class), `ruin/` (The fair game, gambler's ruin), `stpetersburg/` (Infinite money), `twochildren/`, `sleepingbeauty/` (contested: the answer shows halfers and thirders side by side, `R.scale` with `answers`, plus "Which side are you on?" showing the best point against your side). Not linked from any index or `/find` yet; ask Sam first.
 
-Seeds: `ruin` uses seed 5, found offline (searching at load costs 2 million flips per try). Others search a few cheap seeds at load.
+Seeds: no fixed or hand-picked seeds anywhere. See "No hand-picked runs" below.
 
 Front page is built from the `GROUPS` list in `index.html` (thumbnails in `THUMB`). A ruled list on phones; from 720px wide it becomes tiles (picture, name, hook, Play/Done at the foot; Soon tiles dashed). Adding a riddle = one entry in `GROUPS` plus a `THUMB` function.
 
@@ -35,7 +35,7 @@ Watch styles: auto-playing (positive, birthday, streak, galton), played by hand 
 - The Answer step repeats the riddle's question at the top (`R.steps` copies `#s0 .question` into a `.recall` box).
 - Calculations in plain words, no shorthand (no `P(A | B)`, `sens`, `spec`, `HHHHH`). Prefer whole numbers of people. Tests check the Answer step for this shorthand.
 - Give students what they need to guess well (Top of the class now states the class average). Axes start at 0 for scores out of 100.
-- Pick seeds that land near the expected result, so one run cannot teach the wrong lesson (streak, regression).
+- (Superseded 2026-11-13: hand-picked "typical" seeds are out. Use genuinely random or exactly expected numbers.)
 
 ## Keep each riddle about one quantity (Sam, 2026-11-12)
 
@@ -46,14 +46,19 @@ Never say "fair price" or claim one right amount to pay. The maths gives the exp
 ## Random numbers must be honest (Sam, 2026-11-12)
 
 - Every simulated visual says so: a `.randnote` inside `#viz` ("Made at random. ... near 100 each, not exactly"). Real data (Simpson) says "Real data, not a simulation"; DNA says 10 is the expected number. A test checks each Describe step has one.
-- Played riddles (`montyhall`, `stpetersburg`) use `R.freshSeed()` (crypto) so every play is genuinely different; their note says "Truly random". Auto-playing Watch steps still use one fixed typical seed each. Sam has not yet been asked whether those should become fresh too.
+- Played riddles (`montyhall`, `stpetersburg`) use `R.freshSeed()` (crypto) so every play is genuinely different; their note says "Truly random". (Auto-playing Watch steps used to replay fixed typical seeds; Sam rejected that on 2026-11-13, see below.)
 - Three doors: each game goes in the row for the choice made (Stayed / Switched, 50 each). Filled dot = car, thick ring = goat, faint dot = not played. Stay or switch by clicking a door (no buttons). Autoplay fills Stayed first, then Switched.
 - Infinite money: played by hand (Flip the coin), asks after 5 games and every 5 after a "no", then plays to 10,000. Free play draws the running average against a dashed expected-value line.
 
+## No hand-picked runs (Sam, 2026-11-13)
+
+Every Watch step is either genuinely random (`R.freshSeed()`, new each page load or play) or exactly as expected (two children 100 of each kind, Sleeping Beauty 500/500, DNA 10, positive test 10 and 100), or real data (Simpson). The note under the visual says which: "Truly random", "Exactly as expected" or "Real data". A test checks the wording. Free play is always genuinely random.
+
+Check probability claims: "In a class of 30, someone will get it" was wrong for a 1 in 32 chance (it is 61%). Say "a good chance (61%)", not "will".
+
 ## Free play reruns (Sam, 2026-11-12)
 
-Any free play built on a simulation gets a "Run again: <n> new <things>" button (`#again`), so students can rerun without refreshing. Where the count may not change visibly, show "Run N" (`#run-n`). Watch steps stay on fixed, typical seeds on purpose.
-
+Any free play built on a simulation gets a "Run again: <n> new <things>" button (`#again`), so students can rerun without refreshing. Where the count may not change visibly, show "Run N" (`#run-n`).
 ## Files
 
 | File | What |

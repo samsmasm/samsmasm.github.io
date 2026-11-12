@@ -61,7 +61,8 @@
         var t0 = performance.now();
         (function step(now) {
           if (!alive) return;
-          var u = Math.min(1, (now - t0) / dur);
+          /* a frame's timestamp can be slightly earlier than t0, so never let progress go below 0 */
+          var u = Math.max(0, Math.min(1, (now - t0) / dur));
           fn(u);
           if (u < 1) rafs.push(requestAnimationFrame(step)); else if (done) done();
         })(t0);
