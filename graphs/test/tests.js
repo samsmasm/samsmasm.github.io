@@ -521,6 +521,14 @@ test('axis titles and title: Q_1 becomes Q₁ while typing, Q1 stays plain', asy
   eq(await ev(page, `state.yLabel`), 'P₁₀', 'y title');
 });
 
+test('Help button opens a short how-to that mentions subscripts; Escape closes it', async (page) => {
+  await page.click('#help-btn');
+  eq(await ev(page, `document.getElementById('help-modal').classList.contains('open')`), true, 'opens');
+  assert((await ev(page, `document.getElementById('help-modal').textContent`)).includes('S_1'), 'mentions subscripts');
+  await page.keyboard.press('Escape');
+  eq(await ev(page, `document.getElementById('help-modal').classList.contains('open')`), false, 'Escape closes');
+});
+
 test('keyboard: tool letters, arrow nudge as one undo step, Ctrl+C/V and Ctrl+D', async (page) => {
   await ev(page, `state.elements = [mkLine(0.1, 0.5, 0.5, 0.5, '#1a4a8a', 2.5, '', 'S')]; state.selectedId = state.elements[0].id; undoStack = []; redraw();`);
   await page.keyboard.press('l');
