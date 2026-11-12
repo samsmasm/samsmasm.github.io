@@ -16,6 +16,17 @@ const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => { if (m.type() === 'error' && !/fonts\.g/.test(m.text())) errors.push(m.text()); });
 
+// feedback posts are caught here and never reach the real inbox
+const sentFeedback = [];
+await page.setRequestInterception(true);
+page.on('request', req => {
+  if (req.url().startsWith('https://unisam.nz/feedback/api/')) {
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+    if (req.method() === 'POST') sentFeedback.push(JSON.parse(req.postData() || '{}'));
+    req.respond({ status: 200, contentType: 'application/json', body: '{"ok":true}', headers: cors });
+  } else req.continue();
+});
+
 const shot = async (name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); };
 const text = (sel) => page.$eval(sel, e => e.textContent);
 const visible = (sel) => page.$eval(sel, e => !e.closest('[hidden]'));
@@ -292,6 +303,24 @@ for (const [wd, name] of [[820, 'tablet'], [1366, 'laptop']]) {
   await shot(`index-${name}`);
 }
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+
+// Feedback form: opens inline, needs words, posts to the shared inbox as app "riddles"
+await page.goto(BASE + 'galton/', { waitUntil: 'networkidle0' });
+ok(/Send feedback/.test(await text('footer')), 'feedback: link in the footer');
+await page.click('#fb-open');
+ok(await visible('#fb'), 'feedback: form opens on the page');
+await page.click('#fb-send');
+ok(/Write a few words/.test(await text('#fb-msg')), 'feedback: asks for words first');
+await page.click('[data-fb="idea"]');
+await page.type('#fb-text', 'Test idea from the test suite');
+await shot('feedback-form');
+await page.click('#fb-send');
+await page.waitForFunction(() => /Thanks, sent/.test(document.getElementById('fb-open').textContent), { timeout: 5000 });
+const fb = sentFeedback[sentFeedback.length - 1] || {};
+ok(fb.app === 'riddles' && fb.type === 'idea' && /Test idea/.test(fb.message) && fb.meta && fb.meta.page === '/riddles/galton/', 'feedback: posts app, type, message and page', JSON.stringify(fb));
+ok(!(await page.$('script[src*="goatcounter"], script[src*="gc.zgo.at"]')), 'goatcounter: not loaded when testing locally');
+const gcCode = await page.evaluate(() => fetch('/riddles/riddles.js').then(r => r.text()));
+ok(/samsmasm\.goatcounter\.com\/count/.test(gcCode), 'goatcounter: wired up for the live site');
 
 // No horizontal scroll at phone width on any page
 for (const p of ['', 'positive/', 'montyhall/', 'birthday/', 'simpson/', 'streak/', 'galton/', 'dna/', 'regression/', 'ruin/', 'stpetersburg/', 'twochildren/', 'sleepingbeauty/']) {

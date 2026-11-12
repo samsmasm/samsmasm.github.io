@@ -56,6 +56,12 @@ Every Watch step is either genuinely random (`R.freshSeed()`, new each page load
 
 Check probability claims: "In a class of 30, someone will get it" was wrong for a 1 in 32 chance (it is 61%). Say "a good chance (61%)", not "will".
 
+## Feedback and analytics (Sam, 2026-11-13)
+
+`riddles.js` adds both to every page, so new riddles get them for free:
+- "Send feedback" in the footer opens an inline form (no modal) that POSTs to the shared inbox (`../feedback/CLAUDE.md`) with `app: "riddles"`, type bug/idea/other, the message, and `meta` = page, visible step, viewport. Read reports at unisam.nz/feedback. Tests intercept the POST so nothing reaches the real inbox.
+- GoatCounter page views (samsmasm.goatcounter.com), skipped on localhost.
+
 ## Free play reruns (Sam, 2026-11-12)
 
 Any free play built on a simulation gets a "Run again: <n> new <things>" button (`#again`), so students can rerun without refreshing. Where the count may not change visibly, show "Run N" (`#run-n`).

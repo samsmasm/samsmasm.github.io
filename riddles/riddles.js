@@ -374,5 +374,83 @@
     } catch (e) { /* storage blocked: progress is optional */ }
   };
 
+  /* ---------- feedback: a link in the footer opens a small form that posts to Sam's inbox (unisam.nz/feedback) ---------- */
+  var FEEDBACK_URL = "https://unisam.nz/feedback/api/report";
+  function setupFeedback() {
+    var foot = document.querySelector("footer"), main = document.querySelector("main");
+    if (!foot || !main) return;
+    var link = document.createElement("button");
+    link.type = "button"; link.className = "fb-link"; link.id = "fb-open"; link.textContent = "Send feedback";
+    foot.appendChild(document.createTextNode(" · "));
+    foot.appendChild(link);
+    var box = document.createElement("section");
+    box.className = "card fbk"; box.id = "fb"; box.hidden = true;
+    box.innerHTML =
+      '<h2>Feedback</h2>' +
+      '<p class="sub small">Spotted a mistake, or have an idea? It goes straight to Sam. Only the page you were on is sent with it.</p>' +
+      '<div class="btnrow" role="group" aria-label="What kind of feedback">' +
+      '<button type="button" class="btn2" data-fb="bug" aria-pressed="false">Something\'s wrong</button>' +
+      '<button type="button" class="btn2" data-fb="idea" aria-pressed="false">An idea</button>' +
+      '<button type="button" class="btn2" data-fb="other" aria-pressed="false">Something else</button></div>' +
+      '<label class="sr-only" for="fb-text">Your feedback</label>' +
+      '<textarea id="fb-text" rows="4" maxlength="4000" placeholder="What happened, or what would make this better?"></textarea>' +
+      '<input type="text" id="fb-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="sr-only">' +
+      '<div class="btnrow"><button type="button" class="btn" id="fb-send">Send</button><button type="button" class="btn2" id="fb-cancel">Cancel</button></div>' +
+      '<p class="sub small" id="fb-msg" aria-live="polite"></p>';
+    main.appendChild(box);
+    var type = null;
+    function open(show) {
+      box.hidden = !show;
+      if (show) {
+        type = null; R.$("fb-text").value = ""; R.$("fb-msg").textContent = ""; R.$("fb-send").disabled = false;
+        R.all("[data-fb]", box).forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+        box.scrollIntoView({ block: "start" });
+        R.$("fb-text").focus({ preventScroll: true });
+      }
+    }
+    link.addEventListener("click", function () { open(box.hidden); });
+    R.$("fb-cancel").addEventListener("click", function () { open(false); });
+    R.$("fb-text").addEventListener("input", function () { R.$("fb-msg").textContent = ""; });
+    R.all("[data-fb]", box).forEach(function (b) {
+      b.addEventListener("click", function () {
+        type = b.getAttribute("data-fb");
+        R.all("[data-fb]", box).forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      });
+    });
+    R.$("fb-send").addEventListener("click", function () {
+      var text = R.$("fb-text").value.trim(), msg = R.$("fb-msg");
+      if (!text) { msg.textContent = "Write a few words first."; return; }
+      var step = R.all("section.step").filter(function (s) { return !s.hidden; })[0];
+      var payload = {
+        app: "riddles", type: type || "other", message: text, website: R.$("fb-website").value,
+        meta: { page: location.pathname, step: step ? step.id : "", viewport: innerWidth + "x" + innerHeight }
+      };
+      R.$("fb-send").disabled = true; msg.textContent = "Sending...";
+      fetch(FEEDBACK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+        .then(function (r) {
+          if (r.status === 429) throw new Error("Too many messages from here in the last hour. Try again later.");
+          if (!r.ok) throw new Error("It could not be sent (error " + r.status + ").");
+          open(false);
+          link.textContent = "Thanks, sent! Send more feedback";
+        })
+        .catch(function (e) {
+          R.$("fb-send").disabled = false;
+          msg.textContent = /^(Too many|It could)/.test(e.message) ? e.message : "Could not reach the server. Check your connection and try again.";
+        });
+    });
+  }
+
+  /* ---------- GoatCounter page views, as on other unisam.nz pages (not when testing on this computer) ---------- */
+  function setupCounter() {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.protocol === "file:") return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "//gc.zgo.at/count.js";
+    s.setAttribute("data-goatcounter", "https://samsmasm.goatcounter.com/count");
+    document.head.appendChild(s);
+  }
+
   window.R = R;
+  setupFeedback();
+  setupCounter();
 })();
