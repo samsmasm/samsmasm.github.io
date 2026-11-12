@@ -76,6 +76,9 @@ test('every externality intervention generates, draws and labels cleanly', async
       if (Object.keys(conceptsFor(sc)).length < 3) out.push([k, iv, 'too few shading areas']);
       if (calcsFor(sc).length < 3 || effectsFor(sc).length < 4 || readsFor(sc).length < 3) out.push([k, iv, 'too few questions']);
       if (!labelsFit(sc)) out.push([k, iv, 'labels']);
+      // a question about the price must have that price labelled on the graph
+      const pns = diagram(sc).points.map(p => p.pn);
+      for (const q of effectsFor(sc)) if (/price/i.test(q.q) && !q.noGraph && !pns.includes('Pc') && !pns.includes('P₂')) out.push([k, iv, 'no price label', q.q]);
     }
     return out.slice(0, 5);
   });
@@ -112,13 +115,15 @@ test('externality shading lets every area of the chart be tapped', async page =>
 });
 
 test('the mixed externality row picks all four types and shows their combined score', async page => {
-  const seen = await page.evaluate(() => {
-    const s = new Set();
+  const seq = await page.evaluate(() => {
+    const s = [];
     startDrill('cell', 'ext', 'effects');
-    for (let i = 0; i < 60; i++) { s.add(Q.kind); newQuestion(); }
-    return [...s].sort();
+    for (let i = 0; i < 60; i++) { s.push(Q.kind); newQuestion(); }
+    return s;
   });
-  assert(seen.join() === 'negcons,negprod,poscons,posprod', seen.join());
+  // dealt from a shuffled deck: each round of four has all four types, never the same type twice running
+  for (let i = 0; i + 4 <= seq.length; i += 4) assert(new Set(seq.slice(i, i + 4)).size === 4, 'round ' + seq.slice(i, i + 4));
+  for (let i = 1; i < seq.length; i++) assert(seq[i] !== seq[i - 1], 'repeat at ' + i + ': ' + seq.join(' '));
   await page.evaluate(() => { store.scores['negprod.shade'] = [1, 1]; store.scores['poscons.shade'] = [0]; showHome(); });
   const cell = await page.evaluate(() => document.querySelector('[aria-label="All four mixed Shade"]').textContent);
   assert(cell === '2/3', cell);

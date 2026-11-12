@@ -401,7 +401,9 @@ function diagramExt(sc) {
       out.lines = [D, S, soc(e), { line: fLine(c + sg * e2, d), name: withName }];
       out.points = [m, { x: xo, y: Po, qn: 'Q*' }, { x: x2, y: Dy(sc, x2), pn: 'Pc', qn: sc.iv === 'ptax' ? 'Qt' : 'Q2' }, { x: x2, y: Sy(sc, x2), pn: 'Pp' }]; break;
     case 'quota':
-      out.lines = [D, S, soc(e), { line: vLine(xo), name: 'Quota' }]; out.points = [m, { x: xo, y: Po, pn: 'P*', qn: 'Q*' }]; break;
+      // consumers pay what MPB (= D) shows at the quota: Pc. On a production externality that is P* too.
+      out.lines = [D, S, soc(e), { line: vLine(xo), name: 'Quota' }];
+      out.points = sc.prod ? [m, { x: xo, y: Po, pn: 'Pc', qn: 'Q*' }] : [m, { x: xo, y: Dy(sc, xo), pn: 'Pc', qn: 'Q*' }, { x: xo, y: Po }]; break;
     case 'reg':
       // the rule cuts the harm per unit: the social curve moves toward the private one
       out.lines = [D, S, soc(e, N.soc + '₁'), soc(e2, N.soc + '₂')];
@@ -862,7 +864,7 @@ function effectsExt(sc) {
     L.push(['What happens to the quantity?', UDN, neg ? 'Falls' : 'Rises', `From Qm to ${taxy ? 'Qt' : 'Q2'}.`]);
   } else if (iv === 'quota') {
     L.push(['Where should the quota be set?', ['At Q*', 'At Qm', 'Above Qm'], 'At Q*', 'Q* is where MSC = MSB.']);
-    L.push(['What happens to the price consumers pay?', UDN, 'Rises', 'Less is available, so consumers pay what MPB shows at Q*.']);
+    L.push(['What happens to the price consumers pay?', UDN, 'Rises', `Less is available, so the price rises from Pm to Pc: what ${sc.prod ? 'demand' : 'MPB'} shows at Q*.`]);
     L.push(['If the quota is set at Q*, what happens to the welfare loss?', ['It disappears', 'It gets bigger', 'No change'], 'It disappears', 'The market can’t go past Q*, where MSC = MSB.']);
     L.push(['Which is a drawback of a quota?', ['It must be enforced, and can lead to black markets', 'It raises tax revenue', 'It raises output'], 'It must be enforced, and can lead to black markets', 'Firms or buyers who want more than the quota may break the rules.']);
     if (sc.prod) L.push(['Tradable permits (cap and trade): what does the government fix?', ['The total amount of pollution allowed', 'The price of the good', 'The number of firms'], 'The total amount of pollution allowed', 'The cap is a quota on pollution. Firms that can cut pollution cheaply sell their spare permits to firms that can’t.', true]);
@@ -916,6 +918,7 @@ function calcsExt(sc) {
   } else if (iv === 'quota') {
     L.push(['Calculate the welfare loss that the quota removes.', dwl0, '$', dwlLine, 'dwl']);
     L.push(['By how many units does the quota cut the quantity?', gap, 'units', `From Qm (${Qm}) to Q* (${Qo}): ${gap} units.`]);
+    L.push(['By how much does the price consumers pay rise?', Dy(sc, xo) - sc.Pm, '$', `From Pm (${money(sc.Pm)}) to Pc (${money(Dy(sc, xo))}): ${money(Dy(sc, xo) - sc.Pm)}.`]);
     L.push([`By how much does the total ${cw} fall?`, e * gap, '$', `${money(e)} per unit × ${gap} fewer units = ${money(e * gap)}.`]);
   } else if (iv === 'reg') {
     const left = 0.5 * e2 * (Qm - Q2);
@@ -992,7 +995,7 @@ function labelWhyExt(sc) {
   if (iv === 'none') return `${N.D} and ${N.S} are the private curves the market sees. ${N.soc} is ${N.priv} ${sc.prod === sc.neg ? 'plus' : 'minus'} the ${cw} per unit. The market settles at Qm; the social optimum Q* is where MSC = MSB.`;
   if (iv === 'tax' || iv === 'sub') return (sc.prod ? `The ${iv === 'tax' ? 'tax' : 'subsidy'} equals the ${cw}, so supply with the ${iv === 'tax' ? 'tax' : 'subsidy'} lies exactly on MSC.` : `${iv === 'tax' ? 'S + tax' : 'S + subsidy'} meets MPB = D exactly at Q*, because the ${iv === 'tax' ? 'tax' : 'subsidy'} equals the ${cw}.`) + ` Consumers pay Pc (on D); producers ${iv === 'tax' ? 'keep' : 'receive'} Pp (on ${N.S.split(' ')[0]}), straight ${iv === 'tax' ? 'below' : 'above'}.`;
   if (iv === 'ptax' || iv === 'psub') { const t = iv === 'ptax'; return `The ${t ? 'tax' : 'subsidy'} is smaller than the ${cw}, so the market moves only part of the way from Qm toward Q*: to ${t ? 'Qt' : 'Q2'}. Pc is on D; Pp is on ${N.S.split(' ')[0]}, straight ${t ? 'below' : 'above'}.`; }
-  if (iv === 'quota') return 'The quota is a vertical line at Q*, where MSC = MSB: no more than that can be sold.';
+  if (iv === 'quota') return `The quota is a vertical line at Q*, where MSC = MSB: no more than that can be sold. Consumers pay Pc, where the quota meets ${sc.prod ? 'demand' : 'MPB = D'}.`;
   if (iv === 'reg') return `${N.soc}₁ is the old social curve; ${N.soc}₂ is the new one, closer to ${N.priv}. Q*₁ and Q*₂ are where each meets ${N.other}. The market itself stays at Qm.`;
   if (iv === 'prov') return 'S₂ is supply after the government adds its own units. It meets D at Q*, at the lower price P₂.';
   return 'MPB₁ is demand before the campaign; MPB₂ is after. The market moves from Qm to Q₂, where MPB₂ meets S. Q* is still where MSB = MSC.';
@@ -1098,7 +1101,16 @@ function newQuestion() {
   if (session.mode === 'mix' || session.mode === 'skill') kind = pick(Object.keys(KINDS));
   if (session.mode === 'mix' || session.mode === 'kind') skill = pick(skillList());
   if (session.mode === 'weak') [kind, skill] = weakest();
-  if (kind === 'ext') kind = pick(EXT_KINDS);   // the "All four mixed" row
+  // "All four mixed": deal the types from a shuffled deck, so every four questions cover all four and
+  // the same type never comes twice in a row (plain random gave long runs of one type: Sam)
+  if (kind === 'ext') {
+    if (!session.deck || !session.deck.length) {
+      const d = shuffle(EXT_KINDS);
+      if (d[0] === session.lastExt) d.push(d.shift());
+      session.deck = d;
+    }
+    kind = session.lastExt = session.deck.shift();
+  }
   Q = buildQuestion(kind, skill);
   renderStep();
 }
