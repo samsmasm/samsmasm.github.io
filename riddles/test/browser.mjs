@@ -38,6 +38,7 @@ async function play(slug, guessFn, descIndex, checks, tryBtn, watchFn) {
   await shot(`${tag}-2-watch`);
   await page.click('#go-describe');
   ok(await page.$eval('#viz', e => !!e.closest('#s3')), `${tag}: the visual sits in the describe step`);
+  if (slug !== 'positive') ok(!!(await page.$('#s3 .randnote')), `${tag}: says whether the numbers are random or real`);
   await shot(`${tag}-3-describe`);
   await page.click(`#desc-opts .opt[data-i="${descIndex}"]`);
   await page.click('#go-answer');
