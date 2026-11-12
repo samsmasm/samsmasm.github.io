@@ -42,6 +42,10 @@ async function play(slug, guessFn, descIndex, checks, tryBtn, watchFn) {
   await page.click(`#desc-opts .opt[data-i="${descIndex}"]`);
   await page.click('#go-answer');
   await shot(`${tag}-4-answer`);
+  const qs = await page.evaluate(() => [document.querySelector('#s0 .question').textContent, (document.querySelector('#s4 .recall p') || {}).textContent]);
+  ok(qs[0] === qs[1], `${tag}: the answer repeats the question`, qs.join(' | '));
+  const calc = await page.$eval('#s4', e => e.textContent);
+  ok(!/P\(|sens|spec\b|prev\b|HHH/.test(calc), `${tag}: no shorthand in the answer`);
   await checks(tag);
   await page.click(tryBtn);
   ok(await visible('#explore'), `${tag}: free play opens`);

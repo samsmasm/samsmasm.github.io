@@ -119,6 +119,17 @@
         if (n === 3) slot.appendChild(viz);
         else if (viz.parentNode !== home) home.appendChild(viz);
       }
+      /* the Answer step repeats the riddle's question at the top */
+      if (n === 4 && !steps[4].querySelector(".recall")) {
+        var q = steps[0].querySelector(".question"), h4 = steps[4].querySelector("h2");
+        if (q && h4) {
+          var rc = document.createElement("div");
+          rc.className = "recall";
+          rc.innerHTML = '<div class="kicker">The question</div><p></p>';
+          rc.querySelector("p").textContent = q.textContent;
+          h4.insertAdjacentElement("afterend", rc);
+        }
+      }
       if (o.onLeave && prev !== n) o.onLeave(prev, n);
       if (o.onEnter && o.onEnter[n]) o.onEnter[n]();
       if (!quiet) {
