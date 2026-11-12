@@ -413,7 +413,10 @@ function diagramExt(sc) {
       out.lines = [{ ...D, name: 'MPB₁' }, S, soc(e), { line: fLine(a - sg * e2, -b), name: 'MPB₂' }];
       out.points = [m, { x: x2, y: Sy(sc, x2), pn: 'P₂', qn: 'Q₂' }, { x: xo, y: Po, qn: 'Q*' }]; break;
   }
-  out.base = out.lines.slice(0, sc.iv === 'none' ? 2 : 3);   // what the Draw step starts from
+  // what the Draw step starts from. A full tax/subsidy on production lands exactly on MSC, so showing
+  // MSC would give the answer away (Sam spotted it): leave it off.
+  const giveaway = sc.prod && (sc.iv === 'tax' || sc.iv === 'sub');
+  out.base = out.lines.slice(0, sc.iv === 'none' || giveaway ? 2 : 3);
   return out;
 }
 
@@ -953,8 +956,8 @@ function lineCandsExt(sc) {
     const tax = iv === 'tax' || iv === 'ptax', t = iv === 'tax' || iv === 'sub' ? e : e2, dir = tax ? 1 : -1;
     ok = Sf(c + dir * t); decoys = [Sf(c - dir * t), Df(a + dir * t), Df(a - dir * t)];
     if (t < e) decoys.push(Sf(c + dir * e));
-    prompt = t === e ? `The government ${tax ? 'taxes producers' : 'gives producers a subsidy'} equal to the ${costWord(sc)}: ${money(t)} per unit. Tap the new supply curve.`
-      : `The government ${tax ? 'taxes producers' : 'gives producers a subsidy of'} ${money(t)} per unit. Tap the new supply curve.`;
+    prompt = t === e ? `The government puts a ${tax ? 'tax on producers' : 'subsidy for producers'} equal to the ${costWord(sc)}: ${money(t)} per unit. Tap the new supply curve.`
+      : `The government puts a ${money(t)} per unit ${tax ? 'tax on producers' : 'subsidy for producers'}. Tap the new supply curve.`;
     why = `The ${tax ? 'tax adds' : 'subsidy takes'} ${money(t)} ${tax ? 'to' : 'off'} the cost of every unit, so supply shifts ${tax ? 'up' : 'down'} by ${money(t)}, parallel to ${N.S.split(' ')[0]}.` + (t === e && sc.prod ? ' It lands exactly on MSC.' : '');
   } else if (iv === 'quota') {
     ok = vLine(xo); decoys = [vLine(xm), vLine(xm + (xm - xo)), hLine(sc.Po)];

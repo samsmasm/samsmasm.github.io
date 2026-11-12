@@ -67,6 +67,9 @@ test('every externality intervention generates, draws and labels cleanly', async
     for (const k of EXT_KINDS) for (const iv of new Set(EXT_IVS[k])) for (let i = 0; i < 40; i++) {
       const sc = gen(k, iv), lc = lineCands(sc);
       if (lc.cands.filter(c => c.ok).length !== 1 || lc.cands.length < 3) out.push([k, iv, 'draw cands', lc.cands.length]);
+      // the answer must not already be drawn (and labelled) on the Draw step's graph
+      const okKey = JSON.stringify(lc.cands.find(c => c.ok).line);
+      if (drawBase(sc).lines.some(l => JSON.stringify(l.line) === okKey)) out.push([k, iv, 'answer already drawn']);
       const names = labelSlots(sc).map(s => s.answer);
       if (new Set(names).size !== names.length) out.push([k, iv, 'duplicate labels', names]);
       for (const n of names) if (!/^[PQ]/.test(n) && n.length > 12) out.push([k, iv, 'long label', n]);
