@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const logic = html.split('/*LOGIC_START*/')[1].split('/*LOGIC_END*/')[0];
-eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice,shuffle,seededRandom,dayKey,dailyCodes};');
+eval(logic + ';globalThis.api={buildPuzzle,prepare,guessResult,guessKey,pickVoice,shuffle,seededRandom,dayKey,dailyCodes,release,encodeShare,decodeShare};');
 const load = f => JSON.parse(fs.readFileSync(path.join(root, 'data', f), 'utf8'));
 let failed = false;
 for (const [f, n, per, tiers] of [['bm_categories.json', 4, 4, [1,2,3,4]], ['econ_categories.json', 4, 4, [1,2,3,4]], ['kids_categories.json', 4, 4, [1,2,3,4]], ['sound_categories.json', 3, 3, [1,2,3,4]], ['fmw_categories.json', 4, 4, [1,2,3,4]]]) {
@@ -88,6 +88,33 @@ for (const f of ['bm_categories.json', 'econ_categories.json', 'kids_categories.
   console.log(f, 'daily over 1000 days:', bad, 'failed,', hl, 'HL groups,', seen.size, 'different category sets');
   // FMW is trimmed to classroom level (37 categories, many cross-unit clashes), so it gets a lower bar
   if (bad || hl || seen.size < (f.startsWith('fmw') ? 850 : 900)) failed = true;
+}
+// FMW units unlock on their dates (meta.unitStarts). Each stage must make puzzles and never show a later unit.
+{
+  const starts = load('fmw_categories.json').meta.unitStarts;
+  const stages = [['2026-11-13', 'Unit 3'], ...Object.entries(starts).map(([u, d]) => [d, u])];
+  for (const [day, last] of stages) {
+    const bank = api.release(load('fmw_categories.json'), day); api.prepare(bank);
+    const prior = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8) - 1)).toISOString().slice(0, 10);
+    const before = api.release(load('fmw_categories.json'), prior);
+    const units = [...new Set(bank.meta.topics.map(t => t.group))];
+    const leak = bank.meta.topics.some(t => starts[t.group] > day) || bank.categories.some(c => c.topics.some(x => !bank.meta.topics.find(t => t.code === x)));
+    let ok = 0;
+    for (let i = 0; i < 200; i++) if (api.buildPuzzle(bank, api.dailyCodes(bank), { n: 4, per: 4, tiers: [1, 2, 3, 4] }, api.seededRandom(day + i))) ok++;
+    const fresh = day === '2026-11-13' || !before.meta.topics.some(t => t.group === last);
+    const good = !leak && ok === 200 && units[units.length - 1] === last && fresh;
+    console.log('fmw on', day + ':', units.join(', '), ok + '/200', good ? 'ok' : 'FAILED');
+    if (!good) failed = true;
+  }
+}
+// Share links: round trip with accents and emoji, and junk is refused
+{
+  const p = { groups: [{ slot: 0, name: 'Révolution', ref: 'Unit 1', level: '', words: [{ w: 'levée en masse', e: '' }, { w: 'cat', e: '🐱' }] }] };
+  const back = api.decodeShare(api.encodeShare('fmw', p, ['0-1', '0-0']));
+  const ok = back && back.set === 'fmw' && JSON.stringify(back.puzzle) === JSON.stringify(p) && back.order.join() === '0-1,0-0'
+    && api.decodeShare('nonsense') === null && api.decodeShare(api.encodeShare('fmw', p, ['0-1', '0-1'])) === null;
+  console.log('share links', ok ? 'ok' : 'FAILED');
+  if (!ok) failed = true;
 }
 const V = (name, lang) => ({ name, lang });
 const voiceOk = api.pickVoice([V('Daniel', 'en-GB'), V('Samantha', 'en-US'), V('Thomas', 'fr-FR')]).name === 'Samantha'

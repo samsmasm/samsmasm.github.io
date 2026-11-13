@@ -314,6 +314,7 @@ details#topics[open] summary::before { content: "\2212"; }
     <div class="toolbar">
       <div class="tleft">
         <button id="shuffleBtn" class="btn" type="button">Shuffle</button>
+        <button id="shareBtn" class="btn" type="button">Share</button>
         <button id="readBtn" class="btn small" type="button" aria-pressed="false">Voice: off</button>
       </div>
       <div class="tmid">
@@ -420,6 +421,43 @@ function seededRandom(text) {
   };
 }
 
+/* A bank can hold units back until a date: meta.unitStarts maps a unit (topic group) to its first day, in dayKey form */
+function release(bank, day) {
+  const starts = bank.meta.unitStarts || {};
+  const later = new Set(bank.meta.topics.filter(t => starts[t.group] && starts[t.group] > day).map(t => t.code));
+  if (!later.size) return bank;
+  bank.meta.topics = bank.meta.topics.filter(t => !later.has(t.code));
+  bank.categories = bank.categories.filter(c => !c.topics.some(t => later.has(t)));
+  return bank;
+}
+
+/* A shared puzzle travels in the link: set, groups and card order as base64url JSON, so it survives bank edits */
+function encodeShare(set, puzzle, order) {
+  const g = puzzle.groups.map(x => {
+    const row = [x.name, x.ref, x.level, x.words.map(w => w.w)];
+    if (x.words.some(w => w.e)) row.push(x.words.map(w => w.e));
+    return row;
+  });
+  const bytes = new TextEncoder().encode(JSON.stringify({ s: set, g, o: order }));
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeShare(code) {
+  try {
+    const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/'));
+    const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0))));
+    const groups = d.g.map((x, slot) => ({
+      slot, name: String(x[0]), ref: String(x[1] || ''), level: String(x[2] || ''),
+      words: x[3].map((w, i) => ({ w: String(w), e: x[4] ? String(x[4][i] || '') : '' }))
+    }));
+    const ids = groups.flatMap((g, gi) => g.words.map((_, wi) => gi + '-' + wi));
+    if (!groups.length || d.o.length !== ids.length || [...d.o].sort().join() !== ids.sort().join()) return null;
+    return { set: String(d.s), puzzle: { groups }, order: d.o.map(String) };
+  } catch (e) { return null; }
+}
+
 /* The puzzle day starts at 23:00 UTC, which is 6am in Vietnam all year */
 function dayKey(now) {
   return new Date(now.getTime() + 3600000).toISOString().slice(0, 10);
@@ -480,7 +518,19 @@ const S = {
 };
 const els = new Map();
 
-Object.values(BANKS).forEach(prepare);
+Object.values(BANKS).forEach(b => prepare(release(b, dayKey(new Date()))));
+
+/* A shared link (?p=...) is read once, then dropped from the address so Back and refresh behave normally */
+let shared = null;
+try {
+  const params = new URLSearchParams(location.search);
+  if (params.has('p')) {
+    shared = decodeShare(params.get('p'));
+    params.delete('p');
+    const q = params.toString();
+    history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+  }
+} catch (e) { shared = null; }
 
 /* ---------- screens ---------- */
 function syncMenu() {
@@ -523,11 +573,14 @@ function dressSet() {
 
 function openSet(set) {
   const stale = S.day && S.day !== dayKey(new Date());
-  if (S.set === set && S.puzzle && !stale) { showScreen('game'); return; } /* carry on with the same puzzle */
+  const link = shared && shared.set === set ? shared : null;
+  if (link) shared = null;
+  if (!link && S.set === set && S.puzzle && !stale) { showScreen('game'); return; } /* carry on with the same puzzle */
   S.set = set;
   dressSet();
   showScreen('game');
-  doneToday(set) ? newPuzzle() : dailyPuzzle();
+  if (link && link.puzzle.groups.length === grid().n) loadPuzzle(link.puzzle, null, Math.random, link.order);
+  else doneToday(set) ? newPuzzle() : dailyPuzzle();
 }
 
 /* ---------- SL and HL ---------- */
@@ -657,9 +710,10 @@ function dailyPuzzle() {
   loadPuzzle(buildPuzzle(BANKS[S.set], dailyCodes(BANKS[S.set]), grid(), rand), day, rand);
 }
 
-function loadPuzzle(p, day, rand) {
+function loadPuzzle(p, day, rand, order) {
   const msg = $('msg');
   S.day = day;
+  S.shared = !!order; /* only a shared link passes its own card order */
   S.selected = []; S.tried = []; S.lives = LIVES; S.over = null; S.note = ''; S.busy = false;
   askNew(false);
   if (!p) {
@@ -675,7 +729,7 @@ function loadPuzzle(p, day, rand) {
   S.puzzle = p;
   const ids = [];
   p.groups.forEach((g, gi) => g.words.forEach((_, wi) => ids.push(gi + '-' + wi)));
-  S.order = shuffle(ids, rand);
+  S.order = order || shuffle(ids, rand);
   S.revealed = [];
   els.clear();
   $('board').innerHTML = '';
@@ -693,7 +747,8 @@ function updateButtons() {
   $('shuffleBtn').hidden = !playing;
   $('againBtn').hidden = playing;
   $('todayBtn').hidden = !!S.day || doneToday(S.set);
-  $('modeTitle').textContent = S.day ? 'Daily puzzle' : 'Extra puzzle';
+  $('shareBtn').hidden = !S.puzzle;
+  $('modeTitle').textContent = S.day ? 'Daily puzzle' : S.shared ? 'Shared puzzle' : 'Extra puzzle';
   $('modeTitle').classList.toggle('isdaily', !!S.day);
   $('dayLabel').textContent = S.day
     ? new Date(S.day).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' })
@@ -915,6 +970,24 @@ $('todayBtn').addEventListener('click', () => { dailyPuzzle(); });
 $('checkBtn').addEventListener('click', check);
 $('shuffleBtn').addEventListener('click', () => { S.order = shuffle(S.order); render(); });
 $('readBtn').addEventListener('click', () => { S.read = !S.read; syncVoice(); });
+
+/* Copy a link to this puzzle, from the start, in the same card order. No dialogs: the button says what happened. */
+let shareTimer = null;
+async function sharePuzzle() {
+  if (!S.puzzle) return;
+  const url = location.origin + location.pathname + '?p=' + encodeShare(S.set, S.puzzle, S.order) + '#' + LINKS[S.set];
+  const btn = $('shareBtn');
+  const say = text => {
+    btn.textContent = text;
+    clearTimeout(shareTimer);
+    shareTimer = setTimeout(() => { btn.textContent = 'Share'; }, 2500);
+  };
+  try { await navigator.clipboard.writeText(url); say('Link copied'); return; } catch (e) { /* try the share sheet */ }
+  try { await navigator.share({ title: 'Birds of a Feather', url }); return; } catch (e) { /* show the link instead */ }
+  $('msg').hidden = false;
+  $('msg').textContent = 'Copy this link to share the puzzle: ' + url;
+}
+$('shareBtn').addEventListener('click', sharePuzzle);
 
 /* ---------- start-up and republish snapshot ---------- */
 function snapshot() {
