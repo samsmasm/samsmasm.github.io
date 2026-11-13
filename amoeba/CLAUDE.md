@@ -67,3 +67,7 @@ Serve the repo root with `python3 -m http.server 8765 --bind 127.0.0.1`, then
 
 Rebuilt and tested 2026-11-13 (Node tests + headless Chrome on desktop and phone). Open questions are in
 REVIEW.md.
+
+**Next step:** work through REVIEW.md on Claude Fable (`/model` in Claude Code), diagnosis only: measure, explain,
+propose small rule changes, then stop for Sam to pick. Switch back to Opus to build the chosen fixes. Fable costs
+about 2.5x Opus, so keep it to the reasoning-heavy part (see the root CLAUDE.md, Evolution simulations).

@@ -109,6 +109,8 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `walker/`: bone-and-muscle creatures learn to walk (custom Verlet physics)
 - `racecar/`: evolving polygon cars on Planck.js tracks, whole population races at once, background evolution across worker threads. Shared `sim.js`; run `racecar/test/run.sh` before committing. (`racecar2/` is now a redirect here.)
 
+Pattern for these sims (racecar and amoeba, 2026-11): pull the rules into a shared `sim.js` with headless Node tests, measure evolution over many generations before and after any change, and never reason about outcomes from the code alone. Model choice: Opus does the building. Hard "why does evolution do X" questions (balancing costs, coexistence, arms races) go in a `REVIEW.md` with the evidence, to be run on Fable for diagnosis only, then back to Opus to build. Fable costs about 2.5x Opus.
+
 ### Smaller projects (each has a brief CLAUDE.md)
 
 **Hub pages**
