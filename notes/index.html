@@ -44,6 +44,15 @@ main{flex:1;position:relative;overflow:hidden}
 .chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .chip.off{opacity:.4}
 .chip.main{font-weight:600}
+#key{position:absolute;left:8px;bottom:8px;z-index:10;background:var(--card);border:1px solid var(--line);border-radius:6px;font-size:13px;max-height:calc(100% - 64px);overflow:auto;max-width:60%}
+#key button{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 10px;font:600 13px var(--font);color:var(--ink);cursor:pointer}
+#key ul{list-style:none;margin:0;padding:0 10px 8px}
+#key li{display:flex;align-items:center;gap:7px;padding:2px 0;white-space:nowrap}
+#key li i{width:11px;height:11px;border-radius:50%;flex:none}
+#key li small{color:var(--mute)}
+#key li i.prov{border:1.5px dashed var(--mute)}
+#sbtn{flex:none}
+@media(max-width:719px){ #sbtn{font-size:0;gap:0;padding:6px 9px} #sbtn svg{width:17px;height:17px} }
 #sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--ink);padding:12px 14px calc(14px + env(safe-area-inset-bottom));max-height:45%;overflow:auto;display:none;z-index:20}
 #sheet h2{margin:0;font-size:18px}
 #sheet .meta,.art .meta{color:var(--mute);font-size:13px;margin:2px 0 6px}
@@ -107,7 +116,7 @@ ol.notes{font-size:14px;color:var(--mute);padding-left:20px}
 </head>
 <body>
 <div id="app">
-  <header><h1 id="title">Idea network (sample data)</h1><button id="loadbtn" class="chip main">Load</button><input id="search" type="search" placeholder="Search titles and articles" autocomplete="off"></header>
+  <header><h1 id="title">Idea network (sample data)</h1><button id="loadbtn" class="chip main">Load</button><input id="search" type="search" enterkeyhint="search" placeholder="Search titles and articles" autocomplete="off"><button id="sbtn" class="chip main" aria-label="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6.5" cy="6.5" r="5"/><path d="M10.5 10.5 15 15"/></svg>Search</button></header>
   <div id="loadpanel"><div class="box">
     <h2>Load notes</h2>
     <p class="hint">Notes are read in your browser and are not stored anywhere. Nothing is sent except requests to GitHub.</p>
@@ -129,6 +138,7 @@ ol.notes{font-size:14px;color:var(--mute);padding-left:20px}
   <main>
     <canvas id="map"></canvas>
     <div id="filters"></div>
+    <div id="key"></div>
     <div class="tool"><button id="zin">+</button><button id="zout">-</button><button id="fit">&#9635;</button></div>
     <div id="sheet"></div>
     <div id="side"><div class="bar"><button id="sideclose" class="chip">Close</button></div><div class="art"></div></div>
@@ -159,8 +169,11 @@ const CONFIG = {
   dynamicMode: true,          // tapped node glides to the centre and the network reshapes around it
   ringSpacing: 120,           // dynamic mode: gap between rings (neighbours, then their neighbours, and so on)
   ringGap: 46,                // dynamic mode: room each node gets around its ring, so busy rings grow
-  ringPull: 0.12,             // dynamic mode: how firmly nodes are held on their ring
-  maxSpeed: 14,               // fastest a node can move per frame, keeps the reshaping smooth
+  ringPull: 0.35,             // dynamic mode: how firmly nodes are held on their ring
+  maxSpeed: 24,               // fastest a node can move per frame, keeps the reshaping smooth
+  friction: 0.4,              // share of speed a node keeps each frame: lower = less drifting and wobble
+  settle: 0.96,               // how fast the layout calms down after a tap: lower = settles sooner (0.9 to 0.99)
+  camEase: 0.25,             // how fast the camera glides to the tapped node: higher = quicker (0.05 to 0.4)
   hitColour: "#f4a629",       // ring around search matches
   hitWidth: { hard: 4, soft: 2 }, // ring thickness: match in the title, match in the article
   arrowMode: "flow",          // "flow" = arrow shows direction of influence/action. "sentence" = arrow follows how the link is written
@@ -234,11 +247,11 @@ function tick(){
     if (rings && n===state.sel){ n.x = n.y = n.vx = n.vy = 0; return; } // the chosen node stays put at the centre
     if (rings){ const d = Math.hypot(n.x,n.y)+.01, f = (rings.get(n)-d)*CONFIG.ringPull*alpha; n.vx += n.x/d*f; n.vy += n.y/d*f; }
     else { n.vx -= n.x*CONFIG.gravity*alpha; n.vy -= n.y*CONFIG.gravity*alpha; }
-    n.vx*=0.8; n.vy*=0.8;
+    n.vx*=CONFIG.friction; n.vy*=CONFIG.friction;
     const sp = Math.hypot(n.vx,n.vy); if (sp>CONFIG.maxSpeed){ n.vx*=CONFIG.maxSpeed/sp; n.vy*=CONFIG.maxSpeed/sp; }
     n.x+=n.vx; n.y+=n.vy;
   });
-  alpha = Math.max(alpha*0.985, 0.015);
+  alpha = Math.max(alpha*CONFIG.settle, 0.015);
 }
 // dynamic mode: each node gets a ring by how many links it is from the chosen node. Unconnected nodes go outermost
 function setRings(){
@@ -272,7 +285,7 @@ function camStep(){
     const k = rings ? Math.min(1.5, Math.max(.3, (Math.min(a.w,a.h)/2-36)/ringR1)) : view.k;
     t = {k, x:a.x-cam.node.x*k, y:a.y-cam.node.y*k};
   }
-  view.k += (t.k-view.k)*.12; view.x += (t.x-view.x)*.12; view.y += (t.y-view.y)*.12;
+  const e = CONFIG.camEase; view.k += (t.k-view.k)*e; view.x += (t.x-view.x)*e; view.y += (t.y-view.y)*e;
   if (cam.node && Math.hypot(t.x-view.x,t.y-view.y)<.5 && Math.abs(t.k-view.k)<.002) cam = null;
 }
 // choose a node (or null). pan = move the camera to it even with dynamic mode off
@@ -401,6 +414,17 @@ function renderFilters(){
   if (state.menu!=="filters") return;
   types.forEach(t => add(`<i style="background:${colour(t)}"></i>${esc(t)}`, state.hiddenTypes.has(t)?"off":"", () => { state.hiddenTypes.has(t) ? state.hiddenTypes.delete(t) : state.hiddenTypes.add(t); alpha=.5; setRings(); renderFilters(); renderTimeline(); }));
   add(state.hideProv ? "provisional hidden" : "provisional shown", state.hideProv?"off":"", () => { state.hideProv = !state.hideProv; alpha=.5; setRings(); renderFilters(); renderTimeline(); });
+}
+
+// ---------- colour key (bottom left, folds away; open by default on wide screens) ----------
+let keyOpen = (() => { try { const v = localStorage.getItem("dn-key"); if (v) return v === "1"; } catch(e){} return innerWidth >= 720; })();
+function renderKey(){
+  const el = document.getElementById("key"), count = t => NODES.filter(n => n.type === t).length;
+  const prov = NODES.some(n => n.status === "provisional");
+  el.innerHTML = `<button aria-expanded="${keyOpen}">Key ${keyOpen ? "&#9662;" : "&#9652;"}</button>` + (keyOpen ? `<ul>` +
+    types.map(t => `<li><i style="background:${colour(t)}"></i>${esc(t)} <small>${count(t)}</small></li>`).join("") +
+    (prov ? `<li><i class="prov"></i>provisional (not yet checked)</li>` : "") + `</ul>` : "");
+  el.querySelector("button").onclick = () => { keyOpen = !keyOpen; try { localStorage.setItem("dn-key", keyOpen ? "1" : "0"); } catch(e){} renderKey(); };
 }
 
 // ---------- article ----------
@@ -639,7 +663,7 @@ function setData(nodes, label, sources){
   hits = new Map(); sInput.value = "";
   document.getElementById("title").textContent = label || "Idea network";
   document.title = label || "Idea network";
-  renderSheet(); renderFilters(); renderTimeline();
+  renderSheet(); renderFilters(); renderKey(); renderTimeline();
   for (let i = 0; i < CONFIG.startTicks; i++) tick();
   fit(); setView("map");
 }
@@ -696,6 +720,7 @@ function setView(v){
   cv.style.display = v==="map"?"block":"none";
   document.getElementById("filters").style.display = v==="map"?"flex":"none";
   document.querySelector(".tool").style.display = v==="map"?"flex":"none";
+  document.getElementById("key").style.display = v==="map"?"block":"none";
   sheetEl.style.display = v==="map" && state.sel && !state.sideOpen ? "block":"none";
   sideEl.style.display = v==="map" && state.sideOpen ? "block":"none";
   document.getElementById("article").style.display = v==="article"?"block":"none";
@@ -712,8 +737,10 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
 });
 const sInput = document.getElementById("search");
 sInput.addEventListener("input", () => runSearch(sInput.value));
+sInput.addEventListener("keydown", e => { if (e.key === "Enter"){ runSearch(sInput.value); sInput.blur(); } }); // blur closes the phone keyboard
+document.getElementById("sbtn").onclick = () => { if (!sInput.value.trim()) sInput.focus(); else { runSearch(sInput.value); sInput.blur(); } };
 window.addEventListener("resize", () => { resize(); if (state.view==="timeline") renderTimeline(); });
-renderFilters(); resize(); for (let i=0;i<CONFIG.startTicks;i++) tick(); fit(); setView("map"); requestAnimationFrame(loop);
+renderFilters(); renderKey(); resize(); for (let i=0;i<CONFIG.startTicks;i++) tick(); fit(); setView("map"); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
