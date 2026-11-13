@@ -45,8 +45,10 @@ Why these limits: without a ceiling size ran away to 8 to 24, and speed could lo
 - **Food supply** mostly changes the head count, not the genes: the population grows until the food lying around
   is back to about the same level. Food x4 multiplied the population by about 6.5 and moved speed by about 40%.
 - **Water thickness** is the reliable lever: x0.5 evolves speed about 3, x2 about 1.3.
-- **Food rots** (Never / Slowly 150 ticks / Quickly 50 ticks): acts like less food. It did not change evolved
-  speed at any lifetime tested. Rotting pellets are drawn fading to brown.
+- **Food rots** (Never / Slowly 150 ticks / Quickly 50 ticks), drawn fading to brown. The result depends on
+  history. Switched on in a settled dish, speed drops (Quickly: 1.8 to 2.4 down to 1.5 to 1.8 in all four
+  seeds tested, after 180k ticks; Slowly: a smaller drop). Started with rot already on, it goes the other way:
+  speed 2.6 to 3.75, sense 73 to 117, only 12 to 43 alive. Sam spotted the drop in the browser (2026-11-13).
 - Sense ignores its own cost (see REVIEW.md).
 
 ## Page details

@@ -19,13 +19,19 @@ they are chasing to themselves) or something over a lifetime (the 300-tick infan
 with stored energy) outweighs adult intake.
 **Question:** is the probe wrong, or is selection on sense really driven by something other than adult intake?
 
-## 3. Food rot does not reward speed
-At normal food an uneaten pellet lasts about 35 ticks before something eats it. Lifetimes of 3000, 1000, 400,
-150, 80 and 40 ticks left evolved speed at 1.6 to 2.1 (same as no rot) and only lowered the population;
-20 ticks starved everything. Rot acts like less food, which the crowd absorbs. The page offers Never / Slowly
-(150) / Quickly (50) and says so honestly.
-**Question:** is there a simple rot rule (value decaying with age, rot only in some places, rot that scales with
-crowding) that makes speed pay off?
+## 3. Food rot: opposite results depending on when it starts
+At normal food an uneaten pellet lasts about 35 ticks before something eats it.
+- Rot switched on in a settled dish (100k ticks without rot first, then 200k with): speed fell in all 4 seeds.
+  Quickly (50 ticks) 2.43 / 2.07 / 1.80 / 1.94 down to about 1.6 / 1.7 / 1.8 / 1.75; Slowly (150) a smaller
+  drop. The population dipped to about 60 to 90 and mostly recovered. Sam saw the drop in the browser first.
+- Rot on from the start (200k ticks, 4 seeds): Slowly no consistent change; Quickly gave speed 2.6 to 3.75,
+  sense 73 to 117, only 12 to 43 alive, food sitting 100 to 210 px from the nearest amoeba (63 to 79 without rot).
+- Older prototype runs at 400 to 3000 ticks changed nothing; 20 ticks starved everything.
+Guess (unproven): in a crowd, the pellets that rot are the far ones, which are what speed is for, so rot removes
+speed's payoff. From scratch, food rots before slow amoebas reach it, so fast long-range hunters take over and
+then keep food sparse, which keeps rewarding speed. Same two-state problem as item 4.
+**Question:** is that the mechanism, and is the two-state result something to show students on purpose (it is
+real ecology) or to remove?
 
 ## 4. Is the speed ceiling of 4 enough?
 Without a ceiling some runs lock into an arms race: speed 5 to 7.5, sense 150 to 180, about 15 alive, food
