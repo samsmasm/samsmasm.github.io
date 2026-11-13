@@ -104,7 +104,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 - `catjump/`: Cat Jump runner game
 
 **Evolution simulations**
-- `amoeba/`: organisms with four heritable genes compete for food
+- `amoeba/`: amoebas with four heritable genes compete for food in a fixed-size dish; sliders for food, water thickness, food rot, mutation; fast forward and history graph. Shared `sim.js`; run `amoeba/test/run.sh` before committing. Open questions for a stronger model in `amoeba/REVIEW.md`.
 - `trees/`: forest evolution, 11 genes, climate controls
 - `walker/`: bone-and-muscle creatures learn to walk (custom Verlet physics)
 - `racecar/`: evolving polygon cars on Planck.js tracks, whole population races at once, background evolution across worker threads. Shared `sim.js`; run `racecar/test/run.sh` before committing. (`racecar2/` is now a redirect here.)

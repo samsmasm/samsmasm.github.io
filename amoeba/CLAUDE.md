@@ -1,122 +1,67 @@
-# CLAUDE.md — Amoeba (Evolution Simulation)
+# CLAUDE.md: Amoeba (evolution in a dish), `/amoeba`
 
-## What this is
+Amoebas eat food pellets, split when full and pass on four genes with small mutations. Sliders change the world
+(food supply, water thickness, food rot, mutation size) and a graph shows what evolves. Not linked from any index
+yet (see the root CLAUDE.md list of unlinked games).
 
-**Amoeba** is a continuous evolution simulation (Stage 7: Behavioral Divergence). Organisms eat food pellets and reproduce, with four heritable genes under natural selection. Metabolic costs are carefully balanced so multiple survival strategies (fast+blind vs slow+sensing) can coexist.
+History: two single-file versions from Dec 2025 / Mar 2026 (`index.html` "Stage 7", `index1.html` with poison
+and ageing) were replaced on 2026-11-13 by this version. Both are in git history. Headless runs showed the old
+pages supported only about 3 to 15 amoebas, died out 20 to 321 times per hour of play, and never evolved
+more than one strategy.
 
-Live at: `unisam.nz/amoeba/`
-
----
-
-## File structure
+## Files
 
 ```
 amoeba/
-  index.html     ← current simulation (~513 lines, all-in-one)
-  index1.html    ← earlier version (~887 lines) — kept for reference, not live
+  index.html      page markup + CSS (AESTHETIC.md Option B)
+  app.js          drawing, controls, fast forward, history graph
+  sim.js          SHARED: World class, genes, costs, mutation, food grid. No DOM. window.AM or require()
+  REVIEW.md       open questions with evidence, for a targeted review by a stronger model
+  test/run.sh     headless Node tests of sim.js (about 15 s)
+  test/browser.js headless Chrome checks (desktop, phone, controls, fast forward)
 ```
 
-Single canvas, full-screen, dark background (`#0d1117`). No external dependencies.
+**Run `amoeba/test/run.sh` before committing** any change to sim.js.
 
----
+## World
 
-## Genome (4 genes)
+Fixed 1200x800 world (every screen runs the same world, scaled to fit). Food arrives at 1.5 pellets per tick
+times the Food supply slider, cap 2000. A 40px grid makes food lookups local, which is what makes fast forward
+possible (the old page checked every pellet for every amoeba each frame). If everything dies, 15 random
+amoebas are seeded and the Extinctions counter goes up (rare now).
 
-| Gene | Range | Effect |
-|---|---|---|
-| `speed` | 0.5 – ~5.5 | Movement speed; cost is **quadratic** (speed² × 0.05) |
-| `size` | 0.5 – ~1.2 | Body size multiplier; cost is linear |
-| `jitter` | 0 – 0.8 | Wander/noise when not hunting; cost is quadratic (jitter² × 0.5) |
-| `senseRange` | 0 – 250px | Detection radius for food; cost is linear per pixel |
+## Genes and costs
 
-**Visual encoding:**
-- Body colour: speed → hue shift, purple (slow) to red (fast) `hsl(280 - speedNorm*280, 100%, 50%)`
-- Outline colour: jitter → same hue mapping
-- Sense circle drawn at low opacity if `senseRange > 5`
+Genes: `speed` [0.5, 4], `size` [0.5, 3], `jitter` (wobble when no food is in sight) [0, 1], `sense` [0, 250].
+Energy per tick: `0.05 + speed² x 0.05 x thickness + size² x 0.1 + jitter² x 0.5 + sense x 0.002`, times 1.5
+for the first 300 ticks of life. Split at 250 energy; the child gets 120. Each gene mutates with probability 0.5
+by up to `mutation x` (1, 1, 0.5, 50) per gene, clamped to its limits.
 
----
+Why these limits: without a ceiling size ran away to 8 to 24, and speed could lock into an arms race (speed 5 to
+7.5, about 15 alive, food piling up). Speed ceiling 4 stopped that in tests; 5 did not.
 
-## Metabolism (energy per frame)
+## What the sliders do (measured)
 
-```
-loss = baseMetabolism           (0.05)
-     + speed² × speedCostFactor (0.05)
-     + size × sizeCostFactor    (0.05)
-     + jitter² × jitterCostFactor (0.5)
-     + senseRange × senseCostFactor (0.002)
-```
+- **Food supply** mostly changes the head count, not the genes: the population grows until the food lying around
+  is back to about the same level. Food x4 multiplied the population by about 6.5 and moved speed by about 40%.
+- **Water thickness** is the reliable lever: x0.5 evolves speed about 3, x2 about 1.3.
+- **Food rots** (Never / Slowly 150 ticks / Quickly 50 ticks): acts like less food. It did not change evolved
+  speed at any lifetime tested. Rotting pellets are drawn fading to brown.
+- Sense ignores its own cost (see REVIEW.md).
 
-During infancy (`age < 300 frames`): `loss × 1.5`. This penalises newborns that happen to reproduce in a rich patch before proving long-term viability.
+## Page details
 
-**Key design intent:** Speed cost is quadratic — doubling speed costs 4× as much energy, preventing runaway speed evolution. Jitter is also quadratic for the same reason.
+- Watch = 1 tick per frame, 5x, Fast forward = as many ticks as fit in 22 ms per frame (about 240x on a laptop).
+- History graph keeps up to 600 samples from the start; when full it drops every other one and halves the rate.
+- Below 860px the panel moves under the dish and the page scrolls.
+- No modals, no emoji.
 
----
+## Checking in a browser
 
-## Behaviour
+Serve the repo root with `python3 -m http.server 8765 --bind 127.0.0.1`, then
+`node amoeba/test/browser.js <screenshot dir>` (Puppeteer from `~/.cache/sw-test`, `/usr/bin/google-chrome`).
 
-Each frame, organism checks within its `senseRange` for the closest food pellet. If found, it steers toward it (direct velocity toward target). If no food in range, it wanders: angle drifts by `jitter × random(-0.5, 0.5)`.
+## Status
 
-Bounce off canvas walls (velocity component negated).
-
----
-
-## Reproduction
-
-Threshold: `energy >= 250`. Cost: 120 energy. Offspring spawned ±5px from parent. Each gene mutates independently with probability 0.5; magnitude scales with `CONFIG.mutationRate × 2`.
-
-Mutations are clamped:
-- `speed >= 0.5`
-- `size >= 0.5`
-- `jitter >= 0`
-- `senseRange >= 0`
-
----
-
-## Food
-
-Spawned as green circles (shade encodes nutrition: bright = high). Eaten when organism centre is within `organism.radius + food.size`. Nutrition gain: `(15 + nutrition × 40) × foodNutritionMulti`.
-
-Organism `radius = baseRadius × genes.size + energy × radiusScale`. Larger energy = visually bigger body.
-
-Population cap on food: 3000 pellets.
-
----
-
-## CONFIG constants
-
-```js
-reproThreshold:  250     // energy needed to reproduce
-reproCost:       120     // energy cost of reproducing
-speedCostFactor: 0.05    // quadratic speed energy cost per unit² per frame
-jitterCostFactor: 0.5   // quadratic jitter energy cost per unit² per frame
-senseCostFactor: 0.002  // linear sense range energy cost per px per frame
-infantDuration:  300    // frames of higher metabolism after birth
-```
-
-Changing `reproThreshold` has large downstream effects — lower = faster population growth, less selection pressure per generation.
-
----
-
-## Current status
-
-Working. Stage 7 (Behavioral Divergence) is the live version in `index.html`. `index1.html` is an earlier reference backup — do not modify it. No known bugs or planned features.
-
----
-
-## UI sliders (live, affect `CONFIG` directly)
-
-| Slider | Config key | Default |
-|---|---|---|
-| Algae Growth | `foodSpawnRate` | 0.10 |
-| Mutation Rate | `mutationRate` | 0.10 |
-| Food Nutrition | `foodNutritionMulti` | 1.0 |
-
-Stats panel updates every 10 frames: food count, organism count, avg speed, avg sense.
-
----
-
-## Constraints
-
-- Single file. Keep all HTML/CSS/JS in `index.html`.
-- `index1.html` is a reference backup — do not modify it.
-- The simulation auto-restarts from a single organism if the population hits zero after frame 100.
+Rebuilt and tested 2026-11-13 (Node tests + headless Chrome on desktop and phone). Open questions are in
+REVIEW.md.
