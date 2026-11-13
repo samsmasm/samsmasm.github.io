@@ -6,7 +6,8 @@
 
 ## Data and privacy
 
-- The page ships with 9 invented sample nodes only. No real notes and no tokens are in this repo, and none should ever be committed here.
+- The page ships with 9 invented sample nodes only. No tokens are in this repo, ever. Real notes go here only as **public sets** that Sam has chosen to publish (see below); never commit any other real notes.
+- Public sets: `sets/<slug>.json` (parsed nodes and sources) plus a row in `sets/index.json`. The Load panel lists them under "Public notes", and `?set=<slug>` is a direct link that opens one. Made with `publish_set.py` in the source folder (usage in its header). Published so far: `bm-hr` (IB BM Unit 2 HRM, 2026-11-13, unisam.nz/notes/?set=bm-hr). Re-run the script after those nodes change.
 - The Load button reads nodes in the visitor's browser: from a GitHub folder (public repos need no token, private repos need a read-only fine-grained token the visitor pastes in) or from chosen `.md` files. It also reads `Sources.md` from next to the nodes folder, if there is one. Nothing is stored or sent anywhere except requests to api.github.com. The token is only kept on the device if the visitor ticks "Remember", which uses localStorage on this origin.
 - Sam's real notes live in the private repo `samsmasm/notes`, in `Sam's notes/`. Read `Sam's notes/CLAUDE.md` there for the node file format and the display rules.
 
