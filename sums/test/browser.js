@@ -38,7 +38,7 @@ const HELPERS = () => {
       const w = String(n).length * 0.8 * 0.9;
       c.strokes = [...extra, ...numStrokes(n, w / 2, -0.45, 0.9, mirror)];
     } else {
-      const top = { div: -1.3, miss: -1.1 }[c.q.kind] ?? 0.3;
+      const top = { div: -1.3, miss: -1.1, expr: -1.1 }[c.q.kind] ?? 0.3;
       c.strokes = [...extra, ...numStrokes(n, 0, top, 1, mirror)];
     }
     draw(c);
@@ -88,7 +88,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Missing number', '8: Sums and Missing number ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -135,7 +135,7 @@ const fakeSpeech = () => {
 
   // ---- Mia: Sums, set up through the keypad page
   await page.click('#actTiles [data-act="sums"]');
-  ok(await visible('#setupS') && await visible('#kpBlock') && !(await visible('#maxBlock')), 'Sums opens the keypad setup');
+  ok(await visible('#setupS') && await visible('#kpBlock') && await page.$eval('#optBlock', e => e.children.length === 0), 'Sums opens the keypad setup');
   ok(!(await said()).slice(-1)[0].startsWith('Choose'), 'age 8: not read aloud automatically');
   await page.click('#opsOpts button[data-v="/"]');
   await page.click('#nOpts button[data-v="12"]');
@@ -262,7 +262,79 @@ const fakeSpeech = () => {
   });
   ok(mw[0], 'missing number: answer on the line is read');
   ok(mw[1], 'missing number: answer written in the box is read');
+  ok(await page.evaluate(() => { const c = cards[2]; c.strokes = numStrokes(c.q.ans, 0, 0.2); return read(c) === String(c.q.ans); }), 'missing number: answer written a bit low, under the line, is read');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/6-missing.png' });
+
+  // every card's printed question fits and leaves room to write the answer
+  const fits = () => page.evaluate(() => cards.filter(c => {
+    const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect();
+    const room = c.q.kind === 'expr' || c.q.kind === 'miss' ? c.ay > 2.5 * c.F : c.h - c.ay >= 1.3 * c.F;
+    return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
+  }).map(c => JSON.stringify(c.q)));
+  const writeAllAndMark = async () => {
+    await page.evaluate(() => cards.forEach(c => writeNum(c, c.q.ans)));
+    await page.click('#markBtn');
+    return page.evaluate(() => cards.filter(c => c.el.dataset.state !== 'right').map(c => `${JSON.stringify(c.q)} read ${read(c)}`));
+  };
+
+  // ---- Mia: Arrays
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="arrays"]');
+  ok(await page.evaluate(() => $('#kpBlock').dataset.mode === 'grid' && $('#labA').textContent === 'Rows' && $('#labB').textContent === 'Columns' && getComputedStyle($('#opsOpts')).visibility === 'hidden'), 'Arrays setup: keypads for rows and columns, no signs');
+  ok(await page.evaluate(() => { draft.pa = [0]; syncOpts(); const w = $('#warn').textContent, d = $('#newBtn').disabled; draft.pa = [2, 3, 4, 5]; syncOpts(); return /other than 0/.test(w) && d && !$('#newBtn').disabled; }), 'rows of only 0: warning and Start off');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'array' && c.q.ans === c.q.r * c.q.c && c.el.querySelectorAll('circle').length === c.q.ans && c.q.r >= 2 && c.q.r <= 5 && c.q.c >= 2 && c.q.c <= 9)), 'Arrays: 2–5 rows by 2–9 columns, dots = rows × columns');
+  ok((await fits()).length === 0, 'Arrays fit with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Arrays: answers written under them are read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/12-arrays.png' });
+
+  // ---- Mia: Place value
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="pv"]');
+  ok(await page.evaluate(() => draft.kinds.join() === 'blocks,expanded,more' && draft.max === 999), 'Place value setup: all three kinds, up to 999');
+  await page.click('#optBlock [data-key="kinds"] [data-v="more"]');
+  await page.click('#optBlock [data-key="kinds"] [data-v="expanded"]');
+  await page.click('#optBlock [data-key="kinds"] [data-v="blocks"]'); // the last one stays on
+  ok(await page.evaluate(() => draft.kinds.join() === 'blocks'), 'kinds toggle, and one always stays on');
+  const pv = await page.evaluate(() => {
+    const bad = [];
+    for (let i = 0; i < 300; i++) {
+      for (const max of [99, 999]) {
+        const b = ACTS.pv.make({ kinds: ['blocks'], max });
+        if (b.h * 100 + b.t * 10 + b.o !== b.ans || b.ans > max || b.ans < 10) bad.push('blocks ' + JSON.stringify(b));
+        const e = ACTS.pv.make({ kinds: ['expanded'], max }), parts = e.text.split(' + ').map(Number);
+        if (parts.reduce((x, y) => x + y, 0) !== e.ans || parts.some(p => p === 0 || !/^[1-9]0*$/.test(String(p)))) bad.push('expanded ' + JSON.stringify(e));
+        const m = ACTS.pv.make({ kinds: ['more'], max }), [, amt, dir, v] = m.text.match(/^(\d+) (more|less) than (\d+)$/);
+        if (m.ans !== (dir === 'more' ? +v + +amt : +v - +amt) || m.ans < 0 || m.ans > max || (max === 99 && +amt === 100)) bad.push('more ' + JSON.stringify(m));
+      }
+    }
+    return bad.slice(0, 4);
+  });
+  ok(pv.length === 0, 'Place value questions: blocks = the number, expanded parts add up (no 0 parts), more/less right and in range ' + pv.join(' '));
+  await page.click('#optBlock [data-key="kinds"] [data-v="expanded"]');
+  await page.click('#optBlock [data-key="kinds"] [data-v="more"]');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.filter(c => c.q.kind === 'pv').every(c => c.el.querySelectorAll('rect').length === c.q.h + c.q.t + c.q.o)), 'blocks drawn: one shape per hundred, ten and one');
+  ok((await fits()).length === 0, 'Place value fits with room to write ' + (await fits()).join(' '));
+  const pvBad = await writeAllAndMark();
+  ok(pvBad.length === 0, 'Place value: blocks and "= ___" answers read and marked right ' + pvBad.join(' | '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/13-pv.png' });
+
+  // ---- Mia: Number lines
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="nline"]');
+  ok(await page.evaluate(() => draft.steps.join() === '2,5,10'), 'Number lines setup: in 2s, 5s, 10s to start');
+  await page.click('#optBlock [data-key="steps"] [data-v="100"]');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => {
+    const t = [...c.el.querySelectorAll('text')].map(x => +x.textContent);
+    return c.q.ans === c.q.start + c.q.k * c.q.step && c.q.k >= 1 && c.q.k <= 9 && t[0] === c.q.start && t[1] === c.q.start + 10 * c.q.step && [2, 5, 10, 100].includes(c.q.step);
+  })), 'Number lines: ends labelled, arrow inside, answer = start + steps');
+  ok((await fits()).length === 0, 'Number lines fit with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Number lines: answers read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/14-nline.png' });
+  ok(await page.evaluate(() => [labelFor('arrays~2345|23456789|12'), labelFor('pv~blocks,more|999|6'), labelFor('nline~2,5,10|12')].join(' / '))
+    === 'Arrays · 2–5 rows · 2–9 columns · 12 questions / Place value · blocks, more · up to 999 · 6 questions / Number lines · in 2s, 5s, 10s · 12 questions', 'record labels for the new activities');
 
   // ---- Ada (5): How many? and Make 10, read aloud
   await page.click('#backBtn'); await page.click('#backBtn');
@@ -277,8 +349,8 @@ const fakeSpeech = () => {
   ok((await said()).slice(-1)[0] === 'How many dots?', 'speaker button repeats it');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/7-howmany.png' });
   await page.click('#setupBtn');
-  ok(await visible('#maxBlock') && !(await visible('#kpBlock')), 'How many? setup: Up to, no keypads');
-  await page.click('#maxOpts [data-v="20"]');
+  ok(await visible('#optBlock [data-key="max"]') && !(await visible('#kpBlock')), 'How many? setup: Up to, no keypads');
+  await page.click('#optBlock [data-key="max"] [data-v="20"]');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.frame svg').length === 2 && c.el.querySelectorAll('svg circle').length === c.q.dots)), 'up to 20: two frames, dots match');
   await page.click('#backBtn');

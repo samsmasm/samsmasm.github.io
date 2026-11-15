@@ -4,7 +4,7 @@ Maths practice for Sam's two daughters, written by finger or stylus on a touch s
 
 Users: a 5-year-old in US-style kindergarten who **can't read yet** (pictures, numbers and spoken prompts only, never written questions she must read) and a nearly-8-year-old in grade 2 working above level. Sam wants them free to explore: the girls change their own settings, nothing is locked.
 
-## Flow (2026-11-15, steps 1 and 2 of Sam's plan done)
+## Flow (2026-11-15, steps 1, 2 and the first half of 3 done)
 1. **Names** (opening screen): big name tiles, Everyone, "+ Add a name".
 2. **Age**: "How old are you?" with cake tiles (5 or 8 candles, read aloud). A named player is asked once (old names without an age get asked on first tap) and the age is saved on the player; **Everyone** is asked every time, so ages never mix. Ages offered: `AGES = [5, 8]` (6 and 7 to come; store the age, not a grade).
 3. **Home**: "What do you want to do today?" activity tiles for that age (picture, name, best time for her current settings). Age 5: read aloud on arrival. Header: ‹ Names, speaker, "Name · age", Records.
@@ -23,7 +23,11 @@ Each has `ages`, `defaults(age)`, `make(cfg)` → question, `setup` kind, `say` 
 - **Teen numbers** (5): 11–19 as a full ten frame plus a second frame with 1–9 dots.
 - **Read every card aloud** (5): each card has a speaker button in its foot (`cardSay`: "3 plus 4", "3 and 4 make what?", "7 is 3 and what?"; frames use the activity's prompt). Not shown at age 8.
 - **Backwards digits**: the reader has 17 classes, digits 0–9 plus BACKWARDS 2 3 4 5 6 7 9 (trained on mirrored MNIST, see train.py), because a plain flip check can't tell a backwards 5 from a real 2 (tested: same confidence). A backwards digit still counts as right; the card shows it mirrored next to the right way round, and at age 5 it is said ("Watch out, your 3 is backwards"). Tests: 420/420 synthetic backwards digits read and flagged, 0/600 normal digits flagged, a real 2 for 5 still wrong. Sam briefly floated a "receptive" version (choose which way round is right) and then dropped it; worth raising again only if he asks.
-Ideas agreed for later (step 3, age 8): arrays, place value, number lines, then clocks and coins, then word problems.
+- **Arrays** (8): r rows × c columns of dots, write the total (rows × columns). Setup `grid`: the two keypads relabelled Rows / Columns, signs and "bigger" hidden; 0 is skipped, only 0 → warning and Start off (`blocked`). Default rows 2–5, columns 2–9.
+- **Place value** (8): kinds (multi-select) Blocks (base-ten: hundreds squares up to 3 a row, tens sticks, ones cubes 3 a row, drawn to true proportions, `PV_EM` sets the size), 300 + 40 + 7 (expanded form, zero parts left out, shuffled about a third of the time so she can't just copy digits), 10 more / 10 less (amounts 1, 10, 100; never below 0 or above the max). Up to 99 or 999. Expanded and more/less are `expr` cards: a line of text then "= ___".
+- **Number lines** (8): 10 steps, only the two ends labelled, an arrow at tick 1–9; she works out the step and writes the number. Counting in 1s / 2s / 5s / 10s / 100s (multi-select), start a multiple of 10 steps.
+- Picture cards (ten frames, arrays, blocks, number lines) all use the `frame` layout: picture on top, answer anywhere below. Missing number and `expr` cards read **all** her writing (bottom row wins), so an answer written on the line, in the box, or a bit low all count.
+Ideas agreed for later (age 8): clocks and coins, then word problems.
 - The reading under each card is big (26 px) so the girls can check it (Sam).
 
 ## The sheet (unchanged look: plain, like a paper printout; Sam likes it)
@@ -39,12 +43,12 @@ Ideas agreed for later (step 3, age 8): arrays, place value, number lines, then 
 ## Setup page (Start again)
 - Keypad kind (Sums, Missing number): laid out like a sum. First number's calculator keypad (7 8 9 / 4 5 6 / 1 2 3 / 0 All) on top; signs left of the second keypad; "10–99 / 100–999 / 1000–9999" beside each; a line; Questions 6/12/20 and Start. Tap to toggle digits, drag to set many, at least one stays on; a key after 10–99 starts a fresh pick. Default 0–9.
 - ÷ with keypads: divide by the second number (0 skipped), the answer comes from the first number's picks. Only 0 to divide by: warning, Start off if ÷ is the only sign.
-- How many?: "Up to" 5/10/20. Make 10: questions only.
+- `opts` kind (How many?, Number bonds, Place value, Number lines): rows of buttons built from the activity's `options` ([{key, label, values, multi}]); multi rows keep at least one on. Make 10 and Teen numbers: no setup.
 - "Like these": four sample questions in the printed style (`qMarkup`), tap for more. Back without Start discards changes.
 
 ## Players, settings, records
 - localStorage: `sums-players` = `[{id, name, age}]`; settings per player per activity `sums-cfg-<id>-<act>` (Everyone: `sums-cfg-guest-<age>-<act>`); records `sums-rec-<id>` = `{ best: {key: {ms, count, t}}, history: [{k, ms, first, n, t}] }` (last 100).
-- Record keys: Sums keeps the original format with no prefix (`+-|2|1:0123456789|12`, signs | first | second | count, keypad line = `1:` + digits) so old records still count; others are `missing~<same>`, `howmany~<max>|<n>`, `bonds~<max>|<n>`, `teens~<n>`, `make10~<n>`. `labelFor(key)` names them.
+- Record keys: Sums keeps the original format with no prefix (`+-|2|1:0123456789|12`, signs | first | second | count, keypad line = `1:` + digits) so old records still count; others are `missing~<same>`, `howmany~<max>|<n>`, `bonds~<max>|<n>`, `teens~<n>`, `make10~<n>`, `arrays~<row digits>|<col digits>|<n>`, `pv~<kinds>|<max>|<n>`, `nline~<steps>|<n>`. `labelFor(key)` names them.
 - A sheet counts when every card is right. Time runs from the first stroke to the mark that makes it all right; header shows time and "New best!" or the best. No running clock.
 - **Remove** is double-click proof (Sam): the first tap turns it into "Keep <name>" and the real confirm appears at the top of the page, ignoring taps for 0.5 s. Removes the player, records and settings.
 
