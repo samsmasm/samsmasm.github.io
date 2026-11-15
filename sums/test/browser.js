@@ -114,13 +114,29 @@ const fakeSpeech = () => {
   ok(await visible('#ageS'), 'Everyone asks again next time');
   await page.click('#backBtn');
 
-  // ---- Mia: Sums, set up through the keypad page
-  await page.click('#nameTiles [data-id]:not([data-id="guest"]):not([data-id="old1"])');
+  // ---- the bug Sam hit: one girl's choices must never carry to the other.
+  // Old one-device settings (from before names) are ignored; Ada (5) picks
+  // single digits, then Mia (8) gets her own choices.
+  await page.evaluate(() => localStorage.setItem('sums-settings', JSON.stringify({ ops: ['+'], a: 1, b: 1, pa: [1, 2], pb: [1, 2], n: 6 })));
+  await page.click('#nameTiles [data-id="old1"]');
   await page.click('#actTiles [data-act="sums"]');
-  ok(await visible('#sheet') && await page.$$eval('.card', c => c.length) === 12, 'Sums for 8: a sheet of 12 straight away');
-  ok(!(await said()).slice(-1)[0].startsWith('Work'), 'age 8: not read aloud automatically');
-  await page.click('#setupBtn');
-  ok(await visible('#setupS') && await visible('#kpBlock') && !(await visible('#maxBlock')), 'Start again opens the keypad setup');
+  ok(await visible('#setupS') && /Ada · Sums/.test(await page.$eval('#title', e => e.textContent)), 'Sums tile asks first: setup page, titled with her name');
+  ok((await said()).slice(-1)[0] === 'Choose, then press Start.', 'age 5 setup is spoken');
+  await page.click('.kp[data-line="a"] [data-k="3"]'); // Ada switches 3 on: 0–5 minus 3
+  await page.click('#newBtn');
+  ok(await visible('#sheet') && await page.evaluate(() => cards.length === 6 && cards.every(c => c.q.a <= 5 && c.q.a !== 3)), 'Ada gets her sheet from her choices');
+  await page.click('#backBtn'); await page.click('#backBtn');
+  await page.click('#nameTiles [data-id]:not([data-id="guest"]):not([data-id="old1"])');
+  ok(await page.evaluate(() => cards.length === 0), 'switching names clears the last sheet');
+  await page.click('#actTiles [data-act="sums"]');
+  ok(await page.evaluate(() => draft.a === 2 && draft.b === 1 && draft.n === 12 && draft.ops.join() === '+,-,*'), "Mia's setup shows her own (age-8) choices, not Ada's or the old device ones: " + await page.evaluate(() => JSON.stringify(draft)));
+  await page.click('#backBtn');
+  ok(await visible('#homeS'), 'Back from a setup opened from home goes home (not to an old sheet)');
+
+  // ---- Mia: Sums, set up through the keypad page
+  await page.click('#actTiles [data-act="sums"]');
+  ok(await visible('#setupS') && await visible('#kpBlock') && !(await visible('#maxBlock')), 'Sums opens the keypad setup');
+  ok(!(await said()).slice(-1)[0].startsWith('Choose'), 'age 8: not read aloud automatically');
   await page.click('#opsOpts button[data-v="/"]');
   await page.click('#nOpts button[data-v="12"]');
   await page.click('#newBtn');
@@ -212,6 +228,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn');
   ok(await visible('#homeS') && /Best 1:3/.test(await page.$eval('#actTiles [data-act="sums"] .sub', e => e.textContent)), 'home tile shows her best time');
   await page.click('#actTiles [data-act="missing"]');
+  await page.click('#newBtn');
   const miss = await page.evaluate(() => cards.every(c => {
     const q = c.q, calc = { '+': (a, b) => a + b, '-': (a, b) => a - b, '*': (a, b) => a * b, '/': (a, b) => a / b }[q.op];
     return q.kind === 'miss' && calc(q.a, q.b) === q.c && q.ans === q[q.hide] && c.el.querySelectorAll('.bx').length === 2;
@@ -235,6 +252,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
   await page.click('#actTiles [data-act="howmany"]');
+  await page.click('#newBtn');
   ok((await said()).slice(-1)[0] === 'How many dots?', 'age 5: the question is read aloud');
   const hm = await page.evaluate(() => cards.every(c => c.q.kind === 'frame' && c.q.ans === c.q.dots && c.el.querySelectorAll('svg circle').length === c.q.dots && c.q.dots >= 1 && c.q.dots <= 10));
   ok(hm, 'How many?: ten frame shows exactly the answer in dots (up to 10)');
@@ -269,6 +287,7 @@ const fakeSpeech = () => {
   // Number bonds: write in the empty circle
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="bonds"]');
+  await page.click('#newBtn');
   ok((await said()).slice(-1)[0] === 'What number goes in the empty circle?', 'Number bonds read aloud');
   const bonds = await page.evaluate(() => cards.every(c => c.q.kind === 'bond' && c.q.w === c.q.p + c.q.q2 && c.q.ans === c.q[c.q.hide] && c.el.querySelectorAll('.hole').length === 1 && c.el.querySelectorAll('svg text').length === 2 && c.q.w <= 10));
   ok(bonds, 'Number bonds: whole = parts, one empty circle, two numbers shown, up to 10');
@@ -287,7 +306,9 @@ const fakeSpeech = () => {
   // Ada's Sums starts small, and is hers, not Mia's
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="sums"]');
-  ok(await page.evaluate(() => cards.length === 6 && cards.every(c => c.q.op === '+' && c.q.a <= 5 && c.q.b <= 5)), 'Sums at 5 starts with 6 small additions (0–5)');
+  ok(await page.evaluate(() => draft.pa.join('') === '01245' && draft.n === 6), "Ada's Sums setup remembers her own choices (0–5 without 3)");
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.length === 6 && cards.every(c => c.q.op === '+' && c.q.a <= 5 && c.q.a !== 3 && c.q.b <= 5)), 'and her sheet uses them');
 
   // labels for every kind of record
   ok(await page.evaluate(() => [labelFor('+-|1:0123456789|2|12'), labelFor('missing~+|2|1:05|6'), labelFor('howmany~10|6'), labelFor('make10~12')].join(' / '))
@@ -297,7 +318,6 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id]:not([data-id="guest"]):not([data-id="old1"])');
   await page.click('#actTiles [data-act="sums"]');
-  await page.click('#setupBtn');
   for (const v of ['+', '-', '/']) await page.click(`#opsOpts button[data-v="${v}"]`);
   await page.click('.kp[data-line="a"] [data-k="2"]');
   await page.click('.kp[data-line="b"] [data-k="all"]');
@@ -353,12 +373,14 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="old1"]');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone-home.png' });
   await page.click('#actTiles [data-act="howmany"]');
+  await page.click('#newBtn');
   await page.evaluate(() => buildSheet({ max: 20, n: 20 }));
   ok(await cols() === 2, 'phone portrait: 2 columns');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone.png' });
   await page.setViewport({ width: 1180, height: 820, hasTouch: true });
   await page.click('#nameTiles [data-id="old1"]');
   await page.click('#actTiles [data-act="sums"]');
+  await page.click('#newBtn');
   await page.evaluate(() => buildSheet({ ops: ['+', '-', '*', '/'], a: 3, b: 2, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 20 }));
   ok(await cols() === 5, 'landscape: 5 columns for 20');
   const fit = await page.evaluate(() => cards.filter(c => { const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect(); return r.right > w.right + 1 || r.left < w.left - 1 || r.bottom > w.bottom + 1; }).length);

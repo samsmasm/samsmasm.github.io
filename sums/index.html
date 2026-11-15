@@ -491,19 +491,13 @@ const loadRec = id => store.get(recKey(id), { best: {}, history: [] });
 const cfgStoreKey = a => `sums-cfg-${current}${current === 'guest' ? '-' + age : ''}-${a}`;
 function loadCfg(a) {
   const d = ACTS[a].defaults(age);
-  let s = store.get(cfgStoreKey(a), null);
-  if (!s && a === 'sums' && age === 8) s = oldSettings(); // settings saved before activities existed
+  // (the one-device settings from before names existed are NOT used: they
+  // belonged to whoever used it last, and gave the 8-year-old her sister's)
+  const s = store.get(cfgStoreKey(a), null);
   const c = { ...d, ...(s || {}) };
   for (const k of ['pa', 'pb']) if (k in d && (!Array.isArray(c[k]) || !c[k].length)) c[k] = d[k];
   if (c.ops) c.ops = [...c.ops];
   return c;
-}
-function oldSettings() {
-  const s = store.get('sums-settings', null);
-  if (!(s && Array.isArray(s.ops) && s.ops.length)) return null;
-  const out = { ...s };
-  for (const k of ['pa', 'pb']) if (Array.isArray(out[k]) && !s.v && out[k].join() === ONE_TO_NINE.join()) out[k] = ALL_DIGITS;
-  return out;
 }
 function fmtTime(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 function fmtDate(t) { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
@@ -537,14 +531,14 @@ function show(s) {
   const vis = { backBtn: s !== 'names', setupBtn: s === 'sheet', sayBtn: s === 'sheet' || s === 'home' || s === 'age', markBtn: s === 'sheet', score: s === 'sheet', meBtn: s === 'home' };
   for (const id in vis) $('#' + id).hidden = !vis[id];
   const p = current ? player(current) : null;
-  $('#title').textContent = { names: 'Sums', age: p ? p.name : '', home: p ? `${p.name} · ${age}` : '', setup: act ? ACTS[act].name : '', me: p ? p.name : '', sheet: act ? ACTS[act].name : '' }[s];
+  $('#title').textContent = { names: 'Sums', age: p ? p.name : '', home: p ? `${p.name} · ${age}` : '', setup: act && p ? `${p.name} · ${ACTS[act].name}` : '', me: p ? p.name : '', sheet: act ? ACTS[act].name : '' }[s];
   $('#title').className = s === 'sheet' ? 'sheetTitle' : '';
   $('#backBtn').textContent = { age: '‹ Names', home: '‹ Names', setup: '‹ Back', me: '‹ Back', sheet: '‹ Home' }[s] || '‹ Back';
   $('#score').hidden = s !== 'sheet';
 }
 $('#backBtn').onclick = () => {
   if (screen === 'age' || screen === 'home') goNames();
-  else if (screen === 'setup') sheetAct === act && cards.length ? show('sheet') : goHome();
+  else if (screen === 'setup') setupFrom === 'sheet' && sheetAct === act && cards.length ? show('sheet') : goHome();
   else goHome();
 };
 $('#sayBtn').onclick = () => {
@@ -556,6 +550,9 @@ $('#sayBtn').onclick = () => {
 // names
 function goNames() {
   current = null; age = null;
+  // a new person never lands on the last person's sheet
+  for (const k of cards) ro.unobserve(k.work);
+  cards = []; sheetAct = null; $('#sheet').innerHTML = '';
   $('#nameTiles').innerHTML = allPlayers().map(p =>
     `<button class="tile person" data-id="${esc(p.id)}"><span class="nm">${esc(p.name)}</span><span class="sub">${p.id === 'guest' ? 'any age' : p.age ? 'age ' + p.age : ''}</span></button>`).join('')
     + `<button class="tile add" id="addTile"><span class="nm">+ Add a name</span></button>`;
@@ -602,6 +599,8 @@ function goHome() {
 $('#actTiles').addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
   act = t.dataset.act;
+  // anything with choices asks first, with her own last choices ready to go
+  if (ACTS[act].setup !== 'none') { goSetup(); if (age === 5) say('Choose, then press Start.'); return; }
   buildSheet(loadCfg(act));
   show('sheet');
   if (age === 5) say(ACTS[act].say);
@@ -650,12 +649,13 @@ $('#confirmRemoveBtn').onclick = () => {
 // ---------- setup ----------
 // The setup page is laid out like a sum: first number's keypad on top, signs
 // beside the second number's keypad, a line, then how many and Start.
-let draft = null;
+let draft = null, setupFrom = 'home';
 const KEYS = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
 for (const kp of document.querySelectorAll('.kp')) {
   kp.innerHTML = KEYS.map(k => `<button data-k="${k}">${k}</button>`).join('') + '<button data-k="all" class="allk">All</button>';
 }
-function goSetup() {
+function goSetup(from = 'home') {
+  setupFrom = from;
   draft = loadCfg(act);
   const kind = ACTS[act].setup;
   $('#kpBlock').hidden = kind !== 'keypad';
@@ -664,7 +664,7 @@ function goSetup() {
   syncOpts();
   show('setup');
 }
-$('#setupBtn').onclick = goSetup;
+$('#setupBtn').onclick = () => goSetup('sheet');
 function syncOpts() {
   if (draft.ops) {
     for (const b of $('#opsOpts').children) b.setAttribute('aria-pressed', draft.ops.includes(b.dataset.v));
@@ -740,7 +740,10 @@ function renderPreview() {
   }).join('');
 }
 $('#preview').addEventListener('click', renderPreview);
-$('#newBtn').onclick = () => { store.set(cfgStoreKey(act), draft); buildSheet(loadCfg(act)); show('sheet'); };
+$('#newBtn').onclick = () => {
+  store.set(cfgStoreKey(act), draft); buildSheet(loadCfg(act)); show('sheet');
+  if (age === 5) say(ACTS[act].say);
+};
 
 // ---------- the printed question ----------
 // + − × stacked with a line (space above for carrying, answer under the line);

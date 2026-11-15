@@ -8,12 +8,14 @@ Users: a 5-year-old in US-style kindergarten who **can't read yet** (pictures, n
 1. **Names** (opening screen): big name tiles, Everyone, "+ Add a name".
 2. **Age**: "How old are you?" with cake tiles (5 or 8 candles, read aloud). A named player is asked once (old names without an age get asked on first tap) and the age is saved on the player; **Everyone** is asked every time, so ages never mix. Ages offered: `AGES = [5, 8]` (6 and 7 to come; store the age, not a grade).
 3. **Home**: "What do you want to do today?" activity tiles for that age (picture, name, best time for her current settings). Age 5: read aloud on arrival. Header: ‹ Names, speaker, "Name · age", Records.
+   Tapping an activity with choices (Sums, Missing number, How many?, Number bonds) opens its **setup page first** (Sam: ask every time), with that player's own last choices selected; title "Name · Activity"; at age 5 it says "Choose, then press Start." Activities with no choices (Make 10, Teen numbers) go straight to the sheet. Back on a setup goes to where she came from (home, or her sheet via Start again).
+   Switching names clears the current sheet, so nobody lands on someone else's.
 4. **Sheet**: header ‹ Home, Start again (that activity's setup), speaker (repeats the question), score, Mark. At age 5 the question is spoken when the sheet opens.
 5. **Records** page: change age (cakes), best times and recent sheets for all activities, Remove (double-click proof, below).
 
 ## Activities (`ACTS` in index.html)
 Each has `ages`, `defaults(age)`, `make(cfg)` → question, `setup` kind, `say` (spoken prompt), `pic` (tile SVG), `key(cfg)` / `label(key)` for records.
-- **Sums** (5 and 8): stacked + − ×, long-division ÷, keypad setup. Defaults: age 5 = + only, 0–5 and 0–5, 6 questions; age 8 = + − ×, 10–99 and 0–9, 12 (or the old global `sums-settings` if she had one).
+- **Sums** (5 and 8): stacked + − ×, long-division ÷, keypad setup. Defaults: age 5 = + only, 0–5 and 0–5, 6 questions; age 8 = + − ×, 10–99 and 0–9, 12. The old one-device `sums-settings` (from before names) is **never** used: it was briefly carried over to age-8 Sums and gave the 8-year-old her sister's single digits (Sam hit this).
 - **Missing number** (8): `7 + ☐ = 12` with "☐ = ___" underneath. Hides first or second number; never an equation where any number works (0 × ☐ = 0, 0 ÷ ☐). She can write on the line or in the box in the sum (both read; bottom row wins). The line length comes from the longest number shown, not the answer, so it gives no hint. Keypad setup.
 - **How many?** (5): ten frame(s) with dots filled in order (top row left to right); "up to" 5 / 10 / 20 (20 = two frames, first full). She writes anywhere below the frames: **no line** under ten frames (Sam removed it; the anchor is the bottom of the last frame).
 - **Make 10** (5): one ten frame, 1–9 dots, the empty spaces drawn as dashed circles; answer = 10 − dots.
