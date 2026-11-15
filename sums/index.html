@@ -92,6 +92,7 @@
   .empty { color: var(--faint); }
   #removeBtn { border-color: var(--line); color: var(--faint); font-size: 14px; }
   .whonext { margin-bottom: 34px; }
+  #confirmRemoveBtn { border-color: var(--wrong); color: var(--wrong); border-width: 2px; min-height: 48px; padding: 0 18px; }
   header button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 
   /* sheet */
@@ -199,6 +200,9 @@
 </section>
 
 <section id="who" class="panel" hidden>
+  <div class="set" id="confirmBox" hidden>
+    <button id="confirmRemoveBtn"></button>
+  </div>
   <div class="set">
     <h2>Who's doing sums?</h2>
     <div class="opts" id="playerList"></div>
@@ -404,6 +408,7 @@ function renderWho() {
     : '<p class="empty">Nothing yet.</p>';
   const rm = $('#removeBtn');
   rm.hidden = current === 'guest'; rm.dataset.armed = ''; rm.textContent = `Remove ${playerName(current)}`;
+  $('#confirmBox').hidden = true;
 }
 $('#playerList').addEventListener('click', e => {
   const id = e.target.dataset && e.target.dataset.id; if (!id) return;
@@ -418,9 +423,19 @@ function addPlayer() {
 }
 $('#addBtn').onclick = addPlayer;
 $('#newName').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+// Removing: the first tap turns this button into "Keep", and the real confirm
+// appears far away at the top of the page, so a double tap can't remove anyone.
+let confirmShownAt = 0;
 $('#removeBtn').onclick = () => {
-  const rm = $('#removeBtn');
-  if (!rm.dataset.armed) { rm.dataset.armed = '1'; rm.textContent = `Tap again to remove ${playerName(current)} and their records`; return; }
+  const rm = $('#removeBtn'), name = playerName(current);
+  if (rm.dataset.armed) { renderWho(); return; } // "Keep": cancel
+  rm.dataset.armed = '1'; rm.textContent = `Keep ${name}`;
+  $('#confirmRemoveBtn').textContent = `Tap here to remove ${name} and their records`;
+  $('#confirmBox').hidden = false; confirmShownAt = Date.now();
+  $('#who').scrollTop = 0;
+};
+$('#confirmRemoveBtn').onclick = () => {
+  if (Date.now() - confirmShownAt < 500) return;
   players = players.filter(p => p.id !== current); store.set('sums-players', players);
   try { localStorage.removeItem(recKey(current)); } catch (e) {}
   current = 'guest'; store.set('sums-current', current); renderWho();

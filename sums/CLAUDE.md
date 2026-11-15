@@ -20,7 +20,7 @@ Arithmetic drill for Sam's daughter, written by finger or stylus on a touch scre
 
 ## Players and records (Sam: "like on Typurr")
 - The name button and Start again work like tabs (Sam found the names → setup flow confusing): both stay visible on both pages, the open one is filled in, switching keeps unsaved choices, tapping the open one or Back returns to the sheet. Under the names: **Choose sums** (to setup) and **Back to the sheet**, above the records.
-- Header button with the current player's name opens the Who panel: Everyone (guest) plus named players, one tap to switch, Add, and a two-tap Remove (deletes their records).
+- Header button with the current player's name opens the Who panel: Everyone (guest) plus named players, one tap to switch, Add, and Remove (deletes their records). Remove is double-click proof (Sam): the first tap turns the button into "Keep <name>" (cancel) and the real confirm appears at the top of the page, far away, and ignores taps for its first 0.5 s.
 - A sheet counts when every card is right (overrides included). Time runs from her first stroke on the sheet to the mark that makes it all right. The header shows the time and "New best!" or the best.
 - Records are per player and per combination of settings (`comboKey`: signs in + − × ÷ order | digits a | digits b | count): best time and times done, plus the last 100 sheets (date, time, first-try score). localStorage: `sums-players`, `sums-current`, `sums-rec-<id>` = `{ best: {key: {ms, count, t}}, history: [...] }`. Settings stay shared by everyone.
 - No running clock on screen (kept calm); time shows only at the end.

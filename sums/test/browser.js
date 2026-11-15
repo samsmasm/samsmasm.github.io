@@ -253,6 +253,27 @@ const HELPERS = () => {
   ok(fit === 0, `3-digit and 2-digit, 20 on screen: every question fits its card (${fit} overflow)`);
   if (SHOTS) await page.screenshot({ path: SHOTS + '/6-landscape-20.png' });
 
+  // removing a player: a double click can't do it; the confirm is somewhere else
+  await page.click('#whoBtn');
+  await page.click('#playerList button:not([data-id="guest"])');
+  const rmBox = await (await page.$('#removeBtn')).boundingBox();
+  await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2, { clickCount: 2 });
+  await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2);
+  ok(await page.evaluate(() => players.length === 1), 'double (and triple) click on Remove does not remove');
+  ok(await page.$eval('#removeBtn', e => e.textContent) === 'Keep Mia', 'first tap turns Remove into Keep');
+  await page.click('#removeBtn');
+  ok(await page.$eval('#confirmBox', e => e.hidden) && await page.$eval('#removeBtn', e => e.textContent) === 'Remove Mia', 'Keep cancels');
+  await page.click('#removeBtn');
+  const cf = await (await page.$('#confirmRemoveBtn')).boundingBox();
+  ok(cf && Math.abs(cf.y - rmBox.y) > 150, `confirm button is far from Remove (${cf && Math.round(Math.abs(cf.y - rmBox.y))}px)`);
+  await page.click('#confirmRemoveBtn');
+  ok(await page.evaluate(() => players.length === 1), 'confirm ignores a tap in its first half second');
+  const gone = await page.evaluate(() => current);
+  await wait(600);
+  await page.click('#confirmRemoveBtn');
+  ok(await page.evaluate(id => players.length === 0 && current === 'guest' && localStorage.getItem('sums-rec-' + id) === null, gone), 'deliberate confirm removes the player and their records');
+  ok(await page.$eval('#whoBtn', e => e.textContent) === 'Everyone', 'back to Everyone after removing');
+
   await browser.close();
   console.log(fails ? `${fails} failed` : 'all passed');
   process.exit(fails ? 1 : 0);
