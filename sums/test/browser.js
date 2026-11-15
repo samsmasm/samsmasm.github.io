@@ -118,6 +118,20 @@ const fakeSpeech = () => {
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks again next time');
+  ok((await page.$$eval('#ageTiles [data-age]', t => t.map(x => x.dataset.age).join())) === '4,5,6,7,8,9,10,11', 'ages 4 to 11 to choose from');
+  // age only suggests a starting year: 4 and 5 → Year 1, 6 → Year 2, 10 → Year 6 (capped at what is built)
+  const sugg = await page.evaluate(() => [4, 5, 6, 7, 10, 11].map(a => {
+    age = a; return `${a}:${group()}:${reads() ? 'r' : '-'}:${loadCfg('clock').yr}:${loadCfg('seq').yr}:${loadCfg('clock').n}`;
+  }).join(' '));
+  ok(sugg === '4:5:r:1:1:6 5:5:r:1:1:6 6:5:r:2:2:6 7:8:-:3:3:12 10:8:-:4:3:12 11:8:-:4:3:12', 'age → tiles, read aloud, starting year (capped at the highest built): ' + sugg);
+  await page.click('#ageTiles [data-age="6"]');
+  ok((await tiles('#actTiles')).length === 15 && (await page.$eval('#title', e => e.textContent)) === 'Everyone · 6', 'age 6: the younger tiles');
+  await page.click('#actTiles [data-act="graph"]');
+  ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Suggested for age 6: Year 2'), 'age 6: Graphs starts at Year 2 and says so');
+  await page.click('#backBtn'); await page.click('#backBtn');
+  await page.click('#nameTiles [data-id="guest"]');
+  await page.click('#ageTiles [data-age="10"]');
+  ok((await tiles('#actTiles')).length === 19, 'age 10: the older tiles');
   await page.click('#backBtn');
 
   // ---- the bug Sam hit: one girl's choices must never carry to the other.
@@ -420,7 +434,8 @@ const fakeSpeech = () => {
   // ---- Mia: Clocks (Years 1–4)
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="clock"]');
-  ok(await page.evaluate(() => draft.yr === 3 && draft.kinds.join() === 'face,words'), 'Clocks setup: Year 3, clock and words');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'face,words'), 'Clocks setup at age 8: Year 4 suggested, clock and words');
+  ok(await page.evaluate(() => $('#optBlock [data-key="yr"] .sug').dataset.v === '4' && /^Suggested for age 8: Year 4$/.test($('.sughint').textContent)), 'the suggested year has a dot and a line saying so');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -474,7 +489,7 @@ const fakeSpeech = () => {
   // ---- Mia: Money (Years 1–3)
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="money"]');
-  ok(await page.evaluate(() => draft.yr === 3 && draft.kinds.join() === 'count,change'), 'Money setup: Year 3, how much and change');
+  ok(await page.evaluate(() => draft.yr === 3 && draft.kinds.join() === 'count,change' && /Year 4 \(Year 3 is the highest here so far\)/.test($('.sughint').textContent)), 'Money setup at age 8: Year 3, the highest built, and says so');
   const mo = await page.evaluate(() => {
     const bad = [];
     for (const yr of [1, 2, 3]) for (let i = 0; i < 400; i++) {
@@ -548,7 +563,7 @@ const fakeSpeech = () => {
   ok(ys.length === 0, 'Sums by year: answers right; Year 1 within 20, 2 within 100, 3 three digits, 4 four digits; 2s 5s 10s first; across in Years 1–2, stacked after ' + ys.join(' | '));
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="addsub"]');
-  ok(await page.evaluate(() => draft.yr === 3 && draft.ops.join() === '+,-' && $('#kpBlock').hidden), 'Add and take away setup: Year 3, + and −, no keypads');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.ops.join() === '+,-' && $('#kpBlock').hidden), 'Add and take away setup at age 8: Year 4, + and −, no keypads');
   for (const yr of [3, 1, 2, 4]) await yearSheet('addsub', yr, 'Add and take away');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/24-addsub-y4.png' });
   for (const yr of [3, 1, 2, 4]) await yearSheet('muldiv', yr, 'Times and divide');

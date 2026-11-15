@@ -68,11 +68,11 @@
   .addRow { display: flex; gap: 8px; margin-top: 16px; }
   .addRow input { font: inherit; font-size: 20px; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: 6px; width: 14em; max-width: 60vw; }
   .addRow button { font-size: 18px; padding: 0 18px; }
-  .ages { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 16px; }
-  .ages .tile { min-height: 190px; }
-  .ages .tile .pic { height: 110px; }
-  .ages .tile .nm { font-size: 40px; line-height: 1; }
-  .ages.small { grid-template-columns: repeat(2, 130px); gap: 10px; }
+  .ages { display: grid; grid-template-columns: repeat(4, minmax(0, 170px)); gap: 14px; }
+  .ages .tile { min-height: 150px; }
+  .ages .tile .pic { height: 80px; }
+  .ages .tile .nm { font-size: 36px; line-height: 1; }
+  .ages.small { grid-template-columns: repeat(4, minmax(0, 110px)); gap: 10px; }
   .ages.small .tile { min-height: 0; padding: 8px; }
   .ages.small .tile .pic { height: 56px; }
   .ages.small .tile .nm { font-size: 24px; }
@@ -84,6 +84,9 @@
   .opts { display: flex; gap: 8px; flex-wrap: wrap; }
   .opts button { min-width: 56px; min-height: 48px; font-size: 20px; }
   .opts button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .opts button.sug { position: relative; }
+  .opts button.sug::after { content: ""; position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--right); border: 2px solid var(--paper); }
+  .sughint::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--right); margin-right: 6px; }
   .hint { color: var(--faint); font-size: 14px; margin: 6px 0 0; }
   .go { display: flex; gap: 10px; flex-wrap: wrap; }
   .go button { min-height: 48px; padding: 0 22px; font-size: 18px; }
@@ -366,7 +369,15 @@ const SIGN = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 const OP_ORDER = ['+', '-', '*', '/'];
 const ONE_TO_NINE = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const ALL_DIGITS = [0, ...ONE_TO_NINE];
-const AGES = [5, 8];
+// Ages 4–11. Age only suggests where to start (Sam): a NZ year, and which of
+// the two tile sets to show. Activities list ages [5] / [8] / [5, 8], meaning
+// the younger set (4–6, read aloud) and the older set (7–11).
+const AGES = [4, 5, 6, 7, 8, 9, 10, 11];
+const group = () => age <= 6 ? 5 : 8;
+const reads = () => age <= 6;                    // cards and screens read aloud
+const yearFor = a => Math.max(1, a - 4);         // 5 → Year 1 (4 too), 8 → Year 4, 11 → Year 7
+const maxYear = a => { const o = (ACTS[a].options || []).find(o => o.key === 'yr'); return o ? Math.max(...o.values.map(v => Array.isArray(v) ? v[0] : v)) : 0; };
+const suggestedYear = a => Math.min(yearFor(age), maxYear(a));
 const store = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -1285,7 +1296,8 @@ const loadRec = id => store.get(recKey(id), { best: {}, history: [] });
 // settings per player, per activity (Everyone also per age)
 const cfgStoreKey = a => `sums-cfg-${current}${current === 'guest' ? '-' + age : ''}-${a}`;
 function loadCfg(a) {
-  const d = ACTS[a].defaults(age);
+  const d = ACTS[a].defaults(group());
+  if (maxYear(a)) d.yr = suggestedYear(a); // start at the year her age suggests
   // (the one-device settings from before names existed are NOT used: they
   // belonged to whoever used it last, and gave the 8-year-old her sister's)
   const s = store.get(cfgStoreKey(a), null);
@@ -1382,7 +1394,7 @@ function setAge(a) {
 $('#ageTiles').addEventListener('click', e => { const t = e.target.closest('[data-age]'); if (!t) return; setAge(+t.dataset.age); goHome(); });
 
 // home: activities for this age
-const ACTS_FOR = () => Object.keys(ACTS).filter(a => ACTS[a].ages.includes(age));
+const ACTS_FOR = () => Object.keys(ACTS).filter(a => ACTS[a].ages.includes(group()));
 function goHome() {
   const r = loadRec(current);
   $('#actTiles').innerHTML = ACTS_FOR().map(a => {
@@ -1390,16 +1402,16 @@ function goHome() {
     return `<button class="tile" data-act="${a}"><span class="pic">${ACTS[a].pic}</span><span class="nm">${ACTS[a].name}</span><span class="sub">${best ? 'Best ' + fmtTime(best.ms) : ''}</span></button>`;
   }).join('');
   show('home');
-  if (age === 5) say('What do you want to do today?');
+  if (reads()) say('What do you want to do today?');
 }
 $('#actTiles').addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
   act = t.dataset.act;
   // anything with choices asks first, with her own last choices ready to go
-  if (ACTS[act].setup !== 'none') { goSetup(); if (age === 5) say('Choose, then press Start.'); return; }
+  if (ACTS[act].setup !== 'none') { goSetup(); if (reads()) say('Choose, then press Start.'); return; }
   buildSheet(loadCfg(act));
   show('sheet');
-  if (age === 5) say(ACTS[act].say);
+  if (reads()) say(ACTS[act].say);
 });
 
 // records, age, remove
@@ -1459,9 +1471,12 @@ function goSetup(from = 'home') {
   $('#labA').textContent = kind === 'grid' ? 'Rows' : 'First number';
   $('#labB').textContent = kind === 'grid' ? 'Columns' : 'Second number';
   // simple choices (Up to, Kind, Counting in...) as rows of buttons
+  // the Year row marks the year her age suggests (a green dot), and says so
+  const sug = maxYear(act) ? suggestedYear(act) : 0, want = yearFor(age);
   $('#optBlock').innerHTML = (ACTS[act].options || []).map(o =>
     `<div class="set"><div class="lab">${o.label}</div><div class="opts" data-key="${o.key}"${o.multi ? ' data-multi="1"' : ''}>${
-      o.values.map(v => { const [val, txt] = Array.isArray(v) ? v : [v, v]; return `<button data-v="${val}">${txt}</button>`; }).join('')}</div></div>`).join('');
+      o.values.map(v => { const [val, txt] = Array.isArray(v) ? v : [v, v]; return `<button data-v="${val}"${o.key === 'yr' && val === sug ? ' class="sug"' : ''}>${txt}</button>`; }).join('')}</div>${
+      o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want > sug ? ` (Year ${sug} is the highest here so far)` : ''}</p>` : ''}</div>`).join('');
   $('#nOpts').parentElement.hidden = !!ACTS[act].noCount; // the grid sets its own count
   $('#setupHint').textContent = kind === 'keypad' ? 'Takeaways never go below zero. Division always comes out exactly: you divide by the second number.' : '';
   syncOpts();
@@ -1563,7 +1578,7 @@ $('#newBtn').onclick = () => {
   store.set(cfgStoreKey(act), draft);
   if (ACTS[act].grid) { show('grid'); startGrid(loadCfg(act)); }
   else { buildSheet(loadCfg(act)); show('sheet'); }
-  if (age === 5) say(ACTS[act].say);
+  if (reads()) say(ACTS[act].say);
 };
 
 // ---------- the printed question ----------
@@ -1725,9 +1740,9 @@ function buildSheet(c) {
     layout(k);
     k.work._card = k;
     wirePad(k);
-    // age 5: every card has a speaker that reads that card's question
+    // ages 4–6: every card has a speaker that reads that card's question
     const cs = el.querySelector('.cardsay');
-    if (age === 5) cs.onclick = () => say(cardSay(k.q)); else cs.remove();
+    if (reads()) cs.onclick = () => say(cardSay(k.q)); else cs.remove();
     el.querySelector('.undo').onclick = () => { k.strokes.pop(); draw(k); scheduleRead(k, 0); };
     el.querySelector('.clear').onclick = () => { k.strokes = []; draw(k); showRead(k, ''); };
     el.querySelector('.retry').onclick = () => {
@@ -1920,7 +1935,7 @@ function mark() {
     }
     if (note) c.el.querySelector('.read').innerHTML = `${t} <span class="fixed">${note}</span>`;
   }
-  if (backwards.size && age === 5) {
+  if (backwards.size && reads()) {
     const ds = [...backwards];
     say(`Well done. Watch out, your ${ds.join(' and your ')} ${ds.length > 1 ? 'are' : 'is'} backwards.`);
   }
