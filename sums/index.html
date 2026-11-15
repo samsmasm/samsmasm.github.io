@@ -157,6 +157,24 @@
   .tgrid .gc.done { font-weight: 700; }
   .tgrid .gc.bad { outline: 3px solid var(--wrong); outline-offset: -2px; position: relative; z-index: 1; }
 
+  /* finished */
+  #doneS { position: fixed; inset: var(--head) 0 0 0; z-index: 8; background: rgba(255, 255, 255, .9); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #doneS[hidden] { display: none; }
+  .dCard { background: var(--paper); border: 2px solid var(--ink); border-radius: 18px; padding: 26px 24px 16px; width: min(420px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .dTick { position: relative; width: 110px; height: 110px; }
+  .dTick svg { position: relative; width: 100%; height: 100%; animation: dPop .5s cubic-bezier(.3, 1.6, .5, 1) both; }
+  #dBurst i { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px; opacity: 0; animation: dBurst .8s ease-out .15s both; }
+  @keyframes dPop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+  @keyframes dBurst { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(var(--x), var(--y)) scale(1); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .dTick svg, #dBurst i { animation: none; } }
+  #dTitle { font-size: 40px; font-weight: 800; line-height: 1.1; }
+  #dStats { font-size: 18px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+  #dStats .dTime { font-size: 30px; font-weight: 700; }
+  #dStats .dBest { font-weight: 800; color: var(--right); font-size: 22px; }
+  .dBtns { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }
+  .dBtns button { min-height: 56px; font-size: 20px; font-weight: 600; border-radius: 10px; }
+  #dLook { border: none; background: none; color: var(--faint); text-decoration: underline; font-size: 15px; margin-top: 2px; }
+
   /* working area: a third of the screen, below the sheet (portrait) or beside it (landscape) */
   #workBtn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   #workPanel { position: fixed; z-index: 6; background: var(--paper); display: flex; flex-direction: column; }
@@ -369,6 +387,21 @@
 </section>
 
 <main id="sheet" data-n="12" hidden></main>
+
+<!-- finished: tick, time, and what next -->
+<section id="doneS" hidden>
+  <div class="dCard">
+    <div class="dTick"><div id="dBurst"></div><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#1d6b35"/><path d="M28 52 L44 68 L73 36" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div id="dTitle"></div>
+    <div id="dStats"></div>
+    <div class="dBtns">
+      <button id="dAgain" class="primary">Another sheet</button>
+      <button id="dUp">Harder</button>
+      <button id="dHome">Choose something else</button>
+    </div>
+    <button id="dLook">Look at my sheet</button>
+  </div>
+</section>
 
 <!-- working area: a plain page to work things out, bottom third (portrait) or right third (landscape) -->
 <section id="workPanel" hidden>
@@ -1439,7 +1472,7 @@ const cakeSvg = n => {
   return s + '</svg>';
 };
 function show(s) {
-  if (s !== screen) scrollTo(0, 0);
+  if (s !== screen) { scrollTo(0, 0); hideDone(); }
   screen = s;
   for (const id of ['names', 'age', 'home', 'setup', 'me', 'grid']) $('#' + id + 'S').hidden = id !== s;
   $('#sheet').hidden = s !== 'sheet';
@@ -1894,6 +1927,7 @@ function buildSheet(c) {
   sheet.innerHTML = ''; sheet.dataset.n = c.n; sheet.scrollTop = 0;
   sheetKey = ACTS[act].key(c); sheetStart = null; sheetDone = false; lastResult = null;
   W.strokes = []; drawWork(); // a fresh working area for each sheet
+  hideDone();
   sheet.hidden = false; // measured while laying out
   cards = makeSheet(c).map(q => {
     const el = $('#cardT').content.firstElementChild.cloneNode(true);
@@ -2276,6 +2310,7 @@ function updateScore() {
     sheetDone = true;
     const ms = Date.now() - (sheetStart || Date.now());
     lastResult = { ms, ...saveResult(sheetKey, ms, right, cards.length) };
+    queueDone(lastResult, right, cards.length);
   } else if (sheetDone && lastResult && lastResult.first !== right) {
     // "I was right the first time" tapped after the sheet was finished
     const r = loadRec(lastResult.player), h = r.history.find(x => x.t === lastResult.t);
@@ -2299,6 +2334,7 @@ $('#markBtn').onclick = () => screen === 'grid' ? startGrid(cfg) : mark();
 // (12 fits 2 × 6, 3 × 4 and 1 × 12). Cells outside her chosen tables are grey.
 function startGrid(c) {
   cfg = c; sheetAct = act; playScreen = 'grid';
+  hideDone();
   sheetKey = ACTS[act].key(c);
   const N = c.upto, inTables = (r, k) => c.tables.includes(r) || c.tables.includes(k);
   const box = $('#tGrid');
@@ -2363,7 +2399,45 @@ function finishGrid() {
   $('#gTile').hidden = true; $('#gHint').hidden = true;
   $('#markBtn').textContent = 'New grid';
   updateGridScore(); show('grid');
+  queueDone(G.result, G.first, G.total);
 }
+
+// ---------- finished: a kapow and an obvious next step (Sam) ----------
+// Shown a moment after the last card turns green, over the sheet (the header
+// stays usable). Another sheet / Harder: Year N (where there is one) / Choose
+// something else, and "Look at my sheet" to close it and see the marks.
+let doneTimer = 0;
+function queueDone(res, first, n) {
+  clearTimeout(doneTimer);
+  const forAct = act, forPlay = playScreen;
+  doneTimer = setTimeout(() => { if (act === forAct && screen === forPlay) showDone(res, first, n); }, 700);
+}
+function showDone(res, first, n) {
+  const perfect = first === n;
+  $('#dTitle').textContent = perfect ? 'Perfect!' : 'All done!';
+  $('#dStats').innerHTML = `<div class="dTime">${fmtTime(res.ms)}</div>`
+    + `<div>First try <b>${first}</b> of ${n}</div>`
+    + (res.isBest && res.hadPrev ? '<div class="dBest">New best!</div>' : !res.isBest ? `<div class="faint">Best ${fmtTime(res.best)}</div>` : '');
+  const up = maxYear(act) && cfg && cfg.yr < maxYear(act) ? cfg.yr + 1 : 0;
+  $('#dUp').hidden = !up; $('#dUp').dataset.yr = up; $('#dUp').textContent = `Harder: Year ${up}`;
+  $('#dAgain').textContent = playScreen === 'grid' ? 'Another grid' : 'Another sheet';
+  // a little burst of block colours from behind the tick
+  $('#dBurst').innerHTML = range(0, 11).map(i => {
+    const a = i * Math.PI / 6, d = 70 + (i % 3) * 18;
+    return `<i style="--x:${(Math.cos(a) * d).toFixed(0)}px;--y:${(Math.sin(a) * d).toFixed(0)}px;background:${Object.values(BLOCK)[i % 5]};border-radius:${i % 2 ? '50%' : '2px'}"></i>`;
+  }).join('');
+  $('#doneS').hidden = false;
+  if (reads()) say(perfect ? 'Perfect! Well done.' : 'All done! Well done.');
+}
+const hideDone = () => { clearTimeout(doneTimer); $('#doneS').hidden = true; };
+$('#dAgain').onclick = () => { hideDone(); if (playScreen === 'grid') startGrid(cfg); else { buildSheet(cfg); show('sheet'); } };
+$('#dUp').onclick = () => {
+  const c = { ...loadCfg(act), yr: +$('#dUp').dataset.yr };
+  store.set(cfgStoreKey(act), c); hideDone();
+  if (ACTS[act].grid) startGrid(loadCfg(act)); else { buildSheet(loadCfg(act)); show('sheet'); }
+};
+$('#dHome').onclick = () => { hideDone(); goHome(); };
+$('#dLook').onclick = hideDone;
 // tap a cell
 $('#tGrid').addEventListener('click', e => dropOn(e.target.closest('.gc')));
 // drag the tile; the row and column under it light up

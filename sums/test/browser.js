@@ -533,6 +533,30 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => cards.every(c => !c.q.two && c.q.m === 0 && c.el.querySelectorAll('.ln').length === 1 && /o.clock/.test(c.el.querySelector('.ans').textContent))), 'Clocks Year 1: on the hour, "__ o\'clock"');
   ok((await fits()).length === 0, 'Clocks Year 1 fit ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Clocks Year 1: hours read and marked right');
+  // ---- finished (Sam): a kapow and an obvious next step
+  await wait(900);
+  const dn = await page.evaluate(() => ({ shown: !$('#doneS').hidden, title: $('#dTitle').textContent, stats: $('#dStats').textContent, again: $('#dAgain').textContent, up: $('#dUp').hidden ? '' : $('#dUp').textContent, home: $('#dHome').textContent, head: !$('#markBtn').hidden }));
+  ok(dn.shown && /^(Perfect!|All done!)$/.test(dn.title) && /\d:\d\d/.test(dn.stats) && /First try \d+ of 12/.test(dn.stats), 'a finished sheet shows the finish panel: Perfect! or All done!, the time, first try ' + JSON.stringify(dn));
+  ok(dn.again === 'Another sheet' && dn.up === 'Harder: Year 2' && dn.home === 'Choose something else', 'next steps: Another sheet, Harder: Year 2, Choose something else');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/32-done.png' });
+  await page.click('#dLook');
+  ok(!(await visible('#doneS')) && await visible('#sheet') && await page.evaluate(() => sheetDone), 'Look at my sheet closes it and shows the marked sheet');
+  await page.click('#markBtn'); // New sheet
+  await page.evaluate(() => cards.forEach(c => writeNum(c, c.q.ans)));
+  await page.click('#markBtn'); await wait(900);
+  await page.click('#dAgain');
+  ok(!(await visible('#doneS')) && await page.evaluate(() => !sheetDone && cards.every(c => c.strokes.length === 0) && cfg.yr === 1), 'Another sheet: a fresh sheet, same year');
+  await page.evaluate(() => cards.forEach(c => writeNum(c, c.q.ans)));
+  await page.click('#markBtn'); await wait(900);
+  await page.click('#dUp');
+  ok(await page.evaluate(() => !sheetDone && cfg.yr === 2 && loadCfg('clock').yr === 2 && cards.every(c => c.q.two)), 'Harder: the next year up, saved as her choice');
+  await page.evaluate(() => cards.forEach(c => writeNum(c, c.q.ans)));
+  await page.click('#markBtn'); await wait(900);
+  await page.click('#dHome');
+  ok(await visible('#homeS') && !(await visible('#doneS')), 'Choose something else goes to the activity tiles');
+  await page.click('#actTiles [data-act="clock"]');
+  await page.click('#optBlock [data-key="yr"] [data-v="1"]');
+  await page.click('#newBtn');
   ok(await page.evaluate(() => {
     const c = cards[0], h = String(c.q.h);
     c.strokes = [...numStrokes(h, -1.4, -1.05, 0.85), [[-1.2, -0.8], [-1.18, -0.78]], [[-1.2, -0.3], [-1.18, -0.28]], ...numStrokes('00', 0.4, -1.05, 0.85)];
@@ -805,6 +829,8 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => G.placed === 12 && document.querySelectorAll('#tGrid .gc.done').length === 12) && /First try 11\/12 · 1:0[12]/.test(await page.$eval('#score', e => e.textContent)), 'finished: 12 placed, first try 11/12 with its time ' + await page.$eval('#score', e => e.textContent));
   ok(await visible('#markBtn') && await page.$eval('#markBtn', e => e.textContent) === 'New grid', 'then "New grid" appears');
   ok(await page.evaluate(() => { const r = loadRec(current); return r.history[0].k === 'tgrid~2,3,4,5,6,7,8,9,10,11,12|12|12' && r.history[0].first === 11; }), 'saved to her records');
+  await wait(900);
+  ok(await page.evaluate(() => !$('#doneS').hidden && $('#dAgain').textContent === 'Another grid' && $('#dUp').hidden), 'a finished grid shows the finish panel too (Another grid, no Harder)');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/19-grid-done.png' });
   await page.click('#markBtn');
   ok(await page.evaluate(() => !G.done && G.placed === 0 && document.querySelectorAll('#tGrid .gc.done').length === 0) && !(await visible('#markBtn')), 'New grid starts an empty one');
