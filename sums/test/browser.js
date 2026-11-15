@@ -416,8 +416,19 @@ const fakeSpeech = () => {
     writeNum(c, `${q.n + 1}/${q.d}`); out.wrong = !readAnswer(c).ok;
     c.strokes = numStrokes(q.n, -0.3, -1.6, 0.9); out.half = read(c) === `${q.n}/?` && !readAnswer(c).ok;
     writeNum(c, `${q.n}/${q.d}`, numStrokes(1, 3, -4, 0.6)); out.picture = readAnswer(c).ok; // a mark on the picture is ignored
+    // Sam: real writing was missed. A big top number reaching up into the picture
+    c.strokes = [...numStrokes(q.n, -0.2, -3.6, 2.6), ...numStrokes(q.d, -0.3, 0.35, 0.9)]; out.big = readAnswer(c).ok; // middle 2.3 em up: the old reader threw it away
+    // both numbers under the printed bar, with her own line between
+    c.strokes = [...numStrokes(q.n, 0, 0.4, 0.9), [[-1.8, 1.55], [0.3, 1.55]], ...numStrokes(q.d, 0, 1.8, 0.9)]; out.ownLine = readAnswer(c).ok;
+    // both under the bar, stacked with a gap and no line
+    c.strokes = [...numStrokes(q.n, 0, 0.4, 0.9), ...numStrokes(q.d, 0, 1.8, 0.9)]; out.stacked = readAnswer(c).ok;
+    // written across under the bar: "3/4" with a slash
+    c.strokes = [...numStrokes(q.n, -1.2, 0.5, 0.9), [[-1.05, 1.5], [-0.35, 0.3]], ...numStrokes(q.d, -0.15 + String(q.d).length * 0.72, 0.5, 0.9)]; out.slash = readAnswer(c).ok;
     return out;
   });
+  ok(fr.big, 'Fractions: a big top number reaching up into the picture is read');
+  ok(fr.ownLine && fr.stacked, 'Fractions: both numbers under the bar, with her own line or just stacked, are read');
+  ok(fr.slash, 'Fractions: "3/4" written across with a slash is read');
   ok(fr.plain, 'Fractions: top over bottom read as n/d');
   ok(fr.equal, 'an equal fraction counts (2/4 for 1/2)');
   ok(fr.wrong, 'a different fraction is wrong');
