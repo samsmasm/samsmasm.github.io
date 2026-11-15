@@ -44,7 +44,7 @@ const HELPERS = () => {
       const [a, b] = (Array.isArray(n) ? n : c.q.parts).map(String), s = 0.85;
       c.strokes = [...extra, ...numStrokes(a, -0.45, -1.05, s, mirror), ...numStrokes(b, 0.45 + b.length * 0.8 * s, -1.05, s, mirror)];
     } else {
-      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05 }[c.q.kind] ?? 0.3;
+      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05, graph: -1.05, shape: -1.05, ruler: -1.05 }[c.q.kind] ?? 0.3;
       c.strokes = [...extra, ...numStrokes(n, 0, top, 1, mirror)];
     }
     draw(c);
@@ -94,7 +94,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -106,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#ageTiles [data-age="5"]');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
-  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money,Number patterns,Doubles and halves,Story sums', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
   ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'age 5 home is read aloud');
   await page.click('#backBtn');
 
@@ -114,7 +114,7 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks the age');
   await page.click('#ageTiles [data-age="5"]');
-  ok((await tiles('#actTiles')).length === 12, 'Everyone at 5: the age-5 activities');
+  ok((await tiles('#actTiles')).length === 15, 'Everyone at 5: the age-5 activities');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks again next time');
@@ -278,7 +278,7 @@ const fakeSpeech = () => {
     const room = c.q.kind === 'bond' ? true // she writes in the circle, checked separately
       : c.q.kind === 'expr' || c.q.kind === 'miss' || c.q.kind === 'seq' ? c.ay > 2.5 * c.F
       : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
-      : c.q.kind === 'clock' || c.q.kind === 'money' ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
+      : ['clock', 'money', 'graph', 'shape', 'ruler'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
       : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
   }).map(c => JSON.stringify(c.q))));
@@ -603,6 +603,64 @@ const fakeSpeech = () => {
   for (const yr of [3, 1, 2]) await yearSheet('story', yr, 'Story sums');
   ok(await page.evaluate(() => cards.every(c => cardSay(c.q) === c.q.text && c.el.querySelector('.u').textContent === c.q.unit)), 'Story sums: each card reads its story aloud, the answer line has its unit');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y2.png' });
+
+  // ---- Graphs
+  const gq = await page.evaluate(() => {
+    const bad = [];
+    for (const yr of [1, 2, 3]) for (let i = 0; i < 300; i++) {
+      const q = graphQ(yr), ns = q.cats.map(c => c.n), by = Object.fromEntries(q.cats.map(c => [c.nm, c.n]));
+      const want = q.ask === 'one' ? by[q.of[0]] : q.ask === 'more' ? by[q.of[0]] - by[q.of[1]] : ns.reduce((a, b) => a + b, 0);
+      if (q.ans !== want || q.ans < 1 || new Set(ns).size !== ns.length) bad.push(`${yr} ${JSON.stringify(q)}`);
+      if ((yr === 1 && (q.type !== 'pic' || q.ask !== 'one' || q.cats.length !== 3 || Math.max(...ns) > 8)) || (yr === 2 && q.type === 'bar') || (yr === 3 && (q.type !== 'bar' || ns.some(n => n % q.step)))) bad.push(`${yr} type ${JSON.stringify(q)}`);
+      // the drawing shows the counts: dots, tally marks, or bar heights on the scale
+      const svg = new DOMParser().parseFromString(graphSvg(q), 'image/svg+xml');
+      if (q.type === 'pic' && svg.querySelectorAll('circle').length !== ns.reduce((a, b) => a + b, 0)) bad.push('dots ' + JSON.stringify(q));
+      if (q.type === 'tally' && svg.querySelectorAll('line').length !== ns.reduce((a, b) => a + b, 0)) bad.push('tally ' + JSON.stringify(q));
+      if (q.type === 'bar') {
+        const bars = [...svg.querySelectorAll('rect')].filter(r => +r.getAttribute('width') === 13).map(r => +r.getAttribute('height'));
+        if (bars.some((h, j) => Math.abs(h - ns[j] * 60 / (6 * q.step)) > 0.01)) bad.push('bars ' + JSON.stringify(q));
+      }
+    }
+    return bad.slice(0, 4);
+  });
+  ok(gq.length === 0, 'Graphs: answers match the counts and the drawing (dots, tally marks, bars on the scale); Year 1 picture graphs, Year 3 bar graphs ' + gq.join(' | '));
+  for (const yr of [3, 1, 2]) await yearSheet('graph', yr, 'Graphs');
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.cap .sw').length === c.q.of.length && cardSay(c.q) === c.q.say)), 'Graphs: colour squares in the question, read aloud by colour name');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y2.png' });
+
+  // ---- Shapes
+  const shq = await page.evaluate(() => {
+    const bad = [], symOk = { 4: [4], 2: [2], 1: [1], 3: [3], 5: [5], 6: [6], 8: [8] };
+    for (const yr of [1, 2, 3]) for (const kinds of [['flat', 'solid'], ['flat'], ['solid']]) for (let i = 0; i < 200; i++) {
+      const q = shapeQ(yr, kinds);
+      if (q.solid) { if (yr === 1 || !kinds.includes('solid') || q.ans !== SOLIDS[q.solid][q.ask] || (yr === 2 && q.ask === 'edges')) bad.push(`${yr} solid ${JSON.stringify(q)}`); continue; }
+      if (q.ask === 'sym') { if (yr !== 3 || !symOk[q.ans]) bad.push('sym ' + JSON.stringify(q)); continue; }
+      const n = q.pts.length;
+      if (q.ans !== n || (yr === 1 && n > 4) || (yr === 2 && n > 6) || n > 10 || q.pts.some(p => Math.hypot(...p) > 46)) bad.push(`${yr} flat ${JSON.stringify(q)}`);
+      if (yr >= 2 && kinds.length === 1 && kinds[0] === 'solid' && !q.solid) bad.push('solid only gave flat');
+    }
+    return bad.slice(0, 4);
+  });
+  ok(shq.length === 0, 'Shapes: sides = corners = points drawn; 3D faces, edges, corners right; Year 1 up to 4 sides, Year 2 up to 6, symmetry in Year 3 ' + shq.join(' | '));
+  for (const yr of [3, 1, 2]) await yearSheet('shape', yr, 'Shapes');
+  ok(await page.evaluate(() => cards.every(c => c.q.solid ? c.el.querySelectorAll('svg line[stroke-dasharray]').length === 3 : c.el.querySelector('svg polygon').getAttribute('points').split(' ').length === c.q.pts.length)), 'Shapes: the polygon has as many corners as the answer; 3D shapes show hidden edges dashed');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/30-shape-y2.png' });
+
+  // ---- Rulers
+  const rq = await page.evaluate(() => {
+    const bad = [];
+    for (const yr of [1, 2, 3]) for (let i = 0; i < 300; i++) {
+      const q = rulerQ(yr);
+      if (q.ans !== q.e - q.s || q.ans < 2 || q.s < 0 || (yr < 3 && q.s !== 0) || q.e > { 1: 9, 2: 10, 3: 12 }[yr] || q.unit !== (yr === 1 ? 'blocks' : 'cm')) bad.push(`${yr} ${JSON.stringify(q)}`);
+    }
+    return bad.slice(0, 4);
+  });
+  ok(rq.length === 0, 'Rulers: length = end − start, Year 1 in blocks, Year 2 from 0, Year 3 sometimes not from 0 ' + rq.join(' | '));
+  for (const yr of [3, 1, 2]) await yearSheet('ruler', yr, 'Rulers');
+  ok(await page.evaluate(() => cards.every(c => { const t = [...c.el.querySelectorAll('svg text')].map(x => +x.textContent); return t.length === 11 && t[0] === 0 && t[10] === 10 && c.el.querySelector('.u').textContent === 'cm'; })), 'Rulers Year 2: a 0–10 cm ruler and "cm" after the line');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/31-ruler-y2.png' });
+  ok(await page.evaluate(() => [labelFor('graph~3|12'), labelFor('shape~2|flat,solid|6'), labelFor('ruler~1|6')].join(' / '))
+    === 'Graphs · Year 3 · 12 questions / Shapes · Year 2 · flat, 3D · 6 questions / Rulers · Year 1 · 6 questions', 'record labels for Graphs, Shapes, Rulers');
 
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');

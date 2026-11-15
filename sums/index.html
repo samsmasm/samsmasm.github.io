@@ -215,6 +215,8 @@
   .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
   .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
   .pic2 .ln { display: inline-block; width: 1.9em; height: 1em; border-bottom: .07em solid var(--ink); }
+  .pic2 .ln.w { width: 2.5em; }
+  .pic2 .sw { display: inline-block; width: .85em; height: .85em; vertical-align: -.12em; border: .06em solid var(--ink); border-radius: .12em; }
   .pic2 .u, .pic2 .sep { font-size: .8em; line-height: 1.1; }
   .pic2 .sep { padding: 0 .2em; }
 
@@ -761,6 +763,182 @@ function storyQ(yr, kinds) {
   }
   return { kind: 'story', type: 'add', text: 'A dog has 3 bones. It finds 2 more. How many bones now?', unit: 'bones', say: 'A dog has 3 bones. It finds 2 more. How many bones now?', ans: 5 };
 }
+// ---- Graphs, Shapes, Rulers: plain pictures with block colours where colour
+// does a job (graph categories are colours, so a non-reader can match them)
+const BLOCK = { red: '#e04b4b', blue: '#3f74d6', green: '#3aa255', yellow: '#f2c230', purple: '#8c55c9' };
+const INK = '#111';
+const svgText = (x, y, t, fs, anchor = 'middle') => `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="${INK}" font-family="system-ui, sans-serif">${t}</text>`;
+const swatch = nm => `<span class="sw" style="background:${BLOCK[nm]}"></span>`;
+const emBox = (vb, E) => { const [, , w, h] = vb; return `viewBox="${vb.join(' ')}" style="width:${(w * E).toFixed(2)}em;height:${(h * E).toFixed(2)}em"`; };
+const shuffled = a => [...a].sort(() => Math.random() - 0.5);
+const distinctPick = (k, lo, hi) => shuffled(range(lo, hi)).slice(0, k);
+
+// Graphs. Year 1 picture graph (dots in columns), Year 2 tally chart or
+// picture graph, Year 3 bar graph with a scale in 2s, 5s or 10s.
+function graphQ(yr) {
+  const names = shuffled(Object.keys(BLOCK)).slice(0, yr === 1 ? 3 : 4);
+  let type, step = 1, counts;
+  if (yr === 1) { type = 'pic'; counts = distinctPick(3, 1, 8); }
+  else if (yr === 2) { type = pickOne(['tally', 'tally', 'pic']); counts = type === 'pic' ? distinctPick(4, 1, 10) : distinctPick(4, 2, 20); }
+  else { type = 'bar'; step = pickOne([2, 5, 10]); counts = distinctPick(4, 1, 6).map(x => x * step); }
+  const cats = names.map((nm, i) => ({ nm, n: counts[i] }));
+  const ask = yr === 1 ? 'one' : pickOne(yr === 2 ? ['one', 'more', 'more'] : ['one', 'more', 'all']);
+  const q = { kind: 'graph', type, step, cats, ask };
+  if (ask === 'one') { const c = pickOne(cats); return { ...q, of: [c.nm], cap: `How many ${swatch(c.nm)}?`, capLen: 11, say: `How many ${c.nm}?`, ans: c.n }; }
+  if (ask === 'more') {
+    const [a, b] = shuffled(cats).slice(0, 2).sort((x, y) => y.n - x.n);
+    return { ...q, of: [a.nm, b.nm], cap: `How many more ${swatch(a.nm)} than ${swatch(b.nm)}?`, capLen: 22, say: `How many more ${a.nm} than ${b.nm}?`, ans: a.n - b.n };
+  }
+  return { ...q, of: [], cap: 'How many altogether?', capLen: 20, say: 'How many altogether?', ans: sumOf(counts) };
+}
+function graphSvg(q) {
+  const C = q.cats, sw = (x, y, nm, s = 10) => `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="1.2" fill="${BLOCK[nm]}" stroke="${INK}" stroke-width=".7"/>`;
+  if (q.type === 'pic') { // a row of dots for each colour, lined up from a start line
+    let s = `<line x1="15.5" y1="0" x2="15.5" y2="${C.length * 14}" stroke="${INK}" stroke-width="1"/>`;
+    C.forEach((c, i) => {
+      const y = i * 14 + 7;
+      s += sw(0, y - 5, c.nm);
+      for (let k = 0; k < c.n; k++) s += `<circle cx="${23 + k * 12}" cy="${y}" r="5" fill="${BLOCK[c.nm]}" stroke="${INK}" stroke-width=".7"/>`;
+    });
+    return `<svg ${emBox([-1, -1, 23 + 10 * 12, C.length * 14 + 2], 0.05)}>${s}</svg>`;
+  }
+  if (q.type === 'tally') { // a row of tally marks for each colour, bundles of five
+    let s = '';
+    C.forEach((c, i) => {
+      const y = i * 17;
+      s += sw(0, y + 3, c.nm);
+      for (let k = 0; k < c.n; k++) {
+        const g = Math.floor(k / 5), j = k % 5, x0 = 18 + g * 24;
+        s += j < 4 ? `<line x1="${x0 + j * 4}" y1="${y + 2}" x2="${x0 + j * 4}" y2="${y + 15}" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/>`
+          : `<line x1="${x0 - 2.5}" y1="${y + 13}" x2="${x0 + 14.5}" y2="${y + 4}" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/>`;
+      }
+    });
+    return `<svg ${emBox([-1, -1, 116, C.length * 17 + 2], 0.055)}>${s}</svg>`;
+  }
+  // bar graph: scale every step, light grid, coloured bars, squares underneath
+  const top = 6 * q.step, PH = 60, uy = PH / top, ax = 16, W = ax + 6 + C.length * 20;
+  let s = '';
+  for (let v = 0; v <= top; v += q.step) {
+    const y = PH - v * uy;
+    if (v) s += `<line x1="${ax}" y1="${y}" x2="${W}" y2="${y}" stroke="#cfcfcf" stroke-width=".6"/>`;
+    s += svgText(ax - 3, y, v, 6.5, 'end');
+  }
+  C.forEach((c, i) => {
+    const x = ax + 6 + i * 20;
+    s += `<rect x="${x}" y="${PH - c.n * uy}" width="13" height="${c.n * uy}" fill="${BLOCK[c.nm]}" stroke="${INK}" stroke-width=".8"/>`;
+    s += sw(x + 2, PH + 4, c.nm, 9);
+  });
+  s += `<path d="M${ax} -2V${PH}H${W}" fill="none" stroke="${INK}" stroke-width="1"/>`;
+  return `<svg ${emBox([0, -6, W + 2, PH + 22], 0.06)}>${s}</svg>`;
+}
+
+// Shapes: count sides, corners, faces, edges, or lines of symmetry
+const SOLIDS = { cube: { faces: 6, edges: 12, corners: 8 }, cuboid: { faces: 6, edges: 12, corners: 8 }, pyramid: { faces: 5, edges: 8, corners: 5 }, prism: { faces: 5, edges: 9, corners: 6 } };
+const turn = (pts, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return pts.map(([x, y]) => [x * c - y * s, x * s + y * c]); };
+const regular = (n, r = 40) => range(0, n - 1).map(i => [r * Math.sin(2 * Math.PI * i / n), -r * Math.cos(2 * Math.PI * i / n)]);
+// a convex polygon with every corner clearly a corner (turns of at least 18°)
+function irregular(n) {
+  for (let t = 0; t < 80; t++) {
+    const st = 2 * Math.PI / n, pts = range(0, n - 1).map(i => { const a = i * st + (Math.random() - 0.5) * st * 0.6, r = 30 + Math.random() * 13; return [r * Math.sin(a), -r * Math.cos(a)]; });
+    const turns = range(0, n - 1).map(i => {
+      const [a, b, c] = [pts[i], pts[(i + 1) % n], pts[(i + 2) % n]];
+      let d = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]);
+      while (d <= -Math.PI) d += 2 * Math.PI; while (d > Math.PI) d -= 2 * Math.PI;
+      return d;
+    });
+    // every corner turns the same way (convex) and none is nearly straight
+    const ok = turns.every(d => d > 0.32) || turns.every(d => d < -0.32);
+    if (ok) return pts;
+  }
+  return regular(n);
+}
+function flatPts(name) {
+  if (name === 'square') return [[-30, -30], [30, -30], [30, 30], [-30, 30]];
+  if (name === 'rect') { const w = 40, h = rnd(16, 26); return [[-w, -h], [w, -h], [w, h], [-w, h]]; }
+  if (name === 'iso') { const w = rnd(18, 26); return [[0, -40], [w, 32], [-w, 32]]; }
+  if (name === 'tri') { // any triangle with no very thin corner
+    for (let t = 0; t < 50; t++) {
+      const a = shuffled(range(0, 11)).slice(0, 3).sort((x, y) => x - y).map(k => k * Math.PI / 6 + Math.random() * 0.3);
+      const gaps = [a[1] - a[0], a[2] - a[1], 2 * Math.PI - a[2] + a[0]];
+      if (Math.min(...gaps) > 1.3) return a.map(x => [42 * Math.sin(x), -42 * Math.cos(x)]);
+    }
+    return regular(3);
+  }
+}
+// shrink a shape that reaches past 42 from the middle, so it fits its box
+const fitPts = pts => { const r = Math.max(...pts.map(p => Math.hypot(...p))); return r > 42 ? pts.map(([x, y]) => [x * 42 / r, y * 42 / r]) : pts; };
+function shapeQ(yr, kinds) {
+  const fill = pickOne(Object.keys(BLOCK));
+  const solid = yr >= 2 && kinds.includes('solid') && (!kinds.includes('flat') || Math.random() < 0.35);
+  if (solid) {
+    const s = pickOne(Object.keys(SOLIDS)), ask = pickOne(yr === 2 ? ['faces', 'corners'] : ['faces', 'corners', 'edges']);
+    return { kind: 'shape', solid: s, fill, ask, cap: `How many ${ask}?`, say: `How many ${ask}?`, ans: SOLIDS[s][ask] };
+  }
+  if (yr === 3 && Math.random() < 0.3) { // lines of symmetry
+    const [nm, lines] = pickOne([['square', 4], ['rect', 2], ['iso', 1], ['reg3', 3], ['reg5', 5], ['reg6', 6], ['reg8', 8]]);
+    const pts = fitPts(turn(nm.startsWith('reg') ? regular(+nm.slice(3)) : flatPts(nm), rnd(0, 3) * 30));
+    return { kind: 'shape', pts, fill, ask: 'sym', cap: 'How many lines of symmetry?', say: 'How many lines of symmetry?', ans: lines };
+  }
+  let pts;
+  if (yr === 1) pts = turn(flatPts(pickOne(['tri', 'square', 'rect'])), pickOne([0, 0, 0, 20, 45]));
+  else {
+    const n = yr === 2 ? pickOne([3, 4, 4, 5, 6]) : rnd(3, 10);
+    pts = n === 3 ? flatPts('tri') : n === 4 && Math.random() < 0.5 ? flatPts(pickOne(['square', 'rect'])) : n >= 7 || Math.random() < 0.4 ? regular(n) : irregular(n);
+    pts = turn(pts, rnd(0, 11) * 30);
+  }
+  const ask = pickOne(['sides', 'corners']);
+  pts = fitPts(pts);
+  return { kind: 'shape', pts, fill, ask, cap: `How many ${ask}?`, say: `How many ${ask}?`, ans: pts.length };
+}
+function shapeSvg(q) {
+  const E = 0.048, f = BLOCK[q.fill], line = (a, b, dash) => `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"${dash ? ' stroke-dasharray="3 3"' : ''}/>`;
+  const poly = (p, op = 1) => `<polygon points="${p.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${f}" fill-opacity="${op}" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>`;
+  if (!q.solid) return `<svg ${emBox([-46, -46, 92, 92], E)}>${poly(q.pts)}</svg>`;
+  const off = ([x, y], d) => [x + d[0], y + d[1]];
+  let s = '';
+  if (q.solid === 'cube' || q.solid === 'cuboid') { // front face, top and right faces, hidden edges dashed
+    const [w, h] = q.solid === 'cube' ? [44, 44] : [58, 30], d = [18, -18], x0 = -38, y0 = 34 - h;
+    const F = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], B = F.map(p => off(p, d));
+    s += line(B[3], B[0], 1) + line(B[3], B[2], 1) + line(B[3], F[3], 1);
+    s += poly([F[0], F[1], B[1], B[0]], 0.6) + poly([F[1], F[2], B[2], B[1]], 0.8) + poly(F);
+  } else if (q.solid === 'pyramid') {
+    const A = [-38, 30], Bp = [14, 30], C = [36, 10], D = [-16, 10], P = [-2, -40];
+    s += line(A, D, 1) + line(D, C, 1) + line(D, P, 1);
+    s += poly([A, Bp, P]) + poly([Bp, C, P], 0.75);
+  } else { // triangular prism
+    const T = [[-40, 32], [12, 32], [-14, -10]], d = [24, -18], U = T.map(p => off(p, d));
+    s += line(U[0], U[1], 1) + line(U[0], T[0], 1) + line(U[0], U[2], 1);
+    s += poly([T[1], U[1], U[2], T[2]], 0.75) + poly(T);
+  }
+  return `<svg ${emBox([-46, -46, 92, 92], E)}>${s}</svg>`;
+}
+
+// Rulers: Year 1 counts blocks under a pencil, Year 2 a cm ruler from 0,
+// Year 3 a pencil that may not start at 0 (half-cm marks too)
+function rulerQ(yr) {
+  const col = pickOne(['red', 'blue', 'green', 'yellow', 'purple']);
+  if (yr === 1) { const e = rnd(2, 9); return { kind: 'ruler', yr, s: 0, e, col, unit: 'blocks', cap: 'How long?', say: 'How many blocks long is the pencil?', ans: e }; }
+  let s = 0, e; // a 10 cm ruler in Year 2, 12 cm in Year 3 (big enough to read on a card)
+  if (yr === 3 && Math.random() < 0.65) { s = rnd(1, 6); e = rnd(s + 2, 12); } else e = rnd(2, yr === 2 ? 10 : 12);
+  return { kind: 'ruler', yr, s, e, col, unit: 'cm', cap: 'How long?', say: 'How long is the pencil?', ans: e - s };
+}
+function rulerSvg(q) {
+  const u = 10, x0 = q.s * u, x1 = q.e * u, N = { 1: 10, 2: 10, 3: 12 }[q.yr];
+  let s = `<rect x="${x0}" y="0" width="${x1 - x0 - 7}" height="9" fill="${BLOCK[q.col]}" stroke="${INK}" stroke-width=".8"/>`
+    + `<polygon points="${x1 - 7},0 ${x1},4.5 ${x1 - 7},9" fill="#f3dcb0" stroke="${INK}" stroke-width=".8" stroke-linejoin="round"/><polygon points="${x1 - 2.4},3.3 ${x1},4.5 ${x1 - 2.4},5.7" fill="${INK}"/>`;
+  // dashed guides down from both ends
+  for (const x of [x0, x1]) s += `<line x1="${x}" y1="9" x2="${x}" y2="15" stroke="${INK}" stroke-width=".6" stroke-dasharray="1.5 1.2"/>`;
+  if (q.yr === 1) {
+    for (let i = 0; i < N; i++) s += `<rect x="${i * u}" y="15" width="${u}" height="${u}" fill="${i % 2 ? '#ffffff' : '#a9c6ef'}" stroke="${INK}" stroke-width=".7"/>`;
+    return `<svg ${emBox([-2, -2, N * u + 4, 29], 0.05)}>${s}</svg>`;
+  }
+  s += `<rect x="-5" y="15" width="${N * u + 10}" height="19" rx="1.5" fill="#f7efcf" stroke="${INK}" stroke-width=".8"/>`;
+  for (let i = 0; i <= N; i++) {
+    s += `<line x1="${i * u}" y1="15" x2="${i * u}" y2="21.5" stroke="${INK}" stroke-width=".7"/>` + svgText(i * u, 27.5, i, 7);
+    if (q.yr === 3 && i < N) s += `<line x1="${i * u + u / 2}" y1="15" x2="${i * u + u / 2}" y2="18.5" stroke="${INK}" stroke-width=".5"/>`;
+  }
+  return `<svg ${emBox([-7, -2, N * u + 14, 38], 0.05)}>${s}</svg>`;
+}
 const textSvg = lines => `<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -1040,6 +1218,36 @@ const ACTS = {
     make: c => storyQ(c.yr, c.kinds),
     key: c => `story~${c.yr}|${['addsub', 'muldiv'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Story sums · Year ${y} · ${kinds.replace('addsub', '+ −').replace('muldiv', '× ÷').split(',').join(', ')} · ${n} questions`; },
+  },
+  graph: {
+    name: 'Graphs', ages: [5, 8], setup: 'opts', say: 'Look at the graph and answer the question.',
+    pic: graphSvg({ type: 'bar', step: 2, cats: [{ nm: 'red', n: 8 }, { nm: 'blue', n: 4 }, { nm: 'green', n: 10 }, { nm: 'yellow', n: 6 }] }),
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · picture graphs'], [2, '2 · tally charts'], [3, '3 · bar graphs']] }],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
+    make: c => graphQ(c.yr),
+    key: c => `graph~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Graphs · Year ${y} · ${n} questions`; },
+  },
+  shape: {
+    name: 'Shapes', ages: [5, 8], setup: 'opts', say: 'Count them and write how many.',
+    pic: `<svg viewBox="0 0 120 84"><polygon points="8,74 52,74 30,30" fill="${BLOCK.yellow}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><rect x="62" y="34" width="40" height="40" fill="${BLOCK.blue}" stroke="${INK}" stroke-width="3"/></svg>`,
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares'], [2, '2 · up to 6 sides, 3D'], [3, '3 · up to 10 sides, symmetry']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)']] },
+    ],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: ['flat', 'solid'], n: age === 5 ? 6 : 12 }),
+    make: c => shapeQ(c.yr, c.kinds),
+    key: c => `shape~${c.yr}|${['flat', 'solid'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Shapes · Year ${y} · ${kinds.replace('solid', '3D').split(',').join(', ')} · ${n} questions`; },
+  },
+  ruler: {
+    name: 'Rulers', ages: [5, 8], setup: 'opts', say: 'How long is the pencil?',
+    pic: rulerSvg({ yr: 2, s: 0, e: 9, col: 'red' }),
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · blocks'], [2, '2 · cm from 0'], [3, '3 · cm, not from 0']] }],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
+    make: c => rulerQ(c.yr),
+    key: c => `ruler~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Rulers · Year ${y} · ${n} questions`; },
   },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
@@ -1416,6 +1624,17 @@ function qMarkup(q) {
       : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
     return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw) + 1.2 } };
   }
+  // graphs, shapes, rulers: the question, the picture, then "___" (and a unit)
+  if (q.kind === 'graph' || q.kind === 'shape' || q.kind === 'ruler') {
+    const pic = { graph: graphSvg, shape: shapeSvg, ruler: rulerSvg }[q.kind](q);
+    const [, pw, ph] = pic.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    const capLen = q.capLen || q.cap.length;
+    return {
+      cls: 'pic2', anchor: '.ln',
+      html: `<div class="cap">${q.cap}</div>${pic}<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`,
+      vars: { '--h': ph + 1.1 + 3.3, '--c': Math.max(pw, capLen * 0.44, 3.5) + 1.2 },
+    };
+  }
   // number pattern: the hidden term is a box, then "☐ = ___" like a missing number
   if (q.kind === 'seq') {
     const box = '<span class="bx"></span>', chars = q.terms.join(', ').length;
@@ -1596,7 +1815,7 @@ function inZone(kind, cx, cy) {
   if (kind === 'div') return cy < 0;
   // on the line, in the box in the sum, or a bit low under the line: all of it
   // is hers (the bottom row wins if there is more than one)
-  if (['miss', 'expr', 'clock', 'money', 'seq', 'story'].includes(kind)) return true;
+  if (['miss', 'expr', 'clock', 'money', 'seq', 'story', 'graph', 'shape', 'ruler'].includes(kind)) return true;
   return cy > 0;
 }
 // Any card with writing on it gets marked (Sam): if nothing is in the answer

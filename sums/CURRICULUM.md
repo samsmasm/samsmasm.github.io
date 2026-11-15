@@ -57,7 +57,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Put events of the day in order (before, after, yesterday, tomorrow); parts of the day (morning, noon, evening, midnight).
 
 ### Geometry
-- Name and sort 2D shapes by one attribute: triangle, circle, rectangle, square *(6m)*. Knows: a shape keeps its name whatever its size or colour.
+- Name and sort 2D shapes by one attribute: triangle, circle, rectangle, square *(6m)*. Knows: a shape keeps its name whatever its size or colour. ✓ partly (Shapes, Year 1: count sides and corners, not naming)
 - Name and sort 3D shapes in different positions: cube, cylinder, sphere.
 - Make a shape from smaller shapes, and break one up.
 - Position words: above, below, left, right, in front, behind, inside, outside, next to.
@@ -66,7 +66,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Statistics
 - Collect category data for a question (whose foot is longer?) ✋, and tally it.
 - Make a picture graph.
-- Read a picture graph: how many in each group, which has most or least.
+- Read a picture graph: how many in each group, which has most or least. ✓ partly (Graphs, Year 1: how many; not most/least)
 
 ---
 
@@ -110,9 +110,9 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Find the unit of repeat in a pattern and use it to predict what comes later (ACDC in ACDCACDC...).
 
 ### Measurement
-- Measure length, weight or capacity with an informal unit used again and again (paper clips). ✋
+- Measure length, weight or capacity with an informal unit used again and again (paper clips). ✋ ✓ partly (Rulers, Year 1: blocks)
 - Compare and order several objects by those units.
-- Estimate and measure in cm, g and mL with a marked tool (ruler, scale, jug). ✋ (a ruler on screen works)
+- Estimate and measure in cm, g and mL with a marked tool (ruler, scale, jug). ✓ partly (Rulers, Year 2: cm only)
 - Perimeter of a polygon in metric units. ✓ (Area: Perimeter)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - Months and seasons in order; the month before and after; ordinals for months.
@@ -120,7 +120,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Tell the time to the hour, half hour and quarter hour ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ (Clocks, Year 2)
 
 ### Geometry
-- Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex.
+- Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex. ✓ partly (Shapes, Year 2: sides, corners, faces; not naming)
 - Flip, slide and turn 2D shapes to make a pattern or a shape.
 - Give and follow directions with steps and half and quarter turns ✋ (could be a grid game).
 - Read diagrams to say where things are relative to each other.
@@ -128,7 +128,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Statistics
 - Collect category data (favourite pets) ✋, sort it, decide if "other" is needed, tally it.
 - Make picture graphs and dot plots.
-- Describe them and answer most and least questions.
+- Describe them and answer most and least questions. ✓ partly (Graphs, Year 2: tally charts and picture graphs, how many and how many more)
 
 ---
 
@@ -173,7 +173,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Recognise, continue and make growing number patterns (a rule that adds or takes away each time). ✓ partly (Number patterns, Year 3: continue, not make)
 
 ### Measurement
-- Estimate and measure in cm and m, g and kg, mL and L; compare and order by those units. ✋ (rulers and scales could be pictures)
+- Estimate and measure in cm and m, g and kg, mL and L; compare and order by those units. ✓ partly (Rulers, Year 3: cm, not from 0)
 - Perimeter of polygons. ✓ (Area: Perimeter)
 - Area of rectangles by counting equal squares. ✓ (Area: Count squares)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
@@ -182,15 +182,15 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Compare units of time. Knows: 15 minutes in a quarter hour, 60 seconds in a minute, 24 hours in a day, 52 weeks and 365 days in a year (366 in a leap year, every 4 years), months about 4 weeks with different numbers of days, decade 10 years, century 100, millennium 1,000.
 
 ### Geometry
-- Name, picture and sort regular polygons up to 10 sides (all sides and angles equal). Words: right angle, horizontal, vertical.
-- Find lines of symmetry; complete a symmetrical pattern or picture.
+- Name, picture and sort regular polygons up to 10 sides (all sides and angles equal). Words: right angle, horizontal, vertical. ✓ partly (Shapes, Year 3: count sides up to 10)
+- Find lines of symmetry; complete a symmetrical pattern or picture. ✓ partly (Shapes, Year 3: how many lines)
 - Step-by-step directions with half and quarter turns and distances; north, east, south, west.
 - Use simple maps to find things relative to other things.
 
 ### Statistics
 - Collect and sort category data ✋; collect counts (teeth lost, shoe sizes) ✋.
 - Make dot plots and bar graphs.
-- Describe them and answer questions, including ones that need sums (how many teeth did the class lose altogether?).
+- Describe them and answer questions, including ones that need sums (how many teeth did the class lose altogether?). ✓ (Graphs, Year 3: bar graphs, how many more, altogether)
 
 ---
 
