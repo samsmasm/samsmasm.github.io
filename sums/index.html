@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Sums</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23fff'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%23000' stroke-width='4'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --ink: #111; --paper: #fff; --line: #d4d4d4; --faint: #888;
+    --right: #1d6b35; --wrong: #a3201b;
+    --head: 52px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 16px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+  button {
+    font: inherit; color: var(--ink); background: var(--paper);
+    border: 1.5px solid var(--ink); border-radius: 4px;
+    padding: 6px 12px; cursor: pointer; touch-action: manipulation;
+  }
+  button:active { background: #eee; }
+  button.primary { background: var(--ink); color: var(--paper); }
+  button.primary:active { background: #333; }
+
+  header {
+    height: var(--head); display: flex; align-items: center; gap: 10px;
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+    border-bottom: 1.5px solid var(--ink);
+  }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+  #score { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #score b { font-size: 20px; }
+
+  /* settings */
+  #settings {
+    position: fixed; inset: var(--head) 0 0 0; background: var(--paper);
+    overflow: auto; padding: 20px 16px 40px; z-index: 5;
+  }
+  #settings[hidden] { display: none; }
+  .set { max-width: 520px; margin: 0 auto 22px; }
+  .set h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opts button { min-width: 56px; min-height: 48px; font-size: 20px; }
+  .opts button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .set .hint { color: var(--faint); font-size: 14px; margin: 6px 0 0; }
+  .go { max-width: 520px; margin: 0 auto; display: flex; gap: 10px; }
+  .go button { min-height: 48px; padding: 0 22px; font-size: 18px; }
+
+  /* sheet */
+  #sheet {
+    height: calc(100dvh - var(--head)); overflow: auto;
+    display: grid; gap: 10px; padding: 10px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-rows: minmax(140px, 1fr);
+  }
+  #sheet[data-n="6"]  { --cols: 2; }
+  #sheet[data-n="12"] { --cols: 3; }
+  #sheet[data-n="20"] { --cols: 4; }
+  @media (orientation: landscape) {
+    #sheet[data-n="6"]  { --cols: 3; }
+    #sheet[data-n="12"] { --cols: 4; }
+    #sheet[data-n="20"] { --cols: 5; }
+  }
+  @media (orientation: portrait) and (max-width: 560px) {
+    #sheet[data-n] { --cols: 2; }
+  }
+
+  .card {
+    border: 1.5px solid var(--line); border-radius: 6px;
+    display: flex; flex-direction: column; min-width: 0; position: relative;
+    container-type: size;
+  }
+  .q {
+    padding: 6px 10px 0; font-weight: 600; white-space: nowrap;
+    font-size: clamp(18px, 15cqh, 44px); font-variant-numeric: tabular-nums;
+    overflow: hidden; text-overflow: clip;
+  }
+  .pad { flex: 1; position: relative; margin: 4px 8px 0; border-bottom: 1.5px solid var(--line); touch-action: none; min-height: 50px; }
+  .pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #opsOpts button { font-size: 30px; line-height: 1; }
+  .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 38px; padding: 3px 8px 5px; }
+  .foot button { white-space: nowrap; }
+  .read { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 15px; }
+  .mark { font-size: 24px; font-weight: 700; line-height: 1; }
+  .foot button { padding: 4px 9px; font-size: 14px; }
+  .foot .clear { margin-left: auto; border-color: var(--line); color: var(--faint); }
+  .retry, .override, .mark { display: none; }
+
+  .card[data-state="right"] { border-color: var(--right); border-width: 2.5px; }
+  .card[data-state="right"] .mark { display: inline; color: var(--right); }
+  .card[data-state="wrong"] { border-color: var(--wrong); border-width: 2.5px; }
+  .card[data-state="wrong"] .mark { display: inline; color: var(--wrong); }
+  .card[data-state="wrong"] .retry, .card[data-state="wrong"] .override { display: inline-block; }
+  .card[data-state="right"] .clear, .card[data-state="wrong"] .clear { display: none; }
+  .card[data-state="right"] .pad, .card[data-state="wrong"] .pad { pointer-events: none; }
+  .card[data-state="wrong"] .override { margin-left: auto; }
+  .fixed { color: var(--faint); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <button id="settingsBtn">Settings</button>
+  <h1>Sums</h1>
+  <span id="score"></span>
+  <button id="markBtn" class="primary">Mark</button>
+</header>
+
+<section id="settings" hidden>
+  <div class="set">
+    <h2>Signs</h2>
+    <div class="opts" id="opsOpts" data-multi>
+      <button data-v="+">+</button><button data-v="-">−</button><button data-v="*">×</button><button data-v="/">÷</button>
+    </div>
+  </div>
+  <div class="set">
+    <h2>Digits in the first number</h2>
+    <div class="opts" id="aOpts"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button></div>
+  </div>
+  <div class="set">
+    <h2>Digits in the second number</h2>
+    <div class="opts" id="bOpts"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button></div>
+    <p class="hint">Takeaways never go below zero. Divisions always come out exactly.</p>
+  </div>
+  <div class="set">
+    <h2>Questions</h2>
+    <div class="opts" id="nOpts"><button data-v="6">6</button><button data-v="12">12</button><button data-v="20">20</button></div>
+  </div>
+  <div class="go"><button id="newBtn" class="primary">New sheet</button><button id="closeBtn">Back</button></div>
+</section>
+
+<main id="sheet" data-n="12"></main>
+
+<template id="cardT">
+  <div class="card" data-state="writing">
+    <div class="q"></div>
+    <div class="pad"><canvas></canvas></div>
+    <div class="foot">
+      <span class="mark"></span><span class="read"></span>
+      <button class="retry">Try again</button>
+      <button class="override">I wrote it right</button>
+      <button class="clear">Clear</button>
+    </div>
+  </div>
+</template>
+
+<script src="model.js"></script>
+<script src="digits.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const SIGN = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+
+// ---------- settings ----------
+const DEFAULTS = { ops: ['+'], a: 1, b: 1, n: 12 };
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('sums-settings'));
+    if (s && Array.isArray(s.ops) && s.ops.length) return { ...DEFAULTS, ...s };
+  } catch (e) {}
+  return null;
+}
+function saveSettings() { try { localStorage.setItem('sums-settings', JSON.stringify(settings)); } catch (e) {} }
+let settings = loadSettings();
+const firstVisit = !settings;
+if (!settings) settings = { ...DEFAULTS };
+
+function syncOpts() {
+  for (const b of $('#opsOpts').children) b.setAttribute('aria-pressed', settings.ops.includes(b.dataset.v));
+  for (const [id, key] of [['#aOpts', 'a'], ['#bOpts', 'b'], ['#nOpts', 'n']])
+    for (const b of $(id).children) b.setAttribute('aria-pressed', +b.dataset.v === settings[key]);
+}
+$('#opsOpts').addEventListener('click', e => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  const i = settings.ops.indexOf(v);
+  if (i >= 0) { if (settings.ops.length > 1) settings.ops.splice(i, 1); }
+  else settings.ops.push(v);
+  syncOpts();
+});
+for (const [id, key] of [['#aOpts', 'a'], ['#bOpts', 'b'], ['#nOpts', 'n']])
+  $(id).addEventListener('click', e => {
+    const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+    settings[key] = +v; syncOpts();
+  });
+
+// ---------- questions ----------
+const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+function range(d, low) { return d === 1 ? [low, 9] : [10 ** (d - 1), 10 ** d - 1]; }
+function makeQ(op, da, db) {
+  let a, b;
+  if (op === '+') { a = rnd(...range(da, 1)); b = rnd(...range(db, 1)); return { a, b, op, ans: a + b }; }
+  if (op === '-') {
+    a = rnd(...range(da, 1)); b = rnd(...range(db, 1));
+    if (b > a) [a, b] = [b, a];
+    return { a, b, op, ans: a - b };
+  }
+  if (op === '*') { a = rnd(...range(da, 2)); b = rnd(...range(db, 2)); return { a, b, op, ans: a * b }; }
+  // division: b has db digits, a = b * q has da digits where possible
+  b = rnd(...range(db, 2));
+  const [alo, ahi] = range(da, 1);
+  let qlo = Math.max(2, Math.ceil(alo / b)), qhi = Math.floor(ahi / b);
+  if (qlo > qhi) { qlo = Math.min(qlo, 9); qhi = Math.max(qlo, Math.min(qhi, 9)); if (qhi < qlo) qhi = qlo; }
+  const q = rnd(qlo, qhi);
+  return { a: b * q, b, op, ans: q };
+}
+function makeSheet() {
+  const seen = new Set(), qs = [];
+  for (let i = 0; i < settings.n; i++) {
+    let q;
+    for (let t = 0; t < 30; t++) {
+      q = makeQ(settings.ops[rnd(0, settings.ops.length - 1)], settings.a, settings.b);
+      if (!seen.has(q.a + q.op + q.b)) break;
+    }
+    seen.add(q.a + q.op + q.b); qs.push(q);
+  }
+  return qs;
+}
+
+// ---------- cards and writing ----------
+let cards = [];
+let penSeen = false; // once a stylus is used, ignore fingers and palms
+const ro = new ResizeObserver(entries => { for (const en of entries) en.target._card && sizeCanvas(en.target._card); });
+
+function buildSheet() {
+  const sheet = $('#sheet');
+  for (const c of cards) ro.unobserve(c.pad);
+  sheet.innerHTML = ''; sheet.dataset.n = settings.n; sheet.scrollTop = 0;
+  cards = makeSheet().map(q => {
+    const el = $('#cardT').content.firstElementChild.cloneNode(true);
+    const c = { q, el, pad: el.querySelector('.pad'), cv: el.querySelector('canvas'), strokes: [], tries: 0, first: null, timer: 0 };
+    el.querySelector('.q').textContent = `${q.a} ${SIGN[q.op]} ${q.b} =`;
+    c.pad._card = c;
+    wirePad(c);
+    el.querySelector('.clear').onclick = () => { c.strokes = []; draw(c); showRead(c, ''); };
+    el.querySelector('.retry').onclick = () => { c.strokes = []; draw(c); showRead(c, ''); setState(c, 'writing'); };
+    el.querySelector('.override').onclick = () => {
+      if (c.tries === 1) c.first = true;
+      c.el.querySelector('.read').innerHTML = '<span class="fixed">misread</span>';
+      setState(c, 'right'); updateScore();
+    };
+    sheet.appendChild(el); ro.observe(c.pad);
+    return c;
+  });
+  updateScore();
+}
+
+function sizeCanvas(c) {
+  const r = c.pad.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  c.w = r.width; c.h = r.height;
+  c.cv.width = Math.round(r.width * dpr); c.cv.height = Math.round(r.height * dpr);
+  draw(c);
+}
+// strokes are stored in units of the pad height, so they rescale on rotation
+function draw(c) {
+  const g = c.cv.getContext('2d'), dpr = window.devicePixelRatio || 1, h = c.h;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, c.w, c.h);
+  g.lineCap = g.lineJoin = 'round'; g.strokeStyle = '#111'; g.fillStyle = '#111';
+  g.lineWidth = Math.max(3, h * 0.035);
+  for (const s of c.strokes) {
+    if (s.length === 1) { g.beginPath(); g.arc(s[0][0] * h, s[0][1] * h, g.lineWidth / 2, 0, 7); g.fill(); continue; }
+    g.beginPath(); g.moveTo(s[0][0] * h, s[0][1] * h);
+    for (let i = 1; i < s.length; i++) g.lineTo(s[i][0] * h, s[i][1] * h);
+    g.stroke();
+  }
+}
+function wirePad(c) {
+  let active = null, cur = null;
+  const pt = e => { const r = c.pad.getBoundingClientRect(); return [(e.clientX - r.left) / r.height, (e.clientY - r.top) / r.height]; };
+  c.pad.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'pen') penSeen = true;
+    if (penSeen && e.pointerType === 'touch') return;
+    if (active !== null || c.el.dataset.state !== 'writing') return;
+    e.preventDefault();
+    active = e.pointerId; c.pad.setPointerCapture(e.pointerId);
+    cur = [pt(e)]; c.strokes.push(cur); clearTimeout(c.timer); draw(c);
+  });
+  c.pad.addEventListener('pointermove', e => {
+    if (e.pointerId !== active) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of (evs.length ? evs : [e])) cur.push(pt(ev));
+    draw(c);
+  });
+  const end = e => {
+    if (e.pointerId !== active) return;
+    active = null; cur = null;
+    clearTimeout(c.timer); c.timer = setTimeout(() => showRead(c, read(c)), 500);
+  };
+  c.pad.addEventListener('pointerup', end);
+  c.pad.addEventListener('pointercancel', end);
+}
+function read(c) { return SumsDigits.readNumber(c.strokes, 1).text; }
+function showRead(c, t) { c.el.querySelector('.read').textContent = t; }
+function setState(c, s) { c.el.dataset.state = s; c.el.querySelector('.mark').textContent = s === 'right' ? '✓' : s === 'wrong' ? '✗' : ''; }
+
+// ---------- marking ----------
+function mark() {
+  if (cards.length && cards.every(c => c.el.dataset.state === 'right')) { buildSheet(); return; }
+  for (const c of cards) {
+    if (c.el.dataset.state !== 'writing') continue;
+    clearTimeout(c.timer);
+    const t = read(c);
+    showRead(c, t);
+    if (!t) continue;
+    c.tries++;
+    const ok = +t === c.q.ans && t.length > 0;
+    if (c.tries === 1) c.first = ok;
+    setState(c, ok ? 'right' : 'wrong');
+  }
+  updateScore();
+}
+function updateScore() {
+  const done = cards.filter(c => c.first !== null).length;
+  const right = cards.filter(c => c.first === true).length;
+  const all = cards.length && cards.every(c => c.el.dataset.state === 'right');
+  $('#score').innerHTML = done ? `First try <b>${right}</b>/${cards.length}` : '';
+  $('#markBtn').textContent = all ? 'New sheet' : 'Mark';
+}
+
+// ---------- wiring ----------
+function openSettings() { syncOpts(); $('#settings').hidden = false; $('#settingsBtn').hidden = true; $('#markBtn').hidden = true; }
+function closeSettings() { $('#settings').hidden = true; $('#settingsBtn').hidden = false; $('#markBtn').hidden = false; }
+$('#settingsBtn').onclick = openSettings;
+$('#closeBtn').onclick = () => { settings = loadSettings() || settings; closeSettings(); };
+$('#newBtn').onclick = () => { saveSettings(); closeSettings(); buildSheet(); };
+$('#markBtn').onclick = mark;
+
+buildSheet();
+if (firstVisit) openSettings();
+</script>
+</body>
+</html>
