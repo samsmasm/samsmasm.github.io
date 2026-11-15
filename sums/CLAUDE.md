@@ -31,7 +31,7 @@ Ideas agreed for later (step 3, age 8): arrays, place value, number lines, then 
 - **+ − ×** stacked like written sums: carry space on top, sign left, right-aligned, line under; answer under the line. Long multiplication gets more room. **÷** long-division bracket in the middle; answer on the bar, working underneath.
 - Each card is one writing surface (`.work`, canvas over the printed question). Strokes are stored relative to an anchor (`.rule` / `.dd` / `.wl`) in units of the printed font size, so writing stays lined up after rotation.
 - **Only the answer is read** (`answerStrokes` + `inZone(kind)`): below the line (col, frame), above the bar (div), anywhere above the answer line (miss). Ruled lines ignored; several rows → bottom row. Try again removes only those strokes; Undo the last stroke.
-- After a 0.5 s pause the reading shows in grey. Mark marks every card with writing.
+- After a 0.5 s pause the reading shows in grey. **Mark marks every card with anything written on it, in one press** (Sam): 4 of 12 done → those 4 are marked and the clock keeps going; the sheet finishes when all are right. If a card has writing but none in its answer place, `answerStrokes` falls back to all her writing (bottom row) instead of skipping the card (skipped cards looked like Mark was going "one by one").
 - **Wrong** (Sam): only "Try again"; the answer is never shown. When a later try is right, the card shows "first read N" and **I was right the first time**, which counts it as first try right (also updates the saved history if the sheet is already done).
 - Palm rejection once a stylus is used.
 - Look: black and white, only colour dark green / dark red card borders. Not AESTHETIC.md. The front screens can be more designed than the sheet (Sam).

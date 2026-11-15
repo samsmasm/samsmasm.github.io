@@ -915,15 +915,19 @@ function inZone(kind, cx, cy) {
   if (kind === 'miss') return cy < 0.8; // on the line, or in the box in the sum above it
   return cy > 0;
 }
+// Any card with writing on it gets marked (Sam): if nothing is in the answer
+// place, read whatever she wrote rather than skipping the card.
 function answerStrokes(c) {
-  const items = [];
+  const all = [], items = [];
   for (const s of c.strokes) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    if (!inZone(c.q.kind, (x0 + x1) / 2, (y0 + y1) / 2)) continue;
     if (x1 - x0 > 1.4 && y1 - y0 < (x1 - x0) * 0.25) continue; // a ruled line
-    items.push({ s, y0, y1 });
+    const it = { s, y0, y1 };
+    all.push(it);
+    if (inZone(c.q.kind, (x0 + x1) / 2, (y0 + y1) / 2)) items.push(it);
   }
+  if (!items.length) items.push(...all);
   items.sort((p, q) => p.y0 - q.y0);
   const rows = [];
   for (const it of items) {
