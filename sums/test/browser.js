@@ -67,10 +67,19 @@ const HELPERS = () => {
   await page.type('#newName', 'Mia');
   await page.click('#addBtn');
   ok(await page.$eval('#whoBtn', e => e.textContent) === 'Mia', 'new player becomes current');
-  await page.click('#who .back');
+  ok(await page.$eval('#settingsBtn', e => !e.hidden) && await page.$eval('#whoBtn', e => e.getAttribute('aria-pressed')) === 'true', 'names page: both header tabs visible, names tab filled in');
+
+  // straight on from the names to choosing sums
+  await page.click('#toSetupBtn');
+  ok(await page.evaluate(() => !$('#settings').hidden && $('#who').hidden && $('#settingsBtn').getAttribute('aria-pressed') === 'true'), '"Choose sums" goes from the names to the setup');
+  // switching tabs keeps unsaved choices
+  await page.click('#opsOpts button[data-v="-"]');
+  await page.click('#whoBtn');
+  await page.click('#settingsBtn');
+  ok(await page.evaluate(() => settings.ops.includes('-')), 'going to the names and back keeps unsaved choices');
+  await page.click('#opsOpts button[data-v="-"]');
 
   // all four signs, 2 digit and 1 digit, 12 questions
-  await page.click('#settingsBtn');
   for (const v of ['-', '*', '/']) await page.click(`#opsOpts button[data-v="${v}"]`);
   await page.click('.big[data-line="a"] [data-d="2"]');
   await page.click('#nOpts button[data-v="12"]');

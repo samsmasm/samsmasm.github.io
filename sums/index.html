@@ -91,6 +91,8 @@
   td.t { font-weight: 700; white-space: nowrap; }
   .empty { color: var(--faint); }
   #removeBtn { border-color: var(--line); color: var(--faint); font-size: 14px; }
+  .whonext { margin-bottom: 34px; }
+  header button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 
   /* sheet */
   #sheet {
@@ -202,6 +204,7 @@
     <div class="opts" id="playerList"></div>
     <div class="add"><input id="newName" placeholder="New name" maxlength="20" autocomplete="off"><button id="addBtn">Add</button></div>
   </div>
+  <div class="go whonext"><button id="toSetupBtn" class="primary">Choose sums</button><button class="back">Back to the sheet</button></div>
   <div class="set">
     <h2 id="recTitle">Best times</h2>
     <div id="records"></div>
@@ -210,7 +213,7 @@
     <h2>Recent sheets</h2>
     <div id="history"></div>
   </div>
-  <div class="go"><button class="back primary">Back</button><button id="removeBtn" hidden></button></div>
+  <div class="go"><button id="removeBtn" hidden></button></div>
 </section>
 
 <main id="sheet" data-n="12"></main>
@@ -659,19 +662,27 @@ function updateScore() {
 }
 
 // ---------- wiring ----------
+// The two pages (who's playing, choose sums) work like tabs: both header
+// buttons stay visible and the open one is filled in. Moving between them keeps
+// unsaved choices; Back (or tapping the open tab) returns to the sheet.
+const TABS = { who: '#whoBtn', settings: '#settingsBtn' };
 function openPanel(id) {
+  for (const p of document.querySelectorAll('.panel')) p.hidden = p.id !== id;
   if (id === 'settings') syncOpts(); else renderWho();
-  $('#' + id).hidden = false;
-  for (const b of ['#settingsBtn', '#markBtn', '#score']) $(b).hidden = true;
+  for (const [p, b] of Object.entries(TABS)) $(b).setAttribute('aria-pressed', p === id);
+  for (const b of ['#markBtn', '#score']) $(b).hidden = true;
 }
 function closePanels() {
   for (const p of document.querySelectorAll('.panel')) p.hidden = true;
-  for (const b of ['#settingsBtn', '#markBtn', '#score']) $(b).hidden = false;
+  for (const b of Object.values(TABS)) $(b).setAttribute('aria-pressed', false);
+  for (const b of ['#markBtn', '#score']) $(b).hidden = false;
   settings = loadSettings() || settings;
+  settings.pa = [...settings.pa]; settings.pb = [...settings.pb];
   renderWho();
 }
-$('#settingsBtn').onclick = () => openPanel('settings');
-$('#whoBtn').onclick = () => $('#who').hidden ? (closePanels(), openPanel('who')) : closePanels();
+$('#settingsBtn').onclick = () => $('#settings').hidden ? openPanel('settings') : closePanels();
+$('#whoBtn').onclick = () => $('#who').hidden ? openPanel('who') : closePanels();
+$('#toSetupBtn').onclick = () => openPanel('settings');
 for (const b of document.querySelectorAll('.panel .back')) b.onclick = closePanels;
 $('#newBtn').onclick = () => { store.set('sums-settings', settings); closePanels(); buildSheet(); };
 $('#markBtn').onclick = mark;
