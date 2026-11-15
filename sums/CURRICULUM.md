@@ -40,7 +40,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Fractions and money
 - Halves and quarters of sets, amounts and shapes, using equal parts. ✓ partly (Fractions)
 - Find a half or quarter of a set by sharing; ½ of ½ is ¼.
-- Know NZ coins and notes and their values.
+- Know NZ coins and notes and their values. ✓ (Money, Year 1)
 
 ### Algebra (patterns and number sentences)
 - Open number sentences with one-digit numbers (2 + 5 = 3 + __). ✓ partly (Missing number)
@@ -52,7 +52,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Measurement
 - Compare two things by length, weight or capacity, directly *(6m)*, then using a third object. Words: longer, shorter, taller, heavier, lighter. ✋ (could be pictures)
 - Days of the week in order, the day before and after *(6m)*; weekdays and weekend.
-- Tell the time to the hour (o'clock) on analogue and digital clocks.
+- Tell the time to the hour (o'clock) on analogue and digital clocks. ✓ (Clocks, Year 1)
 - Choose a sensible unit for how long things take (seconds, minutes, hours, days, weeks, months, years).
 - Put events of the day in order (before, after, yesterday, tomorrow); parts of the day (morning, noon, evening, midnight).
 
@@ -101,8 +101,8 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Compare two fractions (halves are bigger than thirds, bigger than quarters).
 - Find a half, third or quarter of a set by seeing groups, not sharing one by one.
 - Find the whole from a part (if ½ is 5, the whole is 10).
-- Order NZ coins and notes by value; group like coins and total them.
-- Make an amount using only coins or only notes.
+- Order NZ coins and notes by value; group like coins and total them. ✓ partly (Money, Year 2: totals)
+- Make an amount using only coins or only notes. ✓ partly (Money, Year 2: totals, not making)
 
 ### Algebra
 - True or false comparisons to 120 (16 > 60?), using >, < and =.
@@ -117,7 +117,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - Months and seasons in order; the month before and after; ordinals for months.
 - Describe how long familiar things take.
-- Tell the time to the hour, half hour and quarter hour ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour.
+- Tell the time to the hour, half hour and quarter hour ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ (Clocks, Year 2)
 
 ### Geometry
 - Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex.
@@ -163,9 +163,9 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Add and subtract fractions with the same denominator within one (⅛ + ²⁄₈ + ³⁄₈ = ⁶⁄₈).
 - Unit fraction of a number by dividing (⅓ of 15 = 15 ÷ 3).
 - Whole from a unit fraction (¼ of a set is 3, so the set is 12).
-- Write money as dollars and cents without a decimal point ($2 and 50 cents).
-- Make amounts with $1 and $2 coins and $5, $10, $20, $50 and $100 notes.
-- Give change by adding and subtracting.
+- Write money as dollars and cents without a decimal point ($2 and 50 cents). ✓ (Money, Year 3)
+- Make amounts with $1 and $2 coins and $5, $10, $20, $50 and $100 notes. ✓ partly (Money: totals, not making)
+- Give change by adding and subtracting. ✓ (Money: Change)
 
 ### Algebra
 - True or false comparisons to 1,000 (313 < 330?).
@@ -178,7 +178,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Area of rectangles by counting equal squares. ✓ (Area: Count squares)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - How long events take, in seconds up to years.
-- Tell the time to the nearest 5 minutes and nearest minute ("10 past", "quarter to", a.m. and p.m.).
+- Tell the time to the nearest 5 minutes and nearest minute ("10 past", "quarter to", a.m. and p.m.). ✓ (Clocks, Years 3 and 4; not a.m. and p.m.)
 - Compare units of time. Knows: 15 minutes in a quarter hour, 60 seconds in a minute, 24 hours in a day, 52 weeks and 365 days in a year (366 in a leap year, every 4 years), months about 4 weeks with different numbers of days, decade 10 years, century 100, millennium 1,000.
 
 ### Geometry
@@ -238,7 +238,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Area of rectangles by multiplying the sides. ✓ (Area: Area, Missing side)
 - Volume of cuboids by filling with cubes.
 - Estimate angles against 90°, 180° and 360°. Knows: a full turn is 360°, a half turn 180°, a quarter turn 90°; rectangles have four right angles.
-- Tell the time to the nearest minute, analogue and digital.
+- Tell the time to the nearest minute, analogue and digital. ✓ (Clocks, Year 4)
 - Durations in mixed units (1 h 42 min, 3 min 21 s).
 - Change between time units (3 weeks = 21 days, 90 seconds = 1½ minutes, 48 hours = 2 days).
 

@@ -40,8 +40,11 @@ const HELPERS = () => {
     } else if (c.q.kind === 'bond') { // in the empty circle, centred on the anchor
       const w = String(n).length * 0.8 * 0.9;
       c.strokes = [...extra, ...numStrokes(n, w / 2, -0.45, 0.9, mirror)];
+    } else if (c.q.two) { // "3 : 15", "$2 and 50 c": first number left of the middle, second right of it
+      const [a, b] = (Array.isArray(n) ? n : c.q.parts).map(String), s = 0.85;
+      c.strokes = [...extra, ...numStrokes(a, -0.45, -1.05, s, mirror), ...numStrokes(b, 0.45 + b.length * 0.8 * s, -1.05, s, mirror)];
     } else {
-      const top = { div: -1.3, miss: -1.1, expr: -1.1 }[c.q.kind] ?? 0.3;
+      const top = { div: -1.3, miss: -1.1, expr: -1.1, clock: -1.05, money: -1.05 }[c.q.kind] ?? 0.3;
       c.strokes = [...extra, ...numStrokes(n, 0, top, 1, mirror)];
     }
     draw(c);
@@ -91,7 +94,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -103,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#ageTiles [data-age="5"]');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
-  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,How many?,Number bonds,Teen numbers,Make 10', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
   ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'age 5 home is read aloud');
   await page.click('#backBtn');
 
@@ -111,7 +114,7 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks the age');
   await page.click('#ageTiles [data-age="5"]');
-  ok((await tiles('#actTiles')).length === 5, 'Everyone at 5: the 5 activities');
+  ok((await tiles('#actTiles')).length === 7, 'Everyone at 5: the 5 activities');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks again next time');
@@ -147,6 +150,7 @@ const fakeSpeech = () => {
   ok(await cols() === 3, 'portrait: 3 columns for 12');
   ok(await page.evaluate(() => JSON.parse(localStorage.getItem('sums-cfg-' + current + '-sums')).ops.join('') === '+-*/'), 'her settings are saved under her name');
 
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))); // let the cards size themselves first
   const lay = await page.evaluate(() => {
     const out = [];
     for (const c of cards) {
@@ -272,7 +276,9 @@ const fakeSpeech = () => {
   const fits = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).then(() => page.evaluate(() => cards.filter(c => {
     const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect();
     const room = c.q.kind === 'bond' ? true // she writes in the circle, checked separately
-      : c.q.kind === 'expr' || c.q.kind === 'miss' ? c.ay > 2.5 * c.F : c.h - c.ay >= 1.3 * c.F;
+      : c.q.kind === 'expr' || c.q.kind === 'miss' ? c.ay > 2.5 * c.F
+      : c.q.kind === 'clock' || c.q.kind === 'money' ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
+      : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
   }).map(c => JSON.stringify(c.q))));
   const writeAllAndMark = async () => {
@@ -409,6 +415,107 @@ const fakeSpeech = () => {
   await page.click('#markBtn');
   await page.click('.card[data-state="wrong"] .retry');
   ok(await page.evaluate(() => cards[0].strokes.length === 0), 'Fractions: Try again clears both numbers');
+
+  // ---- Mia: Clocks (Years 1–4)
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="clock"]');
+  ok(await page.evaluate(() => draft.yr === 3 && draft.kinds.join() === 'face,words'), 'Clocks setup: Year 3, clock and words');
+  const ck = await page.evaluate(() => {
+    const bad = [];
+    const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
+    for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 300; i++) {
+      const q = ACTS.clock.make({ yr, kinds: ['face', 'words'] });
+      if (q.h < 1 || q.h > 12 || !minsOk[yr](q.m)) bad.push(yr + ' range ' + JSON.stringify(q));
+      if (yr === 1 && (q.two || q.ans !== q.h || q.words)) bad.push('y1 ' + JSON.stringify(q));
+      if (yr > 1 && (!q.two || q.parts[0] !== q.h || q.parts[1] !== q.m || q.ticks !== (yr >= 3))) bad.push(yr + ' parts ' + JSON.stringify(q));
+    }
+    const w = [[4, 0], [4, 15], [4, 30], [4, 45], [12, 40], [12, 45], [7, 17], [3, 59], [9, 5]].map(([h, m]) => timeWords(h, m)).join(' / ');
+    if (w !== "4 o'clock / quarter past 4 / half past 4 / quarter to 5 / 20 to 1 / quarter to 1 / 17 minutes past 7 / 1 minute to 4 / 5 past 9") bad.push('words: ' + w);
+    // hands: the minute hand points at the minutes, the hour hand moves on through the hour
+    const ends = q => [...new DOMParser().parseFromString(clockSvg(q), 'image/svg+xml').querySelectorAll('path[stroke-linecap]')].map(p => p.getAttribute('d').match(/L(\S+) (\S+)/).slice(1).map(Number));
+    const ang = ([x, y]) => (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360;
+    const [hh, mm] = ends({ h: 3, m: 30 });
+    if (Math.abs(ang(mm) - 180) > 0.5 || Math.abs(ang(hh) - 105) > 0.5) bad.push('hands at 3:30 ' + ang(hh) + ' ' + ang(mm));
+    return bad.slice(0, 4);
+  });
+  ok(ck.length === 0, 'Clocks: o\'clock / half and quarter / 5 minutes / any minute, words and hands right ' + ck.join(' | '));
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'clock' && c.q.two && c.el.querySelectorAll('.ln').length === 2 && (c.q.words ? c.el.querySelector('.words').textContent === c.q.words : c.el.querySelectorAll('svg text').length === 12))), 'Clocks cards: a face (or words) and "__ : __"');
+  ok((await fits()).length === 0, 'Clocks fit ' + (await fits()).join(' '));
+  const cr = await page.evaluate(() => {
+    const c = cards[0], out = {};
+    c.q = { kind: 'clock', h: 3, m: 5, ticks: true, two: true, parts: [3, 5], ans: '3:05' }; layout(c); sizeCanvas(c);
+    writeNum(c, ['3', '05']); out.zero = readAnswer(c).ok && read(c) === '3:05';
+    writeNum(c, ['3', '5']); out.plain = readAnswer(c).ok;
+    writeNum(c, ['5', '3']); out.swapped = !readAnswer(c).ok;
+    c.strokes = numStrokes(3, -0.45, -1.05, 0.85); out.half = read(c) === '3:?' && !readAnswer(c).ok;
+    writeNum(c, ['3', '5'], numStrokes(7, 1, -5, 0.6)); out.face = readAnswer(c).ok; // a mark on the clock is ignored
+    return out;
+  });
+  ok(cr.zero && cr.plain, 'Clocks: 3:05 read whether she writes 05 or 5');
+  ok(cr.swapped && cr.half, 'Clocks: swapped numbers are wrong; only the hour shows 3:? and is not right');
+  ok(cr.face, 'Clocks: marks on the clock face are ignored');
+  ok((await writeAllAndMark()).length === 0, 'Clocks: whole sheet read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/20-clocks.png' });
+  await page.click('#markBtn');
+  await page.evaluate(() => writeNum(cards[0], [String(cards[0].q.h % 12 + 1), String(cards[0].q.m)]));
+  await page.click('#markBtn');
+  await page.click('.card[data-state="wrong"] .retry');
+  ok(await page.evaluate(() => cards[0].strokes.length === 0), 'Clocks: Try again clears both numbers');
+  await page.click('#setupBtn');
+  await page.click('#optBlock [data-key="yr"] [data-v="1"]');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => !c.q.two && c.q.m === 0 && c.el.querySelectorAll('.ln').length === 1 && /o.clock/.test(c.el.querySelector('.ans').textContent))), 'Clocks Year 1: on the hour, "__ o\'clock"');
+  ok((await fits()).length === 0, 'Clocks Year 1 fit ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Clocks Year 1: hours read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/21-clocks-y1.png' });
+
+  // ---- Mia: Money (Years 1–3)
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="money"]');
+  ok(await page.evaluate(() => draft.yr === 3 && draft.kinds.join() === 'count,change'), 'Money setup: Year 3, how much and change');
+  const mo = await page.evaluate(() => {
+    const bad = [];
+    for (const yr of [1, 2, 3]) for (let i = 0; i < 400; i++) {
+      const q = ACTS.money.make({ yr, kinds: ['count', 'change'] });
+      const total = q.change ? q.pay - q.price : sumOf(q.items);
+      const want = q.unit === '$c' ? [Math.floor(total / 100), total % 100] : q.unit === '$' ? total / 100 : total;
+      if (q.unit === '$c' ? !(q.two && q.parts[0] === want[0] && q.parts[1] === want[1]) : q.ans !== want) bad.push('answer ' + JSON.stringify(q));
+      if (q.unit === '$' && total % 100) bad.push('whole dollars ' + JSON.stringify(q));
+      if (q.change) {
+        if (q.price <= 0 || q.price >= q.pay || !isNote(q.pay)) bad.push('change ' + JSON.stringify(q));
+        if ((yr < 3) !== (q.unit === '$')) bad.push('change unit ' + JSON.stringify(q));
+      } else {
+        const cents = q.items.filter(v => v < 100), dollars = q.items.filter(v => v >= 100);
+        if (yr === 1 && (cents.length || total > 1000)) bad.push('y1 ' + JSON.stringify(q));
+        if (yr === 2 && ((cents.length && dollars.length) || (cents.length && total > 100) || total > 10000 || (q.items.some(v => v >= 500) && q.items.some(v => v < 500)))) bad.push('y2 ' + JSON.stringify(q));
+        if (yr === 3 && (!cents.length || !dollars.length || sumOf(cents) >= 100 || q.unit !== '$c')) bad.push('y3 ' + JSON.stringify(q));
+      }
+    }
+    return bad.slice(0, 4);
+  });
+  ok(mo.length === 0, 'Money: totals and change right; Year 1 whole dollars to $10, Year 2 coins or notes, Year 3 dollars and cents ' + mo.join(' | '));
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => {
+    const q = c.q, svg = c.el.querySelector('.qv svg');
+    if (q.change) return c.el.querySelector('.cap').textContent === 'Change?' && svg.querySelectorAll('text').length >= 4;
+    return svg.querySelectorAll('circle').length + svg.querySelectorAll('rect').length / 2 === q.items.length;
+  })), 'Money cards: one coin or note drawn per item; change shows the price and the note');
+  ok((await fits()).length === 0, 'Money fits ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Money: whole sheet read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/22-money.png' });
+  for (const yr of [2, 1]) {
+    await page.click('#setupBtn');
+    await page.click(`#optBlock [data-key="yr"] [data-v="${yr}"]`);
+    await page.click('#newBtn');
+    ok((await fits()).length === 0, `Money Year ${yr} fits ` + (await fits()).join(' '));
+    ok((await writeAllAndMark()).length === 0, `Money Year ${yr}: read and marked right`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/23-money-y${yr}.png` });
+  }
+  ok(await page.evaluate(() => [labelFor('clock~3|face,words|12'), labelFor('money~1|count|6')].join(' / '))
+    === 'Clocks · Year 3 · clock, words · 12 questions / Money · Year 1 · how much · 6 questions', 'record labels for Clocks and Money');
+  ok(await page.evaluate(() => [cardSay({ kind: 'money', change: true, price: 350, pay: 500 }), cardSay({ kind: 'clock', words: 'half past 4' })].join(' / '))
+    === 'It costs 3 dollars and 50 cents. You pay 5 dollars. How much change? / half past 4. Write the time.', 'Clocks and Money cards read aloud');
 
   // ---- Mia: Times grid
   await page.click('#backBtn');

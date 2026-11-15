@@ -202,6 +202,15 @@
   .miss .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
   .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
   .miss .wl { display: inline-block; width: calc((var(--d) + .8) * .7em); border-bottom: .07em solid var(--ink); height: 1em; }
+  /* clocks and money: picture, then blanks to write on */
+  .qv.pic2 { top: .4em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .pic2 svg { display: block; }
+  .pic2 .cap { font-size: .75em; font-weight: 700; margin-bottom: .3em; }
+  .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
+  .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
+  .pic2 .ln { display: inline-block; width: 1.9em; height: 1em; border-bottom: .07em solid var(--ink); }
+  .pic2 .u, .pic2 .sep { font-size: .8em; line-height: 1.1; }
+  .pic2 .sep { padding: 0 .2em; }
 
   .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; padding: 2px 8px 5px; }
   .read { color: #666; font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; line-height: 1.1; }
@@ -526,6 +535,116 @@ const nlineSvg = q => {
   const lab = (x, v) => `<text x="${x}" y="38" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${v}</text>`;
   return s + lab(10, q.start) + lab(110, q.start + 10 * q.step) + '</svg>';
 };
+// clock face: 1 to 12, hour ticks (minute ticks too from Year 3), hour and minute hands
+function clockSvg(q, em = 4.4) {
+  const P = (r, a) => `${(r * Math.sin(a)).toFixed(2)} ${(-r * Math.cos(a)).toFixed(2)}`;
+  let s = `<svg viewBox="-50 -50 100 100" style="width:${em}em;height:${em}em" fill="none" stroke="currentColor"><circle r="47" stroke-width="2.6"/>`;
+  for (let i = 0; i < 60; i++) {
+    const big = i % 5 === 0; if (!big && !q.ticks) continue;
+    const a = i * Math.PI / 30;
+    s += `<path d="M${P(big ? 40 : 43, a)}L${P(46, a)}" stroke-width="${big ? 2.2 : 1}"/>`;
+  }
+  const hand = (deg, len, w) => `<path d="M0 0L${P(len, deg * Math.PI / 180)}" stroke-width="${w}" stroke-linecap="round"/>`;
+  s += hand((q.h % 12) * 30 + q.m * 0.5, 22, 5.5) + hand(q.m * 6, 37, 3);
+  // numbers on top of the hands, with a white edge, so a hand never hides one
+  for (let h = 1; h <= 12; h++) {
+    const [x, y] = P(31, h * Math.PI / 6).split(' ');
+    s += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="currentColor" stroke="white" stroke-width="3" paint-order="stroke" font-family="system-ui, sans-serif">${h}</text>`;
+  }
+  return s + '<circle r="3.6" fill="currentColor" stroke="none"/></svg>';
+}
+function timeWords(h, m) {
+  const nx = h % 12 + 1, mins = k => k % 5 ? `${k} minute${k > 1 ? 's' : ''}` : String(k);
+  if (m === 0) return `${h} o'clock`;
+  if (m === 15) return `quarter past ${h}`;
+  if (m === 30) return `half past ${h}`;
+  if (m === 45) return `quarter to ${nx}`;
+  return m < 30 ? `${mins(m)} past ${h}` : `${mins(60 - m)} to ${nx}`;
+}
+// NZ money in cents. Coins drawn to their real sizes (gold ones grey); notes as
+// labelled rectangles. Up to 96 units a row, 0.07 em a unit.
+const COIN = { 10: [8.2, '10c'], 20: [8.7, '20c'], 50: [9.9, '50c'], 100: [9.2, '$1'], 200: [10.6, '$2'] };
+const MONEY_EM = 0.07;
+const isNote = v => v >= 500;
+const itemW = v => isNote(v) ? 30 : COIN[v][0] * 2, itemH = v => isNote(v) ? 15 : COIN[v][0] * 2;
+const mtext = (x, y, t, fs) => `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${t}</text>`;
+function moneyItem(v, x, cy) {
+  if (isNote(v)) return `<rect x="${x}" y="${cy - 7.5}" width="30" height="15" rx="1.5" fill="white" stroke-width="1.2"/><rect x="${x + 2}" y="${cy - 5.5}" width="26" height="11" rx=".8" stroke-width=".4"/>` + mtext(x + 15, cy, '$' + v / 100, 8.5);
+  const [r, t] = COIN[v];
+  return `<circle cx="${x + r}" cy="${cy}" r="${r}" fill="${v >= 100 ? '#dcdcdc' : 'white'}" stroke-width="1.2"/>` + mtext(x + r, cy, t, v >= 100 ? 7.5 : 6.5);
+}
+function moneySvg(items) {
+  const rows = [[]];
+  let w = 0;
+  for (const v of items) {
+    if (rows[rows.length - 1].length && w + 3 + itemW(v) > 96) { rows.push([]); w = 0; }
+    w += (rows[rows.length - 1].length ? 3 : 0) + itemW(v); rows[rows.length - 1].push(v);
+  }
+  let s = '', y = 0, W = 0;
+  for (const row of rows) {
+    const h = Math.max(...row.map(itemH));
+    let x = 0;
+    for (const v of row) { s += moneyItem(v, x, y + h / 2); x += itemW(v) + 3; }
+    W = Math.max(W, x - 3); y += h + 3;
+  }
+  const H = y - 3;
+  return `<svg viewBox="-1 -1 ${W + 2} ${H + 2}" style="width:${((W + 2) * MONEY_EM).toFixed(3)}em;height:${((H + 2) * MONEY_EM).toFixed(3)}em" fill="none" stroke="currentColor">${s}</svg>`;
+}
+// change: a price tag ("costs") and the note she pays with ("you pay")
+function changeSvg(q) {
+  const d = Math.floor(q.price / 100), c = q.price % 100;
+  let s = `<path d="M7 0H36V22H7L0 11Z" fill="white" stroke-width="1.2" stroke-linejoin="round"/><circle cx="6" cy="11" r="1.8" stroke-width=".8"/>`;
+  s += c ? mtext(21.5, 6.5, '$' + d, 8) + mtext(21.5, 15.5, c + 'c', 8) : mtext(21.5, 11, '$' + d, 9.5);
+  s += moneyItem(q.pay, 44, 11);
+  s += mtext(18, 28.5, 'costs', 6) + mtext(59, 28.5, 'you pay', 6);
+  return `<svg viewBox="-1 -1 77 34" style="width:${(77 * MONEY_EM).toFixed(3)}em;height:${(34 * MONEY_EM).toFixed(3)}em" fill="none" stroke="currentColor">${s}</svg>`;
+}
+const moneyWords = v => { const d = Math.floor(v / 100), c = v % 100; return [d ? `${d} dollar${d > 1 ? 's' : ''}` : '', c ? `${c} cents` : ''].filter(Boolean).join(' and '); };
+const sumOf = a => a.reduce((x, y) => x + y, 0);
+const byValue = a => [...a].sort((x, y) => y - x);
+// one "How much?" question for a year: { items, unit } where unit is
+// '$' (whole dollars), 'c' (cents) or '$c' (dollars and cents, two blanks)
+function moneyCount(yr) {
+  for (let t = 0; t < 60; t++) {
+    if (yr === 1) { // whole dollars up to $10
+      const items = Array.from({ length: rnd(1, 3) }, () => pickOne([100, 200, 500, 1000]));
+      if (sumOf(items) <= 1000) return { items: byValue(items), unit: '$' };
+    } else if (yr === 2) { // coins only or notes only: a group of like ones, or a mix
+      const type = pickOne(['like', 'like', 'cents', 'dollars', 'notes']);
+      let items;
+      if (type === 'like') { const v = pickOne([10, 20, 50, 100, 200, 500, 1000, 2000]); items = Array(rnd(2, { 10: 8, 20: 5, 50: 2, 100: 8, 200: 5, 500: 5, 1000: 5, 2000: 4 }[v])).fill(v); }
+      else if (type === 'cents') items = Array.from({ length: rnd(2, 4) }, () => pickOne([10, 20, 50]));
+      else if (type === 'dollars') items = Array.from({ length: rnd(2, 5) }, () => pickOne([100, 200]));
+      else items = Array.from({ length: rnd(2, 4) }, () => pickOne([500, 1000, 2000, 5000]));
+      const s = sumOf(items), cents = items[0] < 100;
+      if ((cents && s <= 100) || (!cents && s <= 10000)) return { items: byValue(items), unit: cents ? 'c' : '$' };
+    } else { // dollars and cents together
+      const ds = Array.from({ length: rnd(1, 3) }, () => pickOne([100, 200, 500, 1000]));
+      const cs = Array.from({ length: rnd(1, 3) }, () => pickOne([10, 20, 50]));
+      if (sumOf(cs) < 100) {
+        let items = byValue([...ds, ...cs]);
+        if (Math.random() < 0.3) items = items.sort(() => Math.random() - 0.5); // sometimes out of order, so she sorts them herself
+        return { items, unit: '$c' };
+      }
+    }
+  }
+  return { items: [100], unit: '$' };
+}
+// one "Change?" question: { price, pay, unit } (cents)
+function moneyChange(yr) {
+  if (yr === 1) { const pay = pickOne([500, 1000]); return { pay, price: rnd(1, pay / 100 - 1) * 100, unit: '$' }; }
+  if (yr === 2) {
+    const pay = pickOne([2000, 5000, 10000]);
+    const price = pay === 10000 ? rnd(1, 19) * 500 : rnd(pay === 2000 ? 1 : 5, pay / 100 - 1) * 100;
+    return { pay, price, unit: '$' };
+  }
+  const pay = pickOne([500, 1000, 2000]);
+  return { pay, price: rnd(1, pay / 100 - 1) * 100 + rnd(1, 9) * 10, unit: '$c' };
+}
+function moneyQ(q, total) {
+  if (q.unit === '$c') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, parts: [d, c], ans: `$${d} and ${c}c` }; }
+  return { ...q, kind: 'money', ans: q.unit === '$' ? total / 100 : total };
+}
 const textSvg = lines => `<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -709,6 +828,43 @@ const ACTS = {
     },
     key: c => `frac~${['shapes', 'line'].filter(k => c.kinds.includes(k)).join(',')}|${[...c.parts].sort((x, y) => x - y).join(',')}|${c.n}`,
     label: k => { const [kinds, p, n] = k.split('|'); return `Fractions · ${kinds.split(',').join(', ')} · ${p.split(',').join(', ')} parts · ${n} questions`; },
+  },
+  // Clocks and Money go up through the years (NZ curriculum, sums/CURRICULUM.md)
+  clock: {
+    name: 'Clocks', ages: [5, 8], setup: 'opts', say: 'What time is it?',
+    pic: clockSvg({ h: 10, m: 10 }),
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · half and quarter'], [3, '3 · 5 minutes'], [4, '4 · any minute']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)']] },
+    ],
+    defaults: age => age === 5 ? { yr: 1, kinds: ['face'], n: 6 } : { yr: 3, kinds: ['face', 'words'], n: 12 },
+    // Year 1: on the hour, write the hour before "o'clock". Then "h : mm",
+    // to the half and quarter hour, 5 minutes (minute ticks on), any minute.
+    make: c => {
+      const yr = c.yr, h = rnd(1, 12);
+      const m = yr === 1 ? 0 : yr === 2 ? pickOne([0, 15, 30, 30, 45]) : yr === 3 ? rnd(0, 11) * 5 : rnd(0, 59);
+      const words = yr > 1 && pickOne(c.kinds) === 'words' ? timeWords(h, m) : null;
+      if (yr === 1) return { kind: 'clock', h, m, ans: h };
+      return { kind: 'clock', h, m, words, ticks: yr >= 3, two: true, parts: [h, m], ans: `${h}:${String(m).padStart(2, '0')}` };
+    },
+    key: c => `clock~${c.yr}|${['face', 'words'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').split(',').join(', ')} · ${n} questions`; },
+  },
+  money: {
+    name: 'Money', ages: [5, 8], setup: 'opts', say: 'How much money?',
+    pic: moneySvg([200, 100, 50, 20]),
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · dollars to $10'], [2, '2 · coins or notes'], [3, '3 · dollars and cents']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change']] },
+    ],
+    defaults: age => age === 5 ? { yr: 1, kinds: ['count'], n: 6 } : { yr: 3, kinds: ['count', 'change'], n: 12 },
+    make: c => {
+      if (pickOne(c.kinds) === 'change') { const q = moneyChange(c.yr); return moneyQ({ ...q, change: true }, q.pay - q.price); }
+      const q = moneyCount(c.yr);
+      return moneyQ(q, sumOf(q.items));
+    },
+    key: c => `money~${c.yr}|${['count', 'change'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Money · Year ${y} · ${kinds.replace('count', 'how much').split(',').join(', ')} · ${n} questions`; },
   },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
@@ -1068,6 +1224,23 @@ function qMarkup(q) {
     const svg = fracSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
     return { cls: 'frac', html: `${svg}<div class="fbar"></div>`, vars: { '--h': hEm + 0.5 + 1.9 + 2.3, '--c': Math.max(wEm, 4) + 1.4 } };
   }
+  // clocks and money: a picture (or the time in words), then the blank(s) to
+  // write on: "__ o'clock", "__ : __", "$ __", "__ c" or "$ __ and __ c"
+  if (q.kind === 'clock' || q.kind === 'money') {
+    let pic, cap = '';
+    if (q.kind === 'clock') pic = q.words ? `<div class="words">${q.words}</div>` : clockSvg(q);
+    else if (q.change) { cap = '<div class="cap">Change?</div>'; pic = changeSvg(q); }
+    else pic = moneySvg(q.items);
+    const sz = pic.match(/width:([\d.]+)em;height:([\d.]+)em/);
+    // words get the same room as a clock face, so every card prints the same size
+    const [pw, ph] = sz ? [+sz[1], +sz[2]] : [Math.max(q.words.length * 0.56, 4.4), 3.2];
+    const ln = '<span class="ln"></span>', u = t => `<span class="u">${t}</span>`;
+    const [row, rw] = q.kind === 'clock'
+      ? (q.two ? [ln + '<span class="sep">:</span>' + ln, 4.6] : [ln + u("o'clock"), 5.2])
+      : q.unit === '$c' ? [u('$') + ln + '<span class="sep">and</span>' + ln + u('c'), 7.4]
+      : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
+    return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw) + 1.2 } };
+  }
   // a line of words or numbers, then "= ___" to write on
   if (q.kind === 'expr') return {
     cls: 'miss',
@@ -1093,13 +1266,16 @@ function cardSay(q) {
   if (q.kind === 'col' || q.kind === 'div') return `${q.a} ${WORD[q.op]} ${q.b}`;
   if (q.kind === 'miss') return `${q.hide === 'a' ? 'what' : q.a} ${WORD[q.op]} ${q.hide === 'b' ? 'what' : q.b} makes ${q.c}?`;
   if (q.kind === 'bond') return q.hide === 'w' ? `${q.p} and ${q.q2} make what?` : `${q.w} is ${q.hide === 'p' ? q.q2 : q.p} and what?`;
+  if (q.kind === 'clock') return q.words ? `${q.words}. Write the time.` : "What time is it?";
+  if (q.kind === 'money') return q.change ? `It costs ${moneyWords(q.price)}. You pay ${moneyWords(q.pay)}. How much change?` : 'How much money?';
   return ACTS[act].say;
 }
 function layout(c) {
   const qv = c.el.querySelector('.qv'), m = qMarkup(c.q);
   qv.className = 'qv ' + m.cls; qv.innerHTML = m.html;
   for (const k in m.vars) qv.style.setProperty(k, m.vars[k]);
-  c.anchorEl = m.cls === 'frame' ? qv.lastElementChild // bottom of the last ten frame
+  c.anchorEl = m.anchor ? qv.querySelector(m.anchor)
+    : m.cls === 'frame' ? qv.lastElementChild // bottom of the last ten frame
     : qv.querySelector({ div: '.dd', miss: '.wl', bond: '.hole', frac: '.fbar' }[m.cls] || '.rule');
 }
 
@@ -1165,6 +1341,7 @@ function sizeCanvas(c) {
   c.w = r.width; c.h = r.height;
   c.F = parseFloat(getComputedStyle(c.el.querySelector('.qv')).fontSize) || 20;
   if (c.q.kind === 'bond') { c.ax = (ar.left + ar.right) / 2 - r.left; c.ay = (ar.top + ar.bottom) / 2 - r.top; } // centre of the empty circle
+  else if (c.q.two) { c.ax = (ar.left + ar.right) / 2 - r.left; c.ay = c.el.querySelector('.qv .ln').getBoundingClientRect().bottom - r.top; } // middle of ":" or "and", on the lines
   else { c.ax = ar.right - r.left; c.ay = (c.q.kind === 'div' ? ar.top : ar.bottom) - r.top; }
   c.cv.width = Math.round(r.width * dpr); c.cv.height = Math.round(r.height * dpr);
   draw(c);
@@ -1220,13 +1397,14 @@ function inZone(kind, cx, cy) {
   if (kind === 'div') return cy < 0;
   // on the line, in the box in the sum, or a bit low under the line: all of it
   // is hers (the bottom row wins if there is more than one)
-  if (kind === 'miss' || kind === 'expr') return true;
+  if (kind === 'miss' || kind === 'expr' || kind === 'clock' || kind === 'money') return true;
   return cy > 0;
 }
 // Any card with writing on it gets marked (Sam): if nothing is in the answer
 // place, read whatever she wrote rather than skipping the card.
 function answerStrokes(c) {
   if (c.q.kind === 'frac') return fracParts(c).flat();
+  if (c.q.two) return twoParts(c).flat();
   const all = [], items = [];
   for (const s of c.strokes) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -1259,8 +1437,29 @@ function fracParts(c) {
   }
   return [top, bot];
 }
+// Two blanks ("3 : 15", "$2 and 50 c"): left of the ":" or "and" is the first
+// number, right of it the second. Writing up on the picture is ignored.
+function twoParts(c) {
+  const L = [], R = [];
+  for (const s of c.strokes) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    if (x1 - x0 > 1.4 && y1 - y0 < (x1 - x0) * 0.25) continue; // a line she drew
+    if ((y0 + y1) / 2 < -2.4) continue; // on the clock or the coins
+    ((x0 + x1) / 2 < 0 ? L : R).push(s);
+  }
+  return [L, R];
+}
 // Read a card and check it: { text shown under the card, ok, backwards digits }
 function readAnswer(c) {
+  if (c.q.two) {
+    const [l, r] = twoParts(c);
+    if (!l.length && !r.length) return { text: '', ok: false, backwards: [] };
+    const a = SumsDigits.readNumber(l, 1.1), b = SumsDigits.readNumber(r, 1.1);
+    const ok = a.text !== '' && b.text !== '' && +a.text === c.q.parts[0] && +b.text === c.q.parts[1];
+    const A = a.text || '?', B = b.text || '?';
+    return { text: c.q.kind === 'clock' ? `${A}:${b.text ? B.padStart(2, '0') : B}` : `$${A} and ${B}c`, ok, backwards: [...a.backwards, ...b.backwards] };
+  }
   if (c.q.kind === 'frac') {
     const [t, b] = fracParts(c);
     if (!t.length && !b.length) return { text: '', ok: false, backwards: [] };
