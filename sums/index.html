@@ -117,18 +117,18 @@
   .card[data-state="right"] .mark { display: inline; color: var(--right); }
   .card[data-state="wrong"] { border-color: var(--wrong); border-width: 2.5px; }
   .card[data-state="wrong"] .mark { display: inline; color: var(--wrong); }
-  .card[data-state="wrong"] .retry, .card[data-state="wrong"] .override { display: inline-block; }
+  .card[data-state="wrong"] .retry { display: inline-block; margin-left: auto; }
+  .card[data-state="right"][data-claim="1"] .override { display: inline-block; margin-left: auto; }
   .card[data-state="right"] .undo, .card[data-state="right"] .clear,
   .card[data-state="wrong"] .undo, .card[data-state="wrong"] .clear { display: none; }
   .card[data-state="right"] .work, .card[data-state="wrong"] .work { pointer-events: none; }
-  .card[data-state="wrong"] .override { margin-left: auto; }
   .fixed { color: var(--faint); font-size: 13px; }
 </style>
 </head>
 <body>
 <header>
   <button id="whoBtn">Everyone</button>
-  <button id="settingsBtn">Settings</button>
+  <button id="settingsBtn">Start again</button>
   <h1>Sums</h1>
   <span id="score"></span>
   <button id="markBtn" class="primary">Mark</button>
@@ -154,7 +154,7 @@
     <h2>Questions</h2>
     <div class="opts" id="nOpts"><button data-v="6">6</button><button data-v="12">12</button><button data-v="20">20</button></div>
   </div>
-  <div class="go"><button id="newBtn" class="primary">New sheet</button><button class="back">Back</button></div>
+  <div class="go"><button id="newBtn" class="primary">Start</button><button class="back">Back</button></div>
 </section>
 
 <section id="who" class="panel" hidden>
@@ -182,7 +182,7 @@
     <div class="foot">
       <span class="mark"></span><span class="read"></span>
       <button class="retry">Try again</button>
-      <button class="override">I wrote it right</button>
+      <button class="override">I was right the first time</button>
       <button class="undo">Undo</button>
       <button class="clear">Clear</button>
     </div>
@@ -254,10 +254,11 @@ function saveResult(key, ms, first, n) {
   const prev = r.best[key];
   const isBest = !prev || ms < prev.ms;
   r.best[key] = { ms: isBest ? ms : prev.ms, count: (prev ? prev.count : 0) + 1, t: Date.now() };
-  r.history.unshift({ k: key, ms, first, n, t: Date.now() });
+  const t = Date.now();
+  r.history.unshift({ k: key, ms, first, n, t });
   r.history = r.history.slice(0, 100);
   store.set(recKey(current), r);
-  return { isBest, best: r.best[key].ms, hadPrev: !!prev };
+  return { isBest, best: r.best[key].ms, hadPrev: !!prev, first, t, player: current };
 }
 
 function renderWho() {
@@ -381,10 +382,12 @@ function buildSheet() {
       c.strokes = c.strokes.filter(s => !used.has(s));
       draw(c); showRead(c, ''); setState(c, 'writing');
     };
+    // She only finds out her first answer was right once she has the right
+    // answer, so the claim is offered after a later try is marked right.
     el.querySelector('.override').onclick = () => {
-      if (c.tries === 1) c.first = true;
-      c.el.querySelector('.read').innerHTML = '<span class="fixed">misread</span>';
-      setState(c, 'right'); updateScore();
+      c.first = true; c.el.dataset.claim = '';
+      c.el.querySelector('.read').innerHTML = `${c.q.ans} <span class="fixed">· right first time</span>`;
+      updateScore();
     };
     sheet.appendChild(el); ro.observe(c.work);
     return c;
@@ -486,8 +489,12 @@ function mark() {
     if (!t) continue;
     c.tries++;
     const ok = +t === c.q.ans;
-    if (c.tries === 1) c.first = ok;
+    if (c.tries === 1) { c.first = ok; c.firstRead = t; }
     setState(c, ok ? 'right' : 'wrong');
+    if (ok && c.first === false) {
+      c.el.dataset.claim = '1';
+      c.el.querySelector('.read').innerHTML = `${t} <span class="fixed">· first read ${c.firstRead}</span>`;
+    }
   }
   updateScore();
 }
@@ -499,6 +506,11 @@ function updateScore() {
     sheetDone = true;
     const ms = Date.now() - (sheetStart || Date.now());
     lastResult = { ms, ...saveResult(sheetKey, ms, right, cards.length) };
+  } else if (sheetDone && lastResult && lastResult.first !== right) {
+    // "I was right the first time" tapped after the sheet was finished
+    const r = loadRec(lastResult.player), h = r.history.find(x => x.t === lastResult.t);
+    if (h) { h.first = right; store.set(recKey(lastResult.player), r); }
+    lastResult.first = right;
   }
   let html = done ? `<span class="wide">First try </span><b>${right}</b>/${cards.length}` : '';
   if (sheetDone && lastResult) {

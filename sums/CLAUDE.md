@@ -5,7 +5,8 @@ Arithmetic drill for Sam's daughter, written by finger or stylus on a touch scre
 ## Sam's spec
 - Settings: signs (+ − × ÷, any mix), digits in the first number (1 to 4), digits in the second number (1 to 4), number of questions 6 / 12 / 20. Saved in localStorage `sums-settings`; first visit opens Settings.
 - Grid layout that follows rotation: portrait 2/3/4 columns for 6/12/20, landscape 3/4/5, phones in portrait always 2 (scrolls).
-- **Override**: when a card is marked wrong she can press "I wrote it right" and it counts as right (Sam trusts her judgement over the reader). The card then says "misread".
+- **Override** (reworked by Sam the same day): a wrong card offers only "Try again", because she can't know she was right until she has the right answer (the answer is never shown). When a later try is marked right, the card shows "first read N" and an "I was right the first time" button. Tapping it counts the card as right first time (Sam trusts her judgement over the reader); otherwise it counts as right on the later try. Tapping it after the sheet is finished also updates the saved history entry's first-try count.
+- The header button is **Start again** (not "Settings", Sam's wording): it opens the choices panel, whose button is **Start**.
 - Minimal, black and white, not distracting. Deliberately does NOT follow AESTHETIC.md (no masthead, no logo). Only colour: dark green tick / dark red cross borders.
 
 ## Layout (Sam, 2026-11-15, second round)

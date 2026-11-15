@@ -152,9 +152,16 @@ const HELPERS = () => {
   ok(await cols() === 4, 'landscape: 4 columns for 12');
   ok(await page.evaluate(b => { const c = cards[3]; return c.strokes[0][0][0] === b[0] && c.strokes[0][0][1] === b[1] && read(c) === String(c.q.ans); }, before), 'writing kept and still read after rotation');
 
-  await page.click('.card[data-state="wrong"] .override');
-  ok((await page.$$eval('.card', cs => cs[10].dataset.state)) === 'right', 'override marks it right');
-  ok((await page.$eval('#score', e => e.textContent)) === 'First try 11/12', 'override counts first time');
+  // wrong: only Try again is offered (she can't know yet whether she was right)
+  ok(await page.evaluate(() => { const e = cards[10].el; return getComputedStyle(e.querySelector('.retry')).display !== 'none' && getComputedStyle(e.querySelector('.override')).display === 'none'; }), 'wrong card offers only Try again');
+
+  // card 10: try again, now right; the claim button appears with the first reading
+  await page.click('.card[data-state="wrong"] .retry');
+  await page.evaluate(() => writeNum(cards[10], cards[10].q.ans));
+  await page.click('#markBtn');
+  ok(await page.evaluate(() => { const e = cards[10].el; return e.dataset.state === 'right' && getComputedStyle(e.querySelector('.override')).display !== 'none' && /first read/.test(e.querySelector('.read').textContent); }), 'right on a later try: offers "I was right the first time" and shows the first reading');
+  ok(await page.evaluate(() => getComputedStyle(cards[0].el.querySelector('.override')).display === 'none'), 'right first time: no claim button');
+  ok((await page.$eval('#score', e => e.textContent)) === 'First try 10/12', 'without the claim it counts as the later try');
 
   // last card: wrong with a carry, try again keeps the carry and clears the answer
   await page.evaluate(() => writeNum(cards[11], cards[11].q.ans + 1, cards[11].q.op === '/' ? [] : numStrokes(1, -0.8, -3.4, 0.5)));
@@ -164,8 +171,13 @@ const HELPERS = () => {
   await page.evaluate(() => { sheetStart = Date.now() - 95000; writeNum(cards[11], cards[11].q.ans); });
   await page.click('#markBtn');
   const sc = await page.$eval('#score', e => e.textContent);
-  ok(/^First try 11\/12 · 1:3[45]/.test(sc), 'finished: score and time shown ' + sc);
+  ok(/^First try 10\/12 · 1:3[45]/.test(sc), 'finished: score and time shown ' + sc);
   ok((await page.$eval('#markBtn', e => e.textContent)) === 'New sheet', 'all done offers a new sheet');
+
+  // after finishing she claims card 10: the score and the saved record both update
+  await page.evaluate(() => cards[10].el.querySelector('.override').click());
+  ok(/^First try 11\/12/.test(await page.$eval('#score', e => e.textContent)), 'claim counts it as right first time');
+  ok(await page.evaluate(() => getComputedStyle(cards[10].el.querySelector('.override')).display === 'none'), 'claim button goes away once used');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/3-done-landscape.png' });
 
   // records: saved for Mia under this combination
@@ -173,7 +185,7 @@ const HELPERS = () => {
     const id = current, r = JSON.parse(localStorage.getItem('sums-rec-' + id));
     return { k: Object.keys(r.best), ms: Object.values(r.best)[0].ms, h: r.history.length, first: r.history[0].first };
   });
-  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved: ' + JSON.stringify(rec));
+  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved with the claimed first try: ' + JSON.stringify(rec));
 
   // a faster second sheet is a new best
   await page.click('#markBtn');
