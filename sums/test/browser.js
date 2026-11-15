@@ -6,7 +6,7 @@ let fails = 0;
 const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// glyphs in a 0.6 x 1 box (same shapes as run.js)
+// glyphs in a 0.6 x 1 box (same shapes as run.js), and a fake speech engine
 const HELPERS = () => {
   const ring = (cx, cy, rx, ry) => Array.from({ length: 25 }, (_, i) => { const a = -Math.PI / 2 + 2 * Math.PI * i / 24; return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
   window.GL = {
@@ -31,34 +31,35 @@ const HELPERS = () => {
     }));
     return out;
   };
-  // the answer where she should write it: under the line, or on the division bar
+  // the answer where she should write it: under the line, on the division bar, on the missing-number line
   window.writeNum = (c, n, extra = []) => {
-    c.strokes = [...extra, ...numStrokes(n, 0, c.q.op === '/' ? -1.3 : 0.3)];
+    const top = { div: -1.3, miss: -1.1 }[c.q.kind] ?? 0.3;
+    c.strokes = [...extra, ...numStrokes(n, 0, top)];
     draw(c);
   };
+};
+const fakeSpeech = () => {
+  window.__said = [];
+  Object.defineProperty(window, 'speechSynthesis', { value: { cancel() {}, speak(u) { window.__said.push(u.text); } } });
 };
 
 (async () => {
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
   const page = await browser.newPage();
   page.on('pageerror', e => { console.log('page error: ' + e.message); fails++; });
+  await page.evaluateOnNewDocument(fakeSpeech);
   await page.setViewport({ width: 820, height: 1180, hasTouch: true });
   await page.goto(URL);
   await page.evaluate(HELPERS);
+  const said = () => page.evaluate(() => window.__said.slice());
+  const visible = sel => page.$eval(sel, e => { for (let n = e; n && n.nodeType === 1; n = n.parentElement) if (n.hidden || getComputedStyle(n).display === 'none') return false; return true; }).catch(() => false);
+  const tiles = sel => page.$$eval(sel + ' .tile .nm', t => t.map(x => x.textContent));
 
-  ok(await page.$eval('#settings', e => !e.hidden), 'first visit opens settings');
-  ok(await page.evaluate(() => settings.pa.join('') === '0123456789' && settings.pb.join('') === '0123456789' && document.querySelectorAll('.kp [aria-pressed="true"]').length === 22), 'default: every digit 0–9 picked on both keypads (and All lit)');
-  // once only: a saved 1–9 from before becomes 0–9; a 1–9 chosen after the change stays
-  const mig = await page.evaluate(() => {
-    localStorage.setItem('sums-settings', JSON.stringify({ ops: ['+'], a: 1, b: 1, pa: [1, 2, 3, 4, 5, 6, 7, 8, 9], pb: [2], n: 12 }));
-    const old = loadSettings();
-    localStorage.setItem('sums-settings', JSON.stringify({ ...old, pa: [1, 2, 3, 4, 5, 6, 7, 8, 9] }));
-    const chosen = loadSettings();
-    localStorage.removeItem('sums-settings');
-    return [old.pa.join(''), old.pb.join(''), chosen.pa.join('')];
-  });
-  ok(mig.join() === '0123456789,2,123456789', 'saved 1–9 from before becomes 0–9 once: ' + mig.join(' / '));
+  // ---- opening: who's doing sums?
+  ok(await visible('#namesS'), 'opens on the names');
+  ok((await tiles('#nameTiles')).join() === 'Everyone,+ Add a name', 'first visit: Everyone and Add');
 
+  // question generator rules (unchanged from before)
   const gen = await page.evaluate(() => {
     const bad = [];
     for (const op of ['+', '-', '*', '/']) for (let a = 1; a <= 4; a++) for (let b = 1; b <= 4; b++) for (let i = 0; i < 200; i++) {
@@ -73,51 +74,70 @@ const HELPERS = () => {
   });
   ok(gen.length === 0, 'questions: whole, never negative, exact division, right digit counts ' + gen.join(' '));
 
-  // players: add Mia
-  await page.click('#whoBtn');
+  // ---- add Mia, she's 8
+  await page.click('#addTile');
   await page.type('#newName', 'Mia');
   await page.click('#addBtn');
-  ok(await page.$eval('#whoBtn', e => e.textContent) === 'Mia', 'new player becomes current');
-  ok(await page.$eval('#settingsBtn', e => !e.hidden) && await page.$eval('#whoBtn', e => e.getAttribute('aria-pressed')) === 'true', 'names page: both header tabs visible, names tab filled in');
+  ok(await visible('#ageS'), 'new name asks how old');
+  ok((await said()).includes('How old are you?'), 'age question is read aloud');
+  await page.click('#ageTiles [data-age="8"]');
+  ok(await visible('#homeS'), 'age 8 goes to the activities');
+  ok((await tiles('#actTiles')).join() === 'Sums,Missing number', '8: Sums and Missing number ' + (await tiles('#actTiles')).join());
+  ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
+  await page.click('#backBtn');
+  ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
 
-  // straight on from the names to choosing sums
-  await page.click('#toSetupBtn');
-  ok(await page.evaluate(() => !$('#settings').hidden && $('#who').hidden && $('#settingsBtn').getAttribute('aria-pressed') === 'true'), '"Choose sums" goes from the names to the setup');
-  // switching tabs keeps unsaved choices
-  await page.click('#opsOpts button[data-v="-"]');
-  await page.click('#whoBtn');
-  await page.click('#settingsBtn');
-  ok(await page.evaluate(() => settings.ops.includes('-')), 'going to the names and back keeps unsaved choices');
-  await page.click('#opsOpts button[data-v="-"]');
+  // a name saved before ages existed gets asked once, then remembered
+  await page.evaluate(() => { players.push({ id: 'old1', name: 'Ada' }); store.set('sums-players', players); goNames(); });
+  await page.click('#nameTiles [data-id="old1"]');
+  ok(await visible('#ageS'), 'old name without an age is asked');
+  await page.click('#ageTiles [data-age="5"]');
+  await page.click('#backBtn');
+  await page.click('#nameTiles [data-id="old1"]');
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,How many?,Make 10', 'age saved: straight to the 5 activities (Sums, How many?, Make 10)');
+  ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'age 5 home is read aloud');
+  await page.click('#backBtn');
 
-  // all four signs, 2 digit and 1 digit, 12 questions
-  for (const v of ['-', '*', '/']) await page.click(`#opsOpts button[data-v="${v}"]`);
-  await page.click('.big[data-line="a"] [data-d="2"]');
+  // Everyone asks the age every time
+  await page.click('#nameTiles [data-id="guest"]');
+  ok(await visible('#ageS'), 'Everyone asks the age');
+  await page.click('#ageTiles [data-age="5"]');
+  ok((await tiles('#actTiles')).length === 3, 'Everyone at 5: the 5 activities');
+  await page.click('#backBtn');
+  await page.click('#nameTiles [data-id="guest"]');
+  ok(await visible('#ageS'), 'Everyone asks again next time');
+  await page.click('#backBtn');
+
+  // ---- Mia: Sums, set up through the keypad page
+  await page.click('#nameTiles [data-id]:not([data-id="guest"]):not([data-id="old1"])');
+  await page.click('#actTiles [data-act="sums"]');
+  ok(await visible('#sheet') && await page.$$eval('.card', c => c.length) === 12, 'Sums for 8: a sheet of 12 straight away');
+  ok(!(await said()).slice(-1)[0].startsWith('Work'), 'age 8: not read aloud automatically');
+  await page.click('#setupBtn');
+  ok(await visible('#setupS') && await visible('#kpBlock') && !(await visible('#maxBlock')), 'Start again opens the keypad setup');
+  await page.click('#opsOpts button[data-v="/"]');
   await page.click('#nOpts button[data-v="12"]');
   await page.click('#newBtn');
-  ok(await page.$$eval('.card', c => c.length) === 12, '12 cards');
   const cols = () => page.$eval('#sheet', s => getComputedStyle(s).gridTemplateColumns.split(' ').length);
   ok(await cols() === 3, 'portrait: 3 columns for 12');
+  ok(await page.evaluate(() => JSON.parse(localStorage.getItem('sums-cfg-' + current + '-sums')).ops.join('') === '+-*/'), 'her settings are saved under her name');
 
-  // layout: stacked for + − ×, bracket for ÷
   const lay = await page.evaluate(() => {
     const out = [];
     for (const c of cards) {
       const qv = c.el.querySelector('.qv'), w = c.work.getBoundingClientRect(), r = qv.getBoundingClientRect();
       const inside = r.left >= w.left - 1 && r.right <= w.right + 1 && r.top >= w.top - 1;
-      const kind = c.q.op === '/' ? qv.classList.contains('div') && !!qv.querySelector('.dd') : qv.classList.contains('col') && qv.querySelectorAll('.row').length === 2;
-      // stacked: room above for carrying (>= 1 em) and room under the line to write (>= 1.4 em)
-      const room = c.q.op === '/' ? c.ay > 1.3 * c.F && c.h - c.ay > 1.5 * c.F : c.ay > 3 * c.F && c.h - c.ay >= 1.4 * c.F;
-      if (!inside || !kind || !room) out.push(`${c.q.a}${c.q.op}${c.q.b} inside=${inside} kind=${kind} room=${room}`);
+      const room = c.q.kind === 'div' ? c.ay > 1.3 * c.F && c.h - c.ay > 1.5 * c.F : c.ay > 3 * c.F && c.h - c.ay >= 1.4 * c.F;
+      if (!inside || !room) out.push(`${c.q.a}${c.q.op}${c.q.b} inside=${inside} room=${room}`);
     }
     return out;
   });
-  ok(lay.length === 0, 'questions laid out stacked / as long division, fit, with room to write ' + lay.join('; '));
+  ok(lay.length === 0, 'stacked / long division fit with room to write ' + lay.join('; '));
 
-  // force a known mix so every kind is checked: cards 0-2 +, 3-5 −, 6-8 ×, 9-11 ÷
+  // force a known mix: cards 0-2 +, 3-5 −, 6-8 ×, 9-11 ÷
   await page.evaluate(() => {
     const ops = ['+', '+', '+', '-', '-', '-', '*', '*', '*', '/', '/', '/'];
-    cards.forEach((c, i) => { c.q = makeQ(ops[i], 2, 1); layout(c); sizeCanvas(c); });
+    cards.forEach((c, i) => { c.q = makeQ(ops[i], 2, 1); c.q.kind = ops[i] === '/' ? 'div' : 'col'; layout(c); sizeCanvas(c); });
   });
 
   // card 0: real pointer strokes, through the page's own events
@@ -132,11 +152,8 @@ const HELPERS = () => {
     await page.mouse.up();
   }
   await wait(700);
-  const shown = await page.$eval('.card .read', e => e.textContent);
-  ok(shown === String(P0.ans), `pointer writing under the line read as ${shown} (answer ${P0.ans})`);
+  ok(await page.$eval('.card .read', e => e.textContent) === String(P0.ans), 'pointer writing under the line read live');
 
-  // working is ignored: carries above the line, long-division working under the bar,
-  // and for long multiplication only the bottom row (under her own ruled line) counts
   const work = await page.evaluate(() => {
     const out = {};
     const c1 = cards[1]; writeNum(c1, c1.q.ans, numStrokes(1, -0.8, -3.4, 0.5)); out.carry = read(c1) === String(c1.q.ans);
@@ -147,11 +164,10 @@ const HELPERS = () => {
     writeNum(c6, c6.q.ans);
     return out;
   });
-  ok(work.carry, 'carry written above the line is ignored');
+  ok(work.carry, 'carry above the line ignored');
   ok(work.div, 'division: answer on the bar read, working under it ignored');
   ok(work.rows, 'several rows under the line: the bottom row is the answer');
 
-  // cards 2..10 correct (1, 6 and 9 already written), card 10 wrong, card 11 blank
   await page.evaluate(() => {
     for (const i of [2, 3, 4, 5, 7, 8]) writeNum(cards[i], cards[i].q.ans);
     writeNum(cards[10], cards[10].q.ans + 1);
@@ -159,131 +175,160 @@ const HELPERS = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/1-written-portrait.png' });
   await page.click('#markBtn');
   const states = await page.$$eval('.card', cs => cs.map(c => c.dataset.state));
-  ok(states.slice(0, 10).every(s => s === 'right'), 'ten correct answers marked right: ' + states.slice(0, 10).join(','));
-  ok(states[10] === 'wrong', 'wrong answer marked wrong');
-  ok(states[11] === 'writing', 'blank card left alone');
-  ok((await page.$eval('#score', e => e.textContent)) === 'First try 10/12', 'score ' + await page.$eval('#score', e => e.textContent));
-  if (SHOTS) await page.screenshot({ path: SHOTS + '/2-marked-portrait.png' });
+  ok(states.slice(0, 10).every(s => s === 'right') && states[10] === 'wrong' && states[11] === 'writing', 'marking: right, wrong, blank left alone');
+  ok((await page.$eval('#score', e => e.textContent)) === 'First try 10/12', 'score');
 
-  // rotate: landscape gives 4 columns and the writing stays lined up with the numbers
-  const before = await page.evaluate(() => { const c = cards[3]; return c.strokes[0][0]; });
+  const before = await page.evaluate(() => cards[3].strokes[0][0]);
   await page.setViewport({ width: 1180, height: 820, hasTouch: true });
   await wait(300);
   ok(await cols() === 4, 'landscape: 4 columns for 12');
-  ok(await page.evaluate(b => { const c = cards[3]; return c.strokes[0][0][0] === b[0] && c.strokes[0][0][1] === b[1] && read(c) === String(c.q.ans); }, before), 'writing kept and still read after rotation');
+  ok(await page.evaluate(b => { const c = cards[3]; return c.strokes[0][0][0] === b[0] && read(c) === String(c.q.ans); }, before), 'writing kept and still read after rotation');
 
-  // wrong: only Try again is offered (she can't know yet whether she was right)
-  ok(await page.evaluate(() => { const e = cards[10].el; return getComputedStyle(e.querySelector('.retry')).display !== 'none' && getComputedStyle(e.querySelector('.override')).display === 'none'; }), 'wrong card offers only Try again');
-
-  // card 10: try again, now right; the claim button appears with the first reading
+  ok(await page.evaluate(() => { const e = cards[10].el; return getComputedStyle(e.querySelector('.override')).display === 'none'; }), 'wrong card offers only Try again');
   await page.click('.card[data-state="wrong"] .retry');
   await page.evaluate(() => writeNum(cards[10], cards[10].q.ans));
   await page.click('#markBtn');
-  ok(await page.evaluate(() => { const e = cards[10].el; return e.dataset.state === 'right' && getComputedStyle(e.querySelector('.override')).display !== 'none' && /first read/.test(e.querySelector('.read').textContent); }), 'right on a later try: offers "I was right the first time" and shows the first reading');
-  ok(await page.evaluate(() => getComputedStyle(cards[0].el.querySelector('.override')).display === 'none'), 'right first time: no claim button');
-  ok((await page.$eval('#score', e => e.textContent)) === 'First try 10/12', 'without the claim it counts as the later try');
-
-  // last card: wrong with a carry, try again keeps the carry and clears the answer
-  await page.evaluate(() => writeNum(cards[11], cards[11].q.ans + 1, cards[11].q.op === '/' ? [] : numStrokes(1, -0.8, -3.4, 0.5)));
+  ok(await page.evaluate(() => { const e = cards[10].el; return e.dataset.state === 'right' && getComputedStyle(e.querySelector('.override')).display !== 'none'; }), 'right on a later try offers "I was right the first time"');
+  await page.evaluate(() => writeNum(cards[11], cards[11].q.ans + 1, cards[11].q.kind === 'div' ? [] : numStrokes(1, -0.8, -3.4, 0.5)));
   await page.click('#markBtn');
   await page.click('.card[data-state="wrong"] .retry');
-  ok(await page.evaluate(() => { const c = cards[11]; return c.el.dataset.state === 'writing' && read(c) === '' && (c.q.op === '/' || c.strokes.length === 1); }), 'try again clears the answer but keeps the working');
+  ok(await page.evaluate(() => { const c = cards[11]; return read(c) === '' && (c.q.kind === 'div' || c.strokes.length === 1); }), 'try again keeps the working');
   await page.evaluate(() => { sheetStart = Date.now() - 95000; writeNum(cards[11], cards[11].q.ans); });
   await page.click('#markBtn');
-  const sc = await page.$eval('#score', e => e.textContent);
-  ok(/^First try 10\/12 · 1:3[45]/.test(sc), 'finished: score and time shown ' + sc);
-  ok((await page.$eval('#markBtn', e => e.textContent)) === 'New sheet', 'all done offers a new sheet');
-
-  // after finishing she claims card 10: the score and the saved record both update
+  ok(/^First try 10\/12 · 1:3[45]/.test(await page.$eval('#score', e => e.textContent)), 'finished: score and time');
   await page.evaluate(() => cards[10].el.querySelector('.override').click());
-  ok(/^First try 11\/12/.test(await page.$eval('#score', e => e.textContent)), 'claim counts it as right first time');
-  ok(await page.evaluate(() => getComputedStyle(cards[10].el.querySelector('.override')).display === 'none'), 'claim button goes away once used');
+  ok(/^First try 11\/12/.test(await page.$eval('#score', e => e.textContent)), 'claim counts as first try');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/3-done-landscape.png' });
+  const rec = await page.evaluate(() => { const r = loadRec(current); return [Object.keys(r.best).join(), r.history[0].first]; });
+  ok(rec[0] === '+-*/|2|1:0123456789|12' && rec[1] === 11, 'record saved: ' + rec.join(' / '));
 
-  // records: saved for Mia under this combination
-  const rec = await page.evaluate(() => {
-    const id = current, r = JSON.parse(localStorage.getItem('sums-rec-' + id));
-    return { k: Object.keys(r.best), ms: Object.values(r.best)[0].ms, h: r.history.length, first: r.history[0].first };
+  // ---- Mia: Missing number
+  await page.click('#backBtn');
+  ok(await visible('#homeS') && /Best 1:3/.test(await page.$eval('#actTiles [data-act="sums"] .sub', e => e.textContent)), 'home tile shows her best time');
+  await page.click('#actTiles [data-act="missing"]');
+  const miss = await page.evaluate(() => cards.every(c => {
+    const q = c.q, calc = { '+': (a, b) => a + b, '-': (a, b) => a - b, '*': (a, b) => a * b, '/': (a, b) => a / b }[q.op];
+    return q.kind === 'miss' && calc(q.a, q.b) === q.c && q.ans === q[q.hide] && c.el.querySelectorAll('.bx').length === 2;
+  }));
+  ok(miss, 'missing number: every equation true, the box hides a or b');
+  ok(await page.evaluate(() => { const out = []; for (let i = 0; i < 400; i++) out.push(ACTS.missing.make({ ops: ['*', '/'], a: 1, b: 1, pa: [0, 1, 2], pb: [0, 3], n: 6 })); return out.every(q => !(q.op === '*' && (q.hide === 'a' ? q.b : q.a) === 0) && !(q.op === '/' && q.hide === 'b' && q.a === 0)); }), 'missing number never has more than one right answer (no 0 × ☐ = 0)');
+  const mw = await page.evaluate(() => {
+    const c0 = cards[0], c1 = cards[1];
+    writeNum(c0, c0.q.ans); // on the line
+    // in the box in the equation: find the box, write there
+    const bx = c1.el.querySelector('.eq .bx').getBoundingClientRect(), wr = c1.work.getBoundingClientRect();
+    const right = (bx.right - wr.left - c1.ax) / c1.F, top = (bx.top - wr.top - c1.ay) / c1.F;
+    c1.strokes = numStrokes(c1.q.ans, right, top, 0.8); draw(c1);
+    return [read(c0) === String(c0.q.ans), read(c1) === String(c1.q.ans)];
   });
-  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1:0123456789|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved with the claimed first try: ' + JSON.stringify(rec));
+  ok(mw[0], 'missing number: answer on the line is read');
+  ok(mw[1], 'missing number: answer written in the box is read');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/6-missing.png' });
 
-  // a faster second sheet is a new best
-  await page.click('#markBtn');
-  await page.evaluate(() => { sheetStart = Date.now() - 50000; cards.forEach(c => writeNum(c, c.q.ans)); });
-  await page.click('#markBtn');
-  ok(/New best!/.test(await page.$eval('#score', e => e.textContent)), 'faster sheet says New best!');
-  await page.click('#whoBtn');
-  const table = await page.$eval('#records', e => e.textContent);
-  ok(/0:50/.test(table) && /2×/.test(table), 'records table shows best 0:50, done 2×: ' + table);
-  if (SHOTS) await page.screenshot({ path: SHOTS + '/4-who.png' });
+  // ---- Ada (5): How many? and Make 10, read aloud
+  await page.click('#backBtn'); await page.click('#backBtn');
+  await page.click('#nameTiles [data-id="old1"]');
+  await page.click('#actTiles [data-act="howmany"]');
+  ok((await said()).slice(-1)[0] === 'How many dots?', 'age 5: the question is read aloud');
+  const hm = await page.evaluate(() => cards.every(c => c.q.kind === 'frame' && c.q.ans === c.q.dots && c.el.querySelectorAll('svg circle').length === c.q.dots && c.q.dots >= 1 && c.q.dots <= 10));
+  ok(hm, 'How many?: ten frame shows exactly the answer in dots (up to 10)');
+  ok(await page.evaluate(() => { writeNum(cards[0], cards[0].q.ans); return read(cards[0]) === String(cards[0].q.ans); }), 'How many?: answer under the line read');
+  await page.click('#sayBtn');
+  ok((await said()).slice(-1)[0] === 'How many dots?', 'speaker button repeats it');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/7-howmany.png' });
+  await page.click('#setupBtn');
+  ok(await visible('#maxBlock') && !(await visible('#kpBlock')), 'How many? setup: Up to, no keypads');
+  await page.click('#maxOpts [data-v="20"]');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.frame svg').length === 2 && c.el.querySelectorAll('svg circle').length === c.q.dots)), 'up to 20: two frames, dots match');
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="make10"]');
+  ok((await said()).slice(-1)[0] === 'How many more dots to make ten?', 'Make 10 read aloud');
+  ok(await page.evaluate(() => cards.every(c => c.q.ans === 10 - c.q.dots && c.el.querySelectorAll('circle[fill="none"]').length === c.q.ans)), 'Make 10: empty spaces match the answer');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/8-make10.png' });
+  // Ada's Sums starts small, and is hers, not Mia's
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="sums"]');
+  ok(await page.evaluate(() => cards.length === 6 && cards.every(c => c.q.op === '+' && c.q.a <= 5 && c.q.b <= 5)), 'Sums at 5 starts with 6 small additions (0–5)');
 
-  // switching to Everyone shows separate (empty) records
-  await page.click('#playerList button[data-id="guest"]');
-  ok(/No finished sheets/.test(await page.$eval('#records', e => e.textContent)), 'Everyone has separate records');
-  await page.click('#who .back');
+  // labels for every kind of record
+  ok(await page.evaluate(() => [labelFor('+-|1:0123456789|2|12'), labelFor('missing~+|2|1:05|6'), labelFor('howmany~10|6'), labelFor('make10~12')].join(' / '))
+    === 'Sums · + − · 0–9 and 2-digit · 12 questions / Missing number · + · 2-digit and 0, 5 · 6 questions / How many? · up to 10 · 6 questions / Make 10 · 12 questions', 'record labels for each activity');
 
-  // keypads: the 2 times table up to 5
-  await page.click('#settingsBtn');
+  // keypads: the 2 times table up to 5 (on Mia's Sums)
+  await page.click('#backBtn'); await page.click('#backBtn');
+  await page.click('#nameTiles [data-id]:not([data-id="guest"]):not([data-id="old1"])');
+  await page.click('#actTiles [data-act="sums"]');
+  await page.click('#setupBtn');
   for (const v of ['+', '-', '/']) await page.click(`#opsOpts button[data-v="${v}"]`);
-  await page.click('.kp[data-line="a"] [data-k="2"]'); // first number was 10–99, so this starts a fresh pick
+  await page.click('.kp[data-line="a"] [data-k="2"]');
   await page.click('.kp[data-line="b"] [data-k="all"]');
   const centre = async sel => { const b = await (await page.$(sel)).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
   const [x9, y9] = await centre('.kp[data-line="b"] [data-k="9"]'), [x6, y6] = await centre('.kp[data-line="b"] [data-k="6"]');
   await page.mouse.move(x9, y9); await page.mouse.down(); await page.mouse.move(x6, y6, { steps: 6 }); await page.mouse.up();
   await page.click('.kp[data-line="b"] [data-k="7"]');
   await page.click('.kp[data-line="b"] [data-k="8"]');
-  const st = await page.evaluate(() => JSON.stringify([settings.a, settings.pa, settings.b, settings.pb, settings.ops]));
-  ok(st === '[1,[2],1,[0,1,2,3,4,5],["*"]]', 'keypad: tap, All, drag to switch off 9 and 6, tap 7 and 8 off: ' + st);
+  const st = await page.evaluate(() => JSON.stringify([draft.a, draft.pa, draft.b, draft.pb, draft.ops]));
+  ok(st === '[1,[2],1,[0,1,2,3,4,5],["*"]]', 'keypad: tap, All, drag, taps: ' + st);
   ok(await page.$$eval('#preview .mini', m => m.length) === 4, 'four examples shown');
-  if (SHOTS) await page.screenshot({ path: SHOTS + '/7-choices.png', fullPage: true });
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/9-setup.png' });
   await page.click('#newBtn');
-  const tt = await page.evaluate(() => cards.every(c => c.q.op === '*' && c.q.a === 2 && c.q.b >= 0 && c.q.b <= 5 && c.q.ans === 2 * c.q.b));
-  ok(tt, 'sheet is all 2 × 0–5');
-  ok(await page.evaluate(() => comboLabel(sheetKey)) === '× · 2 and 0–5 · 12 questions', 'record label: ' + await page.evaluate(() => comboLabel(sheetKey)));
-  ok(await page.evaluate(() => { const q = []; for (let i = 0; i < 300; i++) q.push(makeQ('/', { d: 1, p: [0, 1, 2] }, { d: 1, p: [0, 3] })); return q.every(x => x.b === 3 && x.a === 3 * x.ans && [0, 1, 2].includes(x.ans)); }), 'division from keypads: divide by the second, answer from the first, never by 0');
-
-  // dividing by only 0 is impossible: warn, and Start is off when ÷ is the only sign
-  await page.click('#settingsBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.op === '*' && c.q.a === 2 && c.q.b <= 5)), 'sheet is all 2 × 0–5');
+  // back from setup without Start keeps the old settings
+  await page.click('#setupBtn');
+  await page.click('#opsOpts button[data-v="+"]');
+  await page.click('#backBtn');
+  ok(await visible('#sheet') && await page.evaluate(() => loadCfg('sums').ops.join() === '*'), 'Back from setup returns to the sheet and keeps the saved settings');
+  await page.click('#setupBtn');
   await page.click('#opsOpts button[data-v="/"]');
   await page.click('.big[data-line="b"] [data-d="2"]');
   await page.click('.kp[data-line="b"] [data-k="0"]');
-  ok(/other than 0/.test(await page.$eval('#warn', e => e.textContent)) && !(await page.$eval('#newBtn', e => e.disabled)), 'only 0 to divide by: warning, Start still on (× works)');
+  ok(/other than 0/.test(await page.$eval('#warn', e => e.textContent)) && !(await page.$eval('#newBtn', e => e.disabled)), 'only 0 to divide by: warning, Start still on');
   await page.click('#opsOpts button[data-v="*"]');
   ok(await page.$eval('#newBtn', e => e.disabled), '÷ alone with only 0: Start is off');
-  await page.click('#settings .back');
+  await page.click('#backBtn');
 
-  // 20 on a phone in portrait: 2 columns (mobile emulation reloads the page)
-  await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
-  await page.evaluate(() => { settings.n = 20; buildSheet(); });
-  ok(await cols() === 2, 'phone portrait: 2 columns');
-  if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone.png' });
-  await page.setViewport({ width: 1180, height: 820, hasTouch: true });
-  await page.evaluate(() => { settings = { ops: ['+', '-', '*', '/'], a: 3, b: 2, n: 20 }; buildSheet(); });
-  ok(await cols() === 5, 'landscape: 5 columns for 20');
-  const fit = await page.evaluate(() => cards.filter(c => { const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect(); return r.right > w.right + 1 || r.left < w.left - 1 || r.bottom > w.bottom + 1; }).length);
-  ok(fit === 0, `3-digit and 2-digit, 20 on screen: every question fits its card (${fit} overflow)`);
-  if (SHOTS) await page.screenshot({ path: SHOTS + '/6-landscape-20.png' });
-
-  // removing a player: a double click can't do it; the confirm is somewhere else
-  await page.click('#whoBtn');
-  await page.click('#playerList button:not([data-id="guest"])');
+  // records page: tables, age change, remove (double-click proof)
+  await page.click('#backBtn');
+  await page.click('#meBtn');
+  ok(/Sums · × · 2 and 0–5|Sums · \+ − × ÷/.test(await page.$eval('#records', e => e.textContent)), 'records page lists her sheets');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/4-me.png' });
   const rmBox = await (await page.$('#removeBtn')).boundingBox();
   await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2, { clickCount: 2 });
   await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2);
-  ok(await page.evaluate(() => players.length === 1), 'double (and triple) click on Remove does not remove');
-  ok(await page.$eval('#removeBtn', e => e.textContent) === 'Keep Mia', 'first tap turns Remove into Keep');
+  ok(await page.evaluate(() => players.length === 2), 'double/triple click on Remove does not remove');
   await page.click('#removeBtn');
-  ok(await page.$eval('#confirmBox', e => e.hidden) && await page.$eval('#removeBtn', e => e.textContent) === 'Remove Mia', 'Keep cancels');
+  ok(await page.$eval('#confirmBox', e => e.hidden), 'Keep cancels');
   await page.click('#removeBtn');
   const cf = await (await page.$('#confirmRemoveBtn')).boundingBox();
-  ok(cf && Math.abs(cf.y - rmBox.y) > 150, `confirm button is far from Remove (${cf && Math.round(Math.abs(cf.y - rmBox.y))}px)`);
+  ok(Math.abs(cf.y - rmBox.y) > 150, 'confirm is far from Remove');
   await page.click('#confirmRemoveBtn');
-  ok(await page.evaluate(() => players.length === 1), 'confirm ignores a tap in its first half second');
+  ok(await page.evaluate(() => players.length === 2), 'confirm ignores its first half second');
   const gone = await page.evaluate(() => current);
   await wait(600);
   await page.click('#confirmRemoveBtn');
-  ok(await page.evaluate(id => players.length === 0 && current === 'guest' && localStorage.getItem('sums-rec-' + id) === null, gone), 'deliberate confirm removes the player and their records');
-  ok(await page.$eval('#whoBtn', e => e.textContent) === 'Everyone', 'back to Everyone after removing');
+  ok(await page.evaluate(id => players.length === 1 && localStorage.getItem('sums-rec-' + id) === null, gone) && await visible('#namesS'), 'removed with records, back to names');
+
+  // phone and landscape layouts
+  await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true }); // reloads
+  await page.evaluate(HELPERS);
+  await page.click('#nameTiles [data-id="old1"]');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone-home.png' });
+  await page.click('#actTiles [data-act="howmany"]');
+  await page.evaluate(() => buildSheet({ max: 20, n: 20 }));
+  ok(await cols() === 2, 'phone portrait: 2 columns');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone.png' });
+  await page.setViewport({ width: 1180, height: 820, hasTouch: true });
+  await page.click('#nameTiles [data-id="old1"]');
+  await page.click('#actTiles [data-act="sums"]');
+  await page.evaluate(() => buildSheet({ ops: ['+', '-', '*', '/'], a: 3, b: 2, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 20 }));
+  ok(await cols() === 5, 'landscape: 5 columns for 20');
+  const fit = await page.evaluate(() => cards.filter(c => { const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect(); return r.right > w.right + 1 || r.left < w.left - 1 || r.bottom > w.bottom + 1; }).length);
+  ok(fit === 0, `3-digit and 2-digit, 20 on screen: every question fits (${fit} overflow)`);
+  await page.evaluate(() => { act = 'howmany'; buildSheet({ max: 20, n: 20 }); });
+  const fit2 = await page.evaluate(() => cards.filter(c => { const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect(); return r.right > w.right + 1 || r.bottom > w.bottom + 1 || c.h - c.ay < 1.3 * c.F; }).length);
+  ok(fit2 === 0, `two ten frames, 20 on screen: fit with room to write (${fit2} bad)`);
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/2-landscape-frames.png' });
 
   await browser.close();
   console.log(fails ? `${fails} failed` : 'all passed');

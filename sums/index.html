@@ -29,6 +29,7 @@
   button:active { background: #eee; }
   button.primary { background: var(--ink); color: var(--paper); }
   button.primary:active { background: #333; }
+  button:disabled { opacity: .35; cursor: default; }
   [hidden] { display: none !important; }
 
   header {
@@ -36,22 +37,65 @@
     padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
     border-bottom: 1.5px solid var(--ink);
   }
-  header h1 { font-size: 20px; margin: 0 0 0 4px; font-weight: 700; letter-spacing: .02em; }
-  #whoBtn { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  header h1 { font-size: 20px; margin: 0 0 0 4px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #score { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
   #score b { font-size: 20px; }
-  @media (max-width: 600px) { header h1, .wide { display: none; } }
+  #sayBtn { padding: 4px 10px; line-height: 0; }
+  #sayBtn svg { width: 24px; height: 24px; }
+  .spacer { margin-left: auto; }
+  @media (max-width: 600px) { .wide { display: none; } header h1.sheetTitle { display: none; } }
 
-  /* panels (settings, who) */
+  /* full-page screens under the header */
   .panel {
     position: fixed; inset: var(--head) 0 0 0; background: var(--paper);
-    overflow: auto; padding: 20px 16px 40px; z-index: 5; -webkit-user-select: text; user-select: text;
+    overflow: auto; padding: 22px 16px 40px; z-index: 5;
   }
-  .set { max-width: 560px; margin: 0 auto 22px; }
+  .inner { max-width: 760px; margin: 0 auto; }
+  .ask { font-size: 26px; font-weight: 700; margin: 4px 0 18px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  .tile {
+    border: 1.5px solid var(--ink); border-radius: 14px; padding: 14px 12px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 150px;
+    justify-content: center; text-align: center;
+  }
+  .tile .pic { width: 100%; max-width: 150px; height: 84px; display: flex; align-items: center; justify-content: center; }
+  .tile .pic svg { width: 100%; height: 100%; }
+  .tile .nm { font-size: 20px; font-weight: 700; }
+  .tile .sub { font-size: 14px; color: var(--faint); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+  .tile.person .nm { font-size: 28px; }
+  .tile.add { border-style: dashed; border-color: var(--faint); color: var(--faint); }
+  .tile.add .nm { font-size: 20px; font-weight: 600; }
+  .addRow { display: flex; gap: 8px; margin-top: 16px; }
+  .addRow input { font: inherit; font-size: 20px; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: 6px; width: 14em; max-width: 60vw; }
+  .addRow button { font-size: 18px; padding: 0 18px; }
+  .ages { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 16px; }
+  .ages .tile { min-height: 190px; }
+  .ages .tile .pic { height: 110px; }
+  .ages .tile .nm { font-size: 40px; line-height: 1; }
+  .ages.small { grid-template-columns: repeat(2, 130px); gap: 10px; }
+  .ages.small .tile { min-height: 0; padding: 8px; }
+  .ages.small .tile .pic { height: 56px; }
+  .ages.small .tile .nm { font-size: 24px; }
+  .tile[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .tile[aria-pressed="true"] .sub { color: #ccc; }
+
+  .set { margin: 0 0 24px; }
   .set h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
   .opts { display: flex; gap: 8px; flex-wrap: wrap; }
   .opts button { min-width: 56px; min-height: 48px; font-size: 20px; }
-  /* choices page, laid out like a sum */
+  .opts button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .hint { color: var(--faint); font-size: 14px; margin: 6px 0 0; }
+  .go { display: flex; gap: 10px; flex-wrap: wrap; }
+  .go button { min-height: 48px; padding: 0 22px; font-size: 18px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  td, th { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; font-weight: 600; color: var(--faint); }
+  td.t { font-weight: 700; white-space: nowrap; }
+  .empty { color: var(--faint); }
+  #removeBtn { border-color: var(--line); color: var(--faint); font-size: 14px; }
+  #confirmRemoveBtn { border-color: var(--wrong); color: var(--wrong); border-width: 2px; min-height: 48px; padding: 0 18px; }
+
+  /* setup page, laid out like a sum */
   .builder { max-width: 460px; margin: 0 auto; }
   .bline { display: grid; grid-template-columns: 52px auto auto; column-gap: 14px; row-gap: 6px; justify-content: start; margin-bottom: 18px; }
   .lab { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
@@ -69,31 +113,13 @@
   }
   .brule { border-top: 2px solid var(--ink); margin: 4px 0 16px; }
   .bfoot { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
-  .bfoot .go { margin: 0; }
   .bfoot .opts button { min-width: 52px; min-height: 48px; font-size: 20px; }
-  button:disabled { opacity: .35; cursor: default; }
   .warn { color: var(--wrong); margin: 0 0 12px; font-size: 15px; }
   .warn:empty { display: none; }
   #preview { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 10px; cursor: pointer; }
   .mini { border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 16px 30px; min-width: 96px; display: flex; justify-content: center; }
-  .mini .qv.col, .mini .qv.div { position: relative; inset: auto; transform: none; font-size: 24px; }
-  .mini .qv.col { margin-top: .6em; }
+  .mini .qv { position: relative !important; inset: auto !important; transform: none !important; font-size: 22px !important; margin-top: .6em; }
   .mini .qv.div { margin-top: 1.4em; }
-  .opts button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-  .set .hint { color: var(--faint); font-size: 14px; margin: 6px 0 0; }
-  .go { max-width: 560px; margin: 0 auto; display: flex; gap: 10px; }
-  .go button { min-height: 48px; padding: 0 22px; font-size: 18px; }
-  .add { display: flex; gap: 8px; margin-top: 10px; }
-  .add input { font: inherit; font-size: 18px; padding: 8px 10px; border: 1.5px solid var(--ink); border-radius: 4px; width: 12em; max-width: 60vw; }
-  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-  td, th { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-size: 13px; font-weight: 600; color: var(--faint); }
-  td.t { font-weight: 700; white-space: nowrap; }
-  .empty { color: var(--faint); }
-  #removeBtn { border-color: var(--line); color: var(--faint); font-size: 14px; }
-  .whonext { margin-bottom: 34px; }
-  #confirmRemoveBtn { border-color: var(--wrong); color: var(--wrong); border-width: 2px; min-height: 48px; padding: 0 18px; }
-  header button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 
   /* sheet */
   #sheet {
@@ -130,10 +156,17 @@
   }
   .qv.col { top: 1.2em; left: 50%; transform: translateX(-50%); width: calc((var(--d) + 1.2) * 1ch); }
   .col .row { display: flex; justify-content: space-between; }
-  .col .rule { border-top: .07em solid var(--ink); margin-top: .12em; }
+  .col .rule, .frame .rule { border-top: .07em solid var(--ink); margin-top: .12em; }
   .qv.div { top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: flex-end; }
   .div .dd { position: relative; border-top: .07em solid var(--ink); padding: .1em .15em 0 .5em; margin-left: .12em; }
   .div .br { position: absolute; left: 0; top: -.07em; width: .38em; height: calc(100% + .07em); overflow: visible; }
+  .qv.frame { top: .6em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .frame svg { display: block; width: 5.5em; height: 2.2em; margin-bottom: .25em; }
+  .frame .rule { width: 3em; margin-top: .25em; }
+  .qv.miss { top: .7em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .miss .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
+  .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
+  .miss .wl { display: inline-block; width: calc((var(--d) + .8) * .7em); border-bottom: .07em solid var(--ink); height: 1em; }
 
   .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 36px; padding: 2px 8px 5px; }
   .read { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 15px; }
@@ -157,32 +190,80 @@
 </head>
 <body>
 <header>
-  <button id="whoBtn">Everyone</button>
-  <button id="settingsBtn">Start again</button>
-  <h1>Sums</h1>
+  <button id="backBtn">‹ Back</button>
+  <button id="setupBtn">Start again</button>
+  <button id="sayBtn" aria-label="Read it to me" title="Read it to me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></button>
+  <h1 id="title">Sums</h1>
   <span id="score"></span>
   <button id="markBtn" class="primary">Mark</button>
+  <button id="meBtn" class="spacer">Records</button>
 </header>
 
-<section id="settings" class="panel" hidden>
-  <div class="builder">
-    <div class="bline">
-      <div></div>
-      <div class="lab">First number</div>
-      <div class="lab">Or bigger</div>
-      <div></div>
-      <div class="kp" data-line="a"></div>
-      <div class="big" data-line="a"><button data-d="2">10–99</button><button data-d="3">100–999</button><button data-d="4">1000–9999</button></div>
+<!-- who is it? -->
+<section id="namesS" class="panel">
+  <div class="inner">
+    <div class="ask">Who's doing sums?</div>
+    <div class="tiles" id="nameTiles"></div>
+    <div class="addRow" id="addRow" hidden><input id="newName" placeholder="Name" maxlength="20" autocomplete="off"><button id="addBtn" class="primary">Add</button></div>
+  </div>
+</section>
+
+<!-- how old? -->
+<section id="ageS" class="panel" hidden>
+  <div class="inner">
+    <div class="ask">How old are you?</div>
+    <div class="ages" id="ageTiles"></div>
+  </div>
+</section>
+
+<!-- what today? -->
+<section id="homeS" class="panel" hidden>
+  <div class="inner">
+    <div class="ask">What do you want to do today?</div>
+    <div class="tiles" id="actTiles"></div>
+  </div>
+</section>
+
+<!-- records, age, remove -->
+<section id="meS" class="panel" hidden>
+  <div class="inner">
+    <div class="set" id="confirmBox" hidden><button id="confirmRemoveBtn"></button></div>
+    <div class="set" id="meAgeSet">
+      <h2>Age</h2>
+      <div class="ages small" id="meAges"></div>
     </div>
-    <div class="bline">
-      <div></div>
-      <div class="lab">Second number</div>
-      <div></div>
-      <div class="signs" id="opsOpts">
-        <button data-v="+">+</button><button data-v="-">−</button><button data-v="*">×</button><button data-v="/">÷</button>
+    <div class="set"><h2 id="recTitle">Best times</h2><div id="records"></div></div>
+    <div class="set"><h2>Recent sheets</h2><div id="history"></div></div>
+    <div class="go"><button id="removeBtn" hidden></button></div>
+  </div>
+</section>
+
+<!-- choose the sums for an activity -->
+<section id="setupS" class="panel" hidden>
+  <div class="builder">
+    <div id="kpBlock">
+      <div class="bline">
+        <div></div>
+        <div class="lab">First number</div>
+        <div class="lab">Or bigger</div>
+        <div></div>
+        <div class="kp" data-line="a"></div>
+        <div class="big" data-line="a"><button data-d="2">10–99</button><button data-d="3">100–999</button><button data-d="4">1000–9999</button></div>
       </div>
-      <div class="kp" data-line="b"></div>
-      <div class="big" data-line="b"><button data-d="2">10–99</button><button data-d="3">100–999</button><button data-d="4">1000–9999</button></div>
+      <div class="bline">
+        <div></div>
+        <div class="lab">Second number</div>
+        <div></div>
+        <div class="signs" id="opsOpts">
+          <button data-v="+">+</button><button data-v="-">−</button><button data-v="*">×</button><button data-v="/">÷</button>
+        </div>
+        <div class="kp" data-line="b"></div>
+        <div class="big" data-line="b"><button data-d="2">10–99</button><button data-d="3">100–999</button><button data-d="4">1000–9999</button></div>
+      </div>
+    </div>
+    <div class="set" id="maxBlock">
+      <div class="lab">Up to</div>
+      <div class="opts" id="maxOpts"><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button></div>
     </div>
     <div class="brule"></div>
     <div class="bfoot">
@@ -190,37 +271,16 @@
         <div class="lab">Questions</div>
         <div class="opts" id="nOpts"><button data-v="6">6</button><button data-v="12">12</button><button data-v="20">20</button></div>
       </div>
-      <div class="go"><button id="newBtn" class="primary">Start</button><button class="back">Back</button></div>
+      <div class="go"><button id="newBtn" class="primary">Start</button></div>
     </div>
     <p class="warn" id="warn"></p>
     <div class="lab">Like these <span class="faint">(tap for more)</span></div>
     <div id="preview"></div>
-    <p class="hint">Takeaways never go below zero. Division always comes out exactly: you divide by the second number.</p>
+    <p class="hint" id="setupHint"></p>
   </div>
 </section>
 
-<section id="who" class="panel" hidden>
-  <div class="set" id="confirmBox" hidden>
-    <button id="confirmRemoveBtn"></button>
-  </div>
-  <div class="set">
-    <h2>Who's doing sums?</h2>
-    <div class="opts" id="playerList"></div>
-    <div class="add"><input id="newName" placeholder="New name" maxlength="20" autocomplete="off"><button id="addBtn">Add</button></div>
-  </div>
-  <div class="go whonext"><button id="toSetupBtn" class="primary">Choose sums</button><button class="back">Back to the sheet</button></div>
-  <div class="set">
-    <h2 id="recTitle">Best times</h2>
-    <div id="records"></div>
-  </div>
-  <div class="set">
-    <h2>Recent sheets</h2>
-    <div id="history"></div>
-  </div>
-  <div class="go"><button id="removeBtn" hidden></button></div>
-</section>
-
-<main id="sheet" data-n="12"></main>
+<main id="sheet" data-n="12" hidden></main>
 
 <template id="cardT">
   <div class="card" data-state="writing">
@@ -242,219 +302,28 @@
 const $ = s => document.querySelector(s);
 const SIGN = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 const OP_ORDER = ['+', '-', '*', '/'];
+const ONE_TO_NINE = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const ALL_DIGITS = [0, ...ONE_TO_NINE];
+const AGES = [5, 8];
 const store = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
 };
-
-// ---------- settings ----------
-const ONE_TO_NINE = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-const ALL_DIGITS = [0, ...ONE_TO_NINE];
-const DEFAULTS = { ops: ['+'], a: 1, b: 1, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 12, v: 2 };
-function loadSettings() {
-  const s = store.get('sums-settings', null);
-  if (!(s && Array.isArray(s.ops) && s.ops.length)) return null;
-  const out = { ...DEFAULTS, ...s };
-  for (const k of ['pa', 'pb']) {
-    if (!Array.isArray(out[k]) || !out[k].length) out[k] = ALL_DIGITS;
-    // once: the old default was 1–9; the default is now every digit
-    if (!s.v && out[k].join() === ONE_TO_NINE.join()) out[k] = ALL_DIGITS;
-  }
-  out.v = 2;
-  return out;
-}
-let settings = loadSettings();
-const firstVisit = !settings;
-if (!settings) settings = { ...DEFAULTS };
-settings.pa = [...settings.pa]; settings.pb = [...settings.pb];
-
-// The choices page is laid out like a sum: first number's keypad on top, signs
-// beside the second number's keypad, a line, then how many and Start.
-const KEYS = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
-for (const kp of document.querySelectorAll('.kp')) {
-  kp.innerHTML = KEYS.map(k => `<button data-k="${k}">${k}</button>`).join('') + '<button data-k="all" class="allk">All</button>';
-}
-function syncOpts() {
-  for (const b of $('#opsOpts').children) b.setAttribute('aria-pressed', settings.ops.includes(b.dataset.v));
-  for (const line of ['a', 'b']) {
-    const d = settings[line], p = settings['p' + line];
-    for (const k of document.querySelectorAll(`.kp[data-line="${line}"] [data-k]`))
-      k.setAttribute('aria-pressed', d === 1 && (k.dataset.k === 'all' ? p.length === 10 : p.includes(+k.dataset.k)));
-    for (const k of document.querySelectorAll(`.big[data-line="${line}"] [data-d]`))
-      k.setAttribute('aria-pressed', +k.dataset.d === d);
-  }
-  for (const b of $('#nOpts').children) b.setAttribute('aria-pressed', +b.dataset.v === settings.n);
-  renderPreview();
-}
-$('#opsOpts').addEventListener('click', e => {
-  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
-  const i = settings.ops.indexOf(v);
-  if (i >= 0) { if (settings.ops.length > 1) settings.ops.splice(i, 1); }
-  else settings.ops.push(v);
-  syncOpts();
-});
-$('#nOpts').addEventListener('click', e => {
-  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
-  settings.n = +v; syncOpts();
-});
-for (const big of document.querySelectorAll('.big')) big.addEventListener('click', e => {
-  const d = e.target.closest('[data-d]'); if (!d) return;
-  settings[big.dataset.line] = +d.dataset.d; syncOpts();
-});
-// keypad: tap to toggle a digit, or drag across keys to set them all the same way
-function setKey(line, k, on) {
-  const pk = 'p' + line;
-  if (k === 'all') { settings[line] = 1; settings[pk] = [...ALL_DIGITS]; return; }
-  k = +k;
-  if (settings[line] !== 1) { settings[line] = 1; settings[pk] = [k]; return; } // fresh pick
-  const has = settings[pk].includes(k);
-  if (on && !has) settings[pk] = [...settings[pk], k].sort((x, y) => x - y);
-  if (!on && has && settings[pk].length > 1) settings[pk] = settings[pk].filter(x => x !== k);
-}
-for (const kp of document.querySelectorAll('.kp')) {
-  let sweep = null;
-  const keyAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); const k = el && el.closest('[data-k]'); return k && kp.contains(k) ? k : null; };
-  kp.addEventListener('pointerdown', e => {
-    const k = keyAt(e); if (!k) return;
-    e.preventDefault();
-    const line = kp.dataset.line;
-    const on = !(settings[line] === 1 && k.dataset.k !== 'all' && settings['p' + line].includes(+k.dataset.k));
-    sweep = { line, on, done: new Set([k.dataset.k]) };
-    setKey(line, k.dataset.k, on); syncOpts();
-  });
-  kp.addEventListener('pointermove', e => {
-    if (!sweep) return;
-    const k = keyAt(e);
-    if (!k || k.dataset.k === 'all' || sweep.done.has(k.dataset.k)) return;
-    sweep.done.add(k.dataset.k); setKey(sweep.line, k.dataset.k, sweep.on); syncOpts();
-  });
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) kp.addEventListener(ev, () => { sweep = null; });
-}
-// a few sample sums in the printed style, so you can see what she will get
-function renderPreview() {
-  const ops = usableOps(), box = $('#preview');
-  $('#warn').textContent = ops.length < settings.ops.length ? 'To divide, choose a second number other than 0.' : '';
-  $('#newBtn').disabled = !ops.length;
-  if (!ops.length) { box.innerHTML = ''; return; }
-  const seen = new Set(), qs = [];
-  for (let t = 0; t < 40 && qs.length < 4; t++) {
-    const q = makeQ(ops[qs.length % ops.length], lineA(), lineB());
-    const id = q.a + q.op + q.b; if (!seen.has(id)) { seen.add(id); qs.push(q); }
-  }
-  box.innerHTML = qs.map(q => {
-    const m = qMarkup(q), style = Object.entries(m.vars).map(([k, v]) => `${k}:${v}`).join(';');
-    return `<div class="mini"><div class="qv ${m.cls}" style="${style}">${m.html}</div></div>`;
-  }).join('');
-}
-$('#preview').addEventListener('click', renderPreview);
-
-// ---------- players and records ----------
-// Everyone (guest) plus named players, as in Typurr. Records are per player:
-// best time to get a whole sheet right, for each combination of settings.
-let players = store.get('sums-players', []);
-let current = store.get('sums-current', 'guest');
-if (current !== 'guest' && !players.some(p => p.id === current)) current = 'guest';
-const allPlayers = () => [{ id: 'guest', name: 'Everyone' }, ...players];
-const playerName = id => (allPlayers().find(p => p.id === id) || { name: 'Everyone' }).name;
-const recKey = id => 'sums-rec-' + id;
-const loadRec = id => store.get(recKey(id), { best: {}, history: [] });
-
-// key: signs | first | second | count, where a keypad line is "1:" + its digits
-function comboKey(s) {
-  const part = L => L.d === 1 ? '1:' + [...L.p].sort((x, y) => x - y).join('') : String(L.d);
-  return OP_ORDER.filter(o => s.ops.includes(o)).join('') + '|' + part(lineOf(s.a, s.pa)) + '|' + part(lineOf(s.b, s.pb)) + '|' + s.n;
-}
-function digitsLabel(ds) { // [0,1,2,3,5,7] -> "0–3, 5, 7"
-  const out = [];
-  for (let i = 0; i < ds.length; i++) {
-    let j = i; while (j + 1 < ds.length && ds[j + 1] === ds[j] + 1) j++;
-    out.push(j - i >= 2 ? `${ds[i]}–${ds[j]}` : j > i ? `${ds[i]}, ${ds[j]}` : `${ds[i]}`);
-    i = j;
-  }
-  return out.join(', ');
-}
-function partLabel(p) {
-  if (p.includes(':')) return digitsLabel([...p.split(':')[1]].map(Number));
-  return p === '1' ? '1-digit' : `${p}-digit`;
-}
-function comboLabel(k) {
-  const [ops, a, b, n] = k.split('|');
-  return `${[...ops].map(o => SIGN[o]).join(' ')} · ${partLabel(a)} and ${partLabel(b)} · ${n} questions`;
-}
-function fmtTime(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-function fmtDate(t) { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+const pickOne = arr => arr[rnd(0, arr.length - 1)];
+const range = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
 
-function saveResult(key, ms, first, n) {
-  const r = loadRec(current);
-  const prev = r.best[key];
-  const isBest = !prev || ms < prev.ms;
-  r.best[key] = { ms: isBest ? ms : prev.ms, count: (prev ? prev.count : 0) + 1, t: Date.now() };
-  const t = Date.now();
-  r.history.unshift({ k: key, ms, first, n, t });
-  r.history = r.history.slice(0, 100);
-  store.set(recKey(current), r);
-  return { isBest, best: r.best[key].ms, hadPrev: !!prev, first, t, player: current };
+// read aloud (the 5-year-old can't read yet)
+function say(text) {
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 0.9; speechSynthesis.speak(u); } catch (e) {}
 }
 
-function renderWho() {
-  $('#whoBtn').textContent = playerName(current);
-  $('#playerList').innerHTML = allPlayers().map(p =>
-    `<button data-id="${esc(p.id)}" aria-pressed="${p.id === current}">${esc(p.name)}</button>`).join('');
-  const r = loadRec(current);
-  $('#recTitle').textContent = `Best times for ${playerName(current)}`;
-  const best = Object.entries(r.best).sort((x, y) => y[1].t - x[1].t);
-  $('#records').innerHTML = best.length
-    ? `<table><tr><th>Sheet</th><th>Best</th><th>Done</th></tr>${best.map(([k, v]) =>
-        `<tr><td>${comboLabel(k)}</td><td class="t">${fmtTime(v.ms)}</td><td>${v.count}×</td></tr>`).join('')}</table>`
-    : '<p class="empty">No finished sheets yet. A sheet counts when every answer is right.</p>';
-  $('#history').innerHTML = r.history.length
-    ? `<table><tr><th>Day</th><th>Sheet</th><th>Time</th><th>First try</th></tr>${r.history.slice(0, 15).map(h =>
-        `<tr><td>${fmtDate(h.t)}</td><td>${comboLabel(h.k)}</td><td class="t">${fmtTime(h.ms)}</td><td>${h.first}/${h.n}</td></tr>`).join('')}</table>`
-    : '<p class="empty">Nothing yet.</p>';
-  const rm = $('#removeBtn');
-  rm.hidden = current === 'guest'; rm.dataset.armed = ''; rm.textContent = `Remove ${playerName(current)}`;
-  $('#confirmBox').hidden = true;
-}
-$('#playerList').addEventListener('click', e => {
-  const id = e.target.dataset && e.target.dataset.id; if (!id) return;
-  current = id; store.set('sums-current', id); renderWho();
-});
-function addPlayer() {
-  const name = $('#newName').value.trim().slice(0, 20); if (!name) return;
-  const p = { id: Date.now().toString(36), name };
-  players.push(p); store.set('sums-players', players);
-  current = p.id; store.set('sums-current', p.id);
-  $('#newName').value = ''; renderWho();
-}
-$('#addBtn').onclick = addPlayer;
-$('#newName').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
-// Removing: the first tap turns this button into "Keep", and the real confirm
-// appears far away at the top of the page, so a double tap can't remove anyone.
-let confirmShownAt = 0;
-$('#removeBtn').onclick = () => {
-  const rm = $('#removeBtn'), name = playerName(current);
-  if (rm.dataset.armed) { renderWho(); return; } // "Keep": cancel
-  rm.dataset.armed = '1'; rm.textContent = `Keep ${name}`;
-  $('#confirmRemoveBtn').textContent = `Tap here to remove ${name} and their records`;
-  $('#confirmBox').hidden = false; confirmShownAt = Date.now();
-  $('#who').scrollTop = 0;
-};
-$('#confirmRemoveBtn').onclick = () => {
-  if (Date.now() - confirmShownAt < 500) return;
-  players = players.filter(p => p.id !== current); store.set('sums-players', players);
-  try { localStorage.removeItem(recKey(current)); } catch (e) {}
-  current = 'guest'; store.set('sums-current', current); renderWho();
-};
-
-// ---------- questions ----------
+// ---------- numbers ----------
 // A "line" is one of the two numbers: { d: digits, p: picked digits }.
 // d = 1 means a single digit chosen from p (the keypad); d = 2..4 means any
 // number with that many digits.
-const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-const pickOne = arr => arr[rnd(0, arr.length - 1)];
 const lineOf = (d, p) => typeof d === 'object' ? d : { d, p: p || ALL_DIGITS };
-const lineA = () => lineOf(settings.a, settings.pa), lineB = () => lineOf(settings.b, settings.pb);
 const num = L => L.d === 1 ? pickOne(L.p) : rnd(10 ** (L.d - 1), 10 ** L.d - 1);
 // For ÷ the second number is the divisor and the answer comes from the first
 // number's choices (keypad), or the first number sets the dividend's digits.
@@ -471,44 +340,400 @@ function makeQ(op, A, B) {
   if (B.d === 1) { const nz = B.p.filter(x => x > 0); if (!nz.length) return null; b = pickOne(nz); }
   else b = rnd(10 ** (B.d - 1), 10 ** B.d - 1);
   if (A.d === 1) { const q = num(A); return { a: b * q, b, op, ans: q }; }
-  // dividend has A.d digits where possible
   const alo = 10 ** (A.d - 1), ahi = 10 ** A.d - 1;
   let qlo = Math.max(2, Math.ceil(alo / b)), qhi = Math.floor(ahi / b);
   if (qlo > qhi) { qlo = Math.min(qlo, 9); qhi = Math.max(qlo, Math.min(qhi, 9)); if (qhi < qlo) qhi = qlo; }
   const q = rnd(qlo, qhi);
   return { a: b * q, b, op, ans: q };
 }
-// signs that can actually make a question with these choices (÷ needs a non-zero divisor)
-const usableOps = () => settings.ops.filter(op => op !== '/' || lineB().d > 1 || lineB().p.some(x => x > 0));
-function makeSheet() {
-  const seen = new Set(), qs = [], ops = usableOps();
-  for (let i = 0; i < settings.n; i++) {
-    let q;
-    for (let t = 0; t < 30; t++) {
-      q = makeQ(pickOne(ops), lineA(), lineB());
-      if (!seen.has(q.a + q.op + q.b)) break;
-    }
-    seen.add(q.a + q.op + q.b); qs.push(q);
+const cfgA = c => lineOf(c.a, c.pa), cfgB = c => lineOf(c.b, c.pb);
+// signs that can actually make a question (÷ needs a non-zero divisor)
+const usableOps = c => c.ops.filter(op => op !== '/' || cfgB(c).d > 1 || cfgB(c).p.some(x => x > 0));
+
+function digitsLabel(ds) { // [0,1,2,3,5,7] -> "0–3, 5, 7"
+  const out = [];
+  for (let i = 0; i < ds.length; i++) {
+    let j = i; while (j + 1 < ds.length && ds[j + 1] === ds[j] + 1) j++;
+    out.push(j - i >= 2 ? `${ds[i]}–${ds[j]}` : j > i ? `${ds[i]}, ${ds[j]}` : `${ds[i]}`);
+    i = j;
   }
-  return qs;
+  return out.join(', ');
+}
+// sums key: signs | first | second | count, where a keypad line is "1:" + its digits
+function kpKey(c) {
+  const part = L => L.d === 1 ? '1:' + [...L.p].sort((x, y) => x - y).join('') : String(L.d);
+  return OP_ORDER.filter(o => c.ops.includes(o)).join('') + '|' + part(cfgA(c)) + '|' + part(cfgB(c)) + '|' + c.n;
+}
+function kpLabel(k) {
+  const [ops, a, b, n] = k.split('|');
+  const part = p => p.includes(':') ? digitsLabel([...p.split(':')[1]].map(Number)) : p === '1' ? '1-digit' : `${p}-digit`;
+  return `${[...ops].map(o => SIGN[o]).join(' ')} · ${part(a)} and ${part(b)} · ${n} questions`;
 }
 
-// The printed question. + − × are stacked and right-aligned with a line under
-// them (space above for carrying, answer goes under the line). ÷ is a long
-// division bracket in the middle: divisor ) dividend with a bar over it, answer
-// goes on the bar. --h / --c are the height / width the layout needs, in em.
+// ---------- activities ----------
+// Each activity: which ages see it, its starting settings, how to make a
+// question, the setup it uses, what to say aloud, and its tile picture.
+const frameSvg = (dots, empty, cls = '') => {
+  let s = `<svg class="${cls}" viewBox="-1 -1 52 22"><rect x="0" y="0" width="50" height="20" fill="none" stroke="currentColor" stroke-width="1"/>`;
+  for (let i = 1; i < 5; i++) s += `<line x1="${i * 10}" y1="0" x2="${i * 10}" y2="20" stroke="currentColor" stroke-width=".7"/>`;
+  s += `<line x1="0" y1="10" x2="50" y2="10" stroke="currentColor" stroke-width=".7"/>`;
+  for (let i = 0; i < 10; i++) {
+    const x = (i % 5) * 10 + 5, y = Math.floor(i / 5) * 10 + 5;
+    if (i < dots) s += `<circle cx="${x}" cy="${y}" r="3.5" fill="currentColor"/>`;
+    else if (empty) s += `<circle cx="${x}" cy="${y}" r="3.3" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.4 1.1"/>`;
+  }
+  return s + '</svg>';
+};
+const textSvg = lines => `<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
+
+const ACTS = {
+  sums: {
+    name: 'Sums', ages: [5, 8], setup: 'keypad', say: 'Work out the answers.',
+    pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="78" y="28" text-anchor="end" font-size="26">23</text><text x="78" y="56" text-anchor="end" font-size="26">+ 14</text><line x1="36" y1="64" x2="80" y2="64" stroke="currentColor" stroke-width="3"/></svg>`,
+    defaults: age => age === 5
+      ? { ops: ['+'], a: 1, b: 1, pa: range(0, 5), pb: range(0, 5), n: 6 }
+      : { ops: ['+', '-', '*'], a: 2, b: 1, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 12 },
+    make: c => { const q = makeQ(pickOne(usableOps(c)), cfgA(c), cfgB(c)); q.kind = q.op === '/' ? 'div' : 'col'; return q; },
+    key: c => kpKey(c),               // no prefix: keeps the records made before activities existed
+    label: k => 'Sums · ' + kpLabel(k),
+  },
+  missing: {
+    name: 'Missing number', ages: [8], setup: 'keypad', say: 'What number is missing?',
+    pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="8" y="52" font-size="26">4 +</text><rect x="52" y="30" width="22" height="26" fill="none" stroke="currentColor" stroke-width="3" rx="2"/><text x="80" y="52" font-size="26">= 9</text></svg>`,
+    defaults: () => ({ ops: ['+', '-'], a: 2, b: 1, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 12 }),
+    // hide one of the two numbers; never one where any number would do (0 × ☐ = 0)
+    make: c => {
+      let q;
+      for (let t = 0; t < 40; t++) {
+        q = makeQ(pickOne(usableOps(c)), cfgA(c), cfgB(c));
+        const hide = Math.random() < 0.5 ? 'a' : 'b', shown = hide === 'a' ? q.b : q.a;
+        if (q.op === '*' && shown === 0) continue;
+        if (q.op === '/' && hide === 'b' && q.a === 0) continue;
+        return { kind: 'miss', a: q.a, b: q.b, op: q.op, c: q.ans, hide, ans: q[hide] };
+      }
+      return { kind: 'miss', a: q.a, b: q.b, op: q.op, c: q.ans, hide: 'a', ans: q.a };
+    },
+    key: c => 'missing~' + kpKey(c),
+    label: k => 'Missing number · ' + kpLabel(k),
+  },
+  howmany: {
+    name: 'How many?', ages: [5], setup: 'max', say: 'How many dots?',
+    pic: frameSvg(7, false),
+    defaults: () => ({ max: 10, n: 6 }),
+    make: c => { const v = rnd(1, c.max); return { kind: 'frame', dots: v, frames: c.max > 10 ? 2 : 1, empty: false, ans: v }; },
+    key: c => `howmany~${c.max}|${c.n}`,
+    label: k => { const [m, n] = k.split('|'); return `How many? · up to ${m} · ${n} questions`; },
+  },
+  make10: {
+    name: 'Make 10', ages: [5], setup: 'none', say: 'How many more dots to make ten?',
+    pic: frameSvg(6, true),
+    defaults: () => ({ n: 6 }),
+    make: () => { const k = rnd(1, 9); return { kind: 'frame', dots: k, frames: 1, empty: true, ans: 10 - k }; },
+    key: c => `make10~${c.n}`,
+    label: k => `Make 10 · ${k} questions`,
+  },
+};
+function labelFor(k) {
+  const i = k.indexOf('~');
+  return i < 0 ? ACTS.sums.label(k) : ACTS[k.slice(0, i)] ? ACTS[k.slice(0, i)].label(k.slice(i + 1)) : k;
+}
+
+// ---------- players ----------
+// Everyone (guest, picks an age each time) plus named players, each with an age.
+let players = store.get('sums-players', []);
+let current = null, age = null, act = null;
+const allPlayers = () => [{ id: 'guest', name: 'Everyone' }, ...players];
+const player = id => allPlayers().find(p => p.id === id) || { id: 'guest', name: 'Everyone' };
+const recKey = id => 'sums-rec-' + id;
+const loadRec = id => store.get(recKey(id), { best: {}, history: [] });
+
+// settings per player, per activity (Everyone also per age)
+const cfgStoreKey = a => `sums-cfg-${current}${current === 'guest' ? '-' + age : ''}-${a}`;
+function loadCfg(a) {
+  const d = ACTS[a].defaults(age);
+  let s = store.get(cfgStoreKey(a), null);
+  if (!s && a === 'sums' && age === 8) s = oldSettings(); // settings saved before activities existed
+  const c = { ...d, ...(s || {}) };
+  for (const k of ['pa', 'pb']) if (k in d && (!Array.isArray(c[k]) || !c[k].length)) c[k] = d[k];
+  if (c.ops) c.ops = [...c.ops];
+  return c;
+}
+function oldSettings() {
+  const s = store.get('sums-settings', null);
+  if (!(s && Array.isArray(s.ops) && s.ops.length)) return null;
+  const out = { ...s };
+  for (const k of ['pa', 'pb']) if (Array.isArray(out[k]) && !s.v && out[k].join() === ONE_TO_NINE.join()) out[k] = ALL_DIGITS;
+  return out;
+}
+function fmtTime(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function fmtDate(t) { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+
+function saveResult(key, ms, first, n) {
+  const r = loadRec(current);
+  const prev = r.best[key];
+  const isBest = !prev || ms < prev.ms;
+  r.best[key] = { ms: isBest ? ms : prev.ms, count: (prev ? prev.count : 0) + 1, t: Date.now() };
+  const t = Date.now();
+  r.history.unshift({ k: key, ms, first, n, t });
+  r.history = r.history.slice(0, 100);
+  store.set(recKey(current), r);
+  return { isBest, best: r.best[key].ms, hadPrev: !!prev, first, t, player: current };
+}
+
+// ---------- screens ----------
+let screen = 'names';
+const cakeSvg = n => {
+  let s = `<svg viewBox="0 0 120 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="14" y="54" width="92" height="38" rx="5"/><path d="M14 68 q11 8 23 0 t23 0 t23 0 t23 0"/>`;
+  for (let i = 0; i < n; i++) {
+    const x = 14 + (92 / (n + 1)) * (i + 1);
+    s += `<line x1="${x}" y1="54" x2="${x}" y2="34"/><path d="M${x} 22 q4 5 0 9 q-4 -4 0 -9z" fill="currentColor" stroke-width="1.5"/>`;
+  }
+  return s + '</svg>';
+};
+function show(s) {
+  screen = s;
+  for (const id of ['names', 'age', 'home', 'setup', 'me']) $('#' + id + 'S').hidden = id !== s;
+  $('#sheet').hidden = s !== 'sheet';
+  const vis = { backBtn: s !== 'names', setupBtn: s === 'sheet', sayBtn: s === 'sheet' || s === 'home' || s === 'age', markBtn: s === 'sheet', score: s === 'sheet', meBtn: s === 'home' };
+  for (const id in vis) $('#' + id).hidden = !vis[id];
+  const p = current ? player(current) : null;
+  $('#title').textContent = { names: 'Sums', age: p ? p.name : '', home: p ? `${p.name} · ${age}` : '', setup: act ? ACTS[act].name : '', me: p ? p.name : '', sheet: act ? ACTS[act].name : '' }[s];
+  $('#title').className = s === 'sheet' ? 'sheetTitle' : '';
+  $('#backBtn').textContent = { age: '‹ Names', home: '‹ Names', setup: '‹ Back', me: '‹ Back', sheet: '‹ Home' }[s] || '‹ Back';
+  $('#score').hidden = s !== 'sheet';
+}
+$('#backBtn').onclick = () => {
+  if (screen === 'age' || screen === 'home') goNames();
+  else if (screen === 'setup') sheetAct === act && cards.length ? show('sheet') : goHome();
+  else goHome();
+};
+$('#sayBtn').onclick = () => {
+  if (screen === 'sheet') say(ACTS[act].say);
+  else if (screen === 'home') say('What do you want to do today? ' + ACTS_FOR().map(a => ACTS[a].name).join('. '));
+  else if (screen === 'age') say('How old are you?');
+};
+
+// names
+function goNames() {
+  current = null; age = null;
+  $('#nameTiles').innerHTML = allPlayers().map(p =>
+    `<button class="tile person" data-id="${esc(p.id)}"><span class="nm">${esc(p.name)}</span><span class="sub">${p.id === 'guest' ? 'any age' : p.age ? 'age ' + p.age : ''}</span></button>`).join('')
+    + `<button class="tile add" id="addTile"><span class="nm">+ Add a name</span></button>`;
+  $('#addRow').hidden = true;
+  show('names');
+}
+$('#nameTiles').addEventListener('click', e => {
+  const t = e.target.closest('.tile'); if (!t) return;
+  if (t.id === 'addTile') { $('#addRow').hidden = false; $('#newName').focus(); return; }
+  current = t.dataset.id;
+  const p = player(current);
+  if (current !== 'guest' && AGES.includes(p.age)) { age = p.age; goHome(); } else goAge();
+});
+function addPlayer() {
+  const name = $('#newName').value.trim().slice(0, 20); if (!name) return;
+  const p = { id: Date.now().toString(36), name };
+  players.push(p); store.set('sums-players', players);
+  $('#newName').value = '';
+  current = p.id; goAge();
+}
+$('#addBtn').onclick = addPlayer;
+$('#newName').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+
+// age
+const ageTiles = sel => AGES.map(a => `<button class="tile" data-age="${a}" aria-pressed="${a === age}"><span class="pic">${cakeSvg(a)}</span><span class="nm">${a}</span></button>`).join('');
+function goAge() { $('#ageTiles').innerHTML = ageTiles(); show('age'); say('How old are you?'); }
+function setAge(a) {
+  age = a;
+  if (current !== 'guest') { const p = players.find(x => x.id === current); if (p) { p.age = a; store.set('sums-players', players); } }
+}
+$('#ageTiles').addEventListener('click', e => { const t = e.target.closest('[data-age]'); if (!t) return; setAge(+t.dataset.age); goHome(); });
+
+// home: activities for this age
+const ACTS_FOR = () => Object.keys(ACTS).filter(a => ACTS[a].ages.includes(age));
+function goHome() {
+  const r = loadRec(current);
+  $('#actTiles').innerHTML = ACTS_FOR().map(a => {
+    const best = r.best[ACTS[a].key(loadCfg(a))];
+    return `<button class="tile" data-act="${a}"><span class="pic">${ACTS[a].pic}</span><span class="nm">${ACTS[a].name}</span><span class="sub">${best ? 'Best ' + fmtTime(best.ms) : ''}</span></button>`;
+  }).join('');
+  show('home');
+  if (age === 5) say('What do you want to do today?');
+}
+$('#actTiles').addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  act = t.dataset.act;
+  buildSheet(loadCfg(act));
+  show('sheet');
+  if (age === 5) say(ACTS[act].say);
+});
+
+// records, age, remove
+let confirmShownAt = 0;
+function goMe() {
+  const p = player(current), r = loadRec(current);
+  $('#meAges').innerHTML = ageTiles();
+  $('#recTitle').textContent = `Best times for ${p.name}`;
+  const best = Object.entries(r.best).sort((x, y) => y[1].t - x[1].t);
+  $('#records').innerHTML = best.length
+    ? `<table><tr><th>Sheet</th><th>Best</th><th>Done</th></tr>${best.map(([k, v]) =>
+        `<tr><td>${esc(labelFor(k))}</td><td class="t">${fmtTime(v.ms)}</td><td>${v.count}×</td></tr>`).join('')}</table>`
+    : '<p class="empty">No finished sheets yet. A sheet counts when every answer is right.</p>';
+  $('#history').innerHTML = r.history.length
+    ? `<table><tr><th>Day</th><th>Sheet</th><th>Time</th><th>First try</th></tr>${r.history.slice(0, 15).map(h =>
+        `<tr><td>${fmtDate(h.t)}</td><td>${esc(labelFor(h.k))}</td><td class="t">${fmtTime(h.ms)}</td><td>${h.first}/${h.n}</td></tr>`).join('')}</table>`
+    : '<p class="empty">Nothing yet.</p>';
+  const rm = $('#removeBtn');
+  rm.hidden = current === 'guest'; rm.dataset.armed = ''; rm.textContent = `Remove ${p.name}`;
+  $('#confirmBox').hidden = true;
+  show('me');
+}
+$('#meBtn').onclick = goMe;
+$('#meAges').addEventListener('click', e => { const t = e.target.closest('[data-age]'); if (!t) return; setAge(+t.dataset.age); goHome(); });
+// Removing: the first tap turns this button into "Keep", and the real confirm
+// appears far away at the top of the page, so a double tap can't remove anyone.
+$('#removeBtn').onclick = () => {
+  const rm = $('#removeBtn'), name = player(current).name;
+  if (rm.dataset.armed) { goMe(); return; } // "Keep": cancel
+  rm.dataset.armed = '1'; rm.textContent = `Keep ${name}`;
+  $('#confirmRemoveBtn').textContent = `Tap here to remove ${name} and their records`;
+  $('#confirmBox').hidden = false; confirmShownAt = Date.now();
+  $('#meS').scrollTop = 0;
+};
+$('#confirmRemoveBtn').onclick = () => {
+  if (Date.now() - confirmShownAt < 500) return;
+  players = players.filter(p => p.id !== current); store.set('sums-players', players);
+  try { localStorage.removeItem(recKey(current)); } catch (e) {}
+  for (const a in ACTS) try { localStorage.removeItem(`sums-cfg-${current}-${a}`); } catch (e) {}
+  goNames();
+};
+
+// ---------- setup ----------
+// The setup page is laid out like a sum: first number's keypad on top, signs
+// beside the second number's keypad, a line, then how many and Start.
+let draft = null;
+const KEYS = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
+for (const kp of document.querySelectorAll('.kp')) {
+  kp.innerHTML = KEYS.map(k => `<button data-k="${k}">${k}</button>`).join('') + '<button data-k="all" class="allk">All</button>';
+}
+function goSetup() {
+  draft = loadCfg(act);
+  const kind = ACTS[act].setup;
+  $('#kpBlock').hidden = kind !== 'keypad';
+  $('#maxBlock').hidden = kind !== 'max';
+  $('#setupHint').textContent = kind === 'keypad' ? 'Takeaways never go below zero. Division always comes out exactly: you divide by the second number.' : '';
+  syncOpts();
+  show('setup');
+}
+$('#setupBtn').onclick = goSetup;
+function syncOpts() {
+  if (draft.ops) {
+    for (const b of $('#opsOpts').children) b.setAttribute('aria-pressed', draft.ops.includes(b.dataset.v));
+    for (const line of ['a', 'b']) {
+      const d = draft[line], p = draft['p' + line];
+      for (const k of document.querySelectorAll(`.kp[data-line="${line}"] [data-k]`))
+        k.setAttribute('aria-pressed', d === 1 && (k.dataset.k === 'all' ? p.length === 10 : p.includes(+k.dataset.k)));
+      for (const k of document.querySelectorAll(`.big[data-line="${line}"] [data-d]`))
+        k.setAttribute('aria-pressed', +k.dataset.d === d);
+    }
+  }
+  for (const b of $('#maxOpts').children) b.setAttribute('aria-pressed', +b.dataset.v === draft.max);
+  for (const b of $('#nOpts').children) b.setAttribute('aria-pressed', +b.dataset.v === draft.n);
+  renderPreview();
+}
+$('#opsOpts').addEventListener('click', e => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  const i = draft.ops.indexOf(v);
+  if (i >= 0) { if (draft.ops.length > 1) draft.ops.splice(i, 1); }
+  else draft.ops.push(v);
+  syncOpts();
+});
+for (const [id, key] of [['#nOpts', 'n'], ['#maxOpts', 'max']])
+  $(id).addEventListener('click', e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; draft[key] = +v; syncOpts(); });
+for (const big of document.querySelectorAll('.big')) big.addEventListener('click', e => {
+  const d = e.target.closest('[data-d]'); if (!d) return;
+  draft[big.dataset.line] = +d.dataset.d; syncOpts();
+});
+// keypad: tap to toggle a digit, or drag across keys to set them all the same way
+function setKey(line, k, on) {
+  const pk = 'p' + line;
+  if (k === 'all') { draft[line] = 1; draft[pk] = [...ALL_DIGITS]; return; }
+  k = +k;
+  if (draft[line] !== 1) { draft[line] = 1; draft[pk] = [k]; return; } // fresh pick
+  const has = draft[pk].includes(k);
+  if (on && !has) draft[pk] = [...draft[pk], k].sort((x, y) => x - y);
+  if (!on && has && draft[pk].length > 1) draft[pk] = draft[pk].filter(x => x !== k);
+}
+for (const kp of document.querySelectorAll('.kp')) {
+  let sweep = null;
+  const keyAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); const k = el && el.closest('[data-k]'); return k && kp.contains(k) ? k : null; };
+  kp.addEventListener('pointerdown', e => {
+    const k = keyAt(e); if (!k) return;
+    e.preventDefault();
+    const line = kp.dataset.line;
+    const on = !(draft[line] === 1 && k.dataset.k !== 'all' && draft['p' + line].includes(+k.dataset.k));
+    sweep = { line, on, done: new Set([k.dataset.k]) };
+    setKey(line, k.dataset.k, on); syncOpts();
+  });
+  kp.addEventListener('pointermove', e => {
+    if (!sweep) return;
+    const k = keyAt(e);
+    if (!k || k.dataset.k === 'all' || sweep.done.has(k.dataset.k)) return;
+    sweep.done.add(k.dataset.k); setKey(sweep.line, k.dataset.k, sweep.on); syncOpts();
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) kp.addEventListener(ev, () => { sweep = null; });
+}
+// a few sample questions in the printed style
+function renderPreview() {
+  const box = $('#preview');
+  const ok = !draft.ops || usableOps(draft).length > 0;
+  $('#warn').textContent = draft.ops && usableOps(draft).length < draft.ops.length ? 'To divide, choose a second number other than 0.' : '';
+  $('#newBtn').disabled = !ok;
+  if (!ok) { box.innerHTML = ''; return; }
+  const seen = new Set(), qs = [];
+  for (let t = 0; t < 40 && qs.length < 4; t++) {
+    const q = ACTS[act].make(draft), id = qId(q);
+    if (!seen.has(id)) { seen.add(id); qs.push(q); }
+  }
+  box.innerHTML = qs.map(q => {
+    const m = qMarkup(q), style = Object.entries(m.vars).map(([k, v]) => `${k}:${v}`).join(';');
+    return `<div class="mini"><div class="qv ${m.cls}" style="${style}">${m.html}</div></div>`;
+  }).join('');
+}
+$('#preview').addEventListener('click', renderPreview);
+$('#newBtn').onclick = () => { store.set(cfgStoreKey(act), draft); buildSheet(loadCfg(act)); show('sheet'); };
+
+// ---------- the printed question ----------
+// + − × stacked with a line (space above for carrying, answer under the line);
+// ÷ as a long-division bracket (answer on the bar); missing number as an
+// equation with a box and a line to write on; ten frames with a line under.
+// --h / --c are the height / width the layout needs, in em.
+const qId = q => JSON.stringify({ ...q, ans: undefined });
 function qMarkup(q) {
-  const { a, b, op, ans } = q, len = n => String(n).length;
-  if (op === '/') return {
+  const len = n => String(n).length;
+  if (q.kind === 'div') return {
     cls: 'div',
-    html: `<span class="dv">${b}</span><span class="dd"><svg class="br" viewBox="0 0 10 40" preserveAspectRatio="none"><path d="M1 0 Q 13 20 1 40" fill="none" stroke="currentColor" stroke-width="2.6" vector-effect="non-scaling-stroke" style="stroke-width:.07em"/></svg>${a}</span>`,
-    vars: { '--h': 5.2, '--c': (len(a) + len(b)) * 0.62 + 2.4 },
+    html: `<span class="dv">${q.b}</span><span class="dd"><svg class="br" viewBox="0 0 10 40" preserveAspectRatio="none"><path d="M1 0 Q 13 20 1 40" fill="none" stroke="currentColor" stroke-width="2.6" vector-effect="non-scaling-stroke" style="stroke-width:.07em"/></svg>${q.a}</span>`,
+    vars: { '--h': 5.2, '--c': (len(q.a) + len(q.b)) * 0.62 + 2.4 },
   };
-  const d = Math.max(len(a), len(b), len(ans));
-  const below = op === '*' && len(b) > 1 ? 1.1 * (len(b) + 1) + 0.3 : 1.7;
+  if (q.kind === 'miss') {
+    const box = '<span class="bx"></span>';
+    const A = q.hide === 'a' ? box : q.a, B = q.hide === 'b' ? box : q.b;
+    return {
+      cls: 'miss',
+      html: `<div class="eq">${A} ${SIGN[q.op]} ${B} = ${q.c}</div><div class="al">${box}<span>=</span><span class="wl"></span></div>`,
+      // line length from the longest number shown, so it doesn't hint at the answer's size
+      vars: { '--d': Math.max(len(q.a), len(q.b), len(q.c)), '--h': 5.4, '--c': (len(q.a) + len(q.b) + len(q.c)) * 0.62 + 5 },
+    };
+  }
+  if (q.kind === 'frame') {
+    const svgs = q.frames === 2 ? frameSvg(Math.min(q.dots, 10), false) + frameSvg(Math.max(0, q.dots - 10), false) : frameSvg(q.dots, q.empty);
+    return { cls: 'frame', html: `${svgs}<div class="rule"></div>`, vars: { '--h': q.frames * 2.45 + 3.4, '--c': 7 } };
+  }
+  const d = Math.max(len(q.a), len(q.b), len(q.ans));
+  const below = q.op === '*' && len(q.b) > 1 ? 1.1 * (len(q.b) + 1) + 0.3 : 1.7;
   return {
     cls: 'col',
-    html: `<div class="row"><span></span><span>${a}</span></div><div class="row"><span>${SIGN[op]}</span><span>${b}</span></div><div class="rule"></div>`,
+    html: `<div class="row"><span></span><span>${q.a}</span></div><div class="row"><span>${SIGN[q.op]}</span><span>${q.b}</span></div><div class="rule"></div>`,
     vars: { '--d': d, '--h': 3.6 + below, '--c': (d + 1.2) * 0.62 + 1.6 },
   };
 }
@@ -516,42 +741,53 @@ function layout(c) {
   const qv = c.el.querySelector('.qv'), m = qMarkup(c.q);
   qv.className = 'qv ' + m.cls; qv.innerHTML = m.html;
   for (const k in m.vars) qv.style.setProperty(k, m.vars[k]);
-  c.anchorEl = qv.querySelector(m.cls === 'div' ? '.dd' : '.rule');
+  c.anchorEl = qv.querySelector({ div: '.dd', miss: '.wl' }[m.cls] || '.rule');
 }
 
 // ---------- cards and writing ----------
-let cards = [], sheetKey = '', sheetStart = null, sheetDone = false;
+let cards = [], cfg = null, sheetAct = null, sheetKey = '', sheetStart = null, sheetDone = false;
 let penSeen = false; // once a stylus is used, ignore fingers and palms
 const ro = new ResizeObserver(entries => { for (const en of entries) en.target._card && sizeCanvas(en.target._card); });
 
-function buildSheet() {
+function makeSheet(c) {
+  const seen = new Set(), qs = [];
+  for (let i = 0; i < c.n; i++) {
+    let q;
+    for (let t = 0; t < 30; t++) { q = ACTS[act].make(c); if (!seen.has(qId(q))) break; }
+    seen.add(qId(q)); qs.push(q);
+  }
+  return qs;
+}
+function buildSheet(c) {
+  cfg = c; sheetAct = act;
   const sheet = $('#sheet');
-  for (const c of cards) ro.unobserve(c.work);
-  sheet.innerHTML = ''; sheet.dataset.n = settings.n; sheet.scrollTop = 0;
-  sheetKey = comboKey(settings); sheetStart = null; sheetDone = false;
-  cards = makeSheet().map(q => {
+  for (const k of cards) ro.unobserve(k.work);
+  sheet.innerHTML = ''; sheet.dataset.n = c.n; sheet.scrollTop = 0;
+  sheetKey = ACTS[act].key(c); sheetStart = null; sheetDone = false; lastResult = null;
+  sheet.hidden = false; // measured while laying out
+  cards = makeSheet(c).map(q => {
     const el = $('#cardT').content.firstElementChild.cloneNode(true);
-    const c = { q, el, work: el.querySelector('.work'), cv: el.querySelector('canvas'), strokes: [], tries: 0, first: null, timer: 0, ax: 0, ay: 0, F: 20 };
-    layout(c);
-    c.work._card = c;
-    wirePad(c);
-    el.querySelector('.undo').onclick = () => { c.strokes.pop(); draw(c); scheduleRead(c, 0); };
-    el.querySelector('.clear').onclick = () => { c.strokes = []; draw(c); showRead(c, ''); };
+    const k = { q, el, work: el.querySelector('.work'), cv: el.querySelector('canvas'), strokes: [], tries: 0, first: null, timer: 0, ax: 0, ay: 0, F: 20 };
+    layout(k);
+    k.work._card = k;
+    wirePad(k);
+    el.querySelector('.undo').onclick = () => { k.strokes.pop(); draw(k); scheduleRead(k, 0); };
+    el.querySelector('.clear').onclick = () => { k.strokes = []; draw(k); showRead(k, ''); };
     el.querySelector('.retry').onclick = () => {
       // keep the working, take away only the answer that was read
-      const used = new Set(answerStrokes(c));
-      c.strokes = c.strokes.filter(s => !used.has(s));
-      draw(c); showRead(c, ''); setState(c, 'writing');
+      const used = new Set(answerStrokes(k));
+      k.strokes = k.strokes.filter(s => !used.has(s));
+      draw(k); showRead(k, ''); setState(k, 'writing');
     };
     // She only finds out her first answer was right once she has the right
     // answer, so the claim is offered after a later try is marked right.
     el.querySelector('.override').onclick = () => {
-      c.first = true; c.el.dataset.claim = '';
-      c.el.querySelector('.read').innerHTML = `${c.q.ans} <span class="fixed">· right first time</span>`;
+      k.first = true; k.el.dataset.claim = '';
+      k.el.querySelector('.read').innerHTML = `${k.q.ans} <span class="fixed">· right first time</span>`;
       updateScore();
     };
-    sheet.appendChild(el); ro.observe(c.work);
-    return c;
+    sheet.appendChild(el); ro.observe(k.work);
+    return k;
   });
   updateScore();
 }
@@ -561,15 +797,17 @@ function buildSheet() {
 // writing stays lined up with the numbers when the screen rotates.
 function sizeCanvas(c) {
   const r = c.work.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
   const ar = c.anchorEl.getBoundingClientRect();
   c.w = r.width; c.h = r.height;
   c.F = parseFloat(getComputedStyle(c.el.querySelector('.qv')).fontSize) || 20;
   c.ax = ar.right - r.left;
-  c.ay = (c.q.op === '/' ? ar.top : ar.bottom) - r.top;
+  c.ay = (c.q.kind === 'div' ? ar.top : ar.bottom) - r.top;
   c.cv.width = Math.round(r.width * dpr); c.cv.height = Math.round(r.height * dpr);
   draw(c);
 }
 function draw(c) {
+  if (!c.w) return;
   const g = c.cv.getContext('2d'), dpr = window.devicePixelRatio || 1, F = c.F;
   const X = x => c.ax + x * F, Y = y => c.ay + y * F;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -610,17 +848,21 @@ function wirePad(c) {
   c.work.addEventListener('pointercancel', end);
 }
 
-// Which strokes are the answer? Below the line for + − × (above the bar for ÷).
-// Ruled lines are ignored, and if there are several rows (long multiplication
-// working) only the row nearest the bottom is the answer.
+// Which strokes are the answer? Below the line for + − × and ten frames, above
+// the bar for ÷, on the line (or in the box) for missing numbers. Ruled lines are ignored, and
+// if there are several rows (long multiplication working) only the row
+// nearest the bottom counts.
+function inZone(kind, cy) {
+  if (kind === 'div') return cy < 0;
+  if (kind === 'miss') return cy < 0.8; // on the line, or in the box in the sum above it
+  return cy > 0;
+}
 function answerStrokes(c) {
-  const below = c.q.op !== '/';
   const items = [];
   for (const s of c.strokes) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    const cy = (y0 + y1) / 2;
-    if (below ? cy <= 0 : cy >= 0) continue;
+    if (!inZone(c.q.kind, (y0 + y1) / 2)) continue;
     if (x1 - x0 > 1.4 && y1 - y0 < (x1 - x0) * 0.25) continue; // a ruled line
     items.push({ s, y0, y1 });
   }
@@ -641,7 +883,7 @@ function setState(c, s) { c.el.dataset.state = s; c.el.querySelector('.mark').te
 // ---------- marking ----------
 let lastResult = null;
 function mark() {
-  if (sheetDone) { buildSheet(); return; }
+  if (sheetDone) { buildSheet(cfg); return; }
   for (const c of cards) {
     if (c.el.dataset.state !== 'writing') continue;
     clearTimeout(c.timer);
@@ -681,36 +923,9 @@ function updateScore() {
   $('#score').innerHTML = html;
   $('#markBtn').textContent = sheetDone ? 'New sheet' : 'Mark';
 }
-
-// ---------- wiring ----------
-// The two pages (who's playing, choose sums) work like tabs: both header
-// buttons stay visible and the open one is filled in. Moving between them keeps
-// unsaved choices; Back (or tapping the open tab) returns to the sheet.
-const TABS = { who: '#whoBtn', settings: '#settingsBtn' };
-function openPanel(id) {
-  for (const p of document.querySelectorAll('.panel')) p.hidden = p.id !== id;
-  if (id === 'settings') syncOpts(); else renderWho();
-  for (const [p, b] of Object.entries(TABS)) $(b).setAttribute('aria-pressed', p === id);
-  for (const b of ['#markBtn', '#score']) $(b).hidden = true;
-}
-function closePanels() {
-  for (const p of document.querySelectorAll('.panel')) p.hidden = true;
-  for (const b of Object.values(TABS)) $(b).setAttribute('aria-pressed', false);
-  for (const b of ['#markBtn', '#score']) $(b).hidden = false;
-  settings = loadSettings() || settings;
-  settings.pa = [...settings.pa]; settings.pb = [...settings.pb];
-  renderWho();
-}
-$('#settingsBtn').onclick = () => $('#settings').hidden ? openPanel('settings') : closePanels();
-$('#whoBtn').onclick = () => $('#who').hidden ? openPanel('who') : closePanels();
-$('#toSetupBtn').onclick = () => openPanel('settings');
-for (const b of document.querySelectorAll('.panel .back')) b.onclick = closePanels;
-$('#newBtn').onclick = () => { store.set('sums-settings', settings); closePanels(); buildSheet(); };
 $('#markBtn').onclick = mark;
 
-renderWho();
-buildSheet();
-if (firstVisit) openPanel('settings');
+goNames();
 </script>
 </body>
 </html>
