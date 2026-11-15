@@ -202,6 +202,12 @@
   .miss .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
   .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
   .miss .wl { display: inline-block; width: calc((var(--d) + .8) * .7em); border-bottom: .07em solid var(--ink); height: 1em; }
+  /* story sums: words that wrap, then "___ fish" */
+  .qv.story { top: .4em; left: 50%; transform: translateX(-50%); width: 9.6em; display: flex; flex-direction: column; align-items: center; }
+  .story .st { white-space: normal; text-align: center; line-height: 1.2; }
+  .story .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 1.4em; }
+  .story .wl { display: inline-block; width: calc((var(--d) + .8) * .7em); border-bottom: .07em solid var(--ink); height: 1em; }
+  .story .u { font-size: .8em; }
   /* clocks and money: picture, then blanks to write on */
   .qv.pic2 { top: .4em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .pic2 svg { display: block; }
@@ -645,6 +651,116 @@ function moneyQ(q, total) {
   if (q.unit === '$c') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, parts: [d, c], ans: `$${d} and ${c}c` }; }
   return { ...q, kind: 'money', ans: q.unit === '$' ? total / 100 : total };
 }
+// ---- year-set sums: horizontal "7 + 5 = ___" in Years 1–2, stacked or long
+// division from Year 3 (column methods start in Year 3)
+function asQ(op, a, b, yr) {
+  const ans = { '+': a + b, '-': a - b, '*': a * b, '/': a / b }[op];
+  if (yr <= 2) return { kind: 'expr', text: `${a} ${SIGN[op]} ${b}`, say: `${a} ${WORD[op]} ${b}`, ans };
+  return { kind: op === '/' ? 'div' : 'col', a, b, op, ans };
+}
+function addSubQ(op, yr) {
+  for (let t = 0; t < 50; t++) {
+    let a, b;
+    if (yr === 1) { // within 20
+      if (op === '+') { a = rnd(0, 10); b = rnd(0, 10); if (Math.random() < 0.2) [a, b] = [10, rnd(1, 9)]; }
+      else { a = rnd(1, 20); b = rnd(0, Math.min(a, 10)); }
+    } else if (yr === 2) { // facts to 20, then within 100 (32 + 2, 32 + 20)
+      const k = pickOne(['fact', 'ones', 'tens']);
+      if (op === '+') {
+        if (k === 'fact') { a = rnd(2, 10); b = rnd(2, 10); } else if (k === 'ones') { a = rnd(10, 89); b = rnd(1, 9); } else { a = rnd(10, 80); b = rnd(1, 9) * 10; }
+        if (a + b > 100) continue;
+      } else {
+        if (k === 'fact') { a = rnd(11, 20); b = rnd(2, 9); } else if (k === 'ones') { a = rnd(11, 99); b = rnd(1, 9); } else { a = rnd(20, 99); b = rnd(1, Math.floor(a / 10)) * 10; }
+      }
+    } else { // Year 3 within 1,000, Year 4 four digits
+      const big = yr === 3 ? [100, 999] : [1000, 9999];
+      a = rnd(...big); b = pickOne(yr === 3 ? [rnd(1, 9), rnd(10, 99), rnd(100, 999)] : [rnd(10, 99), rnd(100, 999), rnd(1000, 9999)]);
+      if (op === '+' && a + b > big[1]) continue;
+      if (op === '-' && b > a) [a, b] = [b, a];
+    }
+    return asQ(op, a, b, yr);
+  }
+  return asQ(op, 5, 3, yr);
+}
+function mulDivQ(op, yr) {
+  const tables = { 1: [2, 5, 10], 2: [2, 5, 10], 3: [2, 3, 4, 5, 8, 10], 4: range(2, 10) }[yr];
+  const t = pickOne(tables);
+  let k = yr === 1 ? rnd(1, Math.floor(20 / t)) : rnd(op === '*' && yr === 2 ? 0 : 1, 10);
+  if (op === '*') {
+    // from Year 3, sometimes a bigger number times a one-digit number (2 × 23, 4 × 125)
+    if (yr >= 3 && Math.random() < 0.35) return asQ('*', yr === 3 ? rnd(11, 99) : rnd(11, 999), rnd(2, 9), yr);
+    return yr <= 2 && Math.random() < 0.5 ? asQ('*', t, k, yr) : asQ('*', k, t, yr);
+  }
+  // from Year 3, sometimes a bigger number divided by a one-digit number (65 ÷ 5)
+  if (yr >= 3 && Math.random() < 0.35) { const d = rnd(2, 9); k = rnd(11, Math.floor((yr === 3 ? 99 : 999) / d)); return asQ('/', d * k, d, yr); }
+  return asQ('/', t * k, t, yr);
+}
+// ---- number patterns: five terms, one hidden
+function seqQ(yr) {
+  for (let t = 0; t < 60; t++) {
+    let step, start, max;
+    if (yr === 1) { max = 100; step = pickOne([1, 1, 1, 2, 10]); start = step === 1 ? rnd(0, 30) : step === 2 ? rnd(0, 15) * 2 : rnd(0, 5) * 10; }
+    else if (yr === 2) { max = 120; step = pickOne([1, 2, 3, 5, 10]); start = step === 3 ? rnd(0, 30) * 3 : step === 1 ? rnd(85, 115) : rnd(0, 100); } // 1s: across 100 to 120, new in Year 2
+    else {
+      max = 1000;
+      const k = pickOne(['times', 'times', 'big', 'grow']);
+      if (k === 'times') { step = pickOne([2, 3, 4, 5, 8]); start = rnd(0, 8) * step; }
+      else if (k === 'big') { step = pickOne([10, 100]); start = rnd(0, step === 10 ? 950 : 500); }
+      else { step = rnd(3, 12); start = rnd(1, 40); } // a growing pattern: add the same each time
+    }
+    let terms = range(0, 4).map(i => start + i * step);
+    if (terms[4] > max) continue;
+    if (Math.random() < (yr === 1 ? 0.25 : 0.35)) terms = terms.reverse(); // counting back
+    const hide = yr === 1 && Math.random() < 0.7 ? 4 : rnd(0, 4);
+    return { kind: 'seq', terms, hide, ans: terms[hide], say: terms.map((v, i) => i === hide ? 'what' : v).join(', ') + '?' };
+  }
+  return { kind: 'seq', terms: [1, 2, 3, 4, 5], hide: 4, ans: 5, say: '1, 2, 3, 4, what?' };
+}
+// ---- doubles and halves: Year 1 has dots (n | n more, or 2n split down the middle)
+function halvesSvg(n, emptyRight) {
+  const rows = Math.ceil(n / 2), H = rows * 10, E = 0.09;
+  let s = `<svg viewBox="-1 -1 54 ${H + 2}" style="width:${(54 * E).toFixed(2)}em;height:${((H + 2) * E).toFixed(2)}em">`;
+  for (let i = 0; i < n; i++) {
+    const x = 5 + (i % 2) * 10, y = 5 + Math.floor(i / 2) * 10;
+    s += `<circle cx="${x}" cy="${y}" r="3.6" fill="currentColor"/>`;
+    s += emptyRight ? `<circle cx="${x + 32}" cy="${y}" r="3.3" fill="none" stroke="currentColor" stroke-width=".7" stroke-dasharray="1.4 1.1"/>` : `<circle cx="${x + 32}" cy="${y}" r="3.6" fill="currentColor"/>`;
+  }
+  return s + `<line x1="26" y1="-1" x2="26" y2="${H + 1}" stroke="currentColor" stroke-width="1" stroke-dasharray="2.5 2"/></svg>`;
+}
+function dblQ(yr, kinds) {
+  const dbl = pickOne(kinds) === 'double';
+  const n = yr === 1 ? rnd(1, 5) : yr === 2 ? rnd(2, 10) : Math.random() < 0.5 ? rnd(2, 9) * 10 : rnd(11, 49);
+  const cap = dbl ? `double ${n}` : `half of ${2 * n}`, ans = dbl ? 2 * n : n;
+  return yr === 1 ? { kind: 'dpic', n, dbl, cap, say: cap, ans } : { kind: 'expr', text: cap, say: cap, ans };
+}
+// ---- story sums: short word problems about animals, read aloud at age 5
+const CRITTERS = [['Ty the cat', 'cats', 'fish', 'eats'], ['A dog', 'dogs', 'bones', 'buries'], ['A bird', 'birds', 'seeds', 'eats'], ['A frog', 'frogs', 'flies', 'eats'],
+  ['A squirrel', 'squirrels', 'nuts', 'hides'], ['A rabbit', 'rabbits', 'carrots', 'eats'], ['A monkey', 'monkeys', 'bananas', 'eats'], ['A hen', 'hens', 'eggs', 'gives away']];
+const STORY_KIND = { add: 'addsub', sub: 'addsub', compare: 'addsub', need: 'addsub', two: 'addsub', groups: 'muldiv', share: 'muldiv' };
+function storyQ(yr, kinds) {
+  const pool = (yr === 1 ? ['add', 'sub', 'groups', 'share'] : ['add', 'sub', 'compare', 'need', 'two', 'groups', 'share']).filter(x => kinds.includes(STORY_KIND[x]));
+  for (let t = 0; t < 60; t++) {
+    const [S, many, th, verb] = pickOne(CRITTERS), type = pickOne(pool);
+    const lo = [0, 3, 10, 100][yr], hi = [0, 20, 100, 1000][yr];
+    let text, ans, a, b, c;
+    if (type === 'add') { a = rnd(lo, hi - 2); b = rnd(1, Math.min(hi - a, yr === 1 ? 10 : hi)); text = `${S} has ${a} ${th}. It finds ${b} more. How many ${th} now?`; ans = a + b; }
+    else if (type === 'sub') { a = rnd(Math.max(lo, 4), hi); b = rnd(1, a - 2); text = `${S} has ${a} ${th}. It ${verb} ${b}. How many ${th} are left?`; ans = a - b; }
+    else if (type === 'compare') { a = rnd(Math.max(lo, 4), hi); b = rnd(1, a - 2); text = `${S} has ${a} ${th}. Its friend has ${b} ${th}. How many more does it have?`; ans = a - b; }
+    else if (type === 'need') { c = rnd(lo + 3, hi); a = rnd(1, c - 2); text = `${S} has ${a} ${th}. It wants ${c}. How many more does it need?`; ans = c - a; }
+    else if (type === 'two') { // two steps: within 20 in Year 2, within 100 in Year 3
+      const top = yr === 2 ? 20 : 100;
+      a = rnd(3, top - 5); b = rnd(1, top - a); c = rnd(1, a + b - 2);
+      text = `${S} has ${a} ${th}. It finds ${b} more, then ${verb} ${c}. How many ${th} now?`; ans = a + b - c;
+    } else {
+      const g = pickOne(yr === 3 ? [2, 3, 4, 5, 8, 10] : [2, 5, 10]), k = rnd(2, yr === 1 ? Math.floor(20 / g) : 10);
+      if (type === 'groups') { text = `There are ${k} bags with ${g} ${th} in each. How many ${th}?`; ans = k * g; }
+      else { text = `${g * k} ${th} are shared equally by ${k} ${many}. How many ${th} does each get?`; ans = g; }
+    }
+    if (ans < 2 || !Number.isInteger(ans)) continue;
+    return { kind: 'story', type, text, unit: th, say: text, ans };
+  }
+  return { kind: 'story', type: 'add', text: 'A dog has 3 bones. It finds 2 more. How many bones now?', unit: 'bones', say: 'A dog has 3 bones. It finds 2 more. How many bones now?', ans: 5 };
+}
 const textSvg = lines => `<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -657,6 +773,32 @@ const ACTS = {
     make: c => { const q = makeQ(pickOne(usableOps(c)), cfgA(c), cfgB(c)); q.kind = q.op === '/' ? 'div' : 'col'; return q; },
     key: c => kpKey(c),               // no prefix: keeps the records made before activities existed
     label: k => 'Sums · ' + kpLabel(k),
+  },
+  // Sums set by year (Sam's request): no keypad, the year chooses the numbers.
+  // The original Sums above stays as it was, for making your own.
+  addsub: {
+    name: 'Add and take away', ages: [5, 8], setup: 'opts', say: 'Work out the answers.',
+    pic: textSvg(['7 + 5', '12 − 4']),
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100'], [3, '3 · within 1,000'], [4, '4 · four digits']] },
+      { key: 'ops', label: 'Signs', multi: true, values: [['+', '+'], ['-', '−']] },
+    ],
+    defaults: age => age === 5 ? { yr: 1, ops: ['+'], n: 6 } : { yr: 3, ops: ['+', '-'], n: 12 },
+    make: c => addSubQ(pickOne(c.ops), c.yr),
+    key: c => `addsub~${c.yr}|${OP_ORDER.filter(o => c.ops.includes(o)).join('')}|${c.n}`,
+    label: k => { const [y, o, n] = k.split('|'); return `Add and take away · Year ${y} · ${[...o].map(x => SIGN[x]).join(' ')} · ${n} questions`; },
+  },
+  muldiv: {
+    name: 'Times and divide', ages: [5, 8], setup: 'opts', say: 'Work out the answers.',
+    pic: textSvg(['3 × 4', '12 ÷ 3']),
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · groups to 20'], [2, '2 · 2s, 5s, 10s'], [3, '3 · 3s, 4s, 8s too'], [4, '4 · all tables, bigger']] },
+      { key: 'ops', label: 'Signs', multi: true, values: [['*', '×'], ['/', '÷']] },
+    ],
+    defaults: age => age === 5 ? { yr: 1, ops: ['*'], n: 6 } : { yr: 3, ops: ['*', '/'], n: 12 },
+    make: c => mulDivQ(pickOne(c.ops), c.yr),
+    key: c => `muldiv~${c.yr}|${OP_ORDER.filter(o => c.ops.includes(o)).join('')}|${c.n}`,
+    label: k => { const [y, o, n] = k.split('|'); return `Times and divide · Year ${y} · ${[...o].map(x => SIGN[x]).join(' ')} · ${n} questions`; },
   },
   missing: {
     name: 'Missing number', ages: [8], setup: 'keypad', say: 'What number is missing?',
@@ -865,6 +1007,39 @@ const ACTS = {
     },
     key: c => `money~${c.yr}|${['count', 'change'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Money · Year ${y} · ${kinds.replace('count', 'how much').split(',').join(', ')} · ${n} questions`; },
+  },
+  seq: {
+    name: 'Number patterns', ages: [5, 8], setup: 'opts', say: 'What number is missing?',
+    pic: textSvg(['2, 4, 6, ?']),
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · 1s, 2s, 10s'], [2, '2 · 3s, 5s, to 120'], [3, '3 · 4s, 8s, 100s, growing']] }],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
+    make: c => seqQ(c.yr),
+    key: c => `seq~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Number patterns · Year ${y} · ${n} questions`; },
+  },
+  dbl: {
+    name: 'Doubles and halves', ages: [5, 8], setup: 'opts', say: 'Double it, or halve it.',
+    pic: halvesSvg(4, true),
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · to 10, with dots'], [2, '2 · to 20'], [3, '3 · bigger numbers']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['double', 'Double'], ['half', 'Half']] },
+    ],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: ['double', 'half'], n: age === 5 ? 6 : 12 }),
+    make: c => dblQ(c.yr, c.kinds),
+    key: c => `dbl~${c.yr}|${['double', 'half'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Doubles and halves · Year ${y} · ${kinds.replace('double', 'doubles').replace('half', 'halves').split(',').join(', ')} · ${n} questions`; },
+  },
+  story: {
+    name: 'Story sums', ages: [5, 8], setup: 'opts', say: 'Listen to the story, then write the answer.',
+    pic: `<svg viewBox="0 0 120 84" fill="currentColor">${[[20, 30], [52, 30], [84, 30], [36, 60], [68, 60]].map(([x, y]) => `<path d="M${x} ${y}q9 -9 18 0q-9 9 -18 0z M${x + 18} ${y}l8 -6v12z"/><circle cx="${x + 5}" cy="${y - 1.5}" r="1.4" fill="white"/>`).join('')}</svg>`,
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100, two steps'], [3, '3 · within 1,000']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['addsub', '+ and −'], ['muldiv', '× and ÷']] },
+    ],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: ['addsub', 'muldiv'], n: 6 }),
+    make: c => storyQ(c.yr, c.kinds),
+    key: c => `story~${c.yr}|${['addsub', 'muldiv'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Story sums · Year ${y} · ${kinds.replace('addsub', '+ −').replace('muldiv', '× ÷').split(',').join(', ')} · ${n} questions`; },
   },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
@@ -1241,6 +1416,29 @@ function qMarkup(q) {
       : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
     return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw) + 1.2 } };
   }
+  // number pattern: the hidden term is a box, then "☐ = ___" like a missing number
+  if (q.kind === 'seq') {
+    const box = '<span class="bx"></span>', chars = q.terms.join(', ').length;
+    return {
+      cls: 'miss',
+      html: `<div class="eq">${q.terms.map((v, i) => i === q.hide ? box : v).join(', ')}</div><div class="al">${box}<span>=</span><span class="wl"></span></div>`,
+      vars: { '--d': Math.max(...q.terms.map(len)), '--h': 5.4, '--c': chars * 0.56 + 1.6 },
+    };
+  }
+  // story sum: the words wrap, then "___ fish"
+  if (q.kind === 'story') {
+    const lines = Math.ceil(q.text.length / 17);
+    return {
+      cls: 'story', anchor: '.wl',
+      html: `<div class="st">${q.text}</div><div class="al"><span class="wl"></span><span class="u">${q.unit}</span></div>`,
+      vars: { '--d': Math.max(2, len(q.ans)), '--h': lines * 1.2 + 3.3, '--c': 10.4 },
+    };
+  }
+  // doubles and halves in Year 1: the words, then dots, answer anywhere below
+  if (q.kind === 'dpic') {
+    const svg = halvesSvg(q.n, q.dbl), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, 5) + 1.2 } };
+  }
   // a line of words or numbers, then "= ___" to write on
   if (q.kind === 'expr') return {
     cls: 'miss',
@@ -1263,6 +1461,7 @@ function qMarkup(q) {
 // what the card's speaker says
 const WORD = { '+': 'plus', '-': 'take away', '*': 'times', '/': 'divided by' };
 function cardSay(q) {
+  if (q.say) return q.say; // questions that carry their own words (patterns, stories, doubles, year sums)
   if (q.kind === 'col' || q.kind === 'div') return `${q.a} ${WORD[q.op]} ${q.b}`;
   if (q.kind === 'miss') return `${q.hide === 'a' ? 'what' : q.a} ${WORD[q.op]} ${q.hide === 'b' ? 'what' : q.b} makes ${q.c}?`;
   if (q.kind === 'bond') return q.hide === 'w' ? `${q.p} and ${q.q2} make what?` : `${q.w} is ${q.hide === 'p' ? q.q2 : q.p} and what?`;
@@ -1397,7 +1596,7 @@ function inZone(kind, cx, cy) {
   if (kind === 'div') return cy < 0;
   // on the line, in the box in the sum, or a bit low under the line: all of it
   // is hers (the bottom row wins if there is more than one)
-  if (kind === 'miss' || kind === 'expr' || kind === 'clock' || kind === 'money') return true;
+  if (['miss', 'expr', 'clock', 'money', 'seq', 'story'].includes(kind)) return true;
   return cy > 0;
 }
 // Any card with writing on it gets marked (Sam): if nothing is in the answer

@@ -16,8 +16,8 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 
 ### Number
 - Read and write numbers to 20 *(6m)*, then to 100. ✓ (Teen numbers, Place value)
-- Count forwards and backwards from any number, within 10 then 20 *(6m)*, then within 100.
-- Count forwards and backwards in 2s and 10s, 0–100. Knows: counting in 2s from 0 gives even numbers, from an odd number gives odd. ✓ partly (Number lines)
+- Count forwards and backwards from any number, within 10 then 20 *(6m)*, then within 100. ✓ (Number patterns, Year 1)
+- Count forwards and backwards in 2s and 10s, 0–100. Knows: counting in 2s from 0 gives even numbers, from an odd number gives odd. ✓ (Number patterns, Number lines)
 - Say the number before or after, to 10 *(6m)* then 20.
 - Compare and order numbers to 20 *(6m)*, then to 100; ordinals 1st to 5th *(6m)*, then with suffixes (1st, 2nd, 3rd...) to 100.
 - Put numbers on a fully labelled number line *(6m)*, then on a partly labelled one (17 on a line marked in 5s). ✓ partly (Number lines)
@@ -29,12 +29,12 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 
 ### Operations
 - Addition and subtraction facts to 5 *(6m)*, then to 10 (including 10 + 0). ✓ (Sums, Number bonds, Make 10)
-- Doubles and halves to 10.
-- Add and subtract one- and two-digit numbers within 20, including 0. ✓ (Sums)
+- Doubles and halves to 10. ✓ (Doubles and halves, Year 1)
+- Add and subtract one- and two-digit numbers within 20, including 0. ✓ (Sums, Add and take away Year 1)
 - Join and separate groups to 20 (9 + 6, 7 + __ = 11). ✓ (Missing number, Number bonds)
-- Add ten to a one-digit number (10 + 4).
-- One-step + and − word problems with objects and pictures.
-- Multiply and divide by equal groups or sharing, answers within 20. ✓ partly (Arrays)
+- Add ten to a one-digit number (10 + 4). ✓ (Add and take away, Year 1)
+- One-step + and − word problems with objects and pictures. ✓ (Story sums, Year 1, read aloud; no pictures)
+- Multiply and divide by equal groups or sharing, answers within 20. ✓ (Times and divide Year 1, Story sums, Arrays)
 - Knows: adding 0 changes nothing; order doesn't matter when adding but does when subtracting.
 
 ### Fractions and money
@@ -79,7 +79,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Roughly place numbers on a number line marked in tens (61 on a line marked 0, 10, 20...). ✓ partly (Number lines)
 - Count a collection to 120 by making groups of ten.
 - Round numbers to 120 to the nearest 10.
-- Count in 2s, 5s and 10s forwards and backwards from any number to 120; count in 3s from multiples of 3. ✓ partly (Number lines)
+- Count in 2s, 5s and 10s forwards and backwards from any number to 120; count in 3s from multiples of 3. ✓ (Number patterns, Year 2)
 - Odd and even numbers to 120 (last digit 0, 2, 4, 6, 8 = even).
 - Numbers in te reo Māori to 100.
 
@@ -87,10 +87,10 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Addition and subtraction facts to 20 (17 + 3). ✓ (Sums, Number bonds)
 - Derive facts from known ones (7 + 2 = 9 so 70 + 20 = 90).
 - Add and subtract within 100 (32 + 20, 32 + 2). ✓ (Sums)
-- Doubles and halves to 20.
+- Doubles and halves to 20. ✓ (Doubles and halves, Year 2)
 - Add three one-digit numbers (7 + 3 + 6).
 - Add 100 to a one-digit number.
-- One-step + and − word problems to 100; two-step to 20.
+- One-step + and − word problems to 100; two-step to 20. ✓ (Story sums, Year 2)
 - Link skip counting to the 2, 5 and 10 times tables; learn those tables and their division facts. ✓ (Times bonds, Times grid)
 - Multiply and divide with answers up to 100. ✓ (Sums, Arrays)
 - Knows: × 1 and ÷ 1 change nothing; × 0 is 0; order doesn't matter for × but does for ÷; + and − undo each other, and so do × and ÷.
@@ -140,14 +140,14 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Place value of each digit in three-digit numbers. ✓ (Place value)
 - Count collections beyond 120 by grouping in 10s and 100s.
 - Round to the nearest 10 or 100; estimate an answer before working it out.
-- Count forwards and backwards in 2s, 3s, 4s, 5s and 8s from multiples (8, 16, 24, 32). ✓ partly (Number lines: 1s, 2s, 5s, 10s, 100s only)
+- Count forwards and backwards in 2s, 3s, 4s, 5s and 8s from multiples (8, 16, 24, 32). ✓ (Number patterns, Year 3)
 - Count in 10s and 100s from any number to 1,000. ✓ (Place value: 10 more / 10 less, Number lines)
 
 ### Operations
 - Complements to 100 (34 + __ = 100).
 - Add and subtract within 1,000 (329 + 3, 329 + 80, 329 − 200, 137 + 54), including column methods with regrouping. ✓ (Sums)
 - Derive facts with place value (7 + 2 = 9 so 700 + 200 = 900).
-- One-step + and − word problems to 1,000; two-step to 100.
+- One-step + and − word problems to 1,000; two-step to 100. ✓ (Story sums, Year 3)
 - Times tables and division facts for 2, 3, 4, 5, 8 and 10. ✓ (Times bonds, Times grid)
 - Multiply and divide by sharing, grouping, repeated adding or known facts. ✓ (Arrays)
 - Multiply a one- or two-digit number by a one-digit number (4 × 6, 2 × 23). ✓ (Sums)
@@ -170,7 +170,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Algebra
 - True or false comparisons to 1,000 (313 < 330?).
 - True or false and open number sentences with all four operations (217 − __ = 105, 12 ÷ 3 = 5 − 2?). ✓ partly (Missing number)
-- Recognise, continue and make growing number patterns (a rule that adds or takes away each time).
+- Recognise, continue and make growing number patterns (a rule that adds or takes away each time). ✓ partly (Number patterns, Year 3: continue, not make)
 
 ### Measurement
 - Estimate and measure in cm and m, g and kg, mL and L; compare and order by those units. ✋ (rulers and scales could be pictures)

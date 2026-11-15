@@ -44,7 +44,7 @@ const HELPERS = () => {
       const [a, b] = (Array.isArray(n) ? n : c.q.parts).map(String), s = 0.85;
       c.strokes = [...extra, ...numStrokes(a, -0.45, -1.05, s, mirror), ...numStrokes(b, 0.45 + b.length * 0.8 * s, -1.05, s, mirror)];
     } else {
-      const top = { div: -1.3, miss: -1.1, expr: -1.1, clock: -1.05, money: -1.05 }[c.q.kind] ?? 0.3;
+      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05 }[c.q.kind] ?? 0.3;
       c.strokes = [...extra, ...numStrokes(n, 0, top, 1, mirror)];
     }
     draw(c);
@@ -94,7 +94,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -106,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#ageTiles [data-age="5"]');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
-  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money,Number patterns,Doubles and halves,Story sums', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
   ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'age 5 home is read aloud');
   await page.click('#backBtn');
 
@@ -114,7 +114,7 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks the age');
   await page.click('#ageTiles [data-age="5"]');
-  ok((await tiles('#actTiles')).length === 7, 'Everyone at 5: the 5 activities');
+  ok((await tiles('#actTiles')).length === 12, 'Everyone at 5: the age-5 activities');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks again next time');
@@ -276,7 +276,8 @@ const fakeSpeech = () => {
   const fits = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).then(() => page.evaluate(() => cards.filter(c => {
     const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect();
     const room = c.q.kind === 'bond' ? true // she writes in the circle, checked separately
-      : c.q.kind === 'expr' || c.q.kind === 'miss' ? c.ay > 2.5 * c.F
+      : c.q.kind === 'expr' || c.q.kind === 'miss' || c.q.kind === 'seq' ? c.ay > 2.5 * c.F
+      : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
       : c.q.kind === 'clock' || c.q.kind === 'money' ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
       : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
@@ -516,6 +517,95 @@ const fakeSpeech = () => {
     === 'Clocks · Year 3 · clock, words · 12 questions / Money · Year 1 · how much · 6 questions', 'record labels for Clocks and Money');
   ok(await page.evaluate(() => [cardSay({ kind: 'money', change: true, price: 350, pay: 500 }), cardSay({ kind: 'clock', words: 'half past 4' })].join(' / '))
     === 'It costs 3 dollars and 50 cents. You pay 5 dollars. How much change? / half past 4. Write the time.', 'Clocks and Money cards read aloud');
+
+  // ---- year-set sheets: open an activity, pick a year, check it fits and marks right
+  const yearSheet = async (a, yr, name) => {
+    if (await visible('#sheet') && await page.evaluate(x => act === x, a)) await page.click('#setupBtn');
+    else { await page.click('#backBtn'); await page.click(`#actTiles [data-act="${a}"]`); }
+    await page.click(`#optBlock [data-key="yr"] [data-v="${yr}"]`);
+    await page.click('#newBtn');
+    ok((await fits()).length === 0, `${name} Year ${yr} fits ` + (await fits()).join(' '));
+    const bad = await writeAllAndMark();
+    ok(bad.length === 0, `${name} Year ${yr}: read and marked right ` + bad.join(' | '));
+  };
+
+  // ---- Add and take away, Times and divide (Sums by year; the original Sums stays as it was)
+  const ys = await page.evaluate(() => {
+    const bad = [];
+    const nums = q => q.kind === 'expr' ? (([a, , b]) => [+a, +b])(q.text.split(' ')) : [q.a, q.b];
+    const lim = { 1: [20, 20], 2: [100, 100], 3: [999, 999], 4: [9999, 9999] };
+    for (const yr of [1, 2, 3, 4]) for (const op of ['+', '-', '*', '/']) for (let i = 0; i < 300; i++) {
+      const q = (op === '+' || op === '-' ? addSubQ : mulDivQ)(op, yr), [a, b] = nums(q);
+      const want = { '+': a + b, '-': a - b, '*': a * b, '/': a / b }[op];
+      if (q.ans !== want || !Number.isInteger(q.ans) || q.ans < 0) bad.push(`${yr} wrong ${JSON.stringify(q)}`);
+      if ((yr <= 2) !== (q.kind === 'expr') || (yr >= 3 && q.kind !== (op === '/' ? 'div' : 'col'))) bad.push(`${yr} layout ${JSON.stringify(q)}`);
+      if ((op === '+' || op === '-') && (Math.max(a, b, q.ans) > lim[yr][0] || (yr === 3 && a < 100) || (yr === 4 && a < 1000))) bad.push(`${yr} size ${JSON.stringify(q)}`);
+      if (op === '*' && yr <= 2 && (![2, 5, 10].includes(a) && ![2, 5, 10].includes(b) || (yr === 1 && q.ans > 20))) bad.push(`${yr} times ${JSON.stringify(q)}`);
+      if (op === '/' && (b < 2 || b > 10 || (yr === 1 && a > 20) || (yr <= 2 && ![2, 5, 10].includes(b)))) bad.push(`${yr} divide ${JSON.stringify(q)}`);
+    }
+    return bad.slice(0, 4);
+  });
+  ok(ys.length === 0, 'Sums by year: answers right; Year 1 within 20, 2 within 100, 3 three digits, 4 four digits; 2s 5s 10s first; across in Years 1–2, stacked after ' + ys.join(' | '));
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="addsub"]');
+  ok(await page.evaluate(() => draft.yr === 3 && draft.ops.join() === '+,-' && $('#kpBlock').hidden), 'Add and take away setup: Year 3, + and −, no keypads');
+  for (const yr of [3, 1, 2, 4]) await yearSheet('addsub', yr, 'Add and take away');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/24-addsub-y4.png' });
+  for (const yr of [3, 1, 2, 4]) await yearSheet('muldiv', yr, 'Times and divide');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/25-muldiv-y4.png' });
+  ok(await page.evaluate(() => { const q = addSubQ('+', 1); return cardSay(q) === q.text.replace('+', 'plus'); }), 'Year 1 sums are read aloud ("3 plus 4")');
+
+  // ---- Number patterns
+  const sq = await page.evaluate(() => {
+    const bad = [], max = { 1: 100, 2: 120, 3: 1000 };
+    for (const yr of [1, 2, 3]) for (let i = 0; i < 400; i++) {
+      const q = seqQ(yr), t = q.terms, d = t[1] - t[0];
+      if (t.length !== 5 || t.some((v, j) => j && v - t[j - 1] !== d) || d === 0 || Math.min(...t) < 0 || Math.max(...t) > max[yr] || q.ans !== t[q.hide]) bad.push(`${yr} ${JSON.stringify(q)}`);
+      if (yr === 1 && ![1, 2, 10].includes(Math.abs(d))) bad.push('y1 step ' + JSON.stringify(q));
+    }
+    return bad.slice(0, 4);
+  });
+  ok(sq.length === 0, 'Number patterns: five terms, same step, never below 0 or past the year\'s top, Year 1 in 1s, 2s, 10s ' + sq.join(' | '));
+  for (const yr of [3, 1, 2]) await yearSheet('seq', yr, 'Number patterns');
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.eq .bx').length === 1)), 'Number patterns: one box in the pattern');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/26-seq.png' });
+
+  // ---- Doubles and halves
+  const dq = await page.evaluate(() => {
+    const bad = [];
+    for (const yr of [1, 2, 3]) for (let i = 0; i < 300; i++) {
+      const q = dblQ(yr, ['double', 'half']), n = +q.cap?.match(/\d+/)?.[0] || +q.text.match(/\d+/)[0], dbl = /double/.test(q.cap || q.text);
+      if (q.ans !== (dbl ? 2 * n : n / 2) || (yr === 1 && (q.kind !== 'dpic' || q.ans > 10)) || (yr === 2 && Math.max(n, q.ans) > 20)) bad.push(`${yr} ${JSON.stringify(q)}`);
+    }
+    return bad.slice(0, 4);
+  });
+  ok(dq.length === 0, 'Doubles and halves: right answers, Year 1 to 10 with dots, Year 2 to 20 ' + dq.join(' | '));
+  for (const yr of [3, 1]) await yearSheet('dbl', yr, 'Doubles and halves');
+  ok(await page.evaluate(() => cards.every(c => {
+    const full = c.el.querySelectorAll('svg circle[fill="currentColor"]').length, empty = c.el.querySelectorAll('svg circle[fill="none"]').length;
+    return c.q.dbl ? full === c.q.n && empty === c.q.n : full === 2 * c.q.n && empty === 0;
+  })), 'Year 1 dots: a double shows n and n empty spaces, a half shows 2n split down the middle');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/27-dbl-y1.png' });
+
+  // ---- Story sums
+  const sto = await page.evaluate(() => {
+    const bad = [], top = { 1: 20, 2: 100, 3: 1000 };
+    const calc = { add: n => n[0] + n[1], sub: n => n[0] - n[1], compare: n => n[0] - n[1], need: n => n[1] - n[0], two: n => n[0] + n[1] - n[2], groups: n => n[0] * n[1], share: n => n[0] / n[1] };
+    for (const yr of [1, 2, 3]) for (const kinds of [['addsub', 'muldiv'], ['muldiv'], ['addsub']]) for (let i = 0; i < 150; i++) {
+      const q = storyQ(yr, kinds), n = q.text.match(/\d+/g).map(Number);
+      if (q.ans !== calc[q.type](n) || q.ans < 2 || Math.max(...n, q.ans) > top[yr]) bad.push(`${yr} ${JSON.stringify(q)}`);
+      if (!kinds.includes(STORY_KIND[q.type]) || (yr === 1 && ['compare', 'need', 'two'].includes(q.type))) bad.push(`${yr} type ${q.type} ${kinds}`);
+      if (q.type === 'two' && Math.max(...n) > (yr === 2 ? 20 : 100)) bad.push('two steps too big ' + JSON.stringify(q));
+    }
+    return bad.slice(0, 4);
+  });
+  ok(sto.length === 0, 'Story sums: the answer matches the story; Year 1 within 20 (no two-step), Year 2 within 100 (two-step within 20), Year 3 within 1,000 ' + sto.join(' | '));
+  for (const yr of [3, 1, 2]) await yearSheet('story', yr, 'Story sums');
+  ok(await page.evaluate(() => cards.every(c => cardSay(c.q) === c.q.text && c.el.querySelector('.u').textContent === c.q.unit)), 'Story sums: each card reads its story aloud, the answer line has its unit');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y2.png' });
+
+  ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
+    === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
 
   // ---- Mia: Times grid
   await page.click('#backBtn');
