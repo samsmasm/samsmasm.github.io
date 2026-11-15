@@ -169,7 +169,7 @@
   }
 
   function readNumber(strokes, unit) {
-    if (!strokes.length) return { text: '', digits: [] };
+    if (!strokes.length) return { text: '', digits: [], backwards: [] };
     if (!unit) { const b = bbox(strokes); unit = Math.max(b.h, 1e-6); }
     const digits = split(strokes, unit).map(g => {
       const p = classify(render(g.strokes));

@@ -34,7 +34,10 @@ const HELPERS = () => {
   };
   // the answer where she should write it: under the line, on the division bar, on the missing-number line
   window.writeNum = (c, n, extra = [], mirror = false) => {
-    if (c.q.kind === 'bond') { // in the empty circle, centred on the anchor
+    if (c.q.kind === 'frac') { // "3/4": top number above the bar, bottom number below
+      const [t, b] = String(n).split('/');
+      c.strokes = [...extra, ...numStrokes(t, -0.3, -1.6, 0.9, mirror), ...numStrokes(b, -0.3, 0.35, 0.9, mirror)];
+    } else if (c.q.kind === 'bond') { // in the empty circle, centred on the anchor
       const w = String(n).length * 0.8 * 0.9;
       c.strokes = [...extra, ...numStrokes(n, w / 2, -0.45, 0.9, mirror)];
     } else {
@@ -88,7 +91,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -266,11 +269,12 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/6-missing.png' });
 
   // every card's printed question fits and leaves room to write the answer
-  const fits = () => page.evaluate(() => cards.filter(c => {
+  const fits = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).then(() => page.evaluate(() => cards.filter(c => {
     const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect();
-    const room = c.q.kind === 'expr' || c.q.kind === 'miss' ? c.ay > 2.5 * c.F : c.h - c.ay >= 1.3 * c.F;
+    const room = c.q.kind === 'bond' ? true // she writes in the circle, checked separately
+      : c.q.kind === 'expr' || c.q.kind === 'miss' ? c.ay > 2.5 * c.F : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
-  }).map(c => JSON.stringify(c.q)));
+  }).map(c => JSON.stringify(c.q))));
   const writeAllAndMark = async () => {
     await page.evaluate(() => cards.forEach(c => writeNum(c, c.q.ans)));
     await page.click('#markBtn');
@@ -333,6 +337,81 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0, 'Number lines fit with room to write ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Number lines: answers read and marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/14-nline.png' });
+  // ---- Mia: Area
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="area"]');
+  ok(await page.evaluate(() => draft.kinds.join() === 'area,perim,side' && draft.max === 12), 'Area setup: area, perimeter, missing side, sides up to 12');
+  await page.click('#optBlock [data-key="kinds"] [data-v="squares"]');
+  const ar = await page.evaluate(() => {
+    const bad = [];
+    for (let i = 0; i < 400; i++) {
+      const q = ACTS.area.make({ kinds: ['squares', 'area', 'perim', 'side'], max: 12 });
+      const want = { squares: q.w * q.h, area: q.w * q.h, perim: 2 * (q.w + q.h), side: q.hide === 'w' ? q.w : q.h }[q.mode];
+      if (q.ans !== want || q.w < 2 || q.h < 2 || q.w > 12 || q.h > 12 || (q.mode === 'squares' && (q.w > 10 || q.h > 10))) bad.push(JSON.stringify(q));
+      if (q.mode === 'side' && q.cap !== `Area ${q.w * q.h}`) bad.push('cap ' + JSON.stringify(q));
+    }
+    return bad.slice(0, 3);
+  });
+  ok(ar.length === 0, 'Area questions: area, perimeter, missing side, squares all right ' + ar.join(' '));
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => {
+    const t = [...c.el.querySelectorAll('svg text')].map(x => x.textContent), lines = c.el.querySelectorAll('svg line').length;
+    if (c.q.mode === 'squares') return t.length === 0 && lines === c.q.w - 1 + c.q.h - 1;
+    return t.length === 2 && t.includes(c.q.hide === 'w' ? '?' : String(c.q.w)) && t.includes(c.q.hide === 'h' ? '?' : String(c.q.h)) && c.el.querySelector('.cap').textContent === c.q.cap;
+  })), 'Area cards: grid for counting, side lengths (or ?) and what to find');
+  ok((await fits()).length === 0, 'Area fits with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Area: answers read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/15-area.png' });
+
+  // ---- Mia: Times bonds
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="tbond"]');
+  ok(await page.evaluate(() => draft.tables.join() === '2,3,4,5,6,7,8,9,10,11,12' && draft.upto === 12), 'Times bonds setup: 2–12 tables, up to × 12');
+  await page.click('#optBlock [data-key="upto"] [data-v="10"]');
+  for (const t of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]) await page.click(`#optBlock [data-key="tables"] [data-v="${t}"]`); // just the 7s
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'bond' && c.q.w === c.q.p * c.q.q2 && (c.q.p === 7 || c.q.q2 === 7) && Math.max(c.q.p, c.q.q2) <= 10 && Math.min(c.q.p, c.q.q2) >= 2 && c.el.querySelectorAll('.hole').length === 1)), 'Times bonds: just the 7s up to × 10, product on top');
+  ok((await fits()).length === 0, 'Times bonds fit ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Times bonds: answers in the empty circle read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/16-tbond.png' });
+
+  // ---- Mia: Fractions
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="frac"]');
+  ok(await page.evaluate(() => draft.kinds.join() === 'shapes,line' && draft.parts.join() === '2,3,4,6,8'), 'Fractions setup: shapes and number line, 2 3 4 6 8 parts');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => {
+    const q = c.q;
+    if (q.n < 1 || q.n >= q.d || q.shaded.length !== q.n) return false;
+    if (q.shape === 'bar') return c.el.querySelectorAll(`svg rect[fill="${SHADE}"]`).length === q.n && c.el.querySelectorAll('svg rect').length === q.d + 1;
+    if (q.shape === 'circle') return c.el.querySelectorAll(`svg path[fill="${SHADE}"]`).length === q.n && c.el.querySelectorAll('svg path').length === q.d;
+    return c.el.querySelectorAll('svg line').length === q.d + 2;
+  })), 'Fractions: the right number of parts, n shaded (or n ticks along on the line)');
+  ok((await fits()).length === 0, 'Fractions fit ' + (await fits()).join(' '));
+  const fr = await page.evaluate(() => {
+    const c = cards[0], q = c.q, out = {};
+    writeNum(c, `${q.n}/${q.d}`); out.plain = readAnswer(c).ok && read(c) === `${q.n}/${q.d}`;
+    writeNum(c, `${q.n * 2}/${q.d * 2}`); out.equal = readAnswer(c).ok;
+    writeNum(c, `${q.n + 1}/${q.d}`); out.wrong = !readAnswer(c).ok;
+    c.strokes = numStrokes(q.n, -0.3, -1.6, 0.9); out.half = read(c) === `${q.n}/?` && !readAnswer(c).ok;
+    writeNum(c, `${q.n}/${q.d}`, numStrokes(1, 3, -4, 0.6)); out.picture = readAnswer(c).ok; // a mark on the picture is ignored
+    return out;
+  });
+  ok(fr.plain, 'Fractions: top over bottom read as n/d');
+  ok(fr.equal, 'an equal fraction counts (2/4 for 1/2)');
+  ok(fr.wrong, 'a different fraction is wrong');
+  ok(fr.half, 'only a top number: shown as n/?, not right');
+  ok(fr.picture, 'marks on the picture are ignored');
+  ok((await writeAllAndMark()).length === 0, 'Fractions: whole sheet read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/17-frac.png' });
+  await page.click('#markBtn'); // new sheet, then try again keeps nothing of the answer
+  await page.evaluate(() => { writeNum(cards[0], `${cards[0].q.n + 1}/${cards[0].q.d}`); });
+  await page.click('#markBtn');
+  await page.click('.card[data-state="wrong"] .retry');
+  ok(await page.evaluate(() => cards[0].strokes.length === 0), 'Fractions: Try again clears both numbers');
+
+  ok(await page.evaluate(() => [labelFor('area~area,perim|12|12'), labelFor('tbond~2,3,4,5,7|12|12'), labelFor('frac~shapes|2,3,4|6')].join(' / '))
+    === 'Area · area, perimeter · sides up to 12 · 12 questions / Times bonds · 2–5, 7 · up to × 12 · 12 questions / Fractions · shapes · 2, 3, 4 parts · 6 questions', 'record labels for Area, Times bonds, Fractions');
   ok(await page.evaluate(() => [labelFor('arrays~2345|23456789|12'), labelFor('pv~blocks,more|999|6'), labelFor('nline~2,5,10|12')].join(' / '))
     === 'Arrays · 2–5 rows · 2–9 columns · 12 questions / Place value · blocks, more · up to 999 · 6 questions / Number lines · in 2s, 5s, 10s · 12 questions', 'record labels for the new activities');
 
@@ -440,6 +519,7 @@ const fakeSpeech = () => {
   await page.click('#meBtn');
   ok(/Sums · × · 2 and 0–5|Sums · \+ − × ÷/.test(await page.$eval('#records', e => e.textContent)), 'records page lists her sheets');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/4-me.png' });
+  await page.$eval('#removeBtn', e => e.scrollIntoView({ block: 'center' }));
   const rmBox = await (await page.$('#removeBtn')).boundingBox();
   await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2, { clickCount: 2 });
   await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2);

@@ -166,6 +166,10 @@
   .div .br { position: absolute; left: 0; top: -.07em; width: .38em; height: calc(100% + .07em); overflow: visible; }
   .qv.frame { top: .6em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .frame svg { display: block; width: 5.5em; height: 2.2em; margin-bottom: .25em; }
+  .frame .cap { font-size: .75em; font-weight: 700; margin-bottom: .35em; }
+  .qv.frac { top: .5em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .frac svg { display: block; }
+  .frac .fbar { width: 2.4em; border-top: .08em solid var(--ink); margin-top: 1.9em; }
   .qv.bond { top: .4em; left: 50%; transform: translateX(-50%); }
   .bond svg { display: block; width: 6em; height: 5.4em; }
   .flipd { display: inline-block; transform: scaleX(-1); font-weight: 700; }
@@ -399,10 +403,54 @@ const bondSvg = q => {
   for (const k of ['w', 'p', 'q2']) {
     const [x, y] = C[k];
     s += `<circle cx="${x}" cy="${y}" r="10" fill="white" stroke-width="1.1"${k === q.hide ? ' class="hole"' : ''}/>`;
-    if (k !== q.hide) s += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${q[k]}</text>`;
+    if (k !== q.hide) s += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${String(q[k]).length > 2 ? 8.5 : 11}" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${q[k]}</text>`;
   }
   return s + '</svg>';
 };
+// rectangle for Area: side lengths written on (top and right), "?" on a hidden
+// side, a grid of unit squares for counting. s = em per unit of length.
+function areaSvg(q) {
+  const { w, h } = q, s = Math.min(0.42, 5.2 / Math.max(w, h)), u = 10;
+  const fs = 7.2 / s; // label font, in viewBox units, about 0.72em on screen
+  const L = 1.5 * fs, T = 1.4 * fs, R = 2.2 * fs, B = 4;
+  let o = `<svg viewBox="${-L} ${-T} ${w * u + L + R} ${h * u + T + B}" style="width:${(w * u + L + R) * s / u}em;height:${(h * u + T + B) * s / u}em" fill="none" stroke="currentColor">`;
+  if (q.mode === 'squares') {
+    for (let i = 1; i < w; i++) o += `<line x1="${i * u}" y1="0" x2="${i * u}" y2="${h * u}" stroke-width="${0.06 * fs}"/>`;
+    for (let j = 1; j < h; j++) o += `<line x1="0" y1="${j * u}" x2="${w * u}" y2="${j * u}" stroke-width="${0.06 * fs}"/>`;
+  }
+  o += `<rect x="0" y="0" width="${w * u}" height="${h * u}" stroke-width="${0.12 * fs}"/>`;
+  const txt = (x, y, t, a = 'middle') => `<text x="${x}" y="${y}" text-anchor="${a}" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${t}</text>`;
+  if (q.mode !== 'squares') {
+    o += txt(w * u / 2, -0.75 * fs, q.hide === 'w' ? '?' : w);
+    o += txt(w * u + 0.5 * fs, h * u / 2, q.hide === 'h' ? '?' : h, 'start');
+  }
+  return o + '</svg>';
+}
+// fraction pictures: a bar or a circle cut into d equal parts with n shaded,
+// or a 0-to-1 number line cut into d with an arrow at n
+const SHADE = '#9a9a9a';
+function fracSvg(q) {
+  const { n, d } = q;
+  if (q.shape === 'bar') {
+    let o = `<svg viewBox="-1 -1 62 16" style="width:6.2em;height:1.6em" stroke="currentColor">`;
+    for (let i = 0; i < d; i++) o += `<rect x="${i * 60 / d}" y="0" width="${60 / d}" height="14" fill="${q.shaded.includes(i) ? SHADE : 'white'}" stroke-width=".7"/>`;
+    return o + `<rect x="0" y="0" width="60" height="14" fill="none" stroke-width="1.1"/></svg>`;
+  }
+  if (q.shape === 'circle') {
+    let o = `<svg viewBox="-16 -16 32 32" style="width:3.2em;height:3.2em" stroke="currentColor" stroke-linejoin="round">`;
+    for (let i = 0; i < d; i++) {
+      const a0 = -Math.PI / 2 + 2 * Math.PI * i / d, a1 = a0 + 2 * Math.PI / d;
+      o += `<path d="M0 0L${(15 * Math.cos(a0)).toFixed(2)} ${(15 * Math.sin(a0)).toFixed(2)}A15 15 0 0 1 ${(15 * Math.cos(a1)).toFixed(2)} ${(15 * Math.sin(a1)).toFixed(2)}z" fill="${q.shaded.includes(i) ? SHADE : 'white'}" stroke-width=".6"/>`;
+    }
+    return o + `<circle r="15" fill="none" stroke-width="1"/></svg>`;
+  }
+  let o = `<svg viewBox="0 0 120 40" fill="none" stroke="currentColor" style="width:10em;height:3.33em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`;
+  for (let i = 0; i <= d; i++) { const x = 10 + 100 * i / d, e = i === 0 || i === d; o += `<line x1="${x}" y1="${e ? 16 : 18}" x2="${x}" y2="${e ? 28 : 26}" stroke-width="${e ? 1.2 : .9}"/>`; }
+  const ax = 10 + 100 * n / d;
+  o += `<path d="M${ax} 2v12" stroke-width="1.4"/><path d="M${ax - 3.2} 10.5 L${ax} 15.5 L${ax + 3.2} 10.5z" fill="currentColor" stroke="none"/>`;
+  const lab = (x, v) => `<text x="${x}" y="38" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${v}</text>`;
+  return o + lab(10, 0) + lab(110, 1) + '</svg>';
+}
 // array: r rows × c columns of dots, 10 units a dot
 const arraySvg = (r, c) => {
   let s = `<svg viewBox="0 0 ${c * 10} ${r * 10}" style="width:${c * 0.55}em;height:${r * 0.55}em">`;
@@ -566,7 +614,70 @@ const ACTS = {
     key: c => `nline~${[...c.steps].sort((x, y) => x - y).join(',')}|${c.n}`,
     label: k => { const [s, n] = k.split('|'); return `Number lines · in ${s.split(',').map(x => x + 's').join(', ')} · ${n} questions`; },
   },
+  area: {
+    name: 'Area', ages: [8], setup: 'opts', say: 'Work out the area or the perimeter.',
+    pic: areaSvg({ w: 5, h: 3, mode: 'squares' }),
+    options: [
+      { key: 'kinds', label: 'Kind', multi: true, values: [['squares', 'Count squares'], ['area', 'Area'], ['perim', 'Perimeter'], ['side', 'Missing side']] },
+      { key: 'max', label: 'Sides up to', values: [5, 10, 12] },
+    ],
+    defaults: () => ({ kinds: ['area', 'perim', 'side'], max: 12, n: 12 }),
+    // the caption says what to find; counting squares keeps sides to 10
+    make: c => {
+      const mode = pickOne(c.kinds), top = mode === 'squares' ? Math.min(c.max, 10) : c.max;
+      const w = rnd(2, top), h = rnd(2, top);
+      if (mode === 'side') { const hide = pickOne(['w', 'h']); return { kind: 'area', mode, w, h, hide, cap: `Area ${w * h}`, ans: hide === 'w' ? w : h }; }
+      if (mode === 'perim') return { kind: 'area', mode, w, h, cap: 'Perimeter?', ans: 2 * (w + h) };
+      return { kind: 'area', mode, w, h, cap: mode === 'squares' ? 'How many squares?' : 'Area?', ans: w * h };
+    },
+    key: c => `area~${['squares', 'area', 'perim', 'side'].filter(k => c.kinds.includes(k)).join(',')}|${c.max}|${c.n}`,
+    label: k => {
+      const [kinds, m, n] = k.split('|'), nm = { squares: 'count squares', area: 'area', perim: 'perimeter', side: 'missing side' };
+      return `Area · ${kinds.split(',').map(x => nm[x]).join(', ')} · sides up to ${m} · ${n} questions`;
+    },
+  },
+  tbond: {
+    name: 'Times bonds', ages: [8], setup: 'opts', say: 'What number goes in the empty circle?',
+    pic: bondSvg({ w: 24, p: 4, q2: 6, hide: 'q2' }),
+    options: [
+      { key: 'tables', label: 'Times tables', multi: true, values: range(2, 12) },
+      { key: 'upto', label: 'Up to', values: [[10, '× 10'], [12, '× 12']] },
+    ],
+    defaults: () => ({ tables: range(2, 12), upto: 12, n: 12 }),
+    // the product on top, the two factors below; one is empty. A missing
+    // factor is a division (24 is 4 times what?).
+    make: c => {
+      let p = pickOne(c.tables), q2 = rnd(2, c.upto);
+      if (Math.random() < 0.5) [p, q2] = [q2, p];
+      const w = p * q2, hide = pickOne(['w', 'p', 'q2']);
+      return { kind: 'bond', times: true, w, p, q2, hide, ans: { w, p, q2 }[hide] };
+    },
+    key: c => `tbond~${[...c.tables].sort((x, y) => x - y).join(',')}|${c.upto}|${c.n}`,
+    label: k => { const [t, u, n] = k.split('|'); return `Times bonds · ${digitsLabelNums(t.split(',').map(Number))} · up to × ${u} · ${n} questions`; },
+  },
+  frac: {
+    name: 'Fractions', ages: [8], setup: 'opts', say: 'What fraction is it?',
+    pic: fracSvg({ shape: 'circle', n: 3, d: 4, shaded: [0, 1, 2] }),
+    options: [
+      { key: 'kinds', label: 'Kind', multi: true, values: [['shapes', 'Shaded shapes'], ['line', 'Number line']] },
+      { key: 'parts', label: 'Parts', multi: true, values: [2, 3, 4, 5, 6, 8, 10, 12] },
+    ],
+    defaults: () => ({ kinds: ['shapes', 'line'], parts: [2, 3, 4, 6, 8], n: 12 }),
+    // n of d equal parts; bars sometimes shade scattered parts so she counts
+    // parts, not just the length
+    make: c => {
+      const d = pickOne(c.parts), n = rnd(1, d - 1), kind = pickOne(c.kinds);
+      const shape = kind === 'line' ? 'line' : pickOne(['bar', 'circle']);
+      let shaded = range(0, n - 1);
+      if (shape === 'bar' && Math.random() < 0.35) shaded = range(0, d - 1).sort(() => Math.random() - 0.5).slice(0, n);
+      return { kind: 'frac', shape, n, d, shaded, ans: `${n}/${d}` };
+    },
+    key: c => `frac~${['shapes', 'line'].filter(k => c.kinds.includes(k)).join(',')}|${[...c.parts].sort((x, y) => x - y).join(',')}|${c.n}`,
+    label: k => { const [kinds, p, n] = k.split('|'); return `Fractions · ${kinds.split(',').join(', ')} · ${p.split(',').join(', ')} parts · ${n} questions`; },
+  },
 };
+// [2,3,4,5,9,12] -> "2–5, 9, 12" for numbers that may have two digits
+function digitsLabelNums(ns) { return digitsLabel([...ns].sort((x, y) => x - y)); }
 function labelFor(k) {
   const i = k.indexOf('~');
   return i < 0 ? ACTS.sums.label(k) : ACTS[k.slice(0, i)] ? ACTS[k.slice(0, i)].label(k.slice(i + 1)) : k;
@@ -891,6 +1002,16 @@ function qMarkup(q) {
     return { cls: 'frame', html: pvSvg(q.h, q.t, q.o), vars: { '--h': (L.H + 1) * PV_EM + 3.3, '--c': Math.max((L.W + 1) * PV_EM, 4) + 1.4 } };
   }
   if (q.kind === 'nline') return { cls: 'frame', html: nlineSvg(q), vars: { '--h': 3.33 + 3.3, '--c': 11 } };
+  if (q.kind === 'area') {
+    // caption (what to find), then the rectangle; answer below it
+    const svg = areaSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, 5) + 1.2 } };
+  }
+  if (q.kind === 'frac') {
+    // the picture, then a short printed bar: top number above it, bottom number below
+    const svg = fracSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    return { cls: 'frac', html: `${svg}<div class="fbar"></div>`, vars: { '--h': hEm + 0.5 + 1.9 + 2.3, '--c': Math.max(wEm, 4) + 1.4 } };
+  }
   // a line of words or numbers, then "= ___" to write on
   if (q.kind === 'expr') return {
     cls: 'miss',
@@ -923,7 +1044,7 @@ function layout(c) {
   qv.className = 'qv ' + m.cls; qv.innerHTML = m.html;
   for (const k in m.vars) qv.style.setProperty(k, m.vars[k]);
   c.anchorEl = m.cls === 'frame' ? qv.lastElementChild // bottom of the last ten frame
-    : qv.querySelector({ div: '.dd', miss: '.wl', bond: '.hole' }[m.cls] || '.rule');
+    : qv.querySelector({ div: '.dd', miss: '.wl', bond: '.hole', frac: '.fbar' }[m.cls] || '.rule');
 }
 
 // ---------- cards and writing ----------
@@ -1048,6 +1169,7 @@ function inZone(kind, cx, cy) {
 // Any card with writing on it gets marked (Sam): if nothing is in the answer
 // place, read whatever she wrote rather than skipping the card.
 function answerStrokes(c) {
+  if (c.q.kind === 'frac') return fracParts(c).flat();
   const all = [], items = [];
   for (const s of c.strokes) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -1067,7 +1189,34 @@ function answerStrokes(c) {
   }
   return rows.length ? rows[rows.length - 1].s : [];
 }
-function read(c) { return SumsDigits.readNumber(answerStrokes(c), 1.1).text; }
+// Fractions have two answers: the top number above the printed bar and the
+// bottom number below it. Writing high up on the picture (counting marks) is ignored.
+function fracParts(c) {
+  const top = [], bot = [];
+  for (const s of c.strokes) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    if (x1 - x0 > 1.4 && y1 - y0 < (x1 - x0) * 0.25) continue; // a line she drew
+    const cy = (y0 + y1) / 2;
+    if (cy < 0 && cy > -2.1) top.push(s); else if (cy >= 0) bot.push(s);
+  }
+  return [top, bot];
+}
+// Read a card and check it: { text shown under the card, ok, backwards digits }
+function readAnswer(c) {
+  if (c.q.kind === 'frac') {
+    const [t, b] = fracParts(c);
+    if (!t.length && !b.length) return { text: '', ok: false, backwards: [] };
+    const rn = SumsDigits.readNumber(t, 1.1), rd = SumsDigits.readNumber(b, 1.1);
+    const N = +rn.text, D = +rd.text;
+    // any equal fraction counts: 1/2 for two quarters shaded
+    const ok = rn.text !== '' && rd.text !== '' && D > 0 && N * c.q.d === c.q.n * D;
+    return { text: `${rn.text || '?'}/${rd.text || '?'}`, ok, backwards: [...rn.backwards, ...rd.backwards] };
+  }
+  const r = SumsDigits.readNumber(answerStrokes(c), 1.1);
+  return { text: r.text, ok: r.text !== '' && +r.text === c.q.ans, backwards: r.backwards };
+}
+function read(c) { return readAnswer(c).text; }
 function scheduleRead(c, ms) { clearTimeout(c.timer); c.timer = setTimeout(() => showRead(c, read(c)), ms); }
 function showRead(c, t) { c.el.querySelector('.read').textContent = t; }
 function setState(c, s) { c.el.dataset.state = s; c.el.querySelector('.mark').textContent = s === 'right' ? '✓' : s === 'wrong' ? '✗' : ''; }
@@ -1080,11 +1229,11 @@ function mark() {
   for (const c of cards) {
     if (c.el.dataset.state !== 'writing') continue;
     clearTimeout(c.timer);
-    const r = SumsDigits.readNumber(answerStrokes(c), 1.1), t = r.text;
+    const r = readAnswer(c), t = r.text;
     showRead(c, t);
     if (!t) continue;
     c.tries++;
-    const ok = +t === c.q.ans;
+    const ok = r.ok;
     if (c.tries === 1) { c.first = ok; c.firstRead = t; }
     setState(c, ok ? 'right' : 'wrong');
     let note = '';

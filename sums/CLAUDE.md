@@ -4,7 +4,7 @@ Maths practice for Sam's two daughters, written by finger or stylus on a touch s
 
 Users: a 5-year-old in US-style kindergarten who **can't read yet** (pictures, numbers and spoken prompts only, never written questions she must read) and a nearly-8-year-old in grade 2 working above level. Sam wants them free to explore: the girls change their own settings, nothing is locked.
 
-## Flow (2026-11-15, steps 1, 2 and the first half of 3 done)
+## Flow (2026-11-15: steps 1 and 2 done; age 8 has Arrays, Place value, Number lines, Area, Times bonds, Fractions)
 1. **Names** (opening screen): big name tiles, Everyone, "+ Add a name".
 2. **Age**: "How old are you?" with cake tiles (5 or 8 candles, read aloud). A named player is asked once (old names without an age get asked on first tap) and the age is saved on the player; **Everyone** is asked every time, so ages never mix. Ages offered: `AGES = [5, 8]` (6 and 7 to come; store the age, not a grade).
 3. **Home**: "What do you want to do today?" activity tiles for that age (picture, name, best time for her current settings). Age 5: read aloud on arrival. Header: ‹ Names, speaker, "Name · age", Records.
@@ -27,7 +27,10 @@ Each has `ages`, `defaults(age)`, `make(cfg)` → question, `setup` kind, `say` 
 - **Place value** (8): kinds (multi-select) Blocks (base-ten: hundreds squares up to 3 a row, tens sticks, ones cubes 3 a row, drawn to true proportions, `PV_EM` sets the size), 300 + 40 + 7 (expanded form, zero parts left out, shuffled about a third of the time so she can't just copy digits), 10 more / 10 less (amounts 1, 10, 100; never below 0 or above the max). Up to 99 or 999. Expanded and more/less are `expr` cards: a line of text then "= ___".
 - **Number lines** (8): 10 steps, only the two ends labelled, an arrow at tick 1–9; she works out the step and writes the number. Counting in 1s / 2s / 5s / 10s / 100s (multi-select), start a multiple of 10 steps.
 - Picture cards (ten frames, arrays, blocks, number lines) all use the `frame` layout: picture on top, answer anywhere below. Missing number and `expr` cards read **all** her writing (bottom row wins), so an answer written on the line, in the box, or a bit low all count.
-Ideas agreed for later (age 8): clocks and coins, then word problems.
+- **Area** (8): kinds Count squares (grid, sides ≤ 10), Area (side lengths only), Perimeter, Missing side (caption "Area 36", "?" on one side). Sides up to 5/10/12. Caption above the rectangle says what to find. Rectangle drawn to proportion (`areaSvg`, labels sized to stay ~0.72 em). Default: area, perimeter, missing side, up to 12 (Sam: she found the first age-8 set straightforward).
+- **Times bonds** (8): Number bonds for multiplication (product on top, factors below, one empty; a missing factor is a division). Times tables 2–12 (multi), up to × 10 or × 12. Reuses the `bond` card; 3-digit numbers print smaller.
+- **Fractions** (8): a bar or circle cut into d equal parts with n shaded (bars sometimes shade scattered parts), or a 0-to-1 number line cut into d with an arrow at n. Parts 2,3,4,5,6,8,10,12 (default 2,3,4,6,8). She writes the top number above a short printed bar and the bottom number below it (`fracParts`: above = within 2.1 em over the bar, so marks on the picture are ignored). **Equal fractions count** (2/4 for 1/2). The reading shows "3/4", or "3/?" if one is missing. `readAnswer(c)` does the reading and checking for every card (fractions compare n·D = N·d).
+Ideas agreed for later (age 8): clocks and coins, then word problems. Also suggested and not built: rounding, breaking numbers apart (7 × 14 = 7 × 10 + 7 × ☐), patterns, rulers, bar models.
 - The reading under each card is big (26 px) so the girls can check it (Sam).
 
 ## The sheet (unchanged look: plain, like a paper printout; Sam likes it)
@@ -48,7 +51,7 @@ Ideas agreed for later (age 8): clocks and coins, then word problems.
 
 ## Players, settings, records
 - localStorage: `sums-players` = `[{id, name, age}]`; settings per player per activity `sums-cfg-<id>-<act>` (Everyone: `sums-cfg-guest-<age>-<act>`); records `sums-rec-<id>` = `{ best: {key: {ms, count, t}}, history: [{k, ms, first, n, t}] }` (last 100).
-- Record keys: Sums keeps the original format with no prefix (`+-|2|1:0123456789|12`, signs | first | second | count, keypad line = `1:` + digits) so old records still count; others are `missing~<same>`, `howmany~<max>|<n>`, `bonds~<max>|<n>`, `teens~<n>`, `make10~<n>`, `arrays~<row digits>|<col digits>|<n>`, `pv~<kinds>|<max>|<n>`, `nline~<steps>|<n>`. `labelFor(key)` names them.
+- Record keys: Sums keeps the original format with no prefix (`+-|2|1:0123456789|12`, signs | first | second | count, keypad line = `1:` + digits) so old records still count; others are `missing~<same>`, `howmany~<max>|<n>`, `bonds~<max>|<n>`, `teens~<n>`, `make10~<n>`, `arrays~<row digits>|<col digits>|<n>`, `pv~<kinds>|<max>|<n>`, `nline~<steps>|<n>`, `area~<kinds>|<max>|<n>`, `tbond~<tables>|<upto>|<n>`, `frac~<kinds>|<parts>|<n>`. `labelFor(key)` names them.
 - A sheet counts when every card is right. Time runs from the first stroke to the mark that makes it all right; header shows time and "New best!" or the best. No running clock.
 - **Remove** is double-click proof (Sam): the first tap turns it into "Keep <name>" and the real confirm appears at the top of the page, ignoring taps for 0.5 s. Removes the player, records and settings.
 
