@@ -13,14 +13,17 @@
     --head: 52px;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; }
   body {
     background: var(--paper); color: var(--ink);
     font: 16px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-user-select: none; user-select: none;
     -webkit-tap-highlight-color: transparent;
-    overflow: hidden;
+    min-height: 100dvh;
   }
+  /* the front screens scroll the page itself (Sam: Firefox would not scroll
+     the home tiles inside a fixed panel); sheets and the grid lock it */
+  body.lock { overflow: hidden; height: 100dvh; }
   button {
     font: inherit; color: var(--ink); background: var(--paper);
     border: 1.5px solid var(--ink); border-radius: 4px;
@@ -33,6 +36,7 @@
   [hidden] { display: none !important; }
 
   header {
+    position: sticky; top: 0; z-index: 10; background: var(--paper);
     height: var(--head); display: flex; align-items: center; gap: 8px;
     padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
     border-bottom: 1.5px solid var(--ink);
@@ -46,10 +50,7 @@
   @media (max-width: 600px) { .wide { display: none; } header h1.sheetTitle { display: none; } }
 
   /* full-page screens under the header */
-  .panel {
-    position: fixed; inset: var(--head) 0 0 0; background: var(--paper);
-    overflow: auto; padding: 22px 16px 40px; z-index: 5;
-  }
+  .panel { background: var(--paper); padding: 22px 16px 40px; }
   .inner { max-width: 760px; margin: 0 auto; }
   .ask { font-size: 26px; font-weight: 700; margin: 4px 0 18px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
@@ -95,7 +96,9 @@
   th { font-size: 13px; font-weight: 600; color: var(--faint); }
   td.t { font-weight: 700; white-space: nowrap; }
   .empty { color: var(--faint); }
-  #removeBtn { border-color: var(--line); color: var(--faint); font-size: 14px; }
+  #removeBtn, .del { border-color: var(--line); color: var(--faint); font-size: 14px; }
+  .del { padding: 2px 8px; }
+  .del[data-armed="1"] { color: var(--ink); border-color: var(--ink); }
   #confirmRemoveBtn { border-color: var(--wrong); color: var(--wrong); border-width: 2px; min-height: 48px; padding: 0 18px; }
 
   /* setup page, laid out like a sum */
@@ -129,7 +132,7 @@
   .mini .qv.div { margin-top: 1.4em; }
 
   /* times grid */
-  #gridS { padding: 12px; overflow: hidden; }
+  #gridS { position: fixed; inset: var(--head) 0 0 0; z-index: 5; padding: 12px; overflow: hidden; }
   .gwrap { display: flex; gap: 14px; align-items: flex-start; justify-content: center; height: 100%; }
   @media (orientation: portrait) { .gwrap { flex-direction: column; align-items: center; } .gside { flex-direction: row; } }
   .gside { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -150,6 +153,22 @@
   .tgrid .gc.hover { outline: 2.5px solid var(--ink); outline-offset: -2px; position: relative; z-index: 1; }
   .tgrid .gc.done { font-weight: 700; }
   .tgrid .gc.bad { outline: 3px solid var(--wrong); outline-offset: -2px; position: relative; z-index: 1; }
+
+  /* working area: a third of the screen, below the sheet (portrait) or beside it (landscape) */
+  #workBtn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  #workPanel { position: fixed; z-index: 6; background: var(--paper); display: flex; flex-direction: column; }
+  #workPanel .wbar { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+  #workPanel .wtitle { font-weight: 700; margin-right: auto; }
+  #workPanel .wbar button { border-color: var(--line); padding: 3px 10px; font-size: 14px; }
+  #wCanvas { flex: 1; width: 100%; min-height: 0; display: block; touch-action: none; }
+  @media (orientation: portrait) {
+    #workPanel { left: 0; right: 0; bottom: 0; height: calc((100dvh - var(--head)) / 3); border-top: 2px solid var(--ink); }
+    body.working #sheet { height: calc((100dvh - var(--head)) * 2 / 3); }
+  }
+  @media (orientation: landscape) {
+    #workPanel { top: var(--head); right: 0; bottom: 0; width: 33.333vw; border-left: 2px solid var(--ink); }
+    body.working #sheet { width: 66.667vw; }
+  }
 
   /* sheet */
   #sheet {
@@ -250,6 +269,7 @@
   <button id="sayBtn" aria-label="Read it to me" title="Read it to me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></button>
   <h1 id="title">Sums</h1>
   <span id="score"></span>
+  <button id="workBtn" aria-pressed="false">Working</button>
   <button id="markBtn" class="primary">Mark</button>
   <button id="meBtn" class="spacer">Records</button>
 </header>
@@ -345,6 +365,12 @@
 </section>
 
 <main id="sheet" data-n="12" hidden></main>
+
+<!-- working area: a plain page to work things out, bottom third (portrait) or right third (landscape) -->
+<section id="workPanel" hidden>
+  <div class="wbar"><span class="wtitle">Working</span><button id="wUndo">Undo</button><button id="wClear">Clear</button><button id="wHide">Hide</button></div>
+  <canvas id="wCanvas"></canvas>
+</section>
 
 <template id="cardT">
   <div class="card" data-state="writing">
@@ -1332,13 +1358,16 @@ const cakeSvg = n => {
   return s + '</svg>';
 };
 function show(s) {
+  if (s !== screen) scrollTo(0, 0);
   screen = s;
   for (const id of ['names', 'age', 'home', 'setup', 'me', 'grid']) $('#' + id + 'S').hidden = id !== s;
   $('#sheet').hidden = s !== 'sheet';
   const play = s === 'sheet' || s === 'grid';
+  document.body.classList.toggle('lock', play);
   // on the grid, Mark only appears (as "New grid") once it is finished
-  const vis = { backBtn: s !== 'names', setupBtn: play, sayBtn: play || s === 'home' || s === 'age', markBtn: s === 'sheet' || (s === 'grid' && G && G.done), score: play, meBtn: s === 'home' };
+  const vis = { backBtn: s !== 'names', setupBtn: play, sayBtn: play || s === 'home' || s === 'age', workBtn: s === 'sheet', markBtn: s === 'sheet' || (s === 'grid' && G && G.done), score: play, meBtn: s === 'home' };
   for (const id in vis) $('#' + id).hidden = !vis[id];
+  applyWorking();
   const p = current ? player(current) : null;
   $('#title').textContent = { names: 'Sums', age: p ? p.name : '', home: p ? `${p.name} · ${age}` : '', setup: act && p ? `${p.name} · ${ACTS[act].name}` : '', me: p ? p.name : '', sheet: act ? ACTS[act].name : '', grid: act ? ACTS[act].name : '' }[s];
   $('#title').className = play ? 'sheetTitle' : '';
@@ -1415,19 +1444,20 @@ $('#actTiles').addEventListener('click', e => {
 });
 
 // records, age, remove
-let confirmShownAt = 0;
+let confirmShownAt = 0, pending = null;
 function goMe() {
   const p = player(current), r = loadRec(current);
+  pending = null;
   $('#meAges').innerHTML = ageTiles();
   $('#recTitle').textContent = `Best times for ${p.name}`;
   const best = Object.entries(r.best).sort((x, y) => y[1].t - x[1].t);
   $('#records').innerHTML = best.length
-    ? `<table><tr><th>Sheet</th><th>Best</th><th>Done</th></tr>${best.map(([k, v]) =>
-        `<tr><td>${esc(labelFor(k))}</td><td class="t">${fmtTime(v.ms)}</td><td>${v.count}×</td></tr>`).join('')}</table>`
+    ? `<table><tr><th>Sheet</th><th>Best</th><th>Done</th><th></th></tr>${best.map(([k, v]) =>
+        `<tr><td>${esc(labelFor(k))}</td><td class="t">${fmtTime(v.ms)}</td><td>${v.count}×</td><td><button class="del" data-k="${esc(k)}">Delete</button></td></tr>`).join('')}</table>`
     : '<p class="empty">No finished sheets yet. A sheet counts when every answer is right.</p>';
   $('#history').innerHTML = r.history.length
-    ? `<table><tr><th>Day</th><th>Sheet</th><th>Time</th><th>First try</th></tr>${r.history.slice(0, 15).map(h =>
-        `<tr><td>${fmtDate(h.t)}</td><td>${esc(labelFor(h.k))}</td><td class="t">${fmtTime(h.ms)}</td><td>${h.first}/${h.n}</td></tr>`).join('')}</table>`
+    ? `<table><tr><th>Day</th><th>Sheet</th><th>Time</th><th>First try</th><th></th></tr>${r.history.slice(0, 15).map(h =>
+        `<tr><td>${fmtDate(h.t)}</td><td>${esc(labelFor(h.k))}</td><td class="t">${fmtTime(h.ms)}</td><td>${h.first}/${h.n}</td><td><button class="del" data-t="${h.t}">Delete</button></td></tr>`).join('')}</table>`
     : '<p class="empty">Nothing yet.</p>';
   const rm = $('#removeBtn');
   rm.hidden = current === 'guest'; rm.dataset.armed = ''; rm.textContent = `Remove ${p.name}`;
@@ -1436,23 +1466,65 @@ function goMe() {
 }
 $('#meBtn').onclick = goMe;
 $('#meAges').addEventListener('click', e => { const t = e.target.closest('[data-age]'); if (!t) return; setAge(+t.dataset.age); goHome(); });
-// Removing: the first tap turns this button into "Keep", and the real confirm
-// appears far away at the top of the page, so a double tap can't remove anyone.
-$('#removeBtn').onclick = () => {
-  const rm = $('#removeBtn'), name = player(current).name;
-  if (rm.dataset.armed) { goMe(); return; } // "Keep": cancel
-  rm.dataset.armed = '1'; rm.textContent = `Keep ${name}`;
-  $('#confirmRemoveBtn').textContent = `Tap here to remove ${name} and their records`;
+// Removing anything (a person, a sheet's records, one sheet): the first tap turns
+// that button into "Keep", and the real confirm appears far away at the top of
+// the page, ignoring taps for half a second, so a double tap can't remove anything.
+function cancelArm() {
+  for (const b of document.querySelectorAll('#meS [data-armed="1"]')) { b.dataset.armed = ''; b.textContent = b.dataset.was; }
+  pending = null; $('#confirmBox').hidden = true;
+}
+function arm(btn, keep, confirmText, action) {
+  if (btn.dataset.armed) { cancelArm(); return; } // "Keep": cancel
+  cancelArm();
+  btn.dataset.armed = '1'; btn.dataset.was = btn.textContent; btn.textContent = keep;
+  pending = action;
+  $('#confirmRemoveBtn').textContent = confirmText;
   $('#confirmBox').hidden = false; confirmShownAt = Date.now();
-  $('#meS').scrollTop = 0;
-};
+  scrollTo(0, 0);
+}
 $('#confirmRemoveBtn').onclick = () => {
-  if (Date.now() - confirmShownAt < 500) return;
-  players = players.filter(p => p.id !== current); store.set('sums-players', players);
-  try { localStorage.removeItem(recKey(current)); } catch (e) {}
-  for (const a in ACTS) try { localStorage.removeItem(`sums-cfg-${current}-${a}`); } catch (e) {}
-  goNames();
+  if (Date.now() - confirmShownAt < 500 || !pending) return;
+  const f = pending; pending = null; f();
 };
+$('#removeBtn').onclick = () => {
+  const name = player(current).name;
+  arm($('#removeBtn'), `Keep ${name}`, `Tap here to remove ${name} and their records`, () => {
+    players = players.filter(p => p.id !== current); store.set('sums-players', players);
+    try { localStorage.removeItem(recKey(current)); } catch (e) {}
+    for (const a in ACTS) try { localStorage.removeItem(`sums-cfg-${current}-${a}`); } catch (e) {}
+    goNames();
+  });
+};
+// Sam: someone else did a sheet on her name. Delete one sheet (its best time
+// is worked out again from what is left), or all of one kind of sheet.
+function deleteSheet(t) {
+  const r = loadRec(current), h = r.history.find(x => x.t === t); if (!h) return;
+  r.history = r.history.filter(x => x !== h);
+  const b = r.best[h.k];
+  if (b) {
+    const rest = r.history.filter(x => x.k === h.k);
+    b.count = Math.max(0, b.count - 1);
+    if (!b.count || (b.ms === h.ms && !rest.length)) delete r.best[h.k];
+    else if (b.ms === h.ms) b.ms = Math.min(...rest.map(x => x.ms));
+  }
+  store.set(recKey(current), r);
+}
+function deleteKind(k) {
+  const r = loadRec(current);
+  delete r.best[k]; r.history = r.history.filter(x => x.k !== k);
+  store.set(recKey(current), r);
+}
+$('#meS').addEventListener('click', e => {
+  const b = e.target.closest('.del'); if (!b) return;
+  const name = player(current).name, r = loadRec(current);
+  if (b.dataset.t) {
+    const h = r.history.find(x => x.t === +b.dataset.t); if (!h) return;
+    arm(b, 'Keep', `Tap here to delete ${labelFor(h.k)} (${fmtTime(h.ms)}, ${fmtDate(h.t)}) from ${name}`, () => { deleteSheet(h.t); goMe(); });
+  } else {
+    const k = b.dataset.k;
+    arm(b, 'Keep', `Tap here to delete every ${labelFor(k)} from ${name}`, () => { deleteKind(k); goMe(); });
+  }
+});
 
 // ---------- setup ----------
 // The setup page is laid out like a sum: first number's keypad on top, signs
@@ -1733,6 +1805,7 @@ function buildSheet(c) {
   for (const k of cards) ro.unobserve(k.work);
   sheet.innerHTML = ''; sheet.dataset.n = c.n; sheet.scrollTop = 0;
   sheetKey = ACTS[act].key(c); sheetStart = null; sheetDone = false; lastResult = null;
+  W.strokes = []; drawWork(); // a fresh working area for each sheet
   sheet.hidden = false; // measured while laying out
   cards = makeSheet(c).map(q => {
     const el = $('#cardT').content.firstElementChild.cloneNode(true);
@@ -1821,6 +1894,64 @@ function wirePad(c) {
   c.work.addEventListener('pointercancel', end);
 }
 
+// ---------- working area ----------
+// Sam: a plain page to work things out, opened from "Working" in the header:
+// the bottom third in portrait, the right third in landscape; Hide collapses it.
+// Nothing on it is read or marked. It empties with each new sheet. Strokes are
+// kept in pixels from its top-left corner.
+const W = { strokes: [], open: store.get('sums-working', false), w: 0, h: 0 };
+function applyWorking() {
+  const on = W.open && screen === 'sheet';
+  $('#workPanel').hidden = !on;
+  document.body.classList.toggle('working', on);
+  $('#workBtn').setAttribute('aria-pressed', on);
+  if (on) requestAnimationFrame(sizeWork);
+}
+function setWorking(open) { W.open = open; store.set('sums-working', open); applyWorking(); }
+function sizeWork() {
+  const cv = $('#wCanvas'), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  W.w = r.width; W.h = r.height;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  drawWork();
+}
+function drawWork() {
+  const cv = $('#wCanvas'), g = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W.w, W.h);
+  g.lineCap = g.lineJoin = 'round'; g.strokeStyle = g.fillStyle = '#111'; g.lineWidth = 3;
+  for (const s of W.strokes) {
+    if (s.length === 1) { g.beginPath(); g.arc(s[0][0], s[0][1], 1.5, 0, 7); g.fill(); continue; }
+    g.beginPath(); g.moveTo(s[0][0], s[0][1]);
+    for (let i = 1; i < s.length; i++) g.lineTo(s[i][0], s[i][1]);
+    g.stroke();
+  }
+}
+$('#workBtn').onclick = () => setWorking(!W.open);
+$('#wHide').onclick = () => setWorking(false);
+$('#wUndo').onclick = () => { W.strokes.pop(); drawWork(); };
+$('#wClear').onclick = () => { W.strokes = []; drawWork(); };
+new ResizeObserver(() => { if (!$('#workPanel').hidden) sizeWork(); }).observe($('#wCanvas'));
+(() => {
+  const cv = $('#wCanvas');
+  let active = null, cur = null;
+  const pt = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'pen') penSeen = true;
+    if ((penSeen && e.pointerType === 'touch') || active !== null) return;
+    e.preventDefault();
+    active = e.pointerId; cv.setPointerCapture(e.pointerId);
+    cur = [pt(e)]; W.strokes.push(cur); drawWork();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (e.pointerId !== active) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of (evs.length ? evs : [e])) cur.push(pt(ev));
+    drawWork();
+  });
+  const end = e => { if (e.pointerId === active) { active = null; cur = null; } };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+})();
+
 // Which strokes are the answer? Below the line for + − × and ten frames, above
 // the bar for ÷, on the line (or in the box) for missing numbers. Ruled lines are ignored, and
 // if there are several rows (long multiplication working) only the row
@@ -1903,18 +2034,60 @@ function fracParts(c) {
   }
   return [S(top), S(bot), []];
 }
-// Two blanks ("3 : 15", "$2 and 50 c"): left of the ":" or "and" is the first
-// number, right of it the second. Writing up on the picture is ignored.
-function twoParts(c) {
-  const L = [], R = [];
-  for (const s of c.strokes) {
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    if (x1 - x0 > 1.4 && y1 - y0 < (x1 - x0) * 0.25) continue; // a line she drew
-    if ((y0 + y1) / 2 < -2.4) continue; // on the clock or the coins
-    ((x0 + x1) / 2 < 0 ? L : R).push(s);
+// Strokes grouped into digits (strokes that overlap side to side are one
+// digit), left to right: { s: [strokes], x0, x1, y0, y1, cx, h }
+function digitClusters(items) {
+  const cl = [];
+  for (const it of [...items].sort((p, q) => p.x0 - q.x0)) {
+    const k = cl.find(g => Math.min(g.x1, it.x1) - Math.max(g.x0, it.x0) > 0.3 * Math.min(g.x1 - g.x0, it.x1 - it.x0, 1e9) || (it.x0 >= g.x0 && it.x1 <= g.x1));
+    if (k) { k.s.push(it.s); k.x0 = Math.min(k.x0, it.x0); k.x1 = Math.max(k.x1, it.x1); k.y0 = Math.min(k.y0, it.y0); k.y1 = Math.max(k.y1, it.y1); }
+    else cl.push({ s: [it.s], x0: it.x0, x1: it.x1, y0: it.y0, y1: it.y1 });
   }
-  return [L, R];
+  for (const g of cl) { g.cx = (g.x0 + g.x1) / 2; g.h = g.y1 - g.y0; }
+  return cl.sort((p, q) => p.cx - q.cx);
+}
+const strokeBox = s => {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return { s, x0, x1, y0, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+};
+const median = a => { const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
+// money: a "$" before the dollars is taller than her digits, a "c" after the
+// cents is smaller; drop them when there are digits beside them
+function dropMoneySigns(cl, first, last) {
+  if (first && cl.length > 1 && cl[0].h > 1.25 * median(cl.slice(1).map(g => g.h))) cl = cl.slice(1);
+  if (last && cl.length > 1 && cl[cl.length - 1].h < 0.7 * median(cl.slice(0, -1).map(g => g.h))) cl = cl.slice(0, -1);
+  return cl;
+}
+// Two blanks ("3 : 15", "$2 and 50 c"): the first number left of the ":" or
+// "and", the second right of it. Sam found real writing was missed, so it is
+// forgiving: dots (her own colon or point) are not digits, writing up on the
+// picture is ignored unless it lines up with a digit below, and if both numbers
+// end up on one side it splits them by her own colon or point, or else takes
+// the last two digits as the minutes / cents. Returns [first, second, dots].
+function twoParts(c) {
+  const items = [], high = [], dots = [];
+  for (const s of c.strokes) {
+    const it = strokeBox(s), w = it.x1 - it.x0, h = it.y1 - it.y0;
+    if (w > 1.4 && h < w * 0.25) continue; // a line she drew
+    if (Math.max(w, h) < 0.3) { dots.push(it); continue; } // a dot: her colon or point
+    (it.y1 < -2.4 ? high : items).push(it); // on the clock or the coins...
+  }
+  for (const it of high) if (items.some(i => i.y0 < -2.4 && i.x0 < it.x1 && it.x0 < i.x1)) items.push(it); // ...unless part of a big digit
+  const cl = digitClusters(items), money = c.q.kind === 'money';
+  let left = cl.filter(g => g.cx < 0), right = cl.filter(g => g.cx >= 0);
+  if ((!left.length || !right.length) && cl.length >= 2) {
+    const dx = dots.length ? dots.reduce((a, d) => a + d.cx, 0) / dots.length : null;
+    if (dx !== null && cl.some(g => g.cx < dx) && cl.some(g => g.cx > dx)) { left = cl.filter(g => g.cx < dx); right = cl.filter(g => g.cx > dx); }
+    else {
+      const all = money ? dropMoneySigns(cl, true, true) : cl;
+      const k = all.length >= 3 ? all.length - 2 : 1;
+      left = all.slice(0, k); right = all.slice(k);
+    }
+  }
+  if (money) { left = dropMoneySigns(left, true, false); right = dropMoneySigns(right, false, true); }
+  const flat = gs => gs.flatMap(g => g.s);
+  return [flat(left), flat(right), dots.map(d => d.s)];
 }
 // Read a card and check it: { text shown under the card, ok, backwards digits }
 function readAnswer(c) {
@@ -1935,8 +2108,18 @@ function readAnswer(c) {
     const ok = rn.text !== '' && rd.text !== '' && D > 0 && N * c.q.d === c.q.n * D;
     return { text: `${rn.text || '?'}/${rd.text || '?'}`, ok, backwards: [...rn.backwards, ...rd.backwards] };
   }
-  const r = SumsDigits.readNumber(answerStrokes(c), 1.1);
-  return { text: r.text, ok: r.text !== '' && +r.text === c.q.ans, backwards: r.backwards };
+  let strokes = answerStrokes(c);
+  if (c.q.kind === 'clock' || c.q.kind === 'money') {
+    // single blanks on clocks and money: no dots ("3:00"), no "$" or "c"
+    const its = strokes.map(strokeBox).filter(it => Math.max(it.x1 - it.x0, it.y1 - it.y0) >= 0.3 || strokes.length === 1);
+    let cl = digitClusters(its);
+    if (c.q.kind === 'money') cl = dropMoneySigns(cl, true, true);
+    strokes = cl.flatMap(g => g.s);
+  }
+  const r = SumsDigits.readNumber(strokes, 1.1);
+  let text = r.text;
+  if (c.q.kind === 'clock' && /^\d{1,2}00$/.test(text)) text = text.slice(0, -2); // "3:00" written for 3 o'clock
+  return { text, ok: text !== '' && +text === c.q.ans, backwards: r.backwards };
 }
 function read(c) { return readAnswer(c).text; }
 function scheduleRead(c, ms) { clearTimeout(c.timer); c.timer = setTimeout(() => showRead(c, read(c)), ms); }

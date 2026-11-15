@@ -197,6 +197,35 @@ const fakeSpeech = () => {
   await wait(700);
   ok(await page.$eval('.card .read', e => e.textContent) === String(P0.ans), 'pointer writing under the line read live');
 
+  // ---- working area (Sam): bottom third in portrait, right third in landscape
+  ok(await visible('#workBtn') && !(await visible('#workPanel')), 'sheet: a Working button, the working area closed');
+  await page.click('#workBtn');
+  await wait(150);
+  const wa = await page.evaluate(() => {
+    const p = $('#workPanel').getBoundingClientRect(), s = $('#sheet').getBoundingClientRect(), avail = innerHeight - 52;
+    return { open: !$('#workPanel').hidden, pressed: $('#workBtn').getAttribute('aria-pressed'), ph: p.height / avail, sh: s.height / avail, bottom: Math.round(p.bottom - innerHeight), meets: Math.abs(s.bottom - p.top) < 3 };
+  });
+  ok(wa.open && wa.pressed === 'true' && Math.abs(wa.ph - 1 / 3) < 0.02 && Math.abs(wa.sh - 2 / 3) < 0.02 && wa.bottom === 0 && wa.meets, 'portrait: the working area is the bottom third, the sheet the top two thirds ' + JSON.stringify(wa));
+  const wbox = await (await page.$('#wCanvas')).boundingBox();
+  for (const k of [0, 1]) { // two strokes
+    await page.mouse.move(wbox.x + 40 + k * 60, wbox.y + 30); await page.mouse.down();
+    await page.mouse.move(wbox.x + 80 + k * 60, wbox.y + 90, { steps: 5 }); await page.mouse.up();
+  }
+  ok(await page.evaluate(() => W.strokes.length === 2 && cards.every(c => c.el.querySelector('.read').textContent === '' || c === cards[0])), 'writing in the working area is kept there, not on any card');
+  await page.click('#wUndo');
+  ok(await page.evaluate(() => W.strokes.length === 1), 'Undo takes away the last stroke');
+  await page.click('#wClear');
+  ok(await page.evaluate(() => W.strokes.length === 0), 'Clear empties it');
+  ok(await page.evaluate(() => cards.every(c => { const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect(); return w.height > 50 && r.left >= w.left - 1 && r.right <= w.right + 1 && r.top >= w.top - 1; })), 'cards still fit above the working area');
+  await page.setViewport({ width: 1180, height: 820, hasTouch: true });
+  await wait(300);
+  const wl = await page.evaluate(() => { const p = $('#workPanel').getBoundingClientRect(), s = $('#sheet').getBoundingClientRect(); return { pw: p.width / innerWidth, sw: s.width / innerWidth, right: Math.round(innerWidth - p.right), top: p.top }; });
+  ok(Math.abs(wl.pw - 1 / 3) < 0.02 && Math.abs(wl.sw - 2 / 3) < 0.02 && wl.right === 0 && wl.top >= 50, 'landscape: the working area is the right third ' + JSON.stringify(wl));
+  await page.click('#wHide');
+  ok(!(await visible('#workPanel')) && await page.evaluate(() => { const s = $('#sheet').getBoundingClientRect(); return Math.abs(s.width - innerWidth) < 2 && store.get('sums-working') === false; }), 'Hide collapses it and the sheet gets the whole screen back');
+  await page.setViewport({ width: 820, height: 1180, hasTouch: true });
+  await wait(300);
+
   const work = await page.evaluate(() => {
     const out = {};
     const c1 = cards[1]; writeNum(c1, c1.q.ans, numStrokes(1, -0.8, -3.4, 0.5)); out.carry = read(c1) === String(c1.q.ans);
@@ -477,8 +506,14 @@ const fakeSpeech = () => {
     writeNum(c, ['5', '3']); out.swapped = !readAnswer(c).ok;
     c.strokes = numStrokes(3, -0.45, -1.05, 0.85); out.half = read(c) === '3:?' && !readAnswer(c).ok;
     writeNum(c, ['3', '5'], numStrokes(7, 1, -5, 0.6)); out.face = readAnswer(c).ok; // a mark on the clock is ignored
+    // Sam: real writing was missed. Her own colon, everything on the left line
+    const dots = x => [[[x, -0.8], [x + 0.02, -0.78]], [[x, -0.3], [x + 0.02, -0.28]]];
+    c.strokes = [...numStrokes('3', -2.5, -1.05, 0.85), ...dots(-2.25), ...numStrokes('05', -0.6, -1.05, 0.85)]; out.colon = readAnswer(c).ok && read(c) === '3:05';
+    // no colon, written in one run on the right: "305"
+    c.strokes = numStrokes('305', 2.4, -1.05, 0.85); out.run = readAnswer(c).ok;
     return out;
   });
+  ok(cr.colon && cr.run, 'Clocks: her own colon, or the time written in one run on one side, is read');
   ok(cr.zero && cr.plain, 'Clocks: 3:05 read whether she writes 05 or 5');
   ok(cr.swapped && cr.half, 'Clocks: swapped numbers are wrong; only the hour shows 3:? and is not right');
   ok(cr.face, 'Clocks: marks on the clock face are ignored');
@@ -495,6 +530,11 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => cards.every(c => !c.q.two && c.q.m === 0 && c.el.querySelectorAll('.ln').length === 1 && /o.clock/.test(c.el.querySelector('.ans').textContent))), 'Clocks Year 1: on the hour, "__ o\'clock"');
   ok((await fits()).length === 0, 'Clocks Year 1 fit ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Clocks Year 1: hours read and marked right');
+  ok(await page.evaluate(() => {
+    const c = cards[0], h = String(c.q.h);
+    c.strokes = [...numStrokes(h, -1.4, -1.05, 0.85), [[-1.2, -0.8], [-1.18, -0.78]], [[-1.2, -0.3], [-1.18, -0.28]], ...numStrokes('00', 0.4, -1.05, 0.85)];
+    return readAnswer(c).ok;
+  }), 'Clocks Year 1: "3:00" written for 3 o\'clock counts');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/21-clocks-y1.png' });
 
   // ---- Mia: Money (Years 1–3)
@@ -530,6 +570,21 @@ const fakeSpeech = () => {
   })), 'Money cards: one coin or note drawn per item; change shows the price and the note');
   ok((await fits()).length === 0, 'Money fits ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Money: whole sheet read and marked right');
+  const ms = await page.evaluate(() => {
+    const c = cards[0], out = {};
+    const dollar = x => [[[x, -1.55], [x, 0.25]], [[x + 0.2, -1.25], [x - 0.2, -1.05], [x + 0.2, -0.65], [x - 0.2, -0.35]]]; // tall line and an S
+    const cee = x => [[[x + 0.25, -0.6], [x, -0.55], [x - 0.05, -0.3], [x + 0.25, -0.25]]]; // a small c
+    c.q = { kind: 'money', items: [200, 50], unit: '$c', two: true, parts: [2, 50], ans: '$2 and 50c' }; layout(c); sizeCanvas(c);
+    c.strokes = [...dollar(-1.9), ...numStrokes('2', -0.5, -1.05, 0.85), ...numStrokes('50', 1.9, -1.05, 0.85), ...cee(2.2)]; out.signs = readAnswer(c).ok;
+    c.strokes = [...numStrokes('2', -2.6, -1.05, 0.85), [[-2.4, -0.1], [-2.38, -0.08]], ...numStrokes('50', -0.6, -1.05, 0.85)]; out.point = readAnswer(c).ok; // "2.50"
+    c.q = { kind: 'money', items: [500, 200], unit: '$', ans: 7 }; layout(c); sizeCanvas(c);
+    c.strokes = [...dollar(-1.6), ...numStrokes('7', 0, -1.05, 0.85)]; out.single = readAnswer(c).ok;
+    c.q = { kind: 'money', items: [20, 20, 20], unit: 'c', ans: 60 }; layout(c); sizeCanvas(c);
+    c.strokes = [...numStrokes('60', -0.3, -1.05, 0.85), ...cee(0)]; out.cents = readAnswer(c).ok;
+    return out;
+  });
+  ok(ms.signs && ms.single && ms.cents, 'Money: a "$" or "c" she writes in is not read as a digit ' + JSON.stringify(ms));
+  ok(ms.point, 'Money: "2.50" written with a point on one side is read as $2 and 50c');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/22-money.png' });
   for (const yr of [2, 1]) {
     await page.click('#setupBtn');
@@ -850,6 +905,22 @@ const fakeSpeech = () => {
   await page.click('#meBtn');
   ok(/Sums · × · 2 and 0–5|Sums · \+ − × ÷/.test(await page.$eval('#records', e => e.textContent)), 'records page lists her sheets');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/4-me.png' });
+  // ---- deleting records (Sam: someone else did a sheet on her name)
+  const r0 = await page.evaluate(() => { const r = loadRec(current), h = r.history[0]; return { n: r.history.length, t: h.t, k: h.k, count: r.best[h.k].count }; });
+  await page.click(`#history .del[data-t="${r0.t}"]`);
+  ok(await page.evaluate(t => $(`#history .del[data-t="${t}"]`).textContent === 'Keep' && !$('#confirmBox').hidden && /^Tap here to delete .+ from Mia$/.test($('#confirmRemoveBtn').textContent), r0.t), 'Delete on a sheet: it turns into Keep, the real confirm appears at the top');
+  await page.click('#confirmRemoveBtn');
+  ok(await page.evaluate(n => loadRec(current).history.length === n, r0.n), 'the confirm ignores its first half second');
+  await wait(600);
+  await page.click('#confirmRemoveBtn');
+  const r1 = await page.evaluate(k => { const r = loadRec(current), rest = r.history.filter(x => x.k === k); return { n: r.history.length, best: r.best[k], restMin: rest.length ? Math.min(...rest.map(x => x.ms)) : null }; }, r0.k);
+  ok(r1.n === r0.n - 1 && (r1.best ? r1.best.count === r0.count - 1 && r1.best.ms <= r1.restMin : r1.restMin === null || r0.count === 1), 'that one sheet is gone; its best time and count are worked out again ' + JSON.stringify(r1));
+  const k1 = await page.$eval('#records .del', b => b.dataset.k);
+  await page.click('#records .del');
+  await page.click('#records .del'); // Keep: cancels
+  ok(await page.evaluate(() => $('#confirmBox').hidden && $('#records .del').textContent === 'Delete'), 'Keep cancels a delete');
+  await page.click('#records .del'); await wait(600); await page.click('#confirmRemoveBtn');
+  ok(await page.evaluate(k => { const r = loadRec(current); return !r.best[k] && !r.history.some(x => x.k === k); }, k1), 'Delete on a best time removes every sheet of that kind');
   await page.$eval('#removeBtn', e => e.scrollIntoView({ block: 'center' }));
   const rmBox = await (await page.$('#removeBtn')).boundingBox();
   await page.mouse.click(rmBox.x + rmBox.width / 2, rmBox.y + rmBox.height / 2, { clickCount: 2 });
@@ -872,8 +943,18 @@ const fakeSpeech = () => {
   await page.evaluate(HELPERS);
   await page.click('#nameTiles [data-id="old1"]');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone-home.png' });
+  // Sam: Firefox would not scroll the home tiles. The front screens now scroll the page itself.
+  const sc = await page.evaluate(async () => {
+    const tall = document.documentElement.scrollHeight > innerHeight + 100, locked = document.body.classList.contains('lock');
+    scrollTo(0, 99999); await new Promise(r => setTimeout(r, 100));
+    const last = [...document.querySelectorAll('#actTiles .tile')].pop().getBoundingClientRect(), head = $('header').getBoundingClientRect();
+    return { tall, locked, y: scrollY, lastVisible: last.bottom <= innerHeight + 1 && last.top > 0, headTop: head.top };
+  });
+  ok(sc.tall && !sc.locked && sc.y > 0 && sc.lastVisible && sc.headTop === 0, 'phone home: the page scrolls to the last tile, the header stays at the top ' + JSON.stringify(sc));
   await page.click('#actTiles [data-act="howmany"]');
+  ok(await page.evaluate(() => scrollY === 0), 'a new screen starts at the top');
   await page.click('#newBtn');
+  ok(await page.evaluate(() => document.body.classList.contains('lock')), 'sheets lock the page (writing never scrolls it)');
   await page.evaluate(() => buildSheet({ max: 20, n: 20 }));
   ok(await cols() === 2, 'phone portrait: 2 columns');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/5-phone.png' });
