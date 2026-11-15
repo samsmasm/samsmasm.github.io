@@ -72,7 +72,7 @@ const HELPERS = () => {
   // all four signs, 2 digit and 1 digit, 12 questions
   await page.click('#settingsBtn');
   for (const v of ['-', '*', '/']) await page.click(`#opsOpts button[data-v="${v}"]`);
-  await page.click('#aOpts button[data-v="2"]');
+  await page.click('.big[data-line="a"] [data-d="2"]');
   await page.click('#nOpts button[data-v="12"]');
   await page.click('#newBtn');
   ok(await page.$$eval('.card', c => c.length) === 12, '12 cards');
@@ -185,7 +185,7 @@ const HELPERS = () => {
     const id = current, r = JSON.parse(localStorage.getItem('sums-rec-' + id));
     return { k: Object.keys(r.best), ms: Object.values(r.best)[0].ms, h: r.history.length, first: r.history[0].first };
   });
-  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved with the claimed first try: ' + JSON.stringify(rec));
+  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1:123456789|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved with the claimed first try: ' + JSON.stringify(rec));
 
   // a faster second sheet is a new best
   await page.click('#markBtn');
@@ -201,6 +201,36 @@ const HELPERS = () => {
   await page.click('#playerList button[data-id="guest"]');
   ok(/No finished sheets/.test(await page.$eval('#records', e => e.textContent)), 'Everyone has separate records');
   await page.click('#who .back');
+
+  // keypads: the 2 times table up to 5
+  await page.click('#settingsBtn');
+  for (const v of ['+', '-', '/']) await page.click(`#opsOpts button[data-v="${v}"]`);
+  await page.click('.kp[data-line="a"] [data-k="2"]'); // first number was 10–99, so this starts a fresh pick
+  await page.click('.kp[data-line="b"] [data-k="all"]');
+  const centre = async sel => { const b = await (await page.$(sel)).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  const [x9, y9] = await centre('.kp[data-line="b"] [data-k="9"]'), [x6, y6] = await centre('.kp[data-line="b"] [data-k="6"]');
+  await page.mouse.move(x9, y9); await page.mouse.down(); await page.mouse.move(x6, y6, { steps: 6 }); await page.mouse.up();
+  await page.click('.kp[data-line="b"] [data-k="7"]');
+  await page.click('.kp[data-line="b"] [data-k="8"]');
+  const st = await page.evaluate(() => JSON.stringify([settings.a, settings.pa, settings.b, settings.pb, settings.ops]));
+  ok(st === '[1,[2],1,[0,1,2,3,4,5],["*"]]', 'keypad: tap, All, drag to switch off 9 and 6, tap 7 and 8 off: ' + st);
+  ok(await page.$$eval('#preview .mini', m => m.length) === 4, 'four examples shown');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/7-choices.png', fullPage: true });
+  await page.click('#newBtn');
+  const tt = await page.evaluate(() => cards.every(c => c.q.op === '*' && c.q.a === 2 && c.q.b >= 0 && c.q.b <= 5 && c.q.ans === 2 * c.q.b));
+  ok(tt, 'sheet is all 2 × 0–5');
+  ok(await page.evaluate(() => comboLabel(sheetKey)) === '× · 2 and 0–5 · 12 questions', 'record label: ' + await page.evaluate(() => comboLabel(sheetKey)));
+  ok(await page.evaluate(() => { const q = []; for (let i = 0; i < 300; i++) q.push(makeQ('/', { d: 1, p: [0, 1, 2] }, { d: 1, p: [0, 3] })); return q.every(x => x.b === 3 && x.a === 3 * x.ans && [0, 1, 2].includes(x.ans)); }), 'division from keypads: divide by the second, answer from the first, never by 0');
+
+  // dividing by only 0 is impossible: warn, and Start is off when ÷ is the only sign
+  await page.click('#settingsBtn');
+  await page.click('#opsOpts button[data-v="/"]');
+  await page.click('.big[data-line="b"] [data-d="2"]');
+  await page.click('.kp[data-line="b"] [data-k="0"]');
+  ok(/other than 0/.test(await page.$eval('#warn', e => e.textContent)) && !(await page.$eval('#newBtn', e => e.disabled)), 'only 0 to divide by: warning, Start still on (× works)');
+  await page.click('#opsOpts button[data-v="*"]');
+  ok(await page.$eval('#newBtn', e => e.disabled), '÷ alone with only 0: Start is off');
+  await page.click('#settings .back');
 
   // 20 on a phone in portrait: 2 columns (mobile emulation reloads the page)
   await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
