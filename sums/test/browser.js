@@ -91,7 +91,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -409,6 +409,56 @@ const fakeSpeech = () => {
   await page.click('#markBtn');
   await page.click('.card[data-state="wrong"] .retry');
   ok(await page.evaluate(() => cards[0].strokes.length === 0), 'Fractions: Try again clears both numbers');
+
+  // ---- Mia: Times grid
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="tgrid"]');
+  ok(await visible('#optBlock [data-key="tables"]') && !(await visible('#nOpts')) && !(await visible('#previewLab')), 'Times grid setup: tables, size, numbers; no Questions row or examples');
+  await page.click('#optBlock [data-key="count"] [data-v="12"]');
+  await page.click('#newBtn');
+  ok(await visible('#gridS') && !(await visible('#markBtn')), 'grid shown, no Mark button while playing');
+  const gl = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('#tGrid .gc')];
+    return {
+      n: cells.length, lower: cells.filter(c => +c.dataset.c < +c.dataset.r).length,
+      off: cells.filter(c => c.classList.contains('off')).map(c => c.dataset.r + 'x' + c.dataset.c).join(),
+      heads: [...document.querySelectorAll('#tGrid [data-col]')].map(h => h.textContent).join(),
+    };
+  });
+  ok(gl.n === 78 && gl.lower === 0 && gl.heads === '1,2,3,4,5,6,7,8,9,10,11,12', `12 × 12, one triangle only: ${gl.n} cells, none below the diagonal`);
+  ok(gl.off === '1x1', 'only 1 × 1 is grey when the 1s table is not chosen: ' + gl.off);
+  // a right cell and a wrong cell for the number on the tile
+  const cellFor = right => page.evaluate(ok => {
+    const c = [...document.querySelectorAll('#tGrid .gc:not(.off):not(.done)')].find(x => (+x.dataset.r * +x.dataset.c === G.value) === ok);
+    const b = c.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, r: c.dataset.r, c: c.dataset.c };
+  }, right);
+  const tileAt = async () => { const b = await (await page.$('#gTile')).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  // drag it to the right cell (and the row and column light up on the way)
+  let [tx, ty] = await tileAt(), good = await cellFor(true);
+  await page.mouse.move(tx, ty); await page.mouse.down(); await page.mouse.move(good.x, good.y, { steps: 8 });
+  ok(await page.evaluate(g => document.querySelector(`#tGrid [data-row="${g.r}"]`).classList.contains('lit') && document.querySelector(`#tGrid [data-col="${g.c}"]`).classList.contains('lit'), good), 'while dragging, the row and column light up');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/18-grid-drag.png' });
+  await page.mouse.up();
+  ok(await page.evaluate(g => document.querySelector(`#tGrid .gc[data-r="${g.r}"][data-c="${g.c}"]`).classList.contains('done') && G.placed === 1 && G.first === 1, good), 'dropped on the right cell: it fills in, first try');
+  // drag to a wrong cell: bounces back
+  [tx, ty] = await tileAt(); const bad = await cellFor(false);
+  await page.mouse.move(tx, ty); await page.mouse.down(); await page.mouse.move(bad.x, bad.y, { steps: 8 }); await page.mouse.up();
+  ok(await page.evaluate(g => !document.querySelector(`#tGrid .gc[data-r="${g.r}"][data-c="${g.c}"]`).classList.contains('done') && G.placed === 1 && G.tries === 1, bad), 'dropped on a wrong cell: stays empty, counts a miss');
+  // tapping the right cell works too, but this one isn't first try
+  good = await cellFor(true);
+  await page.mouse.click(good.x, good.y);
+  ok(await page.evaluate(() => G.placed === 2 && G.first === 1), 'tapping the right cell places it (not first try after a miss)');
+  // the rest, then it finishes with a time
+  await page.evaluate(() => { G.start = Date.now() - 61000; while (!G.done) { const c = [...document.querySelectorAll('#tGrid .gc:not(.off):not(.done)')].find(x => +x.dataset.r * +x.dataset.c === G.value); dropOn(c); } });
+  ok(await page.evaluate(() => G.placed === 12 && document.querySelectorAll('#tGrid .gc.done').length === 12) && /First try 11\/12 · 1:0[12]/.test(await page.$eval('#score', e => e.textContent)), 'finished: 12 placed, first try 11/12 with its time ' + await page.$eval('#score', e => e.textContent));
+  ok(await visible('#markBtn') && await page.$eval('#markBtn', e => e.textContent) === 'New grid', 'then "New grid" appears');
+  ok(await page.evaluate(() => { const r = loadRec(current); return r.history[0].k === 'tgrid~2,3,4,5,6,7,8,9,10,11,12|12|12' && r.history[0].first === 11; }), 'saved to her records');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/19-grid-done.png' });
+  await page.click('#markBtn');
+  ok(await page.evaluate(() => !G.done && G.placed === 0 && document.querySelectorAll('#tGrid .gc.done').length === 0) && !(await visible('#markBtn')), 'New grid starts an empty one');
+  await page.click('#setupBtn'); await page.click('#backBtn');
+  ok(await visible('#gridS'), 'Start again then Back returns to the grid');
+  ok(await page.evaluate(() => labelFor('tgrid~2,3,4,5,7|10|0')) === 'Times grid · 2–5, 7 · 10 × 10 · whole grid', 'record label for the grid');
 
   ok(await page.evaluate(() => [labelFor('area~area,perim|12|12'), labelFor('tbond~2,3,4,5,7|12|12'), labelFor('frac~shapes|2,3,4|6')].join(' / '))
     === 'Area · area, perimeter · sides up to 12 · 12 questions / Times bonds · 2–5, 7 · up to × 12 · 12 questions / Fractions · shapes · 2, 3, 4 parts · 6 questions', 'record labels for Area, Times bonds, Fractions');
