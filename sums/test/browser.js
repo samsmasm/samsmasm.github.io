@@ -47,6 +47,17 @@ const HELPERS = () => {
   await page.evaluate(HELPERS);
 
   ok(await page.$eval('#settings', e => !e.hidden), 'first visit opens settings');
+  ok(await page.evaluate(() => settings.pa.join('') === '0123456789' && settings.pb.join('') === '0123456789' && document.querySelectorAll('.kp [aria-pressed="true"]').length === 22), 'default: every digit 0–9 picked on both keypads (and All lit)');
+  // once only: a saved 1–9 from before becomes 0–9; a 1–9 chosen after the change stays
+  const mig = await page.evaluate(() => {
+    localStorage.setItem('sums-settings', JSON.stringify({ ops: ['+'], a: 1, b: 1, pa: [1, 2, 3, 4, 5, 6, 7, 8, 9], pb: [2], n: 12 }));
+    const old = loadSettings();
+    localStorage.setItem('sums-settings', JSON.stringify({ ...old, pa: [1, 2, 3, 4, 5, 6, 7, 8, 9] }));
+    const chosen = loadSettings();
+    localStorage.removeItem('sums-settings');
+    return [old.pa.join(''), old.pb.join(''), chosen.pa.join('')];
+  });
+  ok(mig.join() === '0123456789,2,123456789', 'saved 1–9 from before becomes 0–9 once: ' + mig.join(' / '));
 
   const gen = await page.evaluate(() => {
     const bad = [];
@@ -194,7 +205,7 @@ const HELPERS = () => {
     const id = current, r = JSON.parse(localStorage.getItem('sums-rec-' + id));
     return { k: Object.keys(r.best), ms: Object.values(r.best)[0].ms, h: r.history.length, first: r.history[0].first };
   });
-  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1:123456789|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved with the claimed first try: ' + JSON.stringify(rec));
+  ok(rec.k.length === 1 && rec.k[0] === '+-*/|2|1:0123456789|12' && rec.ms > 90000 && rec.h === 1 && rec.first === 11, 'record saved with the claimed first try: ' + JSON.stringify(rec));
 
   // a faster second sheet is a new best
   await page.click('#markBtn');

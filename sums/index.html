@@ -249,12 +249,18 @@ const store = {
 
 // ---------- settings ----------
 const ONE_TO_NINE = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-const DEFAULTS = { ops: ['+'], a: 1, b: 1, pa: ONE_TO_NINE, pb: ONE_TO_NINE, n: 12 };
+const ALL_DIGITS = [0, ...ONE_TO_NINE];
+const DEFAULTS = { ops: ['+'], a: 1, b: 1, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 12, v: 2 };
 function loadSettings() {
   const s = store.get('sums-settings', null);
   if (!(s && Array.isArray(s.ops) && s.ops.length)) return null;
   const out = { ...DEFAULTS, ...s };
-  for (const k of ['pa', 'pb']) if (!Array.isArray(out[k]) || !out[k].length) out[k] = ONE_TO_NINE;
+  for (const k of ['pa', 'pb']) {
+    if (!Array.isArray(out[k]) || !out[k].length) out[k] = ALL_DIGITS;
+    // once: the old default was 1–9; the default is now every digit
+    if (!s.v && out[k].join() === ONE_TO_NINE.join()) out[k] = ALL_DIGITS;
+  }
+  out.v = 2;
   return out;
 }
 let settings = loadSettings();
@@ -298,7 +304,7 @@ for (const big of document.querySelectorAll('.big')) big.addEventListener('click
 // keypad: tap to toggle a digit, or drag across keys to set them all the same way
 function setKey(line, k, on) {
   const pk = 'p' + line;
-  if (k === 'all') { settings[line] = 1; settings[pk] = [0, ...ONE_TO_NINE]; return; }
+  if (k === 'all') { settings[line] = 1; settings[pk] = [...ALL_DIGITS]; return; }
   k = +k;
   if (settings[line] !== 1) { settings[line] = 1; settings[pk] = [k]; return; } // fresh pick
   const has = settings[pk].includes(k);
@@ -447,7 +453,7 @@ $('#confirmRemoveBtn').onclick = () => {
 // number with that many digits.
 const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 const pickOne = arr => arr[rnd(0, arr.length - 1)];
-const lineOf = (d, p) => typeof d === 'object' ? d : { d, p: p || [1, 2, 3, 4, 5, 6, 7, 8, 9] };
+const lineOf = (d, p) => typeof d === 'object' ? d : { d, p: p || ALL_DIGITS };
 const lineA = () => lineOf(settings.a, settings.pa), lineB = () => lineOf(settings.b, settings.pb);
 const num = L => L.d === 1 ? pickOne(L.p) : rnd(10 ** (L.d - 1), 10 ** L.d - 1);
 // For ÷ the second number is the divisor and the answer comes from the first

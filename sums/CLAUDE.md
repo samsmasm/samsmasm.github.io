@@ -26,7 +26,7 @@ Arithmetic drill for Sam's daughter, written by finger or stylus on a touch scre
 - No running clock on screen (kept calm); time shows only at the end.
 
 ## Behaviour
-- Answers are always whole numbers 0 or more: takeaways try for first ≥ second and otherwise swap, divisions are generated as divisor × quotient so they are exact. Single digits come from the keypad picks (default 1 to 9). If the first number can't have its digit count for division (e.g. 2-digit ÷ 3-digit), it falls back to a small quotient.
+- Answers are always whole numbers 0 or more: takeaways try for first ≥ second and otherwise swap, divisions are generated as divisor × quotient so they are exact. Single digits come from the keypad picks (default all of 0 to 9, Sam; settings `v: 2` marks the one-time switch of a saved old-default 1–9 to 0–9). If the first number can't have its digit count for division (e.g. 2-digit ÷ 3-digit), it falls back to a small quotient.
 - After a 0.5 s pause the reader shows what it read in grey under the card. **Mark** marks every card that has writing; blank cards are skipped.
 - Wrong: ✗, the reading stays visible, pad locks, buttons "Try again" (clears, reopens) and "I wrote it right". Score is "First try n/N": only the first marking counts (an override on the first marking counts as first try right). When all are right, Mark becomes "New sheet".
 - Palm rejection: once a stylus (`pointerType 'pen'`) is used, finger touches are ignored on pads.
