@@ -102,7 +102,7 @@ Read the folder's own CLAUDE.md before working in any of these.
 **Kids' games**
 - `typurr/`: Typurr typing game for ages 4 to 8, starring Ty the cat (branched from `catjump`)
 - `catjump/`: Cat Jump runner game
-- `sums/`: Sums, handwritten arithmetic drill (+ − × ÷, 1 to 4 digits, 6/12/20 questions) for Sam's daughter. Digits are read on the device by a small CNN (no API). Black and white by request, not AESTHETIC.md. Read its CLAUDE.md; run `sums/test/run.sh` before committing.
+- `sums/`: Sums, handwritten maths practice for Sam's daughters (5, who can't read yet, and nearly 8): names → age → activity tiles (sums, ten frames, number bonds, place value, arrays, area, fractions, a drag-and-drop times grid and more). Answers written by finger are read on the device by a small CNN (no API), including backwards digits. Plain black and white by request, not AESTHETIC.md. Read its CLAUDE.md; run `sums/test/run.sh` before committing.
 
 **Evolution simulations**
 - `amoeba/`: amoebas with four heritable genes compete for food in a fixed-size dish; sliders for food, water thickness, food rot, mutation; fast forward and history graph. Shared `sim.js`; run `amoeba/test/run.sh` before committing. Open questions for a stronger model in `amoeba/REVIEW.md`.

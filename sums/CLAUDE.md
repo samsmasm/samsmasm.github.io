@@ -1,70 +1,83 @@
 # Sums, `/sums`
 
-Maths practice for Sam's two daughters, written by finger or stylus on a touch screen. Built 2026-11-15. Handwriting is read **on the device** by a small neural network: no API, no network calls, works offline once loaded.
+Maths practice for Sam's two daughters, written by finger or stylus on a touch screen. Built 2026-11-15. Handwriting is read **on the device** by a small neural network: no API, no network calls, works offline once loaded. Not linked from any index; `noindex`.
 
-Users: a 5-year-old in US-style kindergarten who **can't read yet** (pictures, numbers and spoken prompts only, never written questions she must read) and a nearly-8-year-old in grade 2 working above level. Sam wants them free to explore: the girls change their own settings, nothing is locked.
+**Users.** A 5-year-old in US-style kindergarten who **can't read yet** (pictures, numbers and spoken prompts only, never written questions she must read) and a nearly-8-year-old in grade 2 working above level (she found the first age-8 set straightforward, so newer age-8 defaults lean harder). Sam wants them free to explore: the girls change their own settings, nothing is locked.
 
-## Flow (2026-11-15: steps 1 and 2 done; age 8 has Arrays, Place value, Number lines, Area, Times bonds, Fractions)
-1. **Names** (opening screen): big name tiles, Everyone, "+ Add a name".
-2. **Age**: "How old are you?" with cake tiles (5 or 8 candles, read aloud). A named player is asked once (old names without an age get asked on first tap) and the age is saved on the player; **Everyone** is asked every time, so ages never mix. Ages offered: `AGES = [5, 8]` (6 and 7 to come; store the age, not a grade).
+**Before committing:** run `test/run.sh` (all must pass; questions are random, so run it twice after layout changes). Update `tracker/projects.md` and run `python3 tracker/publish.py` (see the repo CLAUDE.md).
+
+## Flow
+1. **Names** (opening screen): big name tiles, Everyone, "+ Add a name". Switching names clears the current sheet or grid, so nobody lands on someone else's.
+2. **Age**: "How old are you?" with cake tiles (5 or 8 candles), read aloud. A named player is asked once and the age is saved on the player (names from before ages existed are asked on first tap); **Everyone** is asked every time, so ages never mix. `AGES = [5, 8]` (6 and 7 to come; store the age, not a grade).
 3. **Home**: "What do you want to do today?" activity tiles for that age (picture, name, best time for her current settings). Age 5: read aloud on arrival. Header: ‹ Names, speaker, "Name · age", Records.
-   Tapping an activity with choices (Sums, Missing number, How many?, Number bonds) opens its **setup page first** (Sam: ask every time), with that player's own last choices selected; title "Name · Activity"; at age 5 it says "Choose, then press Start." Activities with no choices (Make 10, Teen numbers) go straight to the sheet. Back on a setup goes to where she came from (home, or her sheet via Start again).
-   Switching names clears the current sheet, so nobody lands on someone else's.
-4. **Sheet**: header ‹ Home, Start again (that activity's setup), speaker (repeats the question), score, Mark. At age 5 the question is spoken when the sheet opens.
-5. **Records** page: change age (cakes), best times and recent sheets for all activities, Remove (double-click proof, below).
+4. Tapping an activity **with choices opens its setup page first** (Sam: ask every time), with that player's own last choices selected; title "Name · Activity"; at age 5 it says "Choose, then press Start." Activities with no choices (Make 10, Teen numbers) go straight to the sheet. Back on a setup returns where she came from (home, or her sheet/grid via Start again).
+5. **Sheet** (cards) or **grid** (Times grid): header ‹ Home, Start again (that activity's setup), speaker (repeats the question), score, Mark. At age 5 the question is spoken when the sheet opens.
+6. **Records** page: change age (cakes), best times and recent sheets for every activity, Remove.
 
 ## Activities (`ACTS` in index.html)
-Each has `ages`, `defaults(age)`, `make(cfg)` → question, `setup` kind, `say` (spoken prompt), `pic` (tile SVG), `key(cfg)` / `label(key)` for records.
-- **Sums** (5 and 8): stacked + − ×, long-division ÷, keypad setup. Defaults: age 5 = + only, 0–5 and 0–5, 6 questions; age 8 = + − ×, 10–99 and 0–9, 12. The old one-device `sums-settings` (from before names) is **never** used: it was briefly carried over to age-8 Sums and gave the 8-year-old her sister's single digits (Sam hit this).
-- **Missing number** (8): `7 + ☐ = 12` with "☐ = ___" underneath. Hides first or second number; never an equation where any number works (0 × ☐ = 0, 0 ÷ ☐). She can write on the line or in the box in the sum (both read; bottom row wins). The line length comes from the longest number shown, not the answer, so it gives no hint. Keypad setup.
-- **How many?** (5): ten frame(s) with dots filled in order (top row left to right); "up to" 5 / 10 / 20 (20 = two frames, first full). She writes anywhere below the frames: **no line** under ten frames (Sam removed it; the anchor is the bottom of the last frame).
-- **Make 10** (5): one ten frame, 1–9 dots, the empty spaces drawn as dashed circles; answer = 10 − dots.
-- **Number bonds** (5): whole circle on top joined to two part circles; one circle is empty (`.hole`) and she writes **inside it** (read if the stroke centre is within 1.9 em of the circle's centre; radius is 1 em). "Up to" 5/10/20. A part of 0 only about 1 card in 10.
-- **Teen numbers** (5): 11–19 as a full ten frame plus a second frame with 1–9 dots.
-- **Read every card aloud** (5): each card has a speaker button in its foot (`cardSay`: "3 plus 4", "3 and 4 make what?", "7 is 3 and what?"; frames use the activity's prompt). Not shown at age 8.
-- **Backwards digits**: the reader has 17 classes, digits 0–9 plus BACKWARDS 2 3 4 5 6 7 9 (trained on mirrored MNIST, see train.py), because a plain flip check can't tell a backwards 5 from a real 2 (tested: same confidence). A backwards digit still counts as right; the card shows it mirrored next to the right way round, and at age 5 it is said ("Watch out, your 3 is backwards"). Tests: 420/420 synthetic backwards digits read and flagged, 0/600 normal digits flagged, a real 2 for 5 still wrong. Sam briefly floated a "receptive" version (choose which way round is right) and then dropped it; worth raising again only if he asks.
-- **Arrays** (8): r rows × c columns of dots, write the total (rows × columns). Setup `grid`: the two keypads relabelled Rows / Columns, signs and "bigger" hidden; 0 is skipped, only 0 → warning and Start off (`blocked`). Default rows 2–5, columns 2–9.
-- **Place value** (8): kinds (multi-select) Blocks (base-ten: hundreds squares up to 3 a row, tens sticks, ones cubes 3 a row, drawn to true proportions, `PV_EM` sets the size), 300 + 40 + 7 (expanded form, zero parts left out, shuffled about a third of the time so she can't just copy digits), 10 more / 10 less (amounts 1, 10, 100; never below 0 or above the max). Up to 99 or 999. Expanded and more/less are `expr` cards: a line of text then "= ___".
-- **Number lines** (8): 10 steps, only the two ends labelled, an arrow at tick 1–9; she works out the step and writes the number. Counting in 1s / 2s / 5s / 10s / 100s (multi-select), start a multiple of 10 steps.
-- Picture cards (ten frames, arrays, blocks, number lines) all use the `frame` layout: picture on top, answer anywhere below. Missing number and `expr` cards read **all** her writing (bottom row wins), so an answer written on the line, in the box, or a bit low all count.
-- **Area** (8): kinds Count squares (grid, sides ≤ 10), Area (side lengths only), Perimeter, Missing side (caption "Area 36", "?" on one side). Sides up to 5/10/12. Caption above the rectangle says what to find. Rectangle drawn to proportion (`areaSvg`, labels sized to stay ~0.72 em). Default: area, perimeter, missing side, up to 12 (Sam: she found the first age-8 set straightforward).
-- **Times bonds** (8): Number bonds for multiplication (product on top, factors below, one empty; a missing factor is a division). Times tables 2–12 (multi), up to × 10 or × 12. Reuses the `bond` card; 3-digit numbers print smaller.
-- **Fractions** (8): a bar or circle cut into d equal parts with n shaded (bars sometimes shade scattered parts), or a 0-to-1 number line cut into d with an arrow at n. Parts 2,3,4,5,6,8,10,12 (default 2,3,4,6,8). She writes the top number above a short printed bar and the bottom number below it (`fracParts`: above = within 2.1 em over the bar, so marks on the picture are ignored). **Equal fractions count** (2/4 for 1/2). The reading shows "3/4", or "3/?" if one is missing. `readAnswer(c)` does the reading and checking for every card (fractions compare n·D = N·d).
-- **Times grid** (8, Sam's design): its own screen (`#gridS`, `startGrid`), not a sheet of cards. 1..N across the top and down the side, only the triangle row ≤ column (6 × 7 and 7 × 6 are one cell, the diagonal included). A number appears on a tile; she **drags** it to its cell (or taps the cell). Any empty cell with that product counts (12 fits 2 × 6, 3 × 4, 1 × 12). Wrong cell: red flash, the tile goes back, the number is no longer first try. While dragging, the row and column headers under her finger light up. Cells outside her chosen tables are grey and never asked. Choices: times tables 1–12 (default 2–12), grid 10 × 10 or 12 × 12, numbers 12 / 24 / whole grid (`noCount`: no Questions row; no "Like these" examples). Mark is hidden while playing; at the end it becomes "New grid". Time and first-try score saved like the sheets (`tgrid~<tables>|<upto>|<count>`). Cell size fills the screen (`sizeGrid`, on resize).
-Ideas agreed for later (age 8): clocks and coins, then word problems. Also suggested and not built: rounding, breaking numbers apart (7 × 14 = 7 × 10 + 7 × ☐), patterns, rulers, bar models.
-- The reading under each card is big (26 px) so the girls can check it (Sam).
+Each has `name`, `ages`, `setup` kind, `say` (spoken prompt), `pic` (tile SVG), `defaults(age)`, `make(cfg)` → question (`kind` + `ans`), `key(cfg)` / `label(key)` for records; optional `options`, `blocked(cfg)` (warning text that turns Start off), `grid`, `noCount`.
 
-## The sheet (unchanged look: plain, like a paper printout; Sam likes it)
-- Grid follows rotation: portrait 2/3/4 columns for 6/12/20, landscape 3/4/5, phones in portrait always 2 (scrolls).
-- **+ − ×** stacked like written sums: carry space on top, sign left, right-aligned, line under; answer under the line. Long multiplication gets more room. **÷** long-division bracket in the middle; answer on the bar, working underneath.
-- Each card is one writing surface (`.work`, canvas over the printed question). Strokes are stored relative to an anchor (`.rule` / `.dd` / `.wl`) in units of the printed font size, so writing stays lined up after rotation.
-- **Only the answer is read** (`answerStrokes` + `inZone(kind)`): below the line (col, frame), above the bar (div), anywhere above the answer line (miss). Ruled lines ignored; several rows → bottom row. Try again removes only those strokes; Undo the last stroke.
-- After a 0.5 s pause the reading shows in grey. **Mark marks every card with anything written on it, in one press** (Sam): 4 of 12 done → those 4 are marked and the clock keeps going; the sheet finishes when all are right. If a card has writing but none in its answer place, `answerStrokes` falls back to all her writing (bottom row) instead of skipping the card (skipped cards looked like Mark was going "one by one").
-- **Wrong** (Sam): only "Try again"; the answer is never shown. When a later try is right, the card shows "first read N" and **I was right the first time**, which counts it as first try right (also updates the saved history if the sheet is already done).
-- Palm rejection once a stylus is used.
-- Look: black and white, only colour dark green / dark red card borders. Not AESTHETIC.md. The front screens can be more designed than the sheet (Sam).
+**Age 5**
+- **Sums** (also age 8): stacked + − ×, long-division ÷, keypad setup. Age 5 default: + only, 0–5 and 0–5, 6 questions.
+- **How many?**: ten frame(s), dots filled in order (top row left to right). Up to 5 / 10 / 20 (20 = two frames, first full). No line under ten frames (Sam removed it); she writes anywhere below.
+- **Number bonds**: whole circle on top joined to two part circles; one is empty (`.hole`) and she writes **inside it** (stroke centre within 1.9 em of the circle centre; radius 1 em). Up to 5 / 10 / 20. A part of 0 only about 1 card in 10.
+- **Teen numbers**: 11–19 as a full ten frame plus a second frame with 1–9 dots.
+- **Make 10**: one ten frame, 1–9 dots, empty spaces as dashed circles; answer = 10 − dots.
+- **Read aloud**: every card has a speaker in its foot (`cardSay`: "3 plus 4", "3 and 4 make what?", "7 is 3 and what?"; frames use the activity's prompt). Age 5 only.
+
+**Age 8**
+- **Sums**: age 8 default + − ×, 10–99 and 0–9, 12 questions. The old one-device `sums-settings` (from before names) is **never** used: carrying it over once gave the 8-year-old her sister's single digits (Sam hit this).
+- **Missing number**: `7 + ☐ = 12` with "☐ = ___" underneath. Hides the first or second number; never an equation where any number works (0 × ☐ = 0, 0 ÷ ☐). The line length comes from the longest number shown, so it gives no hint. Keypad setup.
+- **Arrays**: r rows × c columns of dots, write the total. `grid` setup: the two keypads relabelled Rows / Columns, signs and "bigger" hidden; only 0 chosen → warning, Start off. Default rows 2–5, columns 2–9.
+- **Place value**: kinds Blocks (base-ten, true proportions: hundreds squares 3 a row, tens sticks, ones cubes 3 a row; `PV_EM` sets the size), 300 + 40 + 7 (zero parts left out, shuffled about a third of the time so she can't just copy digits), 10 more / 10 less (amounts 1, 10, 100; never below 0 or above the max). Up to 99 or 999.
+- **Number lines**: 10 steps, only the two ends labelled, an arrow at tick 1–9; she works out the step. Counting in 1s / 2s / 5s / 10s / 100s.
+- **Area**: kinds Count squares (grid, sides ≤ 10), Area (side lengths only), Perimeter, Missing side (caption "Area 36", "?" on a side). Sides up to 5 / 10 / 12. A caption above the rectangle says what to find; rectangle to proportion (`areaSvg`).
+- **Times bonds**: number bonds for multiplication (product on top, factors below, one empty; a missing factor is a division). Tables 2–12, up to × 10 or × 12. Reuses the `bond` card.
+- **Fractions**: a bar or circle cut into d equal parts with n shaded (bars sometimes shade scattered parts), or a 0-to-1 number line cut into d with an arrow. Parts 2,3,4,5,6,8,10,12 (default 2,3,4,6,8). Top number above a short printed bar, bottom number below (`fracParts`; marks on the picture are ignored). **Equal fractions count** (2/4 for 1/2). Reading shows "3/4", or "3/?" if one is missing.
+- **Times grid** (Sam's design): its own screen (`#gridS`, `startGrid`), not cards. 1..N across and down, only the triangle row ≤ column (6 × 7 = 7 × 6 is one cell; diagonal included). A number appears on a tile; she **drags** it to its cell (or taps the cell). Any empty cell with that product counts (12 fits 2 × 6, 3 × 4, 1 × 12). Wrong cell: red flash, tile goes back, no longer first try. While dragging, the row and column headers light up. Cells outside her tables are grey and never asked. Choices: tables 1–12 (default 2–12), 10 × 10 or 12 × 12, numbers 12 / 24 / whole grid (`noCount`: no Questions row, no examples). Mark is hidden while playing and becomes "New grid" at the end. Cell size fills the screen (`sizeGrid`, on resize).
+
+**Agreed for later (age 8):** clocks and coins, then word problems. Also suggested, not built: rounding, breaking numbers apart (7 × 14 = 7 × 10 + 7 × ☐), patterns, rulers, bar models.
+
+## The sheet (plain, like a paper printout; Sam likes it, keep it that way)
+- Grid of cards follows rotation: portrait 2/3/4 columns for 6/12/20, landscape 3/4/5, phones in portrait always 2 (scrolls).
+- `qMarkup(q)` prints each question; `--h` / `--c` (height and width in em) set the font size to fit the card. Layouts: `col` (stacked + − ×: carry space on top, sign left, line under), `div` (long-division bracket in the middle, answer on the bar), `miss` (a line of text, then "= ___"; also used by `expr` cards), `bond`, `frac`, and `frame` (any picture on top, answer anywhere below: ten frames, arrays, blocks, number lines, area).
+- Each card is one writing surface (`.work`, canvas over the printed question). Strokes are stored relative to an **anchor** in units of the printed font size, so writing stays lined up after rotation: `.rule` (col), `.dd` top (div), `.wl` (miss/expr), centre of `.hole` (bond), `.fbar` (frac), bottom of the picture (frame).
+- **Which writing is the answer** (`answerStrokes` + `inZone`): below the line (col, frame), above the bar (div), inside the empty circle (bond), everything (miss/expr, so an answer on the line, in the box or a bit low all count), above/below the bar (frac). Ruled lines she draws are ignored; several rows → the bottom row. If a card has writing but none in its answer place, all her writing is read instead of skipping the card.
+- `readAnswer(c)` reads and checks every card (`{ text, ok, backwards }`); fractions compare n·D = N·d.
+- After a 0.5 s pause the reading shows in big grey text (26 px, Sam) under the card.
+- **Mark marks every card with anything written on it, in one press** (Sam): 4 of 12 done → those 4 marked, clock keeps going; the sheet finishes when all are right.
+- **Wrong** (Sam): only "Try again" (clears the answer, keeps working); the answer is never shown. When a later try is right, the card shows "first read N" and **I was right the first time**, which counts it as first try right (and updates the saved history if the sheet is already finished).
+- **Backwards digits**: the reader has 17 classes, 0–9 plus BACKWARDS 2 3 4 5 6 7 9, because a flip check can't tell a backwards 5 from a real 2 (tested: same confidence). A backwards digit still counts; the card shows it mirrored next to the right way round, and at age 5 it is said ("Watch out, your 3 is backwards"). Sam briefly floated a "receptive" version (choose which way round is right) and dropped it.
+- Palm rejection once a stylus is used. Undo removes the last stroke.
+- Look: black and white; only colour is dark green / dark red card borders (and grey fraction shading). Not AESTHETIC.md. The front screens can be more designed than the sheet (Sam).
 
 ## Setup page (Start again)
-- Keypad kind (Sums, Missing number): laid out like a sum. First number's calculator keypad (7 8 9 / 4 5 6 / 1 2 3 / 0 All) on top; signs left of the second keypad; "10–99 / 100–999 / 1000–9999" beside each; a line; Questions 6/12/20 and Start. Tap to toggle digits, drag to set many, at least one stays on; a key after 10–99 starts a fresh pick. Default 0–9.
-- ÷ with keypads: divide by the second number (0 skipped), the answer comes from the first number's picks. Only 0 to divide by: warning, Start off if ÷ is the only sign.
-- `opts` kind (How many?, Number bonds, Place value, Number lines): rows of buttons built from the activity's `options` ([{key, label, values, multi}]); multi rows keep at least one on. Make 10 and Teen numbers: no setup.
-- "Like these": four sample questions in the printed style (`qMarkup`), tap for more. Back without Start discards changes.
+- `keypad` (Sums, Missing number): laid out like a sum. First number's calculator keypad (7 8 9 / 4 5 6 / 1 2 3 / 0 All) on top; signs left of the second keypad; "10–99 / 100–999 / 1000–9999" beside each; a line; Questions 6/12/20 and Start. Tap to toggle digits, drag across keys to set many, at least one stays on; a key after 10–99 starts a fresh pick. Default 0–9. ÷: divide by the second number (0 skipped), the answer comes from the first number's picks; only 0 to divide by → warning, Start off if ÷ is the only sign.
+- `grid` (Arrays): the same keypads as Rows / Columns.
+- `opts` (How many?, Number bonds, Place value, Number lines, Area, Times bonds, Fractions, Times grid): rows of buttons built from the activity's `options` (`[{key, label, values, multi}]`); multi rows keep at least one on.
+- `none` (Make 10, Teen numbers): no setup page.
+- "Like these": four sample questions in the printed style, tap for more. Back without Start discards changes.
 
 ## Players, settings, records
 - localStorage: `sums-players` = `[{id, name, age}]`; settings per player per activity `sums-cfg-<id>-<act>` (Everyone: `sums-cfg-guest-<age>-<act>`); records `sums-rec-<id>` = `{ best: {key: {ms, count, t}}, history: [{k, ms, first, n, t}] }` (last 100).
-- Record keys: Sums keeps the original format with no prefix (`+-|2|1:0123456789|12`, signs | first | second | count, keypad line = `1:` + digits) so old records still count; others are `missing~<same>`, `howmany~<max>|<n>`, `bonds~<max>|<n>`, `teens~<n>`, `make10~<n>`, `arrays~<row digits>|<col digits>|<n>`, `pv~<kinds>|<max>|<n>`, `nline~<steps>|<n>`, `area~<kinds>|<max>|<n>`, `tbond~<tables>|<upto>|<n>`, `frac~<kinds>|<parts>|<n>`. `labelFor(key)` names them.
-- A sheet counts when every card is right. Time runs from the first stroke to the mark that makes it all right; header shows time and "New best!" or the best. No running clock.
+- Record keys: Sums keeps its original format with no prefix (`+-|2|1:0123456789|12`: signs | first | second | count, keypad line = `1:` + digits) so old records still count; all others are `<act>~...` (see each `key`). `labelFor(key)` names them.
+- A sheet or grid counts when everything is right. Time runs from her first stroke (or first drag) to the end; the header shows the time and "New best!" or the best. No running clock.
 - **Remove** is double-click proof (Sam): the first tap turns it into "Keep <name>" and the real confirm appears at the top of the page, ignoring taps for 0.5 s. Removes the player, records and settings.
 
+## Adding an activity
+1. Add an entry to `ACTS` (ages, setup kind, options, defaults, make, key, label, pic, say). Use an existing card `kind` if one fits.
+2. A new card kind needs: a `qMarkup` branch (with `--h` / `--c`), its anchor in `layout`, and a rule in `inZone` (or its own reader in `readAnswer`, as fractions do).
+3. Add browser tests (questions correct, cards fit with room to write, answers written in place are read and marked right, record label), and check screenshots in portrait, landscape and phone.
+
 ## Files
-- `index.html`: everything, inline CSS/JS. Globals used by tests: `ACTS`, `makeQ`, `cards`, `buildSheet`, `layout`, `sizeCanvas`, `draw`, `read`, `answerStrokes`, `loadCfg`, `loadRec`, `labelFor`, `draft`, `players`, `current`, `act`, `sheetStart`, `goNames`.
-- `digits.js`: the reader. `readNumber(strokes, unit)` splits strokes into digits (x-overlap grouping, or a thin stroke inside a wider one such as a 4's down stroke), renders each MNIST-style (20 px box, centre of mass at 14,14, stroke radius 1.25 px) and runs the CNN in plain JS.
-- `model.js`: int8 weights (~80 KB). CNN conv16/conv32/conv64 (3×3, relu, maxpool) → fc64 → fc17 (10 digits + 7 backwards digits). `digits.js` reads the class count from the weights, so a 10-class model still works.
-- `train/train.py`: retrains on MNIST with augmentation, mirroring a quarter of each batch into the backwards classes. Needs torch (`pip install --target <dir> torch --index-url https://download.pytorch.org/whl/cpu`, run with `PYTHONPATH=<dir>`) and the MNIST .gz files in `train/mnist/` (gitignored). `python3 train.py <out.js>` (~10 min CPU). Last run (2026-11-15): 99.2% digits, 98.3% backwards digits. `train/tojson.py ../test/mnist_sample.json` makes the parity sample (gitignored).
-- `test/run.sh`: node reader tests, then headless-Chrome tests of every screen and activity (speech is stubbed and checked). `SUMS_SHOTS=<dir>` saves screenshots. Run before committing.
+- `index.html`: everything, inline CSS/JS. Globals used by tests: `ACTS`, `makeQ`, `cards`, `buildSheet`, `layout`, `sizeCanvas`, `draw`, `read`, `readAnswer`, `answerStrokes`, `loadCfg`, `loadRec`, `labelFor`, `draft`, `players`, `current`, `act`, `sheetStart`, `goNames`, `G`, `startGrid`, `dropOn`.
+- `digits.js`: the reader. `readNumber(strokes, unit)` splits strokes into digits (x-overlap grouping, or a thin stroke inside a wider one such as a 4's down stroke), renders each MNIST-style (20 px box, centre of mass at 14,14, stroke radius 1.25 px), runs the CNN in plain JS, and returns `{ text, digits, backwards }`.
+- `model.js`: int8 weights (~80 KB). CNN conv16/conv32/conv64 (3×3, relu, maxpool) → fc64 → fc17. `digits.js` reads the class count from the weights, so a 10-class model still works.
+- `train/train.py`: retrains on MNIST with augmentation, mirroring a quarter of each batch into the backwards classes. Needs torch (`pip install --target <dir> torch --index-url https://download.pytorch.org/whl/cpu`, run with `PYTHONPATH=<dir>`) and the MNIST .gz files in `train/mnist/` (gitignored). `python3 train.py <out.js>` (~10 min on CPU). Last run (2026-11-15): 99.2% digits, 98.3% backwards digits. `train/tojson.py ../test/mnist_sample.json` makes the parity sample (gitignored).
+- `test/run.sh`: node reader tests (synthetic pen strokes, backwards digits, splitting, JS = PyTorch parity), then headless-Chrome tests of every screen and activity (speech stubbed and checked). `SUMS_SHOTS=<dir>` saves screenshots.
 
 ## Known limits
-- Synthetic tests are neater than a child's writing; real accuracy is unknown until they use it. If a digit is misread a lot, a "save sample" mode could collect their strokes to fine-tune.
+- Synthetic tests are neater than a child's writing; real accuracy is unknown until they use it on the tablet. If a digit is misread a lot, a "save sample" mode could collect their strokes to fine-tune.
 - Digits written touching or overlapping a lot can merge into one.
 - Speech uses the device's built-in voice (speechSynthesis); quality varies by tablet.
-- Not linked from any index; `noindex`.
+- The page doesn't update itself while open: reload after each change (Sam saw old behaviour from an unrefreshed tab).
