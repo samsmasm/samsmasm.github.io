@@ -4,7 +4,11 @@ Architecture (must match sums/digits.js):
   conv 1->16 3x3 pad1, relu, maxpool2   28 -> 14
   conv 16->32 3x3 pad1, relu, maxpool2  14 -> 7
   conv 32->64 3x3 pad1, relu, maxpool2  7 -> 3
-  fc 576->64 relu, fc 64->10
+  fc 576->64 relu, fc 64->17
+
+Classes 0-9 are digits; 10-16 are BACKWARDS (mirrored) 2 3 4 5 6 7 9, so a
+child's backwards 5 isn't confused with a real 2. Mirrored 0, 1, 8 keep
+their own labels (they look the same).
 """
 import gzip, json, base64, math, sys, os
 import numpy as np
@@ -22,6 +26,17 @@ ytr = torch.tensor(load('train-labels-idx1-ubyte', 8), dtype=torch.long)
 Xte = torch.tensor(load('t10k-images-idx3-ubyte', 16).reshape(-1, 1, 28, 28), dtype=torch.float32) / 255
 yte = torch.tensor(load('t10k-labels-idx1-ubyte', 8), dtype=torch.long)
 
+MIRRORED = [2, 3, 4, 5, 6, 7, 9]
+NCLS = 10 + len(MIRRORED)
+MIRROR_LABEL = torch.tensor([MIRRORED.index(d) + 10 if d in MIRRORED else d for d in range(10)])
+
+def flip_some(x, y, frac):
+    """Mirror a fraction of the batch left-right and relabel them."""
+    f = torch.rand(x.shape[0]) < frac
+    x = torch.where(f.view(-1, 1, 1, 1), x.flip(3), x)
+    y = torch.where(f, MIRROR_LABEL[y], y)
+    return x, y
+
 class Net(nn.Module):
     def __init__(s):
         super().__init__()
@@ -29,7 +44,7 @@ class Net(nn.Module):
         s.c2 = nn.Conv2d(16, 32, 3, padding=1)
         s.c3 = nn.Conv2d(32, 64, 3, padding=1)
         s.f1 = nn.Linear(576, 64)
-        s.f2 = nn.Linear(64, 10)
+        s.f2 = nn.Linear(64, NCLS)
     def forward(s, x):
         x = F.max_pool2d(F.relu(s.c1(x)), 2)
         x = F.max_pool2d(F.relu(s.c2(x)), 2)
@@ -70,14 +85,16 @@ for ep in range(EP):
     perm = torch.randperm(60000)
     for i in range(0, 60000, 128):
         idx = perm[i:i + 128]
-        xb = augment(Xtr[idx])
-        loss = F.cross_entropy(net(xb), ytr[idx], label_smoothing=0.05)
+        xb, yb = flip_some(Xtr[idx], ytr[idx], 0.25)
+        xb = augment(xb)
+        loss = F.cross_entropy(net(xb), yb, label_smoothing=0.05)
         opt.zero_grad(); loss.backward(); opt.step(); sched.step()
     net.eval()
     with torch.no_grad():
         acc = (net(Xte).argmax(1) == yte).float().mean().item()
         acca = (net(augment(Xte)).argmax(1) == yte).float().mean().item()
-    print(f'epoch {ep+1} test {acc:.4f} augmented {acca:.4f}', flush=True)
+        accm = (net(Xte.flip(3)).argmax(1) == MIRROR_LABEL[yte]).float().mean().item()
+    print(f'epoch {ep+1} test {acc:.4f} augmented {acca:.4f} backwards {accm:.4f}', flush=True)
 
 # export int8 per-tensor
 layers = {}

@@ -156,21 +156,25 @@
   }
   .qv.col { top: 1.2em; left: 50%; transform: translateX(-50%); width: calc((var(--d) + 1.2) * 1ch); }
   .col .row { display: flex; justify-content: space-between; }
-  .col .rule, .frame .rule { border-top: .07em solid var(--ink); margin-top: .12em; }
+  .col .rule { border-top: .07em solid var(--ink); margin-top: .12em; }
   .qv.div { top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: flex-end; }
   .div .dd { position: relative; border-top: .07em solid var(--ink); padding: .1em .15em 0 .5em; margin-left: .12em; }
   .div .br { position: absolute; left: 0; top: -.07em; width: .38em; height: calc(100% + .07em); overflow: visible; }
   .qv.frame { top: .6em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .frame svg { display: block; width: 5.5em; height: 2.2em; margin-bottom: .25em; }
-  .frame .rule { width: 3em; margin-top: .25em; }
+  .qv.bond { top: .4em; left: 50%; transform: translateX(-50%); }
+  .bond svg { display: block; width: 6em; height: 5.4em; }
+  .flipd { display: inline-block; transform: scaleX(-1); font-weight: 700; }
+  .foot .cardsay { padding: 2px 6px; line-height: 0; border-color: var(--line); }
+  .foot .cardsay svg { width: 20px; height: 20px; }
   .qv.miss { top: .7em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .miss .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
   .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
   .miss .wl { display: inline-block; width: calc((var(--d) + .8) * .7em); border-bottom: .07em solid var(--ink); height: 1em; }
 
-  .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 36px; padding: 2px 8px 5px; }
-  .read { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 15px; }
-  .mark { font-size: 24px; font-weight: 700; line-height: 1; }
+  .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; padding: 2px 8px 5px; }
+  .read { color: #666; font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; line-height: 1.1; }
+  .mark { font-size: 28px; font-weight: 700; line-height: 1; }
   .foot button { padding: 3px 9px; font-size: 14px; white-space: nowrap; }
   .foot .undo { margin-left: auto; }
   .foot .undo, .foot .clear { border-color: var(--line); color: var(--faint); }
@@ -185,7 +189,7 @@
   .card[data-state="right"] .undo, .card[data-state="right"] .clear,
   .card[data-state="wrong"] .undo, .card[data-state="wrong"] .clear { display: none; }
   .card[data-state="right"] .work, .card[data-state="wrong"] .work { pointer-events: none; }
-  .fixed { color: var(--faint); font-size: 13px; }
+  .fixed { color: var(--faint); font-size: 15px; font-weight: 400; }
 </style>
 </head>
 <body>
@@ -286,6 +290,7 @@
   <div class="card" data-state="writing">
     <div class="work"><div class="qv"></div><canvas></canvas></div>
     <div class="foot">
+      <button class="cardsay" aria-label="Read it to me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></button>
       <span class="mark"></span><span class="read"></span>
       <button class="retry">Try again</button>
       <button class="override">I was right the first time</button>
@@ -373,14 +378,27 @@ function kpLabel(k) {
 // ---------- activities ----------
 // Each activity: which ages see it, its starting settings, how to make a
 // question, the setup it uses, what to say aloud, and its tile picture.
-const frameSvg = (dots, empty, cls = '') => {
-  let s = `<svg class="${cls}" viewBox="-1 -1 52 22"><rect x="0" y="0" width="50" height="20" fill="none" stroke="currentColor" stroke-width="1"/>`;
+const frameSvg = (dots, empty) => `<svg viewBox="-1 -1 52 22">${frameInner(dots, empty)}</svg>`;
+const frameInner = (dots, empty) => {
+  let s = `<rect x="0" y="0" width="50" height="20" fill="none" stroke="currentColor" stroke-width="1"/>`;
   for (let i = 1; i < 5; i++) s += `<line x1="${i * 10}" y1="0" x2="${i * 10}" y2="20" stroke="currentColor" stroke-width=".7"/>`;
   s += `<line x1="0" y1="10" x2="50" y2="10" stroke="currentColor" stroke-width=".7"/>`;
   for (let i = 0; i < 10; i++) {
     const x = (i % 5) * 10 + 5, y = Math.floor(i / 5) * 10 + 5;
     if (i < dots) s += `<circle cx="${x}" cy="${y}" r="3.5" fill="currentColor"/>`;
     else if (empty) s += `<circle cx="${x}" cy="${y}" r="3.3" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.4 1.1"/>`;
+  }
+  return s;
+};
+// number bond: the whole in the top circle, joined to the two parts below; the
+// hidden one is an empty circle (class "hole") she writes in
+const bondSvg = q => {
+  const C = { w: [30, 11], p: [12, 41], q2: [48, 41] };
+  let s = `<svg viewBox="0 -1 60 54" fill="none" stroke="currentColor"><line x1="30" y1="11" x2="12" y2="41" stroke-width="1"/><line x1="30" y1="11" x2="48" y2="41" stroke-width="1"/>`;
+  for (const k of ['w', 'p', 'q2']) {
+    const [x, y] = C[k];
+    s += `<circle cx="${x}" cy="${y}" r="10" fill="white" stroke-width="1.1"${k === q.hide ? ' class="hole"' : ''}/>`;
+    if (k !== q.hide) s += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${q[k]}</text>`;
   }
   return s + '</svg>';
 };
@@ -423,6 +441,28 @@ const ACTS = {
     make: c => { const v = rnd(1, c.max); return { kind: 'frame', dots: v, frames: c.max > 10 ? 2 : 1, empty: false, ans: v }; },
     key: c => `howmany~${c.max}|${c.n}`,
     label: k => { const [m, n] = k.split('|'); return `How many? · up to ${m} · ${n} questions`; },
+  },
+  bonds: {
+    name: 'Number bonds', ages: [5], setup: 'max', say: 'What number goes in the empty circle?',
+    pic: bondSvg({ w: 5, p: 2, q2: 3, hide: 'q2' }),
+    defaults: () => ({ max: 10, n: 6 }),
+    // a whole split into two parts; one of the three circles is empty (the whole a third of the time)
+    make: c => {
+      // a part of 0 only now and then (plain random gave it on half the cards)
+      const w = rnd(2, c.max), p = Math.random() < 0.1 ? pickOne([0, w]) : rnd(1, w - 1), q2 = w - p;
+      const hide = pickOne(['w', 'p', 'q2']);
+      return { kind: 'bond', w, p, q2, hide, ans: { w, p, q2 }[hide] };
+    },
+    key: c => `bonds~${c.max}|${c.n}`,
+    label: k => { const [m, n] = k.split('|'); return `Number bonds · up to ${m} · ${n} questions`; },
+  },
+  teens: {
+    name: 'Teen numbers', ages: [5], setup: 'none', say: 'Ten, and some more. How many dots?',
+    pic: `<svg viewBox="-2 -2 112 92"><g transform="scale(2.1)">${frameInner(10, false)}</g><g transform="translate(0 46) scale(2.1)">${frameInner(4, false)}</g></svg>`,
+    defaults: () => ({ n: 6 }),
+    make: () => { const k = rnd(1, 9); return { kind: 'frame', dots: 10 + k, frames: 2, empty: false, ans: 10 + k }; },
+    key: c => `teens~${c.n}`,
+    label: k => `Teen numbers · ${k} questions`,
   },
   make10: {
     name: 'Make 10', ages: [5], setup: 'none', say: 'How many more dots to make ten?',
@@ -725,9 +765,11 @@ function qMarkup(q) {
       vars: { '--d': Math.max(len(q.a), len(q.b), len(q.c)), '--h': 5.4, '--c': (len(q.a) + len(q.b) + len(q.c)) * 0.62 + 5 },
     };
   }
+  if (q.kind === 'bond') return { cls: 'bond', html: bondSvg(q), vars: { '--h': 6.4, '--c': 6.8 } };
   if (q.kind === 'frame') {
     const svgs = q.frames === 2 ? frameSvg(Math.min(q.dots, 10), false) + frameSvg(Math.max(0, q.dots - 10), false) : frameSvg(q.dots, q.empty);
-    return { cls: 'frame', html: `${svgs}<div class="rule"></div>`, vars: { '--h': q.frames * 2.45 + 3.4, '--c': 7 } };
+    // no line under the frames (Sam): she writes anywhere below them
+    return { cls: 'frame', html: svgs, vars: { '--h': q.frames * 2.45 + 3.2, '--c': 7 } };
   }
   const d = Math.max(len(q.a), len(q.b), len(q.ans));
   const below = q.op === '*' && len(q.b) > 1 ? 1.1 * (len(q.b) + 1) + 0.3 : 1.7;
@@ -737,11 +779,20 @@ function qMarkup(q) {
     vars: { '--d': d, '--h': 3.6 + below, '--c': (d + 1.2) * 0.62 + 1.6 },
   };
 }
+// what the card's speaker says
+const WORD = { '+': 'plus', '-': 'take away', '*': 'times', '/': 'divided by' };
+function cardSay(q) {
+  if (q.kind === 'col' || q.kind === 'div') return `${q.a} ${WORD[q.op]} ${q.b}`;
+  if (q.kind === 'miss') return `${q.hide === 'a' ? 'what' : q.a} ${WORD[q.op]} ${q.hide === 'b' ? 'what' : q.b} makes ${q.c}?`;
+  if (q.kind === 'bond') return q.hide === 'w' ? `${q.p} and ${q.q2} make what?` : `${q.w} is ${q.hide === 'p' ? q.q2 : q.p} and what?`;
+  return ACTS[act].say;
+}
 function layout(c) {
   const qv = c.el.querySelector('.qv'), m = qMarkup(c.q);
   qv.className = 'qv ' + m.cls; qv.innerHTML = m.html;
   for (const k in m.vars) qv.style.setProperty(k, m.vars[k]);
-  c.anchorEl = qv.querySelector({ div: '.dd', miss: '.wl' }[m.cls] || '.rule');
+  c.anchorEl = m.cls === 'frame' ? qv.lastElementChild // bottom of the last ten frame
+    : qv.querySelector({ div: '.dd', miss: '.wl', bond: '.hole' }[m.cls] || '.rule');
 }
 
 // ---------- cards and writing ----------
@@ -771,6 +822,9 @@ function buildSheet(c) {
     layout(k);
     k.work._card = k;
     wirePad(k);
+    // age 5: every card has a speaker that reads that card's question
+    const cs = el.querySelector('.cardsay');
+    if (age === 5) cs.onclick = () => say(cardSay(k.q)); else cs.remove();
     el.querySelector('.undo').onclick = () => { k.strokes.pop(); draw(k); scheduleRead(k, 0); };
     el.querySelector('.clear').onclick = () => { k.strokes = []; draw(k); showRead(k, ''); };
     el.querySelector('.retry').onclick = () => {
@@ -801,8 +855,8 @@ function sizeCanvas(c) {
   const ar = c.anchorEl.getBoundingClientRect();
   c.w = r.width; c.h = r.height;
   c.F = parseFloat(getComputedStyle(c.el.querySelector('.qv')).fontSize) || 20;
-  c.ax = ar.right - r.left;
-  c.ay = (c.q.kind === 'div' ? ar.top : ar.bottom) - r.top;
+  if (c.q.kind === 'bond') { c.ax = (ar.left + ar.right) / 2 - r.left; c.ay = (ar.top + ar.bottom) / 2 - r.top; } // centre of the empty circle
+  else { c.ax = ar.right - r.left; c.ay = (c.q.kind === 'div' ? ar.top : ar.bottom) - r.top; }
   c.cv.width = Math.round(r.width * dpr); c.cv.height = Math.round(r.height * dpr);
   draw(c);
 }
@@ -852,7 +906,8 @@ function wirePad(c) {
 // the bar for ÷, on the line (or in the box) for missing numbers. Ruled lines are ignored, and
 // if there are several rows (long multiplication working) only the row
 // nearest the bottom counts.
-function inZone(kind, cy) {
+function inZone(kind, cx, cy) {
+  if (kind === 'bond') return Math.hypot(cx, cy) < 1.9; // in (or spilling out of) the empty circle, radius 1
   if (kind === 'div') return cy < 0;
   if (kind === 'miss') return cy < 0.8; // on the line, or in the box in the sum above it
   return cy > 0;
@@ -862,7 +917,7 @@ function answerStrokes(c) {
   for (const s of c.strokes) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    if (!inZone(c.q.kind, (y0 + y1) / 2)) continue;
+    if (!inZone(c.q.kind, (x0 + x1) / 2, (y0 + y1) / 2)) continue;
     if (x1 - x0 > 1.4 && y1 - y0 < (x1 - x0) * 0.25) continue; // a ruled line
     items.push({ s, y0, y1 });
   }
@@ -884,20 +939,30 @@ function setState(c, s) { c.el.dataset.state = s; c.el.querySelector('.mark').te
 let lastResult = null;
 function mark() {
   if (sheetDone) { buildSheet(cfg); return; }
+  const backwards = new Set();
   for (const c of cards) {
     if (c.el.dataset.state !== 'writing') continue;
     clearTimeout(c.timer);
-    const t = read(c);
+    const r = SumsDigits.readNumber(answerStrokes(c), 1.1), t = r.text;
     showRead(c, t);
     if (!t) continue;
     c.tries++;
     const ok = +t === c.q.ans;
     if (c.tries === 1) { c.first = ok; c.firstRead = t; }
     setState(c, ok ? 'right' : 'wrong');
-    if (ok && c.first === false) {
-      c.el.dataset.claim = '1';
-      c.el.querySelector('.read').innerHTML = `${t} <span class="fixed">· first read ${c.firstRead}</span>`;
+    let note = '';
+    if (ok && c.first === false) { c.el.dataset.claim = '1'; note += ` · first read ${c.firstRead}`; }
+    // a backwards digit still counts: show it mirrored next to the right way round
+    if (ok && r.backwards.length) {
+      const ds = [...new Set(r.backwards)];
+      ds.forEach(d => backwards.add(d));
+      note += ' · ' + ds.map(d => `<span class="flipd">${d}</span>→${d}`).join(' ');
     }
+    if (note) c.el.querySelector('.read').innerHTML = `${t} <span class="fixed">${note}</span>`;
+  }
+  if (backwards.size && age === 5) {
+    const ds = [...backwards];
+    say(`Well done. Watch out, your ${ds.join(' and your ')} ${ds.length > 1 ? 'are' : 'is'} backwards.`);
   }
   updateScore();
 }

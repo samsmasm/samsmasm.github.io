@@ -63,6 +63,11 @@
     }
     return out;
   }
+  // Classes 0-9 are digits; 10-16 (if the model has them) are the same digits
+  // written BACKWARDS: mirrored 2 3 4 5 6 7 9. See train/train.py.
+  const MIRRORED = [2, 3, 4, 5, 6, 7, 9];
+  const digitOf = cls => cls < 10 ? cls : MIRRORED[cls - 10];
+
   // img: Float32Array(784), 0 = paper, 1 = ink. Returns softmax probabilities.
   function classify(img) {
     const w = weights();
@@ -70,7 +75,7 @@
     x = convReluPool(x, 16, 14, w['c2.weight'], w['c2.bias'], 32);
     x = convReluPool(x, 32, 7, w['c3.weight'], w['c3.bias'], 64);
     x = dense(x, w['f1.weight'], w['f1.bias'], 64, true);
-    x = dense(x, w['f2.weight'], w['f2.bias'], 10, false);
+    x = dense(x, w['f2.weight'], w['f2.bias'], w['f2.bias'].length, false);
     let m = -Infinity; for (const v of x) m = Math.max(m, v);
     let s = 0; const p = x.map(v => { const e = Math.exp(v - m); s += e; return e; });
     return Array.from(p, v => v / s);
@@ -168,11 +173,11 @@
     if (!unit) { const b = bbox(strokes); unit = Math.max(b.h, 1e-6); }
     const digits = split(strokes, unit).map(g => {
       const p = classify(render(g.strokes));
-      let d = 0; for (let i = 1; i < 10; i++) if (p[i] > p[d]) d = i;
-      return { d, p: p[d], x0: g.x0, x1: g.x1 };
+      let c = 0; for (let i = 1; i < p.length; i++) if (p[i] > p[c]) c = i;
+      return { d: digitOf(c), p: p[c], backwards: c >= 10, x0: g.x0, x1: g.x1 };
     });
-    return { text: digits.map(g => g.d).join(''), digits };
+    return { text: digits.map(g => g.d).join(''), digits, backwards: digits.filter(g => g.backwards).map(g => g.d) };
   }
 
-  root.SumsDigits = { readNumber, classify, render, split };
+  root.SumsDigits = { readNumber, classify, render, split, digitOf };
 })(typeof window !== 'undefined' ? window : globalThis);

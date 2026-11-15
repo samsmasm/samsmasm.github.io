@@ -21,20 +21,26 @@ const HELPERS = () => {
     9: [[[0.55, 0.15], [0.3, 0], [0.05, 0.15], [0.1, 0.4], [0.35, 0.45], [0.55, 0.25], [0.55, 0.15], [0.55, 1]]],
   };
   // strokes for a number, right-aligned to x = right, top at y = top (question units)
-  window.numStrokes = (s, right, top, size = 1) => {
+  window.numStrokes = (s, right, top, size = 1, mirror = false) => {
     s = String(s); const out = [];
+    const mx = x => mirror ? 0.6 - x : x;
     [...s].forEach((ch, k) => GL[ch].forEach(st => {
       const x0 = right - (s.length - k) * 0.8 * size + 0.1 * size, pts = [];
       for (let i = 1; i < st.length; i++) for (let t = 0; t < 1; t += 0.1)
-        pts.push([x0 + (st[i - 1][0] + (st[i][0] - st[i - 1][0]) * t) * size, top + (st[i - 1][1] + (st[i][1] - st[i - 1][1]) * t) * size]);
+        pts.push([x0 + mx(st[i - 1][0] + (st[i][0] - st[i - 1][0]) * t) * size, top + (st[i - 1][1] + (st[i][1] - st[i - 1][1]) * t) * size]);
       out.push(pts);
     }));
     return out;
   };
   // the answer where she should write it: under the line, on the division bar, on the missing-number line
-  window.writeNum = (c, n, extra = []) => {
-    const top = { div: -1.3, miss: -1.1 }[c.q.kind] ?? 0.3;
-    c.strokes = [...extra, ...numStrokes(n, 0, top)];
+  window.writeNum = (c, n, extra = [], mirror = false) => {
+    if (c.q.kind === 'bond') { // in the empty circle, centred on the anchor
+      const w = String(n).length * 0.8 * 0.9;
+      c.strokes = [...extra, ...numStrokes(n, w / 2, -0.45, 0.9, mirror)];
+    } else {
+      const top = { div: -1.3, miss: -1.1 }[c.q.kind] ?? 0.3;
+      c.strokes = [...extra, ...numStrokes(n, 0, top, 1, mirror)];
+    }
     draw(c);
   };
 };
@@ -94,7 +100,7 @@ const fakeSpeech = () => {
   await page.click('#ageTiles [data-age="5"]');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
-  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,How many?,Make 10', 'age saved: straight to the 5 activities (Sums, How many?, Make 10)');
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,How many?,Number bonds,Teen numbers,Make 10', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
   ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'age 5 home is read aloud');
   await page.click('#backBtn');
 
@@ -102,7 +108,7 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks the age');
   await page.click('#ageTiles [data-age="5"]');
-  ok((await tiles('#actTiles')).length === 3, 'Everyone at 5: the 5 activities');
+  ok((await tiles('#actTiles')).length === 5, 'Everyone at 5: the 5 activities');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks again next time');
@@ -246,6 +252,38 @@ const fakeSpeech = () => {
   ok((await said()).slice(-1)[0] === 'How many more dots to make ten?', 'Make 10 read aloud');
   ok(await page.evaluate(() => cards.every(c => c.q.ans === 10 - c.q.dots && c.el.querySelectorAll('circle[fill="none"]').length === c.q.ans)), 'Make 10: empty spaces match the answer');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/8-make10.png' });
+  // backwards digits still count, and are pointed out (shown and said)
+  await page.evaluate(() => { cards[0].q = { kind: 'frame', dots: 7, frames: 1, empty: true, ans: 3 }; layout(cards[0]); sizeCanvas(cards[0]); writeNum(cards[0], 3, [], true); });
+  await page.click('#markBtn');
+  ok(await page.evaluate(() => cards[0].el.dataset.state === 'right' && cards[0].first === true && !!cards[0].el.querySelector('.read .flipd')), 'backwards 3: marked right first time, shown mirrored next to a 3');
+  ok(/your 3 is backwards/.test((await said()).slice(-1)[0]), 'backwards 3 is said out loud: ' + (await said()).slice(-1)[0]);
+  await page.evaluate(() => { cards[1].q = { kind: 'frame', dots: 5, frames: 1, empty: true, ans: 5 }; layout(cards[1]); sizeCanvas(cards[1]); writeNum(cards[1], 2); });
+  await page.click('#markBtn');
+  ok(await page.evaluate(() => cards[1].el.dataset.state === 'wrong'), 'a real 2 is not taken as a backwards 5');
+
+  // every card has a speaker at age 5
+  ok(await page.$$eval('.card .cardsay', b => b.length) === 6, 'age 5: a speaker on every card');
+  await page.click('.card:nth-child(3) .cardsay');
+  ok((await said()).slice(-1)[0] === 'How many more dots to make ten?', 'card speaker reads the card');
+
+  // Number bonds: write in the empty circle
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="bonds"]');
+  ok((await said()).slice(-1)[0] === 'What number goes in the empty circle?', 'Number bonds read aloud');
+  const bonds = await page.evaluate(() => cards.every(c => c.q.kind === 'bond' && c.q.w === c.q.p + c.q.q2 && c.q.ans === c.q[c.q.hide] && c.el.querySelectorAll('.hole').length === 1 && c.el.querySelectorAll('svg text').length === 2 && c.q.w <= 10));
+  ok(bonds, 'Number bonds: whole = parts, one empty circle, two numbers shown, up to 10');
+  ok(await page.evaluate(() => cards.every(c => { writeNum(c, c.q.ans); return read(c) === String(c.q.ans); })), 'Number bonds: answer written in the empty circle is read (all 6)');
+  ok(await page.evaluate(() => { const c = cards[0]; c.strokes = numStrokes(7, 4, -0.5, 0.9); return read(c) === ''; }), 'writing away from the empty circle is ignored');
+  const bs = await page.evaluate(() => { cards[0].q = { kind: 'bond', w: 7, p: 3, q2: 4, hide: 'w', ans: 7 }; cards[1].q = { kind: 'bond', w: 7, p: 3, q2: 4, hide: 'q2', ans: 4 }; return [cardSay(cards[0].q), cardSay(cards[1].q)]; });
+  ok(bs.join(' / ') === '3 and 4 make what? / 7 is 3 and what?', 'bond cards are read as "3 and 4 make what?" / "7 is 3 and what?"');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/10-bonds.png' });
+
+  // Teen numbers: a full ten and some more
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="teens"]');
+  ok(await page.evaluate(() => cards.every(c => c.q.ans >= 11 && c.q.ans <= 19 && c.el.querySelectorAll('.frame svg').length === 2 && c.el.querySelectorAll('svg circle').length === c.q.ans)), 'Teen numbers: 11–19 as a full ten frame and some more');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/11-teens.png' });
+
   // Ada's Sums starts small, and is hers, not Mia's
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="sums"]');

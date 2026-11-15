@@ -37,10 +37,11 @@ function densify(s) {
   return out;
 }
 // one written digit at x offset ox; size/height in pad-height units
-function write(d, ox, size) {
+function write(d, ox, size, mirror = false) {
   const slant = R(-0.25, 0.25), sx = R(0.75, 1.25), rot = R(-0.15, 0.15), oy = R(0.1, 0.25);
   const wob = R(0.005, 0.02);
   return G[d].map(s => densify(s).map(([x, y]) => {
+    if (mirror) x = 0.6 - x;
     x = (x - 0.3) * sx + slant * (0.5 - y); y = y - 0.5;
     const X = x * Math.cos(rot) - y * Math.sin(rot), Y = x * Math.sin(rot) + y * Math.cos(rot);
     return [ox + (X + 0.3) * size + R(-wob, wob), oy + (Y + 0.5) * size + R(-wob, wob)];
@@ -64,6 +65,21 @@ for (let d = 0; d <= 9; d++) {
 const acc = total / (10 * N);
 console.log(`single digits ${(acc * 100).toFixed(1)}%`);
 if (acc < 0.9) { console.log('FAIL: single-digit accuracy below 90%'); fails++; }
+
+// backwards digits (if the model has the mirrored classes): read as the right
+// digit and flagged; normal digits must (almost) never be flagged
+if (globalThis.SUMS_MODEL['f2.bias'].n > 10) {
+  let flagged = 0, rightBack = 0, wrongBack = [];
+  for (let d = 0; d <= 9; d++) for (let i = 0; i < N; i++) if (readNumber(write(d, 0.2, R(0.5, 0.75)), 1).backwards.length) flagged++;
+  for (const d of [2, 3, 4, 5, 6, 7, 9]) for (let i = 0; i < N; i++) {
+    const r = readNumber(write(d, 0.2, R(0.5, 0.75), true), 1);
+    if (r.text === String(d) && r.backwards.length === 1) rightBack++; else wrongBack.push(`${d}→${r.text}${r.backwards.length ? 'b' : ''}`);
+  }
+  console.log(`backwards digits read right and flagged ${rightBack}/${7 * N}; normal digits wrongly flagged ${flagged}/${10 * N}`);
+  if (wrongBack.length) console.log('  missed: ' + wrongBack.slice(0, 12).join(' '));
+  if (rightBack / (7 * N) < 0.9) { console.log('FAIL: backwards digits below 90%'); fails++; }
+  if (flagged / (10 * N) > 0.02) { console.log('FAIL: more than 2% of normal digits flagged backwards'); fails++; }
+}
 
 // multi-digit numbers: are they split into the right number of digits?
 let splitOk = 0, readOk = 0; const M = 200;
