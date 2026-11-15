@@ -123,7 +123,7 @@ const fakeSpeech = () => {
   const sugg = await page.evaluate(() => [4, 5, 6, 7, 10, 11].map(a => {
     age = a; return `${a}:${group()}:${reads() ? 'r' : '-'}:${loadCfg('clock').yr}:${loadCfg('seq').yr}:${loadCfg('clock').n}`;
   }).join(' '));
-  ok(sugg === '4:5:r:1:1:6 5:5:r:1:1:6 6:5:r:2:2:6 7:8:-:3:3:12 10:8:-:4:3:12 11:8:-:4:3:12', 'age → tiles, read aloud, starting year (capped at the highest built): ' + sugg);
+  ok(sugg === '4:5:r:1:1:6 5:5:r:1:1:6 6:5:r:2:2:6 7:8:-:3:3:12 10:8:-:4:4:12 11:8:-:4:4:12', 'age → tiles, read aloud, starting year (capped at the highest built): ' + sugg);
   await page.click('#ageTiles [data-age="6"]');
   ok((await tiles('#actTiles')).length === 15 && (await page.$eval('#title', e => e.textContent)) === 'Everyone · 6', 'age 6: the younger tiles');
   await page.click('#actTiles [data-act="graph"]');
@@ -476,6 +476,9 @@ const fakeSpeech = () => {
   await page.click('#actTiles [data-act="clock"]');
   ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'face,words'), 'Clocks setup at age 8: Year 4 suggested, clock and words');
   ok(await page.evaluate(() => $('#optBlock [data-key="yr"] .sug').dataset.v === '4' && /^Suggested for age 8: Year 4$/.test($('.sughint').textContent)), 'the suggested year has a dot and a line saying so');
+  ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
+    === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a)).every(a => maxYear(a) === 4)), 'every activity with years goes up to Year 4');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -540,10 +543,10 @@ const fakeSpeech = () => {
   // ---- Mia: Money (Years 1–3)
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="money"]');
-  ok(await page.evaluate(() => draft.yr === 3 && draft.kinds.join() === 'count,change' && /Year 4 \(Year 3 is the highest here so far\)/.test($('.sughint').textContent)), 'Money setup at age 8: Year 3, the highest built, and says so');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'count,change' && $('.sughint').textContent === 'Suggested for age 8: Year 4'), 'Money setup at age 8: Year 4');
   const mo = await page.evaluate(() => {
     const bad = [];
-    for (const yr of [1, 2, 3]) for (let i = 0; i < 400; i++) {
+    for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 400; i++) {
       const q = ACTS.money.make({ yr, kinds: ['count', 'change'] });
       const total = q.change ? q.pay - q.price : sumOf(q.items);
       const want = q.unit === '$c' ? [Math.floor(total / 100), total % 100] : q.unit === '$' ? total / 100 : total;
@@ -551,8 +554,10 @@ const fakeSpeech = () => {
       if (q.unit === '$' && total % 100) bad.push('whole dollars ' + JSON.stringify(q));
       if (q.change) {
         if (q.price <= 0 || q.price >= q.pay || !isNote(q.pay)) bad.push('change ' + JSON.stringify(q));
-        if ((yr < 3) !== (q.unit === '$')) bad.push('change unit ' + JSON.stringify(q));
+        if ((yr === 3) === (q.unit === '$')) bad.push('change unit ' + JSON.stringify(q));
+        if (yr === 4 && (q.price !== q.qty * q.each * 100 || q.qty < 2 || [1000, 2000, 5000, 10000].find(n => n > q.price) !== q.pay)) bad.push('y4 change ' + JSON.stringify(q));
       } else {
+        if (yr === 4 && (q.unit !== '$c' || total % 100 === 0)) bad.push('y4 ' + JSON.stringify(q));
         const cents = q.items.filter(v => v < 100), dollars = q.items.filter(v => v >= 100);
         if (yr === 1 && (cents.length || total > 1000)) bad.push('y1 ' + JSON.stringify(q));
         if (yr === 2 && ((cents.length && dollars.length) || (cents.length && total > 100) || total > 10000 || (q.items.some(v => v >= 500) && q.items.some(v => v < 500)))) bad.push('y2 ' + JSON.stringify(q));
@@ -561,11 +566,11 @@ const fakeSpeech = () => {
     }
     return bad.slice(0, 4);
   });
-  ok(mo.length === 0, 'Money: totals and change right; Year 1 whole dollars to $10, Year 2 coins or notes, Year 3 dollars and cents ' + mo.join(' | '));
+  ok(mo.length === 0, 'Money: totals and change right; Year 1 whole dollars to $10, Year 2 coins or notes, Year 3 dollars and cents, Year 4 bigger amounts and buying several ' + mo.join(' | '));
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => {
     const q = c.q, svg = c.el.querySelector('.qv svg');
-    if (q.change) return c.el.querySelector('.cap').textContent === 'Change?' && svg.querySelectorAll('text').length >= 4;
+    if (q.change) return c.el.querySelector('.cap').textContent === (q.qty ? `Buy ${q.qty}. Change?` : 'Change?') && svg.querySelectorAll('text').length >= 4;
     return svg.querySelectorAll('circle').length + svg.querySelectorAll('rect').length / 2 === q.items.length;
   })), 'Money cards: one coin or note drawn per item; change shows the price and the note');
   ok((await fits()).length === 0, 'Money fits ' + (await fits()).join(' '));
@@ -586,7 +591,7 @@ const fakeSpeech = () => {
   ok(ms.signs && ms.single && ms.cents, 'Money: a "$" or "c" she writes in is not read as a digit ' + JSON.stringify(ms));
   ok(ms.point, 'Money: "2.50" written with a point on one side is read as $2 and 50c');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/22-money.png' });
-  for (const yr of [2, 1]) {
+  for (const yr of [3, 2, 1]) {
     await page.click('#setupBtn');
     await page.click(`#optBlock [data-key="yr"] [data-v="${yr}"]`);
     await page.click('#newBtn');
@@ -598,6 +603,7 @@ const fakeSpeech = () => {
     === 'Clocks · Year 3 · clock, words · 12 questions / Money · Year 1 · how much · 6 questions', 'record labels for Clocks and Money');
   ok(await page.evaluate(() => [cardSay({ kind: 'money', change: true, price: 350, pay: 500 }), cardSay({ kind: 'clock', words: 'half past 4' })].join(' / '))
     === 'It costs 3 dollars and 50 cents. You pay 5 dollars. How much change? / half past 4. Write the time.', 'Clocks and Money cards read aloud');
+  ok(await page.evaluate(() => cardSay({ kind: 'money', change: true, qty: 3, each: 4, price: 1200, pay: 2000 })) === 'You buy 3, at 4 dollars each. You pay 20 dollars. How much change?', 'Money Year 4: buying several is read aloud');
 
   // ---- year-set sheets: open an activity, pick a year, check it fits and marks right
   const yearSheet = async (a, yr, name) => {
@@ -638,30 +644,31 @@ const fakeSpeech = () => {
 
   // ---- Number patterns
   const sq = await page.evaluate(() => {
-    const bad = [], max = { 1: 100, 2: 120, 3: 1000 };
-    for (const yr of [1, 2, 3]) for (let i = 0; i < 400; i++) {
+    const bad = [], max = { 1: 100, 2: 120, 3: 1000, 4: 10000 };
+    for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 400; i++) {
       const q = seqQ(yr), t = q.terms, d = t[1] - t[0];
-      if (t.length !== 5 || t.some((v, j) => j && v - t[j - 1] !== d) || d === 0 || Math.min(...t) < 0 || Math.max(...t) > max[yr] || q.ans !== t[q.hide]) bad.push(`${yr} ${JSON.stringify(q)}`);
+      const rule = q.mult ? t.every((v, j) => !j || v === t[j - 1] * q.mult) && yr === 4 : t.every((v, j) => !j || v - t[j - 1] === d) && d !== 0;
+      if (t.length !== 5 || !rule || Math.min(...t) < 0 || Math.max(...t) > max[yr] || q.ans !== t[q.hide]) bad.push(`${yr} ${JSON.stringify(q)}`);
       if (yr === 1 && ![1, 2, 10].includes(Math.abs(d))) bad.push('y1 step ' + JSON.stringify(q));
     }
     return bad.slice(0, 4);
   });
-  ok(sq.length === 0, 'Number patterns: five terms, same step, never below 0 or past the year\'s top, Year 1 in 1s, 2s, 10s ' + sq.join(' | '));
-  for (const yr of [3, 1, 2]) await yearSheet('seq', yr, 'Number patterns');
+  ok(sq.length === 0, 'Number patterns: five terms, same step (or ×2, ×3 in Year 4), never below 0 or past the year\'s top, Year 1 in 1s, 2s, 10s ' + sq.join(' | '));
+  for (const yr of [4, 3, 1, 2]) await yearSheet('seq', yr, 'Number patterns');
   ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.eq .bx').length === 1)), 'Number patterns: one box in the pattern');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/26-seq.png' });
 
   // ---- Doubles and halves
   const dq = await page.evaluate(() => {
     const bad = [];
-    for (const yr of [1, 2, 3]) for (let i = 0; i < 300; i++) {
+    for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 300; i++) {
       const q = dblQ(yr, ['double', 'half']), n = +q.cap?.match(/\d+/)?.[0] || +q.text.match(/\d+/)[0], dbl = /double/.test(q.cap || q.text);
       if (q.ans !== (dbl ? 2 * n : n / 2) || (yr === 1 && (q.kind !== 'dpic' || q.ans > 10)) || (yr === 2 && Math.max(n, q.ans) > 20)) bad.push(`${yr} ${JSON.stringify(q)}`);
     }
     return bad.slice(0, 4);
   });
   ok(dq.length === 0, 'Doubles and halves: right answers, Year 1 to 10 with dots, Year 2 to 20 ' + dq.join(' | '));
-  for (const yr of [3, 1]) await yearSheet('dbl', yr, 'Doubles and halves');
+  for (const yr of [4, 3, 1]) await yearSheet('dbl', yr, 'Doubles and halves');
   ok(await page.evaluate(() => cards.every(c => {
     const full = c.el.querySelectorAll('svg circle[fill="currentColor"]').length, empty = c.el.querySelectorAll('svg circle[fill="none"]').length;
     return c.q.dbl ? full === c.q.n && empty === c.q.n : full === 2 * c.q.n && empty === 0;
@@ -670,26 +677,33 @@ const fakeSpeech = () => {
 
   // ---- Story sums
   const sto = await page.evaluate(() => {
-    const bad = [], top = { 1: 20, 2: 100, 3: 1000 };
+    const bad = [], top = { 1: 20, 2: 100, 3: 1000, 4: 10000 };
     const calc = { add: n => n[0] + n[1], sub: n => n[0] - n[1], compare: n => n[0] - n[1], need: n => n[1] - n[0], two: n => n[0] + n[1] - n[2], groups: n => n[0] * n[1], share: n => n[0] / n[1] };
-    for (const yr of [1, 2, 3]) for (const kinds of [['addsub', 'muldiv'], ['muldiv'], ['addsub']]) for (let i = 0; i < 150; i++) {
+    for (const yr of [1, 2, 3, 4]) for (const kinds of [['addsub', 'muldiv'], ['muldiv'], ['addsub']]) for (let i = 0; i < 150; i++) {
       const q = storyQ(yr, kinds), n = q.text.match(/\d+/g).map(Number);
       if (q.ans !== calc[q.type](n) || q.ans < 2 || Math.max(...n, q.ans) > top[yr]) bad.push(`${yr} ${JSON.stringify(q)}`);
       if (!kinds.includes(STORY_KIND[q.type]) || (yr === 1 && ['compare', 'need', 'two'].includes(q.type))) bad.push(`${yr} type ${q.type} ${kinds}`);
-      if (q.type === 'two' && Math.max(...n) > (yr === 2 ? 20 : 100)) bad.push('two steps too big ' + JSON.stringify(q));
+      if (q.type === 'two' && Math.max(...n) > [0, 0, 20, 100, 1000][yr]) bad.push('two steps too big ' + JSON.stringify(q));
     }
     return bad.slice(0, 4);
   });
   ok(sto.length === 0, 'Story sums: the answer matches the story; Year 1 within 20 (no two-step), Year 2 within 100 (two-step within 20), Year 3 within 1,000 ' + sto.join(' | '));
-  for (const yr of [3, 1, 2]) await yearSheet('story', yr, 'Story sums');
+  for (const yr of [4, 3, 1, 2]) await yearSheet('story', yr, 'Story sums');
   ok(await page.evaluate(() => cards.every(c => cardSay(c.q) === c.q.text && c.el.querySelector('.u').textContent === c.q.unit)), 'Story sums: each card reads its story aloud, the answer line has its unit');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y2.png' });
 
   // ---- Graphs
   const gq = await page.evaluate(() => {
     const bad = [];
-    for (const yr of [1, 2, 3]) for (let i = 0; i < 300; i++) {
-      const q = graphQ(yr), ns = q.cats.map(c => c.n), by = Object.fromEntries(q.cats.map(c => [c.nm, c.n]));
+    for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 300; i++) {
+      const q = graphQ(yr);
+      if (yr === 4) { // dot plot: how many have v, the most common value, or how many altogether
+        const C = q.counts, mx = Math.max(...C), want = q.ask === 'one' ? C[q.v] : q.ask === 'mode' ? C.indexOf(mx) : C.reduce((a, b) => a + b, 0);
+        const dots = new DOMParser().parseFromString(graphSvg(q), 'image/svg+xml').querySelectorAll('circle').length;
+        if (q.type !== 'dot' || q.ans !== want || C.filter(n => n === mx).length !== 1 || dots !== C.reduce((a, b) => a + b, 0)) bad.push('dot ' + JSON.stringify(q));
+        continue;
+      }
+      const ns = q.cats.map(c => c.n), by = Object.fromEntries(q.cats.map(c => [c.nm, c.n]));
       const want = q.ask === 'one' ? by[q.of[0]] : q.ask === 'more' ? by[q.of[0]] - by[q.of[1]] : ns.reduce((a, b) => a + b, 0);
       if (q.ans !== want || q.ans < 1 || new Set(ns).size !== ns.length) bad.push(`${yr} ${JSON.stringify(q)}`);
       if ((yr === 1 && (q.type !== 'pic' || q.ask !== 'one' || q.cats.length !== 3 || Math.max(...ns) > 8)) || (yr === 2 && q.type === 'bar') || (yr === 3 && (q.type !== 'bar' || ns.some(n => n % q.step)))) bad.push(`${yr} type ${JSON.stringify(q)}`);
@@ -705,39 +719,41 @@ const fakeSpeech = () => {
     return bad.slice(0, 4);
   });
   ok(gq.length === 0, 'Graphs: answers match the counts and the drawing (dots, tally marks, bars on the scale); Year 1 picture graphs, Year 3 bar graphs ' + gq.join(' | '));
-  for (const yr of [3, 1, 2]) await yearSheet('graph', yr, 'Graphs');
-  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.cap .sw').length === c.q.of.length && cardSay(c.q) === c.q.say)), 'Graphs: colour squares in the question, read aloud by colour name');
+  for (const yr of [4, 3, 1, 2]) await yearSheet('graph', yr, 'Graphs');
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.cap .sw').length === c.q.of.length && cardSay(c.q) === c.q.say)), 'Graphs: colours in the question, read aloud by colour name');
+  ok(await page.evaluate(() => { const qs = range(0, 40).map(() => graphQ(2)); return qs.every(q => q.of.length === 0 || /class="sw round"/.test(q.cap) === (q.type === 'pic')); }), 'Graphs: a circle in the question when she counts circles, a square for tallies and bars (Sam)');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y2.png' });
 
   // ---- Shapes
   const shq = await page.evaluate(() => {
-    const bad = [], symOk = { 4: [4], 2: [2], 1: [1], 3: [3], 5: [5], 6: [6], 8: [8] };
-    for (const yr of [1, 2, 3]) for (const kinds of [['flat', 'solid'], ['flat'], ['solid']]) for (let i = 0; i < 200; i++) {
+    const bad = [], symOk = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12];
+    for (const yr of [1, 2, 3, 4]) for (const kinds of [['flat', 'solid'], ['flat'], ['solid']]) for (let i = 0; i < 200; i++) {
       const q = shapeQ(yr, kinds);
       if (q.solid) { if (yr === 1 || !kinds.includes('solid') || q.ans !== SOLIDS[q.solid][q.ask] || (yr === 2 && q.ask === 'edges')) bad.push(`${yr} solid ${JSON.stringify(q)}`); continue; }
-      if (q.ask === 'sym') { if (yr !== 3 || !symOk[q.ans]) bad.push('sym ' + JSON.stringify(q)); continue; }
+      if (q.ask === 'sym') { if (yr < 3 || !symOk.includes(q.ans) || (yr === 3 && q.ans > 8)) bad.push('sym ' + JSON.stringify(q)); continue; }
+      if (q.ask === 'right') { if (yr !== 4 || ![1, 2, 4].includes(q.ans)) bad.push('right ' + JSON.stringify(q)); continue; }
       const n = q.pts.length;
-      if (q.ans !== n || (yr === 1 && n > 4) || (yr === 2 && n > 6) || n > 10 || q.pts.some(p => Math.hypot(...p) > 46)) bad.push(`${yr} flat ${JSON.stringify(q)}`);
+      if (q.ans !== n || (yr === 1 && n > 4) || (yr === 2 && n > 6) || n > (yr === 4 ? 12 : 10) || q.pts.some(p => Math.hypot(...p) > 46)) bad.push(`${yr} flat ${JSON.stringify(q)}`);
       if (yr >= 2 && kinds.length === 1 && kinds[0] === 'solid' && !q.solid) bad.push('solid only gave flat');
     }
     return bad.slice(0, 4);
   });
   ok(shq.length === 0, 'Shapes: sides = corners = points drawn; 3D faces, edges, corners right; Year 1 up to 4 sides, Year 2 up to 6, symmetry in Year 3 ' + shq.join(' | '));
-  for (const yr of [3, 1, 2]) await yearSheet('shape', yr, 'Shapes');
+  for (const yr of [4, 3, 1, 2]) await yearSheet('shape', yr, 'Shapes');
   ok(await page.evaluate(() => cards.every(c => c.q.solid ? c.el.querySelectorAll('svg line[stroke-dasharray]').length === 3 : c.el.querySelector('svg polygon').getAttribute('points').split(' ').length === c.q.pts.length)), 'Shapes: the polygon has as many corners as the answer; 3D shapes show hidden edges dashed');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/30-shape-y2.png' });
 
   // ---- Rulers
   const rq = await page.evaluate(() => {
     const bad = [];
-    for (const yr of [1, 2, 3]) for (let i = 0; i < 300; i++) {
+    for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 300; i++) {
       const q = rulerQ(yr);
-      if (q.ans !== q.e - q.s || q.ans < 2 || q.s < 0 || (yr < 3 && q.s !== 0) || q.e > { 1: 9, 2: 10, 3: 12 }[yr] || q.unit !== (yr === 1 ? 'blocks' : 'cm')) bad.push(`${yr} ${JSON.stringify(q)}`);
+      if (q.ans !== q.e - q.s || q.ans < 2 || q.s < 0 || (yr < 3 && q.s !== 0) || q.e > { 1: 9, 2: 10, 3: 12, 4: 60 }[yr] || q.unit !== { 1: 'blocks', 2: 'cm', 3: 'cm', 4: 'mm' }[yr] || (yr === 4 && (q.ans < 15 || ![0, 10].includes(q.s)))) bad.push(`${yr} ${JSON.stringify(q)}`);
     }
     return bad.slice(0, 4);
   });
   ok(rq.length === 0, 'Rulers: length = end − start, Year 1 in blocks, Year 2 from 0, Year 3 sometimes not from 0 ' + rq.join(' | '));
-  for (const yr of [3, 1, 2]) await yearSheet('ruler', yr, 'Rulers');
+  for (const yr of [4, 3, 1, 2]) await yearSheet('ruler', yr, 'Rulers');
   ok(await page.evaluate(() => cards.every(c => { const t = [...c.el.querySelectorAll('svg text')].map(x => +x.textContent); return t.length === 11 && t[0] === 0 && t[10] === 10 && c.el.querySelector('.u').textContent === 'cm'; })), 'Rulers Year 2: a 0–10 cm ruler and "cm" after the line');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/31-ruler-y2.png' });
   ok(await page.evaluate(() => [labelFor('graph~3|12'), labelFor('shape~2|flat,solid|6'), labelFor('ruler~1|6')].join(' / '))
