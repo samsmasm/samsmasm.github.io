@@ -213,14 +213,14 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Scale with × and ÷ (double or halve a recipe). ✓ (Story sums, Year 4: recipe stories, double, halve, × 3, × 4)
 
 ### Fractions, decimals and money
-- Tenths as fractions and decimals (³⁄₁₀ = 0.3); compare and order them.
-- Know ½ = 0.5 and other tenths as decimals.
-- Divide one- and two-digit numbers by 10 to make tenths (7 ÷ 10 = 0.7); multiply tenths by 10.
+- Tenths as fractions and decimals (³⁄₁₀ = 0.3); compare and order them. ✓ partly (Decimals, Year 4: bars, number line, ³⁄₁₀ = __ . __; comparing comes with More or less in A5)
+- Know ½ = 0.5 and other tenths as decimals. ✓ (Decimals, Year 4: Picture kind)
+- Divide one- and two-digit numbers by 10 to make tenths (7 ÷ 10 = 0.7); multiply tenths by 10. ✓ (Decimals, Year 4: × and ÷ by 10)
 - Compare and order fractions with the same top or same bottom number.
 - Place fractions, improper fractions and mixed numbers on a number line (⁹⁄₈ = 1⅛).
 - Spot equal fractions with pictures. ✓ (Fractions)
 - Add and subtract fractions with the same denominator, past one whole (³⁄₈ + ³⁄₈ + ³⁄₈ = ⁹⁄₈ = 1⅛).
-- Add and subtract decimals to one place (1.3 + 0.2 = 1.5).
+- Add and subtract decimals to one place (1.3 + 0.2 = 1.5). ✓ (Decimals, Year 4: Add and take away)
 - Unit fraction of a number (⅓ of 300); the whole from a unit fraction (¼ of a set is 7, so the set is 28).
 - Total cost of several items in whole dollars, or many of one item, and the change. ✓ (Money, Year 4: Change kind)
 - Make an amount in different ways ($5 and 80 cents).

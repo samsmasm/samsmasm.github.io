@@ -201,10 +201,12 @@
     grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
     grid-auto-rows: minmax(190px, 1fr);
   }
-  #sheet[data-n="6"]  { --cols: 2; }
+  /* how many questions: 4 and 6 (Story sums), 6 and 12 (most), 20 (the keypad Sums only) */
+  #sheet[data-n="4"], #sheet[data-n="6"]  { --cols: 2; }
   #sheet[data-n="12"] { --cols: 3; }
   #sheet[data-n="20"] { --cols: 4; }
   @media (orientation: landscape) {
+    #sheet[data-n="4"]  { --cols: 2; }
     #sheet[data-n="6"]  { --cols: 3; }
     #sheet[data-n="12"] { --cols: 4; }
     #sheet[data-n="20"] { --cols: 5; }
@@ -282,6 +284,9 @@
   .pic2 .sw.round { border-radius: 50%; }
   .pic2 .u, .pic2 .sep { font-size: .8em; line-height: 1.1; }
   .pic2 .sep { padding: 0 .2em; }
+  .pic2 .sep.pt { font-size: 1.1em; font-weight: 800; padding: 0 .12em; }
+  .pic2 .fr { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.05; }
+  .pic2 .fr span:first-child { border-bottom: .08em solid var(--ink); padding: 0 .1em; }
 
   .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; padding: 2px 8px 5px; }
   .read { color: #666; font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; line-height: 1.1; }
@@ -382,7 +387,7 @@
     <div class="bfoot">
       <div>
         <div class="lab">Questions</div>
-        <div class="opts" id="nOpts"><button data-v="6">6</button><button data-v="12">12</button><button data-v="20">20</button></div>
+        <div class="opts" id="nOpts"></div>
       </div>
       <div class="go"><button id="newBtn" class="primary">Start</button></div>
     </div>
@@ -1312,11 +1317,67 @@ const rlineSvg = q => {
   const lab = (x, y, v) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${v}</text>`;
   return s + lab(lx, -3, q.n) + lab(10, 38, q.lo) + lab(110, 38, q.hi) + '</svg>';
 };
+// Decimals, Year 4: tenths. A decimal answer is two blanks round a printed
+// point (q.two, q.dp = 1): parts [ones, tenths]. A whole answer (0.7 × 10) is
+// an ordinary "= ___" card. Values are kept in tenths (13 = 1.3) so they stay exact.
+const tenths = v => (v / 10).toFixed(1);
+const DEC_KINDS = ['pic', 'line', 'addsub', 'ten'];
+const decTwo = (v, q) => ({ kind: 'dec', two: true, dp: 1, parts: [Math.floor(v / 10), v % 10], v, ans: tenths(v), ...q });
+function decQ(yr, kinds) {
+  const kind = pickOne(kinds);
+  if (kind === 'pic') {
+    if (Math.random() < 0.25) { // the fraction link: 3/10 = 0.3, 1/2 = 0.5
+      const [n, d] = Math.random() < 0.3 ? [1, 2] : [rnd(1, 9), 10];
+      return decTwo(n * 10 / d, { form: 'frac', n, d, say: `${n} over ${d}. Write it as a decimal.` });
+    }
+    return decTwo(rnd(0, 2) * 10 + rnd(1, 9), { form: 'bars' }); // full bars are ones, then some tenths
+  }
+  if (kind === 'line') { const v = pickOne([...range(1, 9), ...range(11, 19)]); return decTwo(v, { form: 'line' }); }
+  if (kind === 'addsub') { // 1.3 + 0.2, 2.5 − 0.4; crossing a whole about a third of the time (0.8 + 0.5)
+    const cross = Math.random() < 1 / 3;
+    for (let t = 0; t < 300; t++) {
+      const op = pickOne(['+', '−']), a = rnd(0, 8) * 10 + rnd(1, 9), b = (Math.random() < 0.7 ? 0 : rnd(1, 2)) * 10 + rnd(1, 9);
+      const r = op === '+' ? a + b : a - b;
+      if (r <= 0 || r % 10 === 0 || r > 99 || (op === '+' ? a % 10 + b % 10 > 10 : a % 10 < b % 10) !== cross) continue;
+      const text = `${tenths(a)} ${op} ${tenths(b)}`;
+      return decTwo(r, { form: 'expr', text, say: signWords(text) });
+    }
+    return decTwo(15, { form: 'expr', text: '1.3 + 0.2', say: '1.3 plus 0.2' });
+  }
+  // × and ÷ by 10: 7 ÷ 10 = 0.7, 23 ÷ 10 = 2.3 (two blanks); 0.7 × 10 = 7 (one blank)
+  let k = rnd(1, 99); while (k % 10 === 0) k = rnd(1, 99);
+  if (Math.random() < 0.5) return decTwo(k, { form: 'expr', text: `${k} ÷ 10`, say: `${k} divided by 10` });
+  return { kind: 'expr', text: `${tenths(k)} × 10`, say: `${tenths(k)} times 10`, ans: k };
+}
+// bars cut into ten: full bars for the ones, then one bar with some tenths shaded.
+// Always drawn in the room of three bars, so every card prints the same size.
+function decBarsSvg(v) {
+  const full = Math.floor(v / 10), part = v % 10, nb = full + (part ? 1 : 0), y0 = (33 - (nb * 9 + (nb - 1) * 3)) / 2;
+  let s = '';
+  for (let b = 0; b < nb; b++) {
+    const y = y0 + b * 12, k = b < full ? 10 : part;
+    for (let i = 0; i < 10; i++) s += `<rect x="${i * 6}" y="${y}" width="6" height="9" fill="${i < k ? SHADE : 'white'}" stroke-width=".6"/>`;
+    s += `<rect x="0" y="${y}" width="60" height="9" fill="none" stroke-width="1.1"/>`;
+  }
+  return `<svg viewBox="-1 -1 62 35" style="width:6.2em;height:3.5em" stroke="currentColor">${s}</svg>`;
+}
+// a 0-to-2 number line in tenths, only the whole numbers labelled, an arrow at the number
+function decLineSvg(v) {
+  let s = `<svg viewBox="-4 0 128 40" fill="none" stroke="currentColor" style="width:10.67em;height:3.33em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`;
+  for (let i = 0; i <= 20; i++) {
+    const x = 10 + i * 5, e = i % 10 === 0, h = i % 5 === 0;
+    s += `<line x1="${x}" y1="${e ? 15 : h ? 17 : 18.5}" x2="${x}" y2="${e ? 29 : h ? 27 : 25.5}" stroke-width="${e ? 1.2 : .8}"/>`;
+  }
+  const ax = 10 + v * 5;
+  s += `<path d="M${ax} 2v12" stroke-width="1.4"/><path d="M${ax - 3.2} 10.5 L${ax} 15.5 L${ax + 3.2} 10.5z" fill="currentColor" stroke="none"/>`;
+  const lab = (x, t) => `<text x="${x}" y="38" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${t}</text>`;
+  return s + lab(10, 0) + lab(60, 1) + lab(110, 2) + '</svg>';
+}
 const textSvg = lines =>`<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
   sums: {
-    name: 'Sums', ages: [5, 8], setup: 'keypad', say: 'Work out the answers.',
+    name: 'Sums', ages: [5, 8], setup: 'keypad', say: 'Work out the answers.', counts: [6, 12, 20],
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="78" y="28" text-anchor="end" font-size="26">23</text><text x="78" y="56" text-anchor="end" font-size="26">+ 14</text><line x1="36" y1="64" x2="80" y2="64" stroke="currentColor" stroke-width="3"/></svg>`,
     defaults: age => age === 5
       ? { ops: ['+'], a: 1, b: 1, pa: range(0, 5), pb: range(0, 5), n: 6 }
@@ -1352,7 +1413,7 @@ const ACTS = {
     label: k => { const [y, o, n] = k.split('|'); return `Times and divide · Year ${y} · ${[...o].map(x => SIGN[x]).join(' ')} · ${n} questions`; },
   },
   missing: {
-    name: 'Missing number', ages: [8], setup: 'keypad', say: 'What number is missing?',
+    name: 'Missing number', ages: [8], setup: 'keypad', say: 'What number is missing?', counts: [6, 12, 20],
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="8" y="52" font-size="26">4 +</text><rect x="52" y="30" width="22" height="26" fill="none" stroke="currentColor" stroke-width="3" rx="2"/><text x="80" y="52" font-size="26">= 9</text></svg>`,
     defaults: () => ({ ops: ['+', '-'], a: 2, b: 1, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 12 }),
     // hide one of the two numbers; never one where any number would do (0 × ☐ = 0)
@@ -1581,7 +1642,7 @@ const ACTS = {
     label: k => { const [y, kinds, n] = k.split('|'); return `Doubles and halves · Year ${y} · ${kinds.replace('double', 'doubles').replace('half', 'halves').split(',').join(', ')} · ${n} questions`; },
   },
   story: {
-    name: 'Story sums', ages: [5, 8], setup: 'opts', say: 'Listen to the story, then write the answer.',
+    name: 'Story sums', ages: [5, 8], setup: 'opts', say: 'Listen to the story, then write the answer.', counts: [4, 6],
     pic: `<svg viewBox="0 0 120 84" fill="currentColor">${[[20, 30], [52, 30], [84, 30], [36, 60], [68, 60]].map(([x, y]) => `<path d="M${x} ${y}q9 -9 18 0q-9 9 -18 0z M${x + 18} ${y}l8 -6v12z"/><circle cx="${x + 5}" cy="${y - 1.5}" r="1.4" fill="white"/>`).join('')}</svg>`,
     options: [
       { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100, two steps'], [3, '3 · within 1,000'], [4, '4 · within 10,000']] },
@@ -1665,6 +1726,18 @@ const ACTS = {
     key: c => `round~${c.yr}|${['line', 'num'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Rounding · Year ${y} · ${kinds.split(',').map(x => ({ line: 'number line', num: 'just numbers' })[x]).join(', ')} · ${n} questions`; },
   },
+  dec: {
+    name: 'Decimals', ages: [8], setup: 'opts', say: 'Write the decimal.',
+    pic: decBarsSvg(13),
+    options: [
+      { key: 'yr', label: 'Year', values: [[4, '4 · tenths']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['pic', 'Picture'], ['line', 'Number line'], ['addsub', 'Add and take away'], ['ten', '× and ÷ by 10']] },
+    ],
+    defaults: () => ({ yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }),
+    make: c => decQ(c.yr, c.kinds),
+    key: c => `dec~${c.yr}|${DEC_KINDS.filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Decimals · Year ${y} · ${kinds.split(',').map(x => ({ pic: 'picture', line: 'number line', addsub: '+ −', ten: '× ÷ 10' })[x]).join(', ')} · ${n} questions`; },
+  },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
     pic: (() => { // a little half-filled triangle grid
@@ -1709,8 +1782,13 @@ function loadCfg(a) {
   const c = { ...d, ...(s || {}) };
   for (const k of ['pa', 'pb']) if (k in d && (!Array.isArray(c[k]) || !c[k].length)) c[k] = d[k];
   if (c.ops) c.ops = [...c.ops];
+  // a saved count this activity no longer offers (20, from before) goes to the nearest one it has
+  const cs = countsOf(a);
+  if (!ACTS[a].noCount && !cs.includes(c.n)) c.n = cs.reduce((b, x) => Math.abs(x - c.n) < Math.abs(b - c.n) ? x : b);
   return c;
 }
+// how many questions an activity offers (Sam: 20 is too many almost everywhere)
+const countsOf = a => ACTS[a].counts || [6, 12];
 function fmtTime(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 function fmtDate(t) { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
 
@@ -1934,6 +2012,7 @@ function goSetup(from = 'home') {
       }).join('')}</div>${
       o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want > sug ? ` (Year ${sug} is the highest here so far)` : want < sug ? ` (Year ${sug} is the lowest here so far)` : ''}</p>` : ''}</div>`).join('');
   $('#nOpts').parentElement.hidden = !!ACTS[act].noCount; // the grid sets its own count
+  $('#nOpts').innerHTML = countsOf(act).map(v => `<button data-v="${v}">${v}</button>`).join('');
   $('#setupHint').textContent = kind === 'keypad' ? 'Takeaways never go below zero. Division always comes out exactly: you divide by the second number.' : '';
   syncOpts();
   show('setup');
@@ -2108,6 +2187,23 @@ function qMarkup(q) {
       : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
     return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw, capW) + 1.2 } };
   }
+  // decimals: bars, a number line, a fraction or a sum, then "__ . __" round a printed point
+  if (q.kind === 'dec') {
+    let top, pw, ph = 3.2;
+    if (q.form === 'bars' || q.form === 'line') {
+      top = q.form === 'bars' ? decBarsSvg(q.v) : decLineSvg(q.v);
+      [, pw, ph] = top.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    } else {
+      top = `<div class="words">${q.form === 'frac' ? `<span class="fr"><span>${q.n}</span><span>${q.d}</span></span>` : q.text}</div>`;
+      pw = q.form === 'frac' ? 2 : q.text.length * 0.56;
+    }
+    const eq = q.form === 'frac' || q.form === 'expr', ln = '<span class="ln"></span>';
+    return {
+      cls: 'pic2', anchor: '.sep',
+      html: `${top}<div class="ans">${eq ? '<span class="u">=</span>' : ''}${ln}<span class="sep pt">.</span>${ln}</div>`,
+      vars: { '--h': ph + 3.3, '--c': Math.max(pw, eq ? 5.6 : 4.9) + 1.2 },
+    };
+  }
   // graphs, shapes, rulers: the question, the picture, then "___" (and a unit)
   if (q.kind === 'graph' || q.kind === 'shape' || q.kind === 'ruler') {
     const pic = { graph: graphSvg, shape: shapeSvg, ruler: rulerSvg }[q.kind](q);
@@ -2146,7 +2242,9 @@ function qMarkup(q) {
   if (q.kind === 'rline') return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${rlineSvg(q)}`, vars: { '--h': 4.67 + 1.1 + 3.2, '--c': 11.9 } };
   // story sum: the words wrap, then "___ fish"
   if (q.kind === 'story') {
-    const lines = Math.ceil(q.text.length / 17);
+    // lines as the words wrap (about 16 characters a line), not just the length: long words wrap early
+    let lines = 1, cur = 0;
+    for (const w of q.text.split(' ')) { if (cur && cur + 1 + w.length > 16) { lines++; cur = w.length; } else cur += (cur ? 1 : 0) + w.length; }
     return {
       cls: 'story', anchor: '.wl',
       html: `<div class="st">${q.text}</div><div class="al"><span class="wl"></span><span class="u">${q.unit}</span></div>`,
@@ -2532,7 +2630,7 @@ function twoParts(c) {
     if (dx !== null && cl.some(g => g.cx < dx) && cl.some(g => g.cx > dx)) { left = cl.filter(g => g.cx < dx); right = cl.filter(g => g.cx > dx); }
     else {
       const all = money ? dropMoneySigns(cl, true, true) : cl;
-      const k = all.length >= 3 ? all.length - 2 : 1;
+      const k = c.q.dp ? Math.max(1, all.length - c.q.dp) : all.length >= 3 ? all.length - 2 : 1; // decimals: the last digit(s) are after the point
       left = all.slice(0, k); right = all.slice(k);
     }
   }
@@ -2549,10 +2647,15 @@ function readAnswer(c) {
   if (c.q.two) {
     const [l, r] = twoParts(c);
     if (!l.length && !r.length) return { text: '', ok: false, backwards: [] };
-    const a = SumsDigits.readNumber(l, 1.1), b = SumsDigits.readNumber(r, 1.1);
+    const a = SumsDigits.readNumber(l, 1.1), b = SumsDigits.readNumber(r, 1.1), bw = [...a.backwards, ...b.backwards];
+    if (c.q.dp) { // decimals: after the point, digits keep their places (1.05 is not 1.5) but trailing zeros don't matter (0.5 = 0.50); ".7" is 0.7
+      const want = String(c.q.parts[1]).padStart(c.q.dp, '0').replace(/0+$/, '');
+      const ok = b.text !== '' && b.text.replace(/0+$/, '') === want && (a.text === '' ? c.q.parts[0] === 0 : +a.text === c.q.parts[0]);
+      return { text: `${a.text}.${b.text || '?'}`, ok, backwards: bw };
+    }
     const ok = a.text !== '' && b.text !== '' && +a.text === c.q.parts[0] && +b.text === c.q.parts[1];
     const A = a.text || '?', B = b.text || '?';
-    return { text: c.q.kind === 'clock' ? `${A}:${b.text ? B.padStart(2, '0') : B}` : `$${A} and ${B}c`, ok, backwards: [...a.backwards, ...b.backwards] };
+    return { text: c.q.kind === 'clock' ? `${A}:${b.text ? B.padStart(2, '0') : B}` : `$${A} and ${B}c`, ok, backwards: bw };
   }
   if (c.q.kind === 'frac') {
     const [t, b] = fracParts(c);

@@ -95,7 +95,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -132,7 +132,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   await page.click('#ageTiles [data-age="10"]');
-  ok((await tiles('#actTiles')).length === 23, 'age 10: the older tiles');
+  ok((await tiles('#actTiles')).length === 24, 'age 10: the older tiles');
   // a new activity can start with one year only: any age opens it at the nearest year it has
   ok(await page.evaluate(() => [7, 8, 11].map(a => { age = a; return loadCfg('tf').yr + '' + loadCfg('cmp').yr; }).join() === '44,44,44'), 'True or false and More or less (Year 4 only so far) open at Year 4 for any age');
   await page.evaluate(() => { age = 7; act = 'tf'; goSetup(); });
@@ -328,7 +328,7 @@ const fakeSpeech = () => {
       : ['expr', 'miss', 'seq', 'bal', 'rnum'].includes(c.q.kind) ? c.ay > 2.5 * c.F
       : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
       : c.q.kind === 'tap' ? r.bottom <= w.bottom + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const t = b.getBoundingClientRect(); return t.width >= (c.q.cells ? 29 : 39) && t.height >= (c.q.cells ? 29 : 39) && t.bottom <= w.bottom + 1 && t.left >= w.left - 1 && t.right <= w.right + 1; }) // tiles big enough to tap
-      : ['clock', 'money', 'graph', 'shape', 'ruler'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
+      : ['clock', 'money', 'graph', 'shape', 'ruler', 'dec'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
       : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
   }).map(c => JSON.stringify(c.q))));
@@ -995,8 +995,8 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/34-cmp.png' });
   ok((await writeAllAndMark()).length === 0, 'More or less: the right signs are marked right');
   for (const k of ['num', 'sum']) {
-    await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 20 }); }, k);
-    ok((await fits()).length === 0, `More or less (${k} only, 20 on a sheet) fits ` + (await fits()).join(' '));
+    await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 12 }); }, k);
+    ok((await fits()).length === 0, `More or less (${k} only) fits ` + (await fits()).join(' '));
   }
   ok(await page.evaluate(() => [labelFor('tf~4|12'), labelFor('cmp~4|num,sum|12'), labelFor('cmp~4|sum|6')].join(' / '))
     === 'True or false · Year 4 · 12 questions / More or less · Year 4 · numbers, sums · 12 questions / More or less · Year 4 · sums · 6 questions', 'record labels for True or false and More or less');
@@ -1045,8 +1045,8 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0, 'Balance fits ' + (await fits()).join(' '));
   if (SHOTS) await page.screenshot({ path: SHOTS + '/35-bal.png' });
   ok((await writeAllAndMark()).length === 0, 'Balance: answers read and marked right');
-  await page.evaluate(() => { hideDone(); buildSheet({ yr: 4, n: 20 }); });
-  ok((await fits()).length === 0, 'Balance, 20 on a sheet, fits ' + (await fits()).join(' '));
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 4, n: 6 }); });
+  ok((await fits()).length === 0, 'Balance, 6 on a sheet, fits ' + (await fits()).join(' '));
 
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="round"]');
@@ -1058,8 +1058,8 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/36-round.png' });
   ok((await writeAllAndMark()).length === 0, 'Rounding: answers read and marked right');
   for (const k of ['line', 'num']) {
-    await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 20 }); }, k);
-    ok((await fits()).length === 0, `Rounding (${k} only, 20 on a sheet) fits ` + (await fits()).join(' '));
+    await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 12 }); }, k);
+    ok((await fits()).length === 0, `Rounding (${k} only) fits ` + (await fits()).join(' '));
     ok((await writeAllAndMark()).length === 0, `Rounding (${k} only): read and marked right`);
   }
   // the widest: five digits on the line, and 10000 to write
@@ -1067,6 +1067,91 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0 && (await writeAllAndMark()).length === 0, 'Rounding: 9960 to 10000 fits and 10000 is read');
   ok(await page.evaluate(() => [labelFor('bal~4|12'), labelFor('round~4|line,num|12'), labelFor('round~4|num|6')].join(' / '))
     === 'Balance · Year 4 · 12 questions / Rounding · Year 4 · number line, just numbers · 12 questions / Rounding · Year 4 · just numbers · 6 questions', 'record labels for Balance and Rounding');
+
+  // ---- how many questions (Sam: 20 is too many almost everywhere)
+  await page.click('#backBtn');
+  const nOpts = () => page.$$eval('#nOpts button', b => b.map(x => x.dataset.v).join());
+  for (const [a, want] of [['sums', '6,12,20'], ['missing', '6,12,20'], ['story', '4,6'], ['graph', '6,12'], ['bal', '6,12']]) {
+    await page.click(`#actTiles [data-act="${a}"]`);
+    ok(await nOpts() === want, `${a}: Questions ${want} ` + await nOpts());
+    await page.click('#backBtn');
+  }
+  ok(await page.evaluate(() => {
+    const keep = localStorage.getItem(cfgStoreKey('sums'));
+    store.set(cfgStoreKey('graph'), { yr: 4, n: 20 }); store.set(cfgStoreKey('story'), { yr: 4, kinds: ['addsub'], n: 12 }); store.set(cfgStoreKey('sums'), { ...ACTS.sums.defaults(8), n: 20 });
+    const r = loadCfg('graph').n === 12 && loadCfg('story').n === 6 && loadCfg('sums').n === 20;
+    localStorage.setItem(cfgStoreKey('sums'), keep); // her own Sums settings back, for the keypad tests later
+    return r;
+  }), 'a saved 20 falls back to 12 (6 on Story sums); the keypad Sums keeps 20');
+  await page.click('#actTiles [data-act="story"]');
+  ok(await page.evaluate(() => draft.n === 6 && $('#nOpts [aria-pressed="true"]').dataset.v === '6'), 'Story sums setup shows the fallback chosen');
+  await page.click('#backBtn');
+  ok(await page.evaluate(() => labelFor('graph~4|20') === 'Graphs · Year 4 · 20 questions' && labelFor('story~3|addsub|12') === 'Story sums · Year 3 · + − · 12 questions'), 'old records with 20 (or 12 stories) keep their labels');
+
+  // ---- Decimals, Year 4: tenths
+  const decq = await page.evaluate(() => {
+    const bad = [], forms = {};
+    let crossed = 0, adds = 0, link = 0, pics = 0;
+    for (const kind of ['pic', 'line', 'addsub', 'ten']) for (let i = 0; i < 500; i++) {
+      const q = decQ(4, [kind]), f = q.form || 'whole';
+      forms[kind + ':' + f] = 1;
+      if (q.kind === 'dec') {
+        const v = q.v;
+        if (!q.two || q.dp !== 1 || q.parts[0] !== Math.floor(v / 10) || q.parts[1] !== v % 10 || q.parts[1] === 0 || q.ans !== (v / 10).toFixed(1)) bad.push('parts ' + JSON.stringify(q));
+        if (f === 'bars' && (v < 1 || v > 29)) bad.push('bars ' + v);
+        if (f === 'line' && (v < 1 || v > 19 || v === 10)) bad.push('line ' + v);
+        if (f === 'frac' && q.n * 10 / q.d !== v) bad.push('frac ' + JSON.stringify(q));
+        if (kind === 'pic') { pics++; if (f === 'frac') link++; }
+      }
+      if (f === 'expr' || f === 'whole') {
+        const [a, op, b] = q.text.split(' '), x = Math.round(+a * 10), y = Math.round(+b * 10);
+        const want = op === '+' ? x + y : op === '−' ? x - y : op === '÷' ? x * 10 / y : x * y / 10; // in tenths, except × 10 (whole)
+        if (kind === 'addsub') { adds++; if (op === '+' ? x % 10 + y % 10 > 10 : x % 10 < y % 10) crossed++; if (want !== q.v || q.v <= 0) bad.push('addsub ' + q.text + ' ' + q.ans); }
+        if (op === '÷' && (want !== q.v || +a % 10 === 0)) bad.push('div ' + q.text + ' ' + q.ans);
+        if (op === '×' && (q.kind !== 'expr' || q.ans !== Math.round(+a * 10))) bad.push('times ' + q.text + ' ' + q.ans);
+      }
+    }
+    if (crossed / adds < 0.2 || crossed / adds > 0.47) bad.push('crossing a whole ' + crossed + '/' + adds);
+    if (link / pics < 0.15 || link / pics > 0.35) bad.push('fraction link ' + link + '/' + pics);
+    if (Object.keys(forms).sort().join() !== 'addsub:expr,line:line,pic:bars,pic:frac,ten:expr,ten:whole') bad.push('forms ' + Object.keys(forms));
+    return bad.slice(0, 4);
+  });
+  ok(decq.length === 0, 'Decimals Year 4: pictures to 2.9, a line from 0 to 2, 3/10 and 1/2, + and − (a third cross a whole), ÷ 10 to tenths, × 10 to wholes; never a whole answer in two blanks ' + decq.join(' | '));
+  await page.click('#actTiles [data-act="dec"]');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'pic,line,addsub,ten' && $('#optBlock [data-key="yr"]').children.length === 1), 'Decimals setup: Year 4, all four kinds');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'expr' || (c.el.querySelectorAll('.ans .ln').length === 2 && c.el.querySelector('.ans .sep').textContent === '.'))), 'Decimals cards: two blanks round a printed point (one line for a whole answer)');
+  ok((await fits()).length === 0, 'Decimals fit ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/37-dec.png' });
+  ok((await writeAllAndMark()).length === 0, 'Decimals: answers read and marked right');
+  for (const k of ['pic', 'line', 'addsub', 'ten']) {
+    await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 12 }); }, k);
+    ok((await fits()).length === 0, `Decimals (${k} only) fits ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/37-dec-${k}.png` });
+    ok((await writeAllAndMark()).length === 0, `Decimals (${k} only): read and marked right`);
+  }
+  const dr = await page.evaluate(() => {
+    hideDone(); buildSheet({ yr: 4, kinds: ['line'], n: 6 });
+    const c = cards[0], out = {};
+    const at = (v, w) => { c.q = decTwo(v, { form: 'line' }); layout(c); sizeCanvas(c); writeNum(c, w); return readAnswer(c); };
+    let r = at(13, ['1', '3']); out.plain = r.ok && r.text === '1.3';
+    out.trailing = at(13, ['1', '30']).ok;           // 1.30 is 1.3
+    out.places = !at(13, ['1', '03']).ok;            // 1.03 is not
+    out.swapped = !at(13, ['3', '1']).ok;
+    r = at(7, ['', '7']); out.noZero = r.ok && r.text === '.7'; // ".7" for 0.7
+    out.zero = at(7, ['0', '7']).ok;
+    out.wrongWhole = !at(7, ['1', '7']).ok;
+    // all on one side, with her own point between the digits
+    c.q = decTwo(13, { form: 'line' }); layout(c); sizeCanvas(c);
+    c.strokes = [...numStrokes('1', -2.2, -1.05, 0.85), [[-2.0, -0.12], [-2.02, -0.1]], ...numStrokes('3', -0.6, -1.05, 0.85)]; draw(c);
+    out.ownPoint = readAnswer(c).ok;
+    c.strokes = numStrokes('13', -0.6, -1.05, 0.85); out.noPoint = readAnswer(c).ok; // 13 squeezed left of the point: the last digit is the tenths
+    return out;
+  });
+  ok(Object.values(dr).every(Boolean), 'Decimals reading: 1.3 and 1.30 right, 1.03 and 3.1 wrong, 0.7 with or without the 0, her own point, both digits on one side ' + JSON.stringify(dr));
+  ok(await page.evaluate(() => [labelFor('dec~4|pic,line,addsub,ten|12'), labelFor('dec~4|addsub|6')].join(' / '))
+    === 'Decimals · Year 4 · picture, number line, + −, × ÷ 10 · 12 questions / Decimals · Year 4 · + − · 6 questions', 'record labels for Decimals');
+  ok(await page.evaluate(() => [cardSay(decQ(4, ['addsub'])), cardSay({ kind: 'dec', form: 'frac', n: 3, d: 10, say: '3 over 10. Write it as a decimal.' })].every(s => /^\d\.\d (plus|take away) \d\.\d$|^3 over 10/.test(s))), 'Decimals sums are read aloud');
 
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
@@ -1298,14 +1383,24 @@ const fakeSpeech = () => {
   ok(fit2 === 0, `two ten frames, 20 on screen: fit with room to write (${fit2} bad)`);
   if (SHOTS) await page.screenshot({ path: SHOTS + '/2-landscape-frames.png' });
 
-  // the Year 4 additions (steps A1 and A2) in portrait and on a phone
-  for (const [name, vp] of [['portrait', { width: 820, height: 1180, hasTouch: true }], ['phone', { width: 390, height: 844, hasTouch: true, isMobile: true }]]) {
+  // the Year 4 additions (steps A1 to A4) in portrait, landscape and on a phone,
+  // and every activity's question counts (each year, each count it offers) fit
+  for (const [name, vp] of [['portrait', { width: 820, height: 1180, hasTouch: true }], ['landscape', { width: 1180, height: 820, hasTouch: true }], ['phone', { width: 390, height: 844, hasTouch: true, isMobile: true }]]) {
     await page.setViewport(vp);
     await page.goto(URL); await page.evaluate(HELPERS);
     await page.click('#nameTiles [data-id="old1"]');
     await page.evaluate(() => { age = 8; });
+    const runs = await page.evaluate(() => Object.keys(ACTS).filter(a => !ACTS[a].grid).flatMap(a => (yearsOf(a).length ? yearsOf(a) : [0]).flatMap(y => countsOf(a).map(n => [a, y, n]))));
+    const badCounts = [];
+    for (const [a, y, n] of runs) {
+      await page.evaluate((a, y, n) => { act = a; const d = ACTS[a].defaults(ACTS[a].ages.includes(8) ? 8 : 5); if (y) d.yr = y; d.n = n; buildSheet(d); show('sheet'); }, a, y, n);
+      const bad = await fits();
+      if (bad.length) badCounts.push(`${a} Year ${y} × ${n}: ${bad[0]}`);
+    }
+    ok(badCounts.length === 0, `${name}: every activity, every year, every question count fits (${runs.length} sheets) ` + badCounts.slice(0, 4).join(' | '));
+    if (SHOTS) for (const n of [4, 6]) { await page.evaluate(n => { act = 'story'; buildSheet({ yr: 4, kinds: ['addsub', 'muldiv'], n }); show('sheet'); }, n); await page.screenshot({ path: SHOTS + `/41-${name}-story-${n}.png` }); }
     for (const [a, c] of [['tf', { yr: 4, n: 12 }], ['cmp', { yr: 4, kinds: ['num', 'sum'], n: 12 }], ['pv', { kinds: ['blocks'], max: 9999, n: 12 }], ['money', { yr: 4, kinds: ['change'], n: 12 }],
-      ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }]]) {
+      ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
