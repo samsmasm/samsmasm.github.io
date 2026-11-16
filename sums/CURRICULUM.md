@@ -200,7 +200,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ### Number
 - Read, write, compare and order numbers to 10,000 with base-ten structure. Knows: each place is 10 times the one on its right; 0 holds a place. ✓ (Place value: Up to 9,999, thousands as cubes; More or less, Year 4: compare; not ordering three or more)
-- Round to the nearest 10, 100 or 1,000; round tenths to the nearest whole.
+- Round to the nearest 10, 100 or 1,000; round tenths to the nearest whole. ✓ (Rounding, Year 4: number line or just numbers)
 - Count forwards and backwards in 2s to 9s, 25s and 50s from multiples. ✓ (Number patterns, Year 4; Number lines: 25s, 50s)
 - Count in 10s, 100s and 1,000s from any number to 10,000. ✓ (Number patterns, Year 4; Place value: 1,000 more / less; Number lines: 1000s)
 
@@ -210,7 +210,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Multiply and divide mentally with place value and known facts, including × 0, × 1 and ÷ 1. ✓ partly (True or false, Year 4: × 10 and ÷ 10)
 - Multiply a two- or three-digit number by a one-digit number. ✓ (Sums)
 - Divide up to a three-digit number by a one-digit number, no remainders (65 ÷ 5). ✓ (Times and divide, printed across: 65 ÷ 5 = ___). The original Sums tile keeps the long-division layout, a Year 5 written method (column and area-model multiplying do start in Year 4).
-- Scale with × and ÷ (double or halve a recipe).
+- Scale with × and ÷ (double or halve a recipe). ✓ (Story sums, Year 4: recipe stories, double, halve, × 3, × 4)
 
 ### Fractions, decimals and money
 - Tenths as fractions and decimals (³⁄₁₀ = 0.3); compare and order them.
@@ -226,9 +226,9 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Make an amount in different ways ($5 and 80 cents).
 
 ### Algebra
-- True or false and open number sentences with + and − (8205 − 4721 = 3484?; 4200 − __ = 4001). ✓ (True or false, Year 4; Missing number)
-- The same with × and ÷ (11 × 7 = 78?; __ ÷ 10 = 12). ✓ (True or false, Year 4; Missing number)
-- Knows: doing the same thing to both sides keeps it balanced.
+- True or false and open number sentences with + and − (8205 − 4721 = 3484?; 4200 − __ = 4001). ✓ (True or false, Year 4; Balance, Year 4; Missing number)
+- The same with × and ÷ (11 × 7 = 78?; __ ÷ 10 = 12). ✓ (True or false, Year 4; Balance, Year 4; Missing number)
+- Knows: doing the same thing to both sides keeps it balanced. ✓ (Balance, Year 4: 36 + 17 = ☐ + 20, 6 × 8 = ☐ × 4)
 - Growing patterns that add, take away or multiply by the same number each time (5, 7, 9, 11...; 3, 6, 12, 24...): continue, make and describe them.
 
 ### Measurement

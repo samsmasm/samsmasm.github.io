@@ -95,7 +95,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -132,7 +132,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   await page.click('#ageTiles [data-age="10"]');
-  ok((await tiles('#actTiles')).length === 21, 'age 10: the older tiles');
+  ok((await tiles('#actTiles')).length === 23, 'age 10: the older tiles');
   // a new activity can start with one year only: any age opens it at the nearest year it has
   ok(await page.evaluate(() => [7, 8, 11].map(a => { age = a; return loadCfg('tf').yr + '' + loadCfg('cmp').yr; }).join() === '44,44,44'), 'True or false and More or less (Year 4 only so far) open at Year 4 for any age');
   await page.evaluate(() => { age = 7; act = 'tf'; goSetup(); });
@@ -325,7 +325,7 @@ const fakeSpeech = () => {
   const fits = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).then(() => page.evaluate(() => cards.filter(c => {
     const w = c.work.getBoundingClientRect(), r = c.el.querySelector('.qv').getBoundingClientRect();
     const room = c.q.kind === 'bond' ? true // she writes in the circle, checked separately
-      : c.q.kind === 'expr' || c.q.kind === 'miss' || c.q.kind === 'seq' ? c.ay > 2.5 * c.F
+      : ['expr', 'miss', 'seq', 'bal', 'rnum'].includes(c.q.kind) ? c.ay > 2.5 * c.F
       : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
       : c.q.kind === 'tap' ? r.bottom <= w.bottom + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const t = b.getBoundingClientRect(); return t.width >= (c.q.cells ? 29 : 39) && t.height >= (c.q.cells ? 29 : 39) && t.bottom <= w.bottom + 1 && t.left >= w.left - 1 && t.right <= w.right + 1; }) // tiles big enough to tap
       : ['clock', 'money', 'graph', 'shape', 'ruler'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
@@ -765,19 +765,35 @@ const fakeSpeech = () => {
   // ---- Story sums
   const sto = await page.evaluate(() => {
     const bad = [], top = { 1: 20, 2: 100, 3: 1000, 4: 10000 };
-    const calc = { add: n => n[0] + n[1], sub: n => n[0] - n[1], compare: n => n[0] - n[1], need: n => n[1] - n[0], two: n => n[0] + n[1] - n[2], groups: n => n[0] * n[1], share: n => n[0] / n[1] };
+    const calc = { add: n => n[0] + n[1], sub: n => n[0] - n[1], compare: n => n[0] - n[1], need: n => n[1] - n[0], two: n => n[0] + n[1] - n[2], groups: n => n[0] * n[1], share: n => n[0] / n[1], recipe: n => n[0] * n[1], scale: n => n[1] * n[2] / n[0] };
+    const recipes = new Set();
     for (const yr of [1, 2, 3, 4]) for (const kinds of [['addsub', 'muldiv'], ['muldiv'], ['addsub']]) for (let i = 0; i < 150; i++) {
       const q = storyQ(yr, kinds), n = q.text.match(/\d+/g).map(Number);
       if (q.ans !== calc[q.type](n) || q.ans < 2 || Math.max(...n, q.ans) > top[yr]) bad.push(`${yr} ${JSON.stringify(q)}`);
       if (!kinds.includes(STORY_KIND[q.type]) || (yr === 1 && ['compare', 'need', 'two'].includes(q.type))) bad.push(`${yr} type ${q.type} ${kinds}`);
       if (q.type === 'two' && Math.max(...n) > [0, 0, 20, 100, 1000][yr]) bad.push('two steps too big ' + JSON.stringify(q));
+      if (['recipe', 'scale'].includes(q.type)) {
+        recipes.add(q.type);
+        if (yr !== 4 || !['grams', 'mL'].includes(q.unit) || !Number.isInteger(q.ans)) bad.push('recipe ' + JSON.stringify(q));
+        if (q.type === 'scale' && ![0.5, 2, 3, 4].includes(n[2] / n[0])) bad.push('scale ' + q.text); // halve, double, × 3, × 4
+      }
     }
+    if (recipes.size !== 2) bad.push('Year 4 recipe stories seen: ' + [...recipes].join());
     return bad.slice(0, 4);
   });
   ok(sto.length === 0, 'Story sums: the answer matches the story; Year 1 within 20 (no two-step), Year 2 within 100 (two-step within 20), Year 3 within 1,000 ' + sto.join(' | '));
   for (const yr of [4, 3, 1, 2]) await yearSheet('story', yr, 'Story sums');
   ok(await page.evaluate(() => cards.every(c => cardSay(c.q) === c.q.text && c.el.querySelector('.u').textContent === c.q.unit)), 'Story sums: each card reads its story aloud, the answer line has its unit');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y2.png' });
+  // the longest recipe story on every card
+  await page.evaluate(() => {
+    hideDone(); buildSheet({ yr: 4, kinds: ['muldiv'], n: 6 });
+    const text = 'A recipe for 12 biscuits needs 600 grams of butter. Ty the cat makes 48 biscuits. How many grams?';
+    cards.forEach(c => { c.q = { kind: 'story', type: 'scale', text, unit: 'grams', say: text, ans: 2400 }; layout(c); sizeCanvas(c); });
+  });
+  ok((await fits()).length === 0, 'Story sums Year 4: the longest recipe story fits ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Story sums Year 4 recipes: read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/28-story-y4.png' });
 
   // ---- Graphs
   const gq = await page.evaluate(() => {
@@ -985,6 +1001,72 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [labelFor('tf~4|12'), labelFor('cmp~4|num,sum|12'), labelFor('cmp~4|sum|6')].join(' / '))
     === 'True or false · Year 4 · 12 questions / More or less · Year 4 · numbers, sums · 12 questions / More or less · Year 4 · sums · 6 questions', 'record labels for True or false and More or less');
   ok(await page.evaluate(() => cardSay(cmpQ(4, ['num']))).then(s => /^\d+, and \d+\. Which sign goes in the box\? is less than, equals, is more than\.$/.test(s)), 'More or less is read aloud with its three signs');
+
+  // ---- Balance and Rounding, Year 4
+  const bq = await page.evaluate(valSrc => {
+    const bad = [], val = eval(valSrc), shapes = new Set();
+    for (let i = 0; i < 800; i++) {
+      const q = balQ(4), [l, r] = q.text.split(' = ');
+      if ((q.text.match(/☐/g) || []).length !== 1) { bad.push('boxes ' + q.text); continue; }
+      const nums = q.text.match(/\d+/g).map(Number);
+      if (!Number.isInteger(q.ans) || q.ans < 1 || Math.max(q.ans, ...nums) > 9999) bad.push('size ' + q.text + ' ' + q.ans);
+      if (val(l.replace('☐', q.ans)) !== val(r.replace('☐', q.ans))) bad.push('not equal ' + q.text + ' ' + q.ans);
+      // exactly one answer: no other whole number from 0 to 10,000 balances it
+      for (const x of [q.ans - 1, q.ans + 1, 0]) if (x >= 0 && val(l.replace('☐', x)) === val(r.replace('☐', x))) bad.push('two answers ' + q.text);
+      shapes.add(/[+−×÷]/.test(l) && /[+−×÷]/.test(r) ? 'both' : 'one');
+      if (q.say !== q.text.replace(/\+/g, 'plus').replace(/−/g, 'take away').replace(/×/g, 'times').replace(/÷/g, 'divided by').replace('=', 'is the same as').replace('☐', 'what') + '?') bad.push('say ' + q.say);
+    }
+    if (shapes.size !== 2) bad.push('shapes ' + [...shapes]);
+    return bad.slice(0, 4);
+  }, val);
+  ok(bq.length === 0, 'Balance Year 4: one box, both sides equal with the answer, one answer only, whole numbers to 9,999, often both sides to work out ' + bq.join(' | '));
+  const rdq = await page.evaluate(() => {
+    const bad = [], tos = new Set();
+    let half = 0;
+    for (const kinds of [['line'], ['num']]) for (let i = 0; i < 600; i++) {
+      const q = roundQ(4, kinds), n = +q.n, u = q.hi - q.lo, want = Math.round(n / u) * u; // Math.round: halfway goes up
+      tos.add(u);
+      if (q.ans !== want || q.kind !== (kinds[0] === 'line' ? 'rline' : 'rnum') || n <= q.lo || n >= q.hi || ![1, 10, 100, 1000].includes(u) || n > 9999) bad.push(JSON.stringify(q));
+      if (Math.abs(q.pos - (n - q.lo) / u) > 1e-9 || q.cap !== `to the nearest ${u === 1 ? 'whole number' : u}`) bad.push('pos/cap ' + JSON.stringify(q));
+      if (u === 1 && !/^\d\.\d$/.test(q.n)) bad.push('tenths ' + q.n);
+      if (q.pos === 0.5) { half++; if (q.kind === 'rline') bad.push('halfway on a line ' + q.n); }
+    }
+    if (tos.size !== 4) bad.push('nearest ' + [...tos]);
+    if (!half) bad.push('no halfway numbers in Just numbers');
+    return bad.slice(0, 4);
+  });
+  ok(rdq.length === 0, 'Rounding Year 4: nearest 10, 100, 1,000 or whole number, right answer (halfway up), never halfway on the number line ' + rdq.join(' | '));
+
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="bal"]');
+  ok(await page.evaluate(() => draft.yr === 4 && $('#optBlock [data-key="yr"]').children.length === 1), 'Balance setup: Year 4 only');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'bal' && c.el.querySelectorAll('.eq .bx').length === 1 && c.el.querySelectorAll('.al .bx').length === 1)), 'Balance sheet: one box in the equation, "☐ = ___" underneath');
+  ok((await fits()).length === 0, 'Balance fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/35-bal.png' });
+  ok((await writeAllAndMark()).length === 0, 'Balance: answers read and marked right');
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 4, n: 20 }); });
+  ok((await fits()).length === 0, 'Balance, 20 on a sheet, fits ' + (await fits()).join(' '));
+
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="round"]');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'line,num'), 'Rounding setup: Year 4, number line and just numbers');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'rnum' ? c.el.querySelector('.eq').textContent === c.q.n && c.el.querySelector('.cap').textContent === c.q.cap
+    : [...c.el.querySelectorAll('svg text')].map(t => t.textContent).join('|') === `${c.q.n}|${c.q.lo}|${c.q.hi}`)), 'Rounding cards print the number and what to round to; the line has both ends labelled and the number on the arrow');
+  ok((await fits()).length === 0, 'Rounding fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/36-round.png' });
+  ok((await writeAllAndMark()).length === 0, 'Rounding: answers read and marked right');
+  for (const k of ['line', 'num']) {
+    await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 20 }); }, k);
+    ok((await fits()).length === 0, `Rounding (${k} only, 20 on a sheet) fits ` + (await fits()).join(' '));
+    ok((await writeAllAndMark()).length === 0, `Rounding (${k} only): read and marked right`);
+  }
+  // the widest: five digits on the line, and 10000 to write
+  await page.evaluate(() => { buildSheet({ yr: 4, kinds: ['line'], n: 12 }); cards[0].q = { kind: 'rline', n: '9960', lo: 9900, hi: 10000, pos: 0.6, cap: 'to the nearest 100', say: 'x', ans: 10000 }; layout(cards[0]); sizeCanvas(cards[0]); });
+  ok((await fits()).length === 0 && (await writeAllAndMark()).length === 0, 'Rounding: 9960 to 10000 fits and 10000 is read');
+  ok(await page.evaluate(() => [labelFor('bal~4|12'), labelFor('round~4|line,num|12'), labelFor('round~4|num|6')].join(' / '))
+    === 'Balance · Year 4 · 12 questions / Rounding · Year 4 · number line, just numbers · 12 questions / Rounding · Year 4 · just numbers · 6 questions', 'record labels for Balance and Rounding');
 
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
