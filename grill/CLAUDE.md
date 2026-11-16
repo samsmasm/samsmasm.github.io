@@ -11,7 +11,7 @@ Drills IB Economics government intervention diagrams: indirect tax, subsidy, pri
 - Externality shading: every area of the chart is tappable (Sam, 2026-11-12), not just areas under demand as in the price-control drills, so areas above D don't hint at the answer (e.g. the external benefit band above MPB).
 - `genExt` keeps every labelled value and every corner of every shading area on a gridline inside the chart, and rejects markets whose label boxes touch (`labelsFit`, including the "Price, cost, benefit ($)" axis title box). HL calcs that match a shading area carry `concept`; a test checks the answer equals the area.
 - Code: `diagramExt`, `conceptsExt`, `effectsExt`, `calcsExt`, `lineCandsExt`, `labelWhyExt`, `contextExt`; the shared functions dispatch to these with `isExt(sc)`.
-- "Totally random", "Practise my weakest" and the skill column buttons cover all eight topics, so weakest will send students to untried externality boxes first.
+- "Totally random", "Practise my weakest" and the skill column buttons cover every topic, so weakest sends students to untried boxes first (see Step 3 in the queue).
 
 ## Minimum wage and PED revenue (added 2026-11-16), and what comes next
 - New topics live in the `TOPICS` map in `index.html` (one object each: `gen`, `diagram`, `base`, `concepts`, `effects`, `calcs`, `reads`, `context`, `lineCands`, `labelWhy`, optional `axes`/`unit`). The shared functions check `TOPICS[kind]` first. Add future graphs the same way, plus a row in `renderHome` and the kind in `test/tests.js`.
@@ -20,9 +20,9 @@ Drills IB Economics government intervention diagrams: indirect tax, subsidy, pri
 
 ## Next steps (when Sam says "do the next steps")
 
-Build the **first unticked batch** below, one batch per session, then tick it here. Everything needed is in this file; the guide itself is at `~/Documents/ib-guides/IB Economics Official Guide.pdf` (copyrighted, outside the repo on purpose: never copy it back in or commit it; `pdftotext -layout` reads it, diagrams are listed in the syllabus tables from "Unit 1").
+Build the **lowest-numbered unticked step** in the queue below, one step per session, then tick it here. Everything needed is in this file; the guide itself is at `~/Documents/ib-guides/IB Economics Official Guide.pdf` (copyrighted, outside the repo on purpose: never copy it back in or commit it; `pdftotext -layout` reads it, diagrams are listed in the syllabus tables from "Unit 1").
 
-### How to do a batch
+### How to do a step
 1. Read this file and skim `TOPICS.minwage` and `TOPICS.rev` in `index.html` as the pattern.
 2. Labels: anything marked **agreed** below is settled. Anything marked **ask** needs one AskUserQuestion round (2 to 4 options with a recommended one) before building. Sam said the labels so far were good, so keep questions few. All labels must be ones IB examiners accept.
 3. Add one `TOPICS.<kind>` object per graph, the kind and name in `KINDS`, a row in `renderHome` (new section heading if it is a new syllabus area), any new label text in `LINE_COL` / `READ_WHAT`-style `reads`, and the kind in the `KINDS` array in `test/tests.js`.
@@ -30,47 +30,49 @@ Build the **first unticked batch** below, one batch per session, then tick it he
 5. Rules that always apply: every key point on a gridline; no Qd/Qs functions; SL never calculates; wrong answers say "Try again" and never leak the answer; labels must fit their boxes (`labelsFit`, long names overflow the 92px box, as "Minimum wage" did); few words on screen; no em dashes.
 6. Add a test like 'minimum wage and PED revenue: ...' for each new topic (labels as agreed, one right line, answers consistent with the diagram, calc answers equal to shaded areas where they match).
 7. Run `mkdir -p <scratchpad>/shots` then `GR_SHOTS=<scratchpad>/shots bash grill/test/run.sh`, and look at the new topics' screenshots (`<kind>-<skill>-0.png`) for clipped or overlapping labels.
-8. Update this file (tick the batch, record label decisions with the date) and the Grill line in the root `CLAUDE.md`.
+8. Update this file (tick the step, record label decisions with the date) and the Grill line in the root `CLAUDE.md`.
 9. Commit only the Grill files by name (never `git add -A`), `git pull --rebase`, push. Then `python3 tracker/publish.py`, edit the Grill entry in `tracker/projects.md`, and run `publish.py` again.
 10. Tell Sam what was built and list anything he should check.
 
 ### Open questions for Sam (raise at the start of the next session)
 - "Min. wage" as the line label, or widen the box for "Minimum wage"?
 - The guide lets SL calculate PED and total revenue (2.5). Keep "SL only reads the graph" there?
-- "Totally random", "Practise my weakest" and the skill column buttons draw from every topic, including ones a class has not been taught yet. Suggested small fix (not built, Sam to decide): make each section heading tappable to drill just that section.
+- (The "random draws from untaught topics" problem is now Step 3 in the queue.)
 
 ### Home page layout (reviewed 2026-11-16 at Sam's request)
 - Sections run in **syllabus order with the guide number**: 2.3 Markets, 2.5 Elasticity, 2.7 Government intervention (was "Taxes, subsidies, price controls"; minimum wage sits here as a price floor), 2.8 Externalities. New sections go in the same order: Trade (4.1, 4.2), Exchange rates (4.5), then macro (3.x) between micro and Unit 4.
 - Header subtitle is now "Graph drill: IB Economics diagrams".
 - On phones the grid used to run off the right edge; the 520px media query now shrinks the skill headings and topic buttons so it fits at 390px. Check `home-phone.png` after adding rows or columns.
 
-### The queue
-- [x] **Minimum wage** (3.3, 3.7) and **PED and total revenue** (2.5). Done 2026-11-16.
-- [x] **Batch 1: 2.3 competitive market equilibrium.** Done 2026-11-16 as `dshift` ("Change in demand") and `sshift` ("Change in supply"), built by `shiftTopic(dem)`. Draw gives a cause in words (`SHIFT_CAUSES`) and says only "Tap the curve that shows the change", so the student picks the curve and the direction. Every area is tappable (`allTap`). **Not built yet: fall in the demand for labour** (do it with Batch 2 or when Sam asks). Original spec kept below for reference.
+### The queue (numbered steps; do the lowest unticked number, one step per "do the next steps")
+- [x] **Step 1: Minimum wage** (3.3, 3.7) and **PED and total revenue** (2.5). Done 2026-11-16.
+- [x] **Step 2: 2.3 competitive market equilibrium.** Done 2026-11-16 as `dshift` ("Change in demand") and `sshift` ("Change in supply"), built by `shiftTopic(dem)`. Draw gives a cause in words (`SHIFT_CAUSES`) and says only "Tap the curve that shows the change", so the student picks the curve and the direction. Every area is tappable (`allTap`). Original spec kept below for reference.
   - Kinds: `dshift` (demand shifts right or left) and `sshift` (supply shifts right or left), direction random per question.
   - Labels **agreed**: D₁ → D₂ or S₁ → S₂; P₁, Q₁ then P₂, Q₂. The curve that does not move is plain D or S.
   - Draw: a cause is given in words (non-price determinants from the guide: income, tastes, price of substitutes/complements, number of consumers; costs of factors of production, technology, number of firms, indirect taxes/subsidies, price of related goods in supply) and the student taps the new curve; decoys are the other direction and the other curve shifting.
   - Shade: consumer surplus and producer surplus before and after, social (community) surplus, expenditure/revenue before and after. No DWL here.
   - Effects: price, quantity, shortage or surplus at the old price (excess demand / excess supply), signalling and incentive functions of price, allocative efficiency at equilibrium (MB = MC, social surplus maximised).
   - HL calc (guide: CS and PS from a diagram): CS, PS, social surplus before and after, change in revenue, size of the shortage/surplus at P₁.
-  - Also add **fall in the demand for labour** (3.3) as a variant here or under Minimum wage: DL₁ → DL₂, W₁/Q₁ → W₂/Q₂ (labels follow the agreed shift pattern; axes as minimum wage).
-- [ ] **Batch 2: 4.1 free trade.** New section "Trade". Kinds: `imports` (world price below domestic price) and `exports` (world price above).
+  - Fall in the demand for labour moved to Step 4.
+- [ ] **Step 3: section headings drill their own section** (Sam asked for this to go in the queue, 2026-11-16). Problem: "Totally random", "Practise my weakest" and the skill column buttons draw from every topic, including ones a class has not been taught yet, and it gets worse as trade and macro arrive. Fix: make each section heading on the home grid (2.3 Markets, 2.5 Elasticity, ...) a button that starts a mixed drill of only that section's topics and all skills (new `startDrill` mode, e.g. `sect` with the list of kinds; scores still recorded under the real topic). It must look tappable (same underline style as the skill headings) and the lede line should mention it in a few words. Keep the externalities "All four mixed" row as it is (Sam chose it). Add a test that a section drill never leaves its section. Do not add topic tick-lists or settings: Sam prefers small refinements.
+- [ ] **Step 4: fall in the demand for labour** (3.3), left over from Step 2. A `TOPICS` variant under 2.7 next to Minimum wage or under 2.3 Markets (ask Sam which): DL₁ → DL₂, W₁/Q₁ → W₂/Q₂ (agreed shift pattern), axes as minimum wage, answers in workers. Reuse `shiftTopic` with labour names if that stays simple.
+- [ ] **Step 5: 4.1 free trade.** New section "Trade". Kinds: `imports` (world price below domestic price) and `exports` (world price above).
   - Labels **agreed**: Pw and numbered quantities. Plain free trade has only two quantities at Pw, so use Q1 and Q2 left to right (imports: Q1 domestic supply, Q2 domestic demand; exports: Q1 domestic demand, Q2 domestic supply). Lines "S domestic", "D domestic", "S world" (horizontal at Pw). **Ask**: whether the no-trade equilibrium is labelled Pd/Qd-style or Pe/Qe (recommend Pe, Qe to match the rest of Grill).
   - Shade: import expenditure or export revenue, domestic producers' revenue, CS and PS before and after trade, the gain in welfare.
   - HL calc (guide): quantity of imports/exports, import expenditure, export revenue.
-- [ ] **Batch 3: 4.2 trade protection.** Kinds: `tariff`, `tquota` (import quota), `tsub` (production subsidy to domestic firms). Export subsidy only if Sam asks.
+- [ ] **Step 6: 4.2 trade protection.** Kinds: `tariff`, `tquota` (import quota), `tsub` (production subsidy to domestic firms). Export subsidy only if Sam asks.
   - Labels **agreed** for tariff: Pw, "Pw + tariff", Q1 to Q4 left to right (Q1 domestic supply and Q4 domestic demand at Pw; Q2 and Q3 after the tariff), lines "S world" and "S world + tariff". **Ask** for quota (recommend Pw, Pq, same Q1 to Q4, supply curve "S domestic + quota") and subsidy (recommend Pw, Pw + subsidy for the price producers receive, "S domestic + subsidy", Q1 → Q2 for domestic output, Q3 demand unchanged).
   - Shade: tariff revenue, the two welfare-loss triangles, fall in CS, rise in PS, import expenditure before and after, quota rent, subsidy cost.
   - HL calc (guide: effects on stakeholders of each): all of the above areas plus changes in imports, domestic output and consumption.
-- [ ] **Batch 4: 4.5 exchange rates.** New section "Exchange rates". Kinds: `fxfloat` (appreciation/depreciation from a D or S shift) and `fxfixed` (central bank keeps a fixed or managed rate by buying or selling its currency, or changing interest rates).
+- [ ] **Step 7: 4.5 exchange rates.** New section "Exchange rates". Kinds: `fxfloat` (appreciation/depreciation from a D or S shift) and `fxfixed` (central bank keeps a fixed or managed rate by buying or selling its currency, or changing interest rates).
   - IB rule: the price axis must name both currencies, e.g. "Price of euro in US$", and the quantity axis "Quantity of euros". Use a small set of real currency pairs chosen at random.
   - **Ask**: axis wording ("Price of euro in US$" vs "US$ per euro") and point labels (recommend ER₁, ER₂ on the price axis with Q₁, Q₂; curves D₁ → D₂, S₁ → S₂).
   - Shading has little to offer here: check with Sam whether Shade is skipped for this section (the grid cell would need to show as not available) or shows the central bank's purchase/sale of currency for `fxfixed`.
   - Effects: causes from the guide's list (exports, imports, FDI, portfolio investment, remittances, speculation, relative inflation, interest and growth rates, central bank intervention) and consequences (inflation, growth, unemployment, current account).
-- [ ] **Batch 5: AD/AS** (3.2, 3.3, 3.5, 3.6, 3.7). Needs a new generator: no number grid, curves shift rather than areas being read, so Shade and Calculate do not apply (decide with Sam how those cells show; Effects and Draw carry most of it).
+- [ ] **Step 8: AD/AS** (3.2, 3.3, 3.5, 3.6, 3.7). Needs a new generator: no number grid, curves shift rather than areas being read, so Shade and Calculate do not apply (decide with Sam how those cells show; Effects and Draw carry most of it).
   - IB rule: axes "Price level" and "Real GDP", never P and Q. Labels follow IBecon macro `graphs.md` (`ibecon-src/public/graphs/macrographs/graphs.md`): AD₁ → AD₂, SRAS₁ → SRAS₂, LRAS, PL₁, PL₂, Y₁, Y₂, Yfe; Keynesian AS has three regions. **Ask** to confirm these before building.
   - Graphs: monetarist/new classical equilibrium, deflationary (recessionary) gap, inflationary gap, demand-pull inflation, cost-push inflation, deflation, growth (LRAS shifts right), expansionary and contractionary fiscal and monetary policy in both models, supply-side policy, Keynesian AD rise across the three regions.
-- [ ] **Later, HL only, curved lines (bigger job, ask Sam before starting):** 2.11 perfect competition and monopoly firm diagrams (abnormal profit, normal profit, losses; welfare loss vs perfect competition; natural monopoly; monopolistic competition), 3.5 money market (equilibrium interest rate), 3.6 crowding out, 3.3 short-run and long-run Phillips curves, 2.5 PED along a straight-line demand curve, 4.6 exchange rate and current account.
+- [ ] **Step 9: HL only, curved lines (bigger job, ask Sam before starting):** 2.11 perfect competition and monopoly firm diagrams (abnormal profit, normal profit, losses; welfare loss vs perfect competition; natural monopoly; monopolistic competition), 3.5 money market (equilibrium interest rate), 3.6 crowding out, 3.3 short-run and long-run Phillips curves, 2.5 PED along a straight-line demand curve, 4.6 exchange rate and current account.
 - **Left out as poor fits for a drill** (do not build unless Sam asks): PPC, circular flow, business cycle, Lorenz curve, Engel curve, J-curve, poverty cycle, constant-PED/PES curves, linear PPCs for comparative advantage.
 
 ## Files
