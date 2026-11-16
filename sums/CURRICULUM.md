@@ -153,7 +153,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Times tables and division facts for 2, 3, 4, 5, 8 and 10. ✓ (Times bonds, Times grid)
 - Multiply and divide by sharing, grouping, repeated adding or known facts. ✓ (Arrays)
 - Multiply a one- or two-digit number by a one-digit number (4 × 6, 2 × 23). ✓ (Sums)
-- Divide by a one-digit number, no remainders (24 ÷ 3, 32 ÷ 4), from known facts. ✓ (Sums ÷, Times and divide). Out of step: the long-division layout is a Year 5 written method.
+- Divide by a one-digit number, no remainders (24 ÷ 3, 32 ÷ 4), from known facts. ✓ (Times and divide, printed across: 24 ÷ 3 = ___). The original Sums tile keeps the long-division layout, a Year 5 written method.
 - Knows: dividing by zero is impossible.
 
 ### Fractions and money
@@ -199,17 +199,17 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ## Year 4
 
 ### Number
-- Read, write, compare and order numbers to 10,000 with base-ten structure. Knows: each place is 10 times the one on its right; 0 holds a place.
+- Read, write, compare and order numbers to 10,000 with base-ten structure. Knows: each place is 10 times the one on its right; 0 holds a place. ✓ (Place value: Up to 9,999, thousands as cubes; More or less, Year 4: compare; not ordering three or more)
 - Round to the nearest 10, 100 or 1,000; round tenths to the nearest whole.
-- Count forwards and backwards in 2s to 9s, 25s and 50s from multiples.
-- Count in 10s, 100s and 1,000s from any number to 10,000.
+- Count forwards and backwards in 2s to 9s, 25s and 50s from multiples. ✓ (Number patterns, Year 4; Number lines: 25s, 50s)
+- Count in 10s, 100s and 1,000s from any number to 10,000. ✓ (Number patterns, Year 4; Place value: 1,000 more / less; Number lines: 1000s)
 
 ### Operations
 - Add and subtract up to four-digit numbers, mentally or in columns. ✓ (Sums, 1000–9999)
 - All times tables and division facts, 2 to 10. ✓ (Times bonds, Times grid)
-- Multiply and divide mentally with place value and known facts, including × 0, × 1 and ÷ 1.
+- Multiply and divide mentally with place value and known facts, including × 0, × 1 and ÷ 1. ✓ partly (True or false, Year 4: × 10 and ÷ 10)
 - Multiply a two- or three-digit number by a one-digit number. ✓ (Sums)
-- Divide up to a three-digit number by a one-digit number, no remainders (65 ÷ 5). ✓ (Sums ÷, Times and divide). Out of step: the long-division layout is a Year 5 written method (column and area-model multiplying do start in Year 4).
+- Divide up to a three-digit number by a one-digit number, no remainders (65 ÷ 5). ✓ (Times and divide, printed across: 65 ÷ 5 = ___). The original Sums tile keeps the long-division layout, a Year 5 written method (column and area-model multiplying do start in Year 4).
 - Scale with × and ÷ (double or halve a recipe).
 
 ### Fractions, decimals and money
@@ -222,12 +222,12 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Add and subtract fractions with the same denominator, past one whole (³⁄₈ + ³⁄₈ + ³⁄₈ = ⁹⁄₈ = 1⅛).
 - Add and subtract decimals to one place (1.3 + 0.2 = 1.5).
 - Unit fraction of a number (⅓ of 300); the whole from a unit fraction (¼ of a set is 7, so the set is 28).
-- Total cost of several items in whole dollars, or many of one item, and the change.
+- Total cost of several items in whole dollars, or many of one item, and the change. ✓ (Money, Year 4: Change kind)
 - Make an amount in different ways ($5 and 80 cents).
 
 ### Algebra
-- True or false and open number sentences with + and − (8205 − 4721 = 3484?; 4200 − __ = 4001). ✓ partly (Missing number, Sums 1000–9999)
-- The same with × and ÷ (11 × 7 = 78?; __ ÷ 10 = 12). ✓ partly (Missing number)
+- True or false and open number sentences with + and − (8205 − 4721 = 3484?; 4200 − __ = 4001). ✓ (True or false, Year 4; Missing number)
+- The same with × and ÷ (11 × 7 = 78?; __ ÷ 10 = 12). ✓ (True or false, Year 4; Missing number)
 - Knows: doing the same thing to both sides keeps it balanced.
 - Growing patterns that add, take away or multiply by the same number each time (5, 7, 9, 11...; 3, 6, 12, 24...): continue, make and describe them.
 
@@ -254,7 +254,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Statistics
 - Collect numerical data, rounding if needed (skips in 30 seconds) ✋.
 - Make dot plots and bar graphs with a title, labels, units and a scale from 0.
-- Read dot plots: the frequency of a value, individual values, the shape, the middle, the spread (lowest to highest). Tell "the value" from "how many had that value" apart (the most pets anyone has vs the most common number of pets). ✓ partly (Graphs, Year 4: frequency and most common; not spread, middle or "the most pets anyone has")
+- Read dot plots: the frequency of a value, individual values, the shape, the middle, the spread (lowest to highest). Tell "the value" from "how many had that value" apart (the most pets anyone has vs the most common number of pets). ✓ (Graphs, Year 4: frequency, most common, most and fewest anyone has, spread; not the shape or the middle)
 
 ---
 

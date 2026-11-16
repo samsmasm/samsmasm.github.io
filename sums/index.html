@@ -133,6 +133,8 @@
   .mini { border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 16px 30px; min-width: 96px; display: flex; justify-content: center; }
   .mini .qv { position: relative !important; inset: auto !important; transform: none !important; font-size: 22px !important; margin-top: .6em; }
   .mini .qv.div { margin-top: 1.4em; }
+  .mini .tap .tiles { --tw: 40px; gap: 6px; }
+  .mini .tap .tiles.cells { --tw: 16px; }
 
   /* times grid */
   #gridS { position: fixed; inset: var(--head) 0 0 0; z-index: 5; padding: 12px; overflow: hidden; }
@@ -242,7 +244,23 @@
   .foot .cardsay { padding: 2px 6px; line-height: 0; border-color: var(--line); }
   .foot .cardsay svg { width: 20px; height: 20px; }
   .qv.miss { top: .7em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
-  .miss .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
+  /* tap cards: the question, then tiles to tap (no writing) */
+  .qv.tap { top: .5em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .card.tapc .qv { pointer-events: auto; }
+  .card.tapc canvas, .card.tapc .undo, .card.tapc .clear { display: none; }
+  .tap .tq { min-height: 1.3em; display: flex; align-items: center; justify-content: center; gap: .3em; }
+  .tap .tq svg { display: block; }
+  /* tiles are sized from the card, not the text, so every card on a sheet has the same big tiles:
+     --n tiles across, --rows rows; the words above keep to the top 45% (30% over a grid) */
+  .tap .tiles { --tw: max(40px, min(38cqh, calc(86cqw / var(--n)), 84px)); display: flex; gap: 3cqw; margin-top: .7em; }
+  .tap .tt {
+    min-width: var(--tw); height: var(--tw); padding: 0 .2em; font-size: calc(var(--tw) * .5); font-weight: 700; line-height: 1;
+    border: 2px solid var(--ink); border-radius: calc(var(--tw) * .12); display: flex; align-items: center; justify-content: center;
+  }
+  .tap .tt[aria-pressed="true"] { box-shadow: inset 0 0 0 calc(var(--tw) * .08) var(--ink); background: #eee; }
+  .tap .tiles.cells { --tw: max(30px, min(calc(56cqh / var(--rows)), calc(88cqw / var(--n)), 60px)); display: grid; grid-template-columns: repeat(var(--n), auto); gap: 0; }
+  .tap .cells .tt { padding: 0; border-radius: 0; border-width: 1.5px; margin: -.75px; }
+  .miss .bx, .tap .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
   .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
   .miss .wl { display: inline-block; width: calc((var(--d) + .8) * .7em); border-bottom: .07em solid var(--ink); height: 1em; }
   /* story sums: words that wrap, then "___ fish" */
@@ -254,7 +272,7 @@
   /* clocks and money: picture, then blanks to write on */
   .qv.pic2 { top: .4em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .pic2 svg { display: block; }
-  .pic2 .cap { font-size: .75em; font-weight: 700; margin-bottom: .3em; }
+  .pic2 .cap { font-size: .75em; font-weight: 700; margin-bottom: .3em; text-align: center; }
   .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
   .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
   .pic2 .ln { display: inline-block; width: 1.9em; height: 1em; border-bottom: .07em solid var(--ink); }
@@ -439,8 +457,10 @@ const AGES = [4, 5, 6, 7, 8, 9, 10, 11];
 const group = () => age <= 6 ? 5 : 8;
 const reads = () => age <= 6;                    // cards and screens read aloud
 const yearFor = a => Math.max(1, a - 4);         // 5 → Year 1 (4 too), 8 → Year 4, 11 → Year 7
-const maxYear = a => { const o = (ACTS[a].options || []).find(o => o.key === 'yr'); return o ? Math.max(...o.values.map(v => Array.isArray(v) ? v[0] : v)) : 0; };
-const suggestedYear = a => Math.min(yearFor(age), maxYear(a));
+const yearsOf = a => { const o = (ACTS[a].options || []).find(o => o.key === 'yr'); return o ? o.values.map(v => Array.isArray(v) ? v[0] : v) : []; };
+const maxYear = a => Math.max(0, ...yearsOf(a));
+// the year her age suggests, or the nearest one this activity has (a new activity may start with one year only)
+const suggestedYear = a => { const ys = yearsOf(a), below = ys.filter(y => y <= yearFor(age)); return below.length ? Math.max(...below) : Math.min(...ys); };
 const store = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -584,33 +604,47 @@ const arraySvg = (r, c) => {
   return s + '</svg>';
 };
 // base-ten blocks: hundreds squares (up to 3 a row), tens sticks, ones cubes (3 a row)
-function pvLayout(h, t, o) {
-  const hRows = Math.ceil(h / 3), hW = h ? Math.min(h, 3) * 11.5 - 1.5 : 0;
-  const tX = hW + (h ? 3 : 0), tW = t ? t * 3 - 1 : 0;
-  const oX = tX + tW + (t ? 3 : 0), oW = o ? Math.min(o, 3) * 2.8 - 0.6 : 0;
-  return { hRows, tX, oX, W: oX + oW, H: Math.max(hRows * 11.5 - 1.5, t || o ? 10 : 0, Math.ceil(o / 3) * 2.8) };
+// With thousands (k): big cubes, 3 a row, beside the hundreds, and the tens and
+// ones on a row underneath, so the picture stays about as wide as it is tall.
+function pvLayout(h, t, o, k = 0) {
+  const hW = h ? Math.min(h, 3) * 11.5 - 1.5 : 0, hH = h ? Math.ceil(h / 3) * 11.5 - 1.5 : 0;
+  const tW = t ? t * 3 - 1 : 0, oW = o ? Math.min(o, 3) * 2.8 - 0.6 : 0, lowH = Math.max(t ? 10 : 0, Math.ceil(o / 3) * 2.8);
+  if (!k) {
+    const tX = hW + (h ? 3 : 0), oX = tX + tW + (t ? 3 : 0);
+    return { hX: 0, tX, lowY: 0, oX, W: oX + oW, H: Math.max(hH, t || o ? 10 : 0, lowH) };
+  }
+  const kW = Math.min(k, 3) * 14.5 - 1.5, topH = Math.max(Math.ceil(k / 3) * 14.5 - 1.5, hH);
+  const oX = tW + (t ? 3 : 0);
+  return { hX: kW + 3, tX: 0, lowY: topH + 3, oX, W: Math.max(kW + (h ? 3 + hW : 0), oX + oW), H: topH + (lowH ? 3 + lowH : 0) };
 }
-function pvInner(h, t, o) {
-  const L = pvLayout(h, t, o), st = 'fill="white" stroke="currentColor"';
+function pvInner(h, t, o, k = 0) {
+  const L = pvLayout(h, t, o, k), st = 'fill="white" stroke="currentColor"';
   let s = '';
+  for (let i = 0; i < k; i++) { // a thousand: a cube, its front face a hundred square
+    const x = (i % 3) * 14.5, y = Math.floor(i / 3) * 14.5 + 3;
+    s += `<path d="M${x} ${y}l3 -3h10l-3 3zM${x + 10} ${y}l3 -3v10l-3 3z" ${st} stroke-width=".6" stroke-linejoin="round"/>`;
+    for (let g = 1; g < 10; g++) s += `<path d="M${x + g} ${y}l3 -3M${x + 10} ${y + g}l3 -3" stroke="currentColor" stroke-width=".18"/>`;
+    s += `<rect x="${x}" y="${y}" width="10" height="10" ${st} stroke-width=".6"/>`;
+    for (let g = 1; g < 10; g++) s += `<path d="M${x + g} ${y}v10M${x} ${y + g}h10" stroke="currentColor" stroke-width=".18"/>`;
+  }
   for (let i = 0; i < h; i++) {
-    const x = (i % 3) * 11.5, y = Math.floor(i / 3) * 11.5;
+    const x = L.hX + (i % 3) * 11.5, y = Math.floor(i / 3) * 11.5;
     s += `<rect x="${x}" y="${y}" width="10" height="10" ${st} stroke-width=".6"/>`;
     for (let g = 1; g < 10; g++) s += `<path d="M${x + g} ${y}v10M${x} ${y + g}h10" stroke="currentColor" stroke-width=".18"/>`;
   }
   for (let i = 0; i < t; i++) {
-    const x = L.tX + i * 3;
-    s += `<rect x="${x}" y="0" width="2" height="10" ${st} stroke-width=".5"/>`;
-    for (let g = 1; g < 10; g++) s += `<path d="M${x} ${g}h2" stroke="currentColor" stroke-width=".18"/>`;
+    const x = L.tX + i * 3, y = L.lowY;
+    s += `<rect x="${x}" y="${y}" width="2" height="10" ${st} stroke-width=".5"/>`;
+    for (let g = 1; g < 10; g++) s += `<path d="M${x} ${y + g}h2" stroke="currentColor" stroke-width=".18"/>`;
   }
-  for (let i = 0; i < o; i++) s += `<rect x="${L.oX + (i % 3) * 2.8}" y="${Math.floor(i / 3) * 2.8}" width="2.2" height="2.2" ${st} stroke-width=".45"/>`;
+  for (let i = 0; i < o; i++) s += `<rect x="${L.oX + (i % 3) * 2.8}" y="${L.lowY + Math.floor(i / 3) * 2.8}" width="2.2" height="2.2" ${st} stroke-width=".45"/>`;
   return s;
 }
 const PV_EM = 0.13; // em per block unit (a ones cube is ~2 units)
-const pvSvg = (h, t, o) => { const L = pvLayout(h, t, o); return `<svg viewBox="-.5 -.5 ${L.W + 1} ${L.H + 1}" style="width:${(L.W + 1) * PV_EM}em;height:${(L.H + 1) * PV_EM}em">${pvInner(h, t, o)}</svg>`; };
+const pvSvg = (h, t, o, k = 0) => { const L = pvLayout(h, t, o, k); return `<svg viewBox="-.5 -.5 ${L.W + 1} ${L.H + 1}" style="width:${(L.W + 1) * PV_EM}em;height:${(L.H + 1) * PV_EM}em">${pvInner(h, t, o, k)}</svg>`; };
 // number line: 10 steps, ends labelled, an arrow down to tick k
 const nlineSvg = q => {
-  let s = `<svg viewBox="0 0 120 40" fill="none" stroke="currentColor" style="width:10em;height:3.33em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`;
+  let s = `<svg viewBox="-4 0 128 40" fill="none" stroke="currentColor" style="width:10.67em;height:3.33em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`; // room for a five-digit label at each end
   for (let i = 0; i <= 10; i++) { const x = 10 + i * 10, e = i === 0 || i === 10; s += `<line x1="${x}" y1="${e ? 16 : 18}" x2="${x}" y2="${e ? 28 : 26}" stroke-width="${e ? 1.2 : .9}"/>`; }
   const ax = 10 + q.k * 10;
   s += `<path d="M${ax} 2v12" stroke-width="1.4"/><path d="M${ax - 3.2} 10.5 L${ax} 15.5 L${ax + 3.2} 10.5z" fill="currentColor" stroke="none"/>`;
@@ -674,8 +708,15 @@ function moneySvg(items) {
 }
 // change: a price tag ("costs") and the note she pays with ("you pay")
 function changeSvg(q) {
+  const TAG = `<path d="M7 0H36V22H7L0 11Z" fill="white" stroke-width="1.2" stroke-linejoin="round"/><circle cx="6" cy="11" r="1.8" stroke-width=".8"/>`;
+  if (q.tags) { // two or three different things: a row of price tags, and under it the note she pays with
+    const n = q.tags.length, W = n * 36 + (n - 1) * 5, H = q.pay ? 45 : 22;
+    let s = q.tags.map((d, i) => `<g transform="translate(${i * 41} 0)">${TAG}${mtext(21.5, 11, '$' + d, 9.5)}</g>`).join('');
+    if (q.pay) s += moneyItem(q.pay, W / 2 - 30, 36.5) + mtext(W / 2 + 16, 36.5, 'you pay', 6);
+    return `<svg viewBox="-1 -1 ${W + 2} ${H + 2}" style="width:${((W + 2) * MONEY_EM).toFixed(3)}em;height:${((H + 2) * MONEY_EM).toFixed(3)}em" fill="none" stroke="currentColor">${s}</svg>`;
+  }
   const tag = q.qty ? q.each * 100 : q.price, d = Math.floor(tag / 100), c = tag % 100; // buying several: the tag shows one
-  let s = `<path d="M7 0H36V22H7L0 11Z" fill="white" stroke-width="1.2" stroke-linejoin="round"/><circle cx="6" cy="11" r="1.8" stroke-width=".8"/>`;
+  let s = TAG;
   s += c ? mtext(21.5, 6.5, '$' + d, 8) + mtext(21.5, 15.5, c + 'c', 8) : mtext(21.5, 11, '$' + d, 9.5);
   s += moneyItem(q.pay, 44, 11);
   s += mtext(18, 28.5, q.qty ? 'each' : 'costs', 6) + mtext(59, 28.5, 'you pay', 6);
@@ -725,9 +766,15 @@ function moneyChange(yr) {
     const price = pay === 10000 ? rnd(1, 19) * 500 : rnd(pay === 2000 ? 1 : 5, pay / 100 - 1) * 100;
     return { pay, price, unit: '$' };
   }
-  if (yr === 4) { // several of one thing at whole dollars each, paid with the smallest note that covers it
-    const qty = rnd(2, 5), each = rnd(2, 9), price = qty * each * 100;
-    return { pay: [1000, 2000, 5000, 10000].find(n => n > price), price, qty, each, unit: '$' };
+  if (yr === 4) { // whole-dollar shopping, paid with the smallest note that covers it
+    const note = price => [1000, 2000, 5000, 10000].find(n => n > price);
+    if (Math.random() < 0.5) { // several of one thing
+      const qty = rnd(2, 5), each = rnd(2, 9), price = qty * each * 100;
+      return { pay: note(price), price, qty, each, unit: '$' };
+    }
+    // two or three different things: the total, or the change
+    const tags = distinctPick(rnd(2, 3), 2, 15), price = sumOf(tags) * 100;
+    return Math.random() < 0.4 ? { tags, price, total: true, unit: '$' } : { tags, price, pay: note(price), unit: '$' };
   }
   const pay = pickOne([500, 1000, 2000]);
   return { pay, price: rnd(1, pay / 100 - 1) * 100 + rnd(1, 9) * 10, unit: '$c' };
@@ -736,12 +783,13 @@ function moneyQ(q, total) {
   if (q.unit === '$c') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, parts: [d, c], ans: `$${d} and ${c}c` }; }
   return { ...q, kind: 'money', ans: q.unit === '$' ? total / 100 : total };
 }
-// ---- year-set sums: horizontal "7 + 5 = ___" in Years 1–2, stacked or long
-// division from Year 3 (column methods start in Year 3)
+// ---- year-set sums: horizontal "7 + 5 = ___" in Years 1–2, stacked from
+// Year 3 (column methods start in Year 3). Division is always printed across:
+// the long-division bracket is a Year 5 written method (it stays in Sums).
 function asQ(op, a, b, yr) {
   const ans = { '+': a + b, '-': a - b, '*': a * b, '/': a / b }[op];
-  if (yr <= 2) return { kind: 'expr', text: `${a} ${SIGN[op]} ${b}`, say: `${a} ${WORD[op]} ${b}`, ans };
-  return { kind: op === '/' ? 'div' : 'col', a, b, op, ans };
+  if (yr <= 2 || op === '/') return { kind: 'expr', text: `${a} ${SIGN[op]} ${b}`, say: `${a} ${WORD[op]} ${b}`, ans };
+  return { kind: 'col', a, b, op, ans };
 }
 function addSubQ(op, yr) {
   for (let t = 0; t < 50; t++) {
@@ -876,18 +924,25 @@ const distinctPick = (k, lo, hi) => shuffled(range(lo, hi)).slice(0, k);
 // picture graph, Year 3 bar graph with a scale in 2s, 5s or 10s.
 // Year 4: a dot plot of a number (pets, books read) from 0 to 6
 const DOT_TOPICS = [
-  { name: 'Pets', one: v => `How many have ${v} ${v === 1 ? 'pet' : 'pets'}?`, mode: 'Most common number of pets?' },
-  { name: 'Books read', one: v => `How many read ${v} ${v === 1 ? 'book' : 'books'}?`, mode: 'Most common number of books?' },
+  { name: 'Pets', one: v => `How many have ${v} ${v === 1 ? 'pet' : 'pets'}?`, mode: 'Most common number of pets?', max: 'Most pets anyone has?', min: 'Fewest pets anyone has?' },
+  { name: 'Books read', one: v => `How many read ${v} ${v === 1 ? 'book' : 'books'}?`, mode: 'Most common number of books?', max: 'Most books anyone read?', min: 'Fewest books anyone read?' },
 ];
+// The values run from lo to hi (dots at both ends). The tallest stack is never
+// at the biggest value, so "the most pets anyone has" (a value) and "the most
+// common number of pets" (how many had it) have different answers.
 function dotPlotQ() {
   const ti = rnd(0, DOT_TOPICS.length - 1), T = DOT_TOPICS[ti];
-  for (let t = 0; t < 50; t++) {
-    const counts = range(0, 6).map(() => rnd(0, 7));
+  for (let t = 0; t < 80; t++) {
+    const lo = rnd(0, 2), hi = rnd(4, 6);
+    const counts = range(0, 6).map(v => v < lo || v > hi ? 0 : v === lo || v === hi ? rnd(1, 7) : rnd(0, 7));
     const mx = Math.max(...counts);
-    if (counts.filter(n => n === mx).length > 1 || sumOf(counts) < 8) continue; // one clear most common
-    const ask = pickOne(['one', 'one', 'mode', 'all']), q = { kind: 'graph', type: 'dot', topic: ti, counts, ask, of: [] };
+    if (counts.filter(n => n === mx).length > 1 || sumOf(counts) < 8 || counts.indexOf(mx) === hi) continue; // one clear most common
+    const ask = pickOne(['one', 'one', 'mode', 'all', 'max', 'min', 'range']), q = { kind: 'graph', type: 'dot', topic: ti, counts, ask, of: [] };
     if (ask === 'one') { const v = rnd(0, 6); return { ...q, v, cap: T.one(v), say: T.one(v), ans: counts[v] }; }
     if (ask === 'mode') return { ...q, cap: T.mode, say: T.mode, ans: counts.indexOf(mx) };
+    if (ask === 'max') return { ...q, cap: T.max, say: T.max, ans: hi };
+    if (ask === 'min') return { ...q, cap: T.min, say: T.min, ans: lo };
+    if (ask === 'range') return { ...q, cap: 'How spread out?<br>Biggest take away smallest', capLen: 26, say: 'How spread out is it? Take the smallest number away from the biggest.', ans: hi - lo };
     return { ...q, cap: 'How many altogether?', say: 'How many dots altogether?', ans: sumOf(counts) };
   }
   return dotPlotQ();
@@ -1090,7 +1145,90 @@ function rulerSvg(q) {
   }
   return `<svg ${emBox([-7, -2, N * u + 14, 38], 0.05)}>${s}</svg>`;
 }
-const textSvg = lines => `<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
+// ---- tap cards: a question with tiles to tap instead of a line to write on.
+// A tap question is { kind: 'tap', top (html), tc / th (the top's width and
+// height in em), tiles: [{ html, label, say }], right: index (or indices with
+// multi), say }. Options: multi (several tiles can be on; all and only the right
+// ones must be chosen) and cells (tiles as a grid of small squares, that many across).
+const signWords = s => s.replace(/\+/g, 'plus').replace(/−/g, 'take away').replace(/×/g, 'times').replace(/÷/g, 'divided by').replace(/=/g, 'equals');
+const TF_TILES = [{ html: '✓', label: '✓', say: 'true' }, { html: '✗', label: '✗', say: 'not true' }];
+const CMP_TILES = [{ html: '&lt;', label: '<', say: 'is less than' }, { html: '=', label: '=', say: 'equals' }, { html: '&gt;', label: '>', say: 'is more than' }];
+const swapDigits = n => { const d = [...String(n)], i = rnd(0, d.length - 2); [d[i], d[i + 1]] = [d[i + 1], d[i]]; return +d.join(''); };
+// True or false: a number sentence that is right about half the time. Wrong
+// ones are near misses: out by 1, 10 or 100, two digits swapped, a times-table
+// neighbour, or a place out when multiplying or dividing by 10.
+function tfQ(yr) {
+  for (let t = 0; t < 200; t++) {
+    const truth = Math.random() < 0.5, type = pickOne(['addsub', 'addsub', 'tables', 'tables', 'ten', 'both']);
+    let lhs, v, rhs, rv; // each side as printed, and what it comes to
+    if (type === 'both') { // something to work out on both sides: 6 × 4 = 12 × 2, 36 + 17 = 33 + 20
+      if (Math.random() < 0.5) {
+        const a = rnd(2, 6), b = pickOne([4, 6, 8, 10]), d = b / 2 + (truth ? 0 : pickOne([-1, 1]));
+        lhs = `${a} × ${b}`; v = a * b; rhs = `${2 * a} × ${d}`; rv = 2 * a * d;
+      } else {
+        const a = rnd(12, 79), b = rnd(12, 79), k = rnd(1, 9), d = b - k + (truth ? 0 : pickOne([-10, -1, 1, 10]));
+        lhs = `${a} + ${b}`; v = a + b; rhs = `${a + k} + ${d}`; rv = a + k + d;
+      }
+      if (Math.random() < 0.5) [lhs, v, rhs, rv] = [rhs, rv, lhs, v];
+    } else {
+      let wrong;
+      if (type === 'addsub') { // four digits
+        let a = rnd(1000, 9999), b = rnd(100, 9999);
+        if (Math.random() < 0.5) { if (a + b > 9999) continue; lhs = `${a} + ${b}`; v = a + b; }
+        else { if (b > a) [a, b] = [b, a]; lhs = `${a} − ${b}`; v = a - b; }
+        wrong = Math.random() < 0.3 ? swapDigits(v) : v + pickOne([-1, 1]) * pickOne([1, 10, 100]);
+        if (String(wrong).length !== String(v).length) continue; // a swap that put 0 in front, or a step past a place
+      } else if (type === 'tables') {
+        const a = rnd(2, 12), b = rnd(2, 10);
+        lhs = Math.random() < 0.5 ? `${a} × ${b}` : `${b} × ${a}`; v = a * b;
+        wrong = pickOne([a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, v + 1, v - 1, v + 10, v - 10]);
+      } else { // × 10 and ÷ 10
+        const k = pickOne([rnd(2, 99), rnd(11, 99) * 10]);
+        if (Math.random() < 0.5) { lhs = `${k * 10} ÷ 10`; v = k; } else { lhs = `${k} × 10`; v = k * 10; }
+        wrong = pickOne([v * 10, v % 10 ? v + 10 : v / 10, v + 1, v - 1, v + 10]);
+      }
+      rv = truth ? v : wrong; rhs = String(rv);
+    }
+    if (rv < 1 || rv > 9999 || v > 9999 || !Number.isInteger(rv) || truth !== (v === rv)) continue;
+    const text = `${lhs} = ${rhs}`;
+    return { kind: 'tap', text, top: text, tc: text.length * 0.56, tiles: TF_TILES, right: truth ? 0 : 1, truth, say: `${signWords(text)}. True?`, ans: truth ? '✓' : '✗' };
+  }
+  return { kind: 'tap', text: '6 × 4 = 24', top: '6 × 4 = 24', tc: 5.6, tiles: TF_TILES, right: 0, truth: true, say: '6 times 4 equals 24. True?', ans: '✓' };
+}
+// More or less: two things with an empty box between them, tiles < = >.
+// About one in five is equal. Numbers often share their digits (4071, 4701).
+const TIMES_PAIRS = range(2, 10).flatMap(a => range(a, 10).map(b => [a, b]));
+function cmpQ(yr, kinds) {
+  for (let t = 0; t < 200; t++) {
+    const kind = pickOne(kinds), same = Math.random() < 0.2;
+    let l, r, lv, rv;
+    if (kind === 'num') { // numbers to 10,000
+      lv = rnd(1000, 9999);
+      if (same) rv = lv;
+      else if (Math.random() < 0.6) { const d = [...String(lv)], [i, j] = distinctPick(2, 0, 3); [d[i], d[j]] = [d[j], d[i]]; rv = +d.join(''); }
+      else rv = lv + pickOne([-1, 1]) * pickOne([1, 10, 100, 1000]);
+      if (rv < 1000 || rv > 10000 || (!same && rv === lv)) continue;
+      l = String(lv); r = String(rv);
+    } else if (Math.random() < 0.5) { // two times-table facts, close together
+      const [a, b] = pickOne(TIMES_PAIRS), near = TIMES_PAIRS.filter(([c, d]) => (c !== a || d !== b) && (same ? c * d === a * b : c * d !== a * b && Math.abs(c * d - a * b) <= 12));
+      if (!near.length) continue;
+      const [c, d] = pickOne(near), flip = p => Math.random() < 0.5 ? p : [p[1], p[0]];
+      l = flip([a, b]).join(' × '); lv = a * b; r = flip([c, d]).join(' × '); rv = c * d;
+    } else { // thousands and hundreds: 3000 + 400 and 3500 − 100
+      const x = rnd(1, 9) * 1000, y = rnd(1, 9) * 100, k = pickOne([100, 200, 500]);
+      lv = x + y; l = `${x} + ${y}`;
+      rv = same ? lv : lv + pickOne([-1, 1]) * pickOne([100, 100, 10, 1000]);
+      if (rv - k < 100 || rv + k > 10000) continue;
+      r = Math.random() < 0.5 ? `${rv + k} − ${k}` : `${rv - k} + ${k}`;
+    }
+    if (kind !== 'num' && l === r) continue; // the same sum printed on both sides
+    if (Math.random() < 0.5) [l, lv, r, rv] = [r, rv, l, lv];
+    const right = lv < rv ? 0 : lv === rv ? 1 : 2;
+    return { kind: 'tap', l, r, top: `${l} <span class="bx"></span> ${r}`, tc: (l.length + r.length + 3) * 0.56, tiles: CMP_TILES, right, say: `${signWords(l)}, and ${signWords(r)}. Which sign goes in the box?`, ans: CMP_TILES[right].label };
+  }
+  return { kind: 'tap', l: '4071', r: '4701', top: '4071 <span class="bx"></span> 4701', tc: 6.2, tiles: CMP_TILES, right: 0, say: '4071, and 4701. Which sign goes in the box?', ans: '<' };
+}
+const textSvg = lines =>`<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
   sums: {
@@ -1206,20 +1344,20 @@ const ACTS = {
     pic: pvSvg(1, 3, 4),
     options: [
       { key: 'kinds', label: 'Kind', multi: true, values: [['blocks', 'Blocks'], ['expanded', '300 + 40 + 7'], ['more', '10 more, 10 less']] },
-      { key: 'max', label: 'Up to', values: [99, 999] },
+      { key: 'max', label: 'Up to', values: [99, 999, [9999, '9,999']] },
     ],
     defaults: () => ({ kinds: ['blocks', 'expanded', 'more'], max: 999, n: 12 }),
     make: c => {
       const kind = pickOne(c.kinds);
       if (kind === 'more') {
-        const amt = pickOne(c.max > 99 ? [1, 10, 100] : [1, 10]), more = Math.random() < 0.5;
+        const amt = pickOne(c.max > 999 ? [1, 10, 100, 1000] : c.max > 99 ? [1, 10, 100] : [1, 10]), more = Math.random() < 0.5;
         const v = more ? rnd(0, c.max - amt) : rnd(amt, c.max);
         return { kind: 'expr', text: `${amt} ${more ? 'more' : 'less'} than ${v}`, ans: more ? v + amt : v - amt };
       }
-      const v = rnd(c.max > 99 ? 100 : 10, c.max), h = Math.floor(v / 100), t = Math.floor(v / 10) % 10, o = v % 10;
-      if (kind === 'blocks') return { kind: 'pv', h, t, o, ans: v };
+      const v = rnd(c.max > 999 ? 1000 : c.max > 99 ? 100 : 10, c.max), k = Math.floor(v / 1000), h = Math.floor(v / 100) % 10, t = Math.floor(v / 10) % 10, o = v % 10;
+      if (kind === 'blocks') return { kind: 'pv', k, h, t, o, ans: v }; // k: thousands, drawn as big cubes
       // expanded form, zero parts left out, sometimes shuffled so she can't just copy the digits
-      let parts = [h * 100, t * 10, o].filter(x => x > 0);
+      let parts = [k * 1000, h * 100, t * 10, o].filter(x => x > 0);
       if (parts.length > 1 && Math.random() < 0.35) parts = parts.sort(() => Math.random() - 0.5);
       return { kind: 'expr', text: parts.join(' + '), ans: v };
     },
@@ -1229,11 +1367,11 @@ const ACTS = {
   nline: {
     name: 'Number lines', ages: [8], setup: 'opts', say: 'What number is the arrow pointing to?',
     pic: nlineSvg({ start: 0, step: 10, k: 6 }),
-    options: [{ key: 'steps', label: 'Counting in', multi: true, values: [[1, '1s'], [2, '2s'], [5, '5s'], [10, '10s'], [100, '100s']] }],
+    options: [{ key: 'steps', label: 'Counting in', multi: true, values: [[1, '1s'], [2, '2s'], [5, '5s'], [10, '10s'], [25, '25s'], [50, '50s'], [100, '100s'], [1000, '1000s']] }],
     defaults: () => ({ steps: [2, 5, 10], n: 12 }),
-    // 10 steps, only the two ends labelled, an arrow at one of the ticks in between
+    // 10 steps, only the two ends labelled, an arrow at one of the ticks in between; never past 10,000
     make: c => {
-      const step = pickOne(c.steps), start = rnd(0, 9) * step * 10, k = rnd(1, 9);
+      const step = pickOne(c.steps), start = rnd(0, Math.min(9, Math.floor(1000 / step) - 1)) * step * 10, k = rnd(1, 9);
       return { kind: 'nline', start, step, k, ans: start + k * step };
     },
     key: c => `nline~${[...c.steps].sort((x, y) => x - y).join(',')}|${c.n}`,
@@ -1330,7 +1468,7 @@ const ACTS = {
     ],
     defaults: age => age === 5 ? { yr: 1, kinds: ['count'], n: 6 } : { yr: 3, kinds: ['count', 'change'], n: 12 },
     make: c => {
-      if (pickOne(c.kinds) === 'change') { const q = moneyChange(c.yr); return moneyQ({ ...q, change: true }, q.pay - q.price); }
+      if (pickOne(c.kinds) === 'change') { const q = moneyChange(c.yr); return moneyQ({ ...q, change: true }, q.total ? q.price : q.pay - q.price); }
       const q = moneyCount(c.yr);
       return moneyQ(q, sumOf(q.items));
     },
@@ -1399,6 +1537,28 @@ const ACTS = {
     make: c => rulerQ(c.yr),
     key: c => `ruler~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `Rulers · Year ${y} · ${n} questions`; },
+  },
+  // tap cards (no writing): tiles under the question, marked with Mark like the rest
+  tf: {
+    name: 'True or false', ages: [8], setup: 'opts', say: 'Is it true? Tap the tick or the cross.',
+    pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="30" text-anchor="middle" font-size="24">6 × 4 = 25</text><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="44" width="30" height="30" rx="5"/><rect x="66" y="44" width="30" height="30" rx="5"/><path d="M31 60l6 6l10 -13M74 52l14 14M88 52l-14 14"/></g></svg>`,
+    options: [{ key: 'yr', label: 'Year', values: [[4, '4 · four digits, tables, × 10']] }],
+    defaults: () => ({ yr: 4, n: 12 }),
+    make: c => tfQ(c.yr),
+    key: c => `tf~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `True or false · Year ${y} · ${n} questions`; },
+  },
+  cmp: {
+    name: 'More or less', ages: [8], setup: 'opts', say: 'Which sign goes in the box? Tap it.',
+    pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="34" y="34" text-anchor="middle" font-size="24">47</text><rect x="50" y="14" width="22" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/><text x="90" y="34" text-anchor="middle" font-size="24">74</text><text x="60" y="72" text-anchor="middle" font-size="24">&lt;  =  &gt;</text></svg>`,
+    options: [
+      { key: 'yr', label: 'Year', values: [[4, '4 · to 10,000']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['num', 'Numbers'], ['sum', 'Sums']] },
+    ],
+    defaults: () => ({ yr: 4, kinds: ['num', 'sum'], n: 12 }),
+    make: c => cmpQ(c.yr, c.kinds),
+    key: c => `cmp~${c.yr}|${['num', 'sum'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.replace('num', 'numbers').replace('sum', 'sums').split(',').join(', ')} · ${n} questions`; },
   },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
@@ -1667,7 +1827,7 @@ function goSetup(from = 'home') {
         if (o.key === 'yr') return `<button data-v="${val}" class="yrb${val === sug ? ' sug' : ''}"><span class="yn">Year ${val}</span><span class="yx">${String(txt).split(' · ').slice(1).join(' · ')}</span></button>`;
         return `<button data-v="${val}">${txt}</button>`;
       }).join('')}</div>${
-      o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want > sug ? ` (Year ${sug} is the highest here so far)` : ''}</p>` : ''}</div>`).join('');
+      o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want > sug ? ` (Year ${sug} is the highest here so far)` : want < sug ? ` (Year ${sug} is the lowest here so far)` : ''}</p>` : ''}</div>`).join('');
   $('#nOpts').parentElement.hidden = !!ACTS[act].noCount; // the grid sets its own count
   $('#setupHint').textContent = kind === 'keypad' ? 'Takeaways never go below zero. Division always comes out exactly: you divide by the second number.' : '';
   syncOpts();
@@ -1798,11 +1958,21 @@ function qMarkup(q) {
   if (q.kind === 'bond') return { cls: 'bond', html: bondSvg(q), vars: { '--h': 6.4, '--c': 6.8 } };
   // pictures with the answer written anywhere below them (like ten frames)
   if (q.kind === 'array') return { cls: 'frame', html: arraySvg(q.r, q.c), vars: { '--h': q.r * 0.55 + 3.3, '--c': Math.max(q.c * 0.55, 4) + 1.4 } };
-  if (q.kind === 'pv') {
-    const L = pvLayout(q.h, q.t, q.o);
-    return { cls: 'frame', html: pvSvg(q.h, q.t, q.o), vars: { '--h': (L.H + 1) * PV_EM + 3.3, '--c': Math.max((L.W + 1) * PV_EM, 4) + 1.4 } };
+  // tap card: the question, then a row (or a grid) of tiles to tap
+  if (q.kind === 'tap') {
+    const n = q.tiles.length, across = q.cells || n, rows = Math.ceil(n / across);
+    return {
+      cls: 'tap', anchor: '.tiles',
+      html: `<div class="tq">${q.top}</div><div class="tiles${q.cells ? ' cells' : ''}" style="--n:${across};--rows:${rows}">${q.tiles.map((t, i) => `<button class="tt" data-i="${i}" aria-pressed="false">${t.html}</button>`).join('')}</div>`,
+      // the tiles take their size from the card (see the CSS); the words keep to the top 45% (30% over a grid)
+      vars: { '--h': ((q.th || 1.3) + 1.9) / (q.cells ? 0.3 : 0.45), '--c': Math.max(q.tc || 0, 4) + 1.4 },
+    };
   }
-  if (q.kind === 'nline') return { cls: 'frame', html: nlineSvg(q), vars: { '--h': 3.33 + 3.3, '--c': 11 } };
+  if (q.kind === 'pv') {
+    const L = pvLayout(q.h, q.t, q.o, q.k || 0);
+    return { cls: 'frame', html: pvSvg(q.h, q.t, q.o, q.k || 0), vars: { '--h': (L.H + 1) * PV_EM + 3.3, '--c': Math.max((L.W + 1) * PV_EM, 4) + 1.4 } };
+  }
+  if (q.kind === 'nline') return { cls: 'frame', html: nlineSvg(q), vars: { '--h': 3.33 + 3.3, '--c': 11.7 } };
   if (q.kind === 'area') {
     // caption (what to find), then the rectangle; answer below it
     const svg = areaSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
@@ -1816,9 +1986,12 @@ function qMarkup(q) {
   // clocks and money: a picture (or the time in words), then the blank(s) to
   // write on: "__ o'clock", "__ : __", "$ __", "__ c" or "$ __ and __ c"
   if (q.kind === 'clock' || q.kind === 'money') {
-    let pic, cap = '';
+    let pic, cap = '', capW = 0;
     if (q.kind === 'clock') pic = q.words ? `<div class="words">${q.words}</div>` : clockSvg(q);
-    else if (q.change) { cap = `<div class="cap">${q.qty ? `Buy ${q.qty}. ` : ''}Change?</div>`; pic = changeSvg(q); }
+    else if (q.change) {
+      const txt = q.qty ? `Buy ${q.qty}. Change?` : q.total ? 'How much altogether?' : q.tags ? 'Buy them all. Change?' : 'Change?';
+      cap = `<div class="cap">${txt}</div>`; capW = txt.length * 0.42; pic = changeSvg(q);
+    }
     else pic = moneySvg(q.items);
     const sz = pic.match(/width:([\d.]+)em;height:([\d.]+)em/);
     // words get the same room as a clock face, so every card prints the same size
@@ -1828,17 +2001,17 @@ function qMarkup(q) {
       ? (q.two ? [ln + '<span class="sep">:</span>' + ln, 4.6] : [ln + u("o'clock"), 5.2])
       : q.unit === '$c' ? [u('$') + ln + '<span class="sep">and</span>' + ln + u('c'), 7.4]
       : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
-    return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw) + 1.2 } };
+    return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw, capW) + 1.2 } };
   }
   // graphs, shapes, rulers: the question, the picture, then "___" (and a unit)
   if (q.kind === 'graph' || q.kind === 'shape' || q.kind === 'ruler') {
     const pic = { graph: graphSvg, shape: shapeSvg, ruler: rulerSvg }[q.kind](q);
     const [, pw, ph] = pic.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
-    const capLen = q.capLen || q.cap.length;
+    const capLen = q.capLen || q.cap.length, capLines = q.cap.split('<br>').length; // a long question takes two lines
     return {
       cls: 'pic2', anchor: '.ln',
       html: `<div class="cap">${q.cap}</div>${pic}<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`,
-      vars: { '--h': ph + 1.1 + 3.3, '--c': Math.max(pw, capLen * 0.44, 3.5) + 1.2 },
+      vars: { '--h': ph + 1.1 + (capLines - 1) * 0.85 + 3.3, '--c': Math.max(pw, capLen * 0.44, 3.5) + 1.2 },
     };
   }
   // number pattern: the hidden term is a box, then "☐ = ___" like a missing number
@@ -1886,6 +2059,7 @@ function qMarkup(q) {
 // what the card's speaker says
 const WORD = { '+': 'plus', '-': 'take away', '*': 'times', '/': 'divided by' };
 function cardSay(q) {
+  if (q.kind === 'tap') return `${q.say} ${q.tiles.map(t => t.say || t.label).join(', ')}.`; // the question, then each tile in order
   if (q.say) return q.say; // questions that carry their own words (patterns, stories, doubles, year sums)
   if (q.kind === 'col' || q.kind === 'div') return `${q.a} ${WORD[q.op]} ${q.b}`;
   if (q.kind === 'miss') return `${q.hide === 'a' ? 'what' : q.a} ${WORD[q.op]} ${q.hide === 'b' ? 'what' : q.b} makes ${q.c}?`;
@@ -1893,6 +2067,7 @@ function cardSay(q) {
   if (q.kind === 'clock') return q.words ? `${q.words}. Write the time.` : "What time is it?";
   if (q.kind === 'money') return !q.change ? 'How much money?'
     : q.qty ? `You buy ${q.qty}, at ${moneyWords(q.each * 100)} each. You pay ${moneyWords(q.pay)}. How much change?`
+    : q.tags ? `You buy things that cost ${q.tags.map(d => moneyWords(d * 100)).join(', ')}. ${q.total ? 'How much altogether?' : `You pay ${moneyWords(q.pay)}. How much change?`}`
     : `It costs ${moneyWords(q.price)}. You pay ${moneyWords(q.pay)}. How much change?`;
   return ACTS[act].say;
 }
@@ -1900,6 +2075,7 @@ function layout(c) {
   const qv = c.el.querySelector('.qv'), m = qMarkup(c.q);
   qv.className = 'qv ' + m.cls; qv.innerHTML = m.html;
   for (const k in m.vars) qv.style.setProperty(k, m.vars[k]);
+  c.pick = []; c.el.classList.toggle('tapc', c.q.kind === 'tap'); // tap cards: tiles, no writing
   c.anchorEl = m.anchor ? qv.querySelector(m.anchor)
     : m.cls === 'frame' ? qv.lastElementChild // bottom of the last ten frame
     : qv.querySelector({ div: '.dd', miss: '.wl', bond: '.hole', frac: '.fbar' }[m.cls] || '.rule');
@@ -1941,6 +2117,7 @@ function buildSheet(c) {
     el.querySelector('.undo').onclick = () => { k.strokes.pop(); draw(k); scheduleRead(k, 0); };
     el.querySelector('.clear').onclick = () => { k.strokes = []; draw(k); showRead(k, ''); };
     el.querySelector('.retry').onclick = () => {
+      if (k.q.kind === 'tap') { k.pick = []; paintTap(k); showRead(k, ''); setState(k, 'writing'); return; } // clears the choice
       // keep the working, take away only the answer that was read
       const used = new Set(answerStrokes(k));
       k.strokes = k.strokes.filter(s => !used.has(s));
@@ -2003,10 +2180,23 @@ function draw(c) {
     g.stroke();
   }
 }
+const paintTap = c => { for (const b of c.el.querySelectorAll('.tt')) b.setAttribute('aria-pressed', c.pick.includes(+b.dataset.i)); };
 function wirePad(c) {
   let active = null, cur = null;
   const pt = e => { const r = c.work.getBoundingClientRect(); return [(e.clientX - r.left - c.ax) / c.F, (e.clientY - r.top - c.ay) / c.F]; };
+  // tap cards: tapping a tile chooses it (another tap moves the choice; with
+  // multi each tile turns on and off). Nothing is marked until Mark.
+  c.work.addEventListener('click', e => {
+    const t = e.target.closest('.tt');
+    if (!t || c.q.kind !== 'tap' || c.el.dataset.state !== 'writing') return;
+    if (sheetStart === null) sheetStart = Date.now();
+    const i = +t.dataset.i;
+    c.pick = !c.q.multi ? [i] : c.pick.includes(i) ? c.pick.filter(x => x !== i) : [...c.pick, i];
+    paintTap(c);
+    if (reads()) say(c.q.tiles[i].say || c.q.tiles[i].label); // ages 4–6: a choice says what it is
+  });
   c.work.addEventListener('pointerdown', e => {
+    if (c.q.kind === 'tap') return;
     if (e.pointerType === 'pen') penSeen = true;
     if (penSeen && e.pointerType === 'touch') return;
     if (active !== null || c.el.dataset.state !== 'writing') return;
@@ -2231,6 +2421,10 @@ function twoParts(c) {
 }
 // Read a card and check it: { text shown under the card, ok, backwards digits }
 function readAnswer(c) {
+  if (c.q.kind === 'tap') { // the chosen tile (with multi: all the right ones and no others)
+    const want = [].concat(c.q.right), p = [...c.pick].sort((x, y) => x - y);
+    return { text: p.map(i => c.q.tiles[i].label).join(' '), ok: p.length === want.length && want.every(i => p.includes(i)), backwards: [] };
+  }
   if (c.q.two) {
     const [l, r] = twoParts(c);
     if (!l.length && !r.length) return { text: '', ok: false, backwards: [] };
@@ -2279,15 +2473,16 @@ function mark() {
     clearTimeout(c.timer);
     let r;
     try { r = readAnswer(c); } catch (e) { showRead(c, safeRead(c)); continue; }
-    const t = r.text;
-    showRead(c, t);
+    const t = r.text, tap = c.q.kind === 'tap';
+    showRead(c, tap ? '' : t); // a tapped tile shows on the card itself
     if (!t) continue;
     c.tries++;
     const ok = r.ok;
     if (c.tries === 1) { c.first = ok; c.firstRead = t; }
     setState(c, ok ? 'right' : 'wrong');
     let note = '';
-    if (ok && c.first === false) { c.el.dataset.claim = '1'; note += ` · first read ${c.firstRead}`; }
+    // (nothing is read on a tap card, so it gets no "I was right the first time")
+    if (ok && c.first === false && !tap) { c.el.dataset.claim = '1'; note += ` · first read ${c.firstRead}`; }
     // a backwards digit still counts: show it mirrored next to the right way round
     if (ok && r.backwards.length) {
       const ds = [...new Set(r.backwards)];
