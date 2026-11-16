@@ -334,6 +334,28 @@ test('topic and skill choices keep to that topic or skill', async page => {
   assert(r.s2.join() === 'shade' && r.k2 > 2, JSON.stringify(r));
 });
 
+test('a section heading drills every topic in its section and nothing else', async page => {
+  const r = await page.evaluate(() => {
+    const heads = [...document.querySelectorAll('#grid .sectbtn')].map(b => b.textContent);
+    const out = SECTIONS.map((s, i) => {
+      const kinds = new Set(), skills = new Set(); let repeats = 0, last = null;
+      startDrill('sect', i);
+      for (let n = 0; n < 60; n++) { kinds.add(Q.kind); skills.add(Q.steps[0].skill); if (Q.kind === last) repeats++; last = Q.kind; newQuestion(); }
+      return { name: s.name, want: s.kinds, got: [...kinds], skills: skills.size, repeats };
+    });
+    showHome();
+    const all = SECTIONS.flatMap(s => s.kinds);
+    return { heads, out, all, kinds: Object.keys(KINDS) };
+  });
+  assert(r.heads.join() === r.out.map(o => o.name).join(), 'headings are buttons: ' + r.heads.join());
+  assert(r.all.slice().sort().join() === r.kinds.slice().sort().join(), 'every topic sits in exactly one section: ' + r.all.join());
+  for (const o of r.out) {
+    assert(o.got.every(k => o.want.includes(k)), o.name + ' left its section: ' + o.got.join());
+    assert(o.got.length === o.want.length && o.skills > 2, o.name + ' missed topics or skills: ' + JSON.stringify(o));
+    assert(o.want.length === 1 || o.repeats === 0, o.name + ' repeated a topic twice running');
+  }
+});
+
 test('report sends the question to the feedback inbox', async page => {
   await page.setRequestInterception(true);
   let sent = null;

@@ -61,6 +61,8 @@
     padding: 4px 2px; letter-spacing: .06em; text-transform: uppercase; width: auto;
   }
   .grid .skillbtn:hover { color: var(--orange); background: none; }
+  .grid .sectbtn { font-size: 15px; color: var(--orange); }
+  .grid .sectbtn:hover { color: var(--deep); }
   .grid button {
     width: 100%; padding: 11px 2px; background: var(--tint); border: 2.5px solid var(--char); border-radius: 4px; cursor: pointer;
     font: 800 16px var(--sans); color: #b8a49c;
@@ -160,6 +162,7 @@
     .grid th { font-size: 11px; }
     /* keep the whole grid inside a phone screen (it used to run off the right edge) */
     .grid .skillbtn { font-size: 11px; letter-spacing: 0; }
+    .grid .sectbtn { font-size: 14px; }
     .grid .topicbtn { font-size: 15px; padding: 9px 7px; }
     .chart { width: calc(100% + 24px); max-width: none; margin: 4px -12px 0; }
   }
@@ -184,7 +187,7 @@
     <button class="btn primary" onclick="startDrill('mix')">Totally random</button>
     <button class="btn" onclick="startDrill('weak')">Practise my weakest</button>
   </div>
-  <p class="lede" style="margin-top:16px">Or tap a topic, a skill, or one box. Scores are your last 10 tries.</p>
+  <p class="lede" style="margin-top:16px">Or tap a section, a topic, a skill, or one box. Scores are your last 10 tries.</p>
   <table class="grid" id="grid"></table>
   <button class="reset" id="reset-btn" onclick="resetProgress()">Reset my progress</button>
 </main>
@@ -346,6 +349,13 @@ function gen(kind, iv) {
 // Each question picks one intervention (iv) for its type. 'none' is the plain market failure diagram.
 const EXT_KINDS = ['negprod', 'posprod', 'negcons', 'poscons'];
 const isExt = sc => EXT_KINDS.includes(sc.kind);
+// home grid sections in syllabus order; tapping a heading drills only that section's topics (startDrill('sect', index))
+const SECTIONS = [
+  { name: '2.3 Markets', kinds: ['dshift', 'sshift'] },
+  { name: '2.5 Elasticity', kinds: ['rev'] },
+  { name: '2.7 Government intervention', kinds: PRICE_KINDS },
+  { name: '2.8 Externalities', kinds: EXT_KINDS },
+];
 const EXT_IVS = {
   negprod: ['none', 'none', 'tax', 'ptax', 'quota', 'reg'],
   posprod: ['none', 'none', 'sub', 'psub'],
@@ -1359,14 +1369,15 @@ function weakest() {
 function newQuestion() {
   let kind = session.kind, skill = session.skill;
   if (session.mode === 'mix' || session.mode === 'skill') kind = pick(Object.keys(KINDS));
-  if (session.mode === 'mix' || session.mode === 'kind') skill = pick(skillList());
+  if (session.mode === 'mix' || session.mode === 'kind' || session.mode === 'sect') skill = pick(skillList());
   if (session.mode === 'weak') [kind, skill] = weakest();
-  // "All four mixed": deal the types from a shuffled deck, so every four questions cover all four and
+  // "All four mixed" and section drills: deal the types from a shuffled deck, so every round covers all of them and
   // the same type never comes twice in a row (plain random gave long runs of one type: Sam)
-  if (kind === 'ext') {
+  const pool = kind === 'ext' ? EXT_KINDS : session.mode === 'sect' ? SECTIONS[session.kind].kinds : null;
+  if (pool) {
     if (!session.deck || !session.deck.length) {
-      const d = shuffle(EXT_KINDS);
-      if (d[0] === session.lastExt) d.push(d.shift());
+      const d = shuffle(pool);
+      if (d.length > 1 && d[0] === session.lastExt) d.push(d.shift());
       session.deck = d;
     }
     kind = session.lastExt = session.deck.shift();
@@ -1696,16 +1707,11 @@ function renderHome() {
     sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}${mix ? ' mix' : ''}" onclick="startDrill('cell','${k}','${s}')" aria-label="${name} ${skillName(s)}">${c.text}</button></td>`; }).join('') + '</tr>';
   let h = '<tr><th></th>' + sk.map(s => `<th><button class="skillbtn" onclick="startDrill('skill',null,'${s}')">${skillName(s)}</button></th>`).join('') + '</tr>';
   // sections run in syllabus order (the order students meet the graphs), each with its guide number
-  const sect = name => `<tr><th colspan="${sk.length + 1}" class="sect">${name}</th></tr>`;
-  h += sect('2.3 Markets');
-  for (const k of ['dshift', 'sshift']) h += row(k, KINDS[k]);
-  h += sect('2.5 Elasticity');
-  h += row('rev', KINDS.rev);
-  h += sect('2.7 Government intervention');
-  for (const k of PRICE_KINDS) h += row(k, KINDS[k]);
-  h += sect('2.8 Externalities');
-  for (const k of EXT_KINDS) h += row(k, KINDS[k].replace(' externality', ''));
-  h += row('ext', 'All four mixed', true);
+  SECTIONS.forEach((s, i) => {
+    h += `<tr><th colspan="${sk.length + 1}" class="sect"><button class="skillbtn sectbtn" onclick="startDrill('sect',${i})">${s.name}</button></th></tr>`;
+    for (const k of s.kinds) h += row(k, KINDS[k].replace(' externality', ''));
+    if (s.kinds === EXT_KINDS) h += row('ext', 'All four mixed', true);
+  });
   document.getElementById('grid').innerHTML = h;
   document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));
 }
