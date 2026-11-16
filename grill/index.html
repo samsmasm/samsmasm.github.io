@@ -241,8 +241,9 @@ const fmt = v => (Math.round(v * 100) / 100).toLocaleString('en-US');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor',
-  negprod: 'Negative production externality', posprod: 'Positive production externality', negcons: 'Negative consumption externality', poscons: 'Positive consumption externality' };
-const PRICE_KINDS = ['tax', 'subsidy', 'ceiling', 'floor'];
+  negprod: 'Negative production externality', posprod: 'Positive production externality', negcons: 'Negative consumption externality', poscons: 'Positive consumption externality',
+  minwage: 'Minimum wage', rev: 'PED and total revenue' };
+const PRICE_KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'minwage'];
 const SKILLS = { draw: 'Draw', label: 'Label', shade: 'Shade', effects: 'Effects', calc: 'Calculate' };
 const LS_KEY = 'grill_v1';
 
@@ -317,7 +318,7 @@ function controlOK(m, P) {
 }
 function genControl(kind) {
   for (;;) {
-    const m = baseMarket(), dir = kind === 'ceiling' ? -1 : 1;
+    const m = baseMarket(), dir = kind === 'ceiling' ? -1 : 1;   // 'floor' and 'minwage' sit above equilibrium
     // the DWL corner (demand above Qs, or supply below Qd) must sit on a gridline so HL can read it
     const corner = P => kind === 'ceiling' ? Dy(m, Sx(m, P)) : Sy(m, Dx(m, P));
     const ok = [1, 2, 3, 4, 5].filter(g => controlOK(m, m.ye + dir * g) && Math.abs(Sx(m, m.ye + dir * g) - Dx(m, m.ye + dir * g)) >= 1 && isInt(corner(m.ye + dir * g)));
@@ -333,6 +334,7 @@ function genControl(kind) {
 function setControl(sc, P) { sc.P = P; sc.qs = Sx(sc, P); sc.qd = Dx(sc, P); }
 function gen(kind, iv) {
   if (EXT_KINDS.includes(kind)) return genExt(kind, iv);
+  if (TOPICS[kind]) return TOPICS[kind].gen();
   return kind === 'tax' ? genTax() : kind === 'subsidy' ? genSubsidy() : genControl(kind);
 }
 
@@ -472,6 +474,7 @@ function conceptsExt(sc) {
 // ---------- the finished diagram ----------
 function diagram(sc) {
   if (isExt(sc)) return diagramExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].diagram(sc);
   const D ={ line: fLine(sc.a, -sc.b), name: 'D' }, S = { line: fLine(sc.c, sc.d), name: 'S' };
   const e = { x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' };
   if (sc.kind === 'tax') return {
@@ -496,6 +499,7 @@ function diagram(sc) {
 // the lines and point shown before a Draw step
 function drawBase(sc) {
   if (isExt(sc)) return { lines: diagramExt(sc).base, pt: { x: sc.xm, y: sc.Pm, pn: 'Pm', qn: 'Qm' } };
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].base(sc);
   return { lines: diagram(sc).lines.slice(0, 2), pt: { x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' } };
 }
 
@@ -538,7 +542,8 @@ function labelsFit(sc) {
 }
 
 // ---------- svg drawing ----------
-function svgAxes(ticks, ext) {
+function svgAxes(ticks, sc) {
+  const ext = isExt(sc), ax = (TOPICS[sc.kind] || {}).axes;
   let s = '';
   for (let i = 1; i <= GX; i++) s += `<line x1="${X(i)}" y1="${Y(0)}" x2="${X(i)}" y2="${Y(GY)}" stroke="#f7ece7"/>`;
   for (let j = 1; j <= GY; j++) s += `<line x1="${X(0)}" y1="${Y(j)}" x2="${X(GX)}" y2="${Y(j)}" stroke="#f7ece7"/>`;
@@ -549,8 +554,9 @@ function svgAxes(ticks, ext) {
   s += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(GX) + 4}" y2="${Y(0)}" stroke="#222" stroke-width="1.6"/>`;
   s += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(GY) - 4}" stroke="#222" stroke-width="1.6"/>`;
   s += ext ? `<text x="${EXT_AXIS_BOX[0] + 2}" y="${EXT_AXIS_BOX[3] - 4}" font-size="12" fill="#555">Price, cost, benefit ($)</text>`
+    : ax ? `<text x="4" y="${Y(GY) - 12}" font-size="12" fill="#555">${ax.y}</text>`
     : `<text x="${X(0) - 4}" y="${Y(GY) - 12}" font-size="12" fill="#555" text-anchor="end">Price ($)</text>`;
-  s += `<text x="${X(GX)}" y="${OY + 58}" font-size="12" fill="#555" text-anchor="end">Quantity (units)</text>`;
+  s += `<text x="${X(GX)}" y="${OY + 58}" font-size="12" fill="#555" text-anchor="end">${ax ? ax.x : 'Quantity (units)'}</text>`;
   return s;
 }
 function svgLine(L, attrs) {
@@ -558,7 +564,7 @@ function svgLine(L, attrs) {
   return `<line x1="${X(s[0][0])}" y1="${Y(s[0][1])}" x2="${X(s[1][0])}" y2="${Y(s[1][1])}" ${attrs}/>`;
 }
 // demand-side private curves blue, supply-side orange, social curves red (as IBecon), interventions black
-const LINE_COL = { 'D': '#1d4e89', 'MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
+const LINE_COL = { 'D': '#1d4e89', 'DL': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
 function lineColour(name) { return LINE_COL[name] || (/^MS[BC][₁₂]?$/.test(name) ? '#c0281b' : '#111'); }
 
 // Draws the finished diagram. opts: labels (true | 'slots'), ticks, slotState
@@ -600,7 +606,7 @@ function labelSlots(sc) {
     if (p.pn) out.push({ id: 'p' + i, kind: 'axis', answer: p.pn, x: OX - 24, y: Y(p.y) + 4, anchor: 'end', w: 42 });
     if (p.qn) out.push({ id: 'q' + i, kind: 'axis', answer: p.qn, x: X(p.x), y: OY + 32, anchor: 'middle', w: 33 });
   });
-  dg.annos.forEach((a, i) => out.push({ id: 'a' + i, kind: 'anno', answer: a.name, x: X((a.x1 + a.x2) / 2), y: Y(a.y) + (a.below ? 32 : -18), anchor: 'middle', w: 72 }));
+  dg.annos.forEach((a, i) => out.push({ id: 'a' + i, kind: 'anno', answer: a.name, x: X((a.x1 + a.x2) / 2), y: Y(a.y) + (a.below ? 32 : -18), anchor: 'middle', w: a.name.length > 9 ? 112 : 72 }));
   return out;
 }
 
@@ -656,6 +662,7 @@ function buildCells(sc) {
 // Each concept: name, polygon in grid units, explanation
 function conceptsFor(sc) {
   if (isExt(sc)) return conceptsExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].concepts(sc);
   const { a, c, xe, ye } = sc, C = {};
   const csB = [[0, a], [0, ye], [xe, ye]], psB = [[0, c], [0, ye], [xe, ye]];
   if (sc.kind === 'tax') {
@@ -707,6 +714,7 @@ function conceptsFor(sc) {
 const UDN = ['Rises', 'Falls', 'No change'];
 function effectsFor(sc) {
   if (isExt(sc)) return effectsExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].effects(sc).map(([q, opts, ans, why, noGraph]) => ({ q, opts, ans, why, noGraph: !!noGraph }));
   const L = [];
   if (sc.kind === 'tax') {
     const cs = sc.Pc - sc.ye, ps = sc.ye - sc.Pp;
@@ -783,6 +791,7 @@ function effectsFor(sc) {
 // Read off the graph only: the 2027 guide doesn't use demand/supply functions, so none are shown.
 function calcsFor(sc) {
   if (isExt(sc)) return calcsExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].calcs(sc).map(([q, ans, unit, why, abs]) => ({ q, ans, unit, why, abs: !!abs }));
   const Qe = sc.xe * 10, L = [];
   if (sc.kind === 'tax') {
     const Qt = sc.xt * 10, t = sc.t;
@@ -1011,17 +1020,166 @@ const READ_WHAT = {
   'P₂': 'the new market price', 'Q₂': 'the new market quantity',
 };
 function readsFor(sc) {
-  const L = [];
+  const L = [], T = TOPICS[sc.kind] || {}, what = T.reads || READ_WHAT, unit = T.unit || 'units', yAxis = T.yWord || 'price';
   for (const p of diagram(sc).points) {
-    if (p.pn) L.push({ q: `What is ${p.pn}?`, ans: p.y, unit: '$', why: `${p.pn} is ${READ_WHAT[p.pn]}. Read across to the price axis: ${money(p.y)}.` });
-    if (p.qn) L.push({ q: `What is ${p.qn}?`, ans: p.x * 10, unit: 'units', why: `${p.qn} is ${READ_WHAT[p.qn]}. Read down to the quantity axis: ${p.x * 10} units.` });
+    if (p.pn) L.push({ q: `What is ${p.pn}?`, ans: p.y, unit: '$', why: `${p.pn} is ${what[p.pn]}. Read across to the ${yAxis} axis: ${money(p.y)}.` });
+    if (p.qn) L.push({ q: `What is ${p.qn}?`, ans: p.x * 10, unit, why: `${p.qn} is ${what[p.qn]}. Read down to the quantity axis: ${p.x * 10} ${unit}.` });
   }
   return L;
 }
 
+// ---------- more topics: minimum wage (3.3, 3.7) and PED and total revenue (2.5) ----------
+// Each topic brings its own generator, diagram and questions; the shared functions check TOPICS first.
+// effects rows: [question, options, answer, why, noGraph]. calcs rows: [question, answer, unit, why, ignoreSign].
+const TOPICS = {};
+
+// A price floor in the labour market. Labels (Sam, 2026-11-16): We, Wmin, Qe, Qd, Qs, DL, SL.
+TOPICS.minwage = {
+  axes: { y: 'Wage rate ($)', x: 'Quantity of labour (workers)' }, unit: 'workers', yWord: 'wage',
+  reads: { We: 'the equilibrium wage', Wmin: 'the minimum wage', Qe: 'the number of workers employed at equilibrium',
+    Qd: 'the quantity of labour demanded (workers firms want to hire)', Qs: 'the quantity of labour supplied (people who want to work)' },
+  gen() {
+    let sc;
+    for (let i = 0; i < 300; i++) { sc = genControl('minwage'); if (labelsFit(sc)) break; }
+    return sc;
+  },
+  diagram(sc) {
+    return {
+      lines: [{ line: fLine(sc.a, -sc.b), name: 'DL' }, { line: fLine(sc.c, sc.d), name: 'SL' }, { line: hLine(sc.P), name: 'Min. wage' }],   // "Minimum wage" is too wide for the label box
+      points: [{ x: sc.xe, y: sc.ye, pn: 'We', qn: 'Qe' }, { x: sc.qd, y: sc.P, pn: 'Wmin', qn: 'Qd' }, { x: sc.qs, y: sc.P, qn: 'Qs' }],
+      annos: [{ x1: sc.qd, x2: sc.qs, y: sc.P, name: 'Unemployment', below: false }]
+    };
+  },
+  base(sc) { return { lines: this.diagram(sc).lines.slice(0, 2), pt: { x: sc.xe, y: sc.ye, pn: 'We', qn: 'Qe' } }; },
+  concepts(sc) {
+    const { P, qd, xe, ye } = sc, Sq = Sy(sc, qd);
+    return {
+      wages_after: { name: 'the total wages paid to workers after the minimum wage', poly: [[0, 0], [qd, 0], [qd, P], [0, P]], why: 'Firms hire Qd workers at Wmin: the rectangle Wmin × Qd.' },
+      wages_before: { name: 'the total wages paid to workers before the minimum wage', poly: [[0, 0], [xe, 0], [xe, ye], [0, ye]], why: 'Before the minimum wage, Qe workers earn We: the rectangle We × Qe.' },
+      gain: { name: 'the extra wages paid to workers who keep their jobs', poly: [[0, ye], [qd, ye], [qd, P], [0, P]], why: 'The Qd workers still employed earn Wmin instead of We: the band between We and Wmin, up to Qd.' },
+      dwl: { name: 'the deadweight (welfare) loss', poly: [[qd, P], [xe, ye], [qd, Sq]], why: 'The workers between Qd and Qe no longer have jobs: the triangle between DL and SL from Qd to Qe.' },
+    };
+  },
+  effects(sc) {
+    const d = sc.P * sc.qd - sc.ye * sc.xe, L = [];
+    L.push(['What happens to the quantity of labour supplied?', UDN, 'Rises', 'At the higher wage Wmin, more people want to work: Qs.']);
+    L.push(['What happens to the quantity of labour demanded?', UDN, 'Falls', 'At the higher wage Wmin, firms want fewer workers: Qd.']);
+    L.push(['What does the minimum wage create?', ['Unemployment (a surplus of labour)', 'A shortage of labour', 'Neither'], 'Unemployment (a surplus of labour)', 'Qs > Qd at Wmin: more people want to work than firms want to hire.']);
+    L.push(['On the graph, unemployment is...', ['Qs − Qd', 'Qs − Qe', 'Qe − Qd'], 'Qs − Qd', 'Quantity of labour supplied minus quantity of labour demanded at Wmin.']);
+    L.push(['How many workers have jobs after the minimum wage?', ['Qd', 'Qs', 'Qe'], 'Qd', 'Firms only hire Qd at Wmin. The rest (Qs − Qd) want work but can’t get it.']);
+    L.push(['On the graph, the fall in employment is...', ['Qe − Qd', 'Qs − Qd', 'Qs − Qe'], 'Qe − Qd', 'Employment was Qe and is now Qd. Qs − Qd is bigger because more people also start looking for work.']);
+    L.push(['What happens to the wage of workers who keep their jobs?', UDN, 'Rises', 'They earn Wmin instead of We.']);
+    L.push(['What happens to firms’ costs of production?', UDN, 'Rises', 'Each worker costs more, so firms’ costs rise.']);
+    L.push(['What happens to the total wages paid to workers?', UDN, d > 0 ? 'Rises' : d < 0 ? 'Falls' : 'No change',
+      `Before: We × Qe = ${money(sc.ye)} × ${sc.xe * 10} = ${money(sc.ye * sc.xe * 10)}. After: Wmin × Qd = ${money(sc.P)} × ${sc.qd * 10} = ${money(sc.P * sc.qd * 10)}. It depends on how elastic the demand for labour is.`]);
+    L.push(['The minimum wage is set below We. What happens?', ['Nothing: it doesn’t bind', 'Unemployment', 'A shortage of labour'], 'Nothing: it doesn’t bind', 'A minimum wage below equilibrium is never reached, so the market stays at We and Qe.', true]);
+    L.push(['Why might a government set a minimum wage?', ['To raise the incomes of low-paid workers', 'To lower firms’ costs', 'To reduce unemployment'], 'To raise the incomes of low-paid workers', 'It guarantees low-paid workers a higher wage, to reduce poverty and inequality.', true]);
+    L.push(['Abolishing the minimum wage is an example of...', ['A market-based supply-side policy', 'An interventionist supply-side policy', 'Expansionary fiscal policy'], 'A market-based supply-side policy', 'It makes the labour market more flexible and lowers firms’ labour costs.', true]);
+    L.push(['The demand for labour is very wage inelastic. The unemployment a minimum wage creates is...', ['Smaller', 'Bigger', 'The same'], 'Smaller', 'Firms cut few jobs when the wage rises, so Qd falls only a little.', true]);
+    return L;
+  },
+  calcs(sc) {
+    const Qe = sc.xe * 10, Qs = sc.qs * 10, Qd = sc.qd * 10, P = sc.P, ch = P * Qd - sc.ye * Qe, L = [];
+    L.push([`The minimum wage is ${money(P)}. Calculate unemployment.`, Qs - Qd, 'workers', `Qs − Qd = ${Qs} − ${Qd} = ${Qs - Qd} workers.`]);
+    L.push([`The minimum wage is ${money(P)}. By how much does employment fall?`, Qe - Qd, 'workers', `Qe − Qd = ${Qe} − ${Qd} = ${Qe - Qd} workers.`]);
+    L.push([`The minimum wage is ${money(P)}. How many more people want to work than at We?`, Qs - Qe, 'workers', `Qs − Qe = ${Qs} − ${Qe} = ${Qs - Qe} workers.`]);
+    L.push([`The minimum wage is ${money(P)}. Calculate the total wages paid to workers.`, P * Qd, '$', `Wmin × Qd = ${money(P)} × ${Qd} = ${money(P * Qd)}.`]);
+    L.push([`The minimum wage is ${money(P)}. By how much do total wages change? (Use − for a fall.)`, ch, '$', `After: Wmin × Qd = ${money(P * Qd)}. Before: We × Qe = ${money(sc.ye * Qe)}. Change: ${ch < 0 ? '−' : ''}${money(Math.abs(ch))}.`]);
+    return L;
+  },
+  context(sc) { return `A minimum wage of ${money(sc.P)}`; },
+  lineCands(sc) {
+    const other = sc.ye - sc.gap, c = [{ line: hLine(sc.P), ok: true }, { line: vLine(sc.qd) }];
+    if (other >= 1) c.push({ line: hLine(other) });
+    return { prompt: 'The government sets a minimum wage that actually affects the market. Tap a line that could be it.', cands: c,
+      why: 'A binding minimum wage is a horizontal line ABOVE We. Below We it changes nothing.' };
+  },
+  labelWhy() { return 'At Wmin, read Qd off DL and Qs off SL. Qs > Qd: the gap is unemployment.'; },
+};
+
+// One demand curve and a price change P₁ → P₂ (labels: Sam, 2026-11-16). Both prices sit on the same side of
+// the midpoint of D, so demand is elastic (upper half, flatter lines) or inelastic (lower half, steeper lines)
+// over the whole change and total revenue moves one clear way.
+TOPICS.rev = {
+  reads: { 'P₁': 'the price before the change', 'Q₁': 'the quantity demanded before the change', 'P₂': 'the price after the change', 'Q₂': 'the quantity demanded after the change' },
+  gen() {
+    for (;;) {
+      const el = Math.random() < 0.5, b = pick(el ? [0.5, 0.5, 1] : [2, 2, 1]);
+      const a = b === 0.5 ? 8 + rnd(4) : b === 1 ? 10 + rnd(4) : 10 + rnd(5), mid = a / 2;
+      const P1 = 1 + rnd(a - 1), P2 = 1 + rnd(a - 1), Pm = 2 * P1 - P2;   // Pm: the same change the other way (Draw decoy)
+      const x1 = (a - P1) / b, x2 = (a - P2) / b;
+      if (P1 === P2 || !isInt(x1) || !isInt(x2) || x1 < 1 || x2 < 1 || x1 > GX - 1 || x2 > GX - 1) continue;
+      if (![P1, P2, Pm].every(p => p >= 1 && p <= a - 1 && (el ? p > mid : p < mid))) continue;
+      return { kind: 'rev', a, b, el, P1, P2, Pm, x1, x2 };
+    }
+  },
+  diagram(sc) {
+    return { lines: [{ line: fLine(sc.a, -sc.b), name: 'D' }],
+      points: [{ x: sc.x1, y: sc.P1, pn: 'P₁', qn: 'Q₁' }, { x: sc.x2, y: sc.P2, pn: 'P₂', qn: 'Q₂' }], annos: [] };
+  },
+  base(sc) { return { lines: this.diagram(sc).lines, pt: { x: sc.x1, y: sc.P1, pn: 'P₁', qn: 'Q₁' } }; },
+  concepts(sc) {
+    const { P1, P2, x1, x2 } = sc, fall = P2 < P1, dir = fall ? 'falls' : 'rises';
+    const r = (xa, ya, xb, yb) => [[xa, ya], [xb, ya], [xb, yb], [xa, yb]];
+    return {
+      tr1: { name: 'total revenue at P₁', poly: r(0, 0, x1, P1), why: 'Total revenue = price × quantity: the rectangle P₁ × Q₁.' },
+      tr2: { name: 'total revenue at P₂', poly: r(0, 0, x2, P2), why: 'Total revenue = price × quantity: the rectangle P₂ × Q₂.' },
+      gain: { name: `the revenue gained when the price ${dir} to P₂`, poly: fall ? r(x1, 0, x2, P2) : r(0, P1, x2, P2),
+        why: fall ? 'The lower price sells more: the extra units (Q₁ to Q₂) each bring in P₂.' : 'Every unit still sold (up to Q₂) brings in more: the band between P₁ and P₂.' },
+      loss: { name: `the revenue lost when the price ${dir} to P₂`, poly: fall ? r(0, P2, x1, P1) : r(x2, 0, x1, P1),
+        why: fall ? 'The units that sold anyway (up to Q₁) each bring in less: the band between P₂ and P₁.' : 'Fewer units sell: the units from Q₂ to Q₁ no longer bring in P₁.' },
+    };
+  },
+  nums(sc) {
+    const tr1 = sc.P1 * sc.x1 * 10, tr2 = sc.P2 * sc.x2 * 10;
+    return { tr1, tr2, up: tr2 > tr1, fall: sc.P2 < sc.P1,
+      text: `Total revenue at P₁ = ${money(sc.P1)} × ${sc.x1 * 10} = ${money(tr1)}. At P₂ = ${money(sc.P2)} × ${sc.x2 * 10} = ${money(tr2)}.` };
+  },
+  effects(sc) {
+    const n = this.nums(sc), el = sc.el, L = [], PX = ['Raise its price', 'Lower its price', 'Keep its price the same'];
+    L.push([`The price ${n.fall ? 'falls' : 'rises'} from P₁ to P₂. What happens to total revenue?`, UDN, n.up ? 'Rises' : 'Falls', n.text]);
+    L.push(['Between P₁ and P₂, demand is...', ['Price elastic', 'Price inelastic', 'Unit elastic'], el ? 'Price elastic' : 'Price inelastic',
+      `${n.text} The price ${n.fall ? 'fell' : 'rose'} and total revenue ${n.up ? 'rose' : 'fell'}: ${el ? 'they move in opposite directions, so demand is price elastic' : 'they move the same way, so demand is price inelastic'}.`]);
+    L.push(['Which is bigger?', ['The revenue gained', 'The revenue lost', 'They are equal'], n.up ? 'The revenue gained' : 'The revenue lost', `${n.text} Total revenue ${n.up ? 'rises' : 'falls'}, so the ${n.up ? 'gain' : 'loss'} is bigger.`]);
+    L.push(['Which changes by the bigger percentage?', ['Quantity demanded', 'Price', 'They change equally'], el ? 'Quantity demanded' : 'Price',
+      el ? 'Price elastic: quantity demanded changes by a bigger percentage than price (PED > 1).' : 'Price inelastic: quantity demanded changes by a smaller percentage than price (PED < 1).']);
+    L.push(['Demand is price inelastic. To raise total revenue, a firm should...', PX, 'Raise its price', 'Quantity falls by a smaller percentage than the price rises, so total revenue rises.', true]);
+    L.push(['Demand is price elastic. To raise total revenue, a firm should...', PX, 'Lower its price', 'Quantity rises by a bigger percentage than the price falls, so total revenue rises.', true]);
+    L.push(['PED = 1 (unit elastic). The price rises. What happens to total revenue?', UDN, 'No change', 'Quantity falls by the same percentage as the price rises, so total revenue stays the same.', true]);
+    L.push(['A government wants an indirect tax to raise a lot of revenue. It should tax goods with...', ['Price inelastic demand', 'Price elastic demand', 'Unit elastic demand'], 'Price inelastic demand', 'Quantity falls only a little when the tax raises the price, so the tax is collected on almost as many units (e.g. fuel, cigarettes).', true]);
+    if (store.level === 'HL') L.push(['Moving down a straight-line demand curve, PED...', ['Falls', 'Rises', 'Stays the same'], 'Falls', 'At high prices demand is price elastic; at low prices it is price inelastic. PED = 1 at the midpoint.', true]);
+    return L;
+  },
+  calcs(sc) {
+    const n = this.nums(sc), C = this.concepts(sc), L = [], Q1 = sc.x1 * 10, Q2 = sc.x2 * 10, ch = n.tr2 - n.tr1;
+    const pq = (Q2 - Q1) / Q1 * 100, pp = (sc.P2 - sc.P1) / sc.P1 * 100, ped = Math.abs(pq / pp), g = polyArea(C.gain.poly) * 10, l = polyArea(C.loss.poly) * 10;
+    L.push(['Calculate total revenue at P₁.', n.tr1, '$', `P₁ × Q₁ = ${money(sc.P1)} × ${Q1} = ${money(n.tr1)}.`]);
+    L.push(['Calculate total revenue at P₂.', n.tr2, '$', `P₂ × Q₂ = ${money(sc.P2)} × ${Q2} = ${money(n.tr2)}.`]);
+    L.push(['By how much does total revenue change from P₁ to P₂? (Use − for a fall.)', ch, '$', `${n.text} Change: ${ch < 0 ? '−' : ''}${money(Math.abs(ch))}.`]);
+    L.push([`Calculate the revenue gained when the price ${n.fall ? 'falls' : 'rises'} to P₂.`, g, '$', n.fall ? `The extra units at the new price: (Q₂ − Q₁) × P₂ = ${Q2 - Q1} × ${money(sc.P2)} = ${money(g)}.` : `The higher price on the units still sold: (P₂ − P₁) × Q₂ = ${money(sc.P2 - sc.P1)} × ${Q2} = ${money(g)}.`]);
+    L.push([`Calculate the revenue lost when the price ${n.fall ? 'falls' : 'rises'} to P₂.`, l, '$', n.fall ? `The lower price on the units that sold anyway: (P₁ − P₂) × Q₁ = ${money(sc.P1 - sc.P2)} × ${Q1} = ${money(l)}.` : `The units no longer sold: (Q₁ − Q₂) × P₁ = ${Q1 - Q2} × ${money(sc.P1)} = ${money(l)}.`]);
+    L.push(['Calculate PED for the change from P₁ to P₂. (2 decimal places, ignore the minus sign.)', ped, '',
+      `% change in quantity = (${Q2} − ${Q1}) ÷ ${Q1} × 100 = ${fmt(pq)}%. % change in price = (${money(sc.P2)} − ${money(sc.P1)}) ÷ ${money(sc.P1)} × 100 = ${fmt(pp)}%. PED = ${fmt(Math.abs(pq))} ÷ ${fmt(Math.abs(pp))} = ${fmt(ped)}.`, true]);
+    return L;
+  },
+  context(sc) { return `The price ${sc.P2 < sc.P1 ? 'falls' : 'rises'} from P₁ to P₂`; },
+  lineCands(sc) {
+    const n = this.nums(sc), el = sc.el;
+    return { prompt: `Demand is price ${el ? 'elastic' : 'inelastic'} here. The firm changes its price from P₁ and total revenue ${n.up ? 'RISES' : 'FALLS'}. Tap the new price.`,
+      cands: [{ line: hLine(sc.P2), ok: true }, { line: hLine(sc.Pm) }, { line: vLine(sc.x2) }],
+      why: el ? 'Price elastic: price and total revenue move in opposite directions. A lower price raises total revenue; a higher price lowers it.'
+        : 'Price inelastic: price and total revenue move the same way. A higher price raises total revenue; a lower price lowers it.' };
+  },
+  labelWhy(sc) {
+    const fall = sc.P2 < sc.P1;
+    return `P₁ and Q₁ are before the change, P₂ and Q₂ after. The price ${fall ? 'falls' : 'rises'}, so P₂ is ${fall ? 'below' : 'above'} P₁ and Q₂ is to the ${fall ? 'right' : 'left'} of Q₁.`;
+  },
+};
+
 // ---------- building questions ----------
 function contextText(sc) {
   if (isExt(sc)) return contextExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].context(sc);
   if (sc.kind === 'tax') return `A ${money(sc.t)} per unit indirect tax`;
   if (sc.kind === 'subsidy') return `A ${money(sc.s)} per unit subsidy`;
   if (sc.kind === 'ceiling') return `A maximum price (price ceiling) of ${money(sc.P)}`;
@@ -1029,6 +1187,7 @@ function contextText(sc) {
 }
 function lineCands(sc) {
   if (isExt(sc)) return lineCandsExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].lineCands(sc);
   const S =(k) => fLine(k, sc.d), D = (k) => fLine(k, -sc.b);
   if (sc.kind === 'tax') {
     const t = sc.t, c = [{ line: S(sc.c + t), ok: true }, { line: S(sc.c - t) }, { line: D(sc.a - t) }];
@@ -1052,15 +1211,15 @@ function buildQuestion(kind, skill) {
   if (skill === 'draw') {
     const lc = lineCands(sc);
     steps.push({ skill: 'draw', type: 'line', prompt: lc.prompt, cands: shuffle(lc.cands), context: [], why: lc.why });
-    if ((kind === 'ceiling' || kind === 'floor') && sc.next != null && Math.random() < 0.7) {
-      const ceil = kind === 'ceiling', P2 = sc.next;
+    if ((kind === 'ceiling' || kind === 'floor' || kind === 'minwage') && sc.next != null && Math.random() < 0.7) {
+      const ceil = kind === 'ceiling', mw = kind === 'minwage', P2 = sc.next;
       const decoy = ceil ? sc.ye + 1 : sc.ye - 1;
       const cands = [{ line: hLine(P2), ok: true }, { line: hLine(decoy) }];
-      steps.push({ skill: 'draw', type: 'line', prompt: ceil ? 'The government now LOWERS the ceiling. Tap the new ceiling.' : 'The government now RAISES the floor. Tap the new floor.',
-        cands: shuffle(cands), context: [hLine(sc.P)], why: ceil ? 'Lower ceiling: a horizontal line further below Pe.' : 'Higher floor: a horizontal line further above Pe.',
+      steps.push({ skill: 'draw', type: 'line', prompt: ceil ? 'The government now LOWERS the ceiling. Tap the new ceiling.' : mw ? 'The government now RAISES the minimum wage. Tap the new minimum wage.' : 'The government now RAISES the floor. Tap the new floor.',
+        cands: shuffle(cands), context: [hLine(sc.P)], why: ceil ? 'Lower ceiling: a horizontal line further below Pe.' : mw ? 'Higher minimum wage: a horizontal line further above We.' : 'Higher floor: a horizontal line further above Pe.',
         after: () => setControl(sc, P2) });
-      steps.push({ skill: 'effects', type: 'mc', q: ceil ? 'What happens to the shortage?' : 'What happens to the surplus?', opts: ['It gets bigger', 'It gets smaller', 'No change'], ans: 'It gets bigger',
-        why: ceil ? 'Lower price: Qs falls further and Qd rises further, so the gap widens.' : 'Higher price: Qs rises further and Qd falls further, so the gap widens.' });
+      steps.push({ skill: 'effects', type: 'mc', q: ceil ? 'What happens to the shortage?' : mw ? 'What happens to unemployment?' : 'What happens to the surplus?', opts: ['It gets bigger', 'It gets smaller', 'No change'], ans: 'It gets bigger',
+        why: ceil ? 'Lower price: Qs falls further and Qd rises further, so the gap widens.' : mw ? 'Higher wage: Qs rises further and Qd falls further, so the gap widens.' : 'Higher price: Qs rises further and Qd falls further, so the gap widens.' });
     }
     steps.push({ skill: 'label', type: 'label', prompt: 'Now label it. Tap a label, then tap its box.' });
   } else if (skill === 'label') {
@@ -1068,7 +1227,7 @@ function buildQuestion(kind, skill) {
   } else if (skill === 'shade') {
     // DWL is the one students miss most, so it comes up in about half of shading questions
     let cs = shuffle(Object.keys(conceptsFor(sc)).filter(c => c !== 'dwl')).slice(0, 2);
-    if (Math.random() < 0.5) cs[rnd(2)] = 'dwl';
+    if (conceptsFor(sc).dwl && Math.random() < 0.5) cs[rnd(2)] = 'dwl';
     cs.forEach(c => steps.push({ skill: 'shade', type: 'shade', concept: c }));
   } else if (skill === 'effects') {
     shuffle(effectsFor(sc)).slice(0, 3).forEach(e => steps.push({ skill: 'effects', type: 'mc', ...e }));
@@ -1143,7 +1302,7 @@ function renderStep() {
   } else if (st.type === 'mc') {
     ctl.innerHTML = '<div class="opts">' + shuffle(st.opts).map(o => `<button class="opt" data-opt="${esc(o)}">${esc(o)}</button>`).join('') + '</div>';
   } else if (st.type === 'num') {
-    ctl.innerHTML = `<div class="num">${st.unit === '$' ? '$' : ''}<input id="num-in" inputmode="decimal" autocomplete="off">${st.unit === 'units' ? ' units' : ''}</div>`;
+    ctl.innerHTML = `<div class="num">${st.unit === '$' ? '$' : ''}<input id="num-in" inputmode="decimal" autocomplete="off">${st.unit && st.unit !== '$' ? ' ' + st.unit : ''}</div>`;
     const inp = document.getElementById('num-in'); inp.focus();
   } else if (st.type === 'shade') {
     ctl.innerHTML = '<div class="hint">Tap areas to shade them. Tap again to unshade.</div>';
@@ -1152,9 +1311,9 @@ function renderStep() {
 }
 
 function drawChart() {
-  const st = Q.steps[Q.i], sc = Q.sc, ext = isExt(sc); let s = '';
+  const st = Q.steps[Q.i], sc = Q.sc; let s = '';
   if (st.type === 'line') {
-    s += svgAxes(true, ext);
+    s += svgAxes(true, sc);
     const db = drawBase(sc), e = db.pt;
     s += `<line x1="${X(0)}" y1="${Y(e.y)}" x2="${X(e.x)}" y2="${Y(e.y)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/><line x1="${X(e.x)}" y1="${Y(e.y)}" x2="${X(e.x)}" y2="${Y(0)}" stroke="#888" stroke-width="1.3" stroke-dasharray="5 4"/>`;
     s += `<text x="${OX - 24}" y="${Y(e.y) + 4}" font-size="15" font-weight="600" fill="#7a1409" text-anchor="end">${e.pn}</text><text x="${X(e.x)}" y="${OY + 32}" font-size="15" font-weight="600" fill="#7a1409" text-anchor="middle">${e.qn}</text>`;
@@ -1168,9 +1327,9 @@ function drawChart() {
       s += `<g class="cand ${cls}" data-cand="${i}">${svgLine(c.line, 'class="vis" stroke-linecap="round"')}${svgLine(c.line, 'class="hit"')}</g>`;
     });
   } else if (st.type === 'label') {
-    s += svgAxes(false, ext) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks, revealed: ui.revealed } });
+    s += svgAxes(false, sc) + svgDiagram(sc, { labels: 'slots', slotState: { filled: ui.filled, marks: ui.marks, revealed: ui.revealed } });
   } else if (st.type === 'shade') {
-    s += svgAxes(true, ext);
+    s += svgAxes(true, sc);
     ui.cells.forEach((g, i) => {
       const inAns = g.sig.includes(st.concept), on = ui.sel.has(i);
       let cls = on ? (ui.bad.has(i) ? 'wrong' : 'sel') : '';
@@ -1181,7 +1340,7 @@ function drawChart() {
     s += `<g class="noclick">${svgDiagram(sc, { labels: true })}</g>`;
   } else {
     // multiple choice asks about the result, so the graph mustn't say "Shortage"/"Surplus"
-    s += svgAxes(true, ext) + svgDiagram(sc, { labels: true, noAnno: st.type === 'mc' });
+    s += svgAxes(true, sc) + svgDiagram(sc, { labels: true, noAnno: st.type === 'mc' });
   }
   const chart = document.getElementById('chart');
   chart.innerHTML = st.noGraph ? '' : s;
@@ -1308,9 +1467,9 @@ function check() {
     }
   } else if (st.type === 'num') {
     const inp = document.getElementById('num-in');
-    const raw = inp.value.replace(/[$,\s]/g, '').replace(/[−–]/g, '-').replace(/units?$/i, '');
+    const raw = inp.value.replace(/[$,\s]/g, '').replace(/[−–]/g, '-').replace(/(units?|workers?)$/i, '');
     if (raw === '' || isNaN(+raw)) return hint('Type a number.');
-    ok = Math.abs(+raw - st.ans) < 0.011;
+    ok = Math.abs((st.abs ? Math.abs(+raw) : +raw) - st.ans) < 0.011;
     if (!ok) { tip = 'Check your working and type a new answer.'; inp.select(); }
   }
   if (!ui.tries) {
@@ -1338,7 +1497,7 @@ function finish(ok) {
   if (st.type === 'mc') document.querySelectorAll('[data-opt]').forEach(b => { b.disabled = true; if (b.dataset.opt === st.ans) b.classList.add('right'); });
   if (st.type === 'num') {
     document.getElementById('num-in').disabled = true;
-    answerText = `Answer: ${st.unit === '$' ? money(st.ans) : fmt(st.ans) + ' units'}`;
+    answerText = `Answer: ${st.unit === '$' ? money(st.ans) : fmt(st.ans) + (st.unit ? ' ' + st.unit : '')}`;
   }
   if (st.type === 'line' && !ok) ui.selected = null;
   if (st.after) st.after();
@@ -1355,6 +1514,7 @@ function finish(ok) {
 function hint(msg) { document.getElementById('feedback').innerHTML = `<div class="hint">${esc(msg)}</div>`; }
 function labelWhy(sc) {
   if (isExt(sc)) return labelWhyExt(sc);
+  if (TOPICS[sc.kind]) return TOPICS[sc.kind].labelWhy(sc);
   if (sc.kind === 'tax') return 'Pc (consumers pay) is where S + tax meets demand. Pp (producers keep) is straight below it on the original S: Pc − Pp = the tax. Qt is the new quantity.';
   if (sc.kind === 'subsidy') return 'Pc (consumers pay) is where S + subsidy meets demand. Pp (producers receive) is straight above it on the original S: Pp − Pc = the subsidy. Q2 is the new quantity.';
   if (sc.kind === 'ceiling') return 'At Pmax, read Qs off supply and Qd off demand. Qd > Qs: the gap is the shortage.';
@@ -1439,6 +1599,8 @@ function renderHome() {
   h += `<tr><th colspan="${sk.length + 1}" class="sect">Externalities</th></tr>`;
   for (const k of EXT_KINDS) h += row(k, KINDS[k].replace(' externality', ''));
   h += row('ext', 'All four mixed', true);
+  h += `<tr><th colspan="${sk.length + 1}" class="sect">Elasticity</th></tr>`;
+  h += row('rev', KINDS.rev);
   document.getElementById('grid').innerHTML = h;
   document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));
 }

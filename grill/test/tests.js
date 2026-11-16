@@ -7,7 +7,7 @@ const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 
-const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons'];
+const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev'];
 const KINDS_ = KINDS;
 
 test('generators always give whole-number, on-chart markets', async page => {
@@ -20,7 +20,7 @@ test('generators always give whole-number, on-chart markets', async page => {
       for (const l of diagram(sc).lines) if (!seg(l.line)) out.push([k, 'line off chart']);
       // every number a calculation needs must be readable off a gridline
       if (k === 'ceiling' && !isInt(Dy(sc, sc.qs))) out.push([k, 'DWL corner off grid']);
-      if (k === 'floor' && !isInt(Sy(sc, sc.qd))) out.push([k, 'DWL corner off grid']);
+      if ((k === 'floor' || k === 'minwage') && !isInt(Sy(sc, sc.qd))) out.push([k, 'DWL corner off grid']);
     }
     return out.slice(0, 5);
   });
@@ -127,6 +127,37 @@ test('the mixed externality row picks all four types and shows their combined sc
   await page.evaluate(() => { store.scores['negprod.shade'] = [1, 1]; store.scores['poscons.shade'] = [0]; showHome(); });
   const cell = await page.evaluate(() => document.querySelector('[aria-label="All four mixed Shade"]').textContent);
   assert(cell === '2/3', cell);
+});
+
+test('minimum wage and PED revenue: labels, one right line, revenue matches elasticity', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    setLevel('HL');
+    for (let i = 0; i < 300; i++) {
+      const m = gen('minwage'), mn = labelSlots(m).map(s => s.answer).sort().join();
+      if (mn !== 'DL,Min. wage,Qd,Qe,Qs,SL,Unemployment,We,Wmin') out.push(['minwage labels', mn]);
+      if (!labelsFit(m)) out.push(['minwage labels touch', JSON.stringify(m)]);
+      if (!(m.P > m.ye && m.qs > m.qd)) out.push(['minwage not binding', JSON.stringify(m)]);
+      const r = gen('rev'), rn = labelSlots(r).map(s => s.answer).sort().join();
+      if (rn !== 'D,P₁,P₂,Q₁,Q₂') out.push(['rev labels', rn]);
+      // elastic: price and total revenue move in opposite directions; inelastic: the same way
+      const tr = p => p * (r.a - p) / r.b, fall = r.P2 < r.P1, up = tr(r.P2) > tr(r.P1);
+      if ((fall === up) !== r.el) out.push(['rev direction', JSON.stringify(r)]);
+      // the decoy price must move total revenue the other way, so only one line is right
+      if ((tr(r.Pm) > tr(r.P1)) === up) out.push(['rev decoy also right', JSON.stringify(r)]);
+      const C = conceptsFor(r), a = k => polyArea(C[k].poly);
+      if (Math.abs(a('tr2') - a('tr1') - (a('gain') - a('loss'))) > 1e-9) out.push(['rev gain/loss', JSON.stringify(r)]);
+      const ped = calcsFor(r).find(q => /PED/.test(q.q)).ans;
+      if ((ped > 1) !== r.el || Math.abs(ped - 1) < 1e-9) out.push(['rev PED', ped, JSON.stringify(r)]);
+      for (const sc of [m, r]) {
+        if (lineCands(sc).cands.filter(c => c.ok).length !== 1) out.push([sc.kind, 'draw cands']);
+        for (const q of effectsFor(sc)) if (!q.opts.includes(q.ans)) out.push([sc.kind, 'answer not an option', q.q]);
+        if (readsFor(sc).some(q => /undefined/.test(q.why))) out.push([sc.kind, 'read text']);
+      }
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
 });
 
 test('calculation answers match the drawn diagram', async page => {
@@ -239,11 +270,11 @@ test('a wrong multiple-choice option greys out and another can be picked', async
   assert((await page.evaluate(() => document.querySelector('.verdict').textContent)) === 'Got it');
 });
 
-test('effects questions never show Shortage/Surplus on the graph', async page => {
-  for (const k of ['ceiling', 'floor']) {
+test('effects questions never show Shortage/Surplus/Unemployment on the graph', async page => {
+  for (const k of ['ceiling', 'floor', 'minwage']) {
     await page.evaluate(k => startDrill('cell', k, 'effects'), k);
     const t = await page.evaluate(() => document.getElementById('chart').textContent);
-    assert(!/Shortage|Surplus/.test(t), k + ': ' + t);
+    assert(!/Shortage|Surplus|Unemployment/.test(t), k + ': ' + t);
   }
 });
 
@@ -358,14 +389,15 @@ test('SL reads labelled values off the graph and never calculates; no equations 
   assert(t.includes('Read graph') && !t.includes('Calculate'), t);
   const qs = await page.evaluate(() => {
     const seen = [];
-    for (let i = 0; i < 40; i++) { startDrill('cell', Object.keys(KINDS)[i % 8], 'calc'); Q.steps.forEach(s => seen.push(s.q)); }
+    const ks = Object.keys(KINDS);
+    for (let i = 0; i < 50; i++) { startDrill('cell', ks[i % ks.length], 'calc'); Q.steps.forEach(s => seen.push(s.q)); }
     return { seen, eqs: document.getElementById('eqs').textContent };
   });
-  const bad = qs.seen.filter(q => !/^What is (P|Q)[\w*₁₂]+\?$/.test(q));
+  const bad = qs.seen.filter(q => !/^What is (P|Q|W)[\w*₁₂]+\?$/.test(q));
   assert(!bad.length, bad.join(' | '));
   assert(!/Qd =|Qs =/.test(qs.eqs), qs.eqs);
-  for (let rep = 0; rep < 8; rep++) {
-    await page.evaluate(k => startDrill('cell', k, 'calc'), KINDS_[rep % 8]);
+  for (let rep = 0; rep < KINDS_.length; rep++) {
+    await page.evaluate(k => startDrill('cell', k, 'calc'), KINDS_[rep]);
     for (let j = 0; j < 3; j++) { const v = await answerRight(page); assert(v === 'Correct', v); await page.click('#next-btn'); }
   }
   await page.evaluate(() => setLevel('HL'));

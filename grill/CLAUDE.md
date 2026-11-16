@@ -1,6 +1,6 @@
 # Grill (graph drill), `/grill`
 
-Drills IB Economics government intervention diagrams: indirect tax, subsidy, price ceiling, price floor (2.7 in the 2027 guide: diagrams SL/HL, calculations HL only), and since 2026-11-12 the four externalities with their interventions (2.8). Built 2026-10-29 as a quick prototype for a class test a few days later; later plans are more micro graphs, then macro.
+Drills IB Economics government intervention diagrams: indirect tax, subsidy, price ceiling, price floor (2.7 in the 2027 guide: diagrams SL/HL, calculations HL only), since 2026-11-12 the four externalities with their interventions (2.8), and since 2026-11-16 minimum wage and PED and total revenue. Built 2026-10-29 as a quick prototype for a class test a few days later; later plans are more micro graphs, then macro.
 
 ## Externalities (added 2026-11-12, Sam's spec)
 - Home grid has two sections. Externality rows: negative/positive production/consumption (`negprod` `posprod` `negcons` `poscons`), plus an amber **All four mixed** row (pseudo-kind `ext`): it deals types from a shuffled deck (`session.deck`: every four questions cover all four, never the same type twice running; plain random gave Sam long runs of one type) and its cells show the four rows' scores added together. Scores are always recorded under the real type.
@@ -12,6 +12,14 @@ Drills IB Economics government intervention diagrams: indirect tax, subsidy, pri
 - `genExt` keeps every labelled value and every corner of every shading area on a gridline inside the chart, and rejects markets whose label boxes touch (`labelsFit`, including the "Price, cost, benefit ($)" axis title box). HL calcs that match a shading area carry `concept`; a test checks the answer equals the area.
 - Code: `diagramExt`, `conceptsExt`, `effectsExt`, `calcsExt`, `lineCandsExt`, `labelWhyExt`, `contextExt`; the shared functions dispatch to these with `isExt(sc)`.
 - "Totally random", "Practise my weakest" and the skill column buttons cover all eight topics, so weakest will send students to untried externality boxes first.
+
+## Minimum wage and PED revenue (added 2026-11-16), and what comes next
+- New topics live in the `TOPICS` map in `index.html` (one object each: `gen`, `diagram`, `base`, `concepts`, `effects`, `calcs`, `reads`, `context`, `lineCands`, `labelWhy`, optional `axes`/`unit`). The shared functions check `TOPICS[kind]` first. Add future graphs the same way, plus a row in `renderHome` and the kind in `test/tests.js`.
+- **Minimum wage** (`minwage`, guide 3.3 and 3.7): a price floor in the labour market, row sits under Price floor. Labels chosen by Sam: We, Wmin, Qe, Qd, Qs, DL, SL; brace "Unemployment"; the line is "Min. wage" ("Minimum wage" overflowed the box, Sam has not seen this yet). Axes "Wage rate ($)" and "Quantity of labour (workers)"; answers in workers.
+- **PED and total revenue** (`rev`, guide 2.5), own "Elasticity" section: one demand curve, price change P₁/Q₁ to P₂/Q₂ (Sam's choice for all shifts and changes: 1 then 2, not Pe then 2). Both prices are on the same side of the midpoint of D (elastic: upper half, slopes 0.5 or 1; inelastic: lower half, slopes 2 or 1), so total revenue moves one clear way. Shade TR at each price, revenue gained, revenue lost. HL calc includes PED (either sign accepted, `abs`). SL still only reads the graph, although the guide lets SL calculate PED: not yet raised with Sam's rule.
+- **Agreed labels for graphs not built yet** (Sam, 2026-11-16): shifts of D or S use D₁ → D₂ / S₁ → S₂ with P₁, Q₁ then P₂, Q₂. Trade uses Pw, "Pw + tariff", Q1 to Q4 (Q1 domestic supply and Q4 domestic demand at Pw, Q2 and Q3 after the tariff), lines "S world", "S world + tariff", "S domestic", "D domestic".
+- **Build order from the guide** (Sam picked minimum wage and PED first): 2.3 equilibrium and shifts with CS/PS; 4.1 free trade imports/exports; 4.2 tariff, quota, subsidy (HL calcs); fall in demand for labour (3.3); 4.5 exchange rates (axes must name both currencies); then AD/AS (axes "Price level" and "Real GDP", PL₁, Y₁, Yfe, never P and Q), which needs a new generator. HL 2.11 firm diagrams, money market and Phillips curves are a bigger job. Left out as poor fits: PPC, circular flow, business cycle, Lorenz, Engel, J-curve, poverty cycle.
+- `IB Economics Official Guide.pdf` in this folder is copyrighted and untracked: never commit it.
 
 ## Files
 - `index.html`: the whole app (inline CSS/JS, SVG, no libraries).
