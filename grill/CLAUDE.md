@@ -37,11 +37,17 @@ Build the **first unticked batch** below, one batch per session, then tick it he
 ### Open questions for Sam (raise at the start of the next session)
 - "Min. wage" as the line label, or widen the box for "Minimum wage"?
 - The guide lets SL calculate PED and total revenue (2.5). Keep "SL only reads the graph" there?
-- The header subtitle still says "Graph drill: intervention and externalities". Suggest "Graph drill: IB Economics diagrams".
+- "Totally random", "Practise my weakest" and the skill column buttons draw from every topic, including ones a class has not been taught yet. Suggested small fix (not built, Sam to decide): make each section heading tappable to drill just that section.
+
+### Home page layout (reviewed 2026-11-16 at Sam's request)
+- Sections run in **syllabus order with the guide number**: 2.3 Markets, 2.5 Elasticity, 2.7 Government intervention (was "Taxes, subsidies, price controls"; minimum wage sits here as a price floor), 2.8 Externalities. New sections go in the same order: Trade (4.1, 4.2), Exchange rates (4.5), then macro (3.x) between micro and Unit 4.
+- Header subtitle is now "Graph drill: IB Economics diagrams".
+- On phones the grid used to run off the right edge; the 520px media query now shrinks the skill headings and topic buttons so it fits at 390px. Check `home-phone.png` after adding rows or columns.
 
 ### The queue
 - [x] **Minimum wage** (3.3, 3.7) and **PED and total revenue** (2.5). Done 2026-11-16.
-- [ ] **Batch 1: 2.3 competitive market equilibrium.** New section "Markets" at the top of the grid. Kinds: `dshift` (demand shifts right or left) and `sshift` (supply shifts right or left), direction random per question.
+- [x] **Batch 1: 2.3 competitive market equilibrium.** Done 2026-11-16 as `dshift` ("Change in demand") and `sshift` ("Change in supply"), built by `shiftTopic(dem)`. Draw gives a cause in words (`SHIFT_CAUSES`) and says only "Tap the curve that shows the change", so the student picks the curve and the direction. Every area is tappable (`allTap`). **Not built yet: fall in the demand for labour** (do it with Batch 2 or when Sam asks). Original spec kept below for reference.
+  - Kinds: `dshift` (demand shifts right or left) and `sshift` (supply shifts right or left), direction random per question.
   - Labels **agreed**: D₁ → D₂ or S₁ → S₂; P₁, Q₁ then P₂, Q₂. The curve that does not move is plain D or S.
   - Draw: a cause is given in words (non-price determinants from the guide: income, tastes, price of substitutes/complements, number of consumers; costs of factors of production, technology, number of firms, indirect taxes/subsidies, price of related goods in supply) and the student taps the new curve; decoys are the other direction and the other curve shifting.
   - Shade: consumer surplus and producer surplus before and after, social (community) surplus, expenditure/revenue before and after. No DWL here.

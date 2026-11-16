@@ -7,7 +7,7 @@ const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 
-const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev'];
+const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev', 'dshift', 'sshift'];
 const KINDS_ = KINDS;
 
 test('generators always give whole-number, on-chart markets', async page => {
@@ -154,6 +154,34 @@ test('minimum wage and PED revenue: labels, one right line, revenue matches elas
         for (const q of effectsFor(sc)) if (!q.opts.includes(q.ans)) out.push([sc.kind, 'answer not an option', q.q]);
         if (readsFor(sc).some(q => /undefined/.test(q.why))) out.push([sc.kind, 'read text']);
       }
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
+test('changes in demand and supply: labels, new equilibrium on both curves, one right line', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    setLevel('HL');
+    for (const k of ['dshift', 'sshift']) for (let i = 0; i < 300; i++) {
+      const sc = gen(k), dem = k === 'dshift', names = labelSlots(sc).map(s => s.answer).sort().join();
+      if (names !== (dem ? 'D₁,D₂,P₁,P₂,Q₁,Q₂,S' : 'D,P₁,P₂,Q₁,Q₂,S₁,S₂')) out.push([k, 'labels', names]);
+      if (!labelsFit(sc)) out.push([k, 'labels touch', JSON.stringify(sc)]);
+      // the new equilibrium sits on the new demand and supply curves
+      if (Math.abs(sc.a2 - sc.b * sc.x2 - sc.y2) > 1e-9 || Math.abs(sc.c2 + sc.d * sc.x2 - sc.y2) > 1e-9) out.push([k, 'P2 off curves', JSON.stringify(sc)]);
+      // an increase moves the curve right: demand up raises price and quantity, supply up lowers price and raises quantity
+      if ((sc.x2 > sc.xe) !== sc.up || (sc.y2 > sc.ye) !== (dem ? sc.up : !sc.up)) out.push([k, 'direction', JSON.stringify(sc)]);
+      const lc = lineCands(sc), okKey = JSON.stringify(lc.cands.find(c => c.ok).line);
+      if (lc.cands.filter(c => c.ok).length !== 1 || lc.cands.length < 3) out.push([k, 'draw cands', lc.cands.length]);
+      if (drawBase(sc).lines.some(l => JSON.stringify(l.line) === okKey)) out.push([k, 'answer already drawn']);
+      if (okKey !== JSON.stringify(diagram(sc).lines[2].line)) out.push([k, 'right line is not the new curve']);
+      // surplus answers equal the shaded areas (x is quantity / 10)
+      const C = conceptsFor(sc), q = calcsFor(sc), ans = t => q.find(x => x.q.includes(t)).ans;
+      for (const [t, c] of [['consumer surplus before', 'cs1'], ['consumer surplus after', 'cs2'], ['producer surplus before', 'ps1'], ['producer surplus after', 'ps2'], ['social', 'soc2']])
+        if (Math.abs(ans(t) - polyArea(C[c].poly) * 10) > 1e-6) out.push([k, t, ans(t)]);
+      for (const e of effectsFor(sc)) if (!e.opts.includes(e.ans)) out.push([k, 'answer not an option', e.q]);
+      if (buildCells(sc).reduce((s, g) => s + g.polys.reduce((t, p) => t + polyArea(p), 0), 0) < GX * GY - 1e-6) out.push([k, 'not every area tappable']);
     }
     return out.slice(0, 5);
   });
@@ -404,9 +432,10 @@ test('SL reads labelled values off the graph and never calculates; no equations 
   const t2 = await page.evaluate(() => document.getElementById('grid').textContent);
   assert(t2.includes('Calculate'), t2);
   if (shots) {
-    await page.screenshot({ path: `${shots}/home.png` });
+    await page.evaluate(() => showHome());
+    await page.screenshot({ path: `${shots}/home.png`, fullPage: true });
     await page.setViewport({ width: 390, height: 844 });
-    await page.screenshot({ path: `${shots}/home-phone.png` });
+    await page.screenshot({ path: `${shots}/home-phone.png`, fullPage: true });
     await page.evaluate(() => startDrill('cell', 'tax', 'shade'));
     await page.screenshot({ path: `${shots}/drill-phone.png` });
   }

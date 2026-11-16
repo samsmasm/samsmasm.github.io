@@ -157,8 +157,10 @@
     .brand .sub { font-size: 11px; }
     .prompt { font-size: 18px; }
     .grid button { font-size: 14px; }
-    .grid td.row { font-size: 14px; padding: 8px 6px; }
     .grid th { font-size: 11px; }
+    /* keep the whole grid inside a phone screen (it used to run off the right edge) */
+    .grid .skillbtn { font-size: 11px; letter-spacing: 0; }
+    .grid .topicbtn { font-size: 15px; padding: 9px 7px; }
     .chart { width: calc(100% + 24px); max-width: none; margin: 4px -12px 0; }
   }
 </style>
@@ -168,7 +170,7 @@
   <a href="./" onclick="showHome(); return false;"><img src="logo.jpg" alt="Grill"></a>
   <div class="brand">
     <div class="title" onclick="showHome()">Grill</div>
-    <div class="sub">Graph drill: intervention and externalities</div>
+    <div class="sub">Graph drill: IB Economics diagrams</div>
   </div>
   <nav class="level" aria-label="Level">
     <button data-level="SL" onclick="setLevel('SL')">SL</button>
@@ -242,7 +244,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor',
   negprod: 'Negative production externality', posprod: 'Positive production externality', negcons: 'Negative consumption externality', poscons: 'Positive consumption externality',
-  minwage: 'Minimum wage', rev: 'PED and total revenue' };
+  minwage: 'Minimum wage', rev: 'PED and total revenue', dshift: 'Change in demand', sshift: 'Change in supply' };
 const PRICE_KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'minwage'];
 const SKILLS = { draw: 'Draw', label: 'Label', shade: 'Shade', effects: 'Effects', calc: 'Calculate' };
 const LS_KEY = 'grill_v1';
@@ -564,7 +566,7 @@ function svgLine(L, attrs) {
   return `<line x1="${X(s[0][0])}" y1="${Y(s[0][1])}" x2="${X(s[1][0])}" y2="${Y(s[1][1])}" ${attrs}/>`;
 }
 // demand-side private curves blue, supply-side orange, social curves red (as IBecon), interventions black
-const LINE_COL = { 'D': '#1d4e89', 'DL': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
+const LINE_COL = { 'D': '#1d4e89', 'D₁': '#1d4e89', 'D₂': '#1d4e89', 'S₁': '#e8590c', 'S₂': '#e8590c','DL': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
 function lineColour(name) { return LINE_COL[name] || (/^MS[BC][₁₂]?$/.test(name) ? '#c0281b' : '#111'); }
 
 // Draws the finished diagram. opts: labels (true | 'slots'), ticks, slotState
@@ -651,7 +653,7 @@ function buildCells(sc) {
     let key;
     if (sig) key = sig;
     // externalities: every area is tappable, so areas above demand don't give the answer away (Sam)
-    else if (isExt(sc) || (cy < Dy(sc, cx) && cx < maxX)) key = 'none' + (solo++);
+    else if (isExt(sc) || (TOPICS[sc.kind] || {}).allTap || (cy < Dy(sc, cx) && cx < maxX)) key = 'none' + (solo++);
     else continue;
     if (!groups.has(key)) groups.set(key, { key, sig: sig ? sig.split(',') : [], polys: [] });
     groups.get(key).polys.push(c);
@@ -1176,6 +1178,105 @@ TOPICS.rev = {
   },
 };
 
+// 2.3 A change in demand or supply moves the market to a new equilibrium. Labels (Sam, 2026-11-16):
+// D₁ → D₂ or S₁ → S₂, with P₁, Q₁ then P₂, Q₂; the curve that stays put is plain D or S.
+// Draw gives a cause in words, so the student must pick the right curve AND the right direction.
+const SHIFT_CAUSES = {
+  dup: ['Consumers’ incomes rise (this is a normal good)', 'The good becomes more fashionable', 'The price of a substitute rises', 'The price of a complement falls', 'The number of consumers rises', 'Consumers expect the price to rise soon'],
+  ddown: ['Consumers’ incomes fall (this is a normal good)', 'The good goes out of fashion', 'The price of a substitute falls', 'The price of a complement rises', 'The number of consumers falls', 'Consumers’ incomes rise (this is an inferior good)'],
+  sup: ['Wages paid by firms fall', 'New technology makes production cheaper', 'More firms enter the market', 'The government gives producers a subsidy', 'Raw materials become cheaper'],
+  sdown: ['Wages paid by firms rise', 'Raw materials become more expensive', 'Firms leave the market', 'The government puts an indirect tax on the good'],
+};
+function shiftTopic(dem) {
+  const w = dem ? 'demand' : 'supply', n1 = dem ? 'D₁' : 'S₁', n2 = dem ? 'D₂' : 'S₂';
+  const ud = v => v > 1e-9 ? 'Rises' : v < -1e-9 ? 'Falls' : 'No change';
+  const T = {
+    allTap: true,
+    reads: { 'P₁': 'the equilibrium price before the change', 'Q₁': 'the equilibrium quantity before the change', 'P₂': 'the new equilibrium price', 'Q₂': 'the new equilibrium quantity' },
+    gen() {
+      for (let n = 0; ; n++) {
+        const m = baseMarket(), kq = pick([-3, -2, -1, 1, 2, 3]), x2 = m.xe + kq, sh = kq * (m.b + m.d);
+        const y2 = dem ? m.ye + m.d * kq : m.ye - m.b * kq, a2 = dem ? m.a + sh : m.a, c2 = dem ? m.c : m.c - sh;
+        const far = m.xe + sh / (dem ? m.b : m.d);   // quantity on the new curve at the old price (for the shortage/surplus)
+        if (x2 < 1 || x2 > GX - 1 || y2 < 1 || y2 > GY - 1 || Math.abs(y2 - m.ye) < 1 || a2 < 1 || a2 > GY || c2 < 0 || far < 1 || far > GX) continue;
+        if (![y2, a2, c2, far].every(isInt)) continue;
+        const up = kq > 0;
+        const sc = { ...m, kind: dem ? 'dshift' : 'sshift', up, x2, y2, a2, c2, far, cause: pick(SHIFT_CAUSES[(dem ? 'd' : 's') + (up ? 'up' : 'down')]) };
+        if (labelsFit(sc) || n > 500) return sc;
+      }
+    },
+    diagram(sc) {
+      const D = k => fLine(k, -sc.b), S = k => fLine(k, sc.d);
+      return {
+        lines: dem ? [{ line: D(sc.a), name: 'D₁' }, { line: S(sc.c), name: 'S' }, { line: D(sc.a2), name: 'D₂' }]
+                   : [{ line: D(sc.a), name: 'D' }, { line: S(sc.c), name: 'S₁' }, { line: S(sc.c2), name: 'S₂' }],
+        points: [{ x: sc.xe, y: sc.ye, pn: 'P₁', qn: 'Q₁' }, { x: sc.x2, y: sc.y2, pn: 'P₂', qn: 'Q₂' }], annos: []
+      };
+    },
+    base(sc) { return { lines: T.diagram(sc).lines.slice(0, 2), pt: { x: sc.xe, y: sc.ye, pn: 'P₁', qn: 'Q₁' } }; },
+    concepts(sc) {
+      const { a, c, a2, c2, xe, ye, x2, y2 } = sc;
+      return {
+        cs1: { name: 'consumer surplus before the change', poly: [[0, a], [0, ye], [xe, ye]], why: `Below ${dem ? 'D₁' : 'D'}, above P₁, up to Q₁.` },
+        cs2: { name: 'consumer surplus after the change', poly: [[0, a2], [0, y2], [x2, y2]], why: `Below ${dem ? 'D₂' : 'D'}, above P₂, up to Q₂.` },
+        ps1: { name: 'producer surplus before the change', poly: [[0, c], [0, ye], [xe, ye]], why: `Above ${dem ? 'S' : 'S₁'}, below P₁, up to Q₁.` },
+        ps2: { name: 'producer surplus after the change', poly: [[0, c2], [0, y2], [x2, y2]], why: `Above ${dem ? 'S' : 'S₂'}, below P₂, up to Q₂.` },
+        rev1: { name: 'producer revenue (= consumer expenditure) before the change', poly: [[0, 0], [xe, 0], [xe, ye], [0, ye]], why: 'Price × quantity: the rectangle P₁ × Q₁.' },
+        rev2: { name: 'producer revenue (= consumer expenditure) after the change', poly: [[0, 0], [x2, 0], [x2, y2], [0, y2]], why: 'Price × quantity: the rectangle P₂ × Q₂.' },
+        soc2: { name: 'social (community) surplus after the change', poly: [[0, a2], [x2, y2], [0, c2]], why: 'Consumer surplus plus producer surplus: the whole triangle between demand and supply up to Q₂.' },
+      };
+    },
+    effects(sc) {
+      const C = T.concepts(sc), ar = k => polyArea(C[k].poly), L = [], short = dem === sc.up, other = dem ? 'supply' : 'demand';
+      const SH = ['A shortage (excess demand)', 'A surplus (excess supply)', 'Neither'], dr = sc.y2 * sc.x2 - sc.ye * sc.xe;
+      L.push(['What happens to the equilibrium price?', UDN, ud(sc.y2 - sc.ye), `The market moves from P₁ to P₂, where ${n2} meets ${dem ? 'S' : 'D'}.`]);
+      L.push(['What happens to the equilibrium quantity?', UDN, ud(sc.x2 - sc.xe), `The market moves from Q₁ to Q₂, where ${n2} meets ${dem ? 'S' : 'D'}.`]);
+      L.push(['Straight after the change, at the old price P₁ there is...', SH, short ? SH[0] : SH[1],
+        short ? `At P₁, quantity demanded is now more than quantity supplied, so the price is pushed up to P₂.` : `At P₁, quantity supplied is now more than quantity demanded, so the price is pushed down to P₂.`]);
+      L.push([`What happens to ${other}?`, [`No change: only quantity ${dem ? 'supplied' : 'demanded'} changes`, 'It increases', 'It decreases'], `No change: only quantity ${dem ? 'supplied' : 'demanded'} changes`,
+        `The ${other} curve does not move. The new price causes a movement along it, from Q₁ to Q₂.`]);
+      L.push([`The change in ${w} is shown by...`, [`A shift of the ${w} curve`, `A movement along the ${w} curve`, `A shift of the ${other} curve`], `A shift of the ${w} curve`,
+        `A non-price determinant of ${w} changed, so the whole curve shifts (${n1} to ${n2}). Only a change in the good’s own price causes a movement along a curve.`]);
+      L.push(['What happens to producer revenue?', UDN, ud(dr), `Before: P₁ × Q₁ = ${money(sc.ye)} × ${sc.xe * 10} = ${money(sc.ye * sc.xe * 10)}. After: P₂ × Q₂ = ${money(sc.y2)} × ${sc.x2 * 10} = ${money(sc.y2 * sc.x2 * 10)}.`]);
+      L.push(['What happens to consumer surplus?', UDN, ud(ar('cs2') - ar('cs1')), 'Compare the triangle under demand and above the price, before and after.']);
+      L.push(['What happens to producer surplus?', UDN, ud(ar('ps2') - ar('ps1')), 'Compare the triangle above supply and below the price, before and after.']);
+      L.push(['A shortage pushes the market price...', ['Up', 'Down', 'Nowhere'], 'Up', 'Buyers compete for too few goods, so the price rises until quantity demanded equals quantity supplied.', true]);
+      L.push(['The price of a good rises. What does this signal to producers?', ['Produce more', 'Produce less', 'Leave the market'], 'Produce more', 'A higher price signals that consumers want more, and gives firms the incentive (more profit) to supply it.', true]);
+      L.push(['At the competitive market equilibrium, social (community) surplus is...', ['Maximised', 'Minimised', 'Zero'], 'Maximised', 'Consumer surplus plus producer surplus is as big as it can be: allocative efficiency.', true]);
+      L.push(['Allocative efficiency is where...', ['MB = MC', 'MB > MC', 'MB < MC'], 'MB = MC', 'The benefit of the last unit equals its cost: demand (MB) meets supply (MC).', true]);
+      return L;
+    },
+    calcs(sc) {
+      const { a, c, a2, c2, ye, y2 } = sc, Q1 = sc.xe * 10, Q2 = sc.x2 * 10, L = [], short = dem === sc.up, gap = Math.abs(sc.far - sc.xe) * 10, dr = y2 * Q2 - ye * Q1;
+      const dn1 = dem ? 'D₁' : 'D', dn2 = dem ? 'D₂' : 'D', sn1 = dem ? 'S' : 'S₁', sn2 = dem ? 'S' : 'S₂';
+      const tri = (hi, lo, q, nm, P, Qn) => `½ × (${money(hi)} − ${money(lo)}) × ${q} = ${money(0.5 * (hi - lo) * q)}. (${nm} meets the price axis at ${money(P)}; ${Qn} = ${q}.)`;
+      L.push(['Calculate consumer surplus before the change.', 0.5 * (a - ye) * Q1, '$', tri(a, ye, Q1, dn1, a, 'Q₁')]);
+      L.push(['Calculate consumer surplus after the change.', 0.5 * (a2 - y2) * Q2, '$', tri(a2, y2, Q2, dn2, a2, 'Q₂')]);
+      L.push(['Calculate producer surplus before the change.', 0.5 * (ye - c) * Q1, '$', tri(ye, c, Q1, sn1, c, 'Q₁')]);
+      L.push(['Calculate producer surplus after the change.', 0.5 * (y2 - c2) * Q2, '$', tri(y2, c2, Q2, sn2, c2, 'Q₂')]);
+      L.push(['Calculate social (community) surplus after the change.', 0.5 * (a2 - c2) * Q2, '$', `Consumer surplus + producer surplus: ½ × (${money(a2)} − ${money(c2)}) × ${Q2} = ${money(0.5 * (a2 - c2) * Q2)}.`]);
+      L.push(['By how much does producer revenue change? (Use − for a fall.)', dr, '$', `After: P₂ × Q₂ = ${money(y2)} × ${Q2} = ${money(y2 * Q2)}. Before: P₁ × Q₁ = ${money(ye)} × ${Q1} = ${money(ye * Q1)}. Change: ${dr < 0 ? '−' : ''}${money(Math.abs(dr))}.`]);
+      L.push([`Straight after the change, how big is the ${short ? 'shortage' : 'surplus'} at the old price P₁?`, gap, 'units',
+        `At P₁ = ${money(ye)}, quantity ${dem ? 'demanded' : 'supplied'} on ${n2} is ${sc.far * 10}. Quantity ${dem ? 'supplied' : 'demanded'} is still ${Q1}. Gap: ${gap} units.`]);
+      return L;
+    },
+    context(sc) { return sc.cause; },
+    lineCands(sc) {
+      const D = k => fLine(k, -sc.b), S = k => fLine(k, sc.d), sh = dem ? sc.a2 - sc.a : sc.c - sc.c2;   // sh > 0: the curve moves right
+      const c = dem ? [{ line: D(sc.a2), ok: true }, { line: D(sc.a - sh) }, { line: S(sc.c - sh) }, { line: S(sc.c + sh) }]
+                    : [{ line: S(sc.c2), ok: true }, { line: S(sc.c + sh) }, { line: D(sc.a + sh) }, { line: D(sc.a - sh) }];
+      return { prompt: `${sc.cause}. Tap the curve that shows the change.`, cands: c.filter(k => seg(k.line) && (k.line.m > 0 || k.line.k >= 1)),
+        why: `This changes ${w}, not ${dem ? 'supply' : 'demand'}: ${w} ${sc.up ? 'increases, so the curve shifts right' : 'decreases, so the curve shifts left'}.` };
+    },
+    labelWhy(sc) {
+      return `${n1} is ${w} before the change and ${n2} after (${sc.up ? 'an increase: to the right' : 'a decrease: to the left'}). P₁ and Q₁ are where ${n1} meets ${dem ? 'S' : 'D'}; P₂ and Q₂ are where ${n2} meets it.`;
+    },
+  };
+  return T;
+}
+TOPICS.dshift = shiftTopic(true);
+TOPICS.sshift = shiftTopic(false);
+
 // ---------- building questions ----------
 function contextText(sc) {
   if (isExt(sc)) return contextExt(sc);
@@ -1594,13 +1695,17 @@ function renderHome() {
   const row = (k, name, mix) => `<tr><td class="row"><button class="topicbtn${mix ? ' mix' : ''}" onclick="startDrill('kind','${k}')">${name}</button></td>` +
     sk.map(s => { const c = scoreCell(k, s); return `<td><button class="${c.cls}${mix ? ' mix' : ''}" onclick="startDrill('cell','${k}','${s}')" aria-label="${name} ${skillName(s)}">${c.text}</button></td>`; }).join('') + '</tr>';
   let h = '<tr><th></th>' + sk.map(s => `<th><button class="skillbtn" onclick="startDrill('skill',null,'${s}')">${skillName(s)}</button></th>`).join('') + '</tr>';
-  h += `<tr><th colspan="${sk.length + 1}" class="sect">Taxes, subsidies, price controls</th></tr>`;
+  // sections run in syllabus order (the order students meet the graphs), each with its guide number
+  const sect = name => `<tr><th colspan="${sk.length + 1}" class="sect">${name}</th></tr>`;
+  h += sect('2.3 Markets');
+  for (const k of ['dshift', 'sshift']) h += row(k, KINDS[k]);
+  h += sect('2.5 Elasticity');
+  h += row('rev', KINDS.rev);
+  h += sect('2.7 Government intervention');
   for (const k of PRICE_KINDS) h += row(k, KINDS[k]);
-  h += `<tr><th colspan="${sk.length + 1}" class="sect">Externalities</th></tr>`;
+  h += sect('2.8 Externalities');
   for (const k of EXT_KINDS) h += row(k, KINDS[k].replace(' externality', ''));
   h += row('ext', 'All four mixed', true);
-  h += `<tr><th colspan="${sk.length + 1}" class="sect">Elasticity</th></tr>`;
-  h += row('rev', KINDS.rev);
   document.getElementById('grid').innerHTML = h;
   document.querySelectorAll('.level button').forEach(b => b.classList.toggle('on', b.dataset.level === store.level));
 }
