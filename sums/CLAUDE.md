@@ -61,7 +61,7 @@ Year activities (Years 1–4 each):
 - **Shapes**: one block colour with an ink outline. 1 sides or corners of triangles, squares, rectangles (sometimes turned); 2 up to 6 sides (regular or irregular; `irregular` keeps them convex with clear corners) and 3D (cube, cuboid, square pyramid, triangular prism; hidden edges dashed) faces or corners; 3 up to 10 sides (7 up always regular), 3D edges too, lines of symmetry (square, rectangle, isosceles, regular 3/5/6/8); 4 up to 12 sides, symmetry on regular shapes to 12, "How many right angles?" (square, rectangle, right triangle, right trapezium; no corner marks). Kind Flat / 3D. `fitPts` keeps every shape inside its box.
 - **Rulers**: a plain coloured pencil with a wood tip, dashed guides down from both ends. Question "How long?", unit after the line. 1 counts alternating blue/white blocks (10 blocks, pencil 2–9), 2 a 10 cm ruler from 0, 3 a 12 cm ruler with half-cm marks, the pencil often not starting at 0, 4 a 6 cm ruler in mm (marks every mm, longer every 5), sometimes from 1 cm, drawn bigger. Rulers are short so the numbers can be read on a card.
 
-**Suggested, not built:** rounding, fractions of a number, breaking numbers apart (7 × 14 = 7 × 10 + 7 × ☐), bar models, repeating picture patterns for Year 1, true or false and < > (these need a tap-to-answer card: the reader only knows digits).
+**Not built yet:** see "Build plan" below. Everything suggested so far is a numbered step there.
 
 ## The sheet (plain, like a paper printout; Sam likes it, keep it that way)
 - Grid of cards follows rotation: portrait 2/3/4 columns for 6/12/20, landscape 3/4/5, phones in portrait always 2 (scrolls).
@@ -95,7 +95,195 @@ Year activities (Years 1–4 each):
 3. Add browser tests (questions correct for every year, cards fit with room to write, answers written in place are read and marked right, record label), and check screenshots in portrait, landscape and phone.
 4. Tick it off in `CURRICULUM.md`, add its row to the mock map (`mock/index.html` `LEVELS`) and refresh `mock/pics.json`.
 
-## Years instead of ages: the big grid (next)
+## Build plan ("make the next step")
+
+Agreed with Sam 2026-11-16, from `CURRICULUM.md` (checked against the Ministry PDFs) and `NZC Maths Activity Alignment.md`. **Year order (Sam): 4, 1, 5, 2, 3, 6, 0.** The nearly-8-year-old comes first, then the 5-year-old, then the way up for the older one, then the years in between, with Year 0 last.
+
+### How to run a step
+When Sam says "make the next step":
+1. Find the first step below without a ✓. Do that one step only (if Sam says "next two", do two).
+2. Read the code for the activities it touches first. This plan describes intent; where the code differs from what a step assumes, follow the code and say so.
+3. Build **only the years the step names**. A new activity starts with a Year row holding just that year; later steps add buttons to the row. Until a step gives it a year in the younger range it is on the older tiles only (`ages: [8]`), and the other way round.
+4. Follow "Adding an activity" above: tests for every new generator and card (answers right, fits with room, read and marked right, record label), screenshots in portrait, landscape and phone, run `test/run.sh` twice.
+5. Update the Activities section above, tick `CURRICULUM.md`, add the mock row (`mock/index.html` `LEVELS`) and refresh `mock/pics.json`.
+6. Mark the step here: `✓ (date)` plus one line on anything that turned out different. Update the tracker and the vault note, commit, push.
+7. Tell Sam what to try on the tablet. If a step proves too big, split it into a and b here and build a.
+
+### Rules for every step
+- The sheet stays plain. New pictures are clean line drawings; block colour only where it carries meaning.
+- Ages 4–6 never have to read: every question and every tappable choice is spoken (`q.say`, and a choice speaks its label when tapped).
+- Wrong is only "Try again"; the answer is never shown. First try is what is scored.
+- Answers stay whole numbers unless the step says otherwise. The reader knows digits only, so anything else is a printed sign with blanks around it (two blanks, `q.two`) or a tap card.
+- Names below are working names. Keep them short and plain; Sam may rename.
+- No new setup options beyond Year and Kind unless a step says so (Sam watches for bloat).
+- "Ask Sam" marks the few real choices. Everything else: just build it.
+
+### Two new card kinds (built once, in the step that first needs them)
+**`tap` card** (step A2). Question or picture on top, 2 to 4 tiles in a row underneath (bordered boxes holding a sign, a short word, a number or a small SVG). Tapping a tile selects it (thick ink border); tapping another moves the choice; nothing is marked until Mark, like written cards. `readAnswer` returns the chosen tile's label and `ok`. Wrong: red border and Try again, which clears the choice. No "I was right the first time" (nothing is being read). No writing canvas on the card, but the Working area still works. At 4–6 the card speaker reads the question, then each tile in order. With only two tiles a second try gives it away; that is fine because only the first try scores. Options: `q.multi` (several tiles can be on; all and only the right ones must be chosen) and `q.cells` (tiles laid out as a grid of small squares instead of a row; used by Map, Mirror and the coordinate plane).
+
+**Two blanks with other signs** (step A4). `q.two` already handles ":" and "and". Add a printed "." (decimals, "$ __ . __"), "r" (remainders, "__ r __") and "h / min" ("__ h __ min"). A decimal's second blank must keep leading zeros: 1.05 is right only as "05", unlike minutes where 5 = 05 is forgiven for the first blank only. Trailing zeros are forgiven (0.5 = 0.50).
+
+---
+
+### Phase A: Year 4 (the older daughter's level now)
+
+**A1. Year 4 fixes on existing games.** No new cards.
+- *Times and divide*, Years 3 and 4: print division across (`65 ÷ 5` then `= ___`, the `expr` card) instead of the long-division bracket, which is a Year 5 written method. Multiplication stays stacked. The original Sums tile is untouched (Sam: keep it exactly).
+- *Graphs*, Year 4 dot plots: add three question types to the ones there: "Most pets anyone has?" (the biggest value with a dot, not the tallest stack), "Fewest pets anyone has?", and "How spread out? Biggest take away smallest". Make sure each plot has a tallest stack that is not at the biggest value, so value and frequency give different answers.
+- *Money*, Year 4: check prices when buying several. The curriculum wants whole-dollar prices: either many of one item ("Buy 3", each $4) or two or three different items ($3, $7, $12: total, then change). Fix whichever is missing.
+- *Place value*: add "Up to 9,999" (thousands as big cubes in Blocks, 4,000 + 300 + 40 + 7, 1,000 more / less).
+- *Number lines*: add counting in 25s, 50s and 1,000s.
+
+**A2. The tap card, with True or false and More or less (Year 4).**
+- Build the `tap` card (above) with its tests: select, change, Mark, Try again, first try scored, spoken tiles, fits in every layout.
+- *True or false* (new): a number sentence, tiles ✓ and ✗ (signs, not words; spoken "true" and "not true"). About half are true. False ones are near misses: out by 1, 10 or 100, a swapped digit, or a times-table neighbour. Year 4: four-digit + and − (8205 − 4721 = 3484), tables (11 × 7 = 78), ÷ 10 and × 10 (120 ÷ 10 = 12), and both-sides sentences (6 × 4 = 12 × 2). Say "8205 take away 4721 equals 3484. True?".
+- *More or less* (new): two things side by side with an empty box between them, tiles < = >. Year 4: numbers to 10,000 (often sharing digits: 4,071 and 4,701), then small calculations (6 × 7 ☐ 5 × 8, 3,000 + 400 ☐ 3,500 − 100). About one in five is =. Kind row: Numbers / Sums.
+
+**A3. Balance, Rounding and recipe stories (Year 4).** Digit reader only.
+- *Balance* (new, `miss` card): an equation with something on both sides and one box, then "☐ = ___". Year 4: 4200 − ☐ = 4001, ☐ ÷ 10 = 12, 36 + 17 = ☐ + 20, 6 × 8 = ☐ × 4, 250 + ☐ = 300 + 75. Always exactly one whole-number answer. Different from Missing number, which keeps one side a plain number and has its own keypad setup.
+- *Rounding* (new): "Round 3,472 to the nearest 100" then "= ___". Year 4: nearest 10, 100 or 1,000 for numbers to 10,000, and tenths to the nearest whole (3.7 → 4). Kind: Number line (a line between the two candidates, both ends labelled, an arrow at the number, write the end it is nearer) or Just numbers. Never a number exactly halfway on the line kind; halfway (ends in 5, 50, 500) is allowed in Just numbers and rounds up.
+- *Story sums*, Year 4: add recipe stories to × ÷ ("A cake needs 250 grams of flour. Ty makes 3 cakes. How many grams?", "The recipe makes 12. Ty wants 6. It needs 300 grams of flour. How many grams now?"). Doubling, halving, × 3, × 4.
+
+**A4. Decimals (Year 4: tenths).** Builds the printed-point two blanks (above).
+- *Decimals* (new). Kinds: **Picture** (bars cut into ten, some shaded; full bars count as ones, so one full bar and three tenths is 1.3; she writes `__ . __`), **Number line** (0 to 2 in tenths, only whole numbers labelled, an arrow), **Add and take away** (1.3 + 0.2, 2.5 − 0.4, crossing a whole about a third of the time: 0.8 + 0.5), **Times and divide by 10** (7 ÷ 10 = 0.7, 23 ÷ 10 = 2.3, 0.7 × 10 = 7; a whole-number answer uses one blank).
+- Also the fraction link: "3/10 = __ . __" and "1/2 = __ . __" inside the Picture kind as plain-text cards, about one in four.
+
+**A5. Fractions past one, and Fractions of a number (Year 4).**
+- *Fractions* keeps its settings and gets two more kinds (no Year row; Fractions is not a year activity): **Past 1** (a 0-to-2 number line cut into d parts with an arrow past 1, or two shapes with n > d parts shaded; caption "Write it as one fraction", so 9/8, and equal fractions still count) and **Add** (same bottom number, two or three fractions, pictures of each above the sum; totals may pass one whole: 3/8 + 3/8 + 3/8 = 9/8; subtraction too).
+- *More or less* gets Kind **Fractions** (Year 4): same top number or same bottom number (3/8 ☐ 5/8, 1/3 ☐ 1/5), and tenths against decimals (3/10 ☐ 0.5).
+- *Fractions of a number* (new, `frame` card): a bar cut into d equal boxes. Two kinds. **Part**: the whole is written above the bar, one box is marked "?" ("1/4 of 28"; Year 4 uses tables to 10 and round numbers such as 1/3 of 300). **Whole**: one box holds a number, a bracket over the whole bar is marked "?" ("1/4 of a set is 7. How many in the set?"). Unit fractions only in Year 4, denominators 2 to 10. This is the bar model; no separate bar-model game.
+
+**A6. Measuring (Year 4).**
+- *Area* gets Kind **Odd shapes**: a shape drawn on a square grid from whole squares and half squares (diagonal halves), filled in one block colour; "How many squares?". Always an even number of halves so the answer is whole. And Kind **Cubes**: a cuboid of small cubes drawn at an angle (up to 4 × 3 × 3, every cube edge drawn); "How many cubes?".
+- *Rulers* gets Kind **Thermometer** (Year 4): an upright thermometer in degrees Celsius, 0 to 40, labels every 10, marks every 1 or 2, a red column; "How warm?" then "___ °C".
+- *Change units* (new, `miss` card), Year 4 time: 3 weeks = ___ days, 48 hours = ___ days, 2 minutes = ___ seconds, 120 minutes = ___ hours, and mixed: 90 seconds = `__ min __ s`, 100 minutes = `__ h __ min` (two blanks).
+- *Angles* (new, tap card), Year 4: an angle drawn as two arms with a small arc; "Is it smaller than a right angle, a right angle, or bigger?" Tiles are three little pictures (a narrow angle, a square corner, a wide angle). Then benchmark questions with number tiles 90 / 180 / 360: "A quarter turn is how many degrees?", "A half turn?", "A full turn?". Never within 12° of 90 unless it is exactly 90.
+
+**A7. Space and money (Year 4).**
+- *Map* (new, tap card with `q.cells`): a 5 × 5 grid, letters A–E along the bottom, numbers 1–5 up the side, three or four block-colour shapes in cells. Two question types: "Tap C4" (any cell can be tapped), and "Where is the red circle?" with four tiles holding grid references (B2, C2, B3, D4).
+- *Shapes* gets Kind **Moves** (tap card, Year 4): an L-shaped block-colour shape and the same shape after one move, a dashed mirror line or a dot for the turning point where needed. Tiles: flip, slide, turn, each a tiny picture with its word (spoken). Only moves that cannot be mistaken for one another (the shape is not symmetrical; a slide never looks like a flip).
+- *Money* gets Kind **Make it** (tap card with a tray, Year 4): "Make $5 and 80 cents". Tiles are the coins and notes; each tap drops one into a tray above (tap one in the tray to take it out). The total is never shown. Mark checks the total. Year 4 uses all coins and notes; any way that adds up is right.
+
+### Phase B: Year 1 (the 5-year-old; everything spoken, nothing to read)
+
+**B1. Year 1 fixes.**
+- *Times and divide*, Year 1: no × or ÷ signs (those are Year 2). Use pictures on a `frame` card. **Groups**: g boxes ("bags") each holding k dots; "3 bags of 2. How many altogether?". **Sharing**: n dots in a heap above g empty boxes; "12 shared between 3. How many in each?". Totals within 20, any group size that fits (not only 2s, 5s, 10s). Record key and tile stay.
+- *Graphs*, Year 1: stack the pictures in columns standing on a line, colour swatch under each, all pictures the same size (the curriculum's picture graph). Add tap questions "Which has the most?" and "Which has the least?": tiles are the colour swatches. "How many ●?" stays written.
+- *How many?* gets Kind **Groups** (Year 1 idea, up to 10): dots in two block colours as two dice-style clusters (3 and 5), no ten frame, so she sees parts inside a whole. Answer is the total.
+
+**B2. Year 1 on the tap and balance games.**
+- *True or false*, Year 1: one-digit + and − only (7 − 5 = 6 − 4, 3 + 4 = 8). Dots under each side for about half the cards.
+- *More or less*, Year 1 (and on the younger tiles): two heaps of dots (1–10), tiles are the left heap, "same", and the right heap; "Which has more?" or "Which has fewer?". Then numerals to 20 the same way. No < > signs (Year 2).
+- *Balance*, Year 1: one-digit sums, 2 + 5 = 3 + ☐, 7 − ☐ = 4 + 1, with a simple level see-saw drawn under the equation. Spoken "2 plus 5 is the same as 3 plus what?".
+- *Clocks* gets Kind **Match** (tap card, Year 1): an analogue face on top, three digital clocks as tiles (3:00, 4:00, 12:00). Covers digital clocks, which the curriculum wants from Year 1. Wrong tiles: the hour either side, and the number the long hand points at.
+
+**B3. Patterns and shape names (Year 1).**
+- *Picture patterns* (new, tap card): a row of 7 to 9 block-colour shapes following a three-part repeat (red circle, green square, blue triangle, ...) with one gap, anywhere but the first three. Tiles are the three elements. "What is missing?". Some patterns change shape only, some colour only, some both.
+- *Shapes* gets Kind **Name** (tap card, Year 1): "Tap the triangle". Four tiles, each a shape in a different size, colour and turn. Flat: triangle, circle, rectangle, square. Solid: cube, cylinder, sphere, drawn with the same clean lines as the 3D kind. A square among rectangles counts only when the question says square.
+
+**B4. Hidden dots, halves, coins, longer and shorter (Year 1).**
+- *Splat* (new, `frame` card): the total as a big numeral on top, dots below, some covered by one flat grey blot. "8 altogether. How many are hiding?". Year 1: totals 6 to 20 (to 10 at first; the dots she can see are in dice or ten-frame arrangements so she can see how many without counting).
+- *Halves and quarters* (new): tap cards "Which one shows a half?" / "a quarter?" (three shapes: one cut into equal parts with one shaded, two cut unequally or with the wrong number of parts), and written cards "Half of 8" / "A quarter of 12" shown as dots with a dashed sharing line (answers within 10).
+- *Money* gets Kind **Which coin?** (tap card, Year 1): "Tap the 50 cent coin". Tiles are three or four coins or notes at real relative size: 10c, 20c, 50c, $1, $2, $5, $10, $20.
+- *Rulers* gets Kind **Which is longer?** (tap card, Year 1): two or three pencils that do not start at the same place; "Tap the longest" / "the shortest". Then two towers of blocks for taller and shorter.
+
+### Phase C: Year 5 (the older daughter's way up)
+
+**C1. Raise the ceiling, and Year 5 number work.**
+- Year options can now go past 4: fix the test that expects every year activity to stop at Year 4 and the "highest here so far" line. Only activities given a Year 5 button offer it.
+- *Add and take away*, Year 5: five- and six-digit numbers stacked; two-decimal-place sums across (1.31 + 0.22) with the printed point.
+- *Times and divide*, Year 5: tables to 12; four-digit × one-digit and two-digit × two-digit, stacked with room for two working rows; division **with a remainder** in the long-division bracket (its proper home), answered `__ r __` (278 ÷ 4 = 69 r 2). About one in four has no remainder (she writes 0 or leaves it empty).
+- *Place value*, Year 5: "Up to 999,999": expanded form and 1,000 / 10,000 / 100,000 more or less. No blocks at this size.
+- *Number patterns*, Year 5: 11s and 12s, 1,000s to 100,000s, decimal steps (3, 4.5, 6, 7.5; two blanks), and counting back through zero (6, 4, 2, 0, ☐). A negative answer prints the minus sign before the blank ("☐ = − ___"): she supplies the size. Accepted that the sign is given away; the reader cannot read a minus.
+
+**C2. Year 5 on the newer games.**
+- *True or false* and *More or less*, Year 5: big numbers and calculations on both sides (2,456 × 2 ☐ 1,228 × 4), decimals to two places (0.12 ☐ 0.2), fractions where one bottom number is a multiple of the other (2/3 ☐ 5/9).
+- *Balance*, Year 5: 999,999 − ☐ = 899,999 and the like. *Rounding*, Year 5: to the nearest 10,000 or 100,000; tenths and hundredths to the nearest whole; dollars and cents to the nearest dollar.
+- *Decimals*, Year 5: hundredths. Picture is a 10 × 10 square; number line 0 to 1 in hundredths with tenths labelled; add and take away to two places; ÷ and × by 10 and 100; "1/4 = __ . __", "3/4".
+- *Fractions* gets Kind **Add different** (2/3 + 1/9 = 7/9: one bottom number a multiple of the other, pictures cut to the bigger bottom number).
+- *Fractions of a number*, Year 5: non-unit fractions (2/3 of 24: two boxes bracketed "?"), the whole from a part (8 is 2/5 of a set), and Kind **Percent**: 10%, 25%, 50% of a number, and the whole from 25% or 50%, on the same bar (4 boxes for 25%, 10 for 10%).
+- *Money*, Year 5: prices in dollars and cents with a decimal point; total of two or three items and change from the next $10, answered `$ __ . __`.
+
+**C3. Year 5 measuring and shapes.**
+- *Angles*, Year 5: Kind **Name** (tap: acute, right, obtuse, straight, reflex; words are fine at this age) and Kind **Measure** (a half-circle protractor drawn over the angle, labels every 10°, marks every 5°, one arm on the zero line; write the degrees; multiples of 5 up to 180).
+- *Area*, Year 5: Kind **Perimeter** on L-shapes and other straight-sided shapes with every side labelled; a new kind **Same area** (tap): "Which has the same area as this but a different perimeter?" with three rectangles on a grid. *Cubes*, Year 5: bigger cuboids with the layers drawn slightly apart; "cubes in one layer × layers".
+- *Clocks*, Year 5: Words kind in 24-hour time ("quarter past 3 in the afternoon" → 15 : 15), and Kind **How long?** (two digital times with a.m. / p.m. or 24-hour; `__ h __ min`).
+- *Change units*, Year 5: m and cm, with decimals (2 m 35 cm = 2.35 m; 180 cm = 1.8 m), km and m, cm and mm.
+- *Shapes*, Year 5: written "How many pairs of parallel sides?" and "How many right angles?" on quadrilaterals and hexagons; tap "Which two lines are parallel?" / "perpendicular?"; 3D adds pentagonal and hexagonal prisms (faces, edges, corners); Kind **Nets** (tap): a solid on top, three nets as tiles, one right (cube, cuboid, triangular prism, square pyramid, cylinder; use a small hand-checked set of nets, right and wrong).
+- *Map*, Year 5: "Start at B2. Go 2 north, 3 east. Tap where you finish." A compass rose on the card.
+
+**C4. Year 5 data and chance.**
+- *Graphs*, Year 5: clustered bar graph (three groups, two block colours side by side, a key): "How many more ■ than ■ in the last group?", "How many ■ altogether?", tap "Which group has more ■ than ■?". And a grouped table (0–0.99, 1–1.99, 2–2.99 with counts): "How many jumped less than 2 metres?".
+- *Chance* (new, tap card), Year 5: a bag drawn with coloured counters; "Picking a red one is..." with tiles impossible, unlikely, even chance, likely, certain. A second kind puts the question on a 0-to-1 line with five marks to tap (0, between, 1/2, between, 1). A third kind, **Try it**: a "Pick 20" button runs 20 real random picks and fills a tally chart, then asks "Which colour came up most?" about what actually happened (truly random, never staged).
+
+### Phase D: Year 2
+
+**D1. Year 2 fixes, and Year 2 on the number games.**
+- *Clocks*, Year 2: no "quarter to" (it is Year 3): minutes are 0, 15 or 30 only; Words say "o'clock", "quarter past", "half past". Add Year 2 to Match.
+- *Graphs*, Year 2: add a dot plot of category data (dots stacked over colour swatches) and the tap most / least questions.
+- *True or false*, Year 2: comparisons to 120 with signs (16 > 60), and number sentences with the 2, 5 and 10 tables (2 + 2 + 2 = 3 × 2). *More or less*, Year 2: numbers to 120 with < = > tiles. *Balance*, Year 2: 18 + ☐ = 17 + 6, 6 ÷ ☐ = 2, ☐ × 5 = 20.
+- *Rounding*, Year 2: nearest 10 for numbers to 120, number-line kind by default. *Splat*, Year 2: totals to 30, and two or three identical blots ("14 altogether. 4 showing. The same number under each blot. How many under one?").
+- *Add and take away*, Year 2: add the missing kinds: three one-digit numbers (7 + 3 + 6), 100 + n, tens facts (70 + 20).
+
+**D2. Year 2 pictures, shapes and measuring.**
+- *Picture patterns*, Year 2: "Which part repeats?" (tiles are candidate units for ACDCACDC...) and "What will the 10th one be?" (tiles are the elements; position asked is 8th to 12th).
+- *Shapes* Name, Year 2: oval, semicircle, pentagon, hexagon; cuboid, pyramid, cone.
+- *Halves and quarters*, Year 2: thirds too; "2/4 is the same as...?" (tap pictures); the whole from a part ("Half is 5. How many altogether?", written); which is bigger, a half, a third or a quarter of the same shape (tap).
+- *Money* Make it, Year 2: coins only or notes only ("Make 70 cents", "Make $35").
+- *Rulers* gets Kinds **Scales** (a round dial in grams, one pointer) and **Jug** (a measuring jug in mL with a flat coloured fill), whole numbered marks only in Year 2.
+- *Turns* (new, tap card): an arrow, then where it points after a turn; "Which turn was it?" with tiles quarter, half, three-quarter, full, each a small arc picture; clockwise and anticlockwise. *Map*, Year 2: "3 steps forward, quarter turn right, 2 steps forward. Tap where you finish" on a plain grid with an arrow showing where she starts and faces.
+
+### Phase E: Year 3
+
+**E1. Year 3 number.**
+- *True or false*, *More or less*, *Balance*, Year 3: to 1,000 and all four operations (313 < 330, 12 ÷ 3 = 5 − 2, 217 − ☐ = 105). *Rounding*, Year 3: nearest 10 or 100.
+- Complements to 100: *Splat*, Year 3 (a hundred square with a blot: "100 altogether, 34 showing") and *Number bonds* "Up to 100" (tens first, then any number).
+- *Add and take away*, Year 3: add 700 + 200 style facts across. 
+- *More or less* Fractions, Year 3: unit fractions to twelfths (1/12 ☐ 1/6) and same bottom number (3/8 ☐ 5/8), with small bar pictures. *Fractions* Add within one whole is already there from A5; make it the Year 3 default example. *Fractions of a number*, Year 3: 1/3 of 15, and 1/4 of a set is 3, with small tables only.
+- *Money* Make it, Year 3: $1 and $2 coins and all notes. *Clocks*, Year 3: add Match, and a.m. / p.m. (tap: a time with a tiny scene such as a sun or a moon and words like "breakfast", tiles a.m. and p.m.).
+
+**E2. Year 3 measuring and space.**
+- *Rulers* Scales and Jug, Year 3: kilograms and litres, marks between the numbers.
+- *Mirror* (new, tap card with `q.cells` and `q.multi`): a 6 × 6 grid with a dashed mirror line down the middle, a pattern of filled squares on the left; she taps squares on the right to finish the mirror picture. Year 3: upright line. (Later years: a line across, then a diagonal.)
+- *Map*, Year 3: north, east, south, west moves on a plain grid, shorter than Year 5 and without grid references. *Shapes* Name, Year 3: regular polygons to 10 sides, by name.
+- *Graphs*, Year 3: tap most / least on bar graphs.
+
+### Phase F: Year 6
+
+**F1. Year 6 number.**
+- *Order* (new, `expr` card): 3 + 4 × 2, (3 + 4) × 2, 20 − 12 ÷ 4, 5 + 3², (2 + 3)² − 5. Each sheet pairs sums that differ only in their brackets. *True or false*, Year 6: the same with ≤ and ≥ (8 × 7 ≤ 8 × 5 + 4²).
+- *Times bonds* gets Kind **Squares and cubes**: 7² = ___, ☐² = 49, 3³ = ___ (squares to 144, cubes to 125).
+- *Times and divide*, Year 6: any number × two-digit (542 × 12); five-digit ÷ one-digit with a remainder. *Story sums*, Year 6: remainder stories where the story decides ("31 children, 6 in each van. How many vans?" rounds up; "How many full boxes?" rounds down).
+- *Decimals*, Year 6: thousandths; × and ÷ by 10, 100, 1,000; add and take away to three places. *Number patterns*, Year 6: from −6 back in 2s, and across zero both ways.
+- *Fractions*, Year 6: Kind **Simplest** ("Write 6/8 in its simplest form": here equal fractions do not count, only 3/4) and Add different with mixed numbers given as improper fractions.
+- *Fractions of a number*, Year 6: 2/3 of 240; 3/4 of a set is 90; Percent with 1%, 10%, 20%, 25%, 50%, 75%, and "75% is 24, what is 100%?". *Money*, Year 6: Kind **Sale** ("$280, 25% off. How much off?", then "What do you pay?").
+- *More or less*, Year 6: match across forms (3/4 ☐ 0.7, 31% ☐ 0.31).
+
+**F2. Year 6 measuring, shapes, data, chance.**
+- *Plot* (new, tap card with `q.cells` on line crossings): x and y axes 0 to 10. "Tap (3, 2)", including points on an axis; then a rule in words ("start at 2, add 3 each time") with a table missing two values (written), then tap the points.
+- *Angles*, Year 6: Measure to 360°; Kind **Missing angle** (written): two angles on a straight line, angles round a point, vertically opposite angles, one marked "?".
+- *Area*, Year 6: Kind **Triangle** (a right-angled triangle on a grid with its rectangle dashed round it, or with base and height labelled; even products so the answer is whole) and *Cubes* with side lengths only (length × width × height, "___ cm³").
+- *Change units*, Year 6: g and kg, mL and L, joined into decimals (10 kg 500 g = 10.5 kg).
+- *Clocks*, Year 6: How long? across the hour (2:53 pm to 3:28 pm, minutes only), and Kind **Timetable**: a small bus timetable (three stops, three buses); "How long from Town to Beach on the second bus?".
+- *Shapes*, Year 6: Name the quadrilaterals (trapezium, parallelogram, kite, rectangle, rhombus, square; "Tap every rhombus" with `q.multi`, a square counts); "Turn symmetry: how many times does it fit in a full turn?" (written); angles inside triangles and quadrilaterals as Missing angle cards.
+- *Graphs*, Year 6: a line graph over days (read a value, "How much did it change from Monday to Friday?", tap "Going up, going down, or no trend?"), and Kind **Mean and range**: four to six numbers on a strip; means always whole.
+- *Chance*, Year 6: a spinner cut into equal slices in block colours; "Chance of red?" as a fraction (`frac` card, equal fractions count); "Red is 1/2, blue is 1/4. Chance of green?"; "How many outcomes?" for a die, a coin, a spinner.
+
+### Phase G: Year 0 (first six months of school)
+
+**G1. Year 0.** Ask Sam first: Year 0 as its own button in the Year row ("Year 0 · just started"; recommended, with age 4 suggesting Year 0 and age 5 still suggesting Year 1), or an "easier" setting inside Year 1. Then add it only to these, using the Year 0 block in `CURRICULUM.md`:
+- *How many?*: 1 to 5 as dice patterns and finger patterns, then counting up to 10 scattered objects.
+- *Number bonds*, *Add and take away*, *Splat*: within 5.
+- *Number patterns*: the number before and after, to 10, on a row of numbered boxes with one empty.
+- *Number lines* (younger tiles): a fully labelled 0 to 10 or 0 to 20 line with one label missing.
+- *More or less*: heaps to 10 only, "more", "fewer", "same".
+- *Picture patterns*: two-part repeats (cat, dog, cat, dog).
+- *Shapes* Name: triangle, circle, rectangle, square. *Rulers* Which is longer?: two objects starting at the same line.
+
+### Not in the plan (left out on purpose)
+Days of the week, months and seasons (need reading or a lot of speech for little maths), te reo Māori number names (worth doing well or not at all: ask Sam), surveys and measuring real things (hands-on), tessellations and two-step transformations, estimation puzzles, digit-tile puzzles and open fraction pictures from the alignment document (big builds for little practice). The big grid (below) is its own job: do it when Sam asks, not as a step here.
+
+## Years instead of ages: the big grid (separate job)
 `mock/` (unisam.nz/sums/mock/, not wired to the real page) is the agreed direction: home shows her year's tiles, each tile has steps for the years that skill has (go up or down one skill without changing year), a Keep going row, and a Map page with skills down and years across. Age would open it at her suggested column. `mock/pics.json` holds the tile pictures, dumped from `ACTS` with headless Chrome; refresh it after adding an activity.
 
 ## Files
