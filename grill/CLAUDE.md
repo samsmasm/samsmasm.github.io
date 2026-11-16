@@ -49,7 +49,7 @@ Build the **first unticked batch** below, one batch per session, then tick it he
   - HL calc (guide: CS and PS from a diagram): CS, PS, social surplus before and after, change in revenue, size of the shortage/surplus at P₁.
   - Also add **fall in the demand for labour** (3.3) as a variant here or under Minimum wage: DL₁ → DL₂, W₁/Q₁ → W₂/Q₂ (labels follow the agreed shift pattern; axes as minimum wage).
 - [ ] **Batch 2: 4.1 free trade.** New section "Trade". Kinds: `imports` (world price below domestic price) and `exports` (world price above).
-  - Labels **agreed**: Pw; Q1 = domestic quantity supplied and Q4... for plain free trade there are only two quantities, so use Q1 (domestic supply) and Q2 (domestic demand) for imports, and the reverse meaning for exports. Lines "S domestic", "D domestic", "S world" (horizontal at Pw). **Ask**: whether the no-trade equilibrium is labelled Pd/Qd-style or Pe/Qe (recommend Pe, Qe to match the rest of Grill).
+  - Labels **agreed**: Pw and numbered quantities. Plain free trade has only two quantities at Pw, so use Q1 and Q2 left to right (imports: Q1 domestic supply, Q2 domestic demand; exports: Q1 domestic demand, Q2 domestic supply). Lines "S domestic", "D domestic", "S world" (horizontal at Pw). **Ask**: whether the no-trade equilibrium is labelled Pd/Qd-style or Pe/Qe (recommend Pe, Qe to match the rest of Grill).
   - Shade: import expenditure or export revenue, domestic producers' revenue, CS and PS before and after trade, the gain in welfare.
   - HL calc (guide): quantity of imports/exports, import expenditure, export revenue.
 - [ ] **Batch 3: 4.2 trade protection.** Kinds: `tariff`, `tquota` (import quota), `tsub` (production subsidy to domestic firms). Export subsidy only if Sam asks.
