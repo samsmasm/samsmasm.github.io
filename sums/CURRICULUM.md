@@ -1,10 +1,10 @@
-# NZ maths curriculum, Years 1 to 4 (for planning Sums)
+# NZ maths curriculum, Years 0 to 6 (for planning Sums)
 
-Source: *The New Zealand Curriculum, Mathematics and Statistics Years 0–10*, November 2026 (in force 1 January 2027). Checked against the October 2025 year-by-year teaching sequences: Years 1–4 content is the same. Probability starts in Year 5, so it is not here.
+Source: the Ministry of Education's October 2025 year-by-year teaching sequences, *Mathematics and Statistics* Years 0–1, 2, 3, 4, 5 and 6. Re-checked line by line against those six PDFs on 2026-11-16 (with `NZC Maths Activity Alignment.md`). Where an earlier version of this file differed, the PDFs won: named quadrilaterals moved from Year 4 to Year 6, parallel lines from Year 4 to Year 5, and Years 5 and 6 were added. Probability starts in Year 5.
 
-**Years.** Year 1 = first year at school (turns 5 to 6). Year 2 = 6–7, Year 3 = 7–8, Year 4 = 8–9. So the 5-year-old (US kindergarten) is about Year 1, and the nearly-8-year-old (US grade 2, above level) is Year 3 going on Year 4.
+**Years.** Year 1 = first year at school (turns 5 to 6); its first six months are "Year 0" here. Year 2 = 6–7, Year 3 = 7–8, Year 4 = 8–9, Year 5 = 9–10, Year 6 = 10–11. So the 5-year-old (US kindergarten) is Year 0 going on Year 1, and the nearly-8-year-old (US grade 2, above level) is Year 3 going on Year 4, with Years 5 and 6 as her way up.
 
-**Marks.** ✓ = a Sums activity already covers it (name in brackets). ✋ = hands-on (real objects, moving around, class surveys), so it needs adapting to fit a screen. Everything else could be a new activity.
+**Marks.** ✓ = a Sums activity already covers it (name in brackets). ✋ = hands-on (real objects, moving around, class surveys), so it needs adapting to fit a screen. Everything else could be a new activity. "Out of step" = the game does it in a different year from the curriculum.
 
 Each year lists **skills** (what she does). Facts she needs to know come after "knows:".
 
@@ -12,7 +12,9 @@ Each year lists **skills** (what she does). Facts she needs to know come after "
 
 ## Year 1 (first year at school)
 
-Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
+Year 1 starts with a "first six months" stage (Year 0); those skills are marked *(6m)*.
+
+**Year 0 is only this:** numbers to 20, counting to 10 objects, subitising 3–5, more / less / same, facts to 5, the number before and after to 10, ordinals to 5th, a fully labelled number line, two-element repeating patterns, comparing two objects directly, days of the week, sorting triangles, circles, rectangles and squares, and following directions. **Not yet in Year 0:** numbers past 20, counting in 2s and 10s, facts past 5, doubles, equal groups, fractions, money, clocks, number sentences, three-element patterns, 3D shapes and graphs.
 
 ### Number
 - Read and write numbers to 20 *(6m)*, then to 100. ✓ (Teen numbers, Place value)
@@ -34,8 +36,8 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Join and separate groups to 20 (9 + 6, 7 + __ = 11). ✓ (Missing number, Number bonds)
 - Add ten to a one-digit number (10 + 4). ✓ (Add and take away, Year 1)
 - One-step + and − word problems with objects and pictures. ✓ (Story sums, Year 1, read aloud; no pictures)
-- Multiply and divide by equal groups or sharing, answers within 20. ✓ (Times and divide Year 1, Story sums, Arrays)
-- Knows: adding 0 changes nothing; order doesn't matter when adding but does when subtracting.
+- Multiply and divide by equal groups or sharing (counting objects), answers within 20. ✓ (Story sums, Arrays). Out of step: Times and divide Year 1 prints × and ÷ sums, but those signs and the 2, 5 and 10 tables are Year 2.
+- Knows: adding 0 changes nothing; order doesn't matter when adding but does when subtracting. Only the + and − signs are Year 1.
 
 ### Fractions and money
 - Halves and quarters of sets, amounts and shapes, using equal parts. ✓ partly (Fractions)
@@ -52,7 +54,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Measurement
 - Compare two things by length, weight or capacity, directly *(6m)*, then using a third object. Words: longer, shorter, taller, heavier, lighter. ✋ (could be pictures)
 - Days of the week in order, the day before and after *(6m)*; weekdays and weekend.
-- Tell the time to the hour (o'clock) on analogue and digital clocks. ✓ (Clocks, Year 1)
+- Tell the time to the hour (o'clock) on analogue and digital clocks. ✓ partly (Clocks, Year 1: analogue only)
 - Choose a sensible unit for how long things take (seconds, minutes, hours, days, weeks, months, years).
 - Put events of the day in order (before, after, yesterday, tomorrow); parts of the day (morning, noon, evening, midnight).
 
@@ -65,8 +67,8 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 
 ### Statistics
 - Collect category data for a question (whose foot is longer?) ✋, and tally it.
-- Make a picture graph.
-- Read a picture graph: how many in each group, which has most or least. ✓ partly (Graphs, Year 1: how many; not most/least)
+- Make a picture graph (one picture per item, all the same height, stacked in columns).
+- Read a picture graph: how many in each group, which has most or least. ✓ partly (Graphs, Year 1: how many; not most/least; drawn in rows, not columns)
 
 ---
 
@@ -117,7 +119,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - Months and seasons in order; the month before and after; ordinals for months.
 - Describe how long familiar things take.
-- Tell the time to the hour, half hour and quarter hour ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ (Clocks, Year 2)
+- Tell the time to the hour, half hour and quarter hour on analogue and digital clocks, saying "past" and "o'clock" only ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ partly (Clocks, Year 2: analogue only). Out of step: Clocks Year 2 also asks "quarter to", which is Year 3.
 
 ### Geometry
 - Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex. ✓ partly (Shapes, Year 2: sides, corners, faces; not naming)
@@ -128,7 +130,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Statistics
 - Collect category data (favourite pets) ✋, sort it, decide if "other" is needed, tally it.
 - Make picture graphs and dot plots.
-- Describe them and answer most and least questions. ✓ partly (Graphs, Year 2: tally charts and picture graphs, how many and how many more)
+- Describe them and answer most and least questions. ✓ partly (Graphs, Year 2: tally charts and picture graphs, how many and how many more; no dot plots until Year 4, no most/least)
 
 ---
 
@@ -151,7 +153,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Times tables and division facts for 2, 3, 4, 5, 8 and 10. ✓ (Times bonds, Times grid)
 - Multiply and divide by sharing, grouping, repeated adding or known facts. ✓ (Arrays)
 - Multiply a one- or two-digit number by a one-digit number (4 × 6, 2 × 23). ✓ (Sums)
-- Divide by a one-digit number, no remainders (24 ÷ 3). ✓ (Sums ÷)
+- Divide by a one-digit number, no remainders (24 ÷ 3, 32 ÷ 4), from known facts. ✓ (Sums ÷, Times and divide). Out of step: the long-division layout is a Year 5 written method.
 - Knows: dividing by zero is impossible.
 
 ### Fractions and money
@@ -178,7 +180,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Area of rectangles by counting equal squares. ✓ (Area: Count squares)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - How long events take, in seconds up to years.
-- Tell the time to the nearest 5 minutes and nearest minute ("10 past", "quarter to", a.m. and p.m.). ✓ (Clocks, Years 3 and 4; not a.m. and p.m.)
+- Tell the time to the nearest 5 minutes and nearest minute on analogue and digital clocks, minutes past and minutes to ("10 past", "quarter to", a.m. and p.m.). ✓ partly (Clocks, Years 3 and 4: analogue only; not a.m. and p.m.)
 - Compare units of time. Knows: 15 minutes in a quarter hour, 60 seconds in a minute, 24 hours in a day, 52 weeks and 365 days in a year (366 in a leap year, every 4 years), months about 4 weeks with different numbers of days, decade 10 years, century 100, millennium 1,000.
 
 ### Geometry
@@ -207,7 +209,7 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - All times tables and division facts, 2 to 10. ✓ (Times bonds, Times grid)
 - Multiply and divide mentally with place value and known facts, including × 0, × 1 and ÷ 1.
 - Multiply a two- or three-digit number by a one-digit number. ✓ (Sums)
-- Divide up to a three-digit number by a one-digit number, no remainders (65 ÷ 5). ✓ (Sums ÷)
+- Divide up to a three-digit number by a one-digit number, no remainders (65 ÷ 5). ✓ (Sums ÷, Times and divide). Out of step: the long-division layout is a Year 5 written method (column and area-model multiplying do start in Year 4).
 - Scale with × and ÷ (double or halve a recipe).
 
 ### Fractions, decimals and money
@@ -243,8 +245,8 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 - Change between time units (3 weeks = 21 days, 90 seconds = 1½ minutes, 48 hours = 2 days).
 
 ### Geometry
-- Classify regular and irregular polygons up to 12 sides by edges, vertices and angles; quadrilaterals (square, rectangle, rhombus, parallelogram, trapezium, kite); parallel lines.
-- Count lines of symmetry in 2D shapes (a circle has infinitely many).
+- Classify regular and irregular polygons up to 12 sides by edges, vertices and angles. ✓ partly (Shapes, Year 4: count sides and right angles). The words "quadrilateral" and "parallel line" are taught, but finding parallel lines is Year 5 and the named quadrilaterals are Year 6.
+- Count lines of symmetry in 2D shapes (a circle has infinitely many). ✓ (Shapes, Year 4)
 - Match 3D shapes to 2D drawings and views from different sides.
 - One-step reflections, translations and rotations of 2D shapes.
 - Grid references (A1, B2) to find squares and plot positions on a map.
@@ -252,4 +254,134 @@ Year 1 starts with a "first six months" stage; those skills are marked *(6m)*.
 ### Statistics
 - Collect numerical data, rounding if needed (skips in 30 seconds) ✋.
 - Make dot plots and bar graphs with a title, labels, units and a scale from 0.
-- Read dot plots: the frequency of a value, individual values, the shape, the middle, the spread (lowest to highest). Tell "the value" from "how many had that value" apart (the most pets anyone has vs the most common number of pets).
+- Read dot plots: the frequency of a value, individual values, the shape, the middle, the spread (lowest to highest). Tell "the value" from "how many had that value" apart (the most pets anyone has vs the most common number of pets). ✓ partly (Graphs, Year 4: frequency and most common; not spread, middle or "the most pets anyone has")
+
+---
+
+## Year 5
+
+Nothing in Sums has a Year 5 or 6 option yet; the ticks here are activities whose own settings happen to reach.
+
+### Number
+- Read, write, compare and order numbers to 1,000,000.
+- Factor pairs of any product up to 10 × 10 (3 and 4 are a factor pair of 12).
+- Round to the nearest 10, 100, 1,000, 10,000 or 100,000; round tenths and hundredths to the nearest whole.
+- Count in 11s and 12s from multiples; in 1,000s, 10,000s and 100,000s from any number to 100,000.
+- Count backwards through 0 into negative numbers. Knows: negatives sit left of 0 (or below it on an upright line); 0 is neither; they turn up as debt and temperature.
+
+### Operations
+- Add and subtract bigger and bigger whole numbers. ✓ partly (Sums, to 9999)
+- All times tables and division facts, 2 to 12. ✓ (Times bonds, Times grid)
+- Multiply and divide bigger numbers mentally with facts, factor pairs and multiples.
+- Multiply a three- or four-digit number by one digit; multiply two two-digit numbers. ✓ partly (Sums: 3-digit × 1-digit)
+- Divide up to a four-digit number by one digit, **with a remainder** (278 ÷ 4 = 69 remainder 2), including the written method. ✓ partly (Sums ÷ has the layout, but no remainders)
+
+### Fractions, decimals, percentages and money
+- Tenths and hundredths as fractions and decimals; compare and order numbers to two decimal places (0.12 < 0.2).
+- Know ½, ¼ and ¾ as decimals, and fractions out of 10 or 100.
+- 10%, 25% and 50% as fractions and decimals.
+- Divide one- and two-digit numbers by 10 or 100; multiply decimals by 10 and 100.
+- Compare fractions where one bottom number is a multiple of the other; families of equal fractions; mixed numbers and improper fractions that are equal. ✓ partly (Fractions accepts equal fractions)
+- Add and subtract fractions with the same bottom number, or where one is a multiple of the other (⅔ + ¹⁄₉ = ⁷⁄₉).
+- Add and subtract decimals to two places (1.31 + 0.22 = 1.53).
+- A non-unit fraction of a number (⅔ of 24); the whole from a part (8 is ⅖ of a set).
+- 10%, 25% and 50% of a number; the whole when given 25% or 50%.
+- Total cost in dollars and cents, change from the nearest $10; money written with a decimal point; round to the nearest dollar.
+
+### Algebra
+- Fill in <, > or = between two calculations (2,456 × 2 __ 1,228 × 4).
+- True or false and open number sentences with big numbers (999,999 − __ = 899,999). ✓ partly (Missing number)
+- Growing patterns that change by a constant amount, decimals included (3, 4.5, 6, 7.5...).
+
+### Measurement
+- Measure accurately with a ruler, scales, jug, thermometer and timer, in mixed units (2 hours and 30 minutes). ✋ partly
+- Change between m and cm. Knows: 10 mm in a cm, 100 cm in a m, 1,000 mm in a m, 1,000 m in a km.
+- Area of irregular shapes from squares, half squares and part squares (roughly).
+- Area of rectangles by multiplying the sides. ✓ (Area)
+- Volume of a cuboid: cubes in a layer × number of layers.
+- Perimeter of regular polygons and other straight-sided shapes. ✓ partly (Area: Perimeter, rectangles only)
+- Same area, different perimeter (and the other way round).
+- Name angles: acute, right, obtuse, straight, reflex; measure and draw angles to 180° with a protractor.
+- Tell the time on analogue and digital clocks; how long between two times, with a.m. and p.m. and 24-hour time.
+
+### Geometry
+- Describe prisms by their cross section, faces, edges and vertices.
+- Find parallel and perpendicular lines, including the sides of polygons.
+- Match 3D shapes to their nets.
+- Say which transformation was done (reflection, translation, rotation).
+- Read and make grid maps with grid references and north, east, south, west.
+
+### Statistics
+- Collect measured data with a set rounding rule ✋; collect paired category data (what we do at lunch, and gender) ✋.
+- Tables that group measured data into ranges (0–0.99, 1–1.99...).
+- Clustered bar graphs for paired categories (two colours side by side, with a key), and questions about them.
+
+### Probability
+- Run a chance game many times and describe the outcomes ✋ (a screen can run the trials).
+- Call an everyday event impossible, unlikely, even chance, likely or certain.
+- Put events on a 0-to-1 line by how likely they are.
+- Knows: with equally likely outcomes, the chance is ways it can happen ÷ all outcomes; all the chances add to 1.
+
+---
+
+## Year 6
+
+### Number
+- Read, write, compare and order any whole number.
+- Factor pairs of any product up to 12 × 12.
+- Round to the nearest 10 up to the nearest million; round hundredths to the nearest whole or tenth.
+- Square and cube numbers and the ² and ³ signs. Knows: squares to 144, cubes to 125.
+- Count forwards and backwards with negative numbers (from −6, back in 2s).
+
+### Operations
+- Order of operations: brackets, then squaring, then × and ÷ left to right, then + and − left to right.
+- Add and subtract any whole numbers.
+- Multiply any whole number by a two-digit number (542 × 12).
+- Divide up to a five-digit number by one digit, with a remainder (1283 ÷ 5 = 256 remainder 3).
+- Write the remainder as a whole number, a fraction or a rounded decimal, whichever suits the story (⅙ of 31 = 31 ÷ 6 = 5⅙).
+
+### Fractions, decimals, percentages and money
+- Tenths, hundredths and thousandths; compare and order numbers to three decimal places.
+- Know ½, ¼, ¾, ⅕, ⅖, ⅗, ⅘ as decimals and percentages; change decimals to fractions and percentages (0.31 = ³¹⁄₁₀₀ = 31%).
+- Multiply and divide by 10, 100 and 1,000 (1.3 × 10 = 13).
+- Find equal fractions and simplify them; compare and order fractions where one bottom number is a multiple of all the others; change between mixed numbers and improper fractions.
+- Add and subtract fractions and mixed numbers where one bottom number is a multiple of the other.
+- Add and subtract decimals to three places.
+- A non-unit fraction of a number (⅔ of 240); the whole from a non-unit fraction (¾ of a set is 90).
+- 1%, 10%, 20%, 25%, 50% and 75% of a number; the whole from a percentage (75% is 24).
+- Compare two amounts and find missing values with fractions, decimals and percentages.
+- 10%, 25% and 50% of whole dollar amounts (50% of $280); is there enough money?
+
+### Algebra
+- True or false and open number sentences with all four operations, ≤ and ≥, and the order of operations (8 × 7 ≤ 8 × 5 + 4²?).
+- Put a growing pattern's rule into words and predict later terms.
+- Make a table of values from a rule and plot it as (x, y) points, including points on the axes.
+
+### Measurement
+- Estimate length, weight, capacity, temperature and time from benchmarks. ✋
+- Change between m and cm, g and kg, L and mL, joining mixed units into decimals (10 kg and 500 g = 10.5 kg). Knows: milli = a thousandth, centi = a hundredth, kilo = a thousand.
+- Area of rectangles and right-angled triangles (half the rectangle), in cm² and m².
+- Volume of cubes and cuboids by multiplying, in cm³ and m³.
+- Measure and draw angles to 360° with a protractor.
+- Find unknown angles: angles at a point add to 360°, on a straight line to 180°, vertically opposite angles are equal.
+- Change between hours, minutes and seconds; durations in 12- and 24-hour time; minutes across an hour (2:53 pm to 3:28 pm).
+- Read timetables (bus, train) to find how long things take. Knows: solar calendars (Gregorian) and lunar ones (maramataka Māori, Chinese).
+
+### Geometry
+- Sort and compare 2D shapes, including kinds of triangle and the quadrilaterals: trapezium (one pair of parallel sides), parallelogram (two pairs), kite (two pairs of equal sides next to each other), rectangle (four right angles), rhombus (four equal sides), square (both). Compare prisms and pyramids.
+- Interior angles of triangles and quadrilaterals.
+- Rotational symmetry and its order (a circle's is infinite).
+- Make and describe tessellations with rotation, reflection and translation.
+- Predict the result of two-step transformations.
+- Maps with grid references, a simple scale, compass points, turns in degrees and distances in m and km.
+
+### Statistics
+- Collect time-series data (the weight of a kilogram of carrots over 5 days) ✋.
+- Work out the mean and the range.
+- Make time-series (line) graphs; choose the right graph for the data.
+- Say whether a time-series graph shows a trend; read graphs from the news.
+
+### Probability
+- List the sample space (a die: 1, 2, 3, 4, 5, 6).
+- Work out the chance of one outcome, and of a spinner colour as a fraction.
+- Chances of combined outcomes; check that all the chances add to 1.

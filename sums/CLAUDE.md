@@ -4,7 +4,7 @@ Maths practice for Sam's two daughters, written by finger or stylus on a touch s
 
 **Users.** A 5-year-old in US-style kindergarten who **can't read yet** (pictures, numbers and spoken prompts only, never written questions she must read) and a nearly-8-year-old in grade 2 working above level (she found the first age-8 set straightforward). Sam wants them free to explore: the girls change their own settings, nothing is locked.
 
-**Organised by NZ curriculum year.** `CURRICULUM.md` lists the NZ Years 1–4 maths curriculum (Nov 2026 NZC) with each Sums activity ticked against it. Sam wants skills both **across** (everything for her year) and **down** (one skill through the years), and never to drop an activity because she has moved up. New activities are built "vertically": one activity with a **Year** option for each level (Years 1–4 for every year activity so far).
+**Organised by NZ curriculum year.** `CURRICULUM.md` lists the NZ Years 0–6 maths curriculum (October 2025 teaching sequences, re-checked against the PDFs 2026-11-16) with each Sums activity ticked against it, and "Out of step" notes where a game does something in a different year (× ÷ signs in Year 1, "quarter to" in Year 2, long division before Year 5). `NZC Maths Activity Alignment.md` is Sam's outside audit with ideas for new activities (Sam's file, untracked). Sam wants skills both **across** (everything for her year) and **down** (one skill through the years), and never to drop an activity because she has moved up. New activities are built "vertically": one activity with a **Year** option for each level (Years 1–4 for every year activity so far).
 
 **Before committing:** run `test/run.sh` (all must pass; questions are random, so run it twice after layout changes). Update `tracker/projects.md` and run `python3 tracker/publish.py` (see the repo CLAUDE.md).
 
@@ -100,7 +100,7 @@ Year activities (Years 1–4 each):
 
 ## Files
 - `index.html`: everything, inline CSS/JS. Globals used by tests include `ACTS`, `makeQ`, `cards`, `buildSheet`, `layout`, `sizeCanvas`, `draw`, `read`, `readAnswer`, `answerStrokes`, `fracParts`, `twoParts`, `loadCfg`, `loadRec`, `labelFor`, `draft`, `players`, `current`, `act`, `age`, `sheetStart`, `goNames`, `G`, `startGrid`, `dropOn`, `W` (working area), and each activity's generator (`graphQ`, `shapeQ`, `rulerQ`, `seqQ`, `dblQ`, `storyQ`, `addSubQ`, `mulDivQ`).
-- `CURRICULUM.md`: NZ Years 1–4 maths curriculum with what Sums covers.
+- `CURRICULUM.md`: NZ Years 0–6 maths curriculum with what Sums covers.
 - `mock/`: the big-grid mock (see above).
 - `digits.js`: the reader. `readNumber(strokes, unit)` splits strokes into digits (x-overlap grouping, or a thin stroke inside a wider one such as a 4's down stroke), renders each MNIST-style (20 px box, centre of mass at 14,14, stroke radius 1.25 px), runs the CNN in plain JS, and returns `{ text, digits, backwards }`.
 - `model.js`: int8 weights (~80 KB). CNN conv16/conv32/conv64 (3×3, relu, maxpool) → fc64 → fc17. `digits.js` reads the class count from the weights, so a 10-class model still works.
