@@ -247,7 +247,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor',
   negprod: 'Negative production externality', posprod: 'Positive production externality', negcons: 'Negative consumption externality', poscons: 'Positive consumption externality',
-  minwage: 'Minimum wage', rev: 'PED and total revenue', dshift: 'Change in demand', sshift: 'Change in supply', lshift: 'Fall in labour demand' };
+  minwage: 'Minimum wage', rev: 'PED and total revenue', dshift: 'Change in demand', sshift: 'Change in supply', lshift: 'Fall in labour demand', imports: 'Imports', exports: 'Exports' };
 const PRICE_KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'minwage'];
 const SKILLS = { draw: 'Draw', label: 'Label', shade: 'Shade', effects: 'Effects', calc: 'Calculate' };
 const LS_KEY = 'grill_v1';
@@ -355,6 +355,7 @@ const SECTIONS = [
   { name: '2.5 Elasticity', kinds: ['rev'] },
   { name: '2.7 Government intervention', kinds: PRICE_KINDS },
   { name: '2.8 Externalities', kinds: EXT_KINDS },
+  { name: '4.1 Free trade', kinds: ['imports', 'exports'] },
 ];
 const EXT_IVS = {
   negprod: ['none', 'none', 'tax', 'ptax', 'quota', 'reg'],
@@ -576,7 +577,7 @@ function svgLine(L, attrs) {
   return `<line x1="${X(s[0][0])}" y1="${Y(s[0][1])}" x2="${X(s[1][0])}" y2="${Y(s[1][1])}" ${attrs}/>`;
 }
 // demand-side private curves blue, supply-side orange, social curves red (as IBecon), interventions black
-const LINE_COL = { 'D': '#1d4e89', 'D₁': '#1d4e89', 'D₂': '#1d4e89', 'S₁': '#e8590c', 'S₂': '#e8590c','DL': '#1d4e89', 'DL₁': '#1d4e89', 'DL₂': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
+const LINE_COL = { 'D domestic': '#1d4e89', 'S domestic': '#e8590c', 'D': '#1d4e89', 'D₁': '#1d4e89', 'D₂': '#1d4e89', 'S₁': '#e8590c', 'S₂': '#e8590c','DL': '#1d4e89', 'DL₁': '#1d4e89', 'DL₂': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
 function lineColour(name) { return LINE_COL[name] || (/^MS[BC][₁₂]?$/.test(name) ? '#c0281b' : '#111'); }
 
 // Draws the finished diagram. opts: labels (true | 'slots'), ticks, slotState
@@ -1350,6 +1351,90 @@ TOPICS.lshift = {
   },
   labelWhy() { return 'DL₁ is the demand for labour before the change and DL₂ after (a fall: to the left). W₁ and Q₁ are where DL₁ meets SL; W₂ and Q₂ are where DL₂ meets it.'; },
 };
+
+// 4.1 Free trade: a horizontal world price line below Pe (imports) or above it (exports).
+// Labels (Sam, 2026-11-16): Pe, Qe for no trade; Pw; Q1, Q2 left to right at Pw; "S domestic", "D domestic", "S world".
+// For exports the horizontal line is named "World price": a world SUPPLY curve above Pe would be wrong.
+function tradeTopic(imp) {
+  const kind = imp ? 'imports' : 'exports', wl = imp ? 'S world' : 'World price', tr = imp ? 'imports' : 'exports';
+  const T = {
+    allTap: true,
+    reads: { Pe: 'the price with no trade', Qe: 'the quantity with no trade', Pw: 'the world price',
+      Q1: imp ? 'the quantity domestic firms supply at Pw' : 'the quantity domestic consumers buy at Pw',
+      Q2: imp ? 'the quantity domestic consumers buy at Pw' : 'the quantity domestic firms supply at Pw' },
+    gen() {
+      for (let n = 0; ; n++) {
+        const m = baseMarket(), dir = imp ? -1 : 1, ok = [1, 2, 3, 4].filter(g => controlOK(m, m.ye + dir * g));
+        if (!ok.length) continue;
+        const gap = pick(ok), P = m.ye + dir * gap, qs = Sx(m, P), qd = Dx(m, P);
+        const sc = { ...m, kind, gap, P, qs, qd, q1: Math.min(qs, qd), q2: Math.max(qs, qd) };
+        if (labelsFit(sc) || n > 500) return sc;
+      }
+    },
+    diagram(sc) {
+      return {
+        lines: [{ line: fLine(sc.a, -sc.b), name: 'D domestic' }, { line: fLine(sc.c, sc.d), name: 'S domestic' }, { line: hLine(sc.P), name: wl }],
+        points: [{ x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' }, { x: sc.q1, y: sc.P, pn: 'Pw', qn: 'Q1' }, { x: sc.q2, y: sc.P, qn: 'Q2' }],
+        annos: [{ x1: sc.q1, x2: sc.q2, y: sc.P, name: imp ? 'Imports' : 'Exports', below: imp }]   // on the far side of Pw from Pe, clear of the crossing
+      };
+    },
+    base(sc) { return { lines: T.diagram(sc).lines.slice(0, 2), pt: { x: sc.xe, y: sc.ye, pn: 'Pe', qn: 'Qe' } }; },
+    concepts(sc) {
+      const { a, c, xe, ye, P, q1, q2, qs, qd } = sc;
+      return {
+        cs1: { name: 'consumer surplus before trade', poly: [[0, a], [0, ye], [xe, ye]], why: 'Below D domestic, above Pe, up to Qe.' },
+        ps1: { name: 'producer surplus before trade', poly: [[0, c], [0, ye], [xe, ye]], why: 'Above S domestic, below Pe, up to Qe.' },
+        cs2: { name: 'consumer surplus with free trade', poly: [[0, a], [0, P], [qd, P]], why: `Below D domestic, above Pw, up to ${imp ? 'Q2' : 'Q1'}.` },
+        ps2: { name: 'domestic producer surplus with free trade', poly: [[0, c], [0, P], [qs, P]], why: `Above S domestic, below Pw, up to ${imp ? 'Q1' : 'Q2'}.` },
+        trade: { name: imp ? 'spending on imports' : 'export revenue', poly: [[q1, 0], [q2, 0], [q2, P], [q1, P]], why: `Pw × the quantity of ${tr}: the rectangle under Pw from Q1 to Q2.` },
+        home: { name: imp ? 'domestic producers’ revenue with free trade' : 'domestic producers’ revenue from sales at home', poly: [[0, 0], [q1, 0], [q1, P], [0, P]], why: 'Pw × Q1: the rectangle under Pw up to Q1.' },
+        gain: { name: 'the net gain in welfare from trade', poly: [[q1, P], [xe, ye], [q2, P]], why: imp ? 'Consumers gain more than producers lose: the triangle between S domestic and D domestic, above Pw.' : 'Producers gain more than consumers lose: the triangle between D domestic and S domestic, below Pw.' },
+      };
+    },
+    effects(sc) {
+      const L = [], gapQ = ['Q2 − Q1', 'Q2 − Qe', 'Qe − Q1'], who = ['Domestic producers', 'Domestic consumers', 'Nobody'];
+      L.push(['What happens to the price in the domestic market?', UDN, imp ? 'Falls' : 'Rises', 'With free trade the price moves from Pe to the world price Pw.']);
+      L.push(['What happens to the quantity domestic firms produce?', UDN, imp ? 'Falls' : 'Rises', imp ? 'At the lower price Pw, domestic firms supply less: Qe to Q1.' : 'At the higher price Pw, domestic firms supply more: Qe to Q2.']);
+      L.push(['What happens to the quantity domestic consumers buy?', UDN, imp ? 'Rises' : 'Falls', imp ? 'At the lower price Pw, consumers buy more: Qe to Q2.' : 'At the higher price Pw, consumers buy less: Qe to Q1.']);
+      L.push([`On the graph, ${tr} are...`, gapQ, gapQ[0], imp ? 'Consumers buy Q2 but domestic firms only make Q1. The rest is imported.' : 'Domestic firms make Q2 but consumers at home only buy Q1. The rest is exported.']);
+      L.push(['What happens to consumer surplus?', UDN, imp ? 'Rises' : 'Falls', imp ? 'Consumers pay less and buy more.' : 'Consumers pay more and buy less.']);
+      L.push(['What happens to domestic producer surplus?', UDN, imp ? 'Falls' : 'Rises', imp ? 'Domestic firms get a lower price and sell less.' : 'Domestic firms get a higher price and sell more.']);
+      L.push(['Who loses from free trade in this market?', who, imp ? who[0] : who[1], imp ? 'Domestic firms get a lower price and sell less. Consumers gain.' : 'Consumers at home pay a higher price and buy less. Producers gain.']);
+      L.push(['What happens to total welfare (social surplus)?', UDN, 'Rises', imp ? 'The gain in consumer surplus is bigger than the loss of producer surplus.' : 'The gain in producer surplus is bigger than the loss of consumer surplus.']);
+      L.push([`The world price is ${imp ? 'above' : 'below'} the price with no trade. The country will...`, ['Export the good', 'Import the good', 'Not trade'], imp ? 'Export the good' : 'Import the good',
+        imp ? 'Domestic firms can sell abroad for more than at home, so they produce more than consumers at home buy.' : 'The good is cheaper from abroad, so consumers buy more than domestic firms make.', true]);
+      L.push(['The world price line is horizontal because...', ['The country is too small to change the world price', 'World demand is zero', 'The government fixes the price'], 'The country is too small to change the world price',
+        'It can buy or sell as much as it likes at Pw without moving the world price.', true]);
+      return L;
+    },
+    calcs(sc) {
+      const { a, c, P } = sc, Q1 = sc.q1 * 10, Q2 = sc.q2 * 10, Qe = sc.xe * 10, Qs = sc.qs * 10, Qd = sc.qd * 10, L = [];
+      const gain = 0.5 * Math.abs(sc.ye - P) * (Q2 - Q1);
+      L.push([`Calculate the quantity of ${tr}.`, Q2 - Q1, 'units', `Q2 − Q1 = ${Q2} − ${Q1} = ${Q2 - Q1} units.`]);
+      L.push([imp ? 'Calculate spending on imports.' : 'Calculate export revenue.', P * (Q2 - Q1), '$', `Pw × (Q2 − Q1) = ${money(P)} × ${Q2 - Q1} = ${money(P * (Q2 - Q1))}.`]);
+      L.push([imp ? 'Calculate domestic producers’ revenue with free trade.' : 'Calculate domestic producers’ total revenue with free trade.', P * Qs, '$', `Pw × ${imp ? 'Q1' : 'Q2'} = ${money(P)} × ${Qs} = ${money(P * Qs)}.`]);
+      L.push([`By how much does domestic production ${imp ? 'fall' : 'rise'}?`, Math.abs(Qs - Qe), 'units', imp ? `Qe − Q1 = ${Qe} − ${Qs} = ${Qe - Qs} units.` : `Q2 − Qe = ${Qs} − ${Qe} = ${Qs - Qe} units.`]);
+      L.push(['Calculate consumer surplus with free trade.', 0.5 * (a - P) * Qd, '$', `½ × (${money(a)} − ${money(P)}) × ${Qd} = ${money(0.5 * (a - P) * Qd)}. (D domestic meets the price axis at ${money(a)}.)`]);
+      L.push(['Calculate domestic producer surplus with free trade.', 0.5 * (P - c) * Qs, '$', `½ × (${money(P)} − ${money(c)}) × ${Qs} = ${money(0.5 * (P - c) * Qs)}. (S domestic meets the price axis at ${money(c)}.)`]);
+      L.push(['Calculate the net gain in welfare from trade.', gain, '$', `The triangle between Pe and Pw from Q1 to Q2: ½ × ${money(Math.abs(sc.ye - P))} × ${Q2 - Q1} = ${money(gain)}.`]);
+      return L;
+    },
+    context(sc) { return `Free trade at a world price of ${money(sc.P)}`; },
+    lineCands(sc) {
+      const other = imp ? sc.ye + sc.gap : sc.ye - sc.gap, cands = [{ line: hLine(sc.P), ok: true }, { line: vLine(sc.q2) }];
+      if (other >= 1 && other <= GY - 1) cands.push({ line: hLine(other) });
+      return { prompt: `The country opens up to free trade and starts ${imp ? 'importing' : 'exporting'} the good. Tap a line that could be the world price.`, cands,
+        why: imp ? 'A country imports when the world price is BELOW its own price Pe.' : 'A country exports when the world price is ABOVE its own price Pe.' };
+    },
+    labelWhy() {
+      return imp ? 'Pw is below Pe. At Pw, read Q1 off S domestic (what domestic firms make) and Q2 off D domestic (what consumers buy). The gap is imports.'
+                 : 'Pw is above Pe. At Pw, read Q1 off D domestic (what consumers at home buy) and Q2 off S domestic (what domestic firms make). The gap is exports.';
+    },
+  };
+  return T;
+}
+TOPICS.imports = tradeTopic(true);
+TOPICS.exports = tradeTopic(false);
 
 // ---------- building questions ----------
 function contextText(sc) {

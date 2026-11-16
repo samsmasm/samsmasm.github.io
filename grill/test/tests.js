@@ -7,7 +7,7 @@ const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 
-const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev', 'dshift', 'sshift', 'lshift'];
+const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev', 'dshift', 'sshift', 'lshift', 'imports', 'exports'];
 const KINDS_ = KINDS;
 
 test('generators always give whole-number, on-chart markets', async page => {
@@ -218,6 +218,38 @@ test('fall in the demand for labour: labels, always a fall, one right line, wage
   assert(bad.length === 0, JSON.stringify(bad));
 });
 
+test('free trade: labels, world price on the right side of Pe, one right line, answers match the shaded areas', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    setLevel('HL');
+    for (const k of ['imports', 'exports']) for (let i = 0; i < 300; i++) {
+      const sc = gen(k), imp = k === 'imports', names = labelSlots(sc).map(s => s.answer).sort().join();
+      const want = ['D domestic', 'S domestic', imp ? 'S world' : 'World price', 'Pe', 'Qe', 'Pw', 'Q1', 'Q2', imp ? 'Imports' : 'Exports'].sort().join();
+      if (names !== want) out.push([k, 'labels', names]);
+      if (!labelsFit(sc)) out.push([k, 'labels touch', JSON.stringify(sc)]);
+      if (imp ? sc.P >= sc.ye : sc.P <= sc.ye) out.push([k, 'world price on the wrong side of Pe', JSON.stringify(sc)]);
+      // Q1 and Q2 sit on the curves at Pw, with Qe between them
+      if (Math.abs(sc.a - sc.b * sc.qd - sc.P) > 1e-9 || Math.abs(sc.c + sc.d * sc.qs - sc.P) > 1e-9) out.push([k, 'Q off curves', JSON.stringify(sc)]);
+      if (!(sc.q1 < sc.xe && sc.xe < sc.q2) || sc.q1 !== (imp ? sc.qs : sc.qd) || ![sc.q1, sc.q2, sc.P].every(isInt)) out.push([k, 'Q1 Qe Q2 order', JSON.stringify(sc)]);
+      const lc = lineCands(sc), okKey = JSON.stringify(lc.cands.find(c => c.ok).line);
+      if (lc.cands.filter(c => c.ok).length !== 1 || lc.cands.length < 2) out.push([k, 'draw cands', lc.cands.length]);
+      if (drawBase(sc).lines.some(l => JSON.stringify(l.line) === okKey)) out.push([k, 'answer already drawn']);
+      if (okKey !== JSON.stringify(diagram(sc).lines[2].line)) out.push([k, 'right line is not the world price']);
+      const C = conceptsFor(sc), q = calcsFor(sc), ans = t => q.find(x => x.q.includes(t)).ans, area = c => polyArea(C[c].poly) * 10;
+      for (const [t, c] of [[imp ? 'spending on imports' : 'export revenue', 'trade'], ['consumer surplus with', 'cs2'], ['producer surplus with', 'ps2'], ['net gain', 'gain']])
+        if (Math.abs(ans(t) - area(c)) > 1e-6) out.push([k, t, ans(t), area(c)]);
+      // the welfare gain is the change in consumer plus producer surplus
+      if (Math.abs(area('cs2') + area('ps2') - area('cs1') - area('ps1') - area('gain')) > 1e-6) out.push([k, 'gain is not the change in surplus']);
+      if (ans('quantity of') !== (sc.q2 - sc.q1) * 10) out.push([k, 'trade quantity']);
+      if (q.length < 3 || effectsFor(sc).filter(e => !e.noGraph).length < 4) out.push([k, 'too few questions']);
+      for (const e of effectsFor(sc)) if (!e.opts.includes(e.ans)) out.push([k, 'answer not an option', e.q]);
+      if (buildCells(sc).reduce((s, g) => s + g.polys.reduce((t, p) => t + polyArea(p), 0), 0) < GX * GY - 1e-6) out.push([k, 'not every area tappable']);
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
 test('calculation answers match the drawn diagram', async page => {
   const bad = await page.evaluate(() => {
     const out = [];
@@ -329,10 +361,10 @@ test('a wrong multiple-choice option greys out and another can be picked', async
 });
 
 test('effects questions never show Shortage/Surplus/Unemployment on the graph', async page => {
-  for (const k of ['ceiling', 'floor', 'minwage']) {
+  for (const k of ['ceiling', 'floor', 'minwage', 'imports', 'exports']) {
     await page.evaluate(k => startDrill('cell', k, 'effects'), k);
     const t = await page.evaluate(() => document.getElementById('chart').textContent);
-    assert(!/Shortage|Surplus|Unemployment/.test(t), k + ': ' + t);
+    assert(!/Shortage|Surplus|Unemployment|Imports|Exports/.test(t), k + ': ' + t);
   }
 });
 
