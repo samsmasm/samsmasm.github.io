@@ -247,7 +247,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 const KINDS = { tax: 'Indirect tax', subsidy: 'Subsidy', ceiling: 'Price ceiling', floor: 'Price floor',
   negprod: 'Negative production externality', posprod: 'Positive production externality', negcons: 'Negative consumption externality', poscons: 'Positive consumption externality',
-  minwage: 'Minimum wage', rev: 'PED and total revenue', dshift: 'Change in demand', sshift: 'Change in supply' };
+  minwage: 'Minimum wage', rev: 'PED and total revenue', dshift: 'Change in demand', sshift: 'Change in supply', lshift: 'Fall in labour demand' };
 const PRICE_KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'minwage'];
 const SKILLS = { draw: 'Draw', label: 'Label', shade: 'Shade', effects: 'Effects', calc: 'Calculate' };
 const LS_KEY = 'grill_v1';
@@ -351,7 +351,7 @@ const EXT_KINDS = ['negprod', 'posprod', 'negcons', 'poscons'];
 const isExt = sc => EXT_KINDS.includes(sc.kind);
 // home grid sections in syllabus order; tapping a heading drills only that section's topics (startDrill('sect', index))
 const SECTIONS = [
-  { name: '2.3 Markets', kinds: ['dshift', 'sshift'] },
+  { name: '2.3 Markets', kinds: ['dshift', 'sshift', 'lshift'] },
   { name: '2.5 Elasticity', kinds: ['rev'] },
   { name: '2.7 Government intervention', kinds: PRICE_KINDS },
   { name: '2.8 Externalities', kinds: EXT_KINDS },
@@ -576,7 +576,7 @@ function svgLine(L, attrs) {
   return `<line x1="${X(s[0][0])}" y1="${Y(s[0][1])}" x2="${X(s[1][0])}" y2="${Y(s[1][1])}" ${attrs}/>`;
 }
 // demand-side private curves blue, supply-side orange, social curves red (as IBecon), interventions black
-const LINE_COL = { 'D': '#1d4e89', 'D₁': '#1d4e89', 'D₂': '#1d4e89', 'S₁': '#e8590c', 'S₂': '#e8590c','DL': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
+const LINE_COL = { 'D': '#1d4e89', 'D₁': '#1d4e89', 'D₂': '#1d4e89', 'S₁': '#e8590c', 'S₂': '#e8590c','DL': '#1d4e89', 'DL₁': '#1d4e89', 'DL₂': '#1d4e89', 'SL': '#e8590c','MSB = D': '#1d4e89', 'MPB = D': '#1d4e89', 'MPB₁': '#1d4e89', 'S': '#e8590c', 'MPC = S': '#e8590c', 'MSC = S': '#e8590c' };
 function lineColour(name) { return LINE_COL[name] || (/^MS[BC][₁₂]?$/.test(name) ? '#c0281b' : '#111'); }
 
 // Draws the finished diagram. opts: labels (true | 'slots'), ticks, slotState
@@ -1286,6 +1286,70 @@ function shiftTopic(dem) {
 }
 TOPICS.dshift = shiftTopic(true);
 TOPICS.sshift = shiftTopic(false);
+
+// 3.3 A fall in the demand for labour: the demand shift in the labour market, always to the left.
+// Labels: DL₁ → DL₂, SL, W₁/Q₁ → W₂/Q₂ (Sam's shift pattern); axes and units as minimum wage.
+const LABOUR_CAUSES = ['The economy goes into a recession', 'Demand for the goods these workers make falls', 'Firms replace workers with machines', 'Firms move production to another country'];
+TOPICS.lshift = {
+  allTap: true, axes: TOPICS.minwage.axes, unit: 'workers', yWord: 'wage',
+  reads: { 'W₁': 'the equilibrium wage before the change', 'Q₁': 'the number of workers employed before the change', 'W₂': 'the new equilibrium wage', 'Q₂': 'the number of workers employed after the change' },
+  gen() {
+    for (let n = 0; ; n++) {
+      const m = TOPICS.dshift.gen();
+      if (m.up) continue;
+      const sc = { ...m, kind: 'lshift', cause: pick(LABOUR_CAUSES) };
+      if (labelsFit(sc) || n > 500) return sc;
+    }
+  },
+  diagram(sc) {
+    return {
+      lines: [{ line: fLine(sc.a, -sc.b), name: 'DL₁' }, { line: fLine(sc.c, sc.d), name: 'SL' }, { line: fLine(sc.a2, -sc.b), name: 'DL₂' }],
+      points: [{ x: sc.xe, y: sc.ye, pn: 'W₁', qn: 'Q₁' }, { x: sc.x2, y: sc.y2, pn: 'W₂', qn: 'Q₂' }], annos: []
+    };
+  },
+  base(sc) { return { lines: this.diagram(sc).lines.slice(0, 2), pt: { x: sc.xe, y: sc.ye, pn: 'W₁', qn: 'Q₁' } }; },
+  concepts(sc) {
+    const { xe, ye, x2, y2 } = sc;
+    return {
+      wages1: { name: 'the total wages paid to workers before the change', poly: [[0, 0], [xe, 0], [xe, ye], [0, ye]], why: 'Q₁ workers each earn W₁: the rectangle W₁ × Q₁.' },
+      wages2: { name: 'the total wages paid to workers after the change', poly: [[0, 0], [x2, 0], [x2, y2], [0, y2]], why: 'Q₂ workers each earn W₂: the rectangle W₂ × Q₂.' },
+      cut: { name: 'the wages lost by workers who keep their jobs', poly: [[0, y2], [x2, y2], [x2, ye], [0, ye]], why: 'The Q₂ workers still employed earn W₂ instead of W₁: the band between W₂ and W₁, up to Q₂.' },
+      lost: { name: 'the wages that were paid to the workers who lose their jobs', poly: [[x2, 0], [xe, 0], [xe, ye], [x2, ye]], why: 'The workers between Q₂ and Q₁ each earned W₁: the rectangle from Q₂ to Q₁, up to W₁.' },
+    };
+  },
+  effects(sc) {
+    const L = [], UN = ['Unemployment (a surplus of labour)', 'A shortage of labour', 'Neither'], NC = 'No change: only the quantity of labour supplied changes';
+    L.push(['What happens to the equilibrium wage?', UDN, 'Falls', 'The market moves from W₁ to W₂, where DL₂ meets SL.']);
+    L.push(['What happens to the number of workers employed?', UDN, 'Falls', 'The market moves from Q₁ to Q₂, where DL₂ meets SL.']);
+    L.push(['Straight after the change, at the old wage W₁ there is...', UN, UN[0], 'At W₁, firms now want fewer workers than the number who want to work, so the wage is pushed down to W₂.']);
+    L.push(['What happens to the supply of labour?', [NC, 'It increases', 'It decreases'], NC, 'SL does not move. The lower wage causes a movement along it, from Q₁ to Q₂.']);
+    L.push(['The fall in the demand for labour is shown by...', ['A shift of the DL curve', 'A movement along the DL curve', 'A shift of the SL curve'], 'A shift of the DL curve',
+      'Something other than the wage changed, so the whole curve shifts left (DL₁ to DL₂). Only a change in the wage causes a movement along a curve.']);
+    L.push(['What happens to the total wages paid to workers?', UDN, 'Falls', `Before: W₁ × Q₁ = ${money(sc.ye)} × ${sc.xe * 10} = ${money(sc.ye * sc.xe * 10)}. After: W₂ × Q₂ = ${money(sc.y2)} × ${sc.x2 * 10} = ${money(sc.y2 * sc.x2 * 10)}.`]);
+    L.push(['The demand for labour is a derived demand. It depends on...', ['The demand for the goods workers make', 'The supply of labour', 'The minimum wage'], 'The demand for the goods workers make', 'Firms hire workers to make goods and services. Less demand for the goods means less demand for labour.', true]);
+    L.push(['The demand for labour falls but wages do not fall (they are "sticky"). The result is...', ['Unemployment', 'A shortage of labour', 'More people in work'], 'Unemployment', 'At the old wage, firms want fewer workers than the number who want to work.', true]);
+    L.push(['Unemployment caused by a fall in demand across the whole economy is...', ['Cyclical', 'Structural', 'Frictional'], 'Cyclical', 'Cyclical (demand-deficient) unemployment comes from a fall in aggregate demand, as in a recession.', true]);
+    return L;
+  },
+  calcs(sc) {
+    const Q1 = sc.xe * 10, Q2 = sc.x2 * 10, { ye, y2 } = sc, ch = y2 * Q2 - ye * Q1, far = sc.far * 10, L = [];
+    L.push(['By how much does employment fall?', Q1 - Q2, 'workers', `Q₁ − Q₂ = ${Q1} − ${Q2} = ${Q1 - Q2} workers.`]);
+    L.push(['Calculate the total wages paid to workers before the change.', ye * Q1, '$', `W₁ × Q₁ = ${money(ye)} × ${Q1} = ${money(ye * Q1)}.`]);
+    L.push(['Calculate the total wages paid to workers after the change.', y2 * Q2, '$', `W₂ × Q₂ = ${money(y2)} × ${Q2} = ${money(y2 * Q2)}.`]);
+    L.push(['By how much do total wages change? (Use − for a fall.)', ch, '$', `After: W₂ × Q₂ = ${money(y2 * Q2)}. Before: W₁ × Q₁ = ${money(ye * Q1)}. Change: −${money(Math.abs(ch))}.`]);
+    L.push(['Wages do not fall and stay at W₁. How many workers are unemployed?', Q1 - far, 'workers',
+      `At W₁ = ${money(ye)}, firms want ${far} workers on DL₂. ${Q1} still want to work. Gap: ${Q1 - far} workers.`]);
+    return L;
+  },
+  context(sc) { return sc.cause; },
+  lineCands(sc) {
+    const D = k => fLine(k, -sc.b), S = k => fLine(k, sc.d), sh = sc.a - sc.a2;   // sh > 0: how far DL moves down
+    const c = [{ line: D(sc.a2), ok: true }, { line: D(sc.a + sh) }, { line: S(sc.c + sh) }, { line: S(sc.c - sh) }];
+    return { prompt: `${sc.cause}. Tap the curve that shows the change.`, cands: c.filter(k => seg(k.line) && (k.line.m > 0 || k.line.k >= 1)),
+      why: 'This changes the demand for labour, not the supply: firms want fewer workers at every wage, so DL shifts left.' };
+  },
+  labelWhy() { return 'DL₁ is the demand for labour before the change and DL₂ after (a fall: to the left). W₁ and Q₁ are where DL₁ meets SL; W₂ and Q₂ are where DL₂ meets it.'; },
+};
 
 // ---------- building questions ----------
 function contextText(sc) {

@@ -7,7 +7,7 @@ const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 
-const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev', 'dshift', 'sshift'];
+const KINDS = ['tax', 'subsidy', 'ceiling', 'floor', 'negprod', 'posprod', 'negcons', 'poscons', 'minwage', 'rev', 'dshift', 'sshift', 'lshift'];
 const KINDS_ = KINDS;
 
 test('generators always give whole-number, on-chart markets', async page => {
@@ -182,6 +182,36 @@ test('changes in demand and supply: labels, new equilibrium on both curves, one 
         if (Math.abs(ans(t) - polyArea(C[c].poly) * 10) > 1e-6) out.push([k, t, ans(t)]);
       for (const e of effectsFor(sc)) if (!e.opts.includes(e.ans)) out.push([k, 'answer not an option', e.q]);
       if (buildCells(sc).reduce((s, g) => s + g.polys.reduce((t, p) => t + polyArea(p), 0), 0) < GX * GY - 1e-6) out.push([k, 'not every area tappable']);
+    }
+    return out.slice(0, 5);
+  });
+  assert(bad.length === 0, JSON.stringify(bad));
+});
+
+test('fall in the demand for labour: labels, always a fall, one right line, wages match the shaded areas', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [];
+    setLevel('HL');
+    for (let i = 0; i < 300; i++) {
+      const k = 'lshift', sc = gen(k), names = labelSlots(sc).map(s => s.answer).sort().join();
+      if (names !== 'DL₁,DL₂,Q₁,Q₂,SL,W₁,W₂') out.push([k, 'labels', names]);
+      if (!labelsFit(sc)) out.push([k, 'labels touch', JSON.stringify(sc)]);
+      if (Math.abs(sc.a2 - sc.b * sc.x2 - sc.y2) > 1e-9 || Math.abs(sc.c + sc.d * sc.x2 - sc.y2) > 1e-9) out.push([k, 'W2 off curves', JSON.stringify(sc)]);
+      if (!(sc.x2 < sc.xe && sc.y2 < sc.ye && sc.a2 < sc.a)) out.push([k, 'not a fall', JSON.stringify(sc)]);
+      // the sticky-wage point (quantity demanded on DL₂ at W₁) is on a gridline and left of Q₁
+      if (!isInt(sc.far) || sc.far >= sc.xe || Math.abs(sc.a2 - sc.b * sc.far - sc.ye) > 1e-9) out.push([k, 'sticky point', JSON.stringify(sc)]);
+      const lc = lineCands(sc), okKey = JSON.stringify(lc.cands.find(c => c.ok).line);
+      if (lc.cands.filter(c => c.ok).length !== 1 || lc.cands.length < 3) out.push([k, 'draw cands', lc.cands.length]);
+      if (drawBase(sc).lines.some(l => JSON.stringify(l.line) === okKey)) out.push([k, 'answer already drawn']);
+      if (okKey !== JSON.stringify(diagram(sc).lines[2].line)) out.push([k, 'right line is not DL₂']);
+      const C = conceptsFor(sc), q = calcsFor(sc), ans = t => q.find(x => x.q.includes(t)).ans, area = c => polyArea(C[c].poly) * 10;
+      if (Math.abs(ans('before the change') - area('wages1')) > 1e-6 || Math.abs(ans('after the change') - area('wages2')) > 1e-6) out.push([k, 'wages']);
+      if (Math.abs(ans('total wages change') - (area('wages2') - area('wages1'))) > 1e-6 || ans('total wages change') >= 0) out.push([k, 'change in wages']);
+      if (Math.abs(area('wages1') - area('wages2') - area('lost') - area('cut')) > 1e-6) out.push([k, 'lost + cut']);
+      if (ans('employment fall') !== (sc.xe - sc.x2) * 10 || ans('unemployed') !== (sc.xe - sc.far) * 10) out.push([k, 'workers']);
+      if (q.length < 3 || effectsFor(sc).filter(e => !e.noGraph).length < 4) out.push([k, 'too few questions']);
+      for (const e of effectsFor(sc)) if (!e.opts.includes(e.ans)) out.push([k, 'answer not an option', e.q]);
+      if (readsFor(sc).some(r => !/^What is [WQ][₁₂]\?$/.test(r.q))) out.push([k, 'reads']);
     }
     return out.slice(0, 5);
   });
