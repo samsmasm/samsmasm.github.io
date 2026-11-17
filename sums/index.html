@@ -72,14 +72,26 @@
   .addRow { display: flex; gap: 8px; margin-top: 16px; }
   .addRow input { font: inherit; font-size: 20px; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: 6px; width: 14em; max-width: 60vw; }
   .addRow button { font-size: 18px; padding: 0 18px; }
-  .ages { display: grid; grid-template-columns: repeat(4, minmax(0, 170px)); gap: 14px; }
-  .ages .tile { min-height: 150px; }
-  .ages .tile .pic { height: 80px; }
-  .ages .tile .nm { font-size: 36px; line-height: 1; }
-  .ages.small { grid-template-columns: repeat(4, minmax(0, 110px)); gap: 10px; }
-  .ages.small .tile { min-height: 0; padding: 8px; }
-  .ages.small .tile .pic { height: 56px; }
-  .ages.small .tile .nm { font-size: 24px; }
+  .ages { display: grid; grid-template-columns: repeat(5, minmax(0, 130px)); gap: 14px; }
+  .ages .tile { min-height: 120px; gap: 2px; }
+  .ages .tile .sub { font-size: 16px; color: inherit; }
+  .ages .tile .nm { font-size: 48px; line-height: 1; }
+  .ages.small { grid-template-columns: repeat(9, minmax(0, 76px)); gap: 8px; }
+  .ages.small .tile { min-height: 0; padding: 8px 4px; }
+  .ages.small .tile .nm { font-size: 28px; }
+  .ages.small .tile .sub { font-size: 12px; }
+  @media (max-width: 700px) { .ages.small { grid-template-columns: repeat(5, minmax(0, 76px)); } }
+  /* home: which year's activities, ‹ Year 3 › (swipe works too, and must not be the browser's back swipe) */
+  html, body { overscroll-behavior-x: none; }
+  #homeS { touch-action: pan-y; }
+  .yswitch { display: flex; align-items: center; gap: 12px; margin: -4px 0 18px; }
+  .yswitch button { width: 56px; height: 56px; font-size: 30px; line-height: 1; padding: 0; }
+  .yswitch button:disabled { opacity: 0.25; }
+  .yswitch .yv { font-size: 30px; font-weight: 700; min-width: 4.2em; text-align: center; }
+  .yswitch .ymine { font-size: 15px; color: var(--faint); }
+  .ydots { display: flex; gap: 6px; }
+  .ydots i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink); }
+  .ydots i.on { background: var(--ink); }
   .tile[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .tile[aria-pressed="true"] .sub { color: #ccc; }
 
@@ -368,11 +380,11 @@
   </div>
 </section>
 
-<!-- how old? -->
-<section id="ageS" class="panel" hidden>
+<!-- what year? -->
+<section id="yearS" class="panel" hidden>
   <div class="inner">
-    <div class="ask">How old are you?</div>
-    <div class="ages" id="ageTiles"></div>
+    <div class="ask">What year are you in?</div>
+    <div class="ages" id="yearTiles"></div>
   </div>
 </section>
 
@@ -380,17 +392,18 @@
 <section id="homeS" class="panel" hidden>
   <div class="inner">
     <div class="ask">What do you want to do today?</div>
+    <div class="yswitch"><button id="yPrev" aria-label="Year down">‹</button><span class="yv" id="yView"></span><button id="yNext" aria-label="Year up">›</button><span class="ydots" id="yDots"></span><span class="ymine" id="yMine"></span></div>
     <div class="tiles" id="actTiles"></div>
   </div>
 </section>
 
-<!-- records, age, remove -->
+<!-- records, year, remove -->
 <section id="meS" class="panel" hidden>
   <div class="inner">
     <div class="set" id="confirmBox" hidden><button id="confirmRemoveBtn"></button></div>
-    <div class="set" id="meAgeSet">
-      <h2>Age</h2>
-      <div class="ages small" id="meAges"></div>
+    <div class="set" id="meYearSet">
+      <h2>Year at school <span class="faint" id="meYearNote"></span></h2>
+      <div class="ages small" id="meYears"></div>
     </div>
     <div class="set"><h2 id="recTitle">Best times</h2><div id="records"></div></div>
     <div class="set"><h2>Recent sheets</h2><div id="history"></div></div>
@@ -496,18 +509,34 @@ const SIGN = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 const OP_ORDER = ['+', '-', '*', '/'];
 const ONE_TO_NINE = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const ALL_DIGITS = [0, ...ONE_TO_NINE];
-// Ages 4–11. Age only suggests where to start (Sam): a NZ year, and which of
-// the two tile sets to show. Activities list ages [5] / [8] / [5, 8], meaning
-// the younger set (4–6, read aloud) and the older set (7–11).
-const AGES = [4, 5, 6, 7, 8, 9, 10, 11];
-const group = () => age <= 6 ? 5 : 8;
-const reads = () => age <= 6;                    // cards and screens read aloud
-const yearFor = a => Math.max(1, a - 4);         // 5 → Year 1 (4 too), 8 → Year 4, 11 → Year 7
+// NZ school years 0–8 (Sam: ask the year, never the age). `year` is hers (saved on
+// the player, up one every 1 January); `view` is the year page home is showing
+// (‹ › or swipe). Activities list ages [5] / [8] / [5, 8], meaning the younger
+// tile set (Years 0–2, read aloud) and the older set (Year 3 up).
+const YEARS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+const group = () => year <= 2 ? 5 : 8;
+const reads = () => year <= 2;                   // cards and screens read aloud
 const yearsOf = a => { const o = (ACTS[a].options || []).find(o => o.key === 'yr'); return o ? o.values.map(v => Array.isArray(v) ? v[0] : v) : []; };
 const maxYear = a => Math.max(0, ...yearsOf(a));
-// the year her age suggests, or the nearest one this activity has (a new activity may start with one year only)
-// the nearest year the activity has to hers; a tie goes to the lower year (with Years 1 and 4 only, age 7 gets Year 4, age 6 Year 1)
-const suggestedYear = a => { const ys = yearsOf(a), w = yearFor(age); return ys.reduce((b, y) => Math.abs(y - w) < Math.abs(b - w) || (Math.abs(y - w) === Math.abs(b - w) && y < b) ? y : b); };
+// the nearest year an activity has to w; a tie goes to the lower year (Years 1 and 4 only: 2 → 1, 3 → 4)
+const nearestOf = (ys, w) => ys.reduce((b, y) => Math.abs(y - w) < Math.abs(b - w) || (Math.abs(y - w) === Math.abs(b - w) && y < b) ? y : b);
+const suggestedYear = a => nearestOf(yearsOf(a), view);
+// year pages: every year some activity has (Years 1–4 so far). An activity with a
+// Year row is on exactly its own years; one without is on the pages of its tile set
+// (younger: Years 1–2, older: 3 up), and the original Sums is on every page.
+const pageYears = () => [...new Set(Object.keys(ACTS).flatMap(yearsOf))].sort((x, y) => x - y);
+const onPage = (a, v) => maxYear(a) ? yearsOf(a).includes(v) : ACTS[a].ages.includes(v <= 2 ? 5 : 8);
+// 1 January: everyone goes up a year (Sam). `yy` is the calendar year her year is for.
+function rollYears(list, now = new Date()) {
+  const cy = now.getFullYear();
+  let changed = false;
+  for (const p of list) {
+    // names from before years were ages: 5 → Year 1, 8 → Year 4
+    if (p.year == null && p.age) { p.year = Math.min(8, Math.max(0, p.age - 4)); p.yy = cy; delete p.age; changed = true; }
+    if (p.year != null && p.yy < cy) { p.year = Math.min(13, p.year + cy - p.yy); p.yy = cy; changed = true; }
+  }
+  return changed;
+}
 const store = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -2462,19 +2491,20 @@ function labelFor(k) {
 }
 
 // ---------- players ----------
-// Everyone (guest, picks an age each time) plus named players, each with an age.
+// Everyone (guest, picks a year each time) plus named players, each with a year.
 let players = store.get('sums-players', []);
-let current = null, age = null, act = null;
+if (rollYears(players)) store.set('sums-players', players);
+let current = null, year = null, view = null, act = null;
 const allPlayers = () => [{ id: 'guest', name: 'Everyone' }, ...players];
 const player = id => allPlayers().find(p => p.id === id) || { id: 'guest', name: 'Everyone' };
 const recKey = id => 'sums-rec-' + id;
 const loadRec = id => store.get(recKey(id), { best: {}, history: [] });
 
-// settings per player, per activity (Everyone also per age)
-const cfgStoreKey = a => `sums-cfg-${current}${current === 'guest' ? '-' + age : ''}-${a}`;
+// settings per player, per activity (Everyone also per year)
+const cfgStoreKey = a => `sums-cfg-${current}${current === 'guest' ? '-y' + year : ''}-${a}`;
 function loadCfg(a) {
   const d = ACTS[a].defaults(group());
-  if (maxYear(a)) d.yr = suggestedYear(a); // start at the year her age suggests
+  if (maxYear(a)) d.yr = suggestedYear(a); // start at the year page she is on
   // (the one-device settings from before names existed are NOT used: they
   // belonged to whoever used it last, and gave the 8-year-old her sister's)
   const s = store.get(cfgStoreKey(a), null);
@@ -2505,49 +2535,41 @@ function saveResult(key, ms, first, n) {
 
 // ---------- screens ----------
 let screen = 'names';
-const cakeSvg = n => {
-  let s = `<svg viewBox="0 0 120 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="14" y="54" width="92" height="38" rx="5"/><path d="M14 68 q11 8 23 0 t23 0 t23 0 t23 0"/>`;
-  for (let i = 0; i < n; i++) {
-    const x = 14 + (92 / (n + 1)) * (i + 1);
-    s += `<line x1="${x}" y1="54" x2="${x}" y2="34"/><path d="M${x} 22 q4 5 0 9 q-4 -4 0 -9z" fill="currentColor" stroke-width="1.5"/>`;
-  }
-  return s + '</svg>';
-};
 function show(s) {
   if (s !== screen) { scrollTo(0, 0); hideDone(); }
   screen = s;
-  for (const id of ['names', 'age', 'home', 'setup', 'me', 'grid']) $('#' + id + 'S').hidden = id !== s;
+  for (const id of ['names', 'year', 'home', 'setup', 'me', 'grid']) $('#' + id + 'S').hidden = id !== s;
   $('#sheet').hidden = s !== 'sheet';
   const play = s === 'sheet' || s === 'grid';
   document.body.classList.toggle('lock', play);
   // on the grid, Mark only appears (as "New grid") once it is finished
-  const vis = { backBtn: s !== 'names', setupBtn: play, sayBtn: play || s === 'home' || s === 'age', workBtn: s === 'sheet', markBtn: s === 'sheet' || (s === 'grid' && G && G.done), score: play, meBtn: s === 'home' };
+  const vis = { backBtn: s !== 'names', setupBtn: play, sayBtn: play || s === 'home' || s === 'year', workBtn: s === 'sheet', markBtn: s === 'sheet' || (s === 'grid' && G && G.done), score: play, meBtn: s === 'home' };
   for (const id in vis) $('#' + id).hidden = !vis[id];
   applyWorking();
   const p = current ? player(current) : null;
-  $('#title').textContent = { names: 'Sums', age: p ? p.name : '', home: p ? `${p.name} · ${age}` : '', setup: act && p ? `${p.name} · ${ACTS[act].name}` : '', me: p ? p.name : '', sheet: act ? ACTS[act].name : '', grid: act ? ACTS[act].name : '' }[s];
+  $('#title').textContent = { names: 'Sums', year: p ? p.name : '', home: p ? `${p.name} · Year ${year}` : '', setup: act && p ? `${p.name} · ${ACTS[act].name}` : '', me: p ? p.name : '', sheet: act ? ACTS[act].name : '', grid: act ? ACTS[act].name : '' }[s];
   $('#title').className = play ? 'sheetTitle' : '';
-  $('#backBtn').textContent = { age: '‹ Names', home: '‹ Names', setup: '‹ Back', me: '‹ Back', sheet: '‹ Home', grid: '‹ Home' }[s] || '‹ Back';
+  $('#backBtn').textContent = { year: '‹ Names', home: '‹ Names', setup: '‹ Back', me: '‹ Back', sheet: '‹ Home', grid: '‹ Home' }[s] || '‹ Back';
 }
 $('#backBtn').onclick = () => {
-  if (screen === 'age' || screen === 'home') goNames();
+  if (screen === 'year' || screen === 'home') goNames();
   else if (screen === 'setup') setupFrom === 'sheet' && sheetAct === act && (playScreen === 'grid' ? G : cards.length) ? show(playScreen) : goHome();
   else goHome();
 };
 $('#sayBtn').onclick = () => {
   if (screen === 'sheet') say(ACTS[act].say);
-  else if (screen === 'home') say('What do you want to do today? ' + ACTS_FOR().map(a => ACTS[a].name).join('. '));
-  else if (screen === 'age') say('How old are you?');
+  else if (screen === 'home') say(`Year ${view}. What do you want to do today? ` + ACTS_FOR().map(a => ACTS[a].name).join('. '));
+  else if (screen === 'year') say('What year are you in?');
 };
 
 // names
 function goNames() {
-  current = null; age = null;
+  current = null; year = null; view = null;
   // a new person never lands on the last person's sheet
   for (const k of cards) ro.unobserve(k.work);
   cards = []; sheetAct = null; $('#sheet').innerHTML = ''; G = null;
   $('#nameTiles').innerHTML = allPlayers().map(p =>
-    `<button class="tile person" data-id="${esc(p.id)}"><span class="nm">${esc(p.name)}</span><span class="sub">${p.id === 'guest' ? 'any age' : p.age ? 'age ' + p.age : ''}</span></button>`).join('')
+    `<button class="tile person" data-id="${esc(p.id)}"><span class="nm">${esc(p.name)}</span><span class="sub">${p.id === 'guest' ? 'any year' : p.year != null ? 'Year ' + p.year : ''}</span></button>`).join('')
     + `<button class="tile add" id="addTile"><span class="nm">+ Add a name</span></button>`;
   $('#addRow').hidden = true;
   $('#linkHint').hidden = !LINK;
@@ -2559,58 +2581,93 @@ $('#nameTiles').addEventListener('click', e => {
   if (t.id === 'addTile') { $('#addRow').hidden = false; $('#newName').focus(); return; }
   current = t.dataset.id;
   const p = player(current);
-  if (current !== 'guest' && AGES.includes(p.age)) { age = p.age; goHome(); }
-  // a link from /sums/review/ with a year: Everyone gets the age for that year, no need to ask
-  else if (current === 'guest' && LINK && LINK.over.yr) { age = Math.min(11, Math.max(4, LINK.over.yr + 4)); goHome(); }
-  else goAge();
+  if (current !== 'guest' && p.year != null) { setYear(p.year); goHome(); }
+  // a link from /sums/review/ with a year: Everyone gets that year, no need to ask
+  else if (current === 'guest' && LINK && LINK.over.yr) { setYear(LINK.over.yr); goHome(); }
+  else goYear();
 });
 function addPlayer() {
   const name = $('#newName').value.trim().slice(0, 20); if (!name) return;
   const p = { id: Date.now().toString(36), name };
   players.push(p); store.set('sums-players', players);
   $('#newName').value = '';
-  current = p.id; goAge();
+  current = p.id; goYear();
 }
 $('#addBtn').onclick = addPlayer;
 $('#newName').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
 
-// age
-const ageTiles = sel => AGES.map(a => `<button class="tile" data-age="${a}" aria-pressed="${a === age}"><span class="pic">${cakeSvg(a)}</span><span class="nm">${a}</span></button>`).join('');
-function goAge() { $('#ageTiles').innerHTML = ageTiles(); show('age'); say('How old are you?'); }
-function setAge(a) {
-  age = a;
-  if (current !== 'guest') { const p = players.find(x => x.id === current); if (p) { p.age = a; store.set('sums-players', players); } }
+// year at school
+const yearTiles = () => YEARS.map(y => `<button class="tile" data-year="${y}" aria-pressed="${y === year}"><span class="sub">Year</span><span class="nm">${y}</span></button>`).join('');
+function goYear() { $('#yearTiles').innerHTML = yearTiles(); show('year'); say('What year are you in?'); }
+// her year, and home opens on that year's page (or the nearest one built)
+function setYear(y, save) {
+  year = y; view = nearestOf(pageYears(), y);
+  if (save && current !== 'guest') { const p = players.find(x => x.id === current); if (p) { p.year = y; p.yy = new Date().getFullYear(); store.set('sums-players', players); } }
 }
-$('#ageTiles').addEventListener('click', e => { const t = e.target.closest('[data-age]'); if (!t) return; setAge(+t.dataset.age); goHome(); });
+$('#yearTiles').addEventListener('click', e => { const t = e.target.closest('[data-year]'); if (!t) return; setYear(+t.dataset.year, true); goHome(); });
 
-// home: activities for this age
-const ACTS_FOR = () => Object.keys(ACTS).filter(a => ACTS[a].ages.includes(group()));
+// home: one page per year, her own first; ‹ › or a swipe goes to the next year down or up
+const ACTS_FOR = () => Object.keys(ACTS).filter(a => onPage(a, view));
 function goHome() {
   if (LINK) return openLink();
-  const r = loadRec(current);
+  drawHome();
+  show('home');
+  if (reads()) say(view === year ? 'What do you want to do today?' : `Year ${view}. What do you want to do today?`);
+}
+function drawHome() {
+  const r = loadRec(current), ys = pageYears(), i = ys.indexOf(view);
+  $('#yView').textContent = 'Year ' + view;
+  $('#yPrev').disabled = i <= 0; $('#yNext').disabled = i >= ys.length - 1;
+  $('#yDots').innerHTML = ys.map(y => `<i class="${y === view ? 'on' : ''}"></i>`).join('');
+  $('#yMine').textContent = view === year ? 'your year' : year > ys[ys.length - 1] && view === ys[ys.length - 1] ? `the highest so far (you're in Year ${year})` : year < ys[0] && view === ys[0] ? `you're in Year ${year}` : '';
   $('#actTiles').innerHTML = ACTS_FOR().map(a => {
-    const best = r.best[ACTS[a].key(loadCfg(a))];
+    const c = loadCfg(a); if (maxYear(a)) c.yr = view;   // best time at this page's year
+    const best = r.best[ACTS[a].key(c)];
     return `<button class="tile" data-act="${a}"><span class="pic">${ACTS[a].pic}</span><span class="nm">${ACTS[a].name}</span><span class="sub">${best ? 'Best ' + fmtTime(best.ms) : ''}</span></button>`;
   }).join('');
-  show('home');
-  if (reads()) say('What do you want to do today?');
 }
+function turnPage(d) {
+  const ys = pageYears(), i = ys.indexOf(view) + d;
+  if (i < 0 || i >= ys.length) return;
+  view = ys[i]; drawHome(); scrollTo(0, 0);
+  if (reads()) say('Year ' + view);
+}
+$('#yPrev').onclick = () => turnPage(-1);
+$('#yNext').onclick = () => turnPage(1);
+// swipe: a mostly sideways drag of 60 px or more anywhere on home
+(() => {
+  let sx = null, sy = 0;
+  const h = $('#homeS');
+  h.addEventListener('touchstart', e => { if (e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; } else sx = null; }, { passive: true });
+  h.addEventListener('touchend', e => {
+    if (sx == null) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; sx = null;
+    if (Math.abs(dx) >= 60 && Math.abs(dx) > 2 * Math.abs(dy)) turnPage(dx < 0 ? 1 : -1);
+  });
+})();
 $('#actTiles').addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
   act = t.dataset.act;
-  // anything with choices asks first, with her own last choices ready to go
-  if (ACTS[act].setup !== 'none') { goSetup(); if (reads()) say('Choose, then press Start.'); return; }
+  // anything with choices asks first, with her own last choices ready to go,
+  // except the year: the page's year wins (saved when she presses Start)
+  if (ACTS[act].setup !== 'none') {
+    goSetup();
+    if (maxYear(act) && draft.yr !== view) { draft.yr = view; syncOpts(); }
+    if (reads()) say('Choose, then press Start.');
+    return;
+  }
   buildSheet(loadCfg(act));
   show('sheet');
   if (reads()) say(ACTS[act].say);
 });
 
-// records, age, remove
+// records, year, remove
 let confirmShownAt = 0, pending = null;
 function goMe() {
   const p = player(current), r = loadRec(current);
   pending = null;
-  $('#meAges').innerHTML = ageTiles();
+  $('#meYears').innerHTML = yearTiles();
+  $('#meYearNote').textContent = current === 'guest' ? '' : '(goes up by itself every 1 January)';
   $('#recTitle').textContent = `Best times for ${p.name}`;
   const best = Object.entries(r.best).sort((x, y) => y[1].t - x[1].t);
   $('#records').innerHTML = best.length
@@ -2627,7 +2684,7 @@ function goMe() {
   show('me');
 }
 $('#meBtn').onclick = goMe;
-$('#meAges').addEventListener('click', e => { const t = e.target.closest('[data-age]'); if (!t) return; setAge(+t.dataset.age); goHome(); });
+$('#meYears').addEventListener('click', e => { const t = e.target.closest('[data-year]'); if (!t) return; setYear(+t.dataset.year, true); goHome(); });
 // Removing anything (a person, a sheet's records, one sheet): the first tap turns
 // that button into "Keep", and the real confirm appears far away at the top of
 // the page, ignoring taps for half a second, so a double tap can't remove anything.
@@ -2705,8 +2762,8 @@ function goSetup(from = 'home') {
   $('#labA').textContent = kind === 'grid' ? 'Rows' : 'First number';
   $('#labB').textContent = kind === 'grid' ? 'Columns' : 'Second number';
   // simple choices (Up to, Kind, Counting in...) as rows of buttons
-  // the Year row marks the year her age suggests (a green dot), and says so
-  const sug = maxYear(act) ? suggestedYear(act) : 0, want = yearFor(age);
+  // the Year row marks the year of the page she came from (a green dot), and says so
+  const sug = maxYear(act) ? suggestedYear(act) : 0, want = view;
   $('#optBlock').innerHTML = (ACTS[act].options || []).map(o =>
     `<div class="set"><div class="lab">${o.label}</div><div class="opts" data-key="${o.key}"${o.multi ? ' data-multi="1"' : ''}>${
       o.values.map(v => {
@@ -2715,7 +2772,7 @@ function goSetup(from = 'home') {
         if (o.key === 'yr') return `<button data-v="${val}" class="yrb${val === sug ? ' sug' : ''}"><span class="yn">Year ${val}</span><span class="yx">${String(txt).split(' · ').slice(1).join(' · ')}</span></button>`;
         return `<button data-v="${val}">${txt}</button>`;
       }).join('')}</div>${
-      o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want === sug ? '' : ` (Year ${sug} is the ${want > sug && sug === maxYear(act) ? 'highest' : want < sug && sug === Math.min(...yearsOf(act)) ? 'lowest' : 'nearest'} here so far)`}</p>` : ''}</div>`).join('');
+      o.key === 'yr' ? `<p class="hint sughint">${want === year ? 'Your year' : 'From the page for'}: Year ${want}${want === sug ? '' : ` (Year ${sug} is the ${want > sug && sug === maxYear(act) ? 'highest' : want < sug && sug === Math.min(...yearsOf(act)) ? 'lowest' : 'nearest'} here so far)`}</p>` : ''}</div>`).join('');
   $('#nOpts').parentElement.hidden = !!ACTS[act].noCount; // the grid sets its own count
   $('#nOpts').innerHTML = countsOf(act).map(v => `<button data-v="${v}">${v}</button>`).join('');
   $('#setupHint').textContent = kind === 'keypad' ? 'Takeaways never go below zero. Division always comes out exactly: you divide by the second number.' : '';
@@ -3673,6 +3730,7 @@ function openLink() {
   const L = LINK; LINK = null;
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
   act = L.act;
+  if (pageYears().includes(L.over.yr)) view = L.over.yr;
   if (ACTS[act].setup === 'none') { buildSheet(loadCfg(act)); show('sheet'); if (reads()) say(ACTS[act].say); return; }
   goSetup();
   for (const o of ACTS[act].options || []) {
@@ -3686,11 +3744,11 @@ function openLink() {
 }
 
 // ---------- what a problem report sends (report.js) ----------
-// No names: age, activity, settings, and on a sheet each card's question, what was read and the writing.
+// No names: year, activity, settings, and on a sheet each card's question, what was read and the writing.
 window.sumsReportContext = () => {
   const round = s => s.map(p => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]);
   const playing = screen === 'sheet' || screen === 'grid';
-  const out = { where: `Sums: ${screen}${act && screen !== 'home' && screen !== 'names' ? ' · ' + ACTS[act].name : ''}`, screen, age, act };
+  const out = { where: `Sums: ${screen}${act && screen !== 'home' && screen !== 'names' ? ' · ' + ACTS[act].name : ''}`, screen, year, view, act };
   if (screen === 'setup' && draft) out.settings = draft;
   if (playing) out.settings = cfg;
   if (screen === 'sheet') out.cards = cards.map((k, i) => ({
