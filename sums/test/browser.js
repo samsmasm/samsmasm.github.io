@@ -430,7 +430,33 @@ const fakeSpeech = () => {
   // ---- Mia: Area
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="area"]');
-  ok(await page.evaluate(() => draft.kinds.join() === 'area,perim,side' && draft.max === 12), 'Area setup: area, perimeter, missing side, sides up to 12');
+  ok(await page.evaluate(() => draft.kinds.join() === 'area,perim,side,odd,cubes' && draft.max === 12), 'Area setup: area, perimeter, missing side, odd shapes, cubes, sides up to 12');
+  // Odd shapes: whole squares joined up inside the grid, an even number of half
+  // squares each in its own empty cell sharing a whole side with a square; Cubes: w × d × h
+  const odd = await page.evaluate(() => {
+    const bad = [];
+    for (let i = 0; i < 400; i++) {
+      const q = oddQ(), sq = new Set(q.sq.map(p => p.join())), cells = new Set();
+      if (q.tris.length % 2 || q.tris.length < 2 || q.ans !== q.sq.length + q.tris.length / 2 || sq.size !== q.sq.length) bad.push('count ' + JSON.stringify(q));
+      if (q.sq.some(([x, y]) => x < 1 || y < 1 || x > ODD_W - 2 || y > ODD_H - 2)) bad.push('outside ' + JSON.stringify(q));
+      // joined up: every square reachable from the first
+      const seen = new Set([q.sq[0].join()]), todo = [q.sq[0]];
+      while (todo.length) { const [x, y] = todo.pop(); for (const [a, b] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) if (sq.has(`${a},${b}`) && !seen.has(`${a},${b}`)) { seen.add(`${a},${b}`); todo.push([a, b]); } }
+      if (seen.size !== sq.size) bad.push('apart ' + JSON.stringify(q));
+      for (const P of q.tris) {
+        const cx = Math.min(...P.map(p => p[0])), cy = Math.min(...P.map(p => p[1])), k = `${cx},${cy}`;
+        const area = Math.abs((P[1][0] - P[0][0]) * (P[2][1] - P[0][1]) - (P[2][0] - P[0][0]) * (P[1][1] - P[0][1])) / 2;
+        if (sq.has(k) || cells.has(k) || area !== 0.5 || cx < 0 || cy < 0 || cx >= ODD_W || cy >= ODD_H) bad.push('half ' + JSON.stringify(P));
+        cells.add(k);
+        // its whole side (two corners on one cell edge) is shared with a square
+        const [a, b] = P; const nb = a[0] === b[0] ? (a[0] === cx ? [cx - 1, cy] : [cx + 1, cy]) : (a[1] === cy ? [cx, cy - 1] : [cx, cy + 1]);
+        if (!sq.has(nb.join())) bad.push('loose half ' + JSON.stringify([P, q.sq]));
+      }
+    }
+    for (let i = 0; i < 300; i++) { const q = cubesQ(); if (q.ans !== q.w * q.d * q.h || q.w > 4 || q.d > 3 || q.h > 3 || q.ans < 6) bad.push('cubes ' + JSON.stringify(q)); }
+    return bad.slice(0, 3);
+  });
+  ok(odd.length === 0, 'Area odd shapes: joined squares + an even number of attached halves; cubes up to 4 × 3 × 3 ' + odd.join(' '));
   await page.click('#optBlock [data-key="kinds"] [data-v="squares"]');
   const ar = await page.evaluate(() => {
     const bad = [];
@@ -446,12 +472,23 @@ const fakeSpeech = () => {
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => {
     const t = [...c.el.querySelectorAll('svg text')].map(x => x.textContent), lines = c.el.querySelectorAll('svg line').length;
+    if (c.q.mode === 'odd' || c.q.mode === 'cubes') return true; // checked below
     if (c.q.mode === 'squares') return t.length === 0 && lines === c.q.w - 1 + c.q.h - 1;
     return t.length === 2 && t.includes(c.q.hide === 'w' ? '?' : String(c.q.w)) && t.includes(c.q.hide === 'h' ? '?' : String(c.q.h)) && c.el.querySelector('.cap').textContent === c.q.cap;
   })), 'Area cards: grid for counting, side lengths (or ?) and what to find');
   ok((await fits()).length === 0, 'Area fits with room to write ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Area: answers read and marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/15-area.png' });
+  await page.evaluate(() => { buildSheet({ kinds: ['odd', 'cubes'], max: 12, n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => {
+    const svg = c.el.querySelector('svg'), cap = c.el.querySelector('.cap').textContent;
+    if (c.q.mode === 'odd') return cap === 'How many squares?' && svg.querySelectorAll('rect').length === c.q.sq.length && svg.querySelectorAll('polygon').length === c.q.tris.length && svg.querySelectorAll('line').length === ODD_W + ODD_H + 2;
+    const { w, d, h } = c.q; return cap === 'How many cubes?' && svg.querySelectorAll('line').length === 2 * (w + 1) + 2 * (h + 1) + 2 * d;
+  })), 'Odd shapes: a square for each whole, a triangle for each half, the full grid; Cubes: every cube edge on the three faces');
+  ok((await fits()).length === 0, 'Odd shapes and Cubes fit with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Odd shapes and Cubes: answers read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/15-area-odd.png' });
+  ok(await page.evaluate(() => labelFor('area~odd,cubes|12|6')) === 'Area · odd shapes, cubes · sides up to 12 · 6 questions', 'record label for Odd shapes and Cubes');
 
   // ---- Mia: Times bonds
   await page.click('#backBtn');
@@ -901,7 +938,7 @@ const fakeSpeech = () => {
   const rq = await page.evaluate(() => {
     const bad = [];
     for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 300; i++) {
-      const q = rulerQ(yr);
+      const q = rulerQ(yr, ['pencil']);
       if (q.ans !== q.e - q.s || q.ans < 2 || q.s < 0 || (yr < 3 && q.s !== 0) || q.e > { 1: 9, 2: 10, 3: 12, 4: 60 }[yr] || q.unit !== { 1: 'blocks', 2: 'cm', 3: 'cm', 4: 'mm' }[yr] || (yr === 4 && (q.ans < 15 || ![0, 10].includes(q.s)))) bad.push(`${yr} ${JSON.stringify(q)}`);
     }
     return bad.slice(0, 4);
@@ -912,6 +949,30 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/31-ruler-y2.png' });
   ok(await page.evaluate(() => [labelFor('graph~3|12'), labelFor('shape~2|flat,solid|6'), labelFor('ruler~1|6')].join(' / '))
     === 'Graphs · Year 3 · 12 questions / Shapes · Year 2 · flat, 3D · 6 questions / Rulers · Year 1 · 6 questions', 'record labels for Graphs, Shapes, Rulers');
+  // Thermometer (Rulers, Year 4 only)
+  const th = await page.evaluate(() => {
+    const bad = []; let thermo = 0;
+    for (let i = 0; i < 400; i++) {
+      const q = rulerQ(4, ['pencil', 'thermo']);
+      if (!q.thermo) continue;
+      thermo++;
+      if (q.ans !== q.t || q.t < 1 || q.t > 39 || q.t % 10 === 0 || q.t % q.step || ![1, 2].includes(q.step) || q.unit !== '°C') bad.push(JSON.stringify(q));
+    }
+    for (const yr of [1, 2, 3]) for (let i = 0; i < 50; i++) if (rulerQ(yr, ['thermo']).thermo) bad.push('thermometer in Year ' + yr);
+    for (let i = 0; i < 50; i++) if (!rulerQ(4, ['thermo']).thermo) bad.push('Thermometer only gave a pencil');
+    return { bad: bad.slice(0, 3), thermo };
+  });
+  ok(th.bad.length === 0 && th.thermo > 120 && th.thermo < 280, 'Thermometer: 1–39 °C, on a mark, never on a labelled 10, Year 4 only ' + th.bad.join(' '));
+  await page.evaluate(() => { act = 'ruler'; buildSheet({ yr: 4, kinds: ['thermo'], n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => {
+    const t = [...c.el.querySelectorAll('svg text')].map(x => +x.textContent), marks = c.el.querySelectorAll('svg line').length;
+    return t.join() === '40,30,20,10,0'.split(',').reverse().join() && marks === 40 / c.q.step + 1 && c.el.querySelector('.u').textContent === '°C' && c.el.querySelector('.cap').textContent === 'How warm?';
+  })), 'Thermometer cards: labels 0 to 40, a mark every 1 or 2, "°C" after the line');
+  ok((await fits()).length === 0, 'Thermometer fits with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Thermometer: answers read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/31-thermo.png' });
+  ok(await page.evaluate(() => [labelFor('ruler~4|pencil,thermo|12'), labelFor('ruler~4|12'), ACTS.ruler.key({ yr: 3, kinds: ['pencil', 'thermo'], n: 12 })].join(' / '))
+    === 'Rulers · Year 4 · pencil, thermometer · 12 questions / Rulers · Year 4 · 12 questions / ruler~3|12', 'Rulers record labels with a Kind; Years 1–3 keep their old keys');
 
   // ---- tap cards (no writing): True or false and More or less, Year 4
   const val = `s => Function('return ' + s.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-'))()`;
@@ -1490,7 +1551,8 @@ const fakeSpeech = () => {
     if (SHOTS) for (const n of [4, 6]) { await page.evaluate(n => { act = 'story'; buildSheet({ yr: 4, kinds: ['addsub', 'muldiv'], n }); show('sheet'); }, n); await page.screenshot({ path: SHOTS + `/41-${name}-story-${n}.png` }); }
     for (const [a, c] of [['tf', { yr: 4, n: 12 }], ['cmp', { yr: 4, kinds: ['num', 'sum'], n: 12 }], ['pv', { kinds: ['blocks'], max: 9999, n: 12 }], ['money', { yr: 4, kinds: ['change'], n: 12 }],
       ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }],
-      ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }]]) {
+      ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }],
+      ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

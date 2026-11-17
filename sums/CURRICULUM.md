@@ -234,11 +234,11 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Measurement
 - Make estimation benchmarks from familiar things (body parts, the walk to school). ✋
 - Measure in mixed units with the right tool (1 m and 23 cm, 2 L and 500 mL). ✋ partly
-- Temperature in degrees Celsius (a thermometer picture works).
+- Temperature in degrees Celsius (a thermometer picture works). ✓ (Rulers, Year 4: Thermometer)
 - Perimeter in mm, cm and m. ✓ (Area: Perimeter)
-- Area of irregular shapes from squares and half squares.
+- Area of irregular shapes from squares and half squares. ✓ (Area: Odd shapes)
 - Area of rectangles by multiplying the sides. ✓ (Area: Area, Missing side)
-- Volume of cuboids by filling with cubes.
+- Volume of cuboids by filling with cubes. ✓ (Area: Cubes, counting a drawn cuboid)
 - Estimate angles against 90°, 180° and 360°. Knows: a full turn is 360°, a half turn 180°, a quarter turn 90°; rectangles have four right angles.
 - Tell the time to the nearest minute, analogue and digital. ✓ (Clocks, Year 4)
 - Durations in mixed units (1 h 42 min, 3 min 21 s).

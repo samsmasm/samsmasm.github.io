@@ -278,6 +278,8 @@
   .pic2 .cap { font-size: .75em; font-weight: 700; margin-bottom: .3em; text-align: center; }
   .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
   .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
+  .pic2 .side { display: flex; align-items: flex-end; gap: .7em; }
+  .pic2 .side .ans { margin: 0 0 .4em; }
   .pic2 .ln { display: inline-block; width: 1.9em; height: 1em; border-bottom: .07em solid var(--ink); }
   .pic2 .ln.w { width: 2.5em; }
   .pic2 .sw { display: inline-block; width: .85em; height: .85em; vertical-align: -.12em; border: .06em solid var(--ink); border-radius: .12em; }
@@ -569,6 +571,8 @@ const bondSvg = q => {
 // rectangle for Area: side lengths written on (top and right), "?" on a hidden
 // side, a grid of unit squares for counting. s = em per unit of length.
 function areaSvg(q) {
+  if (q.mode === 'odd') return oddSvg(q);
+  if (q.mode === 'cubes') return cubesSvg(q);
   const { w, h } = q, s = Math.min(0.42, 5.2 / Math.max(w, h)), u = 10;
   const fs = 7.2 / s; // label font, in viewBox units, about 0.72em on screen
   const L = 1.5 * fs, T = 1.4 * fs, R = 2.2 * fs, B = 4;
@@ -584,6 +588,63 @@ function areaSvg(q) {
     o += txt(w * u + 0.5 * fs, h * u / 2, q.hide === 'h' ? '?' : h, 'start');
   }
   return o + '</svg>';
+}
+// Area, Odd shapes (Year 4): whole squares grown from one cell inside a 7 × 5
+// grid, plus half squares (cut corner to corner) each sharing a whole side
+// with the shape. Always an even number of halves, so the answer is whole.
+const ODD_W = 7, ODD_H = 5;
+function oddQ() {
+  for (;;) {
+    const n = rnd(3, 9), cells = new Set([`${rnd(1, ODD_W - 2)},${rnd(1, ODD_H - 2)}`]);
+    const nbs = k => { const [x, y] = k.split(',').map(Number); return [[x + 1, y, 'l'], [x - 1, y, 'r'], [x, y + 1, 't'], [x, y - 1, 'b']]; };
+    while (cells.size < n) {
+      const [x, y] = pickOne(nbs(pickOne([...cells])));
+      if (x >= 1 && x <= ODD_W - 2 && y >= 1 && y <= ODD_H - 2) cells.add(`${x},${y}`);
+    }
+    // half squares: an empty neighbour cell, the triangle on the side it shares with the shape
+    const halves = pickOne([2, 2, 4, 4, 6]), used = new Set(), tris = [];
+    for (const [x, y, side] of shuffled([...cells].flatMap(nbs))) {
+      const k = `${x},${y}`;
+      if (tris.length === halves || cells.has(k) || used.has(k)) continue;
+      used.add(k);
+      const a = rnd(0, 1), P = {
+        l: [[x, y], [x, y + 1], [x + 1, y + a]], r: [[x + 1, y], [x + 1, y + 1], [x, y + a]],
+        t: [[x, y], [x + 1, y], [x + a, y + 1]], b: [[x, y + 1], [x + 1, y + 1], [x + a, y]],
+      }[side];
+      tris.push(P);
+    }
+    if (tris.length < halves) continue;
+    return { kind: 'area', mode: 'odd', sq: [...cells].map(k => k.split(',').map(Number)), tris, col: pickOne(Object.keys(BLOCK)), cap: 'How many squares?', ans: n + halves / 2 };
+  }
+}
+function oddSvg(q) {
+  const u = 10, f = BLOCK[q.col];
+  let s = q.sq.map(([x, y]) => `<rect x="${x * u}" y="${y * u}" width="${u}" height="${u}" fill="${f}" stroke="${f}" stroke-width=".4"/>`).join('')
+    + q.tris.map(P => `<polygon points="${P.map(([x, y]) => `${x * u},${y * u}`).join(' ')}" fill="${f}" stroke="${f}" stroke-width=".4" stroke-linejoin="round"/>`).join('');
+  for (let i = 0; i <= ODD_W; i++) s += `<line x1="${i * u}" y1="0" x2="${i * u}" y2="${ODD_H * u}" stroke="${INK}" stroke-width=".45" stroke-opacity=".55"/>`;
+  for (let j = 0; j <= ODD_H; j++) s += `<line x1="0" y1="${j * u}" x2="${ODD_W * u}" y2="${j * u}" stroke="${INK}" stroke-width=".45" stroke-opacity=".55"/>`;
+  return `<svg ${emBox([-1, -1, ODD_W * u + 2, ODD_H * u + 2], 0.075)}>${s}</svg>`;
+}
+// Area, Cubes (Year 4): a cuboid of small cubes drawn at an angle, every cube
+// edge on the three faces she can see. Up to 4 across, 3 deep, 3 high.
+function cubesQ() {
+  let w, d, h;
+  do { w = rnd(2, 4); d = rnd(2, 3); h = rnd(1, 3); } while (w * d * h < 6);
+  return { kind: 'area', mode: 'cubes', w, d, h, col: pickOne(Object.keys(BLOCK)), cap: 'How many cubes?', ans: w * d * h };
+}
+// a colour mixed toward white (t > 0) or black (t < 0)
+const tint = (hex, t) => '#' + [1, 3, 5].map(i => { const c = parseInt(hex.slice(i, i + 2), 16), v = t > 0 ? c + (255 - c) * t : c * (1 + t); return Math.round(v).toString(16).padStart(2, '0'); }).join('');
+function cubesSvg(q) {
+  const { w, d, h } = q, u = 10, dx = 5.5, dy = 4, D = d * dy, f = BLOCK[q.col];
+  const pt = (x, y) => `${x},${y}`, ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  let s = `<rect x="0" y="${D}" width="${w * u}" height="${h * u}" fill="${f}"/>`
+    + `<polygon points="${[pt(0, D), pt(w * u, D), pt(w * u + d * dx, 0), pt(d * dx, 0)].join(' ')}" fill="${tint(f, 0.45)}"/>`
+    + `<polygon points="${[pt(w * u, D), pt(w * u + d * dx, 0), pt(w * u + d * dx, h * u), pt(w * u, D + h * u)].join(' ')}" fill="${tint(f, -0.25)}"/>`;
+  s += `<g stroke="${INK}" stroke-width=".7" stroke-linecap="round">`;
+  for (let i = 0; i <= w; i++) s += ln(i * u, D, i * u, D + h * u) + ln(i * u, D, i * u + d * dx, 0); // front uprights, top front-to-back
+  for (let k = 0; k <= h; k++) s += ln(0, D + k * u, w * u, D + k * u) + ln(w * u, D + k * u, w * u + d * dx, k * u); // front across, side front-to-back
+  for (let j = 1; j <= d; j++) s += ln(j * dx, D - j * dy, w * u + j * dx, D - j * dy) + ln(w * u + j * dx, D - j * dy, w * u + j * dx, D - j * dy + h * u); // top across, side uprights
+  return `<svg ${emBox([-1.5, -1.5, w * u + d * dx + 3, D + h * u + 3], 0.072)}>${s}</g></svg>`;
 }
 // fraction pictures: a bar or a circle cut into d equal parts with n shaded,
 // or a 0-to-1 number line cut into d with an arrow at n
@@ -1173,7 +1234,8 @@ function shapeSvg(q) {
 
 // Rulers: Year 1 counts blocks under a pencil, Year 2 a cm ruler from 0,
 // Year 3 a pencil that may not start at 0 (half-cm marks too)
-function rulerQ(yr) {
+function rulerQ(yr, kinds = ['pencil']) {
+  if (yr === 4 && pickOne(kinds) === 'thermo') return thermoQ();
   const col = pickOne(['red', 'blue', 'green', 'yellow', 'purple']);
   if (yr === 1) { const e = rnd(2, 9); return { kind: 'ruler', yr, s: 0, e, col, unit: 'blocks', cap: 'How long?', say: 'How many blocks long is the pencil?', ans: e }; }
   if (yr === 4) { // millimetres on a 6 cm ruler (long enough to see each mm on a card), sometimes not from 0
@@ -1184,7 +1246,27 @@ function rulerQ(yr) {
   if (yr === 3 && Math.random() < 0.65) { s = rnd(1, 6); e = rnd(s + 2, 12); } else e = rnd(2, yr === 2 ? 10 : 12);
   return { kind: 'ruler', yr, s, e, col, unit: 'cm', cap: 'How long?', say: 'How long is the pencil?', ans: e - s };
 }
+// Thermometer (Rulers, Year 4): 0 to 40 °C, labels every 10, marks every 1 or
+// every 2; never on a labelled 10
+function thermoQ() {
+  const step = pickOne([1, 2]); let t;
+  do t = rnd(1, 39); while (t % 10 === 0 || t % step);
+  return { kind: 'ruler', yr: 4, thermo: true, t, step, cap: 'How warm?', unit: '°C', say: 'How warm is it, in degrees?', ans: t };
+}
+function thermoSvg(q) {
+  const k = 1.5, y = c => (40 - c) * k, red = BLOCK.red; // 1.5 units a degree; 0 °C at y = 60
+  let s = `<circle cx="0" cy="70" r="7" fill="${red}" stroke="${INK}" stroke-width=".8"/>`
+    + `<path d="M-3 63.8V-1A3 3 0 0 1 3 -1V63.8" fill="#fff" stroke="${INK}" stroke-width=".8"/>`
+    + `<rect x="-1.6" y="${y(q.t)}" width="3.2" height="${68 - y(q.t)}" fill="${red}"/>`;
+  for (let c = 0; c <= 40; c += q.step) {
+    const len = c % 10 === 0 ? 6 : c % 5 === 0 ? 4.5 : 3;
+    s += `<line x1="4" y1="${y(c)}" x2="${4 + len}" y2="${y(c)}" stroke="${INK}" stroke-width="${c % 10 ? .4 : .7}"/>`;
+    if (c % 10 === 0) s += svgText(12.5, y(c), c, 6.5, 'start');
+  }
+  return `<svg ${emBox([-9, -6, 35, 84], 0.062)}>${s}</svg>`;
+}
 function rulerSvg(q) {
+  if (q.thermo) return thermoSvg(q);
   if (q.yr === 4) { // in mm: 1.6 units a mm, marks every mm, longer every 5 mm, numbers every cm
     const um = 1.6, x0 = q.s * um, x1 = q.e * um, N = 60;
     let s = `<rect x="${x0}" y="0" width="${x1 - x0 - 7}" height="9" fill="${BLOCK[q.col]}" stroke="${INK}" stroke-width=".8"/>`
@@ -1622,21 +1704,23 @@ const ACTS = {
     name: 'Area', ages: [8], setup: 'opts', say: 'Work out the area or the perimeter.',
     pic: areaSvg({ w: 5, h: 3, mode: 'squares' }),
     options: [
-      { key: 'kinds', label: 'Kind', multi: true, values: [['squares', 'Count squares'], ['area', 'Area'], ['perim', 'Perimeter'], ['side', 'Missing side']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['squares', 'Count squares'], ['area', 'Area'], ['perim', 'Perimeter'], ['side', 'Missing side'], ['odd', 'Odd shapes'], ['cubes', 'Cubes']] },
       { key: 'max', label: 'Sides up to', values: [5, 10, 12] },
     ],
-    defaults: () => ({ kinds: ['area', 'perim', 'side'], max: 12, n: 12 }),
+    defaults: () => ({ kinds: ['area', 'perim', 'side', 'odd', 'cubes'], max: 12, n: 12 }),
     // the caption says what to find; counting squares keeps sides to 10
     make: c => {
       const mode = pickOne(c.kinds), top = mode === 'squares' ? Math.min(c.max, 10) : c.max;
+      if (mode === 'odd') return oddQ();
+      if (mode === 'cubes') return cubesQ();
       const w = rnd(2, top), h = rnd(2, top);
       if (mode === 'side') { const hide = pickOne(['w', 'h']); return { kind: 'area', mode, w, h, hide, cap: `Area ${w * h}`, ans: hide === 'w' ? w : h }; }
       if (mode === 'perim') return { kind: 'area', mode, w, h, cap: 'Perimeter?', ans: 2 * (w + h) };
       return { kind: 'area', mode, w, h, cap: mode === 'squares' ? 'How many squares?' : 'Area?', ans: w * h };
     },
-    key: c => `area~${['squares', 'area', 'perim', 'side'].filter(k => c.kinds.includes(k)).join(',')}|${c.max}|${c.n}`,
+    key: c => `area~${['squares', 'area', 'perim', 'side', 'odd', 'cubes'].filter(k => c.kinds.includes(k)).join(',')}|${c.max}|${c.n}`,
     label: k => {
-      const [kinds, m, n] = k.split('|'), nm = { squares: 'count squares', area: 'area', perim: 'perimeter', side: 'missing side' };
+      const [kinds, m, n] = k.split('|'), nm = { squares: 'count squares', area: 'area', perim: 'perimeter', side: 'missing side', odd: 'odd shapes', cubes: 'cubes' };
       return `Area · ${kinds.split(',').map(x => nm[x]).join(', ')} · sides up to ${m} · ${n} questions`;
     },
   },
@@ -1777,11 +1861,18 @@ const ACTS = {
   ruler: {
     name: 'Rulers', ages: [5, 8], setup: 'opts', say: 'How long is the pencil?',
     pic: rulerSvg({ yr: 2, s: 0, e: 9, col: 'red' }),
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · blocks'], [2, '2 · cm from 0'], [3, '3 · cm, not from 0'], [4, '4 · millimetres']] }],
-    defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
-    make: c => rulerQ(c.yr),
-    key: c => `ruler~${c.yr}|${c.n}`,
-    label: k => { const [y, n] = k.split('|'); return `Rulers · Year ${y} · ${n} questions`; },
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · blocks'], [2, '2 · cm from 0'], [3, '3 · cm, not from 0'], [4, '4 · millimetres, °C']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['pencil', 'Pencil'], ['thermo', 'Thermometer (Year 4)']] },
+    ],
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['pencil'] : ['pencil', 'thermo'], n: age === 5 ? 6 : 12 }),
+    make: c => rulerQ(c.yr, c.kinds),
+    // the Kind only changes Year 4, so Years 1–3 keep their old record keys
+    key: c => c.yr === 4 ? `ruler~4|${['pencil', 'thermo'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}` : `ruler~${c.yr}|${c.n}`,
+    label: k => {
+      const p = k.split('|'), [y, n] = [p[0], p[p.length - 1]];
+      return `Rulers · Year ${y}${p.length === 3 ? ' · ' + p[1].replace('thermo', 'thermometer').split(',').join(', ') : ''} · ${n} questions`;
+    },
   },
   // tap cards (no writing): tiles under the question, marked with Mark like the rest
   tf: {
@@ -2260,7 +2351,7 @@ function qMarkup(q) {
   if (q.kind === 'area') {
     // caption (what to find), then the rectangle; answer below it
     const svg = areaSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
-    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, 5) + 1.2 } };
+    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, 5, q.cap.length * 0.44) + 1.2 } };
   }
   if (q.kind === 'frac') {
     if (q.form === 'add') { // each fraction with its picture over it, signs between, then the answer bar
@@ -2319,6 +2410,9 @@ function qMarkup(q) {
     const pic = { graph: graphSvg, shape: shapeSvg, ruler: rulerSvg }[q.kind](q);
     const [, pw, ph] = pic.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
     const capLen = q.capLen || q.cap.length, capLines = q.cap.split('<br>').length; // a long question takes two lines
+    const ans = `<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`;
+    // the upright thermometer is tall and thin: the answer goes beside it, so the picture can be bigger
+    if (q.thermo) return { cls: 'pic2', anchor: '.ln', html: `<div class="cap">${q.cap}</div><div class="side">${pic}${ans}</div>`, vars: { '--h': ph + 1.1 + 0.4, '--c': pw + 0.7 + 3.6 + 1.2 } };
     return {
       cls: 'pic2', anchor: '.ln',
       html: `<div class="cap">${q.cap}</div>${pic}<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`,
