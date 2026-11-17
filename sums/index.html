@@ -1308,7 +1308,9 @@ const fitPts = pts => { const r = Math.max(...pts.map(p => Math.hypot(...p))); r
 function shapeQ(yr, kinds) {
   // Moves is Year 4 only (a tap card); below Year 4, or not picked, it is a written card
   if (yr === 4 && kinds.includes('moves') && (kinds.length === 1 || Math.random() < 1 / kinds.length)) return movesQ();
-  kinds = kinds.filter(k => k !== 'moves');
+  // Name is Year 1 only (a tap card), half the cards when Flat is on too (3D isn't in Year 1)
+  if (yr === 1 && kinds.includes('name') && (!kinds.includes('flat') || Math.random() < 0.5)) return nameQ();
+  kinds = kinds.filter(k => k !== 'moves' && k !== 'name');
   if (!kinds.length) kinds = ['flat'];
   const fill = pickOne(Object.keys(BLOCK));
   const solid = yr >= 2 && kinds.includes('solid') && (!kinds.includes('flat') || Math.random() < 0.35);
@@ -1338,26 +1340,9 @@ function shapeQ(yr, kinds) {
   return { kind: 'shape', pts, fill, ask, cap: `How many ${ask}?`, say: `How many ${ask}?`, ans: pts.length };
 }
 function shapeSvg(q) {
-  const E = 0.048, f = BLOCK[q.fill], line = (a, b, dash) => `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"${dash ? ' stroke-dasharray="3 3"' : ''}/>`;
-  const poly = (p, op = 1) => `<polygon points="${p.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${f}" fill-opacity="${op}" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>`;
-  if (!q.solid) return `<svg ${emBox([-46, -46, 92, 92], E)}>${poly(q.pts)}</svg>`;
-  const off = ([x, y], d) => [x + d[0], y + d[1]];
-  let s = '';
-  if (q.solid === 'cube' || q.solid === 'cuboid') { // front face, top and right faces, hidden edges dashed
-    const [w, h] = q.solid === 'cube' ? [44, 44] : [58, 30], d = [18, -18], x0 = -38, y0 = 34 - h;
-    const F = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], B = F.map(p => off(p, d));
-    s += line(B[3], B[0], 1) + line(B[3], B[2], 1) + line(B[3], F[3], 1);
-    s += poly([F[0], F[1], B[1], B[0]], 0.6) + poly([F[1], F[2], B[2], B[1]], 0.8) + poly(F);
-  } else if (q.solid === 'pyramid') {
-    const A = [-38, 30], Bp = [14, 30], C = [36, 10], D = [-16, 10], P = [-2, -40];
-    s += line(A, D, 1) + line(D, C, 1) + line(D, P, 1);
-    s += poly([A, Bp, P]) + poly([Bp, C, P], 0.75);
-  } else { // triangular prism
-    const T = [[-40, 32], [12, 32], [-14, -10]], d = [24, -18], U = T.map(p => off(p, d));
-    s += line(U[0], U[1], 1) + line(U[0], T[0], 1) + line(U[0], U[2], 1);
-    s += poly([T[1], U[1], U[2], T[2]], 0.75) + poly(T);
-  }
-  return `<svg ${emBox([-46, -46, 92, 92], E)}>${s}</svg>`;
+  const E = 0.048, f = BLOCK[q.fill];
+  if (!q.solid) return `<svg ${emBox([-46, -46, 92, 92], E)}><polygon points="${q.pts.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${f}" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  return `<svg ${emBox([-46, -46, 92, 92], E)}>${solidBody(q.solid, f)}</svg>`;
 }
 
 // Rulers: Year 1 counts blocks under a pencil, Year 2 a cm ruler from 0,
@@ -1919,6 +1904,91 @@ function movesSvg(q) {
   s += `<path d="M${ax} ${ay}H${ax + 1.4 * U}M${ax + 1.4 * U - 3} ${ay - 3}L${ax + 1.4 * U} ${ay}L${ax + 1.4 * U - 3} ${ay + 3}" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`;
   return `<svg ${emBox([-1, -1, W * U + 2, H * U + 2], 0.08)}>${s}</svg>`;
 }
+// ---- Shapes, Name (Year 1, B3): "Tap the triangle". Four tiles, each a shape in
+// its own size, colour and turn. Flat: triangle, circle, rectangle, square. Solid:
+// cube, cylinder, sphere, with one flat look-alike among them (a circle beside a
+// sphere, a square beside a cube). Asked for a rectangle, no square is shown (a
+// square is a rectangle too); asked for a square, rectangles are fair wrong ones.
+// Tiles say "this one" when tapped, so tapping round never names the answer.
+const NAME_FLAT = ['triangle', 'circle', 'rectangle', 'square'], NAME_SOLID = ['cube', 'cylinder', 'sphere'];
+// a solid drawn in a box from -46 to 46: cube and cuboid, pyramid, prism (Shapes 3D), cylinder, sphere (Name)
+function solidBody(nm, f, sw = 1.8) {
+  const line = (a, b, dash) => `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round"${dash ? ' stroke-dasharray="3 3"' : ''}/>`;
+  const poly = (p, op = 1) => `<polygon points="${p.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${f}" fill-opacity="${op}" stroke="${INK}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+  const off = ([x, y], d) => [x + d[0], y + d[1]];
+  let s = '';
+  if (nm === 'cube' || nm === 'cuboid') { // front face, top and right faces, hidden edges dashed
+    const [w, h] = nm === 'cube' ? [44, 44] : [58, 30], d = [18, -18], x0 = -38, y0 = 34 - h;
+    const F = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], B = F.map(p => off(p, d));
+    s += line(B[3], B[0], 1) + line(B[3], B[2], 1) + line(B[3], F[3], 1);
+    s += poly([F[0], F[1], B[1], B[0]], 0.6) + poly([F[1], F[2], B[2], B[1]], 0.8) + poly(F);
+  } else if (nm === 'pyramid') {
+    const A = [-38, 30], Bp = [14, 30], C = [36, 10], D = [-16, 10], P = [-2, -40];
+    s += line(A, D, 1) + line(D, C, 1) + line(D, P, 1);
+    s += poly([A, Bp, P]) + poly([Bp, C, P], 0.75);
+  } else if (nm === 'prism') {
+    const T = [[-40, 32], [12, 32], [-14, -10]], d = [24, -18], U = T.map(p => off(p, d));
+    s += line(U[0], U[1], 1) + line(U[0], T[0], 1) + line(U[0], U[2], 1);
+    s += poly([T[1], U[1], U[2], T[2]], 0.75) + poly(T);
+  } else if (nm === 'cylinder') { // upright: the side, a lighter top, the back of the bottom dashed
+    const st = `stroke="${INK}" stroke-width="${sw}"`;
+    s += `<path d="M-26 -28V30A26 9 0 0 0 26 30V-28Z" fill="${f}" ${st} stroke-linejoin="round"/>`
+      + `<path d="M-26 30A26 9 0 0 1 26 30" fill="none" ${st} stroke-dasharray="3 3"/>`
+      + `<ellipse cx="0" cy="-28" rx="26" ry="9" fill="${tint(f, 0.4)}" ${st}/>`;
+  } else { // sphere: a ball with its middle line, the back half dashed
+    const st = `fill="none" stroke="${INK}" stroke-width="${sw * 0.7}"`;
+    s += `<circle cx="0" cy="0" r="38" fill="${f}" stroke="${INK}" stroke-width="${sw}"/>`
+      + `<path d="M-38 0A38 12 0 0 0 38 0" ${st}/><path d="M-38 0A38 12 0 0 1 38 0" ${st} stroke-dasharray="3 3"/>`;
+  }
+  return s;
+}
+function nameShapeSvg(nm, f, size, rot) {
+  const sw = 3 / size; // the same line on every tile, however big the shape
+  let s;
+  if (nm === 'circle') s = `<circle cx="0" cy="0" r="38" fill="${f}" stroke="${INK}" stroke-width="${sw}"/>`;
+  else if (NAME_SOLID.includes(nm)) s = `<g transform="scale(${rot % 2 ? -1 : 1} 1)">${solidBody(nm, f, sw)}</g>`;
+  else {
+    const h = rnd(14, 24); // a rectangle at least 5 : 3, never close to a square
+    const pts = fitPts(turn(nm === 'triangle' ? flatPts('tri') : nm === 'square' ? flatPts('square') : [[-40, -h], [40, -h], [40, h], [-40, h]], rot));
+    s =`<polygon points="${pts.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${f}" stroke="${INK}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+  }
+  return `<svg viewBox="-46 -46 92 92" style="width:1.5em;height:1.5em"><g transform="scale(${size})">${s}</g></svg>`;
+}
+function nameQ() {
+  const solid = Math.random() < 0.4, nm = pickOne(solid ? NAME_SOLID : NAME_FLAT);
+  let wrong;
+  if (solid) wrong = [...NAME_SOLID.filter(x => x !== nm), nm === 'sphere' ? 'circle' : nm === 'cube' ? 'square' : pickOne(['circle', 'rectangle'])];
+  else if (nm === 'rectangle') wrong = ['triangle', 'circle', pickOne(['triangle', 'circle'])];
+  else if (nm === 'square') wrong = ['rectangle', 'triangle', pickOne(['circle', 'rectangle'])];
+  else wrong = NAME_FLAT.filter(x => x !== nm);
+  const names = shuffled([nm, ...wrong]), cols = shuffled(Object.keys(BLOCK)), sizes = shuffled([0.62, 0.74, 0.87, 1]);
+  const tiles = names.map((x, i) => {
+    // squares and rectangles sometimes turned a little; triangles any way up
+    const rot = x === 'triangle' ? rnd(0, 11) * 30 : x === 'square' || x === 'rectangle' ? pickOne([0, 0, 15, 30, 45, 90]) : rnd(0, 1);
+    return { html: nameShapeSvg(x, BLOCK[cols[i]], sizes[i], rot), label: x, say: 'this one' };
+  });
+  const top = `Tap the ${nm}`;
+  return { kind: 'tap', form: 'name', nm, names, top, tc: top.length * 0.5, tiles, right: names.indexOf(nm), quiet: true, big: true, topf: 0.3, say: `Tap the ${nm}.`, ans: nm };
+}
+// ---- Picture patterns (Year 1, B3): a row of 7 to 9 shapes repeating a unit of
+// three, with one gap (never in the first three, so the unit is always there to
+// see). The tiles are the three parts. Some change shape only, some colour only,
+// some both.
+const PAT_SHAPES = ['circle', 'square', 'triangle', 'diamond'], PAT_EM = 0.1;
+function patQ() {
+  const type = pickOne(['shape', 'colour', 'both']), nms = shuffled(PAT_SHAPES), cols = shuffled(Object.keys(BLOCK));
+  const unit = [0, 1, 2].map(i => ({ nm: type === 'colour' ? nms[0] : nms[i], col: type === 'shape' ? cols[0] : cols[i] }));
+  const len = rnd(7, 9), gap = rnd(3, len - 1), row = range(0, len - 1).map(i => unit[i % 3]);
+  const word = t => type === 'colour' ? t.col : type === 'shape' ? t.nm : `${t.col} ${t.nm}`;
+  const order = shuffled([0, 1, 2]);
+  const tiles = order.map(i => ({ html: thingSvg(unit[i], 1.4), label: word(unit[i]), say: word(unit[i]) }));
+  return { kind: 'tap', form: 'pat', type, unit, len, gap, top: patSvg(row, gap), tc: len * 12 * PAT_EM, th: 12 * PAT_EM, topf: 0.4, big: true, tiles, right: order.indexOf(gap % 3), say: 'What is missing?', ans: word(unit[gap % 3]) };
+}
+// the row: each shape in a box 10 wide, 2 apart; the gap is a dashed box
+function patSvg(row, gap) {
+  const s = row.map((t, i) => i === gap ? `<rect x="${i * 12 + 0.6}" y="0.6" width="8.8" height="8.8" rx="1" fill="none" stroke="${INK}" stroke-width=".6" stroke-dasharray="1.6 1.2"/>` : mapThing(t.nm, t.col, i * 12, 0, 10)).join('');
+  return `<svg ${emBox([-1, -1, row.length * 12, 12], PAT_EM)}>${s}</svg>`;
+}
 const textSvg = lines =>`<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -2200,6 +2270,15 @@ const ACTS = {
     key: c => `seq~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `Number patterns · Year ${y} · ${n} questions`; },
   },
+  pat: { // a tap card: the row of shapes with a gap, the three parts as tiles
+    name: 'Picture patterns', ages: [5], setup: 'opts', say: 'What is missing? Tap it.',
+    pic: `<svg viewBox="0 0 120 84">${mapThing('circle', 'red', 2, 30, 22) + mapThing('square', 'blue', 26, 30, 22) + mapThing('triangle', 'yellow', 50, 30, 22) + mapThing('circle', 'red', 74, 30, 22)}<rect x="99" y="31.5" width="19" height="19" rx="2" fill="none" stroke="${INK}" stroke-width="1.6" stroke-dasharray="3.5 2.5"/></svg>`,
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · repeats of three']] }],
+    defaults: () => ({ yr: 1, n: 6 }),
+    make: c => patQ(c.yr),
+    key: c => `pat~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Picture patterns · Year ${y} · ${n} questions`; },
+  },
   dbl: {
     name: 'Doubles and halves', ages: [5, 8], setup: 'opts', say: 'Double it, or halve it.',
     pic: halvesSvg(4, true),
@@ -2237,13 +2316,13 @@ const ACTS = {
     name: 'Shapes', ages: [5, 8], setup: 'opts', say: 'Count them and write how many.',
     pic: `<svg viewBox="0 0 120 84"><polygon points="8,74 52,74 30,30" fill="${BLOCK.yellow}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><rect x="62" y="34" width="40" height="40" fill="${BLOCK.blue}" stroke="${INK}" stroke-width="3"/></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares'], [2, '2 · up to 6 sides, 3D'], [3, '3 · up to 10 sides, symmetry'], [4, '4 · up to 12 sides, right angles']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)'], ['moves', 'Moves (Year 4)']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares, names'], [2, '2 · up to 6 sides, 3D'], [3, '3 · up to 10 sides, symmetry'], [4, '4 · up to 12 sides, right angles']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)'], ['name', 'Name (Year 1)'], ['moves', 'Moves (Year 4)']] },
     ],
-    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['flat', 'solid'] : ['flat', 'solid', 'moves'], n: age === 5 ? 6 : 12 }),
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['flat', 'solid', 'name'] : ['flat', 'solid', 'moves'], n: age === 5 ? 6 : 12 }),
     make: c => shapeQ(c.yr, c.kinds),
-    // Moves only changes Year 4, so Years 1–3 leave it out of the record key
-    key: c => `shape~${c.yr}|${['flat', 'solid', 'moves'].filter(k => c.kinds.includes(k) && (k !== 'moves' || c.yr === 4)).join(',') || 'flat'}|${c.n}`,
+    // Moves only changes Year 4 and Name only Year 1, so the other years leave them out of the record key
+    key: c => `shape~${c.yr}|${['flat', 'solid', 'name', 'moves'].filter(k => c.kinds.includes(k) && (k !== 'moves' || c.yr === 4) && (k !== 'name' || c.yr === 1)).join(',') || 'flat'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Shapes · Year ${y} · ${kinds.replace('solid', '3D').split(',').join(', ')} · ${n} questions`; },
   },
   ruler: {

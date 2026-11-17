@@ -47,8 +47,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Algebra (patterns and number sentences)
 - Open number sentences with one-digit numbers (2 + 5 = 3 + __). ✓ (Balance, Year 1, over a see-saw; Missing number)
 - True or false? (7 − 5 = 6 − 4) ✓ (True or false, Year 1, dots under the sides on about half)
-- Copy, continue and make repeating patterns: two elements *(6m)* (cat, dog, cat, dog...), then three.
-- Find the missing element (red, green, blue, red, __, blue).
+- Copy, continue and make repeating patterns: two elements *(6m)* (cat, dog, cat, dog...), then three. ✓ partly (Picture patterns, Year 1: three-part repeats, find the gap; not making, two-part is Year 0)
+- Find the missing element (red, green, blue, red, __, blue). ✓ (Picture patterns, Year 1: shape only, colour only, or both)
 - Ordinals to 5th for positions in a pattern.
 
 ### Measurement
@@ -59,8 +59,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Put events of the day in order (before, after, yesterday, tomorrow); parts of the day (morning, noon, evening, midnight).
 
 ### Geometry
-- Name and sort 2D shapes by one attribute: triangle, circle, rectangle, square *(6m)*. Knows: a shape keeps its name whatever its size or colour. ✓ partly (Shapes, Year 1: count sides and corners, not naming)
-- Name and sort 3D shapes in different positions: cube, cylinder, sphere.
+- Name and sort 2D shapes by one attribute: triangle, circle, rectangle, square *(6m)*. Knows: a shape keeps its name whatever its size or colour. ✓ (Shapes, Year 1: count sides and corners; Name: "Tap the triangle" among shapes of different sizes, colours and turns)
+- Name and sort 3D shapes in different positions: cube, cylinder, sphere. ✓ (Shapes, Year 1, Name: cube, cylinder, sphere, with a flat look-alike among them)
 - Make a shape from smaller shapes, and break one up.
 - Position words: above, below, left, right, in front, behind, inside, outside, next to.
 - Follow directions to a place or object ✋; describe positions with pictures or simple maps.

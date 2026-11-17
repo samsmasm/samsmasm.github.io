@@ -107,7 +107,7 @@ const fakeSpeech = () => {
   await page.click('#ageTiles [data-age="5"]');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
-  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money,Number patterns,Picture patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance', 'age saved: straight to the 5 activities ' + (await tiles('#actTiles')).join());
   ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'age 5 home is read aloud');
   await page.click('#backBtn');
 
@@ -115,7 +115,7 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks the age');
   await page.click('#ageTiles [data-age="5"]');
-  ok((await tiles('#actTiles')).length === 18, 'Everyone at 5: the age-5 activities');
+  ok((await tiles('#actTiles')).length === 19, 'Everyone at 5: the age-5 activities');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#ageS'), 'Everyone asks again next time');
@@ -126,7 +126,7 @@ const fakeSpeech = () => {
   }).join(' '));
   ok(sugg === '4:5:r:1:1:6 5:5:r:1:1:6 6:5:r:2:2:6 7:8:-:3:3:12 10:8:-:4:4:12 11:8:-:4:4:12', 'age → tiles, read aloud, starting year (capped at the highest built): ' + sugg);
   await page.click('#ageTiles [data-age="6"]');
-  ok((await tiles('#actTiles')).length === 18 && (await page.$eval('#title', e => e.textContent)) === 'Everyone · 6', 'age 6: the younger tiles');
+  ok((await tiles('#actTiles')).length === 19 && (await page.$eval('#title', e => e.textContent)) === 'Everyone · 6', 'age 6: the younger tiles');
   await page.click('#actTiles [data-act="graph"]');
   ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Suggested for age 6: Year 2'), 'age 6: Graphs starts at Year 2 and says so');
   await page.click('#backBtn'); await page.click('#backBtn');
@@ -595,7 +595,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => $('#optBlock [data-key="yr"] .sug').dataset.v === '4' && /^Suggested for age 8: Year 4$/.test($('.sughint').textContent)), 'the suggested year has a dot and a line saying so');
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a)).every(a => maxYear(a) === 4)), 'every activity with years goes up to Year 4');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) === 4)), 'every activity with years on the older tiles goes up to Year 4');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -1366,6 +1366,73 @@ const fakeSpeech = () => {
     labelFor('clock~1|face,match|6'), labelFor('cmp~1|dots,num|6'), labelFor('tf~1|6'), labelFor('bal~1|6')].join(' / '))
     === 'clock~1|face,match|6 / clock~3|face,words|12 / cmp~1|dots,num|6 / cmp~4|num,sum,frac|12 / Clocks · Year 1 · clock, match · 6 questions / More or less · Year 1 · dots, numbers · 6 questions / True or false · Year 1 · 6 questions / Balance · Year 1 · 6 questions',
     'record keys keep only the kinds that year has; labels for the Year 1 sheets');
+
+  // ---- B3: Picture patterns and Shapes Name (Year 1)
+  const p1 = await page.evaluate(() => {
+    const bad = [], types = {}, gaps = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = patQ(1), u = q.unit, d = new DOMParser().parseFromString(`<div>${q.top}</div>`, 'text/html');
+      const keys = u.map(t => t.nm + t.col);
+      if (new Set(keys).size !== 3) bad.push('unit not three different ' + keys);
+      const nms = new Set(u.map(t => t.nm)).size, cols = new Set(u.map(t => t.col)).size;
+      if ((q.type === 'shape' && (nms !== 3 || cols !== 1)) || (q.type === 'colour' && (nms !== 1 || cols !== 3)) || (q.type === 'both' && (nms !== 3 || cols !== 3))) bad.push('type ' + q.type + ' ' + keys);
+      if (q.len < 7 || q.len > 9 || q.gap < 3 || q.gap >= q.len) bad.push('row ' + q.len + ' gap ' + q.gap);
+      // the picture: len - 1 shapes and one dashed box at the gap
+      const shapes = d.querySelectorAll('svg > circle, svg > polygon, svg > rect:not([stroke-dasharray])').length, box = d.querySelectorAll('rect[stroke-dasharray]').length;
+      if (shapes !== q.len - 1 || box !== 1) bad.push('picture ' + shapes + ' ' + box);
+      if (q.tiles.length !== 3 || new Set(q.tiles.map(t => t.label)).size !== 3 || q.tiles[q.right].label !== q.ans) bad.push('tiles ' + q.tiles.map(t => t.label));
+      // the right tile is the part at the gap, which is the part three before it
+      const want = u[q.gap % 3], w = q.type === 'colour' ? want.col : q.type === 'shape' ? want.nm : want.col + ' ' + want.nm;
+      if (q.ans !== w || q.tiles.some(t => t.say !== t.label)) bad.push('answer ' + q.ans + ' ' + w);
+      if (cardSay(q) !== `What is missing? ${q.tiles.map(t => t.say).join(', ')}.`) bad.push('say ' + cardSay(q));
+      types[q.type] = (types[q.type] || 0) + 1; gaps.add(q.gap);
+    }
+    if (Object.values(types).length !== 3 || Object.values(types).some(n => n < 140)) bad.push('types ' + JSON.stringify(types));
+    if (![3, 4, 5, 6, 7, 8].every(g => gaps.has(g))) bad.push('gaps ' + [...gaps]);
+    return bad.slice(0, 4);
+  });
+  ok(p1.length === 0, 'Picture patterns Year 1: 7 to 9 shapes in a repeat of three, one gap after the first three, tiles are the three parts; shape only, colour only or both ' + p1.join(' | '));
+  const n1 = await page.evaluate(() => {
+    const bad = [], asked = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = nameQ(), labels = q.tiles.map(t => t.label);
+      asked.add(q.nm);
+      if (q.tiles.length !== 4 || labels.filter(l => l === q.nm).length !== 1 || labels[q.right] !== q.nm || q.ans !== q.nm) bad.push('tiles ' + q.nm + ': ' + labels);
+      if (q.nm === 'rectangle' && labels.includes('square')) bad.push('a square among rectangles ' + labels);
+      if (NAME_SOLID.includes(q.nm) && labels.filter(l => NAME_SOLID.includes(l)).length !== 3) bad.push('solids ' + labels);
+      if (q.top !== `Tap the ${q.nm}` || q.say !== `Tap the ${q.nm}.` || !q.quiet || cardSay(q) !== q.say || q.tiles.some(t => t.say !== 'this one')) bad.push('say ' + q.say);
+      // each tile its own colour and size
+      const fills = q.tiles.map(t => t.html.match(/fill="(#[0-9a-f]{6})"/)[1]), sizes = q.tiles.map(t => t.html.match(/scale\(([\d.]+)\)/)[1]);
+      if (new Set(fills).size !== 4 || new Set(sizes).size !== 4) bad.push('looks ' + fills + ' ' + sizes);
+    }
+    if (asked.size !== 7) bad.push('asked ' + [...asked]);
+    const qs = range(0, 300).map(() => shapeQ(1, ['flat', 'solid', 'name'])), m = qs.filter(q => q.form === 'name').length;
+    if (m < 110 || m > 190) bad.push('name share ' + m);
+    if (!range(0, 50).every(() => shapeQ(1, ['name']).form === 'name' && shapeQ(2, ['flat', 'name']).kind === 'shape' && shapeQ(4, ['name']).kind === 'shape')) bad.push('Name outside Year 1');
+    return bad.slice(0, 4);
+  });
+  ok(n1.length === 0, 'Shapes Name Year 1: "Tap the triangle", four tiles in different colours and sizes, no square when asked for a rectangle, solids with a flat look-alike; tiles say "this one"; Name only in Year 1 ' + n1.join(' | '));
+  await page.evaluate(() => { age = 5; hideDone(); act = 'pat'; buildSheet({ yr: 1, n: 6 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tt svg').length === 3 && c.el.querySelector('.tq rect[stroke-dasharray]'))), 'Picture patterns sheet: the row with its gap, three picture tiles');
+  ok((await fits()).length === 0, 'Picture patterns fits ' + (await fits()).join(' '));
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelector('.tt').getBoundingClientRect().width >= 40)), 'Picture patterns: the tiles are big enough to tap');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/47-pat.png' });
+  await page.click('#sheet .card:nth-child(1) .cardsay');
+  ok((await said()).slice(-1)[0] === await page.evaluate(() => cardSay(cards[0].q)), 'Picture patterns: the card speaker asks, then names the three tiles');
+  ok((await writeAllAndMark()).length === 0 && await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'pat~1|6'), 'Picture patterns: tapped right, finished, record pat~1|6');
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 1, n: 12 }); });
+  ok((await fits()).length === 0, 'Picture patterns (12) fits ' + (await fits()).join(' '));
+  await page.evaluate(() => { hideDone(); act = 'shape'; buildSheet({ yr: 1, kinds: ['flat', 'name'], n: 6 }); show('sheet'); cards.forEach((c, i) => { if (i < 3) { c.q = nameQ(); layout(c); sizeCanvas(c); } }); });
+  ok(await page.evaluate(() => cards.filter(c => c.q.form === 'name').every(c => c.el.querySelectorAll('.tt svg').length === 4)), 'Shapes Name sheet: four picture tiles');
+  ok((await fits()).length === 0, 'Shapes Name fits beside written shapes ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/48-shape-name.png' });
+  await page.tap('#sheet .card:nth-child(1) .tt[data-i="0"]');
+  ok((await said()).slice(-1)[0] === 'this one', 'a tapped shape says "this one", not its name');
+  ok((await writeAllAndMark()).length === 0, 'Shapes Name and written shapes on one sheet: all marked right');
+  await page.evaluate(() => { age = 8; hideDone(); });
+  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 1, kinds: ['flat', 'solid', 'name'], n: 6 }), ACTS.shape.key({ yr: 2, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.defaults(5).kinds.join(), ACTS.pat.defaults(5).yr, labelFor('shape~1|flat,solid,name|6'), labelFor('pat~1|6')].join(' / '))
+    === 'shape~1|flat,solid,name|6 / shape~2|flat|6 / flat,solid,name / 1 / Shapes · Year 1 · flat, 3D, name · 6 questions / Picture patterns · Year 1 · 6 questions',
+    'Shapes keys: Name only in Year 1 keys; younger default has Name; Picture patterns key and label');
 
   // ---- how many questions (Sam: 20 is too many almost everywhere)
   await page.click('#backBtn');
