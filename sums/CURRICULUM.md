@@ -260,7 +260,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ## Year 5
 
-Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, 2026-11-17): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map; Area has three Year 5 kinds (L-shapes, Same area, Cube layers); Place value goes up to 999,999. Other ticks are activities whose own settings happen to reach.
+Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, C3c, 2026-11-17): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes; Area has three Year 5 kinds (L-shapes, Same area, Cube layers); Place value goes up to 999,999. Other ticks are activities whose own settings happen to reach.
 
 ### Number
 - Read, write, compare and order numbers to 1,000,000. ✓ (Place value up to 999,999: expanded form and 1,000 / 10,000 / 100,000 more or less; More or less, Year 5: comparing six-digit numbers; not ordering)
@@ -305,9 +305,9 @@ Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, 2026-11-17): Add and take away, T
 - Tell the time on analogue and digital clocks; how long between two times, with a.m. and p.m. and 24-hour time. ✓ (Clocks, Year 5: a face or words with the part of the day, written in 24-hour time; How long?, two times in a.m. / p.m. or 24-hour, "__ h __ min")
 
 ### Geometry
-- Describe prisms by their cross section, faces, edges and vertices.
-- Find parallel and perpendicular lines, including the sides of polygons.
-- Match 3D shapes to their nets.
+- Describe prisms by their cross section, faces, edges and vertices. ✓ partly (Shapes, Year 5: faces, edges, corners of triangular, pentagonal and hexagonal prisms; not naming the cross section)
+- Find parallel and perpendicular lines, including the sides of polygons. ✓ (Shapes, Year 5: "How many pairs of parallel sides?" and "How many right angles?" on quadrilaterals and hexagons; tap "Which two lines are parallel?" / "perpendicular?")
+- Match 3D shapes to their nets. ✓ (Shapes, Year 5, Nets: cube, cuboid, triangular prism, square pyramid, cylinder; three nets, one right)
 - Say which transformation was done (reflection, translation, rotation).
 - Read and make grid maps with grid references and north, east, south, west. ✓ partly (Map, Year 5: "Start at B2. Go 2 north, 3 east", tap where you finish; reading only, not making)
 

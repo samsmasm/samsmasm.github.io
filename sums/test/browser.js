@@ -167,7 +167,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="6"]');
   ok(await page.evaluate(() => view === 5 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 6')), 'Year 6: the Year 5 page, marked the highest so far');
   const y5 = await tiles('#actTiles');
-  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map'].every(t => y5.includes(t)) && !y5.includes('Shapes') && !y5.includes('Graphs'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
+  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map', 'Shapes'].every(t => y5.includes(t)) && !y5.includes('Rulers') && !y5.includes('Graphs'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
   ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('round').yr; }).join() === '4,4'), 'Rounding (Year 4 only so far) opens at Year 4');
   await page.evaluate(() => { setYear(3); act = 'round'; goSetup(); });
@@ -683,7 +683,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,map,money,muldiv,round,seq,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a, C3b): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,map,money,muldiv,round,seq,shape,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a, C3b, C3c): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -2402,6 +2402,99 @@ const fakeSpeech = () => {
   ok((await writeAllAndMark()).length === 0, 'Shapes Moves and written shapes on one sheet: all marked right');
   ok(await page.evaluate(() => [ACTS.shape.key({ yr: 4, kinds: ['flat', 'solid', 'moves'], n: 12 }), ACTS.shape.key({ yr: 3, kinds: ['flat', 'solid', 'moves'], n: 12 }), ACTS.shape.key({ yr: 3, kinds: ['moves'], n: 6 }), labelFor('shape~4|flat,moves|12')].join(' / ') === 'shape~4|flat,solid,moves|12 / shape~3|flat,solid|12 / shape~3|flat|6 / Shapes · Year 4 · flat, moves · 12 questions'), 'Shapes record keys: Moves only in Year 4 keys; label');
 
+  // ---- Shapes, Year 5 (C3c): parallel sides, right angles, lines, prisms, nets
+  const sh5 = await page.evaluate(() => {
+    const bad = [], seen = {}, near = {};
+    // every hand-made shape: no near misses (sides 15° clear of parallel, corners 15° clear of square)
+    for (const [nm, P] of Object.entries(SHAPES5)) {
+      const D = sideDirs(P);
+      D.forEach((a, i) => D.forEach((b, j) => { if (j > i) { const g = dirGap(a, b); if (g >= 1 && g < 15) bad.push(`${nm} sides ${i},${j} ${g.toFixed(1)}°`); } }));
+      cornerAngles(P).forEach((a, i) => { if (Math.abs(a - 90) >= 1 && Math.abs(a - 90) < 15) bad.push(`${nm} corner ${i} ${a.toFixed(1)}°`); });
+      if (cornerAngles(P).reduce((s, a) => s + a, 0).toFixed(0) !== String((P.length - 2) * 180)) bad.push(nm + ' angles');
+    }
+    const want = { square: [2, 4], rectangle: [2, 4], parallelogram: [2, 0], rhombus: [2, 0], trapezium: [1, 0], 'right trapezium': [1, 2], kite: [0, 1], quadrilateral: [0, 0], hexagon: [3, 0], 'L hexagon': [6, 5], 'house hexagon': [2, 2], 'hexagon, one pair': [1, 0], 'hexagon, no pairs': [0, 0] };
+    for (const [nm, [p, r]] of Object.entries(want)) if (parPairs(SHAPES5[nm]) !== p || rightCount(SHAPES5[nm]) !== r) bad.push(`${nm} ${parPairs(SHAPES5[nm])} ${rightCount(SHAPES5[nm])}`);
+    // the line pairs: read the drawn lines back
+    const ang = l => Math.atan2(l[3] - l[1], l[2] - l[0]) * 180 / Math.PI;
+    const crosses = (a, b) => { const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])); const [p1, p2, p3, p4] = [[a[0], a[1]], [a[2], a[3]], [b[0], b[1]], [b[2], b[3]]]; return o(p1, p2, p3) !== o(p1, p2, p4) && o(p3, p4, p1) !== o(p3, p4, p2); };
+    for (let i = 0; i < 1500; i++) {
+      const q = shape5Q(['flat', 'solid', 'nets']), k = q.solid ? 'solid' : q.form || q.ask;
+      seen[k] = (seen[k] || 0) + 1;
+      if (q.solid) { if (q.ans !== SOLIDS[q.solid][q.ask]) bad.push('solid ' + q.solid); continue; }
+      if (q.ask === 'par' && (q.ans !== parPairs(q.pts) || q.nm === 'L hexagon' || q.ans !== want[q.nm][0])) bad.push('par ' + q.nm + ' ' + q.ans);
+      if (q.ask === 'right' && (q.ans !== rightCount(q.pts) || q.ans !== want[q.nm][1])) bad.push('right ' + q.nm + ' ' + q.ans);
+      if (q.ask) { if (q.pts.some(p => Math.hypot(...p) > 46)) bad.push('too big ' + q.nm); continue; }
+      if (q.form === 'lines') {
+        const d = document.createElement('div');
+        q.tiles.forEach((t, j) => {
+          d.innerHTML = t.html;
+          const L = [...d.querySelectorAll('line')].map(l => ['x1', 'y1', 'x2', 'y2'].map(a => +l.getAttribute(a)));
+          const g = dirGap(ang(L[0]), ang(L[1])), x = crosses(L[0], L[1]);
+          const isRight = j === q.right;
+          if (q.type === 'par') {
+            if (isRight && (g > 0.5 || x)) bad.push('parallel tile ' + g);
+            if (!isRight && g < 14.5) bad.push('a wrong tile nearly parallel ' + g);
+            if (q.pairs[j].form === 'near') { near.n = (near.n || 0) + 1; if (x) bad.push('near pair touches'); }
+          } else {
+            if (isRight && Math.abs(g - 90) > 0.5) bad.push('perpendicular tile ' + g);
+            if (!isRight && Math.abs(g - 90) < 14.5) bad.push('a wrong tile nearly square ' + g);
+          }
+          if (L.flat().some(v => Math.abs(v) > 28)) bad.push('line out of its box');
+        });
+        if (q.tiles[q.right].label !== q.ans || !/^Which two lines are (parallel|perpendicular)\?$/.test(q.say)) bad.push('lines say ' + q.say);
+      }
+    }
+    if (!(seen.par > 120 && seen.right > 100 && seen.lines > 100 && seen.solid > 400 && seen.net > 400)) bad.push('spread ' + JSON.stringify(seen));
+    if (range(0, 60).some(() => [2, 3, 4].some(y => /prism\d|^(pent|hex)/.test(shapeQ(y, ['solid']).solid || ''))) || range(0, 60).some(() => shapeQ(4, ['nets']).form === 'net')) bad.push('Year 5 parts below Year 5');
+    return bad.slice(0, 6);
+  });
+  ok(sh5.length === 0, 'Shapes Year 5: parallel pairs and right angles counted right with no near misses; the parallel or perpendicular tile is the only one, wrong ones 15° or more out; prisms only in Year 5 ' + sh5.join(' | '));
+  // nets: fold every grid net on a cube; the others by their parts
+  const nets = await page.evaluate(() => {
+    const bad = [];
+    const folds = cells => {
+      const key = c => c.join(), set = new Set(cells.map(key)), neg = v => v.map(x => -x), seen = new Map([[key(cells[0]), { d: [0, 0, -1], n: [0, 1, 0], e: [1, 0, 0] }]]), stack = [cells[0]];
+      while (stack.length) {
+        const c = stack.pop(), o = seen.get(key(c));
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nc = [c[0] + dx, c[1] + dy]; if (!set.has(key(nc)) || seen.has(key(nc))) continue;
+          let { d, n, e } = o;
+          if (dx === 1) [d, e] = [e, neg(d)]; else if (dx === -1) [d, e] = [neg(e), d]; else if (dy === 1) [d, n] = [n, neg(d)]; else [d, n] = [neg(n), d];
+          seen.set(key(nc), { d, n, e }); stack.push(nc);
+        }
+      }
+      return seen.size === 6 && new Set([...seen.values()].map(o => o.d.join())).size === 6;
+    };
+    const makes = n => n.g === 'grid' ? (!folds(n.cells) ? null : n.cw.every(w => w === 1) && n.rh.every(h => h === 1) ? 'cube' : 'cuboid')
+      : n.g === 'prism' ? (n.tris.length === 2 && n.tris.some(t => t[1] === 'up') && n.tris.some(t => t[1] === 'down') ? 'prism' : null)
+      : n.g === 'pyr' ? (new Set(n.sides).size === 4 ? 'pyramid' : null)
+      : (n.circles.length === 2 && n.circles[0][1] !== n.circles[1][1] ? 'cylinder' : null);
+    CUBE_NETS.ok.forEach(c => { if (!folds(c)) bad.push('cube ok ' + JSON.stringify(c)); });
+    CUBE_NETS.bad.forEach(c => { if (folds(c)) bad.push('cube bad ' + JSON.stringify(c)); });
+    CUBOID_NETS.ok.forEach(c => { if (!folds(c.cells)) bad.push('cuboid ok'); });
+    CUBOID_NETS.bad.forEach(c => { if (folds(c.cells)) bad.push('cuboid bad'); });
+    const solids = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = netQ(), m = q.nets.map(makes);
+      solids.add(q.of);
+      if (m.filter(x => x === q.of).length !== 1 || m[q.right] !== q.of || q.tiles[q.right].label !== q.ans || q.tiles.length !== 3) bad.push(q.of + ' ' + m);
+      // every face of a grid net is a rectangle in the cuboid's sizes; circles of a cylinder never overlap
+      if (q.nets.some(n => n.g === 'cyl' && n.circles.length === 2 && n.circles[0][1] === n.circles[1][1] && Math.abs(n.circles[0][0] - n.circles[1][0]) < 0.8)) bad.push('circles overlap');
+    }
+    if (solids.size !== 5) bad.push('solids ' + [...solids]);
+    return bad.slice(0, 6);
+  });
+  ok(nets.length === 0, 'Shapes Nets: every cube and cuboid net labelled right by folding it; exactly one tile folds into the solid on top; all five solids ' + nets.join(' | '));
+  await yearSheet('shape', 5, 'Shapes');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' ? c.el.querySelectorAll('.tt svg').length === 3 : c.q.solid ? c.el.querySelectorAll('svg line[stroke-dasharray]').length >= 3 : c.el.querySelector('svg polygon').getAttribute('points').split(' ').length === c.q.pts.length)), 'Shapes Year 5 sheet: three picture tiles on tap cards, hidden edges dashed, the shape drawn');
+  await page.evaluate(() => { hideDone(); act = 'shape'; buildSheet({ yr: 5, kinds: ['flat', 'solid', 'nets'], n: 12 }); show('sheet'); cards.forEach((c, i) => { c.q = i % 4 === 0 ? netQ() : i % 4 === 1 ? linesQ(i % 8 === 1 ? 'par' : 'perp') : i % 4 === 2 ? shape5Q(['solid']) : shape5Q(['flat']); layout(c); sizeCanvas(c); }); cards[2].q = { ...cards[2].q, solid: 'hexprism', ask: 'edges', cap: 'How many edges?', ans: 18 }; layout(cards[2]); sizeCanvas(cards[2]); cards[6].q = { ...cards[6].q, solid: 'pentprism', ask: 'faces', cap: 'How many faces?', ans: 7 }; layout(cards[6]); sizeCanvas(cards[6]); });
+  ok(await page.evaluate(() => cards[2].el.querySelectorAll('svg line[stroke-dasharray]').length === 5 && cards[6].el.querySelectorAll('svg line[stroke-dasharray]').length === 3 && cards[2].el.querySelectorAll('svg polygon').length === 4 && cards[6].el.querySelectorAll('svg polygon').length === 4), 'hexagonal prism: 3 side faces and the end showing, 5 hidden edges dashed; pentagonal prism: 3 hidden edges');
+  ok((await fits()).length === 0, 'Shapes Year 5: nets, lines, prisms and parallel cards fit, tiles big enough ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/47-shapes-y5.png' });
+  const wm5 = await writeAllAndMark();
+  ok(wm5.length === 0, 'Shapes Year 5: tapped and written answers marked right ' + wm5.join(' | ').slice(0, 600));
+  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 5, kinds: ['flat', 'solid', 'moves', 'nets'], n: 12 }), ACTS.shape.key({ yr: 4, kinds: ['flat', 'solid', 'moves', 'nets'], n: 12 }), ACTS.shape.defaults(8).kinds.join(), labelFor('shape~5|flat,solid,nets|12')].join(' / ') === 'shape~5|flat,solid,nets|12 / shape~4|flat,solid,moves|12 / flat,solid,moves,nets / Shapes · Year 5 · flat, 3D, nets · 12 questions'), 'Shapes record keys: Nets only in Year 5 keys; label');
+
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
 
@@ -2683,7 +2776,8 @@ const fakeSpeech = () => {
       ['dec', { yr: 5, kinds: ['pic'], n: 12 }], ['dec', { yr: 5, kinds: ['line', 'addsub', 'ten'], n: 12 }], ['frac', { kinds: ['diff'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }],
       ['fof', { yr: 5, kinds: ['part', 'whole', 'pct'], n: 12 }], ['money', { yr: 5, kinds: ['count', 'change'], n: 12 }],
       ['angle', { yr: 5, kinds: ['name'], n: 12 }], ['angle', { yr: 5, kinds: ['measure'], n: 12 }], ['clock', { yr: 5, kinds: ['face', 'words'], n: 12 }], ['clock', { yr: 5, kinds: ['long'], n: 12 }], ['units', { yr: 5, n: 12 }],
-      ['area', { kinds: ['lperim'], max: 12, n: 12 }], ['area', { kinds: ['same'], max: 12, n: 12 }], ['area', { kinds: ['layers'], max: 12, n: 12 }], ['map', { yr: 5, kinds: ['tap'], n: 6 }]]) {
+      ['area', { kinds: ['lperim'], max: 12, n: 12 }], ['area', { kinds: ['same'], max: 12, n: 12 }], ['area', { kinds: ['layers'], max: 12, n: 12 }], ['map', { yr: 5, kinds: ['tap'], n: 6 }],
+      ['shape', { yr: 5, kinds: ['nets'], n: 12 }], ['shape', { yr: 5, kinds: ['flat'], n: 12 }], ['shape', { yr: 5, kinds: ['solid'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

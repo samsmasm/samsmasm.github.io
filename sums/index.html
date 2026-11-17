@@ -1524,7 +1524,8 @@ function graphSvg(q) {
 }
 
 // Shapes: count sides, corners, faces, edges, or lines of symmetry
-const SOLIDS = { cube: { faces: 6, edges: 12, corners: 8 }, cuboid: { faces: 6, edges: 12, corners: 8 }, pyramid: { faces: 5, edges: 8, corners: 5 }, prism: { faces: 5, edges: 9, corners: 6 } };
+const SOLIDS = { cube: { faces: 6, edges: 12, corners: 8 }, cuboid: { faces: 6, edges: 12, corners: 8 }, pyramid: { faces: 5, edges: 8, corners: 5 }, prism: { faces: 5, edges: 9, corners: 6 },
+  pentprism: { faces: 7, edges: 15, corners: 10 }, hexprism: { faces: 8, edges: 18, corners: 12 } }; // the last two are Year 5 only (shape5Q)
 const turn = (pts, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return pts.map(([x, y]) => [x * c - y * s, x * s + y * c]); };
 const regular = (n, r = 40) => range(0, n - 1).map(i => [r * Math.sin(2 * Math.PI * i / n), -r * Math.cos(2 * Math.PI * i / n)]);
 // a convex polygon with every corner clearly a corner (turns of at least 18°)
@@ -1559,6 +1560,7 @@ function flatPts(name) {
 // shrink a shape that reaches past 42 from the middle, so it fits its box
 const fitPts = pts => { const r = Math.max(...pts.map(p => Math.hypot(...p))); return r > 42 ? pts.map(([x, y]) => [x * 42 / r, y * 42 / r]) : pts; };
 function shapeQ(yr, kinds) {
+  if (yr >= 5) return shape5Q(kinds); // parallel, right angles, prisms, nets (C3c)
   // Moves is Year 4 only (a tap card); below Year 4, or not picked, it is a written card
   if (yr === 4 && kinds.includes('moves') && (kinds.length === 1 || Math.random() < 1 / kinds.length)) return movesQ();
   // Name is Year 1 only (a tap card), half the cards when Flat is on too (3D isn't in Year 1)
@@ -1568,7 +1570,7 @@ function shapeQ(yr, kinds) {
   const fill = pickOne(Object.keys(BLOCK));
   const solid = yr >= 2 && kinds.includes('solid') && (!kinds.includes('flat') || Math.random() < 0.35);
   if (solid) {
-    const s = pickOne(Object.keys(SOLIDS)), ask = pickOne(yr === 2 ? ['faces', 'corners'] : ['faces', 'corners', 'edges']);
+    const s = pickOne(['cube', 'cuboid', 'pyramid', 'prism']), ask = pickOne(yr === 2 ? ['faces', 'corners'] : ['faces', 'corners', 'edges']);
     return { kind: 'shape', solid: s, fill, ask, cap: `How many ${ask}?`, say: `How many ${ask}?`, ans: SOLIDS[s][ask] };
   }
   if (yr === 4 && Math.random() < 0.25) { // right angles (no corner marks: she has to spot them)
@@ -2520,6 +2522,18 @@ function solidBody(nm, f, sw = 1.8) {
     const T = [[-40, 32], [12, 32], [-14, -10]], d = [24, -18], U = T.map(p => off(p, d));
     s += line(U[0], U[1], 1) + line(U[0], T[0], 1) + line(U[0], U[2], 1);
     s += poly([T[1], U[1], U[2], T[2]], 0.75) + poly(T);
+  } else if (nm === 'pentprism' || nm === 'hexprism') { // Year 5: the end face to the front, going back up and to the right
+    const n = nm === 'pentprism' ? 5 : 6, [cx, cy, d] = n === 5 ? [-8, 10, [13, -18]] : [-10, 8, [21, -12]];
+    const T = turn(regular(n, 27), n === 6 ? 30 : 0).map(([x, y]) => [+(x + cx).toFixed(1), +(y + cy).toFixed(1)]), U = T.map(p => off(p, d).map(z => +z.toFixed(1)));
+    // a side face shows when it faces the way the prism goes back
+    const vis = T.map((p, i) => {
+      const q = T[(i + 1) % n], e = [q[0] - p[0], q[1] - p[1]], m = [(p[0] + q[0]) / 2 - cx, (p[1] + q[1]) / 2 - cy];
+      let nr = [e[1], -e[0]]; if (nr[0] * m[0] + nr[1] * m[1] < 0) nr = [-nr[0], -nr[1]];
+      return nr[0] * d[0] + nr[1] * d[1] > 0;
+    });
+    T.forEach((p, i) => { if (!vis[i]) s += line(U[i], U[(i + 1) % n], 1); if (!vis[i] && !vis[(i + n - 1) % n]) s += line(T[i], U[i], 1); });
+    T.forEach((p, i) => { if (vis[i]) s += poly([T[i], T[(i + 1) % n], U[(i + 1) % n], U[i]], 0.75); });
+    s += poly(T);
   } else if (nm === 'cylinder') { // upright: the side, a lighter top, the back of the bottom dashed
     const st = `stroke="${INK}" stroke-width="${sw}"`;
     s += `<path d="M-26 -28V30A26 9 0 0 0 26 30V-28Z" fill="${f}" ${st} stroke-linejoin="round"/>`
@@ -2559,6 +2573,148 @@ function nameQ() {
   });
   const top = `Tap the ${nm}`;
   return { kind: 'tap', form: 'name', nm, names, top, tc: top.length * 0.5, tiles, right: names.indexOf(nm), quiet: true, big: true, topf: 0.3, say: `Tap the ${nm}.`, ans: nm };
+}
+// ---- Shapes, Year 5 (C3c). Flat: "How many pairs of parallel sides?" and "How many
+// right angles?" on quadrilaterals and hexagons (no corner marks), and tap cards
+// "Which two lines are parallel?" / "perpendicular?". 3D adds pentagonal and
+// hexagonal prisms. Nets (tap): a solid on top, three nets as tiles, one right.
+// The shapes are hand-made so that no two sides are nearly parallel and no corner is
+// nearly square (the test checks every one is at least 15° clear). The L hexagon has
+// three sides each way, so it is only asked for right angles.
+const SHAPES5 = {
+  square: [[-30, -30], [30, -30], [30, 30], [-30, 30]],
+  rectangle: [[-40, -22], [40, -22], [40, 22], [-40, 22]],
+  parallelogram: [[-40, 20], [20, 20], [40, -20], [-20, -20]],
+  rhombus: [[0, -40], [25, 0], [0, 40], [-25, 0]],
+  trapezium: [[-40, 25], [40, 25], [20, -20], [-25, -20]],
+  'right trapezium': [[-35, 25], [35, 25], [10, -20], [-35, -20]],
+  kite: [[0, -40], [22, -18], [0, 40], [-22, -18]],
+  quadrilateral: [[8, -32], [28, -16], [4, 42], [-36, -17]],
+  hexagon: regular(6),
+  'L hexagon': [[-30, -35], [-5, -35], [-5, 5], [30, 5], [30, 35], [-30, 35]],
+  'house hexagon': [[-30, 30], [30, 30], [30, 0], [15, -25], [-15, -25], [-30, 0]],
+  'hexagon, one pair': [[-8, -36], [30, -24], [34, 21], [7, 40], [-39, 9], [-33, -18]],
+  'hexagon, no pairs': [[7, -39], [24, -24], [33, 8], [7, 36], [-33, 17], [-33, -14]],
+};
+// right-angle questions lean towards the shapes that have some
+const RIGHT5 = ['square', 'rectangle', 'right trapezium', 'right trapezium', 'L hexagon', 'L hexagon', 'house hexagon', 'house hexagon', 'kite', 'parallelogram', 'hexagon', 'trapezium', 'quadrilateral'];
+// each side's direction in degrees, 0 to 180 (a side and its reverse are the same)
+const sideDirs = P => P.map((p, i) => { const q = P[(i + 1) % P.length]; return ((Math.atan2(q[1] - p[1], q[0] - p[0]) * 180 / Math.PI) % 180 + 180) % 180; });
+const dirGap = (a, b) => { const d = Math.abs(a - b) % 180; return Math.min(d, 180 - d); };
+const parPairs = P => { const D = sideDirs(P); let n = 0; D.forEach((a, i) => D.forEach((b, j) => { if (j > i && dirGap(a, b) < 1) n++; })); return n; };
+// the inside angle at every corner (a corner that points in, as in an L, is over 180)
+function cornerAngles(P) {
+  const n = P.length, area2 = P.reduce((s, v, i) => { const w = P[(i + 1) % n]; return s + v[0] * w[1] - w[0] * v[1]; }, 0);
+  return P.map((b, i) => {
+    const a = P[(i + n - 1) % n], c = P[(i + 1) % n], u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]];
+    const ang = Math.abs(Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])) * 180 / Math.PI;
+    const cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    return Math.sign(cross) === Math.sign(area2) ? ang : 360 - ang;
+  });
+}
+const rightCount = P => cornerAngles(P).filter(a => Math.abs(a - 90) < 1).length;
+const SHAPE5_KINDS = ['flat', 'solid', 'nets'];
+function shape5Q(kinds) {
+  const ks = kinds.filter(k => SHAPE5_KINDS.includes(k)), kind = pickOne(ks.length ? ks : SHAPE5_KINDS), fill = pickOne(Object.keys(BLOCK));
+  if (kind === 'nets') return netQ();
+  if (kind === 'solid') { // half the cards are the new prisms
+    const s = Math.random() < 0.5 ? pickOne(['pentprism', 'hexprism']) : pickOne(['cube', 'cuboid', 'pyramid', 'prism']), ask = pickOne(['faces', 'corners', 'edges']);
+    return { kind: 'shape', solid: s, fill, ask, cap: `How many ${ask}?`, say: `How many ${ask}?`, ans: SOLIDS[s][ask] };
+  }
+  const r = Math.random();
+  if (r < 0.3) return linesQ(pickOne(['par', 'perp']));
+  const par = r < 0.65, nm = par ? pickOne(Object.keys(SHAPES5).filter(k => k !== 'L hexagon')) : pickOne(RIGHT5);
+  const pts = fitPts(turn(SHAPES5[nm], rnd(0, 11) * 30));
+  return par ? { kind: 'shape', nm, pts, fill, ask: 'par', cap: 'How many pairs of<br>parallel sides?', capLen: 17, say: 'How many pairs of parallel sides?', ans: parPairs(pts) }
+    : { kind: 'shape', nm, pts, fill, ask: 'right', cap: 'How many right angles?', say: 'How many right angles?', ans: rightCount(pts) };
+}
+// two lines in a small box, turned any way. form: 'par' (parallel), 'near' (a
+// side-step apart but a turned by a, never touching), 'cross', 'T' or 'L' (meeting at a)
+function linePairSvg(form, a, base) {
+  const rad = d => d * Math.PI / 180, u = [Math.cos(rad(base)), Math.sin(rad(base))], v = [Math.cos(rad(base + a)), Math.sin(rad(base + a))], nr = [-u[1], u[0]];
+  const at = (p, w, k) => [p[0] + w[0] * k, p[1] + w[1] * k];
+  let segs;
+  if (form === 'par' || form === 'near') {
+    const s = rnd(-4, 4), c1 = at([0, 0], nr, 8), c2 = at(at([0, 0], nr, -8), u, s), w = form === 'par' ? u : v;
+    segs = [[at(c1, u, -17), at(c1, u, 17)], [at(c2, w, -17), at(c2, w, 17)]];
+  } else if (form === 'cross') segs = [[at([0, 0], u, -19), at([0, 0], u, 19)], [at([0, 0], v, -19), at([0, 0], v, 19)]];
+  else if (form === 'T') { const c = at([0, 0], v, -10); segs = [[at(c, u, -19), at(c, u, 19)], [c, at(c, v, 24)]]; }
+  else { const c = at(at([0, 0], u, -11), v, -11); segs = [[c, at(c, u, 26)], [c, at(c, v, 26)]]; }
+  const f = x => x.toFixed(1);
+  return `<svg viewBox="-28 -28 56 56" style="width:1.5em;height:1.5em" ${ANGLE_INK}>${segs.map(([p, q]) => `<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(q[0])}" y2="${f(q[1])}" stroke-width="3.6"/>`).join('')}</svg>`;
+}
+// "Which two lines are parallel?": a parallel pair, a pair a little turned, and a pair
+// that meets. "...perpendicular?": a pair meeting square, one meeting at 55–72° or
+// 108–125°, and a parallel pair or another that meets at the wrong angle.
+function linesQ(type) {
+  const meet = () => pickOne(['cross', 'T', 'L']), off = () => pickOne([rnd(55, 72), rnd(108, 125)]), base = () => rnd(0, 179);
+  let right, wrong;
+  if (type === 'par') { right = { form: 'par', a: 0 }; wrong = [{ form: 'near', a: pickOne([-1, 1]) * rnd(15, 25) }, { form: meet(), a: pickOne([90, rnd(40, 75), rnd(105, 140)]) }]; }
+  else { right = { form: meet(), a: 90 }; wrong = [{ form: meet(), a: off() }, Math.random() < 0.5 ? { form: 'par', a: 0 } : { form: meet(), a: off() }]; }
+  const pairs = shuffled([right, ...wrong]), word = type === 'par' ? 'parallel' : 'perpendicular';
+  const tiles = pairs.map((p, i) => ({ html: linePairSvg(p.form, p.a, base()), label: 'ABC'[i], say: 'this one' }));
+  return { kind: 'tap', form: 'lines', type, pairs, top: `Which two lines<br>are ${word}?`, tc: 8.2, th: 2.6, topf: 0.45, big: true, tiles, right: pairs.indexOf(right), quiet: true, say: `Which two lines are ${word}?`, ans: 'ABC'[pairs.indexOf(right)] };
+}
+// ---- Nets (Year 5): which net folds into the solid on top? A small hand-made set.
+// Grid nets (cube, cuboid) are cells [column, row]; a cuboid's columns and rows have
+// their own widths and heights. The test folds every grid net to check its label.
+const NET_L = 1.9, NET_W = 0.85, NET_H = 1; // the cuboid: front L × H, W deep
+const CUBE_NETS = {
+  ok: [[[1, 0], [0, 1], [1, 1], [2, 1], [3, 1], [1, 2]], [[0, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2]], [[0, 0], [0, 1], [1, 1], [2, 1], [3, 1], [1, 2]],
+    [[0, 0], [0, 1], [1, 1], [2, 1], [3, 1], [3, 2]], [[1, 0], [0, 1], [1, 1], [2, 1], [3, 1], [2, 2]], [[0, 0], [1, 0], [1, 1], [2, 1], [3, 1], [2, 2]],
+    [[0, 0], [1, 0], [1, 1], [2, 1], [2, 2], [3, 2]], [[0, 0], [1, 0], [2, 0], [2, 1], [3, 1], [4, 1]], [[0, 0], [1, 0], [1, 1], [2, 1], [3, 1], [1, 2]]],
+  // traps: two flaps that fold onto the same face, a 2 × 3 block, five in a row
+  bad: [[[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [3, 1]], [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [3, 1]], [[1, 0], [0, 1], [1, 1], [2, 1], [3, 1], [3, 0]],
+    [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]], [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [1, 1]]],
+};
+const CUBOID_CROSS = { cw: [NET_W, NET_L, NET_W], rh: [NET_W, NET_H, NET_W, NET_H] }, CUBOID_STRIP = { cw: [NET_L, NET_W, NET_L, NET_W], rh: [NET_W, NET_H, NET_W] };
+const CUBOID_NETS = {
+  ok: [{ cells: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2], [1, 3]], ...CUBOID_CROSS }, { cells: [[0, 0], [0, 1], [1, 1], [2, 1], [3, 1], [2, 2]], ...CUBOID_STRIP }],
+  bad: [{ cells: [[1, 0], [0, 1], [1, 1], [1, 2], [1, 3], [0, 3]], ...CUBOID_CROSS }, { cells: [[0, 0], [0, 1], [1, 1], [2, 1], [3, 1], [2, 0]], ...CUBOID_STRIP }],
+};
+const gridNet = (cells, cw, rh) => ({ g: 'grid', cells, cw: cw || range(0, Math.max(...cells.map(c => c[0]))).map(() => 1), rh: rh || range(0, Math.max(...cells.map(c => c[1]))).map(() => 1) });
+// a triangular prism: three rectangles in a row, triangles on top (up) or under (down) of them
+const prismNet = tris => ({ g: 'prism', tris });
+const prismOk = () => prismNet([[rnd(0, 2), 'up'], [rnd(0, 2), 'down']]);
+const pyrNet = sides => ({ g: 'pyr', sides });
+const cylNet = circles => ({ g: 'cyl', circles }); // [[where along 0..1, 'up' | 'down']]
+function netSvg(net, f) {
+  const U = 20, fill = tint(f, 0.4), st = `fill="${fill}" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"`, xs = [], ys = [];
+  const poly = P => { P.forEach(([x, y]) => { xs.push(x * U); ys.push(y * U); }); return `<polygon points="${P.map(([x, y]) => `${(x * U).toFixed(1)},${(y * U).toFixed(1)}`).join(' ')}" ${st}/>`; };
+  const rect = (x, y, w, h) => poly([[x, y], [x + w, y], [x + w, y + h], [x, y + h]]);
+  let s = '';
+  if (net.g === 'grid') {
+    const cx = [0], cy = [0];
+    net.cw.forEach((w, i) => cx.push(cx[i] + w)); net.rh.forEach((h, i) => cy.push(cy[i] + h));
+    s = net.cells.map(([c, r]) => rect(cx[c], cy[r], net.cw[c], net.rh[r])).join('');
+  } else if (net.g === 'prism') {
+    const w = 1, h = 1.7, t = 0.866;
+    s = [0, 1, 2].map(i => rect(i * w, 0, w, h)).join('') + net.tris.map(([i, d]) => poly(d === 'up' ? [[i * w, 0], [(i + 1) * w, 0], [(i + 0.5) * w, -t]] : [[i * w, h], [(i + 1) * w, h], [(i + 0.5) * w, h + t]])).join('');
+  } else if (net.g === 'pyr') {
+    const t = 0.9, tri = { 0: [[0, 0], [1, 0], [0.5, -t]], 1: [[1, 0], [1, 1], [1 + t, 0.5]], 2: [[1, 1], [0, 1], [0.5, 1 + t]], 3: [[0, 1], [0, 0], [-t, 0.5]] };
+    s = rect(0, 0, 1, 1) + net.sides.map(k => poly(tri[k])).join('');
+  } else { // cylinder: a rectangle as wide as the circle goes round, circles touching it
+    const r = 0.36, W = 2 * Math.PI * r, H = 1.3;
+    s = rect(0, 0, W, H) + net.circles.map(([p, d]) => { const x = r + p * (W - 2 * r), y = d === 'up' ? -r : H + r; xs.push((x - r) * U, (x + r) * U); ys.push((y - r) * U, (y + r) * U); return `<circle cx="${(x * U).toFixed(1)}" cy="${(y * U).toFixed(1)}" r="${(r * U).toFixed(1)}" ${st}/>`; }).join('');
+  }
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0, h = Math.max(...ys) - y0, S = Math.max(w, h) + 4;
+  return `<svg viewBox="${(x0 - (S - w) / 2).toFixed(1)} ${(y0 - (S - h) / 2).toFixed(1)} ${S.toFixed(1)} ${S.toFixed(1)}">${s}</svg>`;
+}
+const NET_SOLIDS = ['cube', 'cube', 'cuboid', 'prism', 'pyramid', 'cylinder'];
+function netQ() {
+  const solid = pickOne(NET_SOLIDS), col = pickOne(Object.keys(BLOCK));
+  const g = c => gridNet(c.cells || c, c.cw, c.rh);
+  let right, wrong;
+  if (solid === 'cube') { right = g(pickOne(CUBE_NETS.ok)); wrong = shuffled(CUBE_NETS.bad).slice(0, 2).map(g); }
+  else if (solid === 'cuboid') { right = g(pickOne(CUBOID_NETS.ok)); wrong = shuffled([...CUBOID_NETS.bad, pickOne(CUBE_NETS.ok)]).slice(0, 2).map(g); }
+  else if (solid === 'prism') { const i = rnd(0, 2), j = (i + rnd(1, 2)) % 3; right = prismOk(); wrong = [Math.random() < 0.6 ? prismNet([[i, 'up'], [j, 'up']]) : prismNet([[i, pickOne(['up', 'down'])]]), pyrNet([0, 1, 2, 3])]; }
+  else if (solid === 'pyramid') { right = pyrNet([0, 1, 2, 3]); wrong = [pyrNet(shuffled([0, 1, 2, 3]).slice(0, 3).sort()), Math.random() < 0.5 ? prismOk() : g(pickOne(CUBE_NETS.ok))]; }
+  else { const d = pickOne(['up', 'down']); right = cylNet([[Math.random(), 'up'], [Math.random(), 'down']]); wrong = [cylNet([[Math.random() * 0.1, d], [0.9 + Math.random() * 0.1, d]]), cylNet([[Math.random(), pickOne(['up', 'down'])]])]; }
+  const nets = shuffled([right, ...wrong]), r = nets.indexOf(right);
+  const tiles = nets.map((n, i) => ({ html: netSvg(n, BLOCK[col]), label: 'ABC'[i], say: 'this one' }));
+  // the solid beside the words, so it can be big
+  const top = `<span style="display:flex;align-items:center;gap:.3em"><svg viewBox="-46 -46 92 92" style="width:3.4em;height:3.4em">${solidBody(solid, BLOCK[col])}</svg><span class="tw" style="text-align:left">Which net<br>makes this?</span></span>`;
+  return { kind: 'tap', form: 'net', of: solid, nets, top, tc: 8.8, th: 3.4, topf: 0.5, big: true, tiles, right: r, quiet: true, say: 'Which net folds into this shape?', ans: 'ABC'[r] };
 }
 // ---- Picture patterns (Year 1, B3): a row of 7 to 9 shapes repeating a unit of
 // three, with one gap (never in the first three, so the unit is always there to
@@ -3111,13 +3267,13 @@ const ACTS = {
     name: 'Shapes', ages: [5, 8], setup: 'opts', say: 'Count them and write how many.',
     pic: `<svg viewBox="0 0 120 84"><polygon points="8,74 52,74 30,30" fill="${BLOCK.yellow}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><rect x="62" y="34" width="40" height="40" fill="${BLOCK.blue}" stroke="${INK}" stroke-width="3"/></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares, names'], [2, '2 · up to 6 sides, 3D'], [3, '3 · up to 10 sides, symmetry'], [4, '4 · up to 12 sides, right angles']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)'], ['name', 'Name (Year 1)'], ['moves', 'Moves (Year 4)']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares, names'], [2, '2 · up to 6 sides, 3D'], [3, '3 · up to 10 sides, symmetry'], [4, '4 · up to 12 sides, right angles'], [5, '5 · parallel, prisms, nets']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)'], ['name', 'Name (Year 1)'], ['moves', 'Moves (Year 4)'], ['nets', 'Nets (Year 5)']] },
     ],
-    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['flat', 'solid', 'name'] : ['flat', 'solid', 'moves'], n: age === 5 ? 6 : 12 }),
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['flat', 'solid', 'name'] : ['flat', 'solid', 'moves', 'nets'], n: age === 5 ? 6 : 12 }),
     make: c => shapeQ(c.yr, c.kinds),
-    // Moves only changes Year 4 and Name only Year 1, so the other years leave them out of the record key
-    key: c => `shape~${c.yr}|${['flat', 'solid', 'name', 'moves'].filter(k => c.kinds.includes(k) && (k !== 'moves' || c.yr === 4) && (k !== 'name' || c.yr === 1)).join(',') || 'flat'}|${c.n}`,
+    // Moves only changes Year 4, Name only Year 1 and Nets only Year 5, so the other years leave them out of the record key
+    key: c => `shape~${c.yr}|${['flat', 'solid', 'name', 'moves', 'nets'].filter(k => c.kinds.includes(k) && (k !== 'moves' || c.yr === 4) && (k !== 'name' || c.yr === 1) && (k !== 'nets' || c.yr === 5)).join(',') || 'flat'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Shapes · Year ${y} · ${kinds.replace('solid', '3D').split(',').join(', ')} · ${n} questions`; },
   },
   ruler: {
