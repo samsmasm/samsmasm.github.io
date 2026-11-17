@@ -54,12 +54,37 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   // ---- desktop, mouse ----
   await page.setViewport({ width: 1100, height: 1000 });
   await page.goto(URL, { waitUntil: 'networkidle0' });
-  ok(await page.$eval('.chip', b => b.getAttribute('aria-pressed') === 'true'), 'only topic is picked by default');
+  ok(await page.$$eval('.unit', l => l.length) === 2, 'two units on the start page');
+  ok(await page.$eval('#start', b => b.disabled), 'Start disabled with nothing picked');
   ok(JSON.stringify(await page.$$eval('#lengths button', l => l.map(b => b.textContent))) === '["6","12","All"]', 'lengths are 6, 12, All');
+  ok(await page.$$eval('.unit:nth-child(1) .chip:not(.whole)', l => l.length) === 7, 'HR has 7 subtopics');
+  ok(await page.$$eval('.unit:nth-child(2) .chip:not(.whole)', l => l.length) === 9, 'Finance has 9 subtopics');
+  ok(await page.$eval('.unit:nth-child(1)', u => [...u.querySelectorAll('.chip')].filter(c => c.querySelector('.hl')).map(c => c.textContent.slice(0, 3)).join()) === '2.5,2.7', 'HL marked on 2.5 and 2.7');
+  await page.click('.unit:nth-child(1) .whole');
+  ok(await page.$$eval('.unit:nth-child(1) .chip', l => l.every(c => c.getAttribute('aria-pressed') === 'true')), 'Whole unit picks every HR subtopic');
+  ok(await text(page, '#picked') === '105 terms picked', '105 HR terms picked');
+  await page.click('.unit:nth-child(1) .chip:nth-child(2)');   // untick 2.1
+  ok(await page.$eval('.unit:nth-child(1) .whole', b => b.getAttribute('aria-pressed') === 'false'), 'unticking a subtopic unticks Whole unit');
+  await page.click('.unit:nth-child(1) .whole');
+  ok(await page.$$eval('.unit:nth-child(1) .chip', l => l.every(c => c.getAttribute('aria-pressed') === 'true')), 'Whole unit then picks all again');
+  await page.click('.unit:nth-child(1) .whole');
+  ok(await page.$eval('#start', b => b.disabled), 'Whole unit again clears it');
   await shot(page, 'setup-desktop');
-  await page.click('.chip');
-  ok(await page.$eval('#start', b => b.disabled), 'Start disabled with no topic');
-  await page.click('.chip');
+
+  // 3.1 has only 2 terms: the board is filled to 3 with an unscored Finance term
+  await page.click('.unit:nth-child(2) .chip:nth-child(2)');
+  ok((await text(page, '#picked')) === '2 terms picked', '3.1 has 2 terms');
+  await page.click('#start');
+  ok(await page.$$eval('#terms .term', l => l.length) === 3, 'a 2-term pick still gives a 3-term board');
+  ok(await page.evaluate(() => state.boards[0].filter(x => x.extra).every(x => x.d.unit === 3) && state.scored === 2), 'filler is from Finance and unscored');
+  { const k = await key(page); await solveByTap(page, k); }
+  await page.click('#check'); await page.click('#next');
+  ok(await text(page, '#final') === '2 / 2', 'score counts only the 2 picked terms');
+  await page.click('#change');
+  await page.click('.unit:nth-child(2) .chip:nth-child(2)');   // untick 3.1
+
+  const pick27 = () => page.evaluate(() => [...document.querySelectorAll('.chip')].find(c => c.textContent.startsWith('2.7')).click());
+  await pick27();
   await page.click('#start');                             // default 6
   ok(await text(page, '#progress') === '1 of 2', '6 terms = 2 boards');
   ok(await page.$$eval('#terms .term', l => l.length) === 3, '3 terms on a board');
@@ -122,6 +147,8 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.setViewport({ width: 390, height: 1700, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await page.goto(URL, { waitUntil: 'networkidle0' });
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll on setup (phone)');
+  await shot(page, 'setup-phone');
+  await pick27();
   await page.click('#lengths button:nth-child(3)');   // All
   await page.click('#start');
   ok(await text(page, '#progress') === '1 of 5', 'All = 15 terms = 5 boards');
