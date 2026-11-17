@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Sums: to check</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23fff'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%23000' stroke-width='4'/%3E%3C/svg%3E">
+<style>
+  :root { --ink: #111; --paper: #fff; --line: #d4d4d4; --faint: #888; --right: #1d6b35; --head: 52px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--paper); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, a.go { font: inherit; color: var(--ink); background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; padding: 6px 12px; cursor: pointer; text-decoration: none; display: inline-block; }
+  a.go { background: var(--ink); color: var(--paper); }
+  header { position: sticky; top: 0; z-index: 3; background: var(--paper); height: var(--head); display: flex; align-items: center; gap: 8px;
+           padding: 0 12px; border-bottom: 1.5px solid var(--ink); }
+  header h1 { font-size: 20px; margin: 0 0 0 4px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  main { max-width: 760px; margin: 0 auto; padding: 18px 16px 48px; }
+  .lede { margin: 0 0 18px; }
+  .lede, .hint { color: #444; }
+  h2 { font-size: 18px; margin: 28px 0 10px; }
+  .item { border: 1.5px solid var(--ink); border-radius: 10px; padding: 12px 14px; margin: 0 0 12px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .item input { width: 24px; height: 24px; margin: 2px 0 0; accent-color: var(--right); }
+  .item .t { font-weight: 700; font-size: 17px; }
+  .item .step { color: var(--faint); font-weight: 400; font-size: 14px; }
+  .item p { margin: 2px 0 8px; grid-column: 2; }
+  .item .links { grid-column: 2; display: flex; flex-wrap: wrap; gap: 8px; }
+  .item.done { border-color: var(--line); color: var(--faint); }
+  .item.done a.go { background: var(--paper); color: var(--faint); border-color: var(--line); }
+  details summary { cursor: pointer; font-weight: 700; margin: 28px 0 10px; }
+  .hint { font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <a class="go" href="../" style="background:var(--paper);color:var(--ink)">‹ Sums</a>
+  <h1>To check</h1>
+</header>
+<main>
+  <p class="lede">Things to try on the tablet with the girls. Each button opens Sums at that activity with the right choices picked: choose a name, then Start. Tick an item when it's checked (ticks stay on this device only), and use the flag at the top right of any Sums page to send what you found.</p>
+  <div id="todo"></div>
+  <h2>Open problem</h2>
+  <div id="open"></div>
+  <details id="doneWrap" hidden><summary id="doneSum"></summary><div id="done"></div></details>
+  <p class="hint">The same list is in the vault note Projects/Sums/Sums.md under "To check". Claude adds to both after each build step.</p>
+</main>
+<script>
+// One entry per line of "To check (review later)" in ~/notes/Projects/Sums/Sums.md. Keep the two in step.
+// id: stable key for the tick. links: [label, query for ../ (see LINK in sums/index.html)].
+const ITEMS = [
+  { id: 'tap', step: 'A2', t: 'True or false, More or less', p: 'Are the tiles big enough, and do finger taps land?',
+    links: [['True or false', 'act=tf&yr=4'], ['More or less', 'act=cmp&yr=4&kinds=num,sum']] },
+  { id: 'money4', step: 'A1', t: 'Money Year 4 shopping', p: 'Do "Buy 3. Change?" and the rows of price tags make sense to her?',
+    links: [['Money, Year 4', 'act=money&yr=4&kinds=count,change']] },
+  { id: 'pv9999', step: 'A1', t: 'Place value to 9,999', p: 'Can she count the thousands cubes in the Blocks picture?',
+    links: [['Place value, Blocks to 9,999', 'act=pv&kinds=blocks&max=9999']] },
+  { id: 'bal', step: 'A3', t: 'Balance', p: 'Does "☐ = ___" under the equation make sense, or does she try to write in the box?',
+    links: [['Balance', 'act=bal&yr=4']] },
+  { id: 'round', step: 'A3', t: 'Rounding', p: 'On the number line kind, is it clear she writes one of the two end numbers?',
+    links: [['Rounding, Number line', 'act=round&yr=4&kinds=line']] },
+  { id: 'recipe', step: 'A3', t: 'Recipe stories', p: 'Are the grams and mL stories too wordy?',
+    links: [['Story sums, × and ÷, Year 4', 'act=story&yr=4&kinds=muldiv']] },
+  { id: 'dec', step: 'A4', t: 'Decimals', p: 'Does writing either side of the printed point read correctly, including ".7" and "1.30"?',
+    links: [['Decimals', 'act=dec&yr=4&kinds=pic,line,addsub,ten']] },
+  { id: 'counts', step: 'A4', t: 'Question counts', p: 'Are 6 and 12 the right numbers on the tablet, and is 4 or 6 right for Story sums?',
+    links: [['Add and take away', 'act=addsub&n=12'], ['Story sums', 'act=story&n=6']] },
+  { id: 'fracpast', step: 'A5', t: 'Fractions Past 1', p: 'Do two-digit tops like 15/12 read correctly?',
+    links: [['Fractions, Past 1', 'act=frac&kinds=past&parts=8,10,12']] },
+  { id: 'fracadd', step: 'A5', t: 'Fractions Add', p: 'With three fractions the printed numbers are small. Easy enough to read?',
+    links: [['Fractions, Add and take away', 'act=frac&kinds=add']] },
+  { id: 'cmpfrac', step: 'A5', t: 'More or less fractions', p: 'The fractions are a bit smaller than the numbers. Readable, and the tiles easy to tap?',
+    links: [['More or less, Fractions', 'act=cmp&yr=4&kinds=frac']] },
+  { id: 'fof', step: 'A5', t: 'Fractions of a number', p: 'Does she get the bar model (brace = whole, one box = one part)? The "?" in the box is small.',
+    links: [['Fractions of a number', 'act=fof&yr=4&kinds=part,whole']] },
+  { id: 'odd', step: 'A6a', t: 'Area odd shapes', p: 'Does she see that two half squares make one square?',
+    links: [['Area, Odd shapes', 'act=area&kinds=odd']] },
+  { id: 'cubes', step: 'A6a', t: 'Area cubes', p: 'Does she count the hidden cubes at the back and underneath, or only the ones she can see?',
+    links: [['Area, Cubes', 'act=area&kinds=cubes']] },
+  { id: 'thermo', step: 'A6a', t: 'Thermometer', p: 'Are the marks big enough to read on the tablet? The answer line is beside the thermometer, not under it. Is that clear?',
+    links: [['Rulers, Thermometer', 'act=ruler&yr=4&kinds=thermo']] },
+  { id: 'units', step: 'A6b', t: 'Change units', p: 'Does "= __ h __ min" make sense, and does writing either side of the printed "h" read correctly?',
+    links: [['Change units', 'act=units&yr=4']] },
+  { id: 'angsize', step: 'A6b', t: 'Angles', p: 'Are the three angle tiles (narrow, square corner, wide) clear without words? Is the angle in the question big enough on the tablet?',
+    links: [['Angles, Right angle?', 'act=angle&yr=4&kinds=size']] },
+  { id: 'angdeg', step: 'A6b', t: 'Angles degrees', p: 'Does the little arrow round a dot read as a quarter, half or full turn?',
+    links: [['Angles, Degrees', 'act=angle&yr=4&kinds=deg']] },
+  { id: 'digits', step: 'General', t: 'Real handwriting', p: 'Which digits does the reader get wrong with their real handwriting? Flag any misread card: the report sends her writing.',
+    links: [['Add and take away', 'act=addsub'], ['Sums', '']] },
+];
+const OPEN = [
+  { id: 'nowriting', step: 'Open', t: 'No writing picked up', p: 'On your device Fractions, Clocks and Money picked up no writing at all, even tidy writing. Next time it happens, flag it from that sheet (it sends the writing, the device and the screen size) and say whether the ink appeared.',
+    links: [['Fractions', 'act=frac'], ['Clocks', 'act=clock'], ['Money', 'act=money']] },
+];
+
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem('sums-review') || '{}'); } catch (e) { return {}; } },
+  set(v) { try { localStorage.setItem('sums-review', JSON.stringify(v)); } catch (e) {} },
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const card = (it, done) => `<div class="item${done ? ' done' : ''}">
+  <input type="checkbox" data-id="${it.id}" aria-label="Checked: ${esc(it.t)}"${done ? ' checked' : ''}>
+  <div class="t">${esc(it.t)} <span class="step">${esc(it.step)}</span></div>
+  <p>${esc(it.p)}</p>
+  <div class="links">${it.links.map(([l, q]) => `<a class="go" href="../${q ? '?' + q : ''}">${esc(l)} ›</a>`).join('')}</div></div>`;
+function render() {
+  const ticks = store.get(), all = [...ITEMS, ...OPEN];
+  const todo = ITEMS.filter(i => !ticks[i.id]), open = OPEN.filter(i => !ticks[i.id]), done = all.filter(i => ticks[i.id]);
+  document.getElementById('todo').innerHTML = todo.map(i => card(i, false)).join('') || '<p class="hint">Nothing left to check.</p>';
+  document.getElementById('open').innerHTML = open.map(i => card(i, false)).join('') || '<p class="hint">None open.</p>';
+  document.getElementById('done').innerHTML = done.map(i => card(i, true)).join('');
+  document.getElementById('doneWrap').hidden = !done.length;
+  document.getElementById('doneSum').textContent = `Checked (${done.length})`;
+}
+document.addEventListener('change', e => {
+  const id = e.target.dataset && e.target.dataset.id; if (!id) return;
+  const t = store.get(); if (e.target.checked) t[id] = Date.now(); else delete t[id];
+  store.set(t); render();
+});
+render();
+</script>
+<script src="../report.js"></script>
+</body>
+</html>

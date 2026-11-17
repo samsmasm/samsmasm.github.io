@@ -1643,6 +1643,77 @@ const fakeSpeech = () => {
     }
   }
 
+  // ---- /sums/review/ links open the right activity with the right choices, and the report flag sends
+  {
+    const p2 = await browser.newPage();
+    p2.on('pageerror', e => { console.log('page error: ' + e.message); fails++; });
+    await p2.evaluateOnNewDocument(fakeSpeech);
+    await p2.setViewport({ width: 820, height: 1180, hasTouch: true });
+    await p2.goto(URL + 'review/');
+    const links = await p2.$$eval('#todo a.go, #open a.go', as => as.map(a => a.getAttribute('href')));
+    ok(links.length >= 20, `review page lists its links (${links.length})`);
+    ok(await p2.$('#rptBtn') !== null, 'review page has the report flag');
+    const badLinks = [];
+    for (const href of links) {
+      const q = href.replace(/^\.\.\/\??/, '');
+      await p2.goto(URL + (q ? '?' + q : ''));
+      if (!q) { if (!(await p2.$eval('#linkHint', e => e.hidden))) badLinks.push(href + ': hint shown with no link'); continue; }
+      const want = Object.fromEntries(new URLSearchParams(q));
+      const hint = await p2.$eval('#linkHint', e => e.hidden ? '' : e.textContent);
+      if (!hint.startsWith('Next: ')) { badLinks.push(href + ': no hint'); continue; }
+      await p2.click('#nameTiles [data-id="guest"]');
+      if (await p2.$eval('#ageS', e => !e.hidden)) await p2.click('#ageTiles [data-age="8"]');
+      const st = await p2.evaluate(() => ({ screen, act, draft, url: location.search }));
+      if (st.screen !== 'setup' || st.act !== want.act) { badLinks.push(`${href}: on ${st.screen} ${st.act}`); continue; }
+      if (st.url) badLinks.push(href + ': query left in the address');
+      for (const [k, v] of Object.entries(want)) {
+        if (k === 'act') continue;
+        const got = [].concat(st.draft[k]).map(String).sort().join(), exp = v.split(',').sort().join();
+        if (got !== exp) badLinks.push(`${href}: ${k} is ${got}, wanted ${exp}`);
+      }
+    }
+    ok(badLinks.length === 0, 'every review link opens its activity with its choices ' + badLinks.slice(0, 4).join(' | '));
+    // a named player with an age goes straight there; Back from it goes home
+    await p2.evaluate(() => localStorage.setItem('sums-players', JSON.stringify([{ id: 'x1', name: 'Test', age: 6 }])));
+    await p2.goto(URL + '?act=units&yr=4');
+    await p2.click('#nameTiles [data-id="x1"]');
+    ok(await p2.evaluate(() => screen === 'setup' && act === 'units' && draft.yr === 4), 'link: a named player lands on the setup');
+    await p2.click('#backBtn');
+    ok(await p2.evaluate(() => screen === 'home'), 'link: Back goes to her home');
+    ok(await p2.evaluate(() => localStorage.getItem('sums-cfg-x1-units') === null), 'link: choices not saved before Start');
+
+    // report: flag on a sheet sends app sums, the cards and the writing, never the name
+    await p2.setRequestInterception(true);
+    let sent = null;
+    p2.on('request', r => {
+      if (r.url().includes('/feedback/api/report')) {
+        if (r.method() === 'POST') sent = JSON.parse(r.postData());
+        r.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST' }, body: '{"ok":true}' });
+      }
+      else r.continue();
+    });
+    await p2.evaluate(() => { act = 'addsub'; buildSheet({ yr: 2, ops: ['+', '-'], n: 6 }); show('sheet'); });
+    await p2.evaluate(HELPERS);
+    await p2.evaluate(() => writeNum(cards[0], cards[0].q.ans));
+    ok(await p2.$eval('#rptBtn', e => e.offsetParent !== null), 'report flag shows on a sheet');
+    await p2.click('#rptBtn');
+    await p2.click('#rptBox [data-r="It read the writing wrong"]');
+    await p2.type('#rptBox textarea', 'test');
+    await p2.click('#rptBox [data-a="send"]');
+    await wait(400);
+    const d = sent && sent.diagram ? JSON.parse(sent.diagram) : {};
+    ok(sent && sent.app === 'sums' && /It read the writing wrong: test/.test(sent.message), 'report sends to the sums inbox');
+    ok(d.act === 'addsub' && d.cards && d.cards.length === 6 && d.cards[0].strokes.length > 0 && 'ans' in d.cards[0].q, 'report carries the cards and her writing');
+    ok(!sent || !JSON.stringify(sent).includes('"Test"'), 'report never sends the name');
+    ok(await p2.$eval('#rptBox h2', e => e.textContent.startsWith('Thanks')), 'report says thanks');
+    await p2.close();
+    // the mock has the flag too
+    const p3 = await browser.newPage();
+    await p3.goto(URL + 'mock/');
+    ok(await p3.$('#rptBtn') !== null, 'mock page has the report flag');
+    await p3.close();
+  }
+
   await browser.close();
   console.log(fails ? `${fails} failed` : 'all passed');
   process.exit(fails ? 1 : 0);

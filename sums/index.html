@@ -47,6 +47,9 @@
   #sayBtn { padding: 4px 10px; line-height: 0; }
   #sayBtn svg { width: 24px; height: 24px; }
   .spacer { margin-left: auto; }
+  .hint.linkHint { font-size: 16px; color: var(--ink); margin: -6px 0 16px; }
+  /* phones: a sheet's header is already full, so the report flag only shows on the other screens */
+  @media (max-width: 600px) { body.lock header .rptBtn { display: none; } }
   @media (max-width: 600px) { .wide { display: none; } header h1.sheetTitle { display: none; } }
 
   /* full-page screens under the header */
@@ -336,6 +339,7 @@
 <section id="namesS" class="panel">
   <div class="inner">
     <div class="ask">Who's doing sums?</div>
+    <p class="hint linkHint" id="linkHint" hidden></p>
     <div class="tiles" id="nameTiles"></div>
     <div class="addRow" id="addRow" hidden><input id="newName" placeholder="Name" maxlength="20" autocomplete="off"><button id="addBtn" class="primary">Add</button></div>
   </div>
@@ -461,6 +465,7 @@
 
 <script src="model.js"></script>
 <script src="digits.js"></script>
+<script src="report.js"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -2133,6 +2138,8 @@ function goNames() {
     `<button class="tile person" data-id="${esc(p.id)}"><span class="nm">${esc(p.name)}</span><span class="sub">${p.id === 'guest' ? 'any age' : p.age ? 'age ' + p.age : ''}</span></button>`).join('')
     + `<button class="tile add" id="addTile"><span class="nm">+ Add a name</span></button>`;
   $('#addRow').hidden = true;
+  $('#linkHint').hidden = !LINK;
+  if (LINK) $('#linkHint').textContent = `Next: ${ACTS[LINK.act].name}${LINK.over.yr ? ', Year ' + LINK.over.yr : ''}. Pick who is trying it.`;
   show('names');
 }
 $('#nameTiles').addEventListener('click', e => {
@@ -2140,7 +2147,10 @@ $('#nameTiles').addEventListener('click', e => {
   if (t.id === 'addTile') { $('#addRow').hidden = false; $('#newName').focus(); return; }
   current = t.dataset.id;
   const p = player(current);
-  if (current !== 'guest' && AGES.includes(p.age)) { age = p.age; goHome(); } else goAge();
+  if (current !== 'guest' && AGES.includes(p.age)) { age = p.age; goHome(); }
+  // a link from /sums/review/ with a year: Everyone gets the age for that year, no need to ask
+  else if (current === 'guest' && LINK && LINK.over.yr) { age = Math.min(11, Math.max(4, LINK.over.yr + 4)); goHome(); }
+  else goAge();
 });
 function addPlayer() {
   const name = $('#newName').value.trim().slice(0, 20); if (!name) return;
@@ -2164,6 +2174,7 @@ $('#ageTiles').addEventListener('click', e => { const t = e.target.closest('[dat
 // home: activities for this age
 const ACTS_FOR = () => Object.keys(ACTS).filter(a => ACTS[a].ages.includes(group()));
 function goHome() {
+  if (LINK) return openLink();
   const r = loadRec(current);
   $('#actTiles').innerHTML = ACTS_FOR().map(a => {
     const best = r.best[ACTS[a].key(loadCfg(a))];
@@ -3205,6 +3216,48 @@ $('#tGrid').addEventListener('click', e => dropOn(e.target.closest('.gc')));
   tile.addEventListener('pointerup', end);
   tile.addEventListener('pointercancel', end);
 })();
+
+// ---------- links from /sums/review/ ----------
+// ?act=ruler&yr=4&kinds=thermo opens that activity's setup with those choices picked
+// (not saved until Start), after a name is chosen. Unknown keys and values are ignored.
+let LINK = (() => {
+  const p = new URLSearchParams(location.search), a = p.get('act');
+  if (!a || !Object.hasOwn(ACTS, a)) return null;
+  const over = {};
+  for (const [k, v] of p) if (k !== 'act') over[k] = v.includes(',') || k === 'kinds' ? v.split(',').map(optVal) : optVal(v);
+  return { act: a, over };
+})();
+function openLink() {
+  const L = LINK; LINK = null;
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  act = L.act;
+  if (ACTS[act].setup === 'none') { buildSheet(loadCfg(act)); show('sheet'); if (reads()) say(ACTS[act].say); return; }
+  goSetup();
+  for (const o of ACTS[act].options || []) {
+    if (!(o.key in L.over)) continue;
+    const ok = o.values.map(v => Array.isArray(v) ? v[0] : v), want = [].concat(L.over[o.key]).filter(v => ok.includes(v));
+    if (want.length) draft[o.key] = o.multi ? want : want[0];
+  }
+  if (countsOf(act).includes(L.over.n)) draft.n = L.over.n;
+  syncOpts();
+  if (reads()) say('Choose, then press Start.');
+}
+
+// ---------- what a problem report sends (report.js) ----------
+// No names: age, activity, settings, and on a sheet each card's question, what was read and the writing.
+window.sumsReportContext = () => {
+  const round = s => s.map(p => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]);
+  const playing = screen === 'sheet' || screen === 'grid';
+  const out = { where: `Sums: ${screen}${act && screen !== 'home' && screen !== 'names' ? ' · ' + ACTS[act].name : ''}`, screen, age, act };
+  if (screen === 'setup' && draft) out.settings = draft;
+  if (playing) out.settings = cfg;
+  if (screen === 'sheet') out.cards = cards.map((k, i) => ({
+    n: i + 1, q: k.q, state: k.el.dataset.state, read: k.el.querySelector('.read').textContent, tries: k.tries, first: k.first,
+    pick: k.pick, strokes: k.q.kind === 'tap' ? undefined : k.strokes.map(round),
+  }));
+  if (screen === 'grid' && G) out.grid = G;
+  return out;
+};
 
 goNames();
 </script>
