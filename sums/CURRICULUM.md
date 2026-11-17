@@ -260,7 +260,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ## Year 5
 
-Year 5 buttons so far (C1, C2a, 2026-11-17): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding; Place value goes up to 999,999. Other ticks are activities whose own settings happen to reach.
+Year 5 buttons so far (C1, C2a, C2b, C3a, 2026-11-17): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles; Place value goes up to 999,999. Other ticks are activities whose own settings happen to reach.
 
 ### Number
 - Read, write, compare and order numbers to 1,000,000. ✓ (Place value up to 999,999: expanded form and 1,000 / 10,000 / 100,000 more or less; More or less, Year 5: comparing six-digit numbers; not ordering)
@@ -295,14 +295,14 @@ Year 5 buttons so far (C1, C2a, 2026-11-17): Add and take away, Times and divide
 
 ### Measurement
 - Measure accurately with a ruler, scales, jug, thermometer and timer, in mixed units (2 hours and 30 minutes). ✋ partly
-- Change between m and cm. Knows: 10 mm in a cm, 100 cm in a m, 1,000 mm in a m, 1,000 m in a km.
+- Change between m and cm. Knows: 10 mm in a cm, 100 cm in a m, 1,000 mm in a m, 1,000 m in a km. ✓ (Change units, Year 5: m and cm with decimals, 2 m 35 cm = __ . __ m, 1.8 m = ___ cm; km and m; cm and mm)
 - Area of irregular shapes from squares, half squares and part squares (roughly).
 - Area of rectangles by multiplying the sides. ✓ (Area)
 - Volume of a cuboid: cubes in a layer × number of layers.
 - Perimeter of regular polygons and other straight-sided shapes. ✓ partly (Area: Perimeter, rectangles only)
 - Same area, different perimeter (and the other way round).
-- Name angles: acute, right, obtuse, straight, reflex; measure and draw angles to 180° with a protractor.
-- Tell the time on analogue and digital clocks; how long between two times, with a.m. and p.m. and 24-hour time.
+- Name angles: acute, right, obtuse, straight, reflex; measure and draw angles to 180° with a protractor. ✓ partly (Angles, Year 5: Name, tap the word; Measure, a protractor drawn over the angle, multiples of 5; not drawing)
+- Tell the time on analogue and digital clocks; how long between two times, with a.m. and p.m. and 24-hour time. ✓ (Clocks, Year 5: a face or words with the part of the day, written in 24-hour time; How long?, two times in a.m. / p.m. or 24-hour, "__ h __ min")
 
 ### Geometry
 - Describe prisms by their cross section, faces, edges and vertices.

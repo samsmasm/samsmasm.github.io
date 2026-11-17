@@ -303,6 +303,9 @@
   .tap .tfd { display: flex; align-items: flex-start; gap: .35em; }
   .tap .tfc { display: flex; flex-direction: column; align-items: center; gap: .1em; }
   .tap .tsm { font-size: .55em; }
+  /* word tiles in rows of q.wrap (Angles names, Year 5): wider than tall, smaller words */
+  .tap .tiles.wrap { --tw: max(40px, min(17cqh, 72px)); --ww: min(calc(var(--tw) * 1.7), calc(88cqw / var(--n))); flex-wrap: wrap; justify-content: center; gap: 2cqw; width: calc(var(--ww) * var(--n) + 4cqw + 6px); margin-top: .25em; }
+  .tap .wrap .tt { min-width: 0; width: var(--ww); font-size: min(calc(var(--tw) * .34), calc(var(--ww) * .19)); padding: 0; }
   /* heaps to count (More or less, Year 1): the words are short, so the tiles may be bigger */
   .tap .tiles.bigt { --tw: max(40px, min(52cqh, calc(84cqw / var(--n)), 128px)); }
   .tap .bigt .tt svg { width: 1.6em; height: 1.6em; }
@@ -326,7 +329,7 @@
   .tap .tpic { display: flex; flex-direction: column; align-items: center; gap: .1em; }
   .tap .tw { font-size: .8em; font-weight: 700; line-height: 1.1; }
   .tap .tsw { display: block; width: .95em; height: .95em; border: .06em solid var(--ink); border-radius: .12em; }
-  .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
+  .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; text-align: center; }
   .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
   .pic2 .side { display: flex; align-items: flex-end; gap: .7em; }
   .pic2 .side .ans { margin: 0 0 .4em; }
@@ -894,6 +897,29 @@ function clockMatchQ() {
   const h = rnd(1, 12), wrap = k => (k + 11) % 12 + 1, near = [wrap(h - 1), wrap(h + 1)];
   const opts = shuffled([h, ...(h === 12 ? near : [12, pickOne(near.filter(k => k !== 12))])]);
   return { kind: 'tap', form: 'match', h, m: 0, top: clockSvg({ h, m: 0 }, 4.4), tc: 4.4, th: 4.4, topf: 0.66, tiles: opts.map(DIGI_TILE), right: opts.indexOf(h), say: 'Which clock shows the same time?', ans: `${h}:00` };
+}
+// Clocks, Year 5 (C3a): 24-hour time. A face or words with the part of the day
+// ("quarter past 3 in the afternoon" → 15 : 15). Never "to 12" in the morning (that is midday).
+const DAY_PARTS = [['in the morning', 5, 11, 0], ['in the afternoon', 1, 5, 12], ['in the evening', 6, 10, 12]];
+const pad2 = n => String(n).padStart(2, '0');
+function clock24Q(words) {
+  for (;;) {
+    const [period, lo, hi, add] = pickOne(DAY_PARTS), h = rnd(lo, hi), m = rnd(0, 59);
+    if (h === 11 && m > 30) continue;
+    const H = h + add, w = words ? timeWords(h, m) : null;
+    return { kind: 'clock', h, m, words: w, period, ticks: true, two: true, parts: [H, m], ans: `${H}:${pad2(m)}`,
+      say: `${w ? `${w} ${period}` : `What time is it ${period}?`} Write it in 24-hour time.` };
+  }
+}
+// How long? (Year 5): two times, a.m. / p.m. or 24-hour, 1 to 4 hours and some
+// minutes apart (5-minute times, never a whole number of hours), the same day.
+const ampm = (H, m) => `${H % 12 || 12}:${pad2(m)} ${H < 12 ? 'a.m.' : 'p.m.'}`;
+const sayTime = (H, m, am) => am ? `${H % 12 || 12} ${m ? (m < 10 ? 'oh ' + m : m) : "o'clock"} ${H < 12 ? 'a m' : 'p m'}` : `${H} ${m ? (m < 10 ? 'oh ' + m : m) : 'hundred'}`;
+function clockLongQ() {
+  const am = Math.random() < 0.5, h = rnd(1, 4), m = rnd(1, 11) * 5, len = h * 60 + m;
+  const start = rnd(am ? 7 * 12 : 6 * 12, am ? 17 * 12 : 18 * 12) * 5, end = start + len; // in minutes after midnight, ending by 22:55
+  const t = x => am ? ampm(Math.floor(x / 60), x % 60) : `${pad2(Math.floor(x / 60))}:${pad2(x % 60)}`, s = x => sayTime(Math.floor(x / 60), x % 60, am);
+  return { kind: 'unit', form: 'long', times: [t(start), t(end)], u1: 'h', u2: 'min', two: true, parts: [h, m], ans: `${h} h ${m} min`, say: `How long is it from ${s(start)} to ${s(end)}?` };
 }
 function timeWords(h, m) {
   const nx = h % 12 + 1, mins = k => k % 5 ? `${k} minute${k > 1 ? 's' : ''}` : String(k);
@@ -2159,7 +2185,28 @@ const UNIT_TIME = [ // [big, small, how many small in one big, big from..to]
 const UNIT_SHORT = { hours: 'h', minutes: 'min', seconds: 's' };
 const UNIT_SAY = { h: 'hours', min: 'minutes', s: 'seconds' };
 const unitWords = t => t.replace(/(\d+) (h|min|s)\b/g, (_, n, u) => `${n} ${+n === 1 ? UNIT_SAY[u].slice(0, -1) : UNIT_SAY[u]}`); // "1 hour 40 minutes"
+// Year 5 (C3a): length. m and cm (with decimals: 2 m 35 cm = 2.35 m, 180 cm =
+// 1.8 m, 2.05 m = 205 cm), km and m (2500 m = 2 km 500 m), cm and mm (4.5 cm =
+// 45 mm). A decimal answer is two blanks round a printed point (q.dp).
+const LEN_UNITS = [['m', 'cm', 100], ['km', 'm', 1000], ['cm', 'mm', 10]];
+const LEN_SAY = { km: 'kilometres', m: 'metres', cm: 'centimetres', mm: 'millimetres' };
+const lenWords = t => t.replace(/(\d+(?:\.\d+)?) (km|m|cm|mm)\b/g, (_, n, u) => `${n} ${n === '1' ? LEN_SAY[u].slice(0, -1) : LEN_SAY[u]}`);
+function units5Q() {
+  const [B, S, k] = pickOne(LEN_UNITS), dp = String(k).length - 1, a = rnd(1, 9);
+  const b = k === 10 ? rnd(1, 9) : k === 100 ? rnd(1, 99) : Math.random() < 0.6 ? rnd(1, 9) * 100 : rnd(1, 99) * 10;
+  const v = a * k + b, dec = `${a}.${String(b).padStart(dp, '0').replace(/0+$/, '')}`;
+  const form = pickOne(k === 1000 ? ['whole', 'small', 'mixed'] : ['whole', 'small', 'mixed', 'todec', 'mixdec', 'fromdec']);
+  const one = (text, unit, ans) => ({ kind: 'unit', text, unit, ans, say: `${lenWords(text)}. How many ${LEN_SAY[unit]}?` });
+  const pt = (text) => ({ kind: 'unit', text, unit: B, two: true, dp, parts: [a, b], ans: dec, say: `${lenWords(text)}. How many ${LEN_SAY[B]}? Use a decimal point.` });
+  if (form === 'whole') return Math.random() < 0.5 ? one(`${a} ${B}`, S, a * k) : one(`${a * k} ${S}`, B, a);
+  if (form === 'small') return one(`${a} ${B} ${b} ${S}`, S, v);
+  if (form === 'mixed') return { kind: 'unit', text: `${v} ${S}`, u1: B, u2: S, two: true, parts: [a, b], ans: `${a} ${B} ${b} ${S}`, say: `${lenWords(`${v} ${S}`)}. How many ${LEN_SAY[B]} and ${LEN_SAY[S]}?` };
+  if (form === 'todec') return pt(`${v} ${S}`);
+  if (form === 'mixdec') return pt(`${a} ${B} ${b} ${S}`);
+  return one(`${dec} ${B}`, S, v);
+}
 function unitsQ(yr) {
+  if (yr >= 5) return units5Q();
   if (Math.random() < 1 / 3) { // mixed: 100 minutes = 1 h 40 min, or back again
     const [big, small] = pickOne([['hours', 'minutes'], ['minutes', 'seconds']]), B = UNIT_SHORT[big], S = UNIT_SHORT[small];
     let m = rnd(61, 299); while (m % 60 === 0) m = rnd(61, 299);
@@ -2181,14 +2228,16 @@ const ANGLE_INK = 'stroke="currentColor" fill="none" stroke-linecap="round" stro
 // two arms from the vertex, the first at r0 degrees, the second a degrees on (anticlockwise)
 function angleSvg(a, r0, em, opts = {}) {
   const L = 40, rad = d => d * Math.PI / 180, P = d => [L * Math.cos(rad(d)), -L * Math.sin(rad(d))];
-  const p1 = P(r0), p2 = P(r0 + a), xs = [0, p1[0], p2[0]], ys = [0, p1[1], p2[1]];
+  const r = 11, p1 = P(r0), p2 = P(r0 + a), xs = [0, p1[0], p2[0]], ys = [0, p1[1], p2[1]];
+  // the arc is in the box too (a straight or reflex angle's arc sticks out past the arms)
+  for (let t = 0; t <= a; t += 10) { xs.push(r * Math.cos(rad(r0 + t))); ys.push(-r * Math.sin(rad(r0 + t))); }
   const pad = 6, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad, S = Math.max(w, h);
   const vb = [x0 - (S - w) / 2, y0 - (S - h) / 2, S, S].map(v => +v.toFixed(1)).join(' ');
-  const r = 11, q1 = [r * Math.cos(rad(r0)), -r * Math.sin(rad(r0))], q2 = [r * Math.cos(rad(r0 + a)), -r * Math.sin(rad(r0 + a))];
+  const q1 = [r * Math.cos(rad(r0)), -r * Math.sin(rad(r0))], q2 = [r * Math.cos(rad(r0 + a)), -r * Math.sin(rad(r0 + a))];
   const f = v => v.toFixed(1);
   const mark = opts.square // the right-angle mark: a small square in the corner
     ? (() => { const s = 9, u = [s * Math.cos(rad(r0)), -s * Math.sin(rad(r0))], v = [s * Math.cos(rad(r0 + 90)), -s * Math.sin(rad(r0 + 90))]; return `<path d="M${f(u[0])} ${f(u[1])}L${f(u[0] + v[0])} ${f(u[1] + v[1])}L${f(v[0])} ${f(v[1])}" stroke-width="2.5"/>`; })()
-    : `<path d="M${f(q1[0])} ${f(q1[1])}A${r} ${r} 0 0 0 ${f(q2[0])} ${f(q2[1])}" stroke-width="2.5"/>`;
+    : `<path d="M${f(q1[0])} ${f(q1[1])}A${r} ${r} 0 ${a > 180 ? 1 : 0} 0 ${f(q2[0])} ${f(q2[1])}" stroke-width="2.5"/>`;
   return `<svg viewBox="${vb}" style="width:${em}em;height:${em}em" ${ANGLE_INK}><path d="M${f(p1[0])} ${f(p1[1])}L0 0L${f(p2[0])} ${f(p2[1])}" stroke-width="${opts.thin ? 3.5 : 3}"/>${mark}</svg>`;
 }
 const ANGLE_TILES = [
@@ -2207,8 +2256,37 @@ function turnSvg(f) {
   return `<svg viewBox="-19 -19 38 38" style="width:3em;height:3em" ${ANGLE_INK}><circle cx="0" cy="0" r="2.2" fill="currentColor" stroke="none"/><path d="M0 0V-${r}" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M0 -${r}A${r} ${r} 0 ${big} 1 ${fx(end[0])} ${fx(end[1])}" stroke-width="2.6"/><path d="M${fx(b1[0])} ${fx(b1[1])}L${fx(tip[0])} ${fx(tip[1])}L${fx(b2[0])} ${fx(b2[1])}z" fill="currentColor" stroke-width="1"/></svg>`;
 }
 const TURNS = [['quarter turn', 0.25, 0], ['half turn', 0.5, 1], ['full turn', 1, 2], ['right angle', 0, 0]];
+// Year 5 (C3a): Name (tap the word: acute, right, obtuse, straight, reflex) and
+// Measure (a half-circle protractor over the angle, one arm on its zero line,
+// write the degrees: multiples of 5 to 180). A year uses only its own kinds.
+const ANGLE_KINDS = { 4: ['size', 'deg'], 5: ['name', 'measure'] };
+const ANGLE_NAMES = ['acute', 'right', 'obtuse', 'straight', 'reflex'];
+const NAME_TILES = ANGLE_NAMES.map(w => ({ html: w, label: w, say: w }));
+// the protractor: radius 50, marks every 5° (longer every 10°), labels every 10°
+// outside the edge. q.a is the angle; q.left puts the zero on the left.
+function protSvg(q) {
+  const rad = d => d * Math.PI / 180, f = v => v.toFixed(1), P = (r, d) => `${f(r * Math.cos(rad(d)))} ${f(-r * Math.sin(rad(d)))}`, G = '#8a8a8a';
+  let s = `<path d="M-50 0A50 50 0 0 1 50 0Z" fill="none" stroke="${G}" stroke-width=".8"/>`;
+  for (let d = 0; d <= 180; d += 5) s += `<path d="M${P(d % 10 ? 45.5 : 42, d)}L${P(50, d)}" stroke="${G}" stroke-width="${d % 10 ? .5 : .8}"/>`;
+  // labels a little out from the edge, not bold, so 90, 100 and 110 stay apart at the top
+  for (let d = 0; d <= 180; d += 10) { const [x, y] = P(58.5, d).split(' '); s += svgText(+x, +y, q.left ? 180 - d : d, 5.6).replace('font-weight="700"', 'font-weight="500"'); }
+  const dir = q.left ? 180 - q.a : q.a, zero = q.left ? 180 : 0, r = 9;
+  s += `<path d="M${P(50, zero)}L0 0L${P(50, dir)}" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  s += `<path d="M${P(r, Math.min(zero, dir))}A${r} ${r} 0 0 0 ${P(r, Math.max(zero, dir))}" stroke="currentColor" stroke-width="1.4" fill="none"/>`;
+  return `<svg ${emBox([-66, -66, 132, 72], 0.085)}>${s}</svg>`;
+}
 function angleQ(yr, kinds) {
-  if (pickOne(kinds) === 'deg') {
+  const own = ANGLE_KINDS[yr] || ANGLE_KINDS[4], ks = kinds.filter(k => own.includes(k)), kind = pickOne(ks.length ? ks : own);
+  if (kind === 'name') {
+    const w = pickOne(['acute', 'acute', 'right', 'obtuse', 'obtuse', 'straight', 'reflex', 'reflex']);
+    const a = { acute: rnd(20, 75), right: 90, obtuse: rnd(105, 165), straight: 180, reflex: rnd(200, 340) }[w];
+    return { kind: 'tap', form: 'name', a, top: angleSvg(a, rnd(0, 359), 4), tc: 4, th: 4, topf: 0.5, wrap: 3, tiles: NAME_TILES, right: ANGLE_NAMES.indexOf(w), say: 'What kind of angle is it?', ans: w };
+  }
+  if (kind === 'measure') {
+    const a = rnd(2, 36) * 5;
+    return { kind: 'prot', a, left: Math.random() < 0.5, cap: 'How many degrees?', unit: '°', ans: a, say: 'How many degrees is the angle?' };
+  }
+  if (kind === 'deg') {
     const [w, f, right] = pickOne(TURNS), pic = f ? turnSvg(f) : angleSvg(90, rnd(0, 3) * 90, 3, { square: 1 });
     return { kind: 'tap', form: 'deg', w, top: `<span class="tpic">${pic}<span class="tw">${w}</span></span>`, tc: 6, th: 4.2, topf: 0.55, tiles: DEG_TILES, right, say: `A ${w} is how many degrees?`, ans: DEG_TILES[right].label };
   }
@@ -2800,24 +2878,27 @@ const ACTS = {
     name: 'Clocks', ages: [5, 8], setup: 'opts', say: 'What time is it?',
     pic: clockSvg({ h: 10, m: 10 }),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · half and quarter'], [3, '3 · 5 minutes'], [4, '4 · any minute']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Year 1)']] },
+      { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · half and quarter'], [3, '3 · 5 minutes'], [4, '4 · any minute'], [5, '5 · 24-hour, how long']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Year 1)'], ['long', 'How long? (Year 5)']] },
     ],
-    defaults: age => age === 5 ? { yr: 1, kinds: ['face', 'match'], n: 6 } : { yr: 3, kinds: ['face', 'words'], n: 12 },
+    defaults: age => age === 5 ? { yr: 1, kinds: ['face', 'match'], n: 6 } : { yr: 3, kinds: ['face', 'words', 'long'], n: 12 },
     // Year 1: on the hour, write the hour before "o'clock", or Match (tap the
     // digital clock). Then "h : mm", to the half and quarter hour, 5 minutes
     // (minute ticks on), any minute. Words from Year 2; Match only in Year 1 so far.
+    // Year 5: face and words in 24-hour time, and How long? ("__ h __ min").
     make: c => {
-      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => yr === 1 ? k !== 'words' : k !== 'match'), k = pickOne(kinds.length ? kinds : ['face']);
+      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => k === 'words' ? yr > 1 : k === 'match' ? yr === 1 : k === 'long' ? yr >= 5 : true), k = pickOne(kinds.length ? kinds : ['face']);
       if (k === 'match') return clockMatchQ();
+      if (k === 'long') return clockLongQ();
+      if (yr >= 5) return clock24Q(k === 'words');
       const m = yr === 1 ? 0 : yr === 2 ? pickOne([0, 15, 30, 30, 45]) : yr === 3 ? rnd(0, 11) * 5 : rnd(0, 59);
       const words = k === 'words' ? timeWords(h, m) : null;
       if (yr === 1) return { kind: 'clock', h, m, ans: h };
       return { kind: 'clock', h, m, words, ticks: yr >= 3, two: true, parts: [h, m], ans: `${h}:${String(m).padStart(2, '0')}` };
     },
     // Match only changes Year 1, so Years 2–4 leave it out of the record key
-    key: c => `clock~${c.yr}|${['face', 'words', 'match'].filter(k => c.kinds.includes(k) && (k !== 'match' || c.yr === 1)).join(',') || 'face'}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').split(',').join(', ')} · ${n} questions`; },
+    key: c => `clock~${c.yr}|${['face', 'words', 'match', 'long'].filter(k => c.kinds.includes(k) && (k !== 'match' || c.yr === 1) && (k !== 'long' || c.yr >= 5)).join(',') || 'face'}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').replace('long', 'how long?').split(',').join(', ')} · ${n} questions`; },
   },
   money: {
     name: 'Money', ages: [5, 8], setup: 'opts', say: 'How much money?',
@@ -2995,7 +3076,7 @@ const ACTS = {
   units: {
     name: 'Change units', ages: [8], setup: 'opts', say: 'Change it to the other unit.',
     pic: textSvg(['1 h =', '60 min']),
-    options: [{ key: 'yr', label: 'Year', values: [[4, '4 · time']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[4, '4 · time'], [5, '5 · length']] }],
     defaults: () => ({ yr: 4, n: 12 }),
     make: c => unitsQ(c.yr),
     key: c => `units~${c.yr}|${c.n}`,
@@ -3005,13 +3086,14 @@ const ACTS = {
     name: 'Angles', ages: [8], setup: 'opts', say: 'Compare the angle with a right angle, or choose the degrees. Tap it.',
     pic: `<svg viewBox="0 0 120 84" ${ANGLE_INK}><path d="M100 72H26L70 14" stroke-width="5"/><path d="M48 72A22 22 0 0 0 39.3 54.5" stroke-width="3.5"/></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · right angles, turns']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['size', 'Right angle?'], ['deg', 'Degrees']] },
+      { key: 'yr', label: 'Year', values: [[4, '4 · right angles, turns'], [5, '5 · names, measure']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['size', 'Right angle? (Year 4)'], ['deg', 'Degrees (Year 4)'], ['name', 'Name (Year 5)'], ['measure', 'Measure (Year 5)']] },
     ],
-    defaults: () => ({ yr: 4, kinds: ['size', 'deg'], n: 12 }),
+    defaults: () => ({ yr: 4, kinds: ['size', 'deg', 'name', 'measure'], n: 12 }),
     make: c => angleQ(c.yr, c.kinds),
-    key: c => `angle~${c.yr}|${['size', 'deg'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Angles · Year ${y} · ${kinds.split(',').map(x => ({ size: 'right angle?', deg: 'degrees' })[x]).join(', ')} · ${n} questions`; },
+    // a year keeps only its own kinds in the key (none chosen: all of them)
+    key: c => { const own = ANGLE_KINDS[c.yr] || ANGLE_KINDS[4]; return `angle~${c.yr}|${own.filter(k => c.kinds.includes(k)).join(',') || own.join(',')}|${c.n}`; },
+    label: k => { const [y, kinds, n] = k.split('|'); return `Angles · Year ${y} · ${kinds.split(',').map(x => ({ size: 'right angle?', deg: 'degrees', name: 'names', measure: 'measure' })[x]).join(', ')} · ${n} questions`; },
   },
   map: {
     // 4 or 6: a tappable 5 × 5 grid doesn't fit 12 to a screen; on a phone the cards are taller and the sheet scrolls
@@ -3478,7 +3560,7 @@ function qMarkup(q) {
   if (q.kind === 'array') return { cls: 'frame', html: arraySvg(q.r, q.c), vars: { '--h': q.r * 0.55 + 3.3, '--c': Math.max(q.c * 0.55, 4) + 1.4 } };
   // tap card: the question, then a row (or a grid) of tiles to tap
   if (q.kind === 'tap') {
-    const n = q.tiles.length, across = q.cells || n, rows = Math.ceil(n / across);
+    const n = q.tiles.length, across = q.cells || q.wrap || n, rows = Math.ceil(n / across); // q.wrap: word tiles in rows of that many (Angles names)
     const btn = (t, i) => `<button class="tt" data-i="${i}" aria-pressed="false">${t.html}</button>`;
     // q.axes (Map): a label before each row and a row of labels under the grid; the labels take 0.6 of a tile
     const grid = !q.axes ? q.tiles.map(btn).join('')
@@ -3486,7 +3568,7 @@ function qMarkup(q) {
     const size = q.axes ? `--n:${across + 0.5};--rows:${rows + 0.5};grid-template-columns:auto repeat(${across}, auto)` : `--n:${across};--rows:${rows}`;
     return {
       cls: 'tap', anchor: '.tiles',
-      html: `<div class="tq">${q.top}</div>${q.tray ? '<div class="tray"></div>' : ''}<div class="tiles${q.cells ? ' cells' : ''}${q.axes ? ' axes' : ''}${q.tray ? ' coins' : ''}${q.big ? ' bigt' : ''}" style="${size}">${grid}</div>`,
+      html: `<div class="tq">${q.top}</div>${q.tray ? '<div class="tray"></div>' : ''}<div class="tiles${q.cells ? ' cells' : ''}${q.wrap ? ' wrap' : ''}${q.axes ? ' axes' : ''}${q.tray ? ' coins' : ''}${q.big ? ' bigt' : ''}" style="${size}">${grid}</div>`,
       // the tiles take their size from the card (see the CSS); the words keep to the top 45% (30% over a grid)
       // (q.topf: a picture question may take more of the card, as Angles does)
       vars: { '--h': ((q.th || 1.3) + 1.9) / (q.topf || (q.cells ? 0.3 : 0.45)), '--c': Math.max(q.tc || 0, 4) + 1.4 },
@@ -3523,7 +3605,11 @@ function qMarkup(q) {
   // write on: "__ o'clock", "__ : __", "$ __", "__ c" or "$ __ and __ c"
   if (q.kind === 'clock' || q.kind === 'money') {
     let pic, cap = '', capW = 0;
-    if (q.kind === 'clock') pic = q.words ? `<div class="words">${q.words}</div>` : clockSvg(q);
+    if (q.kind === 'clock') {
+      // Year 5: "24-hour time" above, the part of the day under the words, or above the face too
+      pic = q.words ? `<div class="words">${q.period ? `<span>${q.words}<br>${q.period}</span>` : q.words}</div>` : clockSvg(q);
+      if (q.period) { const c2 = q.words ? '24-hour time' : `${q.period}<br>24-hour time`; cap = `<div class="cap">${c2}</div>`; capW = Math.max(...c2.split('<br>').map(l => l.length)) * 0.42; }
+    }
     else if (q.change) {
       const txt = q.qty ? `Buy ${q.qty}. Change?` : q.total ? 'How much altogether?' : q.tags || q.ctags ? 'Buy them all. Change?' : 'Change?';
       cap = `<div class="cap">${txt}</div>`; capW = txt.length * 0.42; pic = changeSvg(q);
@@ -3531,14 +3617,15 @@ function qMarkup(q) {
     else pic = moneySvg(q.items);
     const sz = pic.match(/width:([\d.]+)em;height:([\d.]+)em/);
     // words get the same room as a clock face, so every card prints the same size
-    const [pw, ph] = sz ? [+sz[1], +sz[2]] : [Math.max(q.words.length * 0.56, 4.4), 3.2];
+    const [pw, ph] = sz ? [+sz[1], +sz[2]] : [Math.max(Math.max(q.words.length, (q.period || '').length) * 0.56, 4.4), 3.2];
+    const capH = cap ? 1.1 + (cap.split('<br>').length - 1) * 0.85 : 0;
     const ln = '<span class="ln"></span>', u = t => `<span class="u">${t}</span>`;
     const [row, rw] = q.kind === 'clock'
       ? (q.two ? [ln + '<span class="sep">:</span>' + ln, 4.6] : [ln + u("o'clock"), 5.2])
       : q.unit === '$c' ? [u('$') + ln + '<span class="sep">and</span>' + ln + u('c'), 7.4]
       : q.unit === '$.' ? [u('$') + ln + '<span class="sep pt">.</span>' + ln, 5.6]
       : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
-    return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw, capW) + 1.2 } };
+    return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + capH + 3.3, '--c': Math.max(pw, rw, capW) + 1.2 } };
   }
   // decimals: bars, a number line, a fraction or a sum, then "__ . __" round a printed point
   if (q.kind === 'dec') {
@@ -3564,18 +3651,24 @@ function qMarkup(q) {
   // change units: "3 weeks", then "= ___ days", or two blanks "= __ h __ min"
   if (q.kind === 'unit') {
     const ln = '<span class="ln"></span>', u = t => `<span class="u">${t}</span>`;
-    const [row, rw] = q.two
-      ? [u('=') + ln + `<span class="sep">${q.u1}</span>` + ln + u(q.u2), 0.6 + 1.9 * 2 + (q.u1.length + 0.5) * 0.45 + q.u2.length * 0.45 + 0.6]
-      : [u('=') + '<span class="ln w"></span>' + u(q.unit), 0.6 + 2.5 + q.unit.length * 0.45 + 0.45];
+    const eq = q.times ? '' : u('='); // How long? has no "="
+    const [row, rw] = q.dp // Year 5: "= __ . __ m"
+      ? [eq + ln + '<span class="sep pt">.</span>' + ln + u(q.unit), 0.6 + 1.9 * 2 + 0.5 + q.unit.length * 0.45 + 0.45]
+      : q.two
+      ? [eq + ln + `<span class="sep">${q.u1}</span>` + ln + u(q.u2), 0.6 + 1.9 * 2 + (q.u1.length + 0.5) * 0.45 + q.u2.length * 0.45 + 0.6]
+      : [eq + '<span class="ln w"></span>' + u(q.unit), 0.6 + 2.5 + q.unit.length * 0.45 + 0.45];
+    // How long? (Clocks, Year 5): the question, then the two times on two lines
+    const lines = q.times ? [`from ${q.times[0]}`, `to ${q.times[1]}`] : [q.text];
+    const top = q.times ? `<div class="cap">How long?</div><div class="eq" style="text-align:center">${lines.join('<br>')}</div>` : `<div class="eq">${q.text}</div>`;
     return {
       cls: 'pic2', anchor: q.two ? '.sep' : '.ln',
-      html: `<div class="eq">${q.text}</div><div class="ans">${row}</div>`,
-      vars: { '--h': 1.25 + 3.3, '--c': Math.max(q.text.length * 0.56, rw) + 1.2 },
+      html: `${top}<div class="ans">${row}</div>`,
+      vars: { '--h': (q.times ? 1.1 + 2.5 : 1.25) + 3.3, '--c': Math.max(...lines.map(l => l.length * 0.56), rw) + 1.2 },
     };
   }
   // graphs, shapes, rulers: the question, the picture, then "___" (and a unit)
-  if (q.kind === 'graph' || q.kind === 'shape' || q.kind === 'ruler') {
-    const pic = { graph: graphSvg, shape: shapeSvg, ruler: rulerSvg }[q.kind](q);
+  if (q.kind === 'graph' || q.kind === 'shape' || q.kind === 'ruler' || q.kind === 'prot') {
+    const pic = { graph: graphSvg, shape: shapeSvg, ruler: rulerSvg, prot: protSvg }[q.kind](q);
     const [, pw, ph] = pic.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
     const capLen = q.capLen || q.cap.length, capLines = q.cap.split('<br>').length; // a long question takes two lines
     const ans = `<div class="ans"><span class="ln w"></span>${q.unit ? `<span class="u">${q.unit}</span>` : ''}</div>`;
@@ -3927,7 +4020,7 @@ function inZone(kind, cx, cy) {
   if (kind === 'div') return cy < 0;
   // on the line, in the box in the sum, or a bit low under the line: all of it
   // is hers (the bottom row wins if there is more than one)
-  if (['miss', 'expr', 'clock', 'money', 'seq', 'story', 'graph', 'shape', 'ruler', 'bal', 'rnum', 'unit'].includes(kind)) return true;
+  if (['miss', 'expr', 'clock', 'money', 'seq', 'story', 'graph', 'shape', 'ruler', 'prot', 'bal', 'rnum', 'unit'].includes(kind)) return true;
   return cy > 0;
 }
 // Any card with writing on it gets marked (Sam): if nothing is in the answer

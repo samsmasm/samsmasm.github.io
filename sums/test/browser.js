@@ -46,7 +46,7 @@ const HELPERS = () => {
       if (c.q.dp && !Array.isArray(n)) b = b.padStart(c.q.dp, '0'); // after the point digits keep their places: 4.09 is 4 and 09
       c.strokes = [...extra, ...numStrokes(a, -0.45, -1.05, s, mirror), ...numStrokes(b, 0.45 + b.length * 0.8 * s, -1.05, s, mirror)];
     } else {
-      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05, graph: -1.05, shape: -1.05, ruler: -1.05, unit: -1.05 }[c.q.kind] ?? 0.3;
+      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05, graph: -1.05, shape: -1.05, ruler: -1.05, prot: -1.05, unit: -1.05 }[c.q.kind] ?? 0.3;
       c.strokes = [...extra, ...numStrokes(c.q.neg ? Math.abs(n) : n, 0, top, 1, mirror)]; // below 0: the minus is printed
     }
     draw(c);
@@ -157,7 +157,7 @@ const fakeSpeech = () => {
   const sugg = await page.evaluate(() => [0, 1, 2, 3, 6, 8].map(y => {
     setYear(y); return `${y}:${view}:${group()}:${reads() ? 'r' : '-'}:${loadCfg('clock').yr}:${loadCfg('seq').yr}:${loadCfg('clock').n}`;
   }).join(' '));
-  ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:4:5:12 8:5:8:-:4:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
+  ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:5:5:12 8:5:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
   await page.click('#yearTiles [data-year="2"]');
   ok((await tiles('#actTiles')).length === 15 && (await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
   await page.click('#actTiles [data-act="graph"]');
@@ -167,7 +167,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="6"]');
   ok(await page.evaluate(() => view === 5 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 6')), 'Year 6: the Year 5 page, marked the highest so far');
   const y5 = await tiles('#actTiles');
-  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money'].every(t => y5.includes(t)) && !y5.includes('Clocks') && !y5.includes('Change units'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
+  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles'].every(t => y5.includes(t)) && !y5.includes('Map') && !y5.includes('Graphs'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
   ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('round').yr; }).join() === '4,4'), 'Rounding (Year 4 only so far) opens at Year 4');
   await page.evaluate(() => { setYear(3); act = 'round'; goSetup(); });
@@ -369,7 +369,7 @@ const fakeSpeech = () => {
       : ['expr', 'miss', 'seq', 'bal', 'rnum'].includes(c.q.kind) ? c.ay > 2.5 * c.F
       : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
       : c.q.kind === 'tap' ? r.bottom <= w.bottom + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const t = b.getBoundingClientRect(); return t.width >= (c.q.cells ? 29 : 39) && t.height >= (c.q.cells ? 29 : 39) && t.bottom <= w.bottom + 1 && t.left >= w.left - 1 && t.right <= w.right + 1; }) // tiles big enough to tap
-      : ['clock', 'money', 'graph', 'shape', 'ruler', 'dec', 'unit'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
+      : ['clock', 'money', 'graph', 'shape', 'ruler', 'prot', 'dec', 'unit'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
       : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
   }).map(c => JSON.stringify(c.q))));
@@ -626,12 +626,12 @@ const fakeSpeech = () => {
   // ---- Mia: Clocks (Years 1–4)
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="clock"]');
-  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'face,words'), 'Clocks setup at age 8: Year 4 suggested, clock and words');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'face,words,long'), 'Clocks setup at age 8: Year 4 suggested, clock, words and How long? (Year 5 only)');
   ok(await page.evaluate(() => $('#optBlock [data-key="yr"] .sug').dataset.v === '4' && /^Your year: Year 4$/.test($('.sughint').textContent)), 'the suggested year has a dot and a line saying so');
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
-    === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
+    === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,bal,cmp,dec,fof,money,muldiv,round,seq,tf'), 'Year 5 so far (C1, C2a, C2b): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,money,muldiv,round,seq,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -2060,7 +2060,7 @@ const fakeSpeech = () => {
   ok(uq.length === 0, 'Change units Year 4: weeks, days, hours, minutes, seconds, months and years both ways, whole answers; about a third mixed (100 minutes = 1 h 40 min, and back) ' + uq.join(' | '));
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="units"]');
-  ok(await page.evaluate(() => draft.yr === 4 && $('#optBlock [data-key="yr"]').children.length === 1 && !$('#optBlock [data-key="kinds"]')), 'Change units setup: just a Year row with Year 4');
+  ok(await page.evaluate(() => draft.yr === 4 && $('#optBlock [data-key="yr"]').children.length === 2 && !$('#optBlock [data-key="kinds"]')), 'Change units setup: just a Year row (Years 4 and 5), on Year 4');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => c.q.two ? c.el.querySelectorAll('.ans .ln').length === 2 && c.el.querySelector('.ans .sep').textContent === c.q.u1 : c.el.querySelectorAll('.ans .ln').length === 1 && c.el.querySelector('.ans .u:last-child').textContent === c.q.unit)), 'Change units cards: "= ___ days", or "= __ h __ min"');
   ok((await fits()).length === 0, 'Change units fit ' + (await fits()).join(' '));
@@ -2105,7 +2105,7 @@ const fakeSpeech = () => {
   ok(aq.length === 0, 'Angles Year 4: about a third each smaller, right and bigger, never within 12° of 90 unless 90; a quarter turn and a right angle are 90°, a half turn 180°, a full turn 360° ' + aq.join(' | '));
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="angle"]');
-  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'size,deg' && $('#optBlock [data-key="yr"]').children.length === 1), 'Angles setup: Year 4, both kinds');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'size,deg,name,measure' && $('#optBlock [data-key="yr"]').children.length === 2), 'Angles setup: Year 4 (of 4 and 5), every kind on');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.length === 12 && cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tt').length === 3 && c.el.querySelector('.tq svg'))), 'Angles sheet: a picture and three tiles on every card');
   ok((await fits()).length === 0, 'Angles fit, with tiles big enough to tap ' + (await fits()).join(' '));
@@ -2114,6 +2114,125 @@ const fakeSpeech = () => {
   ok((await writeAllAndMark()).length === 0, 'Angles: the whole sheet tapped right is marked right');
   ok(await page.evaluate(() => [labelFor('angle~4|size,deg|12'), labelFor('angle~4|deg|6')].join(' / ') === 'Angles · Year 4 · right angle?, degrees · 12 questions / Angles · Year 4 · degrees · 6 questions'), 'Angles record labels');
   ok(await page.evaluate(() => cardSay(angleQ(4, ['size'])) === 'Is it smaller than a right angle, a right angle, or bigger? smaller than a right angle, a right angle, bigger than a right angle.' && /^A (quarter turn|half turn|full turn|right angle) is how many degrees\? 90 degrees, 180 degrees, 360 degrees\.$/.test(cardSay(angleQ(4, ['deg'])))), 'Angles read aloud: the question then each tile');
+
+  // ---- Year 5 measuring (C3a): Angles names and protractor, Clocks 24-hour and How long?, Change units length
+  const a5 = await page.evaluate(() => {
+    const bad = [], seen = {}, sides = [0, 0];
+    const ok = { acute: a => a > 0 && a < 90, right: a => a === 90, obtuse: a => a > 90 && a < 180, straight: a => a === 180, reflex: a => a > 180 && a < 360 };
+    for (let i = 0; i < 800; i++) {
+      const q = angleQ(5, ['name']);
+      if (q.form !== 'name' || q.tiles.map(t => t.label).join() !== 'acute,right,obtuse,straight,reflex') { bad.push('tiles'); continue; }
+      const w = q.tiles[q.right].label; seen[w] = (seen[w] || 0) + 1;
+      if (!ok[w](q.a) || (w === 'acute' && q.a > 78) || (w === 'obtuse' && (q.a < 102 || q.a > 168)) || (w === 'reflex' && (q.a < 195 || q.a > 345))) bad.push(w + ' ' + q.a);
+    }
+    if (Object.keys(seen).length !== 5 || Object.values(seen).some(k => k < 60)) bad.push('spread ' + JSON.stringify(seen));
+    for (let i = 0; i < 400; i++) {
+      const q = angleQ(5, ['measure']); sides[+q.left]++;
+      if (q.kind !== 'prot' || q.a % 5 || q.a < 10 || q.a > 180 || q.ans !== q.a || q.unit !== '°') bad.push('measure ' + JSON.stringify(q));
+    }
+    if (sides.some(k => k < 120)) bad.push('zero side ' + sides);
+    // the protractor: 19 labels, 0 at the end where the fixed arm lies, and the other arm points at the answer
+    const q = { a: 40, left: true }, d = document.createElement('div'); d.innerHTML = protSvg(q);
+    const labs = [...d.querySelectorAll('text')].map(t => [+t.getAttribute('x'), t.textContent]);
+    if (labs.length !== 19 || labs.find(l => l[1] === '0')[0] > 0 || labs.find(l => l[1] === '180')[0] < 0) bad.push('labels ' + JSON.stringify(labs));
+    // a year uses only its own kinds; none left: all of that year's
+    for (let i = 0; i < 60; i++) {
+      if (!['size', 'deg'].includes(angleQ(4, ['size', 'deg', 'name', 'measure']).form)) bad.push('Year 4 got a Year 5 kind');
+      const q5 = angleQ(5, ['size', 'deg']); if (!(q5.form === 'name' || q5.kind === 'prot')) bad.push('Year 5 fallback');
+    }
+    return bad.slice(0, 4);
+  });
+  ok(a5.length === 0, 'Angles Year 5: Name (acute, right, obtuse, straight, reflex, well clear of the edges) and Measure (multiples of 5 to 180, zero on either side); each year only its own kinds ' + a5.join(' | '));
+  await page.evaluate(() => { hideDone(); act = 'angle'; buildSheet({ yr: 5, kinds: ['name', 'measure'], n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.some(c => c.q.kind === 'prot') && cards.some(c => c.q.form === 'name') && cards.filter(c => c.q.form === 'name').every(c => c.el.querySelectorAll('.tiles.wrap .tt').length === 5) && cards.filter(c => c.q.kind === 'prot').every(c => c.el.querySelectorAll('svg text').length === 19 && c.el.querySelector('.ans .u').textContent === '°')), 'Angles Year 5 sheet: five word tiles, or a protractor and "___ °"');
+  ok((await fits()).length === 0, 'Angles Year 5 fit, word tiles big enough to tap ' + (await fits()).join(' '));
+  ok(await page.evaluate(() => cards.filter(c => c.q.form === 'name').every(c => [...c.el.querySelectorAll('.tt')].every(b => b.scrollWidth <= b.clientWidth + 1))), 'Angles names: every word fits inside its tile');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/44-angles5.png' });
+  ok((await writeAllAndMark()).length === 0, 'Angles Year 5: names tapped and degrees written are marked right');
+  ok(await page.evaluate(() => [ACTS.angle.key({ yr: 4, kinds: ['size', 'deg', 'name', 'measure'], n: 12 }), ACTS.angle.key({ yr: 5, kinds: ['size', 'deg', 'name', 'measure'], n: 12 }), ACTS.angle.key({ yr: 5, kinds: ['deg'], n: 6 }), labelFor('angle~5|name,measure|12')].join(' / ')
+    === 'angle~4|size,deg|12 / angle~5|name,measure|12 / angle~5|name,measure|6 / Angles · Year 5 · names, measure · 12 questions'), 'Angles record keys keep only that year\'s kinds; Year 5 label');
+
+  const k5 = await page.evaluate(() => {
+    const bad = [], toMin = t => { const m = t.match(/^(\d{1,2}):(\d\d)(?: ([ap])\.m\.)?$/); if (!m) return NaN; let H = +m[1]; if (m[3]) { if (H > 12 || H < 1) return NaN; H = H % 12 + (m[3] === 'p' ? 12 : 0); } return H * 60 + +m[2]; };
+    let ap = 0, pm = 0, words = 0;
+    for (let i = 0; i < 1000; i++) {
+      const q = ACTS.clock.make({ yr: 5, kinds: ['face', 'words'], n: 12 }), [H, m] = q.parts;
+      const add = q.period === 'in the morning' ? 0 : 12;
+      if (q.kind !== 'clock' || !q.two || !q.period || H !== q.h + add || m !== q.m || H < 5 || H > 22 || q.ans !== `${H}:${String(m).padStart(2, '0')}`) bad.push('24 ' + JSON.stringify(q));
+      if (q.period === 'in the morning' && q.h === 11 && q.m > 30) bad.push('to 12 in the morning');
+      if (H >= 12) pm++; if (q.words) words++;
+    }
+    if (pm < 450 || words < 350 || words > 650) bad.push(`spread pm ${pm} words ${words}`);
+    for (let i = 0; i < 800; i++) {
+      const q = ACTS.clock.make({ yr: 5, kinds: ['long'], n: 12 }), [h, m] = q.parts, [s, e] = q.times.map(toMin);
+      if (q.kind !== 'unit' || q.u1 !== 'h' || q.u2 !== 'min' || !(e - s === h * 60 + m) || h < 1 || h > 4 || m < 5 || m > 55 || m % 5 || s % 5 || e > 23 * 60 + 59 || !/^How long is it from .+ to .+\?$/.test(q.say)) bad.push('long ' + JSON.stringify(q));
+      if (/m\.$/.test(q.times[0])) ap++;
+    }
+    if (ap < 300 || ap > 500) bad.push('a.m./p.m. ' + ap);
+    for (let i = 0; i < 100; i++) { const q = ACTS.clock.make({ yr: 4, kinds: ['long'], n: 12 }); if (q.kind !== 'clock' || q.period) bad.push('Year 4 with How long?'); }
+    return bad.slice(0, 4);
+  });
+  ok(k5.length === 0, 'Clocks Year 5: face or words with the part of the day, written in 24-hour time; How long? 1 to 4 hours and some minutes, a.m./p.m. or 24-hour; Year 4 ignores How long? ' + k5.join(' | '));
+  await page.evaluate(() => { hideDone(); act = 'clock'; buildSheet({ yr: 5, kinds: ['face', 'words', 'long'], n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'unit' ? c.el.querySelector('.cap').textContent === 'How long?' && c.el.querySelector('.ans .sep').textContent === 'h' && !c.el.querySelector('.ans').textContent.includes('=') : c.el.querySelector('.cap').textContent.includes('24-hour time') && c.el.querySelector('.qv').textContent.includes(c.q.period))), 'Clocks Year 5 cards: "24-hour time" and the part of the day; How long? with "__ h __ min" and no "="');
+  ok((await fits()).length === 0, 'Clocks Year 5 fit ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/45-clocks5.png' });
+  ok((await writeAllAndMark()).length === 0, 'Clocks Year 5: answers read and marked right');
+  const cr5 = await page.evaluate(() => {
+    hideDone(); buildSheet({ yr: 5, kinds: ['face'], n: 6 });
+    const c = cards[0], out = {};
+    c.q = { kind: 'clock', h: 3, m: 15, words: null, period: 'in the afternoon', ticks: true, two: true, parts: [15, 15], ans: '15:15' }; layout(c); sizeCanvas(c);
+    writeNum(c, ['15', '15']); out.right = readAnswer(c).ok && read(c) === '15:15';
+    writeNum(c, ['3', '15']); out.twelveHour = !readAnswer(c).ok;
+    c.q = { kind: 'clock', h: 7, m: 5, words: null, period: 'in the morning', ticks: true, two: true, parts: [7, 5], ans: '7:05' }; layout(c); sizeCanvas(c);
+    writeNum(c, ['07', '05']); out.leadingZero = readAnswer(c).ok;
+    return out;
+  });
+  ok(Object.values(cr5).every(Boolean), 'Clocks Year 5 reading: 15:15 right, 3:15 wrong in the afternoon, 07:05 right ' + JSON.stringify(cr5));
+  ok(await page.evaluate(() => [ACTS.clock.key({ yr: 5, kinds: ['face', 'words', 'long'], n: 12 }), ACTS.clock.key({ yr: 4, kinds: ['face', 'words', 'long'], n: 12 }), labelFor('clock~5|face,words,long|12')].join(' / ')
+    === 'clock~5|face,words,long|12 / clock~4|face,words|12 / Clocks · Year 5 · clock, words, how long? · 12 questions'), 'Clocks record keys: How long? only in Year 5; label');
+
+  const u5 = await page.evaluate(() => {
+    const bad = [], MM = { km: 1e6, m: 1000, cm: 10, mm: 1 }, seen = {};
+    let dp = 0;
+    const val = t => { const p = t.split(' '); let v = 0; for (let i = 0; i < p.length; i += 2) v += +p[i] * MM[p[i + 1]]; return Math.round(v * 1000) / 1000; };
+    for (let i = 0; i < 1500; i++) {
+      const q = unitsQ(5), have = val(q.text);
+      seen[q.text.split(' ').slice(-1)[0]] = 1;
+      if (q.kind !== 'unit' || !have) { bad.push('q ' + JSON.stringify(q)); continue; }
+      if (q.dp) {
+        dp++;
+        const [a, b] = q.parts, got = Math.round(+`${a}.${String(b).padStart(q.dp, '0')}` * MM[q.unit] * 1000) / 1000;
+        if (got !== have || b < 1 || String(b).length > q.dp || !q.say.includes('decimal point')) bad.push('dp ' + JSON.stringify(q));
+      } else if (q.two) {
+        const [a, b] = q.parts;
+        if (a * MM[q.u1] + b * MM[q.u2] !== have || b < 1 || b * MM[q.u2] >= MM[q.u1]) bad.push('two ' + JSON.stringify(q));
+      } else if (!Number.isInteger(q.ans) || q.ans < 1 || Math.round(q.ans * MM[q.unit] * 1000) / 1000 !== have) bad.push('one ' + JSON.stringify(q));
+      if (!/How many (kilo|centi|milli)?metres/.test(q.say) || /\d (km|m|cm|mm)\b/.test(q.say)) bad.push('say ' + q.say);
+    }
+    if (dp < 150 || dp > 600 || Object.keys(seen).sort().join() !== 'cm,km,m,mm') bad.push(`spread dp ${dp} ${Object.keys(seen)}`);
+    return bad.slice(0, 4);
+  });
+  ok(u5.length === 0, 'Change units Year 5: m and cm with decimals, km and m, cm and mm, every answer right; decimals as "__ . __" ' + u5.join(' | '));
+  await page.evaluate(() => { hideDone(); act = 'units'; buildSheet({ yr: 5, n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.filter(c => c.q.dp).every(c => c.el.querySelector('.ans .sep.pt') && c.el.querySelector('.ans .u:last-child').textContent === c.q.unit)), 'Change units Year 5 cards: decimals as "= __ . __ m"');
+  ok((await fits()).length === 0, 'Change units Year 5 fit ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/46-units5.png' });
+  ok((await writeAllAndMark()).length === 0, 'Change units Year 5: answers read and marked right');
+  const ur5 = await page.evaluate(() => {
+    hideDone(); buildSheet({ yr: 5, n: 6 });
+    const c = cards[0], out = {};
+    c.q = { kind: 'unit', text: '180 cm', unit: 'm', two: true, dp: 2, parts: [1, 80], ans: '1.8', say: '' }; layout(c); sizeCanvas(c);
+    writeNum(c, ['1', '8']); out.short = readAnswer(c).ok && read(c) === '1.8';
+    writeNum(c, ['1', '80']); out.zero = readAnswer(c).ok;
+    writeNum(c, ['1', '08']); out.wrong = !readAnswer(c).ok;
+    c.q = { kind: 'unit', text: '2 m 5 cm', unit: 'm', two: true, dp: 2, parts: [2, 5], ans: '2.05', say: '' }; layout(c); sizeCanvas(c);
+    writeNum(c, ['2', '05']); out.place = readAnswer(c).ok;
+    writeNum(c, ['2', '5']); out.notFive = !readAnswer(c).ok;
+    return out;
+  });
+  ok(Object.values(ur5).every(Boolean), 'Change units Year 5 reading: 1.8 and 1.80 right, 1.08 wrong; 2.05 needs the 0 ' + JSON.stringify(ur5));
+  ok(await page.evaluate(() => labelFor('units~5|12') === 'Change units · Year 5 · 12 questions'), 'Change units Year 5 record label');
 
   // ---- Map (Year 4): tap a grid reference, or say where a shape is. A7
   const mq = await page.evaluate(() => {
@@ -2487,7 +2606,8 @@ const fakeSpeech = () => {
       ['tf', { yr: 5, n: 12 }], ['cmp', { yr: 5, kinds: ['num', 'sum', 'dec'], n: 12 }], ['cmp', { yr: 5, kinds: ['frac'], n: 12 }], ['bal', { yr: 5, n: 12 }], ['round', { yr: 5, kinds: ['line'], n: 12 }], ['round', { yr: 5, kinds: ['num'], n: 12 }],
       ['splat', { yr: 1, n: 12 }], ['parts', { yr: 1, kinds: ['tap'], n: 12 }], ['parts', { yr: 1, kinds: ['write'], n: 12 }], ['money', { yr: 1, kinds: ['coin'], n: 12 }], ['ruler', { yr: 1, kinds: ['longer'], n: 12 }],
       ['dec', { yr: 5, kinds: ['pic'], n: 12 }], ['dec', { yr: 5, kinds: ['line', 'addsub', 'ten'], n: 12 }], ['frac', { kinds: ['diff'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }],
-      ['fof', { yr: 5, kinds: ['part', 'whole', 'pct'], n: 12 }], ['money', { yr: 5, kinds: ['count', 'change'], n: 12 }]]) {
+      ['fof', { yr: 5, kinds: ['part', 'whole', 'pct'], n: 12 }], ['money', { yr: 5, kinds: ['count', 'change'], n: 12 }],
+      ['angle', { yr: 5, kinds: ['name'], n: 12 }], ['angle', { yr: 5, kinds: ['measure'], n: 12 }], ['clock', { yr: 5, kinds: ['face', 'words'], n: 12 }], ['clock', { yr: 5, kinds: ['long'], n: 12 }], ['units', { yr: 5, n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
