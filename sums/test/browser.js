@@ -95,7 +95,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Fractions of a number,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Change units,Angles,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Fractions of a number,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Change units,Angles,Map,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -132,7 +132,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   await page.click('#ageTiles [data-age="10"]');
-  ok((await tiles('#actTiles')).length === 27, 'age 10: the older tiles');
+  ok((await tiles('#actTiles')).length === 28, 'age 10: the older tiles');
   // a new activity can start with one year only: any age opens it at the nearest year it has
   ok(await page.evaluate(() => [7, 8, 11].map(a => { age = a; return loadCfg('tf').yr + '' + loadCfg('cmp').yr; }).join() === '44,44,44'), 'True or false and More or less (Year 4 only so far) open at Year 4 for any age');
   await page.evaluate(() => { age = 7; act = 'tf'; goSetup(); });
@@ -678,7 +678,7 @@ const fakeSpeech = () => {
   // ---- Mia: Money (Years 1–3)
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="money"]');
-  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'count,change' && $('.sughint').textContent === 'Suggested for age 8: Year 4'), 'Money setup at age 8: Year 4');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'count,change,make' && $('.sughint').textContent === 'Suggested for age 8: Year 4'), 'Money setup at age 8: Year 4, all three kinds');
   const mo = await page.evaluate(() => {
     const bad = [], seen4 = new Set();
     for (const yr of [1, 2, 3, 4]) for (let i = 0; i < 400; i++) {
@@ -712,6 +712,7 @@ const fakeSpeech = () => {
   await page.click('#newBtn');
   const moneyCards = () => page.evaluate(() => cards.every(c => {
     const q = c.q, svg = c.el.querySelector('.qv svg');
+    if (q.form === 'make') return c.el.querySelectorAll('.tt').length === 10 && c.el.querySelector('.tray'); // tested with Make it below
     if (q.tags) return c.el.querySelector('.cap').textContent === (q.total ? 'How much altogether?' : 'Buy them all. Change?') && svg.querySelectorAll('text').length === q.tags.length + (q.total ? 0 : 2) && q.tags.every(d => [...svg.querySelectorAll('text')].some(t => t.textContent === '$' + d));
     if (q.change) return c.el.querySelector('.cap').textContent === (q.qty ? `Buy ${q.qty}. Change?` : 'Change?') && svg.querySelectorAll('text').length >= 4;
     return svg.querySelectorAll('circle').length + svg.querySelectorAll('rect').length / 2 === q.items.length;
@@ -1383,6 +1384,99 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [labelFor('angle~4|size,deg|12'), labelFor('angle~4|deg|6')].join(' / ') === 'Angles · Year 4 · right angle?, degrees · 12 questions / Angles · Year 4 · degrees · 6 questions'), 'Angles record labels');
   ok(await page.evaluate(() => cardSay(angleQ(4, ['size'])) === 'Is it smaller than a right angle, a right angle, or bigger? smaller than a right angle, a right angle, bigger than a right angle.' && /^A (quarter turn|half turn|full turn|right angle) is how many degrees\? 90 degrees, 180 degrees, 360 degrees\.$/.test(cardSay(angleQ(4, ['deg'])))), 'Angles read aloud: the question then each tile');
 
+  // ---- Map (Year 4): tap a grid reference, or say where a shape is. A7
+  const mq = await page.evaluate(() => {
+    const bad = [], seen = new Set(), swapped = [0, 0];
+    for (let i = 0; i < 600; i++) {
+      const q = mapQ(4, ['tap', 'where']);
+      if (q.things.length < 3 || q.things.length > 4 || new Set(q.things.map(t => t.nm)).size !== q.things.length || new Set(q.things.map(t => t.col)).size !== q.things.length || new Set(q.things.map(t => t.x + ',' + t.y)).size !== q.things.length) bad.push('things ' + JSON.stringify(q.things));
+      if (q.form === 'tap') {
+        seen.add(q.ans);
+        const t = q.tiles[q.right];
+        if (q.tiles.length !== 25 || q.cells !== 5 || t.label !== q.ans || q.top !== 'Tap ' + q.ans || q.tiles[0].label !== 'A5' || q.tiles[24].label !== 'E1' || q.tiles.filter(x => x.html).length !== q.things.length) bad.push('tap ' + q.ans);
+      } else {
+        const t = q.thing, refs = q.tiles.map(x => x.label);
+        if (q.ans !== 'ABCDE'[t.x] + t.y || refs[q.right] !== q.ans || refs.length !== 4 || new Set(refs).size !== 4 || refs.some(r => !/^[A-E][1-5]$/.test(r))) bad.push('where ' + JSON.stringify(q.tiles.map(x => x.label)) + ' ' + q.ans);
+        if (t.y - 1 !== t.x) { swapped[0]++; if (refs.includes('ABCDE'[t.y - 1] + (t.x + 1))) swapped[1]++; }
+        if (q.say !== `Where is the ${t.col} ${t.nm}?`) bad.push('say ' + q.say);
+      }
+    }
+    if (seen.size < 22) bad.push('only ' + seen.size + ' cells asked');
+    if (swapped[1] < swapped[0] * 0.9) bad.push('the swapped reference missing: ' + swapped);
+    return bad.slice(0, 4);
+  });
+  ok(mq.length === 0, 'Map Year 4: 3 or 4 different shapes in different colours and cells; Tap asks any cell, A5 top left to E1; Where is offers the right reference and three near misses, the swapped one first ' + mq.join(' | '));
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="map"]');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'tap,where' && draft.n === 6), 'Map setup: Year 4, both kinds, 6 questions');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.length === 6 && cards.every(c => c.q.kind === 'tap' && (c.q.form === 'tap' ? c.el.querySelectorAll('.tt').length === 25 && c.el.querySelectorAll('.ax').length === 11 : c.el.querySelectorAll('.tt').length === 4 && c.el.querySelector('.tq svg')))), 'Map sheet: a 5 × 5 grid with labels, or a map and four references');
+  await page.evaluate(() => { cards.forEach((c, i) => { c.q = mapQ(4, [i % 2 ? 'where' : 'tap']); layout(c); sizeCanvas(c); }); });
+  ok((await fits()).length === 0, 'Map fits, with squares big enough to tap ' + (await fits()).join(' '));
+  ok(await page.evaluate(() => {
+    const g = [...cards[0].el.querySelectorAll('.tiles > *')].map(e => e.getBoundingClientRect()), lab = [...cards[0].el.querySelectorAll('.ax')].map(e => e.textContent);
+    // the 5 label sits left of A5, A sits under A1
+    const a5 = cards[0].el.querySelector('.tt[data-i="0"]').getBoundingClientRect(), a1 = cards[0].el.querySelector('.tt[data-i="20"]').getBoundingClientRect(), l5 = cards[0].el.querySelectorAll('.ay')[0].getBoundingClientRect(), lA = cards[0].el.querySelectorAll('.axx')[0].getBoundingClientRect();
+    return lab.join('') === '54321ABCDE' && l5.right <= a5.left + 1 && Math.abs(l5.top - a5.top) < 2 && lA.top >= a1.bottom - 2 && Math.abs(lA.left - a1.left) < 2;
+  }), 'Map: numbers 5 to 1 up the side, letters A to E along the bottom, each by its row or column');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/44-map.png' });
+  await page.tap(tile(0, (await page.evaluate(() => cards[0].q.right + 1)) % 25));
+  ok(await page.evaluate(() => !readAnswer(cards[0]).ok), 'Map: a different square is wrong');
+  ok((await writeAllAndMark()).length === 0, 'Map: the whole sheet tapped right is marked right');
+  ok(await page.evaluate(() => labelFor('map~4|tap,where|6') === 'Map · Year 4 · tap C4, where is it? · 6 questions' && cardSay({ ...mapQ(4, ['tap']), say: 'Tap C 4.' }) === 'Tap C 4.'), 'Map record label; read aloud is just the question, not every square');
+
+  // ---- Money, Make it (Year 4): drop coins and notes in a tray. A7
+  const mkq = await page.evaluate(() => {
+    const bad = [];
+    for (let i = 0; i < 500; i++) {
+      const q = makeItQ(), sum = q.right.reduce((s, k) => s + q.tiles[k].v, 0), d = Math.floor(q.target / 100), c = q.target % 100;
+      if (sum !== q.target || q.right.length > 8 || d < 1 || d > 49 || c % 10 || q.tiles.length !== 10 || q.top !== `Make $${d}${c ? ` and ${c}c` : ''}` || q.say !== `Make ${moneyWords(q.target)}.`) bad.push(JSON.stringify({ t: q.target, r: q.right, top: q.top }));
+    }
+    const ms = range(0, 200).map(() => ACTS.money.make({ yr: 4, kinds: ['count', 'change', 'make'] })), mk = ms.filter(q => q.form === 'make').length;
+    if (mk < 40 || mk > 100) bad.push('make share ' + mk);
+    if (range(0, 60).some(() => ACTS.money.make({ yr: 3, kinds: ['count', 'make'] }).form === 'make') || ACTS.money.make({ yr: 2, kinds: ['make'] }).kind !== 'money') bad.push('make below Year 4');
+    return bad.slice(0, 4);
+  });
+  ok(mkq.length === 0, 'Money Make it: $1 to $49, cents in tens, a way to make it in 8 or fewer; about a third of Year 4 with all three kinds; never below Year 4 ' + mkq.join(' | '));
+  await page.evaluate(() => { act = 'money'; buildSheet({ yr: 4, kinds: ['count', 'make'], n: 12 }); show('sheet'); cards.forEach((c, i) => { if (i < 6) { c.q = makeItQ(); layout(c); sizeCanvas(c); } }); cards[0].q = { ...makeItQ(), target: 590, top: 'Make $5 and 90c', right: [5, 2, 1, 1] }; layout(cards[0]); sizeCanvas(cards[0]); });
+  ok((await fits()).length === 0, 'Money Make it fits beside written money cards, tiles big enough ' + (await fits()).join(' '));
+  const mi = v => page.evaluate(v => MAKE_V.indexOf(v), v);
+  for (const v of [500, 50, 20, 20, 10]) await page.tap(tile(0, await mi(v))); // $5, 50c, 20c, 20c, 10c = $6: too much
+  ok(await page.evaluate(() => cards[0].el.querySelectorAll('.tray .tri').length === 5 && !/5\.|\$6|100/.test(cards[0].el.querySelector('.tray').textContent.replace(/\$5|50c|20c|10c/g, '')) && !readAnswer(cards[0]).ok), 'Make it: each tap drops one in the tray; no total shown; too much is wrong');
+  await page.tap('#sheet .card:nth-child(1) .tray .tri:last-child'); // takes the 10c out (biggest first, so the 10c is last)
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/46-make-it.png' });
+  ok(await page.evaluate(() => cards[0].pick.length === 4 && readAnswer(cards[0]).ok && readAnswer(cards[0]).text.split(' ').sort().join() === '$5,20c,20c,50c'), 'Make it: a tap in the tray takes one out; $5 50c 20c 20c makes $5 and 90c');
+  ok(await page.evaluate(() => { const c = cards[1]; c.pick = []; let left = c.q.target; for (const v of [200, 100, 50, 20, 10]) while (left >= v) { c.pick.push(MAKE_V.indexOf(v)); left -= v; } return readAnswer(c).ok; }), 'Make it: any way that adds up is right (only coins, no notes)');
+  await page.evaluate(() => { cards[1].pick = []; paintTap(cards[1]); });
+  await page.click('#markBtn');
+  ok(await page.evaluate(() => cards[0].el.dataset.state === 'right' && cards[0].el.querySelector('.read').textContent === ''), 'Make it: marked right, the reading stays blank');
+  ok((await writeAllAndMark()).length === 0, 'Money Make it and written money on one sheet: all marked right');
+  ok(await page.evaluate(() => [ACTS.money.key({ yr: 4, kinds: ['count', 'change', 'make'], n: 12 }), ACTS.money.key({ yr: 3, kinds: ['count', 'change', 'make'], n: 12 }), labelFor('money~4|count,make|12'), cardSay(makeItQ()).split('.').length].join(' / ') === 'money~4|count,change,make|12 / money~3|count,change|12 / Money · Year 4 · how much, make it · 12 questions / 2'), 'Money keys: Make it only in Year 4 keys; label; read aloud is just the question');
+
+  // ---- Shapes, Moves (Year 4): flip, slide or turn. A7
+  const mvq = await page.evaluate(() => {
+    const bad = [], seen = [0, 0, 0], key = cs => cs.map(c => c.join()).sort().join(';');
+    for (let i = 0; i < 600; i++) {
+      const q = movesQ(), A = key(q.a), B = key(q.b);
+      seen[q.right]++;
+      const turns = [1, 2, 3].map(k => key(rotCells(q.a, k))), flips = [0, 1, 2, 3].map(k => key(rotCells(flipCells(q.a), k)));
+      // a slide keeps the shape the same way round; a turn never matches it or any flip; a flip never matches a turn
+      if (q.move === 'slide' && B !== A) bad.push('slide changed');
+      if (q.move === 'turn' && (B === A || !turns.includes(B) || flips.includes(B))) bad.push('turn ' + B);
+      if (q.move === 'flip' && (B === A || turns.includes(B))) bad.push('flip ' + B);
+      if (q.tiles[q.right].label !== q.move || q.a.length !== 4) bad.push('tiles');
+    }
+    if (seen.some(n => n < 150)) bad.push('spread ' + seen);
+    return bad.slice(0, 4);
+  });
+  ok(mvq.length === 0, 'Shapes Moves: a slide is the same shape, a turn is turned and never a mirror image, a flip is a mirror image and never a turn; about a third each ' + mvq.join(' | '));
+  ok(await page.evaluate(() => { const qs = range(0, 300).map(() => shapeQ(4, ['flat', 'solid', 'moves'])), m = qs.filter(q => q.form === 'moves').length; return m > 60 && m < 150 && shapeQ(3, ['moves']).kind === 'shape' && shapeQ(4, ['moves']).form === 'moves' && range(0, 50).every(() => shapeQ(2, ['solid', 'moves']).kind === 'shape'); }), 'Shapes: Moves about a third of Year 4 with all three kinds; only Year 4 has it');
+  await page.evaluate(() => { act = 'shape'; buildSheet({ yr: 4, kinds: ['flat', 'moves'], n: 12 }); show('sheet'); cards.forEach((c, i) => { if (i < 6) { c.q = movesQ(); layout(c); sizeCanvas(c); } }); });
+  ok((await fits()).length === 0, 'Shapes Moves fit beside written shapes, tiles big enough ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/45-moves.png' });
+  ok((await writeAllAndMark()).length === 0, 'Shapes Moves and written shapes on one sheet: all marked right');
+  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 4, kinds: ['flat', 'solid', 'moves'], n: 12 }), ACTS.shape.key({ yr: 3, kinds: ['flat', 'solid', 'moves'], n: 12 }), ACTS.shape.key({ yr: 3, kinds: ['moves'], n: 6 }), labelFor('shape~4|flat,moves|12')].join(' / ') === 'shape~4|flat,solid,moves|12 / shape~3|flat,solid|12 / shape~3|flat|6 / Shapes · Year 4 · flat, moves · 12 questions'), 'Shapes record keys: Moves only in Year 4 keys; label');
+
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
 
@@ -1633,7 +1727,8 @@ const fakeSpeech = () => {
       ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }],
       ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }],
       ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }],
-      ['units', { yr: 4, n: 12 }], ['angle', { yr: 4, kinds: ['size'], n: 12 }], ['angle', { yr: 4, kinds: ['deg'], n: 12 }]]) {
+      ['units', { yr: 4, n: 12 }], ['angle', { yr: 4, kinds: ['size'], n: 12 }], ['angle', { yr: 4, kinds: ['deg'], n: 12 }],
+      ['map', { yr: 4, kinds: ['tap'], n: 6 }], ['map', { yr: 4, kinds: ['where'], n: 6 }], ['shape', { yr: 4, kinds: ['moves'], n: 12 }], ['money', { yr: 4, kinds: ['make'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

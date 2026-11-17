@@ -223,7 +223,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Add and subtract decimals to one place (1.3 + 0.2 = 1.5). ✓ (Decimals, Year 4: Add and take away)
 - Unit fraction of a number (⅓ of 300); the whole from a unit fraction (¼ of a set is 7, so the set is 28). ✓ (Fractions of a number, Year 4)
 - Total cost of several items in whole dollars, or many of one item, and the change. ✓ (Money, Year 4: Change kind)
-- Make an amount in different ways ($5 and 80 cents).
+- Make an amount in different ways ($5 and 80 cents). ✓ (Money, Year 4: Make it, tap coins and notes into a tray; any way that adds up)
 
 ### Algebra
 - True or false and open number sentences with + and − (8205 − 4721 = 3484?; 4200 − __ = 4001). ✓ (True or false, Year 4; Balance, Year 4; Missing number)
@@ -248,8 +248,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Classify regular and irregular polygons up to 12 sides by edges, vertices and angles. ✓ partly (Shapes, Year 4: count sides and right angles). The words "quadrilateral" and "parallel line" are taught, but finding parallel lines is Year 5 and the named quadrilaterals are Year 6.
 - Count lines of symmetry in 2D shapes (a circle has infinitely many). ✓ (Shapes, Year 4)
 - Match 3D shapes to 2D drawings and views from different sides.
-- One-step reflections, translations and rotations of 2D shapes.
-- Grid references (A1, B2) to find squares and plot positions on a map.
+- One-step reflections, translations and rotations of 2D shapes. ✓ partly (Shapes, Year 4: Moves, say which move it was: flip, slide or turn; not drawing the move)
+- Grid references (A1, B2) to find squares and plot positions on a map. ✓ (Map, Year 4: tap a square from its reference, or pick the reference of a shape)
 
 ### Statistics
 - Collect numerical data, rounding if needed (skips in 30 seconds) ✋.
