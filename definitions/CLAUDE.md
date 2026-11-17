@@ -35,7 +35,8 @@ A question counts as correct only if every tile is in the right place.
 - Retry missed: if fewer than 3 were missed, other terms from the chosen topics fill the board but are not scored.
 - Pieces drop trailing commas and full stops so punctuation does not give the order away; the full definition keeps them, with an amber bar at the split point.
 - Build: `node definitions/build.mjs` (validates, rejects em dashes). Tests: `bash definitions/test/run.sh` (64 checks: 6 groups and 486 terms, concepts out of Unit 1, single Whole unit button for Unit 1, start page, folding, Whole unit SL and HL, SL counts, mixed picks across units, HL labels, 3.1 filler board, taps both ways, swap, return to pool, mouse drag, touch drag from the grip, grip tap selects, page scroll on piece text but not on the grip, full round, retry with fillers, no sideways scroll at 390px). `DD_SHOTS=<dir>` saves screenshots.
-- Not linked from any index or mirrored to the work site yet.
+- Linked from the homepage Business dropdown and BM panel, and from /find (Business > Course notes and revision). Not mirrored to the work site.
+- 2026-11-17: Sam called it done for now. Possible later: an IB Economics version (likely its own data and folder or a subject switch; decide with Sam then).
 - The IBO PDF and Kognity glossary in this folder are copyrighted: excluded in `.git/info/exclude`, never commit them.
 
 ## Data model the page expects

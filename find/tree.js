@@ -55,7 +55,7 @@ window.TREE = {
         { id: "bm", label: "Business Management", next: {
           q: "Business: what for?",
           opts: [
-            { id: "review", label: "Course notes and revision", tools: ["/ibbm", "/qreview"] },
+            { id: "review", label: "Course notes and revision", tools: ["/ibbm", "/qreview", "/definitions"] },
             { id: "finance", label: "Finance", hint: "Ratios, accounts, Unit 3", tools: ["/ratibro", "/slopstudy"] },
             { id: "cases", label: "Case studies", tools: ["/slopstudy", "/businews", "/newbiz"] },
             { id: "game", label: "A class game", hint: "Find the hidden groups of terms", tools: ["/birds"] },

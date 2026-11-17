@@ -13,6 +13,7 @@ window.TOOLS = [
   { name: "Slop Study", url: "/slopstudy", s: "bm", desc: "Spin the reels for a random company and theory terms, get a case study and exam questions.", tags: "case study generator slot machine casegen practice" },
   { name: "Busia", url: "/busia", s: "bm", desc: "The BM IA, start to finish, one stage at a time.", tags: "internal assessment research question" },
   { name: "BusiNews", url: "/businews", s: "bm", desc: "Weekly IB BM case studies built from real business news.", tags: "news case study weekly" },
+  { name: "Definition Drill", url: "/definitions", s: "bm", desc: "Match definition pieces to three terms at a time, for every IB BM unit and the toolkit. SL or HL.", tags: "definitions key terms vocabulary glossary 2 marks revision" },
   { name: "Newbiz", url: "/newbiz", s: "bm", desc: "Spin two or three unrelated words, and a constraint, to build a business case out of.", tags: "starter random words spinner entrepreneur" },
   { name: "Review Questions", url: "/qreview", s: "econ", desc: "Random practice from IB past papers. Reveal the answer and mark yourself.", tags: "past papers flashcards practice questions" },
   { name: "Lineup", url: "/lineup", s: "hist", desc: "Card sort for any topic: students line cards up between two extremes, then reveal the notes. Decks made with an AI prompt.", tags: "card sort continuum spectrum deck extent discussion" },
