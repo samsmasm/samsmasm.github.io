@@ -167,7 +167,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="6"]');
   ok(await page.evaluate(() => view === 5 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 6')), 'Year 6: the Year 5 page, marked the highest so far');
   const y5 = await tiles('#actTiles');
-  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles'].every(t => y5.includes(t)) && !y5.includes('Map') && !y5.includes('Graphs'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
+  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map'].every(t => y5.includes(t)) && !y5.includes('Shapes') && !y5.includes('Graphs'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
   ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('round').yr; }).join() === '4,4'), 'Rounding (Year 4 only so far) opens at Year 4');
   await page.evaluate(() => { setYear(3); act = 'round'; goSetup(); });
@@ -531,6 +531,58 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/15-area-odd.png' });
   ok(await page.evaluate(() => labelFor('area~odd,cubes|12|6')) === 'Area · odd shapes, cubes · sides up to 12 · 6 questions', 'record label for Odd shapes and Cubes');
 
+  // ---- Area, Year 5 (C3b): L-shape perimeter, Same area (tap), Cube layers
+  const ar5 = await page.evaluate(() => {
+    const bad = [], types = {}, per = ([w, h]) => 2 * (w + h);
+    for (let i = 0; i < 500; i++) {
+      const q = lshapeQ(), P = q.pts, n = P.length;
+      types[q.type] = 1;
+      const sides = P.map((p, k) => { const r = P[(k + 1) % n]; return [r[0] - p[0], r[1] - p[1]]; });
+      // straight sides only, turning each corner, every side at least 2, inside its box, no side crossing another
+      if (sides.some(([x, y]) => (x && y) || Math.abs(x + y) < 3) || q.ans !== sides.reduce((s, [x, y]) => s + Math.abs(x) + Math.abs(y), 0)) bad.push('sides ' + JSON.stringify(q));
+      if (sides.some((s, k) => { const t = sides[(k + 1) % n]; return (s[0] === 0) === (t[0] === 0); })) bad.push('corner ' + JSON.stringify(P));
+      if (P.some(([x, y]) => x < 0 || y < 0 || x > q.w || y > q.h) || ![0, q.w].every(v => P.some(p => p[0] === v)) || ![0, q.h].every(v => P.some(p => p[1] === v))) bad.push('box ' + JSON.stringify(q));
+      const area = Math.abs(P.reduce((s, p, k) => { const r = P[(k + 1) % n]; return s + p[0] * r[1] - r[0] * p[1]; }, 0)) / 2;
+      if (area >= q.w * q.h || area < q.w * q.h / 3) bad.push('area ' + JSON.stringify(q));
+      if (!['L', 'step', 'T'].includes(q.type) || n !== (q.type === 'L' ? 6 : 8)) bad.push('type ' + q.type + n);
+    }
+    if (Object.keys(types).length !== 3) bad.push('types ' + Object.keys(types));
+    for (let i = 0; i < 500; i++) {
+      const q = sameQ(), A = q.shown[0] * q.shown[1], rs = q.rects;
+      const good = rs.filter(r => r[0] * r[1] === A && per(r) !== per(q.shown));
+      if (rs.length !== 3 || good.length !== 1 || rs[q.right] !== good[0] || q.ans !== good[0].join('x') || q.tiles[q.right].label !== q.ans) bad.push('same ' + JSON.stringify(q.shown) + JSON.stringify(rs));
+      if (new Set(rs.map(r => [...r].sort().join())).size !== 3 || rs.some(r => Math.max(...r) > 8 || Math.min(...r) < 1)) bad.push('tiles ' + JSON.stringify(rs));
+      if (q.tiles.some(t => t.say !== 'this one') || !q.top.includes('Same area')) bad.push('words ' + q.top);
+    }
+    for (let i = 0; i < 300; i++) { const q = layersQ(); if (q.ans !== q.w * q.d * q.h || q.h < 2 || q.w > 5 || q.d > 4 || q.h > 4 || !q.gap) bad.push('layers ' + JSON.stringify(q)); }
+    return bad.slice(0, 4);
+  });
+  ok(ar5.length === 0, 'Area Year 5: L, step and T shapes with straight sides of 2 or more and the right perimeter; Same area has exactly one rectangle with the same area and a new perimeter; Cube layers count w × d × h ' + ar5.join(' | '));
+  await page.evaluate(() => { buildSheet({ kinds: ['lperim', 'same', 'layers'], max: 12, n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => {
+    const q = c.q;
+    if (q.kind === 'tap') return q.form === 'same' && c.el.querySelectorAll('.tt').length === 3 && c.el.querySelectorAll('.tt svg').length === 3;
+    const svg = c.el.querySelector('svg'), cap = c.el.querySelector('.cap').textContent;
+    if (q.mode === 'lperim') { const t = [...svg.querySelectorAll('text')].map(x => +x.textContent); return cap === 'Perimeter?' && t.length === q.pts.length && t.reduce((a, b) => a + b, 0) === q.ans; }
+    return q.mode === 'layers' && cap === 'How many cubes?' && svg.querySelectorAll(':scope > g').length === q.h;
+  })), 'Area Year 5 cards: every side labelled (they add up to the answer), three rectangle tiles, a slab for each layer');
+  await page.evaluate(() => { cards.forEach((c, i) => { c.q = [lshapeQ, sameQ, layersQ][i % 3](); layout(c); sizeCanvas(c); }); });
+  ok((await fits()).length === 0, 'Area Year 5 fits with room to write ' + (await fits()).join(' '));
+  const lab = await page.evaluate(() => {
+    const bad = [];
+    for (let i = 0; i < 60; i++) {
+      const c = cards[0]; c.q = lshapeQ(); layout(c);
+      const R = [...c.el.querySelectorAll('svg text')].map(t => t.getBoundingClientRect()), pg = c.el.querySelector('svg polygon').getBoundingClientRect();
+      for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) if (R[a].left < R[b].right - 1 && R[b].left < R[a].right - 1 && R[a].top < R[b].bottom - 1 && R[b].top < R[a].bottom - 1) bad.push(JSON.stringify(c.q.pts));
+      if (!R.length || pg.width < 40) bad.push('small ' + pg.width);
+    }
+    return bad.slice(0, 2);
+  });
+  ok(lab.length === 0, 'L-shapes: no two side labels overlap ' + lab.join(' | '));
+  ok((await writeAllAndMark()).length === 0, 'Area Year 5: answers read and tapped are marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/15-area-y5.png' });
+  ok(await page.evaluate(() => labelFor('area~lperim,same,layers|12|12')) === 'Area · L-shapes, same area, cube layers · sides up to 12 · 12 questions', 'record label for the Year 5 Area kinds');
+
   // ---- Mia: Times bonds
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="tbond"]');
@@ -631,7 +683,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,money,muldiv,round,seq,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,map,money,muldiv,round,seq,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a, C3b): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -2275,6 +2327,29 @@ const fakeSpeech = () => {
   ok((await writeAllAndMark()).length === 0, 'Map: the whole sheet tapped right is marked right');
   ok(await page.evaluate(() => labelFor('map~4|tap,where|6') === 'Map · Year 4 · tap C4, where is it? · 6 questions' && cardSay({ ...mapQ(4, ['tap']), say: 'Tap C 4.' }) === 'Tap C 4.'), 'Map record label; read aloud is just the question, not every square');
 
+  // ---- Map, Year 5 (C3b): compass moves from a grid reference
+  const mg = await page.evaluate(() => {
+    const bad = [], ends = new Set(), dirs = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = mapQ(5, ['tap']);
+      let x = 'ABCDE'.indexOf(q.start[0]), y = +q.start[1];
+      for (const [n, d] of q.moves) { dirs.add(d); x += COMPASS_V[d][0] * n; y += COMPASS_V[d][1] * n; if (n < 1 || n > 4) bad.push('n ' + n); }
+      const kinds = q.moves.map(m => ['north', 'south'].includes(m[1]) ? 'ud' : 'lr').sort().join();
+      if (kinds !== 'lr,ud' || x < 0 || x > 4 || y < 1 || y > 5 || q.ans !== 'ABCDE'[x] + y || q.tiles[q.right].label !== q.ans || q.tiles.length !== 25 || q.tiles.some(t => t.html)) bad.push(JSON.stringify(q.moves) + q.start + q.ans);
+      if (!q.top.includes(`Start at ${q.start}.`) || !q.top.includes('<svg') || !/Tap where you finish\.$/.test(q.say)) bad.push('words ' + q.top);
+      ends.add(q.ans);
+    }
+    if (ends.size < 22 || dirs.size !== 4) bad.push('spread ' + ends.size + ' ' + [...dirs]);
+    return bad.slice(0, 4);
+  });
+  ok(mg.length === 0, 'Map Year 5: one move up or down and one across, 1 to 4 squares, staying on the map; the tapped square is where she finishes ' + mg.join(' | '));
+  await page.evaluate(() => { act = 'map'; buildSheet({ yr: 5, kinds: ['tap', 'where'], n: 6 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.form === 'go' && c.el.querySelectorAll('.tt').length === 25 && c.el.querySelector('.tq svg'))), 'Map Year 5 sheet: compass moves only, a compass rose by the words');
+  ok((await fits()).length === 0, 'Map Year 5 fits, squares big enough to tap ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Map Year 5: tapped right is marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/44-map-y5.png' });
+  ok(await page.evaluate(() => ACTS.map.key({ yr: 5, kinds: ['tap', 'where'], n: 6 }) === 'map~5|go|6' && labelFor('map~5|go|6') === 'Map · Year 5 · compass moves · 6 questions'), 'Map Year 5 record key and label');
+
   // ---- Money, Make it (Year 4): drop coins and notes in a tray. A7
   const mkq = await page.evaluate(() => {
     const bad = [];
@@ -2607,7 +2682,8 @@ const fakeSpeech = () => {
       ['splat', { yr: 1, n: 12 }], ['parts', { yr: 1, kinds: ['tap'], n: 12 }], ['parts', { yr: 1, kinds: ['write'], n: 12 }], ['money', { yr: 1, kinds: ['coin'], n: 12 }], ['ruler', { yr: 1, kinds: ['longer'], n: 12 }],
       ['dec', { yr: 5, kinds: ['pic'], n: 12 }], ['dec', { yr: 5, kinds: ['line', 'addsub', 'ten'], n: 12 }], ['frac', { kinds: ['diff'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }],
       ['fof', { yr: 5, kinds: ['part', 'whole', 'pct'], n: 12 }], ['money', { yr: 5, kinds: ['count', 'change'], n: 12 }],
-      ['angle', { yr: 5, kinds: ['name'], n: 12 }], ['angle', { yr: 5, kinds: ['measure'], n: 12 }], ['clock', { yr: 5, kinds: ['face', 'words'], n: 12 }], ['clock', { yr: 5, kinds: ['long'], n: 12 }], ['units', { yr: 5, n: 12 }]]) {
+      ['angle', { yr: 5, kinds: ['name'], n: 12 }], ['angle', { yr: 5, kinds: ['measure'], n: 12 }], ['clock', { yr: 5, kinds: ['face', 'words'], n: 12 }], ['clock', { yr: 5, kinds: ['long'], n: 12 }], ['units', { yr: 5, n: 12 }],
+      ['area', { kinds: ['lperim'], max: 12, n: 12 }], ['area', { kinds: ['same'], max: 12, n: 12 }], ['area', { kinds: ['layers'], max: 12, n: 12 }], ['map', { yr: 5, kinds: ['tap'], n: 6 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

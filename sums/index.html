@@ -657,7 +657,8 @@ const bondSvg = q => {
 // side, a grid of unit squares for counting. s = em per unit of length.
 function areaSvg(q) {
   if (q.mode === 'odd') return oddSvg(q);
-  if (q.mode === 'cubes') return cubesSvg(q);
+  if (q.mode === 'cubes' || q.mode === 'layers') return cubesSvg(q);
+  if (q.mode === 'lperim') return lshapeSvg(q);
   const { w, h } = q, s = Math.min(0.42, 5.2 / Math.max(w, h)), u = 10;
   const fs = 7.2 / s; // label font, in viewBox units, about 0.72em on screen
   const L = 1.5 * fs, T = 1.4 * fs, R = 2.2 * fs, B = 4;
@@ -719,17 +720,114 @@ function cubesQ() {
 }
 // a colour mixed toward white (t > 0) or black (t < 0)
 const tint = (hex, t) => '#' + [1, 3, 5].map(i => { const c = parseInt(hex.slice(i, i + 2), 16), v = t > 0 ? c + (255 - c) * t : c * (1 + t); return Math.round(v).toString(16).padStart(2, '0'); }).join('');
+// q.gap (Cube layers, Year 5): each layer drawn as its own slab, a gap between them, bottom first
+const CUBE_GAP = 4.5;
 function cubesSvg(q) {
   const { w, d, h } = q, u = 10, dx = 5.5, dy = 4, D = d * dy, f = BLOCK[q.col];
   const pt = (x, y) => `${x},${y}`, ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
-  let s = `<rect x="0" y="${D}" width="${w * u}" height="${h * u}" fill="${f}"/>`
-    + `<polygon points="${[pt(0, D), pt(w * u, D), pt(w * u + d * dx, 0), pt(d * dx, 0)].join(' ')}" fill="${tint(f, 0.45)}"/>`
-    + `<polygon points="${[pt(w * u, D), pt(w * u + d * dx, 0), pt(w * u + d * dx, h * u), pt(w * u, D + h * u)].join(' ')}" fill="${tint(f, -0.25)}"/>`;
-  s += `<g stroke="${INK}" stroke-width=".7" stroke-linecap="round">`;
-  for (let i = 0; i <= w; i++) s += ln(i * u, D, i * u, D + h * u) + ln(i * u, D, i * u + d * dx, 0); // front uprights, top front-to-back
-  for (let k = 0; k <= h; k++) s += ln(0, D + k * u, w * u, D + k * u) + ln(w * u, D + k * u, w * u + d * dx, k * u); // front across, side front-to-back
-  for (let j = 1; j <= d; j++) s += ln(j * dx, D - j * dy, w * u + j * dx, D - j * dy) + ln(w * u + j * dx, D - j * dy, w * u + j * dx, D - j * dy + h * u); // top across, side uprights
-  return `<svg ${emBox([-1.5, -1.5, w * u + d * dx + 3, D + h * u + 3], 0.072)}>${s}</g></svg>`;
+  const slab = (oy, h) => { // a cuboid h cubes high, the back of its top face at y = oy
+    let s = `<g transform="translate(0 ${oy})"><rect x="0" y="${D}" width="${w * u}" height="${h * u}" fill="${f}"/>`
+      + `<polygon points="${[pt(0, D), pt(w * u, D), pt(w * u + d * dx, 0), pt(d * dx, 0)].join(' ')}" fill="${tint(f, 0.45)}"/>`
+      + `<polygon points="${[pt(w * u, D), pt(w * u + d * dx, 0), pt(w * u + d * dx, h * u), pt(w * u, D + h * u)].join(' ')}" fill="${tint(f, -0.25)}"/>`;
+    s += `<g stroke="${INK}" stroke-width=".7" stroke-linecap="round">`;
+    for (let i = 0; i <= w; i++) s += ln(i * u, D, i * u, D + h * u) + ln(i * u, D, i * u + d * dx, 0); // front uprights, top front-to-back
+    for (let k = 0; k <= h; k++) s += ln(0, D + k * u, w * u, D + k * u) + ln(w * u, D + k * u, w * u + d * dx, k * u); // front across, side front-to-back
+    for (let j = 1; j <= d; j++) s += ln(j * dx, D - j * dy, w * u + j * dx, D - j * dy) + ln(w * u + j * dx, D - j * dy, w * u + j * dx, D - j * dy + h * u); // top across, side uprights
+    return s + '</g></g>';
+  };
+  if (!q.gap) return `<svg ${emBox([-1.5, -1.5, w * u + d * dx + 3, D + h * u + 3], 0.072)}>${slab(0, h)}</svg>`;
+  let s = '';
+  for (let i = h - 1; i >= 0; i--) s += slab(i * (u + CUBE_GAP), 1);
+  const H = D + h * u + (h - 1) * CUBE_GAP;
+  return `<svg ${emBox([-1.5, -1.5, w * u + d * dx + 3, H + 3], 0.062)}>${s}</svg>`;
+}
+// Area, Cube layers (Year 5): bigger cuboids, each layer drawn a little apart, so
+// she can count one layer and times it by the layers
+function layersQ() {
+  let w, d, h;
+  do { w = rnd(3, 5); d = rnd(2, 4); h = rnd(2, 4); } while (w * d * h < 16);
+  return { kind: 'area', mode: 'layers', w, d, h, gap: true, col: pickOne(Object.keys(BLOCK)), cap: 'How many cubes?', ans: w * d * h };
+}
+// Area, L-shapes (Year 5): a rectangle with one corner cut away (an L), two
+// opposite corners (a step) or two corners on one side (a T); every side labelled
+// and at least 2 long. Turned and flipped at random. Perimeter is the sum of the sides.
+function lshapeQ() {
+  for (;;) {
+    const W = rnd(7, 12), H = rnd(6, 9), type = pickOne(['L', 'L', 'step', 'T']);
+    const a = rnd(3, W - 3), b = rnd(3, H - 3);
+    let pts;
+    if (type === 'L') pts = [[0, 0], [W - a, 0], [W - a, b], [W, b], [W, H], [0, H]];
+    else if (type === 'step') { // top right and bottom left cut, never meeting
+      const c = rnd(3, W - 3), e = rnd(3, H - 3);
+      if (W - a <= c && H - e <= b) continue;
+      pts = [[0, 0], [W - a, 0], [W - a, b], [W, b], [W, H], [c, H], [c, H - e], [0, H - e]];
+    } else { // top left and top right cut, the middle at least 3 wide
+      const c = rnd(3, W - 3), e = rnd(3, H - 3);
+      if (W - a - c < 3) continue;
+      pts = [[0, e], [c, e], [c, 0], [W - a, 0], [W - a, b], [W, b], [W, H], [0, H]];
+    }
+    let [w, h] = [W, H];
+    if (Math.random() < 0.5) pts = pts.map(([x, y]) => [w - x, y]);
+    if (Math.random() < 0.5) pts = pts.map(([x, y]) => [x, h - y]);
+    if (Math.random() < 0.5) { pts = pts.map(([x, y]) => [y, x]); [w, h] = [h, w]; }
+    const sides = pts.map((p, i) => { const q = pts[(i + 1) % pts.length]; return Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]); });
+    if (Math.min(...sides) < 3) continue; // labels at an inner corner need room (2 made them overlap)
+    return { kind: 'area', mode: 'lperim', w, h, pts, type, col: pickOne(Object.keys(BLOCK)), cap: 'Perimeter?', ans: sides.reduce((x, y) => x + y, 0) };
+  }
+}
+function lshapeSvg(q) {
+  const { w, h, pts } = q, s = Math.min(0.5, 6 / Math.max(w, h)), u = 10, fs = 6.2 / s;
+  const M = 1.9 * fs, T = 1.3 * fs; // room for a two-digit label outside every side
+  const area2 = pts.reduce((t, p, i) => { const q2 = pts[(i + 1) % pts.length]; return t + p[0] * q2[1] - q2[0] * p[1]; }, 0), sg = area2 > 0 ? 1 : -1;
+  let o = `<svg viewBox="${-M} ${-T} ${w * u + 2 * M} ${h * u + 2 * T}" style="width:${(w * u + 2 * M) * s / u}em;height:${(h * u + 2 * T) * s / u}em">`;
+  o += `<polygon points="${pts.map(([x, y]) => `${x * u},${y * u}`).join(' ')}" fill="${tint(BLOCK[q.col], 0.55)}" stroke="${INK}" stroke-width="${0.12 * fs}" stroke-linejoin="round"/>`;
+  // an inner corner turns the other way from the shape; the two labels beside one are nudged apart
+  const n = pts.length, inner = pts.map((p, i) => {
+    const a = pts[(i + n - 1) % n], b = pts[(i + 1) % n];
+    return Math.sign((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])) === -sg;
+  });
+  pts.forEach((p, i) => {
+    const q2 = pts[(i + 1) % n], len = Math.abs(q2[0] - p[0]) + Math.abs(q2[1] - p[1]);
+    const dx = Math.sign(q2[0] - p[0]), dy = Math.sign(q2[1] - p[1]), k = 0.35 * fs * ((inner[i] ? 1 : 0) - (inner[(i + 1) % n] ? 1 : 0));
+    const mx = (p[0] + q2[0]) / 2 * u + dx * k, my = (p[1] + q2[1]) / 2 * u + dy * k;
+    const nx = dy * sg, ny = -dx * sg; // outward (y runs down the page)
+    if (nx) o += `<text x="${mx + nx * 0.4 * fs}" y="${my}" text-anchor="${nx > 0 ? 'start' : 'end'}" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${len}</text>`;
+    else o += `<text x="${mx}" y="${my + ny * 0.68 * fs}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${len}</text>`;
+  });
+  return o + '</svg>';
+}
+// Area, Same area (Year 5, a tap card): a rectangle on a grid, and three more as
+// tiles; one has the same area and a different perimeter. The wrong ones: the same
+// rectangle turned (same area, same perimeter), the same perimeter with a different
+// area, or one row more or less. Sides up to 8 so the squares can be counted on a tile.
+const SAME_AREAS = { 6: [[1, 6], [2, 3]], 8: [[1, 8], [2, 4]], 12: [[2, 6], [3, 4]], 16: [[2, 8], [4, 4]], 24: [[3, 8], [4, 6]] };
+function gridRectSvg(w, h, col, em, box = 8) {
+  const u = 10, x0 = (box - w) * u / 2, y0 = (box - h) * u / 2;
+  let s = `<rect x="${x0}" y="${y0}" width="${w * u}" height="${h * u}" fill="${BLOCK[col]}"/>`;
+  for (let i = 0; i <= w; i++) s += `<line x1="${x0 + i * u}" y1="${y0}" x2="${x0 + i * u}" y2="${y0 + h * u}" stroke="${INK}" stroke-width="${i % w ? 1 : 2}"/>`;
+  for (let j = 0; j <= h; j++) s += `<line x1="${x0}" y1="${y0 + j * u}" x2="${x0 + w * u}" y2="${y0 + j * u}" stroke="${INK}" stroke-width="${j % h ? 1 : 2}"/>`;
+  return `<svg viewBox="-1 -1 ${box * u + 2} ${box * u + 2}"${em ? ` style="width:${em}em;height:${em}em"` : ''}>${s}</svg>`;
+}
+function sameQ() {
+  const A = +pickOne(Object.keys(SAME_AREAS)), [shown, other] = shuffled(SAME_AREAS[A]);
+  const per = ([w, h]) => 2 * (w + h), turnR = ([w, h]) => [h, w], orient = r => Math.random() < 0.5 ? r : turnR(r);
+  const S = orient(shown), R = orient(other), key = r => r.join('x');
+  // wrong ones: never the same area with a new perimeter (that would be right too)
+  const pool = [];
+  if (S[0] !== S[1]) pool.push(['turned', turnR(S)]);
+  for (let w = 1; w <= 8; w++) for (let h = 1; h <= 8; h++) if (w * h !== A && per([w, h]) === per(S)) pool.push(['perim', [w, h]]);
+  for (const r of [[S[0], S[1] + 1], [S[0], S[1] - 1], [S[0] + 1, S[1]], [S[0] - 1, S[1]]]) if (r[0] >= 1 && r[1] >= 1 && r[0] <= 8 && r[1] <= 8 && r[0] * r[1] !== A) pool.push(['near', r]);
+  const wrong = [], used = new Set([key(R), key(turnR(R))]);
+  for (const kind of shuffled(['turned', 'perim', 'near'])) {
+    const c = shuffled(pool.filter(p => p[0] === kind && !used.has(key(p[1])) && !used.has(key(turnR(p[1])))));
+    if (c.length && wrong.length < 2) { wrong.push(c[0][1]); used.add(key(c[0][1])); used.add(key(turnR(c[0][1]))); }
+  }
+  for (const p of shuffled(pool)) if (wrong.length < 2 && !used.has(key(p[1]))) { wrong.push(p[1]); used.add(key(p[1])); used.add(key(turnR(p[1]))); }
+  const rects = shuffled([R, ...wrong]), col = pickOne(Object.keys(BLOCK));
+  const tiles = rects.map(r => ({ html: gridRectSvg(r[0], r[1], col), label: key(r), say: 'this one' }));
+  // three short lines, so the words stay big on a phone's narrow card
+  const top = `<span class="tpic"><span class="tw" style="font-size:1em">Same area,<br>different<br>perimeter?</span>${gridRectSvg(S[0], S[1], col, 3.6)}</span>`;
+  return { kind: 'tap', form: 'same', shown: S, rects, top, tc: 5.6, th: 7, topf: 0.6, big: true, tiles, right: rects.indexOf(R), say: 'Which one has the same area as this, but a different perimeter?', ans: key(R) };
 }
 // fraction pictures: a bar or a circle cut into d equal parts with n shaded,
 // or a 0-to-1 number line cut into d with an arrow at n
@@ -2318,7 +2416,29 @@ function mapSvg(things) {
   for (const t of things) s += mapThing(t.nm, t.col, 7 + t.x * 10, (5 - t.y) * 10, 10);
   return `<svg ${emBox([0, -1, 58, 59], 0.075)}>${s}</svg>`;
 }
+// Map, Year 5 (C3b): "Start at B2. Go 2 north, 3 east." on the empty grid, a
+// compass rose by the words; tap where she finishes. One move up or down and one
+// across, in either order, each 1 to 4 squares, staying on the map.
+const COMPASS = `<svg viewBox="-13 -13 26 26" style="width:1.9em;height:1.9em;flex:none"><path d="M0 -6.5V6.5M-6.5 0H6.5" stroke="${INK}" stroke-width="1.1"/><path d="M0 -8L-2.6 -3H2.6Z" fill="${INK}"/>`
+  + svgText(0, -10.6, 'N', 5) + svgText(10.4, 0, 'E', 5) + svgText(0, 10.6, 'S', 5) + svgText(-10.4, 0, 'W', 5) + '</svg>';
+const COMPASS_V = { north: [0, 1], south: [0, -1], east: [1, 0], west: [-1, 0] };
+function mapGoQ() {
+  for (;;) {
+    const x0 = rnd(0, 4), y0 = rnd(1, 5), up = pickOne(['north', 'south']), across = pickOne(['east', 'west']), nu = rnd(1, 4), na = rnd(1, 4);
+    const x = x0 + COMPASS_V[across][0] * na, y = y0 + COMPASS_V[up][1] * nu;
+    if (x < 0 || x > 4 || y < 1 || y > 5) continue;
+    const moves = Math.random() < 0.5 ? [[nu, up], [na, across]] : [[na, across], [nu, up]], start = mapRef(x0, y0), ref = mapRef(x, y);
+    const tiles = [];
+    for (let r = 5; r >= 1; r--) for (let c = 0; c < 5; c++) tiles.push({ html: '', label: mapRef(c, r), say: `${MAP_L[c]} ${r}` });
+    const go = moves.map(([n, d]) => `${n} ${d}`);
+    return {
+      kind: 'tap', form: 'go', yr: 5, start, moves, top: `${COMPASS}<span class="tw" style="text-align:left">Start at ${start}.<br>Go ${go.join(', ')}.</span>`, tc: 9, th: 2.1,
+      tiles, right: (5 - y) * 5 + x, cells: 5, axes: { x: [...MAP_L], y: [5, 4, 3, 2, 1] }, say: `Start at ${start[0]} ${start[1]}. Go ${go.join(', then ')}. Tap where you finish.`, ans: ref,
+    };
+  }
+}
 function mapQ(yr, kinds) {
+  if (yr === 5) return mapGoQ();
   const cells = shuffled(range(0, 24)).slice(0, rnd(3, 4)), nms = shuffled(MAP_SHAPES), cols = shuffled(Object.keys(BLOCK));
   const things = cells.map((k, i) => ({ nm: nms[i], col: cols[i], x: k % 5, y: Math.floor(k / 5) + 1 }));
   if (pickOne(kinds) === 'where') {
@@ -2800,23 +2920,26 @@ const ACTS = {
     name: 'Area', ages: [8], setup: 'opts', say: 'Work out the area or the perimeter.',
     pic: areaSvg({ w: 5, h: 3, mode: 'squares' }),
     options: [
-      { key: 'kinds', label: 'Kind', multi: true, values: [['squares', 'Count squares'], ['area', 'Area'], ['perim', 'Perimeter'], ['side', 'Missing side'], ['odd', 'Odd shapes'], ['cubes', 'Cubes']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['squares', 'Count squares'], ['area', 'Area'], ['perim', 'Perimeter'], ['side', 'Missing side'], ['odd', 'Odd shapes'], ['cubes', 'Cubes'], ['lperim', 'L-shapes (Year 5)'], ['same', 'Same area (Year 5)'], ['layers', 'Cube layers (Year 5)']] },
       { key: 'max', label: 'Sides up to', values: [5, 10, 12] },
     ],
     defaults: () => ({ kinds: ['area', 'perim', 'side', 'odd', 'cubes'], max: 12, n: 12 }),
-    // the caption says what to find; counting squares keeps sides to 10
+    // the caption says what to find; counting squares keeps sides to 10 ("Sides up to" leaves the Year 4 and 5 kinds alone)
     make: c => {
       const mode = pickOne(c.kinds), top = mode === 'squares' ? Math.min(c.max, 10) : c.max;
       if (mode === 'odd') return oddQ();
       if (mode === 'cubes') return cubesQ();
+      if (mode === 'layers') return layersQ();
+      if (mode === 'lperim') return lshapeQ();
+      if (mode === 'same') return sameQ();
       const w = rnd(2, top), h = rnd(2, top);
       if (mode === 'side') { const hide = pickOne(['w', 'h']); return { kind: 'area', mode, w, h, hide, cap: `Area ${w * h}`, ans: hide === 'w' ? w : h }; }
       if (mode === 'perim') return { kind: 'area', mode, w, h, cap: 'Perimeter?', ans: 2 * (w + h) };
       return { kind: 'area', mode, w, h, cap: mode === 'squares' ? 'How many squares?' : 'Area?', ans: w * h };
     },
-    key: c => `area~${['squares', 'area', 'perim', 'side', 'odd', 'cubes'].filter(k => c.kinds.includes(k)).join(',')}|${c.max}|${c.n}`,
+    key: c => `area~${['squares', 'area', 'perim', 'side', 'odd', 'cubes', 'lperim', 'same', 'layers'].filter(k => c.kinds.includes(k)).join(',')}|${c.max}|${c.n}`,
     label: k => {
-      const [kinds, m, n] = k.split('|'), nm = { squares: 'count squares', area: 'area', perim: 'perimeter', side: 'missing side', odd: 'odd shapes', cubes: 'cubes' };
+      const [kinds, m, n] = k.split('|'), nm = { squares: 'count squares', area: 'area', perim: 'perimeter', side: 'missing side', odd: 'odd shapes', cubes: 'cubes', lperim: 'L-shapes', same: 'same area', layers: 'cube layers' };
       return `Area · ${kinds.split(',').map(x => nm[x]).join(', ')} · sides up to ${m} · ${n} questions`;
     },
   },
@@ -3106,13 +3229,14 @@ const ACTS = {
       return s + '</svg>';
     })(),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · grid references']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['tap', 'Tap C4'], ['where', 'Where is it?']] },
+      { key: 'yr', label: 'Year', values: [[4, '4 · grid references'], [5, '5 · compass moves']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['tap', 'Tap C4 (Year 4)'], ['where', 'Where is it? (Year 4)']] },
     ],
     defaults: () => ({ yr: 4, kinds: ['tap', 'where'], n: 6 }),
     make: c => mapQ(c.yr, c.kinds),
-    key: c => `map~${c.yr}|${['tap', 'where'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Map · Year ${y} · ${kinds.split(',').map(x => ({ tap: 'tap C4', where: 'where is it?' })[x]).join(', ')} · ${n} questions`; },
+    // Year 5 is compass moves only, whatever the Kind row says
+    key: c => `map~${c.yr}|${c.yr === 5 ? 'go' : ['tap', 'where'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Map · Year ${y} · ${kinds.split(',').map(x => ({ tap: 'tap C4', where: 'where is it?', go: 'compass moves' })[x]).join(', ')} · ${n} questions`; },
   },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
