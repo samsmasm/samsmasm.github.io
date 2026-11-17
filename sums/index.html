@@ -278,6 +278,15 @@
   .tap .tray .tri svg { display: block; }
   .tap .tw.twl { display: flex; align-items: center; gap: .2em; white-space: nowrap; }
   .tap .cells .axx { width: var(--tw); }
+  /* Year 1 (B2): a sentence with dots under each side; "same" and digital-clock tiles */
+  .tap .tfd { display: flex; align-items: flex-start; gap: .35em; }
+  .tap .tfc { display: flex; flex-direction: column; align-items: center; gap: .1em; }
+  .tap .tsm { font-size: .55em; }
+  /* heaps to count (More or less, Year 1): the words are short, so the tiles may be bigger */
+  .tap .tiles.bigt { --tw: max(40px, min(52cqh, calc(84cqw / var(--n)), 128px)); }
+  .tap .bigt .tt svg { width: 1.6em; height: 1.6em; }
+  .tap .dig { font-size: .62em; font-variant-numeric: tabular-nums; }
+  .miss .saw { display: block; margin-top: .15em; }
   .miss .bx, .tap .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
   .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
   .miss .cap { font-size: .6em; font-weight: 700; margin-top: .15em; }
@@ -497,7 +506,8 @@ const yearFor = a => Math.max(1, a - 4);         // 5 → Year 1 (4 too), 8 → 
 const yearsOf = a => { const o = (ACTS[a].options || []).find(o => o.key === 'yr'); return o ? o.values.map(v => Array.isArray(v) ? v[0] : v) : []; };
 const maxYear = a => Math.max(0, ...yearsOf(a));
 // the year her age suggests, or the nearest one this activity has (a new activity may start with one year only)
-const suggestedYear = a => { const ys = yearsOf(a), below = ys.filter(y => y <= yearFor(age)); return below.length ? Math.max(...below) : Math.min(...ys); };
+// the nearest year the activity has to hers; a tie goes to the lower year (with Years 1 and 4 only, age 7 gets Year 4, age 6 Year 1)
+const suggestedYear = a => { const ys = yearsOf(a), w = yearFor(age); return ys.reduce((b, y) => Math.abs(y - w) < Math.abs(b - w) || (Math.abs(y - w) === Math.abs(b - w) && y < b) ? y : b); };
 const store = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -817,6 +827,14 @@ function clockSvg(q, em = 4.4) {
     s += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="currentColor" stroke="white" stroke-width="3" paint-order="stroke" font-family="system-ui, sans-serif">${h}</text>`;
   }
   return s + '<circle r="3.6" fill="currentColor" stroke="none"/></svg>';
+}
+// Clocks, Match (Year 1, B2): a face on the hour, three digital clocks to tap.
+// The wrong ones are the hour either side, and 12:00 (where the long hand points).
+const DIGI_TILE = h => ({ html: `<span class="dig">${h}:00</span>`, label: `${h}:00`, say: `${h} o'clock` });
+function clockMatchQ() {
+  const h = rnd(1, 12), wrap = k => (k + 11) % 12 + 1, near = [wrap(h - 1), wrap(h + 1)];
+  const opts = shuffled([h, ...(h === 12 ? near : [12, pickOne(near.filter(k => k !== 12))])]);
+  return { kind: 'tap', form: 'match', h, m: 0, top: clockSvg({ h, m: 0 }, 4.4), tc: 4.4, th: 4.4, topf: 0.66, tiles: opts.map(DIGI_TILE), right: opts.indexOf(h), say: 'Which clock shows the same time?', ans: `${h}:00` };
 }
 function timeWords(h, m) {
   const nx = h % 12 + 1, mins = k => k % 5 ? `${k} minute${k > 1 ? 's' : ''}` : String(k);
@@ -1418,7 +1436,54 @@ const swapDigits = n => { const d = [...String(n)], i = rnd(0, d.length - 2); [d
 // True or false: a number sentence that is right about half the time. Wrong
 // ones are near misses: out by 1, 10 or 100, two digits swapped, a times-table
 // neighbour, or a place out when multiplying or dividing by 10.
+// Year 1 (B2): one-digit + and − that make v (1 to 10), as [a, '+', b] or [a, '−', b]
+const oneDigitEx = v => {
+  if (v >= 2 && (v > 8 || Math.random() < 0.5)) { const a = rnd(1, v - 1); return [a, '+', v - a]; }
+  const b = rnd(1, 9 - v); return [v + b, '−', b];
+};
+// dots under one side of a Year 1 sentence: in pairs (easy to count), a gap
+// between the two parts of a sum, the ones taken away crossed out
+const sideDotsSvg = s => {
+  const P = 10, r = 3.4, groups = s.length === 1 ? [[s[0], 0]] : s[1] === '+' ? [[s[0], 0], [s[2], 0]] : [[s[0], s[2]]];
+  let x = 0, out = '';
+  groups.forEach(([n, cross], j) => {
+    if (j) x += 6;
+    for (let i = 0; i < n; i++) {
+      const cx = x + Math.floor(i / 2) * P + r, cy = (i % 2) * P + r;
+      // taken away: a hollow dot with one slash through it
+      out += i >= n - cross ? `<circle cx="${cx}" cy="${cy}" r="${r - 0.5}" fill="none" stroke="currentColor" stroke-width="1"/><path d="M${cx - 4.6} ${cy + 4.6}L${cx + 4.6} ${cy - 4.6}" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`
+        : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="currentColor"/>`;
+    }
+    x += Math.ceil(n / 2) * P;
+  });
+  const w = x - (P - 2 * r), u = 0.055; // em a unit
+  return { svg: `<svg viewBox="-5 -5 ${w + 10} ${P + 2 * r + 10}" style="width:${((w + 10) * u).toFixed(2)}em;height:${((P + 2 * r + 10) * u).toFixed(2)}em">${out}</svg>`, w: (w + 10) * u };
+};
+// True or false, Year 1: one-digit + and − within 10 (3 + 4 = 8, 7 − 5 = 6 − 4),
+// sometimes the sum on the right (8 = 3 + 4). Wrong ones are out by 1. Dots
+// under each side on about half the cards.
+function tf1Q() {
+  for (let t = 0; t < 200; t++) {
+    const truth = Math.random() < 0.5, both = Math.random() < 0.4, v = rnd(1, 10);
+    const L = oneDigitEx(v), w = truth ? v : v + pickOne([-1, 1]);
+    if (w < 1 || w > 10) continue;
+    let R = both ? oneDigitEx(w) : [w];
+    if (R.join(' ') === L.join(' ')) continue;
+    let A = L, B = R;
+    if (!both && Math.random() < 0.2) [A, B] = [R, L]; // 8 = 3 + 4
+    const lhs = A.join(' '), rhs = B.join(' '), text = `${lhs} = ${rhs}`, dots = Math.random() < 0.5;
+    const q = { kind: 'tap', yr: 1, text, top: text, tc: text.length * 0.56, tiles: TF_TILES, right: truth ? 0 : 1, truth, dots, say: `${signWords(text)}. True?`, ans: truth ? '✓' : '✗' };
+    if (dots) { // each side over its dots
+      const a = sideDotsSvg(A), b = sideDotsSvg(B);
+      q.top = `<span class="tfd"><span class="tfc">${lhs}${a.svg}</span><span>=</span><span class="tfc">${rhs}${b.svg}</span></span>`;
+      q.tc = Math.max(lhs.length * 0.56, a.w) + Math.max(rhs.length * 0.56, b.w) + 1.4; q.th = 1.1 + 1.45; q.topf = 0.55;
+    }
+    return q;
+  }
+  return { kind: 'tap', yr: 1, text: '3 + 4 = 7', top: '3 + 4 = 7', tc: 5, tiles: TF_TILES, right: 0, truth: true, dots: false, say: '3 plus 4 equals 7. True?', ans: '✓' };
+}
 function tfQ(yr) {
+  if (yr === 1) return tf1Q();
   for (let t = 0; t < 200; t++) {
     const truth = Math.random() < 0.5, type = pickOne(['addsub', 'addsub', 'tables', 'tables', 'ten', 'both']);
     let lhs, v, rhs, rv; // each side as printed, and what it comes to
@@ -1482,7 +1547,39 @@ function cmpFracQ() {
     return { kind: 'tap', l: txt(L), r: txt(R), top: `${html(L)} <span class="bx"></span> ${html(R)}`, tc: 5, th: 2.3, tiles: CMP_TILES, right, say: `${words(L)}, and ${words(R)}. Which sign goes in the box?`, ans: CMP_TILES[right].label };
   }
 }
+// a heap of 1 to 10 dots, scattered over a 4 × 4 grid with a little wobble, so she has to count
+const heapSvg = n => {
+  const cells = shuffled(range(0, 15)).slice(0, n), j = () => (Math.random() * 3 - 1.5).toFixed(1);
+  const dots = cells.map(c => `<circle cx="${(c % 4) * 10 + 5}" cy="${Math.floor(c / 4) * 10 + 5}" r="3.4" transform="translate(${j()} ${j()})"/>`).join('');
+  return `<svg viewBox="-1 -1 42 42" style="width:1.5em;height:1.5em" fill="currentColor">${dots}</svg>`;
+};
+const SAME_TILE = { html: '<span class="tsm">same</span>', label: 'same', say: 'the same' };
+// More or less, Year 1 (B2): two heaps of dots (1 to 10) or two numbers (to 20),
+// "Which has more?" or "fewer?"; the tiles are the two heaps (or numbers) and
+// "same" between them. No < > signs (Year 2). About one in five the same.
+function cmp1Q(kinds) {
+  for (let t = 0; t < 100; t++) {
+    const dots = pickOne(kinds) === 'dots', same = Math.random() < 0.2, more = Math.random() < 0.5, top = dots ? 10 : 20;
+    let a = rnd(1, top), b;
+    if (same) b = a;
+    else if (!dots && a > 10 && Math.random() < 0.3) b = a - 10; // 14 and 4
+    else b = Math.random() < 0.7 ? a + pickOne([-3, -2, -1, 1, 2, 3]) : rnd(1, top);
+    if (b < 1 || b > top || (!same && a === b)) continue;
+    if (Math.random() < 0.5) [a, b] = [b, a];
+    const right = a === b ? 1 : (a > b) === more ? 0 : 2, word = dots ? (more ? 'more' : 'fewer') : (more ? 'more' : 'less');
+    const tiles = dots ? [{ html: heapSvg(a), label: 'left', say: 'this one' }, SAME_TILE, { html: heapSvg(b), label: 'right', say: 'this one' }]
+      : [{ html: String(a), label: String(a), say: String(a) }, SAME_TILE, { html: String(b), label: String(b), say: String(b) }];
+    const top_ = dots ? `Which has ${word}?` : `Which is ${word}?`;
+    return {
+      kind: 'tap', yr: 1, form: dots ? 'heaps' : 'nums', l: String(a), r: String(b), more, top: top_, tc: top_.length * 0.5, tiles, right, quiet: true, big: true, topf: 0.3,
+      say: dots ? `Which has ${word} dots? Or are they the same?` : `Which is ${word}, ${a} or ${b}? Or are they the same?`, ans: tiles[right].label,
+    };
+  }
+  return { kind: 'tap', yr: 1, form: 'nums', l: '12', r: '15', more: true, top: 'Which is more?', tc: 7, tiles: [{ html: '12', label: '12', say: '12' }, SAME_TILE, { html: '15', label: '15', say: '15' }], right: 2, quiet: true, say: 'Which is more, 12 or 15? Or are they the same?', ans: '15' };
+}
 function cmpQ(yr, kinds) {
+  if (yr === 1) { const k = kinds.filter(x => x === 'dots' || x === 'num'); return cmp1Q(k.length ? k : ['dots']); }
+  kinds = kinds.filter(x => x !== 'dots'); if (!kinds.length) kinds = ['num'];
   for (let t = 0; t < 200; t++) {
     const kind = pickOne(kinds), same = Math.random() < 0.2;
     let l, r, lv, rv;
@@ -1517,7 +1614,21 @@ function cmpQ(yr, kinds) {
 // sides (36 + 17 = ☐ + 20). Always exactly one whole-number answer.
 const BAL_OP = { '+': (a, b) => a + b, '−': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b };
 const sideVal = s => s.length === 1 ? s[0] : BAL_OP[s[1]](s[0], s[2]);
+// Year 1 (B2): one-digit + and − on both sides (2 + 5 = 3 + ☐, 7 − ☐ = 4 + 1),
+// both sides 2 to 10, drawn over a level see-saw
+function bal1Q() {
+  for (let t = 0; t < 200; t++) {
+    const v = rnd(2, 10), L = oneDigitEx(v), R = oneDigitEx(v);
+    if (L[0] === R[0] || L[2] === R[2] || L[0] === R[2] || L[2] === R[0]) continue; // the same number on both sides gives it away
+    const [S, i] = pickOne([[L, 0], [L, 2], [R, 0], [R, 2]]), ans = S[i];
+    const side = s => (s === S ? s.map((x, j) => j === i ? '☐' : x) : s).join(' ');
+    const text = `${side(L)} = ${side(R)}`;
+    return { kind: 'bal', yr: 1, saw: true, text, ans, say: signWords(text).replace('equals', 'is the same as').replace('☐', 'what') + '?' };
+  }
+  return { kind: 'bal', yr: 1, saw: true, text: '2 + 5 = 3 + ☐', ans: 4, say: '2 plus 5 is the same as 3 plus what?' };
+}
 function balQ(yr) {
+  if (yr === 1) return bal1Q();
   for (let t = 0; t < 200; t++) {
     const type = pickOne(['one', 'one', 'ten', 'add', 'add', 'mul', 'sub', 'mix']);
     let L, R;
@@ -2042,19 +2153,22 @@ const ACTS = {
     pic: clockSvg({ h: 10, m: 10 }),
     options: [
       { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · half and quarter'], [3, '3 · 5 minutes'], [4, '4 · any minute']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Year 1)']] },
     ],
-    defaults: age => age === 5 ? { yr: 1, kinds: ['face'], n: 6 } : { yr: 3, kinds: ['face', 'words'], n: 12 },
-    // Year 1: on the hour, write the hour before "o'clock". Then "h : mm",
-    // to the half and quarter hour, 5 minutes (minute ticks on), any minute.
+    defaults: age => age === 5 ? { yr: 1, kinds: ['face', 'match'], n: 6 } : { yr: 3, kinds: ['face', 'words'], n: 12 },
+    // Year 1: on the hour, write the hour before "o'clock", or Match (tap the
+    // digital clock). Then "h : mm", to the half and quarter hour, 5 minutes
+    // (minute ticks on), any minute. Words from Year 2; Match only in Year 1 so far.
     make: c => {
-      const yr = c.yr, h = rnd(1, 12);
+      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => yr === 1 ? k !== 'words' : k !== 'match'), k = pickOne(kinds.length ? kinds : ['face']);
+      if (k === 'match') return clockMatchQ();
       const m = yr === 1 ? 0 : yr === 2 ? pickOne([0, 15, 30, 30, 45]) : yr === 3 ? rnd(0, 11) * 5 : rnd(0, 59);
-      const words = yr > 1 && pickOne(c.kinds) === 'words' ? timeWords(h, m) : null;
+      const words = k === 'words' ? timeWords(h, m) : null;
       if (yr === 1) return { kind: 'clock', h, m, ans: h };
       return { kind: 'clock', h, m, words, ticks: yr >= 3, two: true, parts: [h, m], ans: `${h}:${String(m).padStart(2, '0')}` };
     },
-    key: c => `clock~${c.yr}|${['face', 'words'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    // Match only changes Year 1, so Years 2–4 leave it out of the record key
+    key: c => `clock~${c.yr}|${['face', 'words', 'match'].filter(k => c.kinds.includes(k) && (k !== 'match' || c.yr === 1)).join(',') || 'face'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').split(',').join(', ')} · ${n} questions`; },
   },
   money: {
@@ -2150,31 +2264,32 @@ const ACTS = {
   },
   // tap cards (no writing): tiles under the question, marked with Mark like the rest
   tf: {
-    name: 'True or false', ages: [8], setup: 'opts', say: 'Is it true? Tap the tick or the cross.',
+    name: 'True or false', ages: [5, 8], setup: 'opts', say: 'Is it true? Tap the tick or the cross.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="30" text-anchor="middle" font-size="24">6 × 4 = 25</text><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="44" width="30" height="30" rx="5"/><rect x="66" y="44" width="30" height="30" rx="5"/><path d="M31 60l6 6l10 -13M74 52l14 14M88 52l-14 14"/></g></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[4, '4 · four digits, tables, × 10']] }],
-    defaults: () => ({ yr: 4, n: 12 }),
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [4, '4 · four digits, tables, × 10']] }],
+    defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => tfQ(c.yr),
     key: c => `tf~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `True or false · Year ${y} · ${n} questions`; },
   },
   cmp: {
-    name: 'More or less', ages: [8], setup: 'opts', say: 'Which sign goes in the box? Tap it.',
+    name: 'More or less', ages: [5, 8], setup: 'opts', say: 'More, less, or the same? Tap your answer.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="34" y="34" text-anchor="middle" font-size="24">47</text><rect x="50" y="14" width="22" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/><text x="90" y="34" text-anchor="middle" font-size="24">74</text><text x="60" y="72" text-anchor="middle" font-size="24">&lt;  =  &gt;</text></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · to 10,000, fractions']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['num', 'Numbers'], ['sum', 'Sums'], ['frac', 'Fractions']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [4, '4 · to 10,000, fractions']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['dots', 'Dots (Year 1)'], ['num', 'Numbers'], ['sum', 'Sums (Year 4)'], ['frac', 'Fractions (Year 4)']] },
     ],
-    defaults: () => ({ yr: 4, kinds: ['num', 'sum', 'frac'], n: 12 }),
+    defaults: age => age === 5 ? { yr: 1, kinds: ['dots', 'num'], n: 6 } : { yr: 4, kinds: ['num', 'sum', 'frac'], n: 12 },
     make: c => cmpQ(c.yr, c.kinds),
-    key: c => `cmp~${c.yr}|${['num', 'sum', 'frac'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.split(',').map(x => ({ num: 'numbers', sum: 'sums', frac: 'fractions' })[x]).join(', ')} · ${n} questions`; },
+    // only the kinds that year has go in the record key (Year 1 dots and numbers, Year 4 numbers, sums, fractions)
+    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
+    label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.split(',').map(x => ({ dots: 'dots', num: 'numbers', sum: 'sums', frac: 'fractions' })[x]).join(', ')} · ${n} questions`; },
   },
   bal: {
-    name: 'Balance', ages: [8], setup: 'opts', say: 'Both sides are the same. What number goes in the box?',
+    name: 'Balance', ages: [5, 8], setup: 'opts', say: 'Both sides are the same. What number goes in the box?',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="32" text-anchor="middle" font-size="24">6 × 4 =</text><text x="66" y="66" text-anchor="end" font-size="24">12 ×</text><rect x="72" y="46" width="20" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[4, '4 · both sides, to 10,000']] }],
-    defaults: () => ({ yr: 4, n: 12 }),
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, see-saw'], [4, '4 · both sides, to 10,000']] }],
+    defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => balQ(c.yr),
     key: c => `bal~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `Balance · Year ${y} · ${n} questions`; },
@@ -2521,7 +2636,7 @@ function goSetup(from = 'home') {
         if (o.key === 'yr') return `<button data-v="${val}" class="yrb${val === sug ? ' sug' : ''}"><span class="yn">Year ${val}</span><span class="yx">${String(txt).split(' · ').slice(1).join(' · ')}</span></button>`;
         return `<button data-v="${val}">${txt}</button>`;
       }).join('')}</div>${
-      o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want > sug ? ` (Year ${sug} is the highest here so far)` : want < sug ? ` (Year ${sug} is the lowest here so far)` : ''}</p>` : ''}</div>`).join('');
+      o.key === 'yr' ? `<p class="hint sughint">Suggested for age ${age}: Year ${want}${want === sug ? '' : ` (Year ${sug} is the ${want > sug && sug === maxYear(act) ? 'highest' : want < sug && sug === Math.min(...yearsOf(act)) ? 'lowest' : 'nearest'} here so far)`}</p>` : ''}</div>`).join('');
   $('#nOpts').parentElement.hidden = !!ACTS[act].noCount; // the grid sets its own count
   $('#nOpts').innerHTML = countsOf(act).map(v => `<button data-v="${v}">${v}</button>`).join('');
   $('#setupHint').textContent = kind === 'keypad' ? 'Takeaways never go below zero. Division always comes out exactly: you divide by the second number.' : '';
@@ -2663,7 +2778,7 @@ function qMarkup(q) {
     const size = q.axes ? `--n:${across + 0.5};--rows:${rows + 0.5};grid-template-columns:auto repeat(${across}, auto)` : `--n:${across};--rows:${rows}`;
     return {
       cls: 'tap', anchor: '.tiles',
-      html: `<div class="tq">${q.top}</div>${q.tray ? '<div class="tray"></div>' : ''}<div class="tiles${q.cells ? ' cells' : ''}${q.axes ? ' axes' : ''}${q.tray ? ' coins' : ''}" style="${size}">${grid}</div>`,
+      html: `<div class="tq">${q.top}</div>${q.tray ? '<div class="tray"></div>' : ''}<div class="tiles${q.cells ? ' cells' : ''}${q.axes ? ' axes' : ''}${q.tray ? ' coins' : ''}${q.big ? ' bigt' : ''}" style="${size}">${grid}</div>`,
       // the tiles take their size from the card (see the CSS); the words keep to the top 45% (30% over a grid)
       // (q.topf: a picture question may take more of the card, as Angles does)
       vars: { '--h': ((q.th || 1.3) + 1.9) / (q.topf || (q.cells ? 0.3 : 0.45)), '--c': Math.max(q.tc || 0, 4) + 1.4 },
@@ -2768,10 +2883,12 @@ function qMarkup(q) {
   }
   // balance: the equation with its box, then "☐ = ___"
   if (q.kind === 'bal') {
-    const box = '<span class="bx"></span>';
+    const box = '<span class="bx"></span>', w = q.text.length * 0.5;
+    // Year 1: a level see-saw under the equation, the two sides over its two ends
+    const saw = q.saw ? `<svg class="saw" viewBox="0 0 ${w * 20} 16" style="width:${w}em;height:.8em"><line x1="3" y1="3" x2="${w * 20 - 3}" y2="3" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M${w * 10} 4.5L${w * 10 - 8} 15H${w * 10 + 8}z" fill="currentColor"/></svg>` : '';
     return {
       cls: 'miss',
-      html: `<div class="eq">${q.text.replace('☐', box)}</div><div class="al">${box}<span>=</span><span class="wl"></span></div>`,
+      html: `<div class="eq">${q.text.replace('☐', box)}</div>${saw}<div class="al"${q.saw ? ' style="margin-top:1.1em"' : ''}>${box}<span>=</span><span class="wl"></span></div>`,
       vars: { '--d': Math.max(...q.text.split(' ').map(s => /^\d+$/.test(s) ? s.length : 1)), '--h': 5.4, '--c': q.text.length * 0.56 + 1.6 },
     };
   }
@@ -2827,7 +2944,7 @@ function qMarkup(q) {
 // what the card's speaker says
 const WORD = { '+': 'plus', '-': 'take away', '*': 'times', '/': 'divided by' };
 function cardSay(q) {
-  if (q.kind === 'tap') return q.cells ? q.say : `${q.say} ${q.tiles.map(t => t.say || t.label).join(', ')}.`; // the question, then each tile in order (not every square of a grid)
+  if (q.kind === 'tap') return q.cells || q.quiet ? q.say : `${q.say} ${q.tiles.map(t => t.say || t.label).join(', ')}.`; // the question, then each tile in order (not every square of a grid)
   if (q.say) return q.say; // questions that carry their own words (patterns, stories, doubles, year sums)
   if (q.kind === 'col' || q.kind === 'div') return `${q.a} ${WORD[q.op]} ${q.b}`;
   if (q.kind === 'miss') return `${q.hide === 'a' ? 'what' : q.a} ${WORD[q.op]} ${q.hide === 'b' ? 'what' : q.b} makes ${q.c}?`;
@@ -3403,7 +3520,7 @@ function showDone(res, first, n) {
   $('#dStats').innerHTML = `<div class="dTime">${fmtTime(res.ms)}</div>`
     + `<div>First try <b>${first}</b> of ${n}</div>`
     + (res.isBest && res.hadPrev ? '<div class="dBest">New best!</div>' : !res.isBest ? `<div class="faint">Best ${fmtTime(res.best)}</div>` : '');
-  const up = maxYear(act) && cfg && cfg.yr < maxYear(act) ? cfg.yr + 1 : 0;
+  const up = (cfg && yearsOf(act).filter(y => y > cfg.yr).sort((a, b) => a - b)[0]) || 0; // the next year it has (Years 1 and 4 only: 1 → 4)
   $('#dUp').hidden = !up; $('#dUp').dataset.yr = up; $('#dUp').textContent = `Harder: Year ${up}`;
   $('#dAgain').textContent = playScreen === 'grid' ? 'Another grid' : 'Another sheet';
   // a little burst of block colours from behind the tick

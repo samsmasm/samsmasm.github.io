@@ -21,11 +21,11 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Count forwards and backwards from any number, within 10 then 20 *(6m)*, then within 100. ✓ (Number patterns, Year 1)
 - Count forwards and backwards in 2s and 10s, 0–100. Knows: counting in 2s from 0 gives even numbers, from an odd number gives odd. ✓ (Number patterns, Number lines)
 - Say the number before or after, to 10 *(6m)* then 20.
-- Compare and order numbers to 20 *(6m)*, then to 100; ordinals 1st to 5th *(6m)*, then with suffixes (1st, 2nd, 3rd...) to 100.
+- Compare and order numbers to 20 *(6m)*, then to 100; ordinals 1st to 5th *(6m)*, then with suffixes (1st, 2nd, 3rd...) to 100. ✓ partly (More or less, Year 1: two numbers to 20; not ordering, ordinals or to 100)
 - Put numbers on a fully labelled number line *(6m)*, then on a partly labelled one (17 on a line marked in 5s). ✓ partly (Number lines)
 - Subitise (see without counting) 3–5 objects *(6m)*, then smaller groups inside a bigger set (3 and 5 in 8). ✓ (How many?, Kind Groups: two dice in two colours)
 - Count up to 10 objects one by one *(6m)*, then up to 20, also in pairs. ✓ (How many?)
-- More, less or the same *(6m)*.
+- More, less or the same *(6m)*. ✓ (More or less, Year 1: two heaps of dots, "same" tile)
 - Find totals to 20 by grouping in pairs, 5s or 10s. Knows: ten ones is one 10; 12 is six pairs or one 10 and two ones. ✓ (Teen numbers)
 - Numbers in te reo Māori to 30.
 
@@ -45,8 +45,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Know NZ coins and notes and their values. ✓ (Money, Year 1)
 
 ### Algebra (patterns and number sentences)
-- Open number sentences with one-digit numbers (2 + 5 = 3 + __). ✓ partly (Missing number)
-- True or false? (7 − 5 = 6 − 4)
+- Open number sentences with one-digit numbers (2 + 5 = 3 + __). ✓ (Balance, Year 1, over a see-saw; Missing number)
+- True or false? (7 − 5 = 6 − 4) ✓ (True or false, Year 1, dots under the sides on about half)
 - Copy, continue and make repeating patterns: two elements *(6m)* (cat, dog, cat, dog...), then three.
 - Find the missing element (red, green, blue, red, __, blue).
 - Ordinals to 5th for positions in a pattern.
@@ -54,7 +54,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Measurement
 - Compare two things by length, weight or capacity, directly *(6m)*, then using a third object. Words: longer, shorter, taller, heavier, lighter. ✋ (could be pictures)
 - Days of the week in order, the day before and after *(6m)*; weekdays and weekend.
-- Tell the time to the hour (o'clock) on analogue and digital clocks. ✓ partly (Clocks, Year 1: analogue only)
+- Tell the time to the hour (o'clock) on analogue and digital clocks. ✓ (Clocks, Year 1: write the hour, and Match: tap the digital clock for a face)
 - Choose a sensible unit for how long things take (seconds, minutes, hours, days, weeks, months, years).
 - Put events of the day in order (before, after, yesterday, tomorrow); parts of the day (morning, noon, evening, midnight).
 
