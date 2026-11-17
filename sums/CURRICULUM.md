@@ -317,9 +317,9 @@ Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, C3c, 2026-11-17): Add and take aw
 - Clustered bar graphs for paired categories (two colours side by side, with a key), and questions about them. ✓ (Graphs, Year 5: three days, two colours with a key, how many more on one day, one colour altogether, tap the day with more; C4a)
 
 ### Probability
-- Run a chance game many times and describe the outcomes ✋ (a screen can run the trials).
-- Call an everyday event impossible, unlikely, even chance, likely or certain.
-- Put events on a 0-to-1 line by how likely they are.
+- Run a chance game many times and describe the outcomes ✋ (a screen can run the trials). ✓ partly (Chance, Year 5, Try it: "Pick 20" really picks 20 times from the bag, a tally fills, then "Which came up most?"; C4b)
+- Call an everyday event impossible, unlikely, even chance, likely or certain. ✓ (Chance, Year 5, Words: picking a colour from a bag of counters, five word tiles; bags, not everyday events; C4b)
+- Put events on a 0-to-1 line by how likely they are. ✓ (Chance, Year 5, 0 to 1 line: five marks to tap, 0, between, ½, between, 1; C4b)
 - Knows: with equally likely outcomes, the chance is ways it can happen ÷ all outcomes; all the chances add to 1.
 
 ---

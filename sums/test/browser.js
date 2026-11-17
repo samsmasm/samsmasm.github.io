@@ -34,7 +34,8 @@ const HELPERS = () => {
   };
   // the answer where she should write it: under the line, on the division bar, on the missing-number line
   window.writeNum = (c, n, extra = [], mirror = false) => {
-    if (c.q.kind === 'tap') { c.pick = [].concat(c.q.right); paintTap(c); return; } // tap cards: choose the right tile(s)
+    if (c.q.form === 'try' && !c.q.done) chancePick(c, true); // Chance, Try it: the 20 picks first
+    if (c.q.kind === 'tap') { c.pick = c.q.any ? [[].concat(c.q.right)[0]] : [].concat(c.q.right); paintTap(c); return; } // tap cards: choose the right tile(s)
     if (c.q.kind === 'frac') { // "3/4": top number above the bar, bottom number below
       const [t, b] = String(n).split('/');
       c.strokes = [...extra, ...numStrokes(t, -0.3, -1.6, 0.9, mirror), ...numStrokes(b, -0.3, 0.35, 0.9, mirror)];
@@ -368,7 +369,7 @@ const fakeSpeech = () => {
     const room = c.q.kind === 'bond' ? true // she writes in the circle, checked separately
       : ['expr', 'miss', 'seq', 'bal', 'rnum'].includes(c.q.kind) ? c.ay > 2.5 * c.F
       : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
-      : c.q.kind === 'tap' ? r.bottom <= w.bottom + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const t = b.getBoundingClientRect(); return t.width >= (c.q.cells ? 29 : 39) && t.height >= (c.q.cells ? 29 : 39) && t.bottom <= w.bottom + 1 && t.left >= w.left - 1 && t.right <= w.right + 1; }) // tiles big enough to tap
+      : c.q.kind === 'tap' ? r.bottom <= w.bottom + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const t = b.getBoundingClientRect(); const m = c.q.cells ? 29 : c.q.tcls === 'nline' ? 31 : 39; return t.width >= m && t.height >= m && t.bottom <= w.bottom + 1 && t.left >= w.left - 1 && t.right <= w.right + 1; }) // tiles big enough to tap
       : ['clock', 'money', 'graph', 'shape', 'ruler', 'prot', 'dec', 'unit'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
       : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
@@ -683,7 +684,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,graph,map,money,muldiv,round,seq,shape,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a, C3b, C3c, C4a): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes, Graphs');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,chance,clock,cmp,dec,fof,graph,map,money,muldiv,round,seq,shape,tf,units'), 'Year 5 so far (C1 to C4): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes, Graphs, Chance');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -1150,6 +1151,73 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0, 'Graphs Year 5 (all kinds) fit ' + (await fits()).join(' '));
   ok((await writeAllAndMark()).length === 0, 'Graphs Year 5: written and tapped answers marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y5.png' });
+
+  // ---- Chance (C4b, Year 5): a bag of counters; words, a 0 to 1 line, and Try it (20 real picks)
+  const ch = await page.evaluate(() => {
+    const bad = [], seen = {};
+    for (let i = 0; i < 1500; i++) {
+      const q = chanceQ(['words', 'line', 'try']);
+      seen[q.form] = (seen[q.form] || 0) + 1;
+      if (q.cols.length !== sumOf(q.bag.map(b => b[1])) || q.cols.length > BAG_SPOTS.length || q.cols.length < 4) bad.push('bag size ' + JSON.stringify(q));
+      if (q.form === 'try') {
+        if (q.bag.length < 2 || new Set(q.bag.map(b => b[1])).size !== q.bag.length || q.got || q.tiles.length !== q.bag.length) bad.push('try ' + JSON.stringify(q));
+        continue;
+      }
+      const k = q.cols.filter(c => c === q.ask).length, N = q.cols.length, w = chanceWord(k, N);
+      if (w !== q.right || k !== q.k || N !== q.N) bad.push('answer ' + JSON.stringify(q));
+      if ((w === 1 && 2 * k > N - 2) || (w === 3 && 2 * k < N + 2)) bad.push('too close to half ' + JSON.stringify(q));
+      if (w === 0 && q.bag.length < 2) bad.push('impossible needs other colours ' + JSON.stringify(q));
+      if (q.form === 'words' && q.tiles[q.right].label !== q.ans) bad.push('words ans ' + JSON.stringify(q));
+      seen[q.form + w] = 1;
+    }
+    for (const f of ['words0', 'words1', 'words2', 'words3', 'words4', 'line0', 'line1', 'line2', 'line3', 'line4']) if (!seen[f]) bad.push('never ' + f);
+    if (!(seen.try > 350 && seen.words > 350 && seen.line > 350)) bad.push('mix ' + JSON.stringify(seen));
+    if (chanceQ(['line']).form !== 'line' || chanceQ(['nope']).kind !== 'tap') bad.push('kinds');
+    return bad.slice(0, 4);
+  });
+  ok(ch.length === 0, 'Chance: the answer matches the bag (impossible, unlikely, even, likely, certain), unlikely and likely clear of half, every word and mark comes up, Try it bags have different amounts ' + ch.join(' | '));
+  // Try it: really random, a tally of 20, any colour tied for most is right
+  const tr = await page.evaluate(() => {
+    const bad = [], tops = {};
+    act = 'chance'; buildSheet({ yr: 5, kinds: ['try'], n: 6 }); show('sheet');
+    const c = cards[0];
+    if (!c.el.querySelector('.tiles.wait') || !c.el.querySelector('.pick20')) bad.push('waits before picking');
+    c.el.querySelector('.tt').click();
+    if (c.pick.length) bad.push('a tile tapped before the picks counted');
+    chancePick(c, true);
+    if (sumOf(c.q.got) !== 20 || c.el.querySelector('.tiles.wait') || !c.el.querySelector('.pick20').disabled) bad.push('20 picks ' + JSON.stringify(c.q.got));
+    const marks = c.el.querySelectorAll('.tally line').length;
+    if (marks !== 20) bad.push('tally marks ' + marks);
+    const mx = Math.max(...c.q.got);
+    if (!c.q.right.length || !c.q.right.every(j => c.q.got[j] === mx)) bad.push('right ' + JSON.stringify(c.q));
+    // the picks follow the bag: 300 runs of a 9 to 1 bag, red should come up most nearly always
+    const q = { bag: [['red', 9], ['blue', 1]] };
+    for (let t = 0; t < 300; t++) {
+      const k = { q: { ...chanceQ(['try']), bag: q.bag, cols: [] }, el: document.createElement('div') };
+      k.el.innerHTML = '<button class="pick20"></button><span class="tally"></span><div class="tiles"></div>';
+      chancePick(k, true);
+      tops[k.q.ans] = (tops[k.q.ans] || 0) + 1;
+    }
+    if (!(tops.red > 290)) bad.push('9 to 1 bag ' + JSON.stringify(tops));
+    // a tie: either colour is right, both together are not
+    const t2 = { q: { kind: 'tap', any: true, right: [0, 2], tiles: [{ label: 'a' }, { label: 'b' }, { label: 'c' }] }, pick: [2] };
+    if (!readAnswer(t2).ok || (t2.pick = [0, 2], readAnswer(t2).ok) || (t2.pick = [1], readAnswer(t2).ok)) bad.push('tie');
+    return bad;
+  });
+  ok(tr.length === 0, 'Chance Try it: tiles wait for "Pick 20", then 20 tally marks from real picks that follow the bag; any colour tied for most is right ' + tr.join(' | '));
+  for (const kinds of [['words', 'line', 'try'], ['words'], ['line'], ['try']]) for (const n of [6, 12]) {
+    await page.evaluate((kinds, n) => { hideDone(); act = 'chance'; buildSheet({ yr: 5, kinds, n }); show('sheet'); }, kinds, n);
+    ok((await fits()).length === 0, `Chance ${kinds.join(',')} × ${n} fits, tiles big enough to tap ` + (await fits()).join(' '));
+    if (kinds.length === 1) ok(await page.evaluate(() => cards.every(c => [...c.el.querySelectorAll('.tt')].every(b => b.scrollWidth <= b.clientWidth + 1))), `Chance ${kinds[0]}: every tile's words fit inside it`);
+    ok((await writeAllAndMark()).length === 0, `Chance ${kinds.join(',')} × ${n}: tapped right, marked right`);
+  }
+  await page.evaluate(() => { hideDone(); act = 'chance'; buildSheet({ yr: 5, kinds: ['words', 'line', 'try'], n: 6 }); show('sheet'); const f = ['words', 'line', 'try']; for (let i = 0; i < 6; i++) { let q; do q = chanceQ(f); while (q.form !== f[i % 3]); cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); } chancePick(cards[5], true); });
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/30-chance.png' });
+  ok(await page.evaluate(() => { const c = cards[0]; c.pick = [(c.q.right + 1) % 5]; paintTap(c); const a = !readAnswer(c).ok; c.pick = [c.q.right]; return a && readAnswer(c).ok; }), 'Chance: the wrong word is wrong, the right one right');
+  ok(await page.evaluate(() => cards[1].el.querySelectorAll('.tiles.nline .tt').length === 5 && cards[1].el.querySelectorAll('.tiles.nline .tick').length === 2 && cards[0].el.querySelectorAll('.tiles.wrap .tt').length === 5), 'Chance: five word tiles; five marks on the line (0, ½, 1 and two between)');
+  ok(await page.evaluate(() => /^Picking a \w+ counter is what\? impossible, unlikely, even chance, likely, certain\.$/.test(cardSay(cards[0].q)) && /^Where on the line from 0 to 1 is picking a \w+ counter\? 0, between 0 and a half, a half, between a half and 1, 1\.$/.test(cardSay(cards[1].q))), 'Chance read aloud: the question then each tile');
+  ok(await page.evaluate(() => [ACTS.chance.key({ yr: 5, kinds: ['try', 'words'], n: 6 }), ACTS.chance.key({ yr: 5, kinds: [], n: 12 }), labelFor('chance~5|words,line,try|6')].join(' / ')
+    === 'chance~5|words,try|6 / chance~5|words,line,try|12 / Chance · Year 5 · words, 0 to 1 line, try it · 6 questions'), 'Chance record keys and label');
 
   // ---- Shapes
   const shq = await page.evaluate(() => {

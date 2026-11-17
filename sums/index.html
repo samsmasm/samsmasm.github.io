@@ -297,6 +297,17 @@
   .tap .tiles.cells.coins { gap: 4px; --tw: max(30px, min(calc(42cqh / var(--rows)), calc(84cqw / var(--n)), 60px)); }
   .tap .coins .tt { border-radius: calc(var(--tw) * .12); border-width: 2px; margin: 0; }
   .tap .tray .tri svg { display: block; }
+  /* Chance (Year 5): five words in smaller type; a 0 to 1 line through five tiles; Try it's button, tiles wait for the picks */
+  .tap .tiles.words5 .tt { font-size: min(calc(var(--tw) * .3), calc(var(--ww) * .15)); line-height: 1.05; }
+  /* five marks have to fit a phone card: a little smaller than other tiles at the narrowest (32 px) */
+  .tap .tiles.nline { position: relative; --tw: max(32px, min(38cqh, calc(80cqw / 5), 84px)); gap: 2.5cqw; }
+  .tap .tiles.nline::before { content: ''; position: absolute; left: calc(var(--tw) / 2); right: calc(var(--tw) / 2); top: 50%; border-top: 3px solid var(--ink); }
+  .tap .nline .tt { position: relative; }
+  .tap .tick { display: block; width: 3px; height: 40%; background: var(--ink); }
+  .tap .pick20 { font-size: .6em; font-weight: 700; padding: .15em .7em; min-height: 34px; margin: .15em 0 .1em; white-space: nowrap; }
+  .tap .pick20:disabled { color: #777; border-color: #999; }
+  .tap .tiles.wait .tt { opacity: .3; }
+  .tap .sw.round { border-radius: 50%; }
   .tap .tw.twl { display: flex; align-items: center; gap: .2em; white-space: nowrap; }
   .tap .cells .axx { width: var(--tw); }
   /* Year 1 (B2): a sentence with dots under each side; "same" and digital-clock tiles */
@@ -2974,6 +2985,109 @@ function towersSvg(hs, cols) {
   s += `<line x1="-4" y1="${H}" x2="${b * 2 + gap + 4}" y2="${H}" stroke="${INK}" stroke-width="1"/>`;
   return `<svg ${emBox([-5, -1, b * 2 + gap + 10, H + 3], 0.065)}>${s}</svg>`;
 }
+// ---- Chance (C4b, Year 5): a bag of counters in block colours; a picked one is
+// put back. Kind Words: "Picking ● is..." with five word tiles (impossible,
+// unlikely, even chance, likely, certain). Kind Line: the same on a 0 to 1 line
+// with five marks to tap. Kind Try it: "Pick 20" really picks 20 times at random
+// (never staged), a tally fills, then "Which came up most?" about what happened;
+// a tie for most means any of the tied colours is right (q.any).
+const CHANCE_WORDS = ['impossible', 'unlikely', 'even chance', 'likely', 'certain'];
+const CHANCE_KINDS = ['words', 'line', 'try'];
+const CHANCE_TILES = CHANCE_WORDS.map(w => ({ html: w.replace(' ', '<br>'), label: w, say: w }));
+const TICK = '<span class="tick"></span>';
+const CHANCE_LINE = [
+  { html: '0', label: '0', say: '0' }, { html: TICK, label: 'below 1/2', say: 'between 0 and a half' },
+  { html: `<span style="font-size:.6em">${frHtml(1, 2)}</span>`, label: '1/2', say: 'a half' },
+  { html: TICK, label: 'above 1/2', say: 'between a half and 1' }, { html: '1', label: '1', say: '1' },
+];
+// counters settle from the bottom of the bag up: rows of 3, 4, 4, 4 (15 at most)
+const BAG_SPOTS = [[21, 53], [30, 53], [39, 53], ...[45, 36, 27].flatMap(y => [16.5, 25.5, 34.5, 43.5].map(x => [x, y]))];
+const bagBody = cols => `<path d="M15 17C1 30 2 59 30 59C58 59 59 30 45 17" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>`
+  + `<path d="M15 17Q30 13 45 17M17 15L13 4L22 8L30 3L38 8L47 4L43 15" fill="none" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`
+  + cols.map((c, i) => `<circle cx="${BAG_SPOTS[i][0]}" cy="${BAG_SPOTS[i][1]}" r="4.2" fill="${BLOCK[c]}" stroke="${INK}" stroke-width=".8"/>`).join('');
+const chanceBagSvg = (cols, E = 0.055) => `<svg ${emBox([0, 0, 60, 61], E)}>${bagBody(cols)}</svg>`;
+// a tally for each colour in the bag (room for 20 in one row: four gates of five)
+function tallySvg(bag, got) {
+  const RH = 11, W = 14 + 4 * 15;
+  let s = '';
+  bag.forEach(([nm], r) => {
+    const y = r * RH + 1.5, n = got ? got[r] : 0;
+    s += `<circle cx="5" cy="${y + 4}" r="3.8" fill="${BLOCK[nm]}" stroke="${INK}" stroke-width=".7"/>`;
+    for (let i = 0; i < n; i++) {
+      const gx = 14 + Math.floor(i / 5) * 15, j = i % 5;
+      s += j < 4 ? `<line x1="${gx + j * 3}" y1="${y}" x2="${gx + j * 3}" y2="${y + 8}"/>` : `<line x1="${gx - 1.5}" y1="${y + 7}" x2="${gx + 10.5}" y2="${y + 1}"/>`;
+    }
+  });
+  return `<svg ${emBox([0, 0, W, bag.length * RH], 0.055)}><g stroke="${INK}" stroke-width="1.2" stroke-linecap="round">${s}</g></svg>`;
+}
+// a bag where picking the asked colour is CHANCE_WORDS[want]; unlikely and likely
+// are clearly off half (at least one counter either side of it)
+function chanceBag(want) {
+  const cs = shuffled(Object.keys(BLOCK)), ask = cs[0];
+  for (;;) {
+    const N = rnd(4, 12);
+    const k = want === 0 ? 0 : want === 4 ? N : want === 2 ? N / 2 : want === 1 ? rnd(1, Math.floor((N - 2) / 2)) : rnd(Math.ceil((N + 2) / 2), N - 1);
+    if (!Number.isInteger(k) || k < 0 || k > N || (want === 1 && 2 * k > N - 2) || (want === 3 && (2 * k < N + 2 || k === N))) continue;
+    const r = N - k, bag = k ? [[ask, k]] : [];
+    if (r) { // the rest in one or two other colours (impossible: always two or three colours, none of them the asked one)
+      const two = r >= 2 && (k === 0 || Math.random() < 0.5), a = two ? rnd(1, r - 1) : r;
+      bag.push([cs[1], a]); if (two) bag.push([cs[2], r - a]);
+    }
+    return { ask, bag, N, k, cols: shuffled(bag.flatMap(([nm, n]) => Array(n).fill(nm))) };
+  }
+}
+const chanceWord = (k, N) => k === 0 ? 0 : k === N ? 4 : 2 * k === N ? 2 : 2 * k < N ? 1 : 3;
+const CHANCE_TRY_SAY = 'Press Pick 20. Each time, one counter is picked and put back. Which colour came up most?';
+function chanceQ(kinds) {
+  const kind = pickOne(kinds.filter(k => CHANCE_KINDS.includes(k)).length ? kinds.filter(k => CHANCE_KINDS.includes(k)) : CHANCE_KINDS);
+  if (kind === 'try') {
+    // two or three colours, different amounts, 5 to 12 counters
+    const cs = shuffled(Object.keys(BLOCK)).slice(0, rnd(2, 3));
+    let ns; do ns = cs.map(() => rnd(1, 7)); while (new Set(ns).size < ns.length || sumOf(ns) < 5 || sumOf(ns) > 12);
+    const bag = cs.map((nm, i) => [nm, ns[i]]);
+    return {
+      kind: 'tap', chance: true, form: 'try', bag, cols: shuffled(bag.flatMap(([nm, n]) => Array(n).fill(nm))), got: null, done: false,
+      tc: 7.9, th: 4.4, topf: 0.6, tcls: 'wait', any: true, right: [],
+      tiles: cs.map(nm => ({ html: `<span class="tsw" style="background:${BLOCK[nm]};border-radius:50%"></span>`, label: nm, say: nm })),
+      say: CHANCE_TRY_SAY, ans: '',
+    };
+  }
+  const want = pickOne([0, 1, 1, 2, 2, 3, 3, 4]), B = chanceBag(want);
+  const q = { kind: 'tap', chance: true, form: kind, ask: B.ask, bag: B.bag, cols: B.cols, k: B.k, N: B.N, right: want, ans: kind === 'words' ? CHANCE_WORDS[want] : CHANCE_LINE[want].label };
+  if (kind === 'words') return { ...q, tc: 7.4, th: 3.4, topf: 0.5, wrap: 3, tcls: 'words5', tiles: CHANCE_TILES, say: `Picking a ${B.ask} counter is what?` };
+  return { ...q, tc: 7.8, th: 3.4, topf: 0.55, tcls: 'nline', tiles: CHANCE_LINE, say: `Where on the line from 0 to 1 is picking a ${B.ask} counter?` };
+}
+// the question part of a Chance card (Try it shows the tally so far)
+function chanceTop(q) {
+  const ask = q.ask && swatch(q.ask, true), bag = chanceBagSvg(q.cols);
+  if (q.form === 'words') return `<span class="tpic" style="flex-direction:row;gap:.5em">${bag}<span class="tw" style="text-align:left">Picking<br>${ask} is...</span></span>`;
+  if (q.form === 'line') return `<span class="tpic" style="flex-direction:row;gap:.5em">${bag}<span class="tw" style="text-align:left">Picking ${ask}:<br>where on<br>the line?</span></span>`;
+  // the bag, beside it the tally with the button under it, then the question
+  return `<span class="tpic"><span class="tpic" style="flex-direction:row;gap:.4em">${bag}<span class="tpic"><span class="tally">${tallySvg(q.bag, q.got)}</span>`
+    + `<button class="pick20"${q.got ? ' disabled' : ''}>${q.done ? 'Picked 20' : 'Pick 20'}</button></span></span><span class="tw">Which came up most?</span></span>`;
+}
+// Try it: 20 real picks, one at a time (all at once with reduced motion, or for the tests)
+function chancePick(c, instant) {
+  const q = c.q; if (q.got) return;
+  if (sheetStart === null) sheetStart = Date.now();
+  const pool = q.bag.flatMap(([nm, n]) => Array(n).fill(nm)), names = q.bag.map(b => b[0]);
+  q.got = names.map(() => 0);
+  c.el.querySelector('.pick20').disabled = true;
+  instant = instant || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = 0;
+  const step = () => {
+    q.got[names.indexOf(pool[Math.floor(Math.random() * pool.length)])]++;
+    c.el.querySelector('.tally').innerHTML = tallySvg(q.bag, q.got);
+    if (++i < 20) return instant ? step() : setTimeout(step, 90);
+    const mx = Math.max(...q.got);
+    q.right = q.got.map((n, j) => n === mx ? j : -1).filter(j => j >= 0);
+    q.ans = q.right.map(j => names[j]).join(' or ');
+    q.done = true; q.tcls = '';
+    c.el.querySelector('.pick20').textContent = 'Picked 20';
+    c.el.querySelector('.tiles').classList.remove('wait');
+  };
+  step();
+}
 const textSvg = lines =>`<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -3465,6 +3579,18 @@ const ACTS = {
     key: c => `map~${c.yr}|${c.yr === 5 ? 'go' : ['tap', 'where'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Map · Year ${y} · ${kinds.split(',').map(x => ({ tap: 'tap C4', where: 'where is it?', go: 'compass moves' })[x]).join(', ')} · ${n} questions`; },
   },
+  chance: {
+    name: 'Chance', ages: [8], setup: 'opts', say: 'How likely is it? Tap it.',
+    pic: `<svg viewBox="-30 -11 120 84">${bagBody(['red', 'blue', 'red', 'yellow', 'red', 'blue', 'red'])}</svg>`,
+    options: [
+      { key: 'yr', label: 'Year', values: [[5, '5 · likely, unlikely']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['words', 'Words'], ['line', '0 to 1 line'], ['try', 'Try it']] },
+    ],
+    defaults: () => ({ yr: 5, kinds: [...CHANCE_KINDS], n: 6 }),
+    make: c => chanceQ(c.kinds),
+    key: c => `chance~${c.yr}|${CHANCE_KINDS.filter(k => c.kinds.includes(k)).join(',') || CHANCE_KINDS.join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Chance · Year ${y} · ${kinds.split(',').map(x => ({ words: 'words', line: '0 to 1 line', try: 'try it' })[x]).join(', ')} · ${n} questions`; },
+  },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
     pic: (() => { // a little half-filled triangle grid
@@ -3919,7 +4045,7 @@ function qMarkup(q) {
     const size = q.axes ? `--n:${across + 0.5};--rows:${rows + 0.5};grid-template-columns:auto repeat(${across}, auto)` : `--n:${across};--rows:${rows}`;
     return {
       cls: 'tap', anchor: '.tiles',
-      html: `<div class="tq">${q.top}</div>${q.tray ? '<div class="tray"></div>' : ''}<div class="tiles${q.cells ? ' cells' : ''}${q.wrap ? ' wrap' : ''}${q.axes ? ' axes' : ''}${q.tray ? ' coins' : ''}${q.big ? ' bigt' : ''}" style="${size}">${grid}</div>`,
+      html: `<div class="tq">${q.chance ? chanceTop(q) : q.top}</div>${q.tray ? '<div class="tray"></div>' : ''}<div class="tiles${q.cells ? ' cells' : ''}${q.wrap ? ' wrap' : ''}${q.axes ? ' axes' : ''}${q.tray ? ' coins' : ''}${q.big ? ' bigt' : ''}${q.tcls ? ' ' + q.tcls : ''}" style="${size}">${grid}</div>`,
       // the tiles take their size from the card (see the CSS); the words keep to the top 45% (30% over a grid)
       // (q.topf: a picture question may take more of the card, as Angles does)
       vars: { '--h': ((q.th || 1.3) + 1.9) / (q.topf || (q.cells ? 0.3 : 0.45)), '--c': Math.max(q.tc || 0, 4) + 1.4 },
@@ -4269,8 +4395,9 @@ function wirePad(c) {
     if (c.q.kind !== 'tap' || c.el.dataset.state !== 'writing') return;
     const tr = e.target.closest('.tri'); // tray (Money, Make it): tapping one in the tray takes it out
     if (tr && c.q.tray) { c.pick.splice(+tr.dataset.k, 1); paintTap(c); return; }
+    if (e.target.closest('.pick20')) { chancePick(c); return; } // Chance, Try it: the 20 picks
     const t = e.target.closest('.tt');
-    if (!t) return;
+    if (!t || (c.q.form === 'try' && !c.q.done)) return; // Try it: the tiles wait for the picks
     if (sheetStart === null) sheetStart = Date.now();
     const i = +t.dataset.i;
     if (c.q.tray) { if (c.pick.length < TRAY_MAX) c.pick.push(i); paintTap(c); return; } // each tap drops one more in; nothing said, nothing added up
@@ -4514,7 +4641,9 @@ function readAnswer(c) {
   }
   if (c.q.kind === 'tap') { // the chosen tile (with multi: all the right ones and no others)
     const want = [].concat(c.q.right), p = [...c.pick].sort((x, y) => x - y);
-    return { text: p.map(i => c.q.tiles[i].label).join(' '), ok: p.length === want.length && want.every(i => p.includes(i)), backwards: [] };
+    // q.any (Chance, Try it): a tie for most, so any one of the right tiles is right
+    const ok = c.q.any ? p.length === 1 && want.includes(p[0]) : p.length === want.length && want.every(i => p.includes(i));
+    return { text: p.map(i => c.q.tiles[i].label).join(' '), ok, backwards: [] };
   }
   if (c.q.two) {
     const [l, r] = twoParts(c);
