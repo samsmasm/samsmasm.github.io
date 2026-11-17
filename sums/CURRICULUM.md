@@ -260,21 +260,21 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ## Year 5
 
-Nothing in Sums has a Year 5 or 6 option yet; the ticks here are activities whose own settings happen to reach.
+Year 5 buttons so far (C1, 2026-11-17): Add and take away, Times and divide, Number patterns; Place value goes up to 999,999. Other ticks are activities whose own settings happen to reach.
 
 ### Number
-- Read, write, compare and order numbers to 1,000,000.
+- Read, write, compare and order numbers to 1,000,000. ✓ partly (Place value up to 999,999: expanded form and 1,000 / 10,000 / 100,000 more or less; not comparing or ordering)
 - Factor pairs of any product up to 10 × 10 (3 and 4 are a factor pair of 12).
 - Round to the nearest 10, 100, 1,000, 10,000 or 100,000; round tenths and hundredths to the nearest whole.
-- Count in 11s and 12s from multiples; in 1,000s, 10,000s and 100,000s from any number to 100,000.
-- Count backwards through 0 into negative numbers. Knows: negatives sit left of 0 (or below it on an upright line); 0 is neither; they turn up as debt and temperature.
+- Count in 11s and 12s from multiples; in 1,000s, 10,000s and 100,000s from any number to 100,000. ✓ (Number patterns, Year 5)
+- Count backwards through 0 into negative numbers. ✓ (Number patterns, Year 5: "6, 4, 2, 0, ☐" with the minus printed before the line; she writes the size) Knows: negatives sit left of 0 (or below it on an upright line); 0 is neither; they turn up as debt and temperature.
 
 ### Operations
-- Add and subtract bigger and bigger whole numbers. ✓ partly (Sums, to 9999)
-- All times tables and division facts, 2 to 12. ✓ (Times bonds, Times grid)
+- Add and subtract bigger and bigger whole numbers. ✓ (Add and take away, Year 5: five and six digits, stacked)
+- All times tables and division facts, 2 to 12. ✓ (Times bonds, Times grid, Times and divide Year 5)
 - Multiply and divide bigger numbers mentally with facts, factor pairs and multiples.
-- Multiply a three- or four-digit number by one digit; multiply two two-digit numbers. ✓ partly (Sums: 3-digit × 1-digit)
-- Divide up to a four-digit number by one digit, **with a remainder** (278 ÷ 4 = 69 remainder 2), including the written method. ✓ partly (Sums ÷ has the layout, but no remainders)
+- Multiply a three- or four-digit number by one digit; multiply two two-digit numbers. ✓ (Times and divide, Year 5: four digits × one digit, two digits × two digits, stacked with room for working)
+- Divide up to a four-digit number by one digit, **with a remainder** (278 ÷ 4 = 69 remainder 2), including the written method. ✓ (Times and divide, Year 5: the long-division bracket, answered "__ r __"; about one in four exact)
 
 ### Fractions, decimals, percentages and money
 - Tenths and hundredths as fractions and decimals; compare and order numbers to two decimal places (0.12 < 0.2).
@@ -283,7 +283,7 @@ Nothing in Sums has a Year 5 or 6 option yet; the ticks here are activities whos
 - Divide one- and two-digit numbers by 10 or 100; multiply decimals by 10 and 100.
 - Compare fractions where one bottom number is a multiple of the other; families of equal fractions; mixed numbers and improper fractions that are equal. ✓ partly (Fractions accepts equal fractions)
 - Add and subtract fractions with the same bottom number, or where one is a multiple of the other (⅔ + ¹⁄₉ = ⁷⁄₉).
-- Add and subtract decimals to two places (1.31 + 0.22 = 1.53).
+- Add and subtract decimals to two places (1.31 + 0.22 = 1.53). ✓ (Add and take away, Year 5: about a third of cards, "__ . __")
 - A non-unit fraction of a number (⅔ of 24); the whole from a part (8 is ⅖ of a set).
 - 10%, 25% and 50% of a number; the whole when given 25% or 50%.
 - Total cost in dollars and cents, change from the nearest $10; money written with a decimal point; round to the nearest dollar.
@@ -291,7 +291,7 @@ Nothing in Sums has a Year 5 or 6 option yet; the ticks here are activities whos
 ### Algebra
 - Fill in <, > or = between two calculations (2,456 × 2 __ 1,228 × 4).
 - True or false and open number sentences with big numbers (999,999 − __ = 899,999). ✓ partly (Missing number)
-- Growing patterns that change by a constant amount, decimals included (3, 4.5, 6, 7.5...).
+- Growing patterns that change by a constant amount, decimals included (3, 4.5, 6, 7.5...). ✓ (Number patterns, Year 5: decimal steps in tenths, "☐ = __ . __")
 
 ### Measurement
 - Measure accurately with a ruler, scales, jug, thermometer and timer, in mixed units (2 hours and 30 minutes). ✋ partly

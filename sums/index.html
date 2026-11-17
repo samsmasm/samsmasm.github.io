@@ -250,6 +250,14 @@
   .qv.div { top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: flex-end; }
   .div .dd { position: relative; border-top: .07em solid var(--ink); padding: .1em .15em 0 .5em; margin-left: .12em; }
   .div .br { position: absolute; left: 0; top: -.07em; width: .38em; height: calc(100% + .07em); overflow: visible; }
+  /* Year 5: a remainder, "__ r __" written on the bar */
+  .qv.div.rem { flex-direction: column; align-items: flex-end; top: .5em; transform: translateX(-50%); }
+  .div .dvr { display: flex; align-items: flex-end; }
+  .div .rq { display: flex; align-items: flex-end; gap: .1em; margin-bottom: .25em; }
+  .div .rq .ln { display: inline-block; height: 1em; border-bottom: .06em solid var(--ink); }
+  .div .rq .sep { font-size: .8em; line-height: 1.1; padding: 0 .15em; }
+  .pic2 .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
+  .pic2 .ans .bx { margin-right: .2em; }
   .qv.frame { top: .6em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .frame svg { display: block; width: 5.5em; height: 2.2em; margin-bottom: .25em; }
   .frame .cap { font-size: .75em; font-weight: 700; margin-bottom: .35em; }
@@ -1018,15 +1026,42 @@ function addSubQ(op, yr) {
       } else {
         if (k === 'fact') { a = rnd(11, 20); b = rnd(2, 9); } else if (k === 'ones') { a = rnd(11, 99); b = rnd(1, 9); } else { a = rnd(20, 99); b = rnd(1, Math.floor(a / 10)) * 10; }
       }
-    } else { // Year 3 within 1,000, Year 4 four digits
-      const big = yr === 3 ? [100, 999] : [1000, 9999];
-      a = rnd(...big); b = pickOne(yr === 3 ? [rnd(1, 9), rnd(10, 99), rnd(100, 999)] : [rnd(10, 99), rnd(100, 999), rnd(1000, 9999)]);
+    } else { // Year 3 within 1,000, Year 4 four digits, Year 5 five and six digits (or hundredths, across)
+      if (yr === 5 && Math.random() < 0.35) return hundredthsQ(op);
+      const big = yr === 3 ? [100, 999] : yr === 4 ? [1000, 9999] : [10000, 999999];
+      a = rnd(...big); b = pickOne(yr === 3 ? [rnd(1, 9), rnd(10, 99), rnd(100, 999)] : yr === 4 ? [rnd(10, 99), rnd(100, 999), rnd(1000, 9999)] : [rnd(100, 9999), rnd(1000, 99999), rnd(10000, 999999)]);
       if (op === '+' && a + b > big[1]) continue;
       if (op === '-' && b > a) [a, b] = [b, a];
     }
     return asQ(op, a, b, yr);
   }
   return asQ(op, 5, 3, yr);
+}
+// Year 5: two decimal places, printed across ("1.31 + 0.22"), answered in two
+// blanks round a printed point (q.dp = 2: 1.05 must be written 05 after the point).
+// Values in hundredths; every number shown has a hundredths digit, the answer is never whole.
+const hund = v => `${Math.floor(v / 100)}.${String(v % 100).padStart(2, '0')}`;
+function hundredthsQ(op) {
+  for (let t = 0; t < 50; t++) {
+    let a = rnd(101, 999), b = rnd(11, Math.random() < 0.5 ? 99 : 999);
+    if (a % 10 === 0 || b % 10 === 0) continue;
+    if (op === '-' && b > a) [a, b] = [b, a];
+    const s = op === '+' ? a + b : a - b;
+    if (s % 100 === 0 || a === b) continue;
+    const text = `${hund(a)} ${SIGN[op]} ${hund(b)}`;
+    return decTwo(s, { form: 'expr', text, say: `${hund(a)} ${WORD[op]} ${hund(b)}`, dp: 2, parts: [Math.floor(s / 100), s % 100], ans: hund(s) });
+  }
+  return decTwo(153, { form: 'expr', text: '1.31 + 0.22', say: '1.31 plus 0.22', dp: 2, parts: [1, 53], ans: '1.53' });
+}
+// Year 5 division: the long-division bracket (its proper home) with a
+// remainder, answered "__ r __" above the bar; about one in four comes out exact
+// (she writes 0 after the r, or leaves it empty). Tables facts to 12, or up to
+// four digits divided by one digit.
+function remQ() {
+  const tbl = Math.random() < 0.35;
+  const d = tbl ? rnd(3, 12) : rnd(2, 9), k = tbl ? rnd(2, 12) : rnd(11, Math.floor(9999 / d) - 1);
+  const r = Math.random() < 0.25 ? 0 : rnd(1, d - 1), a = d * k + r;
+  return { kind: 'div', a, b: d, op: '/', two: true, rem: true, parts: [k, r], ans: `${k} r ${r}` };
 }
 // Year 1 has no × or ÷ signs (those come in Year 2): pictures instead.
 // Groups: g bags of k dots, how many altogether? Sharing: g·k dots shared
@@ -1063,6 +1098,13 @@ function groupsSvg(q) {
 }
 function mulDivQ(op, yr) {
   if (yr === 1) return groupsQ(op);
+  if (yr === 5) { // tables to 12, four digits × one digit, two digits × two digits (stacked, room for two working rows); ÷ with remainders
+    if (op === '/') return remQ();
+    const k = pickOne(['table', 'big', 'two']);
+    if (k === 'table') return asQ('*', rnd(2, 12), rnd(2, 12), yr);
+    if (k === 'big') return asQ('*', rnd(1000, 9999), rnd(2, 9), yr);
+    return asQ('*', rnd(12, 99), rnd(11, 99), yr);
+  }
   const tables = { 2: [2, 5, 10], 3: [2, 3, 4, 5, 8, 10], 4: range(2, 10) }[yr];
   const t = pickOne(tables);
   let k = rnd(op === '*' && yr === 2 ? 0 : 1, 10);
@@ -1076,7 +1118,34 @@ function mulDivQ(op, yr) {
   return asQ('/', t * k, t, yr);
 }
 // ---- number patterns: five terms, one hidden
+// Year 5: 11s and 12s, 1,000s to 100,000s, decimal steps (two blanks round a
+// printed point), and counting back through 0 (a negative answer prints its
+// minus sign before the line: she writes the size; the reader can't read a minus).
+const negTxt = v => v < 0 ? `−${-v}` : String(v);
+function seq5Q() {
+  const k = pickOne(['times', 'big', 'dec', 'neg']);
+  if (k === 'dec') { // in tenths: 3, 4.5, 6, 7.5; the hidden term always has tenths
+    const step = pickOne([2, 3, 4, 5, 12, 15, 25]), start = rnd(0, 40);
+    let terms = range(0, 4).map(i => start + i * step);
+    if (Math.random() < 0.3) terms = terms.reverse();
+    const hides = range(0, 4).filter(i => terms[i] % 10);
+    if (!hides.length) return seq5Q();
+    const hide = pickOne(hides), v = terms[hide];
+    return decTwo(v, { form: 'seq', terms: terms.map(tenths), hide, say: terms.map((x, i) => i === hide ? 'what' : tenths(x)).join(', ') + '?' });
+  }
+  let step, start;
+  if (k === 'times') { step = pickOne([11, 12]); start = rnd(0, 8) * step; }
+  else if (k === 'big') { step = pickOne([1000, 10000, 100000]); start = step === 100000 ? rnd(0, 5) * 100000 + rnd(0, 99) * 1000 : rnd(0, 999999 - 4 * step); }
+  else { step = pickOne([1, 2, 3, 5, 10, 25]); start = rnd(1, 3) * step + (step >= 5 ? 0 : rnd(0, step - 1)); } // back through zero
+  // counting back: start is under 4 steps, so the last term is below 0
+  let terms = range(0, 4).map(i => k === 'neg' ? start - i * step : start + i * step);
+  if (k !== 'neg' && Math.random() < 0.35) terms = terms.reverse();
+  // counting back through 0: the hidden term is one of the last two (often below 0)
+  const hide = k === 'neg' ? pickOne([3, 4, 4]) : rnd(0, 4), ans = terms[hide];
+  return { kind: 'seq', terms, hide, ans, neg: ans < 0, say: terms.map((v, i) => i === hide ? 'what' : v < 0 ? `minus ${-v}` : v).join(', ') + '?' };
+}
 function seqQ(yr) {
+  if (yr === 5) return seq5Q();
   for (let t = 0; t < 60; t++) {
     let step, start, max;
     if (yr === 1) { max = 100; step = pickOne([1, 1, 1, 2, 10]); start = step === 1 ? rnd(0, 30) : step === 2 ? rnd(0, 15) * 2 : rnd(0, 5) * 10; }
@@ -2208,7 +2277,7 @@ const ACTS = {
     name: 'Add and take away', ages: [5, 8], setup: 'opts', say: 'Work out the answers.',
     pic: textSvg(['7 + 5', '12 − 4']),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100'], [3, '3 · within 1,000'], [4, '4 · four digits']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · within 20'], [2, '2 · within 100'], [3, '3 · within 1,000'], [4, '4 · four digits'], [5, '5 · six digits, hundredths']] },
       { key: 'ops', label: 'Signs', multi: true, values: [['+', '+'], ['-', '−']] },
     ],
     defaults: age => age === 5 ? { yr: 1, ops: ['+'], n: 6 } : { yr: 3, ops: ['+', '-'], n: 12 },
@@ -2220,7 +2289,7 @@ const ACTS = {
     name: 'Times and divide', ages: [5, 8], setup: 'opts', say: 'Work out the answers.',
     pic: textSvg(['3 × 4', '12 ÷ 3']),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · groups to 20'], [2, '2 · 2s, 5s, 10s'], [3, '3 · 3s, 4s, 8s too'], [4, '4 · all tables, bigger']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · groups to 20'], [2, '2 · 2s, 5s, 10s'], [3, '3 · 3s, 4s, 8s too'], [4, '4 · all tables, bigger'], [5, '5 · to 12s, 2 digits × 2, remainders']] },
       { key: 'ops', label: 'Signs', multi: true, values: [['*', '×'], ['/', '÷']] },
     ],
     defaults: age => age === 5 ? { yr: 1, ops: ['*'], n: 6 } : { yr: 3, ops: ['*', '/'], n: 12 },
@@ -2317,15 +2386,23 @@ const ACTS = {
     pic: pvSvg(1, 3, 4),
     options: [
       { key: 'kinds', label: 'Kind', multi: true, values: [['blocks', 'Blocks'], ['expanded', '300 + 40 + 7'], ['more', '10 more, 10 less']] },
-      { key: 'max', label: 'Up to', values: [99, 999, [9999, '9,999']] },
+      { key: 'max', label: 'Up to', values: [99, 999, [9999, '9,999'], [999999, '999,999']] },
     ],
+    // Up to 999,999 (Year 5) has no blocks (too many to draw): expanded form and more / less only
+    blocked: c => c.max > 9999 && c.kinds.every(k => k === 'blocks') ? 'Blocks only go up to 9,999. Choose another kind too.' : '',
     defaults: () => ({ kinds: ['blocks', 'expanded', 'more'], max: 999, n: 12 }),
     make: c => {
-      const kind = pickOne(c.kinds);
+      const kinds = c.max > 9999 ? c.kinds.filter(k => k !== 'blocks') : c.kinds, kind = pickOne(kinds.length ? kinds : ['expanded']);
       if (kind === 'more') {
-        const amt = pickOne(c.max > 999 ? [1, 10, 100, 1000] : c.max > 99 ? [1, 10, 100] : [1, 10]), more = Math.random() < 0.5;
+        const amt = pickOne(c.max > 9999 ? [1000, 10000, 100000] : c.max > 999 ? [1, 10, 100, 1000] : c.max > 99 ? [1, 10, 100] : [1, 10]), more = Math.random() < 0.5;
         const v = more ? rnd(0, c.max - amt) : rnd(amt, c.max);
         return { kind: 'expr', text: `${amt} ${more ? 'more' : 'less'} than ${v}`, ans: more ? v + amt : v - amt };
+      }
+      if (c.max > 9999) { // six digits: 400000 + 20000 + 3000 + 500 + 7, zero parts left out, sometimes shuffled
+        const v = rnd(100000, 999999);
+        let parts = String(v).split('').map((d, i) => +d * 10 ** (5 - i)).filter(x => x > 0);
+        if (Math.random() < 0.35) parts = parts.sort(() => Math.random() - 0.5);
+        return { kind: 'expr', text: parts.join(' + '), ans: v };
       }
       const v = rnd(c.max > 999 ? 1000 : c.max > 99 ? 100 : 10, c.max), k = Math.floor(v / 1000), h = Math.floor(v / 100) % 10, t = Math.floor(v / 10) % 10, o = v % 10;
       if (kind === 'blocks') return { kind: 'pv', k, h, t, o, ans: v }; // k: thousands, drawn as big cubes
@@ -2474,7 +2551,7 @@ const ACTS = {
   seq: {
     name: 'Number patterns', ages: [5, 8], setup: 'opts', say: 'What number is missing?',
     pic: textSvg(['2, 4, 6, ?']),
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · 1s, 2s, 10s'], [2, '2 · 3s, 5s, to 120'], [3, '3 · 4s, 8s, 100s, growing'], [4, '4 · 7s, 25s, 1000s, doubling']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · 1s, 2s, 10s'], [2, '2 · 3s, 5s, to 120'], [3, '3 · 4s, 8s, 100s, growing'], [4, '4 · 7s, 25s, 1000s, doubling'], [5, '5 · 12s, 100,000s, decimals, below 0']] }],
     defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
     make: c => seqQ(c.yr),
     key: c => `seq~${c.yr}|${c.n}`,
@@ -3083,11 +3160,17 @@ $('#newBtn').onclick = () => {
 const qId = q => JSON.stringify({ ...q, ans: undefined });
 function qMarkup(q) {
   const len = n => String(n).length;
-  if (q.kind === 'div') return {
-    cls: 'div',
-    html: `<span class="dv">${q.b}</span><span class="dd"><svg class="br" viewBox="0 0 10 40" preserveAspectRatio="none"><path d="M1 0 Q 13 20 1 40" fill="none" stroke="currentColor" stroke-width="2.6" vector-effect="non-scaling-stroke" style="stroke-width:.07em"/></svg>${q.a}</span>`,
-    vars: { '--h': 5.2, '--c': (len(q.a) + len(q.b)) * 0.62 + 2.4 },
-  };
+  if (q.kind === 'div') {
+    const brk = `<span class="dv">${q.b}</span><span class="dd"><svg class="br" viewBox="0 0 10 40" preserveAspectRatio="none"><path d="M1 0 Q 13 20 1 40" fill="none" stroke="currentColor" stroke-width="2.6" vector-effect="non-scaling-stroke" style="stroke-width:.07em"/></svg>${q.a}</span>`;
+    if (!q.rem) return { cls: 'div', html: brk, vars: { '--h': 5.2, '--c': (len(q.a) + len(q.b)) * 0.62 + 2.4 } };
+    // Year 5: "__ r __" on the bar, the answer's lines sized for its number of digits so they give nothing away beyond the dividend
+    const qd = len(q.a);
+    return {
+      cls: 'div rem', anchor: '.sep',
+      html: `<div class="rq"><span class="ln" style="width:${(qd * 0.62 + 0.5).toFixed(2)}em"></span><span class="sep">r</span><span class="ln" style="width:${(len(q.b) * 0.62 + 0.9).toFixed(2)}em"></span></div><div class="dvr">${brk}</div>`,
+      vars: { '--h': 6.4, '--c': Math.max((qd + len(q.b)) * 0.62 + 2.4, qd * 0.62 + len(q.b) * 0.62 + 2.6) + 0.4 },
+    };
+  }
   if (q.kind === 'miss') {
     const box = '<span class="bx"></span>';
     const A = q.hide === 'a' ? box : q.a, B = q.hide === 'b' ? box : q.b;
@@ -3168,15 +3251,19 @@ function qMarkup(q) {
     if (q.form === 'bars' || q.form === 'line') {
       top = q.form === 'bars' ? decBarsSvg(q.v) : decLineSvg(q.v);
       [, pw, ph] = top.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    } else if (q.form === 'seq') { // a decimal pattern (Year 5): the hidden term is a box, then "☐ = __ . __"
+      const txt = q.terms.join(', ');
+      top = `<div class="words">${q.terms.map((v, i) => i === q.hide ? '<span class="bx"></span>' : v).join(', ')}</div>`;
+      pw = txt.length * 0.56;
     } else {
       top = `<div class="words">${q.form === 'frac' ? `<span class="fr"><span>${q.n}</span><span>${q.d}</span></span>` : q.text}</div>`;
       pw = q.form === 'frac' ? 2 : q.text.length * 0.56;
     }
-    const eq = q.form === 'frac' || q.form === 'expr', ln = '<span class="ln"></span>';
+    const eq = q.form === 'frac' || q.form === 'expr' || q.form === 'seq', ln = '<span class="ln"></span>';
     return {
       cls: 'pic2', anchor: '.sep',
-      html: `${top}<div class="ans">${eq ? '<span class="u">=</span>' : ''}${ln}<span class="sep pt">.</span>${ln}</div>`,
-      vars: { '--h': ph + 3.3, '--c': Math.max(pw, eq ? 5.6 : 4.9) + 1.2 },
+      html: `${top}<div class="ans">${q.form === 'seq' ? '<span class="bx"></span>' : ''}${eq ? '<span class="u">=</span>' : ''}${ln}<span class="sep pt">.</span>${ln}</div>`,
+      vars: { '--h': ph + 3.3, '--c': Math.max(pw, eq ? 5.6 + (q.form === 'seq' ? 1.2 : 0) : 4.9) + 1.2 },
     };
   }
   // change units: "3 weeks", then "= ___ days", or two blanks "= __ h __ min"
@@ -3207,11 +3294,14 @@ function qMarkup(q) {
   }
   // number pattern: the hidden term is a box, then "☐ = ___" like a missing number
   if (q.kind === 'seq') {
-    const box = '<span class="bx"></span>', chars = q.terms.join(', ').length;
+    const box = '<span class="bx"></span>', all = q.terms.join(', ').length, shown = q.terms.map((v, i) => i === q.hide ? box : negTxt(v));
+    // six-digit terms (Year 5) are too small on one line: three terms, then two
+    const two = all > 26, chars = two ? Math.max(q.terms.slice(0, 3).join(', ').length + 1, q.terms.slice(3).join(', ').length) : all;
+    // below 0 (Year 5): the minus sign is printed before the line, she writes the size
     return {
       cls: 'miss',
-      html: `<div class="eq">${q.terms.map((v, i) => i === q.hide ? box : v).join(', ')}</div><div class="al">${box}<span>=</span><span class="wl"></span></div>`,
-      vars: { '--d': Math.max(...q.terms.map(len)), '--h': 5.4, '--c': chars * 0.56 + 1.6 },
+      html: `<div class="eq">${two ? shown.slice(0, 3).join(', ') + ',<br>' + shown.slice(3).join(', ') : shown.join(', ')}</div><div class="al">${box}<span>=</span>${q.neg ? '<span>−</span>' : ''}<span class="wl"></span></div>`,
+      vars: { '--d': Math.max(...q.terms.map(len)), '--h': two ? 6.5 : 5.4, '--c': chars * 0.56 + 1.6 },
     };
   }
   // balance: the equation with its box, then "☐ = ___"
@@ -3259,11 +3349,16 @@ function qMarkup(q) {
     return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, 5) + 1.2 } };
   }
   // a line of words or numbers, then "= ___" to write on
-  if (q.kind === 'expr') return {
-    cls: 'miss',
-    html: `<div class="eq">${q.text}</div><div class="al"><span>=</span><span class="wl"></span></div>`,
-    vars: { '--d': 3, '--h': 5.4, '--c': q.text.length * 0.56 + 1.6 },
-  };
+  if (q.kind === 'expr') {
+    // six-digit expanded form (Place value, Year 5) is too small on one line: split at the middle "+"
+    const ps = q.text.split(' + '), two = q.text.length > 26 && ps.length > 2, h = Math.ceil(ps.length / 2);
+    const lines = two ? [ps.slice(0, h).join(' + '), '+ ' + ps.slice(h).join(' + ')] : [q.text];
+    return {
+      cls: 'miss',
+      html: `<div class="eq">${lines.join('<br>')}</div><div class="al"><span>=</span><span class="wl"></span></div>`,
+      vars: { '--d': 3, '--h': two ? 6.5 : 5.4, '--c': Math.max(...lines.map(l => l.length)) * 0.56 + 1.6 },
+    };
+  }
   // Year 1 times and divide: the words, then bags of dots (or dots and empty bags); answer anywhere below
   if (q.kind === 'mgrp') {
     const svg = groupsSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
@@ -3642,11 +3737,14 @@ function twoParts(c) {
     (it.y1 < -2.4 ? high : items).push(it); // on the clock or the coins...
   }
   for (const it of high) if (items.some(i => i.y0 < -2.4 && i.x0 < it.x1 && it.x0 < i.x1)) items.push(it); // ...unless part of a big digit
+  // long division with a remainder: working under the bar is not the answer
+  if (c.q.rem) { const low = items.filter(i => i.cy > 0.3); if (low.length < items.length) items.splice(0, items.length, ...items.filter(i => i.cy <= 0.3)); }
   if (!items.length) items.push(...high); // never ignore all her writing
   if (!items.length && dots.length) items.push(...dots.splice(0)); // tiny writing is still writing
   const cl = digitClusters(items), money = c.q.kind === 'money';
   let left = cl.filter(g => g.cx < 0), right = cl.filter(g => g.cx >= 0);
-  if ((!left.length || !right.length) && cl.length >= 2) {
+  // a remainder of 0 can be left out: everything left of the "r" is the answer
+  if ((!left.length || !right.length) && cl.length >= 2 && !(c.q.rem && !right.length)) {
     const dx = dots.length ? dots.reduce((a, d) => a + d.cx, 0) / dots.length : null;
     if (dx !== null && cl.some(g => g.cx < dx) && cl.some(g => g.cx > dx)) { left = cl.filter(g => g.cx < dx); right = cl.filter(g => g.cx > dx); }
     else {
@@ -3678,8 +3776,10 @@ function readAnswer(c) {
       const ok = b.text !== '' && b.text.replace(/0+$/, '') === want && (a.text === '' ? c.q.parts[0] === 0 : +a.text === c.q.parts[0]);
       return { text: `${a.text}.${b.text || '?'}`, ok, backwards: bw };
     }
-    const ok = a.text !== '' && b.text !== '' && +a.text === c.q.parts[0] && +b.text === c.q.parts[1];
+    // a remainder of 0 may be left empty
+    const ok = a.text !== '' && (b.text !== '' ? +b.text === c.q.parts[1] : c.q.rem && c.q.parts[1] === 0) && +a.text === c.q.parts[0];
     const A = a.text || '?', B = b.text || '?';
+    if (c.q.rem) return { text: b.text ? `${A} r ${B}` : A, ok, backwards: bw };
     const text = c.q.kind === 'clock' ? `${A}:${b.text ? B.padStart(2, '0') : B}` : c.q.kind === 'unit' ? `${A} ${c.q.u1} ${B} ${c.q.u2}` : `$${A} and ${B}c`;
     return { text, ok, backwards: bw };
   }
@@ -3704,6 +3804,7 @@ function readAnswer(c) {
   const r = SumsDigits.readNumber(strokes, 1.1);
   let text = r.text;
   if (c.q.kind === 'clock' && /^\d{1,2}00$/.test(text)) text = text.slice(0, -2); // "3:00" written for 3 o'clock
+  if (c.q.neg) return { text: text && `−${text}`, ok: text !== '' && -text === c.q.ans, backwards: r.backwards }; // the minus is printed
   return { text, ok: text !== '' && +text === c.q.ans, backwards: r.backwards };
 }
 function read(c) { return readAnswer(c).text; }
