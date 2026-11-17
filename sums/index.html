@@ -1568,8 +1568,99 @@ function tf1Q() {
   }
   return { kind: 'tap', yr: 1, text: '3 + 4 = 7', top: '3 + 4 = 7', tc: 5, tiles: TF_TILES, right: 0, truth: true, dots: false, say: '3 plus 4 equals 7. True?', ans: '✓' };
 }
+// ---- Year 5 (C2) for True or false and More or less: two sides, each
+// { t (text), h (html), s (spoken), v: [top, bottom] } so fractions and decimals compare exactly.
+const S5 = (t, v, h, s) => ({ t, v, h: h || t, s: s || signWords(t) });
+const dpTxt = (h, dp) => (h / 100).toFixed(dp); // hundredths as a decimal: 45 → 0.45 (dp 2), 50 → 0.5 (dp 1)
+const D5 = (h, dp) => S5(dpTxt(h, dp), [h, 100]);
+const F5 = (a, b) => S5(`${a}/${b}`, [a, b], frHtml(a, b), `${a} over ${b}`);
+const cmpV = (a, b) => Math.sign(a.v[0] * b.v[1] - b.v[0] * a.v[1]); // −1 less, 0 equal, 1 more
+// kinds: num (six digits, often the same digits moved), calc (a six-digit sum and a number),
+// sum (both sides to work out: 2456 × 2 and 1228 × 4, 4500 + 2700 and 4700 + 2500),
+// dec (0.12 and 0.2; 0.5 and 0.50), decsum (0.4 + 0.25 and 0.65), frac (2/3 and 6/9, 2/3 and 5/9).
+// same: equal sides; otherwise close but not equal. null when this try didn't work out.
+function pair5(kind, same) {
+  const N = n => S5(String(n), [n, 1]);
+  if (kind === 'num') {
+    const a = rnd(100000, 999999);
+    let b = a;
+    if (!same) {
+      if (Math.random() < 0.6) { const d = [...String(a)], [i, j] = distinctPick(2, 0, 5); [d[i], d[j]] = [d[j], d[i]]; b = +d.join(''); }
+      else b = a + pickOne([-1, 1]) * pickOne([1, 10, 100, 1000, 10000, 100000]);
+      if (b === a || b < 100000 || b > 999999) return null;
+    }
+    return [N(a), N(b)];
+  }
+  if (kind === 'calc') {
+    let a = rnd(10000, 999999), b = pickOne([rnd(1000, 99999), rnd(10000, 999999)]);
+    const op = pickOne(['+', '−']);
+    if (op === '+' && a + b > 999999) return null;
+    if (op === '−' && b > a) [a, b] = [b, a];
+    const v = op === '+' ? a + b : a - b, w = same ? v : Math.random() < 0.3 ? swapDigits(v) : v + pickOne([-1, 1]) * pickOne([1, 10, 100, 1000, 10000]);
+    if (w < 1 || (!same && w === v) || String(w).length !== String(v).length) return null;
+    return [S5(`${a} ${op} ${b}`, [v, 1]), N(w)];
+  }
+  if (kind === 'sum') {
+    if (Math.random() < 0.5) { // halve one number, double the other
+      const h = rnd(501, 4999), m = pickOne([2, 3, 4, 5]), g = same ? h : h + pickOne([-10, -1, 1, 10]);
+      return [S5(`${2 * h} × ${m}`, [2 * h * m, 1]), S5(`${g} × ${2 * m}`, [g * 2 * m, 1])];
+    }
+    // give and take
+    const a = rnd(11, 89) * 100, b = rnd(11, 89) * 100, k = rnd(1, 9) * 100 * pickOne([1, -1]), d = b - k + (same ? 0 : pickOne([-1, 1]) * pickOne([10, 100]));
+    if (a + k < 100 || d < 100) return null;
+    return [S5(`${a} + ${b}`, [a + b, 1]), S5(`${a + k} + ${d}`, [a + k + d, 1])];
+  }
+  if (kind === 'dec') {
+    const w = rnd(0, 2) * 100;
+    if (same || Math.random() < 0.2) { const k = rnd(1, 9); return [D5(w + k * 10, 1), D5(w + (same ? k * 10 : k), 2)]; } // 0.5 and 0.50, or 0.5 and 0.05
+    const p = w + rnd(1, 99), r = w + rnd(1, 9) * 10; // two places against one: 0.12 and 0.2
+    if (p % 10 === 0) return null;
+    return [D5(p, 2), D5(r, 1)];
+  }
+  if (kind === 'decsum') { // wrong ones are a place out (0.4 + 0.25 = 0.29), or 0.1 or 0.01 out
+    const a = rnd(0, 1) * 100 + rnd(1, 9) * 10, b = rnd(0, 1) * 100 + rnd(1, 99), op = pickOne(['+', '−']);
+    if (b % 10 === 0) return null;
+    const [x, xd, y, yd] = Math.random() < 0.5 ? [a, 1, b, 2] : [b, 2, a, 1];
+    if (op === '−' && x <= y) return null;
+    const v = op === '+' ? x + y : x - y, slip = op === '+' && a < 100 ? a / 10 + b : null;
+    const w = same ? v : slip !== null && Math.random() < 0.4 ? slip : v + pickOne([-1, 1]) * pickOne([1, 10]);
+    if (w <= 0 || (!same && w === v) || w % 10 === 0) return null;
+    return [S5(`${dpTxt(x, xd)} ${op} ${dpTxt(y, yd)}`, [v, 100]), D5(w, 2)];
+  }
+  // frac: one bottom number a multiple of the other
+  const d = rnd(2, 6), k = pickOne([2, 3, 4].filter(x => d * x <= 12)), e = d * k, n = rnd(1, d - 1);
+  const m = same ? n * k : Math.random() < 0.6 ? n * k + pickOne([-1, 1]) : rnd(1, e - 1);
+  if (m < 1 || m >= e || (!same && m === n * k)) return null;
+  return Math.random() < 0.5 ? [F5(n, d), F5(m, e)] : [F5(m, e), F5(n, d)];
+}
+const SIGN_WORD = { '<': 'is less than', '>': 'is more than', '=': 'equals' };
+// True or false, Year 5: about half true. Decimals and fractions are sometimes
+// compared with < or > (0.12 > 0.2); everything else is "=". Long sentences take two lines.
+function tf5Q() {
+  for (let t = 0; t < 300; t++) {
+    const truth = Math.random() < 0.5, type = pickOne(['calc', 'sum', 'dec', 'decsum', 'frac']);
+    const eq = !['dec', 'frac'].includes(type) || Math.random() < 0.4;
+    const p = pair5(type, eq && truth);
+    if (!p) continue;
+    let [L, R] = p, sign = '=';
+    const rel = cmpV(L, R);
+    if (!eq) { if (!rel) continue; sign = (rel < 0) === truth ? '<' : '>'; }
+    if (Math.random() < (type === 'calc' ? 0.2 : 0.5)) { [L, R] = [R, L]; sign = { '<': '>', '>': '<', '=': '=' }[sign]; }
+    const r2 = cmpV(L, R);
+    if (truth !== (sign === '=' ? r2 === 0 : sign === '<' ? r2 < 0 : r2 > 0)) continue;
+    const text = `${L.t} ${sign} ${R.t}`, sg = sign === '<' ? '&lt;' : sign === '>' ? '&gt;' : '=', frac = type === 'frac', two = !frac && text.length > 18;
+    const q = { kind: 'tap', yr: 5, type, sign, text, tiles: TF_TILES, right: truth ? 0 : 1, truth, say: `${L.s} ${SIGN_WORD[sign]} ${R.s}. True?`, ans: truth ? '✓' : '✗' };
+    // fractions and two-line sentences take more of the card (topf), or they print small
+    if (frac) Object.assign(q, { top: `${L.h} ${sg} ${R.h}`, tc: 5.2, th: 2.3, topf: 0.55 });
+    else if (two) Object.assign(q, { top: `${L.t}<br>${sg} ${R.t}`, tc: Math.max(L.t.length, R.t.length + 2) * 0.56, th: 2.6, topf: 0.55 });
+    else Object.assign(q, { top: `${L.t} ${sg} ${R.t}`, tc: text.length * 0.56 });
+    return q;
+  }
+  return { kind: 'tap', yr: 5, type: 'frac', sign: '=', text: '2/3 = 6/9', top: `${frHtml(2, 3)} = ${frHtml(6, 9)}`, tc: 5.2, th: 2.3, tiles: TF_TILES, right: 0, truth: true, say: '2 over 3 equals 6 over 9. True?', ans: '✓' };
+}
 function tfQ(yr) {
   if (yr === 1) return tf1Q();
+  if (yr === 5) return tf5Q();
   for (let t = 0; t < 200; t++) {
     const truth = Math.random() < 0.5, type = pickOne(['addsub', 'addsub', 'tables', 'tables', 'ten', 'both']);
     let lhs, v, rhs, rv; // each side as printed, and what it comes to
@@ -1665,7 +1756,8 @@ function cmp1Q(kinds) {
 }
 function cmpQ(yr, kinds) {
   if (yr === 1) { const k = kinds.filter(x => x === 'dots' || x === 'num'); return cmp1Q(k.length ? k : ['dots']); }
-  kinds = kinds.filter(x => x !== 'dots'); if (!kinds.length) kinds = ['num'];
+  if (yr === 5) return cmp5Q(kinds);
+  kinds = kinds.filter(x => ['num', 'sum', 'frac'].includes(x)); if (!kinds.length) kinds = ['num'];
   for (let t = 0; t < 200; t++) {
     const kind = pickOne(kinds), same = Math.random() < 0.2;
     let l, r, lv, rv;
@@ -1696,6 +1788,23 @@ function cmpQ(yr, kinds) {
   }
   return { kind: 'tap', l: '4071', r: '4701', top: '4071 <span class="bx"></span> 4701', tc: 6.2, tiles: CMP_TILES, right: 0, say: '4071, and 4701. Which sign goes in the box?', ans: '<' };
 }
+// More or less, Year 5 (C2): six-digit numbers, both sides to work out, decimals
+// to two places, fractions where one bottom number is a multiple of the other.
+// About one in five equal.
+function cmp5Q(kinds) {
+  kinds = kinds.filter(x => ['num', 'sum', 'dec', 'frac'].includes(x)); if (!kinds.length) kinds = ['num'];
+  for (let t = 0; t < 200; t++) {
+    const kind = pickOne(kinds), p = pair5(kind, Math.random() < 0.2);
+    if (!p) continue;
+    const [L, R] = Math.random() < 0.5 ? p : [p[1], p[0]], c = cmpV(L, R), right = c < 0 ? 0 : c === 0 ? 1 : 2;
+    if (L.t === R.t && kind !== 'num') continue; // the same sum printed on both sides
+    return {
+      kind: 'tap', yr: 5, type: kind, l: L.t, r: R.t, top: `${L.h} <span class="bx"></span> ${R.h}`, tc: kind === 'frac' ? 5 : (L.t.length + R.t.length + 3) * 0.56, ...(kind === 'frac' ? { th: 2.3, topf: 0.55 } : {}),
+      tiles: CMP_TILES, right, say: `${L.s}, and ${R.s}. Which sign goes in the box?`, ans: CMP_TILES[right].label,
+    };
+  }
+  return { kind: 'tap', yr: 5, type: 'dec', l: '0.12', r: '0.2', top: '0.12 <span class="bx"></span> 0.2', tc: 5.6, tiles: CMP_TILES, right: 0, say: '0.12, and 0.2. Which sign goes in the box?', ans: '<' };
+}
 // Balance: an equation with one box, often something to work out on both
 // sides (36 + 17 = ☐ + 20). Always exactly one whole-number answer.
 const BAL_OP = { '+': (a, b) => a + b, '−': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b };
@@ -1715,10 +1824,27 @@ function bal1Q() {
 }
 function balQ(yr) {
   if (yr === 1) return bal1Q();
+  const max = yr === 5 ? 999999 : 9999;
   for (let t = 0; t < 200; t++) {
-    const type = pickOne(['one', 'one', 'ten', 'add', 'add', 'mul', 'sub', 'mix']);
+    const type = yr === 5 ? pickOne(['place', 'place', 'place', 'hund', 'hund', 'thou', 'tens']) : pickOne(['one', 'one', 'ten', 'add', 'add', 'mul', 'sub', 'mix']);
     let L, R;
-    if (type === 'one') { // 4200 − ☐ = 4001: four digits, the other side a plain number
+    if (type === 'place') { // Year 5: 999999 − ☐ = 899999: one digit of a six-digit number changes
+      const a = rnd(100000, 999999), k = rnd(0, 5), dk = Math.floor(a / 10 ** k) % 10, op = pickOne(['+', '−']);
+      if (op === '−' ? dk < 1 : dk > 8) continue;
+      const x = (op === '−' ? rnd(1, dk) : rnd(1, 9 - dk)) * 10 ** k;
+      L = [a, op, x]; R = [sideVal(L)];
+    } else if (type === 'hund') { // Year 5: ☐ × 100 = 4500, 36000 ÷ ☐ = 360, 45 × ☐ = 45000
+      const p = pickOne([10, 100, 1000]), k = rnd(2, 999);
+      L = Math.random() < 0.5 ? [k, '×', p] : [k * p, '÷', p]; R = [sideVal(L)];
+    } else if (type === 'thou') { // Year 5: 45000 + 27000 = ☐ + 30000
+      const a = rnd(11, 89) * 1000, b = rnd(11, 89) * 1000, c = Math.random() < 0.5 ? rnd(1, 9) * 10000 : a + pickOne([-3, -2, -1, 1, 2, 3]) * 1000;
+      L = [a, '+', b]; R = [c, '+', a + b - c];
+    } else if (type === 'tens') { // Year 5: 60 × 80 = ☐ × 40 (a times-table fact with tens)
+      const [a, b] = pickOne(TIMES12), other = TIMES12.filter(([c, d]) => c * d === a * b && c !== a && c !== b);
+      if (!other.length) continue;
+      const [c, d] = pickOne(other);
+      L = [a * 10, '×', b * 10]; R = Math.random() < 0.5 ? [c * 10, '×', d * 10] : [d * 10, '×', c * 10];
+    } else if (type === 'one') { // 4200 − ☐ = 4001: four digits, the other side a plain number
       const a = Math.random() < 0.5 ? rnd(11, 99) * 100 : rnd(1000, 9999), op = pickOne(['+', '−']);
       L = [a, op, rnd(2, 999)]; R = [sideVal(L)];
     } else if (type === 'ten') { // ☐ ÷ 10 = 12, ☐ × 10 = 450, 7 × ☐ = 56
@@ -1743,20 +1869,49 @@ function balQ(yr) {
     const slots = R.length === 1 ? [[L, 0], [L, 2]] : [[L, 0], [L, 2], [R, 0], [R, 2]];
     const [S, i] = pickOne(slots), ans = S[i];
     const nums = [...L, ...R].filter(x => typeof x === 'number');
-    if (nums.some(x => !Number.isInteger(x) || x < 1 || x > 9999) || sideVal(L) !== sideVal(R)) continue;
+    if (nums.some(x => !Number.isInteger(x) || x < 1 || x > max) || sideVal(L) !== sideVal(R)) continue;
     if (R.length === 3 && (L[0] === R[0] || L[2] === R[2] || L[0] === R[2] || L[2] === R[0])) continue; // the same number on both sides gives it away
     if (Math.random() < 0.5) [L, R] = [R, L];
     const side = s => (s === S ? s.map((x, j) => j === i ? '☐' : x) : s).join(' ');
     const text = `${side(L)} = ${side(R)}`;
-    return { kind: 'bal', text, ans, say: signWords(text).replace('equals', 'is the same as').replace('☐', 'what') + '?' };
+    return { kind: 'bal', ...(yr === 5 ? { yr } : {}), text, ans, say: signWords(text).replace('equals', 'is the same as').replace('☐', 'what') + '?' };
   }
-  return { kind: 'bal', text: '36 + 17 = ☐ + 20', ans: 33, say: '36 plus 17 is the same as what plus 20?' };
+  return yr === 5 ? { kind: 'bal', yr, text: '999999 − ☐ = 899999', ans: 100000, say: '999999 take away what is the same as 899999?' }
+    : { kind: 'bal', text: '36 + 17 = ☐ + 20', ans: 33, say: '36 plus 17 is the same as what plus 20?' };
 }
 const TIMES12 = range(2, 12).flatMap(a => range(a, 12).map(b => [a, b]));
 // Rounding to the nearest 10, 100 or 1,000 (numbers to 10,000), or tenths to
 // the nearest whole number. The number line kind is never exactly halfway;
 // Just numbers can be, and halfway rounds up.
+// Year 5 (C2): six-digit numbers to the nearest 1,000, 10,000 or 100,000 (the
+// answer never reaches a million), tenths or hundredths to the nearest whole
+// number, and dollars and cents to the nearest dollar ("$" printed before the line).
+function round5Q(line) {
+  for (let t = 0; t < 100; t++) {
+    const ty = pickOne([1000, 10000, 100000, 't', 'h', '$']);
+    let shown, lo, frac, u = 1, word = 'whole number', pre = '';
+    if (typeof ty === 'number') {
+      u = ty; word = String(u);
+      const n = rnd(100000, 1000000 - u / 2 - 1);
+      if (n % u === 0) continue;
+      lo = Math.floor(n / u) * u; frac = (n - lo) / u; shown = String(n);
+    } else if (ty === 't') { const n = rnd(1, 999); if (n % 10 === 0) continue; lo = Math.floor(n / 10); frac = (n % 10) / 10; shown = (n / 10).toFixed(1); }
+    else { // hundredths, or cents
+      const n = ty === '$' ? rnd(101, 9999) : rnd(1, 9999);
+      if (n % 10 === 0 && ty === 'h') continue; // two places
+      if (n % 100 === 0) continue;
+      lo = Math.floor(n / 100); frac = (n % 100) / 100; shown = (n / 100).toFixed(2);
+      if (ty === '$') { shown = '$' + shown; word = 'dollar'; pre = '$'; }
+    }
+    if (line && frac === 0.5) continue;
+    const hi = lo + u, q = { yr: 5, n: shown, lo, hi, pos: frac, cap: `to the nearest ${word}`, say: `Round ${shown} to the nearest ${word}.`, ans: frac >= 0.5 ? hi : lo };
+    if (pre) q.pre = pre;
+    return { kind: line ? 'rline' : 'rnum', ...q };
+  }
+  return { kind: 'rnum', yr: 5, n: '3.47', lo: 3, hi: 4, pos: 0.47, cap: 'to the nearest whole number', say: 'Round 3.47 to the nearest whole number.', ans: 3 };
+}
 function roundQ(yr, kinds) {
+  if (yr === 5) return round5Q(pickOne(kinds) === 'line');
   for (let t = 0; t < 100; t++) {
     const line = pickOne(kinds) === 'line', u = pickOne([10, 100, 1000, 1]);
     let shown, lo, frac;
@@ -1771,12 +1926,15 @@ function roundQ(yr, kinds) {
 }
 // a number line between the two answers it could round to, the number on an arrow
 const rlineSvg = q => {
-  let s = `<svg viewBox="-4 -16 128 56" fill="none" stroke="currentColor" style="width:10.67em;height:4.67em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`;
+  // six-digit labels (Year 5) need a little more room at each end
+  const pad = Math.max(String(q.n).length, String(q.hi).length) >= 6 ? 8 : 0, W = 128 + 2 * pad;
+  let s = `<svg viewBox="${-4 - pad} -16 ${W} 56" fill="none" stroke="currentColor" style="width:${(W / 12).toFixed(2)}em;height:4.67em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`;
   for (let i = 0; i <= 10; i++) { const x = 10 + i * 10, e = i === 0 || i === 10; s += `<line x1="${x}" y1="${e ? 16 : 18}" x2="${x}" y2="${e ? 28 : 26}" stroke-width="${e ? 1.2 : .9}"/>`; }
   const ax = 10 + q.pos * 100, lx = Math.min(Math.max(ax, 14), 106);
   s += `<path d="M${ax} 4v10" stroke-width="1.4"/><path d="M${ax - 3.2} 10.5 L${ax} 15.5 L${ax + 3.2} 10.5z" fill="currentColor" stroke="none"/>`;
   const lab = (x, y, v) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${v}</text>`;
-  return s + lab(lx, -3, q.n) + lab(10, 38, q.lo) + lab(110, 38, q.hi) + '</svg>';
+  const p = q.pre || '';
+  return s + lab(lx, -3, q.n) + lab(10, 38, p + q.lo) + lab(110, 38, p + q.hi) + '</svg>';
 };
 // Decimals, Year 4: tenths. A decimal answer is two blanks round a printed
 // point (q.two, q.dp = 1): parts [ones, tenths]. A whole answer (0.7 × 10) is
@@ -2648,7 +2806,7 @@ const ACTS = {
   tf: {
     name: 'True or false', ages: [5, 8], setup: 'opts', say: 'Is it true? Tap the tick or the cross.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="30" text-anchor="middle" font-size="24">6 × 4 = 25</text><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="44" width="30" height="30" rx="5"/><rect x="66" y="44" width="30" height="30" rx="5"/><path d="M31 60l6 6l10 -13M74 52l14 14M88 52l-14 14"/></g></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [4, '4 · four digits, tables, × 10']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [4, '4 · four digits, tables, × 10'], [5, '5 · six digits, decimals, fractions']] }],
     defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => tfQ(c.yr),
     key: c => `tf~${c.yr}|${c.n}`,
@@ -2658,19 +2816,19 @@ const ACTS = {
     name: 'More or less', ages: [5, 8], setup: 'opts', say: 'More, less, or the same? Tap your answer.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="34" y="34" text-anchor="middle" font-size="24">47</text><rect x="50" y="14" width="22" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/><text x="90" y="34" text-anchor="middle" font-size="24">74</text><text x="60" y="72" text-anchor="middle" font-size="24">&lt;  =  &gt;</text></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [4, '4 · to 10,000, fractions']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['dots', 'Dots (Year 1)'], ['num', 'Numbers'], ['sum', 'Sums (Year 4)'], ['frac', 'Fractions (Year 4)']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [4, '4 · to 10,000, fractions'], [5, '5 · to 999,999, decimals']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['dots', 'Dots (Year 1)'], ['num', 'Numbers'], ['sum', 'Sums (Year 4 up)'], ['dec', 'Decimals (Year 5)'], ['frac', 'Fractions (Year 4 up)']] },
     ],
-    defaults: age => age === 5 ? { yr: 1, kinds: ['dots', 'num'], n: 6 } : { yr: 4, kinds: ['num', 'sum', 'frac'], n: 12 },
+    defaults: age => age === 5 ? { yr: 1, kinds: ['dots', 'num'], n: 6 } : { yr: 4, kinds: ['num', 'sum', 'dec', 'frac'], n: 12 },
     make: c => cmpQ(c.yr, c.kinds),
-    // only the kinds that year has go in the record key (Year 1 dots and numbers, Year 4 numbers, sums, fractions)
-    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
-    label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.split(',').map(x => ({ dots: 'dots', num: 'numbers', sum: 'sums', frac: 'fractions' })[x]).join(', ')} · ${n} questions`; },
+    // only the kinds that year has go in the record key (Year 1 dots and numbers, Year 4 numbers, sums, fractions, Year 5 decimals too)
+    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : c.yr === 5 ? ['num', 'sum', 'dec', 'frac'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
+    label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.split(',').map(x => ({ dots: 'dots', num: 'numbers', sum: 'sums', dec: 'decimals', frac: 'fractions' })[x]).join(', ')} · ${n} questions`; },
   },
   bal: {
     name: 'Balance', ages: [5, 8], setup: 'opts', say: 'Both sides are the same. What number goes in the box?',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="32" text-anchor="middle" font-size="24">6 × 4 =</text><text x="66" y="66" text-anchor="end" font-size="24">12 ×</text><rect x="72" y="46" width="20" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, see-saw'], [4, '4 · both sides, to 10,000']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, see-saw'], [4, '4 · both sides, to 10,000'], [5, '5 · six digits, × 100']] }],
     defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => balQ(c.yr),
     key: c => `bal~${c.yr}|${c.n}`,
@@ -2680,7 +2838,7 @@ const ACTS = {
     name: 'Rounding', ages: [8], setup: 'opts', say: 'Round the number.',
     pic: rlineSvg({ n: 47, lo: 40, hi: 50, pos: 0.7 }),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · 10s, 100s, 1000s, tenths']] },
+      { key: 'yr', label: 'Year', values: [[4, '4 · 10s, 100s, 1000s, tenths'], [5, '5 · 100,000s, hundredths, dollars']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['line', 'Number line'], ['num', 'Just numbers']] },
     ],
     defaults: () => ({ yr: 4, kinds: ['line', 'num'], n: 12 }),
@@ -3307,6 +3465,15 @@ function qMarkup(q) {
   // balance: the equation with its box, then "☐ = ___"
   if (q.kind === 'bal') {
     const box = '<span class="bx"></span>', w = q.text.length * 0.5;
+    // a long Year 5 equation (45000 + 27000 = ☐ + 30000) is too small on one line: break after "="
+    if (q.text.length > 20 && !q.saw) {
+      const [l, r] = q.text.split(' = ');
+      return {
+        cls: 'miss',
+        html: `<div class="eq">${l.replace('☐', box)} =<br>${r.replace('☐', box)}</div><div class="al">${box}<span>=</span><span class="wl"></span></div>`,
+        vars: { '--d': Math.max(...q.text.split(' ').map(s => /^\d+$/.test(s) ? s.length : 1)), '--h': 6.65, '--c': Math.max(l.length + 2, r.length) * 0.56 + 1.6 },
+      };
+    }
     // Year 1: a level see-saw under the equation, the two sides over its two ends
     const saw = q.saw ? `<svg class="saw" viewBox="0 0 ${w * 20} 16" style="width:${w}em;height:.8em"><line x1="3" y1="3" x2="${w * 20 - 3}" y2="3" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M${w * 10} 4.5L${w * 10 - 8} 15H${w * 10 + 8}z" fill="currentColor"/></svg>` : '';
     return {
@@ -3318,10 +3485,10 @@ function qMarkup(q) {
   // rounding: the number, "to the nearest 100", then a line; or a number line with an arrow, answer below
   if (q.kind === 'rnum') return {
     cls: 'miss',
-    html: `<div class="eq">${q.n}</div><div class="cap">${q.cap}</div><div class="al"><span class="wl"></span></div>`,
+    html: `<div class="eq">${q.n}</div><div class="cap">${q.cap}</div><div class="al">${q.pre ? `<span>${q.pre}</span>` : ''}<span class="wl"></span></div>`,
     vars: { '--d': Math.max(len(q.n), 2), '--h': 6.2, '--c': Math.max(len(q.n) * 0.62, q.cap.length * 0.34) + 1.6 },
   };
-  if (q.kind === 'rline') return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${rlineSvg(q)}`, vars: { '--h': 4.67 + 1.1 + 3.2, '--c': 11.9 } };
+  if (q.kind === 'rline') { const svg = rlineSvg(q); return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': 4.67 + 1.1 + 3.2, '--c': +svg.match(/width:([\d.]+)em/)[1] + 1.23 } }; }
   // story sum: the words wrap, then "___ fish"
   if (q.kind === 'story') {
     // lines as the words wrap (about 16 characters a line), not just the length: long words wrap early

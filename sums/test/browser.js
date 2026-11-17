@@ -167,7 +167,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="6"]');
   ok(await page.evaluate(() => view === 5 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 6')), 'Year 6: the Year 5 page, marked the highest so far');
   const y5 = await tiles('#actTiles');
-  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums'].every(t => y5.includes(t)) && !y5.includes('Clocks') && !y5.includes('Rounding'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
+  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums'].every(t => y5.includes(t)) && !y5.includes('Clocks') && !y5.includes('Decimals'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
   ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('round').yr; }).join() === '4,4'), 'Rounding (Year 4 only so far) opens at Year 4');
   await page.evaluate(() => { setYear(3); act = 'round'; goSetup(); });
@@ -631,7 +631,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,muldiv,seq'), 'Year 5 so far (C1): Add and take away, Times and divide, Number patterns only');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,bal,cmp,muldiv,round,seq,tf'), 'Year 5 so far (C1, C2a): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -1167,7 +1167,7 @@ const fakeSpeech = () => {
 
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="tf"]');
-  ok(await page.evaluate(() => draft.yr === 4 && $('#kpBlock').hidden && $('#optBlock [data-key="yr"]').children.length === 2 && $('.sughint').textContent === 'Your year: Year 4'), 'True or false setup: a Year row with Years 1 and 4, Year 4 chosen');
+  ok(await page.evaluate(() => draft.yr === 4 && $('#kpBlock').hidden && $('#optBlock [data-key="yr"]').children.length === 3 && $('.sughint').textContent === 'Your year: Year 4'), 'True or false setup: a Year row with Years 1, 4 and 5, Year 4 chosen');
   ok(await page.$$eval('#preview .mini .tt', t => t.length) === 8, 'True or false examples show their two tiles');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.length === 12 && cards.every(c => c.q.kind === 'tap' && c.el.classList.contains('tapc') && c.el.querySelectorAll('.tt').length === 2 && getComputedStyle(c.cv).display === 'none' && getComputedStyle(c.el.querySelector('.undo')).display === 'none' && getComputedStyle(c.el.querySelector('.clear')).display === 'none')), 'True or false sheet: every card has a tick tile and a cross tile, and nothing to write on');
@@ -1198,7 +1198,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => cards[0].el.dataset.state === 'right' && cards[0].first === false && cards[0].el.dataset.claim !== '1' && getComputedStyle(cards[0].el.querySelector('.override')).display === 'none' && $('#score').textContent.replace(/\s+/g, ' ').includes('1/12')), 'right on the second try: marked right, the first try is what scores, no "I was right the first time"');
   ok((await writeAllAndMark()).length === 0 && await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'tf~4|12' && loadRec(current).history[0].first === 11), 'True or false: the whole sheet tapped right finishes it and saves the record (11 of 12 first try)');
   await wait(800);
-  ok(await visible('#doneS') && !(await visible('#dUp')), 'finish panel shows; no Harder button (Year 4 is the only year)');
+  ok(await visible('#doneS') && await page.$eval('#dUp', b => b.textContent.includes('Year 5')), 'finish panel shows; Harder goes to Year 5 (C2a)');
   await page.click('#dLook');
   // the Working area still works beside tap cards
   await page.evaluate(() => { hideDone(); buildSheet(cfg); show('sheet'); setWorking(true); });
@@ -1234,7 +1234,7 @@ const fakeSpeech = () => {
   // More or less
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="cmp"]');
-  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'num,sum,frac'), 'More or less setup: Year 4, numbers, sums and fractions');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'num,sum,dec,frac'), 'More or less setup: Year 4, numbers, sums, decimals (Year 5 only) and fractions');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tq .bx').length === 1 && [...c.el.querySelectorAll('.tt')].map(b => b.textContent).join('') === '<=>')), 'More or less sheet: an empty box between the two sides, tiles < = >');
   ok((await fits()).length === 0, 'More or less fits, with tiles big enough to tap ' + (await fits()).join(' '));
@@ -1340,7 +1340,7 @@ const fakeSpeech = () => {
 
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="bal"]');
-  ok(await page.evaluate(() => draft.yr === 4 && $('#optBlock [data-key="yr"]').children.length === 2), 'Balance setup: Years 1 and 4, Year 4 chosen');
+  ok(await page.evaluate(() => draft.yr === 4 && $('#optBlock [data-key="yr"]').children.length === 3), 'Balance setup: Years 1, 4 and 5, Year 4 chosen');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => c.q.kind === 'bal' && c.el.querySelectorAll('.eq .bx').length === 1 && c.el.querySelectorAll('.al .bx').length === 1)), 'Balance sheet: one box in the equation, "☐ = ___" underneath');
   ok((await fits()).length === 0, 'Balance fits ' + (await fits()).join(' '));
@@ -1368,6 +1368,107 @@ const fakeSpeech = () => {
   ok((await fits()).length === 0 && (await writeAllAndMark()).length === 0, 'Rounding: 9960 to 10000 fits and 10000 is read');
   ok(await page.evaluate(() => [labelFor('bal~4|12'), labelFor('round~4|line,num|12'), labelFor('round~4|num|6')].join(' / '))
     === 'Balance · Year 4 · 12 questions / Rounding · Year 4 · number line, just numbers · 12 questions / Rounding · Year 4 · just numbers · 6 questions', 'record labels for Balance and Rounding');
+
+  // ---- C2a: Year 5 on True or false, More or less, Balance, Rounding
+  const val5 = `s => { s = s.trim(); const f = s.match(/^(\\d+)\\/(\\d+)$/); return f ? f[1] / f[2] : Function('return ' + s.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-'))(); }`;
+  const t5 = await page.evaluate(src => {
+    const bad = [], val = eval(src), types = new Set(), signs = new Set();
+    let trues = 0;
+    const dp = s => (s.match(/\.(\d+)/g) || []).every(m => m.length <= 3);
+    for (let i = 0; i < 1500; i++) {
+      const q = tfQ(5), [l, sign, r] = q.text.split(/ ([<=>]) /), lv = val(l), rv = val(r), d = rv - lv;
+      const holds = sign === '=' ? Math.abs(d) < 1e-9 : sign === '<' ? d > 1e-9 : d < -1e-9;
+      if (q.kind !== 'tap' || q.truth !== holds || q.right !== (q.truth ? 0 : 1) || q.ans !== q.tiles[q.right].label) bad.push('wrong ' + q.text);
+      types.add(q.type); signs.add(sign); trues += q.truth;
+      if (sign !== '=' && !['dec', 'frac'].includes(q.type)) bad.push('< or > only on decimals and fractions ' + q.text);
+      if (q.text.match(/\d+(\.\d+)?/g).some(n => +n > 999999) || !dp(q.text)) bad.push('size ' + q.text);
+      if (q.type === 'frac') {
+        const [[a, b], [c, e]] = [l, r].map(s => s.split('/').map(Number));
+        if (Math.max(b, e) % Math.min(b, e) || b === e || Math.max(b, e) > 12 || a >= b || c >= e || q.tc !== 5.2) bad.push('fractions ' + q.text);
+        if (q.top.split('class="fr"').length !== 3) bad.push('printed top over bottom ' + q.top);
+      }
+      if (q.type === 'calc' && !q.truth) { const dd = Math.abs(d), sw = [...String(lv)].sort().join('') === [...String(rv)].sort().join(''); if (![1, 10, 100, 1000, 10000].includes(dd) && !sw) bad.push('not a near miss ' + q.text); }
+      if (q.text.length > 18 && q.type !== 'frac' && !q.top.includes('<br>')) bad.push('long on one line ' + q.text);
+      if (!/\. True\?$/.test(q.say) || /[\/<>=]/.test(q.say)) bad.push('say ' + q.say);
+    }
+    if (trues < 650 || trues > 850) bad.push('true ' + trues + ' of 1500');
+    if (types.size !== 5 || signs.size !== 3) bad.push('types ' + [...types] + ' signs ' + [...signs]);
+    return bad.slice(0, 4);
+  }, val5);
+  ok(t5.length === 0, 'True or false Year 5: six-digit sums, both sides to work out, decimals to two places (sometimes < or >), fractions with one bottom a multiple of the other; about half true ' + t5.join(' | '));
+  const c5 = await page.evaluate(src => {
+    const bad = [], val = eval(src), types = new Set();
+    let same = 0;
+    for (let i = 0; i < 1500; i++) {
+      const q = cmpQ(5, ['num', 'sum', 'dec', 'frac']), lv = val(q.l), rv = val(q.r), d = rv - lv;
+      if (q.right !== (d > 1e-9 ? 0 : Math.abs(d) < 1e-9 ? 1 : 2) || q.ans !== q.tiles[q.right].label) bad.push('wrong ' + q.l + ' ' + q.r);
+      types.add(q.type); same += q.right === 1;
+      if (q.type === 'num' && !(/^\d{6}$/.test(q.l) && /^\d{6}$/.test(q.r))) bad.push('six digits ' + q.l + ' ' + q.r);
+      if (q.type === 'dec' && !(/^\d\.\d\d?$/.test(q.l) && /^\d\.\d\d?$/.test(q.r))) bad.push('decimals ' + q.l + ' ' + q.r);
+      if (q.type !== 'num' && q.l === q.r) bad.push('both sides print the same ' + q.l);
+      if (q.type === 'frac') { const b = +q.l.split('/')[1], e = +q.r.split('/')[1]; if (Math.max(b, e) % Math.min(b, e) || b === e) bad.push('bottoms ' + q.l + ' ' + q.r); }
+      if (!/^.+, and .+\. Which sign goes in the box\?$/.test(q.say) || /\//.test(q.say)) bad.push('say ' + q.say);
+    }
+    if (types.size !== 4) bad.push('types ' + [...types]);
+    if (same < 180 || same > 450) bad.push('equal ' + same + ' of 1500');
+    if (cmpQ(5, ['dots']).type !== 'num' || cmpQ(4, ['dec']).l.includes('.')) bad.push('kinds a year does not have');
+    return bad.slice(0, 4);
+  }, val5);
+  ok(c5.length === 0, 'More or less Year 5: six digits, both sides to work out, decimals (0.12 and 0.2, 0.5 and 0.50), fractions with one bottom a multiple of the other; about one in five equal ' + c5.join(' | '));
+  const b5 = await page.evaluate(valSrc => {
+    const bad = [], val = eval(valSrc), types = new Set();
+    for (let i = 0; i < 1000; i++) {
+      const q = balQ(5), [l, r] = q.text.split(' = ');
+      if ((q.text.match(/☐/g) || []).length !== 1) { bad.push('boxes ' + q.text); continue; }
+      const nums = q.text.match(/\d+/g).map(Number);
+      if (!Number.isInteger(q.ans) || q.ans < 1 || Math.max(q.ans, ...nums) > 999999) bad.push('size ' + q.text + ' ' + q.ans);
+      if (val(l.replace('☐', q.ans)) !== val(r.replace('☐', q.ans))) bad.push('not equal ' + q.text + ' ' + q.ans);
+      for (const x of [q.ans - 1, q.ans + 1, 0]) if (x >= 0 && val(l.replace('☐', x)) === val(r.replace('☐', x))) bad.push('two answers ' + q.text);
+      if (Math.max(q.ans, ...nums) >= 100000) types.add('six digits');
+      if (/[×÷]/.test(q.text)) types.add('times');
+      if (/[+−×÷].* = .*[+−×÷]/.test(q.text)) types.add('both');
+    }
+    if (types.size !== 3) bad.push('types ' + [...types]);
+    return bad.slice(0, 4);
+  }, val);
+  ok(b5.length === 0, 'Balance Year 5: one box, one answer, whole numbers to 999,999: six-digit place changes, × and ÷ by 10, 100, 1000, both sides to work out ' + b5.join(' | '));
+  const r5 = await page.evaluate(() => {
+    const bad = [], tos = new Set();
+    for (const kinds of [['line'], ['num']]) for (let i = 0; i < 800; i++) {
+      const q = roundQ(5, kinds), n = +q.n.replace('$', ''), u = q.hi - q.lo, want = Math.round(n / u + 1e-9) * u;
+      tos.add(q.n[0] === '$' ? '$' : u > 1 ? u : q.n.split('.')[1].length === 2 ? 'h' : 't');
+      if (q.ans !== want || q.kind !== (kinds[0] === 'line' ? 'rline' : 'rnum') || n <= q.lo || n >= q.hi || q.ans > 999999) bad.push(JSON.stringify(q));
+      if (Math.abs(q.pos - (n - q.lo) / u) > 1e-9) bad.push('pos ' + JSON.stringify(q));
+      if (q.n[0] === '$' ? q.pre !== '$' || q.cap !== 'to the nearest dollar' || !/^\$\d+\.\d\d$/.test(q.n) : q.pre) bad.push('dollars ' + JSON.stringify(q));
+      if (u > 1 && (n < 100000 || q.cap !== `to the nearest ${u}`)) bad.push('six digits ' + JSON.stringify(q));
+      if (q.kind === 'rline' && q.pos === 0.5) bad.push('halfway on a line ' + q.n);
+    }
+    if (tos.size !== 6) bad.push('kinds ' + [...tos]);
+    return bad.slice(0, 4);
+  });
+  ok(r5.length === 0, 'Rounding Year 5: six digits to the nearest 1,000, 10,000, 100,000; tenths and hundredths to the whole; dollars to the nearest dollar ' + r5.join(' | '));
+  for (const [a, c, shot] of [['tf', { yr: 5, n: 12 }, '50-tf5'], ['cmp', { yr: 5, kinds: ['num', 'sum', 'dec', 'frac'], n: 12 }, '51-cmp5'], ['bal', { yr: 5, n: 12 }, '52-bal5'], ['round', { yr: 5, kinds: ['line', 'num'], n: 12 }, '53-round5']]) {
+    await page.evaluate((a, c) => { hideDone(); act = a; buildSheet(c); show('sheet'); }, a, c);
+    ok((await fits()).length === 0, `${a} Year 5 fits ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/${shot}.png` });
+    const w = await writeAllAndMark();
+    ok(w.length === 0, `${a} Year 5: read and marked right ` + w.join(' | '));
+  }
+  // the widest cards: a long balance on two lines, a six-digit rounding line, dollars on both kinds
+  await page.evaluate(() => {
+    hideDone(); act = 'bal'; buildSheet({ yr: 5, n: 6 });
+    cards[0].q = { kind: 'bal', yr: 5, text: '45000 + 27000 = ☐ + 30000', ans: 42000, say: 'x' };
+    cards[1].q = { kind: 'rline', yr: 5, n: '949999', lo: 900000, hi: 1000000, pos: 0.49999, cap: 'to the nearest 100000', say: 'x', ans: 900000 };
+    cards[2].q = { kind: 'rline', yr: 5, n: '$48.65', lo: 48, hi: 49, pos: 0.65, cap: 'to the nearest dollar', pre: '$', say: 'x', ans: 49 };
+    cards[3].q = { kind: 'rnum', yr: 5, n: '$48.65', lo: 48, hi: 49, pos: 0.65, cap: 'to the nearest dollar', pre: '$', say: 'x', ans: 49 };
+    for (const c of cards.slice(0, 4)) { layout(c); sizeCanvas(c); }
+  });
+  ok(await page.evaluate(() => cards[0].el.querySelector('.eq br') !== null && cards[0].el.querySelectorAll('.eq .bx').length === 1 && [...cards[2].el.querySelectorAll('svg text')].map(t => t.textContent).join('|') === '$48.65|$48|$49' && cards[3].el.querySelector('.al').textContent.startsWith('$')), 'Year 5: a long balance breaks after "=", dollars label the line ends, "$" before the line');
+  ok((await fits()).length === 0 && (await writeAllAndMark()).length === 0, 'Year 5 widest cards fit and are read ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/54-year5-wide.png' });
+  ok(await page.evaluate(() => [ACTS.cmp.key({ yr: 5, kinds: ['dots', 'num', 'dec'], n: 12 }), ACTS.cmp.key({ yr: 4, kinds: ['num', 'dec'], n: 12 }), labelFor('cmp~5|num,sum,dec,frac|12'), labelFor('tf~5|12'), labelFor('bal~5|6'), labelFor('round~5|line,num|12')].join(' / '))
+    === 'cmp~5|num,dec|12 / cmp~4|num|12 / More or less · Year 5 · numbers, sums, decimals, fractions · 12 questions / True or false · Year 5 · 12 questions / Balance · Year 5 · 6 questions / Rounding · Year 5 · number line, just numbers · 12 questions', 'Year 5 record keys and labels');
+  await page.evaluate(() => hideDone());
 
   // ---- B2: Year 1 on True or false, More or less, Balance, and Clocks Match
   const t1 = await page.evaluate(valSrc => {
@@ -2231,6 +2332,7 @@ const fakeSpeech = () => {
       ['muldiv', { yr: 1, ops: ['*', '/'], n: 12 }], ['graph', { yr: 1, n: 12 }], ['howmany', { kinds: ['groups'], max: 10, n: 12 }],
       ['tf', { yr: 1, n: 12 }], ['cmp', { yr: 1, kinds: ['dots'], n: 12 }], ['cmp', { yr: 1, kinds: ['num'], n: 12 }], ['bal', { yr: 1, n: 12 }], ['clock', { yr: 1, kinds: ['match'], n: 12 }],
       ['addsub', { yr: 5, ops: ['+', '-'], n: 12 }], ['muldiv', { yr: 5, ops: ['*'], n: 12 }], ['muldiv', { yr: 5, ops: ['/'], n: 12 }], ['seq', { yr: 5, n: 12 }], ['pv', { kinds: ['expanded', 'more'], max: 999999, n: 12 }],
+      ['tf', { yr: 5, n: 12 }], ['cmp', { yr: 5, kinds: ['num', 'sum', 'dec'], n: 12 }], ['cmp', { yr: 5, kinds: ['frac'], n: 12 }], ['bal', { yr: 5, n: 12 }], ['round', { yr: 5, kinds: ['line'], n: 12 }], ['round', { yr: 5, kinds: ['num'], n: 12 }],
       ['splat', { yr: 1, n: 12 }], ['parts', { yr: 1, kinds: ['tap'], n: 12 }], ['parts', { yr: 1, kinds: ['write'], n: 12 }], ['money', { yr: 1, kinds: ['coin'], n: 12 }], ['ruler', { yr: 1, kinds: ['longer'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
