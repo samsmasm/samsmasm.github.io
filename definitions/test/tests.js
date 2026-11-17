@@ -57,22 +57,36 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   ok(await page.$$eval('.unit', l => l.length) === 2, 'two units on the start page');
   ok(await page.$eval('#start', b => b.disabled), 'Start disabled with nothing picked');
   ok(JSON.stringify(await page.$$eval('#lengths button', l => l.map(b => b.textContent))) === '["6","12","All"]', 'lengths are 6, 12, All');
-  ok(await page.$$eval('.unit:nth-child(1) .chip:not(.whole)', l => l.length) === 7, 'HR has 7 subtopics');
-  ok(await page.$$eval('.unit:nth-child(2) .chip:not(.whole)', l => l.length) === 9, 'Finance has 9 subtopics');
-  ok(await page.$eval('.unit:nth-child(1)', u => [...u.querySelectorAll('.chip')].filter(c => c.querySelector('.hl')).map(c => c.textContent.slice(0, 3)).join()) === '2.5,2.7', 'HL marked on 2.5 and 2.7');
-  await page.click('.unit:nth-child(1) .whole');
-  ok(await page.$$eval('.unit:nth-child(1) .chip', l => l.every(c => c.getAttribute('aria-pressed') === 'true')), 'Whole unit picks every HR subtopic');
+  const HR = '.unit[data-u="2"]', FIN = '.unit[data-u="3"]';
+  ok(await page.$$eval('.subs', l => l.every(s => s.hidden)), 'units start folded');
+  ok(await page.$$eval(`${HR} .subs .tick`, l => l.length) === 7, 'HR has 7 subtopics');
+  ok(await page.$$eval(`${FIN} .subs .tick`, l => l.length) === 9, 'Finance has 9 subtopics');
+  ok(await page.$eval(HR, u => [...u.querySelectorAll('.subs .tick')].filter(c => c.querySelector('.hl')).map(c => c.textContent.slice(0, 3)).join()) === '2.5,2.7', 'HL marked on 2.5 and 2.7');
+  await page.click(`${HR} .fold`);
+  ok(await page.$eval(`${HR} .subs`, s => !s.hidden) && await page.$eval(`${FIN} .subs`, s => s.hidden), 'tapping a unit name unfolds only that unit');
+  await page.click(`${HR} .uall`);
+  ok(await page.$$eval(`${HR} .subs input`, l => l.every(c => c.checked)), 'unit tick picks every HR subtopic');
   ok(await text(page, '#picked') === '105 terms picked', '105 HR terms picked');
-  await page.click('.unit:nth-child(1) .chip:nth-child(2)');   // untick 2.1
-  ok(await page.$eval('.unit:nth-child(1) .whole', b => b.getAttribute('aria-pressed') === 'false'), 'unticking a subtopic unticks Whole unit');
-  await page.click('.unit:nth-child(1) .whole');
-  ok(await page.$$eval('.unit:nth-child(1) .chip', l => l.every(c => c.getAttribute('aria-pressed') === 'true')), 'Whole unit then picks all again');
-  await page.click('.unit:nth-child(1) .whole');
-  ok(await page.$eval('#start', b => b.disabled), 'Whole unit again clears it');
+  ok(await text(page, `${HR} .fold .n`) === '105 / 105', 'unit shows picked count');
+  await page.click(`${HR} .subs .tick:nth-child(1) input`);   // untick 2.1
+  ok(await page.$eval(`${HR} .uall`, b => !b.checked && b.indeterminate), 'unticking a subtopic half-ticks the unit');
+  await page.click(`${HR} .uall`);
+  ok(await page.$$eval(`${HR} .subs input`, l => l.every(c => c.checked)), 'unit tick then picks all again');
+  await page.click(`${HR} .uall`);
+  ok(await page.$eval('#start', b => b.disabled), 'unit tick again clears it');
+  await page.click('#allunits');
+  ok(await text(page, '#picked') === '192 terms picked' && await page.$$eval('.uall', l => l.every(b => b.checked)), 'All units ticks every unit');
+  await page.click(`${FIN} .uall`);
+  ok(await text(page, '#picked') === '105 terms picked' && await page.$eval('#allunits', b => b.indeterminate), 'mixing units half-ticks All units');
+  await page.click(`${FIN} .fold`);
+  await page.click(`${FIN} .subs .tick:nth-child(3) input`);   // 3.2 on top of all of HR
+  ok(await text(page, '#picked') === `${105 + await page.$eval(`${FIN} .subs .tick:nth-child(3) .n`, n => +n.textContent)} terms picked`, 'a whole unit plus a subtopic from another unit');
   await shot(page, 'setup-desktop');
+  await page.click('#allunits'); await page.click('#allunits');
+  ok(await page.$eval('#start', b => b.disabled), 'All units twice clears everything');
 
   // 3.1 has only 2 terms: the board is filled to 3 with an unscored Finance term
-  await page.click('.unit:nth-child(2) .chip:nth-child(2)');
+  await page.click(`${FIN} .subs .tick:nth-child(1) input`);
   ok((await text(page, '#picked')) === '2 terms picked', '3.1 has 2 terms');
   await page.click('#start');
   ok(await page.$$eval('#terms .term', l => l.length) === 3, 'a 2-term pick still gives a 3-term board');
@@ -81,9 +95,10 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.click('#check'); await page.click('#next');
   ok(await text(page, '#final') === '2 / 2', 'score counts only the 2 picked terms');
   await page.click('#change');
-  await page.click('.unit:nth-child(2) .chip:nth-child(2)');   // untick 3.1
+  ok(await page.$eval(`${FIN} .subs`, s => !s.hidden), 'unfolded units stay open after a round');
+  await page.click(`${FIN} .subs .tick:nth-child(1) input`);   // untick 3.1
 
-  const pick27 = () => page.evaluate(() => [...document.querySelectorAll('.chip')].find(c => c.textContent.startsWith('2.7')).click());
+  const pick27 = () => page.evaluate(() => [...document.querySelectorAll('.subs input')].find(c => c.value.startsWith('2.7')).click());
   await pick27();
   await page.click('#start');                             // default 6
   ok(await text(page, '#progress') === '1 of 2', '6 terms = 2 boards');
