@@ -11,6 +11,7 @@ const UNITS = {
   3: 'Unit 3: Finance and accounts',
   4: 'Unit 4: Marketing',
   5: 'Unit 5: Operations management',
+  6: 'Toolkit and concepts',
 };
 
 const defs = JSON.parse(readFileSync(join(here, 'data/defs.json'), 'utf8'));

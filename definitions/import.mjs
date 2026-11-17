@@ -8,7 +8,9 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const UNITS_LIVE = ['2', '3'];
+const UNITS_LIVE = ['1', '2', '3', '4', '5', 'toolkit'];
+// The bank tags the 4 key concepts as unit 1 and the toolkit as unit "toolkit"; both go in group 6 (see build.mjs UNITS).
+const GROUP6 = { concepts: 'Key concepts', toolkit: 'Toolkit' };
 // Subtopic names as in the IB BM guide (ibbmsyllabus.md); hl = the whole subtopic is HL only.
 const TOPICS = {
   '1.1': 'What is a business?', '1.2': 'Types of business entities', '1.3': 'Business objectives',
@@ -38,11 +40,12 @@ const stop = s => /[.!?]$/.test(s) ? s : s + '.';
 const out = [], warn = [];
 for (const x of all) {
   if (!units.includes(x.unit)) continue;
-  if (!TOPICS[x.subtopic]) { warn.push(`${x.term}: no subtopic name for ${x.subtopic}`); continue; }
+  const g6 = GROUP6[x.subtopic];
+  if (!g6 && !TOPICS[x.subtopic]) { warn.push(`${x.term}: no subtopic name for ${x.subtopic}`); continue; }
   const joined = `${x.element1} ${x.element2}`.replace(/\.$/, '');
   if (joined !== x.definition.replace(/\.$/, '')) warn.push(`${x.term}: element1 + element2 differ from definition`);
   out.push({
-    term: x.term, unit: +x.unit, topic: `${x.subtopic} ${TOPICS[x.subtopic]}`,
+    term: x.term, unit: g6 ? 6 : +x.unit, topic: g6 || `${x.subtopic} ${TOPICS[x.subtopic]}`,
     hl: x.level === 'HL', p: [lower(x.element1), stop(x.element2)],
   });
 }

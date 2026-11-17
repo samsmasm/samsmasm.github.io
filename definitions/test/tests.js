@@ -54,7 +54,11 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   // ---- desktop, mouse ----
   await page.setViewport({ width: 1100, height: 1000 });
   await page.goto(URL, { waitUntil: 'networkidle0' });
-  ok(await page.$$eval('.unit', l => l.length) === 2, 'two units on the start page');
+  ok(await page.$$eval('.unit', l => l.length) === 6, 'five units plus toolkit on the start page');
+  ok(await page.evaluate(() => DEFS.length) === 486, 'all 486 terms');
+  ok(await page.$eval('.unit[data-u="6"]', u => [...u.querySelectorAll('.chip.sub')].map(c => c.textContent.replace(/\d+$/, '')).join()) === 'Key concepts,Toolkit', 'concepts and toolkit grouped last');
+  ok(await page.$eval('.unit[data-u="1"]', u => !u.textContent.includes('concepts')), 'concepts not in Unit 1');
+  ok(await page.$eval('.unit[data-u="1"] .wholes', w => w.querySelectorAll('.chip').length === 1 && w.textContent.startsWith('Whole unit6')), 'Unit 1 (no HL terms) has one Whole unit button');
   ok(await page.$eval('#start', b => b.disabled), 'Start disabled with nothing picked');
   ok(JSON.stringify(await page.$$eval('#lengths button', l => l.map(b => b.textContent))) === '["6","12","All"]', 'lengths are 6, 12, All');
   const HR = '.unit[data-u="2"]', FIN = '.unit[data-u="3"]';
