@@ -167,7 +167,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="6"]');
   ok(await page.evaluate(() => view === 5 && /highest so far/.test($('#yMine').textContent) && $('#yMine').textContent.includes('Year 6')), 'Year 6: the Year 5 page, marked the highest so far');
   const y5 = await tiles('#actTiles');
-  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map', 'Shapes'].every(t => y5.includes(t)) && !y5.includes('Rulers') && !y5.includes('Graphs'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
+  ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map', 'Shapes', 'Graphs'].every(t => y5.includes(t)) && !y5.includes('Rulers'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
   ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('round').yr; }).join() === '4,4'), 'Rounding (Year 4 only so far) opens at Year 4');
   await page.evaluate(() => { setYear(3); act = 'round'; goSetup(); });
@@ -683,7 +683,7 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|half and quarter / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,map,money,muldiv,round,seq,shape,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a, C3b, C3c): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes');
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,clock,cmp,dec,fof,graph,map,money,muldiv,round,seq,shape,tf,units'), 'Year 5 so far (C1, C2a, C2b, C3a, C3b, C3c, C4a): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes, Graphs');
   const ck = await page.evaluate(() => {
     const bad = [];
     const minsOk = { 1: m => m === 0, 2: m => [0, 15, 30, 45].includes(m), 3: m => m % 5 === 0 && m < 60, 4: m => m >= 0 && m < 60 };
@@ -1117,6 +1117,39 @@ const fakeSpeech = () => {
   ok((await writeAllAndMark()).length === 0, 'Graphs Year 1: written and tapped answers marked right');
   ok(await page.evaluate(() => { const c = cards[0], wrong = c.q.right === 0 ? 1 : 0; c.el.querySelector('.retry').click(); c.pick = [wrong]; paintTap(c); return readAnswer(c).ok === false; }), 'Graphs Year 1: a wrong colour is marked wrong');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y1.png' });
+  // Year 5 (C4a): clustered bars (more in one day, altogether, tap the day) and grouped tables
+  const g5 = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = graphQ(5);
+      seen.add(q.type + ' ' + q.ask);
+      const svg = new DOMParser().parseFromString(graphSvg(q), 'image/svg+xml');
+      if (q.type === 'gtab') {
+        const C = q.counts, want = q.ask === 'all' ? sumOf(C) : q.ask === 'less' ? sumOf(C.slice(0, q.cut)) : sumOf(C.slice(q.cut));
+        const shown = [...svg.querySelectorAll('text')].map(t => t.textContent);
+        if (q.ans !== want || C.length !== 4 || !C.every((n, j) => shown.includes(gtabBand(GTAB_TOPICS[q.topic].w, j)))) bad.push('gtab ' + JSON.stringify(q));
+        continue;
+      }
+      const G = q.groups, bars = [...svg.querySelectorAll('rect')].filter(r => +r.getAttribute('width') === 10).map(r => +r.getAttribute('height'));
+      if (q.type !== 'cbar' || G.length !== 3 || G.some(([a, b]) => a === b || a % q.step || b % q.step || a > 6 * q.step) || bars.length !== 6 || bars.some((h, j) => Math.abs(h - G[j >> 1][j & 1] * 60 / (6 * q.step)) > 0.01)) bad.push('cbar ' + JSON.stringify(q));
+      const ix = q.of.map(nm => q.keys.findIndex(k => k.nm === nm));
+      if (q.ask === 'all' && q.ans !== sumOf(G.map(g => g[ix[0]]))) bad.push('all ' + JSON.stringify(q));
+      if (q.ask === 'more' && (q.ans !== G[q.gi][ix[0]] - G[q.gi][ix[1]] || q.ans < 1)) bad.push('more ' + JSON.stringify(q));
+      if (q.ask === 'which') {
+        const hits = G.map((g, j) => g[ix[0]] > g[ix[1]] ? j : -1).filter(j => j >= 0);
+        if (q.kind !== 'tap' || hits.length !== 1 || hits[0] !== q.right || q.tiles.length !== 3 || q.tiles[q.right].label !== q.days[q.right] || !/day$/.test(q.tiles[0].say)) bad.push('which ' + JSON.stringify(q));
+      }
+    }
+    if ([...seen].sort().join() !== 'cbar all,cbar more,cbar which,gtab all,gtab less,gtab more') bad.push('seen ' + [...seen].sort().join());
+    return bad.slice(0, 4);
+  });
+  ok(g5.length === 0, 'Graphs Year 5: clustered bars on the scale (how many more on one day, one colour altogether, tap the one day with more), grouped tables (less than, or more, altogether) ' + g5.join(' | '));
+  for (let r = 0; r < 2; r++) await yearSheet('graph', 5, 'Graphs');
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 5, n: 12 }); const want = ['which', 'which', 'more', 'all', 'gtab', 'gtab']; for (let i = 0; i < want.length; i++) { const q = graphQ(5); if (want[i] === 'gtab' ? q.type !== 'gtab' : q.ask !== want[i] || q.type !== 'cbar') { i--; continue; } cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); } });
+  ok(await page.evaluate(() => cards.slice(0, 2).every(c => c.el.querySelectorAll('.tt').length === 3 && c.el.querySelectorAll('.tw .sw').length === 2 && /^Which day has more \w+ than \w+\? \w+day, \w+day, \w+day\.$/.test(cardSay(c.q)))), 'Graphs Year 5: tap the day, read "Which day has more cats than dogs? Monday, Tuesday, Wednesday."');
+  ok((await fits()).length === 0, 'Graphs Year 5 (all kinds) fit ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Graphs Year 5: written and tapped answers marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y5.png' });
 
   // ---- Shapes
   const shq = await page.evaluate(() => {

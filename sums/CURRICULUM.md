@@ -313,8 +313,8 @@ Year 5 buttons so far (C1, C2a, C2b, C3a, C3b, C3c, 2026-11-17): Add and take aw
 
 ### Statistics
 - Collect measured data with a set rounding rule ✋; collect paired category data (what we do at lunch, and gender) ✋.
-- Tables that group measured data into ranges (0–0.99, 1–1.99...).
-- Clustered bar graphs for paired categories (two colours side by side, with a key), and questions about them.
+- Tables that group measured data into ranges (0–0.99, 1–1.99...). ✓ (Graphs, Year 5: long jump and throw in four bands, how many less than, or at least, a cut, and altogether; reading only; C4a)
+- Clustered bar graphs for paired categories (two colours side by side, with a key), and questions about them. ✓ (Graphs, Year 5: three days, two colours with a key, how many more on one day, one colour altogether, tap the day with more; C4a)
 
 ### Probability
 - Run a chance game many times and describe the outcomes ✋ (a screen can run the trials).

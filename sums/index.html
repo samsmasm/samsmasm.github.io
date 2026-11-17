@@ -335,7 +335,7 @@
   .pic2 .side .ans { margin: 0 0 .4em; }
   .pic2 .ln { display: inline-block; width: 1.9em; height: 1em; border-bottom: .07em solid var(--ink); }
   .pic2 .ln.w { width: 2.5em; }
-  .pic2 .sw { display: inline-block; width: .85em; height: .85em; vertical-align: -.12em; border: .06em solid var(--ink); border-radius: .12em; }
+  .pic2 .sw, .tap .sw { display: inline-block; width: .85em; height: .85em; vertical-align: -.12em; border: .06em solid var(--ink); border-radius: .12em; }
   .pic2 .sw.round { border-radius: 50%; }
   .pic2 .u, .pic2 .sep { font-size: .8em; line-height: 1.1; }
   .pic2 .sep { padding: 0 .2em; }
@@ -1432,7 +1432,52 @@ function dotPlotQ() {
   }
   return dotPlotQ();
 }
+// Year 5 (C4a): a clustered bar graph (three days, two colours side by side, a key)
+// or a grouped table (long jump or throw in bands, how many in each)
+const CBAR_TOPICS = [['cats', 'dogs'], ['apples', 'pears'], ['buses', 'cars'], ['boys', 'girls']];
+const CBAR_DAYS = [['Mon', 'Monday'], ['Tue', 'Tuesday'], ['Wed', 'Wednesday'], ['Thu', 'Thursday'], ['Fri', 'Friday']];
+const GTAB_TOPICS = [
+  { name: 'Long jump (m)', w: 1, verb: 'jumped', unit: 'm', unitSay: 'metres' },
+  { name: 'Throw (m)', w: 5, verb: 'threw', unit: 'm', unitSay: 'metres' },
+];
+const gtabBand = (w, i) => `${i * w} – ${i * w + w - 1}.99`;
+function graph5Q() {
+  if (Math.random() < 0.4) { // grouped table: four bands, how many below a cut, at or above it, or altogether
+    const T = GTAB_TOPICS[rnd(0, 1)], counts = range(0, 3).map(() => rnd(1, 9)), ask = pickOne(['less', 'less', 'more', 'all']);
+    const q = { kind: 'graph', type: 'gtab', topic: GTAB_TOPICS.indexOf(T), counts, ask, of: [] };
+    if (ask === 'all') return { ...q, cap: `How many ${T.verb}<br>altogether?`, capLen: 16, say: `How many ${T.verb} altogether?`, ans: sumOf(counts) };
+    const cut = rnd(1, 3), v = cut * T.w;
+    if (ask === 'less') return { ...q, cut, cap: `How many ${T.verb}<br>less than ${v} ${T.unit}?`, capLen: 16, say: `How many ${T.verb} less than ${v} ${T.unitSay}?`, ans: sumOf(counts.slice(0, cut)) };
+    return { ...q, cut, cap: `How many ${T.verb}<br>${v} ${T.unit} or more?`, capLen: 16, say: `How many ${T.verb} ${v} ${T.unitSay} or more?`, ans: sumOf(counts.slice(cut)) };
+  }
+  // clustered bars: two colours for each of three days in a row, a scale in 2s, 5s or 10s
+  const words = pickOne(CBAR_TOPICS), [ca, cb] = shuffled(Object.keys(BLOCK)).slice(0, 2), d0 = rnd(0, 2), days = CBAR_DAYS.slice(d0, d0 + 3);
+  const step = pickOne([2, 5, 10]), ask = pickOne(['more', 'all', 'which']);
+  for (let t = 0; t < 200; t++) {
+    const groups = days.map(() => [rnd(1, 6) * step, rnd(1, 6) * step]);
+    if (groups.some(([a, b]) => a === b)) continue;
+    const q = { kind: 'graph', type: 'cbar', step, keys: [{ nm: ca, w: words[0] }, { nm: cb, w: words[1] }], days: days.map(d => d[0]), groups, ask };
+    if (ask === 'which') { // exactly one day with more of one colour than the other
+      const ia = rnd(0, 1), ib = 1 - ia, hits = groups.map((g, i) => g[ia] > g[ib] ? i : -1).filter(i => i >= 0);
+      if (hits.length !== 1) continue;
+      const A = q.keys[ia], B = q.keys[ib], right = hits[0], svg = graphSvg(q), [, pw, ph] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+      // the words beside the graph (three short lines), so the graph can be big
+      const tw = `Which day<br>has more<br>${swatch(A.nm)} than ${swatch(B.nm)}?`;
+      return {
+        ...q, kind: 'tap', form: 'graph', of: [A.nm, B.nm], top: `<span class="tpic" style="flex-direction:row;gap:.4em"><span class="tw" style="text-align:left">${tw}</span>${svg}</span>`,
+        tc: pw + 4.4, th: ph, topf: 0.6, right,
+        tiles: days.map(([d, full]) => ({ html: `<span style="font-size:.6em">${d}</span>`, label: d, say: full })),
+        say: `Which day has more ${A.w} than ${B.w}?`, ans: days[right][0],
+      };
+    }
+    if (ask === 'all') { const i = rnd(0, 1), K = q.keys[i]; return { ...q, of: [K.nm], cap: `How many ${swatch(K.nm)}<br>altogether?`, capLen: 12, say: `How many ${K.w} altogether?`, ans: sumOf(groups.map(g => g[i])) }; }
+    const gi = rnd(0, 2), [a, b] = groups[gi], big = a > b ? 0 : 1, A = q.keys[big], B = q.keys[1 - big];
+    return { ...q, gi, of: [A.nm, B.nm], cap: `${days[gi][0]}: how many more<br>${swatch(A.nm)} than ${swatch(B.nm)}?`, capLen: 18, say: `On ${days[gi][1]}, how many more ${A.w} than ${B.w}?`, ans: Math.abs(a - b) };
+  }
+  return graph5Q();
+}
 function graphQ(yr) {
+  if (yr === 5) return graph5Q();
   if (yr === 4) return dotPlotQ();
   const names = shuffled(Object.keys(BLOCK)).slice(0, yr === 1 ? 3 : 4);
   let type, step = 1, counts;
@@ -1463,6 +1508,32 @@ function graphQ(yr) {
 const GRAPH_TILES = cats => cats.map(c => ({ html: `<span class="tsw" style="background:${BLOCK[c.nm]}"></span>`, label: c.nm, say: c.nm }));
 function graphSvg(q) {
   const C = q.cats, sw = (x, y, nm, s = 10) => `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="1.2" fill="${BLOCK[nm]}" stroke="${INK}" stroke-width=".7"/>`;
+  if (q.type === 'gtab') { // a table: the band, then how many, ruled like a printed table
+    const T = GTAB_TOPICS[q.topic], RH = 12, W1 = 52, W2 = 36, W = W1 + W2, H = RH * (q.counts.length + 1);
+    let s = `<rect x="0" y="0" width="${W}" height="${RH}" fill="#eee"/>` + svgText(W1 / 2, RH / 2, T.name, 6.5) + svgText(W1 + W2 / 2, RH / 2, 'How many', 6.5);
+    q.counts.forEach((n, i) => { const y = RH * (i + 1.5); s += svgText(W1 / 2, y, gtabBand(T.w, i), 7) + svgText(W1 + W2 / 2, y, n, 7.5); });
+    for (let i = 1; i <= q.counts.length; i++) s += `<line x1="0" y1="${RH * i}" x2="${W}" y2="${RH * i}" stroke="${INK}" stroke-width=".6"/>`;
+    s += `<line x1="${W1}" y1="0" x2="${W1}" y2="${H}" stroke="${INK}" stroke-width=".6"/><rect x="0" y="0" width="${W}" height="${H}" fill="none" stroke="${INK}" stroke-width="1"/>`;
+    return `<svg ${emBox([-1, -1, W + 2, H + 2], 0.075)}>${s}</svg>`;
+  }
+  if (q.type === 'cbar') { // clustered bars: a pair for each day, the key above
+    const top = 6 * q.step, PH = 60, uy = PH / top, ax = 16, BW = 10, GS = 28, W = ax + 5 + q.days.length * GS;
+    let s = '';
+    for (let v = 0; v <= top; v += q.step) {
+      const y = PH - v * uy;
+      if (v) s += `<line x1="${ax}" y1="${y}" x2="${W}" y2="${y}" stroke="#cfcfcf" stroke-width=".6"/>`;
+      s += svgText(ax - 3, y, v, 6.5, 'end');
+    }
+    q.groups.forEach((g, i) => {
+      const x = ax + 5 + i * GS;
+      g.forEach((n, j) => { s += `<rect x="${x + j * BW}" y="${PH - n * uy}" width="${BW}" height="${n * uy}" fill="${BLOCK[q.keys[j].nm]}" stroke="${INK}" stroke-width=".8"/>`; });
+      s += svgText(x + BW, PH + 6, q.days[i], 6.5);
+    });
+    s += `<path d="M${ax} -2V${PH}H${W}" fill="none" stroke="${INK}" stroke-width="1"/>`;
+    let kx = ax + 2; // the key: a square and its word for each colour
+    q.keys.forEach(k => { s += sw(kx, -17, k.nm, 7) + svgText(kx + 9, -13.5, k.w, 6.5, 'start'); kx += 12 + k.w.length * 3.8; });
+    return `<svg ${emBox([0, -19, W + 2, PH + 31], 0.06)}>${s}</svg>`;
+  }
   if (q.type === 'dot') { // dots stacked over a 0–6 number line, the topic under it
     const top = Math.max(...q.counts), base = top * 10 + 2;
     let s = `<line x1="0" y1="${base}" x2="${7 * 16}" y2="${base}" stroke="${INK}" stroke-width="1"/>`;
@@ -3257,7 +3328,7 @@ const ACTS = {
   graph: {
     name: 'Graphs', ages: [5, 8], setup: 'opts', say: 'Look at the graph and answer the question.',
     pic: graphSvg({ type: 'bar', step: 2, cats: [{ nm: 'red', n: 8 }, { nm: 'blue', n: 4 }, { nm: 'green', n: 10 }, { nm: 'yellow', n: 6 }] }),
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · picture graphs'], [2, '2 · tally charts'], [3, '3 · bar graphs'], [4, '4 · dot plots']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · picture graphs'], [2, '2 · tally charts'], [3, '3 · bar graphs'], [4, '4 · dot plots'], [5, '5 · grouped bars, tables']] }],
     defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
     make: c => graphQ(c.yr),
     key: c => `graph~${c.yr}|${c.n}`,
