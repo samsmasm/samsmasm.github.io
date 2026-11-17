@@ -115,7 +115,7 @@ When Sam says "make the next step":
 4. Follow "Adding an activity" above: tests for every new generator and card (answers right, fits with room, read and marked right, record label), screenshots in portrait, landscape and phone, run `test/run.sh` twice.
 5. Update the Activities section above, tick `CURRICULUM.md`, add the mock row (`mock/index.html` `LEVELS`) and refresh `mock/pics.json`.
 6. Mark the step here: `✓ (date)` plus one line on anything that turned out different. Update the tracker and the vault note, commit, push.
-7. Tell Sam what to try on the tablet. If a step proves too big, split it into a and b here and build a.
+7. Add what Sam should try on the tablet to the **"To check (review later)"** list in the vault note (`~/notes/Projects/Sums/Sums.md`): one `- [ ]` line per thing, with the step number. Sam is building as much as possible now and reviewing later, so don't wait for his answers before the next step. Also keep that note's "What is built, by year" table in step. Tell Sam briefly what was added. If a step proves too big, split it into a and b here and build a.
 
 ### Rules for every step
 - The sheet stays plain. New pictures are clean line drawings; block colour only where it carries meaning.
