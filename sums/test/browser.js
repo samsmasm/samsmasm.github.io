@@ -780,17 +780,23 @@ const fakeSpeech = () => {
     const nums = q => q.kind === 'expr' ? (([a, , b]) => [+a, +b])(q.text.split(' ')) : [q.a, q.b];
     const lim = { 1: [20, 20], 2: [100, 100], 3: [999, 999], 4: [9999, 9999] };
     for (const yr of [1, 2, 3, 4]) for (const op of ['+', '-', '*', '/']) for (let i = 0; i < 300; i++) {
-      const q = (op === '+' || op === '-' ? addSubQ : mulDivQ)(op, yr), [a, b] = nums(q);
+      const q = (op === '+' || op === '-' ? addSubQ : mulDivQ)(op, yr);
+      if (yr === 1 && (op === '*' || op === '/')) { // pictures, no signs: bags of dots, or dots shared into empty bags
+        const dots = new DOMParser().parseFromString(groupsSvg(q), 'image/svg+xml').querySelectorAll('circle').length;
+        if (q.kind !== 'mgrp' || q.form !== (op === '*' ? 'groups' : 'share') || q.ans !== (op === '*' ? q.g * q.k : q.k) || q.g * q.k > 20 || q.g < 2 || q.k < 2 || dots !== q.g * q.k || /[×÷]/.test(q.cap + q.say)) bad.push(`1 picture ${JSON.stringify(q)}`);
+        continue;
+      }
+      const [a, b] = nums(q);
       const want = { '+': a + b, '-': a - b, '*': a * b, '/': a / b }[op];
       if (q.ans !== want || !Number.isInteger(q.ans) || q.ans < 0) bad.push(`${yr} wrong ${JSON.stringify(q)}`);
       if (q.kind !== (yr <= 2 || op === '/' ? 'expr' : 'col')) bad.push(`${yr} layout ${JSON.stringify(q)}`); // division is never the long-division bracket (a Year 5 method)
       if ((op === '+' || op === '-') && (Math.max(a, b, q.ans) > lim[yr][0] || (yr === 3 && a < 100) || (yr === 4 && a < 1000))) bad.push(`${yr} size ${JSON.stringify(q)}`);
-      if (op === '*' && yr <= 2 && (![2, 5, 10].includes(a) && ![2, 5, 10].includes(b) || (yr === 1 && q.ans > 20))) bad.push(`${yr} times ${JSON.stringify(q)}`);
-      if (op === '/' && (b < 2 || b > 10 || (yr === 1 && a > 20) || (yr <= 2 && ![2, 5, 10].includes(b)))) bad.push(`${yr} divide ${JSON.stringify(q)}`);
+      if (op === '*' && yr <= 2 && ![2, 5, 10].includes(a) && ![2, 5, 10].includes(b)) bad.push(`${yr} times ${JSON.stringify(q)}`);
+      if (op === '/' && (b < 2 || b > 10 || (yr <= 2 && ![2, 5, 10].includes(b)))) bad.push(`${yr} divide ${JSON.stringify(q)}`);
     }
     return bad.slice(0, 4);
   });
-  ok(ys.length === 0, 'Sums by year: answers right; Year 1 within 20, 2 within 100, 3 three digits, 4 four digits; 2s 5s 10s first; across in Years 1–2, stacked after, division always across ' + ys.join(' | '));
+  ok(ys.length === 0, 'Sums by year: answers right; Year 1 within 20 (times and divide as bags of dots, no signs), 2 within 100, 3 three digits, 4 four digits; 2s 5s 10s first; across in Years 1–2, stacked after, division always across ' + ys.join(' | '));
   ok(await page.evaluate(() => { act = 'sums'; return range(0, 30).every(() => ACTS.sums.make({ ops: ['/'], a: 2, b: 1, pa: ALL_DIGITS, pb: ALL_DIGITS, n: 12 }).kind === 'div'); }), 'the original Sums keeps its long-division bracket');
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="addsub"]');
@@ -799,6 +805,12 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/24-addsub-y4.png' });
   for (const yr of [3, 1, 2, 4]) await yearSheet('muldiv', yr, 'Times and divide');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/25-muldiv-y4.png' });
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 1, ops: ['*', '/'], n: 12 }); });
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'mgrp' && c.el.querySelectorAll('.qv circle').length === c.q.g * c.q.k && c.el.querySelectorAll('.qv rect').length === c.q.g && cardSay(c.q) === c.q.say)
+    && new Set(cards.map(c => c.q.form)).size === 2), 'Times and divide Year 1: bags of dots and sharing into empty bags, one bag per group, read aloud');
+  ok((await fits()).length === 0, 'Times and divide Year 1 pictures fit ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Times and divide Year 1: answers written under the bags are read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/25-muldiv-y1.png' });
   ok(await page.evaluate(() => { const q = addSubQ('+', 1); return cardSay(q) === q.text.replace('+', 'plus'); }), 'Year 1 sums are read aloud ("3 plus 4")');
 
   // ---- Number patterns
@@ -881,20 +893,27 @@ const fakeSpeech = () => {
         asks.add(q.ask);
         continue;
       }
+      if (q.kind === 'tap') { // Year 1: tap the colour with the most or the least
+        const ns = q.cats.map(c => c.n), want = q.ask === 'most' ? Math.max(...ns) : Math.min(...ns);
+        if (yr !== 1 || q.form !== 'graph' || q.cats.length !== 3 || new Set(ns).size !== 3 || q.tiles.length !== 3 || q.cats[q.right].n !== want || q.tiles[q.right].label !== q.cats[q.right].nm || !q.tiles.every((t, j) => t.say === q.cats[j].nm)) bad.push('y1 tap ' + JSON.stringify(q));
+        asks.add('y1 ' + q.ask);
+        continue;
+      }
+      if (yr === 1) asks.add('y1 ' + q.ask);
       const ns = q.cats.map(c => c.n), by = Object.fromEntries(q.cats.map(c => [c.nm, c.n]));
       const want = q.ask === 'one' ? by[q.of[0]] : q.ask === 'more' ? by[q.of[0]] - by[q.of[1]] : ns.reduce((a, b) => a + b, 0);
       if (q.ans !== want || q.ans < 1 || new Set(ns).size !== ns.length) bad.push(`${yr} ${JSON.stringify(q)}`);
-      if ((yr === 1 && (q.type !== 'pic' || q.ask !== 'one' || q.cats.length !== 3 || Math.max(...ns) > 8)) || (yr === 2 && q.type === 'bar') || (yr === 3 && (q.type !== 'bar' || ns.some(n => n % q.step)))) bad.push(`${yr} type ${JSON.stringify(q)}`);
+      if ((yr === 1 && (q.type !== 'col' || q.ask !== 'one' || q.cats.length !== 3 || Math.max(...ns) > 8)) || (yr === 2 && q.type === 'bar') || (yr === 3 && (q.type !== 'bar' || ns.some(n => n % q.step)))) bad.push(`${yr} type ${JSON.stringify(q)}`);
       // the drawing shows the counts: dots, tally marks, or bar heights on the scale
       const svg = new DOMParser().parseFromString(graphSvg(q), 'image/svg+xml');
-      if (q.type === 'pic' && svg.querySelectorAll('circle').length !== ns.reduce((a, b) => a + b, 0)) bad.push('dots ' + JSON.stringify(q));
+      if ((q.type === 'pic' || q.type === 'col') && svg.querySelectorAll('circle').length !== ns.reduce((a, b) => a + b, 0)) bad.push('dots ' + JSON.stringify(q));
       if (q.type === 'tally' && svg.querySelectorAll('line').length !== ns.reduce((a, b) => a + b, 0)) bad.push('tally ' + JSON.stringify(q));
       if (q.type === 'bar') {
         const bars = [...svg.querySelectorAll('rect')].filter(r => +r.getAttribute('width') === 13).map(r => +r.getAttribute('height'));
         if (bars.some((h, j) => Math.abs(h - ns[j] * 60 / (6 * q.step)) > 0.01)) bad.push('bars ' + JSON.stringify(q));
       }
     }
-    if ([...asks].sort().join() !== 'all,max,min,mode,one,range') bad.push('dot plot questions seen: ' + [...asks].sort().join());
+    if ([...asks].sort().join() !== 'all,max,min,mode,one,range,y1 least,y1 most,y1 one') bad.push('questions seen: ' + [...asks].sort().join());
     return bad.slice(0, 4);
   });
   ok(gq.length === 0, 'Graphs: answers match the counts and the drawing (dots, tally marks, bars on the scale); Year 1 picture graphs, Year 3 bar graphs; Year 4 dot plots ask how many, most common, altogether, most, fewest and spread, and the tallest stack is never at the biggest value ' + gq.join(' | '));
@@ -915,6 +934,13 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.cap .sw').length === c.q.of.length && cardSay(c.q) === c.q.say)), 'Graphs: colours in the question, read aloud by colour name');
   ok(await page.evaluate(() => { const qs = range(0, 40).map(() => graphQ(2)); return qs.every(q => q.of.length === 0 || /class="sw round"/.test(q.cap) === (q.type === 'pic')); }), 'Graphs: a circle in the question when she counts circles, a square for tallies and bars (Sam)');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y2.png' });
+  // Year 1: columns standing on a line, and tap the colour with the most / least (both kinds on one sheet)
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 1, n: 12 }); for (let i = 0; i < 2; i++) { const q = graphQ(1); if (q.kind !== 'tap') { i--; continue; } cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); } });
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' ? c.el.querySelectorAll('.tt .tsw').length === 3 && /^Which has the (most|least)\? (\w+, ){2}\w+\.$/.test(cardSay(c.q)) : c.q.type === 'col')), 'Graphs Year 1: picture graphs in columns; tap cards with three colour squares, read "Which has the most? red, blue, green."');
+  ok((await fits()).length === 0, 'Graphs Year 1 (columns and tap cards) fit ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'Graphs Year 1: written and tapped answers marked right');
+  ok(await page.evaluate(() => { const c = cards[0], wrong = c.q.right === 0 ? 1 : 0; c.el.querySelector('.retry').click(); c.pick = [wrong]; paintTap(c); return readAnswer(c).ok === false; }), 'Graphs Year 1: a wrong colour is marked wrong');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y1.png' });
 
   // ---- Shapes
   const shq = await page.evaluate(() => {
@@ -1543,17 +1569,38 @@ const fakeSpeech = () => {
   await page.click('#actTiles [data-act="howmany"]');
   await page.click('#newBtn');
   ok((await said()).slice(-1)[0] === 'How many dots?', 'age 5: the question is read aloud');
-  const hm = await page.evaluate(() => cards.every(c => c.q.kind === 'frame' && c.q.ans === c.q.dots && c.el.querySelectorAll('svg circle').length === c.q.dots && c.q.dots >= 1 && c.q.dots <= 10));
-  ok(hm, 'How many?: ten frame shows exactly the answer in dots (up to 10)');
+  ok(await page.evaluate(() => draft.kinds.join() === 'frame,groups'), 'How many? starts with both kinds: ten frame and Groups');
+  const hm = await page.evaluate(() => cards.every(c => c.q.kind === 'frame' && c.el.querySelectorAll('svg circle').length === c.q.ans && c.q.ans >= 1 && c.q.ans <= 10 && (c.q.parts ? c.q.ans === c.q.parts[0] + c.q.parts[1] : c.q.ans === c.q.dots)));
+  ok(hm, 'How many?: the picture shows exactly the answer in dots (up to 10)');
+  const grp = await page.evaluate(() => {
+    const bad = [];
+    for (const max of [5, 10, 20]) for (let i = 0; i < 300; i++) {
+      const q = ACTS.howmany.make({ kinds: ['groups'], max, n: 6 }), [a, b] = q.parts;
+      const fills = [...new DOMParser().parseFromString(clustersSvg(q.parts, q.cols), 'image/svg+xml').querySelectorAll('circle')].map(e => e.getAttribute('fill'));
+      if (q.ans !== a + b || a < 1 || b < 1 || a > 6 || b > 6 || q.ans > Math.min(max, 10) || q.cols[0] === q.cols[1] || fills.length !== q.ans || fills.filter(f => f === BLOCK[q.cols[0]]).length !== a || fills.filter(f => f === BLOCK[q.cols[1]]).length !== b) bad.push(JSON.stringify(q));
+    }
+    return bad.slice(0, 3);
+  });
+  ok(grp.length === 0, 'How many? Groups: two dice patterns (1–6 each) in two colours, total up to 10 (5 when "Up to 5") ' + grp.join(' | '));
   ok(await page.evaluate(() => { writeNum(cards[0], cards[0].q.ans); return read(cards[0]) === String(cards[0].q.ans); }), 'How many?: answer under the line read');
   await page.click('#sayBtn');
   ok((await said()).slice(-1)[0] === 'How many dots?', 'speaker button repeats it');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/7-howmany.png' });
   await page.click('#setupBtn');
   ok(await visible('#optBlock [data-key="max"]') && !(await visible('#kpBlock')), 'How many? setup: Up to, no keypads');
+  await page.click('#optBlock [data-key="kinds"] [data-v="frame"]'); // Groups only
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => !!c.q.parts && c.el.querySelectorAll('.frame svg').length === 1)), 'How many? Groups only: every card two clusters, no ten frame');
+  ok((await fits()).length === 0, 'How many? Groups fit with room to write ' + (await fits()).join(' '));
+  ok((await writeAllAndMark()).length === 0, 'How many? Groups: answers under the dots read and marked right');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/7-howmany-groups.png' });
+  ok(await page.evaluate(() => sheetKey === 'howmany~10|6|groups' && labelFor(sheetKey) === 'How many? · groups · up to 10 · 6 questions'), 'How many? Groups record key and label');
+  await page.click('#setupBtn');
+  await page.click('#optBlock [data-key="kinds"] [data-v="frame"]');
+  await page.click('#optBlock [data-key="kinds"] [data-v="groups"]'); // ten frames only, as before
   await page.click('#optBlock [data-key="max"] [data-v="20"]');
   await page.click('#newBtn');
-  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.frame svg').length === 2 && c.el.querySelectorAll('svg circle').length === c.q.dots)), 'up to 20: two frames, dots match');
+  ok(await page.evaluate(() => sheetKey === 'howmany~20|6' && cards.every(c => c.el.querySelectorAll('.frame svg').length === 2 && c.el.querySelectorAll('svg circle').length === c.q.dots)), 'up to 20, ten frames only: two frames, dots match, the old record key');
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="make10"]');
   ok((await said()).slice(-1)[0] === 'How many more dots to make ten?', 'Make 10 read aloud');
@@ -1728,7 +1775,8 @@ const fakeSpeech = () => {
       ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }],
       ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }],
       ['units', { yr: 4, n: 12 }], ['angle', { yr: 4, kinds: ['size'], n: 12 }], ['angle', { yr: 4, kinds: ['deg'], n: 12 }],
-      ['map', { yr: 4, kinds: ['tap'], n: 6 }], ['map', { yr: 4, kinds: ['where'], n: 6 }], ['shape', { yr: 4, kinds: ['moves'], n: 12 }], ['money', { yr: 4, kinds: ['make'], n: 12 }]]) {
+      ['map', { yr: 4, kinds: ['tap'], n: 6 }], ['map', { yr: 4, kinds: ['where'], n: 6 }], ['shape', { yr: 4, kinds: ['moves'], n: 12 }], ['money', { yr: 4, kinds: ['make'], n: 12 }],
+      ['muldiv', { yr: 1, ops: ['*', '/'], n: 12 }], ['graph', { yr: 1, n: 12 }], ['howmany', { kinds: ['groups'], max: 10, n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

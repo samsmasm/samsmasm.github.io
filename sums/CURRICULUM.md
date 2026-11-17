@@ -23,7 +23,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Say the number before or after, to 10 *(6m)* then 20.
 - Compare and order numbers to 20 *(6m)*, then to 100; ordinals 1st to 5th *(6m)*, then with suffixes (1st, 2nd, 3rd...) to 100.
 - Put numbers on a fully labelled number line *(6m)*, then on a partly labelled one (17 on a line marked in 5s). ✓ partly (Number lines)
-- Subitise (see without counting) 3–5 objects *(6m)*, then smaller groups inside a bigger set (3 and 5 in 8). ✓ (How many?)
+- Subitise (see without counting) 3–5 objects *(6m)*, then smaller groups inside a bigger set (3 and 5 in 8). ✓ (How many?, Kind Groups: two dice in two colours)
 - Count up to 10 objects one by one *(6m)*, then up to 20, also in pairs. ✓ (How many?)
 - More, less or the same *(6m)*.
 - Find totals to 20 by grouping in pairs, 5s or 10s. Knows: ten ones is one 10; 12 is six pairs or one 10 and two ones. ✓ (Teen numbers)
@@ -36,7 +36,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Join and separate groups to 20 (9 + 6, 7 + __ = 11). ✓ (Missing number, Number bonds)
 - Add ten to a one-digit number (10 + 4). ✓ (Add and take away, Year 1)
 - One-step + and − word problems with objects and pictures. ✓ (Story sums, Year 1, read aloud; no pictures)
-- Multiply and divide by equal groups or sharing (counting objects), answers within 20. ✓ (Story sums, Arrays). Out of step: Times and divide Year 1 prints × and ÷ sums, but those signs and the 2, 5 and 10 tables are Year 2.
+- Multiply and divide by equal groups or sharing (counting objects), answers within 20. ✓ (Story sums, Arrays, Times and divide Year 1: bags of dots and sharing into empty bags, no signs; B1)
 - Knows: adding 0 changes nothing; order doesn't matter when adding but does when subtracting. Only the + and − signs are Year 1.
 
 ### Fractions and money
@@ -68,7 +68,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Statistics
 - Collect category data for a question (whose foot is longer?) ✋, and tally it.
 - Make a picture graph (one picture per item, all the same height, stacked in columns).
-- Read a picture graph: how many in each group, which has most or least. ✓ partly (Graphs, Year 1: how many; not most/least; drawn in rows, not columns)
+- Read a picture graph: how many in each group, which has most or least. ✓ (Graphs, Year 1: columns of same-size circles on a line, how many, and tap the colour with the most or least; B1)
 
 ---
 

@@ -295,6 +295,7 @@
   .pic2 .eq { font-weight: 700; line-height: 1.25; }
   .tap .tpic { display: flex; flex-direction: column; align-items: center; gap: .1em; }
   .tap .tw { font-size: .8em; font-weight: 700; line-height: 1.1; }
+  .tap .tsw { display: block; width: .95em; height: .95em; border: .06em solid var(--ink); border-radius: .12em; }
   .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
   .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
   .pic2 .side { display: flex; align-items: flex-end; gap: .7em; }
@@ -576,6 +577,18 @@ const frameInner = (dots, empty) => {
     else if (empty) s += `<circle cx="${x}" cy="${y}" r="3.3" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.4 1.1"/>`;
   }
   return s;
+};
+// How many?, Groups: two dice patterns side by side, each its own block colour
+const PIPS = { 1: [[1, 1]], 2: [[0, 0], [2, 2]], 3: [[0, 0], [1, 1], [2, 2]], 4: [[0, 0], [2, 0], [0, 2], [2, 2]], 5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], 6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]] };
+const clustersSvg = (parts, cols) => {
+  // each part on its own die (a thin rounded square), so the two parts never run together
+  let s = '';
+  parts.forEach((n, j) => {
+    const x0 = j * 40;
+    s += `<rect x="${x0}" y="0" width="30" height="30" rx="5" fill="none" stroke="#111" stroke-width=".8"/>`;
+    PIPS[n].forEach(([cx, cy]) => { s += `<circle cx="${x0 + 6.5 + cx * 8.5}" cy="${6.5 + cy * 8.5}" r="3.5" fill="${BLOCK[cols[j]]}" stroke="#111" stroke-width=".6"/>`; });
+  });
+  return `<svg viewBox="-1 -1 72 32" style="width:5.6em;height:2.5em">${s}</svg>`;
 };
 // number bond: the whole in the top circle, joined to the two parts below; the
 // hidden one is an empty circle (class "hole") she writes in
@@ -967,10 +980,44 @@ function addSubQ(op, yr) {
   }
   return asQ(op, 5, 3, yr);
 }
+// Year 1 has no × or ÷ signs (those come in Year 2): pictures instead.
+// Groups: g bags of k dots, how many altogether? Sharing: g·k dots shared
+// between g empty bags, how many in each? Totals within 20.
+function groupsQ(op) {
+  let g, k;
+  do { g = rnd(2, 5); k = rnd(2, 6); } while (g * k > 20);
+  return op === '*'
+    ? { kind: 'mgrp', form: 'groups', g, k, cap: `${g} bags of ${k}`, say: `${g} bags of ${k}. How many altogether?`, ans: g * k }
+    : { kind: 'mgrp', form: 'share', g, k, cap: `${g * k} shared by ${g}`, say: `${g * k} shared between ${g}. How many in each?`, ans: k };
+}
+// a bag: a box with rounded corners; k dots inside in rows of two (an odd last one in the middle)
+function bagSvg(x, y, k) {
+  let s = `<rect x="${x}" y="${y}" width="22" height="32" rx="4" fill="none" stroke="currentColor" stroke-width="1"/>`;
+  for (let i = 0; i < k; i++) {
+    const row = Math.floor(i / 2), alone = i === k - 1 && k % 2;
+    s += `<circle cx="${x + (alone ? 11 : i % 2 ? 15.5 : 6.5)}" cy="${y + 6 + row * 10}" r="3.5" fill="currentColor"/>`;
+  }
+  return s;
+}
+function groupsSvg(q) {
+  const bagsW = q.g * 22 + (q.g - 1) * 6;
+  if (q.form === 'groups') {
+    let s = ''; for (let i = 0; i < q.g; i++) s += bagSvg(i * 28, 0, q.k);
+    return `<svg ${emBox([-1, -1, bagsW + 2, 34], 0.05)}>${s}</svg>`;
+  }
+  // sharing: the dots in rows of ten (a small gap after five) above the empty bags
+  const n = q.g * q.k, rows = Math.ceil(n / 10), dotsW = Math.min(n, 10) * 10 + (n > 5 ? 3 : 0), W = Math.max(dotsW, bagsW);
+  let s = '';
+  for (let i = 0; i < n; i++) { const c = i % 10; s += `<circle cx="${(W - dotsW) / 2 + 5 + c * 10 + (c >= 5 ? 3 : 0)}" cy="${5 + Math.floor(i / 10) * 10}" r="3.5" fill="currentColor"/>`; }
+  const y0 = rows * 10 + 6;
+  for (let i = 0; i < q.g; i++) s += bagSvg((W - bagsW) / 2 + i * 28, y0, 0);
+  return `<svg ${emBox([-1, -1, W + 2, y0 + 34], 0.05)}>${s}</svg>`;
+}
 function mulDivQ(op, yr) {
-  const tables = { 1: [2, 5, 10], 2: [2, 5, 10], 3: [2, 3, 4, 5, 8, 10], 4: range(2, 10) }[yr];
+  if (yr === 1) return groupsQ(op);
+  const tables = { 2: [2, 5, 10], 3: [2, 3, 4, 5, 8, 10], 4: range(2, 10) }[yr];
   const t = pickOne(tables);
-  let k = yr === 1 ? rnd(1, Math.floor(20 / t)) : rnd(op === '*' && yr === 2 ? 0 : 1, 10);
+  let k = rnd(op === '*' && yr === 2 ? 0 : 1, 10);
   if (op === '*') {
     // from Year 3, sometimes a bigger number times a one-digit number (2 × 23, 4 × 125)
     if (yr >= 3 && Math.random() < 0.35) return asQ('*', yr === 3 ? rnd(11, 99) : rnd(11, 999), rnd(2, 9), yr);
@@ -1118,11 +1165,21 @@ function graphQ(yr) {
   if (yr === 4) return dotPlotQ();
   const names = shuffled(Object.keys(BLOCK)).slice(0, yr === 1 ? 3 : 4);
   let type, step = 1, counts;
-  if (yr === 1) { type = 'pic'; counts = distinctPick(3, 1, 8); }
-  else if (yr === 2) { type = pickOne(['tally', 'tally', 'pic']); counts = type === 'pic' ? distinctPick(4, 1, 10) : distinctPick(4, 2, 20); }
+  if (yr === 1) { // a picture graph in columns; "how many ●?" written, or tap the colour with the most / least
+    const cs = distinctPick(3, 1, 8), cats = names.map((nm, i) => ({ nm, n: cs[i] }));
+    const ask = pickOne(['one', 'one', 'most', 'least']);
+    if (ask === 'one') { const c = pickOne(cats); return { kind: 'graph', type: 'col', step, cats, ask, of: [c.nm], cap: `How many ${swatch(c.nm, true)}?`, capLen: 11, say: `How many ${c.nm}?`, ans: c.n }; }
+    const most = ask === 'most', want = (most ? Math.max : Math.min)(...cs), right = cs.indexOf(want);
+    const svg = graphSvg({ type: 'col', cats }), [, pw, ph] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number), words = `Which has the ${ask}?`;
+    return {
+      kind: 'tap', form: 'graph', cats, ask, of: [], top: `<span class="tpic"><span class="tw">${words}</span>${svg}</span>`,
+      tc: Math.max(pw, words.length * 0.45), th: ph + 0.9, topf: 0.66, tiles: GRAPH_TILES(cats), right, say: words, ans: cats[right].nm,
+    };
+  }
+  if (yr === 2) { type = pickOne(['tally', 'tally', 'pic']); counts = type === 'pic' ? distinctPick(4, 1, 10) : distinctPick(4, 2, 20); }
   else { type = 'bar'; step = pickOne([2, 5, 10]); counts = distinctPick(4, 1, 6).map(x => x * step); }
   const cats = names.map((nm, i) => ({ nm, n: counts[i] }));
-  const ask = yr === 1 ? 'one' : pickOne(yr === 2 ? ['one', 'more', 'more'] : ['one', 'more', 'all']);
+  const ask = pickOne(yr === 2 ? ['one', 'more', 'more'] : ['one', 'more', 'all']);
   const q = { kind: 'graph', type, step, cats, ask }, round = type === 'pic';
   if (ask === 'one') { const c = pickOne(cats); return { ...q, of: [c.nm], cap: `How many ${swatch(c.nm, round)}?`, capLen: 11, say: `How many ${c.nm}?`, ans: c.n }; }
   if (ask === 'more') {
@@ -1131,6 +1188,8 @@ function graphQ(yr) {
   }
   return { ...q, of: [], cap: 'How many altogether?', capLen: 20, say: 'How many altogether?', ans: sumOf(counts) };
 }
+// tap the colour: tiles are the graph's colour squares, spoken by colour name
+const GRAPH_TILES = cats => cats.map(c => ({ html: `<span class="tsw" style="background:${BLOCK[c.nm]}"></span>`, label: c.nm, say: c.nm }));
 function graphSvg(q) {
   const C = q.cats, sw = (x, y, nm, s = 10) => `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="1.2" fill="${BLOCK[nm]}" stroke="${INK}" stroke-width=".7"/>`;
   if (q.type === 'dot') { // dots stacked over a 0–6 number line, the topic under it
@@ -1143,6 +1202,16 @@ function graphSvg(q) {
     });
     s += svgText(7 * 8, base + 19, DOT_TOPICS[q.topic].name, 7.5);
     return `<svg ${emBox([-2, -1, 7 * 16 + 4, base + 26], 0.05)}>${s}</svg>`;
+  }
+  if (q.type === 'col') { // Year 1: a column of same-size circles for each colour, standing on a line, its square under it
+    const top = Math.max(...C.map(c => c.n)), B = top * 11 + 1, W = 20 + (C.length - 1) * 18;
+    let s = `<line x1="0" y1="${B}" x2="${W}" y2="${B}" stroke="${INK}" stroke-width="1"/>`;
+    C.forEach((c, i) => {
+      const x = 10 + i * 18;
+      for (let k = 0; k < c.n; k++) s += `<circle cx="${x}" cy="${B - 6 - k * 11}" r="5" fill="${BLOCK[c.nm]}" stroke="${INK}" stroke-width=".7"/>`;
+      s += sw(x - 5, B + 3, c.nm);
+    });
+    return `<svg ${emBox([-1, -1, W + 2, B + 15], 0.04)}>${s}</svg>`;
   }
   if (q.type === 'pic') { // a row of dots for each colour, lined up from a start line
     let s = `<line x1="15.5" y1="0" x2="15.5" y2="${C.length * 14}" stroke="${INK}" stroke-width="1"/>`;
@@ -1799,12 +1868,24 @@ const ACTS = {
   },
   howmany: {
     name: 'How many?', ages: [5], setup: 'opts', say: 'How many dots?',
-    options: [{ key: 'max', label: 'Up to', values: [5, 10, 20] }],
+    options: [
+      { key: 'kinds', label: 'Kind', multi: true, values: [['frame', 'Ten frame'], ['groups', 'Groups']] },
+      { key: 'max', label: 'Up to', values: [5, 10, 20] },
+    ],
     pic: frameSvg(7, false),
-    defaults: () => ({ max: 10, n: 6 }),
-    make: c => { const v = rnd(1, c.max); return { kind: 'frame', dots: v, frames: c.max > 10 ? 2 : 1, empty: false, ans: v }; },
-    key: c => `howmany~${c.max}|${c.n}`,
-    label: k => { const [m, n] = k.split('|'); return `How many? · up to ${m} · ${n} questions`; },
+    defaults: () => ({ kinds: ['frame', 'groups'], max: 10, n: 6 }),
+    make: c => {
+      // Groups (up to 10 even when "Up to" is 20): two dice patterns in two colours, so she sees the parts in the whole
+      if (pickOne(c.kinds || ['frame']) === 'groups') {
+        const top = Math.min(c.max, 10); let a, b;
+        do { a = rnd(1, 6); b = rnd(1, 6); } while (a + b > top);
+        return { kind: 'frame', parts: [a, b], cols: shuffled(Object.keys(BLOCK)).slice(0, 2), ans: a + b };
+      }
+      const v = rnd(1, c.max); return { kind: 'frame', dots: v, frames: c.max > 10 ? 2 : 1, empty: false, ans: v };
+    },
+    // ten frames only keeps the key it had before Groups
+    key: c => { const k = ['frame', 'groups'].filter(x => (c.kinds || ['frame']).includes(x)); return `howmany~${c.max}|${c.n}${k.join() === 'frame' ? '' : '|' + k.join()}`; },
+    label: k => { const [m, n, kinds] = k.split('|'); return `How many? · ${kinds ? kinds.split(',').map(x => x === 'frame' ? 'ten frame' : 'groups').join(', ') + ' · ' : ''}up to ${m} · ${n} questions`; },
   },
   bonds: {
     name: 'Number bonds', ages: [5], setup: 'opts', say: 'What number goes in the empty circle?',
@@ -2723,6 +2804,13 @@ function qMarkup(q) {
     html: `<div class="eq">${q.text}</div><div class="al"><span>=</span><span class="wl"></span></div>`,
     vars: { '--d': 3, '--h': 5.4, '--c': q.text.length * 0.56 + 1.6 },
   };
+  // Year 1 times and divide: the words, then bags of dots (or dots and empty bags); answer anywhere below
+  if (q.kind === 'mgrp') {
+    const svg = groupsSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, q.cap.length * 0.44) + 1.2 } };
+  }
+  // How many?, Groups: two dice-style clusters in two colours, no ten frame
+  if (q.kind === 'frame' && q.parts) return { cls: 'frame', html: clustersSvg(q.parts, q.cols), vars: { '--h': 2.5 + 3.2, '--c': 7 } };
   if (q.kind === 'frame') {
     const svgs = q.frames === 2 ? frameSvg(Math.min(q.dots, 10), false) + frameSvg(Math.max(0, q.dots - 10), false) : frameSvg(q.dots, q.empty);
     // no line under the frames (Sam): she writes anywhere below them
