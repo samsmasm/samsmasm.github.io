@@ -33,16 +33,16 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Addition and subtraction facts to 5 *(6m)*, then to 10 (including 10 + 0). ✓ (Sums, Number bonds, Make 10)
 - Doubles and halves to 10. ✓ (Doubles and halves, Year 1)
 - Add and subtract one- and two-digit numbers within 20, including 0. ✓ (Sums, Add and take away Year 1)
-- Join and separate groups to 20 (9 + 6, 7 + __ = 11). ✓ (Missing number, Number bonds)
+- Join and separate groups to 20 (9 + 6, 7 + __ = 11). ✓ (Missing number, Number bonds; Splat: "8 altogether", some dots under a blot, how many are hiding, totals 6 to 20)
 - Add ten to a one-digit number (10 + 4). ✓ (Add and take away, Year 1)
 - One-step + and − word problems with objects and pictures. ✓ (Story sums, Year 1, read aloud; no pictures)
 - Multiply and divide by equal groups or sharing (counting objects), answers within 20. ✓ (Story sums, Arrays, Times and divide Year 1: bags of dots and sharing into empty bags, no signs; B1)
 - Knows: adding 0 changes nothing; order doesn't matter when adding but does when subtracting. Only the + and − signs are Year 1.
 
 ### Fractions and money
-- Halves and quarters of sets, amounts and shapes, using equal parts. ✓ partly (Fractions)
-- Find a half or quarter of a set by sharing; ½ of ½ is ¼.
-- Know NZ coins and notes and their values. ✓ (Money, Year 1)
+- Halves and quarters of sets, amounts and shapes, using equal parts. ✓ (Halves and quarters, Year 1: tap the shape cut into equal parts with one shaded, against unequal cuts and other numbers of parts; Fractions)
+- Find a half or quarter of a set by sharing; ½ of ½ is ¼. ✓ partly (Halves and quarters, Year 1, written: half of 8, a quarter of 12, as dots in groups with a dashed sharing line; ½ of ½ not asked)
+- Know NZ coins and notes and their values. ✓ (Money, Year 1; Which coin?: "Tap the 50 cent coin" among coins and notes at their real relative sizes)
 
 ### Algebra (patterns and number sentences)
 - Open number sentences with one-digit numbers (2 + 5 = 3 + __). ✓ (Balance, Year 1, over a see-saw; Missing number)
@@ -52,7 +52,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Ordinals to 5th for positions in a pattern.
 
 ### Measurement
-- Compare two things by length, weight or capacity, directly *(6m)*, then using a third object. Words: longer, shorter, taller, heavier, lighter. ✋ (could be pictures)
+- Compare two things by length, weight or capacity, directly *(6m)*, then using a third object. Words: longer, shorter, taller, heavier, lighter. ✓ partly (Rulers, Year 1, Which is longer?: pencils that start in different places on a block grid, and towers of blocks; length and height only, not weight or capacity; no third object)
 - Days of the week in order, the day before and after *(6m)*; weekdays and weekend.
 - Tell the time to the hour (o'clock) on analogue and digital clocks. ✓ (Clocks, Year 1: write the hour, and Match: tap the digital clock for a face)
 - Choose a sensible unit for how long things take (seconds, minutes, hours, days, weeks, months, years).

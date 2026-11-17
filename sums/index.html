@@ -253,6 +253,7 @@
   .qv.frame { top: .6em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .frame svg { display: block; width: 5.5em; height: 2.2em; margin-bottom: .25em; }
   .frame .cap { font-size: .75em; font-weight: 700; margin-bottom: .35em; }
+  .frame .cap b { font-size: 2.2em; line-height: 1; margin-right: .1em; vertical-align: -.08em; }
   .qv.frac { top: .5em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .frac svg { display: block; }
   .frac .fbar { width: 2.4em; border-top: .08em solid var(--ink); margin-top: 1.9em; }
@@ -1378,6 +1379,8 @@ function shapeSvg(q) {
 // Year 3 a pencil that may not start at 0 (half-cm marks too)
 function rulerQ(yr, kinds = ['pencil']) {
   if (yr === 4 && pickOne(kinds) === 'thermo') return thermoQ();
+  // Which is longer? is a Year 1 tap card (pencils, then towers); half the cards when Pencil is on too
+  if (yr === 1 && kinds.includes('longer') && (!kinds.includes('pencil') || Math.random() < 0.5)) return longerQ();
   const col = pickOne(['red', 'blue', 'green', 'yellow', 'purple']);
   if (yr === 1) { const e = rnd(2, 9); return { kind: 'ruler', yr, s: 0, e, col, unit: 'blocks', cap: 'How long?', say: 'How many blocks long is the pencil?', ans: e }; }
   if (yr === 4) { // millimetres on a 6 cm ruler (long enough to see each mm on a card), sometimes not from 0
@@ -2018,6 +2021,174 @@ function patSvg(row, gap) {
   const s = row.map((t, i) => i === gap ? `<rect x="${i * 12 + 0.6}" y="0.6" width="8.8" height="8.8" rx="1" fill="none" stroke="${INK}" stroke-width=".6" stroke-dasharray="1.6 1.2"/>` : mapThing(t.nm, t.col, i * 12, 0, 10)).join('');
   return `<svg ${emBox([-1, -1, row.length * 12, 12], PAT_EM)}>${s}</svg>`;
 }
+// ---- Splat (Year 1, B4): the total as a big numeral, then ten frames of dots with
+// one flat grey blot over some of them: "8 altogether. How many are hiding?" The
+// dots she can see sit in ten-frame places, so she knows how many without counting.
+// The blot covers the last few dots of one row, so it is always one blot and the
+// dots beside it stay whole. Totals 6 to 20, half of them within 10 (one frame).
+function splatQ() {
+  const total = Math.random() < 0.5 ? rnd(6, 10) : rnd(11, 20), last = total > 10 ? total - 10 : total;
+  const row = last > 5 ? 1 : 0, inRow = last - row * 5, hid = rnd(1, inRow);
+  return { kind: 'splat', total, hid, row, from: last - hid, say: `${total} altogether. How many are hiding?`, ans: hid };
+}
+function splatSvg(q) {
+  const frames = q.total > 10 ? 2 : 1, H = 20 + 26 * (frames - 1), fy = frames - 1, E = 0.1;
+  let s = '';
+  for (let f = 0; f < frames; f++) s += `<g transform="translate(0 ${f * 26})">${frameInner(f < frames - 1 ? 10 : q.total - 10 * (frames - 1))}</g>`;
+  // the blot: a thick stroke through the hidden cells, round at both ends, a few lobes, two on the outer edge
+  const cy = fy * 26 + q.row * 10 + 5, x0 = (q.from % 5) * 10 + 5, x1 = x0 + (q.hid - 1) * 10, out = q.row ? 1 : -1;
+  const lobes = [[x0 - 4.8, cy + out * 6.4], [(x0 + x1) / 2 + 1, cy + out * 7.6], [x1 + 4.6, cy + out * 6.9]].map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${[1.5, 2.4, 1.1][i]}" fill="${SHADE}"/>`).join('');
+  s += `<g fill="${SHADE}"><path d="M${x0} ${cy}H${x1}" stroke="${SHADE}" stroke-width="10.4" stroke-linecap="round" fill="none"/>`
+    + `<circle cx="${x0 - 0.2}" cy="${cy + 0.4}" r="5.9"/><circle cx="${x1 + 0.2}" cy="${cy - 0.4}" r="5.9"/>${lobes}</g>`;
+  return `<svg ${emBox([-2, -6, 54, H + 12], E)} stroke="none">${s}</svg>`;
+}
+// ---- Halves and quarters (Year 1, B4). Tap: "Which one shows a half?" among three
+// shapes, one cut into equal parts with one shaded; the others are cut unequally or
+// into a different number of equal parts. Written: "Half of 8", "A quarter of 12",
+// dots in groups with a dashed sharing line (answers within 10).
+const CUT_N = 72, discPts = r => range(0, CUT_N - 1).map(i => [r * Math.cos(2 * Math.PI * i / CUT_N), r * Math.sin(2 * Math.PI * i / CUT_N)]);
+// a convex polygon cut by a line (through p, along angle a degrees): both sides
+function cutPoly(poly, p, a) {
+  const nx = -Math.sin(a * Math.PI / 180), ny = Math.cos(a * Math.PI / 180), d = v => (v[0] - p[0]) * nx + (v[1] - p[1]) * ny;
+  const side = sgn => {
+    const out = [];
+    poly.forEach((v, i) => {
+      const w = poly[(i + 1) % poly.length], dv = d(v) * sgn, dw = d(w) * sgn;
+      if (dv >= 0) out.push(v);
+      if ((dv > 0 && dw < 0) || (dv < 0 && dw > 0)) { const t = dv / (dv - dw); out.push([v[0] + (w[0] - v[0]) * t, v[1] + (w[1] - v[1]) * t]); }
+    });
+    return out;
+  };
+  return [side(1), side(-1)];
+}
+const cutAll = (polys, p, a) => polys.flatMap(P => cutPoly(P, p, a)).filter(P => P.length >= 3 && polyArea(P) > 1); // a line that misses a piece leaves an empty side
+const polyArea = P => Math.abs(P.reduce((s, v, i) => { const w = P[(i + 1) % P.length]; return s + v[0] * w[1] - w[0] * v[1]; }, 0)) / 2;
+const SHAPE_BASE = { circle: () => discPts(38), square: () => [[-38, -38], [38, -38], [38, 38], [-38, 38]], rect: () => [[-42, -26], [42, -26], [42, 26], [-42, 26]] };
+// parts: how many parts, equal or not. Lines are cut across the shape; the parts come back as polygons.
+// extent: how far the shape reaches either side of a line at angle a (so an off-centre cut is a fixed share of it)
+const cutExtent = (shape, a) => shape === 'circle' ? 38 : shape === 'square' ? (a % 90 ? 53.7 : 38) : (a % 180 === 0 ? 26 : 42);
+const lineAt = (a, off) => [[-Math.sin(a * Math.PI / 180) * off, Math.cos(a * Math.PI / 180) * off], a];
+function cutParts(shape, n, equal) {
+  const lines = [];
+  if (n === 2) {
+    const a = shape === 'circle' ? rnd(0, 11) * 15 : pickOne(shape === 'square' ? [0, 90, 45, 135] : [0, 90]);
+    lines.push(lineAt(a, equal ? 0 : pickOne([-1, 1]) * 0.42 * cutExtent(shape, a)));
+  } else if (n === 3) { // strips (square and rectangle only: a circle has no equal thirds from straight cuts)
+    const a = pickOne([0, 90]), e = cutExtent(shape, a);
+    lines.push(lineAt(a, -e / 3), lineAt(a, e / 3));
+  } else if (equal) { // a cross through the middle
+    const a = shape === 'circle' ? rnd(0, 5) * 15 : pickOne(shape === 'square' ? [0, 45] : [0]);
+    lines.push(lineAt(a, 0), lineAt(a + 90, 0));
+  } else if (shape === 'circle') { // sectors of 62 and 118 degrees
+    const a = rnd(0, 5) * 15; lines.push(lineAt(a, 0), lineAt(a + 62, 0));
+  } else { // a cross off the middle: four different rectangles
+    const cx = pickOne([-1, 1]) * 0.38 * cutExtent(shape, 90), cy = pickOne([-1, 1]) * 0.38 * cutExtent(shape, 0);
+    lines.push(lineAt(0, cy), lineAt(90, cx));
+  }
+  return lines.reduce((ps, [p, a]) => cutAll(ps, p, a), [SHAPE_BASE[shape]()]);
+}
+// does a set of parts look equal? (every part within 6% of the mean)
+const partsEqual = ps => { const A = ps.map(polyArea), m = sumOf(A) / A.length; return A.every(a => Math.abs(a - m) < 0.06 * m); };
+function cutSvg(shape, n, equal, col) {
+  let ps;
+  for (let t = 0; t < 40; t++) { ps = cutParts(shape, n, equal); if (partsEqual(ps) === equal && ps.length === n) break; }
+  // shade one part: an unequal cut shades the small one or the big one
+  const A = ps.map(polyArea), pick = equal ? rnd(0, n - 1) : (Math.random() < 0.5 ? A.indexOf(Math.min(...A)) : A.indexOf(Math.max(...A)));
+  const path = P => P.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ');
+  return `<svg viewBox="-46 -46 92 92" style="width:1.5em;height:1.5em" stroke="${INK}" stroke-width="3" stroke-linejoin="round">${ps.map((P, i) => `<polygon points="${path(P)}" fill="${i === pick ? BLOCK[col] : '#fff'}"/>`).join('')}</svg>`;
+}
+function partsQ() {
+  const quarter = Math.random() < 0.5, want = quarter ? 4 : 2, word = quarter ? 'a quarter' : 'a half';
+  const wrong = quarter ? [[4, false], [2, true], [3, true]] : [[2, false], [4, true], [3, true]];
+  const kinds = [[want, true], ...shuffled(wrong).slice(0, 2)], order = shuffled([0, 1, 2]);
+  let shapes = shuffled(['circle', 'square', 'rect']);
+  const thirds = order.findIndex(k => kinds[k][0] === 3); // a circle has no equal thirds from straight cuts
+  if (thirds >= 0 && shapes[thirds] === 'circle') { const j = (thirds + 1) % 3; [shapes[thirds], shapes[j]] = [shapes[j], shapes[thirds]]; }
+  const cols = shuffled(Object.keys(BLOCK));
+  const tiles = order.map((k, i) => ({ html: cutSvg(shapes[i], kinds[k][0], kinds[k][1], cols[i]), label: k === 0 ? 'right' : `${kinds[k][0]}${kinds[k][1] ? ' equal' : ' unequal'}`, say: 'this one' }));
+  const top = `Which one shows ${word}?`;
+  return { kind: 'tap', form: 'parts', want, shapes, top, tc: top.length * 0.5, tiles, right: order.indexOf(0), quiet: true, big: true, topf: 0.3, say: `${top[0].toUpperCase()}${top.slice(1)}`, ans: 'right' };
+}
+function shareQ() {
+  const g = pickOne([2, 4]), k = g === 2 ? rnd(1, 10) : rnd(1, 5), n = g * k, cap = g === 2 ? `Half of ${n}` : `A quarter of ${n}`;
+  return { kind: 'share', g, k, cap, say: `${cap}.`, ans: k };
+}
+function shareSvg(q) {
+  const cols = Math.min(q.k, 5), rows = Math.ceil(q.k / 5), w = 8 * cols, h = 8 * rows, gap = 14, wide = 2 * w + gap, tall = q.g === 2 ? h : 2 * h + gap;
+  let s = '';
+  for (let j = 0; j < q.g; j++) {
+    const gx = (j % 2) * (w + gap), gy = Math.floor(j / 2) * (h + gap);
+    for (let i = 0; i < q.k; i++) s += `<circle cx="${gx + 4 + (i % 5) * 8}" cy="${gy + 4 + Math.floor(i / 5) * 8}" r="3" fill="currentColor"/>`;
+  }
+  const dash = `stroke="currentColor" stroke-width="1" stroke-dasharray="2.5 2"`;
+  s += `<line x1="${w + gap / 2}" y1="-3" x2="${w + gap / 2}" y2="${tall + 3}" ${dash}/>`;
+  if (q.g === 4) s += `<line x1="-3" y1="${h + gap / 2}" x2="${wide + 3}" y2="${h + gap / 2}" ${dash}/>`;
+  return `<svg ${emBox([-3, -3, wide + 6, tall + 6], 0.07)}>${s}</svg>`;
+}
+// ---- Money, Which coin? (Year 1, B4): "Tap the 50 cent coin". Three or four coins
+// (or the three notes) at their real relative sizes; each tile says "this one".
+const COIN_V = [10, 20, 50, 100, 200], NOTE_V = [500, 1000, 2000];
+const coinWord = v => v < 100 ? `${v} cent` : `${v / 100} dollar`;
+function coinQ() {
+  const note = Math.random() < 0.35, pool = note ? NOTE_V : COIN_V, v = pickOne(pool);
+  const vs = shuffled([v, ...shuffled(pool.filter(x => x !== v)).slice(0, note ? 2 : rnd(2, 3))]);
+  const kind = note ? 'note' : 'coin', top = `Tap the ${v < 100 ? v + 'c' : '$' + v / 100} ${kind}`;
+  const tiles = vs.map(x => ({ html: `<span style="font-size:${note ? 0.64 : 0.9}em;line-height:0">${moneySvg([x])}</span>`, label: x < 100 ? x + 'c' : '$' + x / 100, say: 'this one', v: x }));
+  return { kind: 'tap', form: 'coin', v, top, tc: top.length * 0.5, tiles, right: vs.indexOf(v), quiet: true, big: true, topf: 0.3, say: `Tap the ${coinWord(v)} ${kind}.`, ans: tiles[vs.indexOf(v)].label };
+}
+// ---- Rulers, Which is longer? (Year 1, B4). Two or three pencils that do not start
+// at the same place, on a faint block grid: tap the colour of the longest or the
+// shortest. Then two towers of blocks: which is taller, which is shorter.
+const longerQ = () => Math.random() < 0.65 ? pencilsQ() : towersQ();
+function pencilsQ() {
+  const n = rnd(2, 3), most = Math.random() < 0.5, cols = shuffled(Object.keys(BLOCK)).slice(0, n);
+  let ls;
+  for (let t = 0; t < 80; t++) { ls = distinctPick(n, 3, 12); const so = [...ls].sort((a, b) => a - b); if (so.every((x, i) => !i || x - so[i - 1] >= 2)) break; }
+  const want = (most ? Math.max : Math.min)(...ls), right = ls.indexOf(want);
+  let ss;
+  // most of the time the end is a trap: the longest does not reach furthest, the shortest does not stop soonest
+  const trap = Math.random() < 0.6;
+  for (let t = 0; t < 80; t++) {
+    ss = distinctPick(n, 0, 5);
+    const ends = ls.map((l, i) => ss[i] + l), eq = most ? ends.indexOf(Math.max(...ends)) : ends.indexOf(Math.min(...ends));
+    if (new Set(ends).size === n && ((eq !== right) === trap)) break;
+  }
+  const words = n === 2 ? `Which is ${most ? 'longer' : 'shorter'}?` : `Tap the ${most ? 'longest' : 'shortest'}`;
+  const svg = pencilsSvg(ls, ss, cols), [, pw, ph] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+  return {
+    kind: 'tap', form: 'long', most, ls, ss, cols, top: `<span class="tpic"><span class="tw">${words}</span>${svg}</span>`,
+    tc: Math.max(pw, words.length * 0.45), th: ph + 0.9, topf: 0.66, tiles: cols.map(c => ({ html: `<span class="tsw" style="background:${BLOCK[c]}"></span>`, label: c, say: c })), right, say: words, ans: cols[right],
+  };
+}
+function pencilsSvg(ls, ss, cols) {
+  const u = 10, W = Math.max(...ls.map((l, i) => ss[i] + l)) * u, H = ls.length * 13 + 2;
+  let s = '';
+  for (let b = 0; b <= W / u; b++) s += `<line x1="${b * u}" y1="0" x2="${b * u}" y2="${H}" stroke="#c9c9c9" stroke-width=".5"/>`;
+  ls.forEach((l, i) => {
+    const x0 = ss[i] * u, x1 = x0 + l * u, y = 2 + i * 13;
+    s += `<rect x="${x0}" y="${y}" width="${x1 - x0 - 7}" height="9" fill="${BLOCK[cols[i]]}" stroke="${INK}" stroke-width=".8"/>`
+      + `<polygon points="${x1 - 7},${y} ${x1},${y + 4.5} ${x1 - 7},${y + 9}" fill="#f3dcb0" stroke="${INK}" stroke-width=".8" stroke-linejoin="round"/><polygon points="${x1 - 2.4},${y + 3.3} ${x1},${y + 4.5} ${x1 - 2.4},${y + 5.7}" fill="${INK}"/>`;
+  });
+  return `<svg ${emBox([-2, -2, W + 4, H + 4], 0.06)}>${s}</svg>`;
+}
+function towersQ() {
+  const tall = Math.random() < 0.5, cols = shuffled(Object.keys(BLOCK)).slice(0, 2), hs = distinctPick(2, 2, 8);
+  while (Math.abs(hs[0] - hs[1]) < 2) hs[1] = rnd(2, 8);
+  const right = hs.indexOf((tall ? Math.max : Math.min)(...hs)), words = `Which is ${tall ? 'taller' : 'shorter'}?`;
+  const svg = towersSvg(hs, cols), [, pw, ph] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+  return {
+    kind: 'tap', form: 'tower', tall, hs, cols, top: `<span class="tpic"><span class="tw">${words}</span>${svg}</span>`,
+    tc: Math.max(pw, words.length * 0.45), th: ph + 0.9, topf: 0.66, tiles: cols.map(c => ({ html: `<span class="tsw" style="background:${BLOCK[c]}"></span>`, label: c, say: c })), right, say: words, ans: cols[right],
+  };
+}
+// two towers of equal blocks side by side on one floor; the shorter is not always on the left
+function towersSvg(hs, cols) {
+  const b = 9, gap = 12, H = Math.max(...hs) * b;
+  let s = '';
+  hs.forEach((n, t) => { for (let i = 0; i < n; i++) s += `<rect x="${t * (b + gap)}" y="${H - (i + 1) * b}" width="${b}" height="${b}" fill="${BLOCK[cols[t]]}" stroke="${INK}" stroke-width=".8"/>`; });
+  s += `<line x1="-4" y1="${H}" x2="${b * 2 + gap + 4}" y2="${H}" stroke="${INK}" stroke-width="1"/>`;
+  return `<svg ${emBox([-5, -1, b * 2 + gap + 10, H + 3], 0.065)}>${s}</svg>`;
+}
 const textSvg = lines =>`<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -2247,6 +2418,15 @@ const ACTS = {
     label: k => { const [y, kinds, n] = k.split('|'); return `Fractions of a number · Year ${y} · ${kinds.split(',').join(', ')} · ${n} questions`; },
   },
   // Clocks and Money go up through the years (NZ curriculum, sums/CURRICULUM.md)
+  splat: { // a blot hides some of the dots: total on top, how many are hiding?
+    name: 'Splat', ages: [5], setup: 'opts', say: 'How many are hiding?',
+    pic: `<svg viewBox="0 0 120 84"><rect x="12" y="22" width="96" height="40" fill="none" stroke="${INK}" stroke-width="3"/>${[1, 2, 3, 4].map(i => `<line x1="${12 + i * 19.2}" y1="22" x2="${12 + i * 19.2}" y2="62" stroke="${INK}" stroke-width="1.5"/>`).join('')}<line x1="12" y1="42" x2="108" y2="42" stroke="${INK}" stroke-width="1.5"/>${[0, 1, 2].map(i => `<circle cx="${21.6 + i * 19.2}" cy="32" r="6.5" fill="${INK}"/>`).join('')}<path d="M62 52H98" stroke="${SHADE}" stroke-width="19" stroke-linecap="round"/><circle cx="80" cy="45" r="4" fill="${SHADE}"/></svg>`,
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · totals 6 to 20']] }],
+    defaults: () => ({ yr: 1, n: 6 }),
+    make: () => splatQ(),
+    key: c => `splat~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Splat · Year ${y} · ${n} questions`; },
+  },
   clock: {
     name: 'Clocks', ages: [5, 8], setup: 'opts', say: 'What time is it?',
     pic: clockSvg({ h: 10, m: 10 }),
@@ -2275,20 +2455,21 @@ const ACTS = {
     pic: moneySvg([200, 100, 50, 20]),
     options: [
       { key: 'yr', label: 'Year', values: [[1, '1 · dollars to $10'], [2, '2 · coins or notes'], [3, '3 · dollars and cents'], [4, '4 · bigger amounts, buying several']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['make', 'Make it (Year 4)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['coin', 'Which coin? (Year 1)'], ['make', 'Make it (Year 4)']] },
     ],
-    defaults: age => age === 5 ? { yr: 1, kinds: ['count'], n: 6 } : { yr: 3, kinds: ['count', 'change', 'make'], n: 12 },
+    defaults: age => age === 5 ? { yr: 1, kinds: ['count', 'coin'], n: 6 } : { yr: 3, kinds: ['count', 'change', 'make'], n: 12 },
     make: c => {
-      // Make it is Year 4 only (a tap card with a tray); below Year 4 it is left out
-      const kinds = c.kinds.filter(k => k !== 'make' || c.yr === 4), k = pickOne(kinds.length ? kinds : ['count']);
+      // Make it is Year 4 only (a tap card with a tray) and Which coin? Year 1 only (a tap card); elsewhere they are left out
+      const kinds = c.kinds.filter(k => (k !== 'make' || c.yr === 4) && (k !== 'coin' || c.yr === 1)), k = pickOne(kinds.length ? kinds : ['count']);
       if (k === 'make') return makeItQ();
+      if (k === 'coin') return coinQ();
       if (k === 'change') { const q = moneyChange(c.yr); return moneyQ({ ...q, change: true }, q.total ? q.price : q.pay - q.price); }
       const q = moneyCount(c.yr);
       return moneyQ(q, sumOf(q.items));
     },
-    // Make it only changes Year 4, so Years 1–3 leave it out of the record key
-    key: c => `money~${c.yr}|${['count', 'change', 'make'].filter(k => c.kinds.includes(k) && (k !== 'make' || c.yr === 4)).join(',') || 'count'}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Money · Year ${y} · ${kinds.replace('count', 'how much').replace('make', 'make it').split(',').join(', ')} · ${n} questions`; },
+    // Make it only changes Year 4 and Which coin? only Year 1, so the other years leave them out of the record key
+    key: c => `money~${c.yr}|${['count', 'change', 'coin', 'make'].filter(k => c.kinds.includes(k) && (k !== 'make' || c.yr === 4) && (k !== 'coin' || c.yr === 1)).join(',') || 'count'}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Money · Year ${y} · ${kinds.replace('count', 'how much').replace('coin', 'which coin').replace('make', 'make it').split(',').join(', ')} · ${n} questions`; },
   },
   seq: {
     name: 'Number patterns', ages: [5, 8], setup: 'opts', say: 'What number is missing?',
@@ -2319,6 +2500,18 @@ const ACTS = {
     make: c => dblQ(c.yr, c.kinds),
     key: c => `dbl~${c.yr}|${['double', 'half'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Doubles and halves · Year ${y} · ${kinds.replace('double', 'doubles').replace('half', 'halves').split(',').join(', ')} · ${n} questions`; },
+  },
+  parts: { // halves and quarters: tap the shape cut fairly, or write half / a quarter of a number of dots
+    name: 'Halves and quarters', ages: [5], setup: 'opts', say: 'Halves and quarters.',
+    pic: `<svg viewBox="0 0 120 84"><circle cx="34" cy="42" r="28" fill="#fff" stroke="${INK}" stroke-width="3"/><path d="M34 14A28 28 0 0 1 34 70Z" fill="${BLOCK.blue}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><rect x="72" y="14" width="42" height="56" fill="#fff" stroke="${INK}" stroke-width="3"/><path d="M72 42H114M93 14V70" stroke="${INK}" stroke-width="3"/><rect x="72" y="14" width="21" height="28" fill="${BLOCK.yellow}" stroke="${INK}" stroke-width="3"/></svg>`,
+    options: [
+      { key: 'yr', label: 'Year', values: [[1, '1 · half and quarter']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['tap', 'Which one?'], ['write', 'Half of a number']] },
+    ],
+    defaults: () => ({ yr: 1, kinds: ['tap', 'write'], n: 6 }),
+    make: c => pickOne(c.kinds) === 'tap' ? partsQ() : shareQ(),
+    key: c => `parts~${c.yr}|${['tap', 'write'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Halves and quarters · Year ${y} · ${kinds.replace('tap', 'which one').replace('write', 'half of a number').split(',').join(', ')} · ${n} questions`; },
   },
   story: {
     name: 'Story sums', ages: [5, 8], setup: 'opts', say: 'Listen to the story, then write the answer.', counts: [4, 6],
@@ -2359,15 +2552,19 @@ const ACTS = {
     pic: rulerSvg({ yr: 2, s: 0, e: 9, col: 'red' }),
     options: [
       { key: 'yr', label: 'Year', values: [[1, '1 · blocks'], [2, '2 · cm from 0'], [3, '3 · cm, not from 0'], [4, '4 · millimetres, °C']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['pencil', 'Pencil'], ['thermo', 'Thermometer (Year 4)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['pencil', 'Pencil'], ['longer', 'Which is longer? (Year 1)'], ['thermo', 'Thermometer (Year 4)']] },
     ],
-    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['pencil'] : ['pencil', 'thermo'], n: age === 5 ? 6 : 12 }),
+    defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['pencil', 'longer'] : ['pencil', 'thermo'], n: age === 5 ? 6 : 12 }),
     make: c => rulerQ(c.yr, c.kinds),
-    // the Kind only changes Year 4, so Years 1–3 keep their old record keys
-    key: c => c.yr === 4 ? `ruler~4|${['pencil', 'thermo'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}` : `ruler~${c.yr}|${c.n}`,
+    // the Kind only changes Years 1 and 4; Year 1 with Pencil alone keeps its old record key, Years 2 and 3 never had a Kind
+    key: c => {
+      if (c.yr === 4) return `ruler~4|${['pencil', 'thermo'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`;
+      const k1 = c.yr === 1 ? ['pencil', 'longer'].filter(k => c.kinds.includes(k)) : ['pencil'];
+      return k1.join() === 'pencil' || !k1.length ? `ruler~${c.yr}|${c.n}` : `ruler~1|${k1.join(',')}|${c.n}`;
+    },
     label: k => {
       const p = k.split('|'), [y, n] = [p[0], p[p.length - 1]];
-      return `Rulers · Year ${y}${p.length === 3 ? ' · ' + p[1].replace('thermo', 'thermometer').split(',').join(', ') : ''} · ${n} questions`;
+      return `Rulers · Year ${y}${p.length === 3 ? ' · ' + p[1].replace('thermo', 'thermometer').replace('longer', 'which is longer').split(',').join(', ') : ''} · ${n} questions`;
     },
   },
   // tap cards (no writing): tiles under the question, marked with Mark like the rest
@@ -3045,6 +3242,16 @@ function qMarkup(q) {
       html: `<div class="st">${q.text}</div><div class="al"><span class="wl"></span><span class="u">${q.unit}</span></div>`,
       vars: { '--d': Math.max(2, len(q.ans)), '--h': lines * 1.2 + 3.3, '--c': 10.4 },
     };
+  }
+  // Splat: the total as a big numeral, ten frames with a blot over some dots; answer anywhere below
+  if (q.kind === 'splat') {
+    const svg = splatSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    return { cls: 'frame', html: `<div class="cap"><b>${q.total}</b> altogether</div>${svg}`, vars: { '--h': hEm + 2.3 + 3.2, '--c': Math.max(wEm, 6.4) + 1.2 } };
+  }
+  // Half of 8, A quarter of 12: the dots in groups with a dashed sharing line; answer anywhere below
+  if (q.kind === 'share') {
+    const svg = shareSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
+    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, q.cap.length * 0.44) + 1.2 } };
   }
   // doubles and halves in Year 1: the words, then dots, answer anywhere below
   if (q.kind === 'dpic') {

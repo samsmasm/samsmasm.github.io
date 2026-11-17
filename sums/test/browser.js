@@ -136,7 +136,7 @@ const fakeSpeech = () => {
   await page.click('#yearTiles [data-year="1"]');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="old1"]');
-  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Clocks,Money,Number patterns,Picture patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance', 'year saved: straight to the Year 1 activities ' + (await tiles('#actTiles')).join());
+  ok(await visible('#homeS') && (await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,How many?,Number bonds,Teen numbers,Make 10,Splat,Clocks,Money,Number patterns,Picture patterns,Doubles and halves,Halves and quarters,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance', 'year saved: straight to the Year 1 activities ' + (await tiles('#actTiles')).join());
   ok((await said()).slice(-1)[0] === 'What do you want to do today?', 'Year 1 home is read aloud');
   ok(await page.evaluate(() => $('#yPrev').disabled), 'no page below Year 1');
   await page.click('#yNext');
@@ -147,7 +147,7 @@ const fakeSpeech = () => {
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#yearS'), 'Everyone asks the year');
   await page.click('#yearTiles [data-year="1"]');
-  ok((await tiles('#actTiles')).length === 19, 'Everyone in Year 1: the Year 1 activities');
+  ok((await tiles('#actTiles')).length === 21, 'Everyone in Year 1: the Year 1 activities');
   await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   ok(await visible('#yearS'), 'Everyone asks again next time');
@@ -1465,6 +1465,151 @@ const fakeSpeech = () => {
     === 'shape~1|flat,solid,name|6 / shape~2|flat|6 / flat,solid,name / 1 / Shapes · Year 1 · flat, 3D, name · 6 questions / Picture patterns · Year 1 · 6 questions',
     'Shapes keys: Name only in Year 1 keys; younger default has Name; Picture patterns key and label');
 
+  // ---- B4: Splat, Halves and quarters, Money Which coin?, Rulers Which is longer? (Year 1)
+  const sp = await page.evaluate(() => {
+    const bad = [], totals = new Set(), hids = new Set();
+    const dist = (px, py, x0, x1, y) => Math.hypot(px - Math.min(Math.max(px, x0), x1), py - y);
+    for (let i = 0; i < 600; i++) {
+      const q = splatQ(), d = new DOMParser().parseFromString(`<div>${splatSvg(q)}</div>`, 'text/html');
+      totals.add(q.total); hids.add(q.hid);
+      if (q.total < 6 || q.total > 20 || q.hid < 1 || q.hid > 5 || q.ans !== q.hid || q.total - q.hid < 5) bad.push('numbers ' + JSON.stringify(q));
+      if (cardSay(q) !== `${q.total} altogether. How many are hiding?`) bad.push('say ' + cardSay(q));
+      // every dot is drawn in its ten-frame place; the blot is one stroke with a round cap each end
+      const dots = [...d.querySelectorAll('circle[fill="currentColor"]')].map(c => { const g = c.closest('g[transform]'), ty = g ? +g.getAttribute('transform').match(/translate\(0 ([\d.]+)\)/)[1] : 0; return [+c.getAttribute('cx'), +c.getAttribute('cy') + ty]; });
+      const seg = d.querySelector('path[stroke-width="10.4"]'), m = seg.getAttribute('d').match(/M([\d.]+) ([\d.]+)H([\d.]+)/).map(Number), [, x0, y0, x1] = m;
+      const caps = [...d.querySelectorAll('g[fill] > circle')].filter(c => c.getAttribute('r') === '5.9');
+      if (dots.length !== q.total || caps.length !== 2) bad.push('dots ' + dots.length + ' caps ' + caps.length);
+      // dots under the blot: covered completely; every other dot is clear of it by its own radius
+      let covered = 0;
+      dots.forEach(([x, y]) => {
+        const edge = Math.min(dist(x, y, x0, x1, y0) - 5.2, ...caps.map(c => Math.hypot(x - +c.getAttribute('cx'), y - +c.getAttribute('cy')) - 5.9));
+        if (edge <= -3.5 + 0.01) covered++; else if (edge < 3.5 - 0.01) bad.push('a dot half under the blot ' + edge.toFixed(2) + ' ' + JSON.stringify(q));
+      });
+      if (covered !== q.hid) bad.push('covered ' + covered + ' of ' + q.hid);
+      // the blot sits in one row, in the last frame
+      if (Math.abs(y0 - (Math.floor((q.total - 1) / 10) * 26 + q.row * 10 + 5)) > 0.01) bad.push('blot row');
+    }
+    if (![...Array(15).keys()].map(x => x + 6).every(t => totals.has(t))) bad.push('totals ' + [...totals].sort((a, b) => a - b));
+    if (![1, 2, 3, 4, 5].every(h => hids.has(h))) bad.push('hidden ' + [...hids]);
+    return bad.slice(0, 4);
+  });
+  ok(sp.length === 0, 'Splat: totals 6 to 20, 1 to 5 hidden under one blot in one row, the dots beside it untouched, every dot in its ten-frame place ' + sp.join(' | '));
+  const hq = await page.evaluate(() => {
+    const bad = [], area = P => Math.abs(P.reduce((s, v, i) => { const w = P[(i + 1) % P.length]; return s + v[0] * w[1] - w[0] * v[1]; }, 0)) / 2, asked = {}, shapeSets = new Set();
+    for (let i = 0; i < 500; i++) {
+      const q = partsQ(), words = q.want === 4 ? 'a quarter' : 'a half';
+      asked[q.want] = (asked[q.want] || 0) + 1;
+      if (q.tiles.length !== 3 || q.tiles.filter(t => t.label === 'right').length !== 1 || q.tiles[q.right].label !== 'right' || q.ans !== 'right') bad.push('tiles ' + q.tiles.map(t => t.label));
+      if (q.top !== `Which one shows ${words}?` || cardSay(q) !== q.say || !q.quiet || q.tiles.some(t => t.say !== 'this one')) bad.push('words ' + q.top + ' ' + q.say);
+      if (new Set(q.shapes).size !== 3) bad.push('shapes ' + q.shapes);
+      shapeSets.add(q.shapes.join());
+      q.tiles.forEach((t, j) => {
+        const d = new DOMParser().parseFromString(`<div>${t.html}</div>`, 'text/html'), polys = [...d.querySelectorAll('polygon')];
+        const A = polys.map(p => area(p.getAttribute('points').split(' ').map(v => v.split(',').map(Number)))), mean = A.reduce((x, y) => x + y, 0) / A.length;
+        const equal = A.every(a => Math.abs(a - mean) < 0.07 * mean), shaded = polys.filter(p => p.getAttribute('fill') !== '#fff').length;
+        if (shaded !== 1) bad.push('shaded ' + shaded);
+        if (j === q.right) { if (polys.length !== q.want || !equal) bad.push(`right tile ${polys.length} parts equal ${equal} for ${q.want}`); }
+        else if ((polys.length === q.want && equal) || (polys.length === q.want && Math.max(...A) / Math.min(...A) < 1.5)) bad.push(`wrong tile ${polys.length} parts equal ${equal} for ${q.want}`);
+        else if (polys.length !== q.want && !equal) bad.push('wrong tile cut both ways ' + polys.length);
+        if (polys.length === 3 && q.shapes[j] === 'circle') bad.push('thirds of a circle');
+      });
+    }
+    if (!asked[2] || !asked[4] || asked[2] < 180 || asked[4] < 180) bad.push('asked ' + JSON.stringify(asked));
+    // written: dots in groups
+    const wrote = {};
+    for (let i = 0; i < 400; i++) {
+      const q = shareQ(), n = q.g * q.k, d = new DOMParser().parseFromString(`<div>${shareSvg(q)}</div>`, 'text/html');
+      wrote[q.g] = (wrote[q.g] || 0) + 1;
+      if (d.querySelectorAll('circle').length !== n || d.querySelectorAll('line').length !== (q.g === 2 ? 1 : 2) || q.ans !== q.k || q.k < 1 || q.k > 10 || n > 20) bad.push('share ' + JSON.stringify(q));
+      if (q.cap !== (q.g === 2 ? `Half of ${n}` : `A quarter of ${n}`) || q.say !== q.cap + '.' || (q.g === 4 && (q.k > 5 || n % 4))) bad.push('share words ' + q.cap);
+    }
+    if (!wrote[2] || !wrote[4]) bad.push('share kinds ' + JSON.stringify(wrote));
+    return bad.slice(0, 4);
+  });
+  ok(hq.length === 0, 'Halves and quarters: one tile cut into equal parts with one shaded, the others unequal or the wrong number, three different shapes; written half of / a quarter of with dots in groups ' + hq.join(' | '));
+  const cn = await page.evaluate(() => {
+    const bad = [], asked = new Set();
+    for (let i = 0; i < 600; i++) {
+      const q = coinQ(), vs = q.tiles.map(t => t.v), notes = vs.filter(v => v >= 500).length;
+      asked.add(q.v);
+      if (!vs.includes(q.v) || new Set(vs).size !== vs.length || (notes && notes !== vs.length) || vs.length < 3 || vs.length > 4 || (notes && vs.length !== 3)) bad.push('tiles ' + vs + ' for ' + q.v);
+      if (vs[q.right] !== q.v || q.ans !== q.tiles[q.right].label || q.tiles.some(t => t.say !== 'this one') || !q.quiet) bad.push('right ' + q.right);
+      const kind = q.v >= 500 ? 'note' : 'coin', want = `Tap the ${q.v < 100 ? q.v + 'c' : '$' + q.v / 100} ${kind}`;
+      if (q.top !== want || q.say !== `Tap the ${q.v < 100 ? q.v + ' cent' : q.v / 100 + ' dollar'} ${kind}.` || cardSay(q) !== q.say) bad.push('words ' + q.top + ' / ' + q.say);
+      // real relative sizes: every coin drawn at the radius it has in the Money pictures
+      q.tiles.forEach(t => { const r = t.html.match(/<circle[^>]* r="([\d.]+)"/); if (q.v < 500 && +r[1] !== COIN[t.v][0]) bad.push('size ' + t.v); });
+    }
+    if (asked.size !== 8) bad.push('asked ' + [...asked]);
+    return bad.slice(0, 4);
+  });
+  ok(cn.length === 0, 'Which coin? three or four coins (or the three notes) at their real sizes, "Tap the 50c coin", spoken "50 cent", tiles say "this one" ' + cn.join(' | '));
+  const lg = await page.evaluate(() => {
+    const bad = [], trap = { most: [0, 0], least: [0, 0] }, kinds = {};
+    for (let i = 0; i < 800; i++) {
+      const q = longerQ();
+      kinds[q.form] = (kinds[q.form] || 0) + 1;
+      const d = new DOMParser().parseFromString(`<div>${q.top}</div>`, 'text/html');
+      if (q.form === 'long') {
+        const n = q.ls.length, so = [...q.ls].sort((a, b) => a - b);
+        if (n < 2 || n > 3 || !so.every((x, j) => !j || x - so[j - 1] >= 2) || new Set(q.ss).size !== n || q.ls.some(l => l < 3 || l > 12) || q.ss.some(x => x < 0 || x > 5)) bad.push('pencils ' + q.ls + ' ' + q.ss);
+        const want = (q.most ? Math.max : Math.min)(...q.ls);
+        if (q.cols[q.ls.indexOf(want)] !== q.ans || q.tiles[q.right].label !== q.ans || q.tiles.length !== n || new Set(q.cols).size !== n) bad.push('answer ' + q.ans);
+        // drawn at those lengths: each tip ends at (start + length) blocks
+        const tips = [...d.querySelectorAll('polygon')].filter(p => p.getAttribute('fill') === '#f3dcb0').map(p => Math.max(...p.getAttribute('points').split(' ').map(v => +v.split(',')[0])));
+        if (tips.join() !== q.ls.map((l, j) => (q.ss[j] + l) * 10).join()) bad.push('drawn ' + tips + ' vs ' + q.ls.map((l, j) => (q.ss[j] + l) * 10));
+        const words = n === 2 ? `Which is ${q.most ? 'longer' : 'shorter'}?` : `Tap the ${q.most ? 'longest' : 'shortest'}`;
+        if (q.say !== words || cardSay(q) !== `${words} ${q.tiles.map(t => t.say).join(', ')}.`) bad.push('say ' + cardSay(q));
+        // the furthest end (longest) or the earliest end (shortest) belongs to the answer's pencil or not
+        const ends = q.ls.map((l, j) => q.ss[j] + l), edge = q.most ? ends.indexOf(Math.max(...ends)) : ends.indexOf(Math.min(...ends)), t = trap[q.most ? 'most' : 'least'];
+        t[1]++; if (edge !== q.ls.indexOf(want)) t[0]++;
+      } else {
+        if (q.hs.length !== 2 || Math.abs(q.hs[0] - q.hs[1]) < 2 || q.hs.some(h => h < 2 || h > 8)) bad.push('towers ' + q.hs);
+        const want = (q.tall ? Math.max : Math.min)(...q.hs);
+        if (q.cols[q.hs.indexOf(want)] !== q.ans || q.tiles[q.right].label !== q.ans || q.say !== `Which is ${q.tall ? 'taller' : 'shorter'}?`) bad.push('tower answer ' + q.ans);
+        if (d.querySelectorAll('rect').length !== q.hs[0] + q.hs[1]) bad.push('blocks ' + d.querySelectorAll('rect').length);
+      }
+    }
+    for (const [k, [a, b]] of Object.entries(trap)) if (a / b < 0.35 || a / b > 0.85) bad.push(`trap share ${k} ${a}/${b}`);
+    if (!kinds.long || !kinds.tower || kinds.tower / (kinds.long + kinds.tower) < 0.25 || kinds.tower / (kinds.long + kinds.tower) > 0.45) bad.push('mix ' + JSON.stringify(kinds));
+    const mix = range(0, 400).map(() => rulerQ(1, ['pencil', 'longer'])).filter(q => q.kind === 'tap').length;
+    if (mix < 140 || mix > 260) bad.push('Pencil + Longer mix ' + mix);
+    if (!range(0, 60).every(() => rulerQ(1, ['longer']).kind === 'tap' && rulerQ(2, ['longer']).kind === 'ruler' && rulerQ(1, ['pencil']).kind === 'ruler' && rulerQ(4, ['longer']).kind === 'ruler')) bad.push('Longer outside Year 1');
+    return bad.slice(0, 4);
+  });
+  ok(lg.length === 0, 'Which is longer? pencils (two or three, different starts, lengths 2 apart, drawn at their lengths, the end often misleads) and towers of blocks; tiles are the colours; only in Year 1 ' + lg.join(' | '));
+  await page.evaluate(() => { age = 5; hideDone(); act = 'splat'; buildSheet({ yr: 1, n: 6 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'splat' && c.el.querySelector('.cap b') && c.el.querySelectorAll('.qv svg').length === 1)), 'Splat sheet: the numeral, the frames with a blot');
+  ok((await fits()).length === 0, 'Splat fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/49-splat.png' });
+  ok((await writeAllAndMark()).length === 0 && await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'splat~1|6'), 'Splat: written right, finished, record splat~1|6');
+  await page.evaluate(() => { hideDone(); buildSheet({ yr: 1, n: 12 }); });
+  ok((await fits()).length === 0, 'Splat (12) fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/50-splat12.png' });
+  await page.evaluate(() => { hideDone(); act = 'parts'; buildSheet({ yr: 1, kinds: ['tap', 'write'], n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.some(c => c.q.kind === 'tap') && cards.some(c => c.q.kind === 'share') && cards.filter(c => c.q.kind === 'tap').every(c => c.el.querySelectorAll('.tt svg').length === 3)), 'Halves and quarters sheet: three shape tiles on the tap cards, dots on the written ones');
+  ok((await fits()).length === 0, 'Halves and quarters fits ' + (await fits()).join(' '));
+  ok(await page.evaluate(() => cards.filter(c => c.q.kind === 'tap').every(c => c.el.querySelector('.tt').getBoundingClientRect().width >= 40)), 'Halves and quarters: tiles big enough to tap');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/51-parts.png' });
+  ok((await writeAllAndMark()).length === 0 && await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'parts~1|tap,write|12'), 'Halves and quarters: tapped and written right, record parts~1|tap,write|12');
+  await page.evaluate(() => { hideDone(); act = 'money'; buildSheet({ yr: 1, kinds: ['coin'], n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.form === 'coin' && c.el.querySelectorAll('.tt svg').length === c.q.tiles.length)), 'Money Which coin? sheet: a coin or note on every tile');
+  ok((await fits()).length === 0, 'Which coin? fits ' + (await fits()).join(' '));
+  ok(await page.evaluate(() => cards.every(c => [...c.el.querySelectorAll('.tt')].every(t => { const b = t.getBoundingClientRect(), s = t.querySelector('svg').getBoundingClientRect(); return b.width >= 40 && s.width <= b.width + 0.5 && s.height <= b.height + 0.5; }))), 'Which coin?: every coin and note sits inside its tile, tiles big enough to tap');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/52-coin.png' });
+  await page.tap('#sheet .card:nth-child(1) .tt[data-i="0"]');
+  ok((await said()).slice(-1)[0] === 'this one', 'a tapped coin says "this one", not its value');
+  ok((await writeAllAndMark()).length === 0, 'Which coin?: all marked right');
+  await page.evaluate(() => { hideDone(); act = 'ruler'; buildSheet({ yr: 1, kinds: ['longer'], n: 12 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tt .tsw').length === c.q.tiles.length)), 'Rulers Which is longer? sheet: a colour swatch on every tile');
+  ok((await fits()).length === 0, 'Which is longer? fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/53-longer.png' });
+  ok((await writeAllAndMark()).length === 0, 'Which is longer?: tapped right and marked');
+  await page.evaluate(() => { age = 8; hideDone(); });
+  ok(await page.evaluate(() => [ACTS.money.key({ yr: 1, kinds: ['count', 'coin'], n: 6 }), ACTS.money.key({ yr: 3, kinds: ['count', 'coin'], n: 6 }), ACTS.money.defaults(5).kinds.join(), ACTS.ruler.key({ yr: 1, kinds: ['pencil'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['longer'], n: 6 }), ACTS.ruler.key({ yr: 2, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.defaults(5).kinds.join(),
+      labelFor('money~1|count,coin|6'), labelFor('ruler~1|6'), labelFor('ruler~1|longer|6'), labelFor('ruler~1|pencil,longer|6'), labelFor('splat~1|6'), labelFor('parts~1|tap,write|6')].join(' / '))
+    === 'money~1|count,coin|6 / money~3|count|6 / count,coin / ruler~1|6 / ruler~1|pencil,longer|6 / ruler~1|longer|6 / ruler~2|6 / pencil,longer / Money · Year 1 · how much, which coin · 6 questions / Rulers · Year 1 · 6 questions / Rulers · Year 1 · which is longer · 6 questions / Rulers · Year 1 · pencil, which is longer · 6 questions / Splat · Year 1 · 6 questions / Halves and quarters · Year 1 · which one, half of a number · 6 questions',
+    'B4 record keys: Which coin? only in Year 1 keys, Which is longer? only in Year 1; old Year 1 pencil keys unchanged; labels');
+
   // ---- how many questions (Sam: 20 is too many almost everywhere)
   await page.click('#backBtn');
   const nOpts = () => page.$$eval('#nOpts button', b => b.map(x => x.dataset.v).join());
@@ -1997,7 +2142,8 @@ const fakeSpeech = () => {
       ['units', { yr: 4, n: 12 }], ['angle', { yr: 4, kinds: ['size'], n: 12 }], ['angle', { yr: 4, kinds: ['deg'], n: 12 }],
       ['map', { yr: 4, kinds: ['tap'], n: 6 }], ['map', { yr: 4, kinds: ['where'], n: 6 }], ['shape', { yr: 4, kinds: ['moves'], n: 12 }], ['money', { yr: 4, kinds: ['make'], n: 12 }],
       ['muldiv', { yr: 1, ops: ['*', '/'], n: 12 }], ['graph', { yr: 1, n: 12 }], ['howmany', { kinds: ['groups'], max: 10, n: 12 }],
-      ['tf', { yr: 1, n: 12 }], ['cmp', { yr: 1, kinds: ['dots'], n: 12 }], ['cmp', { yr: 1, kinds: ['num'], n: 12 }], ['bal', { yr: 1, n: 12 }], ['clock', { yr: 1, kinds: ['match'], n: 12 }]]) {
+      ['tf', { yr: 1, n: 12 }], ['cmp', { yr: 1, kinds: ['dots'], n: 12 }], ['cmp', { yr: 1, kinds: ['num'], n: 12 }], ['bal', { yr: 1, n: 12 }], ['clock', { yr: 1, kinds: ['match'], n: 12 }],
+      ['splat', { yr: 1, n: 12 }], ['parts', { yr: 1, kinds: ['tap'], n: 12 }], ['parts', { yr: 1, kinds: ['write'], n: 12 }], ['money', { yr: 1, kinds: ['coin'], n: 12 }], ['ruler', { yr: 1, kinds: ['longer'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
