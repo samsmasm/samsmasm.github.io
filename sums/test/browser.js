@@ -95,7 +95,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Fractions of a number,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -132,7 +132,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   await page.click('#ageTiles [data-age="10"]');
-  ok((await tiles('#actTiles')).length === 24, 'age 10: the older tiles');
+  ok((await tiles('#actTiles')).length === 25, 'age 10: the older tiles');
   // a new activity can start with one year only: any age opens it at the nearest year it has
   ok(await page.evaluate(() => [7, 8, 11].map(a => { age = a; return loadCfg('tf').yr + '' + loadCfg('cmp').yr; }).join() === '44,44,44'), 'True or false and More or less (Year 4 only so far) open at Year 4 for any age');
   await page.evaluate(() => { age = 7; act = 'tf'; goSetup(); });
@@ -468,16 +468,50 @@ const fakeSpeech = () => {
   // ---- Mia: Fractions
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="frac"]');
-  ok(await page.evaluate(() => draft.kinds.join() === 'shapes,line' && draft.parts.join() === '2,3,4,6,8'), 'Fractions setup: shapes and number line, 2 3 4 6 8 parts');
+  ok(await page.evaluate(() => draft.kinds.join() === 'shapes,line,past,add' && draft.parts.join() === '2,3,4,6,8'), 'Fractions setup: shapes, number line, past 1, add; 2 3 4 6 8 parts');
+  // the picture matches the fraction, for every kind
+  const fracPicOk = () => page.evaluate(() => cards.every(c => {
+    const q = c.q, sh = c.el.querySelectorAll(`svg rect[fill="${SHADE}"], svg path[fill="${SHADE}"]`).length;
+    if (q.form === 'add') {
+      const t = q.op === '+' ? q.terms.reduce((x, y) => x + y) : q.terms[0] - q.terms[1];
+      return t === q.n && q.n > 0 && q.n % q.d !== 0 && q.terms.every(x => x >= 1 && x < q.d) && c.el.querySelectorAll('.fsum .ft').length === q.terms.length && sh === q.terms.reduce((x, y) => x + y);
+    }
+    const W = q.wholes || 1;
+    if (W === 2 ? q.n <= q.d || q.n >= 2 * q.d || q.cap !== 'Write it as one fraction' : q.n < 1 || q.n >= q.d) return false;
+    if (q.shaded.length !== q.n || q.shaded.some(i => i < 0 || i >= W * q.d) || (W === 2 && !range(0, q.d - 1).every(i => q.shaded.includes(i)))) return false;
+    if (q.shape === 'bar') return sh === q.n && c.el.querySelectorAll('svg rect').length === W * (q.d + 1);
+    if (q.shape === 'circle') return sh === q.n && c.el.querySelectorAll('svg path').length === W * q.d;
+    return c.el.querySelectorAll('svg line').length === W * q.d + 2 && c.el.querySelectorAll('svg text').length === W + 1;
+  }));
   await page.click('#newBtn');
-  ok(await page.evaluate(() => cards.every(c => {
-    const q = c.q;
-    if (q.n < 1 || q.n >= q.d || q.shaded.length !== q.n) return false;
-    if (q.shape === 'bar') return c.el.querySelectorAll(`svg rect[fill="${SHADE}"]`).length === q.n && c.el.querySelectorAll('svg rect').length === q.d + 1;
-    if (q.shape === 'circle') return c.el.querySelectorAll(`svg path[fill="${SHADE}"]`).length === q.n && c.el.querySelectorAll('svg path').length === q.d;
-    return c.el.querySelectorAll('svg line').length === q.d + 2;
-  })), 'Fractions: the right number of parts, n shaded (or n ticks along on the line)');
+  ok(await fracPicOk(), 'Fractions: the right number of parts, n shaded (or n ticks along on the line)');
   ok((await fits()).length === 0, 'Fractions fit ' + (await fits()).join(' '));
+  const fq = await page.evaluate(() => {
+    const bad = [], seen = {};
+    let three = 0, sub = 0, adds = 0, over = 0, pastLine = 0, pasts = 0;
+    for (let i = 0; i < 1200; i++) {
+      const q = fracQ({ kinds: ['shapes', 'line', 'past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12] });
+      const k = q.form === 'add' ? 'add' : q.wholes ? 'past' : q.shape === 'line' ? 'line' : 'shapes';
+      seen[k] = (seen[k] || 0) + 1;
+      if (q.ans !== `${q.n}/${q.d}`) bad.push('ans ' + JSON.stringify(q));
+      if (k === 'add') { adds++; three += q.terms.length === 3; sub += q.op === '−'; over += q.n > q.d; if (!/^\d+ over \d+( (plus|take away) \d+ over \d+)+$/.test(q.say)) bad.push('say ' + q.say); }
+      if (k === 'past') { pasts++; pastLine += q.shape === 'line'; }
+    }
+    if (Object.keys(seen).length !== 4) bad.push('kinds ' + Object.keys(seen));
+    if (three < adds * 0.15 || sub < adds * 0.15 || over < adds * 0.15) bad.push(`add: ${three} with three, ${sub} take away, ${over} past one, of ${adds}`);
+    if (pastLine < pasts * 0.2 || pastLine > pasts * 0.5) bad.push(`past on a line ${pastLine} of ${pasts}`);
+    return bad.slice(0, 4);
+  });
+  ok(fq.length === 0, 'Fractions Past 1 and Add: past 1 as shapes or a 0-to-2 line; sums of two or three, some take away, some past one whole, never a whole number ' + fq.join(' | '));
+  for (const k of ['past', 'add']) {
+    await page.evaluate(k => { hideDone(); buildSheet({ kinds: [k], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }); }, k);
+    ok(await fracPicOk() && (await fits()).length === 0, `Fractions (${k} only, all parts) fit and the pictures match ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/17-frac-${k}.png` });
+    const wr = await writeAllAndMark();
+    ok(wr.length === 0, `Fractions (${k} only): answers read and marked right ` + wr.join(' | '));
+  }
+  ok(await page.evaluate(() => { const c = cards[0]; c.q = { kind: 'frac', form: 'add', terms: [3, 3, 3], op: '+', n: 9, d: 8, ans: '9/8', say: '' }; layout(c); sizeCanvas(c); writeNum(c, '9/8'); const a = readAnswer(c).ok; writeNum(c, '18/16'); const b = readAnswer(c).ok; writeNum(c, '1/8'); return a && b && !readAnswer(c).ok; }), 'Fractions Add: 3/8 + 3/8 + 3/8 is right as 9/8 (or 18/16), not 1/8');
+  await page.evaluate(() => { hideDone(); buildSheet(ACTS.frac.defaults()); });
   const fr = await page.evaluate(() => {
     const c = cards[0], q = c.q, out = {};
     writeNum(c, `${q.n}/${q.d}`); out.plain = readAnswer(c).ok && read(c) === `${q.n}/${q.d}`;
@@ -988,18 +1022,73 @@ const fakeSpeech = () => {
   // More or less
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="cmp"]');
-  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'num,sum'), 'More or less setup: Year 4, numbers and sums');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'num,sum,frac'), 'More or less setup: Year 4, numbers, sums and fractions');
   await page.click('#newBtn');
   ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tq .bx').length === 1 && [...c.el.querySelectorAll('.tt')].map(b => b.textContent).join('') === '<=>')), 'More or less sheet: an empty box between the two sides, tiles < = >');
   ok((await fits()).length === 0, 'More or less fits, with tiles big enough to tap ' + (await fits()).join(' '));
   if (SHOTS) await page.screenshot({ path: SHOTS + '/34-cmp.png' });
   ok((await writeAllAndMark()).length === 0, 'More or less: the right signs are marked right');
-  for (const k of ['num', 'sum']) {
+  for (const k of ['num', 'sum', 'frac']) {
     await page.evaluate(k => { hideDone(); buildSheet({ yr: 4, kinds: [k], n: 12 }); }, k);
     ok((await fits()).length === 0, `More or less (${k} only) fits ` + (await fits()).join(' '));
   }
-  ok(await page.evaluate(() => [labelFor('tf~4|12'), labelFor('cmp~4|num,sum|12'), labelFor('cmp~4|sum|6')].join(' / '))
-    === 'True or false · Year 4 · 12 questions / More or less · Year 4 · numbers, sums · 12 questions / More or less · Year 4 · sums · 6 questions', 'record labels for True or false and More or less');
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/34-cmp-frac.png' });
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.tq .fr').length >= 1)), 'More or less fractions print as top over bottom');
+  const cfr = await page.evaluate(() => {
+    const bad = [], types = new Set();
+    let eq = 0;
+    const v = s => s.includes('/') ? s.split('/').map(Number) : [+s.slice(2), 10];
+    for (let i = 0; i < 1000; i++) {
+      const q = cmpQ(4, ['frac']), [a, b] = v(q.l), [c, d] = v(q.r), dec = !q.l.includes('/') || !q.r.includes('/');
+      if (q.right !== (a * d < c * b ? 0 : a * d === c * b ? 1 : 2) || q.ans !== q.tiles[q.right].label) bad.push('wrong ' + q.l + ' ' + q.r);
+      const t = dec ? 'dec' : b === d ? 'bottom' : a === c ? 'top' : 'other';
+      types.add(t);
+      if (t === 'other' || (!dec && q.l === q.r)) bad.push('type ' + q.l + ' ' + q.r);
+      if (dec && !/^(\d\/10|1\/2)$/.test(q.l.includes('/') ? q.l : q.r)) bad.push('tenths ' + q.l + ' ' + q.r);
+      if (!dec && (a >= b || c >= d || Math.max(b, d) > 12)) bad.push('size ' + q.l + ' ' + q.r);
+      eq += q.right === 1;
+      if (!/^.+, and .+\. Which sign goes in the box\?$/.test(q.say) || /\//.test(q.say)) bad.push('say ' + q.say);
+    }
+    if (types.size !== 3) bad.push('types ' + [...types]);
+    if (eq < 50 || eq > 250) bad.push('equal ' + eq + ' of 1000');
+    return bad.slice(0, 4);
+  });
+  ok(cfr.length === 0, 'More or less fractions: same bottom, same top (to twelfths), or tenths against a decimal; the right sign; only decimals can be equal ' + cfr.join(' | '));
+  ok(await page.evaluate(() => [labelFor('tf~4|12'), labelFor('cmp~4|num,sum|12'), labelFor('cmp~4|sum|6'), labelFor('cmp~4|num,sum,frac|12')].join(' / '))
+    === 'True or false · Year 4 · 12 questions / More or less · Year 4 · numbers, sums · 12 questions / More or less · Year 4 · sums · 6 questions / More or less · Year 4 · numbers, sums, fractions · 12 questions', 'record labels for True or false and More or less');
+
+  // ---- Fractions of a number, Year 4
+  const ofq = await page.evaluate(() => {
+    const bad = [];
+    let round = 0, parts = 0;
+    const ds = new Set();
+    for (let i = 0; i < 800; i++) {
+      const q = fofQ(4, ['part', 'whole']);
+      ds.add(q.d);
+      if (q.whole !== q.k * q.d || q.d < 2 || q.d > 10 || q.whole > 1000 || q.k < 2) bad.push('size ' + JSON.stringify(q));
+      if (q.ans !== (q.part ? q.k : q.whole)) bad.push('ans ' + JSON.stringify(q));
+      if (q.d >= 6 && q.k >= 100) bad.push('three digits in a narrow box ' + JSON.stringify(q));
+      round += q.k % 10 === 0 && q.k > 10; parts += q.part;
+      if (!(q.part ? /^What is an? \w+ of \d+\?$/ : /^An? \w+ of a set is \d+\. How many in the set\?$/).test(q.say)) bad.push('say ' + q.say);
+    }
+    if (ds.size !== 9) bad.push('denominators ' + [...ds]);
+    if (round < 120 || round > 360) bad.push('round numbers ' + round + ' of 800');
+    if (parts < 300 || parts > 500) bad.push('part ' + parts + ' of 800');
+    return bad.slice(0, 4);
+  });
+  ok(ofq.length === 0, 'Fractions of a number Year 4: unit fractions 1/2 to 1/10; find the part or the whole; tables to 10 or round numbers, the whole at most 1,000 ' + ofq.join(' | '));
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="fof"]');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'part,whole'), 'Fractions of a number setup: Year 4, part and whole');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => {
+    const q = c.q, rects = c.el.querySelectorAll('svg rect').length, txt = [...c.el.querySelectorAll('svg text')].map(t => t.textContent);
+    return c.q.kind === 'fof' && rects === q.d + 1 && c.el.querySelector('.cap .fr').textContent === '1' + q.d && txt.join() === (q.part ? `${q.whole},?` : `?,${q.k}`);
+  })), 'Fractions of a number: a bar of d boxes, the whole (or ?) on the brace, ? (or the part) in the first box, the fraction above');
+  ok((await fits()).length === 0, 'Fractions of a number fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/37-fof.png' });
+  ok((await writeAllAndMark()).length === 0, 'Fractions of a number: answers written under the bar are read and marked right');
+  ok(await page.evaluate(() => labelFor('fof~4|part,whole|12')) === 'Fractions of a number · Year 4 · part, whole · 12 questions', 'Fractions of a number record label');
   ok(await page.evaluate(() => cardSay(cmpQ(4, ['num']))).then(s => /^\d+, and \d+\. Which sign goes in the box\? is less than, equals, is more than\.$/.test(s)), 'More or less is read aloud with its three signs');
 
   // ---- Balance and Rounding, Year 4
@@ -1400,7 +1489,8 @@ const fakeSpeech = () => {
     ok(badCounts.length === 0, `${name}: every activity, every year, every question count fits (${runs.length} sheets) ` + badCounts.slice(0, 4).join(' | '));
     if (SHOTS) for (const n of [4, 6]) { await page.evaluate(n => { act = 'story'; buildSheet({ yr: 4, kinds: ['addsub', 'muldiv'], n }); show('sheet'); }, n); await page.screenshot({ path: SHOTS + `/41-${name}-story-${n}.png` }); }
     for (const [a, c] of [['tf', { yr: 4, n: 12 }], ['cmp', { yr: 4, kinds: ['num', 'sum'], n: 12 }], ['pv', { kinds: ['blocks'], max: 9999, n: 12 }], ['money', { yr: 4, kinds: ['change'], n: 12 }],
-      ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }]]) {
+      ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }],
+      ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
