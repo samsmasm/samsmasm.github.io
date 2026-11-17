@@ -44,21 +44,22 @@ section.block { margin-bottom: 24px; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 
 /* topic picker */
-.picker { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.tick { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 14px; cursor: pointer; }
-.tick input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--bm); cursor: pointer; }
-.tick .n, .fold .n { color: var(--muted); font-size: 0.85rem; margin-left: auto; padding-left: 6px; white-space: nowrap; }
-.tick .hl { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--amber-ink); font-weight: 700; }
-.tick.all { font-weight: 700; border-bottom: 1px solid var(--line); }
-.unit + .unit { border-top: 1px solid var(--line); }
-.uhead { display: flex; align-items: stretch; }
-.uhead .tick { padding-right: 4px; }
-.fold { flex: 1; display: flex; align-items: center; gap: 8px; border: 0; background: none; text-align: left; padding: 6px 14px 6px 4px; min-height: 52px; }
-.fold .uname { font-family: 'Fraunces', Georgia, serif; font-weight: 600; color: var(--bm); font-size: 1.05rem; }
-.fold .chev { flex: none; width: 20px; text-align: center; color: var(--muted); transition: transform 0.15s; }
+.unit { margin-bottom: 22px; }
+.unit h3 { font-size: 1.1rem; color: var(--bm); margin-bottom: 8px; }
+.wholes { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)) auto; justify-content: start; gap: 8px; }
+@media (max-width: 560px) { .wholes { grid-template-columns: 1fr 1fr; } .wholes .fold { grid-column: 1 / -1; justify-self: start; } .chip.whole { padding: 10px; white-space: nowrap; } }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; margin-top: 8px; }
+.chip { border-radius: 8px; padding: 10px 14px; min-height: 48px; border: 1px solid var(--line); background: var(--surface); text-align: left;
+  display: flex; align-items: center; gap: 8px; }
+.chip.whole { font-weight: 700; }
+.chip .hl { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--amber-ink); font-weight: 700; }
+.chip .n { color: var(--muted); font-size: 0.85rem; margin-left: auto; padding-left: 6px; }
+.chip[aria-pressed="true"] { background: var(--bm); border-color: var(--bm); color: #fff; }
+.chip[aria-pressed="true"] .hl { color: var(--amber); }
+.chip[aria-pressed="true"] .n { color: var(--masthead-sub); }
+.fold { border: 0; background: none; color: var(--bm); min-height: 48px; padding: 10px 6px; display: flex; align-items: center; gap: 6px; }
+.fold .chev { display: inline-block; transition: transform 0.15s; }
 .fold[aria-expanded="true"] .chev { transform: rotate(180deg); }
-.subs { padding: 0 0 8px 24px; }
-.subs .tick { min-height: 48px; }
 .picked { color: var(--muted); }
 .seg { display: flex; }
 .seg button { border: 1px solid var(--line); background: var(--surface); padding: 10px 18px; min-height: 48px; min-width: 64px; margin-left: -1px; }
@@ -141,7 +142,7 @@ footer { max-width: 1100px; margin: 0 auto; padding: 16px; font-size: 0.75rem; c
     <p class="lede">Three terms, six pieces. Put two pieces under each term, in order.</p>
     <section class="block">
       <p class="label">Topics</p>
-      <div class="picker" id="units"></div>
+      <div id="units"></div>
     </section>
     <section class="block">
       <p class="label">How many terms</p>
@@ -186,7 +187,7 @@ const $ = id => document.getElementById(id);
 const LENGTHS = [6, 12, 'All'];
 const PER_BOARD = 3;
 const state = {
-  topics: new Set(), length: 6, pool: [],
+  picks: new Set(), length: 6, pool: [],
   boards: [], b: 0, score: 0, scored: 0, missed: [],
   frags: [], placed: {}, sel: null, locked: false,
 };
@@ -216,56 +217,62 @@ function topicsByUnit() {
   return [...m.entries()].sort((a, b) => a[0] - b[0]);
 }
 const HL_TOPICS = new Set([...new Set(DEFS.map(d => d.topic))].filter(t => DEFS.every(d => d.topic !== t || d.hl)));
-// a tick box for a group of topics: ticked if all are picked, half-ticked if some are
-function setGroup(box, topics) {
-  const on = topics.filter(t => state.topics.has(t)).length;
-  box.checked = on === topics.length; box.indeterminate = on > 0 && on < topics.length;
+// Picks are single terms, because some HL terms sit inside SL subtopics.
+// A group (unit or subtopic) is "full" when every term is picked, "SL" when every SL term is picked and no HL one.
+const isFull = g => g.every(d => state.picks.has(d));
+const isSL = g => g.some(d => !d.hl) && g.every(d => state.picks.has(d) === !d.hl);
+const pickAll = (g, on) => { for (const d of g) on ? state.picks.add(d) : state.picks.delete(d); };
+state.level = {};   // per unit: 'SL' after Whole unit SL, so subtopics tapped after it add SL terms only
+function chip(cls, html, onclick) {
+  const b = document.createElement('button'); b.className = 'chip ' + cls; b.innerHTML = html;
+  b.onclick = () => { onclick(); syncSetup(); }; return b;
 }
-const termCount = topics => DEFS.filter(d => topics.includes(d.topic)).length;
 function buildPicker() {
   const wrap = $('units'); wrap.innerHTML = '';
-  const units = topicsByUnit().map(([u, topics]) => [u, [...topics.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))]);
-  const everything = units.flatMap(([, l]) => l);
-  const tickAll = (list, on) => { for (const t of list) on ? state.topics.add(t) : state.topics.delete(t); syncSetup(); };
-  const all = document.createElement('label'); all.className = 'tick all';
-  all.innerHTML = `<input type="checkbox" id="allunits"><span>All units</span><span class="n">${DEFS.length}</span>`;
-  all.querySelector('input').onchange = e => tickAll(everything, e.target.checked);
-  wrap.appendChild(all);
-  for (const [u, list] of units) {
+  for (const [u, topics] of topicsByUnit()) {
+    const unit = DEFS.filter(d => d.unit === u), sl = unit.filter(d => !d.hl);
     const div = document.createElement('div'); div.className = 'unit'; div.dataset.u = u;
-    div.innerHTML = `<div class="uhead"><label class="tick"><input type="checkbox" class="uall" aria-label="${esc(UNITS[u])}"></label>`
-      + `<button class="fold" aria-expanded="false"><span class="uname">${esc(UNITS[u])}</span><span class="n"></span><span class="chev" aria-hidden="true">▾</span></button></div>`
-      + `<div class="subs" hidden></div>`;
-    div.querySelector('.uall').onchange = e => tickAll(list, e.target.checked);
-    const fold = div.querySelector('.fold'), subs = div.querySelector('.subs');
+    div.innerHTML = `<h3>${esc(UNITS[u])}</h3><div class="wholes"></div><div class="chips" hidden></div>`;
+    const wholes = div.querySelector('.wholes'), subs = div.querySelector('.chips');
+    wholes.append(
+      chip('whole sl', `Whole unit SL<span class="n">${sl.length}</span>`, () => {
+        const on = isSL(unit); pickAll(unit, false); if (!on) pickAll(sl, true); state.level[u] = 'SL';
+      }),
+      chip('whole hl', `Whole unit HL<span class="n">${unit.length}</span>`, () => {
+        pickAll(unit, !isFull(unit)); state.level[u] = 'HL';
+      }));
+    const fold = document.createElement('button'); fold.className = 'fold'; fold.setAttribute('aria-expanded', 'false');
+    fold.innerHTML = 'Subtopics <span class="chev" aria-hidden="true">▾</span>';
     fold.onclick = () => { const open = subs.hidden; subs.hidden = !open; fold.setAttribute('aria-expanded', open); };
-    for (const t of list) {
-      const l = document.createElement('label'); l.className = 'tick sub';
-      l.innerHTML = `<input type="checkbox"><span>${esc(t)}</span>${HL_TOPICS.has(t) ? '<span class="hl">HL</span>' : ''}<span class="n">${termCount([t])}</span>`;
-      const box = l.querySelector('input'); box.value = t;
-      box.onchange = () => tickAll([t], box.checked);
-      subs.appendChild(l);
+    wholes.append(fold);
+    for (const t of [...topics.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
+      const g = unit.filter(d => d.topic === t);
+      const b = chip('sub', `${esc(t)}${HL_TOPICS.has(t) ? '<span class="hl">HL</span>' : ''}<span class="n"></span>`, () => {
+        if (isFull(g) || isSL(g)) return pickAll(g, false);
+        pickAll(state.level[u] === 'SL' && g.some(d => !d.hl) ? g.filter(d => !d.hl) : g, true);
+      });
+      b._g = g; subs.append(b);
     }
-    wrap.appendChild(div);
+    div._unit = unit; wrap.append(div);
   }
-  wrap._units = units; wrap._everything = everything;
 }
 function syncSetup() {
-  const wrap = $('units');
-  setGroup($('allunits'), wrap._everything);
-  for (const [u, list] of wrap._units) {
-    const div = wrap.querySelector(`.unit[data-u="${u}"]`);
-    setGroup(div.querySelector('.uall'), list);
-    const on = termCount(list.filter(t => state.topics.has(t))), total = termCount(list);
-    div.querySelector('.fold .n').textContent = on ? `${on} / ${total}` : total;
-    for (const box of div.querySelectorAll('.subs input')) box.checked = state.topics.has(box.value);
+  for (const div of $('units').querySelectorAll('.unit')) {
+    const unit = div._unit;
+    div.querySelector('.whole.hl').setAttribute('aria-pressed', isFull(unit));
+    div.querySelector('.whole.sl').setAttribute('aria-pressed', isSL(unit) && !isFull(unit));
+    for (const b of div.querySelectorAll('.chip.sub')) {
+      const on = isFull(b._g) || isSL(b._g);
+      b.setAttribute('aria-pressed', on);
+      b.querySelector('.n').textContent = on ? b._g.filter(d => state.picks.has(d)).length : b._g.length;
+    }
   }
-  const picked = DEFS.filter(d => state.topics.has(d.topic)).length;
-  $('picked').textContent = picked ? `${picked} term${picked === 1 ? '' : 's'} picked` : 'Tick a unit or some topics';
-  $('start').disabled = state.topics.size === 0;
+  const picked = state.picks.size;
+  $('picked').textContent = picked ? `${picked} term${picked === 1 ? '' : 's'} picked` : 'Pick a unit or some topics';
+  $('start').disabled = picked === 0;
 }
 function renderSetup() {
-  if (!$('allunits')) buildPicker();
+  if (!$('units').firstChild) buildPicker();
   syncSetup();
   const seg = $('lengths'); seg.innerHTML = '';
   for (const L of LENGTHS) {
@@ -284,7 +291,7 @@ function startRound(items) {
   show('play'); renderBoard();
 }
 $('start').onclick = () => {
-  state.pool = DEFS.filter(d => state.topics.has(d.topic));
+  state.pool = DEFS.filter(d => state.picks.has(d));
   const list = shuffle(state.pool);
   const items = (state.length === 'All' ? list : list.slice(0, state.length)).map(d => ({ d }));
   startRound(padBoard(items));
