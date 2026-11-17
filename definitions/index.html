@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Definition Drill</title>
+<meta name="description" content="Rebuild IB Business Management definitions piece by piece.">
+<link rel="icon" href="/geocornsmall.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --masthead: #1e2a4a; --masthead-ink: #fff; --masthead-sub: #c9d2ea;
+  --amber: #f4a629; --amber-ink: #8a5a00;
+  --bg: #f7f6f2; --surface: #fffdf8; --surface-2: #efede6; --line: #e3e0d8;
+  --ink: #1e2a4a; --muted: #5b6680; --bm: #1a3a7a;
+  --ok: #18634f; --ok-soft: #d9eee6; --bad: #8a1c1c; --bad-soft: #f8e1e1;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 18px/1.5 'Atkinson Hyperlegible', -apple-system, 'Segoe UI', sans-serif; }
+h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-variant-numeric: lining-nums; margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+header { background: var(--masthead); color: var(--masthead-ink); border-bottom: 4px solid var(--amber); }
+.mast { max-width: 760px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+.mast img { width: 48px; height: 48px; }
+.mast h1 { font-size: 1.5rem; line-height: 1.1; }
+.mast .sub { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--masthead-sub); }
+.mast a.home { margin-left: auto; color: var(--masthead-ink); font-size: 0.9rem; text-decoration: none; }
+.mast a.home:hover { text-decoration: underline; }
+
+main { max-width: 760px; margin: 0 auto; padding: 20px 16px 40px; }
+.label { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.lede { margin: 0 0 20px; color: var(--muted); }
+section.block { margin-bottom: 24px; }
+
+.btn { border-radius: 10px; padding: 12px 20px; min-height: 48px; border: 1px solid var(--line); background: var(--surface); }
+.btn.primary { background: var(--masthead); color: #fff; border-color: var(--masthead); font-weight: 700; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* topic picker */
+.unit { margin-bottom: 14px; }
+.unit h3 { font-size: 1rem; color: var(--bm); margin-bottom: 8px; }
+.chip { border-radius: 8px; padding: 10px 14px; min-height: 48px; border: 1px solid var(--line); background: var(--surface); text-align: left; }
+.chip[aria-pressed="true"] { background: var(--bm); border-color: var(--bm); color: #fff; }
+.chip .n { color: var(--muted); font-size: 0.85rem; margin-left: 6px; }
+.chip[aria-pressed="true"] .n { color: var(--masthead-sub); }
+.seg { display: flex; gap: 0; }
+.seg button { border: 1px solid var(--line); background: var(--surface); padding: 10px 18px; min-height: 48px; min-width: 60px; margin-left: -1px; }
+.seg button:first-child { border-radius: 10px 0 0 10px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 10px 10px 0; }
+.seg button[aria-pressed="true"] { background: var(--masthead); border-color: var(--masthead); color: #fff; position: relative; }
+
+/* question */
+.top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.top .score { font-weight: 700; }
+.topic { color: var(--bm); margin: 0 0 14px; font-size: 0.9rem; }
+.tiles { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.tile { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 8px 8px 4px; touch-action: none; user-select: none; -webkit-user-select: none;
+  cursor: grab; position: relative; }
+.tile.dragging { z-index: 2; cursor: grabbing; border-color: var(--masthead); background: #fff; }
+.tile .grip { flex: none; width: 22px; color: var(--muted); text-align: center; font-size: 1.1rem; line-height: 1; }
+.tile .txt { flex: 1; padding: 6px 0; line-height: 1.4; }
+.tile .arrows { flex: none; display: flex; flex-direction: column; gap: 4px; }
+.tile .arrows button { width: 44px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 0.9rem; }
+.tile .arrows button:disabled { opacity: 0.3; cursor: default; }
+.tile .mark { flex: none; width: 28px; text-align: center; font-weight: 700; display: none; }
+.locked .tile { cursor: default; }
+.locked .tile .arrows { display: none; }
+.locked .tile .mark { display: block; }
+.tile.ok { background: var(--ok-soft); border-color: var(--ok); }
+.tile.ok .mark { color: var(--ok); }
+.tile.bad { background: var(--bad-soft); border-color: var(--bad); }
+.tile.bad .mark { color: var(--bad); }
+
+.answer { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.answer .verdict { font-weight: 700; margin-bottom: 6px; }
+.answer .verdict.ok { color: var(--ok); }
+.answer .verdict.bad { color: var(--bad); }
+.answer p { margin: 0; }
+.sep { color: var(--amber-ink); font-weight: 700; padding: 0 2px; }
+
+/* end */
+.big { font-family: 'Fraunces', Georgia, serif; font-size: 3rem; font-weight: 700; line-height: 1; margin: 4px 0 16px; }
+.missed { list-style: none; padding: 0; margin: 0 0 20px; }
+.missed li { border-top: 1px solid var(--line); padding: 12px 0; }
+.missed li:last-child { border-bottom: 1px solid var(--line); }
+
+footer { max-width: 760px; margin: 0 auto; padding: 16px; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); }
+[hidden] { display: none !important; }
+@media (max-width: 480px) {
+  body { font-size: 17px; }
+  .mast h1 { font-size: 1.25rem; }
+  .mast img { width: 40px; height: 40px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="mast">
+    <img src="/geocorn.png" alt="">
+    <div><h1>Definition Drill</h1><div class="sub">IB Business Management</div></div>
+    <a class="home" href="/">unisam.nz</a>
+  </div>
+</header>
+
+<main>
+  <div id="setup">
+    <p class="lede">Put each definition back together. Term first, then the rest in order.</p>
+    <section class="block">
+      <p class="label">Topics</p>
+      <div id="units"></div>
+    </section>
+    <section class="block">
+      <p class="label">How many</p>
+      <div class="seg" id="lengths"></div>
+    </section>
+    <button class="btn primary" id="start">Start</button>
+  </div>
+
+  <div id="play" hidden>
+    <div class="top"><span class="label" id="progress"></span><span class="score" id="score"></span></div>
+    <p class="topic" id="qtopic"></p>
+    <ol class="tiles" id="tiles"></ol>
+    <div class="answer" id="answer" hidden><div class="verdict" id="verdict"></div><p id="full"></p></div>
+    <div class="row"><button class="btn primary" id="check">Check</button><button class="btn primary" id="next" hidden>Next</button></div>
+  </div>
+
+  <div id="end" hidden>
+    <p class="label">Score</p>
+    <div class="big" id="final"></div>
+    <div id="missedWrap">
+      <h2 style="font-size:1.2rem;margin-bottom:8px">To go over</h2>
+      <ul class="missed" id="missed"></ul>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="retry">Retry missed</button>
+      <button class="btn" id="again">Play again</button>
+      <button class="btn" id="change">Change topics</button>
+    </div>
+  </div>
+</main>
+<footer>Built by Sam G · found a problem? tell Sam.</footer>
+
+<script>
+// BEGIN DATA (generated by build.mjs from data/defs.json, do not edit by hand)
+const UNITS = {"1":"Unit 1: Introduction to business management","2":"Unit 2: Human resource management","3":"Unit 3: Finance and accounts","4":"Unit 4: Marketing","5":"Unit 5: Operations management"};
+const DEFS = [{"term":"Arbitration","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["a way of settling a dispute in which an independent third party examines both sides' cases and makes a decision","that the two sides are usually bound to accept."]},{"term":"Collective bargaining","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["negotiation between employer representatives and employee representatives, usually a trade union,","to agree pay, hours and working conditions for a group of workers."]},{"term":"Conciliation","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["a procedure in which an independent third party helps employers and employees reach agreement","by encouraging discussion and suggesting compromises, without imposing a decision."]},{"term":"Employee participation","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["the involvement of workers in making decisions or shaping how the organisation operates,","ranging from being consulted to having a formal voice at board level."]},{"term":"Industrial action","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["collective measures taken by employees to put pressure on their employer in a dispute","which disrupt or restrict normal production or service."]},{"term":"Industrial democracy","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["a system that gives employees formal representation in how the business is governed,","so that decisions are shared with, rather than imposed on, the workforce."]},{"term":"Industrial relations","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["the relationship between employers and employees or their representatives,","including how disputes, pay and working conditions are negotiated and resolved."]},{"term":"Lockout","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["when an employer prevents employees from entering the workplace","to pressure them into accepting the employer's terms in a dispute."]},{"term":"No-strike agreement","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["a clause in an agreement in which employees or their union promise not to take strike action for a set period,","usually in return for agreed pay or conditions."]},{"term":"Overtime ban","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["employees refusing to work any hours beyond their contracted hours","while carrying on with their normal hours, to pressure the employer in a dispute."]},{"term":"Redundancy","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["the loss of a job because the employer no longer needs the position,","not because of the employee's conduct or performance."]},{"term":"Single-union agreement","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["an agreement in which an employer recognises only one trade union to represent all its employees","in negotiations over pay and conditions."]},{"term":"Strike action","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["a collective refusal by employees to carry out their work","to pressure an employer over a dispute."]},{"term":"Trade union","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["an organisation of workers formed to represent their collective interests","by negotiating with employers over pay, conditions and job security."]},{"term":"Work-to-rule","unit":2,"topic":"2.7 Industrial/employee relations","hl":true,"p":["employees carrying out only the duties set out in their contracts and following every rule strictly,","which slows output without a full strike."]}];
+// END DATA
+
+const $ = id => document.getElementById(id);
+const LENGTHS = [5, 10, 15, 'All'];
+const state = { topics: new Set(), length: 10, round: [], i: 0, score: 0, missed: [], order: [], locked: false };
+
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const clean = s => s.replace(/[,.;:]\s*$/, '');
+const pieces = d => [d.term, ...d.p.map(clean)];
+function fullHTML(d) {
+  const first = d.p[0].charAt(0).toUpperCase() + d.p[0].slice(1);
+  const rest = [first, ...d.p.slice(1)];
+  return `<strong>${d.term}</strong>: ${rest.map(esc).join(' <span class="sep">|</span> ')}`;
+}
+function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+
+// ---------- setup ----------
+function topicsByUnit() {
+  const m = new Map();
+  for (const d of DEFS) {
+    if (!m.has(d.unit)) m.set(d.unit, new Map());
+    const t = m.get(d.unit); t.set(d.topic, (t.get(d.topic) || 0) + 1);
+  }
+  return [...m.entries()].sort((a, b) => a[0] - b[0]);
+}
+function renderSetup() {
+  const wrap = $('units'); wrap.innerHTML = '';
+  for (const [u, topics] of topicsByUnit()) {
+    const div = document.createElement('div'); div.className = 'unit';
+    div.innerHTML = `<h3>${esc(UNITS[u])}</h3><div class="row"></div>`;
+    for (const [t, n] of [...topics.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))) {
+      const b = document.createElement('button'); b.className = 'chip';
+      b.setAttribute('aria-pressed', state.topics.has(t));
+      b.innerHTML = `${esc(t)}<span class="n">${n}</span>`;
+      b.onclick = () => { state.topics.has(t) ? state.topics.delete(t) : state.topics.add(t); renderSetup(); };
+      div.querySelector('.row').appendChild(b);
+    }
+    wrap.appendChild(div);
+  }
+  const seg = $('lengths'); seg.innerHTML = '';
+  for (const L of LENGTHS) {
+    const b = document.createElement('button'); b.textContent = L;
+    b.setAttribute('aria-pressed', state.length === L);
+    b.onclick = () => { state.length = L; renderSetup(); };
+    seg.appendChild(b);
+  }
+  $('start').disabled = state.topics.size === 0;
+}
+function show(id) { for (const s of ['setup', 'play', 'end']) $(s).hidden = s !== id; window.scrollTo(0, 0); }
+
+function startRound(list) {
+  state.round = list; state.i = 0; state.score = 0; state.missed = [];
+  show('play'); renderQuestion();
+}
+$('start').onclick = () => {
+  const pool = shuffle(DEFS.filter(d => state.topics.has(d.topic)));
+  startRound(state.length === 'All' ? pool : pool.slice(0, state.length));
+};
+
+// ---------- question ----------
+function renderQuestion() {
+  const d = state.round[state.i];
+  const n = pieces(d).length;
+  let order;
+  do { order = shuffle([...Array(n).keys()]); } while (order.every((v, i) => v === i));
+  state.order = order; state.locked = false;
+  $('progress').textContent = `${state.i + 1} of ${state.round.length}`;
+  $('score').textContent = `${state.score} right`;
+  $('qtopic').textContent = d.topic;
+  $('answer').hidden = true; $('check').hidden = false; $('next').hidden = true;
+  $('tiles').classList.remove('locked');
+  renderTiles();
+}
+function renderTiles() {
+  const d = state.round[state.i], p = pieces(d), ul = $('tiles');
+  ul.innerHTML = '';
+  state.order.forEach((k, pos) => {
+    const li = document.createElement('li'); li.className = 'tile'; li.dataset.k = k;
+    li.innerHTML = `<span class="grip" aria-hidden="true">&#8942;&#8942;</span><span class="txt">${esc(p[k])}</span>
+      <span class="mark"></span>
+      <span class="arrows"><button type="button" class="up" aria-label="Move up">&#9650;</button><button type="button" class="dn" aria-label="Move down">&#9660;</button></span>`;
+    li.querySelector('.up').disabled = pos === 0;
+    li.querySelector('.dn').disabled = pos === state.order.length - 1;
+    li.querySelector('.up').onclick = () => move(pos, -1);
+    li.querySelector('.dn').onclick = () => move(pos, 1);
+    ul.appendChild(li);
+  });
+}
+function move(pos, dir) {
+  if (state.locked) return;
+  const o = state.order, j = pos + dir;
+  if (j < 0 || j >= o.length) return;
+  [o[pos], o[j]] = [o[j], o[pos]];
+  renderTiles();
+  const btn = $('tiles').children[j].querySelector(dir < 0 ? '.up' : '.dn');
+  (btn.disabled ? $('tiles').children[j].querySelector(dir < 0 ? '.dn' : '.up') : btn).focus();
+}
+function readOrder() { state.order = [...$('tiles').children].map(li => +li.dataset.k); }
+
+// drag with Pointer Events: the tile follows the finger and swaps past a neighbour's midpoint
+$('tiles').addEventListener('pointerdown', e => {
+  const tile = e.target.closest('.tile');
+  if (!tile || state.locked || e.target.closest('button') || e.button > 0) return;
+  e.preventDefault();
+  const list = $('tiles');
+  let startY = e.clientY;
+  tile.setPointerCapture(e.pointerId);
+  tile.classList.add('dragging');
+  const onMove = ev => {
+    let dy = ev.clientY - startY;
+    tile.style.transform = `translateY(${dy}px)`;
+    for (;;) {
+      const r = tile.getBoundingClientRect(), mid = r.top + r.height / 2;
+      const next = tile.nextElementSibling, prev = tile.previousElementSibling;
+      let swapped = null;
+      if (next) { const n = next.getBoundingClientRect(); if (mid > n.top + n.height / 2) { swapped = next; list.insertBefore(next, tile); } }
+      if (!swapped && prev) { const pr = prev.getBoundingClientRect(); if (mid < pr.top + pr.height / 2) { swapped = prev; list.insertBefore(tile, prev); } }
+      if (!swapped) break;
+      // the tile moved in the DOM: shift the start point so it stays under the finger
+      tile.style.transform = '';
+      const plain = tile.getBoundingClientRect().top;
+      startY = ev.clientY - (r.top - plain);
+      dy = ev.clientY - startY;
+      tile.style.transform = `translateY(${dy}px)`;
+    }
+  };
+  const onUp = () => {
+    tile.removeEventListener('pointermove', onMove);
+    tile.removeEventListener('pointerup', onUp);
+    tile.removeEventListener('pointercancel', onUp);
+    tile.classList.remove('dragging'); tile.style.transform = '';
+    readOrder(); renderTiles();
+  };
+  tile.addEventListener('pointermove', onMove);
+  tile.addEventListener('pointerup', onUp);
+  tile.addEventListener('pointercancel', onUp);
+});
+
+$('check').onclick = () => {
+  readOrder();
+  const d = state.round[state.i];
+  const right = state.order.every((k, pos) => k === pos);
+  state.locked = true;
+  $('tiles').classList.add('locked');
+  [...$('tiles').children].forEach((li, pos) => {
+    const ok = +li.dataset.k === pos;
+    li.classList.add(ok ? 'ok' : 'bad');
+    li.querySelector('.mark').textContent = ok ? '✓' : '✗';
+    li.querySelector('.mark').setAttribute('aria-label', ok ? 'Right place' : 'Wrong place');
+  });
+  if (right) state.score++; else state.missed.push(d);
+  $('score').textContent = `${state.score} right`;
+  $('verdict').textContent = right ? 'Right' : 'Not quite. Here it is:';
+  $('verdict').className = 'verdict ' + (right ? 'ok' : 'bad');
+  $('full').innerHTML = fullHTML(d);
+  $('answer').hidden = false;
+  $('check').hidden = true; $('next').hidden = false;
+  $('next').textContent = state.i === state.round.length - 1 ? 'See score' : 'Next';
+  $('next').focus();
+};
+$('next').onclick = () => {
+  state.i++;
+  if (state.i < state.round.length) { renderQuestion(); window.scrollTo(0, 0); } else renderEnd();
+};
+
+// ---------- end ----------
+function renderEnd() {
+  show('end');
+  $('final').textContent = `${state.score} / ${state.round.length}`;
+  const m = state.missed;
+  $('missedWrap').hidden = m.length === 0;
+  $('retry').hidden = m.length === 0;
+  $('missed').innerHTML = m.map(d => `<li>${fullHTML(d)}</li>`).join('');
+}
+$('retry').onclick = () => startRound(shuffle(state.missed));
+$('again').onclick = () => $('start').onclick();
+$('change').onclick = () => { show('setup'); renderSetup(); };
+
+// start with every topic picked when there is only one
+if (new Set(DEFS.map(d => d.topic)).size === 1) state.topics.add(DEFS[0].topic);
+renderSetup();
+</script>
+</body>
+</html>
