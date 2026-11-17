@@ -45,7 +45,7 @@ const HELPERS = () => {
       const [a, b] = (Array.isArray(n) ? n : c.q.parts).map(String), s = 0.85;
       c.strokes = [...extra, ...numStrokes(a, -0.45, -1.05, s, mirror), ...numStrokes(b, 0.45 + b.length * 0.8 * s, -1.05, s, mirror)];
     } else {
-      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05, graph: -1.05, shape: -1.05, ruler: -1.05 }[c.q.kind] ?? 0.3;
+      const top = { div: -1.3, miss: -1.1, expr: -1.1, seq: -1.1, story: -1.1, clock: -1.05, money: -1.05, graph: -1.05, shape: -1.05, ruler: -1.05, unit: -1.05 }[c.q.kind] ?? 0.3;
       c.strokes = [...extra, ...numStrokes(n, 0, top, 1, mirror)];
     }
     draw(c);
@@ -95,7 +95,7 @@ const fakeSpeech = () => {
   ok((await said()).includes('How old are you?'), 'age question is read aloud');
   await page.click('#ageTiles [data-age="8"]');
   ok(await visible('#homeS'), 'age 8 goes to the activities');
-  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Fractions of a number,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
+  ok((await tiles('#actTiles')).join() === 'Sums,Add and take away,Times and divide,Missing number,Arrays,Place value,Number lines,Area,Times bonds,Fractions,Fractions of a number,Clocks,Money,Number patterns,Doubles and halves,Story sums,Graphs,Shapes,Rulers,True or false,More or less,Balance,Rounding,Decimals,Change units,Angles,Times grid', '8: the age-8 activities ' + (await tiles('#actTiles')).join());
   ok(await page.$eval('#title', e => e.textContent) === 'Mia · 8', 'title shows name and age');
   await page.click('#backBtn');
   ok(await page.$$eval('#nameTiles .tile .sub', t => t.map(x => x.textContent).join()) === 'any age,age 8', 'name tile shows her age');
@@ -132,7 +132,7 @@ const fakeSpeech = () => {
   await page.click('#backBtn'); await page.click('#backBtn');
   await page.click('#nameTiles [data-id="guest"]');
   await page.click('#ageTiles [data-age="10"]');
-  ok((await tiles('#actTiles')).length === 25, 'age 10: the older tiles');
+  ok((await tiles('#actTiles')).length === 27, 'age 10: the older tiles');
   // a new activity can start with one year only: any age opens it at the nearest year it has
   ok(await page.evaluate(() => [7, 8, 11].map(a => { age = a; return loadCfg('tf').yr + '' + loadCfg('cmp').yr; }).join() === '44,44,44'), 'True or false and More or less (Year 4 only so far) open at Year 4 for any age');
   await page.evaluate(() => { age = 7; act = 'tf'; goSetup(); });
@@ -328,7 +328,7 @@ const fakeSpeech = () => {
       : ['expr', 'miss', 'seq', 'bal', 'rnum'].includes(c.q.kind) ? c.ay > 2.5 * c.F
       : c.q.kind === 'story' ? c.ay > 2.5 * c.F && r.bottom <= w.bottom + 1
       : c.q.kind === 'tap' ? r.bottom <= w.bottom + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const t = b.getBoundingClientRect(); return t.width >= (c.q.cells ? 29 : 39) && t.height >= (c.q.cells ? 29 : 39) && t.bottom <= w.bottom + 1 && t.left >= w.left - 1 && t.right <= w.right + 1; }) // tiles big enough to tap
-      : ['clock', 'money', 'graph', 'shape', 'ruler', 'dec'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
+      : ['clock', 'money', 'graph', 'shape', 'ruler', 'dec', 'unit'].includes(c.q.kind) ? r.bottom <= w.bottom + 1 // she writes above the line, inside the question
       : c.h - c.ay >= 1.3 * c.F;
     return r.left < w.left - 1 || r.right > w.right + 1 || r.top < w.top - 1 || !room;
   }).map(c => JSON.stringify(c.q))));
@@ -1303,6 +1303,86 @@ const fakeSpeech = () => {
     === 'Decimals · Year 4 · picture, number line, + −, × ÷ 10 · 12 questions / Decimals · Year 4 · + − · 6 questions', 'record labels for Decimals');
   ok(await page.evaluate(() => [cardSay(decQ(4, ['addsub'])), cardSay({ kind: 'dec', form: 'frac', n: 3, d: 10, say: '3 over 10. Write it as a decimal.' })].every(s => /^\d\.\d (plus|take away) \d\.\d$|^3 over 10/.test(s))), 'Decimals sums are read aloud');
 
+  // ---- Change units (Year 4: time), A6b
+  const uq = await page.evaluate(() => {
+    const bad = [], K = { weeks: 7, days: 1, hours: 1 / 24, minutes: 1 / 1440, seconds: 1 / 86400, years: 365, months: 365 / 12, h: 1 / 24, min: 1 / 1440, s: 1 / 86400 };
+    let two = 0, mixed = 0;
+    const toDays = t => { const p = t.split(' '); let v = 0; for (let i = 0; i < p.length; i += 2) v += +p[i] * K[p[i + 1]]; return v; };
+    for (let i = 0; i < 1500; i++) {
+      const q = unitsQ(4);
+      if (q.kind !== 'unit') { bad.push('kind ' + q.kind); continue; }
+      const have = toDays(q.text);
+      if (q.two) {
+        two++;
+        const [a, b] = q.parts;
+        if (a < 1 || b < 1 || b > 59 || !Number.isInteger(a) || !Number.isInteger(b) || Math.abs(toDays(`${a} ${q.u1} ${b} ${q.u2}`) - have) > 1e-9) bad.push('two ' + q.text + ' ' + q.parts);
+      } else {
+        if (q.text.split(' ').length === 4) mixed++;
+        if (!Number.isInteger(q.ans) || q.ans < 1 || Math.abs(q.ans * K[q.unit] - have) > 1e-9) bad.push('one ' + q.text + ' = ' + q.ans + ' ' + q.unit);
+      }
+      if (!/How many/.test(q.say) || /\b(h|min|s)\b/.test(q.say)) bad.push('say ' + q.say);
+    }
+    if (two < 150 || two > 350 || mixed < 150 || mixed > 350) bad.push(`mixed ${two} ${mixed}`);
+    return bad.slice(0, 4);
+  });
+  ok(uq.length === 0, 'Change units Year 4: weeks, days, hours, minutes, seconds, months and years both ways, whole answers; about a third mixed (100 minutes = 1 h 40 min, and back) ' + uq.join(' | '));
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="units"]');
+  ok(await page.evaluate(() => draft.yr === 4 && $('#optBlock [data-key="yr"]').children.length === 1 && !$('#optBlock [data-key="kinds"]')), 'Change units setup: just a Year row with Year 4');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.every(c => c.q.two ? c.el.querySelectorAll('.ans .ln').length === 2 && c.el.querySelector('.ans .sep').textContent === c.q.u1 : c.el.querySelectorAll('.ans .ln').length === 1 && c.el.querySelector('.ans .u:last-child').textContent === c.q.unit)), 'Change units cards: "= ___ days", or "= __ h __ min"');
+  ok((await fits()).length === 0, 'Change units fit ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/42-units.png' });
+  ok((await writeAllAndMark()).length === 0, 'Change units: answers read and marked right');
+  const ur = await page.evaluate(() => {
+    hideDone(); buildSheet({ yr: 4, n: 6 });
+    const c = cards[0], out = {};
+    c.q = { kind: 'unit', text: '100 minutes', u1: 'h', u2: 'min', two: true, parts: [1, 40], ans: '1 h 40 min', say: '' }; layout(c); sizeCanvas(c);
+    writeNum(c, ['1', '40']); let r = readAnswer(c); out.plain = r.ok && r.text === '1 h 40 min';
+    writeNum(c, ['40', '1']); out.swapped = !readAnswer(c).ok;
+    writeNum(c, ['1', '20']); out.wrong = !readAnswer(c).ok;
+    c.strokes = numStrokes('140', -0.6, -1.05, 0.85); draw(c); out.oneSide = readAnswer(c).ok; // all left of the "h": the last two digits are the minutes
+    c.q = { kind: 'unit', text: '3 weeks', unit: 'days', ans: 21, say: '' }; layout(c); sizeCanvas(c);
+    writeNum(c, 21); out.single = readAnswer(c).ok && read(c) === '21';
+    writeNum(c, 3); out.singleWrong = !readAnswer(c).ok;
+    return out;
+  });
+  ok(Object.values(ur).every(Boolean), 'Change units reading: 1 h 40 min right in its blanks or squeezed on one side, swapped or wrong is wrong; 3 weeks = 21 days ' + JSON.stringify(ur));
+  ok(await page.evaluate(() => labelFor('units~4|12') === 'Change units · Year 4 · 12 questions' && cardSay(unitsQ(4)).includes('How many')), 'Change units record label, read aloud');
+
+  // ---- Angles (Year 4): smaller than, a right angle, or bigger; degrees in a turn. A6b
+  const aq = await page.evaluate(() => {
+    const bad = [], seen = [0, 0, 0], deg = {};
+    for (let i = 0; i < 900; i++) {
+      const q = angleQ(4, ['size']);
+      if (q.kind !== 'tap' || q.tiles.length !== 3) { bad.push('tiles'); continue; }
+      seen[q.right]++;
+      if (q.a !== 90 && Math.abs(q.a - 90) < 12) bad.push('near 90: ' + q.a);
+      if ((q.a < 90 ? 0 : q.a === 90 ? 1 : 2) !== q.right) bad.push('right ' + q.a + ' ' + q.right);
+      if (q.a < 15 || q.a > 170) bad.push('size ' + q.a);
+    }
+    if (seen.some(k => k < 200)) bad.push('spread ' + seen);
+    for (let i = 0; i < 300; i++) {
+      const q = angleQ(4, ['deg']); deg[q.w] = q.ans;
+      if (q.form !== 'deg' || q.tiles.map(t => t.label).join() !== '90°,180°,360°') bad.push('deg tiles');
+    }
+    const want = { 'quarter turn': '90°', 'half turn': '180°', 'full turn': '360°', 'right angle': '90°' };
+    if (Object.keys(deg).length !== 4 || Object.keys(want).some(w => deg[w] !== want[w])) bad.push('degrees ' + JSON.stringify(deg));
+    return bad.slice(0, 4);
+  });
+  ok(aq.length === 0, 'Angles Year 4: about a third each smaller, right and bigger, never within 12° of 90 unless 90; a quarter turn and a right angle are 90°, a half turn 180°, a full turn 360° ' + aq.join(' | '));
+  await page.click('#backBtn');
+  await page.click('#actTiles [data-act="angle"]');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'size,deg' && $('#optBlock [data-key="yr"]').children.length === 1), 'Angles setup: Year 4, both kinds');
+  await page.click('#newBtn');
+  ok(await page.evaluate(() => cards.length === 12 && cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tt').length === 3 && c.el.querySelector('.tq svg'))), 'Angles sheet: a picture and three tiles on every card');
+  ok((await fits()).length === 0, 'Angles fit, with tiles big enough to tap ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/43-angles.png' });
+  ok(await page.evaluate(() => { const c = cards[0]; c.pick = [(c.q.right + 1) % 3]; paintTap(c); const a = !readAnswer(c).ok; c.pick = [c.q.right]; return a && readAnswer(c).ok; }), 'Angles: the wrong tile is wrong, the right one right');
+  ok((await writeAllAndMark()).length === 0, 'Angles: the whole sheet tapped right is marked right');
+  ok(await page.evaluate(() => [labelFor('angle~4|size,deg|12'), labelFor('angle~4|deg|6')].join(' / ') === 'Angles · Year 4 · right angle?, degrees · 12 questions / Angles · Year 4 · degrees · 6 questions'), 'Angles record labels');
+  ok(await page.evaluate(() => cardSay(angleQ(4, ['size'])) === 'Is it smaller than a right angle, a right angle, or bigger? smaller than a right angle, a right angle, bigger than a right angle.' && /^A (quarter turn|half turn|full turn|right angle) is how many degrees\? 90 degrees, 180 degrees, 360 degrees\.$/.test(cardSay(angleQ(4, ['deg'])))), 'Angles read aloud: the question then each tile');
+
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
 
@@ -1552,7 +1632,8 @@ const fakeSpeech = () => {
     for (const [a, c] of [['tf', { yr: 4, n: 12 }], ['cmp', { yr: 4, kinds: ['num', 'sum'], n: 12 }], ['pv', { kinds: ['blocks'], max: 9999, n: 12 }], ['money', { yr: 4, kinds: ['change'], n: 12 }],
       ['graph', { yr: 4, n: 12 }], ['nline', { steps: [25, 50, 1000], n: 12 }], ['muldiv', { yr: 4, ops: ['/'], n: 12 }], ['dec', { yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }],
       ['frac', { kinds: ['past', 'add'], parts: [2, 3, 4, 5, 6, 8, 10, 12], n: 12 }], ['cmp', { yr: 4, kinds: ['frac'], n: 12 }], ['fof', { yr: 4, kinds: ['part', 'whole'], n: 12 }],
-      ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }]]) {
+      ['area', { kinds: ['odd', 'cubes'], max: 12, n: 12 }], ['ruler', { yr: 4, kinds: ['pencil', 'thermo'], n: 12 }],
+      ['units', { yr: 4, n: 12 }], ['angle', { yr: 4, kinds: ['size'], n: 12 }], ['angle', { yr: 4, kinds: ['deg'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

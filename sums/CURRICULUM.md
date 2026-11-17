@@ -239,10 +239,10 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Area of irregular shapes from squares and half squares. ✓ (Area: Odd shapes)
 - Area of rectangles by multiplying the sides. ✓ (Area: Area, Missing side)
 - Volume of cuboids by filling with cubes. ✓ (Area: Cubes, counting a drawn cuboid)
-- Estimate angles against 90°, 180° and 360°. Knows: a full turn is 360°, a half turn 180°, a quarter turn 90°; rectangles have four right angles.
+- Estimate angles against 90°, 180° and 360°. Knows: a full turn is 360°, a half turn 180°, a quarter turn 90°; rectangles have four right angles. ✓ (Angles, Year 4: smaller than, a right angle, or bigger; quarter, half and full turns in degrees)
 - Tell the time to the nearest minute, analogue and digital. ✓ (Clocks, Year 4)
 - Durations in mixed units (1 h 42 min, 3 min 21 s).
-- Change between time units (3 weeks = 21 days, 90 seconds = 1½ minutes, 48 hours = 2 days).
+- Change between time units (3 weeks = 21 days, 90 seconds = 1½ minutes, 48 hours = 2 days). ✓ (Change units, Year 4: weeks, days, hours, minutes, seconds, months, years; mixed as __ h __ min and __ min __ s)
 
 ### Geometry
 - Classify regular and irregular polygons up to 12 sides by edges, vertices and angles. ✓ partly (Shapes, Year 4: count sides and right angles). The words "quadrilateral" and "parallel line" are taught, but finding parallel lines is Year 5 and the named quadrilaterals are Year 6.

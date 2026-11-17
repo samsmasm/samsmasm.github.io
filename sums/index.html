@@ -276,6 +276,9 @@
   .qv.pic2 { top: .4em; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
   .pic2 svg { display: block; }
   .pic2 .cap { font-size: .75em; font-weight: 700; margin-bottom: .3em; text-align: center; }
+  .pic2 .eq { font-weight: 700; line-height: 1.25; }
+  .tap .tpic { display: flex; flex-direction: column; align-items: center; gap: .1em; }
+  .tap .tw { font-size: .8em; font-weight: 700; line-height: 1.1; }
   .pic2 .words { font-weight: 700; line-height: 1.2; height: 3.2em; display: flex; align-items: center; }
   .pic2 .ans { display: flex; align-items: flex-end; gap: .15em; margin-top: 1.5em; }
   .pic2 .side { display: flex; align-items: flex-end; gap: .7em; }
@@ -1551,6 +1554,73 @@ function fofSvg(q) {
   const v = String(q.part ? '?' : q.k);
   return s + t(bw / 2, y0 + h / 2, v, Math.min(7.5, bw * 0.85 / (v.length * 0.6))) + '</svg>';
 }
+// Change units, Year 4: time. "3 weeks" then "= ___ days"; mixed ones are two
+// blanks round a printed unit ("100 minutes" then "= __ h __ min"), or the
+// other way ("1 h 20 min" then "= ___ min"). Always whole numbers.
+const UNIT_TIME = [ // [big, small, how many small in one big, big from..to]
+  ['weeks', 'days', 7, 2, 9], ['days', 'hours', 24, 2, 5], ['minutes', 'seconds', 60, 2, 10],
+  ['hours', 'minutes', 60, 2, 5], ['years', 'months', 12, 2, 5],
+];
+const UNIT_SHORT = { hours: 'h', minutes: 'min', seconds: 's' };
+const UNIT_SAY = { h: 'hours', min: 'minutes', s: 'seconds' };
+const unitWords = t => t.replace(/(\d+) (h|min|s)\b/g, (_, n, u) => `${n} ${+n === 1 ? UNIT_SAY[u].slice(0, -1) : UNIT_SAY[u]}`); // "1 hour 40 minutes"
+function unitsQ(yr) {
+  if (Math.random() < 1 / 3) { // mixed: 100 minutes = 1 h 40 min, or back again
+    const [big, small] = pickOne([['hours', 'minutes'], ['minutes', 'seconds']]), B = UNIT_SHORT[big], S = UNIT_SHORT[small];
+    let m = rnd(61, 299); while (m % 60 === 0) m = rnd(61, 299);
+    const a = Math.floor(m / 60), b = m % 60;
+    if (Math.random() < 0.5) return { kind: 'unit', text: `${m} ${small}`, u1: B, u2: S, two: true, parts: [a, b], ans: `${a} ${B} ${b} ${S}`, say: `${m} ${small}. How many ${big} and ${small}?` };
+    const text = `${a} ${B} ${b} ${S}`;
+    return { kind: 'unit', text, unit: small, ans: m, say: `${unitWords(text)}. How many ${small}?` };
+  }
+  const [big, small, k, lo, hi] = pickOne(UNIT_TIME), n = rnd(lo, hi);
+  return Math.random() < 0.5
+    ? { kind: 'unit', text: `${n} ${big}`, unit: small, ans: n * k, say: `${n} ${big}. How many ${small}?` }
+    : { kind: 'unit', text: `${n * k} ${small}`, unit: big, ans: n, say: `${n * k} ${small}. How many ${big}?` };
+}
+// Angles, Year 4. Size: an angle (two arms and a small arc), smaller than a
+// right angle, a right angle, or bigger; never within 12° of 90 unless it is
+// exactly 90. Degrees: a quarter, half or full turn (or a right angle) with
+// tiles 90°, 180°, 360°.
+const ANGLE_INK = 'stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"';
+// two arms from the vertex, the first at r0 degrees, the second a degrees on (anticlockwise)
+function angleSvg(a, r0, em, opts = {}) {
+  const L = 40, rad = d => d * Math.PI / 180, P = d => [L * Math.cos(rad(d)), -L * Math.sin(rad(d))];
+  const p1 = P(r0), p2 = P(r0 + a), xs = [0, p1[0], p2[0]], ys = [0, p1[1], p2[1]];
+  const pad = 6, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad, S = Math.max(w, h);
+  const vb = [x0 - (S - w) / 2, y0 - (S - h) / 2, S, S].map(v => +v.toFixed(1)).join(' ');
+  const r = 11, q1 = [r * Math.cos(rad(r0)), -r * Math.sin(rad(r0))], q2 = [r * Math.cos(rad(r0 + a)), -r * Math.sin(rad(r0 + a))];
+  const f = v => v.toFixed(1);
+  const mark = opts.square // the right-angle mark: a small square in the corner
+    ? (() => { const s = 9, u = [s * Math.cos(rad(r0)), -s * Math.sin(rad(r0))], v = [s * Math.cos(rad(r0 + 90)), -s * Math.sin(rad(r0 + 90))]; return `<path d="M${f(u[0])} ${f(u[1])}L${f(u[0] + v[0])} ${f(u[1] + v[1])}L${f(v[0])} ${f(v[1])}" stroke-width="2.5"/>`; })()
+    : `<path d="M${f(q1[0])} ${f(q1[1])}A${r} ${r} 0 0 0 ${f(q2[0])} ${f(q2[1])}" stroke-width="2.5"/>`;
+  return `<svg viewBox="${vb}" style="width:${em}em;height:${em}em" ${ANGLE_INK}><path d="M${f(p1[0])} ${f(p1[1])}L0 0L${f(p2[0])} ${f(p2[1])}" stroke-width="${opts.thin ? 3.5 : 3}"/>${mark}</svg>`;
+}
+const ANGLE_TILES = [
+  { html: angleSvg(40, 0, 1.5, { thin: 1 }), label: 'smaller', say: 'smaller than a right angle' },
+  { html: angleSvg(90, 0, 1.5, { thin: 1, square: 1 }), label: 'right angle', say: 'a right angle' },
+  { html: angleSvg(140, 0, 1.5, { thin: 1 }), label: 'bigger', say: 'bigger than a right angle' },
+];
+const DEG_TILES = [90, 180, 360].map(d => ({ html: `<span style="font-size:.66em">${d}°</span>`, label: `${d}°`, say: `${d} degrees` }));
+// a turn drawn as an arrow round a dot: a quarter, a half, or all the way
+function turnSvg(f) {
+  // clockwise from the top: the point a degrees round is (r sin a, −r cos a)
+  const r = 14, a = (f * 360 - (f === 1 ? 24 : 0)) * Math.PI / 180, end = [r * Math.sin(a), -r * Math.cos(a)];
+  const big = f > 0.5 ? 1 : 0, T = [Math.cos(a), Math.sin(a)], N = [-Math.sin(a), Math.cos(a)], h = 6; // arrowhead along the way it turns
+  const tip = end, b1 = [tip[0] - h * T[0] + 0.6 * h * N[0], tip[1] - h * T[1] + 0.6 * h * N[1]], b2 = [tip[0] - h * T[0] - 0.6 * h * N[0], tip[1] - h * T[1] - 0.6 * h * N[1]];
+  const fx = v => v.toFixed(1);
+  return `<svg viewBox="-19 -19 38 38" style="width:3em;height:3em" ${ANGLE_INK}><circle cx="0" cy="0" r="2.2" fill="currentColor" stroke="none"/><path d="M0 0V-${r}" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M0 -${r}A${r} ${r} 0 ${big} 1 ${fx(end[0])} ${fx(end[1])}" stroke-width="2.6"/><path d="M${fx(b1[0])} ${fx(b1[1])}L${fx(tip[0])} ${fx(tip[1])}L${fx(b2[0])} ${fx(b2[1])}z" fill="currentColor" stroke-width="1"/></svg>`;
+}
+const TURNS = [['quarter turn', 0.25, 0], ['half turn', 0.5, 1], ['full turn', 1, 2], ['right angle', 0, 0]];
+function angleQ(yr, kinds) {
+  if (pickOne(kinds) === 'deg') {
+    const [w, f, right] = pickOne(TURNS), pic = f ? turnSvg(f) : angleSvg(90, rnd(0, 3) * 90, 3, { square: 1 });
+    return { kind: 'tap', form: 'deg', w, top: `<span class="tpic">${pic}<span class="tw">${w}</span></span>`, tc: 6, th: 4.2, topf: 0.55, tiles: DEG_TILES, right, say: `A ${w} is how many degrees?`, ans: DEG_TILES[right].label };
+  }
+  const right = rnd(0, 2), a = [rnd(20, 77), 90, rnd(103, 165)][right];
+  // turned any way, so the right angle is not always square to the page
+  return { kind: 'tap', form: 'size', a, top: angleSvg(a, rnd(0, 359), 4), tc: 4, th: 4, topf: 0.55, tiles: ANGLE_TILES, right, say: 'Is it smaller than a right angle, a right angle, or bigger?', ans: ANGLE_TILES[right].label };
+}
 const textSvg = lines =>`<svg viewBox="0 0 120 70"><text x="60" y="${lines.length > 1 ? 30 : 46}" text-anchor="middle" font-size="${lines.length > 1 ? 26 : 30}" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[0]}</text>${lines[1] ? `<text x="60" y="60" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">${lines[1]}</text>` : ''}</svg>`;
 
 const ACTS = {
@@ -1928,6 +1998,27 @@ const ACTS = {
     make: c => decQ(c.yr, c.kinds),
     key: c => `dec~${c.yr}|${DEC_KINDS.filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Decimals · Year ${y} · ${kinds.split(',').map(x => ({ pic: 'picture', line: 'number line', addsub: '+ −', ten: '× ÷ 10' })[x]).join(', ')} · ${n} questions`; },
+  },
+  units: {
+    name: 'Change units', ages: [8], setup: 'opts', say: 'Change it to the other unit.',
+    pic: textSvg(['1 h =', '60 min']),
+    options: [{ key: 'yr', label: 'Year', values: [[4, '4 · time']] }],
+    defaults: () => ({ yr: 4, n: 12 }),
+    make: c => unitsQ(c.yr),
+    key: c => `units~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Change units · Year ${y} · ${n} questions`; },
+  },
+  angle: {
+    name: 'Angles', ages: [8], setup: 'opts', say: 'Compare the angle with a right angle, or choose the degrees. Tap it.',
+    pic: `<svg viewBox="0 0 120 84" ${ANGLE_INK}><path d="M100 72H26L70 14" stroke-width="5"/><path d="M48 72A22 22 0 0 0 39.3 54.5" stroke-width="3.5"/></svg>`,
+    options: [
+      { key: 'yr', label: 'Year', values: [[4, '4 · right angles, turns']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['size', 'Right angle?'], ['deg', 'Degrees']] },
+    ],
+    defaults: () => ({ yr: 4, kinds: ['size', 'deg'], n: 12 }),
+    make: c => angleQ(c.yr, c.kinds),
+    key: c => `angle~${c.yr}|${['size', 'deg'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Angles · Year ${y} · ${kinds.split(',').map(x => ({ size: 'right angle?', deg: 'degrees' })[x]).join(', ')} · ${n} questions`; },
   },
   tgrid: {
     name: 'Times grid', ages: [8], setup: 'opts', grid: true, noCount: true, say: 'Drag the number to its place on the grid.',
@@ -2340,7 +2431,8 @@ function qMarkup(q) {
       cls: 'tap', anchor: '.tiles',
       html: `<div class="tq">${q.top}</div><div class="tiles${q.cells ? ' cells' : ''}" style="--n:${across};--rows:${rows}">${q.tiles.map((t, i) => `<button class="tt" data-i="${i}" aria-pressed="false">${t.html}</button>`).join('')}</div>`,
       // the tiles take their size from the card (see the CSS); the words keep to the top 45% (30% over a grid)
-      vars: { '--h': ((q.th || 1.3) + 1.9) / (q.cells ? 0.3 : 0.45), '--c': Math.max(q.tc || 0, 4) + 1.4 },
+      // (q.topf: a picture question may take more of the card, as Angles does)
+      vars: { '--h': ((q.th || 1.3) + 1.9) / (q.topf || (q.cells ? 0.3 : 0.45)), '--c': Math.max(q.tc || 0, 4) + 1.4 },
     };
   }
   if (q.kind === 'pv') {
@@ -2403,6 +2495,18 @@ function qMarkup(q) {
       cls: 'pic2', anchor: '.sep',
       html: `${top}<div class="ans">${eq ? '<span class="u">=</span>' : ''}${ln}<span class="sep pt">.</span>${ln}</div>`,
       vars: { '--h': ph + 3.3, '--c': Math.max(pw, eq ? 5.6 : 4.9) + 1.2 },
+    };
+  }
+  // change units: "3 weeks", then "= ___ days", or two blanks "= __ h __ min"
+  if (q.kind === 'unit') {
+    const ln = '<span class="ln"></span>', u = t => `<span class="u">${t}</span>`;
+    const [row, rw] = q.two
+      ? [u('=') + ln + `<span class="sep">${q.u1}</span>` + ln + u(q.u2), 0.6 + 1.9 * 2 + (q.u1.length + 0.5) * 0.45 + q.u2.length * 0.45 + 0.6]
+      : [u('=') + '<span class="ln w"></span>' + u(q.unit), 0.6 + 2.5 + q.unit.length * 0.45 + 0.45];
+    return {
+      cls: 'pic2', anchor: q.two ? '.sep' : '.ln',
+      html: `<div class="eq">${q.text}</div><div class="ans">${row}</div>`,
+      vars: { '--h': 1.25 + 3.3, '--c': Math.max(q.text.length * 0.56, rw) + 1.2 },
     };
   }
   // graphs, shapes, rulers: the question, the picture, then "___" (and a unit)
@@ -2711,7 +2815,7 @@ function inZone(kind, cx, cy) {
   if (kind === 'div') return cy < 0;
   // on the line, in the box in the sum, or a bit low under the line: all of it
   // is hers (the bottom row wins if there is more than one)
-  if (['miss', 'expr', 'clock', 'money', 'seq', 'story', 'graph', 'shape', 'ruler', 'bal', 'rnum'].includes(kind)) return true;
+  if (['miss', 'expr', 'clock', 'money', 'seq', 'story', 'graph', 'shape', 'ruler', 'bal', 'rnum', 'unit'].includes(kind)) return true;
   return cy > 0;
 }
 // Any card with writing on it gets marked (Sam): if nothing is in the answer
@@ -2859,7 +2963,8 @@ function readAnswer(c) {
     }
     const ok = a.text !== '' && b.text !== '' && +a.text === c.q.parts[0] && +b.text === c.q.parts[1];
     const A = a.text || '?', B = b.text || '?';
-    return { text: c.q.kind === 'clock' ? `${A}:${b.text ? B.padStart(2, '0') : B}` : `$${A} and ${B}c`, ok, backwards: bw };
+    const text = c.q.kind === 'clock' ? `${A}:${b.text ? B.padStart(2, '0') : B}` : c.q.kind === 'unit' ? `${A} ${c.q.u1} ${B} ${c.q.u2}` : `$${A} and ${B}c`;
+    return { text, ok, backwards: bw };
   }
   if (c.q.kind === 'frac') {
     const [t, b] = fracParts(c);
