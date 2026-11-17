@@ -277,16 +277,16 @@ Year 5 buttons so far (C1, C2a, 2026-11-17): Add and take away, Times and divide
 - Divide up to a four-digit number by one digit, **with a remainder** (278 ÷ 4 = 69 remainder 2), including the written method. ✓ (Times and divide, Year 5: the long-division bracket, answered "__ r __"; about one in four exact)
 
 ### Fractions, decimals, percentages and money
-- Tenths and hundredths as fractions and decimals; compare and order numbers to two decimal places (0.12 < 0.2). ✓ partly (More or less and True or false, Year 5: compare to two places, 0.5 = 0.50; hundredths as fractions come with Decimals Year 5)
-- Know ½, ¼ and ¾ as decimals, and fractions out of 10 or 100.
-- 10%, 25% and 50% as fractions and decimals.
-- Divide one- and two-digit numbers by 10 or 100; multiply decimals by 10 and 100.
+- Tenths and hundredths as fractions and decimals; compare and order numbers to two decimal places (0.12 < 0.2). ✓ (Decimals, Year 5: hundred squares, a tenth cut into hundredths on a line, ³⁷⁄₁₀₀ = __ . __; More or less and True or false, Year 5: compare to two places, 0.5 = 0.50; ordering not built)
+- Know ½, ¼ and ¾ as decimals, and fractions out of 10 or 100. ✓ (Decimals, Year 5: Picture kind, ¼ = __ . __, ³⁷⁄₁₀₀)
+- 10%, 25% and 50% as fractions and decimals. ✓ partly (Fractions of a number, Year 5: Percent on the bar model, 4 boxes for 25%, 10 for 10%; not written as decimals)
+- Divide one- and two-digit numbers by 10 or 100; multiply decimals by 10 and 100. ✓ (Decimals, Year 5: × and ÷ by 10 and 100; up to three digits ÷)
 - Compare fractions where one bottom number is a multiple of the other; families of equal fractions; mixed numbers and improper fractions that are equal. ✓ partly (More or less and True or false, Year 5: 2/3 and 5/9, 2/3 = 6/9; Fractions accepts equal fractions; not mixed numbers)
-- Add and subtract fractions with the same bottom number, or where one is a multiple of the other (⅔ + ¹⁄₉ = ⁷⁄₉).
-- Add and subtract decimals to two places (1.31 + 0.22 = 1.53). ✓ (Add and take away, Year 5: about a third of cards, "__ . __")
-- A non-unit fraction of a number (⅔ of 24); the whole from a part (8 is ⅖ of a set).
-- 10%, 25% and 50% of a number; the whole when given 25% or 50%.
-- Total cost in dollars and cents, change from the nearest $10; money written with a decimal point; round to the nearest dollar. ✓ partly (Rounding, Year 5: $48.65 to the nearest dollar; the rest comes with Money Year 5)
+- Add and subtract fractions with the same bottom number, or where one is a multiple of the other (⅔ + ¹⁄₉ = ⁷⁄₉). ✓ (Fractions: Add and take away, and Add different, pictures cut to the bigger bottom number)
+- Add and subtract decimals to two places (1.31 + 0.22 = 1.53). ✓ (Add and take away, Year 5: about a third of cards, "__ . __"; Decimals, Year 5, also a tenth with a hundredth, 0.4 + 0.25)
+- A non-unit fraction of a number (⅔ of 24); the whole from a part (8 is ⅖ of a set). ✓ (Fractions of a number, Year 5: a second brace under the n boxes)
+- 10%, 25% and 50% of a number; the whole when given 25% or 50%. ✓ (Fractions of a number, Year 5: Percent)
+- Total cost in dollars and cents, change from the nearest $10; money written with a decimal point; round to the nearest dollar. ✓ (Money, Year 5: price tags like $3.45, total or change from the next note up, "$ __ . __"; Rounding, Year 5: $48.65 to the nearest dollar)
 
 ### Algebra
 - Fill in <, > or = between two calculations (2,456 × 2 __ 1,228 × 4). ✓ (More or less, Year 5, Kind Sums: halve one and double the other, give and take)

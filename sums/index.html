@@ -764,7 +764,8 @@ function fracSvg(q) {
   return o + range(0, W).map(w => lab(10 + 100 * w / W, w)).join('') + '</svg>';
 }
 // a small bar cut into d with the first n shaded, w em wide (over each fraction in a sum)
-const fracMini = (n, d, w) => `<svg viewBox="-1 -1 62 16" style="width:${w}em;height:${(w * 16 / 62).toFixed(2)}em" stroke="currentColor">${range(0, d - 1).map(i => `<rect x="${i * 60 / d}" y="0" width="${60 / d}" height="14" fill="${i < n ? SHADE : 'white'}" stroke-width=".7"/>`).join('')}<rect x="0" y="0" width="60" height="14" fill="none" stroke-width="1.1"/></svg>`;
+// a small bar for n/d. With sub (Add different): cut into sub thin parts, the d parts marked by thicker lines
+const fracMini = (n, d, w, sub = d) => `<svg viewBox="-1 -1 62 16" style="width:${w}em;height:${(w * 16 / 62).toFixed(2)}em" stroke="currentColor">${range(0, sub - 1).map(i => `<rect x="${i * 60 / sub}" y="0" width="${60 / sub}" height="14" fill="${i < n * sub / d ? SHADE : 'white'}" stroke-width="${sub === d ? .7 : .4}"/>`).join('')}${sub === d ? '' : range(1, d - 1).map(i => `<line x1="${i * 60 / d}" y1="0" x2="${i * 60 / d}" y2="14" stroke-width="1.1"/>`).join('')}<rect x="0" y="0" width="60" height="14" fill="none" stroke-width="1.1"/></svg>`;
 const frHtml = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></span>`;
 // Fractions: one question of the chosen kinds. Shapes and Number line are less
 // than one; Past 1 is between one and two ("write it as one fraction": 9/8);
@@ -772,6 +773,7 @@ const frHtml = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></s
 // one whole), or one take away another.
 function fracQ(c) {
   const d = pickOne(c.parts), kind = pickOne(c.kinds);
+  if (kind === 'diff') return fracDiffQ(c.parts);
   if (kind === 'add') {
     for (let t = 0; t < 100; t++) {
       let terms, op = '+', n;
@@ -793,6 +795,25 @@ function fracQ(c) {
   const q = { kind: 'frac', shape, n, d, shaded, ans: `${n}/${d}` };
   if (past) Object.assign(q, { wholes: 2, cap: 'Write it as one fraction' });
   return q;
+}
+// Add different (Year 5 idea): one bottom number a multiple of the other
+// (2/3 + 1/9). Both pictures are cut into the bigger bottom number's parts, the
+// smaller one's parts marked by thicker lines. Totals may pass one whole; never
+// a whole number. About a third take away. Equal fractions count, as always.
+const DIFF_PAIRS = [[2, 4], [2, 6], [2, 8], [2, 10], [2, 12], [3, 6], [3, 9], [3, 12], [4, 8], [4, 12], [5, 10], [6, 12]];
+function fracDiffQ(parts) {
+  const ok = DIFF_PAIRS.filter(([a, b]) => parts.includes(a) && parts.includes(b)), pairs = ok.length ? ok : DIFF_PAIRS;
+  for (let t = 0; t < 100; t++) {
+    const [d, D] = pickOne(pairs), a = rnd(1, d - 1), b = rnd(1, D - 1);
+    let terms = [a, b], ds = [d, D];
+    const minus = Math.random() < 0.45; // some take-aways come out below 0 and are skipped: about a third are left
+    if (Math.random() < 0.4) { terms = [b, a]; ds = [D, d]; } // the bigger bottom number first, sometimes
+    const [x, y] = terms.map((v, i) => v * D / ds[i]), n = minus ? x - y : x + y;
+    if (n <= 0 || n % D === 0) continue;
+    const op = minus ? '−' : '+';
+    return { kind: 'frac', form: 'add', diff: true, terms, ds, op, n, d: D, ans: `${n}/${D}`, say: terms.map((v, i) => `${v} over ${ds[i]}`).join(minus ? ' take away ' : ' plus ') };
+  }
+  return { kind: 'frac', form: 'add', diff: true, terms: [2, 1], ds: [3, 9], op: '+', n: 7, d: 9, ans: '7/9', say: '2 over 3 plus 1 over 9' };
 }
 // array: r rows × c columns of dots, 10 units a dot
 const arraySvg = (r, c) => {
@@ -914,9 +935,9 @@ function moneySvg(items) {
 // change: a price tag ("costs") and the note she pays with ("you pay")
 function changeSvg(q) {
   const TAG = `<path d="M7 0H36V22H7L0 11Z" fill="white" stroke-width="1.2" stroke-linejoin="round"/><circle cx="6" cy="11" r="1.8" stroke-width=".8"/>`;
-  if (q.tags) { // two or three different things: a row of price tags, and under it the note she pays with
-    const n = q.tags.length, W = n * 36 + (n - 1) * 5, H = q.pay ? 45 : 22;
-    let s = q.tags.map((d, i) => `<g transform="translate(${i * 41} 0)">${TAG}${mtext(21.5, 11, '$' + d, 9.5)}</g>`).join('');
+  if (q.tags || q.ctags) { // two or three different things: a row of price tags, and under it the note she pays with
+    const tags = q.ctags ? q.ctags.map(c => '$' + hund(c)) : q.tags.map(d => '$' + d), n = tags.length, W = n * 36 + (n - 1) * 5, H = q.pay ? 45 : 22;
+    let s = tags.map((t, i) => `<g transform="translate(${i * 41} 0)">${TAG}${mtext(21.5, 11, t, t.length > 5 ? 7.6 : t.length > 4 ? 8.6 : 9.5)}</g>`).join('');
     if (q.pay) s += moneyItem(q.pay, W / 2 - 30, 36.5) + mtext(W / 2 + 16, 36.5, 'you pay', 6);
     return `<svg viewBox="-1 -1 ${W + 2} ${H + 2}" style="width:${((W + 2) * MONEY_EM).toFixed(3)}em;height:${((H + 2) * MONEY_EM).toFixed(3)}em" fill="none" stroke="currentColor">${s}</svg>`;
   }
@@ -933,6 +954,7 @@ const byValue = a => [...a].sort((x, y) => y - x);
 // one "How much?" question for a year: { items, unit } where unit is
 // '$' (whole dollars), 'c' (cents) or '$c' (dollars and cents, two blanks)
 function moneyCount(yr) {
+  if (yr === 5) return { ...moneyCount(4), unit: '$.' }; // Year 4's coins and notes, written "$ __ . __"
   for (let t = 0; t < 60; t++) {
     if (yr === 1) { // whole dollars up to $10
       const items = Array.from({ length: rnd(1, 3) }, () => pickOne([100, 200, 500, 1000]));
@@ -981,6 +1003,13 @@ function moneyChange(yr) {
     const tags = distinctPick(rnd(2, 3), 2, 15), price = sumOf(tags) * 100;
     return Math.random() < 0.4 ? { tags, price, total: true, unit: '$' } : { tags, price, pay: note(price), unit: '$' };
   }
+  if (yr === 5) { // prices with a point ($3.45): two or three things, the total or the change from the next note up ($10, $20, $50)
+    for (let t = 0; t < 100; t++) {
+      const ctags = Array.from({ length: rnd(2, 3) }, () => rnd(1, 19) * 100 + rnd(1, 99)), price = sumOf(ctags);
+      if (price % 100 === 0 || price >= 5000 || new Set(ctags).size < ctags.length) continue;
+      return Math.random() < 0.4 ? { ctags, price, total: true, unit: '$.' } : { ctags, price, pay: [1000, 2000, 5000].find(n => n > price), unit: '$.' };
+    }
+  }
   const pay = pickOne([500, 1000, 2000]);
   return { pay, price: rnd(1, pay / 100 - 1) * 100 + rnd(1, 9) * 10, unit: '$c' };
 }
@@ -1002,6 +1031,7 @@ function makeItQ() {
 }
 function moneyQ(q, total) {
   if (q.unit === '$c') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, parts: [d, c], ans: `$${d} and ${c}c` }; }
+  if (q.unit === '$.') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, dp: 2, parts: [d, c], ans: `$${d}.${String(c).padStart(2, '0')}` }; }
   return { ...q, kind: 'money', ans: q.unit === '$' ? total / 100 : total };
 }
 // ---- year-set sums: horizontal "7 + 5 = ___" in Years 1–2, stacked from
@@ -1944,6 +1974,7 @@ const DEC_KINDS = ['pic', 'line', 'addsub', 'ten'];
 const decTwo = (v, q) => ({ kind: 'dec', two: true, dp: 1, parts: [Math.floor(v / 10), v % 10], v, ans: tenths(v), ...q });
 function decQ(yr, kinds) {
   const kind = pickOne(kinds);
+  if (yr === 5) return dec5Q(kind);
   if (kind === 'pic') {
     if (Math.random() < 0.25) { // the fraction link: 3/10 = 0.3, 1/2 = 0.5
       const [n, d] = Math.random() < 0.3 ? [1, 2] : [rnd(1, 9), 10];
@@ -1967,6 +1998,83 @@ function decQ(yr, kinds) {
   let k = rnd(1, 99); while (k % 10 === 0) k = rnd(1, 99);
   if (Math.random() < 0.5) return decTwo(k, { form: 'expr', text: `${k} ÷ 10`, say: `${k} divided by 10` });
   return { kind: 'expr', text: `${tenths(k)} × 10`, say: `${tenths(k)} times 10`, ans: k };
+}
+// Decimals, Year 5: hundredths. Values kept in hundredths (147 = 1.47); every
+// decimal answer is two blanks with q.dp = 2 (0.05 is 05 after the point; 0.3
+// may be written 3 or 30). Picture: a hundred square (one full square per one);
+// the fraction link 1/4, 3/4, 1/2, 37/100. Number line: one tenth cut into
+// hundredths, both ends labelled (a 0-to-1 line in hundredths is too crowded to
+// read on a card). Add and take away to two places, sometimes a tenth with a
+// hundredth (0.4 + 0.25). × and ÷ by 10 and 100.
+const dstr = v => (v / 100).toFixed(2).replace(/\.?0+$/, ''); // 30 → "0.3", 5 → "0.05", 100 → "1"
+const hTwo = (v, q) => ({ kind: 'dec', yr: 5, two: true, dp: 2, parts: [Math.floor(v / 100), v % 100], v, ans: dstr(v), ...q });
+function dec5Q(kind) {
+  if (kind === 'pic') {
+    if (Math.random() < 0.25) { // the fraction link
+      const [n, d] = pickOne([[1, 4], [3, 4], [1, 2], [1, 4], [3, 4], [rnd(1, 9) * 10 + rnd(1, 9) - 10 * (Math.random() < 0.2), 100]]); // n/100: 1 to 99, never a whole tenth
+      return hTwo(n * 100 / d, { form: 'frac', n, d, say: `${n} over ${d}. Write it as a decimal.` });
+    }
+    let v = rnd(1, 99); if (v % 10 === 0 && Math.random() < 0.6) v += rnd(1, 9);
+    return hTwo((Math.random() < 0.25 ? 100 : 0) + v, { form: 'grid' });
+  }
+  if (kind === 'line') { // between t/10 and (t+1)/10, never on an end
+    const t = rnd(0, 19), v = t * 10 + rnd(1, 9);
+    return hTwo(v, { form: 'hline', lo: t * 10 });
+  }
+  if (kind === 'addsub') {
+    for (let t = 0; t < 300; t++) {
+      const op = pickOne(['+', '−']), mix = Math.random() < 0.35; // a tenth with a hundredth: 0.4 + 0.25
+      let a = rnd(11, 899), b = mix ? rnd(1, 9) * 10 : rnd(11, Math.random() < 0.5 ? 99 : 499);
+      if (a % 10 === 0 || (!mix && b % 10 === 0)) continue;
+      if (Math.random() < 0.5) [a, b] = [b, a];
+      if (op === '−' && b >= a) [a, b] = [b, a];
+      const r = op === '+' ? a + b : a - b;
+      if (r <= 0 || r % 100 === 0) continue;
+      const text = `${dstr(a)} ${op} ${dstr(b)}`;
+      return hTwo(r, { form: 'expr', text, say: signWords(text) });
+    }
+    return hTwo(65, { form: 'expr', text: '0.4 + 0.25', say: '0.4 plus 0.25' });
+  }
+  // × and ÷ by 10 and 100: 23 ÷ 10 = 2.3, 7 ÷ 100 = 0.07, 0.47 × 10 = 4.7, 0.4 × 100 = 40 (one blank)
+  for (let t = 0; t < 100; t++) {
+    const by = pickOne([10, 100]);
+    if (Math.random() < 0.5) {
+      const N = rnd(1, 999), v = N * 100 / by;
+      if (N % 10 === 0) continue;
+      return hTwo(v, { form: 'expr', text: `${N} ÷ ${by}`, say: `${N} divided by ${by}` });
+    }
+    const v = rnd(1, 999); // the number shown, in hundredths
+    if (v % 100 === 0 || v * by / 100 > 9999) continue;
+    const r = v * by; // the answer, in hundredths
+    const text = `${dstr(v)} × ${by}`, say = `${dstr(v)} times ${by}`;
+    if (r % 100 === 0) return { kind: 'expr', text, say, ans: r / 100 };
+    return hTwo(r, { form: 'expr', text, say });
+  }
+  return hTwo(23 * 10, { form: 'expr', text: '23 ÷ 10', say: '23 divided by 10' });
+}
+// a hundred square for each whole one, then one with v % 100 shaded, a column of ten at a time
+function decGridSvg(v) {
+  const full = Math.floor(v / 100), part = v % 100, nb = full + (part ? 1 : 0), u = 3.2, S = 10 * u, gap = 4;
+  let s = '';
+  for (let b = 0; b < nb; b++) {
+    const x0 = b * (S + gap) + (nb === 1 ? (S + gap) / 2 : 0), k = b < full ? 100 : part; // one square sits in the middle
+    for (let i = 0; i < 100; i++) { const c = Math.floor(i / 10), r = i % 10; s += `<rect x="${x0 + c * u}" y="${r * u}" width="${u}" height="${u}" fill="${i < k ? SHADE : 'white'}" stroke-width=".3"/>`; }
+    s += `<rect x="${x0}" y="0" width="${S}" height="${S}" fill="none" stroke-width="1"/>`;
+  }
+  const W = 2 * S + gap; // always the room of two squares, so every card prints the same size
+  return `<svg viewBox="-1 -1 ${W + 2} ${S + 2}" style="width:${((W + 2) / 9).toFixed(2)}em;height:${((S + 2) / 9).toFixed(2)}em" stroke="currentColor">${s}</svg>`;
+}
+// one tenth cut into hundredths: both ends labelled, the middle a bit longer, an arrow at the number
+function decHLineSvg(q) {
+  let s = `<svg viewBox="-4 0 128 40" fill="none" stroke="currentColor" style="width:10.67em;height:3.33em"><line x1="10" y1="22" x2="110" y2="22" stroke-width="1.2"/>`;
+  for (let i = 0; i <= 10; i++) {
+    const x = 10 + i * 10, e = i === 0 || i === 10, h = i === 5;
+    s += `<line x1="${x}" y1="${e ? 15 : h ? 17 : 18.5}" x2="${x}" y2="${e ? 29 : h ? 27 : 25.5}" stroke-width="${e ? 1.2 : .8}"/>`;
+  }
+  const ax = 10 + (q.v - q.lo) * 10;
+  s += `<path d="M${ax} 2v12" stroke-width="1.4"/><path d="M${ax - 3.2} 10.5 L${ax} 15.5 L${ax + 3.2} 10.5z" fill="currentColor" stroke="none"/>`;
+  const lab = (x, t) => `<text x="${x}" y="38" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${t}</text>`;
+  return s + lab(10, (q.lo / 100).toFixed(1)) + lab(110, ((q.lo + 10) / 100).toFixed(1)) + '</svg>';
 }
 // bars cut into ten: full bars for the ones, then one bar with some tenths shaded.
 // Always drawn in the room of three bars, so every card prints the same size.
@@ -1998,21 +2106,46 @@ function decLineSvg(v) {
 // is "?" (1/4 of the set is 7). Unit fractions, 2 to 10; tables to 10, or round
 // numbers (1/3 of 300) with the whole at most 1,000.
 const DEN_WORD = { 2: 'half', 3: 'third', 4: 'quarter', 5: 'fifth', 6: 'sixth', 7: 'seventh', 8: 'eighth', 9: 'ninth', 10: 'tenth' };
+// round numbers keep to two digits in the narrow boxes (6 parts and up)
+const fofK = d => Math.random() < 0.3 ? pickOne([...range(1, 9).map(x => x * 10), ...range(1, 9).map(x => x * 100)].filter(v => v * d <= 1000 && (d < 6 || v < 100))) : rnd(2, 10);
+// Year 5: non-unit fractions (2/3 of 24: a second brace under the first two
+// boxes holds the "?"), the whole from a part (2/5 of a set is 8), and Percent
+// (10%, 25%, 50% of a number, or the whole from 25% or 50%) on the same bar.
+const FOF_KINDS = ['part', 'whole', 'pct'];
 function fofQ(yr, kinds) {
-  const part = pickOne(kinds) === 'part', d = rnd(2, 10);
-  // round numbers keep to two digits in the narrow boxes (6 parts and up)
-  const k = Math.random() < 0.3 ? pickOne([...range(1, 9).map(x => x * 10), ...range(1, 9).map(x => x * 100)].filter(v => v * d <= 1000 && (d < 6 || v < 100))) : rnd(2, 10);
+  const ks = kinds.filter(k => yr === 5 || k !== 'pct'), kind = pickOne(ks.length ? ks : ['part', 'whole']);
+  if (kind === 'pct') {
+    const p = pickOne([10, 25, 50]), d = 100 / p, part = p === 10 || Math.random() < 0.5, k = fofK(d), whole = k * d;
+    return part
+      ? { kind: 'fof', pct: p, part, n: 1, d, whole, k, ans: k, say: `What is ${p} percent of ${whole}?` }
+      : { kind: 'fof', pct: p, part, n: 1, d, whole, k, ans: whole, say: `${p} percent of a set is ${k}. How many in the set?` };
+  }
+  const part = kind === 'part';
+  if (yr === 5) {
+    const gcd = (x, y) => y ? gcd(y, x % y) : x;
+    let d, n; do { d = rnd(3, 10); n = rnd(2, d - 1); } while (gcd(n, d) > 1); // in lowest terms: 2/3, never 4/6
+    const k = fofK(d), whole = k * d, a = `${n} ${DEN_WORD[d]}s`;
+    return part
+      ? { kind: 'fof', part, n, d, whole, k, ans: n * k, say: `What is ${a} of ${whole}?` }
+      : { kind: 'fof', part, n, d, whole, k, ans: whole, say: `${a} of a set is ${n * k}. How many in the set?` };
+  }
+  const d = rnd(2, 10), k = fofK(d);
   const whole = k * d, a = `${d === 8 ? 'an' : 'a'} ${DEN_WORD[d]}`;
   return part
     ? { kind: 'fof', part, d, whole, k, ans: k, say: `What is ${a} of ${whole}?` }
     : { kind: 'fof', part, d, whole, k, ans: whole, say: `${a[0].toUpperCase() + a.slice(1)} of a set is ${k}. How many in the set?` };
 }
 function fofSvg(q) {
-  const W = 90, bw = W / q.d, y0 = 16, h = 12, m = W / 2, t = (x, y, v, fs) => `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${v}</text>`;
-  let s = `<svg viewBox="-2 -1 ${W + 4} ${y0 + h + 2}" style="width:${(W + 4) / 10}em;height:${(y0 + h + 2) / 10}em" fill="none" stroke="currentColor">`;
+  const n = q.n || 1, W = 90, bw = W / q.d, y0 = 16, h = 12, m = W / 2, t = (x, y, v, fs) => `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${v}</text>`;
+  const H = y0 + h + 2 + (n > 1 ? 15 : 0); // room for the brace under the first n boxes
+  let s = `<svg viewBox="-2 -1 ${W + 4} ${H}" style="width:${(W + 4) / 10}em;height:${H / 10}em" fill="none" stroke="currentColor">`;
   s += `<path d="M0 15Q0 12 3 12H${m - 3}Q${m} 12 ${m} 9Q${m} 12 ${m + 3} 12H${W - 3}Q${W} 12 ${W} 15" stroke-width="1" stroke-linejoin="round"/>` + t(m, 3.5, q.part ? q.whole : '?', 7.5);
   for (let i = 0; i < q.d; i++) s += `<rect x="${i * bw}" y="${y0}" width="${bw}" height="${h}" fill="white" stroke-width=".7"/>`;
   s += `<rect x="0" y="${y0}" width="${W}" height="${h}" stroke-width="1.1"/>`;
+  if (n > 1) { // a brace under the first n boxes: "?" or the part
+    const r = n * bw, c = r / 2, y = y0 + h + 1;
+    return s + `<path d="M0 ${y}Q0 ${y + 3} 3 ${y + 3}H${c - 3}Q${c} ${y + 3} ${c} ${y + 6}Q${c} ${y + 3} ${c + 3} ${y + 3}H${r - 3}Q${r} ${y + 3} ${r} ${y}" stroke-width="1" stroke-linejoin="round"/>` + t(c, y + 10.5, q.part ? '?' : n * q.k, 7.5) + '</svg>';
+  }
   const v = String(q.part ? '?' : q.k);
   return s + t(bw / 2, y0 + h / 2, v, Math.min(7.5, bw * 0.85 / (v.length * 0.6))) + '</svg>';
 }
@@ -2632,25 +2765,26 @@ const ACTS = {
     name: 'Fractions', ages: [8], setup: 'opts', say: 'What fraction is it?',
     pic: fracSvg({ shape: 'circle', n: 3, d: 4, shaded: [0, 1, 2] }),
     options: [
-      { key: 'kinds', label: 'Kind', multi: true, values: [['shapes', 'Shaded shapes'], ['line', 'Number line'], ['past', 'Past 1'], ['add', 'Add and take away']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['shapes', 'Shaded shapes'], ['line', 'Number line'], ['past', 'Past 1'], ['add', 'Add and take away'], ['diff', 'Add different (Year 5)']] },
       { key: 'parts', label: 'Parts', multi: true, values: [2, 3, 4, 5, 6, 8, 10, 12] },
     ],
     defaults: () => ({ kinds: ['shapes', 'line', 'past', 'add'], parts: [2, 3, 4, 6, 8], n: 12 }),
     make: fracQ,
-    key: c => `frac~${['shapes', 'line', 'past', 'add'].filter(k => c.kinds.includes(k)).join(',')}|${[...c.parts].sort((x, y) => x - y).join(',')}|${c.n}`,
-    label: k => { const [kinds, p, n] = k.split('|'); return `Fractions · ${kinds.split(',').map(x => ({ past: 'past 1', add: '+ −' })[x] || x).join(', ')} · ${p.split(',').join(', ')} parts · ${n} questions`; },
+    key: c => `frac~${['shapes', 'line', 'past', 'add', 'diff'].filter(k => c.kinds.includes(k)).join(',')}|${[...c.parts].sort((x, y) => x - y).join(',')}|${c.n}`,
+    label: k => { const [kinds, p, n] = k.split('|'); return `Fractions · ${kinds.split(',').map(x => ({ past: 'past 1', add: '+ −', diff: 'add different' })[x] || x).join(', ')} · ${p.split(',').join(', ')} parts · ${n} questions`; },
   },
   fof: {
     name: 'Fractions of a number', ages: [8], setup: 'opts', say: 'Work out the missing number.',
     pic: fofSvg({ d: 4, part: true, whole: 28, k: 7 }),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · unit fractions']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['part', 'Find the part'], ['whole', 'Find the whole']] },
+      { key: 'yr', label: 'Year', values: [[4, '4 · unit fractions'], [5, '5 · 2/3 of 24, percent']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['part', 'Find the part'], ['whole', 'Find the whole'], ['pct', 'Percent (Year 5)']] },
     ],
-    defaults: () => ({ yr: 4, kinds: ['part', 'whole'], n: 12 }),
+    defaults: () => ({ yr: 4, kinds: ['part', 'whole', 'pct'], n: 12 }),
     make: c => fofQ(c.yr, c.kinds),
-    key: c => `fof~${c.yr}|${['part', 'whole'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Fractions of a number · Year ${y} · ${kinds.split(',').join(', ')} · ${n} questions`; },
+    // Percent is Year 5 only, so Year 4 leaves it out of the record key
+    key: c => `fof~${c.yr}|${FOF_KINDS.filter(k => c.kinds.includes(k) && (k !== 'pct' || c.yr === 5)).join(',') || 'part,whole'}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Fractions of a number · Year ${y} · ${kinds.replace('pct', 'percent').split(',').join(', ')} · ${n} questions`; },
   },
   // Clocks and Money go up through the years (NZ curriculum, sums/CURRICULUM.md)
   splat: { // a blot hides some of the dots: total on top, how many are hiding?
@@ -2689,7 +2823,7 @@ const ACTS = {
     name: 'Money', ages: [5, 8], setup: 'opts', say: 'How much money?',
     pic: moneySvg([200, 100, 50, 20]),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · dollars to $10'], [2, '2 · coins or notes'], [3, '3 · dollars and cents'], [4, '4 · bigger amounts, buying several']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · dollars to $10'], [2, '2 · coins or notes'], [3, '3 · dollars and cents'], [4, '4 · bigger amounts, buying several'], [5, '5 · $3.45, with a point']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['coin', 'Which coin? (Year 1)'], ['make', 'Make it (Year 4)']] },
     ],
     defaults: age => age === 5 ? { yr: 1, kinds: ['count', 'coin'], n: 6 } : { yr: 3, kinds: ['count', 'change', 'make'], n: 12 },
@@ -2850,13 +2984,13 @@ const ACTS = {
     name: 'Decimals', ages: [8], setup: 'opts', say: 'Write the decimal.',
     pic: decBarsSvg(13),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · tenths']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['pic', 'Picture'], ['line', 'Number line'], ['addsub', 'Add and take away'], ['ten', '× and ÷ by 10']] },
+      { key: 'yr', label: 'Year', values: [[4, '4 · tenths'], [5, '5 · hundredths']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['pic', 'Picture'], ['line', 'Number line'], ['addsub', 'Add and take away'], ['ten', '× and ÷ by 10 (100 in Year 5)']] },
     ],
     defaults: () => ({ yr: 4, kinds: ['pic', 'line', 'addsub', 'ten'], n: 12 }),
     make: c => decQ(c.yr, c.kinds),
     key: c => `dec~${c.yr}|${DEC_KINDS.filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Decimals · Year ${y} · ${kinds.split(',').map(x => ({ pic: 'picture', line: 'number line', addsub: '+ −', ten: '× ÷ 10' })[x]).join(', ')} · ${n} questions`; },
+    label: k => { const [y, kinds, n] = k.split('|'); return `Decimals · Year ${y} · ${kinds.split(',').map(x => ({ pic: 'picture', line: 'number line', addsub: '+ −', ten: y === '5' ? '× ÷ 10, 100' : '× ÷ 10' })[x]).join(', ')} · ${n} questions`; },
   },
   units: {
     name: 'Change units', ages: [8], setup: 'opts', say: 'Change it to the other unit.',
@@ -3371,7 +3505,8 @@ function qMarkup(q) {
   if (q.kind === 'frac') {
     if (q.form === 'add') { // each fraction with its picture over it, signs between, then the answer bar
       const k = q.terms.length, w = k === 3 ? 2.4 : 3.2;
-      const row = q.terms.map(x => `<span class="ft">${fracMini(x, q.d, w)}${frHtml(x, q.d)}</span>`).join(`<span class="op">${q.op}</span>`) + '<span class="op">=</span>';
+      const ds = q.ds || q.terms.map(() => q.d); // Add different: each its own bottom number, pictures cut to the bigger
+      const row = q.terms.map((x, i) => `<span class="ft">${fracMini(x, ds[i], w, q.d)}${frHtml(x, ds[i])}</span>`).join(`<span class="op">${q.op}</span>`) + '<span class="op">=</span>';
       return { cls: 'frac', html: `<div class="fsum">${row}</div><div class="fbar"></div>`, vars: { '--h': w * 16 / 62 + 1.95 + 0.5 + 1.9 + 2.3, '--c': k * w + (k + 0.3) * 0.95 + 1.4 } };
     }
     // the picture, then a short printed bar: top number above it, bottom number below
@@ -3380,8 +3515,9 @@ function qMarkup(q) {
     return { cls: 'frac', html: `${cap}${svg}<div class="fbar"></div>`, vars: { '--h': hEm + (cap ? 1.15 : 0) + 0.5 + 1.9 + 2.3, '--c': Math.max(wEm, q.cap ? q.cap.length * 0.42 : 0, 4) + 1.4 } };
   }
   if (q.kind === 'fof') { // what to find, then the bar model; answer anywhere below
-    const cap = q.part ? `${frHtml(1, q.d)} of ${q.whole}` : `${frHtml(1, q.d)} of the set is ${q.k}`;
-    return { cls: 'frame', html: `<div class="cap">${cap}</div>${fofSvg(q)}`, vars: { '--h': 1.75 + 0.35 + 3 + 3.2, '--c': 9.4 + 1.4 } };
+    const n = q.n || 1, f = q.pct ? `${q.pct}%` : frHtml(n, q.d), svg = fofSvg(q), ph = +svg.match(/height:([\d.]+)em/)[1];
+    const cap = q.part ? `${f} of ${q.whole}` : `${f} of the set is ${n * q.k}`;
+    return { cls: 'frame', html: `<div class="cap">${cap}</div>${svg}`, vars: { '--h': 1.75 + 0.35 + ph + 3.2, '--c': 9.4 + 1.4 } };
   }
   // clocks and money: a picture (or the time in words), then the blank(s) to
   // write on: "__ o'clock", "__ : __", "$ __", "__ c" or "$ __ and __ c"
@@ -3389,7 +3525,7 @@ function qMarkup(q) {
     let pic, cap = '', capW = 0;
     if (q.kind === 'clock') pic = q.words ? `<div class="words">${q.words}</div>` : clockSvg(q);
     else if (q.change) {
-      const txt = q.qty ? `Buy ${q.qty}. Change?` : q.total ? 'How much altogether?' : q.tags ? 'Buy them all. Change?' : 'Change?';
+      const txt = q.qty ? `Buy ${q.qty}. Change?` : q.total ? 'How much altogether?' : q.tags || q.ctags ? 'Buy them all. Change?' : 'Change?';
       cap = `<div class="cap">${txt}</div>`; capW = txt.length * 0.42; pic = changeSvg(q);
     }
     else pic = moneySvg(q.items);
@@ -3400,14 +3536,15 @@ function qMarkup(q) {
     const [row, rw] = q.kind === 'clock'
       ? (q.two ? [ln + '<span class="sep">:</span>' + ln, 4.6] : [ln + u("o'clock"), 5.2])
       : q.unit === '$c' ? [u('$') + ln + '<span class="sep">and</span>' + ln + u('c'), 7.4]
+      : q.unit === '$.' ? [u('$') + ln + '<span class="sep pt">.</span>' + ln, 5.6]
       : q.unit === '$' ? [u('$') + ln, 2.8] : [ln + u('c'), 2.8];
     return { cls: 'pic2', html: `${cap}${pic}<div class="ans">${row}</div>`, anchor: q.two ? '.sep' : '.ln', vars: { '--h': ph + (cap ? 1.1 : 0) + 3.3, '--c': Math.max(pw, rw, capW) + 1.2 } };
   }
   // decimals: bars, a number line, a fraction or a sum, then "__ . __" round a printed point
   if (q.kind === 'dec') {
     let top, pw, ph = 3.2;
-    if (q.form === 'bars' || q.form === 'line') {
-      top = q.form === 'bars' ? decBarsSvg(q.v) : decLineSvg(q.v);
+    if (q.form === 'bars' || q.form === 'line' || q.form === 'grid' || q.form === 'hline') {
+      top = { bars: decBarsSvg, line: decLineSvg, grid: decGridSvg }[q.form]?.(q.v) || decHLineSvg(q);
       [, pw, ph] = top.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
     } else if (q.form === 'seq') { // a decimal pattern (Year 5): the hidden term is a box, then "☐ = __ . __"
       const txt = q.terms.join(', ');
@@ -3415,7 +3552,7 @@ function qMarkup(q) {
       pw = txt.length * 0.56;
     } else {
       top = `<div class="words">${q.form === 'frac' ? `<span class="fr"><span>${q.n}</span><span>${q.d}</span></span>` : q.text}</div>`;
-      pw = q.form === 'frac' ? 2 : q.text.length * 0.56;
+      pw = q.form === 'frac' ? (q.d === 100 ? 2.4 : 2) : q.text.length * 0.56;
     }
     const eq = q.form === 'frac' || q.form === 'expr' || q.form === 'seq', ln = '<span class="ln"></span>';
     return {
@@ -3557,7 +3694,7 @@ function cardSay(q) {
   if (q.kind === 'clock') return q.words ? `${q.words}. Write the time.` : "What time is it?";
   if (q.kind === 'money') return !q.change ? 'How much money?'
     : q.qty ? `You buy ${q.qty}, at ${moneyWords(q.each * 100)} each. You pay ${moneyWords(q.pay)}. How much change?`
-    : q.tags ? `You buy things that cost ${q.tags.map(d => moneyWords(d * 100)).join(', ')}. ${q.total ? 'How much altogether?' : `You pay ${moneyWords(q.pay)}. How much change?`}`
+    : q.tags || q.ctags ? `You buy things that cost ${(q.ctags || q.tags.map(d => d * 100)).map(moneyWords).join(', ')}. ${q.total ? 'How much altogether?' : `You pay ${moneyWords(q.pay)}. How much change?`}`
     : `It costs ${moneyWords(q.price)}. You pay ${moneyWords(q.pay)}. How much change?`;
   return ACTS[act].say;
 }
@@ -3911,16 +4048,17 @@ function twoParts(c) {
   const cl = digitClusters(items), money = c.q.kind === 'money';
   let left = cl.filter(g => g.cx < 0), right = cl.filter(g => g.cx >= 0);
   // a remainder of 0 can be left out: everything left of the "r" is the answer
-  if ((!left.length || !right.length) && cl.length >= 2 && !(c.q.rem && !right.length)) {
+  // and ".47" (nothing before the point, no more digits after it than places) stays as written
+  if ((!left.length || !right.length) && cl.length >= 2 && !(c.q.rem && !right.length) && !(c.q.dp && !left.length && right.length <= c.q.dp)) {
     const dx = dots.length ? dots.reduce((a, d) => a + d.cx, 0) / dots.length : null;
     if (dx !== null && cl.some(g => g.cx < dx) && cl.some(g => g.cx > dx)) { left = cl.filter(g => g.cx < dx); right = cl.filter(g => g.cx > dx); }
     else {
-      const all = money ? dropMoneySigns(cl, true, true) : cl;
+      const all = money ? dropMoneySigns(cl, true, !c.q.dp) : cl;
       const k = c.q.dp ? Math.max(1, all.length - c.q.dp) : all.length >= 3 ? all.length - 2 : 1; // decimals: the last digit(s) are after the point
       left = all.slice(0, k); right = all.slice(k);
     }
   }
-  if (money) { left = dropMoneySigns(left, true, false); right = dropMoneySigns(right, false, true); }
+  if (money) { left = dropMoneySigns(left, true, false); right = dropMoneySigns(right, false, !c.q.dp); } // "$ __ . __" has no "c" after it
   const flat = gs => gs.flatMap(g => g.s);
   return [flat(left), flat(right), dots.map(d => d.s)];
 }
@@ -3941,7 +4079,7 @@ function readAnswer(c) {
     if (c.q.dp) { // decimals: after the point, digits keep their places (1.05 is not 1.5) but trailing zeros don't matter (0.5 = 0.50); ".7" is 0.7
       const want = String(c.q.parts[1]).padStart(c.q.dp, '0').replace(/0+$/, '');
       const ok = b.text !== '' && b.text.replace(/0+$/, '') === want && (a.text === '' ? c.q.parts[0] === 0 : +a.text === c.q.parts[0]);
-      return { text: `${a.text}.${b.text || '?'}`, ok, backwards: bw };
+      return { text: `${c.q.kind === 'money' ? '$' : ''}${a.text}.${b.text || '?'}`, ok, backwards: bw };
     }
     // a remainder of 0 may be left empty
     const ok = a.text !== '' && (b.text !== '' ? +b.text === c.q.parts[1] : c.q.rem && c.q.parts[1] === 0) && +a.text === c.q.parts[0];
