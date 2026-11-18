@@ -116,7 +116,7 @@ const fakeSpeech = () => {
   await swipe(200, 500);
   ok(await page.evaluate(() => view === 2), 'swipe right: Year 2 page');
   const y2 = await tiles('#actTiles');
-  ok(y2.length === 22 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && y2.includes('Picture patterns') && y2.includes('Halves and quarters') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
+  ok(y2.length === 24 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && y2.includes('Picture patterns') && y2.includes('Halves and quarters') && y2.includes('Turns') && y2.includes('Map') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
   await swipe(500, 200); await swipe(500, 200); await swipe(500, 200); await swipe(500, 200);
   ok(await page.evaluate(() => view === 5 && $('#yNext').disabled), 'swipe left up to Year 5, and no further');
   await page.evaluate(() => turnPage(4 - view));
@@ -160,7 +160,7 @@ const fakeSpeech = () => {
   }).join(' '));
   ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:5:5:12 8:5:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
   await page.click('#yearTiles [data-year="2"]');
-  ok((await tiles('#actTiles')).length === 22 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
+  ok((await tiles('#actTiles')).length === 24 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
   await page.click('#actTiles [data-act="graph"]');
   ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Your year: Year 2'), 'Year 2: Graphs starts at Year 2 and says so');
   await page.click('#backBtn'); await page.click('#backBtn');
@@ -2794,6 +2794,69 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/44-map-y5.png' });
   ok(await page.evaluate(() => ACTS.map.key({ yr: 5, kinds: ['tap', 'where'], n: 6 }) === 'map~5|go|6' && labelFor('map~5|go|6') === 'Map · Year 5 · compass moves · 6 questions'), 'Map Year 5 record key and label');
 
+  // ---- Map, Year 2 (D2d): steps and turns from an arrow on a plain grid
+  const mw2 = await page.evaluate(() => {
+    const bad = [], ends = new Set(), turns = { right: 0, left: 0, half: 0 }, faces = new Set(), V = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+    for (let i = 0; i < 600; i++) {
+      const q = mapQ(2, ['tap', 'where']), [a, t, b] = q.moves;
+      let x = 'ABCDE'.indexOf(q.start[0]), y = +q.start[1], d = q.d0;
+      x += V[d][0] * a; y += V[d][1] * a;
+      if (x < 0 || x > 4 || y < 1 || y > 5) bad.push('off the map after the first leg ' + JSON.stringify([q.start, q.d0, q.moves]));
+      d = (d + { right: 1, left: 3, half: 2 }[t]) % 4; x += V[d][0] * b; y += V[d][1] * b;
+      turns[t]++; faces.add(q.d0); ends.add(q.ans);
+      const arrows = q.tiles.filter(u => u.html);
+      if (x < 0 || x > 4 || y < 1 || y > 5 || q.ans !== 'ABCDE'[x] + y || q.ans === q.start || q.tiles[q.right].label !== q.ans || q.tiles.length !== 25 || q.cells !== 5 || q.axes
+        || arrows.length !== 1 || arrows[0].label !== q.start || !arrows[0].html.includes(`rotate(${q.d0 * 90})`) || a < 1 || a > 4 || b < 1 || b > 4) bad.push(JSON.stringify([q.start, q.d0, q.moves, q.ans]));
+      if (!q.top.includes(`Forward ${a}, `) || !q.top.includes(`forward ${b}.`) || q.tiles.some(u => u.say !== 'this one')
+        || !/^Start at the arrow\. Go \d steps? forward, make a (quarter turn (right|left)|half turn), then go \d steps? forward\. Tap where you finish\.$/.test(q.say) || (a === 1) !== q.say.includes('Go 1 step forward')) bad.push('words ' + q.say);
+    }
+    if (ends.size < 22 || faces.size !== 4 || turns.half < 60 || turns.half > 190 || turns.right < 150 || turns.left < 150) bad.push('spread ' + ends.size + ' ' + JSON.stringify(turns));
+    return bad.slice(0, 4);
+  });
+  ok(mw2.length === 0, 'Map Year 2: forward, a quarter turn right or left (or a half turn), forward, on the map, never back at the start; the arrow sits in the start square facing the way she faces ' + mw2.join(' | '));
+  await page.evaluate(() => { hideDone(); act = 'map'; buildSheet({ yr: 2, kinds: ['tap', 'where'], n: 6 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.form === 'walk' && c.el.querySelectorAll('.tt').length === 25 && c.el.querySelectorAll('.tt svg').length === 1 && !c.el.querySelector('.ax'))), 'Map Year 2 sheet: a plain 5 × 5 grid, no letters or numbers, one arrow');
+  ok((await fits()).length === 0, 'Map Year 2 fits, squares big enough to tap ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/44-map-y2.png' });
+  ok(await page.evaluate(() => { const c = cards[0]; c.pick = [(c.q.right + 1) % 25]; paintTap(c); const w = !readAnswer(c).ok; c.pick = [c.q.right]; paintTap(c); return w && readAnswer(c).ok; }), 'Map Year 2: another square is wrong, the right one right');
+  ok((await writeAllAndMark()).length === 0, 'Map Year 2: tapped right is marked right');
+  ok(await page.evaluate(() => cardSay(cards[0].q) === cards[0].q.say), 'Map Year 2 read aloud: the steps, not every square');
+  ok(await page.evaluate(() => ACTS.map.key({ yr: 2, kinds: ['tap', 'where'], n: 4 }) === 'map~2|walk|4' && labelFor('map~2|walk|4') === 'Map · Year 2 · steps and turns · 4 questions' && ACTS.map.defaults(5).yr === 2 && ACTS.map.defaults(8).yr === 4), 'Map Year 2 record key and label; the younger default is Year 2');
+
+  // ---- Turns (Year 2, D2d): which turn was it, or where does the arrow point now
+  const trq = await page.evaluate(() => {
+    const bad = [], seen = new Set(), D =[[0, -1], [1, 0], [0, 1], [-1, 0]]; // up right down left on screen
+    for (let i = 0; i < 800; i++) {
+      const q = turnsQ(), k = TURN_AMTS.findIndex(t => t[1] === q.f), way = q.acw ? 'anticlockwise' : 'clockwise';
+      // where it ends: each quarter is one step round, clockwise on, anticlockwise back
+      const e = ((q.s + (q.acw ? -1 : 1) * (k + 1)) % 4 + 4) % 4;
+      seen.add(q.form + k + q.acw);
+      if (q.kind !== 'tap' || k < 0 || q.e !== e || q.tiles.length !== 4 || new Set(q.tiles.map(t => t.label)).size !== 4 || q.tiles[q.right].label !== q.ans) bad.push(JSON.stringify(q).slice(0, 160));
+      if (q.form === 'which') {
+        if (q.ans !== TURN_AMTS[k][0] || q.say !== `The arrow turned ${way}. Which turn was it?` || q.tiles.some(t => t.say !== t.label) || q.tiles.some(t => q.acw !== t.html.includes('scale(-1 1)'))) bad.push('which ' + q.ans);
+        const r = [...q.top.matchAll(/rotate\((\d+)\)/g)].map(m => +m[1] / 90); // the arrow before, then after
+        if (r.join() !== [q.s, q.e].join()) bad.push('arrows ' + r);
+      } else {
+        if (q.ans !== DIR_WORDS[e] || q.say !== `The arrow makes a ${TURN_AMTS[k][0]} ${way}. Where does it point now?` || q.tiles.map(t => t.label).join() !== 'up,right,down,left') bad.push('where ' + q.ans);
+        // the arc starts at the arrow and (short of a full turn) ends pointing the answer's way
+        const m = q.top.match(/A14 14 0 [01] 1 (\S+) (\S+)"/); let X = +m[1]; const Y = +m[2]; if (q.acw) X = -X;
+        const th = q.s * Math.PI / 2, ex = (X * Math.cos(th) - Y * Math.sin(th)) / 14, ey = (X * Math.sin(th) + Y * Math.cos(th)) / 14;
+        if (!q.top.includes(`rotate(${q.s * 90})`) || (q.f < 1 && Math.hypot(ex - D[e][0], ey - D[e][1]) > 0.01)) bad.push('spin ' + JSON.stringify([q.s, q.f, q.acw, ex, ey]));
+      }
+    }
+    if (seen.size !== 16) bad.push('only ' + seen.size + ' of 16 kinds of card');
+    return bad.slice(0, 4);
+  });
+  ok(tq.length === 0, 'Turns: quarter, half, three-quarter and full, either way; the arrows before and after, or the turn drawn from the arrow; the right tile is the turn or where it points ' + trq.join(' | '));
+  await page.evaluate(() => { hideDone(); act = 'turn'; buildSheet({ yr: 2, n: 6 }); show('sheet'); for (let i = 0; i < 6; i++) { let q; do q = turnsQ(); while (q.form !== (i % 2 ? 'where' : 'which')); cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); } });
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.tt').length === 4 && c.el.querySelectorAll('.tq svg').length === (c.q.form === 'which' ? 3 : 1))), 'Turns sheet: two arrows (which turn) or one arrow and its turn (where now), four tiles');
+  ok((await fits()).length === 0, 'Turns fits ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/45-turns.png' });
+  ok(await page.evaluate(() => { const c = cards[0]; c.pick = [(c.q.right + 1) % 4]; paintTap(c); return !readAnswer(c).ok; }), 'Turns: another tile is wrong');
+  ok((await writeAllAndMark()).length === 0, 'Turns: tapped right is marked right');
+  ok(await page.evaluate(() => /^The arrow turned (anti)?clockwise\. Which turn was it\? quarter turn, half turn, three-quarter turn, full turn\.$/.test(cardSay(cards[0].q)) && /^The arrow makes a [a-z -]+ turn (anti)?clockwise\. Where does it point now\? pointing up, pointing right, pointing down, pointing left\.$/.test(cardSay(cards[1].q))), 'Turns read aloud: the question, then each tile');
+  ok(await page.evaluate(() => ACTS.turn.key({ yr: 2, n: 6 }) === 'turn~2|6' && labelFor('turn~2|12') === 'Turns · Year 2 · 12 questions' && yearsOf('turn').join() === '2' && ACTS.turn.ages.join() === '5'), 'Turns record key and label; Year 2 only, younger tiles');
+
   // ---- Money, Make it (Year 4): drop coins and notes in a tray. A7
   const mkq = await page.evaluate(() => {
     const bad = [];
@@ -3221,7 +3284,8 @@ const fakeSpeech = () => {
       ['fof', { yr: 5, kinds: ['part', 'whole', 'pct'], n: 12 }], ['money', { yr: 5, kinds: ['count', 'change'], n: 12 }],
       ['angle', { yr: 5, kinds: ['name'], n: 12 }], ['angle', { yr: 5, kinds: ['measure'], n: 12 }], ['clock', { yr: 5, kinds: ['face', 'words'], n: 12 }], ['clock', { yr: 5, kinds: ['long'], n: 12 }], ['units', { yr: 5, n: 12 }],
       ['area', { kinds: ['lperim'], max: 12, n: 12 }], ['area', { kinds: ['same'], max: 12, n: 12 }], ['area', { kinds: ['layers'], max: 12, n: 12 }], ['map', { yr: 5, kinds: ['tap'], n: 6 }],
-      ['shape', { yr: 5, kinds: ['nets'], n: 12 }], ['shape', { yr: 5, kinds: ['flat'], n: 12 }], ['shape', { yr: 5, kinds: ['solid'], n: 12 }]]) {
+      ['shape', { yr: 5, kinds: ['nets'], n: 12 }], ['shape', { yr: 5, kinds: ['flat'], n: 12 }], ['shape', { yr: 5, kinds: ['solid'], n: 12 }],
+      ['turn', { yr: 2, n: 12 }], ['map', { yr: 2, kinds: ['tap'], n: 6 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

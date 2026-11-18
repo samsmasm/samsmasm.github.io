@@ -116,7 +116,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Compare and order several objects by those units.
 - Estimate and measure in cm, g and mL with a marked tool (ruler, scale, jug). ✓ (Rulers, Year 2: a cm ruler from 0, Scales: a round dial in grams, Jug: a measuring jug in mL, every mark numbered in 2s, 5s or 10s; reading only, not estimating; D2c)
 - Perimeter of a polygon in metric units. ✓ (Area: Perimeter)
-- Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
+- Full, half, quarter and three-quarter turns, clockwise and anticlockwise. ✓ (Turns, Year 2: which turn was it, from the arrow before and after; where does the arrow point after a turn; D2d)
 - Months and seasons in order; the month before and after; ordinals for months.
 - Describe how long familiar things take.
 - Tell the time to the hour, half hour and quarter hour on analogue and digital clocks, saying "past" and "o'clock" only ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ (Clocks, Year 2: faces, words, and Match to a digital clock; "quarter to" removed 2026-11-18, D1a).
@@ -124,7 +124,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Geometry
 - Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex. ✓ partly (Shapes, Year 2: sides, corners, faces, and Name taps all seven by name; not sorting)
 - Flip, slide and turn 2D shapes to make a pattern or a shape.
-- Give and follow directions with steps and half and quarter turns ✋ (could be a grid game).
+- Give and follow directions with steps and half and quarter turns ✋ (could be a grid game). ✓ partly (Map, Year 2: "Forward 3, turn right, forward 2" from an arrow on a plain grid, tap where you finish; following, not giving; D2d)
 - Read diagrams to say where things are relative to each other.
 
 ### Statistics

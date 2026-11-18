@@ -289,6 +289,8 @@
   .tap .cells .tt { padding: 0; border-radius: 0; border-width: 1.5px; margin: -.75px; }
   /* a grid with its labels (Map): only a short line of words above it, so the grid may take more of the card */
   .tap .tiles.cells.axes { --tw: max(30px, min(calc(72cqh / var(--rows)), calc(94cqw / var(--n)), 60px)); }
+  /* Map Year 2: no labels either, so the plain grid is as big as the labelled one */
+  .tap .tiles.cells.walk { --tw: max(30px, min(calc(70cqh / var(--rows)), calc(90cqw / var(--n)), 60px)); }
   .tap .cells .ax { font-size: calc(var(--tw) * .4); font-weight: 700; display: flex; align-items: center; justify-content: center; width: calc(var(--tw) * .5); height: var(--tw); }
   .tap .cells .ax:not(.ay) { height: calc(var(--tw) * .5); }
   /* Money, Make it: the tray she drops coins and notes into (two rows of room) */
@@ -2610,15 +2612,44 @@ const ANGLE_TILES = [
 ];
 const DEG_TILES = [90, 180, 360].map(d => ({ html: `<span style="font-size:.66em">${d}°</span>`, label: `${d}°`, say: `${d} degrees` }));
 // a turn drawn as an arrow round a dot: a quarter, a half, or all the way
-function turnSvg(f) {
+// (turnArc: just the arc and its arrowhead, clockwise from the top, radius 14)
+function turnArc(f) {
   // clockwise from the top: the point a degrees round is (r sin a, −r cos a)
   const r = 14, a = (f * 360 - (f === 1 ? 24 : 0)) * Math.PI / 180, end = [r * Math.sin(a), -r * Math.cos(a)];
   const big = f > 0.5 ? 1 : 0, T = [Math.cos(a), Math.sin(a)], N = [-Math.sin(a), Math.cos(a)], h = 6; // arrowhead along the way it turns
   const tip = end, b1 = [tip[0] - h * T[0] + 0.6 * h * N[0], tip[1] - h * T[1] + 0.6 * h * N[1]], b2 = [tip[0] - h * T[0] - 0.6 * h * N[0], tip[1] - h * T[1] - 0.6 * h * N[1]];
   const fx = v => v.toFixed(1);
-  return `<svg viewBox="-19 -19 38 38" style="width:3em;height:3em" ${ANGLE_INK}><circle cx="0" cy="0" r="2.2" fill="currentColor" stroke="none"/><path d="M0 0V-${r}" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M0 -${r}A${r} ${r} 0 ${big} 1 ${fx(end[0])} ${fx(end[1])}" stroke-width="2.6"/><path d="M${fx(b1[0])} ${fx(b1[1])}L${fx(tip[0])} ${fx(tip[1])}L${fx(b2[0])} ${fx(b2[1])}z" fill="currentColor" stroke-width="1"/></svg>`;
+  return `<path d="M0 -${r}A${r} ${r} 0 ${big} 1 ${fx(end[0])} ${fx(end[1])}" stroke-width="2.6"/><path d="M${fx(b1[0])} ${fx(b1[1])}L${fx(tip[0])} ${fx(tip[1])}L${fx(b2[0])} ${fx(b2[1])}z" fill="currentColor" stroke-width="1"/>`;
+}
+// acw: the same turn the other way (mirrored)
+function turnSvg(f, em = 3, acw = false) {
+  return `<svg viewBox="-19 -19 38 38" style="width:${em}em;height:${em}em" ${ANGLE_INK}><circle cx="0" cy="0" r="2.2" fill="currentColor" stroke="none"/><path d="M0 0V-14" stroke-width="1.5" stroke-dasharray="2 2"/><g${acw ? ' transform="scale(-1 1)"' : ''}>${turnArc(f)}</g></svg>`;
 }
 const TURNS = [['quarter turn', 0.25, 0], ['half turn', 0.5, 1], ['full turn', 1, 2], ['right angle', 0, 0]];
+// ---- Turns (Year 2, D2d): an arrow turns on the spot a quarter, half,
+// three-quarter or full turn, clockwise or anticlockwise. "Which turn was it?":
+// the arrow before and after, the four turns as tiles, each an arc going the way
+// it turned (so a quarter clockwise and a three-quarter clockwise look different).
+// "Where does it point now?": the arrow with its turn drawn from its tip, the four
+// ways an arrow can point as tiles. A quarter of each turn; tiles say their names.
+const TURN_AMTS = [['quarter turn', 0.25], ['half turn', 0.5], ['three-quarter turn', 0.75], ['full turn', 1]];
+const DIR_WORDS = ['up', 'right', 'down', 'left'];
+// an arrow through the middle, pointing d quarter turns clockwise from up; ring: a faint circle round it
+const ARROW = '<path d="M0 7V-4" stroke-width="2.8"/><path d="M-4.6 -2.6L0 -9L4.6 -2.6Z" fill="currentColor" stroke-width="1"/>';
+const arrowSvg = (d, em, ring) => `<svg viewBox="-12 -12 24 24" style="width:${em}em;height:${em}em" ${ANGLE_INK}>${ring ? '<circle r="11" stroke="#bbb" stroke-width="1"/>' : ''}<g transform="rotate(${d * 90})">${ARROW}</g></svg>`;
+// the arrow and its turn: the arc starts at the arrow's tip and goes round f of the way
+const spinBody = (d, f, acw) => `<g transform="rotate(${d * 90})"><g${acw ? ' transform="scale(-1 1)"' : ''}>${turnArc(f)}</g><path d="M0 5V-8" stroke-width="2.8"/><path d="M-4 -6L0 -11.5L4 -6Z" fill="currentColor" stroke-width="1"/></g>`;
+const spinSvg = (d, f, acw, em) => `<svg viewBox="-19 -19 38 38" style="width:${em}em;height:${em}em" ${ANGLE_INK}>${spinBody(d, f, acw)}</svg>`;
+const THEN = `<svg viewBox="0 0 16 10" style="width:.8em;height:.5em" ${ANGLE_INK}><path d="M1 5H14M10 1.5L14 5L10 8.5" stroke="#999" stroke-width="1.8"/></svg>`;
+function turnsQ() {
+  const k = rnd(0, 3), [w, f] = TURN_AMTS[k], acw = Math.random() < 0.5, s = rnd(0, 3), e = (s + (acw ? 3 : 1) * (k + 1)) % 4, way = acw ? 'anticlockwise' : 'clockwise';
+  if (Math.random() < 0.5) {
+    const tiles = TURN_AMTS.map(([w2, f2]) => ({ html: turnSvg(f2, 1.3, acw), label: w2, say: w2 }));
+    return { kind: 'tap', form: 'which', s, e, f, acw, top: arrowSvg(s, 2.4, 1) + THEN + arrowSvg(e, 2.4, 1), tc: 6.2, th: 2.4, topf: 0.5, tiles, right: k, say: `The arrow turned ${way}. Which turn was it?`, ans: w };
+  }
+  const tiles = DIR_WORDS.map((dw, d) => ({ html: arrowSvg(d, 1.3), label: dw, say: `pointing ${dw}` }));
+  return { kind: 'tap', form: 'where', s, e, f, acw, top: spinSvg(s, f, acw, 3.2), tc: 4, th: 3.2, topf: 0.5, tiles, right: e, say: `The arrow makes a ${w} ${way}. Where does it point now?`, ans: DIR_WORDS[e] };
+}
 // Year 5 (C3a): Name (tap the word: acute, right, obtuse, straight, reflex) and
 // Measure (a half-circle protractor over the angle, one arm on its zero line,
 // write the degrees: multiples of 5 to 180). A year uses only its own kinds.
@@ -2702,8 +2733,31 @@ function mapGoQ() {
     };
   }
 }
+// Map, Year 2 (D2d): a plain 5 × 5 grid (no letters or numbers, those are Year 4)
+// with an arrow in the square she starts on, pointing the way she faces.
+// "Forward 3, turn right, forward 2": steps forward, a quarter turn right or left
+// (a half turn about one in five), steps forward; tap where she finishes. Both
+// legs stay on the map, and she never finishes where she started.
+const DIR_V = [[0, 1], [1, 0], [0, -1], [-1, 0]]; // up, right, down, left (y counts up)
+const WALK_T = { right: [1, 'turn right', 'make a quarter turn right'], left: [3, 'turn left', 'make a quarter turn left'], half: [2, 'half turn', 'make a half turn'] };
+const steps = n => `${n} step${n > 1 ? 's' : ''}`;
+function mapWalkQ() {
+  for (;;) {
+    const x0 = rnd(0, 4), y0 = rnd(1, 5), d0 = rnd(0, 3), a = rnd(1, 4), b = rnd(1, 4), t = Math.random() < 0.2 ? 'half' : pickOne(['right', 'left']);
+    const d1 = (d0 + WALK_T[t][0]) % 4, x1 = x0 + DIR_V[d0][0] * a, y1 = y0 + DIR_V[d0][1] * a, x = x1 + DIR_V[d1][0] * b, y = y1 + DIR_V[d1][1] * b;
+    if ([x1, x].some(v => v < 0 || v > 4) || [y1, y].some(v => v < 1 || v > 5) || (x === x0 && y === y0)) continue;
+    const tiles = [];
+    for (let r = 5; r >= 1; r--) for (let c = 0; c < 5; c++) tiles.push({ html: c === x0 && r === y0 ? arrowSvg(d0, 1.5) : '', label: mapRef(c, r), say: 'this one' });
+    return {
+      kind: 'tap', form: 'walk', yr: 2, start: mapRef(x0, y0), d0, moves: [a, t, b],
+      top: `<span class="tw" style="text-align:left">Forward ${a}, ${WALK_T[t][1]},<br>forward ${b}.</span>`, tc: 9, th: 2.1,
+      tiles, right: (5 - y) * 5 + x, cells: 5, tcls: 'walk', say: `Start at the arrow. Go ${steps(a)} forward, ${WALK_T[t][2]}, then go ${steps(b)} forward. Tap where you finish.`, ans: mapRef(x, y),
+    };
+  }
+}
 function mapQ(yr, kinds) {
   if (yr === 5) return mapGoQ();
+  if (yr === 2) return mapWalkQ();
   const cells = shuffled(range(0, 24)).slice(0, rnd(3, 4)), nms = shuffled(MAP_SHAPES), cols = shuffled(Object.keys(BLOCK));
   const things = cells.map((k, i) => ({ nm: nms[i], col: cols[i], x: k % 5, y: Math.floor(k / 5) + 1 }));
   if (pickOne(kinds) === 'where') {
@@ -3891,9 +3945,18 @@ const ACTS = {
     key: c => { const own = ANGLE_KINDS[c.yr] || ANGLE_KINDS[4]; return `angle~${c.yr}|${own.filter(k => c.kinds.includes(k)).join(',') || own.join(',')}|${c.n}`; },
     label: k => { const [y, kinds, n] = k.split('|'); return `Angles · Year ${y} · ${kinds.split(',').map(x => ({ size: 'right angle?', deg: 'degrees', name: 'names', measure: 'measure' })[x]).join(', ')} · ${n} questions`; },
   },
+  turn: { // a tap card: which turn was it, or where does the arrow point now
+    name: 'Turns', ages: [5], setup: 'opts', say: 'Which turn was it? Tap it.',
+    pic: `<svg viewBox="-28 -19.5 56 39" ${ANGLE_INK}>${spinBody(1, 0.75, false)}</svg>`,
+    options: [{ key: 'yr', label: 'Year', values: [[2, '2 · quarter, half, full turns']] }],
+    defaults: () => ({ yr: 2, n: 6 }),
+    make: () => turnsQ(),
+    key: c => `turn~${c.yr}|${c.n}`,
+    label: k => { const [y, n] = k.split('|'); return `Turns · Year ${y} · ${n} questions`; },
+  },
   map: {
     // 4 or 6: a tappable 5 × 5 grid doesn't fit 12 to a screen; on a phone the cards are taller and the sheet scrolls
-    name: 'Map', ages: [8], setup: 'opts', say: 'Find the place on the map. Tap it.', counts: [4, 6], tall: true,
+    name: 'Map', ages: [5, 8], setup: 'opts', say: 'Find the place on the map. Tap it.', counts: [4, 6], tall: true,
     pic: (() => {
       let s = `<svg viewBox="0 0 120 84"><g stroke="${INK}" stroke-width="1.2">`;
       for (let i = 0; i <= 4; i++) s += `<line x1="${30 + i * 16}" y1="4" x2="${30 + i * 16}" y2="68"/><line x1="30" y1="${4 + i * 16}" x2="94" y2="${4 + i * 16}"/>`;
@@ -3902,14 +3965,14 @@ const ACTS = {
       return s + '</svg>';
     })(),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · grid references'], [5, '5 · compass moves']] },
+      { key: 'yr', label: 'Year', values: [[2, '2 · steps and turns'], [4, '4 · grid references'], [5, '5 · compass moves']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['tap', 'Tap C4 (Year 4)'], ['where', 'Where is it? (Year 4)']] },
     ],
-    defaults: () => ({ yr: 4, kinds: ['tap', 'where'], n: 6 }),
+    defaults: age => ({ yr: age === 5 ? 2 : 4, kinds: ['tap', 'where'], n: 6 }),
     make: c => mapQ(c.yr, c.kinds),
-    // Year 5 is compass moves only, whatever the Kind row says
-    key: c => `map~${c.yr}|${c.yr === 5 ? 'go' : ['tap', 'where'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Map · Year ${y} · ${kinds.split(',').map(x => ({ tap: 'tap C4', where: 'where is it?', go: 'compass moves' })[x]).join(', ')} · ${n} questions`; },
+    // Year 2 is steps and turns only and Year 5 compass moves only, whatever the Kind row says
+    key: c => `map~${c.yr}|${c.yr === 5 ? 'go' : c.yr === 2 ? 'walk' : ['tap', 'where'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Map · Year ${y} · ${kinds.split(',').map(x => ({ tap: 'tap C4', where: 'where is it?', go: 'compass moves', walk: 'steps and turns' })[x]).join(', ')} · ${n} questions`; },
   },
   chance: {
     name: 'Chance', ages: [8], setup: 'opts', say: 'How likely is it? Tap it.',
