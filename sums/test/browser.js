@@ -106,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#yPrev');
   const y3 = await tiles('#actTiles');
   ok(await page.evaluate(() => view === 3 && $('#yView').textContent === 'Year 3' && $('#yMine').textContent === ''), '‹ goes to the Year 3 page');
-  ok(y3.length === 27 && ['Rounding', 'Mirror', 'Splat', 'Number bonds', 'Fractions of a number','True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
+  ok(y3.length === 28 && y3.includes('Map') && ['Rounding', 'Mirror', 'Splat', 'Number bonds', 'Fractions of a number','True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
   await page.click('#actTiles [data-act="clock"]');
   ok(await page.evaluate(() => draft.yr === 3 && $('.sughint').textContent === 'From the page for: Year 3'), 'Clocks from the Year 3 page opens at Year 3');
   await page.click('#backBtn');
@@ -1259,7 +1259,7 @@ const fakeSpeech = () => {
   });
   ok(shq.length === 0, 'Shapes: sides = corners = points drawn; 3D faces, edges, corners right; Year 1 up to 4 sides, Year 2 up to 6, symmetry in Year 3 ' + shq.join(' | '));
   for (const yr of [4, 3, 1, 2]) await yearSheet('shape', yr, 'Shapes');
-  ok(await page.evaluate(() => cards.every(c => c.q.solid ? c.el.querySelectorAll('svg line[stroke-dasharray]').length === 3 : c.el.querySelector('svg polygon').getAttribute('points').split(' ').length === c.q.pts.length)), 'Shapes: the polygon has as many corners as the answer; 3D shapes show hidden edges dashed');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' || (c.q.solid ? c.el.querySelectorAll('svg line[stroke-dasharray]').length === 3 : c.el.querySelector('svg polygon').getAttribute('points').split(' ').length === c.q.pts.length))), 'Shapes: the polygon has as many corners as the answer; 3D shapes show hidden edges dashed');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/30-shape-y2.png' });
 
   // ---- Rulers
@@ -2085,10 +2085,10 @@ const fakeSpeech = () => {
     if (asked.size !== 7) bad.push('asked ' + [...asked]);
     const qs = range(0, 300).map(() => shapeQ(1, ['flat', 'solid', 'name'])), m = qs.filter(q => q.form === 'name').length;
     if (m < 110 || m > 190) bad.push('name share ' + m);
-    if (!range(0, 50).every(() => shapeQ(1, ['name']).form === 'name' && shapeQ(3, ['flat', 'name']).kind === 'shape' && shapeQ(4, ['name']).kind === 'shape')) bad.push('Name outside Years 1–2');
+    if (!range(0, 50).every(() => shapeQ(1, ['name']).form === 'name' && shapeQ(4, ['flat', 'name']).kind === 'shape' && shapeQ(4, ['name']).kind === 'shape' && shapeQ(5, ['flat', 'name']).form !== 'name')) bad.push('Name outside Years 1–3');
     return bad.slice(0, 4);
   });
-  ok(n1.length === 0, 'Shapes Name Year 1: "Tap the triangle", four tiles in different colours and sizes, no square when asked for a rectangle, solids with a flat look-alike; tiles say "this one"; Name only in Years 1–2 ' + n1.join(' | '));
+  ok(n1.length === 0, 'Shapes Name Year 1: "Tap the triangle", four tiles in different colours and sizes, no square when asked for a rectangle, solids with a flat look-alike; tiles say "this one"; Name only in Years 1–3 ' + n1.join(' | '));
   await page.evaluate(() => { setYear(1); hideDone(); act = 'pat'; buildSheet({ yr: 1, n: 6 }); show('sheet'); });
   ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tt svg').length === 3 && c.el.querySelector('.tq rect[stroke-dasharray]'))), 'Picture patterns sheet: the row with its gap, three picture tiles');
   ok((await fits()).length === 0, 'Picture patterns fits ' + (await fits()).join(' '));
@@ -2107,9 +2107,9 @@ const fakeSpeech = () => {
   ok((await said()).slice(-1)[0] === 'this one', 'a tapped shape says "this one", not its name');
   ok((await writeAllAndMark()).length === 0, 'Shapes Name and written shapes on one sheet: all marked right');
   await page.evaluate(() => { setYear(4); hideDone(); });
-  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 1, kinds: ['flat', 'solid', 'name'], n: 6 }), ACTS.shape.key({ yr: 2, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.key({ yr: 3, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.defaults(5).kinds.join(), ACTS.pat.defaults(5).yr, labelFor('shape~1|flat,solid,name|6'), labelFor('pat~1|6')].join(' / '))
-    === 'shape~1|flat,solid,name|6 / shape~2|flat,name|6 / shape~3|flat|6 / flat,solid,name / 1 / Shapes · Year 1 · flat, 3D, name · 6 questions / Picture patterns · Year 1 · 6 questions',
-    'Shapes keys: Name only in Years 1–2 keys; younger default has Name; Picture patterns key and label');
+  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 1, kinds: ['flat', 'solid', 'name'], n: 6 }), ACTS.shape.key({ yr: 2, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.key({ yr: 4, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.defaults(5).kinds.join(), ACTS.pat.defaults(5).yr, labelFor('shape~1|flat,solid,name|6'), labelFor('pat~1|6')].join(' / '))
+    === 'shape~1|flat,solid,name|6 / shape~2|flat,name|6 / shape~4|flat|6 / flat,solid,name / 1 / Shapes · Year 1 · flat, 3D, name · 6 questions / Picture patterns · Year 1 · 6 questions',
+    'Shapes keys: Name only in Years 1–3 keys; younger default has Name; Picture patterns key and label');
 
   // ---- D2a: Year 2 on Picture patterns (which part repeats, the 10th one) and Shapes Name
   const p2 = await page.evaluate(() => {
@@ -2892,6 +2892,68 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => cardSay(cards[0].q) === cards[0].q.say), 'Map Year 2 read aloud: the steps, not every square');
   ok(await page.evaluate(() => ACTS.map.key({ yr: 2, kinds: ['tap', 'where'], n: 4 }) === 'map~2|walk|4' && labelFor('map~2|walk|4') === 'Map · Year 2 · steps and turns · 4 questions' && ACTS.map.defaults(5).yr === 2 && ACTS.map.defaults(8).yr === 4), 'Map Year 2 record key and label; the younger default is Year 2');
 
+  // ---- Map, Year 3 (E2c): north, south, east, west from a dot on a plain grid
+  const mn3 = await page.evaluate(() => {
+    const bad = [], ends = new Set(), dirs = new Set(), counts = { 1: 0, 2: 0 };
+    for (let i = 0; i < 600; i++) {
+      const q = mapQ(3, ['tap', 'where']);
+      let x = 'ABCDE'.indexOf(q.start[0]), y = +q.start[1];
+      counts[q.moves.length]++;
+      for (const [n, d] of q.moves) { dirs.add(d); x += COMPASS_V[d][0] * n; y += COMPASS_V[d][1] * n; if (n < 1 || n > 3) bad.push('n ' + n); }
+      const axes = q.moves.map(m => ['north', 'south'].includes(m[1]) ? 'ud' : 'lr');
+      const dots = q.tiles.filter(u => u.html);
+      if (new Set(axes).size !== axes.length || x < 0 || x > 4 || y < 1 || y > 5 || q.ans !== 'ABCDE'[x] + y || q.ans === q.start || q.tiles[q.right].label !== q.ans || q.tiles.length !== 25 || q.cells !== 5 || q.axes
+        || dots.length !== 1 || dots[0].label !== q.start) bad.push(JSON.stringify([q.start, q.moves, q.ans]));
+      const go = q.moves.map(([n, d]) => `${n} ${d}`);
+      if (!q.top.includes('<svg') || q.top.includes('Start at') || !q.top.includes(`Go ${go.join(',<br>')}.`) || q.say !== `Start at the dot. Go ${go.join(', then ')}. Tap where you finish.` || q.tiles.some(u => u.say !== 'this one')) bad.push('words ' + q.say);
+      ends.add(q.ans);
+    }
+    if (ends.size < 22 || dirs.size !== 4 || counts[1] < 150 || counts[1] > 330) bad.push('spread ' + ends.size + ' ' + [...dirs] + ' ' + JSON.stringify(counts));
+    return bad.slice(0, 4);
+  });
+  ok(mn3.length === 0, 'Map Year 3: one or two moves (one up or down, one across), 1 to 3 squares, on the map, from a dot; no grid references ' + mn3.join(' | '));
+  await page.evaluate(() => { hideDone(); act = 'map'; buildSheet({ yr: 3, kinds: ['tap', 'where'], n: 6 }); show('sheet'); });
+  ok(await page.evaluate(() => cards.every(c => c.q.form === 'nsew' && c.el.querySelectorAll('.tt').length === 25 && c.el.querySelectorAll('.tt svg').length === 1 && c.el.querySelector('.tq svg') && !c.el.querySelector('.ax'))), 'Map Year 3 sheet: a plain grid, one dot, a compass rose by the words');
+  ok((await fits()).length === 0, 'Map Year 3 fits, squares big enough to tap ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/44-map-y3.png' });
+  ok(await page.evaluate(() => { const c = cards[0]; c.pick = [(c.q.right + 1) % 25]; paintTap(c); const w = !readAnswer(c).ok; c.pick = [c.q.right]; paintTap(c); return w && readAnswer(c).ok; }), 'Map Year 3: another square is wrong, the right one right');
+  ok((await writeAllAndMark()).length === 0, 'Map Year 3: tapped right is marked right');
+  ok(await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'map~3|nsew|6' && ACTS.map.key({ yr: 3, kinds: ['tap'], n: 4 }) === 'map~3|nsew|4' && labelFor('map~3|nsew|4') === 'Map · Year 3 · north, south, east, west · 4 questions'), 'Map Year 3 record key and label');
+
+  // ---- Shapes Name, Year 3 (E2c): regular polygons to 10 sides
+  const n3 = await page.evaluate(() => {
+    const bad = [], asked = {};
+    for (let i = 0; i < 1000; i++) {
+      const q = name3Q(), labels = q.tiles.map(t => t.label), n = POLY_N[q.nm];
+      asked[q.nm] = (asked[q.nm] || 0) + 1;
+      if (q.tiles.length !== 4 || new Set(labels).size !== 4 || labels[q.right] !== q.nm || q.ans !== q.nm || q.top !== `Tap the ${q.nm}`) bad.push('tiles ' + q.nm + ': ' + labels);
+      for (const x of POLY_NAMES) if (Math.abs(POLY_N[x] - n) === 1 && !labels.includes(x)) bad.push('no near one ' + q.nm + ': ' + labels);
+      if (q.say !== `Tap the ${q.nm}.` || !q.quiet || q.tiles.some(t => t.say !== 'this one')) bad.push('say ' + q.say);
+      q.tiles.forEach(t => {
+        // each picture is a regular polygon with that many corners, inside its box
+        const pts = t.html.match(/points="([^"]+)"/)[1].split(' ').map(p => p.split(',').map(Number)), m = POLY_N[t.label];
+        const sides = pts.map((p, j) => Math.hypot(p[0] - pts[(j + 1) % m][0], p[1] - pts[(j + 1) % m][1])), r = pts.map(p => Math.hypot(...p));
+        if (pts.length !== m || Math.max(...sides) - Math.min(...sides) > 0.3 || Math.max(...r) - Math.min(...r) > 0.3 || Math.max(...r) > 46) bad.push('picture ' + t.label);
+        const sc = +t.html.match(/scale\(([\d.]+)\)/)[1]; if (sc < 0.8) bad.push('small ' + sc);
+      });
+    }
+    const newShare = NAME_NEW3.reduce((s, x) => s + (asked[x] || 0), 0);
+    if (Object.keys(asked).length !== 8 || newShare < 520 || newShare > 680) bad.push('asked ' + JSON.stringify(asked));
+    const qs = range(0, 300).map(() => shapeQ(3, ['flat', 'solid', 'name'])), k = qs.filter(q => q.form === 'name').length;
+    if (k < 70 || k > 130) bad.push('name share ' + k);
+    if (!range(0, 50).every(() => { const q = shapeQ(3, ['name']); return q.form === 'name' && POLY_NAMES.includes(q.nm); })) bad.push('Name alone in Year 3');
+    if (range(0, 200).some(() => shapeQ(4, ['flat', 'name']).form === 'name')) bad.push('Name in Year 4');
+    return bad.slice(0, 4);
+  });
+  ok(n3.length === 0, 'Shapes Name Year 3: regular triangles to decagons, the one with a side more and a side fewer on every card, big enough to count ' + n3.join(' | '));
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { hideDone(); act = 'shape'; buildSheet({ yr: 3, kinds: ['flat', 'solid', 'name'], n }); show('sheet'); cards.forEach((c, i) => { if (i % 2 === 0) { c.q = name3Q(); layout(c); sizeCanvas(c); } }); }, n);
+    ok((await fits()).length === 0, `Shapes Name Year 3 (${n}) fits beside written shapes ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/49-shape-name3-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `shape~3|flat,solid,name|${n}`, n), `Shapes Name Year 3 (${n}) and written shapes: all marked right, record shape~3|flat,solid,name|${n}`);
+  }
+  ok(await page.evaluate(() => labelFor('shape~3|flat,solid,name|12') === 'Shapes · Year 3 · flat, 3D, name · 12 questions'), 'Shapes Year 3 with Name: record label');
+
   // ---- Turns (Year 2, D2d): which turn was it, or where does the arrow point now
   const trq = await page.evaluate(() => {
     const bad = [], seen = new Set(), D =[[0, -1], [1, 0], [0, 1], [-1, 0]]; // up right down left on screen
@@ -3360,7 +3422,7 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/47-shapes-y5.png' });
   const wm5 = await writeAllAndMark();
   ok(wm5.length === 0, 'Shapes Year 5: tapped and written answers marked right ' + wm5.join(' | ').slice(0, 600));
-  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 5, kinds: ['flat', 'solid', 'moves', 'nets'], n: 12 }), ACTS.shape.key({ yr: 4, kinds: ['flat', 'solid', 'moves', 'nets'], n: 12 }), ACTS.shape.defaults(8).kinds.join(), labelFor('shape~5|flat,solid,nets|12')].join(' / ') === 'shape~5|flat,solid,nets|12 / shape~4|flat,solid,moves|12 / flat,solid,moves,nets / Shapes · Year 5 · flat, 3D, nets · 12 questions'), 'Shapes record keys: Nets only in Year 5 keys; label');
+  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 5, kinds: ['flat', 'solid', 'moves', 'nets'], n: 12 }), ACTS.shape.key({ yr: 4, kinds: ['flat', 'solid', 'moves', 'nets'], n: 12 }), ACTS.shape.defaults(8).kinds.join(), labelFor('shape~5|flat,solid,nets|12')].join(' / ') === 'shape~5|flat,solid,nets|12 / shape~4|flat,solid,moves|12 / flat,solid,name,moves,nets / Shapes · Year 5 · flat, 3D, nets · 12 questions'), 'Shapes record keys: Nets only in Year 5 keys; label');
 
   ok(await page.evaluate(() => [labelFor('addsub~2|+-|12'), labelFor('muldiv~3|*/|6'), labelFor('seq~1|6'), labelFor('dbl~3|double,half|12'), labelFor('story~2|addsub,muldiv|6')].join(' / '))
     === 'Add and take away · Year 2 · + − · 12 questions / Times and divide · Year 3 · × ÷ · 6 questions / Number patterns · Year 1 · 6 questions / Doubles and halves · Year 3 · doubles, halves · 12 questions / Story sums · Year 2 · + −, × ÷ · 6 questions', 'record labels for the new activities');
@@ -3650,7 +3712,8 @@ const fakeSpeech = () => {
       ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }],
       ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }],
       ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }],
-      ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }], ['mirror', { yr: 3, n: 6 }]]) {
+      ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }], ['mirror', { yr: 3, n: 6 }],
+      ['map', { yr: 3, kinds: ['tap'], n: 6 }], ['shape', { yr: 3, kinds: ['name'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

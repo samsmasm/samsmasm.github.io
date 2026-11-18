@@ -184,9 +184,9 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Compare units of time. Knows: 15 minutes in a quarter hour, 60 seconds in a minute, 24 hours in a day, 52 weeks and 365 days in a year (366 in a leap year, every 4 years), months about 4 weeks with different numbers of days, decade 10 years, century 100, millennium 1,000.
 
 ### Geometry
-- Name, picture and sort regular polygons up to 10 sides (all sides and angles equal). Words: right angle, horizontal, vertical. ✓ partly (Shapes, Year 3: count sides up to 10)
+- Name, picture and sort regular polygons up to 10 sides (all sides and angles equal). Words: right angle, horizontal, vertical. ✓ partly (Shapes, Year 3: count sides up to 10; Name, "Tap the octagon" among regular triangles to decagons; E2c; not sorting)
 - Find lines of symmetry; complete a symmetrical pattern or picture. ✓ (Shapes, Year 3: how many lines; Mirror, Year 3: tap the squares that finish a picture across an upright mirror line; E2b)
-- Step-by-step directions with half and quarter turns and distances; north, east, south, west.
+- Step-by-step directions with half and quarter turns and distances; north, east, south, west. ✓ partly (Map, Year 3: "Go 2 north, 3 east" from a dot on a plain grid, tap where you finish; turns are Map Year 2; E2c)
 - Use simple maps to find things relative to other things.
 
 ### Statistics
