@@ -116,7 +116,7 @@ const fakeSpeech = () => {
   await swipe(200, 500);
   ok(await page.evaluate(() => view === 2), 'swipe right: Year 2 page');
   const y2 = await tiles('#actTiles');
-  ok(y2.length === 21 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && y2.includes('Picture patterns') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
+  ok(y2.length === 22 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && y2.includes('Picture patterns') && y2.includes('Halves and quarters') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
   await swipe(500, 200); await swipe(500, 200); await swipe(500, 200); await swipe(500, 200);
   ok(await page.evaluate(() => view === 5 && $('#yNext').disabled), 'swipe left up to Year 5, and no further');
   await page.evaluate(() => turnPage(4 - view));
@@ -160,7 +160,7 @@ const fakeSpeech = () => {
   }).join(' '));
   ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:5:5:12 8:5:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
   await page.click('#yearTiles [data-year="2"]');
-  ok((await tiles('#actTiles')).length === 21 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
+  ok((await tiles('#actTiles')).length === 22 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
   await page.click('#actTiles [data-act="graph"]');
   ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Your year: Year 2'), 'Year 2: Graphs starts at Year 2 and says so');
   await page.click('#backBtn'); await page.click('#backBtn');
@@ -2181,6 +2181,84 @@ const fakeSpeech = () => {
     ok((await writeAllAndMark()).length === 0, `Shapes Name Year 2 (${n}) and written shapes: all marked right`);
   }
   ok(await page.evaluate(() => labelFor('pat~2|6')) === 'Picture patterns · Year 2 · 6 questions', 'Picture patterns Year 2 label');
+
+  // ---- D2b: Year 2 on Halves and quarters (thirds, the same, which is bigger, the whole) and Money Make it
+  const hq2 = await page.evaluate(() => {
+    const bad = [], area = P => Math.abs(P.reduce((s, v, i) => { const w = P[(i + 1) % P.length]; return s + v[0] * w[1] - w[0] * v[1]; }, 0)) / 2;
+    const polys = html => [...new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').querySelectorAll('polygon')].map(p => ({ A: area(p.getAttribute('points').split(' ').map(v => v.split(',').map(Number))), on: p.getAttribute('fill') !== '#fff' }));
+    const share = ps => sumOf(ps.filter(p => p.on).map(p => p.A)) / sumOf(ps.map(p => p.A));
+    const forms = {}, wants = {};
+    for (let i = 0; i < 1200; i++) {
+      const q = partsQ(2); forms[q.form] = (forms[q.form] || 0) + 1;
+      if (q.form === 'parts') {
+        wants[q.want] = (wants[q.want] || 0) + 1;
+        if (q.top !== `Which one shows ${FRAC_WORD[q.want]}?` || q.tiles[q.right].label !== 'right') bad.push('words ' + q.top);
+        q.tiles.forEach((t, j) => {
+          const ps = polys(t.html), A = ps.map(p => p.A), m = sumOf(A) / A.length, equal = A.every(a => Math.abs(a - m) < 0.07 * m);
+          if (ps.filter(p => p.on).length !== 1) bad.push('shaded');
+          if (j === q.right ? ps.length !== q.want || !equal : ps.length === q.want && (equal || Math.max(...A) / Math.min(...A) < 1.5)) bad.push(`tile ${j === q.right} ${ps.length} ${equal} for ${q.want}`);
+          if (ps.length === 3 && q.shapes[j] === 'circle') bad.push('thirds of a circle');
+        });
+      } else if (q.form === 'same') {
+        const top = polys(q.top), want = q.shown[0] === 2 ? '2/4' : '1/2';
+        if (Math.abs(share(top) - 0.5) > 0.01 || q.ans !== want || q.tiles[q.right].label !== want || q.tiles.length !== 3 || new Set(q.tiles.map(t => t.label)).size !== 3 || !q.quiet || q.tiles.some(t => t.say !== 'this one')) bad.push('same ' + q.ans + ' ' + q.tiles.map(t => t.label));
+        q.tiles.forEach((t, j) => {
+          const ps = polys(t.html), [k, n] = t.label.split('/').map(Number);
+          if (ps.length !== n || ps.filter(p => p.on).length !== k || Math.abs(share(ps) - k / n) > 0.01 || (j !== q.right && Math.abs(share(ps) - 0.5) < 0.05)) bad.push('same tile ' + t.label + ' ' + ps.length);
+          if (n === 3 && q.shape === 'circle') bad.push('thirds of a circle');
+        });
+        if (!/coloured\. Which one has the same amount coloured\?$/.test(q.say)) bad.push('say ' + q.say);
+      } else if (q.form === 'bigger') {
+        const sh = q.tiles.map(t => share(polys(t.html))), want = q.most ? Math.max(...sh) : Math.min(...sh);
+        if (sh[q.right] !== want || q.tiles.map(t => t.label).sort().join() !== '1/2,1/3,1/4' || q.tiles.some(t => t.say !== FRAC_WORD[+t.label[2]]) || q.quiet) bad.push('bigger ' + sh + ' ' + q.right);
+        if (q.tiles.some(t => polys(t.html).length !== +t.label[2]) || q.say !== `Which coloured part is ${q.most ? 'biggest' : 'smallest'}?`) bad.push('bigger parts ' + q.say);
+      } else bad.push('form ' + q.form);
+    }
+    if (Object.keys(forms).length !== 3 || forms.parts < 400 || forms.same < 250 || forms.bigger < 250) bad.push('forms ' + JSON.stringify(forms));
+    if (!wants[2] || !wants[3] || !wants[4]) bad.push('wants ' + JSON.stringify(wants));
+    if (range(0, 200).some(() => partsQ(1).form !== 'parts' || partsQ(1).want === 3)) bad.push('Year 1 changed');
+    const sk = {};
+    for (let i = 0; i < 600; i++) {
+      const q = shareQ(2), d = new DOMParser().parseFromString(`<div>${shareSvg(q)}</div>`, 'text/html'), dots = d.querySelectorAll('circle').length;
+      sk[(q.whole ? 'w' : 'p') + q.g] = 1;
+      if (d.querySelectorAll('line').length !== 2 - (q.g === 2)) bad.push('lines ' + q.g);
+      if (q.whole) {
+        if (dots !== q.k || d.querySelectorAll('rect.hid').length !== q.g - 1 || q.ans !== q.g * q.k || q.cap !== `${q.g === 2 ? 'Half' : 'A quarter'} is ${q.k}` || q.say !== q.cap + '. How many altogether?' || q.k < 2) bad.push('whole ' + JSON.stringify(q));
+      } else if (dots !== q.g * q.k || q.ans !== q.k || q.cap !== `${SHARE_WORD[q.g]} of ${q.g * q.k}` || q.g * q.k > 20) bad.push('part ' + JSON.stringify(q));
+    }
+    if (Object.keys(sk).sort().join() !== 'p2,p3,p4,w2,w4') bad.push('share kinds ' + Object.keys(sk));
+    if (range(0, 200).some(() => { const q = shareQ(1); return q.whole || q.g === 3; })) bad.push('Year 1 share changed');
+    return bad.slice(0, 4);
+  });
+  ok(hq2.length === 0, 'Halves and quarters Year 2: a third too; "Which one is the same?" 1/2 and 2/4; biggest / smallest coloured part; a third of; the whole from a part; Year 1 unchanged ' + hq2.join(' | '));
+  const mk2 = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    for (let i = 0; i < 400; i++) {
+      const q = makeIt2Q(), vs = q.tiles.map(t => t.v), coins = vs[0] === 10, sum = q.right.reduce((s, k) => s + vs[k], 0);
+      seen.add(coins ? 'c' : 'n');
+      if (vs.join() !== (coins ? '10,20,50,100,200' : '500,1000,2000,5000,10000') || vs.includes(q.target) || sum !== q.target) bad.push('tiles ' + vs + ' ' + q.target);
+      if (coins ? q.target < 30 || q.target > 90 || q.target % 10 || q.top !== `Make ${q.target}c` || q.say !== `Make ${q.target} cents.`
+        : q.target < 1500 || q.target > 9500 || q.target % 500 || q.top !== `Make $${q.target / 100}` || q.say !== `Make ${q.target / 100} dollars.`) bad.push('target ' + q.top + ' / ' + q.say);
+    }
+    if (seen.size !== 2) bad.push('only ' + [...seen]);
+    if (!range(0, 50).every(() => ACTS.money.make({ yr: 2, kinds: ['make'] }).yr === 2)) bad.push('Year 2 make');
+    return bad.slice(0, 4);
+  });
+  ok(mk2.length === 0, 'Money Make it Year 2: coins only (30c to 90c) or notes only ($15 to $95), never one coin or note, five tiles ' + mk2.join(' | '));
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { setYear(2); hideDone(); act = 'parts'; buildSheet({ yr: 2, kinds: ['tap', 'write'], n }); show('sheet'); }, n);
+    await page.evaluate(() => { const qs = [sameFracQ(), biggerFracQ(), partsQ(2), { ...shareQ(2), ...{ kind: 'share', whole: true, g: 4, k: 5, cap: 'A quarter is 5', say: 'A quarter is 5. How many altogether?', ans: 20 } }, shareQ(2), sameFracQ()]; qs.forEach((q, i) => { cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); }); });
+    ok((await fits()).length === 0, `Halves and quarters Year 2 (${n}) fits ` + (await fits()).join(' '));
+    ok(await page.evaluate(() => cards.filter(c => c.q.kind === 'tap').every(c => [...c.el.querySelectorAll('.tt')].every(b => { const r = b.getBoundingClientRect(), k = c.el.getBoundingClientRect(); return r.width >= 40 && r.right <= k.right + 1 && r.bottom <= k.bottom + 1; }))), `Halves and quarters Year 2 (${n}): tiles big enough and inside the card`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/51-parts2-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `parts~2|tap,write|${n}`, n), `Halves and quarters Year 2 (${n}): right, finished, record parts~2|tap,write|${n}`);
+    await page.evaluate(n => { hideDone(); act = 'money'; buildSheet({ yr: 2, kinds: ['count', 'make'], n }); show('sheet'); cards.forEach((c, i) => { if (i < 3) { c.q = makeIt2Q(); layout(c); sizeCanvas(c); } }); }, n);
+    ok((await fits()).length === 0 && await page.evaluate(() => cards.filter(c => c.q.form === 'make').every(c => c.el.querySelectorAll('.tt').length === 5)), `Money Make it Year 2 (${n}) fits beside written money, five tiles ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/46-make-it2-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `money~2|count,make|${n}`, n), `Money Make it Year 2 (${n}): all right, record money~2|count,make|${n}`);
+  }
+  ok(await page.evaluate(() => [ACTS.money.key({ yr: 2, kinds: ['count', 'make'], n: 6 }), ACTS.money.key({ yr: 1, kinds: ['count', 'make'], n: 6 }), labelFor('money~2|make|6'), labelFor('parts~2|tap,write|6')].join(' / '))
+    === 'money~2|count,make|6 / money~1|count|6 / Money · Year 2 · make it · 6 questions / Halves and quarters · Year 2 · which one, half of a number · 6 questions', 'D2b record keys and labels');
   await page.evaluate(() => { setYear(4); hideDone(); });
 
   // ---- B4: Splat, Halves and quarters, Money Which coin?, Rulers Which is longer? (Year 1)
@@ -2323,7 +2401,7 @@ const fakeSpeech = () => {
   if (SHOTS) await page.screenshot({ path: SHOTS + '/53-longer.png' });
   ok((await writeAllAndMark()).length === 0, 'Which is longer?: tapped right and marked');
   await page.evaluate(() => { age = 8; hideDone(); });
-  ok(await page.evaluate(() => [ACTS.money.key({ yr: 1, kinds: ['count', 'coin'], n: 6 }), ACTS.money.key({ yr: 3, kinds: ['count', 'coin'], n: 6 }), ACTS.money.defaults(5).kinds.join(), ACTS.ruler.key({ yr: 1, kinds: ['pencil'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['longer'], n: 6 }), ACTS.ruler.key({ yr: 2, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.defaults(5).kinds.join(),
+  ok(await page.evaluate(() => [ACTS.money.key({ yr: 1, kinds: ['count', 'coin'], n: 6 }), ACTS.money.key({ yr: 3, kinds: ['count', 'coin'], n: 6 }), ACTS.money.defaults(5).kinds.filter(k => k !== 'make').join(), ACTS.ruler.key({ yr: 1, kinds: ['pencil'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.key({ yr: 1, kinds: ['longer'], n: 6 }), ACTS.ruler.key({ yr: 2, kinds: ['pencil', 'longer'], n: 6 }), ACTS.ruler.defaults(5).kinds.join(),
       labelFor('money~1|count,coin|6'), labelFor('ruler~1|6'), labelFor('ruler~1|longer|6'), labelFor('ruler~1|pencil,longer|6'), labelFor('splat~1|6'), labelFor('parts~1|tap,write|6')].join(' / '))
     === 'money~1|count,coin|6 / money~3|count|6 / count,coin / ruler~1|6 / ruler~1|pencil,longer|6 / ruler~1|longer|6 / ruler~2|6 / pencil,longer / Money · Year 1 · how much, which coin · 6 questions / Rulers · Year 1 · 6 questions / Rulers · Year 1 · which is longer · 6 questions / Rulers · Year 1 · pencil, which is longer · 6 questions / Splat · Year 1 · 6 questions / Halves and quarters · Year 1 · which one, half of a number · 6 questions',
     'B4 record keys: Which coin? only in Year 1 keys, Which is longer? only in Year 1; old Year 1 pencil keys unchanged; labels');
@@ -2685,10 +2763,10 @@ const fakeSpeech = () => {
     }
     const ms = range(0, 200).map(() => ACTS.money.make({ yr: 4, kinds: ['count', 'change', 'make'] })), mk = ms.filter(q => q.form === 'make').length;
     if (mk < 40 || mk > 100) bad.push('make share ' + mk);
-    if (range(0, 60).some(() => ACTS.money.make({ yr: 3, kinds: ['count', 'make'] }).form === 'make') || ACTS.money.make({ yr: 2, kinds: ['make'] }).kind !== 'money') bad.push('make below Year 4');
+    if (range(0, 60).some(() => ACTS.money.make({ yr: 3, kinds: ['count', 'make'] }).form === 'make' || ACTS.money.make({ yr: 5, kinds: ['count', 'make'] }).form === 'make') || ACTS.money.make({ yr: 1, kinds: ['make'] }).kind !== 'money') bad.push('make in Years 1, 3 or 5');
     return bad.slice(0, 4);
   });
-  ok(mkq.length === 0, 'Money Make it: $1 to $49, cents in tens, a way to make it in 8 or fewer; about a third of Year 4 with all three kinds; never below Year 4 ' + mkq.join(' | '));
+  ok(mkq.length === 0, 'Money Make it: $1 to $49, cents in tens, a way to make it in 8 or fewer; about a third of Year 4 with all three kinds; not in Years 1, 3, 5 ' + mkq.join(' | '));
   await page.evaluate(() => { act = 'money'; buildSheet({ yr: 4, kinds: ['count', 'make'], n: 12 }); show('sheet'); cards.forEach((c, i) => { if (i < 6) { c.q = makeItQ(); layout(c); sizeCanvas(c); } }); cards[0].q = { ...makeItQ(), target: 590, top: 'Make $5 and 90c', right: [5, 2, 1, 1] }; layout(cards[0]); sizeCanvas(cards[0]); });
   ok((await fits()).length === 0, 'Money Make it fits beside written money cards, tiles big enough ' + (await fits()).join(' '));
   const mi = v => page.evaluate(v => MAKE_V.indexOf(v), v);

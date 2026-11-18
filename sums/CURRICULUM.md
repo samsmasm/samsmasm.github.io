@@ -98,13 +98,13 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Knows: × 1 and ÷ 1 change nothing; × 0 is 0; order doesn't matter for × but does for ÷; + and − undo each other, and so do × and ÷.
 
 ### Fractions and money
-- Halves, thirds and quarters (½, ⅓, ⅔, ¼, ²⁄₄, ¾) of sets, amounts and shapes, in words and symbols. ✓ (Fractions)
-- ²⁄₄ is the same as ½. ✓ (Fractions accepts equal fractions)
-- Compare two fractions (halves are bigger than thirds, bigger than quarters).
-- Find a half, third or quarter of a set by seeing groups, not sharing one by one.
-- Find the whole from a part (if ½ is 5, the whole is 10).
+- Halves, thirds and quarters (½, ⅓, ⅔, ¼, ²⁄₄, ¾) of sets, amounts and shapes, in words and symbols. ✓ (Fractions; Halves and quarters, Year 2: "Which one shows a third?" among unequal cuts and other numbers of parts; D2b)
+- ²⁄₄ is the same as ½. ✓ (Fractions accepts equal fractions; Halves and quarters, Year 2: "Which one is the same?", a shape with ½ or ²⁄₄ coloured, tap the one with the same amount; D2b)
+- Compare two fractions (halves are bigger than thirds, bigger than quarters). ✓ (Halves and quarters, Year 2: "Which coloured part is biggest / smallest?", one shape cut into halves, thirds and quarters the same way; D2b)
+- Find a half, third or quarter of a set by seeing groups, not sharing one by one. ✓ (Halves and quarters, Year 2: Half of 8, A third of 12, A quarter of 20, dots already in groups; D2b)
+- Find the whole from a part (if ½ is 5, the whole is 10). ✓ (Halves and quarters, Year 2: "Half is 5. Altogether?", one group of dots, the others dashed and empty; D2b)
 - Order NZ coins and notes by value; group like coins and total them. ✓ partly (Money, Year 2: totals)
-- Make an amount using only coins or only notes. ✓ partly (Money, Year 2: totals, not making)
+- Make an amount using only coins or only notes. ✓ (Money, Year 2, Make it: "Make 70c" with the five coins, "Make $35" with the five notes; D2b)
 
 ### Algebra
 - True or false comparisons to 120 (16 > 60?), using >, < and =. ✓ (True or false Year 2, More or less Year 2)

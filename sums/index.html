@@ -1169,7 +1169,7 @@ function moneyChange(yr) {
 // Make it (Money, Year 4, A7): "Make $5 and 80c". Every coin and note is a tile;
 // each tap drops one into the tray above (tap one in the tray to take it out). The
 // total is never shown; any way that adds up is right.
-const TRAY_MAX = 12, MAKE_V = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+const TRAY_MAX = 12, MAKE_YRS = [2, 4], MAKE_V =[10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
 const MAKE_TILES = MAKE_V.map(v => ({ html: `<span style="font-size:${isNote(v) ? 0.8 : 1.1}em;line-height:0">${moneySvg([v])}</span>`, label: v < 100 ? v + 'c' : '$' + v / 100, say: moneyWords(v), v }));
 function makeItQ() {
   let target, right;
@@ -1181,6 +1181,17 @@ function makeItQ() {
   }
   const d = Math.floor(target / 100), c = target % 100, words = `Make $${d}${c ? ` and ${c}c` : ''}`;
   return { kind: 'tap', form: 'make', tray: true, target, top: words, tc: Math.max(words.length * 0.55, 7.6), th: 1.3 + 2.6, topf: 0.55, tiles: MAKE_TILES, cells: 5, right, say: `Make ${moneyWords(target)}.`, ans: `$${d}${c ? ` and ${c}c` : ''}` };
+}
+// Year 2 (D2b): coins only ("Make 70c", 30c to 90c) or notes only ("Make $35", $15 to $95 in fives),
+// never an amount that is one coin or note; the tiles are just those five
+function makeIt2Q() {
+  const coins = Math.random() < 0.5, tiles = coins ? MAKE_TILES.slice(0, 5) : MAKE_TILES.slice(5), vs = tiles.map(t => t.v);
+  let target;
+  do target = coins ? rnd(3, 9) * 10 : rnd(3, 19) * 500; while (vs.includes(target));
+  const right = []; let left = target;
+  for (let i = vs.length - 1; i >= 0; i--) while (left >= vs[i]) { right.push(i); left -= vs[i]; }
+  const words = coins ? `Make ${target}c` : `Make $${target / 100}`;
+  return { kind: 'tap', form: 'make', yr: 2, tray: true, target, top: words, tc: Math.max(words.length * 0.55, 7.6), th: 1.3 + 2.6, topf: 0.55, tiles, cells: 5, right, say: `Make ${moneyWords(target)}.`, ans: coins ? target + 'c' : '$' + target / 100 };
 }
 function moneyQ(q, total) {
   if (q.unit === '$c') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, parts: [d, c], ans: `$${d} and ${c}c` }; }
@@ -3094,8 +3105,9 @@ function cutParts(shape, n, equal) {
     const a = shape === 'circle' ? rnd(0, 11) * 15 : pickOne(shape === 'square' ? [0, 90, 45, 135] : [0, 90]);
     lines.push(lineAt(a, equal ? 0 : pickOne([-1, 1]) * 0.42 * cutExtent(shape, a)));
   } else if (n === 3) { // strips (square and rectangle only: a circle has no equal thirds from straight cuts)
-    const a = pickOne([0, 90]), e = cutExtent(shape, a);
-    lines.push(lineAt(a, -e / 3), lineAt(a, e / 3));
+    const a = pickOne([0, 90]), e = cutExtent(shape, a), s = pickOne([-1, 1]);
+    // unequal: strips 0.4, 0.65 and 0.95 of the half-width (Year 2 "a third" traps)
+    if (equal) lines.push(lineAt(a, -e / 3), lineAt(a, e / 3)); else lines.push(lineAt(a, -0.6 * s * e), lineAt(a, 0.05 * s * e));
   } else if (equal) { // a cross through the middle
     const a = shape === 'circle' ? rnd(0, 5) * 15 : pickOne(shape === 'square' ? [0, 45] : [0]);
     lines.push(lineAt(a, 0), lineAt(a + 90, 0));
@@ -3117,33 +3129,81 @@ function cutSvg(shape, n, equal, col) {
   const path = P => P.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ');
   return `<svg viewBox="-46 -46 92 92" style="width:1.5em;height:1.5em" stroke="${INK}" stroke-width="3" stroke-linejoin="round">${ps.map((P, i) => `<polygon points="${path(P)}" fill="${i === pick ? BLOCK[col] : '#fff'}"/>`).join('')}</svg>`;
 }
-function partsQ() {
-  const quarter = Math.random() < 0.5, want = quarter ? 4 : 2, word = quarter ? 'a quarter' : 'a half';
-  const wrong = quarter ? [[4, false], [2, true], [3, true]] : [[2, false], [4, true], [3, true]];
+// Year 2 (D2b) mixes in thirds, "Which one is the same?" (2/4 and 1/2) and "Which coloured part is biggest?"
+function partsQ(yr = 1) {
+  if (yr === 2) { const r = Math.random(); if (r < 0.3) return sameFracQ(); if (r < 0.6) return biggerFracQ(); }
+  const want = yr === 2 ? pickOne([2, 3, 4]) : pickOne([2, 4]), word = FRAC_WORD[want];
+  const wrong = { 2: [[2, false], [4, true], [3, true]], 3: [[3, false], [2, true], [4, true]], 4: [[4, false], [2, true], [3, true]] }[want];
   const kinds = [[want, true], ...shuffled(wrong).slice(0, 2)], order = shuffled([0, 1, 2]);
-  let shapes = shuffled(['circle', 'square', 'rect']);
-  const thirds = order.findIndex(k => kinds[k][0] === 3); // a circle has no equal thirds from straight cuts
-  if (thirds >= 0 && shapes[thirds] === 'circle') { const j = (thirds + 1) % 3; [shapes[thirds], shapes[j]] = [shapes[j], shapes[thirds]]; }
+  const shapes = shuffled(['circle', 'square', 'rect']);
+  const ci = shapes.indexOf('circle'); // a circle has no thirds from straight cuts: give it a kind that is not thirds
+  if (kinds[order[ci]][0] === 3) { const j = order.findIndex(k => kinds[k][0] !== 3); [shapes[ci], shapes[j]] = [shapes[j], shapes[ci]]; }
   const cols = shuffled(Object.keys(BLOCK));
   const tiles = order.map((k, i) => ({ html: cutSvg(shapes[i], kinds[k][0], kinds[k][1], cols[i]), label: k === 0 ? 'right' : `${kinds[k][0]}${kinds[k][1] ? ' equal' : ' unequal'}`, say: 'this one' }));
   const top = `Which one shows ${word}?`;
   return { kind: 'tap', form: 'parts', want, shapes, top, tc: top.length * 0.5, tiles, right: order.indexOf(0), quiet: true, big: true, topf: 0.3, say: `${top[0].toUpperCase()}${top.slice(1)}`, ans: 'right' };
 }
-function shareQ() {
-  const g = pickOne([2, 4]), k = g === 2 ? rnd(1, 10) : rnd(1, 5), n = g * k, cap = g === 2 ? `Half of ${n}` : `A quarter of ${n}`;
+// Year 2 adds thirds ("A third of 12", three groups in a row) and, half the time, the whole
+// from a part ("Half is 5": one group of dots, the other groups dashed and empty; write the total)
+const SHARE_WORD = { 2: 'Half', 3: 'A third', 4: 'A quarter' };
+function shareQ(yr = 1) {
+  if (yr === 2 && Math.random() < 0.5) {
+    const g = pickOne([2, 4]), k = g === 2 ? rnd(2, 10) : rnd(2, 5), cap = `${SHARE_WORD[g]} is ${k}`;
+    return { kind: 'share', whole: true, g, k, cap, say: `${cap}. How many altogether?`, ans: g * k };
+  }
+  const g = yr === 2 ? pickOne([2, 3, 4]) : pickOne([2, 4]), k = g === 2 ? rnd(1, 10) : g === 3 ? rnd(1, 6) : rnd(1, 5), n = g * k, cap = `${SHARE_WORD[g]} of ${n}`;
   return { kind: 'share', g, k, cap, say: `${cap}.`, ans: k };
 }
 function shareSvg(q) {
-  const cols = Math.min(q.k, 5), rows = Math.ceil(q.k / 5), w = 8 * cols, h = 8 * rows, gap = 14, wide = 2 * w + gap, tall = q.g === 2 ? h : 2 * h + gap;
+  const cols = Math.min(q.k, 5), rows = Math.ceil(q.k / 5), w = 8 * cols, h = 8 * rows, gap = 14;
+  const gc = q.g === 4 ? 2 : q.g, gr = q.g === 4 ? 2 : 1, wide = gc * w + (gc - 1) * gap, tall = gr * h + (gr - 1) * gap;
   let s = '';
   for (let j = 0; j < q.g; j++) {
-    const gx = (j % 2) * (w + gap), gy = Math.floor(j / 2) * (h + gap);
+    const gx = (j % gc) * (w + gap), gy = Math.floor(j / gc) * (h + gap);
+    if (q.whole && j) { // the other parts: the same size, dashed and empty
+      s += `<rect class="hid" x="${gx - 1}" y="${gy - 1}" width="${w + 2}" height="${h + 2}" rx="2" fill="none" stroke="currentColor" stroke-width=".8" stroke-dasharray="2 1.6"/><text x="${gx + w / 2}" y="${gy + h / 2}" font-size="6.5" text-anchor="middle" dominant-baseline="central" fill="currentColor" stroke="none">?</text>`;
+      continue;
+    }
     for (let i = 0; i < q.k; i++) s += `<circle cx="${gx + 4 + (i % 5) * 8}" cy="${gy + 4 + Math.floor(i / 5) * 8}" r="3" fill="currentColor"/>`;
   }
   const dash = `stroke="currentColor" stroke-width="1" stroke-dasharray="2.5 2"`;
-  s += `<line x1="${w + gap / 2}" y1="-3" x2="${w + gap / 2}" y2="${tall + 3}" ${dash}/>`;
-  if (q.g === 4) s += `<line x1="-3" y1="${h + gap / 2}" x2="${wide + 3}" y2="${h + gap / 2}" ${dash}/>`;
+  for (let i = 1; i < gc; i++) s += `<line x1="${i * (w + gap) - gap / 2}" y1="-3" x2="${i * (w + gap) - gap / 2}" y2="${tall + 3}" ${dash}/>`;
+  if (gr === 2) s += `<line x1="-3" y1="${h + gap / 2}" x2="${wide + 3}" y2="${h + gap / 2}" ${dash}/>`;
   return `<svg ${emBox([-3, -3, wide + 6, tall + 6], 0.07)}>${s}</svg>`;
+}
+// Equal cuts with some parts coloured, for "Which one is the same?" and "Which coloured part is biggest?".
+// strips: the cuts all run one way (halves, thirds and quarters side by side); otherwise quarters are a cross.
+const FRAC_WORD = { 2: 'a half', 3: 'a third', 4: 'a quarter' };
+function fracCut(shape, n, a, strips) {
+  const e = cutExtent(shape, a), lines = n === 2 ? [lineAt(a, 0)] : n === 3 ? [lineAt(a, -e / 3), lineAt(a, e / 3)]
+    : strips ? [lineAt(a, -e / 2), lineAt(a, 0), lineAt(a, e / 2)] : [lineAt(a, 0), lineAt(a + 90, 0)];
+  const ps = lines.reduce((ps, [p, b]) => cutAll(ps, p, b), [SHAPE_BASE[shape]()]);
+  // in order round the middle (or along the strips), so the coloured parts sit together
+  const mid = P => [sumOf(P.map(v => v[0])) / P.length, sumOf(P.map(v => v[1])) / P.length], nx = -Math.sin(a * Math.PI / 180), ny = Math.cos(a * Math.PI / 180);
+  const key = P => { const [x, y] = mid(P); return strips || n === 3 ? x * nx + y * ny : Math.atan2(y, x); };
+  return ps.map(P => [key(P), P]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+}
+const fracPicSvg = (ps, k, col, em = 1.5) => `<svg viewBox="-46 -46 92 92" style="width:${em}em;height:${em}em" stroke="${INK}" stroke-width="3" stroke-linejoin="round">${ps.map((P, i) => `<polygon points="${P.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${i < k ? BLOCK[col] : '#fff'}"/>`).join('')}</svg>`;
+const fracAngle = (shape, n) => shape === 'circle' ? rnd(0, 11) * 15 : n === 3 || shape === 'rect' ? pickOne([0, 90]) : pickOne([0, 45, 90]);
+// "Which one is the same?": a shape with 1/2 or 2/4 coloured beside the words; tiles are the same shape
+// with 2/4 (or 1/2), and two of 1/4, 3/4, 1/3 (no thirds of a circle). Tiles say "this one".
+function sameFracQ() {
+  const shape = pickOne(['circle', 'square', 'rect']), col = pickOne(Object.keys(BLOCK)), half = Math.random() < 0.5;
+  const [sn, sk] = half ? [2, 1] : [4, 2], want = half ? [4, 2] : [2, 1];
+  const wrong = shuffled([[4, 1], [4, 3], ...(shape === 'circle' ? [] : [[3, 1]])]).slice(0, 2), all = shuffled([want, ...wrong]);
+  const pic = ([n, k], em) => fracPicSvg(fracCut(shape, n, fracAngle(shape, n)), k, col, em);
+  const tiles = all.map(f => ({ html: pic(f), label: `${f[1]}/${f[0]}`, say: 'this one' }));
+  const top = `<span style="display:flex;align-items:center;gap:.4em">${pic([sn, sk], 2.8)}<span class="tw" style="text-align:left">Which one<br>is the same?</span></span>`;
+  return { kind: 'tap', form: 'same', shape, shown: [sn, sk], top, tc: 8.6, th: 2.8, topf: 0.45, big: true, tiles, right: all.indexOf(want), quiet: true,
+    say: `${half ? 'Half is' : 'Two quarters are'} coloured. Which one has the same amount coloured?`, ans: `${want[1]}/${want[0]}` };
+}
+// "Which coloured part is biggest?" (or smallest): one shape cut into halves, thirds and quarters the same
+// way, one part coloured in each; each tile says its name ("a third")
+function biggerFracQ() {
+  const shape = pickOne(['square', 'rect']), col = pickOne(Object.keys(BLOCK)), a = pickOne([0, 90]), most = Math.random() < 0.5, ns = shuffled([2, 3, 4]), want = most ? 2 : 4;
+  const tiles = ns.map(n => ({ html: fracPicSvg(fracCut(shape, n, a, true), 1, col), label: '1/' + n, say: FRAC_WORD[n] }));
+  const word = most ? 'biggest' : 'smallest';
+  return { kind: 'tap', form: 'bigger', shape, most, top: `Which coloured part<br>is ${word}?`, tc: 10, th: 2.6, topf: 0.4, big: true, tiles, right: ns.indexOf(want), say: `Which coloured part is ${word}?`, ans: '1/' + want };
 }
 // ---- Money, Which coin? (Year 1, B4): "Tap the 50 cent coin". Three or four coins
 // (or the three notes) at their real relative sizes; each tile says "this one".
@@ -3593,20 +3653,20 @@ const ACTS = {
     pic: moneySvg([200, 100, 50, 20]),
     options: [
       { key: 'yr', label: 'Year', values: [[1, '1 · dollars to $10'], [2, '2 · coins or notes'], [3, '3 · dollars and cents'], [4, '4 · bigger amounts, buying several'], [5, '5 · $3.45, with a point']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['coin', 'Which coin? (Year 1)'], ['make', 'Make it (Year 4)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['coin', 'Which coin? (Year 1)'], ['make', 'Make it (Years 2, 4)']] },
     ],
-    defaults: age => age === 5 ? { yr: 1, kinds: ['count', 'coin'], n: 6 } : { yr: 3, kinds: ['count', 'change', 'make'], n: 12 },
+    defaults: age => age === 5 ? { yr: 1, kinds: ['count', 'coin', 'make'], n: 6 } : { yr: 3, kinds: ['count', 'change', 'make'], n: 12 },
     make: c => {
-      // Make it is Year 4 only (a tap card with a tray) and Which coin? Year 1 only (a tap card); elsewhere they are left out
-      const kinds = c.kinds.filter(k => (k !== 'make' || c.yr === 4) && (k !== 'coin' || c.yr === 1)), k = pickOne(kinds.length ? kinds : ['count']);
-      if (k === 'make') return makeItQ();
+      // Make it is Years 2 and 4 (a tap card with a tray) and Which coin? Year 1 only (a tap card); elsewhere they are left out
+      const kinds = c.kinds.filter(k => (k !== 'make' || MAKE_YRS.includes(c.yr)) && (k !== 'coin' || c.yr === 1)), k = pickOne(kinds.length ? kinds : ['count']);
+      if (k === 'make') return c.yr === 2 ? makeIt2Q() : makeItQ();
       if (k === 'coin') return coinQ();
       if (k === 'change') { const q = moneyChange(c.yr); return moneyQ({ ...q, change: true }, q.total ? q.price : q.pay - q.price); }
       const q = moneyCount(c.yr);
       return moneyQ(q, sumOf(q.items));
     },
-    // Make it only changes Year 4 and Which coin? only Year 1, so the other years leave them out of the record key
-    key: c => `money~${c.yr}|${['count', 'change', 'coin', 'make'].filter(k => c.kinds.includes(k) && (k !== 'make' || c.yr === 4) && (k !== 'coin' || c.yr === 1)).join(',') || 'count'}|${c.n}`,
+    // Make it only changes Years 2 and 4 and Which coin? only Year 1, so the other years leave them out of the record key
+    key: c => `money~${c.yr}|${['count', 'change', 'coin', 'make'].filter(k => c.kinds.includes(k) && (k !== 'make' || MAKE_YRS.includes(c.yr)) && (k !== 'coin' || c.yr === 1)).join(',') || 'count'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Money · Year ${y} · ${kinds.replace('count', 'how much').replace('coin', 'which coin').replace('make', 'make it').split(',').join(', ')} · ${n} questions`; },
   },
   seq: {
@@ -3643,11 +3703,11 @@ const ACTS = {
     name: 'Halves and quarters', ages: [5], setup: 'opts', say: 'Halves and quarters.',
     pic: `<svg viewBox="0 0 120 84"><circle cx="34" cy="42" r="28" fill="#fff" stroke="${INK}" stroke-width="3"/><path d="M34 14A28 28 0 0 1 34 70Z" fill="${BLOCK.blue}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><rect x="72" y="14" width="42" height="56" fill="#fff" stroke="${INK}" stroke-width="3"/><path d="M72 42H114M93 14V70" stroke="${INK}" stroke-width="3"/><rect x="72" y="14" width="21" height="28" fill="${BLOCK.yellow}" stroke="${INK}" stroke-width="3"/></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · half and quarter']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · half and quarter'], [2, '2 · thirds, the same, the whole']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['tap', 'Which one?'], ['write', 'Half of a number']] },
     ],
     defaults: () => ({ yr: 1, kinds: ['tap', 'write'], n: 6 }),
-    make: c => pickOne(c.kinds) === 'tap' ? partsQ() : shareQ(),
+    make: c => pickOne(c.kinds) === 'tap' ? partsQ(c.yr) : shareQ(c.yr),
     key: c => `parts~${c.yr}|${['tap', 'write'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Halves and quarters · Year ${y} · ${kinds.replace('tap', 'which one').replace('write', 'half of a number').split(',').join(', ')} · ${n} questions`; },
   },
@@ -4441,7 +4501,9 @@ function qMarkup(q) {
   // Half of 8, A quarter of 12: the dots in groups with a dashed sharing line; answer anywhere below
   if (q.kind === 'share') {
     const svg = shareSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
-    return { cls: 'frame', html: `<div class="cap">${q.cap}</div>${svg}`, vars: { '--h': hEm + 1.1 + 3.2, '--c': Math.max(wEm, q.cap.length * 0.44) + 1.2 } };
+    // Year 2 "Half is 5": a second line asks for the whole
+    const more = q.whole ? '.<br>Altogether?' : '';
+    return { cls: 'frame', html: `<div class="cap">${q.cap}${more}</div>${svg}`, vars: { '--h': hEm + 1.1 + (more ? 1.2 : 0) + 3.2, '--c': Math.max(wEm, q.cap.length * 0.44, more ? 5.2 : 0) + 1.2 } };
   }
   // doubles and halves in Year 1: the words, then dots, answer anywhere below
   if (q.kind === 'dpic') {
