@@ -1519,17 +1519,14 @@ function graphQ(yr) {
     const cs = distinctPick(3, 1, 8), cats = names.map((nm, i) => ({ nm, n: cs[i] }));
     const ask = pickOne(['one', 'one', 'most', 'least']);
     if (ask === 'one') { const c = pickOne(cats); return { kind: 'graph', type: 'col', step, cats, ask, of: [c.nm], cap: `How many ${swatch(c.nm, true)}?`, capLen: 11, say: `How many ${c.nm}?`, ans: c.n }; }
-    const most = ask === 'most', want = (most ? Math.max : Math.min)(...cs), right = cs.indexOf(want);
-    const svg = graphSvg({ type: 'col', cats }), [, pw, ph] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number), words = `Which has the ${ask}?`;
-    return {
-      kind: 'tap', form: 'graph', cats, ask, of: [], top: `<span class="tpic"><span class="tw">${words}</span>${svg}</span>`,
-      tc: Math.max(pw, words.length * 0.45), th: ph + 0.9, topf: 0.66, tiles: GRAPH_TILES(cats), right, say: words, ans: cats[right].nm,
-    };
+    return graphTapQ('col', cats, ask);
   }
-  if (yr === 2) { type = pickOne(['tally', 'tally', 'pic']); counts = type === 'pic' ? distinctPick(4, 1, 10) : distinctPick(4, 2, 20); }
+  // Year 2 (D1b): a tally chart, a picture graph, or a dot plot of the colours (dots stacked over each square)
+  if (yr === 2) { type = pickOne(['tally', 'pic', 'cdot']); counts = type === 'tally' ? distinctPick(4, 2, 20) : distinctPick(4, 1, 10); }
   else { type = 'bar'; step = pickOne([2, 5, 10]); counts = distinctPick(4, 1, 6).map(x => x * step); }
   const cats = names.map((nm, i) => ({ nm, n: counts[i] }));
-  const ask = pickOne(yr === 2 ? ['one', 'more', 'more'] : ['one', 'more', 'all']);
+  const ask = pickOne(yr === 2 ? ['one', 'more', 'more', 'most', 'least'] : ['one', 'more', 'all']);
+  if (ask === 'most' || ask === 'least') return graphTapQ(type, cats, ask);
   const q = { kind: 'graph', type, step, cats, ask }, round = type === 'pic';
   if (ask === 'one') { const c = pickOne(cats); return { ...q, of: [c.nm], cap: `How many ${swatch(c.nm, round)}?`, capLen: 11, say: `How many ${c.nm}?`, ans: c.n }; }
   if (ask === 'more') {
@@ -1538,8 +1535,17 @@ function graphQ(yr) {
   }
   return { ...q, of: [], cap: 'How many altogether?', capLen: 20, say: 'How many altogether?', ans: sumOf(counts) };
 }
+// "Which has the most?" / "least?" over the graph (Years 1 and 2): tap its colour square
+function graphTapQ(type, cats, ask) {
+  const ns = cats.map(c => c.n), right = ns.indexOf((ask === 'most' ? Math.max : Math.min)(...ns));
+  const svg = graphSvg({ type, cats }), [, pw, ph] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number), words = `Which has the ${ask}?`;
+  return {
+    kind: 'tap', form: 'graph', type, cats, ask, of: [], top: `<span class="tpic"><span class="tw">${words}</span>${svg}</span>`,
+    tc: Math.max(pw, words.length * 0.45), th: ph + 0.9, topf: 0.66, tiles: GRAPH_TILES(cats), right, say: words, ans: cats[right].nm,
+  };
+}
 // tap the colour: tiles are the graph's colour squares, spoken by colour name
-const GRAPH_TILES = cats => cats.map(c => ({ html: `<span class="tsw" style="background:${BLOCK[c.nm]}"></span>`, label: c.nm, say: c.nm }));
+const GRAPH_TILES =cats => cats.map(c => ({ html: `<span class="tsw" style="background:${BLOCK[c.nm]}"></span>`, label: c.nm, say: c.nm }));
 function graphSvg(q) {
   const C = q.cats, sw = (x, y, nm, s = 10) => `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="1.2" fill="${BLOCK[nm]}" stroke="${INK}" stroke-width=".7"/>`;
   if (q.type === 'gtab') { // a table: the band, then how many, ruled like a printed table
@@ -1585,6 +1591,16 @@ function graphSvg(q) {
     C.forEach((c, i) => {
       const x = 10 + i * 18;
       for (let k = 0; k < c.n; k++) s += `<circle cx="${x}" cy="${B - 6 - k * 11}" r="5" fill="${BLOCK[c.nm]}" stroke="${INK}" stroke-width=".7"/>`;
+      s += sw(x - 5, B + 3, c.nm);
+    });
+    return `<svg ${emBox([-1, -1, W + 2, B + 15], 0.04)}>${s}</svg>`;
+  }
+  if (q.type === 'cdot') { // Year 2: a dot plot of the colours, plain dots stacked over each colour's square
+    const top = Math.max(...C.map(c => c.n)), B = top * 9 + 1, W = 20 + (C.length - 1) * 18;
+    let s = `<line x1="0" y1="${B}" x2="${W}" y2="${B}" stroke="${INK}" stroke-width="1"/>`;
+    C.forEach((c, i) => {
+      const x = 10 + i * 18;
+      for (let k = 0; k < c.n; k++) s += `<circle cx="${x}" cy="${B - 5 - k * 9}" r="3.4" fill="${INK}"/>`;
       s += sw(x - 5, B + 3, c.nm);
     });
     return `<svg ${emBox([-1, -1, W + 2, B + 15], 0.04)}>${s}</svg>`;
@@ -2251,9 +2267,10 @@ function round5Q(line) {
 function roundQ(yr, kinds) {
   if (yr === 5) return round5Q(pickOne(kinds) === 'line');
   for (let t = 0; t < 100; t++) {
-    const line = pickOne(kinds) === 'line', u = pickOne([10, 100, 1000, 1]);
+    const line = pickOne(kinds) === 'line', u = yr === 2 ? 10 : pickOne([10, 100, 1000, 1]); // Year 2 (D1b): nearest 10, numbers to 120
     let shown, lo, frac;
-    if (u === 1) { const n10 = rnd(1, 99); if (n10 % 10 === 0) continue; lo = Math.floor(n10 / 10); frac = (n10 % 10) / 10; shown = (n10 / 10).toFixed(1); }
+    if (yr === 2) { const n = rnd(11, 119); if (n % 10 === 0) continue; lo = n - n % 10; frac = (n % 10) / 10; shown = String(n); }
+    else if (u === 1){ const n10 = rnd(1, 99); if (n10 % 10 === 0) continue; lo = Math.floor(n10 / 10); frac = (n10 % 10) / 10; shown = (n10 / 10).toFixed(1); }
     else { const n = rnd(u + 1, 9999); if (n % u === 0) continue; lo = Math.floor(n / u) * u; frac = (n - lo) / u; shown = String(n); }
     if (line && frac === 0.5) continue;
     const hi = lo + u, word = u === 1 ? 'whole number' : String(u);
@@ -2922,20 +2939,48 @@ function patSvg(row, gap) {
 // dots she can see sit in ten-frame places, so she knows how many without counting.
 // The blot covers the last few dots of one row, so it is always one blot and the
 // dots beside it stay whole. Totals 6 to 20, half of them within 10 (one frame).
-function splatQ() {
+function splatQ(yr = 1) {
+  if (yr === 2) return splat2Q();
   const total = Math.random() < 0.5 ? rnd(6, 10) : rnd(11, 20), last = total > 10 ? total - 10 : total;
   const row = last > 5 ? 1 : 0, inRow = last - row * 5, hid = rnd(1, inRow);
   return { kind: 'splat', total, hid, row, from: last - hid, say: `${total} altogether. How many are hiding?`, ans: hid };
 }
+// Year 2 (D1b): totals 11 to 30, two or three blots hiding the same number each,
+// "14 altogether, 4 showing. How many under one?" One blot to a ten frame (two in
+// one frame would touch and look like one), each over 2 to 5 dots of one row.
+const splatFill = (total, row) => Math.max(0, Math.min(5, total - 5 * row));
+function splat2Q() {
+  for (let t = 0; t < 300; t++) {
+    const b = Math.random() < 0.6 ? 2 : 3, total = rnd(b === 3 ? 21 : 11, 30), frames = Math.ceil(total / 10), k = rnd(2, 5);
+    if (frames < b || total - b * k < 2) continue;
+    const fs = shuffled(range(0, frames - 1)).slice(0, b).sort((x, y) => x - y), blots = [];
+    for (const f of fs) {
+      const rows = [0, 1].filter(r => splatFill(total, 2 * f + r) >= k);
+      if (!rows.length) break;
+      const r = pickOne(rows);
+      blots.push({ f, r, s: rnd(0, splatFill(total, 2 * f + r) - k) });
+    }
+    if (blots.length < b) continue;
+    // lobes of a blot on a frame's bottom row and one on the next frame's top row would meet in the gap
+    if (blots.some((B, i) => i && B.f === blots[i - 1].f + 1 && B.r === 0 && blots[i - 1].r === 1)) continue;
+    const showing = total - b * k;
+    return { kind: 'splat', yr: 2, total, showing, k, blots, say: `${total} altogether. ${showing} showing. The same number under each blot. How many under one?`, ans: k };
+  }
+  return { kind: 'splat', yr: 2, total: 14, showing: 4, k: 5, blots: [{ f: 0, r: 0, s: 0 }, { f: 1, r: 0, s: 0 }], say: '14 altogether. 4 showing. The same number under each blot. How many under one?', ans: 5 };
+}
 function splatSvg(q) {
-  const frames = q.total > 10 ? 2 : 1, H = 20 + 26 * (frames - 1), fy = frames - 1, E = 0.1;
+  const frames = Math.ceil(q.total / 10), H = 20 + 26 * (frames - 1), E = frames > 2 ? 0.085 : 0.1;
   let s = '';
   for (let f = 0; f < frames; f++) s += `<g transform="translate(0 ${f * 26})">${frameInner(f < frames - 1 ? 10 : q.total - 10 * (frames - 1))}</g>`;
-  // the blot: a thick stroke through the hidden cells, round at both ends, a few lobes, two on the outer edge
-  const cy = fy * 26 + q.row * 10 + 5, x0 = (q.from % 5) * 10 + 5, x1 = x0 + (q.hid - 1) * 10, out = q.row ? 1 : -1;
-  const lobes = [[x0 - 4.8, cy + out * 6.4], [(x0 + x1) / 2 + 1, cy + out * 7.6], [x1 + 4.6, cy + out * 6.9]].map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${[1.5, 2.4, 1.1][i]}" fill="${SHADE}"/>`).join('');
-  s += `<g fill="${SHADE}"><path d="M${x0} ${cy}H${x1}" stroke="${SHADE}" stroke-width="10.4" stroke-linecap="round" fill="none"/>`
-    + `<circle cx="${x0 - 0.2}" cy="${cy + 0.4}" r="5.9"/><circle cx="${x1 + 0.2}" cy="${cy - 0.4}" r="5.9"/>${lobes}</g>`;
+  // Year 1: one blot over the last dots of a row in the last frame
+  const blots = q.blots || [{ f: frames - 1, r: q.row, s: q.from % 5 }], k = q.k || q.hid;
+  // a blot: a thick stroke through the hidden cells, round at both ends, a few lobes, two on the outer edge
+  for (const B of blots) {
+    const cy = B.f * 26 + B.r * 10 + 5, x0 = B.s * 10 + 5, x1 = x0 + (k - 1) * 10, out = B.r ? 1 : -1;
+    const lobes = [[x0 - 4.8, cy + out * 6.4], [(x0 + x1) / 2 + 1, cy + out * 7.6], [x1 + 4.6, cy + out * 6.9]].map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${[1.5, 2.4, 1.1][i]}" fill="${SHADE}"/>`).join('');
+    s += `<g fill="${SHADE}"><path d="M${x0} ${cy}H${x1}" stroke="${SHADE}" stroke-width="10.4" stroke-linecap="round" fill="none"/>`
+      + `<circle cx="${x0 - 0.2}" cy="${cy + 0.4}" r="5.9"/><circle cx="${x1 + 0.2}" cy="${cy - 0.4}" r="5.9"/>${lobes}</g>`;
+  }
   return `<svg ${emBox([-2, -6, 54, H + 12], E)} stroke="none">${s}</svg>`;
 }
 // ---- Halves and quarters (Year 1, B4). Tap: "Which one shows a half?" among three
@@ -3432,9 +3477,9 @@ const ACTS = {
   splat: { // a blot hides some of the dots: total on top, how many are hiding?
     name: 'Splat', ages: [5], setup: 'opts', say: 'How many are hiding?',
     pic: `<svg viewBox="0 0 120 84"><rect x="12" y="22" width="96" height="40" fill="none" stroke="${INK}" stroke-width="3"/>${[1, 2, 3, 4].map(i => `<line x1="${12 + i * 19.2}" y1="22" x2="${12 + i * 19.2}" y2="62" stroke="${INK}" stroke-width="1.5"/>`).join('')}<line x1="12" y1="42" x2="108" y2="42" stroke="${INK}" stroke-width="1.5"/>${[0, 1, 2].map(i => `<circle cx="${21.6 + i * 19.2}" cy="32" r="6.5" fill="${INK}"/>`).join('')}<path d="M62 52H98" stroke="${SHADE}" stroke-width="19" stroke-linecap="round"/><circle cx="80" cy="45" r="4" fill="${SHADE}"/></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · totals 6 to 20']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · totals 6 to 20'], [2, '2 · to 30, two or three blots']] }],
     defaults: () => ({ yr: 1, n: 6 }),
-    make: () => splatQ(),
+    make: c => splatQ(c.yr),
     key: c => `splat~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `Splat · Year ${y} · ${n} questions`; },
   },
@@ -3542,7 +3587,7 @@ const ACTS = {
   graph: {
     name: 'Graphs', ages: [5, 8], setup: 'opts', say: 'Look at the graph and answer the question.',
     pic: graphSvg({ type: 'bar', step: 2, cats: [{ nm: 'red', n: 8 }, { nm: 'blue', n: 4 }, { nm: 'green', n: 10 }, { nm: 'yellow', n: 6 }] }),
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · picture graphs'], [2, '2 · tally charts'], [3, '3 · bar graphs'], [4, '4 · dot plots'], [5, '5 · grouped bars, tables']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · picture graphs'], [2, '2 · tally charts, dot plots'], [3, '3 · bar graphs'], [4, '4 · dot plots'], [5, '5 · grouped bars, tables']] }],
     defaults: age => ({ yr: age === 5 ? 1 : 3, n: age === 5 ? 6 : 12 }),
     make: c => graphQ(c.yr),
     key: c => `graph~${c.yr}|${c.n}`,
@@ -3614,13 +3659,13 @@ const ACTS = {
     label: k => { const [y, n] = k.split('|'); return `Balance · Year ${y} · ${n} questions`; },
   },
   round: {
-    name: 'Rounding', ages: [8], setup: 'opts', say: 'Round the number.',
+    name: 'Rounding', ages: [5, 8], setup: 'opts', say: 'Round the number.',
     pic: rlineSvg({ n: 47, lo: 40, hi: 50, pos: 0.7 }),
     options: [
-      { key: 'yr', label: 'Year', values: [[4, '4 · 10s, 100s, 1000s, tenths'], [5, '5 · 100,000s, hundredths, dollars']] },
+      { key: 'yr', label: 'Year', values: [[2, '2 · nearest 10, to 120'], [4, '4 · 10s, 100s, 1000s, tenths'], [5, '5 · 100,000s, hundredths, dollars']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['line', 'Number line'], ['num', 'Just numbers']] },
     ],
-    defaults: () => ({ yr: 4, kinds: ['line', 'num'], n: 12 }),
+    defaults: age => age === 5 ? { yr: 2, kinds: ['line'], n: 6 } : { yr: 4, kinds: ['line', 'num'], n: 12 },
     make: c => roundQ(c.yr, c.kinds),
     key: c => `round~${c.yr}|${['line', 'num'].filter(k => c.kinds.includes(k)).join(',')}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Rounding · Year ${y} · ${kinds.split(',').map(x => ({ line: 'number line', num: 'just numbers' })[x]).join(', ')} · ${n} questions`; },
@@ -4310,7 +4355,9 @@ function qMarkup(q) {
   // Splat: the total as a big numeral, ten frames with a blot over some dots; answer anywhere below
   if (q.kind === 'splat') {
     const svg = splatSvg(q), [, wEm, hEm] = svg.match(/width:([\d.]+)em;height:([\d.]+)em/).map(Number);
-    return { cls: 'frame', html: `<div class="cap"><b>${q.total}</b> altogether</div>${svg}`, vars: { '--h': hEm + 2.3 + 3.2, '--c': Math.max(wEm, 6.4) + 1.2 } };
+    // Year 2: "4 showing" on a second line
+    const more = q.yr === 2 ? `<br><b>${q.showing}</b> showing` : '';
+    return { cls: 'frame', html: `<div class="cap"><b>${q.total}</b> altogether${more}</div>${svg}`, vars: { '--h': hEm + 2.3 + (more ? 1.7 : 0) + 3.2, '--c': Math.max(wEm, 6.4) + 1.2 } };
   }
   // Half of 8, A quarter of 12: the dots in groups with a dashed sharing line; answer anywhere below
   if (q.kind === 'share') {

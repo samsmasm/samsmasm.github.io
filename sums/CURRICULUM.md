@@ -80,7 +80,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Place value of each digit in two-digit numbers and three-digit numbers to 120. ✓ (Place value)
 - Roughly place numbers on a number line marked in tens (61 on a line marked 0, 10, 20...). ✓ partly (Number lines)
 - Count a collection to 120 by making groups of ten.
-- Round numbers to 120 to the nearest 10.
+- Round numbers to 120 to the nearest 10. ✓ (Rounding, Year 2: number line or just numbers; D1b)
 - Count in 2s, 5s and 10s forwards and backwards from any number to 120; count in 3s from multiples of 3. ✓ (Number patterns, Year 2)
 - Odd and even numbers to 120 (last digit 0, 2, 4, 6, 8 = even).
 - Numbers in te reo Māori to 100.
@@ -94,7 +94,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Add 100 to a one-digit number. ✓ (Add and take away, Year 2: 100 + n to 120, and back)
 - One-step + and − word problems to 100; two-step to 20. ✓ (Story sums, Year 2)
 - Link skip counting to the 2, 5 and 10 times tables; learn those tables and their division facts. ✓ (Times bonds, Times grid)
-- Multiply and divide with answers up to 100. ✓ (Sums, Arrays)
+- Multiply and divide with answers up to 100. ✓ (Sums, Arrays; Splat, Year 2: two or three blots hiding the same number each, "14 altogether, 4 showing, how many under one?", totals to 30; D1b)
 - Knows: × 1 and ÷ 1 change nothing; × 0 is 0; order doesn't matter for × but does for ÷; + and − undo each other, and so do × and ÷.
 
 ### Fractions and money
@@ -129,8 +129,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ### Statistics
 - Collect category data (favourite pets) ✋, sort it, decide if "other" is needed, tally it.
-- Make picture graphs and dot plots.
-- Describe them and answer most and least questions. ✓ partly (Graphs, Year 2: tally charts and picture graphs, how many and how many more; no dot plots until Year 4, no most/least)
+- Make picture graphs and dot plots. ✓ partly (Graphs, Year 2: reading picture graphs, tally charts and a dot plot of colours, dots stacked over each colour's square; not making them)
+- Describe them and answer most and least questions. ✓ (Graphs, Year 2: how many, how many more, and tap the colour with the most or least; D1b)
 
 ---
 

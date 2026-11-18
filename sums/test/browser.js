@@ -116,7 +116,7 @@ const fakeSpeech = () => {
   await swipe(200, 500);
   ok(await page.evaluate(() => view === 2), 'swipe right: Year 2 page');
   const y2 = await tiles('#actTiles');
-  ok(y2.length === 18 && y2.includes('Number bonds') && !y2.includes('Picture patterns') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
+  ok(y2.length === 20 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && !y2.includes('Picture patterns') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
   await swipe(500, 200); await swipe(500, 200); await swipe(500, 200); await swipe(500, 200);
   ok(await page.evaluate(() => view === 5 && $('#yNext').disabled), 'swipe left up to Year 5, and no further');
   await page.evaluate(() => turnPage(4 - view));
@@ -160,7 +160,7 @@ const fakeSpeech = () => {
   }).join(' '));
   ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:5:5:12 8:5:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
   await page.click('#yearTiles [data-year="2"]');
-  ok((await tiles('#actTiles')).length === 18 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
+  ok((await tiles('#actTiles')).length === 20 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
   await page.click('#actTiles [data-act="graph"]');
   ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Your year: Year 2'), 'Year 2: Graphs starts at Year 2 and says so');
   await page.click('#backBtn'); await page.click('#backBtn');
@@ -170,8 +170,8 @@ const fakeSpeech = () => {
   const y5 = await tiles('#actTiles');
   ok(['Add and take away', 'Times and divide', 'Number patterns', 'Place value', 'Sums', 'Decimals', 'Money', 'Clocks', 'Change units', 'Angles', 'Map', 'Shapes', 'Graphs'].every(t => y5.includes(t)) && !y5.includes('Rulers'), 'Year 5 page: the activities with a Year 5 (and the older tiles without years), not the Year 4-only ones ' + y5.join(', '));
   // a new activity can start with one year only: any page opens it at the nearest year it has
-  ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('round').yr; }).join() === '4,4'), 'Rounding (Year 4 only so far) opens at Year 4');
-  await page.evaluate(() => { setYear(3); act = 'round'; goSetup(); });
+  ok(await page.evaluate(() => [3, 4].map(v => { view = v; return loadCfg('dec').yr; }).join() === '4,4'), 'Decimals (Years 4 and 5 so far) opens at Year 4');
+  await page.evaluate(() => { setYear(3); act = 'dec'; goSetup(); });
   ok(await page.evaluate(() => $('.sughint').textContent === 'Your year: Year 3 (Year 4 is the lowest here so far)' && draft.yr === 4 && $('#optBlock [data-key="yr"] [aria-pressed="true"]').dataset.v === '4'), 'Year 3 on a Year 4 only activity: Year 4 chosen, and the line says it is the lowest so far');
   // Years 1, 2, 4, 5 (B2, D1a): the nearest year, a tie going down
   ok(await page.evaluate(() => [1, 2, 3, 4].map(v => { view = v; return ['tf', 'cmp', 'bal'].map(x => loadCfg(x).yr).join(''); }).join() === '111,222,222,444'), 'True or false, More or less, Balance (Years 1, 2, 4): Year 3 opens Year 2 (a tie goes down)');
@@ -1083,27 +1083,29 @@ const fakeSpeech = () => {
         asks.add(q.ask);
         continue;
       }
-      if (q.kind === 'tap') { // Year 1: tap the colour with the most or the least
-        const ns = q.cats.map(c => c.n), want = q.ask === 'most' ? Math.max(...ns) : Math.min(...ns);
-        if (yr !== 1 || q.form !== 'graph' || q.cats.length !== 3 || new Set(ns).size !== 3 || q.tiles.length !== 3 || q.cats[q.right].n !== want || q.tiles[q.right].label !== q.cats[q.right].nm || !q.tiles.every((t, j) => t.say === q.cats[j].nm)) bad.push('y1 tap ' + JSON.stringify(q));
-        asks.add('y1 ' + q.ask);
+      if (q.kind === 'tap') { // Years 1 and 2: tap the colour with the most or the least
+        const ns = q.cats.map(c => c.n), want = q.ask === 'most' ? Math.max(...ns) : Math.min(...ns), nc = yr === 1 ? 3 : 4;
+        if (yr > 2 || q.form !== 'graph' || q.cats.length !== nc || new Set(ns).size !== nc || q.tiles.length !== nc || q.cats[q.right].n !== want || q.tiles[q.right].label !== q.cats[q.right].nm || !q.tiles.every((t, j) => t.say === q.cats[j].nm)) bad.push(`y${yr} tap ` + JSON.stringify(q));
+        if (yr === 1 && q.type !== 'col') bad.push('y1 tap type ' + q.type);
+        asks.add(`y${yr} ${q.ask}`);
         continue;
       }
       if (yr === 1) asks.add('y1 ' + q.ask);
+      if (yr === 2 && q.type === 'cdot') asks.add('y2 cdot');
       const ns = q.cats.map(c => c.n), by = Object.fromEntries(q.cats.map(c => [c.nm, c.n]));
       const want = q.ask === 'one' ? by[q.of[0]] : q.ask === 'more' ? by[q.of[0]] - by[q.of[1]] : ns.reduce((a, b) => a + b, 0);
       if (q.ans !== want || q.ans < 1 || new Set(ns).size !== ns.length) bad.push(`${yr} ${JSON.stringify(q)}`);
       if ((yr === 1 && (q.type !== 'col' || q.ask !== 'one' || q.cats.length !== 3 || Math.max(...ns) > 8)) || (yr === 2 && q.type === 'bar') || (yr === 3 && (q.type !== 'bar' || ns.some(n => n % q.step)))) bad.push(`${yr} type ${JSON.stringify(q)}`);
       // the drawing shows the counts: dots, tally marks, or bar heights on the scale
       const svg = new DOMParser().parseFromString(graphSvg(q), 'image/svg+xml');
-      if ((q.type === 'pic' || q.type === 'col') && svg.querySelectorAll('circle').length !== ns.reduce((a, b) => a + b, 0)) bad.push('dots ' + JSON.stringify(q));
+      if ((q.type === 'pic' || q.type === 'col' || q.type === 'cdot') && svg.querySelectorAll('circle').length !== ns.reduce((a, b) => a + b, 0)) bad.push('dots ' + JSON.stringify(q));
       if (q.type === 'tally' && svg.querySelectorAll('line').length !== ns.reduce((a, b) => a + b, 0)) bad.push('tally ' + JSON.stringify(q));
       if (q.type === 'bar') {
         const bars = [...svg.querySelectorAll('rect')].filter(r => +r.getAttribute('width') === 13).map(r => +r.getAttribute('height'));
         if (bars.some((h, j) => Math.abs(h - ns[j] * 60 / (6 * q.step)) > 0.01)) bad.push('bars ' + JSON.stringify(q));
       }
     }
-    if ([...asks].sort().join() !== 'all,max,min,mode,one,range,y1 least,y1 most,y1 one') bad.push('questions seen: ' + [...asks].sort().join());
+    if ([...asks].sort().join() !== 'all,max,min,mode,one,range,y1 least,y1 most,y1 one,y2 cdot,y2 least,y2 most') bad.push('questions seen: ' + [...asks].sort().join());
     return bad.slice(0, 4);
   });
   ok(gq.length === 0, 'Graphs: answers match the counts and the drawing (dots, tally marks, bars on the scale); Year 1 picture graphs, Year 3 bar graphs; Year 4 dot plots ask how many, most common, altogether, most, fewest and spread, and the tallest stack is never at the biggest value ' + gq.join(' | '));
@@ -1121,7 +1123,7 @@ const fakeSpeech = () => {
   ok((await writeAllAndMark()).length === 0, 'Graphs Year 4 new questions: read and marked right');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y4.png' });
   for (const yr of [3, 1, 2]) await yearSheet('graph', yr, 'Graphs');
-  ok(await page.evaluate(() => cards.every(c => c.el.querySelectorAll('.cap .sw').length === c.q.of.length && cardSay(c.q) === c.q.say)), 'Graphs: colours in the question, read aloud by colour name');
+  ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' || (c.el.querySelectorAll('.cap .sw').length === c.q.of.length && cardSay(c.q) === c.q.say))), 'Graphs: colours in the question, read aloud by colour name');
   ok(await page.evaluate(() => { const qs = range(0, 40).map(() => graphQ(2)); return qs.every(q => q.of.length === 0 || /class="sw round"/.test(q.cap) === (q.type === 'pic')); }), 'Graphs: a circle in the question when she counts circles, a square for tallies and bars (Sam)');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/29-graph-y2.png' });
   // Year 1: columns standing on a line, and tap the colour with the most / least (both kinds on one sheet)
@@ -1972,6 +1974,65 @@ const fakeSpeech = () => {
     if (SHOTS) await page.screenshot({ path: SHOTS + `/46-${a}-y2.png` });
     ok((await writeAllAndMark()).length === 0, `${a} Year 2: read and marked right`);
   }
+
+  // ---- D1b: Year 2 on Graphs (dot plot of colours, tap most / least), Rounding, Splat
+  const d1b = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    for (let i = 0; i < 500; i++) { // Rounding: nearest 10, numbers to 120, never halfway on the line
+      const kinds = pickOne([['line'], ['num'], ['line', 'num']]), q = roundQ(2, kinds), n = +q.n, want = Math.round(n / 10) * 10;
+      if (q.hi - q.lo !== 10 || n < 11 || n > 119 || n % 10 === 0 || q.ans !== want || q.hi > 120 || q.lo > n || q.hi < n || q.cap !== 'to the nearest 10' || q.say !== `Round ${n} to the nearest 10.`) bad.push('round ' + JSON.stringify(q));
+      if (!kinds.includes(q.kind === 'rline' ? 'line' : 'num')) bad.push('round kind ' + q.kind + ' ' + kinds);
+      if (q.kind === 'rline' && n % 10 === 5) bad.push('round halfway on the line ' + n);
+      if (n % 10 === 5 && q.kind === 'rnum') seen.add('half');
+      if (n > 100) seen.add('over 100');
+    }
+    const dist = (px, py, x0, x1, y) => Math.hypot(px - Math.min(Math.max(px, x0), x1), py - y);
+    for (let i = 0; i < 600; i++) { // Splat: two or three blots, the same number under each
+      const q = splatQ(2), b = q.blots.length, d = new DOMParser().parseFromString(`<div>${splatSvg(q)}</div>`, 'text/html');
+      if (q.total < 11 || q.total > 30 || b < 2 || b > 3 || q.k < 2 || q.k > 5 || q.showing < 2 || q.showing !== q.total - b * q.k || q.ans !== q.k) bad.push('splat numbers ' + JSON.stringify(q));
+      if (new Set(q.blots.map(B => B.f)).size !== b) bad.push('splat two blots in a frame ' + JSON.stringify(q));
+      if (cardSay(q) !== `${q.total} altogether. ${q.showing} showing. The same number under each blot. How many under one?`) bad.push('splat say ' + cardSay(q));
+      seen.add('blots ' + b); seen.add('k ' + q.k);
+      const dots = [...d.querySelectorAll('circle[fill="currentColor"]')].map(c => { const g = c.closest('g[transform]'), ty = g ? +g.getAttribute('transform').match(/translate\(0 ([\d.]+)\)/)[1] : 0; return [+c.getAttribute('cx'), +c.getAttribute('cy') + ty]; });
+      const segs = [...d.querySelectorAll('path[stroke-width="10.4"]')].map(p => p.getAttribute('d').match(/M([\d.]+) ([\d.]+)H([\d.]+)/).slice(1).map(Number));
+      const caps = [...d.querySelectorAll('g[fill] > circle')].filter(c => c.getAttribute('r') === '5.9');
+      if (dots.length !== q.total || segs.length !== b || caps.length !== 2 * b) bad.push('splat drawing ' + dots.length + ' ' + segs.length + ' ' + caps.length);
+      let covered = 0;
+      dots.forEach(([x, y]) => {
+        const edge = Math.min(...segs.map(([x0, y0, x1]) => dist(x, y, x0, x1, y0) - 5.2), ...caps.map(c => Math.hypot(x - +c.getAttribute('cx'), y - +c.getAttribute('cy')) - 5.9));
+        if (edge <= -3.5 + 0.01) covered++; else if (edge < 3.5 - 0.01) bad.push('splat dot half under a blot ' + edge.toFixed(2) + ' ' + JSON.stringify(q));
+      });
+      if (covered !== b * q.k) bad.push('splat covered ' + covered + ' of ' + b * q.k);
+      // every blot is the same length
+      if (segs.some(([x0, , x1]) => Math.abs(x1 - x0 - (q.k - 1) * 10) > 0.01)) bad.push('splat blot sizes');
+    }
+    let taps = 0;
+    for (let i = 0; i < 400; i++) { const q = graphQ(2); if (q.kind === 'tap') { taps++; seen.add('tap ' + q.type); } }
+    if (taps < 110 || taps > 220) bad.push('graph taps ' + taps + ' of 400');
+    const want = ['half', 'over 100', 'blots 2', 'blots 3', 'k 2', 'k 3', 'k 4', 'k 5', 'tap tally', 'tap pic', 'tap cdot'];
+    if (!want.every(s => seen.has(s))) bad.push('seen ' + [...seen]);
+    return bad.slice(0, 5);
+  });
+  ok(d1b.length === 0, 'Year 2: Rounding (nearest 10 to 120, never halfway on the line), Splat (two or three blots, same number under each, dots whole or covered), Graphs (tap most / least on tally, picture and dot plot) ' + d1b.join(' | '));
+  ok(await page.evaluate(() => [ACTS.round.defaults(5).yr, ACTS.round.defaults(5).kinds.join(), ACTS.round.key({ yr: 2, kinds: ['line'], n: 6 }), labelFor('round~2|line|6'), labelFor('splat~2|12'), ACTS.splat.key({ yr: 2, n: 6 })].join(' / '))
+    === '2 / line / round~2|line|6 / Rounding · Year 2 · number line · 6 questions / Splat · Year 2 · 12 questions / splat~2|6', 'Year 2 Rounding and Splat: younger default number line, record keys and labels');
+  // a Graphs sheet with every Year 2 kind: dot plot written, then tap cards on each graph
+  await page.evaluate(() => {
+    hideDone(); act = 'graph'; buildSheet({ yr: 2, n: 12 }); show('sheet');
+    const want = ['cdot', 'tap cdot', 'tap tally', 'tap pic', 'tally', 'pic'];
+    for (let i = 0; i < want.length; i++) { const q = graphQ(2), w = (q.kind === 'tap' ? 'tap ' : '') + q.type; if (w !== want[i]) { i--; continue; } cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); }
+  });
+  ok(await page.evaluate(() => cards.filter(c => c.q.kind === 'tap').every(c => c.el.querySelectorAll('.tt .tsw').length === 4)), 'Graphs Year 2: tap cards with four colour squares');
+  ok((await fits()).length === 0, 'Graphs Year 2 (dot plots and tap cards) fit ' + (await fits()).join(' '));
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/47-graph-y2.png' });
+  ok((await writeAllAndMark()).length === 0, 'Graphs Year 2: written and tapped answers marked right');
+  for (const [a, c] of [['round', { yr: 2, kinds: ['line', 'num'], n: 12 }], ['round', { yr: 2, kinds: ['line'], n: 6 }], ['splat', { yr: 2, n: 6 }], ['splat', { yr: 2, n: 12 }]]) {
+    await page.evaluate((a, c) => { hideDone(); act = a; buildSheet(c); show('sheet'); }, a, c);
+    ok((await fits()).length === 0, `${a} Year 2 (${c.n}) fits ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/47-${a}-y2-${c.n}.png` });
+    ok((await writeAllAndMark()).length === 0, `${a} Year 2 (${c.n}): read and marked right`);
+  }
+  ok(await page.evaluate(() => cards.every(c => c.el.querySelector('.cap').innerText.replace(/\s+/g, ' ') === `${c.q.total} altogether ${c.q.showing} showing`)), 'Splat Year 2: "14 altogether" and "4 showing" printed');
   await page.evaluate(() => { setYear(4); hideDone(); });
 
   // ---- B3: Picture patterns and Shapes Name (Year 1)
