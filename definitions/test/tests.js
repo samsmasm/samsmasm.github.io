@@ -61,7 +61,7 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   ok(await page.$eval('.unit[data-u="1"]', u => !u.textContent.includes('concepts')), 'concepts not in Unit 1');
   ok(await page.$eval('.unit[data-u="1"] .wholes', w => w.querySelectorAll('.chip').length === 1 && w.textContent.startsWith('Whole unit6')), 'Unit 1 (no HL terms) has one Whole unit button');
   ok(await page.$eval('#start', b => b.disabled), 'Start disabled with nothing picked');
-  ok(JSON.stringify(await page.$$eval('#lengths button', l => l.map(b => b.textContent))) === '["6","12","All"]', 'lengths are 6, 12, All');
+  ok(JSON.stringify(await page.$$eval('#lengths button', l => l.map(b => b.textContent))) === '["6","12","18","All"]', 'lengths are 6, 12, 18, All');
   const HR = '.unit[data-u="2"]', FIN = '.unit[data-u="3"]';
   const pressed = sel => page.$eval(sel, b => b.getAttribute('aria-pressed') === 'true');
   const hrSL = await page.evaluate(() => DEFS.filter(d => d.unit === 2 && !d.hl).length);
@@ -176,7 +176,7 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll on setup (phone)');
   await shot(page, 'setup-phone');
   await pick27();
-  await page.click('#lengths button:nth-child(3)');   // All
+  await page.click('#lengths button:nth-child(4)');   // All
   await page.click('#start');
   ok(await text(page, '#progress') === '1 of 5', 'All = 15 terms = 5 boards');
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll on board (phone)');
