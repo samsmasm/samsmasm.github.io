@@ -138,10 +138,10 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ### Number
 - Read, write and show numbers to 1,000 with base-ten blocks. ✓ (Place value: Blocks)
-- Compare and order numbers to 1,000.
+- Compare and order numbers to 1,000. ✓ (More or less and True or false, Year 3)
 - Place value of each digit in three-digit numbers. ✓ (Place value)
 - Count collections beyond 120 by grouping in 10s and 100s.
-- Round to the nearest 10 or 100; estimate an answer before working it out.
+- Round to the nearest 10 or 100; estimate an answer before working it out. ✓ partly (Rounding, Year 3: rounding, not estimating)
 - Count forwards and backwards in 2s, 3s, 4s, 5s and 8s from multiples (8, 16, 24, 32). ✓ (Number patterns, Year 3)
 - Count in 10s and 100s from any number to 1,000. ✓ (Place value: 10 more / 10 less, Number lines)
 
@@ -170,8 +170,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Give change by adding and subtracting. ✓ (Money: Change)
 
 ### Algebra
-- True or false comparisons to 1,000 (313 < 330?).
-- True or false and open number sentences with all four operations (217 − __ = 105, 12 ÷ 3 = 5 − 2?). ✓ partly (Missing number)
+- True or false comparisons to 1,000 (313 < 330?). ✓ (True or false, Year 3)
+- True or false and open number sentences with all four operations (217 − __ = 105, 12 ÷ 3 = 5 − 2?). ✓ (True or false, Balance and More or less, Year 3; Missing number)
 - Recognise, continue and make growing number patterns (a rule that adds or takes away each time). ✓ partly (Number patterns, Year 3: continue, not make)
 
 ### Measurement
