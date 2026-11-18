@@ -1001,11 +1001,26 @@ function clockSvg(q, em = 4.4) {
 }
 // Clocks, Match (Year 1, B2): a face on the hour, three digital clocks to tap.
 // The wrong ones are the hour either side, and 12:00 (where the long hand points).
-const DIGI_TILE = h => ({ html: `<span class="dig">${h}:00</span>`, label: `${h}:00`, say: `${h} o'clock` });
-function clockMatchQ() {
-  const h = rnd(1, 12), wrap = k => (k + 11) % 12 + 1, near = [wrap(h - 1), wrap(h + 1)];
+// Year 2 (D1a) adds quarter past and half past: the wrong ones are the hour
+// after (the short hand is past h, not at the next number) and the number the
+// long hand points at read as minutes (3:06 for half past 3), or the two hands swapped (6:15).
+// A tile reads like a digital clock ("3 30", "3 oh 6"), so its words never give the answer away.
+const DIGI_TILE = (h, m = 0) => ({ html: `<span class="dig">${h}:${pad2(m)}</span>`, label: `${h}:${pad2(m)}`, say: m ? `${h} ${m < 10 ? 'oh ' + m : m}` : `${h} o'clock` });
+function clockMatchQ(yr = 1) {
+  const wrap = k => (k + 11) % 12 + 1;
+  const m = yr === 2 ? pickOne([0, 15, 30, 30]) : 0;
+  if (m) {
+    for (;;) {
+      const h = rnd(1, 12), long = [m / 5 === h ? null : [h, m / 5], [m / 5, h * 5 < 60 ? h * 5 : null]].filter(x => x && x[1] !== null && !(x[0] === h && x[1] === m));
+      if (!long.length) continue;
+      const opts = shuffled([[h, m], [wrap(h + 1), m], pickOne(long)]);
+      if (new Set(opts.map(o => o.join(':'))).size < 3) continue;
+      return { kind: 'tap', form: 'match', yr, h, m, top: clockSvg({ h, m }, 4.4), tc: 4.4, th: 4.4, topf: 0.66, tiles: opts.map(o => DIGI_TILE(...o)), right: opts.findIndex(o => o[0] === h && o[1] === m), say: 'Which clock shows the same time?', ans: `${h}:${pad2(m)}` };
+    }
+  }
+  const h = rnd(1, 12), near = [wrap(h - 1), wrap(h + 1)];
   const opts = shuffled([h, ...(h === 12 ? near : [12, pickOne(near.filter(k => k !== 12))])]);
-  return { kind: 'tap', form: 'match', h, m: 0, top: clockSvg({ h, m: 0 }, 4.4), tc: 4.4, th: 4.4, topf: 0.66, tiles: opts.map(DIGI_TILE), right: opts.indexOf(h), say: 'Which clock shows the same time?', ans: `${h}:00` };
+  return { kind: 'tap', form: 'match', yr, h, m: 0, top: clockSvg({ h, m: 0 }, 4.4), tc: 4.4, th: 4.4, topf: 0.66, tiles: opts.map(k => DIGI_TILE(k)), right: opts.indexOf(h), say: 'Which clock shows the same time?', ans: `${h}:00` };
 }
 // Clocks, Year 5 (C3a): 24-hour time. A face or words with the part of the day
 // ("quarter past 3 in the afternoon" → 15 : 15). Never "to 12" in the morning (that is midday).
@@ -1183,13 +1198,21 @@ function addSubQ(op, yr) {
     if (yr === 1) { // within 20
       if (op === '+') { a = rnd(0, 10); b = rnd(0, 10); if (Math.random() < 0.2) [a, b] = [10, rnd(1, 9)]; }
       else { a = rnd(1, 20); b = rnd(0, Math.min(a, 10)); }
-    } else if (yr === 2) { // facts to 20, then within 100 (32 + 2, 32 + 20)
-      const k = pickOne(['fact', 'ones', 'tens']);
+    } else if (yr === 2) { // facts to 20, then within 100 (32 + 2, 32 + 20); D1a: three one-digit numbers (7 + 3 + 6), tens facts (70 + 20), 100 + n (to 120)
+      const k = pickOne(op === '+' ? ['fact', 'ones', 'tens', 'three', 'tenf', 'hund'] : ['fact', 'ones', 'tens', 'tenf', 'hund']);
+      if (k === 'three') {
+        const n = [rnd(2, 9), rnd(2, 9), rnd(1, 9)], text = n.join(' + ');
+        return { kind: 'expr', text, say: n.join(' plus '), ans: sumOf(n) };
+      }
       if (op === '+') {
-        if (k === 'fact') { a = rnd(2, 10); b = rnd(2, 10); } else if (k === 'ones') { a = rnd(10, 89); b = rnd(1, 9); } else { a = rnd(10, 80); b = rnd(1, 9) * 10; }
-        if (a + b > 100) continue;
+        if (k === 'fact') { a = rnd(2, 10); b = rnd(2, 10); } else if (k === 'ones') { a = rnd(10, 89); b = rnd(1, 9); } else if (k === 'tens') { a = rnd(10, 80); b = rnd(1, 9) * 10; }
+        else if (k === 'tenf') { a = rnd(1, 9) * 10; b = rnd(1, 9) * 10; }
+        else { a = 100; b = rnd(1, 20); if (Math.random() < 0.4) [a, b] = [b, a]; }
+        if (a + b > (k === 'hund' ? 120 : 100)) continue;
       } else {
-        if (k === 'fact') { a = rnd(11, 20); b = rnd(2, 9); } else if (k === 'ones') { a = rnd(11, 99); b = rnd(1, 9); } else { a = rnd(20, 99); b = rnd(1, Math.floor(a / 10)) * 10; }
+        if (k === 'fact') { a = rnd(11, 20); b = rnd(2, 9); } else if (k === 'ones') { a = rnd(11, 99); b = rnd(1, 9); } else if (k === 'tens') { a = rnd(20, 99); b = rnd(1, Math.floor(a / 10)) * 10; }
+        else if (k === 'tenf') { a = rnd(2, 10) * 10; b = rnd(1, a / 10 - 1) * 10; }
+        else { a = 100 + rnd(1, 20); b = Math.random() < 0.5 ? 100 : a - 100; } // 107 − 100, 107 − 7
       }
     } else { // Year 3 within 1,000, Year 4 four digits, Year 5 five and six digits (or hundredths, across)
       if (yr === 5 && Math.random() < 0.35) return hundredthsQ(op);
@@ -1896,8 +1919,51 @@ function tf5Q() {
   }
   return { kind: 'tap', yr: 5, type: 'frac', sign: '=', text: '2/3 = 6/9', top: `${frHtml(2, 3)} = ${frHtml(6, 9)}`, tc: 5.2, th: 2.3, tiles: TF_TILES, right: 0, truth: true, say: '2 over 3 equals 6 over 9. True?', ans: '✓' };
 }
+// Two numbers to 120 that are easy to mix up: digits swapped (16 and 61), a
+// ten or a one apart, a hundred and its ones (104 and 14), or any two. Never equal.
+function near120() {
+  for (;;) {
+    const a = rnd(1, 120), r = Math.random();
+    let b;
+    if (r < 0.35) { if (a < 12 || a > 98 || a % 10 === 0 || a % 11 === 0) continue; b = swapDigits(a); }
+    else if (r < 0.65) b = a + pickOne([-10, -1, 1, 10]);
+    else if (r < 0.75) { if (a < 101) continue; b = a - 100 + pickOne([0, 10]); }
+    else b = rnd(1, 120);
+    if (b < 1 || b > 120 || b === a) continue;
+    return Math.random() < 0.5 ? [a, b] : [b, a];
+  }
+}
+// True or false, Year 2 (D1a): half the cards compare two numbers to 120 with
+// < or > (16 > 60), half are the 2, 5 and 10 tables: adding the same number
+// again as times (2 + 2 + 2 = 3 × 2; wrong ones one too many or too few), or a
+// plain fact (5 × 4 = 20; wrong ones a table neighbour). About half true.
+// Sentences over 18 characters go on two lines, breaking before the "=".
+function tf2Q() {
+  const truth = Math.random() < 0.5;
+  if (Math.random() < 0.5) {
+    const [a, b] = near120(), sign = (a < b) === truth ? '<' : '>', text = `${a} ${sign} ${b}`;
+    return { kind: 'tap', yr: 2, type: 'cmp', sign, text, top: text.replace(sign, sign === '<' ? '&lt;' : '&gt;'), tc: text.length * 0.56, tiles: TF_TILES, right: truth ? 0 : 1, truth, say: `${a} ${SIGN_WORD[sign]} ${b}. True?`, ans: truth ? '✓' : '✗' };
+  }
+  const t = pickOne([2, 5, 10]), k = rnd(2, t === 2 ? 5 : 4);
+  let lhs, rhs;
+  if (Math.random() < 0.6) { // 2 + 2 + 2 = 3 × 2
+    const add = Array(k).fill(t).join(' + '), j = truth ? k : k + pickOne([-1, 1]);
+    lhs = add; rhs = Math.random() < 0.5 ? `${j} × ${t}` : `${t} × ${j}`;
+  } else {
+    const a = rnd(1, 10), v = a * t, w = truth ? v : v + pickOne([-t, t]);
+    if (w < 1) return tf2Q();
+    lhs = Math.random() < 0.5 ? `${a} × ${t}` : `${t} × ${a}`; rhs = String(w);
+  }
+  if (Math.random() < 0.3) [lhs, rhs] = [rhs, lhs];
+  const text = `${lhs} = ${rhs}`, two = text.length > 18;
+  const q = { kind: 'tap', yr: 2, type: 'tables', sign: '=', text, tiles: TF_TILES, right: truth ? 0 : 1, truth, say: `${signWords(text)}. True?`, ans: truth ? '✓' : '✗' };
+  if (two) Object.assign(q, { top: `${lhs}<br>= ${rhs}`, tc: Math.max(lhs.length, rhs.length + 2) * 0.56, th: 2.6, topf: 0.55 });
+  else Object.assign(q, { top: text, tc: text.length * 0.56 });
+  return q;
+}
 function tfQ(yr) {
   if (yr === 1) return tf1Q();
+  if (yr === 2) return tf2Q();
   if (yr === 5) return tf5Q();
   for (let t = 0; t < 200; t++) {
     const truth = Math.random() < 0.5, type = pickOne(['addsub', 'addsub', 'tables', 'tables', 'ten', 'both']);
@@ -1992,8 +2058,15 @@ function cmp1Q(kinds) {
   }
   return { kind: 'tap', yr: 1, form: 'nums', l: '12', r: '15', more: true, top: 'Which is more?', tc: 7, tiles: [{ html: '12', label: '12', say: '12' }, SAME_TILE, { html: '15', label: '15', say: '15' }], right: 2, quiet: true, say: 'Which is more, 12 or 15? Or are they the same?', ans: '15' };
 }
+// More or less, Year 2 (D1a): numbers to 120 with the signs < = > (16 and 61,
+// 104 and 14, a ten apart); about one in five the same. Numbers only.
+function cmp2Q() {
+  const [l, r] = Math.random() < 0.2 ? (n => [n, n])(rnd(1, 120)) : near120(), right = l < r ? 0 : l === r ? 1 : 2;
+  return { kind: 'tap', yr: 2, l: String(l), r: String(r), top: `${l} <span class="bx"></span> ${r}`, tc: (String(l).length + String(r).length + 3) * 0.56, tiles: CMP_TILES, right, say: `${l}, and ${r}. Which sign goes in the box?`, ans: CMP_TILES[right].label };
+}
 function cmpQ(yr, kinds) {
   if (yr === 1) { const k = kinds.filter(x => x === 'dots' || x === 'num'); return cmp1Q(k.length ? k : ['dots']); }
+  if (yr === 2) return cmp2Q();
   if (yr === 5) return cmp5Q(kinds);
   kinds = kinds.filter(x => ['num', 'sum', 'frac'].includes(x)); if (!kinds.length) kinds = ['num'];
   for (let t = 0; t < 200; t++) {
@@ -2060,8 +2133,35 @@ function bal1Q() {
   }
   return { kind: 'bal', yr: 1, saw: true, text: '2 + 5 = 3 + ☐', ans: 4, say: '2 plus 5 is the same as 3 plus what?' };
 }
+// Year 2 (D1a): + and − on both sides with numbers close together (18 + ☐ = 17 + 6,
+// 15 − ☐ = 14 − 3), and the 2, 5, 10 tables with one side a number (☐ × 5 = 20,
+// 6 ÷ ☐ = 2); the box is always on a side with a sign. Numbers to 100, over
+// the same level see-saw as Year 1.
+function bal2Q() {
+  for (let t = 0; t < 200; t++) {
+    let L, R;
+    if (Math.random() < 0.55) {
+      const op = pickOne(['+', '+', '−']), a = rnd(11, 40), c = a + pickOne([-3, -2, -1, 1, 2, 3]), d = rnd(2, 9);
+      L = [a, op, op === '+' ? c + d - a : a - c + d]; R = [c, op, d]; // a + x = c + d, a − x = c − d
+    } else {
+      const s = pickOne([2, 5, 10]), o = rnd(2, 10), [x, y] = Math.random() < 0.5 ? [o, s] : [s, o];
+      L = Math.random() < 0.5 ? [x, '×', y] : [x * y, '÷', y]; R = [sideVal(L)];
+    }
+    const slots = R.length === 1 ? [[L, 0], [L, 2]] : [[L, 0], [L, 2], [R, 0], [R, 2]];
+    const [S, i] = pickOne(slots), ans = S[i];
+    const nums = [...L, ...R].filter(x => typeof x === 'number');
+    if (nums.some(x => !Number.isInteger(x) || x < 1 || x > 100) || sideVal(L) !== sideVal(R) || sideVal(L) < 1) continue;
+    if (R.length === 3 && (L[0] === R[0] || L[2] === R[2] || L[0] === R[2] || L[2] === R[0])) continue; // the same number on both sides gives it away
+    if (Math.random() < 0.5) [L, R] = [R, L];
+    const side = s => (s === S ? s.map((x, j) => j === i ? '☐' : x) : s).join(' ');
+    const text = `${side(L)} = ${side(R)}`;
+    return { kind: 'bal', yr: 2, saw: true, text, ans, say: signWords(text).replace('equals', 'is the same as').replace('☐', 'what') + '?' };
+  }
+  return { kind: 'bal', yr: 2, saw: true, text: '18 + ☐ = 17 + 6', ans: 5, say: '18 plus what is the same as 17 plus 6?' };
+}
 function balQ(yr) {
   if (yr === 1) return bal1Q();
+  if (yr === 2) return bal2Q();
   const max = yr === 5 ? 999999 : 9999;
   for (let t = 0; t < 200; t++) {
     const type = yr === 5 ? pickOne(['place', 'place', 'place', 'hund', 'hund', 'thou', 'tens']) : pickOne(['one', 'one', 'ten', 'add', 'add', 'mul', 'sub', 'mix']);
@@ -3342,26 +3442,26 @@ const ACTS = {
     name: 'Clocks', ages: [5, 8], setup: 'opts', say: 'What time is it?',
     pic: clockSvg({ h: 10, m: 10 }),
     options: [
-      { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · half and quarter'], [3, '3 · 5 minutes'], [4, '4 · any minute'], [5, '5 · 24-hour, how long']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Year 1)'], ['long', 'How long? (Year 5)']] },
+      { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · quarter past, half past'], [3, '3 · 5 minutes'], [4, '4 · any minute'], [5, '5 · 24-hour, how long']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Years 1–2)'], ['long', 'How long? (Year 5)']] },
     ],
     defaults: age => age === 5 ? { yr: 1, kinds: ['face', 'match'], n: 6 } : { yr: 3, kinds: ['face', 'words', 'long'], n: 12 },
     // Year 1: on the hour, write the hour before "o'clock", or Match (tap the
-    // digital clock). Then "h : mm", to the half and quarter hour, 5 minutes
-    // (minute ticks on), any minute. Words from Year 2; Match only in Year 1 so far.
-    // Year 5: face and words in 24-hour time, and How long? ("__ h __ min").
+    // digital clock). Then "h : mm": Year 2 o'clock, quarter past and half past
+    // ("quarter to" is Year 3), 5 minutes (minute ticks on), any minute. Words
+    // from Year 2; Match in Years 1 and 2. Year 5: face and words in 24-hour time, and How long? ("__ h __ min").
     make: c => {
-      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => k === 'words' ? yr > 1 : k === 'match' ? yr === 1 : k === 'long' ? yr >= 5 : true), k = pickOne(kinds.length ? kinds : ['face']);
-      if (k === 'match') return clockMatchQ();
+      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => k === 'words' ? yr > 1 : k === 'match' ? yr <= 2 : k === 'long' ? yr >= 5 : true), k = pickOne(kinds.length ? kinds : ['face']);
+      if (k === 'match') return clockMatchQ(yr);
       if (k === 'long') return clockLongQ();
       if (yr >= 5) return clock24Q(k === 'words');
-      const m = yr === 1 ? 0 : yr === 2 ? pickOne([0, 15, 30, 30, 45]) : yr === 3 ? rnd(0, 11) * 5 : rnd(0, 59);
+      const m = yr === 1 ? 0 : yr === 2 ? pickOne([0, 15, 30, 30]) : yr === 3 ? rnd(0, 11) * 5 : rnd(0, 59);
       const words = k === 'words' ? timeWords(h, m) : null;
       if (yr === 1) return { kind: 'clock', h, m, ans: h };
       return { kind: 'clock', h, m, words, ticks: yr >= 3, two: true, parts: [h, m], ans: `${h}:${String(m).padStart(2, '0')}` };
     },
-    // Match only changes Year 1, so Years 2–4 leave it out of the record key
-    key: c => `clock~${c.yr}|${['face', 'words', 'match', 'long'].filter(k => c.kinds.includes(k) && (k !== 'match' || c.yr === 1) && (k !== 'long' || c.yr >= 5)).join(',') || 'face'}|${c.n}`,
+    // Match only changes Years 1 and 2, so Years 3 up leave it out of the record key
+    key: c => `clock~${c.yr}|${['face', 'words', 'match', 'long'].filter(k => c.kinds.includes(k) && (k !== 'match' || c.yr <= 2) && (k !== 'long' || c.yr >= 5)).join(',') || 'face'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').replace('long', 'how long?').split(',').join(', ')} · ${n} questions`; },
   },
   money: {
@@ -3485,7 +3585,7 @@ const ACTS = {
   tf: {
     name: 'True or false', ages: [5, 8], setup: 'opts', say: 'Is it true? Tap the tick or the cross.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="30" text-anchor="middle" font-size="24">6 × 4 = 25</text><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="44" width="30" height="30" rx="5"/><rect x="66" y="44" width="30" height="30" rx="5"/><path d="M31 60l6 6l10 -13M74 52l14 14M88 52l-14 14"/></g></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [4, '4 · four digits, tables, × 10'], [5, '5 · six digits, decimals, fractions']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, with dots'], [2, '2 · to 120, 2s 5s 10s'], [4, '4 · four digits, tables, × 10'], [5, '5 · six digits, decimals, fractions']] }],
     defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => tfQ(c.yr),
     key: c => `tf~${c.yr}|${c.n}`,
@@ -3495,19 +3595,19 @@ const ACTS = {
     name: 'More or less', ages: [5, 8], setup: 'opts', say: 'More, less, or the same? Tap your answer.',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="34" y="34" text-anchor="middle" font-size="24">47</text><rect x="50" y="14" width="22" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/><text x="90" y="34" text-anchor="middle" font-size="24">74</text><text x="60" y="72" text-anchor="middle" font-size="24">&lt;  =  &gt;</text></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [4, '4 · to 10,000, fractions'], [5, '5 · to 999,999, decimals']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · dots, numbers to 20'], [2, '2 · numbers to 120, < = >'], [4, '4 · to 10,000, fractions'], [5, '5 · to 999,999, decimals']] },
       { key: 'kinds', label: 'Kind', multi: true, values: [['dots', 'Dots (Year 1)'], ['num', 'Numbers'], ['sum', 'Sums (Year 4 up)'], ['dec', 'Decimals (Year 5)'], ['frac', 'Fractions (Year 4 up)']] },
     ],
     defaults: age => age === 5 ? { yr: 1, kinds: ['dots', 'num'], n: 6 } : { yr: 4, kinds: ['num', 'sum', 'dec', 'frac'], n: 12 },
     make: c => cmpQ(c.yr, c.kinds),
-    // only the kinds that year has go in the record key (Year 1 dots and numbers, Year 4 numbers, sums, fractions, Year 5 decimals too)
-    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : c.yr === 5 ? ['num', 'sum', 'dec', 'frac'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
+    // only the kinds that year has go in the record key (Year 1 dots and numbers, Year 2 numbers, Year 4 numbers, sums, fractions, Year 5 decimals too)
+    key: c => { const has = c.yr === 1 ? ['dots', 'num'] : c.yr === 2 ? ['num'] : c.yr === 5 ? ['num', 'sum', 'dec', 'frac'] : ['num', 'sum', 'frac'], k = has.filter(x => c.kinds.includes(x)); return `cmp~${c.yr}|${(k.length ? k : [has[0]]).join(',')}|${c.n}`; },
     label: k => { const [y, kinds, n] = k.split('|'); return `More or less · Year ${y} · ${kinds.split(',').map(x => ({ dots: 'dots', num: 'numbers', sum: 'sums', dec: 'decimals', frac: 'fractions' })[x]).join(', ')} · ${n} questions`; },
   },
   bal: {
     name: 'Balance', ages: [5, 8], setup: 'opts', say: 'Both sides are the same. What number goes in the box?',
     pic: `<svg viewBox="0 0 120 84" font-family="system-ui, sans-serif" font-weight="700" fill="currentColor"><text x="60" y="32" text-anchor="middle" font-size="24">6 × 4 =</text><text x="66" y="66" text-anchor="end" font-size="24">12 ×</text><rect x="72" y="46" width="20" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="3"/></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, see-saw'], [4, '4 · both sides, to 10,000'], [5, '5 · six digits, × 100']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · one digit, see-saw'], [2, '2 · to 100, 2s 5s 10s'], [4, '4 · both sides, to 10,000'], [5, '5 · six digits, × 100']] }],
     defaults: age => age === 5 ? { yr: 1, n: 6 } : { yr: 4, n: 12 },
     make: c => balQ(c.yr),
     key: c => `bal~${c.yr}|${c.n}`,

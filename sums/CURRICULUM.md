@@ -76,7 +76,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ### Number
 - Read, write and show numbers to 120 with tens and ones (and hundreds to 120). ✓ (Place value)
-- Compare and order numbers to 120.
+- Compare and order numbers to 120. ✓ partly (More or less, Year 2: compare two; not ordering)
 - Place value of each digit in two-digit numbers and three-digit numbers to 120. ✓ (Place value)
 - Roughly place numbers on a number line marked in tens (61 on a line marked 0, 10, 20...). ✓ partly (Number lines)
 - Count a collection to 120 by making groups of ten.
@@ -87,11 +87,11 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ### Operations
 - Addition and subtraction facts to 20 (17 + 3). ✓ (Sums, Number bonds)
-- Derive facts from known ones (7 + 2 = 9 so 70 + 20 = 90).
-- Add and subtract within 100 (32 + 20, 32 + 2). ✓ (Sums)
+- Derive facts from known ones (7 + 2 = 9 so 70 + 20 = 90). ✓ partly (Add and take away, Year 2: tens facts 70 + 20)
+- Add and subtract within 100 (32 + 20, 32 + 2). ✓ (Sums, Add and take away Year 2)
 - Doubles and halves to 20. ✓ (Doubles and halves, Year 2)
-- Add three one-digit numbers (7 + 3 + 6).
-- Add 100 to a one-digit number.
+- Add three one-digit numbers (7 + 3 + 6). ✓ (Add and take away, Year 2)
+- Add 100 to a one-digit number. ✓ (Add and take away, Year 2: 100 + n to 120, and back)
 - One-step + and − word problems to 100; two-step to 20. ✓ (Story sums, Year 2)
 - Link skip counting to the 2, 5 and 10 times tables; learn those tables and their division facts. ✓ (Times bonds, Times grid)
 - Multiply and divide with answers up to 100. ✓ (Sums, Arrays)
@@ -107,8 +107,8 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Make an amount using only coins or only notes. ✓ partly (Money, Year 2: totals, not making)
 
 ### Algebra
-- True or false comparisons to 120 (16 > 60?), using >, < and =.
-- True or false and open number sentences with +, −, × and ÷ (18 + __ = 17 + 6, 6 ÷ __ = 2, 2 + 2 + 2 = 3 × 2?). ✓ partly (Missing number)
+- True or false comparisons to 120 (16 > 60?), using >, < and =. ✓ (True or false Year 2, More or less Year 2)
+- True or false and open number sentences with +, −, × and ÷ (18 + __ = 17 + 6, 6 ÷ __ = 2, 2 + 2 + 2 = 3 × 2?). ✓ (True or false Year 2, Balance Year 2, Missing number)
 - Find the unit of repeat in a pattern and use it to predict what comes later (ACDC in ACDCACDC...).
 
 ### Measurement
@@ -119,7 +119,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - Months and seasons in order; the month before and after; ordinals for months.
 - Describe how long familiar things take.
-- Tell the time to the hour, half hour and quarter hour on analogue and digital clocks, saying "past" and "o'clock" only ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ partly (Clocks, Year 2: analogue only). Out of step: Clocks Year 2 also asks "quarter to", which is Year 3.
+- Tell the time to the hour, half hour and quarter hour on analogue and digital clocks, saying "past" and "o'clock" only ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ (Clocks, Year 2: faces, words, and Match to a digital clock; "quarter to" removed 2026-11-18, D1a).
 
 ### Geometry
 - Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex. ✓ partly (Shapes, Year 2: sides, corners, faces; not naming)
