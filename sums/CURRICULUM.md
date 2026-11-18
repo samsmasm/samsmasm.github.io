@@ -166,7 +166,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Unit fraction of a number by dividing (⅓ of 15 = 15 ÷ 3). ✓ (Fractions of a number, Year 3: 2, 3, 4, 5, 8, 10 only, parts to 10; E1c)
 - Whole from a unit fraction (¼ of a set is 3, so the set is 12). ✓ (Fractions of a number, Year 3, Find the whole; E1c)
 - Write money as dollars and cents without a decimal point ($2 and 50 cents). ✓ (Money, Year 3)
-- Make amounts with $1 and $2 coins and $5, $10, $20, $50 and $100 notes. ✓ partly (Money: totals, not making)
+- Make amounts with $1 and $2 coins and $5, $10, $20, $50 and $100 notes. ✓ (Money, Year 3, Make it: "Make $35" with the $1 and $2 coins and the five notes; E1d)
 - Give change by adding and subtracting. ✓ (Money: Change)
 
 ### Algebra
@@ -180,7 +180,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Area of rectangles by counting equal squares. ✓ (Area: Count squares)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
 - How long events take, in seconds up to years.
-- Tell the time to the nearest 5 minutes and nearest minute on analogue and digital clocks, minutes past and minutes to ("10 past", "quarter to", a.m. and p.m.). ✓ partly (Clocks, Years 3 and 4: analogue only; not a.m. and p.m.)
+- Tell the time to the nearest 5 minutes and nearest minute on analogue and digital clocks, minutes past and minutes to ("10 past", "quarter to", a.m. and p.m.). ✓ (Clocks, Years 3 and 4; Year 3 Match: a face to a digital clock at any 5 minutes, and a.m. or p.m.: "7:30, breakfast", tap a.m. or p.m.; E1d)
 - Compare units of time. Knows: 15 minutes in a quarter hour, 60 seconds in a minute, 24 hours in a day, 52 weeks and 365 days in a year (366 in a leap year, every 4 years), months about 4 weeks with different numbers of days, decade 10 years, century 100, millennium 1,000.
 
 ### Geometry

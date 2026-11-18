@@ -681,7 +681,7 @@ const fakeSpeech = () => {
   // ---- Mia: Clocks (Years 1–4)
   await page.click('#backBtn');
   await page.click('#actTiles [data-act="clock"]');
-  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'face,words,long'), 'Clocks setup at age 8: Year 4 suggested, clock, words and How long? (Year 5 only)');
+  ok(await page.evaluate(() => draft.yr === 4 && draft.kinds.join() === 'face,words,ampm,long'), 'Clocks setup at age 8: Year 4 suggested, clock, words, a.m. or p.m. (Year 3 only) and How long? (Year 5 only)');
   ok(await page.evaluate(() => $('#optBlock [data-key="yr"] .sug').dataset.v === '4' && /^Your year: Year 4$/.test($('.sughint').textContent)), 'the suggested year has a dot and a line saying so');
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|quarter past, half past / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
@@ -1869,10 +1869,10 @@ const fakeSpeech = () => {
       if (q.form !== 'match' || q.m !== 0 || new Set(labels).size !== 3 || labels[q.right] !== `${q.h}:00` || !ok_ || (q.h !== 12 && !hs.includes(12))) bad.push(JSON.stringify(labels) + ' ' + q.h);
       if (!labels.every(s => /^\d{1,2}:00$/.test(s)) || q.tiles[q.right].say !== `${q.h} o'clock`) bad.push('tiles ' + labels);
     }
-    for (let i = 0; i < 50; i++) { if (ACTS.clock.make({ yr: 3, kinds: ['match'], n: 6 }).kind !== 'clock') bad.push('match in Year 3'); }
+    for (let i = 0; i < 50; i++) { if (ACTS.clock.make({ yr: 4, kinds: ['match', 'ampm'], n: 6 }).kind !== 'clock') bad.push('match or a.m. in Year 4'); }
     return bad.slice(0, 4);
   });
-  ok(m1.length === 0, 'Clocks Match Year 1: a face on the hour, three digital clocks (the time, an hour either side, 12:00); no Match in Year 3 ' + m1.join(' | '));
+  ok(m1.length === 0, 'Clocks Match Year 1: a face on the hour, three digital clocks (the time, an hour either side, 12:00); no Match in Year 4 ' + m1.join(' | '));
   ok(await page.evaluate(() => [ACTS.tf.defaults(5).yr, ACTS.cmp.defaults(5).yr, ACTS.cmp.defaults(5).kinds.join(), ACTS.bal.defaults(5).yr, ACTS.clock.defaults(5).kinds.join()].join(' / ')) === '1 / 1 / dots,num / 1 / face,match', 'the younger tiles default to Year 1 (More or less: dots and numbers; Clocks: clock and match)');
 
   // Year 1 sheets
@@ -1911,7 +1911,7 @@ const fakeSpeech = () => {
   await page.evaluate(() => { setYear(4); hideDone(); });
   ok(await page.evaluate(() => [ACTS.clock.key({ yr: 1, kinds: ['face', 'match'], n: 6 }), ACTS.clock.key({ yr: 3, kinds: ['face', 'words', 'match'], n: 12 }), ACTS.cmp.key({ yr: 1, kinds: ['dots', 'num', 'sum'], n: 6 }), ACTS.cmp.key({ yr: 4, kinds: ['dots', 'num', 'sum', 'frac'], n: 12 }),
     labelFor('clock~1|face,match|6'), labelFor('cmp~1|dots,num|6'), labelFor('tf~1|6'), labelFor('bal~1|6')].join(' / '))
-    === 'clock~1|face,match|6 / clock~3|face,words|12 / cmp~1|dots,num|6 / cmp~4|num,sum,frac|12 / Clocks · Year 1 · clock, match · 6 questions / More or less · Year 1 · dots, numbers · 6 questions / True or false · Year 1 · 6 questions / Balance · Year 1 · 6 questions',
+    === 'clock~1|face,match|6 / clock~3|face,words,match|12 / cmp~1|dots,num|6 / cmp~4|num,sum,frac|12 / Clocks · Year 1 · clock, match · 6 questions / More or less · Year 1 · dots, numbers · 6 questions / True or false · Year 1 · 6 questions / Balance · Year 1 · 6 questions',
     'record keys keep only the kinds that year has; labels for the Year 1 sheets');
 
   // ---- D1a: Year 2 on Clocks, True or false, More or less, Balance
@@ -3048,6 +3048,64 @@ const fakeSpeech = () => {
     ok((await writeAllAndMark()).length === 0, `${a} Year 3 E1c (${c.n}): read and marked right`);
   }
 
+  // ---- E1d: Money Make it Year 3, Clocks Match Year 3 and a.m. or p.m.
+  const e1d = await page.evaluate(() => {
+    const bad = [], seen = new Set();
+    for (let i = 0; i < 500; i++) { // Make it Year 3: whole dollars with $1, $2 and the notes
+      const q = makeIt3Q(), vs = q.tiles.map(t => t.v), sum = q.right.reduce((s, k) => s + vs[k], 0), d = q.target / 100;
+      if (vs.join() !== '100,200,500,1000,2000,5000,10000' || q.cells !== 4 || q.yr !== 3 || vs.includes(q.target) || sum !== q.target || q.right.length > 8 || d < 6 || d > 199 || q.target % 100
+        || q.top !== `Make $${d}` || q.say !== `Make ${d} dollars.` || q.ans !== `$${d}`) bad.push('make3 ' + JSON.stringify({ t: q.target, r: q.right, top: q.top }));
+      if (d >= 100) seen.add('make 100 up');
+    }
+    if (!range(0, 50).every(() => ACTS.money.make({ yr: 3, kinds: ['make'] }).yr === 3)) bad.push('Year 3 make');
+    const wrap = k => (k + 11) % 12 + 1, p2 = n => String(n).padStart(2, '0');
+    for (let i = 0; i < 600; i++) { // Match Year 3: 5-minute times, traps
+      const q = ACTS.clock.make({ yr: 3, kinds: ['match'], n: 6 }), labels = q.tiles.map(t => t.label), right = `${q.h}:${p2(q.m)}`;
+      if (q.form !== 'match' || q.m % 5 || q.m < 5 || q.m > 55 || new Set(labels).size !== 3 || labels[q.right] !== right || q.ans !== right || !q.top.includes('stroke-width="1"')) bad.push('match3 ' + labels + ' ' + right);
+      const wrong = labels.filter(s => s !== right), traps = [`${q.h}:${p2(q.m / 5)}`, `${q.h}:${p2(60 - q.m)}`, `${q.m / 5}:${p2(q.h * 5)}`];
+      if (!wrong.includes(`${wrap(q.h + 1)}:${p2(q.m)}`) || !wrong.some(s => traps.includes(s))) bad.push('match3 traps ' + labels + ' ' + right);
+      if (q.tiles.some(t => /past|quarter|half| to /.test(t.say))) bad.push('match3 say');
+      wrong.forEach(s => { if (s === traps[0]) seen.add('trap minutes'); else if (s === traps[1]) seen.add('trap past to'); else if (s === traps[2]) seen.add('trap swapped'); });
+    }
+    let pm = 0;
+    for (let i = 0; i < 600; i++) { // a.m. or p.m.
+      const q = ampmQ(), ev = AMPM_EVENTS.find(e => e[0] === q.what), H = q.h % 12 + (q.pm ? 12 : 0);
+      if (!ev || q.h < ev[1] || q.h > ev[2] || !!ev[3] !== q.pm || q.m % 5 || q.tiles.map(t => t.label).join() !== 'a.m.,p.m.' || q.right !== (q.pm ? 1 : 0) || q.ans !== q.tiles[q.right].label
+        || !q.top.includes(`>${q.h}:${p2(q.m)}<`) || !q.top.includes(`>${q.what}<`) || q.sun !== (H >= 6 && H < 19) || !q.top.includes(q.sun ? BLOCK.yellow : '#c9cbd3') || !q.quiet
+        || !/^[A-Z].* at \d{1,2} .*\. Is it A M or P M\?$/.test(q.say)) bad.push('ampm ' + JSON.stringify(q).slice(0, 200));
+      pm += q.pm;
+      seen.add((q.pm ? 'pm ' : 'am ') + (q.sun ? 'sun' : 'moon'));
+    }
+    if (pm < 220 || pm > 380) bad.push('pm share ' + pm);
+    ['make 100 up', 'trap minutes', 'trap past to', 'trap swapped', 'am sun', 'am moon', 'pm sun', 'pm moon'].forEach(w => { if (!seen.has(w)) bad.push('never saw ' + w); });
+    const ks = range(0, 400).map(() => ACTS.clock.make({ yr: 3, kinds: ['face', 'words', 'match', 'ampm'] }).form || 'w');
+    if (['match', 'ampm'].some(f => { const n = ks.filter(x => x === f).length; return n < 60 || n > 150; })) bad.push('clock kinds share');
+    if (range(0, 60).some(() => ['ampm'].includes(ACTS.clock.make({ yr: pickOne([1, 2, 4, 5]), kinds: ['face', 'ampm'] }).form))) bad.push('ampm outside Year 3');
+    return bad.slice(0, 5);
+  });
+  ok(e1d.length === 0, 'Year 3: Money Make it ($6 to $199 with $1, $2 and the notes, seven tiles); Clocks Match (5-minute times; the hour after and a minute trap) and a.m. or p.m. (events in their hours, sun or moon never decides) ' + e1d.join(' | '));
+  ok(await page.evaluate(() => [ACTS.money.key({ yr: 3, kinds: ['count', 'change', 'make'], n: 12 }), labelFor('money~3|count,make|6'), ACTS.clock.key({ yr: 3, kinds: ['face', 'words', 'match', 'ampm', 'long'], n: 12 }), ACTS.clock.key({ yr: 4, kinds: ['face', 'words', 'match', 'ampm', 'long'], n: 12 }),
+    ACTS.clock.key({ yr: 2, kinds: ['face', 'match', 'ampm'], n: 6 }), ACTS.clock.key({ yr: 1, kinds: ['face', 'words'], n: 6 }), labelFor('clock~3|face,match,ampm|12'), ACTS.clock.defaults(8).kinds.join()].join(' / '))
+    === 'money~3|count,change,make|12 / Money · Year 3 · how much, make it · 6 questions / clock~3|face,words,match,ampm|12 / clock~4|face,words|12 / clock~2|face,match|6 / clock~1|face,words|6 / Clocks · Year 3 · clock, match, a.m. or p.m. · 12 questions / face,words,ampm,long', 'E1d record keys and labels; older Clocks default has a.m. or p.m.');
+  await page.evaluate(() => { setYear(3); hideDone(); });
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { hideDone(); act = 'money'; buildSheet({ yr: 3, kinds: ['count', 'change', 'make'], n }); show('sheet'); cards.forEach((c, i) => { if (i < 3) { c.q = makeIt3Q(); layout(c); sizeCanvas(c); } }); cards[0].q = { ...makeIt3Q(), target: 18800, top: 'Make $188', right: [6, 5, 4, 3, 2, 1, 0] }; layout(cards[0]); sizeCanvas(cards[0]); }, n);
+    ok((await fits()).length === 0 && await page.evaluate(() => cards.filter(c => c.q.form === 'make').every(c => c.el.querySelectorAll('.tt').length === 7 && [...c.el.querySelectorAll('.tt')].every(b => { const r = b.getBoundingClientRect(), k = c.el.getBoundingClientRect(); return r.width >= 30 && r.right <= k.right + 1 && r.bottom <= k.bottom + 1; }))), `Money Make it Year 3 (${n}) fits beside written money, seven tiles inside the card ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/50-make-it3-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `money~3|count,change,make|${n}`, n), `Money Make it Year 3 (${n}): all right, record money~3|count,change,make|${n}`);
+    await page.evaluate(n => { hideDone(); act = 'clock'; buildSheet({ yr: 3, kinds: ['face', 'words', 'match', 'ampm'], n }); show('sheet'); cards.forEach((c, i) => { if (i < 4) { c.q = i % 2 ? ampmQ() : clockMatchQ(3); layout(c); sizeCanvas(c); } });
+      let q; do q = ampmQ(); while (q.what !== 'home from school'); cards[1].q = q; layout(cards[1]); sizeCanvas(cards[1]); }, n); // the longest words
+    ok((await fits()).length === 0, `Clocks Year 3 with Match and a.m. or p.m. (${n}) fits ` + (await fits()).join(' '));
+    ok(await page.evaluate(() => cards.filter(c => c.q.kind === 'tap').every(c => { const k = c.el.getBoundingClientRect(), w = c.el.querySelector('.amp, .tq svg').getBoundingClientRect();
+      return w.left >= k.left - 1 && w.right <= k.right + 1 && [...c.el.querySelectorAll('.tt')].every(b => { const r = b.getBoundingClientRect(); return r.width >= 40 && r.right <= k.right + 1 && r.bottom <= k.bottom + 1 && r.top >= w.bottom - 1; }); })), `Clocks Year 3 (${n}): tap tiles big enough, under the question and inside the card`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/50-clock-y3-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `clock~3|face,words,match,ampm|${n}`, n), `Clocks Year 3 (${n}): all right, record clock~3|face,words,match,ampm|${n}`);
+  }
+  await page.evaluate(() => { hideDone(); act = 'clock'; buildSheet({ yr: 3, kinds: ['ampm'], n: 6 }); show('sheet'); });
+  await page.tap(tile(0, await page.evaluate(() => 1 - cards[0].q.right)));
+  await page.click('#markBtn');
+  ok(await page.evaluate(() => cards[0].el.dataset.state === 'wrong' && cards[0].first === false), 'a.m. or p.m.: the other tile is marked wrong, not first try');
+
   // ---- Money, Make it (Year 4): drop coins and notes in a tray. A7
   const mkq = await page.evaluate(() => {
     const bad = [];
@@ -3057,10 +3115,10 @@ const fakeSpeech = () => {
     }
     const ms = range(0, 200).map(() => ACTS.money.make({ yr: 4, kinds: ['count', 'change', 'make'] })), mk = ms.filter(q => q.form === 'make').length;
     if (mk < 40 || mk > 100) bad.push('make share ' + mk);
-    if (range(0, 60).some(() => ACTS.money.make({ yr: 3, kinds: ['count', 'make'] }).form === 'make' || ACTS.money.make({ yr: 5, kinds: ['count', 'make'] }).form === 'make') || ACTS.money.make({ yr: 1, kinds: ['make'] }).kind !== 'money') bad.push('make in Years 1, 3 or 5');
+    if (range(0, 60).some(() => ACTS.money.make({ yr: 5, kinds: ['count', 'make'] }).form === 'make') || ACTS.money.make({ yr: 1, kinds: ['make'] }).kind !== 'money') bad.push('make in Years 1 or 5');
     return bad.slice(0, 4);
   });
-  ok(mkq.length === 0, 'Money Make it: $1 to $49, cents in tens, a way to make it in 8 or fewer; about a third of Year 4 with all three kinds; not in Years 1, 3, 5 ' + mkq.join(' | '));
+  ok(mkq.length === 0, 'Money Make it: $1 to $49, cents in tens, a way to make it in 8 or fewer; about a third of Year 4 with all three kinds; not in Years 1, 5 ' + mkq.join(' | '));
   await page.evaluate(() => { act = 'money'; buildSheet({ yr: 4, kinds: ['count', 'make'], n: 12 }); show('sheet'); cards.forEach((c, i) => { if (i < 6) { c.q = makeItQ(); layout(c); sizeCanvas(c); } }); cards[0].q = { ...makeItQ(), target: 590, top: 'Make $5 and 90c', right: [5, 2, 1, 1] }; layout(cards[0]); sizeCanvas(cards[0]); });
   ok((await fits()).length === 0, 'Money Make it fits beside written money cards, tiles big enough ' + (await fits()).join(' '));
   const mi = v => page.evaluate(v => MAKE_V.indexOf(v), v);
@@ -3074,7 +3132,7 @@ const fakeSpeech = () => {
   await page.click('#markBtn');
   ok(await page.evaluate(() => cards[0].el.dataset.state === 'right' && cards[0].el.querySelector('.read').textContent === ''), 'Make it: marked right, the reading stays blank');
   ok((await writeAllAndMark()).length === 0, 'Money Make it and written money on one sheet: all marked right');
-  ok(await page.evaluate(() => [ACTS.money.key({ yr: 4, kinds: ['count', 'change', 'make'], n: 12 }), ACTS.money.key({ yr: 3, kinds: ['count', 'change', 'make'], n: 12 }), labelFor('money~4|count,make|12'), cardSay(makeItQ()).split('.').length].join(' / ') === 'money~4|count,change,make|12 / money~3|count,change|12 / Money · Year 4 · how much, make it · 12 questions / 2'), 'Money keys: Make it only in Year 4 keys; label; read aloud is just the question');
+  ok(await page.evaluate(() => [ACTS.money.key({ yr: 4, kinds: ['count', 'change', 'make'], n: 12 }), ACTS.money.key({ yr: 5, kinds: ['count', 'change', 'make'], n: 12 }), labelFor('money~4|count,make|12'), cardSay(makeItQ()).split('.').length].join(' / ') === 'money~4|count,change,make|12 / money~5|count,change|12 / Money · Year 4 · how much, make it · 12 questions / 2'), 'Money keys: Make it in Year 4 keys, not Year 5; label; read aloud is just the question');
 
   // ---- Shapes, Moves (Year 4): flip, slide or turn. A7
   const mvq = await page.evaluate(() => {
@@ -3479,7 +3537,8 @@ const fakeSpeech = () => {
       ['turn', { yr: 2, n: 12 }], ['map', { yr: 2, kinds: ['tap'], n: 6 }],
       ['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }],
       ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }],
-      ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }]]) {
+      ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }],
+      ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

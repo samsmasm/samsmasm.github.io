@@ -326,6 +326,13 @@
   .tap .tiles.prow { --tw: max(40px, min(18cqh, 21cqw, 64px)); flex-direction: column; align-items: center; gap: max(2px, 1.2cqh); margin-top: .1em; }
   .tap .prow .tt { padding: 0 .25em; }
   .tap .dig { font-size: .62em; font-variant-numeric: tabular-nums; }
+  /* Clocks a.m. or p.m. (Year 3): a sun or moon and the time, what is happening under it */
+  .tap .amp { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+  .tap .amr { display: flex; align-items: center; gap: .25em; }
+  .tap .amt { font-variant-numeric: tabular-nums; }
+  .tap .amw { font-size: .72em; font-weight: 700; white-space: nowrap; }
+  .tap .tiles.ampm { --tw: max(40px, min(34cqh, 30cqw, 76px)); gap: 6cqw; }
+  .tap .ampm .tt { font-size: calc(var(--tw) * .4); }
   .miss .saw { display: block; margin-top: .15em; }
   .miss .bx, .tap .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
   .miss .al { display: flex; align-items: flex-end; gap: .3em; margin-top: 2.1em; }
@@ -1025,7 +1032,44 @@ function clockSvg(q, em = 4.4) {
 // long hand points at read as minutes (3:06 for half past 3), or the two hands swapped (6:15).
 // A tile reads like a digital clock ("3 30", "3 oh 6"), so its words never give the answer away.
 const DIGI_TILE = (h, m = 0) => ({ html: `<span class="dig">${h}:${pad2(m)}</span>`, label: `${h}:${pad2(m)}`, say: m ? `${h} ${m < 10 ? 'oh ' + m : m}` : `${h} o'clock` });
+// Year 3 (E1d): any 5-minute time (minute ticks on the face); the traps are the hour after,
+// and the long hand's number read as minutes (3:05 for 3:25), past and to mixed up
+// (3:20 for 3:40), or the hands swapped.
+function clockMatch3Q() {
+  const wrap = k => (k + 11) % 12 + 1;
+  for (;;) {
+    const h = rnd(1, 12), m = rnd(1, 11) * 5, right = [h, m];
+    const long = [[h, m / 5], m !== 30 ? [h, 60 - m] : null, h * 5 < 60 && m / 5 !== h ? [m / 5, h * 5] : null].filter(x => x && !(x[0] === h && x[1] === m));
+    const opts = shuffled([right, [wrap(h + 1), m], pickOne(long)]);
+    if (new Set(opts.map(o => o.join(':'))).size < 3) continue;
+    return { kind: 'tap', form: 'match', yr: 3, h, m, top: clockSvg({ h, m, ticks: true }, 4.4), tc: 4.4, th: 4.4, topf: 0.66, tiles: opts.map(o => DIGI_TILE(...o)), right: opts.indexOf(right), say: 'Which clock shows the same time?', ans: `${h}:${pad2(m)}` };
+  }
+}
+// a.m. or p.m. (Year 3, E1d): a digital time, a small sun or moon and what is happening
+// ("breakfast"); tap a.m. or p.m. The sun or moon never decides it (asleep at 2:00 is a.m.
+// under a moon, dinner at 6:00 is p.m. under the sun); about half are each.
+const AMPM_EVENTS = [['wake up', 6, 7, 0], ['breakfast', 7, 8, 0], ['school starts', 8, 9, 0], ['morning tea', 10, 10, 0], ['fast asleep', 1, 4, 0],
+  ['lunch', 12, 12, 1], ['home from school', 3, 4, 1], ['play at the park', 4, 5, 1], ['dinner', 6, 7, 1], ['bedtime', 7, 8, 1]];
+const AMPM_TILES = [{ html: 'a.m.', label: 'a.m.', say: 'A M' }, { html: 'p.m.', label: 'p.m.', say: 'P M' }];
+function skySvg(sun, em = 1.3) {
+  const s = `<svg viewBox="-12 -12 24 24" style="width:${em}em;height:${em}em">`;
+  if (!sun) return s + '<path d="M3 -9.5A9.5 9.5 0 1 0 9.5 3A7.5 7.5 0 0 1 3 -9.5Z" fill="#c9cbd3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+  let r = '';
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, c = Math.cos(a), d = Math.sin(a); r += `<path d="M${(7.5 * c).toFixed(2)} ${(7.5 * d).toFixed(2)}L${(10.8 * c).toFixed(2)} ${(10.8 * d).toFixed(2)}"/>`; }
+  return s + `<g stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${r}</g><circle r="5.4" fill="${BLOCK.yellow}" stroke="currentColor" stroke-width="1.2"/></svg>`;
+}
+function ampmQ() {
+  const [what, lo, hi, pm] = pickOne(AMPM_EVENTS), h = rnd(lo, hi), m = rnd(0, 11) * 5, H = h % 12 + (pm ? 12 : 0), sun = H >= 6 && H < 19;
+  const t = `${h}:${pad2(m)}`, Say = what[0].toUpperCase() + what.slice(1);
+  return { kind: 'tap', form: 'ampm', yr: 3, h, m, pm: !!pm, what, sun,
+    top: `<span class="amp"><span class="amr">${skySvg(sun)}<span class="amt">${t}</span></span><span class="amw">${what}</span></span>`,
+    tc: Math.max(4.4, what.length * 0.42), th: 2.1, topf: 0.5, tcls: 'ampm', tiles: AMPM_TILES, right: pm ? 1 : 0, quiet: true,
+    say: `${Say} at ${DIGI_TILE(h, m).say}. Is it A M or P M?`, ans: pm ? 'p.m.' : 'a.m.' };
+}
+// which years a Clocks Kind changes (Words is in Year 1 keys too, as it always was)
+const clockKindIn = (k, yr) => k === 'match' ? yr <= 3 : k === 'ampm' ? yr === 3 : k === 'long' ? yr >= 5 : true;
 function clockMatchQ(yr = 1) {
+  if (yr === 3) return clockMatch3Q();
   const wrap = k => (k + 11) % 12 + 1;
   const m = yr === 2 ? pickOne([0, 15, 30, 30]) : 0;
   if (m) {
@@ -1185,7 +1229,7 @@ function moneyChange(yr) {
 // Make it (Money, Year 4, A7): "Make $5 and 80c". Every coin and note is a tile;
 // each tap drops one into the tray above (tap one in the tray to take it out). The
 // total is never shown; any way that adds up is right.
-const TRAY_MAX = 12, MAKE_YRS = [2, 4], MAKE_V =[10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+const TRAY_MAX = 12, MAKE_YRS = [2, 3, 4], MAKE_V =[10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
 const MAKE_TILES = MAKE_V.map(v => ({ html: `<span style="font-size:${isNote(v) ? 0.8 : 1.1}em;line-height:0">${moneySvg([v])}</span>`, label: v < 100 ? v + 'c' : '$' + v / 100, say: moneyWords(v), v }));
 function makeItQ() {
   let target, right;
@@ -1208,6 +1252,21 @@ function makeIt2Q() {
   for (let i = vs.length - 1; i >= 0; i--) while (left >= vs[i]) { right.push(i); left -= vs[i]; }
   const words = coins ? `Make ${target}c` : `Make $${target / 100}`;
   return { kind: 'tap', form: 'make', yr: 2, tray: true, target, top: words, tc: Math.max(words.length * 0.55, 7.6), th: 1.3 + 2.6, topf: 0.55, tiles, cells: 5, right, say: `Make ${moneyWords(target)}.`, ans: coins ? target + 'c' : '$' + target / 100 };
+}
+// Year 3 (E1d): whole dollars, $6 to $199, with the $1 and $2 coins and all five notes
+// (seven tiles, four across); never one coin or note, and a way to make it in 8 or fewer
+function makeIt3Q() {
+  const tiles = MAKE_TILES.slice(3), vs = tiles.map(t => t.v);
+  let target, right;
+  for (;;) {
+    target = rnd(6, 199) * 100;
+    if (vs.includes(target)) continue;
+    right = []; let left = target;
+    for (let i = vs.length - 1; i >= 0; i--) while (left >= vs[i]) { right.push(i); left -= vs[i]; }
+    if (right.length <= 8) break;
+  }
+  const words = `Make $${target / 100}`;
+  return { kind: 'tap', form: 'make', yr: 3, tray: true, target, top: words, tc: 7.6, th: 1.3 + 2.6, topf: 0.55, tiles, cells: 4, right, say: `Make ${moneyWords(target)}.`, ans: words.slice(5) };
 }
 function moneyQ(q, total) {
   if (q.unit === '$c') { const d = Math.floor(total / 100), c = total % 100; return { ...q, kind: 'money', two: true, parts: [d, c], ans: `$${d} and ${c}c` }; }
@@ -3923,16 +3982,17 @@ const ACTS = {
     pic: clockSvg({ h: 10, m: 10 }),
     options: [
       { key: 'yr', label: 'Year', values: [[1, "1 · o'clock"], [2, '2 · quarter past, half past'], [3, '3 · 5 minutes'], [4, '4 · any minute'], [5, '5 · 24-hour, how long']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Years 1–2)'], ['long', 'How long? (Year 5)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['face', 'Clock'], ['words', 'Words (Year 2 up)'], ['match', 'Match (Years 1–3)'], ['ampm', 'a.m. or p.m. (Year 3)'], ['long', 'How long? (Year 5)']] },
     ],
-    defaults: age => age === 5 ? { yr: 1, kinds: ['face', 'match'], n: 6 } : { yr: 3, kinds: ['face', 'words', 'long'], n: 12 },
+    defaults: age => age === 5 ? { yr: 1, kinds: ['face', 'match'], n: 6 } : { yr: 3, kinds: ['face', 'words', 'ampm', 'long'], n: 12 },
     // Year 1: on the hour, write the hour before "o'clock", or Match (tap the
     // digital clock). Then "h : mm": Year 2 o'clock, quarter past and half past
     // ("quarter to" is Year 3), 5 minutes (minute ticks on), any minute. Words
-    // from Year 2; Match in Years 1 and 2. Year 5: face and words in 24-hour time, and How long? ("__ h __ min").
+    // from Year 2; Match in Years 1 to 3, a.m. or p.m. in Year 3. Year 5: face and words in 24-hour time, and How long? ("__ h __ min").
     make: c => {
-      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => k === 'words' ? yr > 1 : k === 'match' ? yr <= 2 : k === 'long' ? yr >= 5 : true), k = pickOne(kinds.length ? kinds : ['face']);
+      const yr = c.yr, h = rnd(1, 12), kinds = c.kinds.filter(k => (k !== 'words' || yr > 1) && clockKindIn(k, yr)), k = pickOne(kinds.length ? kinds : ['face']);
       if (k === 'match') return clockMatchQ(yr);
+      if (k === 'ampm') return ampmQ();
       if (k === 'long') return clockLongQ();
       if (yr >= 5) return clock24Q(k === 'words');
       const m = yr === 1 ? 0 : yr === 2 ? pickOne([0, 15, 30, 30]) : yr === 3 ? rnd(0, 11) * 5 : rnd(0, 59);
@@ -3940,28 +4000,28 @@ const ACTS = {
       if (yr === 1) return { kind: 'clock', h, m, ans: h };
       return { kind: 'clock', h, m, words, ticks: yr >= 3, two: true, parts: [h, m], ans: `${h}:${String(m).padStart(2, '0')}` };
     },
-    // Match only changes Years 1 and 2, so Years 3 up leave it out of the record key
-    key: c => `clock~${c.yr}|${['face', 'words', 'match', 'long'].filter(k => c.kinds.includes(k) && (k !== 'match' || c.yr <= 2) && (k !== 'long' || c.yr >= 5)).join(',') || 'face'}|${c.n}`,
-    label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').replace('long', 'how long?').split(',').join(', ')} · ${n} questions`; },
+    // a kind that doesn't change that year is left out of the record key
+    key: c => `clock~${c.yr}|${['face', 'words', 'match', 'ampm', 'long'].filter(k => c.kinds.includes(k) && clockKindIn(k, c.yr)).join(',') || 'face'}|${c.n}`,
+    label: k => { const [y, kinds, n] = k.split('|'); return `Clocks · Year ${y} · ${kinds.replace('face', 'clock').replace('ampm', 'a.m. or p.m.').replace('long', 'how long?').split(',').join(', ')} · ${n} questions`; },
   },
   money: {
     name: 'Money', ages: [5, 8], setup: 'opts', say: 'How much money?',
     pic: moneySvg([200, 100, 50, 20]),
     options: [
       { key: 'yr', label: 'Year', values: [[1, '1 · dollars to $10'], [2, '2 · coins or notes'], [3, '3 · dollars and cents'], [4, '4 · bigger amounts, buying several'], [5, '5 · $3.45, with a point']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['coin', 'Which coin? (Year 1)'], ['make', 'Make it (Years 2, 4)']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['count', 'How much?'], ['change', 'Change'], ['coin', 'Which coin? (Year 1)'], ['make', 'Make it (Years 2 to 4)']] },
     ],
     defaults: age => age === 5 ? { yr: 1, kinds: ['count', 'coin', 'make'], n: 6 } : { yr: 3, kinds: ['count', 'change', 'make'], n: 12 },
     make: c => {
-      // Make it is Years 2 and 4 (a tap card with a tray) and Which coin? Year 1 only (a tap card); elsewhere they are left out
+      // Make it is Years 2 to 4 (a tap card with a tray) and Which coin? Year 1 only (a tap card); elsewhere they are left out
       const kinds = c.kinds.filter(k => (k !== 'make' || MAKE_YRS.includes(c.yr)) && (k !== 'coin' || c.yr === 1)), k = pickOne(kinds.length ? kinds : ['count']);
-      if (k === 'make') return c.yr === 2 ? makeIt2Q() : makeItQ();
+      if (k === 'make') return c.yr === 2 ? makeIt2Q() : c.yr === 3 ? makeIt3Q() : makeItQ();
       if (k === 'coin') return coinQ();
       if (k === 'change') { const q = moneyChange(c.yr); return moneyQ({ ...q, change: true }, q.total ? q.price : q.pay - q.price); }
       const q = moneyCount(c.yr);
       return moneyQ(q, sumOf(q.items));
     },
-    // Make it only changes Years 2 and 4 and Which coin? only Year 1, so the other years leave them out of the record key
+    // Make it only changes Years 2 to 4 and Which coin? only Year 1, so the other years leave them out of the record key
     key: c => `money~${c.yr}|${['count', 'change', 'coin', 'make'].filter(k => c.kinds.includes(k) && (k !== 'make' || MAKE_YRS.includes(c.yr)) && (k !== 'coin' || c.yr === 1)).join(',') || 'count'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Money · Year ${y} · ${kinds.replace('count', 'how much').replace('coin', 'which coin').replace('make', 'make it').split(',').join(', ')} · ${n} questions`; },
   },
