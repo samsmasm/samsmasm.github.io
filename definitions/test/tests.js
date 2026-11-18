@@ -56,6 +56,7 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.goto(URL, { waitUntil: 'networkidle0' });
   ok(await page.$$eval('.unit', l => l.length) === 6, 'five units plus toolkit on the start page');
   ok(await page.evaluate(() => DEFS.length) === 486, 'all 486 terms');
+  ok(await page.evaluate(() => DEFS.filter(d => d.review).length) === 55, 'BM: 55 terms flagged for review');
   ok(await page.$eval('.unit[data-u="6"]', u => [...u.querySelectorAll('.chip.sub')].map(c => c.textContent.replace(/\d+$/, '')).join()) === 'Key concepts,Toolkit', 'concepts and toolkit grouped last');
   ok(await page.$eval('.unit[data-u="1"]', u => !u.textContent.includes('concepts')), 'concepts not in Unit 1');
   ok(await page.$eval('.unit[data-u="1"] .wholes', w => w.querySelectorAll('.chip').length === 1 && w.textContent.startsWith('Whole unit6')), 'Unit 1 (no HL terms) has one Whole unit button');
@@ -246,6 +247,19 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.click('#next');
   ok(await text(page, '#final') === '3 / 3', 'economics round scores 3 / 3');
   await page.click('#change');
+  // review-flagged terms are played with a small "subject to review" tag, on the card and in the full definition
+  ok(await page.evaluate(() => DEFS.filter(d => d.review).length) === 64, 'economics: 64 terms flagged for review');
+  await page.evaluate(() => {
+    const r = DEFS.filter(d => d.review), n = DEFS.filter(d => !d.review && d.p.length === 2);
+    startRound([r[0], n[0], n[1]].map(d => ({ d })));
+  });
+  ok(JSON.stringify(await page.$$eval('#terms .term h3', l => l.map(h => !!h.querySelector('.rev')))) === '[true,false,false]', 'only the flagged term shows subject to review');
+  k = await key(page);
+  await solveByTap(page, swapFirst(k));
+  await page.click('#check');
+  ok(await page.$eval('.term.wrong .fix', e => e.textContent.includes('subject to review')), 'full definition keeps the review note');
+  await shot(page, 'econ-review');
+  await page.click('#next'); await page.click('#change');
   await page.click('.unit[data-u="3"] .whole.sl');
   await page.click('#start');
   ok(await page.$$eval('#terms .term', l => l.length) === 3 && await text(page, '#progress') === '1 of 2', 'economics Unit 3 SL round starts');

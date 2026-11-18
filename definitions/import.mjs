@@ -47,6 +47,7 @@ for (const x of all) {
   out.push({
     term: x.term, unit: g6 ? 6 : +x.unit, topic: g6 || `${x.subtopic} ${TOPICS[x.subtopic]}`,
     hl: x.level === 'HL', p: [lower(x.element1), stop(x.element2)],
+    ...(x.review ? { review: true } : {}),
   });
 }
 const save = (name, list) => writeFileSync(join(here, `data/${name}.json`), '[\n' + list.map(d => '  ' + JSON.stringify(d)).join(',\n') + '\n]\n');
@@ -56,11 +57,17 @@ console.log(`Wrote ${out.length} Business definitions (units ${units.join(', ')}
 // Economics: the vault file is already in the game's shape (unit 1-4, guide topic names, p lowercase start and
 // final full stop). one_part terms (5) have a single part; the game gives them one box.
 const econSrc = join(homedir(), 'notes/Projects/Economics definitions/data/all.json');
+// review flags live only in the audit copy, which also holds copyrighted source text: read the flag, nothing else
+const econAudit = join(homedir(), 'notes/temp/economics definitions/data/all-audit.json');
+const econReview = new Set(JSON.parse(readFileSync(econAudit, 'utf8')).filter(x => x.review).map(x => `${x.term}|${x.topic}`));
 const econ = JSON.parse(readFileSync(econSrc, 'utf8')).map(x => {
   if (!(x.unit >= 1 && x.unit <= 4) || !x.topic || !Array.isArray(x.p)) warn.push(`Economics ${x.term}: missing unit, topic or p`);
   if (x.p.length === 1 && !x.one_part) warn.push(`Economics ${x.term}: one part but no one_part flag`);
-  return { term: x.term, unit: x.unit, topic: x.topic, hl: !!x.hl, p: x.p.map((s, i) => i === x.p.length - 1 ? stop(s) : s) };
+  const review = econReview.delete(`${x.term}|${x.topic}`);
+  return { term: x.term, unit: x.unit, topic: x.topic, hl: !!x.hl, p: x.p.map((s, i) => i === x.p.length - 1 ? stop(s) : s),
+    ...(review ? { review: true } : {}) };
 });
+if (econReview.size) warn.push(`Economics review flags with no matching term: ${[...econReview].join(', ')}`);
 save('economics', econ);
 console.log(`Wrote ${econ.length} Economics definitions to data/economics.json`);
 if (warn.length) console.log('Check:\n  ' + warn.join('\n  '));
