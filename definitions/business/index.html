@@ -119,6 +119,16 @@ section.block { margin-bottom: 24px; }
 .missed li { border-top: 1px solid var(--line); padding: 12px 0; }
 .missed li:last-child { border-bottom: 1px solid var(--line); }
 .sep { color: var(--amber-ink); font-weight: 700; padding: 0 2px; }
+/* review again: per-student saved terms */
+.head { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; }
+.head h3 { margin: 0; flex: 1; }
+.again { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 10px; min-height: 36px;
+  font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
+.again[aria-pressed="true"] { background: var(--amber-soft); border-color: var(--amber); color: var(--amber-ink); font-weight: 700; }
+.missed li .again { margin-top: 6px; }
+.againchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.againchips .chip { min-width: 150px; }
+#againList { margin-top: 10px; }
 .rev { display: inline-block; font-family: 'Atkinson Hyperlegible', sans-serif; font-size: 0.72rem; font-weight: 400; letter-spacing: 0.04em;
   color: var(--amber-ink); background: var(--amber-soft); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
 
@@ -143,6 +153,11 @@ footer { max-width: 1100px; margin: 0 auto; padding: 16px; font-size: 0.75rem; c
 <main>
   <div id="setup">
     <p class="lede">Three terms, six pieces. Put two pieces under each term, in order.</p>
+    <section class="block" id="againBlock" hidden>
+      <p class="label">Review again</p>
+      <div class="againchips" id="againChips"></div>
+      <ul class="missed" id="againList" hidden></ul>
+    </section>
     <section class="block">
       <p class="label">Topics</p>
       <div id="units"></div>
@@ -202,6 +217,48 @@ function fullHTML(d) {
   const rest = [d.p[0].charAt(0).toUpperCase() + d.p[0].slice(1), ...d.p.slice(1)];
   return `<strong>${esc(d.term)}</strong>${revTag(d)}: ${rest.map(esc).join(' <span class="sep">|</span> ')}`;
 }
+// ---------- review again ----------
+// Terms a student marks to see again, kept in this browser per subject (a Google sign-in may replace this later:
+// only loadAgain and saveAgain touch storage).
+const SUBJECT = 'business';
+const AGAIN_KEY = 'dd-again-' + SUBJECT;
+const keyOf = d => `${d.unit}|${d.term}`;
+function loadAgain() { try { return new Set(JSON.parse(localStorage.getItem(AGAIN_KEY)) || []); } catch { return new Set(); } }
+function saveAgain() { try { localStorage.setItem(AGAIN_KEY, JSON.stringify([...again])); } catch {} }
+const again = loadAgain();
+function againBtn(d) {
+  const on = again.has(keyOf(d));
+  return `<button type="button" class="again" data-k="${esc(keyOf(d))}" aria-pressed="${on}">${on ? '★' : '☆'} Review again</button>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.again');
+  if (!b) return;
+  const k = b.dataset.k;
+  again.has(k) ? again.delete(k) : again.add(k);
+  saveAgain();
+  for (const x of document.querySelectorAll('.again')) if (x.dataset.k === k) x.outerHTML = againBtn(DEFS.find(d => keyOf(d) === k));
+  if (!$('setup').hidden) { renderAgain(); syncSetup(); }
+});
+// start page: Whole course plus one button per unit (no subtopics), and a fold-out list
+function renderAgain() {
+  const saved = DEFS.filter(d => again.has(keyOf(d)));
+  $('againBlock').hidden = !saved.length;
+  const wrap = $('againChips'), list = $('againList');
+  wrap.innerHTML = '';
+  if (!saved.length) { list.hidden = true; return; }
+  const groups = [['Whole course', saved]];
+  for (const u of [...new Set(saved.map(d => d.unit))].sort((a, b) => a - b)) groups.push([UNITS[u].split(':')[0], saved.filter(d => d.unit === u)]);
+  for (const [name, g] of groups) {
+    const b = chip('whole againpick', `${esc(name)}<span class="n">${g.length}</span>`, () => pickAll(g, !isFull(g)));
+    b._g = g; wrap.append(b);
+  }
+  const fold = document.createElement('button'); fold.className = 'fold'; fold.setAttribute('aria-expanded', !list.hidden);
+  fold.innerHTML = 'List <span class="chev" aria-hidden="true">▾</span>';
+  fold.onclick = () => { list.hidden = !list.hidden; fold.setAttribute('aria-expanded', !list.hidden); };
+  wrap.append(fold);
+  list.innerHTML = saved.map(d => `<li>${fullHTML(d)}<br>${againBtn(d)}</li>`).join('');
+}
+
 // flagged in the bank for Sam to double-check: still played, with a small note for students
 const revTag = d => d.review ? '<span class="rev" title="This definition is still being checked, so it may change.">subject to review</span>' : '';
 // split a list of terms into boards of 3 (a leftover of 1 or 2 is spread over the last boards)
@@ -272,12 +329,14 @@ function syncSetup() {
       b.querySelector('.n').textContent = on ? b._g.filter(d => state.picks.has(d)).length : b._g.length;
     }
   }
+  for (const b of $('againChips').querySelectorAll('.chip')) b.setAttribute('aria-pressed', isFull(b._g));
   const picked = state.picks.size;
   $('picked').textContent = picked ? `${picked} term${picked === 1 ? '' : 's'} picked` : 'Pick a unit or some topics';
   $('start').disabled = picked === 0;
 }
 function renderSetup() {
   if (!$('units').firstChild) buildPicker();
+  renderAgain();
   syncSetup();
   const seg = $('lengths'); seg.innerHTML = '';
   for (const L of LENGTHS) {
@@ -321,7 +380,7 @@ function renderBoard() {
   $('qtopic').textContent = topics.join(' · ');
   $('board').classList.remove('locked');
   $('check').hidden = false; $('next').hidden = true;
-  $('terms').innerHTML = items.map((it, t) => `<div class="term" data-t="${t}"><h3>${esc(it.d.term)}${revTag(it.d)}</h3>${
+  $('terms').innerHTML = items.map((it, t) => `<div class="term" data-t="${t}"><div class="head"><h3>${esc(it.d.term)}${revTag(it.d)}</h3>${againBtn(it.d)}</div>${
     it.d.p.map((_, i) => `<button type="button" class="slot" data-slot="${t}-${i}" aria-label="${esc(it.d.term)}, piece ${i + 1}"></button>`).join('')
   }<p class="fix" hidden></p></div>`).join('');
   renderPieces();
@@ -485,7 +544,7 @@ function renderEnd() {
   const m = state.missed;
   $('missedWrap').hidden = m.length === 0;
   $('retry').hidden = m.length === 0;
-  $('missed').innerHTML = m.map(d => `<li>${fullHTML(d)}</li>`).join('');
+  $('missed').innerHTML = m.map(d => `<li>${fullHTML(d)}<br>${againBtn(d)}</li>`).join('');
 }
 // retry missed: if fewer than 3 were missed, other terms from the same topics fill the board (not scored)
 $('retry').onclick = () => {

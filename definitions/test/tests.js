@@ -264,6 +264,41 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   await page.click('#start');
   ok(await page.$$eval('#terms .term', l => l.length) === 3 && await text(page, '#progress') === '1 of 2', 'economics Unit 3 SL round starts');
 
+  // ---- review again (economics) ----
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'networkidle0' });
+  ok(await page.$eval('#againBlock', e => e.hidden), 'no Review again section with nothing saved');
+  await page.evaluate(() => {   // a board with one Unit 2 and one Unit 4 term
+    const a = DEFS.find(d => d.unit === 2 && d.p.length === 2), b = DEFS.find(d => d.unit === 4 && d.p.length === 2), c = DEFS.find(d => d.unit === 1 && d.p.length === 2);
+    startRound([a, b, c].map(d => ({ d })));
+  });
+  ok(await page.$$eval('#terms .again', l => l.every(b => b.getAttribute('aria-pressed') === 'false')), 'Review again is off by default');
+  await page.click('.term[data-t="0"] .again'); await page.click('.term[data-t="1"] .again');
+  await page.click('.term[data-t="1"] .again'); await page.click('.term[data-t="1"] .again');   // off and on again
+  ok(await page.$$eval('#terms .again', l => l.map(b => b.getAttribute('aria-pressed')).join()) === 'true,true,false', 'tapping marks terms (and unmarks)');
+  ok(await page.evaluate(() => state.sel === null && Object.keys(state.placed).length === 0), 'marking a term does not touch the pieces');
+  await page.reload({ waitUntil: 'networkidle0' });
+  ok(await page.$eval('#againBlock', e => !e.hidden), 'saved terms survive a reload');
+  ok(await page.$$eval('#againChips .chip', l => l.map(c => c.textContent).join()) === 'Whole course2,Unit 21,Unit 41', 'Whole course plus one button per unit');
+  await page.click('#againChips .chip:nth-child(1)');
+  ok(await text(page, '#picked') === '2 terms picked' && await pressed('#againChips .chip:nth-child(2)'), 'Whole course picks the saved terms');
+  await page.click('#againChips .chip:nth-child(1)');
+  await page.click('#againChips .chip:nth-child(3)');
+  ok(await text(page, '#picked') === '1 term picked', 'a unit button picks only that unit\'s saved terms');
+  await shot(page, 'again-setup');
+  await page.click('#start');
+  ok(await page.$$eval('#terms .term', l => l.length) === 3 && await page.evaluate(() => state.scored === 1), 'review round runs (fillers unscored)');
+  ok(await page.$eval('#terms .again[aria-pressed="true"]', b => !!b), 'the saved term shows as marked on the board');
+  k = await key(page); await solveByTap(page, swapFirst(k)); await page.click('#check'); await page.click('#next');
+  ok(await page.$$eval('#missed li .again', l => l.length) === await page.$$eval('#missed li', l => l.length), 'To go over list has Review again buttons');
+  await page.click('#change');
+  await page.click('#againChips .fold');
+  ok(await page.$$eval('#againList li', l => l.length) === 2, 'List shows the saved terms');
+  await page.click('#againList li:first-child .again');
+  ok(await page.$$eval('#againChips .chip', l => l[0].textContent) === 'Whole course1' && await page.$eval('#againList', e => !e.hidden), 'unmarking in the list updates the counts, list stays open');
+  await page.goto(URL, { waitUntil: 'networkidle0' });
+  ok(await page.$eval('#againBlock', e => e.hidden), 'Business keeps its own list');
+
   ok(errors.length === 0, 'no console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
   console.log(fails ? `\n${fails} failed` : '\nall passed');
