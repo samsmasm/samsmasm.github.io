@@ -14,4 +14,4 @@ python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$ROOT" >/dev/null 2
 SERVER=$!
 trap 'kill $SERVER' EXIT
 sleep 0.6
-DD_MODS="$MODS" DD_URL="http://127.0.0.1:$PORT/definitions/" node "$HERE/tests.js" "$@"
+DD_MODS="$MODS" DD_ROOT="http://127.0.0.1:$PORT/definitions/" DD_URL="http://127.0.0.1:$PORT/definitions/business/" node "$HERE/tests.js" "$@"

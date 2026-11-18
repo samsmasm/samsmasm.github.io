@@ -1,6 +1,16 @@
-# Definition Drill (IB Business Management)
+# Definition Drill (IB Business Management and IB Economics)
 
-A browser game for drilling IB Business Management definitions. Built for Sam's students at SSIS. Single static page, no build step, no backend, works on touch screens and with a mouse.
+A browser game for drilling IB style definitions in two subjects.
+
+## Layout (2026-11-18): two subjects
+
+- `/definitions/` is a hand-written landing page: "IB style definitions", two cards, Business Management (BM blue, 486 terms) and Economics (Econ green, 793 terms). Update the counts on it if the banks change size.
+- `/definitions/business/` and `/definitions/economics/` are **generated**: `build.mjs` fills `template.html` (`{{SUBJECT}}`, `{{COLOUR}}`, `{{LEDE}}`, `{{DATA}}`) with `data/business.json` or `data/economics.json`. Edit `template.html` for any game change, then rebuild; never hand-edit the subject pages. Per-subject settings (name, colour, lede, unit names) live in `SUBJECTS` in `build.mjs`. Masthead links: Subjects (landing) and unisam.nz.
+- `node definitions/import.mjs` writes both data files: Business from `~/notes/Projects/BM definitions/data/all.json` (as below), Economics from `~/notes/Projects/Economics definitions/data/all.json` (already in game shape; import keeps term, unit, topic, hl, p). Fix Economics wording in the vault's `temp/economics definitions/` drafts and rerun its `assemble.py`, not here.
+- Economics: units 1 to 4 (Unit 1 has no HL, so one Whole unit button), HL-only subtopics 2.4, 2.10, 2.11, 2.12; some HL terms sit in units 3 and 4 SL subtopics. 5 terms are `one_part` (Change, Market price, One-off windfall, International trade, Forex) and get a single box, so a board can have 4 or 5 pieces; the Economics lede does not promise six. Sam's 64 `review: true` entries and 61 possible duplicate pairs are still unreviewed in the vault; all are included.
+- Homepage: Business menu and BM panel link `/definitions/business/`, Economics menu and Econ panel link `/definitions/economics/`. /find has one entry per subject.
+
+The rest of this file was written for the BM version and still holds for both subjects (paths: `data/defs.json` is now `data/business.json`, `index.html` game is now `template.html`). Built for Sam's students at SSIS. Single static page, no build step, no backend, works on touch screens and with a mouse.
 
 ## Why it exists
 
@@ -34,7 +44,7 @@ A question counts as correct only if every tile is in the right place.
 - Check is enabled only when every piece is placed. Marking is per piece (✓/✗); a term counts as right only if all its pieces are in the right boxes in order. Wrong terms show the full definition inside their card.
 - Retry missed: if fewer than 3 were missed, other terms from the chosen topics fill the board but are not scored.
 - Pieces drop trailing commas and full stops so punctuation does not give the order away; the full definition keeps them, with an amber bar at the split point.
-- Build: `node definitions/build.mjs` (validates, rejects em dashes). Tests: `bash definitions/test/run.sh` (64 checks: 6 groups and 486 terms, concepts out of Unit 1, single Whole unit button for Unit 1, start page, folding, Whole unit SL and HL, SL counts, mixed picks across units, HL labels, 3.1 filler board, taps both ways, swap, return to pool, mouse drag, touch drag from the grip, grip tap selects, page scroll on piece text but not on the grip, full round, retry with fillers, no sideways scroll at 390px). `DD_SHOTS=<dir>` saves screenshots.
+- Build: `node definitions/build.mjs` (validates, rejects em and en dashes). Tests: `bash definitions/test/run.sh` (74 checks; the 11 added 2026-11-18 cover the landing page and Economics: 793 terms in 4 units, HL labels, a board with a one-part term, a Unit 3 SL round. The BM ones: 6 groups and 486 terms, concepts out of Unit 1, single Whole unit button for Unit 1, start page, folding, Whole unit SL and HL, SL counts, mixed picks across units, HL labels, 3.1 filler board, taps both ways, swap, return to pool, mouse drag, touch drag from the grip, grip tap selects, page scroll on piece text but not on the grip, full round, retry with fillers, no sideways scroll at 390px). `DD_SHOTS=<dir>` saves screenshots.
 - Linked from the homepage Business dropdown and BM panel, and from /find (Business > Course notes and revision). Not mirrored to the work site.
 - 2026-11-17: Sam called it done for now. Possible later: an IB Economics version (likely its own data and folder or a subject switch; decide with Sam then).
 - The IBO PDF and Kognity glossary in this folder are copyrighted: excluded in `.git/info/exclude`, never commit them.

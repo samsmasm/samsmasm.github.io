@@ -217,6 +217,39 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   y1 = await page.evaluate(() => scrollY);
   ok(Math.abs(y1 - y0) < 30,`swipe on a grip drags instead of scrolling (${y0} -> ${y1})`);
 
+  // ---- landing page ----
+  await page.goto(process.env.DD_ROOT, { waitUntil: 'networkidle0' });
+  ok(JSON.stringify(await page.$$eval('a.subj', l => l.map(a => a.getAttribute('href')))) === '["business/","economics/"]', 'landing links to both subjects');
+  ok(await page.$eval('main', m => /IB style definitions/.test(m.textContent)), 'landing says IB style definitions');
+  ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll on landing (phone)');
+  await shot(page, 'landing-phone');
+  await page.click('a.subj[href="economics/"]'); await page.waitForSelector('.unit');
+
+  // ---- economics ----
+  await page.setViewport({ width: 1100, height: 1000 });
+  ok(await page.$eval('.mast .sub', e => e.textContent) === 'IB Economics', 'economics page from the landing link');
+  ok(await page.evaluate(() => DEFS.length) === 793 && await page.$$eval('.unit', l => l.length) === 4, 'economics: 793 terms in 4 units');
+  ok(await page.$eval('.unit[data-u="1"] .wholes', w => w.querySelectorAll('.chip').length === 1), 'economics Unit 1 (no HL) has one Whole unit button');
+  ok(await page.$eval('.unit[data-u="2"]', u => [...u.querySelectorAll('.chip.sub')].filter(c => c.querySelector('.hl')).map(c => c.textContent.split(' ')[0]).join()) === '2.4,2.10,2.11,2.12', 'economics HL marked on 2.4, 2.10, 2.11, 2.12');
+  await shot(page, 'econ-setup');
+  // a board holding a one-part term: 1 box for it, pieces still all placed and marked
+  await page.evaluate(() => {
+    const one = DEFS.filter(d => d.p.length === 1), two = DEFS.filter(d => d.p.length === 2);
+    state.picks = new Set([one[0], two[0], two[1]]);
+    startRound([one[0], two[0], two[1]].map(d => ({ d })));
+  });
+  ok(await page.$$eval('#terms .slot', l => l.length) === 5 && await page.$$eval('#pool .frag', l => l.length) === 5, 'one-part term gets one box (5 pieces)');
+  k = await key(page);
+  await solveByTap(page, k);
+  await page.click('#check');
+  ok(await page.$$eval('.term.right', l => l.length) === 3, 'board with a one-part term marks all right');
+  await page.click('#next');
+  ok(await text(page, '#final') === '3 / 3', 'economics round scores 3 / 3');
+  await page.click('#change');
+  await page.click('.unit[data-u="3"] .whole.sl');
+  await page.click('#start');
+  ok(await page.$$eval('#terms .term', l => l.length) === 3 && await text(page, '#progress') === '1 of 2', 'economics Unit 3 SL round starts');
+
   ok(errors.length === 0, 'no console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
   console.log(fails ? `\n${fails} failed` : '\nall passed');

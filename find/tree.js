@@ -45,7 +45,7 @@ window.TREE = {
         { id: "econ", label: "Economics", next: {
           q: "Economics: what for?",
           opts: [
-            { id: "review", label: "Course notes and revision", tools: ["/ibecon", "/qreview", "/samples"] },
+            { id: "review", label: "Course notes and revision", tools: ["/ibecon", "/qreview", "/samples", "/definitions/economics/"] },
             { id: "answers", label: "Model answers and essay writing", tools: ["/samples", "/argmap"] },
             { id: "diagram", label: "Draw a diagram", tools: ["/graphs"] },
             { id: "ia", label: "The IA", tools: ["/econia", "/graphs"] },
@@ -55,7 +55,7 @@ window.TREE = {
         { id: "bm", label: "Business Management", next: {
           q: "Business: what for?",
           opts: [
-            { id: "review", label: "Course notes and revision", tools: ["/ibbm", "/qreview", "/definitions"] },
+            { id: "review", label: "Course notes and revision", tools: ["/ibbm", "/qreview", "/definitions/business/"] },
             { id: "finance", label: "Finance", hint: "Ratios, accounts, Unit 3", tools: ["/ratibro", "/slopstudy"] },
             { id: "cases", label: "Case studies", tools: ["/slopstudy", "/businews", "/newbiz"] },
             { id: "game", label: "A class game", hint: "Find the hidden groups of terms", tools: ["/birds"] },

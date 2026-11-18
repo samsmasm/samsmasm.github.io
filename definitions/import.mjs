@@ -1,7 +1,7 @@
-// Copies chosen units from the definitions bank in Sam's vault into data/defs.json.
-// The vault's all.json is the source of truth: fix wording there, then run
+// Copies the two definitions banks in Sam's vault into data/business.json and data/economics.json.
+// The vault's all.json files are the source of truth: fix wording there, then run
 //   node definitions/import.mjs && node definitions/build.mjs
-// Optional args: path to all.json, then unit numbers (default: the UNITS_LIVE list below).
+// Optional args (Business only): path to the BM all.json, then unit numbers (default: UNITS_LIVE below).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
@@ -49,6 +49,18 @@ for (const x of all) {
     hl: x.level === 'HL', p: [lower(x.element1), stop(x.element2)],
   });
 }
-writeFileSync(join(here, 'data/defs.json'), '[\n' + out.map(d => '  ' + JSON.stringify(d)).join(',\n') + '\n]\n');
-console.log(`Wrote ${out.length} definitions (units ${units.join(', ')}) to data/defs.json`);
+const save = (name, list) => writeFileSync(join(here, `data/${name}.json`), '[\n' + list.map(d => '  ' + JSON.stringify(d)).join(',\n') + '\n]\n');
+save('business', out);
+console.log(`Wrote ${out.length} Business definitions (units ${units.join(', ')}) to data/business.json`);
+
+// Economics: the vault file is already in the game's shape (unit 1-4, guide topic names, p lowercase start and
+// final full stop). one_part terms (5) have a single part; the game gives them one box.
+const econSrc = join(homedir(), 'notes/Projects/Economics definitions/data/all.json');
+const econ = JSON.parse(readFileSync(econSrc, 'utf8')).map(x => {
+  if (!(x.unit >= 1 && x.unit <= 4) || !x.topic || !Array.isArray(x.p)) warn.push(`Economics ${x.term}: missing unit, topic or p`);
+  if (x.p.length === 1 && !x.one_part) warn.push(`Economics ${x.term}: one part but no one_part flag`);
+  return { term: x.term, unit: x.unit, topic: x.topic, hl: !!x.hl, p: x.p.map((s, i) => i === x.p.length - 1 ? stop(s) : s) };
+});
+save('economics', econ);
+console.log(`Wrote ${econ.length} Economics definitions to data/economics.json`);
 if (warn.length) console.log('Check:\n  ' + warn.join('\n  '));
