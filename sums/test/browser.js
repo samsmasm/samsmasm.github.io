@@ -106,7 +106,7 @@ const fakeSpeech = () => {
   await page.click('#yPrev');
   const y3 = await tiles('#actTiles');
   ok(await page.evaluate(() => view === 3 && $('#yView').textContent === 'Year 3' && $('#yMine').textContent === ''), '‹ goes to the Year 3 page');
-  ok(y3.length === 26 && ['Rounding', 'Splat', 'Number bonds', 'Fractions of a number','True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
+  ok(y3.length === 27 && ['Rounding', 'Mirror', 'Splat', 'Number bonds', 'Fractions of a number','True or false', 'More or less', 'Balance'].every(t => y3.includes(t)) && y3.includes('Arrays') && y3.includes('Clocks'), 'Year 3 page: year activities at Year 3 plus the older tiles ' + y3.join());
   await page.click('#actTiles [data-act="clock"]');
   ok(await page.evaluate(() => draft.yr === 3 && $('.sughint').textContent === 'From the page for: Year 3'), 'Clocks from the Year 3 page opens at Year 3');
   await page.click('#backBtn');
@@ -685,7 +685,8 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => $('#optBlock [data-key="yr"] .sug').dataset.v === '4' && /^Your year: Year 4$/.test($('.sughint').textContent)), 'the suggested year has a dot and a line saying so');
   ok(await page.evaluate(() => [...document.querySelectorAll('#optBlock .yrb')].map(b => `${b.querySelector('.yn').textContent}|${b.querySelector('.yx').textContent}`).join(' / '))
     === "Year 1|o'clock / Year 2|quarter past, half past / Year 3|5 minutes / Year 4|any minute / Year 5|24-hour, how long", 'Year buttons: "Year 1" on its own, the example under it (Sam: the 1 looked like part of the example)');
-  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8)).every(a => maxYear(a) >= 4)), 'every activity with years on the older tiles goes up to Year 4 at least');
+  // (Mirror is Year 3 only so far, E2b: its line across and diagonal are for later years)
+  ok(await page.evaluate(() => Object.keys(ACTS).filter(a => maxYear(a) && ACTS[a].ages.includes(8) && a !== 'mirror').every(a => maxYear(a) >= 4) && maxYear('mirror') === 3), 'every activity with years on the older tiles goes up to Year 4 at least (Mirror: Year 3 so far)');
   ok(await page.evaluate(() => Object.keys(ACTS).filter(a => yearsOf(a).includes(5)).sort().join() === 'addsub,angle,bal,chance,clock,cmp,dec,fof,graph,map,money,muldiv,round,seq,shape,tf,units'), 'Year 5 so far (C1 to C4): Add and take away, Times and divide, Number patterns, True or false, More or less, Balance, Rounding, Decimals, Fractions of a number, Money, Clocks, Change units, Angles, Map, Shapes, Graphs, Chance');
   const ck = await page.evaluate(() => {
     const bad = [];
@@ -2925,6 +2926,56 @@ const fakeSpeech = () => {
   ok(await page.evaluate(() => /^The arrow turned (anti)?clockwise\. Which turn was it\? quarter turn, half turn, three-quarter turn, full turn\.$/.test(cardSay(cards[0].q)) && /^The arrow makes a [a-z -]+ turn (anti)?clockwise\. Where does it point now\? pointing up, pointing right, pointing down, pointing left\.$/.test(cardSay(cards[1].q))), 'Turns read aloud: the question, then each tile');
   ok(await page.evaluate(() => ACTS.turn.key({ yr: 2, n: 6 }) === 'turn~2|6' && labelFor('turn~2|12') === 'Turns · Year 2 · 12 questions' && yearsOf('turn').join() === '2' && ACTS.turn.ages.join() === '5'), 'Turns record key and label; Year 2 only, younger tiles');
 
+  // ---- Mirror (Year 3, E2b): finish the mirror picture on a 6 × 6 grid
+  const mir = await page.evaluate(() => {
+    const bad = [], sizes = new Set(), shapes = new Set();
+    let touch = 0, away = 0;
+    for (let i = 0; i < 800; i++) {
+      const q = mirrorQ(), N = 6, rc = j => [Math.floor(j / N), j % N];
+      const L = q.on.map(rc), R = [].concat(q.right).map(rc);
+      sizes.add(L.length); shapes.add(q.on.join());
+      // every given square is on the left and joined to another; the right ones are their mirror pictures and nothing else
+      const joined = L.length === 1 || L.every(([r, c]) => L.some(([r2, c2]) => Math.abs(r - r2) + Math.abs(c - c2) === 1));
+      const want = L.map(([r, c]) => r * N + N - 1 - c).sort((a, b) => a - b).join(), slide = L.map(([r, c]) => r * N + c + 3).sort((a, b) => a - b).join();
+      if (q.kind !== 'tap' || !q.multi || q.cells !== N || q.tiles.length !== N * N || L.length < 3 || L.length > 6 || L.some(([, c]) => c > 2) || R.some(([, c]) => c < 3) || !joined
+        || [].concat(q.right).join() !== want || want === slide) bad.push(JSON.stringify([q.on, q.right]));
+      // the left half is given and can't be tapped (its filled squares drawn), the right half is all tappable and blank
+      if (q.tiles.some((t, j) => (j % N < 3) !== !!t.off) || q.tiles.some((t, j) => j % N < 3 && (t.cls === 'off on') !== q.on.includes(j)) || q.tiles.some(t => !t.off && (t.say !== 'this one' || t.html))) bad.push('tiles ' + q.on);
+      if (q.ans !== R.map(([r, c]) => `${r + 1},${c + 1}`).join(' ') || q.say !== 'Tap the squares that finish the mirror picture.' || !q.quiet || cardSay(q) !== q.say) bad.push('words ' + q.ans);
+      if (L.some(([, c]) => c === 2)) touch++; else away++;
+    }
+    if (sizes.size !== 4 || shapes.size < 250 || touch < 300 || away < 60) bad.push(`spread sizes ${[...sizes]} shapes ${shapes.size} touch ${touch} away ${away}`);
+    return bad.slice(0, 4);
+  });
+  ok(mir.length === 0, 'Mirror: 3 to 6 joined squares on the left of a 6 × 6 grid; the right answer is their mirror picture, never the same as sliding them across; the left half is given, the right half blank and tappable ' + mir.join(' | '));
+  for (const n of [4, 6]) {
+    await page.evaluate(n => { setYear(3); hideDone(); act = 'mirror'; buildSheet({ yr: 3, n }); show('sheet'); }, n);
+    ok(await page.evaluate(n => cards.length === n && cards.every(c => c.q.form === 'mirror' && c.el.querySelectorAll('.tt').length === 36 && c.el.querySelectorAll('.tt.on').length === c.q.on.length
+      && getComputedStyle(c.el.querySelector('.tiles'), '::after').borderLeftStyle === 'dashed' && getComputedStyle(c.el.querySelector('.tt.on')).backgroundColor === 'rgb(63, 116, 214)'), n), `Mirror sheet (${n}): a 6 × 6 grid, the shape filled in blue, a dashed mirror line`);
+    ok((await fits()).length === 0, `Mirror (${n}) fits, squares big enough to tap ` + (await fits()).join(' '));
+    // the line sits on the middle of the grid
+    ok(await page.evaluate(() => cards.every(c => { const g = c.el.querySelector('.tiles').getBoundingClientRect(), t = [...c.el.querySelectorAll('.tt')], a = t[2].getBoundingClientRect(), b = t[3].getBoundingClientRect(); return Math.abs((a.right + b.left) / 2 - (g.left + g.right) / 2) < 2; })), `Mirror (${n}): the mirror line is between the third and fourth columns`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/46-mirror-${n}.png` });
+  }
+  // taps: the given half does nothing; a tap turns a square on and off; the slide copy, one short or one extra is wrong
+  ok(await page.evaluate(() => {
+    const c = cards[0], q = c.q, tt = i => c.el.querySelector(`.tt[data-i="${i}"]`), R = [].concat(q.right);
+    tt(q.on[0]).click(); tt(0).click();
+    const none = c.pick.length === 0 && sheetStart === null;
+    R.forEach(i => tt(i).click());
+    const all = readAnswer(c).ok && tt(R[0]).getAttribute('aria-pressed') === 'true' && getComputedStyle(tt(R[0])).backgroundColor === 'rgb(63, 116, 214)';
+    tt(R[0]).click();
+    const short = !readAnswer(c).ok && tt(R[0]).getAttribute('aria-pressed') === 'false';
+    tt(R[0]).click(); const extra = range(0, 35).find(i => i % 6 > 2 && !R.includes(i)); tt(extra).click();
+    const more = !readAnswer(c).ok;
+    c.pick = q.on.map(i => i + 3); paintTap(c);
+    const slid = !readAnswer(c).ok;
+    c.pick = []; paintTap(c);
+    return none && all && short && more && slid;
+  }), 'Mirror: the given half can\'t be tapped; a tap turns a square on and off; all the mirror squares are right, one short, one extra or the shape slid across is wrong');
+  ok((await writeAllAndMark()).length === 0 && await page.evaluate(() => sheetDone && loadRec(current).history[0].k === 'mirror~3|6'), 'Mirror: tapped right is marked right, record mirror~3|6');
+  ok(await page.evaluate(() => ACTS.mirror.key({ yr: 3, n: 4 }) === 'mirror~3|4' && labelFor('mirror~3|4') === 'Mirror · Year 3 · 4 questions' && yearsOf('mirror').join() === '3' && ACTS.mirror.ages.join() === '8' && countsOf('mirror').join() === '4,6' && onPage('mirror', 3) && !onPage('mirror', 4) && !onPage('mirror', 2)), 'Mirror record key and label; Year 3 only, older tiles, 4 or 6 questions');
+
   // ---- E1a: Year 3 on True or false, More or less, Balance, Rounding
   const e1 = await page.evaluate(valSrc => {
     const bad = [], val = eval(valSrc), seen = new Set();
@@ -3599,7 +3650,7 @@ const fakeSpeech = () => {
       ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }],
       ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }],
       ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }],
-      ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }]]) {
+      ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }], ['mirror', { yr: 3, n: 6 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));

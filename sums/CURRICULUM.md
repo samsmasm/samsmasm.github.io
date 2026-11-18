@@ -185,7 +185,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 
 ### Geometry
 - Name, picture and sort regular polygons up to 10 sides (all sides and angles equal). Words: right angle, horizontal, vertical. ✓ partly (Shapes, Year 3: count sides up to 10)
-- Find lines of symmetry; complete a symmetrical pattern or picture. ✓ partly (Shapes, Year 3: how many lines)
+- Find lines of symmetry; complete a symmetrical pattern or picture. ✓ (Shapes, Year 3: how many lines; Mirror, Year 3: tap the squares that finish a picture across an upright mirror line; E2b)
 - Step-by-step directions with half and quarter turns and distances; north, east, south, west.
 - Use simple maps to find things relative to other things.
 
