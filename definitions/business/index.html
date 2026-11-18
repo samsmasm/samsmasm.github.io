@@ -166,7 +166,7 @@ footer { max-width: 1100px; margin: 0 auto; padding: 16px; font-size: 0.75rem; c
       <p class="label">How many terms</p>
       <div class="seg" id="lengths"></div>
     </section>
-    <div class="row"><button class="btn primary" id="start">Start</button><span class="picked" id="picked"></span></div>
+    <div class="row"><button class="btn primary" id="start">Start</button><span class="picked"><span id="picked"></span> <span id="fresh"></span></span></div>
   </div>
 
   <div id="play" hidden>
@@ -218,14 +218,25 @@ function fullHTML(d) {
   return `<strong>${esc(d.term)}</strong>${revTag(d)}: ${rest.map(esc).join(' <span class="sep">|</span> ')}`;
 }
 // ---------- review again ----------
-// Terms a student marks to see again, kept in this browser per subject (a Google sign-in may replace this later:
-// only loadAgain and saveAgain touch storage).
+// Per-student lists kept in this browser per subject (a Google sign-in may replace this later:
+// only loadSet and saveSet touch storage).
+//   again: terms the student marked "Review again"
+//   seen:  terms already asked this cycle, so every picked term comes up before any repeats
 const SUBJECT = 'business';
-const AGAIN_KEY = 'dd-again-' + SUBJECT;
 const keyOf = d => `${d.unit}|${d.term}`;
-function loadAgain() { try { return new Set(JSON.parse(localStorage.getItem(AGAIN_KEY)) || []); } catch { return new Set(); } }
-function saveAgain() { try { localStorage.setItem(AGAIN_KEY, JSON.stringify([...again])); } catch {} }
-const again = loadAgain();
+function loadSet(name) { try { return new Set(JSON.parse(localStorage.getItem(`dd-${name}-${SUBJECT}`)) || []); } catch { return new Set(); } }
+function saveSet(name, set) { try { localStorage.setItem(`dd-${name}-${SUBJECT}`, JSON.stringify([...set])); } catch {} }
+const again = loadSet('again'), seen = loadSet('seen');
+const saveAgain = () => saveSet('again', again);
+// n terms from the pick, never-asked first; once every picked term has been asked, those start a fresh cycle
+function choose(pool, n) {
+  const fresh = shuffle(pool.filter(d => !seen.has(keyOf(d))));
+  if (fresh.length >= n) return fresh.slice(0, n);
+  for (const d of pool) seen.delete(keyOf(d));
+  saveSet('seen', seen);
+  const rest = shuffle(pool.filter(d => !fresh.includes(d)));
+  return shuffle([...fresh, ...rest.slice(0, n - fresh.length)]);
+}
 function againBtn(d) {
   const on = again.has(keyOf(d));
   return `<button type="button" class="again" data-k="${esc(keyOf(d))}" aria-pressed="${on}">${on ? '★' : '☆'} Review again</button>`;
@@ -332,6 +343,8 @@ function syncSetup() {
   for (const b of $('againChips').querySelectorAll('.chip')) b.setAttribute('aria-pressed', isFull(b._g));
   const picked = state.picks.size;
   $('picked').textContent = picked ? `${picked} term${picked === 1 ? '' : 's'} picked` : 'Pick a unit or some topics';
+  const fresh = [...state.picks].filter(d => !seen.has(keyOf(d))).length;
+  $('fresh').textContent = !picked || fresh === picked ? '' : fresh ? `· ${fresh} not asked yet` : '· all asked, starting again';
   $('start').disabled = picked === 0;
 }
 function renderSetup() {
@@ -356,8 +369,7 @@ function startRound(items) {
 }
 $('start').onclick = () => {
   state.pool = DEFS.filter(d => state.picks.has(d));
-  const list = shuffle(state.pool);
-  const items = (state.length === 'All' ? list : list.slice(0, state.length)).map(d => ({ d }));
+  const items = choose(state.pool, state.length === 'All' ? state.pool.length : state.length).map(d => ({ d }));
   startRound(padBoard(items));
 };
 // a board needs 3 terms: if too few were picked, borrow unscored ones from the same unit
@@ -526,7 +538,9 @@ $('check').onclick = () => {
     card.classList.add(right ? 'right' : 'wrong');
     if (!right) { const fx = card.querySelector('.fix'); fx.innerHTML = fullHTML(it.d); fx.hidden = false; }
     if (!it.extra) { if (right) state.score++; else state.missed.push(it.d); }
+    seen.add(keyOf(it.d));
   });
+  saveSet('seen', seen);
   $('score').textContent = `${state.score} right`;
   $('check').hidden = true; $('next').hidden = false;
   $('next').textContent = state.b === state.boards.length - 1 ? 'See score' : 'Next';

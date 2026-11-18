@@ -218,6 +218,30 @@ const placedRight = (page, k) => page.evaluate(k => k.every(({ slot, fid }) => s
   y1 = await page.evaluate(() => scrollY);
   ok(Math.abs(y1 - y0) < 30,`swipe on a grip drags instead of scrolling (${y0} -> ${y1})`);
 
+  // ---- every picked term is asked before any repeats (BM 2.7, 15 terms, rounds of 6) ----
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL, { waitUntil: 'networkidle0' });
+  const playRound = async () => {
+    await page.click('#start');
+    const asked = await page.evaluate(() => state.boards.flat().filter(x => !x.extra).map(x => x.d.term));
+    while (await page.$eval('#play', e => !e.hidden)) {
+      await solveByTap(page, await key(page)); await page.click('#check'); await page.click('#next');
+    }
+    await page.click('#change');
+    return asked;
+  };
+  await pick27();
+  ok(await text(page, '#fresh') === '', 'nothing asked yet: no note');
+  const r1 = await playRound(), r2 = await playRound();
+  ok(r1.length === 6 && r2.length === 6 && r1.every(t => !r2.includes(t)), 'second round asks 6 different terms');
+  ok(await text(page, '#fresh') === '· 3 not asked yet', 'start line says 3 not asked yet');
+  const r3 = await playRound();
+  ok(new Set([...r1, ...r2, ...r3]).size === 15, 'three rounds cover all 15 terms before repeating');
+  ok(await text(page, '#fresh') === '· 9 not asked yet', 'a fresh cycle starts once all 15 were asked');
+  await page.reload({ waitUntil: 'networkidle0' });
+  await pick27();
+  ok(await text(page, '#fresh') === '· 9 not asked yet', 'asked terms are remembered after a reload');
+
   // ---- landing page ----
   await page.goto(process.env.DD_ROOT, { waitUntil: 'networkidle0' });
   ok(JSON.stringify(await page.$$eval('a.subj', l => l.map(a => a.getAttribute('href')))) === '["business/","economics/"]', 'landing links to both subjects');
