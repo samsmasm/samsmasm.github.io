@@ -109,7 +109,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Algebra
 - True or false comparisons to 120 (16 > 60?), using >, < and =. ✓ (True or false Year 2, More or less Year 2)
 - True or false and open number sentences with +, −, × and ÷ (18 + __ = 17 + 6, 6 ÷ __ = 2, 2 + 2 + 2 = 3 × 2?). ✓ (True or false Year 2, Balance Year 2, Missing number)
-- Find the unit of repeat in a pattern and use it to predict what comes later (ACDC in ACDCACDC...).
+- Find the unit of repeat in a pattern and use it to predict what comes later (ACDC in ACDCACDC...). ✓ (Picture patterns Year 2: "Which part repeats?" and "What will the 10th one be?")
 
 ### Measurement
 - Measure length, weight or capacity with an informal unit used again and again (paper clips). ✋ ✓ partly (Rulers, Year 1: blocks)
@@ -122,7 +122,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Tell the time to the hour, half hour and quarter hour on analogue and digital clocks, saying "past" and "o'clock" only ("half past", "quarter past"). Knows: 60 minutes in an hour, 30 in half an hour. ✓ (Clocks, Year 2: faces, words, and Match to a digital clock; "quarter to" removed 2026-11-18, D1a).
 
 ### Geometry
-- Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex. ✓ partly (Shapes, Year 2: sides, corners, faces; not naming)
+- Name and sort 2D and 3D shapes by attributes: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone. Words: edge, face, vertex. ✓ partly (Shapes, Year 2: sides, corners, faces, and Name taps all seven by name; not sorting)
 - Flip, slide and turn 2D shapes to make a pattern or a shape.
 - Give and follow directions with steps and half and quarter turns ✋ (could be a grid game).
 - Read diagrams to say where things are relative to each other.

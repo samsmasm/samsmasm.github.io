@@ -320,6 +320,9 @@
   /* heaps to count (More or less, Year 1): the words are short, so the tiles may be bigger */
   .tap .tiles.bigt { --tw: max(40px, min(52cqh, calc(84cqw / var(--n)), 128px)); }
   .tap .bigt .tt svg { width: 1.6em; height: 1.6em; }
+  /* Picture patterns Year 2: each tile a short row of shapes, the tiles one under another */
+  .tap .tiles.prow { --tw: max(40px, min(18cqh, 21cqw, 64px)); flex-direction: column; align-items: center; gap: max(2px, 1.2cqh); margin-top: .1em; }
+  .tap .prow .tt { padding: 0 .25em; }
   .tap .dig { font-size: .62em; font-variant-numeric: tabular-nums; }
   .miss .saw { display: block; margin-top: .15em; }
   .miss .bx, .tap .bx { display: inline-block; width: .95em; height: 1em; border: .07em solid var(--ink); vertical-align: -.12em; border-radius: .08em; }
@@ -1684,8 +1687,11 @@ function shapeQ(yr, kinds) {
   if (yr >= 5) return shape5Q(kinds); // parallel, right angles, prisms, nets (C3c)
   // Moves is Year 4 only (a tap card); below Year 4, or not picked, it is a written card
   if (yr === 4 && kinds.includes('moves') && (kinds.length === 1 || Math.random() < 1 / kinds.length)) return movesQ();
-  // Name is Year 1 only (a tap card), half the cards when Flat is on too (3D isn't in Year 1)
-  if (yr === 1 && kinds.includes('name') && (!kinds.includes('flat') || Math.random() < 0.5)) return nameQ();
+  // Name is Years 1 and 2 (a tap card), an equal share with the written kinds that are on (3D isn't in Year 1)
+  if (yr <= 2 && kinds.includes('name')) {
+    const others = kinds.filter(k => k === 'flat' || (k === 'solid' && yr === 2)).length;
+    if (!others || Math.random() < 1 / (others + 1)) return yr === 1 ? nameQ() : name2Q();
+  }
   kinds = kinds.filter(k => k !== 'moves' && k !== 'name');
   if (!kinds.length) kinds = ['flat'];
   const fill = pickOne(Object.keys(BLOCK));
@@ -2738,6 +2744,10 @@ function solidBody(nm, f, sw = 1.8) {
     s += `<path d="M-26 -28V30A26 9 0 0 0 26 30V-28Z" fill="${f}" ${st} stroke-linejoin="round"/>`
       + `<path d="M-26 30A26 9 0 0 1 26 30" fill="none" ${st} stroke-dasharray="3 3"/>`
       + `<ellipse cx="0" cy="-28" rx="26" ry="9" fill="${tint(f, 0.4)}" ${st}/>`;
+  } else if (nm === 'cone') { // upright, point at the top, the back of the bottom dashed (Name Year 2)
+    const st = `stroke="${INK}" stroke-width="${sw}"`;
+    s += `<path d="M0 -40L-30 28A30 10 0 0 0 30 28Z" fill="${f}" ${st} stroke-linejoin="round"/>`
+      + `<path d="M-30 28A30 10 0 0 1 30 28" fill="none" ${st} stroke-dasharray="3 3"/>`;
   } else { // sphere: a ball with its middle line, the back half dashed
     const st = `fill="none" stroke="${INK}" stroke-width="${sw * 0.7}"`;
     s += `<circle cx="0" cy="0" r="38" fill="${f}" stroke="${INK}" stroke-width="${sw}"/>`
@@ -2748,9 +2758,16 @@ function solidBody(nm, f, sw = 1.8) {
 function nameShapeSvg(nm, f, size, rot) {
   const sw = 3 / size; // the same line on every tile, however big the shape
   let s;
+  const st = `fill="${f}" stroke="${INK}" stroke-width="${sw}" stroke-linejoin="round"`;
   if (nm === 'circle') s = `<circle cx="0" cy="0" r="38" fill="${f}" stroke="${INK}" stroke-width="${sw}"/>`;
-  else if (NAME_SOLID.includes(nm)) s = `<g transform="scale(${rot % 2 ? -1 : 1} 1)">${solidBody(nm, f, sw)}</g>`;
-  else {
+  else if (NAME_SOLID2.includes(nm)) s = `<g transform="scale(${rot % 2 ? -1 : 1} 1)">${solidBody(nm, f, sw)}</g>`;
+  // Year 2: an oval never close to a circle, a semicircle any way round, pentagons and hexagons regular or not
+  else if (nm === 'oval') s = `<ellipse cx="0" cy="0" rx="40" ry="${rnd(20, 26)}" transform="rotate(${rot})" ${st}/>`;
+  else if (nm === 'semicircle') s = `<path d="M-38 16A38 38 0 0 1 38 16Z" transform="rotate(${rot})" ${st}/>`;
+  else if (nm === 'pentagon' || nm === 'hexagon') {
+    const n = nm === 'pentagon' ? 5 : 6, pts = fitPts(turn(Math.random() < 0.4 ? irregular(n) : regular(n), rot));
+    s = `<polygon points="${pts.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" ${st}/>`;
+  } else {
     const h = rnd(14, 24); // a rectangle at least 5 : 3, never close to a square
     const pts = fitPts(turn(nm === 'triangle' ? flatPts('tri') : nm === 'square' ? flatPts('square') : [[-40, -h], [40, -h], [40, h], [-40, h]], rot));
     s =`<polygon points="${pts.map(v => v.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="${f}" stroke="${INK}" stroke-width="${sw}" stroke-linejoin="round"/>`;
@@ -2764,10 +2781,32 @@ function nameQ() {
   else if (nm === 'rectangle') wrong = ['triangle', 'circle', pickOne(['triangle', 'circle'])];
   else if (nm === 'square') wrong = ['rectangle', 'triangle', pickOne(['circle', 'rectangle'])];
   else wrong = NAME_FLAT.filter(x => x !== nm);
+  return nameTiles(nm, wrong);
+}
+// ---- Name, Year 2 (D2a): oval, semicircle, pentagon, hexagon; cuboid, pyramid, cone
+// (asked 3 times in 4), with the Year 1 shapes. One wrong tile is the near one (an oval
+// by a circle, a pentagon by a hexagon, a cone by a pyramid), and a solid has one flat
+// look-alike. A square is a rectangle and a cube is a cuboid, so neither is shown when
+// the other is asked.
+const NAME_FLAT2 = [...NAME_FLAT, 'oval', 'semicircle', 'pentagon', 'hexagon'], NAME_SOLID2 = [...NAME_SOLID, 'cuboid', 'pyramid', 'cone'];
+const NAME_NEW2 = ['oval', 'semicircle', 'pentagon', 'hexagon', 'cuboid', 'pyramid', 'cone'];
+const NAME_NEAR = { oval: 'circle', circle: 'oval', semicircle: 'circle', pentagon: 'hexagon', hexagon: 'pentagon', triangle: 'pentagon', square: 'rectangle', rectangle: 'oval', cube: 'cuboid', cuboid: 'cylinder', cone: 'pyramid', pyramid: 'cone', cylinder: 'cone', sphere: 'cylinder' };
+const NAME_FLATLIKE = { cube: 'square', cuboid: 'rectangle', cone: 'triangle', pyramid: 'triangle', cylinder: 'rectangle', sphere: 'circle' };
+const NAME_ALSO = { rectangle: 'square', cuboid: 'cube' };
+function name2Q() {
+  const nm = Math.random() < 0.75 ? pickOne(NAME_NEW2) : pickOne([...NAME_FLAT, ...NAME_SOLID]);
+  const solid = NAME_SOLID2.includes(nm);
+  const pool = (solid ? NAME_SOLID2 : NAME_FLAT2).filter(x => x !== nm && x !== NAME_ALSO[nm] && x !== NAME_NEAR[nm]);
+  const wrong = [NAME_NEAR[nm], ...shuffled(pool).slice(0, solid ? 1 : 2)];
+  if (solid) wrong.push(NAME_FLATLIKE[nm]);
+  return nameTiles(nm, wrong);
+}
+function nameTiles(nm, wrong) {
   const names = shuffled([nm, ...wrong]), cols = shuffled(Object.keys(BLOCK)), sizes = shuffled([0.62, 0.74, 0.87, 1]);
   const tiles = names.map((x, i) => {
-    // squares and rectangles sometimes turned a little; triangles any way up
-    const rot = x === 'triangle' ? rnd(0, 11) * 30 : x === 'square' || x === 'rectangle' ? pickOne([0, 0, 15, 30, 45, 90]) : rnd(0, 1);
+    // squares and rectangles sometimes turned a little; triangles, pentagons, hexagons, ovals any way up
+    const rot = ['triangle', 'pentagon', 'hexagon', 'oval'].includes(x) ? rnd(0, 11) * 30 : x === 'square' || x === 'rectangle' ? pickOne([0, 0, 15, 30, 45, 90])
+      : x === 'semicircle' ? rnd(0, 3) * 90 + pickOne([0, 0, 20, -20]) : rnd(0, 1);
     return { html: nameShapeSvg(x, BLOCK[cols[i]], sizes[i], rot), label: x, say: 'this one' };
   });
   const top = `Tap the ${nm}`;
@@ -2928,6 +2967,46 @@ function patQ() {
   const order = shuffled([0, 1, 2]);
   const tiles = order.map(i => ({ html: thingSvg(unit[i], 1.4), label: word(unit[i]), say: word(unit[i]) }));
   return { kind: 'tap', form: 'pat', type, unit, len, gap, top: patSvg(row, gap), tc: len * 12 * PAT_EM, th: 12 * PAT_EM, topf: 0.4, big: true, tiles, right: order.indexOf(gap % 3), say: 'What is missing?', ans: word(unit[gap % 3]) };
+}
+// ---- Picture patterns, Year 2 (D2a). Half "Which part repeats?": the row with no gap,
+// three short rows as tiles, one the part that repeats; the others are the start of the
+// row a bit too short or too long, never a part that also repeats (two copies of it).
+// Units can repeat a shape (ABB, ABCB). Half "What will the 10th one be?": the first six
+// numbered, then "…" and a dashed box with the place asked (8th to 12th) under it; tiles
+// are the shapes in the pattern. The words are only spoken.
+const PAT2_UNITS = ['ab', 'abb', 'aab', 'abc', 'abcb', 'abac', 'aabb', 'abbc', 'abcd'];
+const repeatsAs = (row, c) => row.every((t, i) => t === c[i % c.length]);
+function pat2Q() {
+  const type = pickOne(['shape', 'colour', 'both']), nms = shuffled(PAT_SHAPES), cols = shuffled(Object.keys(BLOCK));
+  const things = [0, 1, 2, 3].map(i => ({ nm: type === 'colour' ? nms[0] : nms[i], col: type === 'shape' ? cols[0] : cols[i] }));
+  const word = t => type === 'colour' ? t.col : type === 'shape' ? t.nm : `${t.col} ${t.nm}`;
+  const ids = u => u.split('').map(ch => ch.charCodeAt(0) - 97);
+  if (Math.random() < 0.5) { // the Nth one
+    const u = pickOne(['ab', 'abc', 'abc', 'abb', 'aab']), U = ids(u), k = U.length, p = rnd(8, 12), ans = U[(p - 1) % k];
+    const order = shuffled([...new Set(U)]);
+    const tiles = order.map(i => ({ html: thingSvg(things[i], 1.4), label: word(things[i]), say: word(things[i]) }));
+    const row = range(0, 5).map(i => things[U[i % k]]);
+    return { kind: 'tap', form: 'pat', ask: 'nth', type, unit: u, p, top: patNthSvg(row, p), tc: 97 * PAT_EM, th: 20 * PAT_EM, topf: 0.4, big: true, tiles, right: order.indexOf(ans), say: `What will the ${p}th one be?`, ans: word(things[ans]) };
+  }
+  const u = pickOne(PAT2_UNITS), U = ids(u), k = U.length, len = Math.min(10, 2 * k + rnd(2, 3)), row = range(0, len - 1).map(i => U[i % k]);
+  const seen = new Set([u]), pool = [];
+  for (const c of [...range(2, 5).map(n => row.slice(0, n)), [...U, U[k - 1]], [U[0], ...U]]) {
+    const s = c.map(i => 'abcd'[i]).join('');
+    if (c.length >= 2 && c.length <= 5 && c.length !== k && !seen.has(s) && !repeatsAs(row, c)) { seen.add(s); pool.push(c); }
+  }
+  const cands = shuffled([U, ...shuffled(pool).slice(0, 2)]);
+  const tiles = cands.map(c => ({ html: patRowSvg(c.map(i => things[i])), label: c.map(i => 'abcd'[i]).join(''), say: 'this one' }));
+  return { kind: 'tap', form: 'pat', ask: 'unit', type, unit: u, len, top: patSvg(row.map(i => things[i]), -1), tc: len * 12 * PAT_EM, th: 12 * PAT_EM, topf: 0.27, tcls: 'prow', quiet: true, tiles, right: cands.indexOf(U), say: 'Which part repeats?', ans: u };
+}
+// a short row of shapes for a tile (as tall as a Year 1 tile's shape)
+const patRowSvg = row => `<svg ${emBox([-1, -1, row.length * 12, 12], 1.4 / 12)}>${row.map((t, i) => mapThing(t.nm, t.col, i * 12, 0, 10)).join('')}</svg>`;
+// six numbered shapes, three dots, then a dashed box with "?" and the place asked under it
+function patNthSvg(row, p) {
+  const num = (x, t, b) => `<text x="${x}" y="18" text-anchor="middle" font-size="5.5"${b ? ' font-weight="700"' : ''} fill="${INK}">${t}</text>`;
+  let s = row.map((t, i) => mapThing(t.nm, t.col, i * 12, 0, 10) + num(i * 12 + 5, i + 1)).join('');
+  s += [0, 1, 2].map(j => `<circle cx="${73 + j * 3}" cy="5" r=".8" fill="${INK}"/>`).join('');
+  s += `<rect x="84.6" y="0.6" width="8.8" height="8.8" rx="1" fill="none" stroke="${INK}" stroke-width=".6" stroke-dasharray="1.6 1.2"/><text x="89" y="7.2" text-anchor="middle" font-size="6.5" font-weight="700" fill="${INK}">?</text>` + num(89, p, true);
+  return `<svg ${emBox([-1, -1, 97, 20], PAT_EM)}>${s}</svg>`;
 }
 // the row: each shape in a box 10 wide, 2 apart; the gap is a dashed box
 function patSvg(row, gap) {
@@ -3542,9 +3621,9 @@ const ACTS = {
   pat: { // a tap card: the row of shapes with a gap, the three parts as tiles
     name: 'Picture patterns', ages: [5], setup: 'opts', say: 'What is missing? Tap it.',
     pic: `<svg viewBox="0 0 120 84">${mapThing('circle', 'red', 2, 30, 22) + mapThing('square', 'blue', 26, 30, 22) + mapThing('triangle', 'yellow', 50, 30, 22) + mapThing('circle', 'red', 74, 30, 22)}<rect x="99" y="31.5" width="19" height="19" rx="2" fill="none" stroke="${INK}" stroke-width="1.6" stroke-dasharray="3.5 2.5"/></svg>`,
-    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · repeats of three']] }],
+    options: [{ key: 'yr', label: 'Year', values: [[1, '1 · repeats of three'], [2, '2 · which part repeats, the 10th one']] }],
     defaults: () => ({ yr: 1, n: 6 }),
-    make: c => patQ(c.yr),
+    make: c => c.yr === 2 ? pat2Q() : patQ(),
     key: c => `pat~${c.yr}|${c.n}`,
     label: k => { const [y, n] = k.split('|'); return `Picture patterns · Year ${y} · ${n} questions`; },
   },
@@ -3597,13 +3676,13 @@ const ACTS = {
     name: 'Shapes', ages: [5, 8], setup: 'opts', say: 'Count them and write how many.',
     pic: `<svg viewBox="0 0 120 84"><polygon points="8,74 52,74 30,30" fill="${BLOCK.yellow}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><rect x="62" y="34" width="40" height="40" fill="${BLOCK.blue}" stroke="${INK}" stroke-width="3"/></svg>`,
     options: [
-      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares, names'], [2, '2 · up to 6 sides, 3D'], [3, '3 · up to 10 sides, symmetry'], [4, '4 · up to 12 sides, right angles'], [5, '5 · parallel, prisms, nets']] },
-      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)'], ['name', 'Name (Year 1)'], ['moves', 'Moves (Year 4)'], ['nets', 'Nets (Year 5)']] },
+      { key: 'yr', label: 'Year', values: [[1, '1 · triangles, squares, names'], [2, '2 · up to 6 sides, 3D, names'], [3, '3 · up to 10 sides, symmetry'], [4, '4 · up to 12 sides, right angles'], [5, '5 · parallel, prisms, nets']] },
+      { key: 'kinds', label: 'Kind', multi: true, values: [['flat', 'Flat'], ['solid', '3D (Year 2 up)'], ['name', 'Name (Years 1–2)'],['moves', 'Moves (Year 4)'], ['nets', 'Nets (Year 5)']] },
     ],
     defaults: age => ({ yr: age === 5 ? 1 : 3, kinds: age === 5 ? ['flat', 'solid', 'name'] : ['flat', 'solid', 'moves', 'nets'], n: age === 5 ? 6 : 12 }),
     make: c => shapeQ(c.yr, c.kinds),
-    // Moves only changes Year 4, Name only Year 1 and Nets only Year 5, so the other years leave them out of the record key
-    key: c => `shape~${c.yr}|${['flat', 'solid', 'name', 'moves', 'nets'].filter(k => c.kinds.includes(k) && (k !== 'moves' || c.yr === 4) && (k !== 'name' || c.yr === 1) && (k !== 'nets' || c.yr === 5)).join(',') || 'flat'}|${c.n}`,
+    // Moves only changes Year 4, Name only Years 1–2 and Nets only Year 5, so the other years leave them out of the record key
+    key: c => `shape~${c.yr}|${['flat', 'solid', 'name', 'moves', 'nets'].filter(k => c.kinds.includes(k) && (k !== 'moves' || c.yr === 4) && (k !== 'name' || c.yr <= 2) && (k !== 'nets' || c.yr === 5)).join(',') || 'flat'}|${c.n}`,
     label: k => { const [y, kinds, n] = k.split('|'); return `Shapes · Year ${y} · ${kinds.replace('solid', '3D').split(',').join(', ')} · ${n} questions`; },
   },
   ruler: {

@@ -116,7 +116,7 @@ const fakeSpeech = () => {
   await swipe(200, 500);
   ok(await page.evaluate(() => view === 2), 'swipe right: Year 2 page');
   const y2 = await tiles('#actTiles');
-  ok(y2.length === 20 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && !y2.includes('Picture patterns') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
+  ok(y2.length === 21 && y2.includes('Number bonds') && y2.includes('Rounding') && y2.includes('Splat') && y2.includes('Picture patterns') && !y2.includes('Arrays'), 'Year 2 page: younger tiles, Year 2 activities ' + y2.join());
   await swipe(500, 200); await swipe(500, 200); await swipe(500, 200); await swipe(500, 200);
   ok(await page.evaluate(() => view === 5 && $('#yNext').disabled), 'swipe left up to Year 5, and no further');
   await page.evaluate(() => turnPage(4 - view));
@@ -160,7 +160,7 @@ const fakeSpeech = () => {
   }).join(' '));
   ok(sugg === '0:1:5:r:1:1:6 1:1:5:r:1:1:6 2:2:5:r:2:2:6 3:3:8:-:3:3:12 6:5:8:-:5:5:12 8:5:8:-:5:5:12', 'year → page, tiles, read aloud, starting year: ' + sugg);
   await page.click('#yearTiles [data-year="2"]');
-  ok((await tiles('#actTiles')).length === 20 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
+  ok((await tiles('#actTiles')).length === 21 &&(await page.$eval('#title', e => e.textContent)) === 'Everyone · Year 2', 'Year 2: its own page');
   await page.click('#actTiles [data-act="graph"]');
   ok(await page.evaluate(() => draft.yr === 2 && $('.sughint').textContent === 'Your year: Year 2'), 'Year 2: Graphs starts at Year 2 and says so');
   await page.click('#backBtn'); await page.click('#backBtn');
@@ -2076,10 +2076,10 @@ const fakeSpeech = () => {
     if (asked.size !== 7) bad.push('asked ' + [...asked]);
     const qs = range(0, 300).map(() => shapeQ(1, ['flat', 'solid', 'name'])), m = qs.filter(q => q.form === 'name').length;
     if (m < 110 || m > 190) bad.push('name share ' + m);
-    if (!range(0, 50).every(() => shapeQ(1, ['name']).form === 'name' && shapeQ(2, ['flat', 'name']).kind === 'shape' && shapeQ(4, ['name']).kind === 'shape')) bad.push('Name outside Year 1');
+    if (!range(0, 50).every(() => shapeQ(1, ['name']).form === 'name' && shapeQ(3, ['flat', 'name']).kind === 'shape' && shapeQ(4, ['name']).kind === 'shape')) bad.push('Name outside Years 1–2');
     return bad.slice(0, 4);
   });
-  ok(n1.length === 0, 'Shapes Name Year 1: "Tap the triangle", four tiles in different colours and sizes, no square when asked for a rectangle, solids with a flat look-alike; tiles say "this one"; Name only in Year 1 ' + n1.join(' | '));
+  ok(n1.length === 0, 'Shapes Name Year 1: "Tap the triangle", four tiles in different colours and sizes, no square when asked for a rectangle, solids with a flat look-alike; tiles say "this one"; Name only in Years 1–2 ' + n1.join(' | '));
   await page.evaluate(() => { setYear(1); hideDone(); act = 'pat'; buildSheet({ yr: 1, n: 6 }); show('sheet'); });
   ok(await page.evaluate(() => cards.every(c => c.q.kind === 'tap' && c.el.querySelectorAll('.tt svg').length === 3 && c.el.querySelector('.tq rect[stroke-dasharray]'))), 'Picture patterns sheet: the row with its gap, three picture tiles');
   ok((await fits()).length === 0, 'Picture patterns fits ' + (await fits()).join(' '));
@@ -2098,9 +2098,90 @@ const fakeSpeech = () => {
   ok((await said()).slice(-1)[0] === 'this one', 'a tapped shape says "this one", not its name');
   ok((await writeAllAndMark()).length === 0, 'Shapes Name and written shapes on one sheet: all marked right');
   await page.evaluate(() => { setYear(4); hideDone(); });
-  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 1, kinds: ['flat', 'solid', 'name'], n: 6 }), ACTS.shape.key({ yr: 2, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.defaults(5).kinds.join(), ACTS.pat.defaults(5).yr, labelFor('shape~1|flat,solid,name|6'), labelFor('pat~1|6')].join(' / '))
-    === 'shape~1|flat,solid,name|6 / shape~2|flat|6 / flat,solid,name / 1 / Shapes · Year 1 · flat, 3D, name · 6 questions / Picture patterns · Year 1 · 6 questions',
-    'Shapes keys: Name only in Year 1 keys; younger default has Name; Picture patterns key and label');
+  ok(await page.evaluate(() => [ACTS.shape.key({ yr: 1, kinds: ['flat', 'solid', 'name'], n: 6 }), ACTS.shape.key({ yr: 2, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.key({ yr: 3, kinds: ['flat', 'name'], n: 6 }), ACTS.shape.defaults(5).kinds.join(), ACTS.pat.defaults(5).yr, labelFor('shape~1|flat,solid,name|6'), labelFor('pat~1|6')].join(' / '))
+    === 'shape~1|flat,solid,name|6 / shape~2|flat,name|6 / shape~3|flat|6 / flat,solid,name / 1 / Shapes · Year 1 · flat, 3D, name · 6 questions / Picture patterns · Year 1 · 6 questions',
+    'Shapes keys: Name only in Years 1–2 keys; younger default has Name; Picture patterns key and label');
+
+  // ---- D2a: Year 2 on Picture patterns (which part repeats, the 10th one) and Shapes Name
+  const p2 = await page.evaluate(() => {
+    const bad = [], asks = {}, units = new Set(), ps = new Set();
+    for (let i = 0; i < 800; i++) {
+      const q = pat2Q(), d = new DOMParser().parseFromString(`<div>${q.top}</div>`, 'text/html');
+      asks[q.ask] = (asks[q.ask] || 0) + 1; units.add(q.unit);
+      const labels = q.tiles.map(t => t.label);
+      if (q.kind !== 'tap' || new Set(labels).size !== labels.length || labels[q.right] !== q.ans) bad.push('tiles ' + labels + ' ans ' + q.ans);
+      if (q.ask === 'unit') {
+        // the row repeats the unit; exactly one tile repeats too, and it is the unit
+        const row = range(0, q.len - 1).map(j => q.unit[j % q.unit.length]).join('');
+        const rep = labels.filter(l => row.split('').every((ch, j) => ch === l[j % l.length]));
+        if (q.tiles.length !== 3 || rep.length !== 1 || rep[0] !== q.unit || q.ans !== q.unit) bad.push('unit ' + q.unit + ': ' + labels);
+        if (q.len < 2 * q.unit.length + 1 || q.len > 10) bad.push('row ' + q.len + ' for ' + q.unit);
+        const shapes = d.querySelectorAll('svg > circle, svg > polygon, svg > rect').length;
+        if (shapes !== q.len || d.querySelector('[stroke-dasharray]')) bad.push('picture ' + shapes);
+        if (q.tiles.some((t, j) => t.say !== 'this one' || (t.html.match(/<(circle|polygon|rect)/g) || []).length !== labels[j].length)) bad.push('tile pictures ' + labels);
+        if (!q.quiet || cardSay(q) !== 'Which part repeats?') bad.push('say ' + cardSay(q));
+      } else {
+        ps.add(q.p);
+        if (q.p < 8 || q.p > 12 || q.tiles.length !== new Set(q.unit).size) bad.push('nth ' + q.p + ' ' + q.unit + ' ' + labels);
+        const want = q.unit[(q.p - 1) % q.unit.length], texts = [...d.querySelectorAll('text')].map(t => t.textContent).join();
+        if (texts !== `1,2,3,4,5,6,?,${q.p}`) bad.push('numbers ' + texts);
+        if (q.say !== `What will the ${q.p}th one be?` || q.tiles.some(t => t.say !== t.label)) bad.push('say ' + q.say);
+        // the answer tile is the shape in place p (unit letters map to the things in order of first use)
+        const first = [...new Set(q.unit)];
+        if (q.tiles[q.right].label !== q.ans || first.indexOf(want) < 0) bad.push('answer ' + q.ans);
+      }
+    }
+    if (asks.unit < 320 || asks.nth < 320) bad.push('asks ' + JSON.stringify(asks));
+    if (units.size < 9 || ps.size !== 5) bad.push('variety ' + [...units] + ' ' + [...ps]);
+    return bad.slice(0, 4);
+  });
+  ok(p2.length === 0, 'Picture patterns Year 2: which part repeats (one tile repeats, the others are too short or too long) and the 8th to 12th one ' + p2.join(' | '));
+  // the Nth answer really is the shape in that place: rebuild the row from the picture's six shapes
+  ok(await page.evaluate(() => range(0, 300).every(() => {
+    const q = pat2Q(); if (q.ask !== 'nth') return true;
+    const d = new DOMParser().parseFromString(`<div>${q.top}</div>`, 'text/html');
+    const six = [...d.querySelectorAll('svg > circle, svg > polygon, svg > rect:not([stroke-dasharray])')].map(e => e.tagName + e.getAttribute('fill') + (e.getAttribute('points') || '').split(' ').length);
+    const k = q.unit.length, t = q.tiles[q.right].html, d2 = new DOMParser().parseFromString(t, 'text/html').querySelector('svg > *');
+    const tile = d2.tagName + d2.getAttribute('fill') + (d2.getAttribute('points') || '').split(' ').length;
+    return six[(q.p - 1) % k].toLowerCase() === tile.toLowerCase();
+  })), 'Picture patterns Year 2: the right tile is the shape in the asked place');
+  const n2 = await page.evaluate(() => {
+    const bad = [], asked = {};
+    for (let i = 0; i < 1000; i++) {
+      const q = name2Q(), labels = q.tiles.map(t => t.label);
+      asked[q.nm] = (asked[q.nm] || 0) + 1;
+      if (q.tiles.length !== 4 || new Set(labels).size !== 4 || labels[q.right] !== q.nm || q.ans !== q.nm) bad.push('tiles ' + q.nm + ': ' + labels);
+      if ((q.nm === 'rectangle' && labels.includes('square')) || (q.nm === 'cuboid' && labels.includes('cube'))) bad.push('also right ' + labels);
+      if (!labels.includes(NAME_NEAR[q.nm])) bad.push('no near one ' + q.nm + ': ' + labels);
+      if (NAME_SOLID2.includes(q.nm) && labels.filter(l => NAME_SOLID2.includes(l)).length !== 3) bad.push('solids ' + labels);
+      if (!NAME_SOLID2.includes(q.nm) && labels.some(l => NAME_SOLID2.includes(l))) bad.push('a solid among flats ' + labels);
+      if (q.say !== `Tap the ${q.nm}.` || !q.quiet || q.tiles.some(t => t.say !== 'this one')) bad.push('say ' + q.say);
+      // every picture stays inside its box (polygons)
+      for (const t of q.tiles) for (const m of t.html.matchAll(/points="([^"]+)"/g)) if (m[1].split(' ').some(p => p.split(',').some(v => Math.abs(+v) > 46))) bad.push('outside ' + t.label);
+    }
+    const newShare = NAME_NEW2.reduce((s, x) => s + (asked[x] || 0), 0);
+    if (Object.keys(asked).length !== 14 || newShare < 680 || newShare > 820) bad.push('asked ' + JSON.stringify(asked));
+    const qs = range(0, 300).map(() => shapeQ(2, ['flat', 'solid', 'name'])), m = qs.filter(q => q.form === 'name').length;
+    if (m < 70 || m > 130) bad.push('name share ' + m);
+    if (!range(0, 50).every(() => shapeQ(2, ['name']).form === 'name' && NAME_FLAT2.concat(NAME_SOLID2).includes(shapeQ(2, ['name']).nm))) bad.push('Name alone in Year 2');
+    return bad.slice(0, 4);
+  });
+  ok(n2.length === 0, 'Shapes Name Year 2: oval, semicircle, pentagon, hexagon, cuboid, pyramid, cone mostly; a near one on every card; no square for a rectangle or cube for a cuboid ' + n2.join(' | '));
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { setYear(2); hideDone(); act = 'pat'; buildSheet({ yr: 2, n }); show('sheet'); }, n);
+    ok((await fits()).length === 0, `Picture patterns Year 2 (${n}) fits ` + (await fits()).join(' '));
+    ok(await page.evaluate(() => cards.every(c => [...c.el.querySelectorAll('.tt')].every(b => { const r = b.getBoundingClientRect(), k = c.el.getBoundingClientRect(); return r.height >= 30 && r.left >= k.left - 1 && r.right <= k.right + 1 && r.bottom <= k.bottom + 1; }))), `Picture patterns Year 2 (${n}): tiles big enough and inside the card`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/49-pat2-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `pat~2|${n}`, n), `Picture patterns Year 2 (${n}): tapped right, finished, record pat~2|${n}`);
+  }
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { hideDone(); act = 'shape'; buildSheet({ yr: 2, kinds: ['flat', 'solid', 'name'], n }); show('sheet'); cards.forEach((c, i) => { if (i % 2 === 0) { c.q = name2Q(); layout(c); sizeCanvas(c); } }); }, n);
+    ok((await fits()).length === 0, `Shapes Name Year 2 (${n}) fits beside written shapes ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/49-shape-name2-${n}.png` });
+    ok((await writeAllAndMark()).length === 0, `Shapes Name Year 2 (${n}) and written shapes: all marked right`);
+  }
+  ok(await page.evaluate(() => labelFor('pat~2|6')) === 'Picture patterns · Year 2 · 6 questions', 'Picture patterns Year 2 label');
+  await page.evaluate(() => { setYear(4); hideDone(); });
 
   // ---- B4: Splat, Halves and quarters, Money Which coin?, Rulers Which is longer? (Year 1)
   const sp = await page.evaluate(() => {
