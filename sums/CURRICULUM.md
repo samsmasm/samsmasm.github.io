@@ -175,7 +175,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 - Recognise, continue and make growing number patterns (a rule that adds or takes away each time). ✓ partly (Number patterns, Year 3: continue, not make)
 
 ### Measurement
-- Estimate and measure in cm and m, g and kg, mL and L; compare and order by those units. ✓ partly (Rulers, Year 3: cm, not from 0)
+- Estimate and measure in cm and m, g and kg, mL and L; compare and order by those units. ✓ partly (Rulers, Year 3: cm, not from 0; Scales in kg and Jug in L with marks between the numbers, reading only; E2a)
 - Perimeter of polygons. ✓ (Area: Perimeter)
 - Area of rectangles by counting equal squares. ✓ (Area: Count squares)
 - Full, half, quarter and three-quarter turns, clockwise and anticlockwise.
@@ -192,7 +192,7 @@ Year 1 starts with a "first six months" stage (Year 0); those skills are marked 
 ### Statistics
 - Collect and sort category data ✋; collect counts (teeth lost, shoe sizes) ✋.
 - Make dot plots and bar graphs.
-- Describe them and answer questions, including ones that need sums (how many teeth did the class lose altogether?). ✓ (Graphs, Year 3: bar graphs, how many more, altogether)
+- Describe them and answer questions, including ones that need sums (how many teeth did the class lose altogether?). ✓ (Graphs, Year 3: bar graphs, how many more, altogether, and tap the colour with the most or least; E2a)
 
 ---
 

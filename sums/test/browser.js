@@ -1091,9 +1091,9 @@ const fakeSpeech = () => {
         asks.add(q.ask);
         continue;
       }
-      if (q.kind === 'tap') { // Years 1 and 2: tap the colour with the most or the least
+      if (q.kind === 'tap') { // Years 1 to 3: tap the colour with the most or the least (Year 3 on bar graphs, E2a)
         const ns = q.cats.map(c => c.n), want = q.ask === 'most' ? Math.max(...ns) : Math.min(...ns), nc = yr === 1 ? 3 : 4;
-        if (yr > 2 || q.form !== 'graph' || q.cats.length !== nc || new Set(ns).size !== nc || q.tiles.length !== nc || q.cats[q.right].n !== want || q.tiles[q.right].label !== q.cats[q.right].nm || !q.tiles.every((t, j) => t.say === q.cats[j].nm)) bad.push(`y${yr} tap ` + JSON.stringify(q));
+        if ((yr === 3 && q.type !== 'bar') || q.form !== 'graph' || q.cats.length !== nc || new Set(ns).size !== nc || q.tiles.length !== nc || q.cats[q.right].n !== want || q.tiles[q.right].label !== q.cats[q.right].nm || !q.tiles.every((t, j) => t.say === q.cats[j].nm)) bad.push(`y${yr} tap ` + JSON.stringify(q));
         if (yr === 1 && q.type !== 'col') bad.push('y1 tap type ' + q.type);
         asks.add(`y${yr} ${q.ask}`);
         continue;
@@ -1113,7 +1113,7 @@ const fakeSpeech = () => {
         if (bars.some((h, j) => Math.abs(h - ns[j] * 60 / (6 * q.step)) > 0.01)) bad.push('bars ' + JSON.stringify(q));
       }
     }
-    if ([...asks].sort().join() !== 'all,max,min,mode,one,range,y1 least,y1 most,y1 one,y2 cdot,y2 least,y2 most') bad.push('questions seen: ' + [...asks].sort().join());
+    if ([...asks].sort().join() !== 'all,max,min,mode,one,range,y1 least,y1 most,y1 one,y2 cdot,y2 least,y2 most,y3 least,y3 most') bad.push('questions seen: ' + [...asks].sort().join());
     return bad.slice(0, 4);
   });
   ok(gq.length === 0, 'Graphs: answers match the counts and the drawing (dots, tally marks, bars on the scale); Year 1 picture graphs, Year 3 bar graphs; Year 4 dot plots ask how many, most common, altogether, most, fewest and spread, and the tallest stack is never at the biggest value ' + gq.join(' | '));
@@ -2292,7 +2292,7 @@ const fakeSpeech = () => {
       }
     }
     if (Math.min(...Object.values(seen)) < 230 || steps.size !== 3) bad.push('mix ' + JSON.stringify(seen) + [...steps]);
-    for (const yr of [1, 3, 4]) if (range(0, 60).some(() => { const q = rulerQ(yr, ['scales', 'jug']); return q.dial || q.jug; })) bad.push('scales or jug in Year ' + yr);
+    for (const yr of [1, 4]) if (range(0, 60).some(() => { const q = rulerQ(yr, ['scales', 'jug']); return q.dial || q.jug; })) bad.push('scales or jug in Year ' + yr);
     if (!range(0, 60).every(() => rulerQ(2, ['scales']).dial && rulerQ(2, ['jug']).jug)) bad.push('one kind alone');
     if (range(0, 200).some(() => rulerQ(4, ['pencil', 'scales', 'jug', 'thermo']).dial) || range(0, 400).filter(() => rulerQ(4, ['pencil', 'scales', 'jug', 'thermo']).thermo).length < 140) bad.push('Year 4 thermometer share changed');
     return bad.slice(0, 4);
@@ -2306,7 +2306,67 @@ const fakeSpeech = () => {
     ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `ruler~2|pencil,scales,jug|${n}`, n), `Rulers Year 2 Scales and Jug (${n}): read and marked right, record ruler~2|pencil,scales,jug|${n}`);
   }
   ok(await page.evaluate(() => [ACTS.ruler.key({ yr: 2, kinds: ['pencil'], n: 6 }), ACTS.ruler.key({ yr: 2, kinds: ['scales', 'jug', 'thermo'], n: 12 }), ACTS.ruler.key({ yr: 3, kinds: ['pencil', 'scales'], n: 12 }), ACTS.ruler.key({ yr: 4, kinds: ['pencil', 'jug', 'thermo'], n: 12 }), ACTS.ruler.defaults(8).kinds.join(), labelFor('ruler~2|pencil,scales,jug|6'), labelFor('ruler~2|6')].join(' / '))
-    === 'ruler~2|6 / ruler~2|scales,jug|12 / ruler~3|12 / ruler~4|pencil,thermo|12 / pencil,scales,jug,thermo / Rulers · Year 2 · pencil, scales, jug · 6 questions / Rulers · Year 2 · 6 questions', 'D2c record keys and labels (Pencil alone keeps the old Year 2 key)');
+    === 'ruler~2|6 / ruler~2|scales,jug|12 / ruler~3|pencil,scales|12 / ruler~4|pencil,thermo|12 / pencil,scales,jug,thermo / Rulers · Year 2 · pencil, scales, jug · 6 questions / Rulers · Year 2 · 6 questions', 'D2c record keys and labels (Pencil alone keeps the old Year 2 key)');
+
+  // ---- E2a: Rulers Year 3 Scales (kg) and Jug (L) with marks between the numbers; Graphs Year 3 tap most / least on bar graphs
+  const e2a = await page.evaluate(() => {
+    const bad = [], seen = { pencil: 0, dial: 0, jug: 0, between: 0, onnum: 0 }, sets = new Set();
+    const dom = h => new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html');
+    for (let i = 0; i < 900; i++) {
+      const q = rulerQ(3, ['pencil', 'scales', 'jug']);
+      seen[q.dial ? 'dial' : q.jug ? 'jug' : 'pencil']++;
+      if (!q.dial && !q.jug) continue;
+      sets.add((q.dial ? 's' : 'j') + [q.num, q.step, q.max]);
+      seen[q.v % q.num ? 'between' : 'onnum']++;
+      if (q.yr !== 3 || q.ans !== q.v || q.v % q.step || q.v <= 0 || q.v >= q.max || q.max % q.num || q.num % q.step || cardSay(q) !== q.say) bad.push('q ' + JSON.stringify(q));
+      const d = dom(rulerSvg(q)), t = [...d.querySelectorAll('text')].map(x => x.textContent), nums = range(0, q.max / q.num).map(j => j * q.num);
+      if (q.dial) {
+        if (q.unit !== 'kg' || q.cap !== 'How heavy?' || q.say !== 'How heavy is it, in kilograms?') bad.push('dial words ' + q.say);
+        if (t.join() !== [...nums, 'kg'].join()) bad.push('dial numbers ' + t);
+        if (d.querySelectorAll(`line[stroke="${INK}"]`).length !== q.max / q.step + 2) bad.push('dial marks ' + JSON.stringify(q)); // every mark from 0 to the top, and the parcel's string
+        const p = d.querySelector(`line[stroke="${BLOCK.red}"]`), a = (Math.atan2(+p.getAttribute('x2'), -p.getAttribute('y2')) * 180 / Math.PI + 360) % 360;
+        if (Math.abs(a - q.v / q.max * 300) > 0.5) bad.push(`pointer ${a} for ${q.v}/${q.max}`);
+      } else {
+        if (q.unit !== 'L' || q.cap !== 'How much?' || q.say !== 'How much water is in the jug, in litres?') bad.push('jug words ' + q.say);
+        if (t.join() !== nums.slice(1).join()) bad.push('jug numbers ' + t);
+        const marks = [...d.querySelectorAll(`line[x1="-24"][stroke="${INK}"]`)], w = d.querySelector(`line[stroke="${BLOCK.blue}"]`);
+        if (marks.length !== q.max / q.step) bad.push('jug marks ' + marks.length);
+        if (!marks.some(m => Math.abs(+m.getAttribute('y1') - +w.getAttribute('y1')) < 0.01)) bad.push('water not on a mark for ' + q.v);
+      }
+    }
+    if (Math.min(seen.pencil, seen.dial, seen.jug) < 230 || seen.between < 2 * seen.onnum || seen.onnum < 60 || sets.size !== 5) bad.push('mix ' + JSON.stringify(seen) + [...sets]);
+    if (!range(0, 40).every(() => rulerQ(3, ['scales']).dial && rulerQ(3, ['jug']).jug) || range(0, 40).some(() => rulerQ(2, ['scales']).unit !== 'g')) bad.push('one kind alone, or Year 2 changed');
+    let taps = 0;
+    for (let i = 0; i < 500; i++) {
+      const q = graphQ(3);
+      if (q.kind !== 'tap') continue;
+      taps++;
+      const ns = q.cats.map(c => c.n), want = (q.ask === 'most' ? Math.max : Math.min)(...ns);
+      if (q.type !== 'bar' || q.cats.length !== 4 || new Set(ns).size !== 4 || ns[q.right] !== want || q.tiles.length !== 4 || q.ans !== q.cats[q.right].nm || q.say !== `Which has the ${q.ask}?` || !/<rect/.test(q.top) || ns.some(n => n % q.step)) bad.push('graph tap ' + JSON.stringify(q).slice(0, 200));
+    }
+    if (taps < 140 || taps > 260) bad.push('graph taps ' + taps + ' of 500');
+    return bad.slice(0, 5);
+  });
+  ok(e2a.length === 0, 'Year 3: Rulers Scales (kg) and Jug (L), marks between the numbers, reading on a mark, 3 in 4 between numbers; Graphs tap most / least on bar graphs ' + e2a.join(' | '));
+  ok(await page.evaluate(() => [ACTS.ruler.key({ yr: 3, kinds: ['pencil', 'scales', 'jug'], n: 12 }), ACTS.ruler.key({ yr: 3, kinds: ['pencil', 'thermo'], n: 6 }), ACTS.ruler.key({ yr: 3, kinds: ['jug'], n: 6 }), labelFor('ruler~3|pencil,scales,jug|12'), labelFor('ruler~3|12')].join(' / '))
+    === 'ruler~3|pencil,scales,jug|12 / ruler~3|6 / ruler~3|jug|6 / Rulers · Year 3 · pencil, scales, jug · 12 questions / Rulers · Year 3 · 12 questions', 'E2a Rulers Year 3 record keys and labels (Pencil alone keeps ruler~3|n)');
+  for (const n of [6, 12]) {
+    await page.evaluate(n => { setYear(3); hideDone(); act = 'ruler'; buildSheet({ yr: 3, kinds: ['pencil', 'scales', 'jug'], n }); show('sheet'); [scales3Q(), jug3Q(), scales3Q(), jug3Q()].forEach((q, i) => { cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); }); }, n);
+    ok((await fits()).length === 0, `Rulers Year 3 Scales and Jug (${n}) fit with room to write ` + (await fits()).join(' '));
+    ok(await page.evaluate(() => cards.filter(c => c.q.jug).every(c => c.el.querySelector('.side .u').textContent === 'L') && cards.filter(c => c.q.dial).every(c => c.el.querySelector('.side .u').textContent === 'kg')), `Rulers Year 3 (${n}): the answer beside the jug in L and beside the scales in kg`);
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/31-scales-jug-y3-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `ruler~3|pencil,scales,jug|${n}`, n), `Rulers Year 3 Scales and Jug (${n}): read and marked right, record ruler~3|pencil,scales,jug|${n}`);
+  }
+  for (const n of [6, 12]) {
+    await page.evaluate(n => {
+      hideDone(); act = 'graph'; buildSheet({ yr: 3, n }); show('sheet');
+      for (let i = 0; i < 4; i++) { let q; do q = graphQ(3); while ((q.kind === 'tap') !== (i % 2 === 0)); cards[i].q = q; layout(cards[i]); sizeCanvas(cards[i]); }
+    }, n);
+    ok(await page.evaluate(() => cards.filter(c => c.q.kind === 'tap').length >= 2 && cards.filter(c => c.q.kind === 'tap').every(c => c.el.querySelectorAll('.tt .tsw').length === 4)), `Graphs Year 3 (${n}): tap cards with four colour squares under a bar graph`);
+    ok((await fits()).length === 0, `Graphs Year 3 (${n}) with tap cards fits ` + (await fits()).join(' '));
+    if (SHOTS) await page.screenshot({ path: SHOTS + `/47-graph-y3-${n}.png` });
+    ok((await writeAllAndMark()).length === 0 && await page.evaluate(n => sheetDone && loadRec(current).history[0].k === `graph~3|${n}`, n), `Graphs Year 3 (${n}): written and tapped answers marked right, record graph~3|${n}`);
+  }
   await page.evaluate(() => { setYear(4); hideDone(); });
 
   // ---- B4: Splat, Halves and quarters, Money Which coin?, Rulers Which is longer? (Year 1)
@@ -3538,7 +3598,8 @@ const fakeSpeech = () => {
       ['tf', { yr: 3, n: 12 }], ['cmp', { yr: 3, kinds: ['num', 'sum'], n: 12 }], ['bal', { yr: 3, n: 12 }], ['round', { yr: 3, kinds: ['line', 'num'], n: 12 }],
       ['splat', { yr: 3, n: 12 }], ['bonds', { max: 100, n: 12 }], ['addsub', { yr: 3, ops: ['+', '-'], n: 12 }],
       ['cmp', { yr: 3, kinds: ['frac'], n: 12 }], ['frac', { kinds: ['add1'], parts: [2, 3, 4, 6, 8, 10, 12], n: 12 }], ['fof', { yr: 3, kinds: ['part', 'whole'], n: 12 }],
-      ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }]]) {
+      ['money', { yr: 3, kinds: ['make'], n: 12 }], ['clock', { yr: 3, kinds: ['match'], n: 12 }], ['clock', { yr: 3, kinds: ['ampm'], n: 12 }],
+      ['ruler', { yr: 3, kinds: ['scales'], n: 12 }], ['ruler', { yr: 3, kinds: ['jug'], n: 12 }], ['graph', { yr: 3, n: 12 }]]) {
       await page.evaluate((a, c) => { act = a; buildSheet(c); show('sheet'); }, a, c);
       const bad = await fits();
       ok(bad.length === 0, `${name}: ${a} (Year 4 additions) fits ` + bad.join(' '));
